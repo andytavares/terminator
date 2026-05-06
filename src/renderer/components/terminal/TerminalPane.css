@@ -1,0 +1,29 @@
+.terminal-pane {
+  flex: 1;
+  overflow: hidden;
+  background: #0C0C0F;
+  position: relative;
+}
+
+.terminal-pane--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.terminal-pane__container {
+  width: 100%;
+  height: 100%;
+  padding: 6px;
+}
+
+.terminal-pane__container .xterm {
+  height: 100%;
+}
+
+.terminal-pane__container .xterm-viewport {
+  border-radius: 0;
+}

@@ -1,0 +1,117 @@
+/* ── Tab Bar ─────────────────────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  height: 36px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-shrink: 0;
+}
+
+.tab-bar::-webkit-scrollbar { height: 0; }
+
+/* ── Individual tab ──────────────────────────────────────────── */
+.tab-bar__tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  min-width: 110px;
+  max-width: 200px;
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background 0.1s, color 0.1s;
+  position: relative;
+}
+
+.tab-bar__tab:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.tab-bar__tab--active {
+  background: var(--bg-base);
+  color: var(--text-primary);
+}
+
+/* top accent line on active tab */
+.tab-bar__tab--active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--ws-color, var(--accent));
+}
+
+.tab-bar__title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Agent badge ─────────────────────────────────────────────── */
+.tab-bar__badge--agent {
+  font-size: 8px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  background: rgba(139, 92, 246, 0.25);
+  color: var(--agent-clr);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  flex-shrink: 0;
+}
+
+/* ── Close button ────────────────────────────────────────────── */
+.tab-bar__close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+}
+
+.tab-bar__tab:hover .tab-bar__close,
+.tab-bar__tab--active .tab-bar__close {
+  opacity: 0.5;
+}
+
+.tab-bar__close:hover {
+  opacity: 1 !important;
+  background: var(--bg-card-hover);
+  color: var(--danger);
+}
+
+/* ── New tab button ──────────────────────────────────────────── */
+.tab-bar__new-tab {
+  background: none;
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 18px;
+  padding: 0 12px;
+  height: 100%;
+  line-height: 1;
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+
+.tab-bar__new-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}

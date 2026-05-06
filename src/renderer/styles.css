@@ -1,0 +1,94 @@
+/* ── Tokens ──────────────────────────────────────────────────── */
+:root {
+  --font-mono: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+
+  /* surfaces */
+  --bg-base:     #0C0C0F;
+  --bg-surface:  #111116;
+  --bg-elevated: #18181F;
+  --bg-card:     #1C1C25;
+  --bg-card-hover: #22222E;
+  --bg-input:    #16161C;
+
+  /* text */
+  --text-primary:   #E2E2EE;
+  --text-secondary: #7070A0;
+  --text-muted:     #3A3A5A;
+
+  /* borders */
+  --border:         rgba(255,255,255,0.06);
+  --border-strong:  rgba(255,255,255,0.12);
+
+  /* accent — overridden per-workspace via inline style vars */
+  --accent:         #5C6BC0;
+  --accent-dim:     rgba(92, 107, 192, 0.18);
+  --accent-glow:    rgba(92, 107, 192, 0.35);
+
+  /* semantic */
+  --danger:    #E05C5C;
+  --agent-clr: #8B5CF6;
+
+  /* spacing */
+  --rail-w:     72px;
+  --panel-w:   248px;
+  --radius-sm:   6px;
+  --radius-md:  10px;
+  --radius-lg:  16px;
+}
+
+/* ── Reset ───────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #app {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; cursor: pointer; }
+
+/* ── Layout ──────────────────────────────────────────────────── */
+.app-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-base);
+  min-width: 0;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  user-select: none;
+}
+
+.empty-state__icon {
+  font-size: 32px;
+  opacity: 0.3;
+}
+
+/* ── Scrollbars ──────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
