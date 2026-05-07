@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react'
 import type { Project } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
+import { useSessionStore } from '../../stores/session.store'
+import { AlertBadge } from '../AlertBadge'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { BranchSwitcher } from './BranchSwitcher'
 import './ProjectsPanel.css'
@@ -140,7 +142,9 @@ function ProjectCard({
   const [renameError, setRenameError] = useState('')
   const renameRef = useRef<HTMLInputElement>(null)
   const { activeProjectId, setActiveProject, deleteProject, renameProject } = useWorkspaceStore()
+  const { getBellCountForProject } = useSessionStore()
   const isActive = activeProjectId === project.id
+  const bellCount = getBellCountForProject(project.id)
 
   function handleClick(): void {
     if (!renaming) setActiveProject(project.id)
@@ -193,6 +197,7 @@ function ProjectCard({
         onClick={handleClick}
         onContextMenu={handleContextMenu}
       >
+        <AlertBadge count={bellCount} className="alert-badge--corner" />
         <span className="proj-card__drag-handle" title="Drag to reorder">⠿</span>
 
         <div className="proj-card__body">

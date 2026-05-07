@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useSessionStore } from '../../stores/session.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
+import { AlertBadge } from '../AlertBadge'
 import { NewTabDialog } from './NewTabDialog'
 import './TabBar.css'
 
@@ -10,7 +11,7 @@ interface Props {
 
 export function TabBar({ projectId }: Props): JSX.Element {
   const [newTabOpen, setNewTabOpen] = useState(false)
-  const { getSessionsForProject, closeSession, setActiveSessionForProject, getActiveSessionForProject } =
+  const { getSessionsForProject, closeSession, setActiveSessionForProject, getActiveSessionForProject, getBellCountForSession } =
     useSessionStore()
   const { workspaces, activeWorkspaceId } = useWorkspaceStore()
   const sessions = getSessionsForProject(projectId)
@@ -36,6 +37,9 @@ export function TabBar({ projectId }: Props): JSX.Element {
           <span className="tab-bar__title">{session.tabTitle}</span>
           {session.type === 'agent' && (
             <span className="tab-bar__badge tab-bar__badge--agent">agent</span>
+          )}
+          {session.id !== activeSessionId && (
+            <AlertBadge count={getBellCountForSession(session.id)} className="alert-badge--tab" />
           )}
           <button
             className="tab-bar__close"

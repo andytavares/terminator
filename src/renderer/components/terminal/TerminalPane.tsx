@@ -10,11 +10,15 @@ interface Props {
 export function TerminalPane({ projectId }: Props): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const prevSessionIdRef = useRef<string | null>(null)
-  const { getSessionsForProject, getActiveSessionForProject, getTerminalInstance } =
+  const { getSessionsForProject, getActiveSessionForProject, getTerminalInstance, clearBellCount } =
     useSessionStore()
 
   const activeSessionId = getActiveSessionForProject(projectId)
   const sessions = getSessionsForProject(projectId)
+
+  useEffect(() => {
+    if (activeSessionId) clearBellCount(activeSessionId)
+  }, [activeSessionId])
 
   useEffect(() => {
     const prevId = prevSessionIdRef.current
@@ -42,8 +46,15 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     )
   }
 
+  function handleClick(): void {
+    if (activeSessionId) {
+      const instance = getTerminalInstance(activeSessionId) as TerminalInstance | undefined
+      instance?.terminal.focus()
+    }
+  }
+
   return (
-    <div className="terminal-pane">
+    <div className="terminal-pane" onClick={handleClick}>
       <div ref={containerRef} className="terminal-pane__container" />
     </div>
   )

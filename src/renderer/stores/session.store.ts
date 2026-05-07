@@ -5,6 +5,7 @@ interface SessionState {
   sessions: Map<string, TerminalSession>
   terminalInstances: Map<string, unknown>
   activeSessionIdByProject: Map<string, string>
+  bellCounts: Map<string, number>
 
   createSession: (
     projectId: string,
@@ -20,12 +21,17 @@ interface SessionState {
   setActiveSessionForProject: (projectId: string, sessionId: string) => void
   getActiveSessionForProject: (projectId: string) => string | null
   handleProcessExit: (sessionId: string, exitCode: number) => void
+  incrementBellCount: (sessionId: string) => void
+  clearBellCount: (sessionId: string) => void
+  getBellCountForSession: (sessionId: string) => number
+  getBellCountForProject: (projectId: string) => number
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
   sessions: new Map(),
   terminalInstances: new Map(),
   activeSessionIdByProject: new Map(),
+  bellCounts: new Map(),
 
   createSession: async (projectId, type, title, cwd, scrollbackLimit) => {
     const result = await window.electronAPI.terminal.create({
@@ -68,6 +74,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       sessions.delete(sessionId)
       const terminalInstances = new Map(s.terminalInstances)
       terminalInstances.delete(sessionId)
+      const bellCounts = new Map(s.bellCounts)
+      bellCounts.delete(sessionId)
       const activeMap = new Map(s.activeSessionIdByProject)
       if (session) {
         if (activeMap.get(session.projectId) === sessionId) {
@@ -78,7 +86,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           else activeMap.delete(session.projectId)
         }
       }
-      return { sessions, terminalInstances, activeSessionIdByProject: activeMap }
+      return { sessions, terminalInstances, activeSessionIdByProject: activeMap, bellCounts }
     })
   },
 
@@ -106,11 +114,40 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           sessions.set(id, { ...session, status: id === sessionId ? 'active' : 'backgrounded' })
         }
       }
-      return { activeSessionIdByProject: map, sessions }
+      const bellCounts = new Map(s.bellCounts)
+      bellCounts.delete(sessionId)
+      return { activeSessionIdByProject: map, sessions, bellCounts }
     })
   },
 
   getActiveSessionForProject: (projectId) => get().activeSessionIdByProject.get(projectId) ?? null,
+
+  incrementBellCount: (sessionId) => {
+    set((s) => {
+      const bellCounts = new Map(s.bellCounts)
+      bellCounts.set(sessionId, (bellCounts.get(sessionId) ?? 0) + 1)
+      return { bellCounts }
+    })
+  },
+
+  clearBellCount: (sessionId) => {
+    set((s) => {
+      if (!s.bellCounts.has(sessionId)) return s
+      const bellCounts = new Map(s.bellCounts)
+      bellCounts.delete(sessionId)
+      return { bellCounts }
+    })
+  },
+
+  getBellCountForSession: (sessionId) => get().bellCounts.get(sessionId) ?? 0,
+
+  getBellCountForProject: (projectId) => {
+    const { sessions, bellCounts } = get()
+    let total = 0
+    for (const [id, session] of sessions)
+      if (session.projectId === projectId) total += bellCounts.get(id) ?? 0
+    return total
+  },
 
   handleProcessExit: (sessionId, _exitCode) => {
     set((s) => {

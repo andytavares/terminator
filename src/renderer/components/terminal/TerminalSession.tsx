@@ -12,7 +12,7 @@ export class TerminalInstance {
   // The root element xterm renders into — created on first mount(), moved between containers.
   readonly element: HTMLDivElement
 
-  constructor(sessionId: string, scrollbackLimit: number) {
+  constructor(sessionId: string, scrollbackLimit: number, onBell?: () => void) {
     this.terminal = new Terminal({
       scrollback: scrollbackLimit,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
@@ -33,6 +33,14 @@ export class TerminalInstance {
       window.electronAPI.terminal.input(sessionId, data)
     })
 
+    this.terminal.onResize(({ cols, rows }) => {
+      window.electronAPI.terminal.resize(sessionId, cols, rows)
+    })
+
+    if (onBell) {
+      this.terminal.onBell(onBell)
+    }
+
     this.outputUnsubscribe = window.electronAPI.terminal.onOutput((sid, data) => {
       if (sid === sessionId) this.terminal.write(data)
     })
@@ -46,6 +54,7 @@ export class TerminalInstance {
       this.opened = true
     }
     this.fitAddon.fit()
+    this.terminal.focus()
     this.resizeObserver = new ResizeObserver(() => this.fitAddon.fit())
     this.resizeObserver.observe(container)
   }

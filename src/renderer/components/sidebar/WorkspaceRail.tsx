@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react'
 import type { Workspace } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
+import { useSessionStore } from '../../stores/session.store'
+import { AlertBadge } from '../AlertBadge'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { EditWorkspaceDialog } from './EditWorkspaceDialog'
 import './WorkspaceRail.css'
@@ -85,8 +87,11 @@ export function WorkspaceRail(): JSX.Element {
 function WorkspaceTile({ workspace }: { workspace: Workspace }): JSX.Element {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const [editOpen, setEditOpen] = useState(false)
-  const { activeWorkspaceId, setActiveWorkspace, deleteWorkspace } = useWorkspaceStore()
+  const { activeWorkspaceId, setActiveWorkspace, deleteWorkspace, projectsByWorkspaceId } = useWorkspaceStore()
+  const { getBellCountForProject } = useSessionStore()
   const isActive = activeWorkspaceId === workspace.id
+  const projects = projectsByWorkspaceId.get(workspace.id) ?? []
+  const bellCount = projects.reduce((sum, p) => sum + getBellCountForProject(p.id), 0)
 
   function handleClick(): void {
     setActiveWorkspace(workspace.id)
@@ -116,6 +121,7 @@ function WorkspaceTile({ workspace }: { workspace: Workspace }): JSX.Element {
         onContextMenu={handleContextMenu}
         title=""
       >
+        <AlertBadge count={bellCount} className="alert-badge--corner" />
         <span className="ws-tile__initials">{getInitials(workspace.name)}</span>
         <span className="ws-tile__tooltip">{workspace.name}</span>
       </div>
