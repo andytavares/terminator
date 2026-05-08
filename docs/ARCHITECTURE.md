@@ -64,11 +64,13 @@ All renderer-to-main communication goes through `window.electronAPI`, exposed by
 | `dialog:*`    | renderer → main  | Native OS dialogs (folder picker)                            |
 | `extension:*` | renderer → main  | Extension install, toggle, contribution queries              |
 | `git:*`       | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create   |
+| `github:*`    | renderer → main  | PR review queue, diff, file metrics, inline comments, submit, session persistence |
 | `shell:exec`  | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)          |
 | `fs:*`        | renderer ↔ main  | File watch start/stop; `fs:changed` push events              |
 
-Full channel specifications: [`specs/001-extension-first-terminal/contracts/ipc-channels.md`](../specs/001-extension-first-terminal/contracts/ipc-channels.md)
-and [`specs/002-git-github-integration/contracts/ipc-channels-git.md`](../specs/002-git-github-integration/contracts/ipc-channels-git.md)
+Full channel specifications: [`specs/001-extension-first-terminal/contracts/ipc-channels.md`](../specs/001-extension-first-terminal/contracts/ipc-channels.md),
+[`specs/002-git-github-integration/contracts/ipc-channels-git.md`](../specs/002-git-github-integration/contracts/ipc-channels-git.md),
+and [`specs/003-pr-review/contracts/ipc-channels-pr-review.md`](../specs/003-pr-review/contracts/ipc-channels-pr-review.md).
 
 ### Type safety
 

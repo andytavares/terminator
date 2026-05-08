@@ -87,6 +87,24 @@ interface ElectronAPI {
     onTogglePanel(handler: (panelId: string) => void): () => void
     onSelectProjectTab(handler: (tabId: string) => void): () => void
   }
+  github: {
+    listOpenPrs(repoRoot: string): Promise<{ prs: unknown[] } | { error: string }>
+    prReviewDetail(repoRoot: string, prNumber: number): Promise<{ pr: unknown } | { error: string }>
+    prFileDiff(repoRoot: string, prNumber: number, path: string): Promise<{ diff: unknown } | { error: string }>
+    fileMetrics(repoRoot: string, path: string): Promise<{
+      churn90d: number
+      blastRadius: number
+      topImporters: string[]
+      importerCount: number
+      testFilePresent: boolean
+    } | { error: string }>
+    prInlineComments(repoRoot: string, prNumber: number): Promise<{ comments: unknown[] } | { error: string }>
+    prCommentAdd(payload: unknown): Promise<{ comment: unknown } | { error: string }>
+    prCommentReply(payload: unknown): Promise<{ comment: unknown } | { error: string }>
+    prReviewSubmit(payload: unknown): Promise<{ reviewId: number } | { error: string }>
+    sessionGet(key: string): Promise<{ session: unknown } | { session: null }>
+    sessionSet(key: string, session: unknown): Promise<{ ok: true } | { error: string }>
+  }
 }
 
 declare global {

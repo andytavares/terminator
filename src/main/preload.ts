@@ -118,6 +118,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   shell: {
     exec: (options: unknown) => ipcRenderer.invoke('shell:exec', options),
   },
+  github: {
+    listOpenPrs: (repoRoot: string) =>
+      ipcRenderer.invoke('github:list-open-prs', { repoRoot }),
+    prReviewDetail: (repoRoot: string, prNumber: number) =>
+      ipcRenderer.invoke('github:pr-review-detail', { repoRoot, prNumber }),
+    prFileDiff: (repoRoot: string, prNumber: number, path: string) =>
+      ipcRenderer.invoke('github:pr-file-diff', { repoRoot, prNumber, path }),
+    fileMetrics: (repoRoot: string, path: string) =>
+      ipcRenderer.invoke('github:file-metrics', { repoRoot, path }),
+    prInlineComments: (repoRoot: string, prNumber: number) =>
+      ipcRenderer.invoke('github:pr-inline-comments', { repoRoot, prNumber }),
+    prCommentAdd: (payload: unknown) =>
+      ipcRenderer.invoke('github:pr-comment-add', payload),
+    prCommentReply: (payload: unknown) =>
+      ipcRenderer.invoke('github:pr-comment-reply', payload),
+    prReviewSubmit: (payload: unknown) =>
+      ipcRenderer.invoke('github:pr-review-submit', payload),
+    sessionGet: (key: string) =>
+      ipcRenderer.invoke('github:session-get', { key }),
+    sessionSet: (key: string, session: unknown) =>
+      ipcRenderer.invoke('github:session-set', { key, session }),
+  },
   fs: {
     watchStart: (projectRoot: string) => ipcRenderer.invoke('fs:watch-start', { projectRoot }),
     watchStop: () => ipcRenderer.invoke('fs:watch-stop'),
