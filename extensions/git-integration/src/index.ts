@@ -1,4 +1,6 @@
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
+import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
+import { registerGithubHandlers } from './ipc/github.ipc.js'
 import { useGitStore } from './stores/git.store'
 import { GitSidebarPanel } from './components/GitSidebarPanel'
 
@@ -35,6 +37,13 @@ export function activate(api: ExtensionAPI): void {
   // Settings gate — early return if disabled
   const enabled = api.settings.get<boolean>('terminator.git-integration.git.enabled') ?? true
   if (!enabled) return
+
+  // Register extension-owned IPC handlers via the Extension API
+  const registerFn = (channel: string, handler: (payload: unknown) => Promise<unknown> | unknown) => {
+    disposables.push(api.ipc.registerHandler(channel, handler))
+  }
+  registerGitExtensionHandlers(registerFn)
+  registerGithubHandlers(registerFn)
 
   // Register settings schema (FR-029)
   disposables.push(

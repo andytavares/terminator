@@ -11,6 +11,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 - **Settings** — Global and per-workspace configuration for theme, scrollback limit, and default shell.
 - **Extension system** — Extensions install from local directories and contribute settings sections, sidebar items, sidebar panels, top-bar menu items, native View menu items, context menu entries, and terminal event hooks without modifying core code. See [Extension Development Guide](docs/EXTENSION-DEVELOPMENT.md).
 - **Git Integration** — Built-in first-party extension: toggleable right sidebar showing live git status, full git view for staging/committing, and PR creation via `gh` CLI. Configurable per-workspace. Auto-refreshes on file changes.
+- **Code Reviews tab** — PR review workflow inside the git-integration extension. Prioritised queue of open PRs with risk scoring (churn, blast radius, cyclomatic complexity delta), chapter-by-chapter review surface with syntax-highlighted diffs, inline comment threading, and one-click review submission (Approve / Request Changes / Comment) via `gh` CLI. Review sessions persist across restarts. Requires `gh auth login`.
 - **Keyboard shortcuts** — `Cmd+1–9` (switch workspace), `Cmd++/-` (cycle workspaces), `Cmd+T` (new tab), `Cmd+Left/Right` (cycle tabs), `Cmd+,` (settings), `Cmd+W` (close tab), `Cmd+Shift+G` (toggle git sidebar).
 
 ## Tech Stack
@@ -36,7 +37,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
   pip3 install setuptools --break-system-packages
   ```
 - **git** — Required for the git integration extension. Assumed to be on your PATH.
-- **gh CLI** (optional) — Required for GitHub PR creation. [Install gh](https://cli.github.com/). Authenticate with `gh auth login`.
+- **gh CLI** (optional) — Required for GitHub PR creation and the Code Reviews tab. [Install gh](https://cli.github.com/). Authenticate with `gh auth login`.
 - macOS 13+ (primary), Windows 11, Ubuntu 22.04 LTS.
 
 ## Quick Start

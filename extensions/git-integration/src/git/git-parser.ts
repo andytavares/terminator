@@ -1,4 +1,4 @@
-import type { GitStatus, GitFileStatus, FileDiff, DiffHunk, DiffLine } from '../../../../src/shared/schemas/git.schema'
+import type { GitStatus, GitFileStatus, FileDiff, DiffHunk, DiffLine } from '../schemas/git.schema'
 
 const DEFAULT_MAX_DIFF_BYTES = 500 * 1024 // 500 KB
 

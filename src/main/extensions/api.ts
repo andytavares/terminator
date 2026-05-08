@@ -104,13 +104,16 @@ export interface ExtensionAPI {
   keyboard: {
     register(accelerator: string, handler: () => void): Disposable
   }
+  ipc: {
+    registerHandler(channel: string, handler: (payload: unknown) => Promise<unknown> | unknown): Disposable
+  }
   terminal: {
     onSessionCreate(handler: (session: Readonly<SessionSnapshot>) => void): Disposable
     onSessionClose(handler: (sessionId: string) => void): Disposable
   }
 }
 
-import { BrowserWindow, Menu, MenuItem } from 'electron'
+import { BrowserWindow, Menu, MenuItem, ipcMain } from 'electron'
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
 import { fsWatcherService } from '../fs/fs-watcher.js'
 
@@ -299,6 +302,12 @@ export function createExtensionAPI(extensionId: string, appVersion: string, getA
         const key = `${extensionId}.keyboard.${accelerator}`
         globalRegistry.keyboardHandlers.set(key, handler)
         return disposable(() => globalRegistry.keyboardHandlers.delete(key))
+      },
+    },
+    ipc: {
+      registerHandler(channel: string, handler: (payload: unknown) => Promise<unknown> | unknown): Disposable {
+        ipcMain.handle(channel, (_event, payload) => handler(payload))
+        return disposable(() => ipcMain.removeHandler(channel))
       },
     },
     terminal: {

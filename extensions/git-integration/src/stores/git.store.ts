@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { GitStatus, FileDiff } from '../../../../src/shared/schemas/git.schema'
+import type { GitStatus, FileDiff } from '../schemas/git.schema'
 
 interface GitStore {
   status: GitStatus | null

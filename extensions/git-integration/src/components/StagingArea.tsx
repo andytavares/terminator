@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react'
 import { useGitStore } from '../stores/git.store'
-import type { GitFileStatus, GitStatus } from '../../../../src/shared/schemas/git.schema'
+import type { GitFileStatus, GitStatus } from '../schemas/git.schema'
 
 const STATUS_BADGE: Record<string, string> = {
   modified: 'M',

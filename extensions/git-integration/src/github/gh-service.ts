@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from '../../../../src/main/extensions/api'
-import type { PullRequest } from '../../../../src/shared/schemas/git.schema'
+import type { PullRequest } from '../schemas/git.schema'
 
 interface PrCreateInput {
   title: string

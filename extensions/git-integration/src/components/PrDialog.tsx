@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { marked } from 'marked'
-import type { PullRequest } from '../../../../src/shared/schemas/git.schema'
-import type { Branch } from '../../../../src/shared/types/index'
+import type { PullRequest } from '../schemas/git.schema'
+
+interface Branch {
+  name: string
+  isCurrent: boolean
+  isRemote: boolean
+}
 
 interface PrDialogProps {
   repoRoot: string

@@ -4,7 +4,7 @@ import { useGitStatus } from '../hooks/useGitStatus'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { StagingArea } from './StagingArea'
 import './git-integration.css'
-import type { FileDiff } from '../../../../src/shared/schemas/git.schema'
+import type { FileDiff } from '../schemas/git.schema'
 
 interface Props {
   repoRoot: string | null

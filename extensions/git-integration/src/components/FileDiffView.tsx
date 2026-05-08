@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import hljs from 'highlight.js'
-import type { FileDiff, DiffLine, DiffHunk } from '../../../../src/shared/schemas/git.schema'
+import type { FileDiff, DiffLine, DiffHunk } from '../schemas/git.schema'
 
 type ViewMode = 'unified' | 'split'
 
