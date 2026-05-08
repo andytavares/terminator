@@ -1,0 +1,11 @@
+appId: com.terminator.app
+productName: Terminator
+directories:
+  output: dist
+files:
+  - out/**/*
+mac:
+  target:
+    - target: dmg
+      arch: arm64
+  category: public.app-category.developer-tools

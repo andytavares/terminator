@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ReviewSession, PrReviewDetail, ReviewQueuePR, Thread } from '../schemas/pr-review.schema'
+import type { ReviewSession, PrReviewDetail, ReviewQueuePR, Thread, RiskScore, SignalDots } from '../schemas/pr-review.schema'
 
 interface RateLimitState {
   resetAt: number
@@ -45,6 +45,10 @@ interface PrReviewStore {
   setPaused(repoRoot: string, prNumber: number, headSHA: string, isoTimestamp: string | null): void
 
   setThreads(path: string, threads: Thread[]): void
+
+  updateFileRiskScore(chapterId: string, filePath: string, riskScore: RiskScore): void
+  patchFileComplexity(chapterId: string, filePath: string, complexityDelta: number): void
+  updateQueuePrRisk(prNumber: number, riskLevel: 'low' | 'medium' | 'high', signalDots: SignalDots): void
 
   setRateLimitState(state: RateLimitState | null): void
 
@@ -139,6 +143,62 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
 
   setThreads: (path, threads) =>
     set(state => ({ threads: { ...state.threads, [path]: threads } })),
+
+  updateFileRiskScore: (chapterId, filePath, riskScore) =>
+    set(state => {
+      if (!state.activePr) return {}
+      const chapters = state.activePr.chapters.map(chapter => {
+        if (chapter.id !== chapterId) return chapter
+        return {
+          ...chapter,
+          files: chapter.files.map(f =>
+            f.path === filePath ? { ...f, riskScore } : f
+          ),
+        }
+      })
+      return { activePr: { ...state.activePr, chapters } }
+    }),
+
+  patchFileComplexity: (chapterId, filePath, complexityDelta) =>
+    set(state => {
+      if (!state.activePr) return {}
+      const chapters = state.activePr.chapters.map(chapter => {
+        if (chapter.id !== chapterId) return chapter
+        return {
+          ...chapter,
+          files: chapter.files.map(f => {
+            if (f.path !== filePath) return f
+            const prevComposite = f.riskScore.composite ?? 0
+            // Simple adjustment: apply complexity weight (0.10 * 80) relative to thresholds
+            const compContrib = complexityDelta <= 0 ? 0 : Math.min(1, complexityDelta / 15) * 0.10 * 80
+            const newComposite = Math.min(100, Math.round(
+              f.riskScore.metrics.changeSize != null
+                ? prevComposite + compContrib
+                : prevComposite
+            ))
+            const level: 'low' | 'medium' | 'high' =
+              newComposite >= 67 ? 'high' : newComposite >= 34 ? 'medium' : 'low'
+            return {
+              ...f,
+              riskScore: {
+                ...f.riskScore,
+                composite: newComposite || null,
+                level,
+                metrics: { ...f.riskScore.metrics, complexityDelta },
+              },
+            }
+          }),
+        }
+      })
+      return { activePr: { ...state.activePr, chapters } }
+    }),
+
+  updateQueuePrRisk: (prNumber, riskLevel, signalDots) =>
+    set(state => ({
+      prQueue: state.prQueue.map(pr =>
+        pr.number === prNumber ? { ...pr, riskLevel, signalDots } : pr
+      ),
+    })),
 
   setRateLimitState: (s) => set({ rateLimitState: s }),
 

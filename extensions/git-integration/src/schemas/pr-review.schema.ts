@@ -73,6 +73,8 @@ export const ChapterSchema = z.object({
 
 // ─── PR review detail ─────────────────────────────────────────────────────────
 
+const SignalValueSchema2 = z.enum(['pass', 'warn', 'fail', 'unknown'])
+
 export const PrReviewDetailSchema = z.object({
   number:         z.number(),
   title:          z.string(),
@@ -84,6 +86,8 @@ export const PrReviewDetailSchema = z.object({
   baseRefName:    z.string(),
   headSHA:        z.string(),
   ciStatus:       z.enum(['passing', 'failing', 'pending', 'none']),
+  lintStatus:     SignalValueSchema2.default('unknown'),
+  coverageStatus: SignalValueSchema2.default('unknown'),
   chapters:       z.array(ChapterSchema),
 })
 

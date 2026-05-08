@@ -13,11 +13,12 @@ interface Props {
   repoRoot: string
   pr: PrReviewDetail
   onClose: () => void
+  onRefresh: () => Promise<void>
 }
 
 type ViewMode = 'guided' | 'full'
 
-export function PrReviewView({ repoRoot, pr, onClose }: Props) {
+export function PrReviewView({ repoRoot, pr, onClose, onRefresh }: Props) {
   const {
     currentChapterId, currentFilePath,
     setCurrentChapter, setCurrentFile,
@@ -29,6 +30,12 @@ export function PrReviewView({ repoRoot, pr, onClose }: Props) {
   const [showSubmit, setShowSubmit] = useState(false)
   const [showRiskFor, setShowRiskFor] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('guided')
+  const [refreshing, setRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try { await onRefresh() } finally { setRefreshing(false) }
+  }
 
   // Resolve active chapter and file
   const activeChapterId = currentChapterId ?? pr.chapters[0]?.id ?? null
@@ -130,11 +137,20 @@ export function PrReviewView({ repoRoot, pr, onClose }: Props) {
     <aside className="pr-review-panel pr-review-panel--left">
       <div className="pr-review-panel-header">
         <span className="pr-review-chapter-name">All files</span>
-        <button
-          className="pr-view-mode-btn pr-view-mode-btn--active"
-          onClick={() => setViewMode('guided')}
-          title="Switch to guided chapter view"
-        >Guided ↩</button>
+        <div className="pr-review-panel-header-right">
+          <button
+            className={`pr-refresh-btn${refreshing ? ' pr-refresh-btn--spinning' : ''}`}
+            onClick={handleRefresh}
+            disabled={refreshing}
+            title="Refresh PR"
+            aria-label="Refresh pull request"
+          >↻</button>
+          <button
+            className="pr-view-mode-btn pr-view-mode-btn--active"
+            onClick={() => setViewMode('guided')}
+            title="Switch to guided chapter view"
+          >Guided ↩</button>
+        </div>
       </div>
       <FullFileList
         pr={pr}
@@ -153,6 +169,13 @@ export function PrReviewView({ repoRoot, pr, onClose }: Props) {
             <span className="pr-review-chapter-count">
               {orderedFiles.filter(f => viewedFiles.has(f.path)).length}/{orderedFiles.length}
             </span>
+            <button
+              className={`pr-refresh-btn${refreshing ? ' pr-refresh-btn--spinning' : ''}`}
+              onClick={handleRefresh}
+              disabled={refreshing}
+              title="Refresh PR"
+              aria-label="Refresh pull request"
+            >↻</button>
             {showMultipleChapters && (
               <button
                 className="pr-view-mode-btn"

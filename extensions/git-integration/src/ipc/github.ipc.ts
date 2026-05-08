@@ -2,7 +2,8 @@ import { z } from 'zod'
 import Store from 'electron-store'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
-import { basename } from 'path'
+import { basename, join } from 'path'
+import { readFile } from 'fs/promises'
 import type { ReviewQueuePR, PrReviewDetail, InlineComment } from '../schemas/pr-review.schema.js'
 import { ReviewSessionSchema } from '../schemas/pr-review.schema.js'
 import { buildChapters, parseReviewQueuePR } from '../github/pr-review-service.js'
@@ -82,6 +83,8 @@ export function registerGithubHandlers(register: RegisterFn): void {
         baseRefName:     String(meta.baseRefName ?? ''),
         headSHA:         String(meta.headRefOid ?? ''),
         ciStatus:        mapCiStatus(meta.statusCheckRollup),
+        lintStatus:      mapCheckStatus(meta.statusCheckRollup, LINT_CHECK_NAMES),
+        coverageStatus:  mapCheckStatus(meta.statusCheckRollup, COVERAGE_CHECK_NAMES),
         chapters,
       }
       return { pr }
@@ -127,11 +130,11 @@ export function registerGithubHandlers(register: RegisterFn): void {
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, path } = parsed.data
     try {
+      const stem = basename(path, `.${basename(path).split('.').pop()}`)
       const [churnRaw, blastRaw, testRaw] = await Promise.all([
         runGit(repoRoot, ['log', '--oneline', '--since=90 days ago', '--', path]),
         runGit(repoRoot, ['grep', '-l', basename(path).replace(/\.[^.]+$/, ''), '--']).catch(() => ''),
-        runGit(repoRoot, ['ls-files', '--', `**/${basename(path, `.${basename(path).split('.').pop()}`)}*.spec.*`,
-          `**/${basename(path, `.${basename(path).split('.').pop()}`)}*.test.*`]).catch(() => ''),
+        runGit(repoRoot, ['ls-files', '--', `**/${stem}*.spec.*`, `**/${stem}*.test.*`]).catch(() => ''),
       ])
       const churn90d = churnRaw ? churnRaw.split('\n').filter(Boolean).length : 0
       const importerLines = blastRaw ? blastRaw.split('\n').filter(Boolean).filter(l => l !== path) : []
@@ -139,7 +142,8 @@ export function registerGithubHandlers(register: RegisterFn): void {
       const topImporters = importerLines.slice(0, 5)
       const importerCount = importerLines.length
       const testFilePresent = testRaw ? testRaw.trim().length > 0 : false
-      return { churn90d, blastRadius, topImporters, importerCount, testFilePresent }
+      const patchCoverage = await readFileCoverage(repoRoot, path)
+      return { churn90d, blastRadius, topImporters, importerCount, testFilePresent, patchCoverage }
     } catch (e) {
       return { error: String(e) }
     }
@@ -276,6 +280,9 @@ export function registerGithubHandlers(register: RegisterFn): void {
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
+const LINT_CHECK_NAMES     = ['lint', 'eslint', 'rubocop', 'flake8', 'pylint', 'stylelint', 'prettier', 'tslint']
+const COVERAGE_CHECK_NAMES = ['coverage', 'codecov', 'coveralls', 'sonar', 'codeclimate', 'lcov']
+
 function mapCiStatus(rollup: unknown): 'passing' | 'failing' | 'pending' | 'none' {
   if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'none'
   const statuses = (rollup as Array<Record<string, unknown>>).map(s => String(s.state ?? s.conclusion ?? ''))
@@ -283,6 +290,52 @@ function mapCiStatus(rollup: unknown): 'passing' | 'failing' | 'pending' | 'none
   if (statuses.some(s => s === 'PENDING' || s === 'in_progress' || s === 'pending')) return 'pending'
   if (statuses.every(s => s === 'SUCCESS' || s === 'success')) return 'passing'
   return 'none'
+}
+
+function mapCheckStatus(rollup: unknown, names: string[]): 'pass' | 'fail' | 'warn' | 'unknown' {
+  if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'unknown'
+  const checks = (rollup as Array<Record<string, unknown>>).filter(s => {
+    const name = String(s.name ?? s.context ?? '').toLowerCase()
+    return names.some(n => name.includes(n))
+  })
+  if (checks.length === 0) return 'unknown'
+  const statuses = checks.map(s => String(s.state ?? s.conclusion ?? '').toUpperCase())
+  if (statuses.some(s => s === 'FAILURE' || s === 'ERROR')) return 'fail'
+  if (statuses.some(s => s === 'PENDING' || s === 'IN_PROGRESS')) return 'warn'
+  if (statuses.every(s => s === 'SUCCESS')) return 'pass'
+  return 'unknown'
+}
+
+async function readFileCoverage(repoRoot: string, filePath: string): Promise<number | null> {
+  // Try Istanbul/nyc coverage-summary.json first
+  try {
+    const summaryPath = join(repoRoot, 'coverage', 'coverage-summary.json')
+    const raw = await readFile(summaryPath, 'utf-8')
+    const summary = JSON.parse(raw) as Record<string, { lines?: { pct?: number } }>
+    // Keys use absolute or relative paths — try both
+    const candidates = [filePath, join(repoRoot, filePath), `./${filePath}`]
+    for (const key of candidates) {
+      if (summary[key]?.lines?.pct != null) return Math.round(summary[key].lines!.pct!)
+    }
+    // Partial match: key ends with filePath
+    const match = Object.entries(summary).find(([k]) => k.endsWith(filePath))
+    if (match) return Math.round(match[1]?.lines?.pct ?? 0)
+  } catch { /* file not found or parse error — fall through */ }
+
+  // Try lcov.info
+  try {
+    const lcovPath = join(repoRoot, 'coverage', 'lcov.info')
+    const raw = await readFile(lcovPath, 'utf-8')
+    const sections = raw.split('end_of_record')
+    for (const section of sections) {
+      if (!section.includes(filePath)) continue
+      const linesFound = Number(section.match(/LF:(\d+)/)?.[1] ?? '0')
+      const linesHit   = Number(section.match(/LH:(\d+)/)?.[1] ?? '0')
+      if (linesFound > 0) return Math.round((linesHit / linesFound) * 100)
+    }
+  } catch { /* file not found or parse error */ }
+
+  return null
 }
 
 function mapComment(raw: unknown): InlineComment {

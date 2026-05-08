@@ -24,6 +24,7 @@ declare global {
           topImporters: string[]
           importerCount: number
           testFilePresent: boolean
+          patchCoverage: number | null
         } | { error: string }>
         prInlineComments(repoRoot: string, prNumber: number): Promise<{ comments: unknown[] } | { error: string }>
         prCommentAdd(payload: unknown): Promise<{ comment: unknown } | { error: string }>

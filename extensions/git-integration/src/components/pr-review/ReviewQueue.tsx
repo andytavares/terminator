@@ -9,11 +9,18 @@ const STALE_DAYS = 3
 interface Props {
   repoRoot: string
   onOpenPr: (pr: ReviewQueuePR) => void
+  onRefresh: () => Promise<void>
 }
 
-export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr }: Props) {
+export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr, onRefresh }: Props) {
   const { prQueue, queueLoading, queueError, rateLimitState } = usePrReviewStore()
   const [activeFilter, setActiveFilter] = useState<Filter>('all')
+  const [refreshing, setRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try { await onRefresh() } finally { setRefreshing(false) }
+  }
 
   const now = Date.now()
   const staleMs = STALE_DAYS * 24 * 60 * 60 * 1000
@@ -50,7 +57,14 @@ export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr }: Props) {
   }
 
   if (queueError) {
-    return <div className="pr-queue-error">Failed to load queue: {queueError}</div>
+    return (
+      <div className="pr-queue-error">
+        Failed to load queue: {queueError}
+        <button className="pr-refresh-btn" onClick={handleRefresh} disabled={refreshing}>
+          {refreshing ? '↻' : '↺'} Retry
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -61,7 +75,8 @@ export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr }: Props) {
         </div>
       )}
 
-      {/* Stat cards */}
+      {/* Stat cards + refresh */}
+      <div className="pr-stat-cards-row">
       <div className="pr-stat-cards">
         <div className="pr-stat-card">
           <span className="pr-stat-value">{prQueue.length}</span>
@@ -79,6 +94,14 @@ export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr }: Props) {
           <span className="pr-stat-value">{inProgressCount}</span>
           <span className="pr-stat-label">In progress — resume from where you stopped</span>
         </div>
+      </div>
+      <button
+        className={`pr-refresh-btn${refreshing ? ' pr-refresh-btn--spinning' : ''}`}
+        onClick={handleRefresh}
+        disabled={refreshing}
+        title="Refresh pull requests"
+        aria-label="Refresh pull requests"
+      >↻</button>
       </div>
 
       {/* Filter pills */}
@@ -140,7 +163,7 @@ function PrRow({ pr, onOpen }: { pr: ReviewQueuePR; onOpen: (pr: ReviewQueuePR) 
   const age = formatAge(pr.openedAt)
 
   return (
-    <button className="pr-row" onClick={() => onOpen(pr)}>
+    <button className={`pr-row pr-row--${pr.riskLevel}`} onClick={() => onOpen(pr)}>
       <div className="pr-row-left">
         <span className="pr-row-number">#{pr.number}</span>
         {pr.isDraft && <span className="pr-row-draft">Draft</span>}
@@ -156,6 +179,9 @@ function PrRow({ pr, onOpen }: { pr: ReviewQueuePR; onOpen: (pr: ReviewQueuePR) 
 
       <div className="pr-row-right">
         <span className="pr-row-time">{pr.estimatedMinutes}m</span>
+        <span className={`pr-risk-chip pr-risk-chip--${pr.riskLevel}`}>
+          {pr.riskLevel === 'high' ? 'HIGH' : pr.riskLevel === 'medium' ? 'MED' : 'LOW'}
+        </span>
         <span className={`pr-row-action pr-row-action--${pr.riskLevel}`}>{actionLabel}</span>
       </div>
     </button>

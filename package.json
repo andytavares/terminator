@@ -18,7 +18,8 @@
     "lint": "eslint . --ext .ts,.tsx && tsc --noEmit",
     "format": "prettier --write .",
     "rebuild": "electron-rebuild",
-    "create-extension": "node scripts/create-extension.js"
+    "create-extension": "node scripts/create-extension.js",
+    "package": "electron-builder --mac --arm64 --publish never"
   },
   "dependencies": {
     "electron-store": "^8.2.0",

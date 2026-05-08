@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { PrReviewDetail, Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
+import { chapterRiskLevel } from '../../github/pr-review-service'
 
 interface Props {
   pr: PrReviewDetail
@@ -61,6 +62,13 @@ export function FullFileList({ pr, repoRoot: _repoRoot, headSHA: _headSHA, curre
               <span className={`full-file-chapter-status full-file-chapter-status--${status}`} />
               <span className="full-file-chapter-num">Ch {ci + 1}</span>
               <span className="full-file-chapter-name">{chapter.name}</span>
+              {chapter.files.some(f => f.tier !== 3) ? (
+                <span className={`full-file-chapter-risk full-file-chapter-risk--${chapterRiskLevel(chapter)}`}>
+                  {chapterRiskLevel(chapter)}
+                </span>
+              ) : (
+                <span className="full-file-chapter-risk full-file-chapter-risk--none">auto</span>
+              )}
               <span className="full-file-chapter-progress">{viewedInChapter}/{files.length}</span>
               {status === 'complete' && <span className="full-file-chapter-done">✓</span>}
               <span className="full-file-chapter-chevron">{isOpen ? '▾' : '▸'}</span>
@@ -82,7 +90,7 @@ export function FullFileList({ pr, repoRoot: _repoRoot, headSHA: _headSHA, curre
                   title={file.path}
                 >
                   <span className="full-file-row-num">{fi + 1}</span>
-                  <span className={`full-file-row-risk full-file-row-risk--${file.riskScore.level}`} />
+                  <span className={`full-file-row-risk full-file-row-risk--${file.tier === 3 ? 'none' : file.riskScore.level}`} />
                   <span className="full-file-row-name">{file.path.split('/').pop()}</span>
                   <span className="full-file-row-changes">
                     <span className="full-file-row-add">+{file.additions}</span>
