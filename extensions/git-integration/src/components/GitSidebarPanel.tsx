@@ -4,23 +4,16 @@ import { useGitStatus } from '../hooks/useGitStatus'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { StagingArea } from './StagingArea'
 import './git-integration.css'
-import type { FileDiff, GitStatus } from '../../../../src/shared/schemas/git.schema'
+import type { FileDiff } from '../../../../src/shared/schemas/git.schema'
 
 interface Props {
   repoRoot: string | null
   onClose: () => void
 }
 
-async function refreshStatus(repoRoot: string, setStatus: (s: GitStatus | null) => void): Promise<void> {
-  try {
-    const result = await window.electronAPI.git.status(repoRoot) as GitStatus | { error: string }
-    if (!('error' in result)) setStatus(result as unknown as GitStatus)
-  } catch { /* next poll handles it */ }
-}
-
 export function GitSidebarPanel({ repoRoot, onClose }: Props): JSX.Element {
   useGitStatus(repoRoot)
-  const { status, setStatus, setSelectedFile, setDiff } = useGitStore()
+  const { status, setSelectedFile, setDiff } = useGitStore()
   const { setActiveProjectTab } = useExtensionRegistry()
 
   const handleFileSelect = useCallback((path: string, staged: boolean) => {

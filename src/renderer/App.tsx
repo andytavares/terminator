@@ -34,7 +34,6 @@ export function App(): JSX.Element {
   useKeyboardShortcuts({
     onOpenSettings: () => setSettingsOpen(true),
     onToggleLog: () => setLogOpen((v) => !v),
-    onToggleGitSidebar: () => togglePanel('git-changes'),
   })
 
   useEffect(() => {

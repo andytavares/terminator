@@ -3,19 +3,20 @@ import { useWorkspaceStore } from '../stores/workspace.store'
 import { useSessionStore } from '../stores/session.store'
 import { useTerminalSession } from './useTerminalSession'
 import { useSettingsStore } from '../stores/settings.store'
+import { useExtensionRegistry, matchesAccelerator } from '../extensions/registry'
 
 interface Options {
   onOpenSettings?: () => void
   onToggleLog?: () => void
-  onToggleGitSidebar?: () => void
 }
 
-export function useKeyboardShortcuts({ onOpenSettings, onToggleLog, onToggleGitSidebar }: Options = {}): void {
+export function useKeyboardShortcuts({ onOpenSettings, onToggleLog }: Options = {}): void {
   const { workspaces, activeWorkspaceId, setActiveWorkspace, activeProjectId, projectsByWorkspaceId } = useWorkspaceStore()
   const { getActiveSessionForProject, setActiveSessionForProject, getSessionsForProject } =
     useSessionStore()
   const { createSession } = useTerminalSession()
   const { resolveSettings } = useSettingsStore()
+  const { keyboardShortcuts } = useExtensionRegistry()
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
@@ -34,11 +35,13 @@ export function useKeyboardShortcuts({ onOpenSettings, onToggleLog, onToggleGitS
         return
       }
 
-      // Cmd+Shift+G: toggle git sidebar
-      if (isMeta && e.shiftKey && (e.key === 'g' || e.key === 'G')) {
-        e.preventDefault()
-        onToggleGitSidebar?.()
-        return
+      // Extension-registered keyboard shortcuts
+      for (const shortcut of keyboardShortcuts) {
+        if (matchesAccelerator(e, shortcut.accelerator)) {
+          e.preventDefault()
+          shortcut.action()
+          return
+        }
       }
 
       // Cmd+1–9: switch to nth workspace
@@ -100,7 +103,7 @@ export function useKeyboardShortcuts({ onOpenSettings, onToggleLog, onToggleGitS
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [workspaces, activeWorkspaceId, activeProjectId])
+  }, [workspaces, activeWorkspaceId, activeProjectId, keyboardShortcuts])
 
   function cycleWorkspace(delta: number): void {
     if (workspaces.length === 0) return

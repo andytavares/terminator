@@ -14,14 +14,23 @@ export interface ProjectTabRegistration {
   component: ComponentType<{ repoRoot: string | null }>
 }
 
+export interface KeyboardShortcutRegistration {
+  /** Electron-style accelerator, e.g. "CmdOrCtrl+Shift+G" */
+  accelerator: string
+  action: () => void
+  description?: string
+}
+
 interface ExtensionRegistry {
   sidebarPanels: Map<string, SidebarPanelRegistration>
   projectTabs: Map<string, ProjectTabRegistration>
+  keyboardShortcuts: KeyboardShortcutRegistration[]
   openPanels: Set<string>
   activeProjectTabId: string | null
 
   registerSidebarPanel(panel: SidebarPanelRegistration): () => void
   registerProjectTab(tab: ProjectTabRegistration): () => void
+  registerKeyboardShortcut(shortcut: KeyboardShortcutRegistration): () => void
   togglePanel(panelId: string): void
   setActiveProjectTab(tabId: string | null): void
 }
@@ -29,6 +38,7 @@ interface ExtensionRegistry {
 export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
   sidebarPanels: new Map(),
   projectTabs: new Map(),
+  keyboardShortcuts: [],
   openPanels: new Set(),
   activeProjectTabId: null,
 
@@ -66,6 +76,12 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
       })
   },
 
+  registerKeyboardShortcut(shortcut) {
+    set((s) => ({ keyboardShortcuts: [...s.keyboardShortcuts, shortcut] }))
+    return () =>
+      set((s) => ({ keyboardShortcuts: s.keyboardShortcuts.filter((sc) => sc !== shortcut) }))
+  },
+
   togglePanel(panelId) {
     set((s) => {
       const open = new Set(s.openPanels)
@@ -79,3 +95,35 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
     set({ activeProjectTabId: tabId })
   },
 }))
+
+// ── Accelerator parser ────────────────────────────────────────────────────────
+// Converts "CmdOrCtrl+Shift+G" → a predicate that matches a KeyboardEvent.
+
+interface ParsedAccelerator {
+  metaOrCtrl: boolean
+  shift: boolean
+  alt: boolean
+  key: string
+}
+
+function parseAccelerator(accelerator: string): ParsedAccelerator {
+  const parts = accelerator.split('+')
+  const key = parts[parts.length - 1].toLowerCase()
+  return {
+    metaOrCtrl: parts.some((p) => p === 'CmdOrCtrl' || p === 'Cmd' || p === 'Ctrl'),
+    shift: parts.some((p) => p === 'Shift'),
+    alt: parts.some((p) => p === 'Alt' || p === 'Option'),
+    key,
+  }
+}
+
+export function matchesAccelerator(e: KeyboardEvent, accelerator: string): boolean {
+  const parsed = parseAccelerator(accelerator)
+  const metaOrCtrl = e.metaKey || e.ctrlKey
+  return (
+    metaOrCtrl === parsed.metaOrCtrl &&
+    e.shiftKey === parsed.shift &&
+    e.altKey === parsed.alt &&
+    e.key.toLowerCase() === parsed.key
+  )
+}
