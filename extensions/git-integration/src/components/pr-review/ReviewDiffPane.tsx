@@ -3,7 +3,7 @@ import { HealthChips } from './HealthChips'
 import { InlineCommentThread } from './InlineCommentThread'
 import { CommentComposer } from './CommentComposer'
 import { usePrReviewStore } from '../../stores/pr-review.store'
-import { detectComplexityHotspots } from '../../github/pr-review-service'
+import { detectComplexityHotspots, computeFileCyclomaticDelta } from '../../github/pr-review-service'
 import type { PrChangedFile, PrReviewDetail } from '../../schemas/pr-review.schema'
 import type { FileDiff } from '../../schemas/git.schema'
 import { FileDiffSchema } from '../../schemas/git.schema'
@@ -38,7 +38,7 @@ export function ReviewDiffPane({
   const [composerAnchor, setComposerAnchor] = useState<ComposerAnchor | null>(null)
   const [replyTarget, setReplyTarget] = useState<{ threadId: string; inReplyToId: number } | null>(null)
   const [selectionStart, setSelectionStart] = useState<number | null>(null)
-  const { viewedFiles, threads } = usePrReviewStore()
+  const { viewedFiles, threads, patchFileComplexity } = usePrReviewStore()
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const isViewed = viewedFiles.has(file.path)
@@ -57,7 +57,13 @@ export function ReviewDiffPane({
           return
         }
         const parsed = FileDiffSchema.safeParse((result as { diff: unknown }).diff)
-        if (parsed.success) setDiff(parsed.data)
+        if (parsed.success) {
+          setDiff(parsed.data)
+          // Feed complexity delta back to the risk score
+          const delta = computeFileCyclomaticDelta(parsed.data)
+          const chapter = pr.chapters.find(c => c.files.some(f => f.path === file.path))
+          if (chapter) patchFileComplexity(chapter.id, file.path, delta)
+        }
       })
       .catch(e => setDiffError(String(e)))
       .finally(() => setDiffLoading(false))
@@ -110,7 +116,12 @@ export function ReviewDiffPane({
       </div>
 
       {/* Health chips */}
-      <HealthChips riskScore={file.riskScore} />
+      <HealthChips
+        riskScore={file.riskScore}
+        ciStatus={pr.ciStatus}
+        lintStatus={pr.lintStatus}
+        coverageStatus={pr.coverageStatus}
+      />
 
       {/* Diff content */}
       <div className="review-diff-scroll" ref={scrollRef}>

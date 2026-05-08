@@ -3,6 +3,9 @@ import type { RiskScore } from '../../schemas/pr-review.schema'
 
 interface Props {
   riskScore: RiskScore
+  ciStatus?: 'passing' | 'failing' | 'pending' | 'none'
+  lintStatus?: 'pass' | 'fail' | 'warn' | 'unknown'
+  coverageStatus?: 'pass' | 'fail' | 'warn' | 'unknown'
 }
 
 interface Chip {
@@ -11,8 +14,27 @@ interface Chip {
   status: 'pass' | 'warn' | 'fail' | 'unknown'
 }
 
-export function HealthChips({ riskScore }: Props) {
+export function HealthChips({ riskScore, ciStatus, lintStatus, coverageStatus }: Props) {
   const { metrics } = riskScore
+
+  const ciChipStatus: Chip['status'] =
+    ciStatus === 'passing' ? 'pass'
+    : ciStatus === 'failing' ? 'fail'
+    : ciStatus === 'pending' ? 'warn'
+    : 'unknown'
+
+  const ciChipValue =
+    ciStatus === 'passing' ? 'passing'
+    : ciStatus === 'failing' ? 'failing'
+    : ciStatus === 'pending' ? 'pending'
+    : null
+
+  // Prefer per-file coverage from metrics, fall back to PR-level coverageStatus
+  const covPct = metrics.patchCoverage
+  const covStatus: Chip['status'] = covPct != null
+    ? (covPct >= 80 ? 'pass' : covPct >= 50 ? 'warn' : 'fail')
+    : (coverageStatus ?? 'unknown')
+  const covValue = covPct != null ? `${covPct}%` : null
 
   const chips: Chip[] = [
     {
@@ -31,20 +53,18 @@ export function HealthChips({ riskScore }: Props) {
     },
     {
       label:  'Coverage',
-      value:  metrics.patchCoverage == null ? null : `${metrics.patchCoverage}%`,
-      status: metrics.patchCoverage == null ? 'unknown'
-              : metrics.patchCoverage >= 80 ? 'pass'
-              : metrics.patchCoverage >= 50 ? 'warn' : 'fail',
+      value:  covValue,
+      status: covStatus,
     },
     {
       label:  'Lint',
-      value:  null,
-      status: 'unknown',
+      value:  lintStatus === 'pass' ? 'clean' : lintStatus === 'fail' ? 'errors' : lintStatus === 'warn' ? 'warnings' : null,
+      status: lintStatus ?? 'unknown',
     },
     {
       label:  'CI',
-      value:  null,
-      status: 'unknown',
+      value:  ciChipValue,
+      status: ciChipStatus,
     },
     {
       label:  'Churn',

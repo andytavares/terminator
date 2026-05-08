@@ -29,13 +29,42 @@
 
 /* Stat cards */
 
-.pr-stat-cards {
+.pr-stat-cards-row {
   display: flex;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 8px;
   padding: 14px 16px 10px;
   flex-shrink: 0;
+}
+
+.pr-stat-cards {
+  display: flex;
+  flex: 1;
+  gap: 10px;
   flex-wrap: wrap;
 }
+
+.pr-refresh-btn {
+  padding: 4px 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--color-text-muted, #8b949e);
+  transition: color 0.15s, border-color 0.15s, transform 0.15s;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+.pr-refresh-btn:hover:not(:disabled) {
+  color: var(--color-text, #e6edf3);
+  border-color: rgba(255,255,255,0.3);
+}
+.pr-refresh-btn:disabled { opacity: 0.4; cursor: default; }
+@keyframes pr-spin { to { transform: rotate(360deg); } }
+.pr-refresh-btn--spinning { animation: pr-spin 0.7s linear infinite; }
 
 .pr-stat-card {
   flex: 1;
@@ -151,6 +180,9 @@
   transition: background 0.1s;
 }
 .pr-row:hover { background: rgba(255, 255, 255, 0.04); }
+.pr-row--high   { border-left: 3px solid #f85149; padding-left: 13px; }
+.pr-row--medium { border-left: 3px solid #f0a500; padding-left: 13px; }
+.pr-row--low    { border-left: 3px solid transparent; padding-left: 13px; }
 
 .pr-row-left {
   flex: 1;
@@ -234,6 +266,18 @@
 .pr-row-action--high   { background: rgba(248, 81, 73, 0.15); color: #f85149; }
 .pr-row-action--medium { background: rgba(240, 165, 0, 0.15); color: #f0a500; }
 .pr-row-action--low    { background: rgba(63, 185, 80, 0.15);  color: #3fb950; }
+
+.pr-risk-chip {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 2px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.pr-risk-chip--low    { background: rgba(63,185,80,0.12);  color: #3fb950; }
+.pr-risk-chip--medium { background: rgba(240,165,0,0.12);  color: #f0a500; }
+.pr-risk-chip--high   { background: rgba(248,81,73,0.12);  color: #f85149; }
 
 /* ─── PrReviewView: 3-panel layout ────────────────────────────────────────── */
 
@@ -366,9 +410,19 @@
   border-bottom-color: var(--color-accent, #58a6ff);
 }
 
+.chapter-nav-tab { flex-direction: row; align-items: center; gap: 6px; }
 .chapter-nav-name { font-weight: 500; }
 .chapter-nav-meta { font-size: 10px; opacity: 0.7; }
 .chapter-nav-check { font-size: 10px; color: #3fb950; }
+
+.chapter-nav-risk-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.chapter-nav-risk-dot--low    { background: #3fb950; }
+.chapter-nav-risk-dot--medium { background: #f0a500; }
+.chapter-nav-risk-dot--high   { background: #f85149; }
 
 /* ─── ChapterFileList ─────────────────────────────────────────────────────── */
 
@@ -1194,6 +1248,20 @@
 .full-file-chapter-num  { color: rgba(255,255,255,0.3); }
 .full-file-chapter-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text, #e6edf3); }
 .full-file-chapter-progress { font-size: 10px; color: rgba(255,255,255,0.3); flex-shrink: 0; }
+
+.full-file-chapter-risk {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.full-file-chapter-risk--low    { background: rgba(63,185,80,0.15);  color: #3fb950; }
+.full-file-chapter-risk--medium { background: rgba(240,165,0,0.15);  color: #f0a500; }
+.full-file-chapter-risk--high   { background: rgba(248,81,73,0.15);  color: #f85149; }
+.full-file-chapter-risk--none   { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.3); }
 .full-file-chapter-done { font-size: 10px; color: #3fb950; flex-shrink: 0; }
 .full-file-chapter-chevron { font-size: 10px; color: rgba(255,255,255,0.3); flex-shrink: 0; }
 
@@ -1235,6 +1303,7 @@
 .full-file-row-risk--low    { background: #3fb950; }
 .full-file-row-risk--medium { background: #f0a500; }
 .full-file-row-risk--high   { background: #f85149; }
+.full-file-row-risk--none   { background: rgba(255,255,255,0.15); }
 
 .full-file-row-name {
   flex: 1;

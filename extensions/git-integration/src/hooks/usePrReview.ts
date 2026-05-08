@@ -1,7 +1,8 @@
 import { useCallback } from 'react'
 import { usePrReviewStore } from '../stores/pr-review.store'
 import { ReviewQueuePRSchema, PrReviewDetailSchema } from '../schemas/pr-review.schema'
-import type { PrReviewDetail } from '../schemas/pr-review.schema'
+import type { PrReviewDetail, FileMetrics, SignalDots } from '../schemas/pr-review.schema'
+import { computeRiskScore } from '../github/pr-review-service'
 
 // ─── Queue loading ────────────────────────────────────────────────────────────
 
@@ -64,22 +65,89 @@ export function useLoadPrDetail(repoRoot: string | null) {
 // ─── File metrics loading ─────────────────────────────────────────────────────
 
 export function useFetchFileMetrics(repoRoot: string | null) {
-  const { activePr } = usePrReviewStore()
+  const { activePr, updateFileRiskScore, updateQueuePrRisk } = usePrReviewStore()
 
-  return useCallback(async () => {
-    if (!repoRoot || !activePr) return
-    const allFiles = activePr.chapters.flatMap(c => c.files)
+  return useCallback(async (prDetail?: PrReviewDetail) => {
+    const pr = prDetail ?? activePr
+    if (!repoRoot || !pr) return
+    // Exclude lock files / generated files (tier 3) from risk scoring entirely
+    const allFiles = pr.chapters.flatMap(c => c.files).filter(f => f.tier !== 3)
 
-    for (const file of allFiles) {
-      try {
+    // Fetch raw metrics for all files in parallel
+    const results = await Promise.allSettled(
+      allFiles.map(async file => {
         const result = await window.electronAPI.github.fileMetrics(repoRoot, file.path)
-        if ('error' in result) continue
-        // Metrics are stored on the file object via activePr update;
-        // full wiring done when RiskBreakdownPanel requests per-file detail
-      } catch {
-        // non-blocking; individual file failures don't block others
-      }
+        if ('error' in result) return null
+        const raw = result as {
+          churn90d: number; blastRadius: number; topImporters: string[]
+          importerCount: number; testFilePresent: boolean
+        }
+        const metrics: FileMetrics = {
+          path:            file.path,
+          additions:       file.additions,
+          deletions:       file.deletions,
+          churn90d:        raw.churn90d ?? null,
+          blastRadius:     raw.blastRadius ?? null,
+          testFilePresent: raw.testFilePresent ?? false,
+          complexityDelta: null,
+          patchCoverage:   raw.patchCoverage ?? null,
+          topImporters:    raw.topImporters ?? [],
+          importerCount:   raw.importerCount ?? 0,
+        }
+        return { file, metrics }
+      })
+    )
+
+    const collected: Array<{ file: typeof allFiles[0]; metrics: FileMetrics }> = []
+    for (const r of results) {
+      if (r.status === 'fulfilled' && r.value != null) collected.push(r.value)
     }
+
+    if (collected.length === 0) return
+
+    const allMetrics = collected.map(c => c.metrics)
+
+    // Compute risk scores for each file and update the store
+    for (const { file, metrics } of collected) {
+      const chapter = pr.chapters.find(c => c.files.some(f => f.path === file.path))
+      if (!chapter) continue
+      const riskScore = computeRiskScore(metrics, allMetrics)
+      updateFileRiskScore(chapter.id, file.path, riskScore)
+    }
+
+    // Weighted PR-level risk: high files always push to HIGH; medium files block LOW
+    const riskLevels = collected.map(c => computeRiskScore(c.metrics, allMetrics).level)
+    const highCount  = riskLevels.filter(l => l === 'high').length
+    const medCount   = riskLevels.filter(l => l === 'medium').length
+    const n          = riskLevels.length
+    const prRiskLevel: 'low' | 'medium' | 'high' =
+      highCount > 0                               ? 'high'
+      : medCount >= 3 || (n > 0 && medCount / n >= 0.3) ? 'high'
+      : medCount > 0                              ? 'medium'
+      : 'low'
+
+    const anyMissingTest = collected.some(c => !c.metrics.testFilePresent)
+    const maxChurn = Math.max(...collected.map(c => c.metrics.churn90d ?? 0))
+    const maxBlast = Math.max(...collected.map(c => c.metrics.blastRadius ?? 0))
+    const covValues = collected.map(c => c.metrics.patchCoverage).filter((v): v is number => v != null)
+    const avgCoverage = covValues.length > 0 ? covValues.reduce((a, b) => a + b, 0) / covValues.length : null
+
+    const ciDot: SignalDots['ci'] =
+      pr.ciStatus === 'passing' ? 'pass'
+      : pr.ciStatus === 'failing' ? 'fail'
+      : pr.ciStatus === 'pending' ? 'warn'
+      : 'unknown'
+
+    const signalDots: SignalDots = {
+      tests:    anyMissingTest ? 'fail' : 'pass',
+      coverage: avgCoverage == null ? 'unknown' : avgCoverage >= 80 ? 'pass' : avgCoverage >= 50 ? 'warn' : 'fail',
+      ci:       ciDot,
+      lint:     pr.lintStatus ?? 'unknown',
+      churn:    maxChurn > 50 ? 'fail' : maxChurn > 20 ? 'warn' : 'pass',
+      blast:    maxBlast > 20 ? 'fail' : maxBlast > 10 ? 'warn' : 'pass',
+    }
+
+    updateQueuePrRisk(pr.number, prRiskLevel, signalDots)
   }, [repoRoot, activePr])
 }
 

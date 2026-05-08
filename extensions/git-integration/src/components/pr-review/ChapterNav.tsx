@@ -1,6 +1,7 @@
 import React from 'react'
 import type { Chapter } from '../../schemas/pr-review.schema'
 import { usePrReviewStore } from '../../stores/pr-review.store'
+import { chapterRiskLevel } from '../../github/pr-review-service'
 
 interface Props {
   chapters: Chapter[]
@@ -31,6 +32,7 @@ export function ChapterNav({ chapters }: Props) {
             className={`chapter-nav-tab chapter-nav-tab--${status}${isActive ? ' chapter-nav-tab--active' : ''}`}
             onClick={() => setCurrentChapter(ch.id)}
           >
+            <span className={`chapter-nav-risk-dot chapter-nav-risk-dot--${chapterRiskLevel(ch)}`} />
             <span className="chapter-nav-name">{ch.name}</span>
             <span className="chapter-nav-meta">{ch.files.length} files · {ch.estimatedMinutes}m</span>
             {status === 'complete' && <span className="chapter-nav-check" aria-label="complete">✓</span>}

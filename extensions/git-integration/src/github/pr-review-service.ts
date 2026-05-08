@@ -1,4 +1,4 @@
-import type { Chapter, PrChangedFile, RiskScore, FileMetrics, ReviewQueuePR } from '../schemas/pr-review.schema.js'
+import type { Chapter, PrChangedFile, RiskScore, FileMetrics, ReviewQueuePR, SignalDots } from '../schemas/pr-review.schema.js'
 import type { FileDiff } from '../schemas/git.schema.js'
 
 // ─── Decision-point keywords for cyclomatic complexity ───────────────────────
@@ -162,6 +162,31 @@ export function computeRiskScore(
 
 // ─── Chapter building ─────────────────────────────────────────────────────────
 
+function isLockOrGeneratedFile(name: string): boolean {
+  // Lock files (all languages)
+  if (/\.lock$/.test(name)) return true                 // *.lock (yarn, Cargo, Gemfile, poetry, etc.)
+  if (/package-lock\.json$/.test(name)) return true     // npm
+  if (/pnpm-lock\.yaml$/.test(name)) return true        // pnpm
+  if (/packages\.lock\.json$/.test(name)) return true   // .NET
+  if (/gradle\.lockfile$/.test(name)) return true       // Gradle
+  if (/Package\.resolved$/.test(name)) return true      // Swift
+  if (/go\.sum$/.test(name)) return true                // Go
+  if (/go\.work\.sum$/.test(name)) return true          // Go workspaces
+  if (/requirements\.txt$/.test(name)) return true      // Python (pinned deps)
+  if (/constraints\.txt$/.test(name)) return true       // Python pip constraints
+  if (/shrinkwrap\.json$/.test(name)) return true       // npm shrinkwrap
+  // Generated / mechanical files
+  if (/\.generated\.[^.]+$/.test(name)) return true
+  if (/\.snap$/.test(name)) return true                 // test snapshots
+  if (/\.pb\.go$/.test(name)) return true               // protobuf Go
+  if (/\.pb\.swift$/.test(name)) return true            // protobuf Swift
+  if (/_pb2\.py$/.test(name)) return true               // protobuf Python
+  if (/\.pb\.cc$|\.pb\.h$/.test(name)) return true      // protobuf C++
+  if (/GraphQL\.swift$/.test(name)) return true         // Apollo GraphQL generated
+  if (/API\.graphql\.swift$/.test(name)) return true
+  return false
+}
+
 function classifyTier(path: string): 0 | 1 | 2 | 3 {
   const name = path.split('/').pop() ?? path
   if (
@@ -169,12 +194,7 @@ function classifyTier(path: string): 0 | 1 | 2 | 3 {
     name === 'types.ts' || name === 'interfaces.ts' || name === 'index.ts'
   ) return 0
   if (/\.(spec|test)\.[^.]+$/.test(name) || path.includes('__tests__/')) return 2
-  if (
-    /package-lock\.json$/.test(name) ||
-    /\.lock$/.test(name) ||
-    /\.generated\.[^.]+$/.test(name) ||
-    /\.snap$/.test(name)
-  ) return 3
+  if (isLockOrGeneratedFile(name)) return 3
   return 1
 }
 
@@ -325,12 +345,80 @@ function mapChangeType(raw: string): PrChangedFile['changeType'] {
 
 // ─── Queue PR parsing ─────────────────────────────────────────────────────────
 
+const LINT_NAMES     = ['lint', 'eslint', 'rubocop', 'flake8', 'pylint', 'stylelint', 'tslint']
+const COVERAGE_NAMES = ['coverage', 'codecov', 'coveralls', 'sonar', 'codeclimate', 'lcov']
+
+type SignalValue = 'pass' | 'warn' | 'fail' | 'unknown'
+
+function checkSignal(rollup: unknown, keywords: string[]): SignalValue {
+  if (!rollup || !Array.isArray(rollup)) return 'unknown'
+  const checks = (rollup as Array<Record<string, unknown>>).filter(s => {
+    const name = String(s.name ?? s.context ?? '').toLowerCase()
+    return keywords.some(k => name.includes(k))
+  })
+  if (checks.length === 0) return 'unknown'
+  const states = checks.map(s => String(s.state ?? s.conclusion ?? '').toUpperCase())
+  if (states.some(s => s === 'FAILURE' || s === 'ERROR'))  return 'fail'
+  if (states.some(s => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED')) return 'warn'
+  if (states.every(s => s === 'SUCCESS')) return 'pass'
+  return 'unknown'
+}
+
+function ciSignal(rollup: unknown): SignalValue {
+  if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'unknown'
+  const states = (rollup as Array<Record<string, unknown>>).map(s => String(s.state ?? s.conclusion ?? '').toUpperCase())
+  if (states.some(s => s === 'FAILURE' || s === 'ERROR'))  return 'fail'
+  if (states.some(s => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED')) return 'warn'
+  if (states.every(s => s === 'SUCCESS')) return 'pass'
+  return 'unknown'
+}
+
+function testsSignal(filePaths: string[]): SignalValue {
+  if (filePaths.length === 0) return 'unknown'
+  const sourceFiles = filePaths.filter(p => /\.(ts|tsx|js|jsx|py|rb|go|java|cs)$/.test(p) && !/\.(spec|test)\.[^.]+$/.test(p) && !p.includes('__tests__'))
+  if (sourceFiles.length === 0) return 'unknown'
+  const testFiles = new Set(filePaths.filter(p => /\.(spec|test)\.[^.]+$/.test(p) || p.includes('__tests__')))
+  if (testFiles.size === 0) return 'fail'
+  // Check if source files have corresponding test files in the PR
+  const covered = sourceFiles.filter(src => {
+    const stem = src.replace(/\.[^.]+$/, '').replace(/\/index$/, '')
+    return [...testFiles].some(t => t.includes(stem.split('/').pop()!))
+  })
+  if (covered.length === 0) return 'warn'
+  return covered.length >= sourceFiles.length / 2 ? 'pass' : 'warn'
+}
+
+function churnSignal(totalLines: number, fileCount: number): SignalValue {
+  if (fileCount === 0) return 'unknown'
+  const perFile = totalLines / fileCount
+  return perFile > 200 ? 'fail' : perFile > 80 ? 'warn' : 'pass'
+}
+
+function blastSignal(fileCount: number): SignalValue {
+  return fileCount > 15 ? 'fail' : fileCount > 6 ? 'warn' : 'pass'
+}
+
 export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
-  const obj = raw as Record<string, unknown>
-  const files  = (obj.files as unknown[] | undefined) ?? []
-  const fileCount  = files.length
-  const additions  = files.reduce((s, f) => s + Number((f as Record<string,unknown>).additions ?? 0), 0)
-  const deletions  = files.reduce((s, f) => s + Number((f as Record<string,unknown>).deletions ?? 0), 0)
+  const obj      = raw as Record<string, unknown>
+  const rawFiles = (obj.files as unknown[] | undefined) ?? []
+  const fileCount  = rawFiles.length
+  const additions  = rawFiles.reduce((s, f) => s + Number((f as Record<string,unknown>).additions ?? 0), 0)
+  const deletions  = rawFiles.reduce((s, f) => s + Number((f as Record<string,unknown>).deletions ?? 0), 0)
+  const filePaths  = rawFiles.map(f => String((f as Record<string,unknown>).path ?? (f as Record<string,unknown>).filename ?? ''))
+  const rollup     = obj.statusCheckRollup
+
+  const signalDots: SignalDots = {
+    tests:    testsSignal(filePaths),
+    coverage: checkSignal(rollup, COVERAGE_NAMES),
+    ci:       ciSignal(rollup),
+    lint:     checkSignal(rollup, LINT_NAMES),
+    churn:    churnSignal(additions + deletions, fileCount),
+    blast:    blastSignal(fileCount),
+  }
+
+  const ciSt = ciSignal(rollup)
+  const ciStatus: ReviewQueuePR['ciStatus'] =
+    ciSt === 'pass' ? 'passing' : ciSt === 'fail' ? 'failing' : ciSt === 'warn' ? 'pending' : 'none'
 
   return {
     number:             Number(obj.number),
@@ -341,25 +429,25 @@ export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
     headRefName:        String(obj.headRefName ?? ''),
     baseRefName:        String(obj.baseRefName ?? ''),
     isDraft:            Boolean(obj.isDraft),
-    ciStatus:           'none',
+    ciStatus,
     fileCount,
     additions,
     deletions,
     estimatedMinutes:   Math.max(1, Math.ceil((additions + deletions) / 60)),
     riskLevel:          'low',
-    signalDots: {
-      tests:    'unknown',
-      coverage: 'unknown',
-      ci:       'unknown',
-      lint:     'unknown',
-      churn:    'unknown',
-      blast:    'unknown',
-    },
+    signalDots,
     sessionStatus: 'not-started',
   }
 }
 
 // ─── Force-push changed-file detection ───────────────────────────────────────
+
+export function chapterRiskLevel(chapter: Chapter): 'low' | 'medium' | 'high' {
+  const scoreable = chapter.files.filter(f => f.tier !== 3)
+  if (scoreable.some(f => f.riskScore.level === 'high'))   return 'high'
+  if (scoreable.some(f => f.riskScore.level === 'medium')) return 'medium'
+  return 'low'
+}
 
 export function detectChangedFiles(
   oldFiles: PrChangedFile[],
