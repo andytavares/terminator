@@ -1,20 +1,48 @@
 # Extension Development Guide
 
-Extensions allow you to add functionality to Terminator without modifying its core code. They run in the main process and contribute to four integration points: settings, sidebar, context menus, and keyboard shortcuts.
+Extensions let you add functionality to Terminator without touching its core code. They contribute to the application through the `ExtensionAPI` — a stable, versioned interface. This guide covers everything you need to write, test, and distribute an extension.
+
+**Current API version**: 1.1.0
+
+---
+
+## Quick Start: Scaffold a New Extension
+
+The fastest way to start is the scaffolding CLI. It generates a complete, working hello-world extension in seconds:
+
+```bash
+npm run create-extension -- my-extension
+```
+
+This creates `extensions/my-extension/` with a `manifest.json` and a `src/index.ts` that demonstrates every API surface. Run `npm run dev` and your extension loads automatically.
+
+Options:
+
+```bash
+npm run create-extension -- <name> [--id <reverse-domain-id>] [--dir <output-dir>]
+
+# Examples:
+npm run create-extension -- git-tools
+npm run create-extension -- git-tools --id com.acme.git-tools
+npm run create-extension -- git-tools --dir /path/to/my/extensions/git-tools
+```
+
+See [Scaffolding CLI Reference](#scaffolding-cli-reference) at the end of this guide for full options.
 
 ---
 
 ## Extension Structure
 
-An extension is a directory with two required files:
+An extension is a directory with a manifest and an entry point:
 
 ```
 my-extension/
-├── extension.json   # Manifest
-└── index.js         # Entry point (CommonJS)
+├── manifest.json     # Required: extension metadata
+└── src/
+    └── index.ts      # Required: activate() / deactivate() entry point
 ```
 
-### Manifest (`extension.json`)
+### Manifest (`manifest.json`)
 
 ```json
 {
@@ -22,89 +50,90 @@ my-extension/
   "name": "My Extension",
   "version": "1.0.0",
   "description": "A short description of what this extension does.",
-  "main": "index.js",
+  "main": "src/index.ts",
   "minAppVersion": "0.1.0"
 }
 ```
 
-| Field           | Required | Description                                                              |
-| --------------- | -------- | ------------------------------------------------------------------------ |
-| `id`            | Yes      | Reverse-domain identifier. Must be unique. Example: `com.acme.git-tools` |
-| `name`          | Yes      | Human-readable name shown in the Extensions panel                        |
-| `version`       | Yes      | Semver string (`X.Y.Z`)                                                  |
-| `description`   | Yes      | Shown in the Extensions panel                                            |
-| `main`          | Yes      | Relative path to the entry point file                                    |
-| `minAppVersion` | Yes      | Minimum Terminator version required (semver range, e.g. `0.1.0`)         |
+| Field | Required | Description |
+|---|---|---|
+| `id` | Yes | Reverse-domain identifier, globally unique. Example: `com.acme.git-tools` |
+| `name` | Yes | Human-readable name shown in the Extensions panel |
+| `version` | Yes | Semver string (`X.Y.Z`) |
+| `description` | Yes | Shown in the Extensions panel |
+| `main` | Yes | Relative path to the entry point |
+| `minAppVersion` | Yes | Minimum Terminator version required (semver, e.g. `0.1.0`) |
 
----
+### Entry Point
 
-## Entry Point
+The entry point must export an `activate` function and may export `deactivate`:
 
-The entry point must export an `activate` function. It may optionally export `deactivate`.
+```typescript
+import type { ExtensionAPI } from '../../src/main/extensions/api'
 
-```js
-// index.js
+const disposables: Array<{ dispose(): void }> = []
 
-/**
- * Called when the extension is loaded or enabled.
- * @param {ExtensionAPI} api
- */
-function activate(api) {
-  // Register contributions here
+export function activate(api: ExtensionAPI): void {
+  // Register your contributions here
+  disposables.push(
+    api.sidebar.registerItem({
+      id: 'my-panel',
+      label: 'My Panel',
+      onClick: () => api.notifications.showToast('info', 'Hello from My Panel!'),
+    })
+  )
 }
 
-/**
- * Called when the extension is disabled (without app restart).
- * Clean up any resources not covered by Disposable.dispose().
- */
-function deactivate() {
-  // Optional cleanup
+export function deactivate(): void {
+  disposables.forEach(d => d.dispose())
+  disposables.length = 0
 }
-
-module.exports = { activate, deactivate }
 ```
 
-If `activate` throws, the extension transitions to `status: 'error'` and the app remains stable. The error message is shown in the Extensions panel.
+If `activate` throws, the extension transitions to `status: 'error'` and the app remains stable.
 
 ---
 
 ## ExtensionAPI Reference
 
-The `api` object passed to `activate` provides access to all contribution points.
+The `api` object passed to `activate` is the sole interface between your extension and the host application. **Do not import from `src/main/`, `src/renderer/`, or `src/shared/` directly.**
 
 ### `api.app`
 
-```js
-api.app.version // string — current Terminator version, e.g. "0.1.0"
+```typescript
+api.app.version  // string — current Terminator version, e.g. "0.1.0"
 ```
 
-### `api.settings`
+---
 
-Register a settings section that appears in both the Global and Workspace settings panels.
+### `api.settings` — Register and Read Settings
 
-```js
+Register a settings section that appears in the Global and Workspace settings panels. Settings declared as `workspaceScoped: true` can be overridden per workspace.
+
+```typescript
 const disposable = api.settings.register({
   label: 'My Extension Settings',
   properties: {
-    apiUrl: {
+    'myext.enabled': {
+      type: 'boolean',
+      label: 'Enable feature',
+      default: true,
+      workspaceScoped: true,   // Can be overridden per workspace
+    },
+    'myext.apiUrl': {
       type: 'string',
       label: 'API URL',
       description: 'The endpoint to call',
       default: 'https://example.com',
     },
-    timeout: {
+    'myext.timeout': {
       type: 'number',
       label: 'Timeout (ms)',
       default: 5000,
       min: 100,
       max: 30000,
     },
-    enabled: {
-      type: 'boolean',
-      label: 'Enable feature',
-      default: true,
-    },
-    mode: {
+    'myext.mode': {
       type: 'enum',
       label: 'Mode',
       default: 'fast',
@@ -113,72 +142,183 @@ const disposable = api.settings.register({
   },
 })
 
-// Read a setting value (respects workspace overrides)
-const url = api.settings.get('apiUrl')
+// Read a value (workspace setting takes precedence when in a workspace context)
+const url = api.settings.get<string>('myext.apiUrl')
 ```
 
-Call `disposable.dispose()` in `deactivate()` to remove the settings section.
+**Naming**: prefix all setting keys with your extension ID to avoid collisions. The host enforces this at registration time.
 
-### `api.sidebar`
+---
 
-Add an item below the workspace list in the sidebar.
+### `api.sidebar` — Sidebar Contributions
 
-```js
+#### Register a simple sidebar item
+
+Adds a clickable item beneath the workspace list.
+
+```typescript
 const disposable = api.sidebar.registerItem({
-  id: 'my-panel',
+  id: 'my-panel-trigger',
   label: 'My Panel',
   tooltip: 'Open My Panel',
-  onClick: () => {
-    // Handle click
-  },
+  onClick: () => { /* handle click */ },
 })
 ```
 
-### `api.contextMenu`
+#### Register a full sidebar panel _(v1.1.0)_
 
-Add items to right-click menus. The `target` parameter specifies which context menu to inject into.
+Registers a React component as a full UI panel in a layout slot (e.g., the right sidebar).
 
-```js
-// Available targets: 'workspace', 'project', 'tab', 'terminal'
+```typescript
+import { GitSidebarPanel } from './components/GitSidebarPanel'
+
+const disposable = api.sidebar.registerPanel('right-sidebar', {
+  id: 'git-changes',
+  title: 'Git Changes',
+  component: GitSidebarPanel,
+  defaultVisible: api.settings.get('git.sidebar.defaultOpen') ?? false,
+})
+```
+
+Available slots: `'right-sidebar'`. More slots will be added in future API versions.
+
+---
+
+### `api.topBar` — Project View Menu Items _(v1.1.0)_
+
+Register a menu item in the top bar of the project view.
+
+```typescript
+const disposable = api.topBar.registerMenuItem({
+  id: 'git-view-toggle',
+  label: 'Git',
+  tooltip: 'Open Git view',
+  onClick: () => openGitView(),
+})
+```
+
+---
+
+### `api.contextMenu` — Context Menu Contributions
+
+Add items to right-click menus.
+
+```typescript
+// Available targets: 'workspace' | 'project' | 'tab' | 'terminal'
 const disposable = api.contextMenu.registerItem('workspace', {
   id: 'open-in-editor',
   label: 'Open in Editor',
   onClick: (workspaceId) => {
-    // workspaceId is the id of the workspace that was right-clicked
-    console.log('Open workspace:', workspaceId)
+    // workspaceId is the id of the right-clicked entity
   },
 })
 ```
 
-### `api.keyboard`
+---
+
+### `api.keyboard` — Keyboard Shortcuts
 
 Register a keyboard shortcut. Throws synchronously if the accelerator conflicts with a reserved core shortcut.
 
-```js
-const disposable = api.keyboard.register('CmdOrCtrl+Shift+K', () => {
+```typescript
+const disposable = api.keyboard.register('CmdOrCtrl+Shift+G', () => {
   // Handle shortcut
 })
 ```
 
-**Reserved shortcuts** — cannot be claimed by extensions:
+**Reserved shortcuts** (cannot be claimed by extensions):
 `Cmd+1–9`, `Cmd++`, `Cmd+-`, `Cmd+Left`, `Cmd+Right`, `Cmd+T`, `Cmd+W`, `Cmd+,`
 
-Use Electron accelerator syntax. See the [Electron Accelerator docs](https://www.electronjs.org/docs/latest/api/accelerator).
+Use [Electron accelerator syntax](https://www.electronjs.org/docs/latest/api/accelerator).
 
-### `api.terminal`
+---
+
+### `api.terminal` — Terminal Session Events
 
 Subscribe to terminal session lifecycle events.
 
-```js
+```typescript
 const onCreate = api.terminal.onSessionCreate((session) => {
   // session: { id, projectId, tabTitle, type: 'human' | 'agent' }
-  console.log('New session:', session.id)
 })
 
 const onClose = api.terminal.onSessionClose((sessionId) => {
-  console.log('Session closed:', sessionId)
+  // sessionId: string
 })
 ```
+
+---
+
+### `api.shell` — Sandboxed Shell Execution _(v1.1.0)_
+
+Run `git` or `gh` commands in the main process. Execution is sandboxed to the current project directory.
+
+```typescript
+const result = await api.shell.exec({
+  command: 'git',                          // 'git' or 'gh' only
+  args: ['status', '--porcelain=v1', '-z'],
+  cwd: projectRoot,                        // Must be within the project root
+  timeoutMs: 5000,                         // Optional, default: 10000
+})
+
+if (result.exitCode !== 0) {
+  api.notifications.showToast('error', `git status failed: ${result.stderr}`)
+  return
+}
+// result.stdout contains the porcelain output
+```
+
+**Security**: `command` must be `'git'` or `'gh'`. `cwd` must be within the workspace folder. Arguments are passed directly to the OS — no shell expansion.
+
+---
+
+### `api.notifications` — Toasts _(v1.1.0)_
+
+Display a toast notification using the application's standard feedback system.
+
+```typescript
+api.notifications.showToast('info',    'Checking git status...')
+api.notifications.showToast('success', 'Committed 3 files')
+api.notifications.showToast('warning', 'gh CLI not authenticated')
+api.notifications.showToast('error',   'Could not create pull request')
+```
+
+Available types: `'info'` | `'success'` | `'warning'` | `'error'`
+
+---
+
+### `api.nativeMenu` — Native Application Menu _(v1.1.0)_
+
+Add items to the application's native **View** menu (macOS menu bar, Windows/Linux system menu).
+
+```typescript
+const disposable = api.nativeMenu.addViewMenuItem({
+  id: 'git-sidebar-toggle',
+  label: 'Toggle Git Sidebar',
+  accelerator: 'CmdOrCtrl+Shift+G',  // Optional; shown next to label in menu
+  onClick: () => toggleSidebar(),
+})
+```
+
+Items appear in registration order within the View submenu. Disposing removes the item and rebuilds the menu. Use this alongside `api.keyboard.register()` for the same action — the native menu item gives discoverability at the OS level; the keyboard shortcut gives speed.
+
+---
+
+### `api.fs` — File System Watch Events _(v1.1.0)_
+
+Subscribe to file change events for the current project root. Uses OS-level `fs.watch` with polling fallback.
+
+```typescript
+const watcher = api.fs.watch((event) => {
+  // event: { projectRoot, eventType: 'change' | 'rename', filename: string | null }
+  scheduleStatusRefresh(event.projectRoot)
+})
+
+// In deactivate():
+watcher.dispose()
+```
+
+**Note**: `filename` may be `null` on some Linux filesystems when using the polling fallback.
 
 ---
 
@@ -186,25 +326,26 @@ const onClose = api.terminal.onSessionClose((sessionId) => {
 
 Every registration method returns a `Disposable`:
 
-```js
+```typescript
 interface Disposable {
   dispose(): void
 }
 ```
 
-Call `dispose()` to undo the registration (remove the menu item, unregister the shortcut, etc.). If you do not call `dispose()` during `deactivate()`, the extension host cleans up automatically when the extension is unloaded.
+Calling `dispose()` undoes the registration. If you do not call `dispose()` in `deactivate()`, the extension host cleans up automatically on unload.
 
-**Best practice**: collect disposables and dispose all of them in `deactivate()`:
+**Best practice** — collect and dispose all registrations:
 
-```js
-const disposables = []
+```typescript
+const disposables: Array<{ dispose(): void }> = []
 
-function activate(api) {
+export function activate(api: ExtensionAPI): void {
   disposables.push(api.sidebar.registerItem({ ... }))
-  disposables.push(api.keyboard.register('CmdOrCtrl+Shift+X', () => {}))
+  disposables.push(api.keyboard.register('CmdOrCtrl+Shift+H', () => {}))
+  disposables.push(api.fs.watch((event) => { ... }))
 }
 
-function deactivate() {
+export function deactivate(): void {
   disposables.forEach(d => d.dispose())
   disposables.length = 0
 }
@@ -214,36 +355,73 @@ function deactivate() {
 
 ## Installing an Extension
 
-1. Open Terminator.
-2. Press `Cmd+,` to open Settings → select **Extensions**.
+**Pre-bundled extensions** (like the git integration) load automatically. No install step needed.
+
+**Local extensions**:
+
+1. Build your extension (compile TypeScript if needed, or use `.js` directly).
+2. Open Terminator → `Cmd+,` → **Extensions**.
 3. Click **Install from Directory** and select your extension directory.
-4. The extension is activated immediately if it loads without errors.
+4. The extension activates immediately.
 
-Extensions persist across app restarts. Enabled extensions are reloaded automatically on startup.
-
----
-
-## Disabling / Re-enabling
-
-Use the toggle in Settings → Extensions. Disabling calls `deactivate()` and removes all contributions without restarting the app. Re-enabling calls `activate()` again.
+Extensions persist across restarts.
 
 ---
 
-## Working Example
+## Disabling / Enabling
 
-A complete working extension is at `tests/fixtures/sample-extension/`. It demonstrates:
+Toggle in Settings → Extensions. Disabling calls `deactivate()` and removes all contributions without restarting the app.
 
-- Registering a settings section
-- Adding a workspace context menu item
-- Registering a keyboard shortcut
+To disable per-workspace, add to `.terminator/settings.json` in your project root:
 
-Study it as a starting point.
+```json
+{
+  "com.example.my-extension": {
+    "myext.enabled": false
+  }
+}
+```
 
 ---
 
 ## Constraints
 
-1. **No internal imports** — extensions must not import from `src/main/`, `src/renderer/`, or `src/shared/`. The `ExtensionAPI` object is the only allowed interface.
-2. **CommonJS only** — extension entry points must use `module.exports`, not ES module `export`. The extension host uses `require()`.
-3. **Synchronous `activate`** — `activate` may return a Promise (async), but errors thrown synchronously or from the resolved Promise both result in `status: 'error'`.
-4. **Main process context** — extensions run in the Electron main process with full Node.js access. Future versions may sandbox extensions in a separate process.
+1. **No internal imports** — only the `ExtensionAPI` object. Do not import from `src/main/`, `src/renderer/`, or `src/shared/`.
+2. **Shell commands**: `api.shell.exec` only allows `git` and `gh`. Any other command is rejected with `COMMAND_NOT_ALLOWED`.
+3. **CWD scope**: `api.shell.exec` `cwd` must be within the current workspace folder.
+4. **Panel slots**: only one panel per slot per extension.
+5. **Settings key namespacing**: all setting keys must be prefixed with the extension ID (enforced at registration).
+6. **Native menu**: `api.nativeMenu.addViewMenuItem` adds to the View submenu only. Other native menus (File, Edit, Help) are not exposed.
+7. **API versioning**: breaking changes bump the MAJOR version. Additive changes bump MINOR. Check `api.app.version` to feature-detect if needed.
+
+---
+
+## Scaffolding CLI Reference
+
+```bash
+npm run create-extension -- <name> [options]
+```
+
+| Argument / Option | Description |
+|---|---|
+| `<name>` | Kebab-case extension name (e.g., `my-extension`). Becomes the directory name under `extensions/`. |
+| `--id <id>` | Reverse-domain extension ID (e.g., `com.acme.my-extension`). Defaults to `com.example.<name>`. |
+| `--dir <path>` | Custom output directory. Defaults to `extensions/<name>`. |
+| `--help` | Print usage and exit. |
+
+**Exit codes**: `0` success, `1` bad arguments, `2` directory already exists, `3` filesystem error.
+
+The generated `src/index.ts` is a complete working hello-world demonstrating all v1.1.0 API surfaces. v1.1.0-specific surfaces (shell, fs, registerPanel, topBar) are included as commented-out stubs with `// TODO:` markers so you can activate them incrementally.
+
+---
+
+## Working Example
+
+The pre-bundled git integration extension at `extensions/git-integration/` is the canonical real-world example. It demonstrates:
+
+- `api.sidebar.registerPanel` (right sidebar git status)
+- `api.topBar.registerMenuItem` (Git view in project top bar)
+- `api.shell.exec` (git status, diff, stage, commit; gh pr create)
+- `api.notifications.showToast` (all operation outcomes)
+- `api.fs.watch` (sidebar auto-refresh)
+- `api.settings.register` with `workspaceScoped` settings

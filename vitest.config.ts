@@ -3,7 +3,14 @@ import { resolve } from 'path'
 
 export default defineConfig({
   test: {
-    include: ['tests/unit/**/*.spec.ts', 'tests/integration/**/*.spec.ts'],
+    include: [
+      'tests/unit/**/*.spec.ts',
+      'tests/unit/**/*.spec.js',
+      'tests/integration/**/*.spec.ts',
+      'tests/integration/**/*.spec.js',
+      'extensions/*/tests/**/*.spec.ts',
+      'extensions/*/tests/**/*.spec.js',
+    ],
     environment: 'node',
     globals: true,
     coverage: {

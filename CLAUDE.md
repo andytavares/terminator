@@ -2,7 +2,7 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/001-extension-first-terminal/plan.md
+at specs/002-git-github-integration/plan.md
 
 <!-- SPECKIT END -->
 

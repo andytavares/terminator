@@ -1,10 +1,16 @@
-/* ── Tab Bar ─────────────────────────────────────────────────── */
+/* ── Tab bar stack (wraps primary + session rows) ─────────────── */
+.tab-bar-stack {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* ── Primary tab bar (Terminal, Git, …) ───────────────────────── */
 .tab-bar {
   display: flex;
   align-items: stretch;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
-  height: 36px;
   overflow-x: auto;
   overflow-y: hidden;
   flex-shrink: 0;
@@ -12,13 +18,24 @@
 
 .tab-bar::-webkit-scrollbar { height: 0; }
 
+.tab-bar--primary {
+  height: 36px;
+}
+
+/* ── Session sub-tab bar ──────────────────────────────────────── */
+.tab-bar--sessions {
+  height: 30px;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border);
+}
+
 /* ── Individual tab ──────────────────────────────────────────── */
 .tab-bar__tab {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 0 12px;
-  min-width: 110px;
+  padding: 0 14px;
+  min-width: 90px;
   max-width: 200px;
   cursor: pointer;
   border-right: 1px solid var(--border);
@@ -32,6 +49,20 @@
   position: relative;
 }
 
+/* Primary tabs are slightly bolder */
+.tab-bar--primary .tab-bar__tab {
+  font-size: 12px;
+  font-weight: 500;
+  min-width: 80px;
+}
+
+/* Session sub-tabs are smaller */
+.tab-bar--sessions .tab-bar__tab {
+  font-size: 11px;
+  min-width: 100px;
+  padding: 0 10px;
+}
+
 .tab-bar__tab:hover {
   background: var(--bg-elevated);
   color: var(--text-primary);
@@ -42,11 +73,22 @@
   color: var(--text-primary);
 }
 
-/* top accent line on active tab */
-.tab-bar__tab--active::before {
+/* Active indicator: top accent on primary tabs */
+.tab-bar--primary .tab-bar__tab--active::before {
   content: '';
   position: absolute;
   top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--ws-color, var(--accent));
+}
+
+/* Active indicator: bottom accent on session sub-tabs */
+.tab-bar--sessions .tab-bar__tab--active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
   left: 0;
   right: 0;
   height: 2px;
@@ -104,7 +146,7 @@
   border-right: 1px solid var(--border);
   color: var(--text-muted);
   font-size: 18px;
-  padding: 0 12px;
+  padding: 0 10px;
   height: 100%;
   line-height: 1;
   transition: background 0.1s, color 0.1s;

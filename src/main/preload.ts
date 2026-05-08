@@ -75,6 +75,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeWorktree: (repoRoot: string, worktreePath: string) =>
       ipcRenderer.invoke('git:remove-worktree', { repoRoot, worktreePath }),
     listWorktrees: (path: string) => ipcRenderer.invoke('git:list-worktrees', { path }),
+    status: (path: string, maxFiles?: number) =>
+      ipcRenderer.invoke('git:status', { path, maxFiles }),
+    diffFile: (repoRoot: string, path: string, staged: boolean) =>
+      ipcRenderer.invoke('git:diff-file', { repoRoot, path, staged }),
+    stage: (repoRoot: string, paths: string[]) =>
+      ipcRenderer.invoke('git:stage', { repoRoot, paths }),
+    unstage: (repoRoot: string, paths: string[]) =>
+      ipcRenderer.invoke('git:unstage', { repoRoot, paths }),
+    commit: (repoRoot: string, message: string, signOff?: boolean) =>
+      ipcRenderer.invoke('git:commit', { repoRoot, message, signOff }),
+    prStatus: (repoRoot: string) =>
+      ipcRenderer.invoke('git:pr-status', { repoRoot }),
+    prCreate: (payload: unknown) =>
+      ipcRenderer.invoke('git:pr-create', payload),
   },
   settings: {
     getGlobal: () => ipcRenderer.invoke('settings:get-global'),
@@ -100,5 +114,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   keyboard: {
     isReserved: (accelerator: string) => RESERVED_SHORTCUTS.has(accelerator),
+  },
+  shell: {
+    exec: (options: unknown) => ipcRenderer.invoke('shell:exec', options),
+  },
+  fs: {
+    watchStart: (projectRoot: string) => ipcRenderer.invoke('fs:watch-start', { projectRoot }),
+    watchStop: () => ipcRenderer.invoke('fs:watch-stop'),
+    onChanged: (handler: (event: unknown) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: unknown) => handler(payload)
+      ipcRenderer.on('fs:changed', listener)
+      return () => ipcRenderer.removeListener('fs:changed', listener)
+    },
+  },
+  extensionEvents: {
+    onToast: (handler: (payload: { type: string; message: string }) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: { type: string; message: string }) =>
+        handler(payload)
+      ipcRenderer.on('extension:toast', listener)
+      return () => ipcRenderer.removeListener('extension:toast', listener)
+    },
+    onTogglePanel: (handler: (panelId: string) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: { panelId: string }) =>
+        handler(payload.panelId)
+      ipcRenderer.on('extension:toggle-panel', listener)
+      return () => ipcRenderer.removeListener('extension:toggle-panel', listener)
+    },
+    onSelectProjectTab: (handler: (tabId: string) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: { tabId: string }) =>
+        handler(payload.tabId)
+      ipcRenderer.on('extension:select-project-tab', listener)
+      return () => ipcRenderer.removeListener('extension:select-project-tab', listener)
+    },
   },
 })

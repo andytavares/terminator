@@ -14,10 +14,12 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext .ts,.tsx && tsc --noEmit",
     "format": "prettier --write .",
-    "rebuild": "electron-rebuild"
+    "rebuild": "electron-rebuild",
+    "create-extension": "node scripts/create-extension.js"
   },
   "dependencies": {
     "electron-store": "^8.2.0",
+    "highlight.js": "^11.11.1",
     "node-pty": "1.0.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",

@@ -5,6 +5,8 @@ import { registerTerminalHandlers } from './ipc/terminal.ipc.js'
 import { registerSettingsHandlers } from './ipc/settings.ipc.js'
 import { registerExtensionHandlers } from './ipc/extension.ipc.js'
 import { registerGitHandlers } from './ipc/git.ipc.js'
+import { registerShellHandlers } from './ipc/shell.ipc.js'
+import { registerFsHandlers } from './ipc/fs.ipc.js'
 import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
 
@@ -93,9 +95,12 @@ app.whenReady().then(async () => {
   registerSettingsHandlers()
   registerExtensionHandlers(extensionHost)
   registerGitHandlers()
+  registerShellHandlers()
+  registerFsHandlers(() => mainWindow)
   registerDialogHandlers()
 
   await extensionHost.loadAll()
+  await extensionHost.loadBundledExtensions(join(__dirname, '../../extensions'))
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

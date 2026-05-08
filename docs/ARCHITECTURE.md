@@ -63,8 +63,12 @@ All renderer-to-main communication goes through `window.electronAPI`, exposed by
 | `settings:*`  | renderer → main  | Global and per-workspace settings                            |
 | `dialog:*`    | renderer → main  | Native OS dialogs (folder picker)                            |
 | `extension:*` | renderer → main  | Extension install, toggle, contribution queries              |
+| `git:*`       | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create   |
+| `shell:exec`  | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)          |
+| `fs:*`        | renderer ↔ main  | File watch start/stop; `fs:changed` push events              |
 
 Full channel specifications: [`specs/001-extension-first-terminal/contracts/ipc-channels.md`](../specs/001-extension-first-terminal/contracts/ipc-channels.md)
+and [`specs/002-git-github-integration/contracts/ipc-channels-git.md`](../specs/002-git-github-integration/contracts/ipc-channels-git.md)
 
 ### Type safety
 
@@ -160,25 +164,45 @@ Theme changes take effect immediately — no restart needed — because the CSS 
 
 Extensions are Node.js CommonJS modules loaded in the main process by `ExtensionHost`.
 
+### Bundled extensions
+
+First-party extensions (like `extensions/git-integration/`) are auto-loaded at startup via `ExtensionHost.loadBundledExtensions(bundledDir)`. This scans the `extensions/` directory for subdirectories containing a `manifest.json` and loads each one. See [ADR-007](adr/007-bundled-first-extension-distribution.md).
+
 ### Loading sequence
 
 ```
 ExtensionHost.load(directoryPath)
       │
-      ├─ reads extension.json manifest
+      ├─ reads manifest.json (ADR-008: manifest.json, not extension.json)
       ├─ validates with ExtensionManifestSchema (Zod)
       ├─ checks minAppVersion compatibility
-      ├─ require()s entry point
+      ├─ require()s entry point (compiled .js, see ADR-008)
       ├─ calls activate(api) with ExtensionAPI instance
       │        │
-      │        └─ api.settings.register()      → globalRegistry.settingsSections
-      │           api.sidebar.registerItem()   → globalRegistry.sidebarItems
-      │           api.contextMenu.registerItem() → globalRegistry.contextMenuItems
-      │           api.keyboard.register()      → globalRegistry.keyboardHandlers (throws on reserved)
-      │           api.terminal.onSessionCreate() → globalRegistry.sessionCreateHandlers
+      │        └─ api.settings.register()           → globalRegistry.settingsSections
+      │           api.sidebar.registerItem()        → globalRegistry.sidebarItems
+      │           api.sidebar.registerPanel(slot)   → globalRegistry.sidebarPanels (v1.1.0)
+      │           api.topBar.registerMenuItem()     → globalRegistry.topBarItems (v1.1.0)
+      │           api.nativeMenu.addViewMenuItem()  → globalRegistry.nativeMenuItems + rebuild (v1.1.0)
+      │           api.shell.exec()                  → shell-executor.ts (sandboxed, v1.1.0)
+      │           api.notifications.showToast()     → BrowserWindow.webContents.send (v1.1.0)
+      │           api.fs.watch()                    → FsWatcherService handlers (v1.1.0)
+      │           api.contextMenu.registerItem()    → globalRegistry.contextMenuItems
+      │           api.keyboard.register()           → globalRegistry.keyboardHandlers (throws on reserved)
+      │           api.terminal.onSessionCreate()    → globalRegistry.sessionCreateHandlers
       │
       └─ errors in activate() set status: 'error', app stays stable (FR-028)
 ```
+
+### Sandboxed Shell Execution (v1.1.0)
+
+`api.shell.exec()` allows extensions to run `git` and `gh` commands in the main process. Since extensions run in the main process (not the renderer), this is a direct call to `shell-executor.ts` — not an IPC round-trip. The `shell:exec` IPC channel exists separately for renderer-initiated shell calls.
+
+Security constraints: command allowlist `['git', 'gh']`, CWD pinned to project root, `shell: false`, sanitized environment. See [ADR-006](adr/006-sandboxed-shell-exec-for-extensions.md).
+
+### File System Watch (v1.1.0)
+
+`FsWatcherService` (`src/main/fs/fs-watcher.ts`) manages OS-level `fs.watch` events with a polling fallback. Extensions subscribe via `api.fs.watch(handler)`. The service pushes `fs:changed` events to the renderer via `webContents.send`. See [ADR-005](adr/005-native-fswatcher-over-chokidar.md).
 
 ### Reserved keyboard shortcuts
 

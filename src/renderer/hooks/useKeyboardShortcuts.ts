@@ -7,9 +7,10 @@ import { useSettingsStore } from '../stores/settings.store'
 interface Options {
   onOpenSettings?: () => void
   onToggleLog?: () => void
+  onToggleGitSidebar?: () => void
 }
 
-export function useKeyboardShortcuts({ onOpenSettings, onToggleLog }: Options = {}): void {
+export function useKeyboardShortcuts({ onOpenSettings, onToggleLog, onToggleGitSidebar }: Options = {}): void {
   const { workspaces, activeWorkspaceId, setActiveWorkspace, activeProjectId, projectsByWorkspaceId } = useWorkspaceStore()
   const { getActiveSessionForProject, setActiveSessionForProject, getSessionsForProject } =
     useSessionStore()
@@ -30,6 +31,13 @@ export function useKeyboardShortcuts({ onOpenSettings, onToggleLog }: Options = 
       if (isMeta && e.shiftKey && e.key === 'l') {
         e.preventDefault()
         onToggleLog?.()
+        return
+      }
+
+      // Cmd+Shift+G: toggle git sidebar
+      if (isMeta && e.shiftKey && (e.key === 'g' || e.key === 'G')) {
+        e.preventDefault()
+        onToggleGitSidebar?.()
         return
       }
 

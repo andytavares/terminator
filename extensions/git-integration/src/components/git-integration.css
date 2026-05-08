@@ -1,0 +1,700 @@
+/* Git Sidebar Panel */
+.git-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 300px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--color-border);
+  font-size: 12px;
+}
+
+.git-sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  flex-shrink: 0;
+}
+
+.git-sidebar__close-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.git-sidebar__close-btn:hover { opacity: 1; }
+
+.git-sidebar__branch {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.git-sidebar__loading,
+.git-sidebar__not-git,
+.git-sidebar__empty {
+  padding: 16px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.git-sidebar__file-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.git-sidebar__file-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 8px;
+}
+
+.git-sidebar__file-row:hover {
+  background: var(--color-bg-hover);
+}
+
+.git-sidebar__checkbox {
+  flex-shrink: 0;
+  cursor: pointer;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+}
+
+.git-sidebar__file-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  flex: 1;
+}
+
+.git-sidebar__file-path:hover {
+  text-decoration: underline;
+}
+
+/* Git View */
+.git-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.git-view__left {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.git-view__right {
+  border-top: 1px solid var(--color-border);
+  min-height: 120px;
+  max-height: 40%;
+  overflow: hidden;
+}
+
+.git-view__commit-section {
+  padding: 8px;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.git-view__commit-message {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--color-bg-input, var(--color-bg-secondary));
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  padding: 6px 8px;
+  resize: vertical;
+  min-height: 52px;
+  font-family: inherit;
+}
+
+.git-view__commit-message:focus {
+  outline: none;
+  border-color: var(--color-accent, #61afef);
+}
+
+.git-view__commit-error {
+  color: #e06c75;
+  font-size: 11px;
+  margin: 4px 0;
+}
+
+.git-view__commit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  gap: 6px;
+}
+
+.git-view__commit-hint {
+  flex: 1;
+  min-width: 0;
+}
+
+.git-view__hint-text {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.git-view__buttons {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.git-view__btn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: inherit;
+}
+
+.git-view__btn--primary {
+  background: var(--color-accent, #61afef);
+  color: #fff;
+  border-color: var(--color-accent, #61afef);
+}
+
+.git-view__btn--primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.git-view__btn--primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.git-view__btn--secondary {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+}
+
+.git-view__btn--secondary:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+/* Staging Area */
+.staging-area {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.staging-area__section {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.staging-area__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  background: var(--color-bg-primary);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.staging-area__section-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.staging-area__action-btn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 1px 6px;
+  font-family: inherit;
+}
+
+.staging-area__action-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.staging-area__file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.staging-area__file-row:hover {
+  background: var(--color-bg-hover);
+}
+
+.staging-area__file-row--selected {
+  background: rgba(97, 175, 239, 0.12);
+}
+
+.staging-area__file-row--selected:hover {
+  background: rgba(97, 175, 239, 0.18);
+}
+
+.staging-area__checkbox {
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.staging-area__badge {
+  font-size: 10px;
+  font-weight: 700;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.staging-area__badge--modified { color: #d19a66; }
+.staging-area__badge--added { color: #98c379; }
+.staging-area__badge--deleted { color: #e06c75; }
+.staging-area__badge--renamed { color: #61afef; }
+.staging-area__badge--untracked { color: #abb2bf; }
+.staging-area__badge--conflicted { color: #e06c75; font-weight: 900; }
+
+.staging-area__file-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  flex: 1;
+}
+
+.staging-area__empty {
+  padding: 10px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.staging-area__conflict-badge {
+  font-size: 10px;
+  color: #e06c75;
+  margin-left: 4px;
+}
+
+.staging-area__truncation-banner {
+  padding: 6px 10px;
+  background: rgba(209, 154, 102, 0.15);
+  color: #d19a66;
+  font-size: 11px;
+  border-bottom: 1px solid rgba(209, 154, 102, 0.3);
+}
+
+/* File Diff View */
+.file-diff-view {
+  height: 100%;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.file-diff-view__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  height: 30px;
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.file-diff-view__filename {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.file-diff-view__view-toggle {
+  display: flex;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.file-diff-view__toggle-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 2px 8px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.file-diff-view__toggle-btn + .file-diff-view__toggle-btn {
+  border-left: 1px solid var(--color-border);
+}
+
+.file-diff-view__toggle-btn--active {
+  background: var(--color-accent, #61afef);
+  color: #fff;
+}
+
+.file-diff-view__toggle-btn:not(.file-diff-view__toggle-btn--active):hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.file-diff-view__scroll {
+  flex: 1;
+  overflow: auto;
+}
+
+.file-diff-view table {
+  width: 100%;
+}
+
+.file-diff-view--empty,
+.file-diff-view--binary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.file-diff-view__stale-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  background: rgba(97, 175, 239, 0.1);
+  border-bottom: 1px solid rgba(97, 175, 239, 0.3);
+  font-size: 11px;
+  color: #61afef;
+}
+
+.file-diff-view__refresh-btn {
+  background: none;
+  border: 1px solid rgba(97, 175, 239, 0.5);
+  border-radius: 3px;
+  color: #61afef;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 1px 6px;
+}
+
+.file-diff-view__truncation-notice {
+  padding: 6px 10px;
+  background: rgba(209, 154, 102, 0.1);
+  color: #d19a66;
+  font-size: 11px;
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.diff-hunk-header {
+  background: rgba(97, 175, 239, 0.08);
+  color: #61afef;
+  font-size: 11px;
+  padding: 2px 8px;
+  display: block;
+  border-top: 1px solid var(--color-border);
+}
+
+.diff-line {
+  display: flex;
+}
+
+.diff-line--add {
+  background: rgba(152, 195, 121, 0.12);
+}
+
+.diff-line--remove {
+  background: rgba(224, 108, 117, 0.12);
+}
+
+.diff-line__old-num,
+.diff-line__new-num {
+  user-select: none;
+  color: var(--color-text-secondary);
+  min-width: 36px;
+  text-align: right;
+  padding: 0 6px;
+  border-right: 1px solid var(--color-border);
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.diff-line__prefix {
+  padding: 0 4px;
+  min-width: 16px;
+  user-select: none;
+}
+
+.diff-line--add .diff-line__prefix { color: #98c379; }
+.diff-line--remove .diff-line__prefix { color: #e06c75; }
+
+.diff-line__content {
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+}
+
+/* Split diff table */
+.diff-table--split { table-layout: fixed; }
+
+.diff-table--split .diff-line__content {
+  width: 50%;
+}
+
+.diff-table__split-divider {
+  width: 1px;
+  background: var(--color-border);
+  padding: 0;
+}
+
+.diff-line__content--remove {
+  background: rgba(224, 108, 117, 0.12);
+}
+
+.diff-line__content--add {
+  background: rgba(152, 195, 121, 0.12);
+}
+
+.diff-line__content--empty {
+  background: var(--color-bg-secondary, rgba(0,0,0,0.08));
+}
+
+/* PR Dialog */
+.pr-dialog {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.pr-dialog__panel {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 20px;
+  width: 480px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pr-dialog__title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.pr-dialog__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pr-dialog__label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.pr-dialog__input,
+.pr-dialog__textarea {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  padding: 6px 8px;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pr-dialog__input:focus,
+.pr-dialog__textarea:focus {
+  outline: none;
+  border-color: var(--color-accent, #61afef);
+}
+
+.pr-dialog__textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.pr-dialog__inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pr-dialog__draft-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.pr-dialog__warning {
+  font-size: 11px;
+  color: #d19a66;
+  background: rgba(209, 154, 102, 0.1);
+  padding: 6px 10px;
+  border-radius: 4px;
+}
+
+.pr-dialog__existing-pr {
+  font-size: 12px;
+  color: #98c379;
+  background: rgba(152, 195, 121, 0.1);
+  padding: 8px 10px;
+  border-radius: 4px;
+}
+
+.pr-dialog__existing-pr a {
+  color: #61afef;
+}
+
+.pr-dialog__error {
+  font-size: 12px;
+  color: #e06c75;
+  background: rgba(224, 108, 117, 0.1);
+  padding: 6px 10px;
+  border-radius: 4px;
+}
+
+.pr-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.pr-dialog__cancel-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 6px 14px;
+  font-family: inherit;
+}
+
+.pr-dialog__cancel-btn:hover {
+  background: var(--color-bg-hover);
+}
+
+.pr-dialog__submit-btn {
+  background: var(--color-accent, #61afef);
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 6px 14px;
+  font-family: inherit;
+  font-weight: 500;
+}
+
+.pr-dialog__submit-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.pr-dialog__submit-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Git Full View (project tab: diff LEFT, changes RIGHT) */
+.git-full-view {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  overflow: hidden;
+}
+
+.git-full-view--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.git-full-view__diff-pane {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--color-border);
+}
+
+.git-full-view__changes-pane {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.git-full-view__staging {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.git-full-view__commit-section {
+  padding: 8px;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}

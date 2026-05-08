@@ -1,4 +1,5 @@
 import { join } from 'path'
+import { readdirSync, existsSync } from 'fs'
 import { app } from 'electron'
 import Store from 'electron-store'
 import type { Extension } from '../../shared/types/index.js'
@@ -36,9 +37,9 @@ export class ExtensionHost {
     let manifest: Record<string, unknown>
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      manifest = require(join(directoryPath, 'extension.json'))
+      manifest = require(join(directoryPath, 'manifest.json'))
     } catch (e) {
-      return { error: 'INVALID_MANIFEST', message: 'Cannot read extension.json' }
+      return { error: 'INVALID_MANIFEST', message: 'Cannot read manifest.json' }
     }
 
     const parsed = ExtensionManifestSchema.safeParse(manifest)
@@ -133,6 +134,28 @@ export class ExtensionHost {
     const extensions = store.get('extensions').filter((e) => e.status === 'enabled')
     for (const record of extensions) {
       await this.activate(record)
+    }
+  }
+
+  async loadBundledExtensions(bundledDir: string): Promise<void> {
+    if (!existsSync(bundledDir)) return
+    let entries: string[]
+    try {
+      entries = readdirSync(bundledDir, { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => d.name)
+    } catch {
+      return
+    }
+    for (const name of entries) {
+      const dirPath = join(bundledDir, name)
+      const manifestPath = join(dirPath, 'manifest.json')
+      if (!existsSync(manifestPath)) continue
+      // Only load if not already registered (avoid duplicates on hot-reload)
+      const alreadyLoaded = this.loaded.has(name)
+      if (!alreadyLoaded) {
+        await this.load(dirPath)
+      }
     }
   }
 

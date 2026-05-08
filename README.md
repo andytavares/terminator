@@ -2,15 +2,16 @@
 
 An extension-first, AI-focused terminal emulator built on Electron. Organizes work into Workspaces (repository-level) and Projects (task-level) with persistent tabbed terminal sessions that stay alive as you navigate between them.
 
-## Features (Phase 1)
+## Features
 
 - **Workspaces & Projects** — Two-level hierarchy. Workspaces map to local directories; Projects hold terminal sessions. Collapsible sidebar with color coding and tag chips.
 - **Persistent terminal sessions** — xterm.js `Terminal` instances are never destroyed on tab switch. Buffer, scroll position, and running process survive navigation.
 - **Agent tab labeling** — Tabs can be designated `human` or `agent`. Agent tabs show a visible badge in the tab strip.
 - **Theme system** — Dark/light themes switch immediately app-wide via CSS custom properties. Workspace-level overrides are supported.
 - **Settings** — Global and per-workspace configuration for theme, scrollback limit, and default shell.
-- **Extension system** — Extensions install from local directories and contribute settings sections, sidebar items, context menu entries, and terminal event hooks without modifying core code.
-- **Keyboard shortcuts** — `Cmd+1–9` (switch workspace), `Cmd++/-` (cycle workspaces), `Cmd+T` (new tab), `Cmd+Left/Right` (cycle tabs), `Cmd+,` (settings), `Cmd+W` (close tab).
+- **Extension system** — Extensions install from local directories and contribute settings sections, sidebar items, sidebar panels, top-bar menu items, native View menu items, context menu entries, and terminal event hooks without modifying core code. See [Extension Development Guide](docs/EXTENSION-DEVELOPMENT.md).
+- **Git Integration** — Built-in first-party extension: toggleable right sidebar showing live git status, full git view for staging/committing, and PR creation via `gh` CLI. Configurable per-workspace. Auto-refreshes on file changes.
+- **Keyboard shortcuts** — `Cmd+1–9` (switch workspace), `Cmd++/-` (cycle workspaces), `Cmd+T` (new tab), `Cmd+Left/Right` (cycle tabs), `Cmd+,` (settings), `Cmd+W` (close tab), `Cmd+Shift+G` (toggle git sidebar).
 
 ## Tech Stack
 
@@ -34,6 +35,8 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
   ```bash
   pip3 install setuptools --break-system-packages
   ```
+- **git** — Required for the git integration extension. Assumed to be on your PATH.
+- **gh CLI** (optional) — Required for GitHub PR creation. [Install gh](https://cli.github.com/). Authenticate with `gh auth login`.
 - macOS 13+ (primary), Windows 11, Ubuntu 22.04 LTS.
 
 ## Quick Start
