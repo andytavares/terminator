@@ -62,7 +62,20 @@ export function execShell(input: ShellExecInput): Promise<ShellExecOutput> {
           PATH: process.env.PATH,
           HOME: process.env.HOME,
           USER: process.env.USER,
+          LOGNAME: process.env.LOGNAME,
+          SHELL: process.env.SHELL,
+          TMPDIR: process.env.TMPDIR,
+          // git credentials
           GIT_TERMINAL_PROMPT: '0',
+          GIT_ASKPASS: process.env.GIT_ASKPASS,
+          SSH_AUTH_SOCK: process.env.SSH_AUTH_SOCK,
+          // gh CLI auth — token takes precedence over config dir auth
+          GH_TOKEN: process.env.GH_TOKEN,
+          GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+          // gh config location (used when no token env var is set)
+          XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
+          XDG_DATA_HOME: process.env.XDG_DATA_HOME,
+          APPDATA: process.env.APPDATA,
         },
       },
       (error, stdout, stderr) => {

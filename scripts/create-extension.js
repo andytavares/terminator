@@ -25,6 +25,20 @@ function validateId(id) {
 
 // ── Template generators ───────────────────────────────────────────────────────
 
+function generatePackageJson(name) {
+  return JSON.stringify(
+    {
+      name: `@terminator/extension-${name}`,
+      version: '0.1.0',
+      private: true,
+      description: `${name} extension for Terminator`,
+      dependencies: {},
+    },
+    null,
+    2
+  )
+}
+
 function generateManifest(name, id) {
   const displayName = name
     .split('-')
@@ -147,8 +161,9 @@ module.exports = { activate, deactivate }
 
 // ── File generation ───────────────────────────────────────────────────────────
 
-function writeExtension(dir, manifestContent, indexContent) {
+function writeExtension(dir, manifestContent, indexContent, pkgContent) {
   fs.mkdirSync(path.join(dir, 'src'), { recursive: true })
+  fs.writeFileSync(path.join(dir, 'package.json'), pkgContent, 'utf8')
   fs.writeFileSync(path.join(dir, 'manifest.json'), manifestContent, 'utf8')
   fs.writeFileSync(path.join(dir, 'src', 'index.js'), indexContent, 'utf8')
 }
@@ -222,21 +237,23 @@ function main(argv) {
   }
 
   // Generate content
+  const pkgContent = generatePackageJson(name)
   const manifestContent = generateManifest(name, id)
   const indexContent = generateIndex(name, id)
 
   // Write files
   try {
-    writeExtension(outDir, manifestContent, indexContent)
+    writeExtension(outDir, manifestContent, indexContent, pkgContent)
   } catch (err) {
     console.error(`Error writing extension files: ${err.message}`)
     process.exit(3)
   }
 
   console.log(`✓ Created extension "${name}" at ${outDir}`)
+  console.log(`  package.json  — workspace package (add npm deps here)`)
   console.log(`  manifest.json — id: ${id}`)
   console.log(`  src/index.js  — hello-world with all v1.1.0 API stubs`)
-  console.log(`\nRun "npm run dev" to load the extension automatically.`)
+  console.log(`\nRun "npm install" then "npm run dev" to load the extension automatically.`)
 }
 
 // Only run CLI when executed directly (not when imported for tests)
@@ -244,4 +261,4 @@ if (require.main === module) {
   main(process.argv)
 }
 
-module.exports = { validateName, validateId, generateManifest, generateIndex, writeExtension }
+module.exports = { validateName, validateId, generatePackageJson, generateManifest, generateIndex, writeExtension }

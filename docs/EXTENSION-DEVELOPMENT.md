@@ -92,6 +92,31 @@ export function deactivate(): void {
 
 If `activate` throws, the extension transitions to `status: 'error'` and the app remains stable.
 
+### Extension Dependencies (`package.json`)
+
+If your extension needs npm packages that aren't part of Terminator's core, declare them in an optional `package.json` alongside `manifest.json`. Extensions are registered as npm workspaces so their dependencies are hoisted automatically:
+
+```
+my-extension/
+├── manifest.json
+├── package.json     # Optional: extension-specific npm dependencies
+└── src/
+    └── renderer.tsx
+```
+
+```json
+{
+  "name": "@terminator/extension-my-extension",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "some-library": "^1.0.0"
+  }
+}
+```
+
+Run `npm install` from the repo root after adding a new `package.json`. Core dependencies (React, Zustand, Zod, etc.) are provided by the host app — do not redeclare them.
+
 ---
 
 ## ExtensionAPI Reference
