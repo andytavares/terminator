@@ -351,7 +351,6 @@ const COVERAGE_NAMES = ['coverage', 'codecov', 'coveralls', 'sonar', 'codeclimat
 type SignalValue = 'pass' | 'warn' | 'fail' | 'unknown'
 
 // Non-blocking conclusions that don't count as success or failure
-const NEUTRAL_CONCLUSIONS = new Set(['SKIPPED', 'NEUTRAL', 'CANCELLED'])
 
 function checkSignal(rollup: unknown, keywords: string[]): SignalValue {
   if (!rollup || !Array.isArray(rollup)) return 'unknown'
