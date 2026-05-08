@@ -2,17 +2,20 @@ import React, { useEffect, useState } from 'react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { ChapterNav } from './ChapterNav'
 import { ChapterFileList } from './ChapterFileList'
+import { FullFileList } from './FullFileList'
 import { ReviewDiffPane } from './ReviewDiffPane'
 import { RiskBreakdownPanel } from './RiskBreakdownPanel'
 import { ReviewSubmitPanel } from './ReviewSubmitPanel'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
-import type { PrReviewDetail, PrChangedFile } from '../../../../../src/shared/schemas/pr-review.schema'
+import type { PrReviewDetail, PrChangedFile } from '../../schemas/pr-review.schema'
 
 interface Props {
   repoRoot: string
   pr: PrReviewDetail
   onClose: () => void
 }
+
+type ViewMode = 'guided' | 'full'
 
 export function PrReviewView({ repoRoot, pr, onClose }: Props) {
   const {
@@ -23,8 +26,9 @@ export function PrReviewView({ repoRoot, pr, onClose }: Props) {
   } = usePrReviewStore()
 
   const loadInlineComments = useLoadInlineComments(repoRoot)
-  const [showSubmit, setShowSubmit]       = useState(false)
-  const [showRiskFor, setShowRiskFor]     = useState<string | null>(null)
+  const [showSubmit, setShowSubmit] = useState(false)
+  const [showRiskFor, setShowRiskFor] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('guided')
 
   // Resolve active chapter and file
   const activeChapterId = currentChapterId ?? pr.chapters[0]?.id ?? null
@@ -45,10 +49,9 @@ export function PrReviewView({ repoRoot, pr, onClose }: Props) {
   const currentFileIndex = currentFilePath
     ? orderedFiles.findIndex(f => f.path === currentFilePath)
     : 0
-  const resolvedIndex   = Math.max(0, currentFileIndex)
-  const activeFile      = orderedFiles[resolvedIndex] ?? null
+  const resolvedIndex = Math.max(0, currentFileIndex)
+  const activeFile    = orderedFiles[resolvedIndex] ?? null
 
-  // Set initial file if nothing selected yet
   useEffect(() => {
     if (!currentFilePath && orderedFiles.length > 0) {
       setCurrentFile(orderedFiles[0].path)
@@ -76,6 +79,13 @@ export function PrReviewView({ repoRoot, pr, onClose }: Props) {
     setShowRiskFor(null)
   }
 
+  // Used by FullFileList: selecting a file also switches active chapter
+  const handleSelectFileFromFull = (path: string, chapterId: string) => {
+    if (chapterId !== activeChapterId) setCurrentChapter(chapterId)
+    setCurrentFile(path)
+    setShowRiskFor(null)
+  }
+
   const handleMarkViewed = () => {
     if (!activeFile) return
     markFileViewed(repoRoot, pr.number, pr.headSHA, activeFile.path)
@@ -97,18 +107,14 @@ export function PrReviewView({ repoRoot, pr, onClose }: Props) {
 
   const handleFinishChapter = () => {
     if (!activeChapter) return
-    // Mark remaining files as viewed
     orderedFiles.forEach(f => {
       if (!viewedFiles.has(f.path)) {
         markFileViewed(repoRoot, pr.number, pr.headSHA, f.path)
       }
     })
-    // Move to next chapter if available
     const chapterIndex = pr.chapters.findIndex(c => c.id === activeChapterId)
     const nextChapter  = pr.chapters[chapterIndex + 1]
-    if (nextChapter) {
-      handleSelectChapter(nextChapter.id)
-    }
+    if (nextChapter) handleSelectChapter(nextChapter.id)
   }
 
   const handlePause = () => {
@@ -118,10 +124,60 @@ export function PrReviewView({ repoRoot, pr, onClose }: Props) {
 
   const showMultipleChapters = pr.chapters.length > 1
 
+  // In guided mode: chapter tabs + single-chapter file list
+  // In full mode:   all-chapters file list (no chapter tabs)
+  const leftPanel = viewMode === 'full' ? (
+    <aside className="pr-review-panel pr-review-panel--left">
+      <div className="pr-review-panel-header">
+        <span className="pr-review-chapter-name">All files</span>
+        <button
+          className="pr-view-mode-btn pr-view-mode-btn--active"
+          onClick={() => setViewMode('guided')}
+          title="Switch to guided chapter view"
+        >Guided ↩</button>
+      </div>
+      <FullFileList
+        pr={pr}
+        repoRoot={repoRoot}
+        headSHA={pr.headSHA}
+        currentFilePath={currentFilePath}
+        onSelectFile={handleSelectFileFromFull}
+      />
+    </aside>
+  ) : (
+    activeChapter && (
+      <aside className="pr-review-panel pr-review-panel--left">
+        <div className="pr-review-panel-header">
+          <span className="pr-review-chapter-name">{activeChapter.name}</span>
+          <div className="pr-review-panel-header-right">
+            <span className="pr-review-chapter-count">
+              {orderedFiles.filter(f => viewedFiles.has(f.path)).length}/{orderedFiles.length}
+            </span>
+            {showMultipleChapters && (
+              <button
+                className="pr-view-mode-btn"
+                onClick={() => setViewMode('full')}
+                title="Switch to full file view"
+              >All ↗</button>
+            )}
+          </div>
+        </div>
+        <ChapterFileList
+          repoRoot={repoRoot}
+          prNumber={pr.number}
+          headSHA={pr.headSHA}
+          chapter={activeChapter}
+          currentFilePath={activeFile?.path ?? null}
+          onSelectFile={handleSelectFile}
+        />
+      </aside>
+    )
+  )
+
   return (
     <div className="pr-review-view">
-      {/* Chapter tabs (hidden for single-chapter PRs) */}
-      {showMultipleChapters && activeChapterId && (
+      {/* Chapter tabs: only in guided mode, only for multi-chapter PRs */}
+      {viewMode === 'guided' && showMultipleChapters && activeChapterId && (
         <ChapterNav
           chapters={pr.chapters}
           activeChapterId={activeChapterId}
@@ -130,25 +186,7 @@ export function PrReviewView({ repoRoot, pr, onClose }: Props) {
       )}
 
       <div className="pr-review-panels">
-        {/* Left panel: file list */}
-        {activeChapter && (
-          <aside className="pr-review-panel pr-review-panel--left">
-            <div className="pr-review-panel-header">
-              <span className="pr-review-chapter-name">{activeChapter.name}</span>
-              <span className="pr-review-chapter-count">
-                {orderedFiles.filter(f => viewedFiles.has(f.path)).length} / {orderedFiles.length}
-              </span>
-            </div>
-            <ChapterFileList
-              repoRoot={repoRoot}
-              prNumber={pr.number}
-              headSHA={pr.headSHA}
-              chapter={activeChapter}
-              currentFilePath={activeFile?.path ?? null}
-              onSelectFile={handleSelectFile}
-            />
-          </aside>
-        )}
+        {leftPanel}
 
         {/* Centre panel: diff */}
         <main className="pr-review-panel pr-review-panel--centre">

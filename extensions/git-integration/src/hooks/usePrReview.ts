@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { usePrReviewStore } from '../stores/pr-review.store'
-import { ReviewQueuePRSchema, PrReviewDetailSchema } from '../../../../src/shared/schemas/pr-review.schema'
-import type { PrReviewDetail } from '../../../../src/shared/schemas/pr-review.schema'
+import { ReviewQueuePRSchema, PrReviewDetailSchema } from '../schemas/pr-review.schema'
+import type { PrReviewDetail } from '../schemas/pr-review.schema'
 
 // ─── Queue loading ────────────────────────────────────────────────────────────
 

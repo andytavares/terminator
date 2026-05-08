@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
-import type { Chapter, PrChangedFile } from '../../../../../src/shared/schemas/pr-review.schema'
+import type { Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
 
 interface Props {
   repoRoot: string

@@ -4,7 +4,7 @@ import { useGitStore } from '../stores/git.store'
 import { StagingArea } from './StagingArea'
 import { FileDiffView } from './FileDiffView'
 import { PrDialog } from './PrDialog'
-import type { FileDiff, PullRequest } from '../../../../src/shared/schemas/git.schema'
+import type { FileDiff, PullRequest } from '../schemas/git.schema'
 
 interface GitViewProps {
   repoRoot: string

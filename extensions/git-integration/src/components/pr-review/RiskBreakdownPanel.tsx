@@ -1,5 +1,5 @@
 import React from 'react'
-import type { RiskScore } from '../../../../../src/shared/schemas/pr-review.schema'
+import type { RiskScore } from '../../schemas/pr-review.schema'
 
 interface Props {
   filePath: string

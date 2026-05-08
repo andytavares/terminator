@@ -3,10 +3,10 @@ import { HealthChips } from './HealthChips'
 import { InlineCommentThread } from './InlineCommentThread'
 import { CommentComposer } from './CommentComposer'
 import { usePrReviewStore } from '../../stores/pr-review.store'
-import { detectComplexityHotspots } from '../../../../../src/main/github/pr-review-service'
-import type { PrChangedFile, PrReviewDetail } from '../../../../../src/shared/schemas/pr-review.schema'
-import type { FileDiff } from '../../../../../src/shared/schemas/git.schema'
-import { FileDiffSchema } from '../../../../../src/shared/schemas/git.schema'
+import { detectComplexityHotspots } from '../../github/pr-review-service'
+import type { PrChangedFile, PrReviewDetail } from '../../schemas/pr-review.schema'
+import type { FileDiff } from '../../schemas/git.schema'
+import { FileDiffSchema } from '../../schemas/git.schema'
 
 interface Props {
   repoRoot: string

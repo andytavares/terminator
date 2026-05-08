@@ -1,4 +1,4 @@
-import type { InlineComment, Thread } from '../../../../src/shared/schemas/pr-review.schema'
+import type { InlineComment, Thread } from '../schemas/pr-review.schema'
 
 // ─── Thread building (T045) ───────────────────────────────────────────────────
 

@@ -1,20 +1,17 @@
-import { ipcMain } from 'electron'
 import { z } from 'zod'
 import Store from 'electron-store'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { basename } from 'path'
-import type {
-  ReviewQueuePR,
-  PrReviewDetail,
-  InlineComment,
-} from '../../shared/schemas/pr-review.schema.js'
-import { ReviewSessionSchema } from '../../shared/schemas/pr-review.schema.js'
+import type { ReviewQueuePR, PrReviewDetail, InlineComment } from '../schemas/pr-review.schema.js'
+import { ReviewSessionSchema } from '../schemas/pr-review.schema.js'
 import { buildChapters, parseReviewQueuePR } from '../github/pr-review-service.js'
-import type { FileDiff } from '../../shared/schemas/git.schema.js'
-import { FileDiffSchema } from '../../shared/schemas/git.schema.js'
+import type { FileDiff } from '../schemas/git.schema.js'
+import { FileDiffSchema } from '../schemas/git.schema.js'
 
 const execFileAsync = promisify(execFile)
+
+type RegisterFn = (channel: string, handler: (payload: unknown) => Promise<unknown> | unknown) => void
 
 const sessionStore = new Store<Record<string, unknown>>({ name: 'pr-review-sessions' })
 
@@ -41,10 +38,9 @@ function parseRateLimit(err: unknown): { error: 'RATE_LIMITED'; resetAt: number 
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
-export function registerGithubHandlers(): void {
+export function registerGithubHandlers(register: RegisterFn): void {
 
-  // github:list-open-prs
-  ipcMain.handle('github:list-open-prs', async (_event, payload) => {
+  register('github:list-open-prs', async (payload) => {
     const schema = z.object({ repoRoot: z.string().min(1) })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
@@ -61,8 +57,7 @@ export function registerGithubHandlers(): void {
     }
   })
 
-  // github:pr-review-detail
-  ipcMain.handle('github:pr-review-detail', async (_event, payload) => {
+  register('github:pr-review-detail', async (payload) => {
     const schema = z.object({ repoRoot: z.string().min(1), prNumber: z.number().int().positive() })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
@@ -95,8 +90,7 @@ export function registerGithubHandlers(): void {
     }
   })
 
-  // github:pr-file-diff
-  ipcMain.handle('github:pr-file-diff', async (_event, payload) => {
+  register('github:pr-file-diff', async (payload) => {
     const schema = z.object({
       repoRoot: z.string().min(1),
       prNumber: z.number().int().positive(),
@@ -106,10 +100,20 @@ export function registerGithubHandlers(): void {
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber, path } = parsed.data
     try {
-      const shaRaw = await runGh(repoRoot, ['api',
-        `repos/{owner}/{repo}/pulls/${prNumber}`, '--jq', '.base.sha,.head.sha'])
-      const [baseSHA, headSHA] = shaRaw.split('\n').map(s => s.trim())
-      const diffRaw = await runGit(repoRoot, ['diff', `${baseSHA}..${headSHA}`, '--', path])
+      const prRef = `refs/remotes/pull/${prNumber}/head`
+      await runGit(repoRoot, ['fetch', 'origin', `pull/${prNumber}/head:${prRef}`])
+
+      const baseRefName = (await runGh(repoRoot, [
+        'pr', 'view', String(prNumber), '--json', 'baseRefName', '--jq', '.baseRefName',
+      ])).trim()
+
+      const mergeBase = await runGit(repoRoot, [
+        'merge-base', `origin/${baseRefName}`, prRef,
+      ])
+
+      const diffRaw = await runGit(repoRoot, [
+        'diff', `${mergeBase.trim()}...${prRef}`, '--', path,
+      ])
       const diff = parseDiff(diffRaw, path)
       return { diff }
     } catch (e) {
@@ -117,8 +121,7 @@ export function registerGithubHandlers(): void {
     }
   })
 
-  // github:file-metrics
-  ipcMain.handle('github:file-metrics', async (_event, payload) => {
+  register('github:file-metrics', async (payload) => {
     const schema = z.object({ repoRoot: z.string().min(1), path: z.string().min(1) })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
@@ -142,8 +145,7 @@ export function registerGithubHandlers(): void {
     }
   })
 
-  // github:pr-inline-comments
-  ipcMain.handle('github:pr-inline-comments', async (_event, payload) => {
+  register('github:pr-inline-comments', async (payload) => {
     const schema = z.object({ repoRoot: z.string().min(1), prNumber: z.number().int().positive() })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
@@ -162,8 +164,7 @@ export function registerGithubHandlers(): void {
     }
   })
 
-  // github:pr-comment-add
-  ipcMain.handle('github:pr-comment-add', async (_event, payload) => {
+  register('github:pr-comment-add', async (payload) => {
     const schema = z.object({
       repoRoot:  z.string().min(1),
       prNumber:  z.number().int().positive(),
@@ -198,8 +199,7 @@ export function registerGithubHandlers(): void {
     }
   })
 
-  // github:pr-comment-reply
-  ipcMain.handle('github:pr-comment-reply', async (_event, payload) => {
+  register('github:pr-comment-reply', async (payload) => {
     const schema = z.object({
       repoRoot:     z.string().min(1),
       prNumber:     z.number().int().positive(),
@@ -223,8 +223,7 @@ export function registerGithubHandlers(): void {
     }
   })
 
-  // github:pr-review-submit
-  ipcMain.handle('github:pr-review-submit', async (_event, payload) => {
+  register('github:pr-review-submit', async (payload) => {
     const schema = z.object({
       repoRoot: z.string().min(1),
       prNumber: z.number().int().positive(),
@@ -250,8 +249,7 @@ export function registerGithubHandlers(): void {
     }
   })
 
-  // github:session-get
-  ipcMain.handle('github:session-get', (_event, payload) => {
+  register('github:session-get', (payload) => {
     const schema = z.object({ key: z.string().min(1) })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { session: null }
@@ -261,8 +259,7 @@ export function registerGithubHandlers(): void {
     return result.success ? { session: result.data } : { session: null }
   })
 
-  // github:session-set
-  ipcMain.handle('github:session-set', (_event, payload) => {
+  register('github:session-set', (payload) => {
     const schema = z.object({ key: z.string().min(1), session: z.unknown() })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
@@ -341,7 +338,6 @@ function parseDiff(raw: string, filePath: string): FileDiff {
   }
   if (currentHunk) hunks.push(currentHunk)
 
-  // Fill line numbers
   for (const hunk of hunks) {
     const match = hunk.header.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
     let oldN = match ? parseInt(match[1], 10) : 1

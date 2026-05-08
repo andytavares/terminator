@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useGitStore } from '../stores/git.store'
-import type { GitStatus } from '../../../../src/shared/schemas/git.schema'
+import type { GitStatus } from '../schemas/git.schema'
 
 export function useGitStatus(repoRoot: string | null, refreshIntervalMs = 3000): void {
   const { setStatus, setLoading } = useGitStore()

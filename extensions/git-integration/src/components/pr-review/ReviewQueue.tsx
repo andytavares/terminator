@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
-import type { ReviewQueuePR } from '../../../../../src/shared/schemas/pr-review.schema'
+import type { ReviewQueuePR } from '../../schemas/pr-review.schema'
 
 type Filter = 'all' | 'high-risk' | 'quick-wins' | 'in-progress' | 'stale'
 

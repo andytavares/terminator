@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import type { Thread } from '../../../../../src/shared/schemas/pr-review.schema'
+import type { Thread } from '../../schemas/pr-review.schema'
 import { RichContent } from './RichContent'
 
 interface Props {

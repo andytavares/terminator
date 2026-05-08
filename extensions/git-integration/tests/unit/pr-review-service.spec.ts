@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { buildChapters, detectChangedFiles } from '../../../../src/main/github/pr-review-service'
-import { ReviewSessionSchema } from '../../../../src/shared/schemas/pr-review.schema'
-import type { PrChangedFile, ReviewSession } from '../../../../src/shared/schemas/pr-review.schema'
+import { buildChapters, detectChangedFiles } from '../../src/github/pr-review-service'
+import { ReviewSessionSchema } from '../../src/schemas/pr-review.schema'
+import type { PrChangedFile, ReviewSession } from '../../src/schemas/pr-review.schema'
 
 // ─── Session persistence schema (T037) ───────────────────────────────────────
 

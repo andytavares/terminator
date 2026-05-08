@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { computeRiskScore, detectComplexityHotspots, computeFileCyclomaticDelta } from '../../../../src/main/github/pr-review-service'
-import type { FileMetrics } from '../../../../src/shared/schemas/pr-review.schema'
-import type { FileDiff } from '../../../../src/shared/schemas/git.schema'
+import { computeRiskScore, detectComplexityHotspots, computeFileCyclomaticDelta } from '../../src/github/pr-review-service'
+import type { FileMetrics } from '../../src/schemas/pr-review.schema'
+import type { FileDiff } from '../../src/schemas/git.schema'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

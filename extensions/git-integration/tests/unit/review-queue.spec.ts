@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseReviewQueuePR } from '../../../../src/main/github/pr-review-service'
+import { parseReviewQueuePR } from '../../src/github/pr-review-service'
 
 const makeRawPr = (overrides: Record<string, unknown> = {}) => ({
   number:       1,

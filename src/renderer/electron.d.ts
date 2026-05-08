@@ -43,14 +43,8 @@ interface ElectronAPI {
     createWorktree(payload: unknown): Promise<{ success: true } | { error: string }>
     removeWorktree(repoRoot: string, worktreePath: string): Promise<{ success: true } | { error: string }>
     listWorktrees(path: string): Promise<{ worktrees: WorktreeInfo[] }>
-    // v1.1.0 git integration channels
-    status(path: string, maxFiles?: number): Promise<{ branch: string; files: unknown[]; hasConflicts: boolean; truncated: boolean } | { error: string }>
-    diffFile(repoRoot: string, path: string, staged: boolean): Promise<{ diff: unknown } | { error: string }>
-    stage(repoRoot: string, paths: string[]): Promise<{ success: true } | { error: string }>
-    unstage(repoRoot: string, paths: string[]): Promise<{ success: true } | { error: string }>
-    commit(repoRoot: string, message: string, signOff?: boolean): Promise<{ commitHash: string } | { error: string }>
-    prStatus(repoRoot: string): Promise<{ pr: unknown | null } | { error: string }>
-    prCreate(payload: unknown): Promise<{ pr: unknown } | { error: string }>
+    // git:status, diffFile, stage, unstage, commit, prStatus, prCreate are augmented by the git-integration extension
+    [key: string]: unknown
   }
   shell: {
     exec(options: { command: 'git' | 'gh'; args: string[]; cwd: string; timeoutMs?: number; workspaceRoot?: string }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut: boolean } | { error: string }>
@@ -87,24 +81,7 @@ interface ElectronAPI {
     onTogglePanel(handler: (panelId: string) => void): () => void
     onSelectProjectTab(handler: (tabId: string) => void): () => void
   }
-  github: {
-    listOpenPrs(repoRoot: string): Promise<{ prs: unknown[] } | { error: string }>
-    prReviewDetail(repoRoot: string, prNumber: number): Promise<{ pr: unknown } | { error: string }>
-    prFileDiff(repoRoot: string, prNumber: number, path: string): Promise<{ diff: unknown } | { error: string }>
-    fileMetrics(repoRoot: string, path: string): Promise<{
-      churn90d: number
-      blastRadius: number
-      topImporters: string[]
-      importerCount: number
-      testFilePresent: boolean
-    } | { error: string }>
-    prInlineComments(repoRoot: string, prNumber: number): Promise<{ comments: unknown[] } | { error: string }>
-    prCommentAdd(payload: unknown): Promise<{ comment: unknown } | { error: string }>
-    prCommentReply(payload: unknown): Promise<{ comment: unknown } | { error: string }>
-    prReviewSubmit(payload: unknown): Promise<{ reviewId: number } | { error: string }>
-    sessionGet(key: string): Promise<{ session: unknown } | { session: null }>
-    sessionSet(key: string, session: unknown): Promise<{ ok: true } | { error: string }>
-  }
+  // github namespace is contributed by the git-integration extension (see extensions/git-integration/src/types/electron.d.ts)
 }
 
 declare global {

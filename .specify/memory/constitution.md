@@ -40,7 +40,41 @@ only — they MUST NOT be the sole basis for implementation choices.
 - **MUST** verify behavior against the official specification, not inferred examples.
 - When official docs and community guidance conflict, official docs win.
 
-### II. Dependency Stewardship
+### II. Extension Isolation (NON-NEGOTIABLE)
+
+Extensions MUST be completely self-contained. An extension MUST NOT assume anything
+exists in the core application beyond the published Extension API. If it is not in the
+API contract, the extension cannot rely on it — full stop.
+
+**Dependencies**
+- All npm packages an extension needs MUST be declared in that extension's own
+  `package.json`. npm workspaces hoist them automatically; Vite resolves them without
+  any root-level entry.
+- Adding an extension-only package to the root `package.json` is a defect. The root
+  manifest is for the core application only.
+
+**Code & Types**
+- An extension MUST NOT import from core application source files (`src/main/*`,
+  `src/renderer/*`, `src/shared/*`, etc.). If shared types or utilities are needed,
+  they MUST be exposed through the Extension API and the extension imports from there.
+- An extension MUST NOT copy or re-declare types from core internals. If a type is not
+  in the API surface, the extension defines its own equivalent locally.
+- Schemas, stores, hooks, components, and utilities needed by an extension MUST live
+  inside the extension's own directory tree.
+
+**IPC & Runtime**
+- IPC channels introduced for an extension MUST be registered by the extension's own
+  handler file. Core `index.ts` may wire in that handler file, but MUST NOT contain
+  handler logic written for the extension.
+- The extension MUST NOT depend on undocumented side-effects of core initialisation
+  order, store shape, or runtime globals.
+
+**The test**
+Before considering any extension work complete, ask: "If this extension directory were
+deleted, would the core application still build and run without modification?" If no,
+isolation has been violated and MUST be corrected first.
+
+### IV. Dependency Stewardship
 
 Dependencies are a long-term liability. Every addition MUST be justified and evaluated
 for community health before adoption.
@@ -57,7 +91,7 @@ for community health before adoption.
 - Deprecated packages or packages carrying active CVEs MUST be replaced promptly;
   they MUST NOT be left in a passing state.
 
-### III. Code Readability & Minimalism
+### V. Code Readability & Minimalism
 
 Code is a liability. The least code that correctly fulfills a requirement is the best code.
 
@@ -69,7 +103,7 @@ Code is a liability. The least code that correctly fulfills a requirement is the
 - Comments are reserved for non-obvious WHY — not WHAT. Explanatory comments about
   what the code does are a sign the code should be clearer, not commented.
 
-### IV. Test-Driven Development (NON-NEGOTIABLE)
+### VI. Test-Driven Development (NON-NEGOTIABLE)
 
 TDD is the primary mechanism for validating work. No production code is written before
 a failing test exists that demands it.
@@ -84,7 +118,7 @@ a failing test exists that demands it.
   spec and validated manually before being marked done.
 - Test coverage MUST be scoped to behavior, not implementation internals.
 
-### V. SOLID Design & YAGNI
+### VII. SOLID Design & YAGNI
 
 Design MUST solve today's problem cleanly. Anticipating future requirements is actively
 harmful.
@@ -97,7 +131,7 @@ harmful.
 - Complexity deviations from the plan MUST be recorded in the plan's Complexity Tracking
   table with justification.
 
-### VI. Documentation as First-Class
+### VIII. Documentation as First-Class
 
 Documentation is part of the deliverable, not an afterthought. A feature is not complete
 until its documentation is accurate.
@@ -108,7 +142,7 @@ until its documentation is accurate.
 - A feature MUST NOT be marked complete until documentation has been reviewed and
   confirmed to reflect the current implementation.
 
-### VII. Architectural Decision Records (ADRs)
+### IX. Architectural Decision Records (ADRs)
 
 Every significant architectural decision MUST be captured in an ADR so future maintainers
 understand the reasoning and tradeoffs, not just the outcome.
@@ -119,7 +153,7 @@ understand the reasoning and tradeoffs, not just the outcome.
 - ADRs are immutable records; if a decision is reversed, a new ADR supersedes the old one
   rather than editing it.
 
-### VIII. Functional Purity & Immutability
+### X. Functional Purity & Immutability
 
 Side effects are a code smell. Functions MUST be pure, idempotent, and deterministic
 wherever the problem domain allows.
@@ -158,4 +192,4 @@ Compliance is not optional.
 - The constitution version and amendment history are the authoritative record of governance
   decisions affecting this project.
 
-**Version**: 1.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-05-05
+**Version**: 1.2.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-05-08

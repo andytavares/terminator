@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildChapters } from '../../../../src/main/github/pr-review-service'
+import { buildChapters } from '../../src/github/pr-review-service'
 
 const f = (path: string, additions = 10, deletions = 2) => ({ path, additions, deletions, status: 'modified' })
 

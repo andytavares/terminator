@@ -3,8 +3,8 @@ import { usePrReviewStore } from '../../stores/pr-review.store'
 import { ReviewQueue } from './ReviewQueue'
 import { PrReviewView } from './PrReviewView'
 import { useLoadPrQueue, useLoadPrDetail } from '../../hooks/usePrReview'
-import { ReviewSessionSchema } from '../../../../../src/shared/schemas/pr-review.schema'
-import type { ReviewQueuePR } from '../../../../../src/shared/schemas/pr-review.schema'
+import { ReviewSessionSchema } from '../../schemas/pr-review.schema'
+import type { ReviewQueuePR } from '../../schemas/pr-review.schema'
 import './pr-review.css'
 
 interface Props {

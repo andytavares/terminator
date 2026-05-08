@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ReviewSession, PrReviewDetail, ReviewQueuePR, Thread } from '../../../../src/shared/schemas/pr-review.schema'
+import type { ReviewSession, PrReviewDetail, ReviewQueuePR, Thread } from '../schemas/pr-review.schema'
 
 interface RateLimitState {
   resetAt: number

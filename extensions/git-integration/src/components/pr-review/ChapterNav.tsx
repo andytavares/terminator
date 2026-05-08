@@ -1,5 +1,5 @@
 import React from 'react'
-import type { Chapter } from '../../../../../src/shared/schemas/pr-review.schema'
+import type { Chapter } from '../../schemas/pr-review.schema'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 
 interface Props {
