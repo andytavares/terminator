@@ -5,7 +5,7 @@
   height: 100%;
   width: 300px;
   flex-shrink: 0;
-  border-left: 1px solid var(--color-border);
+  border-left: 1px solid var(--border);
   font-size: 12px;
 }
 
@@ -14,15 +14,15 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
   flex-shrink: 0;
 }
 
 .git-sidebar__close-btn {
   background: none;
   border: none;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 16px;
   line-height: 1;
   padding: 0 2px;
@@ -33,7 +33,7 @@
 
 .git-sidebar__branch {
   font-size: 11px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
@@ -41,7 +41,7 @@
 .git-sidebar__not-git,
 .git-sidebar__empty {
   padding: 16px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -58,7 +58,7 @@
 }
 
 .git-sidebar__file-row:hover {
-  background: var(--color-bg-hover);
+  background: var(--bg-card-hover);
 }
 
 .git-sidebar__checkbox {
@@ -73,7 +73,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
   cursor: pointer;
   flex: 1;
 }
@@ -98,7 +98,7 @@
 }
 
 .git-view__right {
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--border);
   min-height: 120px;
   max-height: 40%;
   overflow: hidden;
@@ -106,17 +106,17 @@
 
 .git-view__commit-section {
   padding: 8px;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
 
 .git-view__commit-message {
   width: 100%;
   box-sizing: border-box;
-  background: var(--color-bg-input, var(--color-bg-secondary));
-  border: 1px solid var(--color-border);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
   font-size: 12px;
   padding: 6px 8px;
   resize: vertical;
@@ -126,7 +126,7 @@
 
 .git-view__commit-message:focus {
   outline: none;
-  border-color: var(--color-accent, #61afef);
+  border-color: var(--accent, #5C6BC0);
 }
 
 .git-view__commit-error {
@@ -150,7 +150,7 @@
 
 .git-view__hint-text {
   font-size: 11px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .git-view__buttons {
@@ -169,9 +169,9 @@
 }
 
 .git-view__btn--primary {
-  background: var(--color-accent, #61afef);
+  background: var(--accent, #5C6BC0);
   color: #fff;
-  border-color: var(--color-accent, #61afef);
+  border-color: var(--accent, #5C6BC0);
 }
 
 .git-view__btn--primary:hover:not(:disabled) {
@@ -185,13 +185,13 @@
 
 .git-view__btn--secondary {
   background: transparent;
-  color: var(--color-text-secondary);
-  border-color: var(--color-border);
+  color: var(--text-secondary);
+  border-color: var(--border);
 }
 
 .git-view__btn--secondary:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
 }
 
 /* Staging Area */
@@ -204,7 +204,7 @@
 }
 
 .staging-area__section {
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--border);
 }
 
 .staging-area__section-header {
@@ -212,10 +212,10 @@
   align-items: center;
   justify-content: space-between;
   padding: 5px 10px;
-  background: var(--color-bg-primary);
+  background: var(--bg-surface);
   font-size: 11px;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -227,9 +227,9 @@
 
 .staging-area__action-btn {
   background: none;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: 3px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 10px;
   padding: 1px 6px;
@@ -237,8 +237,8 @@
 }
 
 .staging-area__action-btn:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
 }
 
 .staging-area__file-row {
@@ -250,7 +250,7 @@
 }
 
 .staging-area__file-row:hover {
-  background: var(--color-bg-hover);
+  background: var(--bg-card-hover);
 }
 
 .staging-area__file-row--selected {
@@ -286,13 +286,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
   flex: 1;
 }
 
 .staging-area__empty {
   padding: 10px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 12px;
   font-style: italic;
 }
@@ -327,15 +327,15 @@
   justify-content: space-between;
   padding: 0 10px;
   height: 30px;
-  background: var(--color-bg-primary);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   gap: 8px;
 }
 
 .file-diff-view__filename {
   font-size: 11px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -346,7 +346,7 @@
 .file-diff-view__view-toggle {
   display: flex;
   flex-shrink: 0;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -354,7 +354,7 @@
 .file-diff-view__toggle-btn {
   background: none;
   border: none;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 11px;
   font-family: inherit;
@@ -363,17 +363,17 @@
 }
 
 .file-diff-view__toggle-btn + .file-diff-view__toggle-btn {
-  border-left: 1px solid var(--color-border);
+  border-left: 1px solid var(--border);
 }
 
 .file-diff-view__toggle-btn--active {
-  background: var(--color-accent, #61afef);
+  background: var(--accent, #5C6BC0);
   color: #fff;
 }
 
 .file-diff-view__toggle-btn:not(.file-diff-view__toggle-btn--active):hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
 }
 
 .file-diff-view__scroll {
@@ -391,7 +391,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -434,7 +434,7 @@
   font-size: 11px;
   padding: 2px 8px;
   display: block;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--border);
 }
 
 .diff-line {
@@ -452,11 +452,11 @@
 .diff-line__old-num,
 .diff-line__new-num {
   user-select: none;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   min-width: 36px;
   text-align: right;
   padding: 0 6px;
-  border-right: 1px solid var(--color-border);
+  border-right: 1px solid var(--border);
   font-size: 11px;
   opacity: 0.6;
 }
@@ -486,7 +486,7 @@
 
 .diff-table__split-divider {
   width: 1px;
-  background: var(--color-border);
+  background: var(--border);
   padding: 0;
 }
 
@@ -499,7 +499,7 @@
 }
 
 .diff-line__content--empty {
-  background: var(--color-bg-secondary, rgba(0,0,0,0.08));
+  background: var(--bg-elevated, rgba(0,0,0,0.08));
 }
 
 /* PR Dialog */
@@ -514,43 +514,70 @@
 }
 
 .pr-dialog__panel {
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 20px;
-  width: 480px;
+  width: 560px;
   max-width: 90vw;
-  max-height: 80vh;
+  max-height: 85vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+}
+
+.pr-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .pr-dialog__title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  margin: 0 0 4px;
+  margin: 0;
+}
+
+.pr-dialog__close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.pr-dialog__close:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
 }
 
 .pr-dialog__field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+}
+
+.pr-dialog__field--flex {
+  flex: 1;
 }
 
 .pr-dialog__label {
   font-size: 12px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 .pr-dialog__input,
-.pr-dialog__textarea {
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
+.pr-dialog__textarea,
+.pr-dialog__select {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
   font-size: 13px;
   padding: 6px 8px;
   font-family: inherit;
@@ -559,19 +586,85 @@
 }
 
 .pr-dialog__input:focus,
-.pr-dialog__textarea:focus {
+.pr-dialog__textarea:focus,
+.pr-dialog__select:focus {
   outline: none;
-  border-color: var(--color-accent, #61afef);
+  border-color: var(--accent, #5C6BC0);
 }
 
 .pr-dialog__textarea {
   resize: vertical;
-  min-height: 80px;
+  min-height: 160px;
+  font-family: inherit;
+}
+
+.pr-dialog__select {
+  appearance: none;
+  cursor: pointer;
+}
+
+.pr-dialog__desc-header {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pr-dialog__mode-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.pr-dialog__mode-btn {
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 8px;
+  font-family: inherit;
+}
+
+.pr-dialog__mode-btn--active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.pr-dialog__preview {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  min-height: 160px;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-y: auto;
+}
+
+.pr-dialog__preview p { margin: 0 0 8px; }
+.pr-dialog__preview p:last-child { margin: 0; }
+.pr-dialog__preview h1, .pr-dialog__preview h2, .pr-dialog__preview h3 {
+  font-size: 13px;
+  margin: 12px 0 4px;
+}
+.pr-dialog__preview ul, .pr-dialog__preview ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+.pr-dialog__preview code {
+  background: var(--bg-surface);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: monospace;
+  font-size: 12px;
 }
 
 .pr-dialog__inline {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 12px;
 }
 
@@ -580,9 +673,11 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   cursor: pointer;
   user-select: none;
+  white-space: nowrap;
+  padding-bottom: 6px;
 }
 
 .pr-dialog__warning {
@@ -615,16 +710,24 @@
 
 .pr-dialog__actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 4px;
 }
 
+.pr-dialog__status {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-right: auto;
+  font-style: italic;
+}
+
 .pr-dialog__cancel-btn {
   background: transparent;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 13px;
   padding: 6px 14px;
@@ -632,11 +735,11 @@
 }
 
 .pr-dialog__cancel-btn:hover {
-  background: var(--color-bg-hover);
+  background: var(--bg-card-hover);
 }
 
 .pr-dialog__submit-btn {
-  background: var(--color-accent, #61afef);
+  background: var(--accent, #5C6BC0);
   border: none;
   border-radius: 4px;
   color: #fff;
@@ -668,7 +771,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
@@ -676,7 +779,7 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  border-right: 1px solid var(--color-border);
+  border-right: 1px solid var(--border);
 }
 
 .git-full-view__changes-pane {
@@ -695,6 +798,6 @@
 
 .git-full-view__commit-section {
   padding: 8px;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--border);
   flex-shrink: 0;
 }

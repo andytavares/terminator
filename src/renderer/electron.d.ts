@@ -59,6 +59,7 @@ interface ElectronAPI {
     watchStart(projectRoot: string): Promise<{ ok: true } | { error: string }>
     watchStop(): Promise<{ ok: true }>
     onChanged(handler: (event: { projectRoot: string; eventType: string; filename: string | null }) => void): () => void
+    readFile(filePath: string): Promise<{ content: string } | { error: string }>
   }
 
   settings: {

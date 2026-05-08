@@ -126,6 +126,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('fs:changed', listener)
       return () => ipcRenderer.removeListener('fs:changed', listener)
     },
+    readFile: (filePath: string) => ipcRenderer.invoke('fs:read-file', { filePath }),
   },
   extensionEvents: {
     onToast: (handler: (payload: { type: string; message: string }) => void) => {
