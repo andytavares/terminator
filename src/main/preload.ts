@@ -117,6 +117,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   shell: {
     exec: (options: unknown) => ipcRenderer.invoke('shell:exec', options),
+    openPath: (filePath: string) => ipcRenderer.invoke('shell:open-path', { filePath }),
   },
   github: {
     listOpenPrs: (repoRoot: string, options?: { cursor?: string; search?: string; includeClosedPrs?: boolean }) =>

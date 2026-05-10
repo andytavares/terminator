@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import { z } from 'zod'
 import {
   execShell,
@@ -17,6 +17,13 @@ const ShellExecPayloadSchema = z.object({
 })
 
 export function registerShellHandlers(): void {
+  ipcMain.handle('shell:open-path', async (_event, payload) => {
+    const parsed = z.object({ filePath: z.string().min(1) }).safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const errorMsg = await shell.openPath(parsed.data.filePath)
+    return errorMsg ? { error: errorMsg } : { ok: true as const }
+  })
+
   ipcMain.handle('shell:exec', async (_event, payload) => {
     const parsed = ShellExecPayloadSchema.safeParse(payload)
     if (!parsed.success) {

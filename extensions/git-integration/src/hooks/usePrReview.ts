@@ -166,9 +166,16 @@ export function useFetchFileMetrics(repoRoot: string | null) {
       : pr.ciStatus === 'pending' ? 'warn'
       : 'unknown'
 
+    // For coverage: prefer local patch coverage (file-level) when available;
+    // fall back to the API-reported codecov/coveralls check so it doesn't show ? when CI passed.
+    const coverageDot: SignalDots['coverage'] =
+      avgCoverage != null
+        ? (avgCoverage >= 80 ? 'pass' : avgCoverage >= 50 ? 'warn' : 'fail')
+        : (pr.coverageStatus ?? 'unknown')
+
     const signalDots: SignalDots = {
       tests:    anyMissingTest ? 'fail' : 'pass',
-      coverage: avgCoverage == null ? 'unknown' : avgCoverage >= 80 ? 'pass' : avgCoverage >= 50 ? 'warn' : 'fail',
+      coverage: coverageDot,
       ci:       ciDot,
       lint:     pr.lintStatus ?? 'unknown',
       churn:    maxChurn > 50 ? 'fail' : maxChurn > 20 ? 'warn' : 'pass',

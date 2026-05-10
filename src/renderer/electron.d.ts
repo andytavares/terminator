@@ -48,6 +48,7 @@ interface ElectronAPI {
   }
   shell: {
     exec(options: { command: 'git' | 'gh'; args: string[]; cwd: string; timeoutMs?: number; workspaceRoot?: string }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut: boolean } | { error: string }>
+    openPath(filePath: string): Promise<{ ok: true } | { error: string }>
   }
   fs: {
     watchStart(projectRoot: string): Promise<{ ok: true } | { error: string }>

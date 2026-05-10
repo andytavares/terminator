@@ -16,8 +16,28 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
-      include: ['src/**/*.ts', 'src/**/*.tsx'],
-      exclude: ['src/renderer/index.tsx', 'src/main/index.ts', 'src/main/preload.ts'],
+      include: [
+        'src/**/*.ts',
+        'src/**/*.tsx',
+        'extensions/*/src/**/*.ts',
+        'extensions/*/src/**/*.tsx',
+      ],
+      exclude: [
+        'src/renderer/index.tsx',
+        'src/main/index.ts',
+        'src/main/preload.ts',
+        '**/*.spec.ts',
+        '**/*.spec.tsx',
+        '**/*.test.ts',
+        '**/*.test.tsx',
+        '**/tests/**',
+      ],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 80,
+        statements: 80,
+      },
     },
   },
   resolve: {

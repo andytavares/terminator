@@ -155,7 +155,7 @@ export function computeRiskScore(
       patchCoverage:   metrics.patchCoverage,
     },
     dominantDriver,
-    topImporters:  metrics.topImporters.slice(0, 5),
+    topImporters:  metrics.topImporters,
     importerCount: metrics.importerCount,
   }
 }

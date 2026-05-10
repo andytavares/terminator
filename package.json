@@ -9,8 +9,9 @@
   ],
   "scripts": {
     "postinstall": "electron-rebuild",
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build:extensions": "node scripts/build-extensions.js",
+    "dev": "npm run build:extensions && electron-vite dev",
+    "build": "npm run build:extensions && electron-vite build",
     "preview": "electron-vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

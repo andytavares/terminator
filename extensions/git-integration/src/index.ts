@@ -1,37 +1,10 @@
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
 import { registerGithubHandlers } from './ipc/github.ipc.js'
-import { useGitStore } from './stores/git.store'
-import { GitSidebarPanel } from './components/GitSidebarPanel'
 
 const disposables: Disposable[] = []
 let refreshTimer: ReturnType<typeof setTimeout> | null = null
 let currentProjectRoot: string | null = null
-
-function scheduleRefresh(repoRoot: string, api: ExtensionAPI, maxFiles: number): void {
-  if (refreshTimer) clearTimeout(refreshTimer)
-  refreshTimer = setTimeout(async () => {
-    const store = useGitStore.getState()
-    store.setLoading(true)
-    try {
-      const result = await window.electronAPI.git.status(repoRoot, maxFiles) as
-        | { branch: string; files: unknown[]; hasConflicts: boolean; truncated: boolean }
-        | { error: string }
-
-      if ('error' in result) {
-        store.setStatus(null)
-        api.notifications.showToast('error', `Git status failed: ${(result as { error: string }).error}`)
-      } else {
-        store.setStatus(result as Parameters<typeof store.setStatus>[0])
-      }
-    } catch {
-      store.setStatus(null)
-    } finally {
-      store.setLoading(false)
-    }
-    refreshTimer = null
-  }, 200)
-}
 
 export function activate(api: ExtensionAPI): void {
   // Settings gate — early return if disabled
@@ -99,16 +72,6 @@ export function activate(api: ExtensionAPI): void {
     api.settings.get<number>('terminator.git-integration.git.maxDisplayedFiles') ?? 500
   const refreshIntervalMs =
     api.settings.get<number>('terminator.git-integration.git.sidebar.refreshIntervalMs') ?? 3000
-
-  // Register right sidebar panel (FR-022)
-  disposables.push(
-    api.sidebar.registerPanel('right-sidebar', {
-      id: 'git-changes',
-      title: 'Git Changes',
-      component: GitSidebarPanel,
-      defaultVisible: defaultOpen,
-    })
-  )
 
   // Register sidebar toggle item
   disposables.push(

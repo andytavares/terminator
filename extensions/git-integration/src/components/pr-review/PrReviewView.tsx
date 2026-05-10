@@ -240,7 +240,7 @@ export function PrReviewView({ repoRoot, pr, onClose, onRefresh }: Props) {
               onClick={() => setShowRiskFor(null)}
               aria-label="Close risk panel"
             >×</button>
-            <RiskBreakdownPanel filePath={activeFile.path} riskScore={activeFile.riskScore} />
+            <RiskBreakdownPanel filePath={activeFile.path} riskScore={activeFile.riskScore} repoRoot={repoRoot} />
           </aside>
         )}
       </div>
