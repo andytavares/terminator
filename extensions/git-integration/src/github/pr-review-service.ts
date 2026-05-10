@@ -350,6 +350,8 @@ const COVERAGE_NAMES = ['coverage', 'codecov', 'coveralls', 'sonar', 'codeclimat
 
 type SignalValue = 'pass' | 'warn' | 'fail' | 'unknown'
 
+// Non-blocking conclusions that don't count as success or failure
+
 function checkSignal(rollup: unknown, keywords: string[]): SignalValue {
   if (!rollup || !Array.isArray(rollup)) return 'unknown'
   const checks = (rollup as Array<Record<string, unknown>>).filter(s => {
@@ -358,18 +360,19 @@ function checkSignal(rollup: unknown, keywords: string[]): SignalValue {
   })
   if (checks.length === 0) return 'unknown'
   const states = checks.map(s => String(s.state ?? s.conclusion ?? '').toUpperCase())
-  if (states.some(s => s === 'FAILURE' || s === 'ERROR'))  return 'fail'
+  if (states.some(s => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT' || s === 'ACTION_REQUIRED')) return 'fail'
   if (states.some(s => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED')) return 'warn'
-  if (states.every(s => s === 'SUCCESS')) return 'pass'
+  if (states.some(s => s === 'SUCCESS')) return 'pass'
   return 'unknown'
 }
 
 function ciSignal(rollup: unknown): SignalValue {
   if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'unknown'
   const states = (rollup as Array<Record<string, unknown>>).map(s => String(s.state ?? s.conclusion ?? '').toUpperCase())
-  if (states.some(s => s === 'FAILURE' || s === 'ERROR'))  return 'fail'
+  if (states.some(s => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT' || s === 'ACTION_REQUIRED')) return 'fail'
   if (states.some(s => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED')) return 'warn'
-  if (states.every(s => s === 'SUCCESS')) return 'pass'
+  // SKIPPED/NEUTRAL/CANCELLED are non-blocking — pass if at least one check succeeded
+  if (states.some(s => s === 'SUCCESS')) return 'pass'
   return 'unknown'
 }
 
@@ -401,9 +404,13 @@ function blastSignal(fileCount: number): SignalValue {
 export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
   const obj      = raw as Record<string, unknown>
   const rawFiles = (obj.files as unknown[] | undefined) ?? []
-  const fileCount  = rawFiles.length
-  const additions  = rawFiles.reduce((s, f) => s + Number((f as Record<string,unknown>).additions ?? 0), 0)
-  const deletions  = rawFiles.reduce((s, f) => s + Number((f as Record<string,unknown>).deletions ?? 0), 0)
+  const fileCount  = rawFiles.length > 0 ? rawFiles.length : Number(obj.changedFiles ?? 0)
+  const additions  = rawFiles.length > 0
+    ? rawFiles.reduce((s, f) => s + Number((f as Record<string,unknown>).additions ?? 0), 0)
+    : Number(obj.additions ?? 0)
+  const deletions  = rawFiles.length > 0
+    ? rawFiles.reduce((s, f) => s + Number((f as Record<string,unknown>).deletions ?? 0), 0)
+    : Number(obj.deletions ?? 0)
   const filePaths  = rawFiles.map(f => String((f as Record<string,unknown>).path ?? (f as Record<string,unknown>).filename ?? ''))
   const rollup     = obj.statusCheckRollup
 

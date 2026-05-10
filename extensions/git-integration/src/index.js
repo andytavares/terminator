@@ -332,6 +332,8 @@ const COVERAGE_NAMES = ['coverage', 'codecov', 'coveralls', 'sonar', 'codeclimat
 const LINT_CHECK_NAMES     = LINT_NAMES
 const COVERAGE_CHECK_NAMES = COVERAGE_NAMES
 
+const NEUTRAL_CONCLUSIONS = new Set(['SKIPPED', 'NEUTRAL', 'CANCELLED'])
+
 function checkSignal(rollup, keywords) {
   if (!rollup || !Array.isArray(rollup)) return 'unknown'
   const checks = rollup.filter(s => {
@@ -340,18 +342,18 @@ function checkSignal(rollup, keywords) {
   })
   if (checks.length === 0) return 'unknown'
   const states = checks.map(s => String(s.state ?? s.conclusion ?? '').toUpperCase())
-  if (states.some(s => s === 'FAILURE' || s === 'ERROR'))  return 'fail'
+  if (states.some(s => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT' || s === 'ACTION_REQUIRED')) return 'fail'
   if (states.some(s => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED')) return 'warn'
-  if (states.every(s => s === 'SUCCESS')) return 'pass'
+  if (states.some(s => s === 'SUCCESS')) return 'pass'
   return 'unknown'
 }
 
 function ciSignal(rollup) {
   if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'unknown'
   const states = rollup.map(s => String(s.state ?? s.conclusion ?? '').toUpperCase())
-  if (states.some(s => s === 'FAILURE' || s === 'ERROR'))  return 'fail'
+  if (states.some(s => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT' || s === 'ACTION_REQUIRED')) return 'fail'
   if (states.some(s => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED')) return 'warn'
-  if (states.every(s => s === 'SUCCESS')) return 'pass'
+  if (states.some(s => s === 'SUCCESS')) return 'pass'
   return 'unknown'
 }
 
@@ -385,9 +387,13 @@ function blastSignal(fileCount) {
 
 function parseReviewQueuePR(raw) {
   const rawFiles = raw.files ?? []
-  const fileCount  = rawFiles.length
-  const additions  = rawFiles.reduce((s, f) => s + Number(f.additions ?? 0), 0)
-  const deletions  = rawFiles.reduce((s, f) => s + Number(f.deletions ?? 0), 0)
+  const fileCount  = rawFiles.length > 0 ? rawFiles.length : (raw.changedFiles ?? 0)
+  const additions  = rawFiles.length > 0
+    ? rawFiles.reduce((s, f) => s + Number(f.additions ?? 0), 0)
+    : Number(raw.additions ?? 0)
+  const deletions  = rawFiles.length > 0
+    ? rawFiles.reduce((s, f) => s + Number(f.deletions ?? 0), 0)
+    : Number(raw.deletions ?? 0)
   const filePaths  = rawFiles.map(f => String(f.path ?? f.filename ?? ''))
   const rollup     = raw.statusCheckRollup
 
@@ -627,7 +633,7 @@ function activate(api) {
     try {
       const raw = await runGh(parsed.data.repoRoot, [
         'pr', 'list', '--state', 'open', '--limit', '500',
-        '--json', 'number,title,author,createdAt,headRefName,baseRefName,isDraft,statusCheckRollup,files,additions,deletions',
+        '--json', 'number,title,author,createdAt,headRefName,baseRefName,isDraft,statusCheckRollup,files,additions,deletions,changedFiles',
       ])
       const items = JSON.parse(raw)
       const prs = items.map(item => parseReviewQueuePR(item))
