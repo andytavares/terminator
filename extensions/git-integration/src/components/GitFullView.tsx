@@ -17,6 +17,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
   const { status, selectedFile, diffCache, setSelectedFile, setDiff, setLoading } = useGitStore()
   const [commitMessage, setCommitMessage] = useState('')
   const [isCommitting, setIsCommitting] = useState(false)
+  const [isPushing, setIsPushing] = useState(false)
   const [showPrDialog, setShowPrDialog] = useState(false)
   const [existingPr, setExistingPr] = useState<PullRequest | null>(null)
   const [commitError, setCommitError] = useState<string | null>(null)
@@ -66,6 +67,24 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
       setIsCommitting(false)
     }
   }, [repoRoot, commitMessage, canCommit])
+
+  const handlePush = useCallback(async () => {
+    if (!repoRoot) return
+    setIsPushing(true)
+    setCommitError(null)
+    try {
+      const result = await window.electronAPI.git.push(repoRoot) as { success: true } | { error: string }
+      if ('error' in result) {
+        const msgs: Record<string, string> = {
+          NO_UPSTREAM: 'No upstream branch set. Use "git push -u origin <branch>" in the terminal.',
+          REJECTED: 'Push rejected — pull changes first.',
+        }
+        setCommitError(msgs[result.error] ?? result.error)
+      }
+    } finally {
+      setIsPushing(false)
+    }
+  }, [repoRoot])
 
   const handleOpenPr = useCallback(async () => {
     if (!repoRoot) return
@@ -124,6 +143,13 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
             <div className="git-view__buttons">
               <button className="git-view__btn git-view__btn--secondary" onClick={handleOpenPr}>
                 Open PR
+              </button>
+              <button
+                className="git-view__btn git-view__btn--secondary"
+                onClick={handlePush}
+                disabled={isPushing}
+              >
+                {isPushing ? 'Pushing…' : 'Push'}
               </button>
               <button
                 className="git-view__btn git-view__btn--primary"
