@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import type { Project } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
+import { ConfirmDialog } from '../ConfirmDialog'
 import './ProjectItem.css'
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 
 export function ProjectItem({ project }: Props): JSX.Element {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const { activeProjectId, setActiveProject, deleteProject } = useWorkspaceStore()
   const isActive = activeProjectId === project.id
 
@@ -18,29 +20,42 @@ export function ProjectItem({ project }: Props): JSX.Element {
   }
 
   function handleRemove(): void {
-    if (window.confirm(`Remove project "${project.name}"?`)) {
-      deleteProject(project.id)
-    }
     setContextMenu(null)
+    setConfirmOpen(true)
   }
 
   return (
-    <div
-      className={`project-item${isActive ? ' project-item--active' : ''}`}
-      onClick={() => setActiveProject(project.id)}
-      onContextMenu={handleContextMenu}
-    >
-      <span className="project-item__name">{project.name}</span>
+    <>
+      <div
+        className={`project-item${isActive ? ' project-item--active' : ''}`}
+        onClick={() => setActiveProject(project.id)}
+        onContextMenu={handleContextMenu}
+      >
+        <span className="project-item__name">{project.name}</span>
 
-      {contextMenu && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          onRemove={handleRemove}
-          onClose={() => setContextMenu(null)}
+        {contextMenu && (
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            onRemove={handleRemove}
+            onClose={() => setContextMenu(null)}
+          />
+        )}
+      </div>
+
+      {confirmOpen && (
+        <ConfirmDialog
+          title={`Remove project "${project.name}"?`}
+          confirmLabel="Remove"
+          danger
+          onConfirm={() => {
+            deleteProject(project.id)
+            setConfirmOpen(false)
+          }}
+          onClose={() => setConfirmOpen(false)}
         />
       )}
-    </div>
+    </>
   )
 }
 

@@ -22,7 +22,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
   const [existingPr, setExistingPr] = useState<PullRequest | null>(null)
   const [commitError, setCommitError] = useState<string | null>(null)
 
-  const selectedDiff: FileDiff | null = selectedFile ? diffCache.get(selectedFile) ?? null : null
+  const selectedDiff: FileDiff | null = selectedFile ? (diffCache.get(selectedFile) ?? null) : null
 
   const handleFileSelect = useCallback(
     async (path: string, staged: boolean) => {
@@ -31,7 +31,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
       if (!diffCache.has(path)) {
         setLoading(true)
         try {
-          const result = await window.electronAPI.git.diffFile(repoRoot, path, staged) as
+          const result = (await window.electronAPI.git.diffFile(repoRoot, path, staged)) as
             | { diff: FileDiff }
             | { error: string }
           if ('diff' in result) setDiff(path, result.diff)
@@ -45,13 +45,15 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
 
   const stagedFiles = status?.files.filter((f) => f.staged) ?? []
   const canCommit = stagedFiles.length > 0 && commitMessage.trim().length > 0
+  const charCount = commitMessage.length
+  const showCharCount = charCount > 50
 
   const handleCommit = useCallback(async () => {
     if (!canCommit || !repoRoot) return
     setIsCommitting(true)
     setCommitError(null)
     try {
-      const result = await window.electronAPI.git.commit(repoRoot, commitMessage.trim()) as
+      const result = (await window.electronAPI.git.commit(repoRoot, commitMessage.trim())) as
         | { commitHash: string }
         | { error: string }
       if ('error' in result) {
@@ -68,27 +70,9 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
     }
   }, [repoRoot, commitMessage, canCommit])
 
-  const handlePush = useCallback(async () => {
-    if (!repoRoot) return
-    setIsPushing(true)
-    setCommitError(null)
-    try {
-      const result = await window.electronAPI.git.push(repoRoot) as { success: true } | { error: string }
-      if ('error' in result) {
-        const msgs: Record<string, string> = {
-          NO_UPSTREAM: 'No upstream branch set. Use "git push -u origin <branch>" in the terminal.',
-          REJECTED: 'Push rejected — pull changes first.',
-        }
-        setCommitError(msgs[result.error] ?? result.error)
-      }
-    } finally {
-      setIsPushing(false)
-    }
-  }, [repoRoot])
-
   const handleOpenPr = useCallback(async () => {
     if (!repoRoot) return
-    const prResult = await window.electronAPI.git.prStatus(repoRoot) as
+    const prResult = (await window.electronAPI.git.prStatus(repoRoot)) as
       | { pr: PullRequest | null }
       | { error: string }
     const pr = 'pr' in prResult ? prResult.pr : null
@@ -96,17 +80,48 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
     setShowPrDialog(true)
   }, [repoRoot])
 
+  const handleCommitAndPush = useCallback(async () => {
+    if (!canCommit || !repoRoot) return
+    setIsCommitting(true)
+    setCommitError(null)
+    try {
+      const result = (await window.electronAPI.git.commit(repoRoot, commitMessage.trim())) as
+        | { commitHash: string }
+        | { error: string }
+      if ('error' in result) {
+        const msgs: Record<string, string> = {
+          NOTHING_TO_COMMIT: 'Nothing staged to commit.',
+          EMPTY_MESSAGE: 'Commit message cannot be empty.',
+        }
+        setCommitError(msgs[result.error] ?? result.error)
+        return
+      }
+      setCommitMessage('')
+      setIsCommitting(false)
+      setIsPushing(true)
+      const pushResult = (await window.electronAPI.git.push(repoRoot)) as
+        | { success: true }
+        | { error: string }
+      if ('error' in pushResult) {
+        const msgs: Record<string, string> = {
+          NO_UPSTREAM: 'Committed but push failed — no upstream branch set.',
+          REJECTED: 'Committed but push rejected — pull changes first.',
+        }
+        setCommitError(msgs[pushResult.error] ?? pushResult.error)
+      }
+    } finally {
+      setIsCommitting(false)
+      setIsPushing(false)
+    }
+  }, [repoRoot, commitMessage, canCommit])
+
   const handlePrCreated = useCallback((pr: PullRequest) => {
     setShowPrDialog(false)
     window.dispatchEvent(new CustomEvent('git:pr-created', { detail: { pr } }))
   }, [])
 
   if (!repoRoot) {
-    return (
-      <div className="git-full-view git-full-view--empty">
-        No project selected.
-      </div>
-    )
+    return <div className="git-full-view git-full-view--empty">No project selected.</div>
   }
 
   return (
@@ -130,6 +145,13 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
             onChange={(e) => setCommitMessage(e.target.value)}
             rows={3}
           />
+          {showCharCount && (
+            <span
+              className={`git-view__char-count${charCount > 72 ? ' git-view__char-count--warn' : ''}`}
+            >
+              {charCount} chars
+            </span>
+          )}
           {commitError && <div className="git-view__commit-error">{commitError}</div>}
           <div className="git-view__commit-actions">
             <div className="git-view__commit-hint">
@@ -146,17 +168,17 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
               </button>
               <button
                 className="git-view__btn git-view__btn--secondary"
-                onClick={handlePush}
-                disabled={isPushing}
+                onClick={handleCommit}
+                disabled={!canCommit || isCommitting || isPushing}
               >
-                {isPushing ? 'Pushing…' : 'Push'}
+                {isCommitting ? '⟳ Committing…' : 'Commit'}
               </button>
               <button
                 className="git-view__btn git-view__btn--primary"
-                onClick={handleCommit}
-                disabled={!canCommit || isCommitting}
+                onClick={handleCommitAndPush}
+                disabled={!canCommit || isCommitting || isPushing}
               >
-                {isCommitting ? 'Committing…' : 'Commit'}
+                {isPushing ? '⟳ Pushing…' : isCommitting ? '⟳ Committing…' : 'Commit & Push'}
               </button>
             </div>
           </div>

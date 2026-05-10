@@ -1,104 +1,198 @@
-# Research: Unified Pull Request Review
+# Research: UX Improvement PRD
 
-**Branch**: `003-pr-review` | **Date**: 2026-05-07
+**Branch**: `bugfix-various-small-issues` | **Date**: 2026-05-10  
+**Source PRD**: `docs/ux-improvement-prd.md`
 
 ---
 
-## 1. Markdown Rendering for Comment Bodies
+## 1. `:focus-visible` in Electron + xterm.js
 
-**Decision**: `react-markdown@9` + `remark-gfm@4`
+**Decision**: Global `:focus-visible` rule in `styles.css`; xterm.js canvas is exempt via selector specificity.
 
 **Rationale**:
-The project already uses React 18 throughout the renderer. `react-markdown` is the canonical React-native markdown renderer — it renders to React elements (no `innerHTML` injection), making it safe for untrusted GitHub comment content. `remark-gfm` adds GitHub Flavored Markdown support (tables, strikethrough, task lists, autolinks) matching what GitHub itself renders.
+The `:focus-visible` CSS pseudo-class is natively supported in all Chromium versions that ship in Electron 30+. It fires only for keyboard-initiated focus (Tab, arrow keys), not mouse clicks — making it safe to apply globally without adding unwanted rings to click-targeted elements.
 
-- `react-markdown`: 13k+ GitHub stars, maintained by the [unified collective](https://github.com/unifiedjs/collective) (7+ active maintainers), actively released, no CVEs. Official docs: https://github.com/remarkjs/react-markdown
-- `remark-gfm`: 2k+ stars, same unified collective, peer of `react-markdown`. Official docs: https://github.com/remarkjs/remark-gfm
+xterm.js renders into a `<canvas>` element wrapped in a `.xterm` container div. The canvas does not receive DOM focus in the conventional sense; the `.xterm-helper-textarea` receives focus for keyboard capture. These elements are scoped to the `TerminalSession` component and will not match any component-level `:focus-visible` rules we add to sidebar/dialog elements. No collision exists.
 
-`highlight.js` is already installed for diff syntax highlighting; it can be reused inside code blocks via `react-syntax-highlighter` or the existing `hljs.highlight()` call wrapped in a custom `code` component for `react-markdown`.
+No new dependency is needed — this is pure CSS.
 
 **Alternatives considered**:
-- `marked` + `dangerouslySetInnerHTML`: Rejected — XSS risk from raw HTML injection without a sanitizer. Constitution §I (official docs) and safe-by-default preference favor react-markdown's element-tree approach.
-- `@uiw/react-md-editor`: Overkill (includes an editor); we only need rendering here.
-- Hand-rolled markdown: Rejected — brittle, unscoped, against §III (minimalism).
+
+- `focus-trap-react` package: Overkill for global focus ring; relevant only for modal trapping.
+- `what-input` polyfill: Unnecessary — `:focus-visible` is natively supported in the target Chromium runtime.
 
 ---
 
-## 2. GitHub API Access Pattern
+## 2. ConfirmDialog Component
 
-**Decision**: All GitHub PR review operations via `gh api` subcommands, executed through the existing `execShell` / `github:*` IPC channel (same pattern as `git:pr-status` and `git:pr-create`).
+**Decision**: Build a project-local `ConfirmDialog` React component reusing existing `Dialog.css` + `dialog-in` keyframe. No new library.
 
 **Rationale**:
-The project already has a sandboxed shell executor (`src/main/shell/shell-executor.ts`) that allows only `git` and `gh` commands (Constitution §VI — source integrity via official GitHub CLI). Adding a direct HTTPS fetch from the renderer would introduce a new dependency surface (node-fetch or Electron's `net` module), bypass the sandbox, and create a second auth mechanism. The `gh` CLI handles OAuth token refresh, pagination, and API versioning automatically.
+`Dialog.css` already contains `.dialog`, `.dialog__title`, `.dialog__actions`, `.dialog__btn-primary`, `.dialog__btn-secondary`, and a `dialog-in` entrance animation. A `ConfirmDialog` is a thin wrapper that accepts `{ title, description, confirmLabel, danger, onConfirm, onClose }` props and renders this existing markup pattern.
 
-All `gh api` calls use the `--jq` or `--template` flag for structured JSON output, parsed with `JSON.parse` after `exitCode` check. Rate-limit errors are detected by `gh` exit code 1 + stderr containing `API rate limit exceeded`.
+The `--danger` CSS token is already defined (`#E05C5C`). The `onConfirm` callback is invoked on button click; focus is trapped inside the dialog using a simple `useEffect` + `ref.focus()` approach (first focusable child auto-focused, Escape closes).
 
-Official `gh api` reference: https://cli.github.com/manual/gh_api
+No new packages. Zero dependency cost.
 
 **Alternatives considered**:
-- Octokit REST SDK (`@octokit/rest`): Would require managing OAuth tokens in the renderer — the existing auth is opaque behind `gh`. Adds a dependency with its own release cadence. Rejected.
-- GitHub GraphQL API directly: More efficient for batching but requires managing auth tokens and adds complexity. Deferred to v2 if performance profiling shows `gh api` is the bottleneck.
+
+- `@radix-ui/react-alert-dialog`: 30k+ stars, accessible. Rejected because the constitution (§IV) requires std-lib preference and the existing Dialog infrastructure fully covers the need.
+- Electron native dialog (`dialog.showMessageBox`): Rejected — renders off-thread, not styleable, inconsistent with in-app UX.
 
 ---
 
-## 3. File Dependency Ordering (v1)
+## 3. CSS Token Namespace Unification
 
-**Decision**: Heuristic ordering based on filename patterns, with no call-graph construction in v1.
+**Decision**: Add a `--tm-*` alias layer in `styles.css` that maps every core token to a canonical extension-facing name. Migrate git-integration CSS to use `--tm-*`. Deprecate `--color-*` fallbacks in the extension.
 
 **Rationale**:
-True caller→callee ordering requires a per-language symbol extraction step (Tree-sitter or LSP `references` calls). Building this correctly for all languages in scope (TypeScript, Python, Go, Rust, etc.) is a multi-week effort and is not required for the spec's success criteria. The spec explicitly allows graceful degradation (FR-015). The heuristic captures the most valuable aspect — separating interfaces from implementations and tests from source — which covers ~80% of the ordering benefit documented in the PRD research.
+The core app already has a working dark-mode token set (`--bg-*`, `--text-*`, `--border-*`). The git-integration extension was written with its own `--color-*` namespace because no published contract existed. The cleanest migration is an alias layer — no renames of core variables (to avoid breaking other consumers), new `--tm-*` names become the stable public API:
 
-Heuristic ordering rules (applied within each chapter):
-1. **Tier 0** — Type/interface files: `*.types.ts`, `*.interface.ts`, `*.d.ts`, `types.ts`, `interfaces.ts`, `index.ts`
-2. **Tier 1** — Source files: everything else, sorted by (additions + deletions) descending
-3. **Tier 2** — Test/spec files: `*.spec.*`, `*.test.*`, `__tests__/**`
-4. **Tier 3** — Mechanical: `package-lock.json`, `yarn.lock`, `*.lock`, `*.generated.*`, files with only whitespace changes
-
-Chapter grouping: files are grouped by the first path segment that differs between files (usually top-level directory). If all files share the same directory, grouping falls back to the four tiers above as separate chapters.
-
-See ADR-010 for the full rationale and the v2 path to Tree-sitter.
-
-**Alternatives considered**:
-- Tree-sitter (WASM build): Correct but adds ~2 MB of WASM per language, requires an async init path, and the v1 timeline does not allow for correctness validation across languages. Deferred to v2.
-- LSP `textDocument/references`: Would reuse existing language servers but requires a running LSP connection per language, which the app does not currently manage. Deferred.
-
----
-
-## 4. Review Session Persistence
-
-**Decision**: `electron-store@8.2` (already installed), new key `pr-review-sessions`.
-
-**Rationale**:
-`electron-store` already handles settings persistence. Adding a new top-level key avoids any new dependency and keeps all persistent state in one place. The store is synchronous by design (good for auto-save on every viewed-state change) and survives app restarts. Key schema: `"${repoRoot}:::${prNumber}:::${headSHA}"` → `ReviewSession` object (see data-model.md).
-
-The SHA component of the key means a force-push naturally invalidates line-level position state while the per-file viewed record can be migrated forward (files whose SHA-keyed entry matches the new head are re-used).
-
-**Alternatives considered**:
-- SQLite via `better-sqlite3`: Appropriate for relational data; overkill for a flat key→session map. Adds a native module dependency. Rejected.
-- In-memory Zustand only: Would lose state on app quit without explicit save. Rejected per clarification Q1 (auto-save on every action).
-
----
-
-## 5. Risk Score Computation
-
-**Decision**: Four of six metrics computed from available `git`/`gh` data; two (`complexityDelta`, `patchCoverage`) deferred to "?" in v1.
-
-**Available metrics (v1)**:
-- `changeSize`: `additions + deletions` from `gh pr view --json files`
-- `churn90d`: `git log --oneline --since="90 days ago" -- <file>` line count, executed per-file via `github:file-churn` IPC
-- `blastRadius`: grep for `import.*<relative-path>` across repo using `git grep` (sandboxed via `git` command in shell executor)
-- `testFilePresent`: check existence of adjacent `*.spec.*` / `*.test.*` via `fs.existsSync`
-
-**Deferred metrics (v1 → "?")**:
-- `complexityDelta`: Requires AST parsing (Tree-sitter). Deferred per ADR-010.
-- `patchCoverage`: Requires CI lcov/cobertura artifact. Deferred; the chip shows "?" unless a coverage file is found at a conventional path (`coverage/lcov.info`).
-
-Composite score formula (v1 — 4 active metrics renormalised to 100%):
+```css
+/* styles.css — published contract for extensions */
+:root {
+  --tm-bg-base: var(--bg-base);
+  --tm-bg-surface: var(--bg-surface);
+  --tm-bg-elevated: var(--bg-elevated);
+  --tm-bg-card: var(--bg-card);
+  --tm-text-primary: var(--text-primary);
+  --tm-text-secondary: var(--text-secondary);
+  --tm-text-muted: var(--text-muted);
+  --tm-border: var(--border);
+  --tm-border-strong: var(--border-strong);
+  --tm-accent: var(--accent);
+  --tm-accent-dim: var(--accent-dim);
+  --tm-danger: var(--danger);
+  --tm-success: #4ade80;
+  --tm-warning: #facc15;
+  --tm-radius-sm: var(--radius-sm);
+  --tm-radius-md: var(--radius-md);
+  --tm-radius-lg: var(--radius-lg);
+  --tm-font-mono: var(--font-mono);
+  --tm-font-ui: var(--font-ui);
+}
 ```
-score = (changeSize_normalised × 0.333)
-      + (churn90d_normalised × 0.25)
-      + (blastRadius_normalised × 0.25)
-      + (testFileMissing ? 0.167 : 0)
-```
-Normalisation: `min-max` within the current PR's file set. High-risk threshold: score > 0.60. Medium: 0.30–0.60.
 
-See `risk-score.spec.ts` for the full test table.
+The git-integration CSS then replaces `var(--color-bg, #1a1a1a)` with `var(--tm-bg-surface)`, etc. The fallback hex values are removed; the extension relies on the host injecting tokens.
+
+This change also formalizes the token contract in `docs/EXTENSION-DEVELOPMENT.md`.
+
+**Alternatives considered**:
+
+- Rename core variables to `--tm-*` directly: Too disruptive; breaks all existing CSS in the core app.
+- Keep dual namespaces, do a mapping in extension CSS: Same as chosen approach but without the alias layer in the host — extension would lose any future token changes unless manually updated.
+
+---
+
+## 4. Font: IBM Plex Sans for UI Chrome
+
+**Decision**: Add `IBM Plex Sans` (weights 400, 500, 600) as `--font-ui`. Source via self-hosted font files or @import from Google Fonts CDN (network-permitting in Electron).
+
+**Rationale**:
+IBM Plex Sans is the proportional companion typeface to IBM Plex Mono, both published by IBM under OFL license. Using Plex Sans for sidebar/dialog chrome and Plex Mono for code/terminal content is the intended pairing from the type foundry. The visual rhythm is coherent because metrics (x-height, optical sizing) are harmonized across the family.
+
+For Electron (offline-capable desktop app), self-hosted fonts are preferred. The `@fontsource/ibm-plex-sans` npm package (5k+ GitHub stars, maintained by `fontsource` org with 10+ contributors, published on npm) provides self-hosted font files importable as CSS. This avoids a network dependency.
+
+```
+npm install @fontsource/ibm-plex-sans
+```
+
+Import in `renderer/index.tsx`:
+
+```ts
+import '@fontsource/ibm-plex-sans/400.css'
+import '@fontsource/ibm-plex-sans/500.css'
+import '@fontsource/ibm-plex-sans/600.css'
+```
+
+Then in `styles.css`:
+
+```css
+--font-ui: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+```
+
+**Alternatives considered**:
+
+- System font stack only (`-apple-system, BlinkMacSystemFont`): Acceptable fallback but loses cross-platform visual consistency.
+- Inter: Generic, overused in developer tools — PRD explicitly calls out avoiding Inter.
+- Google Fonts CDN import: Rejected — Electron apps may run offline; network font dependency is fragile.
+
+---
+
+## 5. Skeleton Loading (No New Library)
+
+**Decision**: Pure CSS shimmer animation using `@keyframes` + `background: linear-gradient`. No new library.
+
+**Rationale**:
+Skeleton UIs are implementable with ~15 lines of CSS: a base `background-color` on the placeholder element, an animated gradient overlay for the shimmer effect, and `animation: shimmer 1.5s infinite`. This is entirely sufficient for the 3–4 affected surfaces (git sidebar, branch switcher, PR queue, settings).
+
+No library is needed; this falls squarely in the "standard library covers the need" category per constitution §IV.
+
+```css
+.skeleton {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  position: relative;
+  overflow: hidden;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+```
+
+**Alternatives considered**:
+
+- `react-loading-skeleton`: Popular (8k stars), but adds a dependency for ~3 CSS rules. Rejected per constitution §IV.
+
+---
+
+## 6. Command Palette (P3 — Deferred)
+
+**Decision**: Use `cmdk` when this P3 item is implemented. Deferred from current scope.
+
+**Rationale** (for future reference):
+`cmdk` (28k+ GitHub stars, maintained by Radix/Vercel team, 10+ contributors, actively released) is the canonical headless command menu primitive for React. It integrates with Zustand stores directly — the data layer (projects, workspaces, registered actions) feeds into `cmdk`'s Command component as items. The component is unstyled by default, making it fully compatible with the existing CSS token system.
+
+```
+npm install cmdk   # when P3 is scheduled
+```
+
+This item is excluded from the current implementation scope and should be planned as a separate task batch.
+
+---
+
+## 7. Resizable Panels (P3 — Deferred)
+
+**Decision**: Use `react-resizable-panels` when P3 is implemented.
+
+**Rationale** (for future reference):
+`react-resizable-panels` (6k+ stars, Bryan Vaughn, active maintenance, no dependencies) provides accessible resize handles for panel-based layouts. It works natively with flexbox and CSS, requiring no wrapper DOM restructuring.
+
+For now, the panel width (248px) is a fixed CSS variable. Persisting the user-set width can be done via `settings.store`.
+
+---
+
+## 8. Summary of Dependencies Required for Current Scope (P0–P2)
+
+| Package                     | Purpose             | New?    |
+| --------------------------- | ------------------- | ------- |
+| `@fontsource/ibm-plex-sans` | Self-hosted UI font | **NEW** |
+
+All other P0–P2 changes are pure CSS and React refactors — no new packages needed.

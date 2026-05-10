@@ -1,203 +1,128 @@
-# Tasks: Unified Pull Request Review ("Code Reviews" Tab)
+# Tasks: UX Improvement PRD
 
-**Input**: Design documents from `specs/003-pr-review/`
-**Prerequisites**: plan.md ✅, spec.md ✅, research.md ✅, data-model.md ✅, contracts/ ✅
+**Input**: Design documents from `specs/003-pr-review/` + `docs/ux-improvement-prd.md`  
+**Prerequisites**: plan.md ✅, research.md ✅, data-model.md ✅, contracts/extension-token-api.md ✅
 
-**Tests**: Per Constitution Principle IV (TDD — NON-NEGOTIABLE), test tasks MUST be written and confirmed FAILING before their corresponding implementation tasks.
+**Tests**: Per the project constitution (Principle VI: TDD is NON-NEGOTIABLE), test tasks are written first and MUST fail before implementation begins. Red → Green → Refactor.
 
-**Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
+**Organization**: Tasks are grouped by improvement area. P0 (critical fixes) → P1 (design system + git UX) → P2 (core polish) → documentation.
 
 ## Format: `[ID] [P?] [Story] Description`
 
-- **[P]**: Can run in parallel with other [P] tasks in the same phase (different files, no shared state)
-- **[Story]**: Maps to user story in spec.md (US1–US6)
-- Exact file paths are included in every task description
+- **[P]**: Can run in parallel (different files, no shared dependencies)
+- **[Story]**: Maps to improvement phase (US1=P0 Fixes, US2=Design System, US3=Git UX, US4=Core Polish)
 
 ---
 
 ## Phase 1: Setup
 
-**Purpose**: Install dependencies, create the shared schema file, and scaffold the component directory structure.
+**Purpose**: Install new dependencies required before any implementation can begin.
 
-- [X] T001 Add `react-markdown@9` and `remark-gfm@4` to `extensions/git-integration/package.json` and run `npm install` from repo root
-- [X] T002 [P] Create `src/shared/schemas/pr-review.schema.ts` with Zod schemas for all types in `specs/003-pr-review/data-model.md`: `ReviewQueuePRSchema`, `SignalDotsSchema`, `PrReviewDetailSchema`, `ChapterSchema`, `PrChangedFileSchema`, `RiskScoreSchema`, `FileMetricsSchema`, `InlineCommentSchema`, `ThreadSchema`, `ReviewSessionSchema`
-- [X] T003 [P] Create empty placeholder files for all new components and services listed in `specs/003-pr-review/plan.md` under the `extensions/git-integration/src/components/pr-review/` directory, `extensions/git-integration/src/github/pr-review-service.ts`, `extensions/git-integration/src/stores/pr-review.store.ts`, and `extensions/git-integration/src/hooks/usePrReview.ts`
+- [ ] T001 Install `@fontsource/ibm-plex-sans` in root `package.json` (`npm install @fontsource/ibm-plex-sans`)
+- [ ] T002 Install `@testing-library/react` in root `package.json` devDependencies to enable React component unit tests (`npm install --save-dev @testing-library/react`)
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: IPC plumbing, store scaffold, and tab registration. MUST be complete before any user story phase.
+**Purpose**: Shared infrastructure that multiple user stories depend on. MUST complete before Phase 3+.
 
-**⚠️ CRITICAL**: No user story work can begin until this phase is complete.
+**⚠️ CRITICAL**: No user story implementation can begin until this phase is complete.
 
-- [X] T004 Add `github.*` namespace to `src/renderer/electron.d.ts` per the contract in `specs/003-pr-review/contracts/ipc-channels-pr-review.md` (10 methods: `listOpenPrs`, `prReviewDetail`, `prFileDiff`, `fileMetrics`, `prInlineComments`, `prCommentAdd`, `prCommentReply`, `prReviewSubmit`, `sessionGet`, `sessionSet`)
-- [X] T005 Add `github` namespace to `src/main/preload.ts` with `ipcRenderer.invoke` wrappers for all 10 `github:*` channels (including `github:session-get` and `github:session-set`), following the same pattern as the existing `git` namespace
-- [X] T006 Create `src/main/ipc/github.ipc.ts` with `registerGithubHandlers()` function containing stub `ipcMain.handle` registrations for all 10 channels: `github:list-open-prs`, `github:pr-review-detail`, `github:pr-file-diff`, `github:file-metrics`, `github:pr-inline-comments`, `github:pr-comment-add`, `github:pr-comment-reply`, `github:pr-review-submit`, `github:session-get`, `github:session-set` — each returning `{ error: 'NOT_IMPLEMENTED' }` initially
-- [X] T007 Import and call `registerGithubHandlers()` in `src/main/index.ts` alongside the existing `registerGitHandlers()` call
-- [X] T008 Create `extensions/git-integration/src/stores/pr-review.store.ts` as a Zustand store with the `ReviewSession` state shape from `data-model.md`, actions: `initSession`, `markFileViewed`, `unmarkFileViewed`, `setCurrentFile`, `setCurrentChapter`, `reorderFiles`, `setPaused`, `setRateLimitState`, and `reset`
-- [X] T009 Create `extensions/git-integration/src/components/pr-review/PrReviewTab.tsx` as the root component (receives `{ repoRoot: string | null }` props per `ProjectTabRegistration` interface) — renders `<ReviewQueue>` when no PR is selected, renders `<PrReviewView>` when a PR is open; reads active PR from `pr-review.store`
-- [X] T010 Register the "Code Reviews" project tab in `extensions/git-integration/src/renderer.tsx` by adding `registry.registerProjectTab({ id: 'code-reviews', label: 'Code Reviews', component: PrReviewTab })` directly below the existing `registerProjectTab` call for the "Git" tab
+- [ ] T003 Add `ui: { hasSeenWelcome: boolean }` field to globalSettings Zod schema and TypeScript types in `src/renderer/stores/settings.store.ts` and `src/main/storage/settings-store.ts` (default: `false`)
+- [ ] T004 [P] Write unit tests for `ConfirmDialog` in `tests/unit/ConfirmDialog.spec.tsx` (RED — test: renders title/description, calls `onConfirm` on confirm click, calls `onClose` on cancel click, calls `onClose` on Escape key, initial focus is on Cancel button, danger prop applies danger CSS class to confirm button)
+- [ ] T005 Create `ConfirmDialog` component in `src/renderer/components/ConfirmDialog.tsx` (props: `title`, `description?`, `confirmLabel?`, `danger?`, `onConfirm`, `onClose`; initial focus on Cancel via `useEffect` + `ref.focus()`; Escape key listener; reuses `Dialog.css` classes)
 
-**Checkpoint**: Build passes (`npm run build`), the "Code Reviews" tab appears in the UI (even if blank), TypeScript compilation has no errors on the new types.
+**Checkpoint**: `ConfirmDialog` unit tests GREEN. `ui.hasSeenWelcome` field compiles without type errors.
 
 ---
 
-## Phase 3: User Story 1 — Review Queue Dashboard (Priority: P1) 🎯 MVP
+## Phase 3: US1 — P0 Critical Fixes (Priority: P0) 🎯 MVP
 
-**Goal**: Reviewer opens the "Code Reviews" tab and sees a prioritised, structured list of all open PRs with rich metadata, categorised into sections, filterable by pills.
+**Goal**: Eliminate all native browser dialogs and missing focus indicators — the most visible quality regressions in the current app.
 
-**Independent Test**: Open the "Code Reviews" tab on a project with a connected GitHub repo. Verify: four stat cards render with real counts; PRs appear in correct sections (read-first / quick-wins / larger); each PR row shows number, title, author, signal dots, estimated time, and an action badge.
+**Independent Test**: Right-click a workspace → Remove → a styled in-app dialog appears (not a native OS dialog). Tab through the workspace rail and project list — a white focus ring appears on the focused element. Install an extension from a bad path — a toast error appears (not a native alert).
 
-### Tests for User Story 1 (write FIRST — confirm FAILING before implementing)
+- [ ] T006 [P] [US1] Replace `window.confirm` in `src/renderer/components/sidebar/WorkspaceRail.tsx:106` with `ConfirmDialog` (title: `Remove workspace "${workspace.name}"?`, description includes project count, danger: true, onConfirm: deleteWorkspace)
+- [ ] T007 [P] [US1] Replace `window.confirm` in `src/renderer/components/sidebar/WorkspaceItem.tsx:52` with `ConfirmDialog` (same props pattern as T006)
+- [ ] T008 [P] [US1] Replace `window.confirm` in `src/renderer/components/sidebar/ProjectsPanel.tsx:186` with `ConfirmDialog` (title: `Remove project "${project.name}"?`, danger: true, onConfirm: deleteProject)
+- [ ] T009 [P] [US1] Replace `window.confirm` in `src/renderer/components/sidebar/ProjectItem.tsx:21` with `ConfirmDialog` (same props pattern as T008)
+- [ ] T010 [US1] Replace `alert()` in `src/renderer/components/settings/SettingsPanel.tsx:84` with `addToast({ type: 'error', message: \`Failed to install extension: ${installResult.error}\` })`— import`useToastStore` at top of file
+- [ ] T011 [US1] Add global `:focus-visible` rule to `src/renderer/styles.css` after the Reset block: `*:focus { outline: none; } *:focus-visible { outline: 2px solid rgba(255,255,255,0.85); outline-offset: 2px; border-radius: var(--radius-sm); }`
+- [ ] T012 [US1] Remove the bare `outline: none` override from `src/renderer/components/settings/SettingsPanel.css:135` (now covered by the global rule in T011)
 
-- [X] T011 [US1] Write failing unit tests in `extensions/git-integration/tests/unit/review-queue.spec.ts` covering: `parseReviewQueuePR()` maps `gh pr list` JSON to `ReviewQueuePR`; risk level derived correctly from signal values; `estimatedMinutes` formula (ceil((additions+deletions)/60)); section classification (high-risk → read-first, ≤100 LOC + low-risk → quick-wins)
-
-### Implementation for User Story 1
-
-- [X] T012 [US1] Implement `listOpenPrs(repoRoot: string)` in `src/main/ipc/github.ipc.ts` — replace the stub: exec `gh pr list --state open --limit 500 --json number,title,author,createdAt,headRefName,baseRefName,isDraft,statusCheckRollup,files` and return `{ prs: ReviewQueuePR[] }`
-- [X] T013 [US1] Implement `parseReviewQueuePR()` and `classifyRiskLevel()` in `extensions/git-integration/src/github/pr-review-service.ts` — makes the T011 tests pass
-- [X] T014 [US1] Create `extensions/git-integration/src/components/pr-review/ReviewQueue.tsx` with the four stat cards: "Awaiting you" (count + Δ since yesterday), "High risk" (count + "read these first"), "Total review time" (est. sum), "In progress" (count + "resume from where you stopped")
-- [X] T015 [P] [US1] Add the three labelled PR sections to `ReviewQueue.tsx`: "Read these first" (red left border, high-risk PRs), "Quick wins" (green left border, low-risk ≤100 LOC), "Larger reviews" (all others)
-- [X] T016 [P] [US1] Add filter pills to `ReviewQueue.tsx`: All / High risk / Quick wins / In progress / Stale (>3d) — each filters the visible PR list
-- [X] T017 [US1] Add the PR row component inside `ReviewQueue.tsx` showing: PR number, title, author, time-since-opened, scope description, file count, additions/deletions, six coloured signal dots (legend: tests / coverage / CI / lint / churn / blast radius), estimated review time, action badge (approve / review / resume Ch N/M)
-- [X] T018 [US1] Wire `ReviewQueue` to `window.electronAPI.github.listOpenPrs(repoRoot)` in `usePrReview.ts`, handle loading/empty/error/rate-limited states
-- [X] T019 [US1] Add rate-limit banner to `ReviewQueue.tsx`: non-blocking yellow banner when store has `rateLimitState` set, with a per-item retry control on unloaded rows
-
-**Checkpoint**: "Code Reviews" tab shows the live review queue for the current repo. All PR sections, filter pills, and action badges work.
+**Checkpoint**: All 5 `window.confirm` / `alert()` call sites replaced. Tab navigation shows white focus ring on workspace tiles, project cards, tab bar tabs, and settings nav items.
 
 ---
 
-## Phase 4: User Story 2 — Dependency-Ordered Chapter Navigation (Priority: P1)
+## Phase 4: US2 — P1 Design System Foundation (Priority: P1)
 
-**Goal**: Reviewer opens a PR and sees files grouped into dependency-ordered chapters (not alphabetical), with a chapter nav bar, numbered file list with "why this file is here" labels, diff view, and "Mark viewed → Next" controls.
+**Goal**: Unify the CSS token namespace between the core app and git extension, and introduce IBM Plex Sans for UI chrome text.
 
-**Independent Test**: Open a PR with 10+ changed files spanning multiple directories. Verify: files are grouped into named chapters; within each chapter, type/interface files appear before implementation files and test files appear last; "Mechanical" chapter is auto-collapsed; reviewer can mark files viewed and advance through a chapter; drag-and-drop reorder works and persists.
+**Independent Test**: Open the git sidebar and PR review tab — all text, borders, and backgrounds visually match the core app's dark theme with no jarring hex-colour fallbacks. Sidebar labels (workspace names, project names, tab bar) render in a proportional sans-serif font while terminal content and diffs remain in monospace.
 
-### Tests for User Story 2 (write FIRST — confirm FAILING before implementing)
+- [ ] T013 [US2] Add `--tm-*` CSS token alias block (all 20 tokens from `contracts/extension-token-api.md`) plus `--radius-xs: 4px` and `--font-ui` token to `:root` in `src/renderer/styles.css`; import IBM Plex Sans weights 400/500/600 in `src/renderer/index.tsx` (`import '@fontsource/ibm-plex-sans/400.css'` etc.); set `body { font-family: var(--font-ui); }` in `src/renderer/styles.css`
+- [ ] T014 [P] [US2] Apply `font-family: var(--font-ui)` to sidebar chrome in `src/renderer/components/sidebar/WorkspaceRail.css`, `WorkspaceItem.css`, `ProjectsPanel.css`, `Dialog.css`, and `BranchSwitcher.css` — replace any `font-family: var(--font-mono)` on non-code selectors
+- [ ] T015 [P] [US2] Apply `font-family: var(--font-ui)` to `src/renderer/components/terminal/TabBar.css` (tab labels only — not terminal content), `src/renderer/components/settings/SettingsPanel.css`, and `src/renderer/components/ToastContainer.css`
+- [ ] T016 [US2] Migrate `extensions/git-integration/src/components/git-integration.css`: replace every `var(--color-*, #hex)` with the corresponding `var(--tm-*)` token per the mapping table in `contracts/extension-token-api.md`; remove all hardcoded hex fallback values; replace raw `border-radius` values (4px, 6px, 7px, 8px) with `var(--tm-radius-xs)` / `var(--tm-radius-sm)` / `var(--tm-radius-md)` tokens
+- [ ] T017 [US2] Migrate `extensions/git-integration/src/components/pr-review/pr-review.css`: same replacement pattern as T016 — all `--color-*` → `--tm-*`, remove hardcoded hex fallbacks (including hardcoded `#3fb950`, `#f85149`, `#f0a500` — replace with `--tm-success`, `--tm-danger`, `--tm-warning`)
+- [ ] T018 [P] [US2] Update `docs/EXTENSION-DEVELOPMENT.md` with the complete `--tm-*` token contract table and migration guide from `specs/003-pr-review/contracts/extension-token-api.md`
+- [ ] T019 [P] [US2] Update `docs/ARCHITECTURE.md` with a "CSS Token Strategy" section describing the `--tm-*` alias layer and the core-private vs extension-public token split
 
-- [X] T020 [US2] Write failing unit tests in `extensions/git-integration/tests/unit/chapter-builder.spec.ts` for `buildChapters()`: files sorted into four tiers (T0 types, T1 source, T2 tests, T3 mechanical); files grouped by top-level directory segment; Mechanical chapter is last and `tier === 3`; empty PR returns `[]`; single-file PR returns one chapter with one file; drag-drop override (`fileOrderOverrides`) respected when provided
-
-### Implementation for User Story 2
-
-- [X] T021 [US2] Implement `buildChapters(files: PrChangedFile[], overrides?: Record<string, string[]>): Chapter[]` in `extensions/git-integration/src/github/pr-review-service.ts` — makes T020 tests pass
-- [X] T022 [US2] Implement `prReviewDetail` handler in `src/main/ipc/github.ipc.ts`: exec `gh pr view <prNumber> --json ...` + `gh pr view <prNumber> --json files`, build chapters via `buildChapters()`, return `PrReviewDetail`
-- [X] T023 [US2] Implement `useLoadPrDetail(repoRoot, prNumber)` in `extensions/git-integration/src/hooks/usePrReview.ts` — calls `window.electronAPI.github.prReviewDetail`, populates store, handles loading/error states
-- [X] T024 [US2] Create `extensions/git-integration/src/components/pr-review/PrReviewView.tsx` — three-column layout: left `<ChapterFileList>`, centre `<ReviewDiffPane>`, right `<RiskBreakdownPanel>`; reads active chapter/file from `pr-review.store`
-- [X] T025 [US2] Create `extensions/git-integration/src/components/pr-review/ChapterNav.tsx` — horizontal tab bar showing all chapters; each tab shows name, file count, estimated time, and status indicator (not started / in progress / complete ✓); clicking a tab switches active chapter in store
-- [X] T026 [US2] Create `extensions/git-integration/src/components/pr-review/ChapterFileList.tsx` — renders ordered file list for the active chapter; each row shows: number badge, risk dot placeholder (coloured once US3 is done), filename, +additions/-deletions, "why this file is here" label (always shown per FR-011/FR-043); supports HTML5 drag-and-drop reorder dispatching `reorderFiles` to store
-- [X] T027 [US2] Create `extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx` — loads `FileDiff` via `window.electronAPI.github.prFileDiff` on file selection; renders existing `<FileDiffView>` component; shows filename, change badge, binary-file message; bottom status bar with chapter progress (`2 of 4 files`)
-- [X] T028 [US2] Add navigation controls to `ReviewDiffPane.tsx`: "← Previous file" (`[`), "Mark viewed → Next file" (`1`), "Finish chapter" (`↵`) — wire to store actions; keyboard shortcuts registered via `api.keyboard.register`
-- [X] T029 [US2] Connect `markFileViewed` store action to auto-save: inside `markFileViewed`, call `window.electronAPI.github.sessionSet(key, session)` via the `github:session-set` IPC channel — electron-store is main-process-only and cannot be called directly from the renderer
-
-**Checkpoint**: Reviewer can open any PR, navigate through dependency-ordered chapters, mark files viewed, and the progress persists correctly in the file tree.
+**Checkpoint**: `npm run build:extensions` succeeds. Git sidebar and PR review tab visually match the core theme. Sidebar text renders in IBM Plex Sans (proportional). Terminal and diff text remain in IBM Plex Mono.
 
 ---
 
-## Phase 5: User Story 3 — Per-File Risk Score and Health Chips (Priority: P1)
+## Phase 5: US3 — P1/P2 Git Extension UX Improvements (Priority: P1/P2)
 
-**Goal**: Every file in the chapter list shows a coloured risk dot. Above the diff, a row of 7 health chips displays real metric values. A right-panel breakdown shows the composite score, per-metric bars, and top importers. Inline complexity hotspot annotations appear within the diff.
+**Goal**: Polish the git sidebar and PR review surfaces — skeleton loading, custom checkboxes, status tooltips, commit workflow improvements, and viewed-file contrast fix.
 
-**Independent Test**: Open a PR with at least one large, highly-imported file with no adjacent test. Verify: that file shows a red dot and "HIGH RISK" badge; chips row shows correct churn count, blast radius count, and "missing" tests chip; right panel shows composite score and importer list. Open a small config-only file — verify it shows a green dot.
+**Independent Test**: Open the git sidebar on a large repo — skeleton rows animate during fetch (no "Loading…" text). Check a file in the staging area — the checkbox shows the accent color. Hover a status badge — a tooltip reads "Modified" / "Added" / etc. Type 73+ characters in the commit message — a character count appears. Open the PR review and mark a file as viewed — it dims to ≥0.65 opacity with a strikethrough and remains readable. Hover a health chip — a tooltip explains the metric.
 
-### Tests for User Story 3 (write FIRST — confirm FAILING before implementing)
+- [ ] T020 [P] [US3] Write unit test: `GitSidebarPanel` renders `.skeleton--row` elements (not "Loading…" text) when `loading` state is `true`, in `extensions/git-integration/tests/unit/GitSidebarPanel.spec.tsx` (RED)
+- [ ] T021 [P] [US3] Write unit test: `StagingArea` file-status badge elements have correct `title` attributes (e.g., `title="Modified"` for `M` badge) in `extensions/git-integration/tests/unit/StagingArea.spec.tsx` (RED)
+- [ ] T022 [US3] Add skeleton utility CSS classes to `src/renderer/styles.css`: `.skeleton` (base with shimmer keyframe), `.skeleton--row` (full-width file-row placeholder, 12px height, 70% width), `.skeleton--text-sm`, `.skeleton--text-md`; shimmer animation: `linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%)` sliding left-to-right over 1.4s
+- [ ] T023 [US3] Replace "Loading…" text with 5× `.skeleton--row` elements in `extensions/git-integration/src/components/GitSidebarPanel.tsx` when git status is loading; verify T020 goes GREEN
+- [ ] T024 [P] [US3] Add custom checkbox styles to `extensions/git-integration/src/components/git-integration.css`: override `.staging-area__checkbox` with `appearance: none`, 14×14px, 1.5px `--tm-border-strong` border, `--tm-bg-input` background; `:checked` state uses `--tm-accent` background + white `✓` via `::after`
+- [ ] T025 [P] [US3] Add `title` attributes to each file status badge in `extensions/git-integration/src/components/StagingArea.tsx`: `M`→`"Modified"`, `A`→`"Added"`, `D`→`"Deleted"`, `R`→`"Renamed"`, `C`→`"Copied"`, `U`→`"Untracked"`, `!`→`"Conflicted"`; verify T021 goes GREEN
+- [ ] T026 [US3] In `extensions/git-integration/src/components/GitFullView.tsx` commit section: increase `.git-view__commit-message` `min-height` from 52px → 80px in `git-integration.css`; set `font-family: var(--tm-font-ui)` on the textarea; add a character count `<span>` below the textarea that appears when `value.length > 50` and turns amber (`--tm-warning`) when `value.length > 72`
+- [ ] T027 [US3] Add loading spinner state to Commit and Push buttons in `extensions/git-integration/src/components/GitFullView.tsx`: track `committing: boolean` state; when true, disable both buttons and replace label with `"⟳ Committing…"` / `"⟳ Pushing…"`; add "Commit & Push" as the primary button and move "Commit" to secondary
+- [ ] T028 [P] [US3] Fix viewed-file contrast in `extensions/git-integration/src/components/pr-review/pr-review.css`: change `.chapter-file-row--viewed` opacity from `0.55` → `0.65`; change `.full-file-row--viewed` opacity from `0.5` → `0.65`; add `text-decoration: line-through` to `.chapter-file-name` and `.full-file-row-name` within their respective `--viewed` selectors
+- [ ] T029 [P] [US3] Add descriptive `title` attributes to each health chip in `extensions/git-integration/src/components/pr-review/HealthChips.tsx` (e.g., `title="Cyclomatic complexity delta — how much more complex this file is after the change"`, `title="Patch coverage — percentage of changed lines covered by tests"`, etc.)
+- [ ] T030 [P] [US3] Add `title` tooltip text to each stat card in `extensions/git-integration/src/components/pr-review/ReviewQueue.tsx` explaining what the metric means and what threshold triggers HIGH/MEDIUM/LOW (e.g., `title="Composite risk score ≥ 70 = HIGH, 40–69 = MEDIUM, < 40 = LOW"`)
 
-- [X] T030 [US3] Write failing unit tests in `extensions/git-integration/tests/unit/risk-score.spec.ts` for `computeRiskScore()`: low/medium/high thresholds; all-null metrics returns `{ level: 'low', composite: null }`; `testFileMissing` adds correct weight; `dominantDriver` string set to the highest-contributing metric; `topImporters` capped at 5
-
-### Implementation for User Story 3
-
-- [X] T031 [US3] Implement `computeRiskScore(metrics: FileMetrics, allFilesMetrics: FileMetrics[]): RiskScore` in `extensions/git-integration/src/github/pr-review-service.ts` — min-max normalises across current PR file set, calculates composite score, sets `dominantDriver` — makes T030 tests pass
-- [X] T032 [US3] Implement `fileMetrics` handler in `src/main/ipc/github.ipc.ts`: exec `git log --oneline --since="90 days ago" -- <path>` for churn, `git grep -l` for blast radius, `git ls-files -- <spec-pattern>` for test presence; return `FileMetrics` object
-- [X] T033 [US3] Add `fetchAllFileMetrics(repoRoot, files)` to `usePrReview.ts` — calls `window.electronAPI.github.fileMetrics` per file (sequential to respect gh rate limits), stores results in `pr-review.store`
-- [X] T034 [US3] Create `extensions/git-integration/src/components/pr-review/HealthChips.tsx` — renders 7 chips (tests / complexity-delta / patch-coverage / lint / CI / churn / blast-radius) with value labels; chips show "?" when metric is `null`; chip colour: pass=green, warn=amber, fail=red, unknown=grey
-- [X] T035 [US3] Create `extensions/git-integration/src/components/pr-review/RiskBreakdownPanel.tsx` — shows "Why this file is [High/Medium/Low]" heading, composite score (`73 / 100`), per-metric bar visualisations, `Importers (top 5 of N)` list; rendered in the right column of `PrReviewView`
-- [X] T036 [US3] Add risk dot and "HIGH RISK why?" badge to `ChapterFileList.tsx` and `ReviewDiffPane.tsx` header — clicking "why?" opens `RiskBreakdownPanel`; dot colours driven by `riskScore.level` from store
-- [X] T060 [US3] Write failing unit tests in `extensions/git-integration/tests/unit/risk-score.spec.ts` for `detectComplexityHotspots()`: hunk with 5+ decision-point keywords in added lines is flagged; removed keywords subtract from delta; hunk with hunkDelta < 5 is not flagged; empty diff returns `[]`; per-file `complexityDelta` equals sum of all hunkDeltas
-- [X] T061 [US3] Implement `detectComplexityHotspots(diff: FileDiff): Array<{ hunkIndex: number; complexityDelta: number; message: string }>` in `extensions/git-integration/src/github/pr-review-service.ts` — counts decision-point keywords (`if`/`else if`/`for`/`while`/`do`/`switch`/`case`/`catch`/`&&`/`||`/`??`/`? `) in added vs removed lines per hunk; flags hunks where hunkDelta >= 5; message format: "Complexity hotspot — this block adds N decision points (cyclomatic delta +N)."; also returns per-file `complexityDelta` total for the risk score; makes T060 tests pass
-- [X] T062 [US3] Render complexity hotspot annotation rows in `ReviewDiffPane.tsx`: after the last line of each flagged hunk, insert a highlighted `<tr>` with amber background and the message from `detectComplexityHotspots()`; populate `FileMetrics.complexityDelta` from the per-file total so the chip and risk score use it
-
-**Checkpoint**: Every file in the chapter list has a coloured risk dot. The health chips row and right-panel breakdown show live metric values. "HIGH RISK why?" badge is visible on high-risk files. Large diff hunks show an inline amber annotation row.
+**Checkpoint**: Git sidebar skeleton visible during load. Staging area checkboxes render in accent color. File status badges show tooltips. Character count appears in commit textarea. Viewed files show strikethrough at ≥0.65 opacity. Health chip tooltips visible on hover.
 
 ---
 
-## Phase 6: User Story 4 — Pause and Resume (Priority: P2)
+## Phase 6: US4 — P2 Core UX Polish (Priority: P2)
 
-**Goal**: Reviewer can pause a review at any time and resume from the exact chapter and file on next open. Progress auto-saves on every "mark viewed" action. Force-push invalidates changed files but preserves unchanged ones.
+**Goal**: Replace the confusing empty state, add the rename pencil affordance, and polish the PR review pop-out window.
 
-**Independent Test**: Mark 3 files viewed across 2 chapters, click "Pause review", quit and reopen the app. Verify: the PR shows "Resume Ch N/M" in the queue; opening it restores the exact chapter and file position; the 3 files are still shown as viewed.
+**Independent Test**: Launch the app with no workspaces — "Welcome to Terminator" empty state with keyboard shortcut table appears. Create a workspace → activate a project → close and reopen — the simpler "Select a project" state appears (welcome state not shown again). Hover a project card name — a pencil icon (✎) appears to its right; single-click it triggers rename mode. Open the PR review pop-out — window title reads "Code Review — #NNN repo-name" with a workspace-color accent bar at the top.
 
-### Tests for User Story 4 (write FIRST — confirm FAILING before implementing)
+- [ ] T031 [P] [US4] Write unit tests for `EmptyState` in `tests/unit/EmptyState.spec.tsx` (RED — welcome variant renders icon, "Welcome to Terminator" title, keyboard shortcuts table; simple variant renders "Select a project" subtitle; component accepts `actions` prop and renders buttons with shortcut labels)
+- [ ] T032 [P] [US4] Create `src/renderer/components/EmptyState.tsx` (props: `icon?`, `title`, `subtitle?`, `actions?: Array<{label, shortcut?, onClick}>`) and `src/renderer/components/EmptyState.css` (centered flex column layout, muted text, shortcut table styles); verify T031 goes GREEN
+- [ ] T033 [US4] Replace ad-hoc empty state markup in `src/renderer/App.tsx` with `<EmptyState>`: when `!globalSettings?.ui?.hasSeenWelcome` render welcome variant (icon: `⬡`, title: "Welcome to Terminator", actions: New Tab/Settings/Git Sidebar shortcuts); when `hasSeenWelcome` render simple variant; call `updateGlobalSettings({ ui: { hasSeenWelcome: true } })` on first project activation in the `setActiveProject` effect
+- [ ] T034 [P] [US4] Add rename pencil icon CSS to `src/renderer/components/sidebar/ProjectsPanel.css`: `.proj-card__rename-icon` with `opacity: 0`, `transition: opacity 0.1s`, `cursor: pointer`, `color: var(--text-muted)`; `.proj-card:hover .proj-card__rename-icon { opacity: 1; }`
+- [ ] T035 [P] [US4] Add pencil icon `<span className="proj-card__rename-icon" onClick={(e) => { e.stopPropagation(); startRename() }}>✎</span>` after `.proj-card__name` in `ProjectCard` within `src/renderer/components/sidebar/ProjectsPanel.tsx`; update context menu label to "Rename (or double-click)"
+- [ ] T036 [US4] Set the PR review pop-out window title to `"Code Review — ${repoName}"` in the Electron window creation call in `src/main/index.ts` (or wherever `openPrReview` IPC handler creates the BrowserWindow); extract repo name from the `repoRoot` path argument
+- [ ] T037 [P] [US4] Add a 3px workspace-color top accent bar to `src/renderer/PrReviewWindow.tsx`: render a `<div style={{ height: 3, background: wsColor, flexShrink: 0 }} />` at the top of the layout; pass `wsColor` via URL query param from the IPC call or read from the store
 
-- [X] T037 [US4] Write failing unit tests in `extensions/git-integration/tests/unit/pr-review-service.spec.ts` for session persistence: `persistSession()` writes correct key to electron-store; `loadSession()` returns null for unknown key; session key changes when headSHA changes (force-push invalidation); `viewedFiles` serialises/deserialises correctly as a Set
-
-### Implementation for User Story 4
-
-- [X] T038 [US4] Implement `persistSession()` in `pr-review.store.ts` using `window.electronAPI.github.sessionSet(key, session)` and `loadSession()` using `window.electronAPI.github.sessionGet(key)` with key `"${repoRoot}:::${prNumber}:::${headSHA}"` — makes T037 tests pass; `persistSession` called from `markFileViewed`, `unmarkFileViewed`, `reorderFiles`, and `setPaused` actions
-- [X] T039 [US4] Add "Pause review" button to `ReviewDiffPane.tsx` bottom bar — calls `store.setPaused(ISO timestamp)`, navigates back to `<ReviewQueue>` via `PrReviewTab` state
-- [X] T040 [US4] Add resume flow to `PrReviewTab.tsx`: on PR selection, call `loadSession()` — if session exists with `currentChapterId` + `currentFilePath`, restore those (and `scrollPosition`) into store and open `<PrReviewView>` at that position; if no session, start fresh
-- [X] T063 [US4] Implement `detectChangedFiles(oldFiles: PrChangedFile[], newFiles: PrChangedFile[]): Set<string>` in `extensions/git-integration/src/github/pr-review-service.ts` — compares file paths and blob SHAs; call in `PrReviewTab.tsx` resume flow to mark changed files as needing re-review when headSHA in the loaded session differs from the current PR headSHA (FR-026)
-
-**Checkpoint**: Full pause/resume cycle works. Progress survives app quit. "Resume Ch N/M" badge appears in queue for in-progress PRs. Force-pushed PRs correctly re-flag only changed files.
+**Checkpoint**: Empty state renders correctly for both first-launch and returning users. `hasSeenWelcome` persists across restarts. Pencil icon visible on project card hover. Pop-out window shows correct title and accent bar.
 
 ---
 
-## Phase 7: User Story 5 — Submit a Formal PR Review (Priority: P2)
+## Phase 7: Polish & Documentation
 
-**Goal**: Reviewer can submit a formal GitHub review (Approve / Request Changes / Comment only) with a text body. Submission posts to GitHub and shows a confirmation toast. Failures preserve the body text for retry.
+**Purpose**: Documentation updates, lint/build verification, and manual accessibility validation.
 
-**Independent Test**: Fill out the review panel, select "Approve", submit — verify the approval appears in GitHub's PR timeline. Test network error path: mock failure — verify error toast appears and text is preserved.
-
-### Tests for User Story 5 (write FIRST — confirm FAILING before implementing)
-
-- [X] T041 [US5] Write failing unit tests in `extensions/git-integration/tests/unit/pr-review-service.spec.ts` for review submission: `prReviewSubmit` IPC handler builds correct `gh api` command for each event type (APPROVE / REQUEST_CHANGES / COMMENT); body is passed correctly; non-zero exit code returns `{ error }`
-
-### Implementation for User Story 5
-
-- [X] T042 [US5] Implement `prReviewSubmit` handler in `src/main/ipc/github.ipc.ts`: exec `gh api repos/{owner}/{repo}/pulls/{prNumber}/reviews --method POST --field event=<event> --field body=<body> --field commit_id=<sha>`, return `{ reviewId }` — makes T041 tests pass
-- [X] T043 [US5] Create `extensions/git-integration/src/components/pr-review/ReviewSubmitPanel.tsx` — three-option selector (Approve / Request Changes / Comment), `<textarea>` for body, submit button; submit calls `window.electronAPI.github.prReviewSubmit`, shows success toast via `useToastStore` or failure toast with body preserved
-
-**Checkpoint**: A formal review can be submitted from within the app. Approval/rejection appears on GitHub. Error handling and retry work.
-
----
-
-## Phase 8: User Story 6 — Inline Comments and Threads (Priority: P2)
-
-**Goal**: Existing inline comments render inside the diff as rich (markdown) formatted content, threaded and anchored to their line(s). Reviewer can add single-line and multi-line comments via a "+" gutter button. Replies thread under the parent. All comment bodies render as rich content (bold, code blocks, lists, etc.).
-
-**Independent Test**: Open a PR with existing inline comments. Verify: all comments appear inline at correct lines; markdown in comment bodies renders (not raw text). Add a new comment via the gutter button, reload — verify it appears. Reply to it — verify nesting. Select 3 lines and comment — verify the range anchor.
-
-### Tests for User Story 6 (write FIRST — confirm FAILING before implementing)
-
-- [X] T044 [US6] Write failing unit tests in `extensions/git-integration/tests/unit/pr-review-service.spec.ts` for `buildThreads()`: groups comments by `threadId`; root comment is always first; replies are in `createdAt` order; `outdated` flag propagates to thread; thread with 4+ comments has `collapsed: true`
-
-### Implementation for User Story 6
-
-- [X] T045 [US6] Implement `buildThreads(comments: InlineComment[]): Thread[]` in `extensions/git-integration/src/github/pr-review-service.ts` — makes T044 tests pass
-- [X] T046 [US6] Implement `prInlineComments` handler in `src/main/ipc/github.ipc.ts`: exec `gh api repos/{owner}/{repo}/pulls/{prNumber}/comments --paginate`, parse into `InlineComment[]` using `pr-review.schema.ts`
-- [X] T047 [US6] Create `extensions/git-integration/src/components/pr-review/RichContent.tsx` — wraps `react-markdown` with `remark-gfm`; provides a custom `code` component that calls `highlight.js` for fenced code blocks (reusing the existing `hljs.highlight` pattern from `FileDiffView.tsx`)
-- [X] T048 [US6] Create `extensions/git-integration/src/components/pr-review/InlineCommentThread.tsx` — renders a `Thread`: root comment + replies in chronological order; "Show N more replies" collapses threads with >3 replies; "Outdated" label on outdated threads; all bodies via `<RichContent>`
-- [X] T049 [US6] Create `extensions/git-integration/src/components/pr-review/CommentComposer.tsx` — `<textarea>` with write/preview tabs (preview renders body via `<RichContent>`); submit button calls appropriate IPC (`prCommentAdd` or `prCommentReply`); cancel closes the composer; submit errors show a toast
-- [X] T050 [US6] Add "+" gutter column to `ReviewDiffPane.tsx` diff table: `<td class="diff-gutter">` rendered for each `<tr>`; button appears on `tr:hover` via CSS; clicking sets `composerAnchor: { line, side }` state; renders `<CommentComposer>` anchored below the row
-- [X] T051 [US6] Add multi-line selection tracking to `ReviewDiffPane.tsx`: `onMouseDown` stores start line, `onMouseUp` stores end line; when selection spans >1 line, the "+" button on any row in the selection opens composer with `startLine` and `line` range
-- [X] T052 [US6] Implement `prCommentAdd` and `prCommentReply` handlers in `src/main/ipc/github.ipc.ts`: exec `gh api repos/{owner}/{repo}/pulls/{prNumber}/comments --method POST` with correct fields; return `{ comment: InlineComment }`
-- [X] T053 [US6] Wire `usePrReview.ts` to fetch inline comments via `github:pr-inline-comments` and build threads via `buildThreads()`; render `<InlineCommentThread>` components inside `ReviewDiffPane` at correct diff row positions
-
-**Checkpoint**: Full comment workflow works end-to-end. Existing comments visible inline, new comments post to GitHub, replies thread correctly, all content renders as rich markdown.
-
----
-
-## Phase 9: Polish & Cross-Cutting Concerns
-
-**Purpose**: Keyboard shortcuts, documentation, ADR files, README update.
-
-- [X] T054 [P] Write ADR files to `docs/adr/`: `009-gh-cli-for-review-ops.md`, `010-heuristic-file-ordering-v1.md`, `011-react-markdown-for-comments.md` — copy content from `specs/003-pr-review/contracts/adrs/` as the canonical source
-- [X] T055 [P] Register keyboard shortcuts in `extensions/git-integration/src/renderer.tsx`: `[` → previous file, `1` → mark viewed + next file; use `registry.registerKeyboardShortcut` (avoid reserved shortcuts per `RESERVED_SHORTCUTS` set)
-- [X] T056 [P] Update `README.md` features list with "Code Reviews tab" entry and brief description
-- [X] T057 [P] Update `docs/ARCHITECTURE.md`: add `github:*` IPC namespace, note the new `pr-review` component directory in the git-integration extension, reference `pr-review.schema.ts`
-- [X] T058 [P] Add `pr-review.css` styles to `extensions/git-integration/src/components/pr-review/pr-review.css`: 3-column layout, chapter nav tabs, chapter file list, health chip styles, risk dot colours (green/amber/red), gutter button, comment thread indentation, outdated label
-- [X] T064 [P] Write a Playwright performance test in `e2e/pr-review-perf.spec.ts` asserting that `ReviewQueue` + chapter file tree for a 200-file mock PR renders in under 3 seconds on warm cache (mocked IPC responses); validates SC-002
-- [X] T065 [P] Add test cases to `extensions/git-integration/tests/unit/pr-review-service.spec.ts` asserting that all 10 `github:*` IPC handlers return `{ error: string }` when the underlying `gh`/`git` command exits non-zero; validates FR-040
-- [X] T059 Run `npm run lint` and `npm run test` to confirm all tests pass and no TypeScript errors remain
+- [ ] T038 [P] Update `README.md` tech stack table: add `@fontsource/ibm-plex-sans` under the UI row alongside React 18.x + Zustand
+- [ ] T039 Run `npm run lint` from repo root; fix all errors until exit code is 0
+- [ ] T040 Run `npm run build:extensions` from repo root; fix any TypeScript compilation errors
+- [ ] T041 [P] Verify all new unit tests pass GREEN: `npx vitest run tests/unit/ConfirmDialog.spec.tsx tests/unit/EmptyState.spec.tsx` and `npx vitest run extensions/git-integration/tests/unit/GitSidebarPanel.spec.tsx extensions/git-integration/tests/unit/StagingArea.spec.tsx`
+- [ ] T042 Manual accessibility test: Tab through workspace rail → project list → tab bar → settings nav → open ConfirmDialog → Tab between Cancel/Remove; verify white `rgba(255,255,255,0.85)` focus ring visible at each step; verify Escape closes ConfirmDialog and focus returns to trigger element
+- [ ] T043 [P] Manual visual regression: side-by-side compare git sidebar and PR review tab before/after token migration; verify no colour drift, no missing borders, no broken backgrounds
 
 ---
 
@@ -205,102 +130,96 @@
 
 ### Phase Dependencies
 
-```
-Phase 1 (Setup) — no dependencies, start immediately
-    ↓
-Phase 2 (Foundational) — depends on Phase 1; BLOCKS all user story phases
-    ↓
-Phase 3 (US1 Queue)       ← can start once Phase 2 is done
-Phase 4 (US2 Chapters)    ← can start once Phase 2 is done; US1 NOT required
-Phase 5 (US3 Risk)        ← depends on Phase 4 (needs file list)
-    ↓
-Phase 6 (US4 Pause)       ← depends on Phase 4 (needs markFileViewed)
-Phase 7 (US5 Submit)      ← can start once Phase 2 is done; independent of US1–US4
-Phase 8 (US6 Comments)    ← depends on Phase 4 (needs diff view); US5 NOT required
-    ↓
-Phase 9 (Polish) — after all desired user stories complete
-```
+- **Setup (Phase 1)**: No dependencies — start immediately
+- **Foundational (Phase 2)**: Depends on Phase 1 (npm install must complete) — **blocks all user stories**
+- **US1 — Phase 3**: Depends on Phase 2 (ConfirmDialog component must exist)
+- **US2 — Phase 4**: Depends on Phase 1 (font must be installed) — independent of US1
+- **US3 — Phase 5**: Depends on Phase 4 (T013 must add skeleton CSS to styles.css before T022 extends it; T016/T017 token migration should precede T024/T028 CSS additions to extension)
+- **US4 — Phase 6**: Depends on Phase 2 (T003 globalSettings schema must exist before T033 reads `hasSeenWelcome`)
+- **Polish (Phase 7)**: Depends on all previous phases
 
 ### User Story Dependencies
 
-| Story | Depends on | Notes |
-|-------|-----------|-------|
-| US1 Queue | Phase 2 only | Fully independent of all other stories |
-| US2 Chapters | Phase 2 only | Core review surface; US3–US6 build on it |
-| US3 Risk | US2 (needs file list + diff view) | Adds metadata layer on top of US2 |
-| US4 Pause/Resume | US2 (needs markFileViewed) | State extension of US2 |
-| US5 Submit | Phase 2 only | Independent IPC + UI component |
-| US6 Comments | US2 (needs diff view) | US5 not required; comments are independent |
+- **US1 (P0)**: Needs Phase 2 complete (ConfirmDialog) — no dependency on US2/US3/US4
+- **US2 (P1)**: Needs Phase 1 complete — no dependency on US1/US3/US4
+- **US3 (P1/P2)**: Needs US2 complete (token migration must precede CSS additions in extension) — no dependency on US1/US4
+- **US4 (P2)**: Needs Phase 2 complete (globalSettings schema) — no dependency on US1/US2/US3
 
-### Within Each User Story
+### Within Each Phase
 
-1. Tests written first → confirmed FAILING
-2. Pure service functions (schemas, parsers, calculators) → IPC handler implementation
-3. IPC handler → store integration → component rendering
-4. Component → wired to live data
-
-### Parallel Opportunities (within a phase)
-
-**Phase 1**: T002 and T003 can run in parallel (different files)
-**Phase 2**: T004 and T005 and T006 can run in parallel (different files); T007–T010 sequential
-**Phase 3**: T015 and T016 can run in parallel once T014 exists
-**Phase 4**: T025 and T026 can run in parallel once T024 exists; T027 and T028 can run in parallel
-**Phase 9**: T054 through T058 are all parallel
+- Test tasks marked [P] (T004, T020, T021, T031) must run FIRST and FAIL before their paired implementation task
+- T006–T009 (ConfirmDialog wire-up) are all [P] — no shared file conflicts
+- T014, T015 (font application) are [P] — different CSS files
+- T024, T025, T028, T029, T030 (git extension UX) are all [P] — different files or non-conflicting selectors
+- T034, T035 are [P] — CSS and TSX files are separate
+- T036, T037 are [P] — different files
 
 ---
 
-## Parallel Example: User Story 2 (Chapters)
+## Parallel Execution Examples
+
+### Phase 3 (P0 Fixes) — After T005 complete:
 
 ```
-# Start test spec first:
-T020 chapter-builder.spec.ts (write failing tests)
+Task T006: Wire ConfirmDialog into WorkspaceRail.tsx
+Task T007: Wire ConfirmDialog into WorkspaceItem.tsx   [parallel with T006]
+Task T008: Wire ConfirmDialog into ProjectsPanel.tsx   [parallel with T006, T007]
+Task T009: Wire ConfirmDialog into ProjectItem.tsx     [parallel with T006-T008]
+Task T010: Add :focus-visible CSS to styles.css        [parallel with T006-T009]
+```
 
-# Once T020 is done, these three are independent:
-T021 buildChapters() pure function        ← run against T020 tests
-T022 prReviewDetail IPC handler           ← uses buildChapters()
-T023 useLoadPrDetail() hook               ← uses IPC handler
+### Phase 5 (Git UX) — Can begin after T017 complete:
 
-# Once T021–T023 complete, start UI in parallel:
-T024 PrReviewView layout shell
-T025 ChapterNav component
-T026 ChapterFileList component
-T027 ReviewDiffPane component
+```
+Task T020: Write GitSidebarPanel skeleton test (RED)
+Task T021: Write StagingArea tooltip test (RED)        [parallel with T020]
+→ T022: Add skeleton CSS (then T023: implement skeleton, verify T020 GREEN)
+Task T024: Custom checkbox CSS                         [parallel with T023]
+Task T025: Badge title attributes → T021 GREEN         [parallel with T023, T024]
+Task T028: Fix viewed-file opacity                     [parallel with T023-T025]
+Task T029: Health chip tooltips                        [parallel with T023-T025, T028]
+Task T030: Stat card tooltips                          [parallel with T023-T025, T028, T029]
+```
+
+### Phase 6 (Core Polish) — Can begin after T003 complete:
+
+```
+Task T031: Write EmptyState unit tests (RED)
+Task T032: Create EmptyState component → T031 GREEN    [parallel with other US3 tasks]
+Task T034: Pencil icon CSS                             [parallel with T032]
+Task T035: Pencil icon TSX                             [parallel with T032]
+Task T036: Pop-out window title                        [parallel with T032-T035]
+Task T037: Pop-out accent bar                          [parallel with T036]
 ```
 
 ---
 
 ## Implementation Strategy
 
-### MVP First (US1 + US2 = working review surface)
+### MVP (US1 Only — P0 Fixes, ~1 day)
 
-1. Complete Phase 1: Setup
-2. Complete Phase 2: Foundational — tab appears in UI
-3. Complete Phase 3 (US1): Review queue with live PR list
-4. Complete Phase 4 (US2): Chapter navigation + diff view + mark viewed
-5. **STOP and VALIDATE**: Browse PRs, navigate chapters, mark files, progress tracks — core loop works
-6. Continue to Phase 5+ for risk scoring, comments, submit
+1. Phase 1: Setup (T001–T002)
+2. Phase 2: Foundational (T003–T005)
+3. Phase 3: US1 (T006–T012)
+4. **STOP and VALIDATE**: Native dialogs gone, focus ring visible everywhere
+5. Ship — immediate quality improvement with zero visual regressions
 
 ### Incremental Delivery
 
-| After | What works |
-|-------|-----------|
-| Phase 2 | "Code Reviews" tab exists (blank) |
-| Phase 3 | Browse all open PRs with smart queue |
-| Phase 4 | Full chapter-based review navigation, mark files viewed |
-| Phase 5 | Per-file risk signals and health chips |
-| Phase 6 | Pause and resume across sessions |
-| Phase 7 | Submit formal reviews to GitHub |
-| Phase 8 | Full inline comment workflow with threads |
-| Phase 9 | Keyboard shortcuts, docs, polish |
+1. Setup + Foundational → ConfirmDialog ready
+2. US1 (P0) → No more native dialogs or missing focus rings ✅
+3. US2 (P1) → Unified design system, IBM Plex Sans ✅
+4. US3 (P1/P2) → Polished git extension UX ✅
+5. US4 (P2) → Improved empty state and affordances ✅
+6. Polish → Lint clean, docs updated, visual regression verified ✅
 
 ---
 
 ## Notes
 
-- All `[P]` tasks touch different files and have no shared mutable state — safe to run in parallel
-- Every `[Story]` label maps directly to the user story in `specs/003-pr-review/spec.md`
-- Tests MUST fail before implementation — commit the failing test, then the implementation
-- `computeRiskScore()` and `buildChapters()` are pure functions — test them exhaustively before any UI work
-- `electron-store` writes are synchronous — no async complexity in session persistence
-- The "Code Reviews" tab component receives `{ repoRoot: string | null }` per the `ProjectTabRegistration` interface — same as `GitFullView`
-- `RichContent.tsx` is the single shared markdown renderer — all comment bodies go through it
+- `[P]` tasks touch different files with no shared state — safe to run in parallel
+- TDD order is strictly enforced: RED test → implementation → GREEN verification
+- CSS-only changes (T011, T013–T017, T022, T024, T028) have no unit tests; verified manually via T042–T043
+- After T039 (`npm run lint`), fix any errors before marking T039 done — do not skip
+- After T040 (`npm run build:extensions`), fix TypeScript errors before proceeding to Polish
+- Commit after each phase checkpoint to preserve a rollback point

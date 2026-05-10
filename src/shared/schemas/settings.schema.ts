@@ -14,6 +14,11 @@ export const GlobalSettingsSchema = z.object({
     worktreeBaseDir: z.string(),
   }),
   extensions: z.record(z.string(), z.record(z.string(), z.unknown())),
+  ui: z
+    .object({
+      hasSeenWelcome: z.boolean(),
+    })
+    .default({ hasSeenWelcome: false }),
 })
 
 export const WorkspaceSettingsSchema = z.object({
@@ -47,6 +52,7 @@ export const DEFAULT_GLOBAL_SETTINGS = {
   terminal: { scrollbackLimit: 10000, defaultShell: process.env.SHELL || '/bin/zsh' },
   git: { worktreeBaseDir: '' },
   extensions: {},
+  ui: { hasSeenWelcome: false },
 }
 
 export type GlobalSettingsData = z.infer<typeof GlobalSettingsSchema>

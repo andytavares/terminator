@@ -85,12 +85,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('git:unstage', { repoRoot, paths }),
     commit: (repoRoot: string, message: string, signOff?: boolean) =>
       ipcRenderer.invoke('git:commit', { repoRoot, message, signOff }),
-    prStatus: (repoRoot: string) =>
-      ipcRenderer.invoke('git:pr-status', { repoRoot }),
-    prCreate: (payload: unknown) =>
-      ipcRenderer.invoke('git:pr-create', payload),
-    push: (repoRoot: string) =>
-      ipcRenderer.invoke('git:push', { repoRoot }),
+    prStatus: (repoRoot: string) => ipcRenderer.invoke('git:pr-status', { repoRoot }),
+    prCreate: (payload: unknown) => ipcRenderer.invoke('git:pr-create', payload),
+    push: (repoRoot: string) => ipcRenderer.invoke('git:push', { repoRoot }),
   },
   settings: {
     getGlobal: () => ipcRenderer.invoke('settings:get-global'),
@@ -122,8 +119,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openPath: (filePath: string) => ipcRenderer.invoke('shell:open-path', { filePath }),
   },
   github: {
-    listOpenPrs: (repoRoot: string, options?: { cursor?: string; search?: string; includeClosedPrs?: boolean }) =>
-      ipcRenderer.invoke('github:list-open-prs', { repoRoot, ...options }),
+    listOpenPrs: (
+      repoRoot: string,
+      options?: { cursor?: string; search?: string; includeClosedPrs?: boolean }
+    ) => ipcRenderer.invoke('github:list-open-prs', { repoRoot, ...options }),
     prReviewDetail: (repoRoot: string, prNumber: number) =>
       ipcRenderer.invoke('github:pr-review-detail', { repoRoot, prNumber }),
     prFileDiff: (repoRoot: string, prNumber: number, path: string) =>
@@ -132,14 +131,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('github:file-metrics', { repoRoot, path }),
     prInlineComments: (repoRoot: string, prNumber: number) =>
       ipcRenderer.invoke('github:pr-inline-comments', { repoRoot, prNumber }),
-    prCommentAdd: (payload: unknown) =>
-      ipcRenderer.invoke('github:pr-comment-add', payload),
-    prCommentReply: (payload: unknown) =>
-      ipcRenderer.invoke('github:pr-comment-reply', payload),
-    prReviewSubmit: (payload: unknown) =>
-      ipcRenderer.invoke('github:pr-review-submit', payload),
-    sessionGet: (key: string) =>
-      ipcRenderer.invoke('github:session-get', { key }),
+    prCommentAdd: (payload: unknown) => ipcRenderer.invoke('github:pr-comment-add', payload),
+    prCommentReply: (payload: unknown) => ipcRenderer.invoke('github:pr-comment-reply', payload),
+    prReviewSubmit: (payload: unknown) => ipcRenderer.invoke('github:pr-review-submit', payload),
+    sessionGet: (key: string) => ipcRenderer.invoke('github:session-get', { key }),
     sessionSet: (key: string, session: unknown) =>
       ipcRenderer.invoke('github:session-set', { key, session }),
   },
@@ -155,8 +150,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   extensionEvents: {
     onToast: (handler: (payload: { type: string; message: string }) => void) => {
-      const listener = (_event: Electron.IpcRendererEvent, payload: { type: string; message: string }) =>
-        handler(payload)
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: { type: string; message: string }
+      ) => handler(payload)
       ipcRenderer.on('extension:toast', listener)
       return () => ipcRenderer.removeListener('extension:toast', listener)
     },
@@ -189,6 +186,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
   window: {
-    openPrReview: (repoRoot: string) => ipcRenderer.invoke('window:open-pr-review', { repoRoot }),
+    openPrReview: (repoRoot: string, accentColor?: string) =>
+      ipcRenderer.invoke('window:open-pr-review', { repoRoot, accentColor }),
   },
 })

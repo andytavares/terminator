@@ -29,6 +29,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 | Build                  | electron-vite 2.x                |
 | Unit/integration tests | Vitest 2.x                       |
 | E2E tests              | Playwright 1.x                   |
+| UI font                | IBM Plex Sans (@fontsource)      |
 
 ## Prerequisites
 
@@ -59,19 +60,19 @@ npm run dev
 
 ## Available Scripts
 
-| Script                       | Description                                              |
-| ---------------------------- | -------------------------------------------------------- |
-| `npm run dev`                | Build extensions + development mode with hot-reload      |
-| `npm run build`              | Build extensions + production build                      |
-| `npm run build:extensions`   | Compile extension TypeScript → `src/index.js` bundles   |
-| `npm run preview`            | Preview production build                                 |
-| `npm test`                   | Unit + integration tests (Vitest)                        |
-| `npm run test:watch`         | Tests in watch mode                                      |
-| `npm run test:e2e`           | E2E tests (Playwright, launches Electron)                |
-| `npm run test:coverage`      | Tests with V8 coverage report                            |
-| `npm run lint`               | ESLint + TypeScript type check                           |
-| `npm run format`             | Prettier format                                          |
-| `npm run rebuild`            | Recompile native modules for Electron                    |
+| Script                     | Description                                           |
+| -------------------------- | ----------------------------------------------------- |
+| `npm run dev`              | Build extensions + development mode with hot-reload   |
+| `npm run build`            | Build extensions + production build                   |
+| `npm run build:extensions` | Compile extension TypeScript → `src/index.js` bundles |
+| `npm run preview`          | Preview production build                              |
+| `npm test`                 | Unit + integration tests (Vitest)                     |
+| `npm run test:watch`       | Tests in watch mode                                   |
+| `npm run test:e2e`         | E2E tests (Playwright, launches Electron)             |
+| `npm run test:coverage`    | Tests with V8 coverage report                         |
+| `npm run lint`             | ESLint + TypeScript type check                        |
+| `npm run format`           | Prettier format                                       |
+| `npm run rebuild`          | Recompile native modules for Electron                 |
 
 ## Project Structure
 

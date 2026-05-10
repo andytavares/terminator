@@ -55,18 +55,18 @@ All renderer-to-main communication goes through `window.electronAPI`, exposed by
 
 ### Channel namespaces
 
-| Namespace     | Direction        | Description                                                  |
-| ------------- | ---------------- | ------------------------------------------------------------ |
-| `terminal:*`  | renderer ↔ main | PTY lifecycle: create, close, input, output, resize, cleanup |
-| `workspace:*` | renderer → main  | Workspace and project CRUD                                   |
-| `project:*`   | renderer → main  | Project CRUD (scoped under workspace)                        |
-| `settings:*`  | renderer → main  | Global and per-workspace settings                            |
-| `dialog:*`    | renderer → main  | Native OS dialogs (folder picker)                            |
-| `extension:*` | renderer → main  | Extension install, toggle, contribution queries              |
-| `git:*`       | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create   |
+| Namespace     | Direction        | Description                                                                       |
+| ------------- | ---------------- | --------------------------------------------------------------------------------- |
+| `terminal:*`  | renderer ↔ main | PTY lifecycle: create, close, input, output, resize, cleanup                      |
+| `workspace:*` | renderer → main  | Workspace and project CRUD                                                        |
+| `project:*`   | renderer → main  | Project CRUD (scoped under workspace)                                             |
+| `settings:*`  | renderer → main  | Global and per-workspace settings                                                 |
+| `dialog:*`    | renderer → main  | Native OS dialogs (folder picker)                                                 |
+| `extension:*` | renderer → main  | Extension install, toggle, contribution queries                                   |
+| `git:*`       | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create                        |
 | `github:*`    | renderer → main  | PR review queue, diff, file metrics, inline comments, submit, session persistence |
-| `shell:exec`  | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)          |
-| `fs:*`        | renderer ↔ main  | File watch start/stop; `fs:changed` push events              |
+| `shell:exec`  | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)                               |
+| `fs:*`        | renderer ↔ main | File watch start/stop; `fs:changed` push events                                   |
 
 Full channel specifications: [`specs/001-extension-first-terminal/contracts/ipc-channels.md`](../specs/001-extension-first-terminal/contracts/ipc-channels.md),
 [`specs/002-git-github-integration/contracts/ipc-channels-git.md`](../specs/002-git-github-integration/contracts/ipc-channels-git.md),
@@ -252,3 +252,24 @@ All store actions are async — they call IPC first, then update local state onl
 - All user input that crosses the IPC boundary is Zod-validated before use.
 - Extensions are loaded via `require()` in the main process — they run with full Node.js privileges. Phase 1 does not sandbox extensions. This is a known limitation documented for Phase 2 consideration (see ADR-002).
 - Reserved keyboard shortcuts are enforced in both preload.ts (renderer guard) and the extension API (main process throw).
+
+---
+
+## CSS Token Strategy
+
+The renderer uses two tiers of CSS custom properties:
+
+**Core-private tokens** (`--bg-*`, `--text-*`, `--border-*`, `--accent`, `--radius-*`, `--font-*`) are defined in `src/renderer/styles.css` and consumed only by core app components. Extensions MUST NOT use these directly — they are an implementation detail and may change without notice.
+
+**Published extension tokens** (`--tm-*`) are aliases for the core-private tokens, also defined in `src/renderer/styles.css` `:root`. These are the stable API surface for extensions. The `--tm-` prefix signals a versioned, stable contract. The full contract is documented in `specs/003-pr-review/contracts/extension-token-api.md` and `docs/EXTENSION-DEVELOPMENT.md`.
+
+```
+styles.css :root
+├── --bg-base: #0C0C0F        ← core private
+├── ...
+└── --tm-bg-base: var(--bg-base)  ← extension API alias
+```
+
+This alias layer allows the core design system to evolve (rename, restructure tokens) without breaking extensions, as long as the `--tm-*` values remain stable.
+
+**Adding a new extension token** requires a MINOR version bump in `specs/003-pr-review/contracts/extension-token-api.md` and an update to `docs/EXTENSION-DEVELOPMENT.md`.

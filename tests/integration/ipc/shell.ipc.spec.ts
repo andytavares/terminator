@@ -50,11 +50,14 @@ describe('shell:exec IPC handler', () => {
   })
 
   it('executes a valid git command and returns ShellResult', async () => {
-    const result = await handler({}, {
-      command: 'git',
-      args: ['status'],
-      cwd: '/tmp/repo',
-    })
+    const result = await handler(
+      {},
+      {
+        command: 'git',
+        args: ['status'],
+        cwd: '/tmp/repo',
+      }
+    )
 
     expect(shellExecutor.assertCommandAllowed).toHaveBeenCalledWith('git')
     expect(shellExecutor.execShell).toHaveBeenCalledWith({
@@ -72,11 +75,14 @@ describe('shell:exec IPC handler', () => {
       throw new shellExecutor.CommandNotAllowedError(cmd)
     })
 
-    const result = await handler({}, {
-      command: 'git',
-      args: ['status'],
-      cwd: '/tmp',
-    }) as { error: string }
+    const result = (await handler(
+      {},
+      {
+        command: 'git',
+        args: ['status'],
+        cwd: '/tmp',
+      }
+    )) as { error: string }
 
     expect(result.error).toBe('COMMAND_NOT_ALLOWED')
   })
@@ -86,18 +92,91 @@ describe('shell:exec IPC handler', () => {
       throw new shellExecutor.CwdOutOfScopeError()
     })
 
-    const result = await handler({}, {
-      command: 'git',
-      args: ['status'],
-      cwd: '/etc',
-      workspaceRoot: '/tmp/repo',
-    }) as { error: string }
+    const result = (await handler(
+      {},
+      {
+        command: 'git',
+        args: ['status'],
+        cwd: '/etc',
+        workspaceRoot: '/tmp/repo',
+      }
+    )) as { error: string }
 
     expect(result.error).toBe('CWD_OUT_OF_SCOPE')
   })
 
   it('returns VALIDATION_ERROR for invalid payload schema', async () => {
-    const result = await handler({}, { command: 'rm', args: [] }) as { error: string }
+    const result = (await handler({}, { command: 'rm', args: [] })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns generic error string for unexpected exceptions', async () => {
+    vi.mocked(shellExecutor.execShell).mockRejectedValue(new Error('process spawn failed'))
+    const result = (await handler(
+      {},
+      {
+        command: 'git',
+        args: ['log'],
+        cwd: '/tmp/repo',
+      }
+    )) as { error: string }
+    expect(result.error).toContain('process spawn failed')
+  })
+
+  it('calls assertCwdInScope only when workspaceRoot is provided', async () => {
+    await handler(
+      {},
+      {
+        command: 'git',
+        args: ['status'],
+        cwd: '/tmp/repo',
+      }
+    )
+    expect(shellExecutor.assertCwdInScope).not.toHaveBeenCalled()
+
+    await handler(
+      {},
+      {
+        command: 'git',
+        args: ['status'],
+        cwd: '/tmp/repo',
+        workspaceRoot: '/tmp',
+      }
+    )
+    expect(shellExecutor.assertCwdInScope).toHaveBeenCalledWith('/tmp/repo', '/tmp')
+  })
+})
+
+describe('shell:open-path IPC handler', () => {
+  let handler: (event: unknown, payload: unknown) => Promise<unknown>
+
+  const mockOpenPath = vi.fn()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockOpenPath.mockResolvedValue('')
+
+    vi.doMock('electron', () => ({
+      ipcMain: { handle: vi.fn() },
+      shell: { openPath: mockOpenPath },
+    }))
+
+    registerShellHandlers()
+
+    const calls = vi.mocked(ipcMain.handle).mock.calls
+    const call = calls.find(([channel]) => channel === 'shell:open-path')
+    if (call) handler = call[1] as typeof handler
+  })
+
+  it('returns VALIDATION_ERROR for empty filePath', async () => {
+    if (!handler) return
+    const result = (await handler({}, { filePath: '' })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns VALIDATION_ERROR for missing filePath', async () => {
+    if (!handler) return
+    const result = (await handler({}, {})) as { error: string }
     expect(result.error).toBe('VALIDATION_ERROR')
   })
 })

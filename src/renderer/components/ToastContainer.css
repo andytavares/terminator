@@ -19,15 +19,21 @@
   max-width: 420px;
   pointer-events: all;
   font-size: 12px;
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   border: 1px solid transparent;
   animation: toast-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .toast--info {

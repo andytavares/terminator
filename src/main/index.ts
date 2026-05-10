@@ -36,11 +36,12 @@ function createWindow(): void {
   })
 }
 
-function createPrReviewWindow(repoRoot: string): void {
+function createPrReviewWindow(repoRoot: string, accentColor?: string): void {
+  const repoName = repoRoot.split('/').filter(Boolean).pop() ?? 'Code Review'
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
-    title: 'Code Reviews',
+    title: `Code Review — ${repoName}`,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -48,7 +49,8 @@ function createPrReviewWindow(repoRoot: string): void {
     },
   })
 
-  const params = new URLSearchParams({ view: 'pr-review', repoRoot })
+  const paramObj: Record<string, string> = { view: 'pr-review', repoRoot }
+  if (accentColor) paramObj.accentColor = accentColor
   if (process.env.NODE_ENV === 'development' || process.env['ELECTRON_RENDERER_URL']) {
     const base = process.env['ELECTRON_RENDERER_URL'] || 'http://localhost:5173'
     win.loadURL(`${base}?${params}`)
@@ -126,8 +128,8 @@ app.whenReady().then(async () => {
   registerDialogHandlers()
 
   ipcMain.handle('window:open-pr-review', (_event, payload) => {
-    const repoRoot = (payload as { repoRoot: string }).repoRoot
-    if (repoRoot) createPrReviewWindow(repoRoot)
+    const { repoRoot, accentColor } = payload as { repoRoot: string; accentColor?: string }
+    if (repoRoot) createPrReviewWindow(repoRoot, accentColor)
   })
 
   await extensionHost.loadAll()

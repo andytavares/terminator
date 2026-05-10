@@ -6,7 +6,9 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 
 export function PrReviewWindow(): JSX.Element {
   const { loadSettings, resolvedTheme } = useSettingsStore()
-  const repoRoot = new URLSearchParams(window.location.search).get('repoRoot')
+  const params = new URLSearchParams(window.location.search)
+  const repoRoot = params.get('repoRoot')
+  const accentColor = params.get('accentColor')
 
   useEffect(() => {
     loadSettings()
@@ -18,7 +20,10 @@ export function PrReviewWindow(): JSX.Element {
 
   return (
     <ErrorBoundary>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      <div
+        style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}
+      >
+        {accentColor && <div style={{ height: 3, background: accentColor, flexShrink: 0 }} />}
         <PrReviewTab repoRoot={repoRoot} />
         <ToastContainer />
       </div>

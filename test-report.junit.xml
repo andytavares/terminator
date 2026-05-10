@@ -1,0 +1,2070 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="701" failures="14" errors="0" time="1.671">
+    <testsuite name="tests/unit/ConfirmDialog.spec.tsx" timestamp="2026-05-10T18:22:57.116Z" hostname="Andrews-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.026">
+        <testcase classname="tests/unit/ConfirmDialog.spec.tsx" name="ConfirmDialog &gt; renders title" time="0.012">
+        </testcase>
+        <testcase classname="tests/unit/ConfirmDialog.spec.tsx" name="ConfirmDialog &gt; renders description when provided" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/ConfirmDialog.spec.tsx" name="ConfirmDialog &gt; calls onConfirm when confirm button is clicked" time="0.004">
+        </testcase>
+        <testcase classname="tests/unit/ConfirmDialog.spec.tsx" name="ConfirmDialog &gt; calls onClose when cancel button is clicked" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/ConfirmDialog.spec.tsx" name="ConfirmDialog &gt; calls onClose when Escape key is pressed" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/ConfirmDialog.spec.tsx" name="ConfirmDialog &gt; uses custom confirmLabel when provided" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/ConfirmDialog.spec.tsx" name="ConfirmDialog &gt; applies danger class to confirm button when danger prop is true" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/ConfirmDialog.spec.tsx" name="ConfirmDialog &gt; cancel button receives initial focus" time="0.001">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/EmptyState.spec.tsx" timestamp="2026-05-10T18:22:57.117Z" hostname="Andrews-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="0.026">
+        <testcase classname="tests/unit/EmptyState.spec.tsx" name="EmptyState &gt; renders title" time="0.01">
+        </testcase>
+        <testcase classname="tests/unit/EmptyState.spec.tsx" name="EmptyState &gt; renders icon when provided" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/EmptyState.spec.tsx" name="EmptyState &gt; renders subtitle when provided" time="0">
+        </testcase>
+        <testcase classname="tests/unit/EmptyState.spec.tsx" name="EmptyState &gt; renders action buttons" time="0.005">
+        </testcase>
+        <testcase classname="tests/unit/EmptyState.spec.tsx" name="EmptyState &gt; calls onClick when action button clicked" time="0.008">
+        </testcase>
+        <testcase classname="tests/unit/EmptyState.spec.tsx" name="EmptyState &gt; renders keyboard shortcut label when provided" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/EmptyState.spec.tsx" name="EmptyState &gt; renders nothing for icon when not provided" time="0.001">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/extensions/api.spec.ts" timestamp="2026-05-10T18:22:57.117Z" hostname="Andrews-MacBook-Pro.local" tests="14" failures="0" errors="0" skipped="0" time="0.004">
+        <testcase classname="tests/unit/extensions/api.spec.ts" name="api.notifications.showToast &gt; sends extension:toast IPC message to all windows" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/api.spec.ts" name="api.notifications.showToast &gt; sends error toast with correct type" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/api.spec.ts" name="api.shell.exec &gt; calls execShell with correct args for git command" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/api.spec.ts" name="api.shell.exec &gt; rejects with COMMAND_NOT_ALLOWED for non-allowlisted commands" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/api.spec.ts" name="api.nativeMenu.addViewMenuItem &gt; adds item and returns a disposable" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/api.spec.ts" name="api.nativeMenu.addViewMenuItem &gt; dispose removes item from registry" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/api.spec.ts" name="api.sidebar.registerPanel &gt; registers a panel and returns a disposable" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/api.spec.ts" name="api.sidebar.registerPanel &gt; throws SLOT_ALREADY_REGISTERED when same slot registered twice by same extension" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/api.spec.ts" name="api.sidebar.registerPanel &gt; allows different extensions to register in same slot" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/api.spec.ts" name="api.settings workspace precedence &gt; returns global value when no workspace override exists" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/api.spec.ts" name="api.settings workspace precedence &gt; returns workspace value over global when workspace override exists" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/api.spec.ts" name="api.settings workspace precedence &gt; falls back to global value when workspace has no override for the key" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/api.spec.ts" name="api.settings workspace precedence &gt; returns undefined when key not set globally or in workspace" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/api.spec.ts" name="api.settings workspace precedence &gt; ignores workspace values when no workspace ID getter provided" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/extensions/ext-git-service.spec.ts" timestamp="2026-05-10T18:22:57.118Z" hostname="Andrews-MacBook-Pro.local" tests="9" failures="0" errors="0" skipped="0" time="0.004">
+        <testcase classname="tests/unit/extensions/ext-git-service.spec.ts" name="extension git-service &gt; getStatus &gt; returns parsed status with branch" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/extensions/ext-git-service.spec.ts" name="extension git-service &gt; getStatus &gt; returns HEAD when branch command fails" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/ext-git-service.spec.ts" name="extension git-service &gt; getDiff &gt; returns unstaged diff for false staged flag" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/ext-git-service.spec.ts" name="extension git-service &gt; getDiff &gt; passes --cached for staged diff" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/ext-git-service.spec.ts" name="extension git-service &gt; stageFiles &gt; calls git add with the paths" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/ext-git-service.spec.ts" name="extension git-service &gt; unstageFiles &gt; calls git restore --staged" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/ext-git-service.spec.ts" name="extension git-service &gt; commitChanges &gt; extracts short hash from commit output" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/ext-git-service.spec.ts" name="extension git-service &gt; commitChanges &gt; returns empty string when hash not found" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/ext-git-service.spec.ts" name="extension git-service &gt; commitChanges &gt; appends --signoff when requested" time="0.001">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/extensions/extension-host.spec.ts" timestamp="2026-05-10T18:22:57.118Z" hostname="Andrews-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="0.077">
+        <testcase classname="tests/unit/extensions/extension-host.spec.ts" name="ExtensionAPI keyboard &gt; keyboard.register with non-reserved accelerator returns Disposable" time="0.012">
+        </testcase>
+        <testcase classname="tests/unit/extensions/extension-host.spec.ts" name="ExtensionAPI keyboard &gt; keyboard.register throws synchronously for reserved shortcut CmdOrCtrl+T" time="0.006">
+        </testcase>
+        <testcase classname="tests/unit/extensions/extension-host.spec.ts" name="ExtensionAPI keyboard &gt; disposing the returned Disposable removes the handler" time="0.004">
+        </testcase>
+        <testcase classname="tests/unit/extensions/extension-host.spec.ts" name="ExtensionHost &gt; activate error sets extension status to error without crashing host" time="0.026">
+        </testcase>
+        <testcase classname="tests/unit/extensions/extension-host.spec.ts" name="ExtensionHost &gt; invalid manifest returns INVALID_MANIFEST error" time="0.029">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/extensions/git.store.spec.ts" timestamp="2026-05-10T18:22:57.119Z" hostname="Andrews-MacBook-Pro.local" tests="10" failures="0" errors="0" skipped="0" time="0.002">
+        <testcase classname="tests/unit/extensions/git.store.spec.ts" name="useGitStore &gt; setStatus &gt; stores the given status" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/git.store.spec.ts" name="useGitStore &gt; setStatus &gt; clears status when set to null" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/git.store.spec.ts" name="useGitStore &gt; setSelectedFile &gt; stores the selected file path" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/git.store.spec.ts" name="useGitStore &gt; setSelectedFile &gt; clears selected file when set to null" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/git.store.spec.ts" name="useGitStore &gt; setDiff &gt; adds diff to cache by path" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/git.store.spec.ts" name="useGitStore &gt; setDiff &gt; stores multiple diffs independently" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/git.store.spec.ts" name="useGitStore &gt; setDiff &gt; overwrites existing diff for the same path" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/git.store.spec.ts" name="useGitStore &gt; setLoading &gt; sets isLoading to true" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/git.store.spec.ts" name="useGitStore &gt; setLoading &gt; sets isLoading to false" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/git.store.spec.ts" name="useGitStore &gt; clearDiffCache &gt; removes all cached diffs" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/extensions/github.ipc.spec.ts" timestamp="2026-05-10T18:22:57.119Z" hostname="Andrews-MacBook-Pro.local" tests="33" failures="0" errors="0" skipped="0" time="0.007">
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:list-open-prs &gt; returns VALIDATION_ERROR for missing repoRoot" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:list-open-prs &gt; returns RATE_LIMITED error on rate limit message" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:list-open-prs &gt; returns error string for non-rate-limit gh failure" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:list-open-prs &gt; returns RATE_LIMITED for &quot;rate limit&quot; phrasing" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-review-detail &gt; returns VALIDATION_ERROR for missing prNumber" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-review-detail &gt; returns VALIDATION_ERROR for non-integer prNumber" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-review-detail &gt; returns VALIDATION_ERROR for missing repoRoot" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-review-detail &gt; returns RATE_LIMITED on rate limit error" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-file-diff &gt; returns VALIDATION_ERROR for missing path" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-file-diff &gt; returns VALIDATION_ERROR for missing repoRoot" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-file-diff &gt; returns error string on subprocess failure" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:file-metrics &gt; returns VALIDATION_ERROR for missing path" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:file-metrics &gt; returns VALIDATION_ERROR for empty path" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:file-metrics &gt; returns metrics when git commands succeed" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-inline-comments &gt; returns VALIDATION_ERROR for missing prNumber" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-inline-comments &gt; returns RATE_LIMITED on rate limit error" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-inline-comments &gt; returns parsed comments on success" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-inline-comments &gt; correctly marks replies" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-comment-add &gt; returns VALIDATION_ERROR for missing required fields" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-comment-add &gt; returns VALIDATION_ERROR for invalid side value" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-comment-add &gt; returns error string on gh failure" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-comment-reply &gt; returns VALIDATION_ERROR for missing inReplyToId" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-comment-reply &gt; returns error on gh failure" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-review-submit &gt; returns VALIDATION_ERROR for invalid event" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-review-submit &gt; returns reviewId on success" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:pr-review-submit &gt; accepts all valid event types" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:session-get &gt; returns session null for missing key" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:session-get &gt; returns session null when key not in store" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:session-get &gt; returns stored session when key exists and data is valid" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:session-get &gt; returns session null when stored data fails schema validation" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:session-set &gt; returns VALIDATION_ERROR for missing key" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:session-set &gt; returns VALIDATION_ERROR for invalid session data" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/github.ipc.spec.ts" name="github:session-set &gt; stores valid session and returns ok" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/extensions/pr-review-service-renderer.spec.ts" timestamp="2026-05-10T18:22:57.121Z" hostname="Andrews-MacBook-Pro.local" tests="11" failures="0" errors="0" skipped="0" time="0.002">
+        <testcase classname="tests/unit/extensions/pr-review-service-renderer.spec.ts" name="buildThreads &gt; returns empty array for no comments" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review-service-renderer.spec.ts" name="buildThreads &gt; creates one thread per unique threadId" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review-service-renderer.spec.ts" name="buildThreads &gt; groups replies under the same thread" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review-service-renderer.spec.ts" name="buildThreads &gt; sorts comments by createdAt within a thread" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review-service-renderer.spec.ts" name="buildThreads &gt; sets thread metadata from root comment" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review-service-renderer.spec.ts" name="buildThreads &gt; marks thread as outdated when any comment is outdated" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review-service-renderer.spec.ts" name="buildThreads &gt; thread is not outdated when no comments are outdated" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review-service-renderer.spec.ts" name="buildThreads &gt; collapses thread when there are 4 or more replies" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review-service-renderer.spec.ts" name="buildThreads &gt; does not collapse thread with fewer than 4 replies" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review-service-renderer.spec.ts" name="buildThreads &gt; uses threadId as the thread id" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review-service-renderer.spec.ts" name="buildThreads &gt; handles multiple separate threads correctly" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/extensions/pr-review.store.spec.ts" timestamp="2026-05-10T18:22:57.121Z" hostname="Andrews-MacBook-Pro.local" tests="37" failures="0" errors="0" skipped="0" time="0.006">
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; queue management &gt; setQueue replaces the PR queue" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; queue management &gt; appendQueue adds to existing queue" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; queue management &gt; setQueueLoading updates queueLoading" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; queue management &gt; setLoadingMorePrs updates loadingMorePrs" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; queue management &gt; setQueueError sets error message" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; queue management &gt; setQueueError clears error with null" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; queue management &gt; setHasMorePrs updates flag" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; queue management &gt; setNextPrCursor stores cursor" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; queue management &gt; setIncludeClosedPrs toggles inclusion" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; active review state &gt; setActivePr stores the PR detail" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; active review state &gt; setActivePr clears with null" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; active review state &gt; setCurrentChapter updates currentChapterId" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; active review state &gt; setCurrentFile updates currentFilePath" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; viewed files tracking &gt; markFileViewed adds file to viewedFiles set" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; viewed files tracking &gt; markFileViewed is idempotent" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; viewed files tracking &gt; unmarkFileViewed removes file from viewedFiles" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; file reordering &gt; reorderFiles updates fileOrderOverrides" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; file reordering &gt; reorderFiles preserves overrides for other chapters" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; scroll and pause state &gt; setScrollPosition stores position" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; scroll and pause state &gt; setScrollPosition clears with null" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; scroll and pause state &gt; setPaused stores timestamp" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; scroll and pause state &gt; setPaused clears with null" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; threads &gt; setThreads stores thread list by path" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; threads &gt; setThreads overwrites existing threads for the same path" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; updateFileRiskScore &gt; updates risk score for file in specified chapter" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; updateFileRiskScore &gt; is a no-op when activePr is null" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; updateQueuePrRisk &gt; updates risk level and signal dots for matching PR" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; updateQueuePrRisk &gt; does not affect other PRs in the queue" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; setRateLimitState &gt; stores rate limit state" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; setRateLimitState &gt; clears rate limit state with null" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; initSession &gt; restores session state from ReviewSession object" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; initSession &gt; converts viewedFiles array to Set" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; reset &gt; clears active PR, chapters, viewed files, and threads" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; reset &gt; does not clear prQueue" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; patchFileComplexity &gt; updates complexity delta and adjusts composite score" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; patchFileComplexity &gt; is a no-op when activePr is null" time="0">
+        </testcase>
+        <testcase classname="tests/unit/extensions/pr-review.store.spec.ts" name="usePrReviewStore &gt; patchFileComplexity &gt; does not modify files in other chapters" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/fs/fs-watcher.spec.ts" timestamp="2026-05-10T18:22:57.122Z" hostname="Andrews-MacBook-Pro.local" tests="6" failures="0" errors="0" skipped="0" time="0.004">
+        <testcase classname="tests/unit/fs/fs-watcher.spec.ts" name="FsWatcherService &gt; attaches fs.watch on watchStart" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/fs/fs-watcher.spec.ts" name="FsWatcherService &gt; does not re-attach if already watching same root" time="0">
+        </testcase>
+        <testcase classname="tests/unit/fs/fs-watcher.spec.ts" name="FsWatcherService &gt; delivers change events to registered handlers" time="0">
+        </testcase>
+        <testcase classname="tests/unit/fs/fs-watcher.spec.ts" name="FsWatcherService &gt; falls back to polling when fs.watch throws" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/fs/fs-watcher.spec.ts" name="FsWatcherService &gt; stops watcher on watchStop" time="0">
+        </testcase>
+        <testcase classname="tests/unit/fs/fs-watcher.spec.ts" name="FsWatcherService &gt; stops watching when last handler is removed" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/git/git-parser.spec.ts" timestamp="2026-05-10T18:22:57.123Z" hostname="Andrews-MacBook-Pro.local" tests="33" failures="0" errors="0" skipped="0" time="0.003">
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; returns empty result for blank stdout" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; returns empty result for whitespace-only stdout" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; parses untracked file" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; parses ignored file" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; parses staged modified file (M in index, clean worktree)" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; parses unstaged modified file" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; parses staged added file" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; parses staged deleted file" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; sets hasConflicts for UU" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; sets hasConflicts for AA" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; sets hasConflicts for DD" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; sets hasConflicts for AU" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; sets hasConflicts for UA" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; sets hasConflicts for DU" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; sets hasConflicts for UD" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; parses renamed file (two NUL-separated entries)" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; parses copy (C) the same way as rename" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; parses multiple files from NUL-delimited output" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; truncates at maxFiles and sets truncated flag" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; truncated is false when exactly at maxFiles limit with no remaining" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; skips entries shorter than 3 chars" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; does not set hasConflicts when no conflict codes present" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseStatus &gt; defaults unknown xy code to modified" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseDiff &gt; detects binary file diff" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseDiff &gt; returns empty hunks for empty diff output" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseDiff &gt; parses a single hunk with add/remove/context lines" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseDiff &gt; tracks line numbers across add/remove/context correctly" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseDiff &gt; parses multiple hunks" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseDiff &gt; sets truncated flag when content exceeds maxBytes" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseDiff &gt; does not set truncated when content fits in maxBytes" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseDiff &gt; ignores diff header lines (diff --git, index, ---, +++)" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseDiff &gt; returns path as empty string (caller must set it)" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-parser.spec.ts" name="parseDiff &gt; @@ header without line count still parses (defaults to line 1)" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/git/git-service.spec.ts" timestamp="2026-05-10T18:22:57.124Z" hostname="Andrews-MacBook-Pro.local" tests="31" failures="0" errors="0" skipped="0" time="0.007">
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="getStatus &gt; returns parsed status with branch name" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="getStatus &gt; falls back to HEAD when branch command fails" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="getStatus &gt; passes maxFiles to parser" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="getDiff &gt; calls git diff without --cached for unstaged" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="getDiff &gt; calls git diff --cached for staged changes" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="getDiff &gt; attaches path to parsed diff result" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="stageFiles &gt; calls git add with the given paths" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="unstageFiles &gt; calls git restore --staged with the given paths" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="commitChanges &gt; returns short hash from commit output" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="commitChanges &gt; returns empty string when hash cannot be parsed" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="commitChanges &gt; appends --signoff when signOff is true" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="commitChanges &gt; does not append --signoff by default" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="isGitRepo &gt; returns true when rev-parse succeeds" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="isGitRepo &gt; returns false when rev-parse fails" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="getGitRoot &gt; returns trimmed repo root path" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="getCurrentBranch &gt; returns branch name" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="getCurrentBranch &gt; returns HEAD when branch output is empty" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="listBranches &gt; lists local branches" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="listBranches &gt; marks current branch with isCurrent" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="listBranches &gt; deduplicates remote branches that have a local equivalent" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="listBranches &gt; omits HEAD from remote branch list" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="listBranches &gt; returns empty array for empty output" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="checkoutBranch &gt; calls git checkout with the branch name" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="suggestWorktreePath &gt; defaults to repoRoot/.worktrees/&lt;safeBranch&gt;" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="suggestWorktreePath &gt; uses baseDir when provided" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="suggestWorktreePath &gt; replaces slashes, backslashes, colons, and spaces in branch name" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="listWorktrees &gt; parses porcelain worktree list" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="listWorktrees &gt; uses HEAD as branch fallback when branch line is absent" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="createWorktree &gt; uses -b flag when creating a new branch" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="createWorktree &gt; does not use -b flag for existing branch" time="0">
+        </testcase>
+        <testcase classname="tests/unit/git/git-service.spec.ts" name="removeWorktree &gt; calls git worktree remove --force" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/scripts/create-extension.spec.js" timestamp="2026-05-10T18:22:57.125Z" hostname="Andrews-MacBook-Pro.local" tests="12" failures="0" errors="0" skipped="0" time="0.009">
+        <testcase classname="tests/unit/scripts/create-extension.spec.js" name="validateName() &gt; accepts valid kebab-case names" time="0.007">
+        </testcase>
+        <testcase classname="tests/unit/scripts/create-extension.spec.js" name="validateName() &gt; rejects names starting with a number" time="0">
+        </testcase>
+        <testcase classname="tests/unit/scripts/create-extension.spec.js" name="validateName() &gt; rejects uppercase letters" time="0">
+        </testcase>
+        <testcase classname="tests/unit/scripts/create-extension.spec.js" name="validateName() &gt; rejects names shorter than 3 characters" time="0">
+        </testcase>
+        <testcase classname="tests/unit/scripts/create-extension.spec.js" name="validateName() &gt; rejects names with spaces" time="0">
+        </testcase>
+        <testcase classname="tests/unit/scripts/create-extension.spec.js" name="validateId() &gt; accepts valid reverse-domain IDs" time="0">
+        </testcase>
+        <testcase classname="tests/unit/scripts/create-extension.spec.js" name="validateId() &gt; rejects IDs without dots" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/scripts/create-extension.spec.js" name="validateId() &gt; rejects IDs with uppercase" time="0">
+        </testcase>
+        <testcase classname="tests/unit/scripts/create-extension.spec.js" name="generateManifest() &gt; generates valid JSON manifest with correct fields" time="0">
+        </testcase>
+        <testcase classname="tests/unit/scripts/create-extension.spec.js" name="generateIndex() &gt; generates index with activate and deactivate exports" time="0">
+        </testcase>
+        <testcase classname="tests/unit/scripts/create-extension.spec.js" name="generateIndex() &gt; includes all v1.1.0 API surface stubs" time="0">
+        </testcase>
+        <testcase classname="tests/unit/scripts/create-extension.spec.js" name="generateIndex() &gt; includes commented-out stubs for v1.1.0 surfaces" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/shell/shell-executor.spec.ts" timestamp="2026-05-10T18:22:57.126Z" hostname="Andrews-MacBook-Pro.local" tests="19" failures="0" errors="0" skipped="0" time="0.004">
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="assertCommandAllowed &gt; allows git" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="assertCommandAllowed &gt; allows gh" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="assertCommandAllowed &gt; throws CommandNotAllowedError for rm" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="assertCommandAllowed &gt; throws CommandNotAllowedError for curl" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="assertCommandAllowed &gt; thrown error has COMMAND_NOT_ALLOWED code" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="assertCommandAllowed &gt; thrown error message names the disallowed command" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="assertCwdInScope &gt; allows cwd exactly equal to workspaceRoot" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="assertCwdInScope &gt; allows cwd inside workspaceRoot" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="assertCwdInScope &gt; allows deeply nested cwd inside workspaceRoot" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="assertCwdInScope &gt; throws CwdOutOfScopeError when cwd is outside workspaceRoot" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="assertCwdInScope &gt; throws CwdOutOfScopeError for path traversal attempt (../escape)" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="assertCwdInScope &gt; throws CwdOutOfScopeError when cwd is relative" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="assertCwdInScope &gt; throws CwdOutOfScopeError when workspaceRoot is relative" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="assertCwdInScope &gt; thrown error has CWD_OUT_OF_SCOPE code" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="execShell &gt; resolves with exitCode 0 and stdout on success" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="execShell &gt; resolves with non-zero exitCode when process fails" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="execShell &gt; resolves with exitCode 1 when error code is non-numeric" time="0">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="execShell &gt; marks timedOut when SIGTERM close signal fires before callback" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/shell/shell-executor.spec.ts" name="execShell &gt; passes sanitized env variables to child process" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/terminal/pty-manager.spec.ts" timestamp="2026-05-10T18:22:57.127Z" hostname="Andrews-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="0.018">
+        <testcase classname="tests/unit/terminal/pty-manager.spec.ts" name="PtyManager &gt; spawn creates a PTY and returns sessionId" time="0.007">
+        </testcase>
+        <testcase classname="tests/unit/terminal/pty-manager.spec.ts" name="PtyManager &gt; resize calls pty.resize" time="0.003">
+        </testcase>
+        <testcase classname="tests/unit/terminal/pty-manager.spec.ts" name="PtyManager &gt; write sends data to PTY" time="0.004">
+        </testcase>
+        <testcase classname="tests/unit/terminal/pty-manager.spec.ts" name="PtyManager &gt; kill terminates process" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/terminal/pty-manager.spec.ts" name="PtyManager &gt; killAll terminates all tracked PTY processes" time="0.002">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/schemas/git.schema.spec.ts" timestamp="2026-05-10T18:22:57.127Z" hostname="Andrews-MacBook-Pro.local" tests="11" failures="0" errors="0" skipped="0" time="0.008">
+        <testcase classname="tests/unit/schemas/git.schema.spec.ts" name="FileStatusSchema &gt; accepts all valid status values" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/schemas/git.schema.spec.ts" name="FileStatusSchema &gt; rejects unknown status" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/git.schema.spec.ts" name="GitFileStatusSchema &gt; parses a modified staged file" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/git.schema.spec.ts" name="GitFileStatusSchema &gt; parses a renamed file with originalPath" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/schemas/git.schema.spec.ts" name="GitFileStatusSchema &gt; defaults isBinary to false" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/git.schema.spec.ts" name="GitFileStatusSchema &gt; rejects empty path" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/git.schema.spec.ts" name="GitStatusSchema &gt; parses a clean git status" time="0.004">
+        </testcase>
+        <testcase classname="tests/unit/schemas/git.schema.spec.ts" name="GitStatusSchema &gt; parses status with files" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/schemas/git.schema.spec.ts" name="GitStatusSchema &gt; sets truncated flag when file list is capped" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/git.schema.spec.ts" name="GitStatusSchema &gt; sets hasConflicts when conflicts present" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/git.schema.spec.ts" name="GitStatusSchema &gt; defaults truncated to false" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/schemas/pr-review.schema.spec.ts" timestamp="2026-05-10T18:22:57.127Z" hostname="Andrews-MacBook-Pro.local" tests="37" failures="0" errors="0" skipped="0" time="0.004">
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="SignalDotsSchema &gt; accepts valid signal dots" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="SignalDotsSchema &gt; accepts all signal values" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="SignalDotsSchema &gt; rejects invalid signal value" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="RiskScoreSchema &gt; accepts valid risk score" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="RiskScoreSchema &gt; accepts null composite" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="RiskScoreSchema &gt; accepts all risk levels" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="RiskScoreSchema &gt; rejects invalid risk level" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="RiskScoreSchema &gt; accepts null metric values" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="FileMetricsSchema &gt; accepts valid file metrics" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="FileMetricsSchema &gt; requires path string" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="PrChangedFileSchema &gt; accepts valid changed file" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="PrChangedFileSchema &gt; accepts renamed file with oldPath" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="PrChangedFileSchema &gt; accepts all change types" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="PrChangedFileSchema &gt; accepts all tier values" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="PrChangedFileSchema &gt; rejects invalid tier" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ChapterSchema &gt; accepts valid chapter" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ChapterSchema &gt; accepts all chapter statuses" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ChapterSchema &gt; accepts chapter with no files" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ReviewQueuePRSchema &gt; accepts valid review queue PR" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ReviewQueuePRSchema &gt; accepts all CI statuses" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ReviewQueuePRSchema &gt; accepts optional resumeChapter fields" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ReviewQueuePRSchema &gt; accepts draft PRs" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ReviewQueuePRSchema &gt; rejects non-numeric PR number" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ReviewSessionSchema &gt; accepts valid session" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ReviewSessionSchema &gt; accepts null currentChapterId" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ReviewSessionSchema &gt; accepts null currentFilePath" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ReviewSessionSchema &gt; accepts null scrollPosition" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ReviewSessionSchema &gt; accepts non-null pausedAt timestamp" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ReviewSessionSchema &gt; accepts empty viewedFiles" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ReviewSessionSchema &gt; rejects missing repoRoot" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="InlineCommentSchema &gt; accepts valid inline comment" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="InlineCommentSchema &gt; accepts both side values" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="InlineCommentSchema &gt; rejects invalid side" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="InlineCommentSchema &gt; accepts reply with parentId" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ThreadSchema &gt; accepts valid thread" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ThreadSchema &gt; accepts thread with startLine" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/pr-review.schema.spec.ts" name="ThreadSchema &gt; rejects thread without required fields" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/schemas/session.schema.spec.ts" timestamp="2026-05-10T18:22:57.129Z" hostname="Andrews-MacBook-Pro.local" tests="15" failures="0" errors="0" skipped="0" time="0.003">
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="TerminalSessionSchema &gt; accepts a valid session" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="TerminalSessionSchema &gt; accepts optional closedAt" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="TerminalSessionSchema &gt; rejects invalid status" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="TerminalSessionSchema &gt; rejects invalid type" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="TerminalSessionSchema &gt; rejects non-UUID id" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="TerminalSessionSchema &gt; rejects empty tabTitle" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="TerminalSessionSchema &gt; rejects scrollbackLimit below 1000" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="TerminalSessionSchema &gt; rejects scrollbackLimit above 100000" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="TerminalSessionSchema &gt; accepts all valid status values" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="TerminalSessionSchema &gt; accepts both session types" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="CreateSessionInputSchema &gt; accepts valid input" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="CreateSessionInputSchema &gt; accepts optional shell" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="CreateSessionInputSchema &gt; rejects empty cwd" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="CreateSessionInputSchema &gt; rejects non-UUID projectId" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/session.schema.spec.ts" name="CreateSessionInputSchema &gt; rejects tabTitle longer than 100 chars" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/schemas/shell.schema.spec.ts" timestamp="2026-05-10T18:22:57.129Z" hostname="Andrews-MacBook-Pro.local" tests="9" failures="0" errors="0" skipped="0" time="0.003">
+        <testcase classname="tests/unit/schemas/shell.schema.spec.ts" name="ShellExecOptionsSchema &gt; accepts git command" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/schemas/shell.schema.spec.ts" name="ShellExecOptionsSchema &gt; accepts gh command" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/shell.schema.spec.ts" name="ShellExecOptionsSchema &gt; rejects non-allowlisted command" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/shell.schema.spec.ts" name="ShellExecOptionsSchema &gt; rejects empty cwd" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/shell.schema.spec.ts" name="ShellExecOptionsSchema &gt; defaults timeoutMs to 10000" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/shell.schema.spec.ts" name="ShellExecOptionsSchema &gt; accepts custom timeoutMs" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/shell.schema.spec.ts" name="ShellExecOptionsSchema &gt; rejects negative timeoutMs" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/shell.schema.spec.ts" name="ShellResultSchema &gt; parses a successful result" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/shell.schema.spec.ts" name="ShellResultSchema &gt; parses a timed-out result" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/schemas/workspace.schema.spec.ts" timestamp="2026-05-10T18:22:57.130Z" hostname="Andrews-MacBook-Pro.local" tests="9" failures="0" errors="0" skipped="0" time="0.002">
+        <testcase classname="tests/unit/schemas/workspace.schema.spec.ts" name="WorkspaceSchema &gt; accepts a valid workspace" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/schemas/workspace.schema.spec.ts" name="WorkspaceSchema &gt; rejects empty name" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/schemas/workspace.schema.spec.ts" name="WorkspaceSchema &gt; rejects name over 100 characters" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/workspace.schema.spec.ts" name="WorkspaceSchema &gt; rejects invalid hex color" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/workspace.schema.spec.ts" name="WorkspaceSchema &gt; rejects more than 20 tags" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/workspace.schema.spec.ts" name="WorkspaceSchema &gt; accepts workspace with zero tags" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/workspace.schema.spec.ts" name="WorkspaceSchema &gt; accepts workspace with exactly 20 tags" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/workspace.schema.spec.ts" name="ProjectSchema &gt; accepts a valid project" time="0">
+        </testcase>
+        <testcase classname="tests/unit/schemas/workspace.schema.spec.ts" name="ProjectSchema &gt; rejects empty project name" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/storage/settings-store.spec.ts" timestamp="2026-05-10T18:22:57.130Z" hostname="Andrews-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="0.051">
+        <testcase classname="tests/unit/storage/settings-store.spec.ts" name="settings-store &gt; getGlobalSettings returns defaults" time="0.008">
+        </testcase>
+        <testcase classname="tests/unit/storage/settings-store.spec.ts" name="settings-store &gt; updateGlobalSettings merges patch" time="0.006">
+        </testcase>
+        <testcase classname="tests/unit/storage/settings-store.spec.ts" name="settings-store &gt; getWorkspaceSettings returns global defaults when no override" time="0.005">
+        </testcase>
+        <testcase classname="tests/unit/storage/settings-store.spec.ts" name="settings-store &gt; updateWorkspaceSettings stores workspace-scoped override" time="0.007">
+        </testcase>
+        <testcase classname="tests/unit/storage/settings-store.spec.ts" name="settings-store &gt; workspace override takes precedence — test via resolveSettings logic" time="0.025">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/storage/workspace-store.spec.ts" timestamp="2026-05-10T18:22:57.130Z" hostname="Andrews-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.064">
+        <testcase classname="tests/unit/storage/workspace-store.spec.ts" name="workspace-store &gt; creates a workspace and returns it" time="0.02">
+        </testcase>
+        <testcase classname="tests/unit/storage/workspace-store.spec.ts" name="workspace-store &gt; rejects duplicate workspace name with DUPLICATE_NAME error" time="0.007">
+        </testcase>
+        <testcase classname="tests/unit/storage/workspace-store.spec.ts" name="workspace-store &gt; update rejects duplicate name" time="0.007">
+        </testcase>
+        <testcase classname="tests/unit/storage/workspace-store.spec.ts" name="workspace-store &gt; lists all workspaces" time="0.005">
+        </testcase>
+        <testcase classname="tests/unit/storage/workspace-store.spec.ts" name="workspace-store &gt; deletes workspace and its projects" time="0.008">
+        </testcase>
+        <testcase classname="tests/unit/storage/workspace-store.spec.ts" name="workspace-store &gt; creates a project within a workspace" time="0.007">
+        </testcase>
+        <testcase classname="tests/unit/storage/workspace-store.spec.ts" name="workspace-store &gt; rejects duplicate project name within same workspace" time="0.005">
+        </testcase>
+        <testcase classname="tests/unit/storage/workspace-store.spec.ts" name="workspace-store &gt; allows same project name in different workspaces" time="0.005">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/components/AlertBadge.spec.tsx" timestamp="2026-05-10T18:22:57.131Z" hostname="Andrews-MacBook-Pro.local" tests="9" failures="0" errors="0" skipped="0" time="0.013">
+        <testcase classname="tests/unit/renderer/components/AlertBadge.spec.tsx" name="AlertBadge &gt; renders nothing when count is 0" time="0.005">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/AlertBadge.spec.tsx" name="AlertBadge &gt; renders nothing when count is negative" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/AlertBadge.spec.tsx" name="AlertBadge &gt; renders count when count is positive" time="0.003">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/AlertBadge.spec.tsx" name="AlertBadge &gt; shows 99+ when count exceeds 99" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/AlertBadge.spec.tsx" name="AlertBadge &gt; shows exact count at 99" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/AlertBadge.spec.tsx" name="AlertBadge &gt; has correct aria-label for single alert" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/AlertBadge.spec.tsx" name="AlertBadge &gt; has correct aria-label for multiple alerts" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/AlertBadge.spec.tsx" name="AlertBadge &gt; applies className prop to rendered span" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/AlertBadge.spec.tsx" name="AlertBadge &gt; applies alert-badge class by default" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/components/ErrorBoundary.spec.tsx" timestamp="2026-05-10T18:22:57.131Z" hostname="Andrews-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="0.034">
+        <testcase classname="tests/unit/renderer/components/ErrorBoundary.spec.tsx" name="ErrorBoundary &gt; renders children when no error occurs" time="0.01">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ErrorBoundary.spec.tsx" name="ErrorBoundary &gt; renders error UI when a child throws" time="0.008">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ErrorBoundary.spec.tsx" name="ErrorBoundary &gt; shows recovery button when error occurs" time="0.007">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ErrorBoundary.spec.tsx" name="ErrorBoundary &gt; logs error to console when child throws" time="0.003">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ErrorBoundary.spec.tsx" name="ErrorBoundary &gt; clears error state when recovery button is clicked" time="0.005">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/components/GlobalSettings.spec.tsx" timestamp="2026-05-10T18:22:57.131Z" hostname="Andrews-MacBook-Pro.local" tests="9" failures="0" errors="0" skipped="0" time="0.036">
+        <testcase classname="tests/unit/renderer/components/GlobalSettings.spec.tsx" name="GlobalSettings &gt; shows loading when globalSettings is null" time="0.008">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/GlobalSettings.spec.tsx" name="GlobalSettings &gt; renders theme options" time="0.005">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/GlobalSettings.spec.tsx" name="GlobalSettings &gt; calls updateGlobalTheme when theme is changed" time="0.007">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/GlobalSettings.spec.tsx" name="GlobalSettings &gt; renders scrollback limit input with current value" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/GlobalSettings.spec.tsx" name="GlobalSettings &gt; calls updateScrollbackLimit for valid scrollback value" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/GlobalSettings.spec.tsx" name="GlobalSettings &gt; does not call updateScrollbackLimit for below-minimum value" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/GlobalSettings.spec.tsx" name="GlobalSettings &gt; does not call updateScrollbackLimit for above-maximum value" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/GlobalSettings.spec.tsx" name="GlobalSettings &gt; calls updateWorktreeBaseDir on blur of worktree input" time="0.003">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/GlobalSettings.spec.tsx" name="GlobalSettings &gt; calls electronAPI.settings.updateGlobal when default shell is changed" time="0.006">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/components/LogWindow.spec.tsx" timestamp="2026-05-10T18:22:57.132Z" hostname="Andrews-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="0.021">
+        <testcase classname="tests/unit/renderer/components/LogWindow.spec.tsx" name="LogWindow &gt; renders dialog with title" time="0.013">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/LogWindow.spec.tsx" name="LogWindow &gt; shows empty state when no entries" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/LogWindow.spec.tsx" name="LogWindow &gt; renders log entries with level and message" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/LogWindow.spec.tsx" name="LogWindow &gt; calls clear when Clear button is clicked" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/LogWindow.spec.tsx" name="LogWindow &gt; calls onClose when close button is clicked" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/LogWindow.spec.tsx" name="LogWindow &gt; calls onClose when Escape key is pressed" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/LogWindow.spec.tsx" name="LogWindow &gt; renders warn and log level labels" time="0.001">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/components/NewTabDialog.spec.tsx" timestamp="2026-05-10T18:22:57.132Z" hostname="Andrews-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="0.038">
+        <testcase classname="tests/unit/renderer/components/NewTabDialog.spec.tsx" name="NewTabDialog &gt; renders title and form fields" time="0.019">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/NewTabDialog.spec.tsx" name="NewTabDialog &gt; calls onClose when Cancel is clicked" time="0.003">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/NewTabDialog.spec.tsx" name="NewTabDialog &gt; submits with default title when empty" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/NewTabDialog.spec.tsx" name="NewTabDialog &gt; submits with custom title" time="0.004">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/NewTabDialog.spec.tsx" name="NewTabDialog &gt; uses Agent as default title for agent type" time="0.006">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/NewTabDialog.spec.tsx" name="NewTabDialog &gt; uses worktree path when project has worktreePath" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/NewTabDialog.spec.tsx" name="NewTabDialog &gt; uses workspace folderPath when project has no worktreePath" time="0.002">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/components/ProjectItem.spec.tsx" timestamp="2026-05-10T18:22:57.132Z" hostname="Andrews-MacBook-Pro.local" tests="7" failures="2" errors="0" skipped="0" time="0.025">
+        <testcase classname="tests/unit/renderer/components/ProjectItem.spec.tsx" name="ProjectItem &gt; renders project name" time="0.01">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ProjectItem.spec.tsx" name="ProjectItem &gt; applies active class when project is active" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ProjectItem.spec.tsx" name="ProjectItem &gt; calls setActiveProject when clicked" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ProjectItem.spec.tsx" name="ProjectItem &gt; shows context menu on right-click" time="0.003">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ProjectItem.spec.tsx" name="ProjectItem &gt; shows confirm dialog when Remove is clicked" time="0.006">
+            <failure message="window.confirm is not a function" type="TypeError">
+TypeError: window.confirm is not a function
+ ❯ handleRemove src/renderer/components/sidebar/ProjectItem.tsx:21:16
+ ❯ HTMLUnknownElement.callCallback node_modules/react-dom/cjs/react-dom.development.js:4164:14
+ ❯ HTMLUnknownElement.#callDispatchEventListeners node_modules/happy-dom/src/event/EventTarget.ts:305:42
+ ❯ HTMLUnknownElement.dispatchEvent node_modules/happy-dom/src/event/EventTarget.ts:142:35
+ ❯ HTMLUnknownElement.#goThroughDispatchEventPhases node_modules/happy-dom/src/event/EventTarget.ts:214:33
+ ❯ HTMLUnknownElement.dispatchEvent node_modules/happy-dom/src/event/EventTarget.ts:135:38
+ ❯ Object.invokeGuardedCallbackDev node_modules/react-dom/cjs/react-dom.development.js:4213:16
+ ❯ invokeGuardedCallback node_modules/react-dom/cjs/react-dom.development.js:4277:31
+ ❯ invokeGuardedCallbackAndCatchFirstError node_modules/react-dom/cjs/react-dom.development.js:4291:25
+ ❯ executeDispatch node_modules/react-dom/cjs/react-dom.development.js:9041:3
+            </failure>
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ProjectItem.spec.tsx" name="ProjectItem &gt; calls deleteProject when confirm dialog confirms" time="0.001">
+            <failure message="window.confirm is not a function" type="TypeError">
+TypeError: window.confirm is not a function
+ ❯ handleRemove src/renderer/components/sidebar/ProjectItem.tsx:21:16
+ ❯ HTMLUnknownElement.callCallback node_modules/react-dom/cjs/react-dom.development.js:4164:14
+ ❯ HTMLUnknownElement.#callDispatchEventListeners node_modules/happy-dom/src/event/EventTarget.ts:305:42
+ ❯ HTMLUnknownElement.dispatchEvent node_modules/happy-dom/src/event/EventTarget.ts:142:35
+ ❯ HTMLUnknownElement.#goThroughDispatchEventPhases node_modules/happy-dom/src/event/EventTarget.ts:214:33
+ ❯ HTMLUnknownElement.dispatchEvent node_modules/happy-dom/src/event/EventTarget.ts:135:38
+ ❯ Object.invokeGuardedCallbackDev node_modules/react-dom/cjs/react-dom.development.js:4213:16
+ ❯ invokeGuardedCallback node_modules/react-dom/cjs/react-dom.development.js:4277:31
+ ❯ invokeGuardedCallbackAndCatchFirstError node_modules/react-dom/cjs/react-dom.development.js:4291:25
+ ❯ executeDispatch node_modules/react-dom/cjs/react-dom.development.js:9041:3
+            </failure>
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ProjectItem.spec.tsx" name="ProjectItem &gt; closes context menu when clicking elsewhere" time="0.001">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/components/SettingsPanel.spec.tsx" timestamp="2026-05-10T18:22:57.134Z" hostname="Andrews-MacBook-Pro.local" tests="9" failures="0" errors="0" skipped="0" time="0.025">
+        <testcase classname="tests/unit/renderer/components/SettingsPanel.spec.tsx" name="SettingsPanel &gt; renders Settings title" time="0.011">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/SettingsPanel.spec.tsx" name="SettingsPanel &gt; shows GlobalSettings by default" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/SettingsPanel.spec.tsx" name="SettingsPanel &gt; shows Extensions nav item" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/SettingsPanel.spec.tsx" name="SettingsPanel &gt; hides Workspace Settings nav when no active workspace" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/SettingsPanel.spec.tsx" name="SettingsPanel &gt; shows Workspace Settings nav when a workspace is active" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/SettingsPanel.spec.tsx" name="SettingsPanel &gt; switches to workspace section when Workspace Settings is clicked" time="0.005">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/SettingsPanel.spec.tsx" name="SettingsPanel &gt; calls onClose when close button is clicked" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/SettingsPanel.spec.tsx" name="SettingsPanel &gt; calls onClose when overlay is clicked" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/SettingsPanel.spec.tsx" name="SettingsPanel &gt; calls onClose on Escape key" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/components/Sidebar.spec.tsx" timestamp="2026-05-10T18:22:57.134Z" hostname="Andrews-MacBook-Pro.local" tests="6" failures="0" errors="0" skipped="0" time="0.024">
+        <testcase classname="tests/unit/renderer/components/Sidebar.spec.tsx" name="Sidebar &gt; renders workspaces section" time="0.012">
+            <system-err>
+Warning: An update to Sidebar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() =&gt; {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you&apos;re testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at Sidebar (/Users/atavares/repos/terminator/src/renderer/components/sidebar/Sidebar.tsx:14:59)
+
+            </system-err>
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/Sidebar.spec.tsx" name="Sidebar &gt; renders workspace items" time="0.001">
+            <system-err>
+Warning: An update to Sidebar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() =&gt; {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you&apos;re testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at Sidebar (/Users/atavares/repos/terminator/src/renderer/components/sidebar/Sidebar.tsx:14:59)
+
+            </system-err>
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/Sidebar.spec.tsx" name="Sidebar &gt; renders extension sidebar items when loaded" time="0.005">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/Sidebar.spec.tsx" name="Sidebar &gt; toggles collapsed state when toggle button is clicked" time="0.002">
+            <system-err>
+Warning: An update to Sidebar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() =&gt; {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you&apos;re testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at Sidebar (/Users/atavares/repos/terminator/src/renderer/components/sidebar/Sidebar.tsx:14:59)
+
+            </system-err>
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/Sidebar.spec.tsx" name="Sidebar &gt; hides Create Workspace button when collapsed" time="0.001">
+            <system-err>
+Warning: An update to Sidebar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() =&gt; {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you&apos;re testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at Sidebar (/Users/atavares/repos/terminator/src/renderer/components/sidebar/Sidebar.tsx:14:59)
+
+            </system-err>
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/Sidebar.spec.tsx" name="Sidebar &gt; opens CreateWorkspaceDialog when Create button is clicked" time="0.001">
+            <system-err>
+Warning: An update to Sidebar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() =&gt; {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you&apos;re testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at Sidebar (/Users/atavares/repos/terminator/src/renderer/components/sidebar/Sidebar.tsx:14:59)
+
+            </system-err>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/components/TabBar.spec.tsx" timestamp="2026-05-10T18:22:57.135Z" hostname="Andrews-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.019">
+        <testcase classname="tests/unit/renderer/components/TabBar.spec.tsx" name="TabBar &gt; renders Terminal primary tab" time="0.01">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/TabBar.spec.tsx" name="TabBar &gt; renders extension-contributed tabs" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/TabBar.spec.tsx" name="TabBar &gt; shows new tab button when Terminal is active" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/TabBar.spec.tsx" name="TabBar &gt; hides session sub-tab bar when extension tab is active" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/TabBar.spec.tsx" name="TabBar &gt; renders sessions as tabs" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/TabBar.spec.tsx" name="TabBar &gt; calls closeSession when close button is clicked" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/TabBar.spec.tsx" name="TabBar &gt; opens new tab dialog when + button is clicked" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/TabBar.spec.tsx" name="TabBar &gt; calls setActiveSessionForProject when session tab is clicked" time="0.001">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/components/TerminalPane.spec.tsx" timestamp="2026-05-10T18:22:57.135Z" hostname="Andrews-MacBook-Pro.local" tests="4" failures="0" errors="0" skipped="0" time="0.014">
+        <testcase classname="tests/unit/renderer/components/TerminalPane.spec.tsx" name="TerminalPane &gt; shows empty state when no sessions" time="0.011">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/TerminalPane.spec.tsx" name="TerminalPane &gt; renders container when sessions exist" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/TerminalPane.spec.tsx" name="TerminalPane &gt; clears bell count when active session changes" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/TerminalPane.spec.tsx" name="TerminalPane &gt; does not crash when terminal instance is undefined" time="0.001">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/components/ToastContainer.spec.tsx" timestamp="2026-05-10T18:22:57.135Z" hostname="Andrews-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="0.017">
+        <testcase classname="tests/unit/renderer/components/ToastContainer.spec.tsx" name="ToastContainer &gt; renders empty container with no toasts" time="0.009">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ToastContainer.spec.tsx" name="ToastContainer &gt; renders info toast" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ToastContainer.spec.tsx" name="ToastContainer &gt; renders success toast" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ToastContainer.spec.tsx" name="ToastContainer &gt; renders error toast" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ToastContainer.spec.tsx" name="ToastContainer &gt; renders warning toast" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ToastContainer.spec.tsx" name="ToastContainer &gt; calls removeToast when dismiss button is clicked" time="0.003">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/ToastContainer.spec.tsx" name="ToastContainer &gt; renders multiple toasts" time="0.001">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/components/WorkspaceItem.spec.tsx" timestamp="2026-05-10T18:22:57.136Z" hostname="Andrews-MacBook-Pro.local" tests="7" failures="3" errors="0" skipped="0" time="0.03">
+        <testcase classname="tests/unit/renderer/components/WorkspaceItem.spec.tsx" name="WorkspaceItem &gt; renders workspace name" time="0.013">
+            <system-err>
+Warning: An update to WorkspaceItem inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() =&gt; {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you&apos;re testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at WorkspaceItem (/Users/atavares/repos/terminator/src/renderer/components/sidebar/WorkspaceItem.tsx:18:26)
+
+            </system-err>
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/WorkspaceItem.spec.tsx" name="WorkspaceItem &gt; renders collapsed initials (MW for &quot;My Work&quot;)" time="0.001">
+            <system-err>
+Warning: An update to WorkspaceItem inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() =&gt; {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you&apos;re testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at WorkspaceItem (/Users/atavares/repos/terminator/src/renderer/components/sidebar/WorkspaceItem.tsx:18:26)
+
+            </system-err>
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/WorkspaceItem.spec.tsx" name="WorkspaceItem &gt; toggles expanded and shows projects when active workspace clicked" time="0.004">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/WorkspaceItem.spec.tsx" name="WorkspaceItem &gt; shows Add Project button when expanded and active" time="0.003">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/WorkspaceItem.spec.tsx" name="WorkspaceItem &gt; shows context menu on right-click" time="0.006">
+            <system-err>
+Warning: An update to WorkspaceItem inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() =&gt; {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you&apos;re testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at WorkspaceItem (/Users/atavares/repos/terminator/src/renderer/components/sidebar/WorkspaceItem.tsx:18:26)
+
+            </system-err>
+            <failure message="Unable to find an element with the text: Edit workspace. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m&lt;body&gt;[39m
+  [36m&lt;div&gt;[39m
+    [36m&lt;div[39m
+      [33mclass[39m=[32m&quot;workspace-item workspace-item--active&quot;[39m
+    [36m&gt;[39m
+      [36m&lt;div[39m
+        [33mclass[39m=[32m&quot;workspace-item__header&quot;[39m
+      [36m&gt;[39m
+        [36m&lt;span[39m
+          [33mclass[39m=[32m&quot;workspace-item__color-strip&quot;[39m
+          [33mstyle[39m=[32m&quot;background-color: #4a90d9;&quot;[39m
+        [36m/&gt;[39m
+        [36m&lt;span[39m
+          [33mclass[39m=[32m&quot;workspace-item__name&quot;[39m
+        [36m&gt;[39m
+          [0mMy Work[0m
+        [36m&lt;/span&gt;[39m
+        [36m&lt;span[39m
+          [33mclass[39m=[32m&quot;workspace-item__chevron&quot;[39m
+        [36m&gt;[39m
+          [0m▸[0m
+        [36m&lt;/span&gt;[39m
+      [36m&lt;/div&gt;[39m
+      [36m&lt;div[39m
+        [33mclass[39m=[32m&quot;context-menu&quot;[39m
+        [33mstyle[39m=[32m&quot;position: fixed; left: 0px; top: 0px;&quot;[39m
+      [36m&gt;[39m
+        [36m&lt;button[39m
+          [33mclass[39m=[32m&quot;context-menu__item&quot;[39m
+        [36m&gt;[39m
+          [0mEdit[0m
+        [36m&lt;/button&gt;[39m
+        [36m&lt;button[39m
+          [33mclass[39m=[32m&quot;context-menu__item context-menu__item--danger&quot;[39m
+        [36m&gt;[39m
+          [0mRemove[0m
+        [36m&lt;/button&gt;[39m
+      [36m&lt;/div&gt;[39m
+    [36m&lt;/div&gt;[39m
+  [36m&lt;/div&gt;[39m
+[36m&lt;/body&gt;[39m" type="TestingLibraryElementError">
+TestingLibraryElementError: Unable to find an element with the text: Edit workspace. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+&lt;body&gt;
+  &lt;div&gt;
+    &lt;div
+      class=&quot;workspace-item workspace-item--active&quot;
+    &gt;
+      &lt;div
+        class=&quot;workspace-item__header&quot;
+      &gt;
+        &lt;span
+          class=&quot;workspace-item__color-strip&quot;
+          style=&quot;background-color: #4a90d9;&quot;
+        /&gt;
+        &lt;span
+          class=&quot;workspace-item__name&quot;
+        &gt;
+          My Work
+        &lt;/span&gt;
+        &lt;span
+          class=&quot;workspace-item__chevron&quot;
+        &gt;
+          ▸
+        &lt;/span&gt;
+      &lt;/div&gt;
+      &lt;div
+        class=&quot;context-menu&quot;
+        style=&quot;position: fixed; left: 0px; top: 0px;&quot;
+      &gt;
+        &lt;button
+          class=&quot;context-menu__item&quot;
+        &gt;
+          Edit
+        &lt;/button&gt;
+        &lt;button
+          class=&quot;context-menu__item context-menu__item--danger&quot;
+        &gt;
+          Remove
+        &lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ tests/unit/renderer/components/WorkspaceItem.spec.tsx:70:19
+            </failure>
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/WorkspaceItem.spec.tsx" name="WorkspaceItem &gt; opens EditWorkspaceDialog from context menu" time="0.001">
+            <system-err>
+Warning: An update to WorkspaceItem inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() =&gt; {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you&apos;re testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at WorkspaceItem (/Users/atavares/repos/terminator/src/renderer/components/sidebar/WorkspaceItem.tsx:18:26)
+
+            </system-err>
+            <failure message="Unable to find an element with the text: Edit workspace. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m&lt;body&gt;[39m
+  [36m&lt;div&gt;[39m
+    [36m&lt;div[39m
+      [33mclass[39m=[32m&quot;workspace-item workspace-item--active&quot;[39m
+    [36m&gt;[39m
+      [36m&lt;div[39m
+        [33mclass[39m=[32m&quot;workspace-item__header&quot;[39m
+      [36m&gt;[39m
+        [36m&lt;span[39m
+          [33mclass[39m=[32m&quot;workspace-item__color-strip&quot;[39m
+          [33mstyle[39m=[32m&quot;background-color: #4a90d9;&quot;[39m
+        [36m/&gt;[39m
+        [36m&lt;span[39m
+          [33mclass[39m=[32m&quot;workspace-item__name&quot;[39m
+        [36m&gt;[39m
+          [0mMy Work[0m
+        [36m&lt;/span&gt;[39m
+        [36m&lt;span[39m
+          [33mclass[39m=[32m&quot;workspace-item__chevron&quot;[39m
+        [36m&gt;[39m
+          [0m▸[0m
+        [36m&lt;/span&gt;[39m
+      [36m&lt;/div&gt;[39m
+      [36m&lt;div[39m
+        [33mclass[39m=[32m&quot;context-menu&quot;[39m
+        [33mstyle[39m=[32m&quot;position: fixed; left: 0px; top: 0px;&quot;[39m
+      [36m&gt;[39m
+        [36m&lt;button[39m
+          [33mclass[39m=[32m&quot;context-menu__item&quot;[39m
+        [36m&gt;[39m
+          [0mEdit[0m
+        [36m&lt;/button&gt;[39m
+        [36m&lt;button[39m
+          [33mclass[39m=[32m&quot;context-menu__item context-menu__item--danger&quot;[39m
+        [36m&gt;[39m
+          [0mRemove[0m
+        [36m&lt;/button&gt;[39m
+      [36m&lt;/div&gt;[39m
+    [36m&lt;/div&gt;[39m
+  [36m&lt;/div&gt;[39m
+[36m&lt;/body&gt;[39m" type="TestingLibraryElementError">
+TestingLibraryElementError: Unable to find an element with the text: Edit workspace. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+&lt;body&gt;
+  &lt;div&gt;
+    &lt;div
+      class=&quot;workspace-item workspace-item--active&quot;
+    &gt;
+      &lt;div
+        class=&quot;workspace-item__header&quot;
+      &gt;
+        &lt;span
+          class=&quot;workspace-item__color-strip&quot;
+          style=&quot;background-color: #4a90d9;&quot;
+        /&gt;
+        &lt;span
+          class=&quot;workspace-item__name&quot;
+        &gt;
+          My Work
+        &lt;/span&gt;
+        &lt;span
+          class=&quot;workspace-item__chevron&quot;
+        &gt;
+          ▸
+        &lt;/span&gt;
+      &lt;/div&gt;
+      &lt;div
+        class=&quot;context-menu&quot;
+        style=&quot;position: fixed; left: 0px; top: 0px;&quot;
+      &gt;
+        &lt;button
+          class=&quot;context-menu__item&quot;
+        &gt;
+          Edit
+        &lt;/button&gt;
+        &lt;button
+          class=&quot;context-menu__item context-menu__item--danger&quot;
+        &gt;
+          Remove
+        &lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ tests/unit/renderer/components/WorkspaceItem.spec.tsx:76:28
+            </failure>
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/WorkspaceItem.spec.tsx" name="WorkspaceItem &gt; shows confirm dialog for remove workspace" time="0.002">
+            <system-err>
+Warning: An update to WorkspaceItem inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() =&gt; {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you&apos;re testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at WorkspaceItem (/Users/atavares/repos/terminator/src/renderer/components/sidebar/WorkspaceItem.tsx:18:26)
+
+            </system-err>
+            <failure message="Unable to find an element with the text: Remove workspace. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m&lt;body&gt;[39m
+  [36m&lt;div&gt;[39m
+    [36m&lt;div[39m
+      [33mclass[39m=[32m&quot;workspace-item workspace-item--active&quot;[39m
+    [36m&gt;[39m
+      [36m&lt;div[39m
+        [33mclass[39m=[32m&quot;workspace-item__header&quot;[39m
+      [36m&gt;[39m
+        [36m&lt;span[39m
+          [33mclass[39m=[32m&quot;workspace-item__color-strip&quot;[39m
+          [33mstyle[39m=[32m&quot;background-color: #4a90d9;&quot;[39m
+        [36m/&gt;[39m
+        [36m&lt;span[39m
+          [33mclass[39m=[32m&quot;workspace-item__name&quot;[39m
+        [36m&gt;[39m
+          [0mMy Work[0m
+        [36m&lt;/span&gt;[39m
+        [36m&lt;span[39m
+          [33mclass[39m=[32m&quot;workspace-item__chevron&quot;[39m
+        [36m&gt;[39m
+          [0m▸[0m
+        [36m&lt;/span&gt;[39m
+      [36m&lt;/div&gt;[39m
+      [36m&lt;div[39m
+        [33mclass[39m=[32m&quot;context-menu&quot;[39m
+        [33mstyle[39m=[32m&quot;position: fixed; left: 0px; top: 0px;&quot;[39m
+      [36m&gt;[39m
+        [36m&lt;button[39m
+          [33mclass[39m=[32m&quot;context-menu__item&quot;[39m
+        [36m&gt;[39m
+          [0mEdit[0m
+        [36m&lt;/button&gt;[39m
+        [36m&lt;button[39m
+          [33mclass[39m=[32m&quot;context-menu__item context-menu__item--danger&quot;[39m
+        [36m&gt;[39m
+          [0mRemove[0m
+        [36m&lt;/button&gt;[39m
+      [36m&lt;/div&gt;[39m
+    [36m&lt;/div&gt;[39m
+  [36m&lt;/div&gt;[39m
+[36m&lt;/body&gt;[39m" type="TestingLibraryElementError">
+TestingLibraryElementError: Unable to find an element with the text: Remove workspace. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+&lt;body&gt;
+  &lt;div&gt;
+    &lt;div
+      class=&quot;workspace-item workspace-item--active&quot;
+    &gt;
+      &lt;div
+        class=&quot;workspace-item__header&quot;
+      &gt;
+        &lt;span
+          class=&quot;workspace-item__color-strip&quot;
+          style=&quot;background-color: #4a90d9;&quot;
+        /&gt;
+        &lt;span
+          class=&quot;workspace-item__name&quot;
+        &gt;
+          My Work
+        &lt;/span&gt;
+        &lt;span
+          class=&quot;workspace-item__chevron&quot;
+        &gt;
+          ▸
+        &lt;/span&gt;
+      &lt;/div&gt;
+      &lt;div
+        class=&quot;context-menu&quot;
+        style=&quot;position: fixed; left: 0px; top: 0px;&quot;
+      &gt;
+        &lt;button
+          class=&quot;context-menu__item&quot;
+        &gt;
+          Edit
+        &lt;/button&gt;
+        &lt;button
+          class=&quot;context-menu__item context-menu__item--danger&quot;
+        &gt;
+          Remove
+        &lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ tests/unit/renderer/components/WorkspaceItem.spec.tsx:83:28
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/components/WorkspaceRail.spec.tsx" timestamp="2026-05-10T18:22:57.137Z" hostname="Andrews-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.024">
+        <testcase classname="tests/unit/renderer/components/WorkspaceRail.spec.tsx" name="WorkspaceRail &gt; renders workspace initials" time="0.012">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/WorkspaceRail.spec.tsx" name="WorkspaceRail &gt; renders create button" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/WorkspaceRail.spec.tsx" name="WorkspaceRail &gt; opens CreateWorkspaceDialog when + is clicked" time="0.003">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/WorkspaceRail.spec.tsx" name="WorkspaceRail &gt; renders empty rail with no workspaces" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/WorkspaceRail.spec.tsx" name="WorkspaceRail &gt; shows active workspace with active class" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/WorkspaceRail.spec.tsx" name="WorkspaceRail &gt; calls setActiveWorkspace when workspace tile is clicked" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/WorkspaceRail.spec.tsx" name="WorkspaceRail &gt; shows context menu on right-click" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/renderer/components/WorkspaceRail.spec.tsx" name="WorkspaceRail &gt; opens EditWorkspaceDialog from context menu" time="0.002">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/extensions/registry.spec.ts" timestamp="2026-05-10T18:22:57.138Z" hostname="Andrews-MacBook-Pro.local" tests="24" failures="0" errors="0" skipped="0" time="0.004">
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; registerSidebarPanel &gt; adds panel to sidebarPanels map" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; registerSidebarPanel &gt; opens panel when defaultOpen is true" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; registerSidebarPanel &gt; does not open panel when defaultOpen is false" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; registerSidebarPanel &gt; returns dispose function that removes the panel" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; registerSidebarPanel &gt; dispose also removes panel from openPanels" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; registerProjectTab &gt; adds tab to projectTabs map" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; registerProjectTab &gt; returns dispose function that removes the tab" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; registerProjectTab &gt; clears activeProjectTabId when active tab is disposed" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; registerProjectTab &gt; does not clear activeProjectTabId when a different tab is disposed" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; registerKeyboardShortcut &gt; adds shortcut to keyboardShortcuts array" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; registerKeyboardShortcut &gt; returns dispose function that removes the shortcut" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; registerKeyboardShortcut &gt; only removes the exact shortcut instance, not others" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; togglePanel &gt; opens closed panel" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; togglePanel &gt; closes open panel" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; setActiveProjectTab &gt; sets activeProjectTabId" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="useExtensionRegistry &gt; setActiveProjectTab &gt; sets activeProjectTabId to null" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="matchesAccelerator &gt; matches CmdOrCtrl+Shift+G with Ctrl held on non-Mac" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="matchesAccelerator &gt; matches CmdOrCtrl+Shift+G with Meta held on Mac" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="matchesAccelerator &gt; does not match when key differs" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="matchesAccelerator &gt; does not match when shift is required but not held" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="matchesAccelerator &gt; does not match when no modifier is held but accelerator requires one" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="matchesAccelerator &gt; matches accelerator without shift modifier" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="matchesAccelerator &gt; matches Alt+F4 style shortcut" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/extensions/registry.spec.ts" name="matchesAccelerator &gt; is case-insensitive for key comparison" time="0.001">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/stores/log.store.spec.ts" timestamp="2026-05-10T18:22:57.139Z" hostname="Andrews-MacBook-Pro.local" tests="10" failures="0" errors="0" skipped="0" time="0.07">
+        <testcase classname="tests/unit/renderer/stores/log.store.spec.ts" name="useLogStore &gt; addEntry &gt; adds an entry with sequential id, level, and message" time="0.011">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/log.store.spec.ts" name="useLogStore &gt; addEntry &gt; assigns incrementing ids across multiple entries" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/log.store.spec.ts" name="useLogStore &gt; addEntry &gt; includes a timestamp string" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/log.store.spec.ts" name="useLogStore &gt; addEntry &gt; caps log at 1000 entries, dropping oldest" time="0.031">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/log.store.spec.ts" name="useLogStore &gt; clear &gt; removes all entries" time="0.025">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/log.store.spec.ts" name="installLogInterceptor &gt; intercepts console.log calls and stores them as log entries" time="0.001">
+            <system-out>
+intercepted log
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/log.store.spec.ts" name="installLogInterceptor &gt; intercepts console.warn and stores as warn level" time="0">
+            <system-err>
+intercepted warn
+
+            </system-err>
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/log.store.spec.ts" name="installLogInterceptor &gt; intercepts console.error and stores as error level" time="0">
+            <system-err>
+intercepted error
+
+            </system-err>
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/log.store.spec.ts" name="installLogInterceptor &gt; serializes object arguments to JSON" time="0.001">
+            <system-out>
+{ key: &apos;value&apos; }
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/log.store.spec.ts" name="installLogInterceptor &gt; joins multiple arguments with spaces" time="0">
+            <system-out>
+hello world
+
+            </system-out>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/stores/session.store.spec.ts" timestamp="2026-05-10T18:22:57.139Z" hostname="Andrews-MacBook-Pro.local" tests="23" failures="0" errors="0" skipped="0" time="0.009">
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; createSession &gt; creates a session and stores it" time="0.004">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; createSession &gt; throws when terminal.create returns an error" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; closeSession &gt; removes session from store" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; closeSession &gt; disposes xterm instance if present" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; closeSession &gt; clears bell count for closed session" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; closeSession &gt; updates activeSessionIdByProject when closed session was active" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; closeSession &gt; removes project from activeSessionIdByProject when last session closed" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; getSessionsForProject &gt; returns only sessions belonging to the given project" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; getSessionsForProject &gt; returns empty array for unknown project" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; setActiveSessionForProject &gt; marks the given session as active and others as backgrounded" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; setActiveSessionForProject &gt; clears bell count for the newly active session" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; setActiveSessionForProject &gt; sets activeSessionIdByProject for the project" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; getActiveSessionForProject &gt; returns the active session id" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; getActiveSessionForProject &gt; returns null for unknown project" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; handleProcessExit &gt; marks session status as closed and appends [exited] to title" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; handleProcessExit &gt; is a no-op for unknown session id" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; bell counts &gt; incrementBellCount increases count" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; bell counts &gt; clearBellCount removes entry" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; bell counts &gt; clearBellCount is a no-op when count is already 0" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; bell counts &gt; getBellCountForSession returns 0 for unknown session" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; bell counts &gt; getBellCountForProject sums bell counts across all project sessions" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; setTerminalInstance / getTerminalInstance &gt; stores and retrieves terminal instance by sessionId" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/session.store.spec.ts" name="useSessionStore &gt; setTerminalInstance / getTerminalInstance &gt; returns undefined for unknown session" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/stores/settings.store.spec.ts" timestamp="2026-05-10T18:22:57.140Z" hostname="Andrews-MacBook-Pro.local" tests="14" failures="1" errors="0" skipped="0" time="0.007">
+        <testcase classname="tests/unit/renderer/stores/settings.store.spec.ts" name="useSettingsStore &gt; loadSettings &gt; loads and stores global settings" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/settings.store.spec.ts" name="useSettingsStore &gt; loadSettings &gt; falls back to DEFAULT_SETTINGS when global settings is null" time="0.004">
+            <failure message="expected { appearance: { theme: &apos;dark&apos; }, …(3) } to deeply equal { appearance: { theme: &apos;dark&apos; }, …(4) }" type="AssertionError">
+AssertionError: expected { appearance: { theme: &apos;dark&apos; }, …(3) } to deeply equal { appearance: { theme: &apos;dark&apos; }, …(4) }
+
+- Expected
++ Received
+
+  Object {
+    &quot;appearance&quot;: Object {
+      &quot;theme&quot;: &quot;dark&quot;,
+    },
+    &quot;extensions&quot;: Object {},
+    &quot;git&quot;: Object {
+      &quot;worktreeBaseDir&quot;: &quot;&quot;,
+    },
+    &quot;terminal&quot;: Object {
+      &quot;defaultShell&quot;: &quot;/bin/zsh&quot;,
+      &quot;scrollbackLimit&quot;: 10000,
+    },
+-   &quot;ui&quot;: Object {
+-     &quot;hasSeenWelcome&quot;: false,
+-   },
+  }
+
+ ❯ tests/unit/renderer/stores/settings.store.spec.ts:55:58
+            </failure>
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/settings.store.spec.ts" name="useSettingsStore &gt; loadSettings &gt; loads workspace settings when workspaceId is provided" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/settings.store.spec.ts" name="useSettingsStore &gt; loadSettings &gt; sets resolvedTheme based on merged settings" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/settings.store.spec.ts" name="useSettingsStore &gt; updateGlobalTheme &gt; calls updateGlobal and updates store" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/settings.store.spec.ts" name="useSettingsStore &gt; updateWorkspaceTheme &gt; calls updateWorkspace and updates workspace settings map" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/settings.store.spec.ts" name="useSettingsStore &gt; updateScrollbackLimit &gt; calls updateGlobal with scrollbackLimit and updates store" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/settings.store.spec.ts" name="useSettingsStore &gt; updateWorktreeBaseDir &gt; calls updateGlobal with worktreeBaseDir" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/settings.store.spec.ts" name="useSettingsStore &gt; updateWorkspaceWorktreeBaseDir &gt; calls updateWorkspace with git override when dir is provided" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/settings.store.spec.ts" name="useSettingsStore &gt; updateWorkspaceWorktreeBaseDir &gt; calls updateWorkspace with undefined git override when dir is undefined" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/settings.store.spec.ts" name="useSettingsStore &gt; resolveSettings &gt; returns defaults merged with global settings when no workspace" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/settings.store.spec.ts" name="useSettingsStore &gt; resolveSettings &gt; merges workspace overrides over global settings" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/settings.store.spec.ts" name="useSettingsStore &gt; resolveSettings &gt; uses defaults when globalSettings is null" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/settings.store.spec.ts" name="useSettingsStore &gt; resolveSettings &gt; ignores workspace overrides when no workspace id provided" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/stores/toast.store.spec.ts" timestamp="2026-05-10T18:22:57.141Z" hostname="Andrews-MacBook-Pro.local" tests="10" failures="0" errors="0" skipped="0" time="0.004">
+        <testcase classname="tests/unit/renderer/stores/toast.store.spec.ts" name="useToastStore &gt; addToast &gt; adds a toast with a unique id and specified type/message" time="0.002">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/toast.store.spec.ts" name="useToastStore &gt; addToast &gt; defaults duration to 3500ms for non-error toasts" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/toast.store.spec.ts" name="useToastStore &gt; addToast &gt; defaults duration to 6000ms for error toasts" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/toast.store.spec.ts" name="useToastStore &gt; addToast &gt; respects explicit duration override" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/toast.store.spec.ts" name="useToastStore &gt; addToast &gt; generates unique ids for multiple toasts" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/toast.store.spec.ts" name="useToastStore &gt; addToast &gt; auto-removes toast after duration expires" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/toast.store.spec.ts" name="useToastStore &gt; addToast &gt; does not remove other toasts when one expires" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/toast.store.spec.ts" name="useToastStore &gt; removeToast &gt; removes the toast with the given id" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/toast.store.spec.ts" name="useToastStore &gt; removeToast &gt; does not remove other toasts" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/toast.store.spec.ts" name="useToastStore &gt; removeToast &gt; is a no-op for unknown id" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/renderer/stores/workspace.store.spec.ts" timestamp="2026-05-10T18:22:57.141Z" hostname="Andrews-MacBook-Pro.local" tests="25" failures="0" errors="0" skipped="0" time="0.005">
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; loadWorkspaces &gt; fetches and stores workspace list" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; loadWorkspaces &gt; stores empty array when result has no workspaces" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; createWorkspace &gt; appends new workspace to list" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; createWorkspace &gt; returns the api result directly (including errors)" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; updateWorkspace &gt; replaces workspace in list by id" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; deleteWorkspace &gt; removes workspace from list" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; deleteWorkspace &gt; clears activeWorkspaceId when deleted workspace was active" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; deleteWorkspace &gt; does not clear activeWorkspaceId when a different workspace is deleted" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; deleteWorkspace &gt; removes projects map entry for deleted workspace" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; setActiveWorkspace &gt; sets activeWorkspaceId and clears activeProjectId" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; setActiveWorkspace &gt; triggers loadProjects for the new workspace" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; setActiveWorkspace &gt; sets activeWorkspaceId to null when called with null" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; loadProjects &gt; stores projects under workspaceId key" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; createProject &gt; appends project to workspace entry" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; createProject &gt; creates workspace entry if it does not exist yet" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; updateProjectBranch &gt; updates matching project in the map" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; renameProject &gt; renames matching project in the map" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; reorderWorkspaces &gt; reorders workspaces by given ids" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; reorderWorkspaces &gt; appends workspaces not in the ids list at the end" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; reorderProjects &gt; reorders projects within the workspace" time="0.001">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; deleteProject &gt; removes project from its workspace" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; deleteProject &gt; clears activeProjectId when deleted project was active" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; deleteProject &gt; does not clear activeProjectId when a different project is deleted" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; setActiveProject &gt; sets activeProjectId" time="0">
+        </testcase>
+        <testcase classname="tests/unit/renderer/stores/workspace.store.spec.ts" name="useWorkspaceStore &gt; setActiveProject &gt; sets activeProjectId to null" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/integration/ipc/extension.ipc.spec.ts" timestamp="2026-05-10T18:22:57.142Z" hostname="Andrews-MacBook-Pro.local" tests="11" failures="0" errors="0" skipped="0" time="0.003">
+        <testcase classname="tests/integration/ipc/extension.ipc.spec.ts" name="extension IPC handlers &gt; extension:list &gt; returns extensions from host" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/extension.ipc.spec.ts" name="extension IPC handlers &gt; extension:install &gt; calls load with directoryPath and returns result" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/extension.ipc.spec.ts" name="extension IPC handlers &gt; extension:toggle &gt; returns extension on successful toggle" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/extension.ipc.spec.ts" name="extension IPC handlers &gt; extension:toggle &gt; returns NOT_FOUND error when toggle returns null" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/extension.ipc.spec.ts" name="extension IPC handlers &gt; extension:get-sidebar-items &gt; returns empty items when registry has none" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/extension.ipc.spec.ts" name="extension IPC handlers &gt; extension:get-sidebar-items &gt; returns mapped sidebar items from registry" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/extension.ipc.spec.ts" name="extension IPC handlers &gt; extension:get-context-menu-items &gt; returns empty items when no items match target" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/extension.ipc.spec.ts" name="extension IPC handlers &gt; extension:get-context-menu-items &gt; returns only items matching the given target" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/extension.ipc.spec.ts" name="extension IPC handlers &gt; extension:context-menu-click &gt; calls onClick for the matching context menu item" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/extension.ipc.spec.ts" name="extension IPC handlers &gt; extension:context-menu-click &gt; does not call onClick when target does not match" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/extension.ipc.spec.ts" name="extension IPC handlers &gt; extension:context-menu-click &gt; does not crash when no matching item exists" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/integration/ipc/fs.ipc.spec.ts" timestamp="2026-05-10T18:22:57.142Z" hostname="Andrews-MacBook-Pro.local" tests="10" failures="0" errors="0" skipped="0" time="0.004">
+        <testcase classname="tests/integration/ipc/fs.ipc.spec.ts" name="fs IPC handlers &gt; fs:watch-start &gt; calls watchStart and returns ok for valid payload" time="0.002">
+        </testcase>
+        <testcase classname="tests/integration/ipc/fs.ipc.spec.ts" name="fs IPC handlers &gt; fs:watch-start &gt; returns VALIDATION_ERROR when projectRoot is missing" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/fs.ipc.spec.ts" name="fs IPC handlers &gt; fs:watch-start &gt; returns VALIDATION_ERROR when projectRoot is an empty string" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/fs.ipc.spec.ts" name="fs IPC handlers &gt; fs:watch-stop &gt; calls watchStop and returns ok" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/fs.ipc.spec.ts" name="fs IPC handlers &gt; fs:read-file &gt; reads file and returns content" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/fs.ipc.spec.ts" name="fs IPC handlers &gt; fs:read-file &gt; returns VALIDATION_ERROR when filePath is missing" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/fs.ipc.spec.ts" name="fs IPC handlers &gt; fs:read-file &gt; returns VALIDATION_ERROR when filePath is empty string" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/fs.ipc.spec.ts" name="fs IPC handlers &gt; fs:read-file &gt; returns FILE_NOT_FOUND when readFile rejects" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/fs.ipc.spec.ts" name="fs IPC handlers &gt; fs watcher event forwarding &gt; registers a watcher handler that sends fs:changed events to the window" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/fs.ipc.spec.ts" name="fs IPC handlers &gt; fs watcher event forwarding &gt; does not crash when main window is null" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/integration/ipc/git-extension.ipc.spec.ts" timestamp="2026-05-10T18:22:57.143Z" hostname="Andrews-MacBook-Pro.local" tests="11" failures="0" errors="0" skipped="0" time="0.006">
+        <testcase classname="tests/integration/ipc/git-extension.ipc.spec.ts" name="git-integration extension: git:status IPC handler &gt; returns GitStatus for a valid git repo path" time="0.002">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git-extension.ipc.spec.ts" name="git-integration extension: git:status IPC handler &gt; returns error for non-repo path" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git-extension.ipc.spec.ts" name="git-integration extension: git:status IPC handler &gt; returns VALIDATION_ERROR for missing path" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git-extension.ipc.spec.ts" name="git-integration extension: git:diff-file IPC handler &gt; returns FileDiff for staged file" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git-extension.ipc.spec.ts" name="git-integration extension: git:diff-file IPC handler &gt; returns binary flag for binary file" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git-extension.ipc.spec.ts" name="git-integration extension: git:stage / git:unstage IPC handlers &gt; stages a file" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git-extension.ipc.spec.ts" name="git-integration extension: git:stage / git:unstage IPC handlers &gt; returns error for empty paths array on stage" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git-extension.ipc.spec.ts" name="git-integration extension: git:stage / git:unstage IPC handlers &gt; unstages a file" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git-extension.ipc.spec.ts" name="git-integration extension: git:commit IPC handler &gt; commits staged changes and returns hash" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git-extension.ipc.spec.ts" name="git-integration extension: git:commit IPC handler &gt; returns EMPTY_MESSAGE when message is empty" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git-extension.ipc.spec.ts" name="git-integration extension: git:commit IPC handler &gt; returns NOTHING_TO_COMMIT when no staged files" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/integration/ipc/git.ipc.spec.ts" timestamp="2026-05-10T18:22:57.143Z" hostname="Andrews-MacBook-Pro.local" tests="25" failures="0" errors="0" skipped="0" time="0.005">
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:is-repo returns true for a git repo" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:is-repo returns false for a non-repo path" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:current-branch returns the current branch" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:checkout switches to branch" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:is-repo returns false for invalid payload" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:is-repo returns false when service throws" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:current-branch returns INVALID_PATH for empty path" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:current-branch returns error string when service throws" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:list-branches returns empty array for invalid payload" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:list-branches returns branches on success" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:list-branches returns empty array when service throws" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:checkout returns VALIDATION_ERROR for missing branch" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:checkout returns error string when checkout fails" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:suggest-worktree-path returns empty path for invalid payload" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:suggest-worktree-path returns suggested path" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:suggest-worktree-path passes optional baseDir" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:create-worktree returns VALIDATION_ERROR for invalid payload" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:create-worktree returns success" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:create-worktree returns error string on failure" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:remove-worktree returns VALIDATION_ERROR for invalid payload" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:remove-worktree returns success" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:remove-worktree returns error string on failure" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:list-worktrees returns empty array for invalid payload" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:list-worktrees returns worktrees on success" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/git.ipc.spec.ts" name="core git IPC handlers &gt; git:list-worktrees returns empty array when service throws" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/integration/ipc/settings.ipc.spec.ts" timestamp="2026-05-10T18:22:57.144Z" hostname="Andrews-MacBook-Pro.local" tests="4" failures="0" errors="0" skipped="0" time="0.003">
+        <testcase classname="tests/integration/ipc/settings.ipc.spec.ts" name="settings IPC handlers &gt; settings:get-global &gt; returns global settings from store" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/settings.ipc.spec.ts" name="settings IPC handlers &gt; settings:update-global &gt; calls updateGlobalSettings with patch and returns updated settings" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/settings.ipc.spec.ts" name="settings IPC handlers &gt; settings:get-workspace &gt; returns workspace-specific settings" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/settings.ipc.spec.ts" name="settings IPC handlers &gt; settings:update-workspace &gt; calls updateWorkspaceSettings with workspaceId and patch" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/integration/ipc/shell.ipc.spec.ts" timestamp="2026-05-10T18:22:57.145Z" hostname="Andrews-MacBook-Pro.local" tests="6" failures="0" errors="0" skipped="0" time="0.004">
+        <testcase classname="tests/integration/ipc/shell.ipc.spec.ts" name="shell:exec IPC handler &gt; executes a valid git command and returns ShellResult" time="0.002">
+        </testcase>
+        <testcase classname="tests/integration/ipc/shell.ipc.spec.ts" name="shell:exec IPC handler &gt; returns COMMAND_NOT_ALLOWED for non-allowlisted command" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/shell.ipc.spec.ts" name="shell:exec IPC handler &gt; returns CWD_OUT_OF_SCOPE when cwd escapes workspace" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/shell.ipc.spec.ts" name="shell:exec IPC handler &gt; returns VALIDATION_ERROR for invalid payload schema" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/shell.ipc.spec.ts" name="shell:exec IPC handler &gt; returns generic error string for unexpected exceptions" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/shell.ipc.spec.ts" name="shell:exec IPC handler &gt; calls assertCwdInScope only when workspaceRoot is provided" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/integration/ipc/terminal.ipc.spec.ts" timestamp="2026-05-10T18:22:57.145Z" hostname="Andrews-MacBook-Pro.local" tests="6" failures="0" errors="0" skipped="0" time="0.147">
+        <testcase classname="tests/integration/ipc/terminal.ipc.spec.ts" name="terminal IPC handlers &gt; terminal:create &gt; returns a sessionId when given a valid payload" time="0.038">
+        </testcase>
+        <testcase classname="tests/integration/ipc/terminal.ipc.spec.ts" name="terminal IPC handlers &gt; terminal:create &gt; returns VALIDATION_ERROR when projectId is not a UUID" time="0.022">
+        </testcase>
+        <testcase classname="tests/integration/ipc/terminal.ipc.spec.ts" name="terminal IPC handlers &gt; terminal:create &gt; returns VALIDATION_ERROR when type is invalid" time="0.012">
+        </testcase>
+        <testcase classname="tests/integration/ipc/terminal.ipc.spec.ts" name="terminal IPC handlers &gt; terminal:create &gt; accepts agent session type" time="0.032">
+        </testcase>
+        <testcase classname="tests/integration/ipc/terminal.ipc.spec.ts" name="terminal IPC handlers &gt; terminal:close &gt; terminates the PTY for the given sessionId" time="0.015">
+        </testcase>
+        <testcase classname="tests/integration/ipc/terminal.ipc.spec.ts" name="terminal IPC handlers &gt; terminal:input &gt; routes data to the correct PTY instance" time="0.026">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/integration/ipc/workspace.ipc.spec.ts" timestamp="2026-05-10T18:22:57.145Z" hostname="Andrews-MacBook-Pro.local" tests="11" failures="0" errors="0" skipped="0" time="0.003">
+        <testcase classname="tests/integration/ipc/workspace.ipc.spec.ts" name="workspace IPC handlers &gt; workspace:list &gt; returns workspaces from store" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/workspace.ipc.spec.ts" name="workspace IPC handlers &gt; workspace:create &gt; forwards payload to createWorkspace and returns result" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/workspace.ipc.spec.ts" name="workspace IPC handlers &gt; workspace:update &gt; forwards payload to updateWorkspace and returns result" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/workspace.ipc.spec.ts" name="workspace IPC handlers &gt; workspace:delete &gt; calls deleteWorkspace with the id" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/workspace.ipc.spec.ts" name="workspace IPC handlers &gt; workspace:reorder &gt; calls reorderWorkspaces with payload" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/workspace.ipc.spec.ts" name="workspace IPC handlers &gt; project:list &gt; returns projects for the given workspaceId" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/workspace.ipc.spec.ts" name="workspace IPC handlers &gt; project:create &gt; calls createProject with payload and returns result" time="0.001">
+        </testcase>
+        <testcase classname="tests/integration/ipc/workspace.ipc.spec.ts" name="workspace IPC handlers &gt; project:update-branch &gt; calls updateProjectBranch with payload and returns result" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/workspace.ipc.spec.ts" name="workspace IPC handlers &gt; project:rename &gt; calls renameProject with payload and returns result" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/workspace.ipc.spec.ts" name="workspace IPC handlers &gt; project:reorder &gt; calls reorderProjects with payload" time="0">
+        </testcase>
+        <testcase classname="tests/integration/ipc/workspace.ipc.spec.ts" name="workspace IPC handlers &gt; project:delete &gt; calls deleteProject with the id" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/integration/scripts/create-extension.spec.js" timestamp="2026-05-10T18:22:57.146Z" hostname="Andrews-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="0.203">
+        <testcase classname="tests/integration/scripts/create-extension.spec.js" name="create-extension.js CLI &gt; exits 0 and creates extension directory" time="0.035">
+        </testcase>
+        <testcase classname="tests/integration/scripts/create-extension.spec.js" name="create-extension.js CLI &gt; generates valid manifest.json" time="0.031">
+        </testcase>
+        <testcase classname="tests/integration/scripts/create-extension.spec.js" name="create-extension.js CLI &gt; uses custom --id when provided" time="0.028">
+        </testcase>
+        <testcase classname="tests/integration/scripts/create-extension.spec.js" name="create-extension.js CLI &gt; exits 2 on directory collision" time="0.027">
+        </testcase>
+        <testcase classname="tests/integration/scripts/create-extension.spec.js" name="create-extension.js CLI &gt; exits 1 for invalid name" time="0.025">
+        </testcase>
+        <testcase classname="tests/integration/scripts/create-extension.spec.js" name="create-extension.js CLI &gt; exits 0 with --help" time="0.028">
+        </testcase>
+        <testcase classname="tests/integration/scripts/create-extension.spec.js" name="create-extension.js CLI &gt; generated src/index.js is valid JavaScript with activate/deactivate" time="0.027">
+        </testcase>
+    </testsuite>
+    <testsuite name="extensions/git-integration/tests/unit/GitSidebarPanel.spec.tsx" timestamp="2026-05-10T18:22:57.146Z" hostname="Andrews-MacBook-Pro.local" tests="2" failures="2" errors="0" skipped="0" time="0.014">
+        <testcase classname="extensions/git-integration/tests/unit/GitSidebarPanel.spec.tsx" name="GitSidebarPanel — loading state &gt; renders skeleton rows instead of &quot;Loading…&quot; text when status is null" time="0.012">
+            <failure message="expected &lt;div class=&quot;git-sidebar__loading&quot;&gt;&lt;/div&gt; to be null" type="AssertionError">
+AssertionError: expected &lt;div class=&quot;git-sidebar__loading&quot;&gt;&lt;/div&gt; to be null
+ ❯ extensions/git-integration/tests/unit/GitSidebarPanel.spec.tsx:32:44
+            </failure>
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/GitSidebarPanel.spec.tsx" name="GitSidebarPanel — loading state &gt; renders at least 5 skeleton rows" time="0.001">
+            <failure message="expected 0 to be greater than or equal to 5" type="AssertionError">
+AssertionError: expected 0 to be greater than or equal to 5
+ ❯ extensions/git-integration/tests/unit/GitSidebarPanel.spec.tsx:40:33
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="extensions/git-integration/tests/unit/StagingArea.spec.tsx" timestamp="2026-05-10T18:22:57.146Z" hostname="Andrews-MacBook-Pro.local" tests="6" failures="6" errors="0" skipped="0" time="0.018">
+        <testcase classname="extensions/git-integration/tests/unit/StagingArea.spec.tsx" name="StagingArea — file status badge tooltips &gt; badge for &quot;modified&quot; has title=&quot;Modified&quot;" time="0.012">
+            <failure message="expected &apos;modified&apos; to be &apos;Modified&apos; // Object.is equality" type="AssertionError">
+AssertionError: expected &apos;modified&apos; to be &apos;Modified&apos; // Object.is equality
+
+Expected: &quot;Modified&quot;
+Received: &quot;modified&quot;
+
+ ❯ extensions/git-integration/tests/unit/StagingArea.spec.tsx:56:44
+            </failure>
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/StagingArea.spec.tsx" name="StagingArea — file status badge tooltips &gt; badge for &quot;added&quot; has title=&quot;Added&quot;" time="0.002">
+            <failure message="expected &apos;added&apos; to be &apos;Added&apos; // Object.is equality" type="AssertionError">
+AssertionError: expected &apos;added&apos; to be &apos;Added&apos; // Object.is equality
+
+Expected: &quot;Added&quot;
+Received: &quot;added&quot;
+
+ ❯ extensions/git-integration/tests/unit/StagingArea.spec.tsx:56:44
+            </failure>
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/StagingArea.spec.tsx" name="StagingArea — file status badge tooltips &gt; badge for &quot;deleted&quot; has title=&quot;Deleted&quot;" time="0">
+            <failure message="expected &apos;deleted&apos; to be &apos;Deleted&apos; // Object.is equality" type="AssertionError">
+AssertionError: expected &apos;deleted&apos; to be &apos;Deleted&apos; // Object.is equality
+
+Expected: &quot;Deleted&quot;
+Received: &quot;deleted&quot;
+
+ ❯ extensions/git-integration/tests/unit/StagingArea.spec.tsx:56:44
+            </failure>
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/StagingArea.spec.tsx" name="StagingArea — file status badge tooltips &gt; badge for &quot;renamed&quot; has title=&quot;Renamed&quot;" time="0.001">
+            <failure message="expected &apos;renamed&apos; to be &apos;Renamed&apos; // Object.is equality" type="AssertionError">
+AssertionError: expected &apos;renamed&apos; to be &apos;Renamed&apos; // Object.is equality
+
+Expected: &quot;Renamed&quot;
+Received: &quot;renamed&quot;
+
+ ❯ extensions/git-integration/tests/unit/StagingArea.spec.tsx:56:44
+            </failure>
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/StagingArea.spec.tsx" name="StagingArea — file status badge tooltips &gt; badge for &quot;untracked&quot; has title=&quot;Untracked&quot;" time="0.001">
+            <failure message="expected &apos;untracked&apos; to be &apos;Untracked&apos; // Object.is equality" type="AssertionError">
+AssertionError: expected &apos;untracked&apos; to be &apos;Untracked&apos; // Object.is equality
+
+Expected: &quot;Untracked&quot;
+Received: &quot;untracked&quot;
+
+ ❯ extensions/git-integration/tests/unit/StagingArea.spec.tsx:56:44
+            </failure>
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/StagingArea.spec.tsx" name="StagingArea — file status badge tooltips &gt; badge for &quot;conflicted&quot; has title=&quot;Conflicted&quot;" time="0.001">
+            <failure message="expected &apos;conflicted&apos; to be &apos;Conflicted&apos; // Object.is equality" type="AssertionError">
+AssertionError: expected &apos;conflicted&apos; to be &apos;Conflicted&apos; // Object.is equality
+
+Expected: &quot;Conflicted&quot;
+Received: &quot;conflicted&quot;
+
+ ❯ extensions/git-integration/tests/unit/StagingArea.spec.tsx:56:44
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="extensions/git-integration/tests/unit/chapter-builder.spec.ts" timestamp="2026-05-10T18:22:57.147Z" hostname="Andrews-MacBook-Pro.local" tests="12" failures="0" errors="0" skipped="0" time="0.003">
+        <testcase classname="extensions/git-integration/tests/unit/chapter-builder.spec.ts" name="buildChapters() &gt; returns empty array for empty input" time="0.001">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/chapter-builder.spec.ts" name="buildChapters() &gt; returns a single chapter for a single file" time="0.001">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/chapter-builder.spec.ts" name="buildChapters() &gt; groups files by top-level directory segment" time="0.001">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/chapter-builder.spec.ts" name="buildChapters() &gt; places type/interface files in tier 0" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/chapter-builder.spec.ts" name="buildChapters() &gt; places *.spec.* and *.test.* files in tier 2" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/chapter-builder.spec.ts" name="buildChapters() &gt; places lock files and generated files in tier 3" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/chapter-builder.spec.ts" name="buildChapters() &gt; tier 0 files appear before tier 1 within the same chapter" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/chapter-builder.spec.ts" name="buildChapters() &gt; tier 2 files appear after tier 1 within the same chapter" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/chapter-builder.spec.ts" name="buildChapters() &gt; all-mechanical files form their own chapter with tier 3" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/chapter-builder.spec.ts" name="buildChapters() &gt; applies fileOrderOverrides when provided" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/chapter-builder.spec.ts" name="buildChapters() &gt; includes a whyHere label for every file" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/chapter-builder.spec.ts" name="buildChapters() &gt; sets estimatedMinutes on each chapter as sum of file estimates" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="extensions/git-integration/tests/unit/gh-service.spec.ts" timestamp="2026-05-10T18:22:57.148Z" hostname="Andrews-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.002">
+        <testcase classname="extensions/git-integration/tests/unit/gh-service.spec.ts" name="GhService.checkAuth() &gt; resolves true when gh auth status exits 0" time="0.001">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/gh-service.spec.ts" name="GhService.checkAuth() &gt; resolves false when gh exits non-zero" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/gh-service.spec.ts" name="GhService.checkAuth() &gt; resolves false when gh is not found" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/gh-service.spec.ts" name="GhService.getPrForBranch() &gt; returns PullRequest when PR exists" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/gh-service.spec.ts" name="GhService.getPrForBranch() &gt; returns null when no PR found" time="0.001">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/gh-service.spec.ts" name="GhService.getPrForBranch() &gt; throws on unexpected gh error" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/gh-service.spec.ts" name="GhService.createPr() &gt; returns created PullRequest with url" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/gh-service.spec.ts" name="GhService.createPr() &gt; creates draft PR when isDraft=true" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="extensions/git-integration/tests/unit/git-parser.spec.ts" timestamp="2026-05-10T18:22:57.148Z" hostname="Andrews-MacBook-Pro.local" tests="16" failures="0" errors="0" skipped="0" time="0.003">
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseStatus() &gt; parses a modified unstaged file" time="0.002">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseStatus() &gt; parses a staged new file (A)" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseStatus() &gt; parses an untracked file (??)" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseStatus() &gt; parses a deleted file (D)" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseStatus() &gt; parses a renamed file (R) with original path" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseStatus() &gt; parses a conflicted file (UU)" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseStatus() &gt; sets truncated=true when file count exceeds maxFiles" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseStatus() &gt; returns empty files array for empty output" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseStatus() &gt; handles multiple files" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseDiff() &gt; parses hunk header" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseDiff() &gt; parses add lines (green)" time="0.001">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseDiff() &gt; parses remove lines (red)" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseDiff() &gt; parses context lines" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseDiff() &gt; detects binary files" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseDiff() &gt; sets truncated flag for large output" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/git-parser.spec.ts" name="parseDiff() &gt; assigns correct line numbers to add/remove/context" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="extensions/git-integration/tests/unit/pr-review-service.spec.ts" timestamp="2026-05-10T18:22:57.149Z" hostname="Andrews-MacBook-Pro.local" tests="12" failures="0" errors="0" skipped="0" time="0.003">
+        <testcase classname="extensions/git-integration/tests/unit/pr-review-service.spec.ts" name="ReviewSessionSchema &gt; parses a valid session" time="0.001">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/pr-review-service.spec.ts" name="ReviewSessionSchema &gt; accepts null currentChapterId and currentFilePath" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/pr-review-service.spec.ts" name="ReviewSessionSchema &gt; accepts null scrollPosition" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/pr-review-service.spec.ts" name="ReviewSessionSchema &gt; accepts null pausedAt" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/pr-review-service.spec.ts" name="ReviewSessionSchema &gt; rejects missing repoRoot" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/pr-review-service.spec.ts" name="ReviewSessionSchema &gt; serialises viewedFiles as an array (Set → array for JSON)" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/pr-review-service.spec.ts" name="ReviewSessionSchema &gt; session key changes when headSHA changes (force-push invalidation)" time="0.001">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/pr-review-service.spec.ts" name="detectChangedFiles() &gt; returns empty set when all files are unchanged" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/pr-review-service.spec.ts" name="detectChangedFiles() &gt; flags files whose addition/deletion counts changed" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/pr-review-service.spec.ts" name="detectChangedFiles() &gt; flags newly added files" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/pr-review-service.spec.ts" name="detectChangedFiles() &gt; does not flag files with identical sizes" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/pr-review-service.spec.ts" name="buildChapters() — cross-reference &gt; returns [] for empty input" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="extensions/git-integration/tests/unit/review-queue.spec.ts" timestamp="2026-05-10T18:22:57.149Z" hostname="Andrews-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="0.002">
+        <testcase classname="extensions/git-integration/tests/unit/review-queue.spec.ts" name="parseReviewQueuePR() &gt; maps gh pr list JSON to ReviewQueuePR shape" time="0.001">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/review-queue.spec.ts" name="parseReviewQueuePR() &gt; derives fileCount from files array" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/review-queue.spec.ts" name="parseReviewQueuePR() &gt; sums additions and deletions across all files" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/review-queue.spec.ts" name="parseReviewQueuePR() &gt; derives estimatedMinutes as ceil((additions+deletions)/60)" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/review-queue.spec.ts" name="parseReviewQueuePR() &gt; sets estimatedMinutes to at least 1 for tiny PRs" time="0.001">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/review-queue.spec.ts" name="parseReviewQueuePR() &gt; defaults sessionStatus to not-started" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/review-queue.spec.ts" name="parseReviewQueuePR() &gt; handles empty files array gracefully" time="0">
+        </testcase>
+    </testsuite>
+    <testsuite name="extensions/git-integration/tests/unit/risk-score.spec.ts" timestamp="2026-05-10T18:22:57.149Z" hostname="Andrews-MacBook-Pro.local" tests="14" failures="0" errors="0" skipped="0" time="0.003">
+        <testcase classname="extensions/git-integration/tests/unit/risk-score.spec.ts" name="computeRiskScore() &gt; returns low risk when all metrics are minimal" time="0.001">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/risk-score.spec.ts" name="computeRiskScore() &gt; returns high risk for the most extreme file in the set" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/risk-score.spec.ts" name="computeRiskScore() &gt; all-null numeric metrics (except testFilePresent) returns composite null" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/risk-score.spec.ts" name="computeRiskScore() &gt; missing test file adds the flat 20-point penalty" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/risk-score.spec.ts" name="computeRiskScore() &gt; sets dominantDriver to a non-empty string" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/risk-score.spec.ts" name="computeRiskScore() &gt; topImporters is capped at 5" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/risk-score.spec.ts" name="computeRiskScore() &gt; composite is between 0 and 100" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/risk-score.spec.ts" name="detectComplexityHotspots() &gt; returns empty array for empty diff" time="0.001">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/risk-score.spec.ts" name="detectComplexityHotspots() &gt; does not flag a hunk with fewer than 5 added decision points" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/risk-score.spec.ts" name="detectComplexityHotspots() &gt; flags a hunk with 5 or more added decision points" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/risk-score.spec.ts" name="detectComplexityHotspots() &gt; subtracts removed decision points from added ones" time="0.001">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/risk-score.spec.ts" name="detectComplexityHotspots() &gt; annotation message includes the delta count" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/risk-score.spec.ts" name="computeFileCyclomaticDelta() &gt; returns 0 for an empty diff" time="0">
+        </testcase>
+        <testcase classname="extensions/git-integration/tests/unit/risk-score.spec.ts" name="computeFileCyclomaticDelta() &gt; sums deltas across all hunks" time="0">
+        </testcase>
+    </testsuite>
+</testsuites>

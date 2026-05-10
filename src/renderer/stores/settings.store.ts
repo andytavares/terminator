@@ -13,6 +13,7 @@ interface SettingsState {
   updateWorkspaceScrollback: (workspaceId: string, limit: number) => Promise<void>
   updateWorktreeBaseDir: (dir: string) => Promise<void>
   updateWorkspaceWorktreeBaseDir: (workspaceId: string, dir: string | undefined) => Promise<void>
+  markWelcomeSeen: () => Promise<void>
   resolveSettings: (workspaceId?: string | null) => GlobalSettings
 }
 
@@ -21,6 +22,7 @@ const DEFAULT_SETTINGS: GlobalSettings = {
   terminal: { scrollbackLimit: 10000, defaultShell: '/bin/zsh' },
   git: { worktreeBaseDir: '' },
   extensions: {},
+  ui: { hasSeenWelcome: false },
 }
 
 function mergeSettings(
@@ -116,6 +118,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       map.set(workspaceId, result.settings)
       return { workspaceSettings: map }
     })
+  },
+
+  markWelcomeSeen: async () => {
+    const result = await window.electronAPI.settings.updateGlobal({ ui: { hasSeenWelcome: true } })
+    set({ globalSettings: result.settings })
   },
 
   resolveSettings: (workspaceId) => {

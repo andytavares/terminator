@@ -16,7 +16,10 @@
   font-family: var(--font-mono);
   font-size: 11px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .branch-sw__trigger:hover {
@@ -64,8 +67,14 @@
 }
 
 @keyframes bsw-in {
-  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* ── Sections ────────────────────────────────────────────────── */
@@ -100,7 +109,9 @@
   font-size: 11px;
   text-align: left;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .branch-sw__item:hover {
@@ -132,7 +143,7 @@
   padding: 12px;
   font-size: 11px;
   color: var(--text-muted);
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   text-align: center;
 }
 

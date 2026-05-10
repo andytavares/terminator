@@ -39,21 +39,38 @@ interface ElectronAPI {
     currentBranch(path: string): Promise<{ branch: string } | { error: string }>
     listBranches(path: string): Promise<{ branches: Branch[] }>
     checkout(path: string, branch: string): Promise<{ success: true } | { error: string }>
-    suggestWorktreePath(repoRoot: string, branch: string, baseDir?: string): Promise<{ path: string }>
+    suggestWorktreePath(
+      repoRoot: string,
+      branch: string,
+      baseDir?: string
+    ): Promise<{ path: string }>
     createWorktree(payload: unknown): Promise<{ success: true } | { error: string }>
-    removeWorktree(repoRoot: string, worktreePath: string): Promise<{ success: true } | { error: string }>
+    removeWorktree(
+      repoRoot: string,
+      worktreePath: string
+    ): Promise<{ success: true } | { error: string }>
     listWorktrees(path: string): Promise<{ worktrees: WorktreeInfo[] }>
     // git:status, diffFile, stage, unstage, commit, prStatus, prCreate are augmented by the git-integration extension
     [key: string]: unknown
   }
   shell: {
-    exec(options: { command: 'git' | 'gh'; args: string[]; cwd: string; timeoutMs?: number; workspaceRoot?: string }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut: boolean } | { error: string }>
+    exec(options: {
+      command: 'git' | 'gh'
+      args: string[]
+      cwd: string
+      timeoutMs?: number
+      workspaceRoot?: string
+    }): Promise<
+      { exitCode: number; stdout: string; stderr: string; timedOut: boolean } | { error: string }
+    >
     openPath(filePath: string): Promise<{ ok: true } | { error: string }>
   }
   fs: {
     watchStart(projectRoot: string): Promise<{ ok: true } | { error: string }>
     watchStop(): Promise<{ ok: true }>
-    onChanged(handler: (event: { projectRoot: string; eventType: string; filename: string | null }) => void): () => void
+    onChanged(
+      handler: (event: { projectRoot: string; eventType: string; filename: string | null }) => void
+    ): () => void
     readFile(filePath: string): Promise<{ content: string } | { error: string }>
   }
 
@@ -86,7 +103,7 @@ interface ElectronAPI {
     onMenuOpenPrReviewWindow(handler: () => void): () => void
   }
   window: {
-    openPrReview(repoRoot: string): Promise<void>
+    openPrReview(repoRoot: string, accentColor?: string): Promise<void>
   }
   // github namespace is contributed by the git-integration extension (see extensions/git-integration/src/types/electron.d.ts)
 }

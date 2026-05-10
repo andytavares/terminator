@@ -5,14 +5,21 @@ export default defineConfig({
   test: {
     include: [
       'tests/unit/**/*.spec.ts',
+      'tests/unit/**/*.spec.tsx',
       'tests/unit/**/*.spec.js',
       'tests/integration/**/*.spec.ts',
       'tests/integration/**/*.spec.js',
       'extensions/*/tests/**/*.spec.ts',
+      'extensions/*/tests/**/*.spec.tsx',
       'extensions/*/tests/**/*.spec.js',
     ],
     environment: 'node',
+    environmentMatchGlobs: [
+      ['tests/unit/**/*.spec.tsx', 'jsdom'],
+      ['extensions/*/tests/unit/**/*.spec.tsx', 'jsdom'],
+    ],
     globals: true,
+    setupFiles: ['tests/setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],

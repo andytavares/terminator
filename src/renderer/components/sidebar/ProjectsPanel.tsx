@@ -3,6 +3,7 @@ import type { Project } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
 import { AlertBadge } from '../AlertBadge'
+import { ConfirmDialog } from '../ConfirmDialog'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { BranchSwitcher } from './BranchSwitcher'
 import './ProjectsPanel.css'
@@ -37,7 +38,9 @@ export function ProjectsPanel({ workspaceId }: Props): JSX.Element {
       {workspace.tags.length > 0 && (
         <div className="projects-panel__tags">
           {workspace.tags.map((tag) => (
-            <span key={tag} className="projects-panel__tag">{tag}</span>
+            <span key={tag} className="projects-panel__tag">
+              {tag}
+            </span>
           ))}
         </div>
       )}
@@ -95,16 +98,17 @@ function ProjectList({
     const reordered = [...projects]
     const [moved] = reordered.splice(fromIndex, 1)
     reordered.splice(dropIndex, 0, moved)
-    reorderProjects(workspaceId, reordered.map((p) => p.id))
+    reorderProjects(
+      workspaceId,
+      reordered.map((p) => p.id)
+    )
     dragIndexRef.current = null
     setDragOver(null)
   }
 
   return (
     <div className="projects-panel__list">
-      {projects.length > 0 && (
-        <div className="projects-panel__section-label">Projects</div>
-      )}
+      {projects.length > 0 && <div className="projects-panel__section-label">Projects</div>}
       {projects.map((project, index) => (
         <div
           key={project.id}
@@ -113,7 +117,10 @@ function ProjectList({
           onDragOver={(e) => handleDragOver(e, index)}
           onDragLeave={() => setDragOver(null)}
           onDrop={() => handleDrop(index)}
-          onDragEnd={() => { dragIndexRef.current = null; setDragOver(null) }}
+          onDragEnd={() => {
+            dragIndexRef.current = null
+            setDragOver(null)
+          }}
           className={dragOver === index ? 'proj-dnd-target' : ''}
         >
           <ProjectCard
@@ -137,6 +144,7 @@ function ProjectCard({
   workspaceFolderPath: string
 }): JSX.Element {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState('')
   const [renameError, setRenameError] = useState('')
@@ -165,7 +173,10 @@ function ProjectCard({
 
   async function commitRename(): Promise<void> {
     const trimmed = renameValue.trim()
-    if (!trimmed || trimmed === project.name) { setRenaming(false); return }
+    if (!trimmed || trimmed === project.name) {
+      setRenaming(false)
+      return
+    }
 
     const result = await renameProject(project.id, trimmed)
     if ('error' in result) {
@@ -183,10 +194,8 @@ function ProjectCard({
   }
 
   function handleRemove(): void {
-    if (window.confirm(`Remove project "${project.name}"?`)) {
-      deleteProject(project.id)
-    }
     setCtxMenu(null)
+    setConfirmOpen(true)
   }
 
   return (
@@ -198,7 +207,9 @@ function ProjectCard({
         onContextMenu={handleContextMenu}
       >
         <AlertBadge count={bellCount} className="alert-badge--corner" />
-        <span className="proj-card__drag-handle" title="Drag to reorder">⠿</span>
+        <span className="proj-card__drag-handle" title="Drag to reorder">
+          ⠿
+        </span>
 
         <div className="proj-card__body">
           {renaming ? (
@@ -208,7 +219,10 @@ function ProjectCard({
                 className={`proj-card__rename-input${renameError ? ' proj-card__rename-input--error' : ''}`}
                 value={renameValue}
                 autoFocus
-                onChange={(e) => { setRenameValue(e.target.value); setRenameError('') }}
+                onChange={(e) => {
+                  setRenameValue(e.target.value)
+                  setRenameError('')
+                }}
                 onBlur={commitRename}
                 onKeyDown={handleRenameKey}
                 onClick={(e) => e.stopPropagation()}
@@ -216,7 +230,21 @@ function ProjectCard({
               {renameError && <span className="proj-card__rename-error">{renameError}</span>}
             </div>
           ) : (
-            <span className="proj-card__name" onDoubleClick={startRename}>{project.name}</span>
+            <>
+              <span className="proj-card__name" onDoubleClick={startRename}>
+                {project.name}
+              </span>
+              <span
+                className="proj-card__rename-icon"
+                title="Rename"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  startRename()
+                }}
+              >
+                ✎
+              </span>
+            </>
           )}
 
           {isActive && (project.gitBranch || project.worktreePath) && !renaming && (
@@ -226,7 +254,10 @@ function ProjectCard({
 
         <button
           className="proj-card__menu-btn"
-          onClick={(e) => { e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY }) }}
+          onClick={(e) => {
+            e.stopPropagation()
+            setCtxMenu({ x: e.clientX, y: e.clientY })
+          }}
           title="Options"
         >
           ···
@@ -242,14 +273,35 @@ function ProjectCard({
           onClose={() => setCtxMenu(null)}
         />
       )}
+
+      {confirmOpen && (
+        <ConfirmDialog
+          title={`Remove project "${project.name}"?`}
+          confirmLabel="Remove"
+          danger
+          onConfirm={() => {
+            deleteProject(project.id)
+            setConfirmOpen(false)
+          }}
+          onClose={() => setConfirmOpen(false)}
+        />
+      )}
     </>
   )
 }
 
 function ProjectCtxMenu({
-  x, y, onRename, onRemove, onClose,
+  x,
+  y,
+  onRename,
+  onRemove,
+  onClose,
 }: {
-  x: number; y: number; onRename: () => void; onRemove: () => void; onClose: () => void
+  x: number
+  y: number
+  onRename: () => void
+  onRemove: () => void
+  onClose: () => void
 }): JSX.Element {
   React.useEffect(() => {
     const close = (): void => onClose()
@@ -258,12 +310,10 @@ function ProjectCtxMenu({
   }, [onClose])
 
   return (
-    <div
-      className="ctx-menu"
-      style={{ left: x, top: y }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <button className="ctx-menu__item" onClick={onRename}>Rename</button>
+    <div className="ctx-menu" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
+      <button className="ctx-menu__item" onClick={onRename}>
+        Rename
+      </button>
       <div className="ctx-menu__separator" />
       <button className="ctx-menu__item ctx-menu__item--danger" onClick={onRemove}>
         Remove project

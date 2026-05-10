@@ -3,6 +3,7 @@ import type { Workspace } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
 import { AlertBadge } from '../AlertBadge'
+import { ConfirmDialog } from '../ConfirmDialog'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { EditWorkspaceDialog } from './EditWorkspaceDialog'
 import './WorkspaceRail.css'
@@ -62,7 +63,10 @@ export function WorkspaceRail(): JSX.Element {
           onDragOver={(e) => handleDragOver(e, index)}
           onDragLeave={() => setDragOver(null)}
           onDrop={() => handleDrop(index)}
-          onDragEnd={() => { dragIndexRef.current = null; setDragOver(null) }}
+          onDragEnd={() => {
+            dragIndexRef.current = null
+            setDragOver(null)
+          }}
           className={`ws-tile-wrap${dragOver === index ? ' ws-tile-wrap--dnd-over' : ''}`}
         >
           <WorkspaceTile workspace={ws} />
@@ -71,11 +75,7 @@ export function WorkspaceRail(): JSX.Element {
 
       <div className="ws-rail__spacer" />
 
-      <button
-        className="ws-rail__add"
-        onClick={() => setCreateOpen(true)}
-        title="Create workspace"
-      >
+      <button className="ws-rail__add" onClick={() => setCreateOpen(true)} title="Create workspace">
         +
       </button>
 
@@ -87,7 +87,9 @@ export function WorkspaceRail(): JSX.Element {
 function WorkspaceTile({ workspace }: { workspace: Workspace }): JSX.Element {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const [editOpen, setEditOpen] = useState(false)
-  const { activeWorkspaceId, setActiveWorkspace, deleteWorkspace, projectsByWorkspaceId } = useWorkspaceStore()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const { activeWorkspaceId, setActiveWorkspace, deleteWorkspace, projectsByWorkspaceId } =
+    useWorkspaceStore()
   const { getBellCountForProject } = useSessionStore()
   const isActive = activeWorkspaceId === workspace.id
   const projects = projectsByWorkspaceId.get(workspace.id) ?? []
@@ -103,10 +105,8 @@ function WorkspaceTile({ workspace }: { workspace: Workspace }): JSX.Element {
   }
 
   function handleRemove(): void {
-    if (window.confirm(`Remove workspace "${workspace.name}" and all its projects?`)) {
-      deleteWorkspace(workspace.id)
-    }
     setCtxMenu(null)
+    setConfirmOpen(true)
   }
 
   return (
@@ -130,23 +130,46 @@ function WorkspaceTile({ workspace }: { workspace: Workspace }): JSX.Element {
         <ContextMenu
           x={ctxMenu.x}
           y={ctxMenu.y}
-          onEdit={() => { setEditOpen(true); setCtxMenu(null) }}
+          onEdit={() => {
+            setEditOpen(true)
+            setCtxMenu(null)
+          }}
           onRemove={handleRemove}
           onClose={() => setCtxMenu(null)}
         />
       )}
 
-      {editOpen && (
-        <EditWorkspaceDialog workspace={workspace} onClose={() => setEditOpen(false)} />
+      {editOpen && <EditWorkspaceDialog workspace={workspace} onClose={() => setEditOpen(false)} />}
+
+      {confirmOpen && (
+        <ConfirmDialog
+          title={`Remove workspace "${workspace.name}"?`}
+          description={`This will permanently delete all ${projects.length} project${projects.length !== 1 ? 's' : ''} in this workspace.`}
+          confirmLabel="Remove"
+          danger
+          onConfirm={() => {
+            deleteWorkspace(workspace.id)
+            setConfirmOpen(false)
+          }}
+          onClose={() => setConfirmOpen(false)}
+        />
       )}
     </>
   )
 }
 
 function ContextMenu({
-  x, y, onEdit, onRemove, onClose,
+  x,
+  y,
+  onEdit,
+  onRemove,
+  onClose,
 }: {
-  x: number; y: number; onEdit: () => void; onRemove: () => void; onClose: () => void
+  x: number
+  y: number
+  onEdit: () => void
+  onRemove: () => void
+  onClose: () => void
 }): JSX.Element {
   React.useEffect(() => {
     const close = (): void => onClose()
@@ -155,12 +178,10 @@ function ContextMenu({
   }, [onClose])
 
   return (
-    <div
-      className="ctx-menu"
-      style={{ left: x, top: y }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <button className="ctx-menu__item" onClick={onEdit}>Edit workspace</button>
+    <div className="ctx-menu" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
+      <button className="ctx-menu__item" onClick={onEdit}>
+        Edit workspace
+      </button>
       <div className="ctx-menu__separator" />
       <button className="ctx-menu__item ctx-menu__item--danger" onClick={onRemove}>
         Remove workspace
