@@ -1,0 +1,19 @@
+.github/PULL_REQUEST_TEMPLATE.md
+  s_a6c5d45d077d6d::t_853babaa050a59 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "7cf11f237324502e1a8cce5c4122f2aac7c40e8d",
+  "prompts": {},
+  "sessions": {
+    "s_a6c5d45d077d6d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "86c9c8a7-b7d6-4540-aebd-a3c43734bd38",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
