@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 const SignalValueSchema = z.enum(['pass', 'warn', 'fail', 'unknown'])
 
-export const SignalDotsSchema = z.object({
+const SignalDotsSchema = z.object({
   tests:    SignalValueSchema,
   coverage: SignalValueSchema,
   ci:       SignalValueSchema,
@@ -15,7 +15,7 @@ export const SignalDotsSchema = z.object({
 
 // ─── Risk score ───────────────────────────────────────────────────────────────
 
-export const RiskScoreSchema = z.object({
+const RiskScoreSchema = z.object({
   level:     z.enum(['low', 'medium', 'high']),
   composite: z.number().nullable(),
   metrics: z.object({
@@ -33,7 +33,7 @@ export const RiskScoreSchema = z.object({
 
 // ─── File metrics (raw input to computeRiskScore) ────────────────────────────
 
-export const FileMetricsSchema = z.object({
+const FileMetricsSchema = z.object({
   path:            z.string(),
   additions:       z.number(),
   deletions:       z.number(),
@@ -48,7 +48,7 @@ export const FileMetricsSchema = z.object({
 
 // ─── Changed file ─────────────────────────────────────────────────────────────
 
-export const PrChangedFileSchema = z.object({
+const PrChangedFileSchema = z.object({
   path:             z.string(),
   oldPath:          z.string().optional(),
   changeType:       z.enum(['added', 'modified', 'deleted', 'renamed']),
@@ -63,7 +63,7 @@ export const PrChangedFileSchema = z.object({
 
 // ─── Chapter ──────────────────────────────────────────────────────────────────
 
-export const ChapterSchema = z.object({
+const ChapterSchema = z.object({
   id:               z.string(),
   name:             z.string(),
   files:            z.array(PrChangedFileSchema),
@@ -72,8 +72,6 @@ export const ChapterSchema = z.object({
 })
 
 // ─── PR review detail ─────────────────────────────────────────────────────────
-
-const SignalValueSchema2 = z.enum(['pass', 'warn', 'fail', 'unknown'])
 
 export const PrReviewDetailSchema = z.object({
   number:         z.number(),
@@ -86,8 +84,8 @@ export const PrReviewDetailSchema = z.object({
   baseRefName:    z.string(),
   headSHA:        z.string(),
   ciStatus:       z.enum(['passing', 'failing', 'pending', 'none']),
-  lintStatus:     SignalValueSchema2.default('unknown'),
-  coverageStatus: SignalValueSchema2.default('unknown'),
+  lintStatus:     SignalValueSchema.default('unknown'),
+  coverageStatus: SignalValueSchema.default('unknown'),
   chapters:       z.array(ChapterSchema),
 })
 
@@ -116,7 +114,7 @@ export const ReviewQueuePRSchema = z.object({
 
 // ─── Inline comments ─────────────────────────────────────────────────────────
 
-export const InlineCommentSchema = z.object({
+const InlineCommentSchema = z.object({
   id:             z.number(),
   author:         z.string(),
   authorAvatarUrl: z.string(),
@@ -134,7 +132,7 @@ export const InlineCommentSchema = z.object({
   parentId:       z.number().nullable(),
 })
 
-export const ThreadSchema = z.object({
+const ThreadSchema = z.object({
   id:        z.string(),
   path:      z.string(),
   line:      z.number(),
@@ -164,7 +162,6 @@ export const ReviewSessionSchema = z.object({
 
 // ─── Type exports ─────────────────────────────────────────────────────────────
 
-export type SignalValue   = z.infer<typeof SignalValueSchema>
 export type SignalDots    = z.infer<typeof SignalDotsSchema>
 export type RiskScore     = z.infer<typeof RiskScoreSchema>
 export type FileMetrics   = z.infer<typeof FileMetricsSchema>

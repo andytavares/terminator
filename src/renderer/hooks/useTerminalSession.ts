@@ -5,8 +5,6 @@ import { TerminalInstance } from '../components/terminal/TerminalSession'
 export function useTerminalSession() {
   const {
     createSession: storeCreateSession,
-    closeSession,
-    getSessionsForProject,
     setTerminalInstance,
     setActiveSessionForProject,
     incrementBellCount,
@@ -37,9 +35,5 @@ export function useTerminalSession() {
     return sessionId
   }
 
-  return {
-    createSession,
-    closeSession,
-    getSessionsForProject,
-  }
+  return { createSession }
 }

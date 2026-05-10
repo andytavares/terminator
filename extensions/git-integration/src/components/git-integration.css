@@ -137,26 +137,25 @@
 
 .git-view__commit-actions {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: flex-end;
   margin-top: 6px;
   gap: 6px;
 }
 
 .git-view__commit-hint {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
 }
 
 .git-view__hint-text {
   font-size: 11px;
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .git-view__buttons {
   display: flex;
   gap: 6px;
-  flex-shrink: 0;
 }
 
 .git-view__btn {
