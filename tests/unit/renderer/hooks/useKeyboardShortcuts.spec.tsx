@@ -32,7 +32,7 @@ function setupMocks(
   overrides: {
     activeWorkspaceId?: string | null
     activeProjectId?: string | null
-    workspaces?: any[]
+    workspaces?: unknown[]
   } = {}
 ) {
   vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -43,21 +43,21 @@ function setupMocks(
     projectsByWorkspaceId: new Map([
       ['ws-1', [{ id: 'proj-1', name: 'Proj', worktreePath: null }]],
     ]),
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSessionStore).mockReturnValue({
     getActiveSessionForProject: mockGetActiveSessionForProject,
     setActiveSessionForProject: mockSetActiveSessionForProject,
     getSessionsForProject: mockGetSessionsForProject,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSettingsStore).mockReturnValue({
     resolveSettings: mockResolveSettings,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useExtensionRegistry).mockReturnValue({
     keyboardShortcuts: [],
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useTerminalSession).mockReturnValue({
     createSession: mockCreateSession,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
 }
 
 beforeEach(() => {
@@ -190,7 +190,7 @@ describe('useKeyboardShortcuts', () => {
     const shortcutAction = vi.fn()
     vi.mocked(useExtensionRegistry).mockReturnValue({
       keyboardShortcuts: [{ accelerator: 'CmdOrCtrl+Shift+K', action: shortcutAction }],
-    } as any)
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
     vi.mocked(matchesAccelerator).mockReturnValue(true)
     const useKeyboardShortcuts = await importHook()
     renderHook(() => useKeyboardShortcuts())

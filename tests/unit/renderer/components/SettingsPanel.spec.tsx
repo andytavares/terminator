@@ -24,9 +24,13 @@ const mockAddToast = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(useWorkspaceStore).mockReturnValue({ activeWorkspaceId: null } as any)
-  vi.mocked(useToastStore).mockReturnValue({ addToast: mockAddToast } as any)
-  ;(globalThis as any).electronAPI = {
+  vi.mocked(useWorkspaceStore).mockReturnValue({ activeWorkspaceId: null } as unknown as ReturnType<
+    typeof useWorkspaceStore
+  >)
+  vi.mocked(useToastStore).mockReturnValue({ addToast: mockAddToast } as unknown as ReturnType<
+    typeof useWorkspaceStore
+  >)
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     extension: {
       list: vi.fn().mockResolvedValue({ extensions: [] }),
       install: vi.fn(),
@@ -39,7 +43,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('SettingsPanel', () => {
@@ -64,13 +68,17 @@ describe('SettingsPanel', () => {
   })
 
   it('shows Workspace Settings nav when a workspace is active', () => {
-    vi.mocked(useWorkspaceStore).mockReturnValue({ activeWorkspaceId: 'ws-1' } as any)
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      activeWorkspaceId: 'ws-1',
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
     render(<SettingsPanel onClose={vi.fn()} />)
     expect(screen.getByText('Workspace Settings')).toBeTruthy()
   })
 
   it('switches to workspace section when Workspace Settings is clicked', () => {
-    vi.mocked(useWorkspaceStore).mockReturnValue({ activeWorkspaceId: 'ws-1' } as any)
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      activeWorkspaceId: 'ws-1',
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Workspace Settings'))
     expect(screen.getByTestId('workspace-settings')).toBeTruthy()
@@ -100,7 +108,9 @@ describe('SettingsPanel', () => {
 
 describe('ExtensionsSection', () => {
   beforeEach(() => {
-    ;(globalThis as any).electronAPI.extension.list.mockResolvedValue({ extensions: [] })
+    ;(
+      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
+    ).extension.list.mockResolvedValue({ extensions: [] })
   })
 
   it('shows empty message when no extensions', async () => {
@@ -111,7 +121,9 @@ describe('ExtensionsSection', () => {
 
   it('renders installed extensions list', async () => {
     const ext = { id: 'com.test', name: 'Test Extension', version: '1.0.0', status: 'enabled' }
-    ;(globalThis as any).electronAPI.extension.list.mockResolvedValue({ extensions: [ext] })
+    ;(
+      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
+    ).extension.list.mockResolvedValue({ extensions: [ext] })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => expect(screen.getByText('Test Extension')).toBeTruthy())
@@ -121,7 +133,9 @@ describe('ExtensionsSection', () => {
 
   it('shows Disable button for enabled extensions', async () => {
     const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    ;(globalThis as any).electronAPI.extension.list.mockResolvedValue({ extensions: [ext] })
+    ;(
+      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
+    ).extension.list.mockResolvedValue({ extensions: [ext] })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => expect(screen.getByText('Disable')).toBeTruthy())
@@ -129,7 +143,9 @@ describe('ExtensionsSection', () => {
 
   it('shows Enable button for disabled extensions', async () => {
     const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'disabled' }
-    ;(globalThis as any).electronAPI.extension.list.mockResolvedValue({ extensions: [ext] })
+    ;(
+      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
+    ).extension.list.mockResolvedValue({ extensions: [ext] })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => expect(screen.getByText('Enable')).toBeTruthy())
@@ -142,22 +158,31 @@ describe('ExtensionsSection', () => {
   })
 
   it('calls openDirectory when install button is clicked', async () => {
-    ;(globalThis as any).electronAPI.dialog.openDirectory.mockResolvedValue({ cancelled: true })
+    ;(
+      window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } }
+    ).dialog.openDirectory.mockResolvedValue({ cancelled: true })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Install from Directory'))
     fireEvent.click(screen.getByText('Install from Directory'))
     await waitFor(() =>
-      expect((globalThis as any).electronAPI.dialog.openDirectory).toHaveBeenCalled()
+      expect(
+        (window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } })
+          .dialog.openDirectory
+      ).toHaveBeenCalled()
     )
   })
 
   it('installs extension and shows it in list', async () => {
     const newExt = { id: 'com.new', name: 'New Ext', version: '2.0.0', status: 'enabled' }
-    ;(globalThis as any).electronAPI.dialog.openDirectory.mockResolvedValue({
+    ;(
+      window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } }
+    ).dialog.openDirectory.mockResolvedValue({
       filePath: '/path/to/ext',
     })
-    ;(globalThis as any).electronAPI.extension.install.mockResolvedValue({ extension: newExt })
+    ;(
+      window.electronAPI as unknown as { extension: { install: ReturnType<typeof vi.fn> } }
+    ).extension.install.mockResolvedValue({ extension: newExt })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Install from Directory'))
@@ -166,8 +191,12 @@ describe('ExtensionsSection', () => {
   })
 
   it('shows toast on install error', async () => {
-    ;(globalThis as any).electronAPI.dialog.openDirectory.mockResolvedValue({ filePath: '/path' })
-    ;(globalThis as any).electronAPI.extension.install.mockResolvedValue({
+    ;(
+      window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } }
+    ).dialog.openDirectory.mockResolvedValue({ filePath: '/path' })
+    ;(
+      window.electronAPI as unknown as { extension: { install: ReturnType<typeof vi.fn> } }
+    ).extension.install.mockResolvedValue({
       error: 'INVALID_MANIFEST',
     })
     render(<SettingsPanel onClose={vi.fn()} />)
@@ -181,8 +210,12 @@ describe('ExtensionsSection', () => {
 
   it('toggles extension enable/disable', async () => {
     const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    ;(globalThis as any).electronAPI.extension.list.mockResolvedValue({ extensions: [ext] })
-    ;(globalThis as any).electronAPI.extension.toggle.mockResolvedValue({
+    ;(
+      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
+    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    ;(
+      window.electronAPI as unknown as { extension: { toggle: ReturnType<typeof vi.fn> } }
+    ).extension.toggle.mockResolvedValue({
       extension: { ...ext, status: 'disabled' },
     })
     render(<SettingsPanel onClose={vi.fn()} />)
@@ -190,10 +223,10 @@ describe('ExtensionsSection', () => {
     await waitFor(() => screen.getByText('Disable'))
     fireEvent.click(screen.getByText('Disable'))
     await waitFor(() =>
-      expect((globalThis as any).electronAPI.extension.toggle).toHaveBeenCalledWith(
-        'com.test',
-        false
-      )
+      expect(
+        (window.electronAPI as unknown as { extension: { toggle: ReturnType<typeof vi.fn> } })
+          .extension.toggle
+      ).toHaveBeenCalledWith('com.test', false)
     )
   })
 })

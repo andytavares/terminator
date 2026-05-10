@@ -21,12 +21,12 @@ export function buildThreads(comments: InlineComment[]): Thread[] {
     const replies = sorted.length - 1
     threads.push({
       id,
-      path:      root.path,
-      line:      root.line,
+      path: root.path,
+      line: root.line,
       startLine: root.startLine,
-      side:      root.side,
-      outdated:  sorted.some(c => c.outdated),
-      comments:  sorted,
+      side: root.side,
+      outdated: sorted.some((c) => c.outdated),
+      comments: sorted,
       collapsed: replies >= 4,
     })
   }

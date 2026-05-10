@@ -14,12 +14,12 @@ The spec (FR-015) explicitly requires graceful degradation to heuristic ordering
 
 ## Heuristic Tiers (applied within each chapter)
 
-| Tier | Pattern | Rationale |
-|------|---------|-----------|
-| 0 | `*.types.ts`, `*.interface.ts`, `*.d.ts`, `types.ts`, `interfaces.ts`, `index.ts` | Contract/type files read first |
-| 1 | All other source files, sorted by (additions+deletions) desc | Most-changed files near top |
-| 2 | `*.spec.*`, `*.test.*`, `__tests__/**` | Tests read after the code they test |
-| 3 | `package-lock.json`, `*.lock`, `*.generated.*`, whitespace-only diffs | Skimmable noise; auto-collapsed |
+| Tier | Pattern                                                                           | Rationale                           |
+| ---- | --------------------------------------------------------------------------------- | ----------------------------------- |
+| 0    | `*.types.ts`, `*.interface.ts`, `*.d.ts`, `types.ts`, `interfaces.ts`, `index.ts` | Contract/type files read first      |
+| 1    | All other source files, sorted by (additions+deletions) desc                      | Most-changed files near top         |
+| 2    | `*.spec.*`, `*.test.*`, `__tests__/**`                                            | Tests read after the code they test |
+| 3    | `package-lock.json`, `*.lock`, `*.generated.*`, whitespace-only diffs             | Skimmable noise; auto-collapsed     |
 
 ## Chapter Grouping
 

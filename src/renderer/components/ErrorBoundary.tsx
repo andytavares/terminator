@@ -25,21 +25,31 @@ export class ErrorBoundary extends React.Component<Props, State> {
   render(): React.ReactNode {
     if (this.state.error) {
       return (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100vh',
-          gap: 16,
-          fontFamily: 'monospace',
-          background: '#0c0c0f',
-          color: '#f87171',
-          padding: 32,
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100vh',
+            gap: 16,
+            fontFamily: 'monospace',
+            background: '#0c0c0f',
+            color: '#f87171',
+            padding: 32,
+          }}
+        >
           <div style={{ fontSize: 32 }}>⚠</div>
           <div style={{ fontSize: 16, fontWeight: 600 }}>Something went wrong</div>
-          <div style={{ fontSize: 12, color: '#9ca3af', maxWidth: 480, textAlign: 'center', lineHeight: 1.6 }}>
+          <div
+            style={{
+              fontSize: 12,
+              color: '#9ca3af',
+              maxWidth: 480,
+              textAlign: 'center',
+              lineHeight: 1.6,
+            }}
+          >
             {this.state.error.message}
           </div>
           <button

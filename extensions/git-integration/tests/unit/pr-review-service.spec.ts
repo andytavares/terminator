@@ -7,16 +7,16 @@ import type { PrChangedFile, ReviewSession } from '../../src/schemas/pr-review.s
 
 describe('ReviewSessionSchema', () => {
   const validSession: ReviewSession = {
-    repoRoot:           '/home/user/repo',
-    prNumber:           42,
-    headSHA:            'abc123',
-    currentChapterId:   'src',
-    currentFilePath:    'src/auth.ts',
-    viewedFiles:        ['src/auth.ts', 'src/types.ts'],
+    repoRoot: '/home/user/repo',
+    prNumber: 42,
+    headSHA: 'abc123',
+    currentChapterId: 'src',
+    currentFilePath: 'src/auth.ts',
+    viewedFiles: ['src/auth.ts', 'src/types.ts'],
     fileOrderOverrides: { src: ['src/types.ts', 'src/auth.ts'] },
-    scrollPosition:     250,
-    pausedAt:           '2026-05-07T12:00:00Z',
-    lastAccessedAt:     '2026-05-07T12:05:00Z',
+    scrollPosition: 250,
+    pausedAt: '2026-05-07T12:00:00Z',
+    lastAccessedAt: '2026-05-07T12:05:00Z',
   }
 
   it('parses a valid session', () => {
@@ -25,7 +25,11 @@ describe('ReviewSessionSchema', () => {
   })
 
   it('accepts null currentChapterId and currentFilePath', () => {
-    const result = ReviewSessionSchema.safeParse({ ...validSession, currentChapterId: null, currentFilePath: null })
+    const result = ReviewSessionSchema.safeParse({
+      ...validSession,
+      currentChapterId: null,
+      currentFilePath: null,
+    })
     expect(result.success).toBe(true)
   })
 
@@ -61,16 +65,26 @@ describe('ReviewSessionSchema', () => {
 
 const makeFile = (path: string, additions = 10, deletions = 2): PrChangedFile => ({
   path,
-  changeType:       'modified',
+  changeType: 'modified',
   additions,
   deletions,
-  isBinary:         false,
-  tier:             1,
-  whyHere:          'Source file',
+  isBinary: false,
+  tier: 1,
+  whyHere: 'Source file',
   riskScore: {
-    level: 'low', composite: null,
-    metrics: { changeSize: null, churn90d: null, blastRadius: null, testFilePresent: null, complexityDelta: null, patchCoverage: null },
-    dominantDriver: '', topImporters: [], importerCount: 0,
+    level: 'low',
+    composite: null,
+    metrics: {
+      changeSize: null,
+      churn90d: null,
+      blastRadius: null,
+      testFilePresent: null,
+      complexityDelta: null,
+      patchCoverage: null,
+    },
+    dominantDriver: '',
+    topImporters: [],
+    importerCount: 0,
   },
   estimatedMinutes: 1,
 })
@@ -90,7 +104,7 @@ describe('detectChangedFiles()', () => {
   })
 
   it('flags newly added files', () => {
-    const old  = [makeFile('src/a.ts')]
+    const old = [makeFile('src/a.ts')]
     const next = [makeFile('src/a.ts'), makeFile('src/b.ts')]
     const changed = detectChangedFiles(old, next)
     expect(changed.has('src/b.ts')).toBe(true)
@@ -98,7 +112,7 @@ describe('detectChangedFiles()', () => {
   })
 
   it('does not flag files with identical sizes', () => {
-    const old  = [makeFile('src/a.ts', 10, 2), makeFile('src/b.ts', 5, 1)]
+    const old = [makeFile('src/a.ts', 10, 2), makeFile('src/b.ts', 5, 1)]
     const next = [makeFile('src/a.ts', 10, 2), makeFile('src/b.ts', 5, 1)]
     expect(detectChangedFiles(old, next).size).toBe(0)
   })

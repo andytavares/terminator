@@ -23,7 +23,7 @@ export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
 
   useEffect(() => {
     loadSettings(workspaceId)
-  }, [workspaceId])
+  }, [workspaceId, loadSettings])
 
   if (!globalSettings) return <div>Loading...</div>
 
@@ -91,7 +91,9 @@ export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
         </button>
       </div>
 
-      <h3 className="settings-section__title" style={{ marginTop: 20 }}>Git</h3>
+      <h3 className="settings-section__title" style={{ marginTop: 20 }}>
+        Git
+      </h3>
 
       <div className="settings-section__field">
         <label className="settings-section__label">Worktree Base Directory</label>
@@ -101,7 +103,9 @@ export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
           key={effectiveWorktreeBaseDir}
           defaultValue={effectiveWorktreeBaseDir}
           placeholder="Leave empty to use <repo>/.worktrees"
-          onBlur={(e) => updateWorkspaceWorktreeBaseDir(workspaceId, e.target.value.trim() || undefined)}
+          onBlur={(e) =>
+            updateWorkspaceWorktreeBaseDir(workspaceId, e.target.value.trim() || undefined)
+          }
         />
         <span className="settings-section__hint">
           Overrides the global setting for this workspace.

@@ -12,7 +12,10 @@ import { FileDiffSchema } from '../schemas/git.schema.js'
 
 const execFileAsync = promisify(execFile)
 
-type RegisterFn = (channel: string, handler: (payload: unknown) => Promise<unknown> | unknown) => void
+type RegisterFn = (
+  channel: string,
+  handler: (payload: unknown) => Promise<unknown> | unknown
+) => void
 
 const sessionStore = new Store<Record<string, unknown>>({ name: 'pr-review-sessions' })
 
@@ -37,9 +40,9 @@ function normalizeGraphQLNode(node: unknown): Record<string, unknown> {
   type CommitsField = { nodes?: CommitNode[] }
   const commits = obj.commits as CommitsField | undefined
   const contextNodes = commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes ?? []
-  const statusCheckRollup = contextNodes.map(ctx => ({
-    name:       ctx.name ?? ctx.context ?? '',
-    state:      ctx.conclusion ?? ctx.state ?? '',
+  const statusCheckRollup = contextNodes.map((ctx) => ({
+    name: ctx.name ?? ctx.context ?? '',
+    state: ctx.conclusion ?? ctx.state ?? '',
     conclusion: ctx.conclusion ?? ctx.state ?? '',
   }))
   return { ...obj, statusCheckRollup }
@@ -61,18 +64,18 @@ function parseRateLimit(err: unknown): { error: 'RATE_LIMITED'; resetAt: number 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
 export function registerGithubHandlers(register: RegisterFn): void {
-
   register('github:list-open-prs', async (payload) => {
     const schema = z.object({
-      repoRoot:         z.string().min(1),
-      cursor:           z.string().optional(),
-      search:           z.string().optional(),
+      repoRoot: z.string().min(1),
+      cursor: z.string().optional(),
+      search: z.string().optional(),
       includeClosedPrs: z.boolean().optional(),
     })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, cursor, search, includeClosedPrs } = parsed.data
-    const PR_JSON_FIELDS = 'number,title,author,createdAt,headRefName,baseRefName,isDraft,statusCheckRollup,files,additions,deletions'
+    const PR_JSON_FIELDS =
+      'number,title,author,createdAt,headRefName,baseRefName,isDraft,statusCheckRollup,files,additions,deletions'
 
     try {
       // PR number lookup — always finds the PR regardless of state
@@ -85,8 +88,16 @@ export function registerGithubHandlers(register: RegisterFn): void {
       // Text search — always searches all states so nothing is missed
       if (search && search.trim()) {
         const raw = await runGh(repoRoot, [
-          'pr', 'list', '--state', 'all', '--search', search.trim(),
-          '--limit', '50', '--json', PR_JSON_FIELDS,
+          'pr',
+          'list',
+          '--state',
+          'all',
+          '--search',
+          search.trim(),
+          '--limit',
+          '50',
+          '--json',
+          PR_JSON_FIELDS,
         ])
         const prs: ReviewQueuePR[] = (JSON.parse(raw) as unknown[]).map(parseReviewQueuePR)
         return { prs, hasMore: false }
@@ -95,16 +106,38 @@ export function registerGithubHandlers(register: RegisterFn): void {
       // Paginated load via GraphQL
       const { owner, repo } = await getRepoOwnerAndName(repoRoot)
       const gqlStates = includeClosedPrs ? '[OPEN,CLOSED,MERGED]' : 'OPEN'
-      const gql = `query($owner:String!,$repo:String!,$cursor:String){repository(owner:$owner,name:$repo){pullRequests(first:20,states:${gqlStates},after:$cursor,orderBy:{field:CREATED_AT,direction:DESC}){pageInfo{endCursor hasNextPage}nodes{number title isDraft additions deletions createdAt headRefName baseRefName changedFiles author{login avatarUrl}commits(last:1){nodes{commit{statusCheckRollup{contexts(first:20){nodes{...on CheckRun{name conclusion status}...on StatusContext{context state}}}}}}}}}}}`;
-      const args = ['api', 'graphql', '-f', `query=${gql}`, '-f', `owner=${owner}`, '-f', `repo=${repo}`]
+      const gql = `query($owner:String!,$repo:String!,$cursor:String){repository(owner:$owner,name:$repo){pullRequests(first:20,states:${gqlStates},after:$cursor,orderBy:{field:CREATED_AT,direction:DESC}){pageInfo{endCursor hasNextPage}nodes{number title isDraft additions deletions createdAt headRefName baseRefName changedFiles author{login avatarUrl}commits(last:1){nodes{commit{statusCheckRollup{contexts(first:20){nodes{...on CheckRun{name conclusion status}...on StatusContext{context state}}}}}}}}}}}`
+      const args = [
+        'api',
+        'graphql',
+        '-f',
+        `query=${gql}`,
+        '-f',
+        `owner=${owner}`,
+        '-f',
+        `repo=${repo}`,
+      ]
       if (cursor) args.push('-f', `cursor=${cursor}`)
 
       const raw = await runGh(repoRoot, args, 60_000)
-      type GQLResponse = { data: { repository: { pullRequests: { pageInfo: { endCursor: string; hasNextPage: boolean }; nodes: unknown[] } } } }
+      type GQLResponse = {
+        data: {
+          repository: {
+            pullRequests: {
+              pageInfo: { endCursor: string; hasNextPage: boolean }
+              nodes: unknown[]
+            }
+          }
+        }
+      }
       const data = JSON.parse(raw) as GQLResponse
       const { nodes, pageInfo } = data.data.repository.pullRequests
-      const prs: ReviewQueuePR[] = nodes.map(n => parseReviewQueuePR(normalizeGraphQLNode(n)))
-      return { prs, hasMore: pageInfo.hasNextPage, nextCursor: pageInfo.hasNextPage ? pageInfo.endCursor : undefined }
+      const prs: ReviewQueuePR[] = nodes.map((n) => parseReviewQueuePR(normalizeGraphQLNode(n)))
+      return {
+        prs,
+        hasMore: pageInfo.hasNextPage,
+        nextCursor: pageInfo.hasNextPage ? pageInfo.endCursor : undefined,
+      }
     } catch (e) {
       return parseRateLimit(e) ?? { error: String(e) }
     }
@@ -117,26 +150,31 @@ export function registerGithubHandlers(register: RegisterFn): void {
     const { repoRoot, prNumber } = parsed.data
     try {
       const [metaRaw, filesRaw] = await Promise.all([
-        runGh(repoRoot, ['pr', 'view', String(prNumber), '--json',
-          'number,title,body,author,createdAt,headRefName,baseRefName,headRefOid,statusCheckRollup']),
+        runGh(repoRoot, [
+          'pr',
+          'view',
+          String(prNumber),
+          '--json',
+          'number,title,body,author,createdAt,headRefName,baseRefName,headRefOid,statusCheckRollup',
+        ]),
         runGh(repoRoot, ['pr', 'view', String(prNumber), '--json', 'files']),
       ])
       const meta = JSON.parse(metaRaw) as Record<string, unknown>
       const filesData = (JSON.parse(filesRaw) as { files: unknown[] }).files
       const chapters = buildChapters(filesData)
       const pr: PrReviewDetail = {
-        number:          Number(meta.number),
-        title:           String(meta.title ?? ''),
-        body:            String(meta.body ?? ''),
-        author:          String((meta.author as Record<string,unknown>)?.login ?? ''),
-        authorAvatarUrl: String((meta.author as Record<string,unknown>)?.avatarUrl ?? ''),
-        openedAt:        String(meta.createdAt ?? ''),
-        headRefName:     String(meta.headRefName ?? ''),
-        baseRefName:     String(meta.baseRefName ?? ''),
-        headSHA:         String(meta.headRefOid ?? ''),
-        ciStatus:        mapCiStatus(meta.statusCheckRollup),
-        lintStatus:      mapCheckStatus(meta.statusCheckRollup, LINT_CHECK_NAMES),
-        coverageStatus:  mapCheckStatus(meta.statusCheckRollup, COVERAGE_CHECK_NAMES),
+        number: Number(meta.number),
+        title: String(meta.title ?? ''),
+        body: String(meta.body ?? ''),
+        author: String((meta.author as Record<string, unknown>)?.login ?? ''),
+        authorAvatarUrl: String((meta.author as Record<string, unknown>)?.avatarUrl ?? ''),
+        openedAt: String(meta.createdAt ?? ''),
+        headRefName: String(meta.headRefName ?? ''),
+        baseRefName: String(meta.baseRefName ?? ''),
+        headSHA: String(meta.headRefOid ?? ''),
+        ciStatus: mapCiStatus(meta.statusCheckRollup),
+        lintStatus: mapCheckStatus(meta.statusCheckRollup, LINT_CHECK_NAMES),
+        coverageStatus: mapCheckStatus(meta.statusCheckRollup, COVERAGE_CHECK_NAMES),
         chapters,
       }
       return { pr }
@@ -149,7 +187,7 @@ export function registerGithubHandlers(register: RegisterFn): void {
     const schema = z.object({
       repoRoot: z.string().min(1),
       prNumber: z.number().int().positive(),
-      path:     z.string().min(1),
+      path: z.string().min(1),
     })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
@@ -158,17 +196,21 @@ export function registerGithubHandlers(register: RegisterFn): void {
       const prRef = `refs/remotes/pull/${prNumber}/head`
       await runGit(repoRoot, ['fetch', 'origin', `pull/${prNumber}/head:${prRef}`])
 
-      const baseRefName = (await runGh(repoRoot, [
-        'pr', 'view', String(prNumber), '--json', 'baseRefName', '--jq', '.baseRefName',
-      ])).trim()
+      const baseRefName = (
+        await runGh(repoRoot, [
+          'pr',
+          'view',
+          String(prNumber),
+          '--json',
+          'baseRefName',
+          '--jq',
+          '.baseRefName',
+        ])
+      ).trim()
 
-      const mergeBase = await runGit(repoRoot, [
-        'merge-base', `origin/${baseRefName}`, prRef,
-      ])
+      const mergeBase = await runGit(repoRoot, ['merge-base', `origin/${baseRefName}`, prRef])
 
-      const diffRaw = await runGit(repoRoot, [
-        'diff', `${mergeBase.trim()}...${prRef}`, '--', path,
-      ])
+      const diffRaw = await runGit(repoRoot, ['diff', `${mergeBase.trim()}...${prRef}`, '--', path])
       const diff = parseDiff(diffRaw, path)
       return { diff }
     } catch (e) {
@@ -190,15 +232,29 @@ export function registerGithubHandlers(register: RegisterFn): void {
       const [churnRaw, blastRaw, testRaw] = await Promise.all([
         runGit(repoRoot, ['log', '--oneline', '--since=90 days ago', '--', path]),
         runGit(repoRoot, ['grep', '-rl', '--extended-regexp', importPattern]).catch(() => ''),
-        runGit(repoRoot, ['ls-files', '--', `**/${stem}*.spec.*`, `**/${stem}*.test.*`]).catch(() => ''),
+        runGit(repoRoot, ['ls-files', '--', `**/${stem}*.spec.*`, `**/${stem}*.test.*`]).catch(
+          () => ''
+        ),
       ])
       const churn90d = churnRaw ? churnRaw.split('\n').filter(Boolean).length : 0
-      const importerLines = blastRaw ? blastRaw.split('\n').filter(Boolean).filter(l => l !== path) : []
+      const importerLines = blastRaw
+        ? blastRaw
+            .split('\n')
+            .filter(Boolean)
+            .filter((l) => l !== path)
+        : []
       const blastRadius = importerLines.length
       const importerCount = importerLines.length
       const testFilePresent = testRaw ? testRaw.trim().length > 0 : false
       const patchCoverage = await readFileCoverage(repoRoot, path)
-      return { churn90d, blastRadius, topImporters: importerLines, importerCount, testFilePresent, patchCoverage }
+      return {
+        churn90d,
+        blastRadius,
+        topImporters: importerLines,
+        importerCount,
+        testFilePresent,
+        patchCoverage,
+      }
     } catch (e) {
       return { error: String(e) }
     }
@@ -211,9 +267,11 @@ export function registerGithubHandlers(register: RegisterFn): void {
     const { repoRoot, prNumber } = parsed.data
     try {
       const raw = await runGh(repoRoot, [
-        'api', `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
+        'api',
+        `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
         '--paginate',
-        '--jq', '[.[] | {id,user,body,created_at,updated_at,path,line,start_line,side,diff_hunk,in_reply_to_id,pull_request_review_id}]',
+        '--jq',
+        '[.[] | {id,user,body,created_at,updated_at,path,line,start_line,side,diff_hunk,in_reply_to_id,pull_request_review_id}]',
       ])
       const items = JSON.parse(raw) as unknown[]
       const comments: InlineComment[] = items.map(mapComment)
@@ -225,27 +283,34 @@ export function registerGithubHandlers(register: RegisterFn): void {
 
   register('github:pr-comment-add', async (payload) => {
     const schema = z.object({
-      repoRoot:  z.string().min(1),
-      prNumber:  z.number().int().positive(),
-      commitId:  z.string().min(1),
-      path:      z.string().min(1),
-      line:      z.number().int().positive(),
+      repoRoot: z.string().min(1),
+      prNumber: z.number().int().positive(),
+      commitId: z.string().min(1),
+      path: z.string().min(1),
+      line: z.number().int().positive(),
       startLine: z.number().int().positive().optional(),
-      side:      z.enum(['LEFT', 'RIGHT']),
-      body:      z.string().min(1),
+      side: z.enum(['LEFT', 'RIGHT']),
+      body: z.string().min(1),
     })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber, commitId, path, line, startLine, side, body } = parsed.data
     try {
       const args = [
-        'api', `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
-        '--method', 'POST',
-        '--field', `commit_id=${commitId}`,
-        '--field', `path=${path}`,
-        '--field', `line=${line}`,
-        '--field', `side=${side}`,
-        '--field', `body=${body}`,
+        'api',
+        `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
+        '--method',
+        'POST',
+        '--field',
+        `commit_id=${commitId}`,
+        '--field',
+        `path=${path}`,
+        '--field',
+        `line=${line}`,
+        '--field',
+        `side=${side}`,
+        '--field',
+        `body=${body}`,
       ]
       if (startLine != null) {
         args.push('--field', `start_line=${startLine}`, '--field', `start_side=${side}`)
@@ -260,20 +325,24 @@ export function registerGithubHandlers(register: RegisterFn): void {
 
   register('github:pr-comment-reply', async (payload) => {
     const schema = z.object({
-      repoRoot:     z.string().min(1),
-      prNumber:     z.number().int().positive(),
-      inReplyToId:  z.number().int().positive(),
-      body:         z.string().min(1),
+      repoRoot: z.string().min(1),
+      prNumber: z.number().int().positive(),
+      inReplyToId: z.number().int().positive(),
+      body: z.string().min(1),
     })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber, inReplyToId, body } = parsed.data
     try {
       const raw = await runGh(repoRoot, [
-        'api', `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
-        '--method', 'POST',
-        '--field', `in_reply_to_id=${inReplyToId}`,
-        '--field', `body=${body}`,
+        'api',
+        `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
+        '--method',
+        'POST',
+        '--field',
+        `in_reply_to_id=${inReplyToId}`,
+        '--field',
+        `body=${body}`,
       ])
       const comment = mapComment(JSON.parse(raw))
       return { comment }
@@ -287,19 +356,24 @@ export function registerGithubHandlers(register: RegisterFn): void {
       repoRoot: z.string().min(1),
       prNumber: z.number().int().positive(),
       commitId: z.string().min(1),
-      event:    z.enum(['APPROVE', 'REQUEST_CHANGES', 'COMMENT']),
-      body:     z.string(),
+      event: z.enum(['APPROVE', 'REQUEST_CHANGES', 'COMMENT']),
+      body: z.string(),
     })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber, commitId, event, body } = parsed.data
     try {
       const raw = await runGh(repoRoot, [
-        'api', `repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
-        '--method', 'POST',
-        '--field', `commit_id=${commitId}`,
-        '--field', `event=${event}`,
-        '--field', `body=${body}`,
+        'api',
+        `repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
+        '--method',
+        'POST',
+        '--field',
+        `commit_id=${commitId}`,
+        '--field',
+        `event=${event}`,
+        '--field',
+        `body=${body}`,
       ])
       const data = JSON.parse(raw) as Record<string, unknown>
       return { reviewId: Number(data.id) }
@@ -335,7 +409,16 @@ export function registerGithubHandlers(register: RegisterFn): void {
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
-const LINT_CHECK_NAMES     = ['lint', 'eslint', 'rubocop', 'flake8', 'pylint', 'stylelint', 'prettier', 'tslint']
+const LINT_CHECK_NAMES = [
+  'lint',
+  'eslint',
+  'rubocop',
+  'flake8',
+  'pylint',
+  'stylelint',
+  'prettier',
+  'tslint',
+]
 const COVERAGE_CHECK_NAMES = ['coverage', 'codecov', 'coveralls', 'sonar', 'codeclimate', 'lcov']
 
 const NON_BLOCKING = new Set(['SKIPPED', 'NEUTRAL', 'CANCELLED', 'STALE'])
@@ -343,28 +426,38 @@ const NON_BLOCKING = new Set(['SKIPPED', 'NEUTRAL', 'CANCELLED', 'STALE'])
 function mapCiStatus(rollup: unknown): 'passing' | 'failing' | 'pending' | 'none' {
   if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'none'
   // Normalise: gh returns `conclusion` on CheckRuns; StatusContext uses `state`
-  const statuses = (rollup as Array<Record<string, unknown>>).map(s =>
+  const statuses = (rollup as Array<Record<string, unknown>>).map((s) =>
     String(s.conclusion ?? s.state ?? '').toUpperCase()
   )
-  if (statuses.some(s => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT' || s === 'ACTION_REQUIRED')) return 'failing'
-  if (statuses.some(s => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED' || s === 'WAITING')) return 'pending'
+  if (
+    statuses.some(
+      (s) => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT' || s === 'ACTION_REQUIRED'
+    )
+  )
+    return 'failing'
+  if (
+    statuses.some(
+      (s) => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED' || s === 'WAITING'
+    )
+  )
+    return 'pending'
   // SKIPPED / NEUTRAL / CANCELLED are non-blocking; pass if at least one check succeeded
-  if (statuses.some(s => s === 'SUCCESS')) return 'passing'
+  if (statuses.some((s) => s === 'SUCCESS')) return 'passing'
   return 'none'
 }
 
 function mapCheckStatus(rollup: unknown, names: string[]): 'pass' | 'fail' | 'warn' | 'unknown' {
   if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'unknown'
-  const checks = (rollup as Array<Record<string, unknown>>).filter(s => {
+  const checks = (rollup as Array<Record<string, unknown>>).filter((s) => {
     const name = String(s.name ?? s.context ?? '').toLowerCase()
-    return names.some(n => name.includes(n))
+    return names.some((n) => name.includes(n))
   })
   if (checks.length === 0) return 'unknown'
-  const statuses = checks.map(s => String(s.conclusion ?? s.state ?? '').toUpperCase())
-  if (statuses.some(s => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT')) return 'fail'
-  if (statuses.some(s => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED')) return 'warn'
-  if (statuses.some(s => s === 'SUCCESS')) return 'pass'
-  if (statuses.every(s => NON_BLOCKING.has(s))) return 'unknown'
+  const statuses = checks.map((s) => String(s.conclusion ?? s.state ?? '').toUpperCase())
+  if (statuses.some((s) => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT')) return 'fail'
+  if (statuses.some((s) => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED')) return 'warn'
+  if (statuses.some((s) => s === 'SUCCESS')) return 'pass'
+  if (statuses.every((s) => NON_BLOCKING.has(s))) return 'unknown'
   return 'unknown'
 }
 
@@ -382,7 +475,9 @@ async function readFileCoverage(repoRoot: string, filePath: string): Promise<num
     // Partial match: key ends with filePath
     const match = Object.entries(summary).find(([k]) => k.endsWith(filePath))
     if (match) return Math.round(match[1]?.lines?.pct ?? 0)
-  } catch { /* file not found or parse error — fall through */ }
+  } catch {
+    /* file not found or parse error — fall through */
+  }
 
   // Try lcov.info
   try {
@@ -392,10 +487,12 @@ async function readFileCoverage(repoRoot: string, filePath: string): Promise<num
     for (const section of sections) {
       if (!section.includes(filePath)) continue
       const linesFound = Number(section.match(/LF:(\d+)/)?.[1] ?? '0')
-      const linesHit   = Number(section.match(/LH:(\d+)/)?.[1] ?? '0')
+      const linesHit = Number(section.match(/LH:(\d+)/)?.[1] ?? '0')
       if (linesFound > 0) return Math.round((linesHit / linesFound) * 100)
     }
-  } catch { /* file not found or parse error */ }
+  } catch {
+    /* file not found or parse error */
+  }
 
   return null
 }
@@ -407,20 +504,22 @@ function mapComment(raw: unknown): InlineComment {
   const inReplyTo = obj.in_reply_to_id != null ? Number(obj.in_reply_to_id) : null
   return {
     id,
-    author:          String(user.login ?? ''),
+    author: String(user.login ?? ''),
     authorAvatarUrl: String(user.avatar_url ?? ''),
-    body:            String(obj.body ?? ''),
-    createdAt:       String(obj.created_at ?? ''),
-    updatedAt:       String(obj.updated_at ?? ''),
-    path:            String(obj.path ?? ''),
-    line:            Number(obj.line ?? 0),
-    startLine:       obj.start_line != null ? Number(obj.start_line) : null,
-    side:            (String(obj.side ?? 'RIGHT').toUpperCase() === 'LEFT' ? 'LEFT' : 'RIGHT') as 'LEFT' | 'RIGHT',
-    diffHunk:        String(obj.diff_hunk ?? ''),
-    outdated:        Boolean(obj.outdated),
-    threadId:        inReplyTo != null ? String(inReplyTo) : String(id),
-    isReply:         inReplyTo != null,
-    parentId:        inReplyTo,
+    body: String(obj.body ?? ''),
+    createdAt: String(obj.created_at ?? ''),
+    updatedAt: String(obj.updated_at ?? ''),
+    path: String(obj.path ?? ''),
+    line: Number(obj.line ?? 0),
+    startLine: obj.start_line != null ? Number(obj.start_line) : null,
+    side: (String(obj.side ?? 'RIGHT').toUpperCase() === 'LEFT' ? 'LEFT' : 'RIGHT') as
+      | 'LEFT'
+      | 'RIGHT',
+    diffHunk: String(obj.diff_hunk ?? ''),
+    outdated: Boolean(obj.outdated),
+    threadId: inReplyTo != null ? String(inReplyTo) : String(id),
+    isReply: inReplyTo != null,
+    parentId: inReplyTo,
   }
 }
 
@@ -444,11 +543,26 @@ function parseDiff(raw: string, filePath: string): FileDiff {
     if (!currentHunk) continue
 
     if (line.startsWith('+') && !line.startsWith('+++')) {
-      currentHunk.lines.push({ type: 'add', content: line.slice(1), oldLineNumber: null, newLineNumber: null })
+      currentHunk.lines.push({
+        type: 'add',
+        content: line.slice(1),
+        oldLineNumber: null,
+        newLineNumber: null,
+      })
     } else if (line.startsWith('-') && !line.startsWith('---')) {
-      currentHunk.lines.push({ type: 'remove', content: line.slice(1), oldLineNumber: null, newLineNumber: null })
+      currentHunk.lines.push({
+        type: 'remove',
+        content: line.slice(1),
+        oldLineNumber: null,
+        newLineNumber: null,
+      })
     } else if (!line.startsWith('---') && !line.startsWith('+++')) {
-      currentHunk.lines.push({ type: 'context', content: line.slice(1), oldLineNumber: null, newLineNumber: null })
+      currentHunk.lines.push({
+        type: 'context',
+        content: line.slice(1),
+        oldLineNumber: null,
+        newLineNumber: null,
+      })
     }
   }
   if (currentHunk) hunks.push(currentHunk)

@@ -51,7 +51,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockDeleteProject.mockResolvedValue({ success: true })
   mockRenameProject.mockResolvedValue({ project: { ...project, name: 'Renamed' } })
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     git: {
       isRepo: vi.fn().mockResolvedValue({ isRepo: false }),
       listBranches: vi.fn().mockResolvedValue({ branches: [] }),
@@ -67,14 +67,14 @@ beforeEach(() => {
     deleteProject: mockDeleteProject,
     renameProject: mockRenameProject,
     reorderProjects: mockReorderProjects,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSessionStore).mockReturnValue({
     getBellCountForProject: mockGetBellCountForProject,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('ProjectsPanel', () => {
@@ -98,7 +98,7 @@ describe('ProjectsPanel', () => {
       deleteProject: mockDeleteProject,
       renameProject: mockRenameProject,
       reorderProjects: mockReorderProjects,
-    } as any)
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
     render(<ProjectsPanel workspaceId="ws-1" />)
     expect(screen.getByText('2 projects')).toBeTruthy()
   })
@@ -135,7 +135,7 @@ describe('ProjectsPanel', () => {
       deleteProject: mockDeleteProject,
       renameProject: mockRenameProject,
       reorderProjects: mockReorderProjects,
-    } as any)
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
     const { container } = render(<ProjectsPanel workspaceId="ws-unknown" />)
     expect(container.firstChild).toBeNull()
   })
@@ -149,7 +149,7 @@ describe('ProjectsPanel', () => {
       deleteProject: mockDeleteProject,
       renameProject: mockRenameProject,
       reorderProjects: mockReorderProjects,
-    } as any)
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
     render(<ProjectsPanel workspaceId="ws-1" />)
     expect(screen.getByText('frontend')).toBeTruthy()
     expect(screen.getByText('react')).toBeTruthy()
@@ -213,7 +213,7 @@ describe('ProjectsPanel', () => {
       deleteProject: mockDeleteProject,
       renameProject: mockRenameProject,
       reorderProjects: mockReorderProjects,
-    } as any)
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
     render(<ProjectsPanel workspaceId="ws-1" />)
     expect(screen.queryByText('Projects')).toBeNull()
   })

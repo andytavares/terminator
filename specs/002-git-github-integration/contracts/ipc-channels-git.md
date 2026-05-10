@@ -19,16 +19,21 @@ Returns the full git status for a directory, parsed from `git status --porcelain
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
-{ path: string }  // Absolute path (project working directory)
+{
+  path: string
+} // Absolute path (project working directory)
 ```
 
 **Response**:
+
 ```typescript
 GitStatus | { error: string }
 ```
 
 Where `GitStatus` is:
+
 ```typescript
 {
   repoRoot: string
@@ -49,20 +54,23 @@ Returns the parsed unified diff for a single file.
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
 {
   repoRoot: string
-  path: string     // Relative path from repo root
-  staged: boolean  // true → git diff --cached; false → git diff
+  path: string // Relative path from repo root
+  staged: boolean // true → git diff --cached; false → git diff
 }
 ```
 
 **Response**:
+
 ```typescript
 FileDiff | { error: string }
 ```
 
 Where `FileDiff` is:
+
 ```typescript
 {
   path: string
@@ -84,6 +92,7 @@ Stages one or more files (`git add`).
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
 {
   repoRoot: string
@@ -92,6 +101,7 @@ Stages one or more files (`git add`).
 ```
 
 **Response**:
+
 ```typescript
 { success: true } | { error: string }
 ```
@@ -105,6 +115,7 @@ Unstages one or more files (`git restore --staged`).
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
 {
   repoRoot: string
@@ -113,6 +124,7 @@ Unstages one or more files (`git restore --staged`).
 ```
 
 **Response**:
+
 ```typescript
 { success: true } | { error: string }
 ```
@@ -126,20 +138,23 @@ Creates a commit from currently staged files.
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
 {
   repoRoot: string
-  message: string    // Non-empty; validated server-side
+  message: string // Non-empty; validated server-side
   signOff: boolean
 }
 ```
 
 **Response**:
+
 ```typescript
 { commitHash: string } | { error: string }
 ```
 
 **Error codes**:
+
 - `'NOTHING_TO_COMMIT'` — no staged files
 - `'EMPTY_MESSAGE'` — message is empty after trimming
 - `'GIT_ERROR'` — git process exited non-zero (stderr included in error string)
@@ -155,11 +170,15 @@ Checks whether a pull request exists for the current branch via `gh pr view`.
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
-{ repoRoot: string }
+{
+  repoRoot: string
+}
 ```
 
 **Response**:
+
 ```typescript
 { pr: PullRequest } | { pr: null } | { error: string }
 ```
@@ -167,6 +186,7 @@ Checks whether a pull request exists for the current branch via `gh pr view`.
 Where `{ pr: null }` means no PR found (not an error). `{ error: string }` means gh CLI is unavailable or returned an unexpected error.
 
 **Error codes**:
+
 - `'GH_NOT_FOUND'` — gh CLI binary not found on PATH or at `git.ghCliPath`
 - `'GH_NOT_AUTHENTICATED'` — `gh auth status` returned non-zero
 - `'GH_ERROR'` — unexpected gh error (stderr included)
@@ -180,6 +200,7 @@ Creates a pull request via `gh pr create`.
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
 {
   repoRoot: string
@@ -191,11 +212,13 @@ Creates a pull request via `gh pr create`.
 ```
 
 **Response**:
+
 ```typescript
 { pr: PullRequest } | { error: string }
 ```
 
 **Error codes** (same as `git:pr-status` plus):
+
 - `'PR_ALREADY_EXISTS'` — a PR for this branch already exists
 - `'NO_REMOTE'` — current branch has no upstream remote configured
 - `'DEFAULT_BRANCH_WARNING'` — head branch is the repository default branch (non-fatal warning attached to `pr` response as `warning: string`)
@@ -211,6 +234,7 @@ Sandboxed shell command execution for extension use via the `api.shell.exec()` b
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
 ShellExecOptions
 // {
@@ -222,6 +246,7 @@ ShellExecOptions
 ```
 
 **Response**:
+
 ```typescript
 ShellResult | { error: 'COMMAND_NOT_ALLOWED' | 'CWD_OUT_OF_SCOPE' | 'VALIDATION_ERROR', message?: string }
 ```
@@ -237,11 +262,15 @@ Registers a file system watch on a project root. Idempotent — calling again fo
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
-{ projectRoot: string }
+{
+  projectRoot: string
+}
 ```
 
 **Response**:
+
 ```typescript
 { success: true } | { error: string }
 ```
@@ -255,13 +284,19 @@ Unregisters the file system watch for a project root.
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
-{ projectRoot: string }
+{
+  projectRoot: string
+}
 ```
 
 **Response**:
+
 ```typescript
-{ success: true }
+{
+  success: true
+}
 ```
 
 ---
@@ -273,6 +308,7 @@ Push event from the main process to the renderer when a file change is detected 
 **Direction**: main → renderer (push via `webContents.send`)
 
 **Payload**:
+
 ```typescript
 FsChangeEvent
 // {
@@ -295,10 +331,24 @@ interface ElectronAPI {
   git: {
     // ... existing (is-repo, current-branch, list-branches, checkout, worktree channels) ...
     status(req: { path: string }): Promise<GitStatus | { error: string }>
-    diffFile(req: { repoRoot: string; path: string; staged: boolean }): Promise<FileDiff | { error: string }>
-    stage(req: { repoRoot: string; paths: string[] }): Promise<{ success: true } | { error: string }>
-    unstage(req: { repoRoot: string; paths: string[] }): Promise<{ success: true } | { error: string }>
-    commit(req: { repoRoot: string; message: string; signOff: boolean }): Promise<{ commitHash: string } | { error: string }>
+    diffFile(req: {
+      repoRoot: string
+      path: string
+      staged: boolean
+    }): Promise<FileDiff | { error: string }>
+    stage(req: {
+      repoRoot: string
+      paths: string[]
+    }): Promise<{ success: true } | { error: string }>
+    unstage(req: {
+      repoRoot: string
+      paths: string[]
+    }): Promise<{ success: true } | { error: string }>
+    commit(req: {
+      repoRoot: string
+      message: string
+      signOff: boolean
+    }): Promise<{ commitHash: string } | { error: string }>
     prStatus(req: { repoRoot: string }): Promise<{ pr: PullRequest | null } | { error: string }>
     prCreate(req: PrCreatePayload): Promise<{ pr: PullRequest } | { error: string }>
   }
@@ -310,7 +360,7 @@ interface ElectronAPI {
   fs: {
     watchStart(req: { projectRoot: string }): Promise<{ success: true } | { error: string }>
     watchStop(req: { projectRoot: string }): Promise<{ success: true }>
-    onChanged(handler: (event: FsChangeEvent) => void): () => void  // returns unsubscribe fn
+    onChanged(handler: (event: FsChangeEvent) => void): () => void // returns unsubscribe fn
   }
 }
 ```

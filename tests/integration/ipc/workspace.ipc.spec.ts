@@ -38,7 +38,9 @@ describe('workspace IPC handlers', () => {
   describe('workspace:list', () => {
     it('returns workspaces from store', () => {
       const workspaces = [{ id: '1', name: 'WS1' }]
-      vi.mocked(store.listWorkspaces).mockReturnValue(workspaces as any)
+      vi.mocked(store.listWorkspaces).mockReturnValue(
+        workspaces as unknown as ReturnType<typeof store.listWorkspaces>
+      )
       const handler = captureHandler('workspace:list')
       const result = handler({}) as { workspaces: unknown[] }
       expect(result.workspaces).toEqual(workspaces)
@@ -48,7 +50,9 @@ describe('workspace IPC handlers', () => {
   describe('workspace:create', () => {
     it('forwards payload to createWorkspace and returns result', () => {
       const ws = { id: '2', name: 'New WS' }
-      vi.mocked(store.createWorkspace).mockReturnValue({ workspace: ws } as any)
+      vi.mocked(store.createWorkspace).mockReturnValue({ workspace: ws } as unknown as ReturnType<
+        typeof store.createWorkspace
+      >)
       const handler = captureHandler('workspace:create')
       const result = handler({}, { name: 'New WS', folderPath: '/a', color: '#fff', tags: [] })
       expect(result).toEqual({ workspace: ws })
@@ -58,7 +62,9 @@ describe('workspace IPC handlers', () => {
   describe('workspace:update', () => {
     it('forwards payload to updateWorkspace and returns result', () => {
       const ws = { id: '1', name: 'Updated' }
-      vi.mocked(store.updateWorkspace).mockReturnValue({ workspace: ws } as any)
+      vi.mocked(store.updateWorkspace).mockReturnValue({ workspace: ws } as unknown as ReturnType<
+        typeof store.createWorkspace
+      >)
       const handler = captureHandler('workspace:update')
       const result = handler({}, { id: '1', name: 'Updated' })
       expect(result).toEqual({ workspace: ws })
@@ -67,7 +73,9 @@ describe('workspace IPC handlers', () => {
 
   describe('workspace:delete', () => {
     it('calls deleteWorkspace with the id', () => {
-      vi.mocked(store.deleteWorkspace).mockReturnValue(undefined as any)
+      vi.mocked(store.deleteWorkspace).mockReturnValue(
+        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
+      )
       const handler = captureHandler('workspace:delete')
       handler({}, { id: 'ws-1' })
       expect(store.deleteWorkspace).toHaveBeenCalledWith('ws-1')
@@ -76,7 +84,9 @@ describe('workspace IPC handlers', () => {
 
   describe('workspace:reorder', () => {
     it('calls reorderWorkspaces with payload', () => {
-      vi.mocked(store.reorderWorkspaces).mockReturnValue(undefined as any)
+      vi.mocked(store.reorderWorkspaces).mockReturnValue(
+        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
+      )
       const handler = captureHandler('workspace:reorder')
       handler({}, ['id1', 'id2'])
       expect(store.reorderWorkspaces).toHaveBeenCalledWith(['id1', 'id2'])
@@ -86,7 +96,9 @@ describe('workspace IPC handlers', () => {
   describe('project:list', () => {
     it('returns projects for the given workspaceId', () => {
       const projects = [{ id: 'p1', workspaceId: 'ws-1' }]
-      vi.mocked(store.listProjects).mockReturnValue(projects as any)
+      vi.mocked(store.listProjects).mockReturnValue(
+        projects as unknown as ReturnType<typeof store.listProjects>
+      )
       const handler = captureHandler('project:list')
       const result = handler({}, { workspaceId: 'ws-1' }) as { projects: unknown[] }
       expect(store.listProjects).toHaveBeenCalledWith('ws-1')
@@ -97,7 +109,9 @@ describe('workspace IPC handlers', () => {
   describe('project:create', () => {
     it('calls createProject with payload and returns result', () => {
       const project = { id: 'p2', name: 'MyProject' }
-      vi.mocked(store.createProject).mockReturnValue({ project } as any)
+      vi.mocked(store.createProject).mockReturnValue({ project } as unknown as ReturnType<
+        typeof store.createProject
+      >)
       const handler = captureHandler('project:create')
       const result = handler({}, { workspaceId: 'ws-1', name: 'MyProject' })
       expect(result).toEqual({ project })
@@ -107,7 +121,9 @@ describe('workspace IPC handlers', () => {
   describe('project:update-branch', () => {
     it('calls updateProjectBranch with payload and returns result', () => {
       const project = { id: 'p1', gitBranch: 'main' }
-      vi.mocked(store.updateProjectBranch).mockReturnValue({ project } as any)
+      vi.mocked(store.updateProjectBranch).mockReturnValue({ project } as unknown as ReturnType<
+        typeof store.createProject
+      >)
       const handler = captureHandler('project:update-branch')
       const result = handler({}, { id: 'p1', gitBranch: 'main' })
       expect(result).toEqual({ project })
@@ -117,7 +133,9 @@ describe('workspace IPC handlers', () => {
   describe('project:rename', () => {
     it('calls renameProject with payload and returns result', () => {
       const project = { id: 'p1', name: 'Renamed' }
-      vi.mocked(store.renameProject).mockReturnValue({ project } as any)
+      vi.mocked(store.renameProject).mockReturnValue({ project } as unknown as ReturnType<
+        typeof store.createProject
+      >)
       const handler = captureHandler('project:rename')
       const result = handler({}, { id: 'p1', name: 'Renamed' })
       expect(result).toEqual({ project })
@@ -126,7 +144,9 @@ describe('workspace IPC handlers', () => {
 
   describe('project:reorder', () => {
     it('calls reorderProjects with payload', () => {
-      vi.mocked(store.reorderProjects).mockReturnValue(undefined as any)
+      vi.mocked(store.reorderProjects).mockReturnValue(
+        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
+      )
       const handler = captureHandler('project:reorder')
       handler({}, { workspaceId: 'ws-1', ids: ['p2', 'p1'] })
       expect(store.reorderProjects).toHaveBeenCalledWith({ workspaceId: 'ws-1', ids: ['p2', 'p1'] })
@@ -135,7 +155,9 @@ describe('workspace IPC handlers', () => {
 
   describe('project:delete', () => {
     it('calls deleteProject with the id', () => {
-      vi.mocked(store.deleteProject).mockReturnValue(undefined as any)
+      vi.mocked(store.deleteProject).mockReturnValue(
+        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
+      )
       const handler = captureHandler('project:delete')
       handler({}, { id: 'p1' })
       expect(store.deleteProject).toHaveBeenCalledWith('p1')

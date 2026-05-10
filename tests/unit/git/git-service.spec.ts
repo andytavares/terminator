@@ -10,7 +10,7 @@ const PROMISIFY_CUSTOM = Symbol.for('nodejs.util.promisify.custom')
 const { execFileMock } = vi.hoisted(() => {
   const CUSTOM = Symbol.for('nodejs.util.promisify.custom')
   const execFileMock = vi.fn()
-  ;(execFileMock as any)[CUSTOM] = vi.fn()
+  ;(execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[CUSTOM] = vi.fn()
   return { execFileMock }
 })
 
@@ -18,11 +18,15 @@ vi.mock('child_process', () => ({ execFile: execFileMock }))
 
 // Convenience helpers — update the promisify.custom mock (the path actually invoked)
 function mockResolve(stdout: string) {
-  ;(execFileMock as any)[PROMISIFY_CUSTOM].mockResolvedValue({ stdout, stderr: '' })
+  ;(execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[
+    PROMISIFY_CUSTOM
+  ].mockResolvedValue({ stdout, stderr: '' })
 }
 
 function mockReject(message: string) {
-  ;(execFileMock as any)[PROMISIFY_CUSTOM].mockRejectedValue(new Error(message))
+  ;(execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[
+    PROMISIFY_CUSTOM
+  ].mockRejectedValue(new Error(message))
 }
 
 import {
@@ -42,7 +46,8 @@ import {
   removeWorktree,
 } from '../../../src/main/git/git-service'
 
-const customMock = () => (execFileMock as any)[PROMISIFY_CUSTOM]
+const customMock = () =>
+  (execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[PROMISIFY_CUSTOM]
 
 beforeEach(() => {
   vi.clearAllMocks()

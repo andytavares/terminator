@@ -29,16 +29,20 @@ beforeEach(() => {
     setTerminalInstance: mockSetTerminalInstance,
     setActiveSessionForProject: mockSetActiveSessionForProject,
     incrementBellCount: mockIncrementBellCount,
-  } as any)
+  } as unknown as ReturnType<typeof useSessionStore>)
   // Setup getState for use inside the closure
-  ;(useSessionStore as any).getState = vi.fn().mockReturnValue({
-    activeSessionIdByProject: new Map(),
-    sessions: new Map(),
+  Object.assign(useSessionStore, {
+    getState: vi.fn().mockReturnValue({
+      activeSessionIdByProject: new Map(),
+      sessions: new Map(),
+    }),
   })
-  ;(useWorkspaceStore as any).getState = vi.fn().mockReturnValue({
-    activeProjectId: null,
+  Object.assign(useWorkspaceStore, {
+    getState: vi.fn().mockReturnValue({
+      activeProjectId: null,
+    }),
   })
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     terminal: {
       input: vi.fn(),
       resize: vi.fn(),
@@ -48,7 +52,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('useTerminalSession', () => {

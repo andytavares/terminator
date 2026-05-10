@@ -19,7 +19,7 @@ const mockCheckout = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     git: {
       listBranches: mockListBranches,
       checkout: mockCheckout,
@@ -27,10 +27,10 @@ beforeEach(() => {
   }
   vi.mocked(useWorkspaceStore).mockReturnValue({
     updateProjectBranch: mockUpdateProjectBranch,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useToastStore).mockReturnValue({
     addToast: mockAddToast,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   mockListBranches.mockResolvedValue({
     branches: [
       { name: 'main', isRemote: false },
@@ -43,7 +43,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 const project = {
@@ -96,7 +96,7 @@ describe('BranchSwitcher', () => {
   })
 
   it('shows loading state while fetching branches', async () => {
-    let resolve: (v: any) => void
+    let resolve: (v: { branches: unknown[] }) => void
     mockListBranches.mockReturnValue(
       new Promise((r) => {
         resolve = r

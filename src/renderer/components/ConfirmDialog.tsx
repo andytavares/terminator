@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import '../components/sidebar/Dialog.css'
+import './sidebar/Dialog.css'
 
 interface ConfirmDialogProps {
   title: string

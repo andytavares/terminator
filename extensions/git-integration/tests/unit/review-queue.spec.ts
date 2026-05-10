@@ -2,16 +2,16 @@ import { describe, it, expect } from 'vitest'
 import { parseReviewQueuePR } from '../../src/github/pr-review-service'
 
 const makeRawPr = (overrides: Record<string, unknown> = {}) => ({
-  number:       1,
-  title:        'feat: add login',
-  author:       { login: 'alice', avatarUrl: 'https://example.com/avatar.png' },
-  createdAt:    '2026-05-01T10:00:00Z',
-  headRefName:  'feat/login',
-  baseRefName:  'main',
-  isDraft:      false,
+  number: 1,
+  title: 'feat: add login',
+  author: { login: 'alice', avatarUrl: 'https://example.com/avatar.png' },
+  createdAt: '2026-05-01T10:00:00Z',
+  headRefName: 'feat/login',
+  baseRefName: 'main',
+  isDraft: false,
   statusCheckRollup: [],
   files: [
-    { path: 'src/auth.ts',    additions: 80,  deletions: 10, status: 'modified' },
+    { path: 'src/auth.ts', additions: 80, deletions: 10, status: 'modified' },
     { path: 'src/auth.spec.ts', additions: 40, deletions: 5, status: 'modified' },
   ],
   ...overrides,
@@ -46,9 +46,11 @@ describe('parseReviewQueuePR()', () => {
   })
 
   it('sets estimatedMinutes to at least 1 for tiny PRs', () => {
-    const pr = parseReviewQueuePR(makeRawPr({
-      files: [{ path: 'x.ts', additions: 1, deletions: 0, status: 'added' }],
-    }))
+    const pr = parseReviewQueuePR(
+      makeRawPr({
+        files: [{ path: 'x.ts', additions: 1, deletions: 0, status: 'added' }],
+      })
+    )
     expect(pr.estimatedMinutes).toBeGreaterThanOrEqual(1)
   })
 

@@ -13,7 +13,9 @@ export function RiskBreakdownPanel({ filePath, riskScore, repoRoot }: Props) {
   const { level, composite, metrics, dominantDriver, topImporters, importerCount } = riskScore
   const [importersExpanded, setImportersExpanded] = useState(false)
 
-  const visibleImporters = importersExpanded ? topImporters : topImporters.slice(0, IMPORTERS_INITIAL)
+  const visibleImporters = importersExpanded
+    ? topImporters
+    : topImporters.slice(0, IMPORTERS_INITIAL)
   const hiddenCount = topImporters.length - IMPORTERS_INITIAL
 
   function openImporter(relPath: string) {
@@ -22,17 +24,26 @@ export function RiskBreakdownPanel({ filePath, riskScore, repoRoot }: Props) {
   }
 
   const metricRows: Array<{ label: string; value: string | number | null; max: number }> = [
-    { label: 'Change size',       value: metrics.changeSize,      max: 500 },
-    { label: 'Churn 90d',         value: metrics.churn90d,        max: 100 },
-    { label: 'Blast radius',      value: metrics.blastRadius,     max: 200 },
-    { label: 'Complexity delta',  value: metrics.complexityDelta, max: 20 },
-    { label: 'Patch coverage',    value: metrics.patchCoverage != null ? `${metrics.patchCoverage}%` : null, max: 100 },
+    { label: 'Change size', value: metrics.changeSize, max: 500 },
+    { label: 'Churn 90d', value: metrics.churn90d, max: 100 },
+    { label: 'Blast radius', value: metrics.blastRadius, max: 200 },
+    { label: 'Complexity delta', value: metrics.complexityDelta, max: 20 },
+    {
+      label: 'Patch coverage',
+      value: metrics.patchCoverage != null ? `${metrics.patchCoverage}%` : null,
+      max: 100,
+    },
   ]
 
   return (
-    <aside className={`risk-breakdown-panel risk-breakdown-panel--${level}`} aria-label="Risk breakdown">
+    <aside
+      className={`risk-breakdown-panel risk-breakdown-panel--${level}`}
+      aria-label="Risk breakdown"
+    >
       <h2 className="risk-breakdown-heading">
-        Why this file is <span className={`risk-level-badge risk-level-badge--${level}`}>{level.toUpperCase()}</span> risk
+        Why this file is{' '}
+        <span className={`risk-level-badge risk-level-badge--${level}`}>{level.toUpperCase()}</span>{' '}
+        risk
       </h2>
 
       <p className="risk-dominant-driver">{dominantDriver}</p>
@@ -45,7 +56,7 @@ export function RiskBreakdownPanel({ filePath, riskScore, repoRoot }: Props) {
       )}
 
       <div className="risk-metric-bars" aria-label="Metric contributions">
-        {metricRows.map(row => (
+        {metricRows.map((row) => (
           <div key={row.label} className="risk-metric-row">
             <span className="risk-metric-label">{row.label}</span>
             {row.value == null ? (
@@ -66,25 +77,25 @@ export function RiskBreakdownPanel({ filePath, riskScore, repoRoot }: Props) {
 
         <div className="risk-metric-row">
           <span className="risk-metric-label">Test file</span>
-          <span className={`risk-metric-boolean risk-metric-boolean--${metrics.testFilePresent ? 'pass' : 'fail'}`}>
-            {metrics.testFilePresent == null ? '?' : metrics.testFilePresent ? 'present' : 'missing'}
+          <span
+            className={`risk-metric-boolean risk-metric-boolean--${metrics.testFilePresent ? 'pass' : 'fail'}`}
+          >
+            {metrics.testFilePresent == null
+              ? '?'
+              : metrics.testFilePresent
+                ? 'present'
+                : 'missing'}
           </span>
         </div>
       </div>
 
       {topImporters.length > 0 && (
         <div className="risk-importers">
-          <h3 className="risk-importers-heading">
-            Importers ({importerCount})
-          </h3>
+          <h3 className="risk-importers-heading">Importers ({importerCount})</h3>
           <ul className="risk-importers-list">
-            {visibleImporters.map(imp => (
+            {visibleImporters.map((imp) => (
               <li key={imp} className="risk-importer-path">
-                <button
-                  className="risk-importer-btn"
-                  onClick={() => openImporter(imp)}
-                  title={imp}
-                >
+                <button className="risk-importer-btn" onClick={() => openImporter(imp)} title={imp}>
                   {imp.split('/').pop()}
                 </button>
               </li>

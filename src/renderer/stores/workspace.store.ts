@@ -15,7 +15,10 @@ interface WorkspaceState {
 
   loadProjects: (workspaceId: string) => Promise<void>
   createProject: (input: unknown) => Promise<{ project: Project } | { error: string }>
-  updateProjectBranch: (id: string, gitBranch: string) => Promise<{ project: Project } | { error: string }>
+  updateProjectBranch: (
+    id: string,
+    gitBranch: string
+  ) => Promise<{ project: Project } | { error: string }>
   renameProject: (id: string, name: string) => Promise<{ project: Project } | { error: string }>
   reorderWorkspaces: (ids: string[]) => Promise<void>
   reorderProjects: (workspaceId: string, ids: string[]) => Promise<void>
@@ -102,7 +105,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         const map = new Map(s.projectsByWorkspaceId)
         for (const [wsId, projects] of map) {
           if (projects.some((p) => p.id === id)) {
-            map.set(wsId, projects.map((p) => (p.id === id ? project : p)))
+            map.set(
+              wsId,
+              projects.map((p) => (p.id === id ? project : p))
+            )
             break
           }
         }
@@ -120,7 +126,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         const map = new Map(s.projectsByWorkspaceId)
         for (const [wsId, projects] of map) {
           if (projects.some((p) => p.id === id)) {
-            map.set(wsId, projects.map((p) => (p.id === id ? project : p)))
+            map.set(
+              wsId,
+              projects.map((p) => (p.id === id ? project : p))
+            )
             break
           }
         }

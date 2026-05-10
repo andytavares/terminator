@@ -13,10 +13,20 @@ interface Props {
   onSelectProjectTab: (tabId: string | null) => void
 }
 
-export function TabBar({ projectId, activeProjectTabId, projectTabs, onSelectProjectTab }: Props): JSX.Element {
+export function TabBar({
+  projectId,
+  activeProjectTabId,
+  projectTabs,
+  onSelectProjectTab,
+}: Props): JSX.Element {
   const [newTabOpen, setNewTabOpen] = useState(false)
-  const { getSessionsForProject, closeSession, setActiveSessionForProject, getActiveSessionForProject, getBellCountForSession } =
-    useSessionStore()
+  const {
+    getSessionsForProject,
+    closeSession,
+    setActiveSessionForProject,
+    getActiveSessionForProject,
+    getBellCountForSession,
+  } = useSessionStore()
   const { workspaces, activeWorkspaceId } = useWorkspaceStore()
   const sessions = getSessionsForProject(projectId)
   const activeSessionId = getActiveSessionForProject(projectId)
@@ -33,7 +43,10 @@ export function TabBar({ projectId, activeProjectTabId, projectTabs, onSelectPro
   }
 
   return (
-    <div className="tab-bar-stack" style={wsColor ? { ['--ws-color' as string]: wsColor } : undefined}>
+    <div
+      className="tab-bar-stack"
+      style={wsColor ? { ['--ws-color' as string]: wsColor } : undefined}
+    >
       {/* Primary tab bar: Terminal + extension-contributed tabs */}
       <div className="tab-bar tab-bar--primary">
         <div
@@ -68,7 +81,10 @@ export function TabBar({ projectId, activeProjectTabId, projectTabs, onSelectPro
                 <span className="tab-bar__badge tab-bar__badge--agent">agent</span>
               )}
               {session.id !== activeSessionId && (
-                <AlertBadge count={getBellCountForSession(session.id)} className="alert-badge--tab" />
+                <AlertBadge
+                  count={getBellCountForSession(session.id)}
+                  className="alert-badge--tab"
+                />
               )}
               <button
                 className="tab-bar__close"
@@ -79,7 +95,11 @@ export function TabBar({ projectId, activeProjectTabId, projectTabs, onSelectPro
               </button>
             </div>
           ))}
-          <button className="tab-bar__new-tab" onClick={() => setNewTabOpen(true)} title="New tab (⌘T)">
+          <button
+            className="tab-bar__new-tab"
+            onClick={() => setNewTabOpen(true)}
+            title="New tab (⌘T)"
+          >
             +
           </button>
         </div>

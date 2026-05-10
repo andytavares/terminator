@@ -46,7 +46,9 @@ const defaultStoreState = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(usePrReviewStore).mockReturnValue(defaultStoreState as any)
+  vi.mocked(usePrReviewStore).mockReturnValue(
+    defaultStoreState as unknown as ReturnType<typeof usePrReviewStore>
+  )
 })
 
 const defaultProps = {
@@ -63,7 +65,7 @@ describe('ReviewQueue', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       queueLoading: true,
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText('Loading pull requests…')).toBeTruthy()
   })
@@ -84,7 +86,7 @@ describe('ReviewQueue', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       prQueue: [makePr({ number: 42, title: 'Add feature' })],
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText('Add feature')).toBeTruthy()
     expect(screen.getByText('#42')).toBeTruthy()
@@ -95,7 +97,7 @@ describe('ReviewQueue', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       prQueue: [pr],
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     const onOpenPr = vi.fn()
     render(<ReviewQueue {...defaultProps} onOpenPr={onOpenPr} />)
     fireEvent.click(screen.getByText('My PR'))
@@ -153,7 +155,7 @@ describe('ReviewQueue', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       queueError: 'Network failure',
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText(/Failed to load queue: Network failure/)).toBeTruthy()
   })
@@ -162,7 +164,7 @@ describe('ReviewQueue', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       rateLimitState: { resetAt: Date.now() + 60000 },
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText(/GitHub API rate limit reached/)).toBeTruthy()
   })
@@ -172,7 +174,7 @@ describe('ReviewQueue', () => {
       ...defaultStoreState,
       hasMorePrs: true,
       prQueue: [makePr()],
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText('Load more pull requests')).toBeTruthy()
   })
@@ -181,7 +183,7 @@ describe('ReviewQueue', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       prQueue: [makePr({ riskLevel: 'high', number: 10, title: 'Risky PR' })],
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText('HIGH')).toBeTruthy()
     expect(screen.getByText('Read these first')).toBeTruthy()
@@ -191,7 +193,7 @@ describe('ReviewQueue', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       prQueue: [makePr({ isDraft: true, number: 11, title: 'Draft PR' })],
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getByText('Draft')).toBeTruthy()
   })
@@ -208,7 +210,7 @@ describe('ReviewQueue', () => {
           title: 'Paused PR',
         }),
       ],
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
     expect(screen.getAllByText('Resume Ch 2/3').length).toBeGreaterThan(0)
   })

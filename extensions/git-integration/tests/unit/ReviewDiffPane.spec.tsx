@@ -11,7 +11,7 @@ vi.mock('../../src/components/pr-review/InlineCommentThread', () => ({
   InlineCommentThread: () => <div data-testid="thread" />,
 }))
 vi.mock('../../src/components/pr-review/CommentComposer', () => ({
-  CommentComposer: ({ onCancel }: any) => (
+  CommentComposer: ({ onCancel }: { onCancel?: () => void }) => (
     <div data-testid="composer">
       <button onClick={onCancel}>Cancel</button>
     </div>
@@ -92,18 +92,18 @@ const defaultProps = {
 beforeEach(() => {
   vi.clearAllMocks()
   mockPrFileDiff.mockResolvedValue({ diff: { hunks: [] } })
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     github: { prFileDiff: mockPrFileDiff },
   }
   vi.mocked(usePrReviewStore).mockReturnValue({
     viewedFiles: new Set<string>(),
     threads: {},
     patchFileComplexity: mockPatchFileComplexity,
-  } as any)
+  } as unknown as ReturnType<typeof usePrReviewStore>)
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 async function renderPane(props: Partial<typeof defaultProps> = {}) {
@@ -161,7 +161,7 @@ describe('ReviewDiffPane', () => {
       viewedFiles: new Set(['src/foo.ts']),
       threads: {},
       patchFileComplexity: mockPatchFileComplexity,
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     await renderPane()
     expect(screen.getByText('✓ Viewed')).toBeTruthy()
   })

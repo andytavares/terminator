@@ -17,7 +17,7 @@ const mockCreateProject = vi.fn()
 beforeEach(() => {
   vi.clearAllMocks()
   mockCreateProject.mockResolvedValue({ project: { id: 'proj-1' } })
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     git: {
       isRepo: vi.fn().mockResolvedValue({ isRepo: false }),
       listBranches: vi.fn().mockResolvedValue({ branches: [] }),
@@ -29,14 +29,14 @@ beforeEach(() => {
     createProject: mockCreateProject,
     projectsByWorkspaceId: new Map([['ws-1', []]]),
     workspaces: [{ id: 'ws-1', name: 'My WS', folderPath: '' }],
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSettingsStore).mockReturnValue({
     resolveSettings: vi.fn().mockReturnValue({ git: { worktreeBaseDir: '' } }),
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('CreateProjectDialog', () => {

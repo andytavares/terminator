@@ -17,7 +17,7 @@ beforeEach(() => {
   mockCreateWorkspace.mockResolvedValue({ workspace: { id: 'ws-new', name: 'New' } })
   mockCreateProject.mockResolvedValue({ project: { id: 'proj-new' } })
   mockOpenDirectory.mockResolvedValue({ filePath: '/selected/path' })
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     dialog: { openDirectory: mockOpenDirectory },
     git: { isRepo: vi.fn().mockResolvedValue({ isRepo: false }) },
   }
@@ -25,11 +25,11 @@ beforeEach(() => {
     workspaces: [],
     createWorkspace: mockCreateWorkspace,
     createProject: mockCreateProject,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('CreateWorkspaceDialog', () => {
@@ -60,7 +60,7 @@ describe('CreateWorkspaceDialog', () => {
       workspaces: [{ id: 'ws-1', name: 'Existing' }],
       createWorkspace: mockCreateWorkspace,
       createProject: mockCreateProject,
-    } as any)
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
     render(<CreateWorkspaceDialog onClose={vi.fn()} />)
     const nameInput = screen.getByPlaceholderText('My Workspace')
     fireEvent.change(nameInput, { target: { value: 'existing' } })

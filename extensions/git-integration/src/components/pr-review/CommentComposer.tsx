@@ -40,21 +40,21 @@ export function CommentComposer(props: Props) {
     try {
       if (isReply(props)) {
         const result = await window.electronAPI.github.prCommentReply({
-          repoRoot:    props.repoRoot,
-          prNumber:    props.prNumber,
+          repoRoot: props.repoRoot,
+          prNumber: props.prNumber,
           inReplyToId: props.inReplyToId,
           body,
         })
         if ('error' in result) throw new Error((result as { error: string }).error)
       } else {
         const result = await window.electronAPI.github.prCommentAdd({
-          repoRoot:  props.repoRoot,
-          prNumber:  props.prNumber,
-          commitId:  props.commitId,
-          path:      props.path,
-          line:      props.line,
+          repoRoot: props.repoRoot,
+          prNumber: props.prNumber,
+          commitId: props.commitId,
+          path: props.path,
+          line: props.line,
           startLine: props.startLine,
-          side:      props.side,
+          side: props.side,
           body,
         })
         if ('error' in result) throw new Error((result as { error: string }).error)
@@ -73,18 +73,22 @@ export function CommentComposer(props: Props) {
         <button
           className={`comment-composer-tab${tab === 'write' ? ' comment-composer-tab--active' : ''}`}
           onClick={() => setTab('write')}
-        >Write</button>
+        >
+          Write
+        </button>
         <button
           className={`comment-composer-tab${tab === 'preview' ? ' comment-composer-tab--active' : ''}`}
           onClick={() => setTab('preview')}
-        >Preview</button>
+        >
+          Preview
+        </button>
       </div>
 
       {tab === 'write' ? (
         <textarea
           className="comment-composer-textarea"
           value={body}
-          onChange={e => setBody(e.target.value)}
+          onChange={(e) => setBody(e.target.value)}
           placeholder="Leave a comment…"
           rows={4}
           disabled={submitting}

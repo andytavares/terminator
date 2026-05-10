@@ -64,7 +64,7 @@ beforeEach(() => {
   vi.mocked(usePrReviewStore).mockReturnValue({
     viewedFiles: new Set<string>(),
     fileOrderOverrides: {},
-  } as any)
+  } as unknown as ReturnType<typeof usePrReviewStore>)
 })
 
 describe('FullFileList', () => {
@@ -123,7 +123,7 @@ describe('FullFileList', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set(['src/foo.ts']),
       fileOrderOverrides: {},
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     const { container } = render(<FullFileList {...defaultProps} />)
     const viewedRow = container.querySelector('.full-file-row--viewed')
     expect(viewedRow).toBeTruthy()
@@ -149,7 +149,7 @@ describe('FullFileList', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set(['src/foo.ts', 'src/bar.ts']),
       fileOrderOverrides: {},
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     const { container } = render(<FullFileList {...defaultProps} />)
     expect(container.querySelector('.full-file-chapter-done')).toBeTruthy()
   })
@@ -158,7 +158,7 @@ describe('FullFileList', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set<string>(),
       fileOrderOverrides: { 'ch-1': ['src/bar.ts', 'src/foo.ts'] },
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<FullFileList {...defaultProps} />)
     const rows = screen.getAllByTitle(/src\//)
     expect(rows[0].getAttribute('title')).toBe('src/bar.ts')

@@ -16,7 +16,7 @@ export function useGitStatus(repoRoot: string | null, refreshIntervalMs = 3000):
     async function refresh(): Promise<void> {
       if (cancelled) return
       try {
-        const result = await window.electronAPI.git.status(repoRoot!) as
+        const result = (await window.electronAPI.git.status(repoRoot!)) as
           | GitStatus
           | { error: string }
         if (!cancelled) {
@@ -41,5 +41,5 @@ export function useGitStatus(repoRoot: string | null, refreshIntervalMs = 3000):
       unsubFs()
       clearInterval(interval)
     }
-  }, [repoRoot, refreshIntervalMs])
+  }, [repoRoot, refreshIntervalMs, setStatus, setLoading])
 }

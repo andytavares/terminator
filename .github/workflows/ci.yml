@@ -7,21 +7,14 @@ on:
     branches: [main]
 
 jobs:
-  ci:
-    name: Lint, Typecheck, Test & Build
-    runs-on: macos-14  # Apple Silicon (M1)
+  lint:
+    name: Lint
+    runs-on: macos-14
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -32,13 +25,65 @@ jobs:
       - name: Lint
         run: npx eslint . --ext .ts,.tsx
 
+  typecheck:
+    name: Typecheck
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Typecheck
         run: npx tsc --noEmit
+
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+  test:
+    name: Test
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Test
         run: npm run test:coverage
 
-      - name: Upload coverage
+      - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -57,31 +102,50 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
 
+  build:
+    name: Build
+    needs: [lint, typecheck, format, test]
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Build
         run: npm run build
 
   release:
     name: Package & Release
-    needs: ci
+    needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: macos-14  # Apple Silicon (M1)
+    runs-on: macos-14
     permissions:
       contents: write
+      packages: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+          registry-url: 'https://npm.pkg.github.com'
 
       - name: Install dependencies
         run: npm ci
@@ -104,3 +168,16 @@ jobs:
           draft: false
           prerelease: false
           files: dist/*.dmg
+
+      - name: Publish to GitHub Packages
+        run: npm publish --access restricted
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete old package versions (keep last 5)
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'app'
+          package-type: 'npm'
+          min-versions-to-keep: 5
+          delete-only-pre-release-versions: false

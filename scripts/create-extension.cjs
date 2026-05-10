@@ -72,7 +72,10 @@ function activate(api) {
   // Register settings
   disposables.push(
     api.settings.register({
-      label: '${name.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} Settings',
+      label: '${name
+        .split('-')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ')} Settings',
       properties: {
         '${id}.enabled': {
           type: 'boolean',
@@ -93,7 +96,10 @@ function activate(api) {
   disposables.push(
     api.sidebar.registerItem({
       id: '${id}-panel',
-      label: '${name.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}',
+      label: '${name
+        .split('-')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ')}',
       tooltip: 'Open ${name}',
       onClick: () => {
         const msg = api.settings.get('${id}.message') ?? 'Hello!'
@@ -123,7 +129,10 @@ function activate(api) {
   // disposables.push(
   //   api.sidebar.registerPanel('right-sidebar', {
   //     id: '${id}-right-panel',
-  //     title: '${name.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}',
+  //     title: '${name
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')}',
   //     component: MyPanelComponent,  // React component
   //     defaultVisible: false,
   //   })
@@ -133,7 +142,10 @@ function activate(api) {
   // disposables.push(
   //   api.topBar.registerMenuItem({
   //     id: '${id}-view',
-  //     label: '${name.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}',
+  //     label: '${name
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')}',
   //     onClick: () => { /* open your view */ },
   //   })
   // )
@@ -226,9 +238,7 @@ function main(argv) {
   // Parse --dir
   const dirIdx = args.indexOf('--dir')
   const outDir =
-    dirIdx !== -1
-      ? path.resolve(args[dirIdx + 1])
-      : path.resolve(process.cwd(), 'extensions', name)
+    dirIdx !== -1 ? path.resolve(args[dirIdx + 1]) : path.resolve(process.cwd(), 'extensions', name)
 
   // Check for directory collision
   if (fs.existsSync(outDir)) {
@@ -261,4 +271,11 @@ if (require.main === module) {
   main(process.argv)
 }
 
-module.exports = { validateName, validateId, generatePackageJson, generateManifest, generateIndex, writeExtension }
+module.exports = {
+  validateName,
+  validateId,
+  generatePackageJson,
+  generateManifest,
+  generateIndex,
+  writeExtension,
+}

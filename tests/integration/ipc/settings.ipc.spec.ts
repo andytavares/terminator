@@ -31,7 +31,9 @@ describe('settings IPC handlers', () => {
   describe('settings:get-global', () => {
     it('returns global settings from store', () => {
       const settings = { appearance: { theme: 'dark' } }
-      vi.mocked(settingsStore.getGlobalSettings).mockReturnValue(settings as any)
+      vi.mocked(settingsStore.getGlobalSettings).mockReturnValue(
+        settings as unknown as ReturnType<typeof settingsStore.getGlobalSettings>
+      )
       const handler = captureHandler('settings:get-global')
       const result = handler({}) as { settings: unknown }
       expect(result.settings).toEqual(settings)
@@ -41,7 +43,9 @@ describe('settings IPC handlers', () => {
   describe('settings:update-global', () => {
     it('calls updateGlobalSettings with patch and returns updated settings', () => {
       const updated = { appearance: { theme: 'light' } }
-      vi.mocked(settingsStore.updateGlobalSettings).mockReturnValue(updated as any)
+      vi.mocked(settingsStore.updateGlobalSettings).mockReturnValue(
+        updated as unknown as ReturnType<typeof settingsStore.updateGlobalSettings>
+      )
       const handler = captureHandler('settings:update-global')
       const result = handler({}, { patch: { appearance: { theme: 'light' } } }) as {
         settings: unknown
@@ -56,7 +60,9 @@ describe('settings IPC handlers', () => {
   describe('settings:get-workspace', () => {
     it('returns workspace-specific settings', () => {
       const settings = { overrides: { appearance: { theme: 'light' } } }
-      vi.mocked(settingsStore.getWorkspaceSettings).mockReturnValue(settings as any)
+      vi.mocked(settingsStore.getWorkspaceSettings).mockReturnValue(
+        settings as unknown as ReturnType<typeof settingsStore.getWorkspaceSettings>
+      )
       const handler = captureHandler('settings:get-workspace')
       const result = handler({}, { workspaceId: 'ws-1' }) as { settings: unknown }
       expect(settingsStore.getWorkspaceSettings).toHaveBeenCalledWith('ws-1')
@@ -67,7 +73,9 @@ describe('settings IPC handlers', () => {
   describe('settings:update-workspace', () => {
     it('calls updateWorkspaceSettings with workspaceId and patch', () => {
       const updated = { overrides: { terminal: { scrollbackLimit: 5000 } } }
-      vi.mocked(settingsStore.updateWorkspaceSettings).mockReturnValue(updated as any)
+      vi.mocked(settingsStore.updateWorkspaceSettings).mockReturnValue(
+        updated as unknown as ReturnType<typeof settingsStore.updateWorkspaceSettings>
+      )
       const handler = captureHandler('settings:update-workspace')
       const result = handler(
         {},

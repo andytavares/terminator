@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useCallback, useEffect } from 'react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { ReviewQueue } from './ReviewQueue'
 import { PrReviewView } from './PrReviewView'
@@ -12,18 +12,29 @@ interface Props {
 }
 
 export function PrReviewTab({ repoRoot }: Props) {
-  const { activePr, setActivePr, initSession, reset, nextPrCursor, includeClosedPrs, setIncludeClosedPrs } = usePrReviewStore()
+  const {
+    activePr,
+    setActivePr,
+    initSession,
+    reset,
+    nextPrCursor,
+    includeClosedPrs,
+    setIncludeClosedPrs,
+  } = usePrReviewStore()
   const loadQueue = useLoadPrQueue(repoRoot)
   const loadPrDetail = useLoadPrDetail(repoRoot)
   const fetchFileMetrics = useFetchFileMetrics(repoRoot)
 
   useEffect(() => {
     if (repoRoot) loadQueue()
-  }, [repoRoot])
+  }, [repoRoot, loadQueue])
 
-  const handleRefreshQueue = async (options?: { search?: string; includeClosedPrs?: boolean }) => {
-    await loadQueue({ search: options?.search, includeClosedPrs: options?.includeClosedPrs })
-  }
+  const handleRefreshQueue = useCallback(
+    async (options?: { search?: string; includeClosedPrs?: boolean }) => {
+      await loadQueue({ search: options?.search, includeClosedPrs: options?.includeClosedPrs })
+    },
+    [loadQueue]
+  )
 
   const handleToggleClosed = async (include: boolean) => {
     setIncludeClosedPrs(include)
@@ -79,7 +90,15 @@ export function PrReviewTab({ repoRoot }: Props) {
   }
 
   if (activePr) {
-    return <PrReviewView repoRoot={repoRoot} pr={activePr} onClose={handleClosePr} onRefresh={handleRefreshPr} />
+    return (
+      <PrReviewView
+        repoRoot={repoRoot}
+        pr={activePr}
+        onClose={handleClosePr}
+        onRefresh={handleRefreshPr}
+        onPopOut={handlePopOut}
+      />
+    )
   }
 
   return (

@@ -43,7 +43,7 @@ export function ReviewQueue({
     return () => {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
     }
-  }, [searchQuery])
+  }, [searchQuery, onRefresh])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -61,14 +61,22 @@ export function ReviewQueue({
   const now = Date.now()
   const staleMs = STALE_DAYS * 24 * 60 * 60 * 1000
 
+  // In-progress PRs always appear at the top regardless of active filter
+  const inProgress = prQueue.filter(
+    (p) => p.sessionStatus === 'in-progress' || p.sessionStatus === 'paused'
+  )
+  const inProgressNumbers = new Set(inProgress.map((p) => p.number))
+
   const filtered = prQueue.filter((pr) => {
+    // Already shown in the in-progress section
+    if (inProgressNumbers.has(pr.number)) return false
     switch (activeFilter) {
       case 'high-risk':
         return pr.riskLevel === 'high'
       case 'quick-wins':
         return pr.riskLevel === 'low' && pr.additions + pr.deletions <= 100
       case 'in-progress':
-        return pr.sessionStatus === 'in-progress' || pr.sessionStatus === 'paused'
+        return false // already captured above
       case 'stale':
         return now - new Date(pr.openedAt).getTime() > staleMs
       default:
@@ -80,12 +88,7 @@ export function ReviewQueue({
   const quickWins = filtered.filter(
     (p) => p.riskLevel === 'low' && p.additions + p.deletions <= 100
   )
-  const inProgress = filtered.filter(
-    (p) => p.sessionStatus === 'in-progress' || p.sessionStatus === 'paused'
-  )
-  const larger = filtered.filter(
-    (p) => !readFirst.includes(p) && !quickWins.includes(p) && !inProgress.includes(p)
-  )
+  const larger = filtered.filter((p) => !readFirst.includes(p) && !quickWins.includes(p))
 
   const totalMinutes = prQueue.reduce((s, p) => s + p.estimatedMinutes, 0)
   const highRiskCount = prQueue.filter((p) => p.riskLevel === 'high').length
@@ -211,10 +214,25 @@ export function ReviewQueue({
           </div>
         ) : (
           <>
-            <PrSection title="In progress" prs={inProgress} accent="blue" onOpen={onOpenPr} />
-            <PrSection title="Read these first" prs={readFirst} accent="red" onOpen={onOpenPr} />
-            <PrSection title="Quick wins" prs={quickWins} accent="green" onOpen={onOpenPr} />
-            <PrSection title="Larger reviews" prs={larger} accent="none" onOpen={onOpenPr} />
+            <PrSection
+              title="In progress"
+              prs={inProgress}
+              accent="blue"
+              onOpen={onOpenPr}
+              showProgress
+            />
+            {activeFilter !== 'in-progress' && (
+              <>
+                <PrSection
+                  title="Read these first"
+                  prs={readFirst}
+                  accent="red"
+                  onOpen={onOpenPr}
+                />
+                <PrSection title="Quick wins" prs={quickWins} accent="green" onOpen={onOpenPr} />
+                <PrSection title="Larger reviews" prs={larger} accent="none" onOpen={onOpenPr} />
+              </>
+            )}
           </>
         )}
       </div>
@@ -236,18 +254,20 @@ function PrSection({
   prs,
   accent,
   onOpen,
+  showProgress = false,
 }: {
   title: string
   prs: ReviewQueuePR[]
   accent: 'red' | 'green' | 'blue' | 'none'
   onOpen: (pr: ReviewQueuePR) => void
+  showProgress?: boolean
 }) {
   if (prs.length === 0) return null
   return (
     <div className={`pr-section pr-section--${accent}`}>
       <h3 className="pr-section-title">{title}</h3>
       {prs.map((pr) => (
-        <PrRow key={pr.number} pr={pr} onOpen={onOpen} />
+        <PrRow key={pr.number} pr={pr} onOpen={onOpen} showProgress={showProgress} />
       ))}
     </div>
   )
@@ -255,7 +275,15 @@ function PrSection({
 
 const SIGNAL_LABELS = ['Tests', 'Coverage', 'CI', 'Lint', 'Churn', 'Blast'] as const
 
-function PrRow({ pr, onOpen }: { pr: ReviewQueuePR; onOpen: (pr: ReviewQueuePR) => void }) {
+function PrRow({
+  pr,
+  onOpen,
+  showProgress = false,
+}: {
+  pr: ReviewQueuePR
+  onOpen: (pr: ReviewQueuePR) => void
+  showProgress?: boolean
+}) {
   const dots = [
     pr.signalDots.tests,
     pr.signalDots.coverage,
@@ -276,6 +304,14 @@ function PrRow({ pr, onOpen }: { pr: ReviewQueuePR; onOpen: (pr: ReviewQueuePR) 
 
   const age = formatAge(pr.openedAt)
 
+  const chapterProgress =
+    showProgress &&
+    pr.resumeChapter != null &&
+    pr.resumeChapterTotal != null &&
+    pr.resumeChapterTotal > 0
+      ? Math.round(((pr.resumeChapter - 1) / pr.resumeChapterTotal) * 100)
+      : null
+
   return (
     <button className={`pr-row pr-row--${pr.riskLevel}`} onClick={() => onOpen(pr)}>
       <div className="pr-row-left">
@@ -285,6 +321,11 @@ function PrRow({ pr, onOpen }: { pr: ReviewQueuePR; onOpen: (pr: ReviewQueuePR) 
         <span className="pr-row-meta">
           {pr.author} · {age} · {pr.fileCount} files · +{pr.additions}/−{pr.deletions}
         </span>
+        {chapterProgress !== null && (
+          <div className="pr-row-progress" aria-label={`${chapterProgress}% reviewed`}>
+            <div className="pr-row-progress-bar" style={{ width: `${chapterProgress}%` }} />
+          </div>
+        )}
       </div>
 
       <div className="pr-row-signals">

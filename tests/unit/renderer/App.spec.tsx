@@ -78,8 +78,8 @@ function setupMocks(
   overrides: {
     activeWorkspaceId?: string | null
     activeProjectId?: string | null
-    globalSettings?: any
-    workspaces?: any[]
+    globalSettings?: Record<string, unknown> | null
+    workspaces?: unknown[]
   } = {}
 ) {
   const {
@@ -94,19 +94,21 @@ function setupMocks(
     activeWorkspaceId,
     activeProjectId,
     workspaces,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSettingsStore).mockReturnValue({
     loadSettings: mockLoadSettings,
     globalSettings,
     markWelcomeSeen: mockMarkWelcomeSeen,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSessionStore).mockReturnValue({
     handleProcessExit: mockHandleProcessExit,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useToastStore).mockReturnValue({
     addToast: mockAddToast,
-  } as any)
-  vi.mocked(useExtensionRegistry).mockReturnValue(defaultExtensionRegistry as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
+  vi.mocked(useExtensionRegistry).mockReturnValue(
+    defaultExtensionRegistry as unknown as ReturnType<typeof useExtensionRegistry>
+  )
 }
 
 let mockUnsubscribe: ReturnType<typeof vi.fn>
@@ -114,7 +116,7 @@ let mockUnsubscribe: ReturnType<typeof vi.fn>
 beforeEach(() => {
   vi.clearAllMocks()
   mockUnsubscribe = vi.fn()
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     terminal: {
       onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe),
     },
@@ -124,7 +126,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('App', () => {
@@ -224,7 +226,13 @@ describe('App', () => {
 
   it('subscribes to terminal process exit events on mount', () => {
     render(<App />)
-    expect((globalThis as any).electronAPI.terminal.onProcessExit).toHaveBeenCalled()
+    expect(
+      (globalThis as unknown as Record<string, unknown>).electronAPI as Record<string, unknown>
+    ).toBeTruthy()
+    expect(
+      (window.electronAPI as unknown as { terminal: { onProcessExit: ReturnType<typeof vi.fn> } })
+        .terminal.onProcessExit
+    ).toHaveBeenCalled()
   })
 
   it('calls loadSettings with activeWorkspaceId when workspace changes', () => {
@@ -245,7 +253,7 @@ describe('App', () => {
 
   it('calls onMenuOpenSettings extensionEvent to open settings panel', async () => {
     let openSettingsCallback: (() => void) | null = null
-    ;(globalThis as any).electronAPI = {
+    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
       terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
       extensionEvents: {
         onMenuOpenSettings: (cb: () => void) => {
@@ -265,13 +273,13 @@ describe('App', () => {
   })
 
   it('calls onToast extensionEvent to display a toast', () => {
-    ;(globalThis as any).electronAPI = {
+    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
       terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
       extensionEvents: {
         onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
         onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
         onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onToast: (cb: (payload: any) => void) => {
+        onToast: (cb: (payload: { type: string; message: string }) => void) => {
           cb({ type: 'info', message: 'hello' })
           return vi.fn()
         },
@@ -288,8 +296,8 @@ describe('App', () => {
     vi.mocked(useExtensionRegistry).mockReturnValue({
       ...defaultExtensionRegistry,
       togglePanel: mockTogglePanel,
-    } as any)
-    ;(globalThis as any).electronAPI = {
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
       terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
       extensionEvents: {
         onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
@@ -312,8 +320,8 @@ describe('App', () => {
     vi.mocked(useExtensionRegistry).mockReturnValue({
       ...defaultExtensionRegistry,
       setActiveProjectTab: mockSetActiveProjectTab,
-    } as any)
-    ;(globalThis as any).electronAPI = {
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
       terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
       extensionEvents: {
         onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),

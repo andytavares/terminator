@@ -17,11 +17,15 @@ Lists all open PRs for the current repository via `gh pr list`.
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
-{ repoRoot: string }
+{
+  repoRoot: string
+}
 ```
 
 **Response**:
+
 ```typescript
 { prs: ReviewQueuePR[] } | { error: string } | { error: 'RATE_LIMITED', resetAt: number }
 ```
@@ -37,16 +41,22 @@ Fetches full PR metadata and the ordered chapter/file list.
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
-{ repoRoot: string; prNumber: number }
+{
+  repoRoot: string
+  prNumber: number
+}
 ```
 
 **Response**:
+
 ```typescript
 { pr: PrReviewDetail } | { error: string } | { error: 'RATE_LIMITED', resetAt: number }
 ```
 
 **gh commands**:
+
 - `gh pr view <prNumber> --json number,title,body,author,createdAt,headRefName,baseRefName,headRefOid,statusCheckRollup`
 - `gh pr view <prNumber> --json files` (for file list with additions/deletions)
 
@@ -61,11 +71,17 @@ Returns the parsed unified diff for a single PR file.
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
-{ repoRoot: string; prNumber: number; path: string }
+{
+  repoRoot: string
+  prNumber: number
+  path: string
+}
 ```
 
 **Response**:
+
 ```typescript
 { diff: FileDiff } | { error: string }
 ```
@@ -83,11 +99,16 @@ Returns churn, blast radius, and test-file-presence for a single changed file. U
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
-{ repoRoot: string; path: string }
+{
+  repoRoot: string
+  path: string
+}
 ```
 
 **Response**:
+
 ```typescript
 {
   churn90d: number
@@ -99,6 +120,7 @@ Returns churn, blast radius, and test-file-presence for a single changed file. U
 ```
 
 **Shell commands** (all via `git` — allowed command):
+
 - Churn: `git log --oneline --since="90 days ago" -- <path>` (line count)
 - Blast radius: `git grep -l "from.*<basename>" --` (approximate; counts unique files)
 - Test presence: `git ls-files -- <spec-path-pattern>`
@@ -112,11 +134,16 @@ Returns all inline review comments for a PR, including threads.
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
-{ repoRoot: string; prNumber: number }
+{
+  repoRoot: string
+  prNumber: number
+}
 ```
 
 **Response**:
+
 ```typescript
 { comments: InlineComment[] } | { error: string } | { error: 'RATE_LIMITED', resetAt: number }
 ```
@@ -132,6 +159,7 @@ Creates a new inline comment on a specific line or line range.
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
 {
   repoRoot: string
@@ -146,6 +174,7 @@ Creates a new inline comment on a specific line or line range.
 ```
 
 **Response**:
+
 ```typescript
 { comment: InlineComment } | { error: string }
 ```
@@ -161,16 +190,18 @@ Replies to an existing inline comment (creates a thread reply).
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
 {
   repoRoot: string
   prNumber: number
-  inReplyToId: number     // GitHub comment ID of the root comment
+  inReplyToId: number // GitHub comment ID of the root comment
   body: string
 }
 ```
 
 **Response**:
+
 ```typescript
 { comment: InlineComment } | { error: string }
 ```
@@ -186,17 +217,19 @@ Submits a formal GitHub review (approve / request changes / comment only).
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
 {
   repoRoot: string
   prNumber: number
-  commitId: string        // PR head SHA
+  commitId: string // PR head SHA
   event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT'
   body: string
 }
 ```
 
 **Response**:
+
 ```typescript
 { reviewId: number } | { error: string }
 ```
@@ -212,11 +245,15 @@ Reads a persisted review session from electron-store on the main process. The re
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
-{ key: string }  // "${repoRoot}:::${prNumber}:::${headSHA}"
+{
+  key: string
+} // "${repoRoot}:::${prNumber}:::${headSHA}"
 ```
 
 **Response**:
+
 ```typescript
 { session: ReviewSession } | { session: null }
 ```
@@ -230,11 +267,16 @@ Writes a review session to electron-store on the main process. Called automatica
 **Direction**: renderer → main (invoke/handle)
 
 **Request**:
+
 ```typescript
-{ key: string; session: ReviewSession }
+{
+  key: string
+  session: ReviewSession
+}
 ```
 
 **Response**:
+
 ```typescript
 { ok: true } | { error: string }
 ```
@@ -252,9 +294,28 @@ interface ElectronAPI {
   github: {
     listOpenPrs(repoRoot: string): Promise<{ prs: unknown[] } | { error: string }>
     prReviewDetail(repoRoot: string, prNumber: number): Promise<{ pr: unknown } | { error: string }>
-    prFileDiff(repoRoot: string, prNumber: number, path: string): Promise<{ diff: unknown } | { error: string }>
-    fileMetrics(repoRoot: string, path: string): Promise<{ churn90d: number; blastRadius: number; topImporters: string[]; importerCount: number; testFilePresent: boolean } | { error: string }>
-    prInlineComments(repoRoot: string, prNumber: number): Promise<{ comments: unknown[] } | { error: string }>
+    prFileDiff(
+      repoRoot: string,
+      prNumber: number,
+      path: string
+    ): Promise<{ diff: unknown } | { error: string }>
+    fileMetrics(
+      repoRoot: string,
+      path: string
+    ): Promise<
+      | {
+          churn90d: number
+          blastRadius: number
+          topImporters: string[]
+          importerCount: number
+          testFilePresent: boolean
+        }
+      | { error: string }
+    >
+    prInlineComments(
+      repoRoot: string,
+      prNumber: number
+    ): Promise<{ comments: unknown[] } | { error: string }>
     prCommentAdd(payload: unknown): Promise<{ comment: unknown } | { error: string }>
     prCommentReply(payload: unknown): Promise<{ comment: unknown } | { error: string }>
     prReviewSubmit(payload: unknown): Promise<{ reviewId: number } | { error: string }>

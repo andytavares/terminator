@@ -14,7 +14,9 @@ Element.prototype.scrollIntoView = vi.fn()
 const mockClear = vi.fn()
 
 beforeEach(() => {
-  vi.mocked(useLogStore).mockReturnValue({ entries: [], clear: mockClear } as any)
+  vi.mocked(useLogStore).mockReturnValue({ entries: [], clear: mockClear } as unknown as ReturnType<
+    typeof useLogStore
+  >)
 })
 
 describe('LogWindow', () => {
@@ -36,7 +38,7 @@ describe('LogWindow', () => {
         { id: '2', level: 'error', message: 'something failed', timestamp: '12:00:01' },
       ],
       clear: mockClear,
-    } as any)
+    } as unknown as ReturnType<typeof useLogStore>)
     render(<LogWindow onClose={vi.fn()} />)
     expect(screen.getByText('started up')).toBeTruthy()
     expect(screen.getByText('something failed')).toBeTruthy()
@@ -71,7 +73,7 @@ describe('LogWindow', () => {
         { id: '2', level: 'log', message: 'debug info', timestamp: '12:00:01' },
       ],
       clear: mockClear,
-    } as any)
+    } as unknown as ReturnType<typeof useLogStore>)
     render(<LogWindow onClose={vi.fn()} />)
     expect(screen.getByText(/^WARN$/)).toBeTruthy()
     expect(screen.getByText(/^LOG/)).toBeTruthy()

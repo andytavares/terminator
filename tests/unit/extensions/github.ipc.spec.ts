@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const { execFileMock } = vi.hoisted(() => {
   const CUSTOM_SYM = Symbol.for('nodejs.util.promisify.custom')
   const mock = vi.fn()
-  ;(mock as any)[CUSTOM_SYM] = vi.fn()
+  ;(mock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[CUSTOM_SYM] = vi.fn()
   return { execFileMock: mock }
 })
 vi.mock('child_process', () => ({ execFile: execFileMock }))
@@ -37,7 +37,9 @@ function register(channel: string, handler: Handler) {
 }
 
 function customMock() {
-  return (execFileMock as any)[Symbol.for('nodejs.util.promisify.custom')]
+  return (execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[
+    Symbol.for('nodejs.util.promisify.custom')
+  ]
 }
 
 function mockResolve(stdout: string) {
@@ -52,7 +54,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   handlers.clear()
   Object.keys(storeData).forEach((k) => delete storeData[k])
-  registerGithubHandlers(register as any)
+  registerGithubHandlers(register as Parameters<typeof registerGithubHandlers>[0])
 })
 
 // ─── Helper: get registered handler ───────────────────────────────────────────
@@ -188,7 +190,7 @@ describe('github:file-metrics', () => {
     const result = (await getHandler('github:file-metrics')({
       repoRoot: '/repo',
       path: 'src/app.ts',
-    })) as any
+    })) as Record<string, unknown>
     expect(result.churn90d).toBe(3)
     expect(result.blastRadius).toBe(2) // importerLines excludes the file itself (src/app.ts not in importer list)
     expect(result.testFilePresent).toBe(true)
@@ -234,7 +236,7 @@ describe('github:pr-inline-comments', () => {
     const result = (await getHandler('github:pr-inline-comments')({
       repoRoot: '/repo',
       prNumber: 42,
-    })) as { comments: any[] }
+    })) as { comments: Record<string, unknown>[] }
     expect(result.comments).toHaveLength(1)
     expect(result.comments[0].author).toBe('alice')
     expect(result.comments[0].body).toBe('LGTM')
@@ -260,7 +262,7 @@ describe('github:pr-inline-comments', () => {
     const result = (await getHandler('github:pr-inline-comments')({
       repoRoot: '/repo',
       prNumber: 42,
-    })) as { comments: any[] }
+    })) as { comments: Record<string, unknown>[] }
     expect(result.comments[0].isReply).toBe(true)
     expect(result.comments[0].parentId).toBe(1)
     expect(result.comments[0].threadId).toBe('1')

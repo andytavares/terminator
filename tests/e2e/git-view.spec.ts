@@ -79,15 +79,18 @@ test('US2: Commit is blocked when message is empty', async () => {
 // US2: Stage via IPC then commit
 test('US2: git:stage and git:commit IPC handlers respond correctly', async () => {
   // Stage the README change
-  const stageResult = await electronApp.evaluate(async (_, { dir }) => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { stageFiles } = require('./out/main/git/git-service.js')
-      return await stageFiles(dir, ['README.md'])
-    } catch {
-      return { error: 'service not available in dev mode' }
-    }
-  }, { dir: gitRepoDir })
+  const stageResult = await electronApp.evaluate(
+    async (_, { dir }) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { stageFiles } = require('./out/main/git/git-service.js')
+        return await stageFiles(dir, ['README.md'])
+      } catch {
+        return { error: 'service not available in dev mode' }
+      }
+    },
+    { dir: gitRepoDir }
+  )
 
   // Stage may succeed or fail in test environment (module paths differ in dev vs prod)
   expect(stageResult).toBeDefined()

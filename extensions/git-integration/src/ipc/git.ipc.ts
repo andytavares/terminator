@@ -5,12 +5,17 @@ import { getStatus, getDiff, stageFiles, unstageFiles, commitChanges } from '../
 
 const execFile = promisify(execFileCb)
 
-type RegisterFn = (channel: string, handler: (payload: unknown) => Promise<unknown> | unknown) => void
+type RegisterFn = (
+  channel: string,
+  handler: (payload: unknown) => Promise<unknown> | unknown
+) => void
 
 export function registerGitExtensionHandlers(register: RegisterFn): void {
-
   register('git:status', async (payload) => {
-    const schema = z.object({ path: z.string().min(1), maxFiles: z.number().int().positive().optional() })
+    const schema = z.object({
+      path: z.string().min(1),
+      maxFiles: z.number().int().positive().optional(),
+    })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     try {

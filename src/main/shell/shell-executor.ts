@@ -79,9 +79,7 @@ export function execShell(input: ShellExecInput): Promise<ShellExecOutput> {
         },
       },
       (error, stdout, stderr) => {
-        const exitCode = error?.code != null
-          ? (typeof error.code === 'number' ? error.code : 1)
-          : 0
+        const exitCode = error?.code != null ? (typeof error.code === 'number' ? error.code : 1) : 0
         resolve({ exitCode, stdout, stderr, timedOut })
       }
     )

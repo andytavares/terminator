@@ -14,8 +14,12 @@
 }
 
 @keyframes log-slide-up {
-  from { transform: translateY(100%); }
-  to   { transform: translateY(0); }
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 .log-window__header {
@@ -48,7 +52,9 @@
   font-family: var(--font-mono);
   padding: 2px 8px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .log-window__btn:hover {
@@ -109,10 +115,18 @@
   width: 32px;
 }
 
-.log-entry--log   .log-entry__level { color: #6b7280; }
-.log-entry--info  .log-entry__level { color: #60a5fa; }
-.log-entry--warn  .log-entry__level { color: #facc15; }
-.log-entry--error .log-entry__level { color: #f87171; }
+.log-entry--log .log-entry__level {
+  color: #6b7280;
+}
+.log-entry--info .log-entry__level {
+  color: #60a5fa;
+}
+.log-entry--warn .log-entry__level {
+  color: #facc15;
+}
+.log-entry--error .log-entry__level {
+  color: #f87171;
+}
 
 .log-entry__msg {
   color: var(--text-secondary);
@@ -121,5 +135,9 @@
   flex: 1;
 }
 
-.log-entry--error .log-entry__msg { color: #fca5a5; }
-.log-entry--warn  .log-entry__msg { color: #fde68a; }
+.log-entry--error .log-entry__msg {
+  color: #fca5a5;
+}
+.log-entry--warn .log-entry__msg {
+  color: #fde68a;
+}

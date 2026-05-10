@@ -15,11 +15,7 @@ export function ToastContainer(): JSX.Element {
   return (
     <div className="toast-container" aria-live="polite">
       {toasts.map((toast) => (
-        <div
-          key={toast.id}
-          className={`toast toast--${toast.type}`}
-          role="alert"
-        >
+        <div key={toast.id} className={`toast toast--${toast.type}`} role="alert">
           <span className="toast__icon">{ICONS[toast.type]}</span>
           <span className="toast__message">{toast.message}</span>
           <button

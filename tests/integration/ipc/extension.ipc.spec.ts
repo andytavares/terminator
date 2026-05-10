@@ -41,9 +41,9 @@ function captureOn(channel: string): (event: unknown, payload?: unknown) => unkn
 describe('extension IPC handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    ;(globalRegistry.sidebarItems as Map<string, any>).clear()
-    ;(globalRegistry.contextMenuItems as Map<string, any>).clear()
-    registerExtensionHandlers(mockExtensionHost as any)
+    ;(globalRegistry.sidebarItems as Map<string, unknown>).clear()
+    ;(globalRegistry.contextMenuItems as Map<string, unknown>).clear()
+    registerExtensionHandlers(mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0])
   })
 
   describe('extension:list', () => {
@@ -95,7 +95,7 @@ describe('extension IPC handlers', () => {
     })
 
     it('returns mapped sidebar items from registry', () => {
-      ;(globalRegistry.sidebarItems as Map<string, any>).set('item1', {
+      ;(globalRegistry.sidebarItems as Map<string, unknown>).set('item1', {
         id: 'sidebar-1',
         label: 'Git',
         tooltip: 'Git panel',
@@ -115,11 +115,11 @@ describe('extension IPC handlers', () => {
     })
 
     it('returns only items matching the given target', () => {
-      ;(globalRegistry.contextMenuItems as Map<string, any>).set('ext1.open', {
+      ;(globalRegistry.contextMenuItems as Map<string, unknown>).set('ext1.open', {
         target: 'file',
         item: { id: 'open', label: 'Open in editor' },
       })
-      ;(globalRegistry.contextMenuItems as Map<string, any>).set('ext1.delete', {
+      ;(globalRegistry.contextMenuItems as Map<string, unknown>).set('ext1.delete', {
         target: 'project',
         item: { id: 'delete', label: 'Delete project' },
       })
@@ -133,7 +133,7 @@ describe('extension IPC handlers', () => {
   describe('extension:context-menu-click', () => {
     it('calls onClick for the matching context menu item', () => {
       const onClick = vi.fn()
-      ;(globalRegistry.contextMenuItems as Map<string, any>).set('ext1.open', {
+      ;(globalRegistry.contextMenuItems as Map<string, unknown>).set('ext1.open', {
         target: 'file',
         item: { id: 'open', label: 'Open', onClick },
       })
@@ -144,7 +144,7 @@ describe('extension IPC handlers', () => {
 
     it('does not call onClick when target does not match', () => {
       const onClick = vi.fn()
-      ;(globalRegistry.contextMenuItems as Map<string, any>).set('ext1.open', {
+      ;(globalRegistry.contextMenuItems as Map<string, unknown>).set('ext1.open', {
         target: 'file',
         item: { id: 'open', label: 'Open', onClick },
       })

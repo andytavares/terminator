@@ -10,15 +10,15 @@ This document defines the **additions** to the `ExtensionAPI` interface required
 
 ## Summary of Additions
 
-| Surface | Method | Requirement |
-|---|---|---|
-| `sidebar` | `registerPanel(slot, panel)` | FR-022 |
-| `topBar` | `registerMenuItem(item)` | FR-023 |
-| `shell` | `exec(options)` | FR-024 |
-| `notifications` | `showToast(type, message)` | FR-026 |
-| `fs` | `watch(handler)` | FR-027 |
-| `nativeMenu` | `addViewMenuItem(item)` | FR-030 |
-| `SettingDefinition` | `workspaceScoped?: boolean` | FR-025 |
+| Surface             | Method                       | Requirement |
+| ------------------- | ---------------------------- | ----------- |
+| `sidebar`           | `registerPanel(slot, panel)` | FR-022      |
+| `topBar`            | `registerMenuItem(item)`     | FR-023      |
+| `shell`             | `exec(options)`              | FR-024      |
+| `notifications`     | `showToast(type, message)`   | FR-026      |
+| `fs`                | `watch(handler)`             | FR-027      |
+| `nativeMenu`        | `addViewMenuItem(item)`      | FR-030      |
+| `SettingDefinition` | `workspaceScoped?: boolean`  | FR-025      |
 
 ---
 
@@ -30,7 +30,7 @@ interface ExtensionAPI {
   //    contextMenu, keyboard, terminal ──
 
   sidebar: {
-    registerItem(item: SidebarContribution): Disposable  // existing (v1.0.0)
+    registerItem(item: SidebarContribution): Disposable // existing (v1.0.0)
 
     /**
      * Register a full UI panel into a named layout slot.
@@ -221,9 +221,9 @@ interface SettingDefinition {
   label: string
   description?: string
   default: unknown
-  options?: string[]   // For type 'enum' only
-  min?: number         // For type 'number' only
-  max?: number         // For type 'number' only
+  options?: string[] // For type 'enum' only
+  min?: number // For type 'number' only
+  max?: number // For type 'number' only
   /**
    * NEW in v1.1.0: When true, this setting can be overridden at workspace level.
    * Workspace-level value takes precedence when api.settings.get() is called

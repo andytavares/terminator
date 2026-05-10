@@ -18,7 +18,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
 
   useEffect(() => {
     if (activeSessionId) clearBellCount(activeSessionId)
-  }, [activeSessionId])
+  }, [activeSessionId, clearBellCount])
 
   useEffect(() => {
     const prevId = prevSessionIdRef.current
@@ -36,7 +36,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     }
 
     prevSessionIdRef.current = nextId
-  }, [activeSessionId])
+  }, [activeSessionId, getTerminalInstance])
 
   if (sessions.length === 0) {
     return (

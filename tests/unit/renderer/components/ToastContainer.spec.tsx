@@ -11,7 +11,10 @@ vi.mock('../../../../src/renderer/stores/toast.store', () => ({
 const mockRemoveToast = vi.fn()
 
 beforeEach(() => {
-  vi.mocked(useToastStore).mockReturnValue({ toasts: [], removeToast: mockRemoveToast } as any)
+  vi.mocked(useToastStore).mockReturnValue({
+    toasts: [],
+    removeToast: mockRemoveToast,
+  } as unknown as ReturnType<typeof useToastStore>)
 })
 
 describe('ToastContainer', () => {
@@ -25,7 +28,7 @@ describe('ToastContainer', () => {
     vi.mocked(useToastStore).mockReturnValue({
       toasts: [{ id: '1', type: 'info', message: 'Hello world' }],
       removeToast: mockRemoveToast,
-    } as any)
+    } as unknown as ReturnType<typeof useToastStore>)
     render(<ToastContainer />)
     expect(screen.getByText('Hello world')).toBeTruthy()
     expect(screen.getByText('ℹ')).toBeTruthy()
@@ -35,7 +38,7 @@ describe('ToastContainer', () => {
     vi.mocked(useToastStore).mockReturnValue({
       toasts: [{ id: '2', type: 'success', message: 'Done!' }],
       removeToast: mockRemoveToast,
-    } as any)
+    } as unknown as ReturnType<typeof useToastStore>)
     render(<ToastContainer />)
     expect(screen.getByText('Done!')).toBeTruthy()
     expect(screen.getByText('✓')).toBeTruthy()
@@ -45,7 +48,7 @@ describe('ToastContainer', () => {
     vi.mocked(useToastStore).mockReturnValue({
       toasts: [{ id: '3', type: 'error', message: 'Failed!' }],
       removeToast: mockRemoveToast,
-    } as any)
+    } as unknown as ReturnType<typeof useToastStore>)
     render(<ToastContainer />)
     expect(screen.getByText('Failed!')).toBeTruthy()
   })
@@ -54,7 +57,7 @@ describe('ToastContainer', () => {
     vi.mocked(useToastStore).mockReturnValue({
       toasts: [{ id: '4', type: 'warning', message: 'Careful!' }],
       removeToast: mockRemoveToast,
-    } as any)
+    } as unknown as ReturnType<typeof useToastStore>)
     render(<ToastContainer />)
     expect(screen.getByText('Careful!')).toBeTruthy()
     expect(screen.getByText('⚠')).toBeTruthy()
@@ -64,7 +67,7 @@ describe('ToastContainer', () => {
     vi.mocked(useToastStore).mockReturnValue({
       toasts: [{ id: '5', type: 'info', message: 'Test' }],
       removeToast: mockRemoveToast,
-    } as any)
+    } as unknown as ReturnType<typeof useToastStore>)
     render(<ToastContainer />)
     fireEvent.click(screen.getByLabelText('Dismiss'))
     expect(mockRemoveToast).toHaveBeenCalledWith('5')
@@ -77,7 +80,7 @@ describe('ToastContainer', () => {
         { id: '2', type: 'error', message: 'Second' },
       ],
       removeToast: mockRemoveToast,
-    } as any)
+    } as unknown as ReturnType<typeof useToastStore>)
     const { container } = render(<ToastContainer />)
     expect(container.querySelectorAll('.toast').length).toBe(2)
   })

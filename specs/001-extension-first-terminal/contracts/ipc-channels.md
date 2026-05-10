@@ -639,11 +639,11 @@ Returns churn, blast radius (actual code importers only — not prose), test fil
 
 These channels are sent from the main process menu to the renderer via `webContents.send`.
 
-| Channel                      | Payload | Effect                                              |
-| ---------------------------- | ------- | --------------------------------------------------- |
-| `menu:open-settings`         | none    | Opens the Settings panel                            |
-| `menu:toggle-sidebar`        | none    | Toggles the Projects Panel sidebar                  |
-| `menu:open-pr-review-window` | none    | Triggers `window:open-pr-review` for active repo    |
+| Channel                      | Payload | Effect                                           |
+| ---------------------------- | ------- | ------------------------------------------------ |
+| `menu:open-settings`         | none    | Opens the Settings panel                         |
+| `menu:toggle-sidebar`        | none    | Toggles the Projects Panel sidebar               |
+| `menu:open-pr-review-window` | none    | Triggers `window:open-pr-review` for active repo |
 
 ---
 

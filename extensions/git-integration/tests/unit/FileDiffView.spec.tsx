@@ -4,11 +4,13 @@ import { render, screen, fireEvent } from '@testing-library/react'
 
 vi.mock('highlight.js', () => ({
   default: {
-    highlight: vi.fn((_content: string, _opts: any) => ({ value: '<span>highlighted</span>' })),
+    highlight: vi.fn((_content: string, _opts: { language: string }) => ({
+      value: '<span>highlighted</span>',
+    })),
   },
 }))
 
-const makeDiff = (overrides: any = {}) => ({
+const makeDiff = (overrides: Record<string, unknown> = {}) => ({
   path: 'src/foo.ts',
   isBinary: false,
   truncated: false,
@@ -25,7 +27,7 @@ const makeDiff = (overrides: any = {}) => ({
   ...overrides,
 })
 
-async function renderDiff(props: any = {}) {
+async function renderDiff(props: Record<string, unknown> = {}) {
   const { FileDiffView } = await import('../../src/components/FileDiffView')
   return render(<FileDiffView diff={props.diff ?? makeDiff()} {...props} />)
 }

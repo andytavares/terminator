@@ -1,5 +1,12 @@
 import { create } from 'zustand'
-import type { ReviewSession, PrReviewDetail, ReviewQueuePR, Thread, RiskScore, SignalDots } from '../schemas/pr-review.schema'
+import type {
+  ReviewSession,
+  PrReviewDetail,
+  ReviewQueuePR,
+  Thread,
+  RiskScore,
+  SignalDots,
+} from '../schemas/pr-review.schema'
 
 interface RateLimitState {
   resetAt: number
@@ -49,7 +56,13 @@ interface PrReviewStore {
 
   markFileViewed(repoRoot: string, prNumber: number, headSHA: string, filePath: string): void
   unmarkFileViewed(repoRoot: string, prNumber: number, headSHA: string, filePath: string): void
-  reorderFiles(chapterId: string, orderedPaths: string[], repoRoot: string, prNumber: number, headSHA: string): void
+  reorderFiles(
+    chapterId: string,
+    orderedPaths: string[],
+    repoRoot: string,
+    prNumber: number,
+    headSHA: string
+  ): void
   setScrollPosition(pos: number | null): void
   setPaused(repoRoot: string, prNumber: number, headSHA: string, isoTimestamp: string | null): void
 
@@ -57,7 +70,11 @@ interface PrReviewStore {
 
   updateFileRiskScore(chapterId: string, filePath: string, riskScore: RiskScore): void
   patchFileComplexity(chapterId: string, filePath: string, complexityDelta: number): void
-  updateQueuePrRisk(prNumber: number, riskLevel: 'low' | 'medium' | 'high', signalDots: SignalDots): void
+  updateQueuePrRisk(
+    prNumber: number,
+    riskLevel: 'low' | 'medium' | 'high',
+    signalDots: SignalDots
+  ): void
 
   setRateLimitState(state: RateLimitState | null): void
 
@@ -70,48 +87,56 @@ function sessionKey(repoRoot: string, prNumber: number, headSHA: string): string
 }
 
 async function persistSession(
-  store: Pick<PrReviewStore, 'viewedFiles' | 'fileOrderOverrides' | 'scrollPosition' | 'pausedAt' | 'currentChapterId' | 'currentFilePath'>,
+  store: Pick<
+    PrReviewStore,
+    | 'viewedFiles'
+    | 'fileOrderOverrides'
+    | 'scrollPosition'
+    | 'pausedAt'
+    | 'currentChapterId'
+    | 'currentFilePath'
+  >,
   repoRoot: string,
   prNumber: number,
-  headSHA: string,
+  headSHA: string
 ): Promise<void> {
   if (typeof window === 'undefined') return
   const session: ReviewSession = {
     repoRoot,
     prNumber,
     headSHA,
-    currentChapterId:   store.currentChapterId,
-    currentFilePath:    store.currentFilePath,
-    viewedFiles:        [...store.viewedFiles],
+    currentChapterId: store.currentChapterId,
+    currentFilePath: store.currentFilePath,
+    viewedFiles: [...store.viewedFiles],
     fileOrderOverrides: store.fileOrderOverrides,
-    scrollPosition:     store.scrollPosition,
-    pausedAt:           store.pausedAt,
-    lastAccessedAt:     new Date().toISOString(),
+    scrollPosition: store.scrollPosition,
+    pausedAt: store.pausedAt,
+    lastAccessedAt: new Date().toISOString(),
   }
   const key = sessionKey(repoRoot, prNumber, headSHA)
   await window.electronAPI.github.sessionSet(key, session)
 }
 
 export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
-  prQueue:            [],
-  queueLoading:       false,
-  loadingMorePrs:     false,
-  queueError:         null,
-  hasMorePrs:         false,
-  nextPrCursor:       undefined,
-  includeClosedPrs:   false,
-  activePr:           null,
-  currentChapterId:   null,
-  currentFilePath:    null,
-  viewedFiles:        new Set(),
+  prQueue: [],
+  queueLoading: false,
+  loadingMorePrs: false,
+  queueError: null,
+  hasMorePrs: false,
+  nextPrCursor: undefined,
+  includeClosedPrs: false,
+  activePr: null,
+  currentChapterId: null,
+  currentFilePath: null,
+  viewedFiles: new Set(),
   fileOrderOverrides: {},
-  scrollPosition:     null,
-  pausedAt:           null,
-  threads:            {},
-  rateLimitState:     null,
+  scrollPosition: null,
+  pausedAt: null,
+  threads: {},
+  rateLimitState: null,
 
   setQueue: (prs) => set({ prQueue: prs }),
-  appendQueue: (prs) => set(state => ({ prQueue: [...state.prQueue, ...prs] })),
+  appendQueue: (prs) => set((state) => ({ prQueue: [...state.prQueue, ...prs] })),
   setQueueLoading: (loading) => set({ queueLoading: loading }),
   setLoadingMorePrs: (loading) => set({ loadingMorePrs: loading }),
   setQueueError: (error) => set({ queueError: error }),
@@ -124,7 +149,7 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   setCurrentFile: (filePath) => set({ currentFilePath: filePath }),
 
   markFileViewed: (repoRoot, prNumber, headSHA, filePath) => {
-    set(state => {
+    set((state) => {
       const next = new Set(state.viewedFiles)
       next.add(filePath)
       return { viewedFiles: next }
@@ -134,7 +159,7 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   },
 
   unmarkFileViewed: (repoRoot, prNumber, headSHA, filePath) => {
-    set(state => {
+    set((state) => {
       const next = new Set(state.viewedFiles)
       next.delete(filePath)
       return { viewedFiles: next }
@@ -144,7 +169,7 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   },
 
   reorderFiles: (chapterId, orderedPaths, repoRoot, prNumber, headSHA) => {
-    set(state => ({
+    set((state) => ({
       fileOrderOverrides: { ...state.fileOrderOverrides, [chapterId]: orderedPaths },
     }))
     const state = get()
@@ -160,40 +185,40 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   },
 
   setThreads: (path, threads) =>
-    set(state => ({ threads: { ...state.threads, [path]: threads } })),
+    set((state) => ({ threads: { ...state.threads, [path]: threads } })),
 
   updateFileRiskScore: (chapterId, filePath, riskScore) =>
-    set(state => {
+    set((state) => {
       if (!state.activePr) return {}
-      const chapters = state.activePr.chapters.map(chapter => {
+      const chapters = state.activePr.chapters.map((chapter) => {
         if (chapter.id !== chapterId) return chapter
         return {
           ...chapter,
-          files: chapter.files.map(f =>
-            f.path === filePath ? { ...f, riskScore } : f
-          ),
+          files: chapter.files.map((f) => (f.path === filePath ? { ...f, riskScore } : f)),
         }
       })
       return { activePr: { ...state.activePr, chapters } }
     }),
 
   patchFileComplexity: (chapterId, filePath, complexityDelta) =>
-    set(state => {
+    set((state) => {
       if (!state.activePr) return {}
-      const chapters = state.activePr.chapters.map(chapter => {
+      const chapters = state.activePr.chapters.map((chapter) => {
         if (chapter.id !== chapterId) return chapter
         return {
           ...chapter,
-          files: chapter.files.map(f => {
+          files: chapter.files.map((f) => {
             if (f.path !== filePath) return f
             const prevComposite = f.riskScore.composite ?? 0
             // Simple adjustment: apply complexity weight (0.10 * 80) relative to thresholds
-            const compContrib = complexityDelta <= 0 ? 0 : Math.min(1, complexityDelta / 15) * 0.10 * 80
-            const newComposite = Math.min(100, Math.round(
-              f.riskScore.metrics.changeSize != null
-                ? prevComposite + compContrib
-                : prevComposite
-            ))
+            const compContrib =
+              complexityDelta <= 0 ? 0 : Math.min(1, complexityDelta / 15) * 0.1 * 80
+            const newComposite = Math.min(
+              100,
+              Math.round(
+                f.riskScore.metrics.changeSize != null ? prevComposite + compContrib : prevComposite
+              )
+            )
             const level: 'low' | 'medium' | 'high' =
               newComposite >= 67 ? 'high' : newComposite >= 34 ? 'medium' : 'low'
             return {
@@ -212,8 +237,8 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
     }),
 
   updateQueuePrRisk: (prNumber, riskLevel, signalDots) =>
-    set(state => ({
-      prQueue: state.prQueue.map(pr =>
+    set((state) => ({
+      prQueue: state.prQueue.map((pr) =>
         pr.number === prNumber ? { ...pr, riskLevel, signalDots } : pr
       ),
     })),
@@ -222,24 +247,25 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
 
   initSession: (session) => {
     set({
-      currentChapterId:   session.currentChapterId,
-      currentFilePath:    session.currentFilePath,
-      viewedFiles:        new Set(session.viewedFiles),
+      currentChapterId: session.currentChapterId,
+      currentFilePath: session.currentFilePath,
+      viewedFiles: new Set(session.viewedFiles),
       fileOrderOverrides: session.fileOrderOverrides,
-      scrollPosition:     session.scrollPosition,
-      pausedAt:           session.pausedAt,
+      scrollPosition: session.scrollPosition,
+      pausedAt: session.pausedAt,
     })
   },
 
-  reset: () => set({
-    activePr:           null,
-    currentChapterId:   null,
-    currentFilePath:    null,
-    viewedFiles:        new Set(),
-    fileOrderOverrides: {},
-    scrollPosition:     null,
-    pausedAt:           null,
-    threads:            {},
-    rateLimitState:     null,
-  }),
+  reset: () =>
+    set({
+      activePr: null,
+      currentChapterId: null,
+      currentFilePath: null,
+      viewedFiles: new Set(),
+      fileOrderOverrides: {},
+      scrollPosition: null,
+      pausedAt: null,
+      threads: {},
+      rateLimitState: null,
+    }),
 }))

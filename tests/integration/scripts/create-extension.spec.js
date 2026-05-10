@@ -5,7 +5,7 @@ import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomBytes } from 'crypto'
 
-const SCRIPT = join(process.cwd(), 'scripts', 'create-extension.js')
+const SCRIPT = join(process.cwd(), 'scripts', 'create-extension.cjs')
 
 function run(args, opts = {}) {
   return spawnSync('node', [SCRIPT, ...args], {

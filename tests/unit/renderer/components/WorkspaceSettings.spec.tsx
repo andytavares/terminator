@@ -29,7 +29,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockLoadSettings.mockResolvedValue(undefined)
   mockUpdateWorkspace.mockResolvedValue(undefined)
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     settings: { updateWorkspace: mockUpdateWorkspace },
   }
   vi.mocked(useSettingsStore).mockReturnValue({
@@ -39,14 +39,14 @@ beforeEach(() => {
     updateWorkspaceScrollback: mockUpdateScrollback,
     updateWorkspaceWorktreeBaseDir: mockUpdateWorktreeDir,
     loadSettings: mockLoadSettings,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useWorkspaceStore).mockReturnValue({
     workspaces: [{ id: 'ws-1', name: 'My Workspace' }],
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('WorkspaceSettings', () => {
@@ -55,7 +55,7 @@ describe('WorkspaceSettings', () => {
       globalSettings: null,
       workspaceSettings: new Map(),
       loadSettings: mockLoadSettings,
-    } as any)
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
     render(<WorkspaceSettings workspaceId="ws-1" />)
     expect(screen.getByText('Loading...')).toBeTruthy()
   })
@@ -66,7 +66,9 @@ describe('WorkspaceSettings', () => {
   })
 
   it('shows workspaceId when workspace not found', () => {
-    vi.mocked(useWorkspaceStore).mockReturnValue({ workspaces: [] } as any)
+    vi.mocked(useWorkspaceStore).mockReturnValue({ workspaces: [] } as unknown as ReturnType<
+      typeof useWorkspaceStore
+    >)
     render(<WorkspaceSettings workspaceId="ws-unknown" />)
     expect(screen.getByText(/Settings for: ws-unknown/)).toBeTruthy()
   })

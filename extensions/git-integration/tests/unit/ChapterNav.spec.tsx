@@ -21,7 +21,7 @@ beforeEach(() => {
     currentChapterId: null,
     setCurrentChapter: mockSetCurrentChapter,
     viewedFiles: new Set<string>(),
-  } as any)
+  } as unknown as ReturnType<typeof usePrReviewStore>)
 })
 
 function makeChapter(id: string, name: string, files: string[] = ['a.ts']): Chapter {
@@ -58,7 +58,7 @@ describe('ChapterNav', () => {
       currentChapterId: 'c1',
       setCurrentChapter: mockSetCurrentChapter,
       viewedFiles: new Set<string>(),
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     const chapters = [makeChapter('c1', 'Core'), makeChapter('c2', 'Tests')]
     render(<ChapterNav chapters={chapters} />)
     const tabs = screen.getAllByRole('tab')
@@ -71,7 +71,7 @@ describe('ChapterNav', () => {
       currentChapterId: null,
       setCurrentChapter: mockSetCurrentChapter,
       viewedFiles: new Set(['a.ts', 'b.ts']),
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     const chapters = [makeChapter('c1', 'Core', ['a.ts']), makeChapter('c2', 'Tests', ['b.ts'])]
     render(<ChapterNav chapters={chapters} />)
     expect(screen.getAllByLabelText('complete').length).toBeGreaterThanOrEqual(1)

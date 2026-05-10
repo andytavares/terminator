@@ -1,8 +1,17 @@
-import type { GitStatus, GitFileStatus, FileDiff, DiffHunk, DiffLine } from '../../shared/schemas/git.schema.js'
+import type {
+  GitStatus,
+  GitFileStatus,
+  FileDiff,
+  DiffHunk,
+  DiffLine,
+} from '../../shared/schemas/git.schema.js'
 
 const DEFAULT_MAX_DIFF_BYTES = 500 * 1024 // 500 KB
 
-export function parseStatus(stdout: string, maxFiles: number): Omit<GitStatus, 'branch'> & { branch: string } {
+export function parseStatus(
+  stdout: string,
+  maxFiles: number
+): Omit<GitStatus, 'branch'> & { branch: string } {
   if (!stdout.trim()) {
     return { branch: '', files: [], hasConflicts: false, truncated: false }
   }
@@ -14,7 +23,10 @@ export function parseStatus(stdout: string, maxFiles: number): Omit<GitStatus, '
 
   while (i < entries.length && files.length < maxFiles) {
     const entry = entries[i]
-    if (entry.length < 3) { i++; continue }
+    if (entry.length < 3) {
+      i++
+      continue
+    }
 
     const xy = entry.slice(0, 2)
     const path = entry.slice(3)
@@ -22,12 +34,25 @@ export function parseStatus(stdout: string, maxFiles: number): Omit<GitStatus, '
     const y = xy[1]
 
     if (xy === '??' || xy === '!!') {
-      files.push({ path, status: xy === '??' ? 'untracked' : 'ignored', staged: false, isBinary: false })
+      files.push({
+        path,
+        status: xy === '??' ? 'untracked' : 'ignored',
+        staged: false,
+        isBinary: false,
+      })
       i++
       continue
     }
 
-    if (xy === 'UU' || xy === 'AA' || xy === 'DD' || xy === 'AU' || xy === 'UA' || xy === 'DU' || xy === 'UD') {
+    if (
+      xy === 'UU' ||
+      xy === 'AA' ||
+      xy === 'DD' ||
+      xy === 'AU' ||
+      xy === 'UA' ||
+      xy === 'DU' ||
+      xy === 'UD'
+    ) {
       files.push({ path, status: 'conflicted', staged: false, isBinary: false })
       hasConflicts = true
       i++
@@ -56,12 +81,18 @@ export function parseStatus(stdout: string, maxFiles: number): Omit<GitStatus, '
 function resolveStatus(x: string, y: string): GitFileStatus['status'] {
   const code = x !== ' ' ? x : y
   switch (code) {
-    case 'M': return 'modified'
-    case 'A': return 'added'
-    case 'D': return 'deleted'
-    case 'R': return 'renamed'
-    case 'C': return 'renamed'
-    default:  return 'modified'
+    case 'M':
+      return 'modified'
+    case 'A':
+      return 'added'
+    case 'D':
+      return 'deleted'
+    case 'R':
+      return 'renamed'
+    case 'C':
+      return 'renamed'
+    default:
+      return 'modified'
   }
 }
 
@@ -92,13 +123,28 @@ export function parseDiff(stdout: string, maxBytes: number = DEFAULT_MAX_DIFF_BY
     if (!currentHunk) continue
 
     if (line.startsWith('+')) {
-      const diffLine: DiffLine = { type: 'add', content: line.slice(1), oldLineNumber: null, newLineNumber: newLine++ }
+      const diffLine: DiffLine = {
+        type: 'add',
+        content: line.slice(1),
+        oldLineNumber: null,
+        newLineNumber: newLine++,
+      }
       currentHunk.lines.push(diffLine)
     } else if (line.startsWith('-')) {
-      const diffLine: DiffLine = { type: 'remove', content: line.slice(1), oldLineNumber: oldLine++, newLineNumber: null }
+      const diffLine: DiffLine = {
+        type: 'remove',
+        content: line.slice(1),
+        oldLineNumber: oldLine++,
+        newLineNumber: null,
+      }
       currentHunk.lines.push(diffLine)
     } else if (line.startsWith(' ')) {
-      const diffLine: DiffLine = { type: 'context', content: line.slice(1), oldLineNumber: oldLine++, newLineNumber: newLine++ }
+      const diffLine: DiffLine = {
+        type: 'context',
+        content: line.slice(1),
+        oldLineNumber: oldLine++,
+        newLineNumber: newLine++,
+      }
       currentHunk.lines.push(diffLine)
     }
   }

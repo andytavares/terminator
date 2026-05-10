@@ -20,7 +20,13 @@ export function ReviewSubmitPanel({ repoRoot, prNumber, commitId, onClose }: Pro
     setSubmitting(true)
     setError(null)
     try {
-      const result = await window.electronAPI.github.prReviewSubmit({ repoRoot, prNumber, commitId, event, body })
+      const result = await window.electronAPI.github.prReviewSubmit({
+        repoRoot,
+        prNumber,
+        commitId,
+        event,
+        body,
+      })
       if ('error' in result) throw new Error((result as { error: string }).error)
       setSubmitted(true)
     } catch (e) {
@@ -44,26 +50,33 @@ export function ReviewSubmitPanel({ repoRoot, prNumber, commitId, onClose }: Pro
       <h2 className="review-submit-heading">Submit review</h2>
 
       <div className="review-submit-options" role="radiogroup" aria-label="Review outcome">
-        {([['APPROVE', 'Approve'], ['REQUEST_CHANGES', 'Request changes'], ['COMMENT', 'Comment']] as const).map(
-          ([val, label]) => (
-            <label key={val} className={`review-submit-option review-submit-option--${val.toLowerCase().replace('_', '-')}${event === val ? ' review-submit-option--selected' : ''}`}>
-              <input
-                type="radio"
-                name="review-event"
-                value={val}
-                checked={event === val}
-                onChange={() => setEvent(val)}
-              />
-              {label}
-            </label>
-          )
-        )}
+        {(
+          [
+            ['APPROVE', 'Approve'],
+            ['REQUEST_CHANGES', 'Request changes'],
+            ['COMMENT', 'Comment'],
+          ] as const
+        ).map(([val, label]) => (
+          <label
+            key={val}
+            className={`review-submit-option review-submit-option--${val.toLowerCase().replace('_', '-')}${event === val ? ' review-submit-option--selected' : ''}`}
+          >
+            <input
+              type="radio"
+              name="review-event"
+              value={val}
+              checked={event === val}
+              onChange={() => setEvent(val)}
+            />
+            {label}
+          </label>
+        ))}
       </div>
 
       <textarea
         className="review-submit-body"
         value={body}
-        onChange={e => setBody(e.target.value)}
+        onChange={(e) => setBody(e.target.value)}
         placeholder="Leave a summary comment (optional)…"
         rows={5}
         disabled={submitting}
@@ -75,11 +88,7 @@ export function ReviewSubmitPanel({ repoRoot, prNumber, commitId, onClose }: Pro
         <button className="review-submit-cancel" onClick={onClose} disabled={submitting}>
           Cancel
         </button>
-        <button
-          className="review-submit-btn"
-          onClick={handleSubmit}
-          disabled={submitting}
-        >
+        <button className="review-submit-btn" onClick={handleSubmit} disabled={submitting}>
           {submitting ? 'Submitting…' : 'Submit review'}
         </button>
       </div>

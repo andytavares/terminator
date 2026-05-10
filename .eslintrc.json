@@ -13,6 +13,14 @@
   ],
   "ignorePatterns": ["dist", "out", "node_modules", ".eslintrc.json"],
   "parser": "@typescript-eslint/parser",
+  "overrides": [
+    {
+      "files": ["*.cjs"],
+      "rules": {
+        "@typescript-eslint/no-var-requires": "off"
+      }
+    }
+  ],
   "rules": {
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/no-unused-vars": [

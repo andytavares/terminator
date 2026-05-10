@@ -48,6 +48,7 @@ Documentation ships in the same change as the code. A feature is **not complete*
 | New dependency                      | `README.md` tech stack table + PR justification (community health + official docs link)                 |
 
 Rules:
+
 1. **Never mark a task complete** without checking whether documentation needs updating.
 2. **Before finishing any implementation session**, verify README.md and the relevant docs above reflect what was built.
 3. **Any new IPC channel** must be in `ipc-channels.md` and `electron.d.ts` before or alongside the handler code.

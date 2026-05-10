@@ -21,6 +21,7 @@ Deliver three things as part of this feature branch:
 **Runtime**: Node.js 20 LTS (bundled with Electron 30.x)
 **Framework**: Electron 30.x — existing
 **Primary Dependencies** (additions to Phase 1):
+
 - No new npm dependencies. All git/gh operations via `child_process.execFile` (stdlib). File watching via Node.js `fs.watch` (stdlib). Scaffolding CLI uses Node.js `fs` and `path` (stdlib).
 
 **Storage**: `electron-store` (existing) — extension settings stored in global/workspace stores
@@ -28,6 +29,7 @@ Deliver three things as part of this feature branch:
 **Target Platform**: macOS 13+, Windows 11, Ubuntu 22.04 LTS — consistent with Phase 1
 **Project Type**: Desktop application extension + developer tooling CLI — consistent with Phase 1
 **Performance Goals**:
+
 - Sidebar initial load: < 2s (SC-001)
 - Stage-and-commit workflow: < 60s (SC-002)
 - PR creation: < 90s (SC-003)
@@ -35,6 +37,7 @@ Deliver three things as part of this feature branch:
 - Scaffolding CLI: < 2s to generate a new extension directory
 
 **Constraints**:
+
 - Zero new npm dependencies (stdlib only for all new capabilities)
 - Sandboxed shell exec: CWD pinned to project root; `shell: false`; env sanitized
 - File cap: 500 changed files displayed by default; configurable via `git.maxDisplayedFiles`
@@ -47,15 +50,15 @@ Deliver three things as part of this feature branch:
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-|---|---|---|
-| I. Source Integrity | ✅ PASS | All decisions grounded in official Node.js, Electron, git, gh CLI documentation. No blog-only sources. |
-| II. Dependency Stewardship | ✅ PASS | Zero new npm dependencies. Native `fs.watch` (stdlib) over chokidar (ADR-005). `child_process.execFile` (stdlib) for shell. Scaffolding CLI uses `fs`/`path` stdlib only. |
-| III. Code Readability & Minimalism | ✅ PASS | All extension API additions are spec-required (FR-022–FR-027). Scaffolding CLI generates only what the hello-world needs — no speculative features. |
-| IV. Test-Driven Development | ✅ PASS | TDD cycle for git parser, gh service, IPC handlers, and the scaffolding CLI's file generation logic. |
-| V. SOLID & YAGNI | ✅ PASS | Extension API additions minimal and spec-driven. Scaffolding CLI scoped to directory/file generation only — no plugin marketplace or registry logic. |
-| VI. Documentation as First-Class | ✅ PASS | `EXTENSION-DEVELOPMENT.md` updated in same delivery. All new IPC channels in `ipc-channels.md` and `electron.d.ts`. README updated. |
-| VII. ADRs | ✅ PASS | 3 ADRs written before implementation (ADR-005, ADR-006, ADR-007). |
+| Principle                              | Status  | Notes                                                                                                                                                                         |
+| -------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| I. Source Integrity                    | ✅ PASS | All decisions grounded in official Node.js, Electron, git, gh CLI documentation. No blog-only sources.                                                                        |
+| II. Dependency Stewardship             | ✅ PASS | Zero new npm dependencies. Native `fs.watch` (stdlib) over chokidar (ADR-005). `child_process.execFile` (stdlib) for shell. Scaffolding CLI uses `fs`/`path` stdlib only.     |
+| III. Code Readability & Minimalism     | ✅ PASS | All extension API additions are spec-required (FR-022–FR-027). Scaffolding CLI generates only what the hello-world needs — no speculative features.                           |
+| IV. Test-Driven Development            | ✅ PASS | TDD cycle for git parser, gh service, IPC handlers, and the scaffolding CLI's file generation logic.                                                                          |
+| V. SOLID & YAGNI                       | ✅ PASS | Extension API additions minimal and spec-driven. Scaffolding CLI scoped to directory/file generation only — no plugin marketplace or registry logic.                          |
+| VI. Documentation as First-Class       | ✅ PASS | `EXTENSION-DEVELOPMENT.md` updated in same delivery. All new IPC channels in `ipc-channels.md` and `electron.d.ts`. README updated.                                           |
+| VII. ADRs                              | ✅ PASS | 3 ADRs written before implementation (ADR-005, ADR-006, ADR-007).                                                                                                             |
 | VIII. Functional Purity & Immutability | ✅ PASS | Git/gh side effects isolated to service layer. Scaffolding CLI: file-write side effects isolated to a single `generateExtension()` function; all path/template logic is pure. |
 
 **Constitution Check: PASSED — no gates blocked. Proceed to Phase 0.**

@@ -16,20 +16,20 @@ const mockOnChanged = vi.fn().mockReturnValue(mockUnsubFs)
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers()
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     git: { status: mockGitStatus },
     fs: { onChanged: mockOnChanged },
   }
   vi.mocked(useGitStore).mockReturnValue({
     setStatus: mockSetStatus,
     setLoading: mockSetLoading,
-  } as any)
+  } as unknown as ReturnType<typeof useGitStore>)
   mockGitStatus.mockResolvedValue({ branch: 'main', staged: [], unstaged: [], untracked: [] })
 })
 
 afterEach(() => {
   vi.useRealTimers()
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('useGitStatus', () => {

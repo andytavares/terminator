@@ -15,16 +15,43 @@ interface FileDiffViewProps {
 function detectLanguage(path: string): string | undefined {
   const ext = path.split('.').pop()?.toLowerCase()
   const map: Record<string, string> = {
-    ts: 'typescript', tsx: 'typescript',
-    js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
-    py: 'python', rs: 'rust', go: 'go', java: 'java',
-    kt: 'kotlin', swift: 'swift',
-    c: 'c', h: 'c', cpp: 'cpp', cc: 'cpp', cxx: 'cpp', hpp: 'cpp',
-    cs: 'csharp', rb: 'ruby', php: 'php',
-    css: 'css', scss: 'scss', less: 'less',
-    html: 'xml', htm: 'xml', xml: 'xml', svg: 'xml',
-    json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'toml',
-    md: 'markdown', sh: 'bash', bash: 'bash', zsh: 'bash', sql: 'sql',
+    ts: 'typescript',
+    tsx: 'typescript',
+    js: 'javascript',
+    jsx: 'javascript',
+    mjs: 'javascript',
+    cjs: 'javascript',
+    py: 'python',
+    rs: 'rust',
+    go: 'go',
+    java: 'java',
+    kt: 'kotlin',
+    swift: 'swift',
+    c: 'c',
+    h: 'c',
+    cpp: 'cpp',
+    cc: 'cpp',
+    cxx: 'cpp',
+    hpp: 'cpp',
+    cs: 'csharp',
+    rb: 'ruby',
+    php: 'php',
+    css: 'css',
+    scss: 'scss',
+    less: 'less',
+    html: 'xml',
+    htm: 'xml',
+    xml: 'xml',
+    svg: 'xml',
+    json: 'json',
+    yaml: 'yaml',
+    yml: 'yaml',
+    toml: 'toml',
+    md: 'markdown',
+    sh: 'bash',
+    bash: 'bash',
+    zsh: 'bash',
+    sql: 'sql',
   }
   return ext ? map[ext] : undefined
 }
@@ -52,18 +79,30 @@ function UnifiedRow({ line, lang }: { line: DiffLine; lang: string | undefined }
       <td className="diff-line__old-num">{line.oldLineNumber ?? ''}</td>
       <td className="diff-line__new-num">{line.newLineNumber ?? ''}</td>
       <td className="diff-line__prefix">{prefix}</td>
-      <td className="diff-line__content"><pre dangerouslySetInnerHTML={{ __html: html }} /></td>
+      <td className="diff-line__content">
+        <pre dangerouslySetInnerHTML={{ __html: html }} />
+      </td>
     </tr>
   )
 }
 
-function UnifiedTable({ hunks, lang }: { hunks: DiffHunk[]; lang: string | undefined }): JSX.Element {
+function UnifiedTable({
+  hunks,
+  lang,
+}: {
+  hunks: DiffHunk[]
+  lang: string | undefined
+}): JSX.Element {
   return (
     <table className="diff-table">
       <tbody>
         {hunks.map((hunk, hi) => (
           <React.Fragment key={hi}>
-            <tr><td colSpan={4} className="diff-hunk-header">{hunk.header}</td></tr>
+            <tr>
+              <td colSpan={4} className="diff-hunk-header">
+                {hunk.header}
+              </td>
+            </tr>
             {hunk.lines.map((line, li) => (
               <UnifiedRow key={`${hi}-${li}`} line={line} lang={lang} />
             ))}
@@ -115,10 +154,7 @@ function SplitCell({
   side: 'old' | 'new'
   lang: string | undefined
 }): JSX.Element {
-  const html = useMemo(
-    () => (line ? highlight(line.content, lang) : ''),
-    [line?.content, lang]
-  )
+  const html = useMemo(() => (line ? highlight(line.content, lang) : ''), [line, lang])
   if (!line) {
     return (
       <>
@@ -128,15 +164,18 @@ function SplitCell({
     )
   }
   const lineNum = side === 'old' ? line.oldLineNumber : line.newLineNumber
-  const cls = line.type === 'remove'
-    ? 'diff-line__content diff-line__content--remove'
-    : line.type === 'add'
-      ? 'diff-line__content diff-line__content--add'
-      : 'diff-line__content'
+  const cls =
+    line.type === 'remove'
+      ? 'diff-line__content diff-line__content--remove'
+      : line.type === 'add'
+        ? 'diff-line__content diff-line__content--add'
+        : 'diff-line__content'
   return (
     <>
       <td className="diff-line__old-num">{lineNum ?? ''}</td>
-      <td className={cls}><pre dangerouslySetInnerHTML={{ __html: html }} /></td>
+      <td className={cls}>
+        <pre dangerouslySetInnerHTML={{ __html: html }} />
+      </td>
     </>
   )
 }
@@ -150,7 +189,9 @@ function SplitTable({ hunks, lang }: { hunks: DiffHunk[]; lang: string | undefin
           return (
             <React.Fragment key={hi}>
               <tr>
-                <td colSpan={4} className="diff-hunk-header">{hunk.header}</td>
+                <td colSpan={4} className="diff-hunk-header">
+                  {hunk.header}
+                </td>
               </tr>
               {rows.map((row, ri) => {
                 if (row.kind === 'context') {
@@ -185,17 +226,13 @@ export function FileDiffView({ diff, isStale, onRefresh }: FileDiffViewProps): J
 
   if (!diff) {
     return (
-      <div className="file-diff-view file-diff-view--empty">
-        Select a file to view its diff.
-      </div>
+      <div className="file-diff-view file-diff-view--empty">Select a file to view its diff.</div>
     )
   }
 
   if (diff.isBinary) {
     return (
-      <div className="file-diff-view file-diff-view--binary">
-        Binary file — no diff available.
-      </div>
+      <div className="file-diff-view file-diff-view--binary">Binary file — no diff available.</div>
     )
   }
 
@@ -227,7 +264,9 @@ export function FileDiffView({ diff, isStale, onRefresh }: FileDiffViewProps): J
         <div className="file-diff-view__stale-banner">
           File changed while viewing.{' '}
           {onRefresh && (
-            <button className="file-diff-view__refresh-btn" onClick={onRefresh}>Refresh</button>
+            <button className="file-diff-view__refresh-btn" onClick={onRefresh}>
+              Refresh
+            </button>
           )}
         </div>
       )}
@@ -236,10 +275,11 @@ export function FileDiffView({ diff, isStale, onRefresh }: FileDiffViewProps): J
       )}
 
       <div className="file-diff-view__scroll">
-        {viewMode === 'unified'
-          ? <UnifiedTable hunks={diff.hunks} lang={lang} />
-          : <SplitTable hunks={diff.hunks} lang={lang} />
-        }
+        {viewMode === 'unified' ? (
+          <UnifiedTable hunks={diff.hunks} lang={lang} />
+        ) : (
+          <SplitTable hunks={diff.hunks} lang={lang} />
+        )}
       </div>
     </div>
   )

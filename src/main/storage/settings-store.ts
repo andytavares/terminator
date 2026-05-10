@@ -17,7 +17,10 @@ const store = new Store<StoreSchema>({
 
 export function getGlobalSettings(): GlobalSettings {
   // Always normalize against defaults so schema migrations don't surface missing fields
-  return deepMerge(DEFAULT_GLOBAL_SETTINGS as unknown as GlobalSettings, store.get('global') as Partial<GlobalSettings>)
+  return deepMerge(
+    DEFAULT_GLOBAL_SETTINGS as unknown as GlobalSettings,
+    store.get('global') as Partial<GlobalSettings>
+  )
 }
 
 export function updateGlobalSettings(patch: unknown): GlobalSettings {

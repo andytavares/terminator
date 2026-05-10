@@ -7,13 +7,13 @@ const mockPrReviewSubmit = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     github: { prReviewSubmit: mockPrReviewSubmit },
   }
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('ReviewSubmitPanel', () => {
