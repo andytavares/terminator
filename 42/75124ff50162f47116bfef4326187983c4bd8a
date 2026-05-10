@@ -1,0 +1,441 @@
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_8c0d07b5ca2bdd::t_fe25afbe0611c1 14
+  s_8c0d07b5ca2bdd::t_0c3267cda1438e 102
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 106
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 95
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 164
+tests/integration/scripts/create-extension.spec.js
+  s_8c0d07b5ca2bdd::t_7e8a7c683dfb37 8
+tests/unit/renderer/components/WorkspaceSettings.spec.tsx
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 42,45,58
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 32
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 49
+  s_8c0d07b5ca2bdd::t_81521838a1b624 69-71
+extensions/git-integration/tests/unit/ReviewQueue.spec.tsx
+  s_8c0d07b5ca2bdd::t_ba4ae8c22a81f9 68,89,100,158,167,177,186,196,213
+  s_8c0d07b5ca2bdd::t_81521838a1b624 49-51
+tests/unit/renderer/components/WorkspaceRail.spec.tsx
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 49,52,82
+extensions/git-integration/src/types/electron.d.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 9-20,23-27,32-57,59-62
+src/main/storage/workspace-store.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 170-175
+src/renderer/components/sidebar/CreateProjectDialog.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 72-75,82-85,95-96,103-104,124-127,157-162,167-168,195-197
+tests/integration/ipc/workspace.ipc.spec.ts
+  s_8c0d07b5ca2bdd::t_b423fe78c6f9ca 41-43,53-55,65-67,76-78,87-89,99-101,112-114,124-126,136-138,147-149,158-160
+tests/unit/extensions/github.ipc.spec.ts
+  s_8c0d07b5ca2bdd::t_b423fe78c6f9ca 40-42
+  s_8c0d07b5ca2bdd::t_557afaac4e1fc8 7
+  s_8c0d07b5ca2bdd::t_15b22ea95f657b 57,193,239,265
+extensions/git-integration/tests/unit/review-queue.spec.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 5-11,14,49-53
+src/shared/schemas/pr-review.schema.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 8,10-13,19,22-24,27,30-31,37-41,44-46,52-60,67-69,71,77-80,82-87,93-109,116-117,119-130,134-136,138-140,149-154,156-158,163-166,168,172
+.github/workflows/ci.yml
+  s_8c0d07b5ca2bdd::t_ad449aebc6305e 10-12,15,17,28-42,46-82,86,105-124,130,132,135,138,140,144,148,171-183
+extensions/git-integration/src/components/pr-review/PrReviewTab.tsx
+  s_8c0d07b5ca2bdd::t_3711a20d54cd5d 1
+  s_8c0d07b5ca2bdd::t_573ef1565a707f 30,32-37
+  s_8c0d07b5ca2bdd::t_81521838a1b624 15-23,93-101
+extensions/git-integration/tests/unit/useGitStatus.spec.tsx
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 19
+  s_8c0d07b5ca2bdd::t_e0785509256482 26
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 32
+tests/e2e/git-pr.spec.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 98-105,107-114
+extensions/git-integration/tests/unit/GitFullView.spec.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 82-85
+  s_8c0d07b5ca2bdd::t_7b9a86d5b841be 9,19-25
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 79
+  s_8c0d07b5ca2bdd::t_1b01d0799ed270 49,58
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 68
+CLAUDE.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 51
+extensions/git-integration/src/components/PrDialog.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 31-34,74-79,117-123,166-174,192-198,201-203,258,273-275,282-284
+docs/adr/010-heuristic-file-ordering-v1.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 17-22
+src/renderer/components/settings/WorkspaceSettings.tsx
+  s_8c0d07b5ca2bdd::t_55dcbb18557e7e 26
+  s_8c0d07b5ca2bdd::t_81521838a1b624 94-96,106-108
+extensions/git-integration/src/components/pr-review/RiskBreakdownPanel.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 16-18,27-35,39-42,44-46,59,80-87,94,96,98
+extensions/git-integration/tests/unit/ReviewSubmitPanel.spec.tsx
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 16
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 10
+tests/integration/ipc/settings.ipc.spec.ts
+  s_8c0d07b5ca2bdd::t_b423fe78c6f9ca 34-36,46-48,63-65,76-78
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 642-646
+extensions/git-integration/src/github/pr-review-service-renderer.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 24-25,27-29
+src/renderer/components/ToastContainer.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 18
+tests/unit/renderer/components/LogWindow.spec.tsx
+  s_8c0d07b5ca2bdd::t_92e0840a99ad98 41,76
+  s_8c0d07b5ca2bdd::t_b423fe78c6f9ca 17-19
+src/renderer/components/LogWindow.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 11-13,39-44,49
+extensions/git-integration/src/components/pr-review/InlineCommentThread.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 17-20,22-26
+src/renderer/components/terminal/TabBar.css
+  s_8c0d07b5ca2bdd::t_81521838a1b624 19-21,50-52,132-135,159-161
+tests/unit/extensions/api.spec.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 174-183
+electron.vite.config.ts
+  s_a6c5d45d077d6d::t_7859e63ef9e882 23-26
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 22
+extensions/git-integration/src/components/pr-review/CommentComposer.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 43-44,51-55,57,76-78,82-84,91
+specs/003-pr-review/spec.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 25,270
+tests/integration/ipc/extension.ipc.spec.ts
+  s_8c0d07b5ca2bdd::t_e8eeceef2be223 44-46
+  s_8c0d07b5ca2bdd::t_64086b14df80cd 98,118,122,136,147
+src/renderer/index.html
+  s_8c0d07b5ca2bdd::t_81521838a1b624 9-12
+src/renderer/components/sidebar/WorkspaceRail.css
+  s_8c0d07b5ca2bdd::t_81521838a1b624 46-48,58,65,69-72,111,127,163-165,179-182
+tests/unit/renderer/components/ProjectsPanel.spec.tsx
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 54
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 70,73,101,138,152,216
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 77
+extensions/git-integration/src/ipc/git.ipc.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 8-11,15-18
+extensions/git-integration/src/stores/pr-review.store.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 2-9,59-65,73-77,90-98,101,108-110,112-114,121-131,133-136,139,152,162,172,188,191,193,197,204,206,210,214-221,240-241,250-252,254-255,259-270
+extensions/git-integration/src/git/git-parser.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 5-8,21-24,42-50,89-100
+specs/002-git-github-integration/plan.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 24,32,40,53-61
+src/main/shell/shell-executor.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 82
+extensions/git-integration/src/components/pr-review/ReviewQueue.tsx
+  s_8c0d07b5ca2bdd::t_2b56148f43c7d1 224-225,232-235
+  s_8c0d07b5ca2bdd::t_5661ac38f72b55 257,263,270
+  s_8c0d07b5ca2bdd::t_1220c05ddba882 278-286
+  s_8c0d07b5ca2bdd::t_07954e9db491b6 307,312-314,324-328
+  s_8c0d07b5ca2bdd::t_393baab027df09 64-69,71-72,79,91
+  s_8c0d07b5ca2bdd::t_2fb2bb686c4dc4 46
+  s_8c0d07b5ca2bdd::t_81521838a1b624 217-223,226-231,308-311
+docs/adr/011-react-markdown-for-comments.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 23-27
+extensions/git-integration/src/git/git-service.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 33-37
+tests/unit/extensions/pr-review.store.spec.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 307-313
+tests/unit/renderer/components/Sidebar.spec.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 32-34
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 53
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 29
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 38
+tests/unit/renderer/extensions/registry.spec.ts
+  s_8c0d07b5ca2bdd::t_3cc1c52e1e96f4 3-5
+  s_8c0d07b5ca2bdd::t_7aded22a22dc3b 28,34,40,46,53,62,68,75,83
+  s_8c0d07b5ca2bdd::t_cfe4ab88b46289 2
+specs/002-git-github-integration/tasks.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 23-28,38-52,62-73,83-99,109-119,129-134,144-147,155-165,173-175,181-184,205-209,216
+scripts/create-extension.cjs
+  s_8c0d07b5ca2bdd::t_81521838a1b624 75-78,99-102,132-135,145-148,241,274-281
+extensions/git-integration/tests/unit/FullFileList.spec.tsx
+  s_8c0d07b5ca2bdd::t_1de518c8419c5c 67,126,152,161
+tests/integration/ipc/fs.ipc.spec.ts
+  s_8c0d07b5ca2bdd::t_98a1d8d7d56a16 36
+  s_8c0d07b5ca2bdd::t_c589f027581e50 76,108
+  s_8c0d07b5ca2bdd::t_b423fe78c6f9ca 115-117
+specs/002-git-github-integration/contracts/ipc-channels-git.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 22,24-26,30,36,57,61-62,67,73,95,104,118,127,141,145,151,157,173,175-177,181,189,203,215,221,237,249,265,267-269,273,287,289-291,295,297-299,311,334-351,363
+src/main/git/git-parser.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 1-7,11-14,26-29,37-42,47-55,84-95,126-131,134-139,142-147
+src/main/ipc/git.ipc.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 73-75
+extensions/git-integration/src/github/gh-service.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 27-32,71-80
+tests/e2e/git-view.spec.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 82-93
+tests/unit/git/git-service.spec.ts
+  s_8c0d07b5ca2bdd::t_b423fe78c6f9ca 21-23,27-29,49-50
+  s_8c0d07b5ca2bdd::t_557afaac4e1fc8 13
+codecov.yml
+  s_8c0d07b5ca2bdd::t_81521838a1b624 4,10,15-16,21-23,28-43
+extensions/git-integration/tests/unit/gh-service.spec.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 26-31,64-69,75-80
+.eslintrc.json
+  s_a6c5d45d077d6d::t_04b797ef062766 16-23
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 8,10-13,19,22-24,27,30-31,37-41,44-46,52-60,67-69,71,77-80,82-87,89,95-111,118-119,121-132,136-138,140-142,151-156,158-160,165-167,169,173
+src/renderer/components/ErrorBoundary.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 28-41,44-52
+extensions/git-integration/tests/unit/risk-score.spec.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 2-6,13-17,20-22,32-43,52-63,69-76,85-90,99,102,118,126-139,161-166,171-182,191-192,198-203,218
+src/renderer/stores/workspace.store.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 18-21,108-111,129-132
+extensions/git-integration/src/components/pr-review/ChapterNav.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 14,24,35-37,39-46
+tests/unit/renderer/components/GlobalSettings.spec.tsx
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 30
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 37
+  s_8c0d07b5ca2bdd::t_81521838a1b624 42-44
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 31
+docs/adr/009-gh-cli-for-review-ops.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 23-26
+src/renderer/PrReviewWindow.tsx
+  s_8c0d07b5ca2bdd::t_1991cd6a874b51 15
+scripts/build-extensions.cjs
+  s_8c0d07b5ca2bdd::t_81521838a1b624 27,34-35,40-43
+extensions/git-integration/tests/unit/ChapterFileList.spec.tsx
+  s_8c0d07b5ca2bdd::t_2124cf71e57ab0 64,108,128
+tests/unit/extensions/ext-git-service.spec.ts
+  s_8c0d07b5ca2bdd::t_557afaac4e1fc8 8,23
+extensions/git-integration/README.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 19-25,32-39,86-93
+package.json
+  s_a6c5d45d077d6d::t_cfcc0e0d8c8a51 20
+  s_8c0d07b5ca2bdd::t_673ae657795801 2,6,10-13,16,24-25,27,29,39,41
+extensions/git-integration/tests/unit/usePrReview.spec.tsx
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 104
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 77
+  s_8c0d07b5ca2bdd::t_dc963c590528d2 100
+  s_8c0d07b5ca2bdd::t_9acfe0024e65de 253,274,289,309,370
+tests/unit/renderer/hooks/useTerminalSession.spec.tsx
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 45
+  s_8c0d07b5ca2bdd::t_70a03c4f551944 32,34-38,40-43
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 55
+src/renderer/components/AlertBadge.css
+  s_8c0d07b5ca2bdd::t_81521838a1b624 9,16
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 33
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 46
+  s_8c0d07b5ca2bdd::t_b423fe78c6f9ca 27-32,71-73,79-81,111-113,124-126,136-138,146-148,161-163,169-172,178-180,183-185,194-199,213-218,226-229
+tests/unit/scripts/create-extension.spec.js
+  s_8c0d07b5ca2bdd::t_83f6dbd1f85163 3,8
+  s_a6c5d45d077d6d::t_1281b640b98f9b 1
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_8c0d07b5ca2bdd::t_26eb6da43de7d3 35
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 46,51,54,57,60,193
+extensions/git-integration/src/components/pr-review/ReviewSubmitPanel.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 23-29,53-73,79,91
+specs/003-pr-review/contracts/adrs/010-heuristic-file-ordering-v1.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 17-22
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 15-18,43-45,69-71,77-78,91-100,109-119,123-132,135-140,153-159,166-177,190,199-209,211,213,235-237,240-245,250-257,270-271,273-274,286-290,292-293,300-313,328-331,338-345,359-360,367-376,412-421,429,432-443,445,451,453,456-460,478-480,490,493-495,507,509-522,546-551,553-558,560-565
+tests/unit/renderer/App.spec.tsx
+  s_8c0d07b5ca2bdd::t_b423fe78c6f9ca 109-111,229-235
+  s_8c0d07b5ca2bdd::t_2ae452f35c093b 81-82,282
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 119,256,276,300,324
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 129
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 97,102,105,108,299,323
+extensions/git-integration/tests/unit/CommentComposer.spec.tsx
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 17
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 26
+src/renderer/components/LogWindow.css
+  s_8c0d07b5ca2bdd::t_81521838a1b624 17-22,55-57,118-129,138-143
+extensions/git-integration/src/components/pr-review/PrReviewView.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 24-31,42-46,51,65,68,82,86-88,127,132-133,146-147,150,158-167,170-171,174-175,178-216,282-289
+  s_8c0d07b5ca2bdd::t_2723860205849a 22
+  s_8c0d07b5ca2bdd::t_7535d89bb0f218 74,78
+  s_8c0d07b5ca2bdd::t_e82ea21c7624eb 53-62
+  s_8c0d07b5ca2bdd::t_470d46f9a28788 1
+  s_8c0d07b5ca2bdd::t_c6fd9b01434e97 17
+  s_8c0d07b5ca2bdd::t_3c3734cac1f8b2 221-241
+docs/adr/008-extension-commonjs-compilation.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 24
+extensions/git-integration/tests/unit/git-parser.spec.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 139-142
+specs/002-git-github-integration/contracts/extension-api-additions.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 13-21,33,224-226
+extensions/git-integration/tests/unit/ChapterNav.spec.tsx
+  s_8c0d07b5ca2bdd::t_1de518c8419c5c 24,61,74
+tests/unit/renderer/components/BranchSwitcher.spec.tsx
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 30,33
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 22
+  s_8c0d07b5ca2bdd::t_26eb6da43de7d3 99
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 46
+extensions/git-integration/tests/unit/PrReviewTab.spec.tsx
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 75
+  s_8c0d07b5ca2bdd::t_a3f9aba481d6ae 6,19-29,40,69-71,92-93,106,109,115-116
+  s_8c0d07b5ca2bdd::t_81521838a1b624 107-108
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 65
+src/renderer/components/terminal/TerminalPane.tsx
+  s_8c0d07b5ca2bdd::t_5ec2f754fef5c1 39
+  s_8c0d07b5ca2bdd::t_f222f169115203 21
+tests/integration/ipc/git-extension.ipc.spec.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 16-19,56-58,63,86-90,96-106,129-131,137-140,157-160,165-167,175-177
+src/renderer/components/settings/GlobalSettings.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 6-7,80-81
+extensions/git-integration/src/components/pr-review/ChapterFileList.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 14-21,25-27,50,66-67,75-76,78-80,83-84,89,92-94,102-109
+specs/003-pr-review/contracts/adrs/011-react-markdown-for-comments.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 23-27
+tests/unit/renderer/components/WorkspaceItem.spec.tsx
+  s_8c0d07b5ca2bdd::t_1ce26f05bd3520 6,12,19,65,70,75,81,87,94,101,109,119,128,136,143,153,177
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 56
+  s_8c0d07b5ca2bdd::t_b423fe78c6f9ca 26-28,35-43,161-175
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 60
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 48
+tests/unit/renderer/components/NewTabDialog.spec.tsx
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 37,97
+  s_8c0d07b5ca2bdd::t_b423fe78c6f9ca 32-34
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 14-20,97-99
+  s_8c0d07b5ca2bdd::t_0714e26e45a5c2 28-43,130-144
+src/renderer/components/ConfirmDialog.tsx
+  s_a6c5d45d077d6d::t_c0ce061c39f1c8 2
+extensions/git-integration/src/hooks/usePrReview.ts
+  s_8c0d07b5ca2bdd::t_e5f0e9a6dca143 79-90
+  s_8c0d07b5ca2bdd::t_90a750bd8f1b33 233
+  s_8c0d07b5ca2bdd::t_81521838a1b624 11-13,18-25,29-37,39,41-42,44-76,78,91,99-110,112-115,117,119,127-132,134-160,162-165,167,169,171-229,231-232,234
+  s_8c0d07b5ca2bdd::t_2047cde3dd51bb 118
+  s_8c0d07b5ca2bdd::t_35497eaa800716 262
+src/renderer/App.tsx
+  s_8c0d07b5ca2bdd::t_0a07350d920bed 91
+  s_8c0d07b5ca2bdd::t_e1c29ad04aa638 42-44
+  s_8c0d07b5ca2bdd::t_fe762d5b699193 1
+  s_8c0d07b5ca2bdd::t_cc5783098e8907 49,53,59,66
+  s_8c0d07b5ca2bdd::t_84b3d787456d5c 133
+tests/unit/shell/shell-executor.spec.ts
+  s_8c0d07b5ca2bdd::t_937db36ed89bf9 172
+  s_8c0d07b5ca2bdd::t_c292b11c6e170d 95,98-99
+  s_8c0d07b5ca2bdd::t_81521838a1b624 97,107-112,123-128,138-143,150-163,165,173-179
+tests/integration/ipc/git.ipc.spec.ts
+  s_8c0d07b5ca2bdd::t_b423fe78c6f9ca 218-220
+tests/unit/renderer/components/ProjectItem.spec.tsx
+  s_8c0d07b5ca2bdd::t_b423fe78c6f9ca 15-22
+  s_8c0d07b5ca2bdd::t_5e51fc61865e62 6,35,45,50,56,62,69,77,85
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 30,44
+.specify/memory/constitution.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 50,58,68
+extensions/git-integration/src/index.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 11-14
+specs/002-git-github-integration/data-model.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 17-19,21,37,48-53,63-66,71-75,81,93-95,100,134-135,149,151-152,157,185-187
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 20
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 39
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 32,35
+src/main/extensions/api.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 90-95,113-116,193,208-212,252-254,268-273,325-328
+extensions/git-integration/tests/unit/PrReviewView.spec.tsx
+  s_8c0d07b5ca2bdd::t_2b486513084288 25-32
+  s_8c0d07b5ca2bdd::t_638199462e8755 47
+  s_8c0d07b5ca2bdd::t_0dfd7f24bc53e6 112,123
+  s_8c0d07b5ca2bdd::t_81521838a1b624 131-134
+extensions/git-integration/src/hooks/useGitStatus.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 19
+  s_8c0d07b5ca2bdd::t_024523cfec40c1 44
+specs/003-pr-review/contracts/ipc-channels-pr-review.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 20,22-24,28,44,46-49,53,59,74,76-80,84,102,104-107,111,123,137,139-142,146,162,177,193,198,204,220,225,232,248,250-252,256,270,272-275,279,297-318
+tests/unit/renderer/PrReviewWindow.spec.tsx
+  s_a6c5d45d077d6d::t_04247056058986 1-99
+src/main/git/git-service.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 35-39,131
+src/renderer/components/terminal/TabBar.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 16-21,23-29,46-49,84-87,98-102
+specs/002-git-github-integration/research.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 14,19,36,50,91,131,140,149,155,166-171
+extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 6-9,37-47,53-55,70-72,82,86,103,105-115,127-137,157-159,183,195-197,202-204,214-216,225-227,247,252-257,284,287-289,293-301,307-309,312-330,335-340,363,366-368,372-380,386-388,391-409,414-419,443-451,461-466,470,478-481,485-488
+  s_8c0d07b5ca2bdd::t_9b75434c8b0b1c 182,191-194,198-201,205-213,217-224,230-232,236-242,244-246,248-251,258-283,285-286,290-292,302-306,310-311,331-334,341-362,364-365,369-371,381-385,389-390,410-413,420-440
+  s_8c0d07b5ca2bdd::t_64d12a3a9d14c7 141-156
+  s_8c0d07b5ca2bdd::t_0490162637452f 34-35,57
+  s_8c0d07b5ca2bdd::t_168af854868cc3 88
+src/main/storage/settings-store.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 20-23
+docs/adr/005-native-fswatcher-over-chokidar.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 13,16,30
+extensions/git-integration/src/components/pr-review/FullFileList.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 14-20,23-27,32,35,38,48-50,55-56,59-61,64,77-80,86-88,94-123
+extensions/git-integration/tests/unit/FileDiffView.spec.tsx
+  s_8c0d07b5ca2bdd::t_9f95559b77c093 7-9,13,30
+specs/002-git-github-integration/contracts/cli-scaffold.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 25-27,31-35,41-46
+extensions/git-integration/tests/unit/StagingArea.spec.tsx
+  s_8c0d07b5ca2bdd::t_b423fe78c6f9ca 34-37
+  s_8c0d07b5ca2bdd::t_1de518c8419c5c 50,90,100,111,122,134,145,159,171,185,198,210,222,234
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 36,40
+  s_8c0d07b5ca2bdd::t_5bc9ea67bcbfb6 7
+  s_8c0d07b5ca2bdd::t_b423fe78c6f9ca 64-70,94-100
+extensions/git-integration/tests/unit/chapter-builder.spec.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 4-9,29,35-38,45-47,52-53,57,64,66-67,72-73,78-80,89-90,95-96,98
+specs/003-pr-review/contracts/adrs/009-gh-cli-for-review-ops.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 23-26
+src/renderer/components/AlertBadge.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 4-10,13-16
+src/renderer/components/sidebar/BranchSwitcher.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 46-47,64-67,89-92,105-108,116-150,156-159
+tests/e2e/git-sidebar.spec.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 71-78
+test-report.junit.xml
+  s_a6c5d45d077d6d::t_4b6122a898d79e 2-4,6,8,10,16,18,21-22,28,37-38,42,44,48,51,54,56,58,62,81-82,94,98,101-102,104,106,108,110,112,114,116,118,120,122,124,127,132,149,156,162,172,180,182,188,190,217-218,241,246,260,286,302,310,317,324,326,364,385-386,392,400,402,416,418,432,438,442,446,449-450,454,462,470,475-476,494,500,510,515-578,580,582,584,586,589-590,613,652,689-690,694,698,716,721,741,761-762,770,780-786,792-794,812,817-818,824,833-834,838,842,846,853-856,860,862,864-866,904,906,908-922,926,931-942,946,949-950,952,954,963-964,966,970,975-976,978,980,982,986,988,992,995-996,998,1000,1011-1012,1014,1016,1018,1020,1022,1024,1027-1028,1030,1032,1034,1036,1042,1045-1046,1048,1052,1054,1056,1064,1066,1074,1095,1099,1102-1103,1121,1123,1125,1127,1129,1131,1133,1135,1137,1140-1141,1207,1224-1225,1227,1237,1242-1243,1252,1255,1257,1259,1263,1267,1276,1279,1285,1292-1293,1325,1327,1329,1345,1377,1379,1381,1383,1399,1415,1417,1420-1421,1423,1425,1433,1435,1443,1450-1451,1453,1457,1459,1461,1465,1468-1469,1473,1477,1479,1481,1491,1493,1496-1497,1504-1533,1553,1556-1557,1563,1567,1598-1599,1613,1635,1646,1655,1676-1677,1687,1698,1703,1707,1719,1750,1753,1759,1763,1771,1774,1796,1820,1831,1847,1851,1859,1872,1875,1882,1897-1898,1900-1901,1903,1905,1907,1909,1911,1914,1921,1935,1938-1939,1941,1943,1945,1947,1949,1951,1954-1959,1967-1969,1971-1973,1977,1979-1982,1985-1991,1998-1999,2003,2011,2013-2015,2017,2019,2022-2023,2027-2031,2037,2043-2045,2051,2054,2059,2063-2073,2080-2083,2087,2091-2103,2107,2112,2118-2133,2139,2141,2151,2153,2157,2160-2161,2171,2173,2181,2184,2191,2193,2200-2201,2205,2207,2209,2211,2217,2223,2239,2242-2243,2259,2275,2323,2327,2343,2375,2391,2423,2455,2471,2487,2490-2495,2499-2501,2519-2523,2527-2531,2535-2537,2541,2546-2553,2561-2567,2572-2573,2577-2583,2591-2593,2597-2601,2605,2609,2612-2613,2619,2623-2627,2631-2633,2639-2645,2649,2652,2657,2659,2678,2689,2696,2730,2733,2745,2756,2772,2802-2803,2805,2809,2811,2813,2817,2820,2825,2827,2831,2839,2841,2843,2849,2865,2867,2869,2871,2873,2875,2877,2881
+  s_a6c5d45d077d6d::t_27ad82d8d343b7 14,39-41,43,45-47,49-50,768,774,816,819-821,823,826,958,984,1058,1070,1253-1254,1256,1258,1260,1262,1264-1266,1268-1270,1273-1274,1277,1797,1963-1965,1983,2039-2041,2055,2061,2077,2089,2113-2115,2143,2163,2165,2169,2179,2197,2291,2503,2543,2607,2637,2647,2821,2833
+  s_a6c5d45d077d6d::t_f3f1890d0a0cc3 103,105,107,109,119,121,123,604,618,620,776,788-790,822,828,830,924,956,960,968,972,990,1002,1038,1060,1062,1097,1113,1115,1157,1235,1261,1271,1361,1431,1437,1439,1441,1445,1456,1458,1460,1462-1464,1466-1467,1470-1472,1474-1476,1478,1480,1482-1490,1492,1494-1495,1498-1503,1565,1605,1615,1639,1649,1653,1667,1689,1737,1803,1895,1993,2033-2035,2047,2057,2085,2109,2135,2137,2145,2185,2187,2195,2203,2213,2215,2219,2221,2497,2525,2533,2539,2557-2559,2569,2575,2585-2589,2603,2621,2687,2699,2717,2721,2807,2815,2829,2835,2847,2879
+  s_a6c5d45d077d6d::t_766f977cb8447b 30,602,638,660,764,766,772,778,796-808,810,814,844,858,861,863,868-900,905,907,928-930,943-945,947-948,959,961-962,965,967,969,971,1013,1015,1017,1019,1021,1023,1025-1026,1029,1040,1047,1049-1051,1053,1055,1057,1059,1061,1068,1072,1075-1094,1096,1098,1105,1119-1120,1122,1124,1126,1128,1130,1132,1134,1136,1175,1229,1245,1272,1275,1305,1321,1341,1344,1357,1360,1373,1378,1382,1384-1397,1400-1413,1427,1429,1447-1449,1452,1454-1455,1799,1821,1825,1839,1877,1927,1961,1975,1978,1995-1997,2001,2005-2010,2012,2016,2018,2025,2042,2046,2048-2050,2052,2075,2079,2105-2106,2110,2117,2136,2138,2140,2142,2144,2146-2150,2152,2154-2156,2158-2159,2162,2164,2166-2168,2170,2172,2174-2178,2180,2182-2183,2186,2188-2190,2192,2194,2196,2198-2199,2202,2204,2206,2208,2210,2212,2214,2216,2218,2220,2222,2224-2238,2240-2241,2244-2258,2260-2274,2276-2290,2292-2316,2318-2319,2321,2325,2328-2336,2338-2339,2341,2344-2352,2354-2355,2357,2359-2368,2370-2371,2373,2376-2384,2386-2387,2389,2392-2400,2402-2403,2405-2421,2424-2453,2456-2469,2472-2485,2489,2504-2517,2545,2555,2595,2611,2615-2617,2629,2635,2697,2743,2765,2804,2806,2808,2810,2812,2814,2816,2818-2819,2822-2824,2826,2828,2830,2832,2834,2836-2838,2840,2842,2844-2846,2848,2850-2864,2866,2868,2870,2872,2874,2876,2878,2880
+specs/001-extension-first-terminal/tasks.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 66,94,119,121,146,166,188,215,239-240,242-245
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_8c0d07b5ca2bdd::t_962bde0070859c 478-517
+  s_8c0d07b5ca2bdd::t_5e03cff3117fae 383-396
+  s_8c0d07b5ca2bdd::t_d20a7615e9e723 936-960
+  s_8c0d07b5ca2bdd::t_81521838a1b624 902-904
+  s_8c0d07b5ca2bdd::t_a0a03b37d32cf8 889-901,905-915
+tests/unit/renderer/components/ToastContainer.spec.tsx
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 31,41,51,60,70,83
+  s_8c0d07b5ca2bdd::t_81521838a1b624 14-17
+extensions/git-integration/tests/unit/RiskBreakdownPanel.spec.tsx
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 17
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 11
+src/renderer/components/terminal/TerminalPane.css
+  s_8c0d07b5ca2bdd::t_81521838a1b624 4
+extensions/git-integration/tests/unit/pr-review-service.spec.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 10-15,17-19,28-32,68,71-73,75-87,107,115
+src/renderer/stores/log.store.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 38-39,48-50
+tests/unit/renderer/components/EditWorkspaceDialog.spec.tsx
+  s_8c0d07b5ca2bdd::t_d0724202192ddf 6,15,21-22,44,50,56,65,72,78
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 29
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 39
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 35
+tests/unit/renderer/components/CreateWorkspaceDialog.spec.tsx
+  s_8c0d07b5ca2bdd::t_bdd70acb136442 20
+  s_8c0d07b5ca2bdd::t_c2a61c933b9a9b 32
+  s_8c0d07b5ca2bdd::t_63050d40c54fab 28,63
+src/renderer/hooks/useTerminalSession.ts
+  s_8c0d07b5ca2bdd::t_c94336867b6ea7 1
+  s_8c0d07b5ca2bdd::t_6a4ae396abe25c 14-40
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_a6c5d45d077d6d::t_44f943eff1abba 4-9
+specs/002-git-github-integration/quickstart.md
+  s_8c0d07b5ca2bdd::t_81521838a1b624 34,187-194
+extensions/git-integration/src/components/FileDiffView.tsx
+  s_8c0d07b5ca2bdd::t_81521838a1b624 18-54,82-84,89-95,101-105,167-172,176-178,192-194,229,235,267-269,278-282
+  s_8c0d07b5ca2bdd::t_c7bc0cd085e7d7 157
+src/main/fs/fs-watcher.ts
+  s_8c0d07b5ca2bdd::t_81521838a1b624 41-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "4275124ff50162f47116bfef4326187983c4bd8a",
+  "prompts": {},
+  "sessions": {
+    "s_8c0d07b5ca2bdd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a7e75c9f-f977-4b42-935d-6345f235e0d3",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_a6c5d45d077d6d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "86c9c8a7-b7d6-4540-aebd-a3c43734bd38",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
