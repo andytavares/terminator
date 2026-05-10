@@ -183,9 +183,16 @@ export function registerGithubHandlers(register: RegisterFn): void {
     const { repoRoot, path } = parsed.data
     try {
       const stem = basename(path, `.${basename(path).split('.').pop()}`)
+      // Blast radius via grep only makes sense for importable source files.
+      // Config/data/markup files (YAML, JSON, Markdown, CSS, shell scripts, …)
+      // can't be imported, so their stem would match arbitrary text and inflate the count.
+      const IMPORTABLE_EXTS = /\.(ts|tsx|js|jsx|mjs|cjs|py|rb|go|java|cs|swift|kt|rs|cpp|cc|c|h|hpp)$/i
+      const canBeImported = IMPORTABLE_EXTS.test(path)
       const [churnRaw, blastRaw, testRaw] = await Promise.all([
         runGit(repoRoot, ['log', '--oneline', '--since=90 days ago', '--', path]),
-        runGit(repoRoot, ['grep', '-l', basename(path).replace(/\.[^.]+$/, ''), '--']).catch(() => ''),
+        canBeImported
+          ? runGit(repoRoot, ['grep', '-l', basename(path).replace(/\.[^.]+$/, ''), '--']).catch(() => '')
+          : Promise.resolve(''),
         runGit(repoRoot, ['ls-files', '--', `**/${stem}*.spec.*`, `**/${stem}*.test.*`]).catch(() => ''),
       ])
       const churn90d = churnRaw ? churnRaw.split('\n').filter(Boolean).length : 0
