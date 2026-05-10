@@ -36,6 +36,29 @@ function createWindow(): void {
   })
 }
 
+function createPrReviewWindow(repoRoot: string, accentColor?: string): void {
+  const repoName = repoRoot.split('/').filter(Boolean).pop() ?? 'Code Review'
+  const win = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    title: `Code Review — ${repoName}`,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: join(__dirname, '../preload/index.js'),
+    },
+  })
+
+  const paramObj: Record<string, string> = { view: 'pr-review', repoRoot }
+  if (accentColor) paramObj.accentColor = accentColor
+  if (process.env.NODE_ENV === 'development' || process.env['ELECTRON_RENDERER_URL']) {
+    const base = process.env['ELECTRON_RENDERER_URL'] || 'http://localhost:5173'
+    win.loadURL(`${base}?${params}`)
+  } else {
+    win.loadFile(join(__dirname, '../renderer/index.html'), { query: Object.fromEntries(params) })
+  }
+}
+
 function setupMenu(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
@@ -57,6 +80,11 @@ function setupMenu(): void {
           label: 'Open Settings',
           accelerator: 'CmdOrCtrl+,',
           click: () => mainWindow?.webContents.send('menu:open-settings'),
+        },
+        { type: 'separator' },
+        {
+          label: 'Code Reviews in New Window',
+          click: () => mainWindow?.webContents.send('menu:open-pr-review-window'),
         },
       ],
     },
@@ -98,6 +126,11 @@ app.whenReady().then(async () => {
   registerShellHandlers()
   registerFsHandlers(() => mainWindow)
   registerDialogHandlers()
+
+  ipcMain.handle('window:open-pr-review', (_event, payload) => {
+    const { repoRoot, accentColor } = payload as { repoRoot: string; accentColor?: string }
+    if (repoRoot) createPrReviewWindow(repoRoot, accentColor)
+  })
 
   await extensionHost.loadAll()
   await extensionHost.loadBundledExtensions(join(__dirname, '../../extensions'))

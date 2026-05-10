@@ -11,6 +11,15 @@ const STATUS_BADGE: Record<string, string> = {
   conflicted: 'U',
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  modified: 'modified',
+  added: 'added',
+  deleted: 'deleted',
+  renamed: 'renamed',
+  untracked: 'untracked',
+  conflicted: 'conflicted',
+}
+
 interface StagingAreaProps {
   repoRoot: string
   onFileSelect: (path: string, staged: boolean) => void
@@ -46,7 +55,7 @@ function FileItem({
       />
       <span
         className={`staging-area__badge staging-area__badge--${file.status}`}
-        title={file.status}
+        title={STATUS_LABEL[file.status] ?? file.status}
       >
         {badge}
       </span>
@@ -56,9 +65,12 @@ function FileItem({
   )
 }
 
-async function refreshStatus(repoRoot: string, setStatus: (s: GitStatus | null) => void): Promise<void> {
+async function refreshStatus(
+  repoRoot: string,
+  setStatus: (s: GitStatus | null) => void
+): Promise<void> {
   try {
-    const result = await window.electronAPI.git.status(repoRoot) as GitStatus | { error: string }
+    const result = (await window.electronAPI.git.status(repoRoot)) as GitStatus | { error: string }
     if ('error' in result) setStatus(null)
     else setStatus(result as unknown as GitStatus)
   } catch {
@@ -88,14 +100,20 @@ export function StagingArea({ repoRoot, onFileSelect }: StagingAreaProps): JSX.E
   const stageAll = useCallback(async () => {
     const unstaged = status?.files.filter((f) => !f.staged && f.status !== 'conflicted') ?? []
     if (unstaged.length === 0) return
-    await window.electronAPI.git.stage(repoRoot, unstaged.map((f) => f.path))
+    await window.electronAPI.git.stage(
+      repoRoot,
+      unstaged.map((f) => f.path)
+    )
     await refreshStatus(repoRoot, setStatus)
   }, [repoRoot, status, setStatus])
 
   const unstageAll = useCallback(async () => {
     const staged = status?.files.filter((f) => f.staged) ?? []
     if (staged.length === 0) return
-    await window.electronAPI.git.unstage(repoRoot, staged.map((f) => f.path))
+    await window.electronAPI.git.unstage(
+      repoRoot,
+      staged.map((f) => f.path)
+    )
     await refreshStatus(repoRoot, setStatus)
   }, [repoRoot, status, setStatus])
 
@@ -113,9 +131,7 @@ export function StagingArea({ repoRoot, onFileSelect }: StagingAreaProps): JSX.E
   return (
     <div className="staging-area">
       {status.truncated && (
-        <div className="staging-area__truncation-banner">
-          Showing first 500 files.
-        </div>
+        <div className="staging-area__truncation-banner">Showing first 500 files.</div>
       )}
 
       <div className="staging-area__section">
@@ -128,11 +144,15 @@ export function StagingArea({ repoRoot, onFileSelect }: StagingAreaProps): JSX.E
           )}
         </div>
         {stagedFiles.map((f) => (
-          <FileItem key={f.path} file={f} isSelected={f.path === selectedFile} onToggle={toggleFile} onSelect={onFileSelect} />
+          <FileItem
+            key={f.path}
+            file={f}
+            isSelected={f.path === selectedFile}
+            onToggle={toggleFile}
+            onSelect={onFileSelect}
+          />
         ))}
-        {stagedFiles.length === 0 && (
-          <div className="staging-area__empty">No staged changes</div>
-        )}
+        {stagedFiles.length === 0 && <div className="staging-area__empty">No staged changes</div>}
       </div>
 
       <div className="staging-area__section">
@@ -145,7 +165,13 @@ export function StagingArea({ repoRoot, onFileSelect }: StagingAreaProps): JSX.E
           )}
         </div>
         {unstagedFiles.map((f) => (
-          <FileItem key={f.path} file={f} isSelected={f.path === selectedFile} onToggle={toggleFile} onSelect={onFileSelect} />
+          <FileItem
+            key={f.path}
+            file={f}
+            isSelected={f.path === selectedFile}
+            onToggle={toggleFile}
+            onSelect={onFileSelect}
+          />
         ))}
         {unstagedFiles.length === 0 && (
           <div className="staging-area__empty">No unstaged changes</div>

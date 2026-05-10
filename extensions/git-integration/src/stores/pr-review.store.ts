@@ -9,7 +9,11 @@ interface PrReviewStore {
   // Queue state
   prQueue: ReviewQueuePR[]
   queueLoading: boolean
+  loadingMorePrs: boolean
   queueError: string | null
+  hasMorePrs: boolean
+  nextPrCursor: string | undefined
+  includeClosedPrs: boolean
 
   // Active review state
   activePr: PrReviewDetail | null
@@ -31,8 +35,13 @@ interface PrReviewStore {
   // ── Actions ────────────────────────────────────────────────────────────────
 
   setQueue(prs: ReviewQueuePR[]): void
+  appendQueue(prs: ReviewQueuePR[]): void
   setQueueLoading(loading: boolean): void
+  setLoadingMorePrs(loading: boolean): void
   setQueueError(error: string | null): void
+  setHasMorePrs(hasMore: boolean): void
+  setNextPrCursor(cursor: string | undefined): void
+  setIncludeClosedPrs(include: boolean): void
 
   setActivePr(pr: PrReviewDetail | null): void
   setCurrentChapter(chapterId: string | null): void
@@ -86,7 +95,11 @@ async function persistSession(
 export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   prQueue:            [],
   queueLoading:       false,
+  loadingMorePrs:     false,
   queueError:         null,
+  hasMorePrs:         false,
+  nextPrCursor:       undefined,
+  includeClosedPrs:   false,
   activePr:           null,
   currentChapterId:   null,
   currentFilePath:    null,
@@ -98,8 +111,13 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   rateLimitState:     null,
 
   setQueue: (prs) => set({ prQueue: prs }),
+  appendQueue: (prs) => set(state => ({ prQueue: [...state.prQueue, ...prs] })),
   setQueueLoading: (loading) => set({ queueLoading: loading }),
+  setLoadingMorePrs: (loading) => set({ loadingMorePrs: loading }),
   setQueueError: (error) => set({ queueError: error }),
+  setHasMorePrs: (hasMore) => set({ hasMorePrs: hasMore }),
+  setNextPrCursor: (cursor) => set({ nextPrCursor: cursor }),
+  setIncludeClosedPrs: (include) => set({ includeClosedPrs: include }),
 
   setActivePr: (pr) => set({ activePr: pr }),
   setCurrentChapter: (chapterId) => set({ currentChapterId: chapterId }),

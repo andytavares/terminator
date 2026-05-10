@@ -1,246 +1,136 @@
-# Data Model: Unified Pull Request Review
+# Data Model: UX Improvement PRD
 
-**Branch**: `003-pr-review` | **Date**: 2026-05-07
-
-All types are defined as Zod schemas in `src/shared/schemas/pr-review.schema.ts` and inferred TypeScript types exported alongside.
+**Branch**: `bugfix-various-small-issues` | **Date**: 2026-05-10
 
 ---
 
-## Core Types
+## 1. ConfirmDialog Options
 
-### `ReviewQueuePR`
-
-Lightweight PR summary used in the review queue list. Fetched via `gh pr list`.
+New type used by the shared `ConfirmDialog` component. Lives in `src/shared/types/index.ts` or as a local prop type in the component file (preferred — no shared type needed since it's a UI-only construct).
 
 ```typescript
-{
-  number: number              // PR number
-  title: string
-  author: string              // GitHub login
-  authorAvatarUrl: string
-  openedAt: string            // ISO 8601
-  headRefName: string
-  baseRefName: string
-  isDraft: boolean
-  ciStatus: 'passing' | 'failing' | 'pending' | 'none'
-  fileCount: number
-  additions: number
-  deletions: number
-  estimatedMinutes: number    // derived: ceil((additions + deletions) / 60)
-  riskLevel: 'low' | 'medium' | 'high'  // derived from signal scores
-  signalDots: SignalDots      // six coloured dots
-  sessionStatus: 'not-started' | 'in-progress' | 'paused'
-  resumeChapter?: number      // 1-indexed; set when sessionStatus === 'paused'
-  resumeChapterTotal?: number
+interface ConfirmDialogProps {
+  title: string // Primary question, e.g. "Remove workspace "My Repo"?"
+  description?: string // Context message, e.g. "This will delete all 4 projects."
+  confirmLabel?: string // Default: "Confirm"
+  danger?: boolean // If true, confirm button uses --danger background
+  onConfirm: () => void
+  onClose: () => void
 }
 ```
 
-### `SignalDots`
+**Usage sites**: `WorkspaceRail.tsx`, `WorkspaceItem.tsx`, `ProjectsPanel.tsx`, `ProjectItem.tsx` (replace `window.confirm`). `SettingsPanel.tsx` (replace `alert`).
 
-Six boolean-ish health signals shown as coloured dots in the queue row.
+---
 
-```typescript
-{
-  tests:    'pass' | 'warn' | 'fail' | 'unknown'
-  coverage: 'pass' | 'warn' | 'fail' | 'unknown'
-  ci:       'pass' | 'warn' | 'fail' | 'unknown'
-  lint:     'pass' | 'warn' | 'fail' | 'unknown'
-  churn:    'pass' | 'warn' | 'fail' | 'unknown'  // low/medium/high churn
-  blast:    'pass' | 'warn' | 'fail' | 'unknown'  // low/medium/high blast radius
-}
+## 2. CSS Token Contract (Host → Extension)
+
+The canonical token names published to extensions. Defined in `styles.css` as aliases over the core private tokens.
+
+| Token                 | Maps to (core)     | Description                                  |
+| --------------------- | ------------------ | -------------------------------------------- |
+| `--tm-bg-base`        | `--bg-base`        | Deepest background                           |
+| `--tm-bg-surface`     | `--bg-surface`     | Panel backgrounds                            |
+| `--tm-bg-elevated`    | `--bg-elevated`    | Modals, dropdowns                            |
+| `--tm-bg-card`        | `--bg-card`        | Card/list item backgrounds                   |
+| `--tm-text-primary`   | `--text-primary`   | Primary text                                 |
+| `--tm-text-secondary` | `--text-secondary` | Secondary / labels                           |
+| `--tm-text-muted`     | `--text-muted`     | Hints, disabled text                         |
+| `--tm-border`         | `--border`         | Subtle borders                               |
+| `--tm-border-strong`  | `--border-strong`  | High-contrast borders                        |
+| `--tm-accent`         | `--accent`         | Primary accent color (workspace-overridable) |
+| `--tm-accent-dim`     | `--accent-dim`     | Tinted accent background                     |
+| `--tm-danger`         | `--danger`         | Error/destructive color                      |
+| `--tm-success`        | _(new)_ `#4ade80`  | Success state                                |
+| `--tm-warning`        | _(new)_ `#facc15`  | Warning state                                |
+| `--tm-radius-sm`      | `--radius-sm`      | 6px                                          |
+| `--tm-radius-md`      | `--radius-md`      | 10px                                         |
+| `--tm-radius-lg`      | `--radius-lg`      | 16px                                         |
+| `--tm-font-mono`      | `--font-mono`      | Monospace font stack                         |
+| `--tm-font-ui`        | `--font-ui`        | UI / proportional font stack                 |
+
+**Extension CSS migration mapping** (git-integration `--color-*` → `--tm-*`):
+
+| Old                                  | New                      |
+| ------------------------------------ | ------------------------ |
+| `var(--color-bg, #161b22)`           | `var(--tm-bg-surface)`   |
+| `var(--color-bg-secondary, #1a1a1a)` | `var(--tm-bg-base)`      |
+| `var(--color-text, #e6edf3)`         | `var(--tm-text-primary)` |
+| `var(--color-text-muted, #8b949e)`   | `var(--tm-text-muted)`   |
+| `var(--color-border, #333)`          | `var(--tm-border)`       |
+| `var(--color-accent, #58a6ff)`       | `var(--tm-accent)`       |
+
+---
+
+## 3. Font Token
+
+New token `--font-ui` added to `:root` in `styles.css`. Propagates to all non-terminal, non-code UI surfaces.
+
+```
+--font-ui: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 ```
 
-### `PrReviewDetail`
+**Apply to**: workspace rail labels, projects panel, dialogs, settings panel nav + fields, tab bar labels, toast messages, context menus, branch switcher.  
+**Keep `--font-mono` on**: terminal pane, diff views, commit message textareas, branch name pills, file paths, `<code>` / `<pre>` content.
 
-Full PR detail fetched when the reviewer opens a PR. Includes file list, ordered and grouped.
+---
 
-```typescript
-{
-  number: number
-  title: string
-  body: string                // raw markdown — rendered via RichContent
-  author: string
-  authorAvatarUrl: string
-  openedAt: string
-  headRefName: string
-  baseRefName: string
-  headSHA: string             // used as part of the session persistence key
-  ciStatus: 'passing' | 'failing' | 'pending' | 'none'
-  chapters: Chapter[]
-}
-```
+## 4. Skeleton Utility Classes
 
-### `Chapter`
+Shared CSS utility classes added to `styles.css` for use across all surfaces that need loading skeletons.
 
-A named group of related changed files in dependency order.
-
-```typescript
-{
-  id: string                  // slugified name, e.g. 'src-auth'
-  name: string                // display name, e.g. 'src/auth'
-  files: PrChangedFile[]      // in display order
-  estimatedMinutes: number    // sum of per-file estimates
-  status: 'not-started' | 'in-progress' | 'complete'  // derived from file viewed states
-}
-```
-
-### `PrChangedFile`
-
-A single changed file within a PR, with all health metadata.
-
-```typescript
-{
-  path: string
-  oldPath?: string            // set for renames
-  changeType: 'added' | 'modified' | 'deleted' | 'renamed'
-  additions: number
-  deletions: number
-  isBinary: boolean
-  tier: 0 | 1 | 2 | 3        // heuristic ordering tier (0=types, 1=source, 2=tests, 3=mechanical)
-  whyHere: string             // e.g. "Interface file — defines types used by the files below"
-  riskScore: RiskScore
-  estimatedMinutes: number    // ceil((additions + deletions) / 60), min 1
-}
-```
-
-### `RiskScore`
-
-The computed risk rating and per-metric breakdown for a single file.
-
-```typescript
-{
-  level: 'low' | 'medium' | 'high'
-  composite: number           // 0–100 (or null if fewer than 2 metrics available)
-  metrics: {
-    changeSize: number | null
-    churn90d: number | null   // raw commit count in last 90 days
-    blastRadius: number | null // count of files importing this one
-    testFilePresent: boolean | null
-    complexityDelta: number | null  // cyclomatic delta via keyword counting; null if diff unavailable
-    patchCoverage: number | null    // null unless lcov/cobertura available from CI
-  }
-  dominantDriver: string      // human-readable "why" e.g. "High churn (47 commits/90d)"
-  topImporters: string[]      // up to 5 relative paths
-  importerCount: number       // total including those not in topImporters
-}
-```
-
-### `FileMetrics`
-
-Intermediate type carrying raw metric values before normalisation — input to `computeRiskScore`.
-
-```typescript
-{
-  path: string
-  additions: number
-  deletions: number
-  churn90d: number | null
-  blastRadius: number | null
-  testFilePresent: boolean
-  complexityDelta: number | null  // sum of per-hunk cyclomatic deltas from keyword counting
-  patchCoverage: number | null
-  topImporters: string[]
-  importerCount: number
-}
+```css
+.skeleton            /* Base placeholder block */
+.skeleton--text-sm   /* 11px text placeholder (width: 60%) */
+.skeleton--text-md   /* 13px text placeholder (width: 80%) */
+.skeleton--icon      /* 16x16 icon placeholder */
+.skeleton--row       /* Full-width file-row placeholder */
 ```
 
 ---
 
-## Comment Types
+## 5. EmptyState Component Props
 
-### `InlineComment`
-
-A single comment anchored to a line or range within a file diff.
+New `EmptyState` component at `src/renderer/components/EmptyState.tsx`. Props:
 
 ```typescript
-{
-  id: number                  // GitHub comment ID
-  author: string
-  authorAvatarUrl: string
-  body: string                // raw markdown
-  createdAt: string           // ISO 8601
-  updatedAt: string
-  path: string                // file path
-  line: number                // end line (GitHub convention)
-  startLine: number | null    // null = single-line comment
-  side: 'LEFT' | 'RIGHT'
-  diffHunk: string            // context from GitHub for outdated detection
-  outdated: boolean
-  threadId: string            // all comments with the same threadId form a thread
-  isReply: boolean            // true if this is a reply to another comment
-  parentId: number | null     // GitHub's in_reply_to_id
+interface EmptyStateProps {
+  icon?: string // Emoji or SVG character, default "⬡"
+  title: string // Main message
+  subtitle?: string // Optional secondary message
+  actions?: Array<{ label: string; shortcut?: string; onClick: () => void }>
 }
 ```
 
-### `Thread`
+Replaces the ad-hoc `.empty-state` + `.empty-state__icon` pattern in `App.tsx`.
 
-A group of inline comments (root + replies) displayed together.
+---
+
+## 6. Settings Dirty State
+
+Tracked inside `SettingsPanel` local state — no shared store needed (UI-only concern):
 
 ```typescript
-{
-  id: string                  // == root comment threadId
-  path: string
-  line: number
-  startLine: number | null
-  side: 'LEFT' | 'RIGHT'
-  outdated: boolean
-  comments: InlineComment[]   // chronological order, root first
-  collapsed: boolean          // true when thread has > 3 replies and not yet expanded
+interface SettingsDirty {
+  global: boolean
+  workspace: boolean
 }
 ```
 
----
-
-## Session State
-
-### `ReviewSession`
-
-Persisted to `electron-store` at key `"${repoRoot}:::${prNumber}:::${headSHA}"`.
-
-```typescript
-{
-  repoRoot: string
-  prNumber: number
-  headSHA: string
-  currentChapterId: string | null
-  currentFilePath: string | null
-  viewedFiles: Set<string>             // paths of files marked viewed
-  fileOrderOverrides: Record<string, string[]>  // chapterId → ordered file paths (manual drag-drop)
-  scrollPosition: number | null        // px offset from top of diff pane; null = top
-  pausedAt: string | null              // ISO 8601; null if not paused
-  lastAccessedAt: string               // ISO 8601
-}
-```
+When any field value differs from the loaded settings snapshot, the corresponding flag is set. The close button shows "Discard" or renders a confirmation when dirty.
 
 ---
 
-## State Transitions
+## 7. File Status Badge Labels
 
-### File Viewed State
+Lookup table (no new type — derived from existing `StagedFile.status` field already typed in git schema):
 
-```
-unviewed → viewed       (user clicks "Mark viewed → Next file")
-viewed   → unviewed     (user clicks the checkmark to unmark)
-```
-
-### Chapter Status (derived, not stored)
-
-```
-not-started   (0 files in chapter are viewed)
-in-progress   (1..N-1 files viewed, N = chapter.files.length)
-complete      (all N files viewed)
-```
-
-### Review Session (derived, not stored)
-
-```
-not-started → in-progress   (first file marked viewed)
-in-progress → paused        ("Pause review" clicked; pausedAt set)
-paused      → in-progress   (PR re-opened from queue; pausedAt cleared)
-```
-
----
-
-## Zod Schema Location
-
-`src/shared/schemas/pr-review.schema.ts` — all types above as Zod schemas with `.parse` / `.safeParse`. Renderer and main process both import from this path (no duplication).
+| Status code | Badge letter | Tooltip text |
+| ----------- | ------------ | ------------ |
+| `M`         | M            | Modified     |
+| `A`         | A            | Added        |
+| `D`         | D            | Deleted      |
+| `R`         | R            | Renamed      |
+| `C`         | C            | Copied       |
+| `U`         | U            | Untracked    |
+| `!`         | !            | Conflicted   |

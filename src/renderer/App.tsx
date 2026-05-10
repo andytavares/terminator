@@ -14,6 +14,7 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { installLogInterceptor } from './stores/log.store'
 import { useToastStore } from './stores/toast.store'
 import { useExtensionRegistry } from './extensions/registry'
+import { EmptyState } from './components/EmptyState'
 import './extensions/loader'
 
 installLogInterceptor()
@@ -21,12 +22,19 @@ installLogInterceptor()
 export function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
+  const [sidebarVisible, setSidebarVisible] = useState(true)
   const { loadWorkspaces, activeWorkspaceId, activeProjectId, workspaces } = useWorkspaceStore()
-  const { loadSettings } = useSettingsStore()
+  const { loadSettings, globalSettings, markWelcomeSeen } = useSettingsStore()
   const { handleProcessExit } = useSessionStore()
   const { addToast } = useToastStore()
-  const { sidebarPanels, projectTabs, openPanels, activeProjectTabId, togglePanel, setActiveProjectTab } =
-    useExtensionRegistry()
+  const {
+    sidebarPanels,
+    projectTabs,
+    openPanels,
+    activeProjectTabId,
+    togglePanel,
+    setActiveProjectTab,
+  } = useExtensionRegistry()
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
   const repoRoot = activeWorkspace?.folderPath ?? null
@@ -46,6 +54,12 @@ export function App(): JSX.Element {
   }, [activeWorkspaceId])
 
   useEffect(() => {
+    if (activeProjectId && globalSettings && !globalSettings.ui?.hasSeenWelcome) {
+      markWelcomeSeen()
+    }
+  }, [activeProjectId])
+
+  useEffect(() => {
     const unsub = window.electronAPI.terminal.onProcessExit((sessionId, exitCode) => {
       handleProcessExit(sessionId, exitCode)
     })
@@ -57,6 +71,25 @@ export function App(): JSX.Element {
     window.addEventListener('open-settings', handler)
     return () => window.removeEventListener('open-settings', handler)
   }, [])
+
+  useEffect(() => {
+    if (!window.electronAPI.extensionEvents?.onMenuOpenSettings) return
+    return window.electronAPI.extensionEvents.onMenuOpenSettings(() => setSettingsOpen(true))
+  }, [])
+
+  useEffect(() => {
+    if (!window.electronAPI.extensionEvents?.onMenuToggleSidebar) return
+    return window.electronAPI.extensionEvents.onMenuToggleSidebar(() =>
+      setSidebarVisible((v) => !v)
+    )
+  }, [])
+
+  useEffect(() => {
+    if (!window.electronAPI.extensionEvents?.onMenuOpenPrReviewWindow) return
+    return window.electronAPI.extensionEvents.onMenuOpenPrReviewWindow(() => {
+      if (repoRoot) window.electronAPI.window.openPrReview(repoRoot, activeWorkspace?.color)
+    })
+  }, [repoRoot])
 
   useEffect(() => {
     if (!window.electronAPI.extensionEvents) return
@@ -105,9 +138,7 @@ export function App(): JSX.Element {
       <div className="app-layout">
         <WorkspaceRail />
 
-        {activeWorkspaceId && (
-          <ProjectsPanel workspaceId={activeWorkspaceId} />
-        )}
+        {activeWorkspaceId && sidebarVisible && <ProjectsPanel workspaceId={activeWorkspaceId} />}
 
         <div className="main-content">
           {activeProjectId ? (
@@ -128,15 +159,25 @@ export function App(): JSX.Element {
                 <TerminalPane projectId={activeProjectId} />
               )}
             </>
+          ) : globalSettings && !globalSettings.ui?.hasSeenWelcome ? (
+            <EmptyState
+              icon="⬡"
+              title="Welcome to Terminator"
+              subtitle="A keyboard-first terminal for developers. Open a project to get started."
+              actions={[
+                { label: 'New Tab', shortcut: '⌘T', onClick: () => {} },
+                { label: 'Open Settings', shortcut: '⌘,', onClick: () => setSettingsOpen(true) },
+              ]}
+            />
           ) : (
-            <div className="empty-state">
-              <span className="empty-state__icon">⌥</span>
-              <span>
-                {activeWorkspaceId
+            <EmptyState
+              icon="⌥"
+              title={
+                activeWorkspaceId
                   ? 'Select or create a project'
-                  : 'Select a workspace to get started'}
-              </span>
-            </div>
+                  : 'Select a workspace to get started'
+              }
+            />
           )}
         </div>
 

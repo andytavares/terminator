@@ -6,15 +6,35 @@ import { computeRiskScore } from '../github/pr-review-service'
 
 // ─── Queue loading ────────────────────────────────────────────────────────────
 
-export function useLoadPrQueue(repoRoot: string | null) {
-  const { setQueue, setQueueLoading, setQueueError, setRateLimitState } = usePrReviewStore()
+function parsePrList(raw: unknown[]): ReturnType<typeof ReviewQueuePRSchema.safeParse>['data'][] {
+  return raw
+    .map(p => ReviewQueuePRSchema.safeParse(p))
+    .filter(r => r.success)
+    .map(r => r.data!)
+}
 
-  return useCallback(async () => {
+export function useLoadPrQueue(repoRoot: string | null) {
+  const {
+    setQueue, appendQueue, setQueueLoading, setLoadingMorePrs,
+    setQueueError, setRateLimitState, setHasMorePrs, setNextPrCursor,
+    includeClosedPrs,
+  } = usePrReviewStore()
+
+  return useCallback(async (options?: { cursor?: string; search?: string; append?: boolean; includeClosedPrs?: boolean }) => {
     if (!repoRoot) return
-    setQueueLoading(true)
-    setQueueError(null)
+    const isAppend = Boolean(options?.append)
+    if (isAppend) {
+      setLoadingMorePrs(true)
+    } else {
+      setQueueLoading(true)
+      setQueueError(null)
+    }
     try {
-      const result = await window.electronAPI.github.listOpenPrs(repoRoot)
+      const result = await window.electronAPI.github.listOpenPrs(repoRoot, {
+        cursor:           options?.cursor,
+        search:           options?.search,
+        includeClosedPrs: options?.includeClosedPrs ?? includeClosedPrs,
+      })
       if ('error' in result) {
         if ((result as { error: string }).error === 'RATE_LIMITED') {
           setRateLimitState({ resetAt: (result as { resetAt?: number }).resetAt ?? Date.now() + 60_000 })
@@ -23,15 +43,23 @@ export function useLoadPrQueue(repoRoot: string | null) {
         }
         return
       }
-      const prs = ((result as { prs: unknown[] }).prs)
-        .map(p => ReviewQueuePRSchema.safeParse(p))
-        .filter(r => r.success)
-        .map(r => r.data!)
-      setQueue(prs)
+      const res = result as { prs: unknown[]; hasMore: boolean; nextCursor?: string }
+      const prs = parsePrList(res.prs)
+      if (isAppend) {
+        appendQueue(prs)
+      } else {
+        setQueue(prs)
+      }
+      setHasMorePrs(res.hasMore)
+      setNextPrCursor(res.nextCursor)
     } catch (e) {
       setQueueError(String(e))
     } finally {
-      setQueueLoading(false)
+      if (isAppend) {
+        setLoadingMorePrs(false)
+      } else {
+        setQueueLoading(false)
+      }
     }
   }, [repoRoot])
 }
@@ -138,9 +166,16 @@ export function useFetchFileMetrics(repoRoot: string | null) {
       : pr.ciStatus === 'pending' ? 'warn'
       : 'unknown'
 
+    // For coverage: prefer local patch coverage (file-level) when available;
+    // fall back to the API-reported codecov/coveralls check so it doesn't show ? when CI passed.
+    const coverageDot: SignalDots['coverage'] =
+      avgCoverage != null
+        ? (avgCoverage >= 80 ? 'pass' : avgCoverage >= 50 ? 'warn' : 'fail')
+        : (pr.coverageStatus ?? 'unknown')
+
     const signalDots: SignalDots = {
       tests:    anyMissingTest ? 'fail' : 'pass',
-      coverage: avgCoverage == null ? 'unknown' : avgCoverage >= 80 ? 'pass' : avgCoverage >= 50 ? 'warn' : 'fail',
+      coverage: coverageDot,
       ci:       ciDot,
       lint:     pr.lintStatus ?? 'unknown',
       churn:    maxChurn > 50 ? 'fail' : maxChurn > 20 ? 'warn' : 'pass',

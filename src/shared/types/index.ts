@@ -86,6 +86,9 @@ export interface GlobalSettings {
   extensions: {
     [extensionId: string]: Record<string, unknown>
   }
+  ui: {
+    hasSeenWelcome: boolean
+  }
 }
 
 export interface WorkspaceSettings {

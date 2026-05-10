@@ -18,10 +18,31 @@ const sessionStore = new Store<Record<string, unknown>>({ name: 'pr-review-sessi
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function runGh(cwd: string, args: string[]): Promise<string> {
-  const { stdout, stderr } = await execFileAsync('gh', args, { cwd, timeout: 30_000 })
+async function runGh(cwd: string, args: string[], timeoutMs = 30_000): Promise<string> {
+  const { stdout, stderr } = await execFileAsync('gh', args, { cwd, timeout: timeoutMs })
   if (stderr && !stdout) throw new Error(stderr)
   return stdout.trim()
+}
+
+async function getRepoOwnerAndName(repoRoot: string): Promise<{ owner: string; repo: string }> {
+  const raw = await runGh(repoRoot, ['repo', 'view', '--json', 'owner,name'])
+  const data = JSON.parse(raw) as { owner: { login: string }; name: string }
+  return { owner: data.owner.login, repo: data.name }
+}
+
+function normalizeGraphQLNode(node: unknown): Record<string, unknown> {
+  const obj = node as Record<string, unknown>
+  type CommitContext = { name?: string; context?: string; conclusion?: string; state?: string }
+  type CommitNode = { commit?: { statusCheckRollup?: { contexts?: { nodes?: CommitContext[] } } } }
+  type CommitsField = { nodes?: CommitNode[] }
+  const commits = obj.commits as CommitsField | undefined
+  const contextNodes = commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes ?? []
+  const statusCheckRollup = contextNodes.map(ctx => ({
+    name:       ctx.name ?? ctx.context ?? '',
+    state:      ctx.conclusion ?? ctx.state ?? '',
+    conclusion: ctx.conclusion ?? ctx.state ?? '',
+  }))
+  return { ...obj, statusCheckRollup }
 }
 
 async function runGit(cwd: string, args: string[]): Promise<string> {
@@ -42,17 +63,48 @@ function parseRateLimit(err: unknown): { error: 'RATE_LIMITED'; resetAt: number 
 export function registerGithubHandlers(register: RegisterFn): void {
 
   register('github:list-open-prs', async (payload) => {
-    const schema = z.object({ repoRoot: z.string().min(1) })
+    const schema = z.object({
+      repoRoot:         z.string().min(1),
+      cursor:           z.string().optional(),
+      search:           z.string().optional(),
+      includeClosedPrs: z.boolean().optional(),
+    })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repoRoot, cursor, search, includeClosedPrs } = parsed.data
+    const PR_JSON_FIELDS = 'number,title,author,createdAt,headRefName,baseRefName,isDraft,statusCheckRollup,files,additions,deletions'
+
     try {
-      const raw = await runGh(parsed.data.repoRoot, [
-        'pr', 'list', '--state', 'open', '--limit', '500',
-        '--json', 'number,title,author,createdAt,headRefName,baseRefName,isDraft,statusCheckRollup,files,additions,deletions',
-      ])
-      const items = JSON.parse(raw) as unknown[]
-      const prs: ReviewQueuePR[] = items.map(item => parseReviewQueuePR(item))
-      return { prs }
+      // PR number lookup — always finds the PR regardless of state
+      if (search && /^\d+$/.test(search.trim())) {
+        const raw = await runGh(repoRoot, ['pr', 'view', search.trim(), '--json', PR_JSON_FIELDS])
+        const pr = parseReviewQueuePR(JSON.parse(raw))
+        return { prs: [pr], hasMore: false }
+      }
+
+      // Text search — always searches all states so nothing is missed
+      if (search && search.trim()) {
+        const raw = await runGh(repoRoot, [
+          'pr', 'list', '--state', 'all', '--search', search.trim(),
+          '--limit', '50', '--json', PR_JSON_FIELDS,
+        ])
+        const prs: ReviewQueuePR[] = (JSON.parse(raw) as unknown[]).map(parseReviewQueuePR)
+        return { prs, hasMore: false }
+      }
+
+      // Paginated load via GraphQL
+      const { owner, repo } = await getRepoOwnerAndName(repoRoot)
+      const gqlStates = includeClosedPrs ? '[OPEN,CLOSED,MERGED]' : 'OPEN'
+      const gql = `query($owner:String!,$repo:String!,$cursor:String){repository(owner:$owner,name:$repo){pullRequests(first:20,states:${gqlStates},after:$cursor,orderBy:{field:CREATED_AT,direction:DESC}){pageInfo{endCursor hasNextPage}nodes{number title isDraft additions deletions createdAt headRefName baseRefName changedFiles author{login avatarUrl}commits(last:1){nodes{commit{statusCheckRollup{contexts(first:20){nodes{...on CheckRun{name conclusion status}...on StatusContext{context state}}}}}}}}}}}`;
+      const args = ['api', 'graphql', '-f', `query=${gql}`, '-f', `owner=${owner}`, '-f', `repo=${repo}`]
+      if (cursor) args.push('-f', `cursor=${cursor}`)
+
+      const raw = await runGh(repoRoot, args, 60_000)
+      type GQLResponse = { data: { repository: { pullRequests: { pageInfo: { endCursor: string; hasNextPage: boolean }; nodes: unknown[] } } } }
+      const data = JSON.parse(raw) as GQLResponse
+      const { nodes, pageInfo } = data.data.repository.pullRequests
+      const prs: ReviewQueuePR[] = nodes.map(n => parseReviewQueuePR(normalizeGraphQLNode(n)))
+      return { prs, hasMore: pageInfo.hasNextPage, nextCursor: pageInfo.hasNextPage ? pageInfo.endCursor : undefined }
     } catch (e) {
       return parseRateLimit(e) ?? { error: String(e) }
     }
@@ -131,19 +183,22 @@ export function registerGithubHandlers(register: RegisterFn): void {
     const { repoRoot, path } = parsed.data
     try {
       const stem = basename(path, `.${basename(path).split('.').pop()}`)
+      // Match actual import/require/from statements only — not plain-text mentions in markdown or comments.
+      // No extension allowlist: the pattern itself is the filter. Any language that uses import/require/from
+      // syntax will be found; prose files (markdown, YAML, JSON, gitignore…) won't match.
+      const importPattern = `(from|require|import).*['"./]` + stem + `['"/]`
       const [churnRaw, blastRaw, testRaw] = await Promise.all([
         runGit(repoRoot, ['log', '--oneline', '--since=90 days ago', '--', path]),
-        runGit(repoRoot, ['grep', '-l', basename(path).replace(/\.[^.]+$/, ''), '--']).catch(() => ''),
+        runGit(repoRoot, ['grep', '-rl', '--extended-regexp', importPattern]).catch(() => ''),
         runGit(repoRoot, ['ls-files', '--', `**/${stem}*.spec.*`, `**/${stem}*.test.*`]).catch(() => ''),
       ])
       const churn90d = churnRaw ? churnRaw.split('\n').filter(Boolean).length : 0
       const importerLines = blastRaw ? blastRaw.split('\n').filter(Boolean).filter(l => l !== path) : []
       const blastRadius = importerLines.length
-      const topImporters = importerLines.slice(0, 5)
       const importerCount = importerLines.length
       const testFilePresent = testRaw ? testRaw.trim().length > 0 : false
       const patchCoverage = await readFileCoverage(repoRoot, path)
-      return { churn90d, blastRadius, topImporters, importerCount, testFilePresent, patchCoverage }
+      return { churn90d, blastRadius, topImporters: importerLines, importerCount, testFilePresent, patchCoverage }
     } catch (e) {
       return { error: String(e) }
     }
@@ -283,12 +338,18 @@ export function registerGithubHandlers(register: RegisterFn): void {
 const LINT_CHECK_NAMES     = ['lint', 'eslint', 'rubocop', 'flake8', 'pylint', 'stylelint', 'prettier', 'tslint']
 const COVERAGE_CHECK_NAMES = ['coverage', 'codecov', 'coveralls', 'sonar', 'codeclimate', 'lcov']
 
+const NON_BLOCKING = new Set(['SKIPPED', 'NEUTRAL', 'CANCELLED', 'STALE'])
+
 function mapCiStatus(rollup: unknown): 'passing' | 'failing' | 'pending' | 'none' {
   if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'none'
-  const statuses = (rollup as Array<Record<string, unknown>>).map(s => String(s.state ?? s.conclusion ?? ''))
-  if (statuses.some(s => s === 'FAILURE' || s === 'failure')) return 'failing'
-  if (statuses.some(s => s === 'PENDING' || s === 'in_progress' || s === 'pending')) return 'pending'
-  if (statuses.every(s => s === 'SUCCESS' || s === 'success')) return 'passing'
+  // Normalise: gh returns `conclusion` on CheckRuns; StatusContext uses `state`
+  const statuses = (rollup as Array<Record<string, unknown>>).map(s =>
+    String(s.conclusion ?? s.state ?? '').toUpperCase()
+  )
+  if (statuses.some(s => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT' || s === 'ACTION_REQUIRED')) return 'failing'
+  if (statuses.some(s => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED' || s === 'WAITING')) return 'pending'
+  // SKIPPED / NEUTRAL / CANCELLED are non-blocking; pass if at least one check succeeded
+  if (statuses.some(s => s === 'SUCCESS')) return 'passing'
   return 'none'
 }
 
@@ -299,10 +360,11 @@ function mapCheckStatus(rollup: unknown, names: string[]): 'pass' | 'fail' | 'wa
     return names.some(n => name.includes(n))
   })
   if (checks.length === 0) return 'unknown'
-  const statuses = checks.map(s => String(s.state ?? s.conclusion ?? '').toUpperCase())
-  if (statuses.some(s => s === 'FAILURE' || s === 'ERROR')) return 'fail'
-  if (statuses.some(s => s === 'PENDING' || s === 'IN_PROGRESS')) return 'warn'
-  if (statuses.every(s => s === 'SUCCESS')) return 'pass'
+  const statuses = checks.map(s => String(s.conclusion ?? s.state ?? '').toUpperCase())
+  if (statuses.some(s => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT')) return 'fail'
+  if (statuses.some(s => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED')) return 'warn'
+  if (statuses.some(s => s === 'SUCCESS')) return 'pass'
+  if (statuses.every(s => NON_BLOCKING.has(s))) return 'unknown'
   return 'unknown'
 }
 

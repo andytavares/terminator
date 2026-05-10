@@ -58,9 +58,11 @@
   text-align: left;
   cursor: pointer;
   font-size: 12px;
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   color: var(--text-secondary);
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .settings-panel__nav-item:hover {
@@ -92,7 +94,9 @@
   font-size: 14px;
   padding: 4px 7px;
   border-radius: var(--radius-sm);
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .settings-panel__close:hover {
@@ -132,7 +136,6 @@
   font-family: var(--font-mono);
   color: var(--text-primary);
   width: 200px;
-  outline: none;
   transition: border-color 0.15s;
 }
 
@@ -160,11 +163,13 @@
   border-radius: var(--radius-sm);
   padding: 6px 14px;
   font-size: 11px;
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   color: var(--text-primary);
   cursor: pointer;
   margin-bottom: 12px;
-  transition: background 0.1s, border-color 0.1s;
+  transition:
+    background 0.1s,
+    border-color 0.1s;
 }
 
 .settings-section__btn:hover {
@@ -193,7 +198,7 @@
   color: var(--accent);
   cursor: pointer;
   font-size: 11px;
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   padding: 0;
   margin-left: 8px;
 }

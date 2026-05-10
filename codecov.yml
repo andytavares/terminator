@@ -1,0 +1,43 @@
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 1%       # allow up to 1% slip from base before failing
+        if_not_found: success
+        if_ci_failed: success
+    patch:
+      default:
+        target: 80%         # all new/changed lines must reach 80%
+        threshold: 0%       # no wiggle room — enforce strictly
+        if_not_found: success
+        if_ci_failed: success
+
+comment:
+  layout: "reach,diff,flags,files,footer"
+  behavior: default         # update existing comment instead of posting new one
+  require_changes: true     # only comment when coverage actually changes
+  require_base: false
+  require_head: true
+
+ignore:
+  - "node_modules/**"
+  - "dist/**"
+  - "out/**"
+  - "coverage/**"
+  - "scripts/**"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/__tests__/**"
+  - "src/renderer/index.tsx"
+  - "src/main/index.ts"
+  - "src/main/preload.ts"
+  - ".github/**"
+  - ".claude/**"
+  - ".specify/**"

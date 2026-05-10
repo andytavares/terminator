@@ -103,11 +103,10 @@ export function ReviewDiffPane({
           {file.changeType !== 'modified' && (
             <span className="review-diff-change-badge">{file.changeType}</span>
           )}
-          {file.riskScore.level === 'high' && (
-            <span className="review-diff-high-risk">
-              HIGH RISK <button className="review-diff-why-btn" onClick={onShowRisk}>why?</button>
-            </span>
-          )}
+          <span className={`review-diff-risk-label review-diff-risk-label--${file.riskScore.level}`}>
+            {file.riskScore.level === 'high' ? 'HIGH RISK' : file.riskScore.level === 'medium' ? 'MED RISK' : 'LOW RISK'}
+            {' '}<button className="review-diff-why-btn" onClick={onShowRisk}>why?</button>
+          </span>
         </div>
         <div className="review-diff-header-right">
           <span className="review-diff-changes">+{file.additions}/−{file.deletions}</span>

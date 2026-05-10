@@ -1,13 +1,25 @@
-import React from 'react'
+import React, { useState } from 'react'
 import type { RiskScore } from '../../schemas/pr-review.schema'
+
+const IMPORTERS_INITIAL = 5
 
 interface Props {
   filePath: string
   riskScore: RiskScore
+  repoRoot: string
 }
 
-export function RiskBreakdownPanel({ filePath, riskScore }: Props) {
+export function RiskBreakdownPanel({ filePath, riskScore, repoRoot }: Props) {
   const { level, composite, metrics, dominantDriver, topImporters, importerCount } = riskScore
+  const [importersExpanded, setImportersExpanded] = useState(false)
+
+  const visibleImporters = importersExpanded ? topImporters : topImporters.slice(0, IMPORTERS_INITIAL)
+  const hiddenCount = topImporters.length - IMPORTERS_INITIAL
+
+  function openImporter(relPath: string) {
+    const abs = `${repoRoot}/${relPath}`
+    window.electronAPI.shell.openPath(abs)
+  }
 
   const metricRows: Array<{ label: string; value: string | number | null; max: number }> = [
     { label: 'Change size',       value: metrics.changeSize,      max: 500 },
@@ -63,13 +75,31 @@ export function RiskBreakdownPanel({ filePath, riskScore }: Props) {
       {topImporters.length > 0 && (
         <div className="risk-importers">
           <h3 className="risk-importers-heading">
-            Importers (top {topImporters.length} of {importerCount})
+            Importers ({importerCount})
           </h3>
           <ul className="risk-importers-list">
-            {topImporters.map(imp => (
-              <li key={imp} className="risk-importer-path">{imp}</li>
+            {visibleImporters.map(imp => (
+              <li key={imp} className="risk-importer-path">
+                <button
+                  className="risk-importer-btn"
+                  onClick={() => openImporter(imp)}
+                  title={imp}
+                >
+                  {imp.split('/').pop()}
+                </button>
+              </li>
             ))}
           </ul>
+          {hiddenCount > 0 && !importersExpanded && (
+            <button className="risk-importers-toggle" onClick={() => setImportersExpanded(true)}>
+              Show {hiddenCount} more…
+            </button>
+          )}
+          {importersExpanded && topImporters.length > IMPORTERS_INITIAL && (
+            <button className="risk-importers-toggle" onClick={() => setImportersExpanded(false)}>
+              Collapse
+            </button>
+          )}
         </div>
       )}
 

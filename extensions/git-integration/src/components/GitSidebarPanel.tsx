@@ -16,16 +16,19 @@ export function GitSidebarPanel({ repoRoot, onClose }: Props): JSX.Element {
   const { status, setSelectedFile, setDiff } = useGitStore()
   const { setActiveProjectTab } = useExtensionRegistry()
 
-  const handleFileSelect = useCallback((path: string, staged: boolean) => {
-    setSelectedFile(path)
-    setActiveProjectTab('git')
-    if (repoRoot) {
-      void window.electronAPI.git.diffFile(repoRoot, path, staged).then((result) => {
-        const r = result as { diff: FileDiff } | { error: string }
-        if ('diff' in r) setDiff(path, r.diff)
-      })
-    }
-  }, [repoRoot, setSelectedFile, setActiveProjectTab, setDiff])
+  const handleFileSelect = useCallback(
+    (path: string, staged: boolean) => {
+      setSelectedFile(path)
+      setActiveProjectTab('git')
+      if (repoRoot) {
+        void window.electronAPI.git.diffFile(repoRoot, path, staged).then((result) => {
+          const r = result as { diff: FileDiff } | { error: string }
+          if ('diff' in r) setDiff(path, r.diff)
+        })
+      }
+    },
+    [repoRoot, setSelectedFile, setActiveProjectTab, setDiff]
+  )
 
   return (
     <div className="git-sidebar">
@@ -35,11 +38,17 @@ export function GitSidebarPanel({ repoRoot, onClose }: Props): JSX.Element {
         ) : (
           <span className="git-sidebar__branch">Git</span>
         )}
-        <button className="git-sidebar__close-btn" onClick={onClose} title="Close">×</button>
+        <button className="git-sidebar__close-btn" onClick={onClose} title="Close">
+          ×
+        </button>
       </div>
 
       {!status ? (
-        <div className="git-sidebar__loading">Loading…</div>
+        <div className="git-sidebar__file-list">
+          {Array.from({ length: 5 }, (_, i) => (
+            <span key={i} className="skeleton skeleton--row" />
+          ))}
+        </div>
       ) : (
         <StagingArea repoRoot={repoRoot!} onFileSelect={handleFileSelect} />
       )}

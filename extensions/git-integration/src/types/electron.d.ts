@@ -15,7 +15,9 @@ declare global {
         prCreate(payload: unknown): Promise<{ pr: unknown } | { error: string }>
       }
       github: {
-        listOpenPrs(repoRoot: string): Promise<{ prs: unknown[] } | { error: string }>
+        listOpenPrs(repoRoot: string, options?: { cursor?: string; search?: string; includeClosedPrs?: boolean }): Promise<
+          { prs: unknown[]; hasMore: boolean; nextCursor?: string } | { error: string }
+        >
         prReviewDetail(repoRoot: string, prNumber: number): Promise<{ pr: unknown } | { error: string }>
         prFileDiff(repoRoot: string, prNumber: number, path: string): Promise<{ diff: unknown } | { error: string }>
         fileMetrics(repoRoot: string, path: string): Promise<{
@@ -32,6 +34,12 @@ declare global {
         prReviewSubmit(payload: unknown): Promise<{ reviewId: number } | { error: string }>
         sessionGet(key: string): Promise<{ session: unknown } | { session: null }>
         sessionSet(key: string, session: unknown): Promise<{ ok: true } | { error: string }>
+      }
+      git: Window['electronAPI']['git'] & {
+        push(repoRoot: string): Promise<{ success: true } | { error: string }>
+      }
+      window: {
+        openPrReview(repoRoot: string): Promise<void>
       }
     }
   }

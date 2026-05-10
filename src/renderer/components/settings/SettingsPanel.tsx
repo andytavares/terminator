@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { GlobalSettings } from './GlobalSettings'
 import { WorkspaceSettings } from './WorkspaceSettings'
 import { useWorkspaceStore } from '../../stores/workspace.store'
+import { useToastStore } from '../../stores/toast.store'
 import './SettingsPanel.css'
 
 type Section = 'global' | 'workspace' | 'extensions'
@@ -69,6 +70,7 @@ function ExtensionsSection(): JSX.Element {
   const [extensions, setExtensions] = React.useState<
     Array<{ id: string; name: string; version: string; status: string }>
   >([])
+  const { addToast } = useToastStore()
 
   React.useEffect(() => {
     window.electronAPI.extension.list().then((r) => setExtensions(r.extensions ?? []))
@@ -81,7 +83,7 @@ function ExtensionsSection(): JSX.Element {
     if ('extension' in installResult) {
       setExtensions((prev) => [...prev, installResult.extension])
     } else {
-      alert(`Failed to install extension: ${installResult.error}`)
+      addToast({ type: 'error', message: `Failed to install extension: ${installResult.error}` })
     }
   }
 

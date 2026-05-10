@@ -55,18 +55,18 @@ All renderer-to-main communication goes through `window.electronAPI`, exposed by
 
 ### Channel namespaces
 
-| Namespace     | Direction        | Description                                                  |
-| ------------- | ---------------- | ------------------------------------------------------------ |
-| `terminal:*`  | renderer ↔ main | PTY lifecycle: create, close, input, output, resize, cleanup |
-| `workspace:*` | renderer → main  | Workspace and project CRUD                                   |
-| `project:*`   | renderer → main  | Project CRUD (scoped under workspace)                        |
-| `settings:*`  | renderer → main  | Global and per-workspace settings                            |
-| `dialog:*`    | renderer → main  | Native OS dialogs (folder picker)                            |
-| `extension:*` | renderer → main  | Extension install, toggle, contribution queries              |
-| `git:*`       | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create   |
+| Namespace     | Direction        | Description                                                                       |
+| ------------- | ---------------- | --------------------------------------------------------------------------------- |
+| `terminal:*`  | renderer ↔ main | PTY lifecycle: create, close, input, output, resize, cleanup                      |
+| `workspace:*` | renderer → main  | Workspace and project CRUD                                                        |
+| `project:*`   | renderer → main  | Project CRUD (scoped under workspace)                                             |
+| `settings:*`  | renderer → main  | Global and per-workspace settings                                                 |
+| `dialog:*`    | renderer → main  | Native OS dialogs (folder picker)                                                 |
+| `extension:*` | renderer → main  | Extension install, toggle, contribution queries                                   |
+| `git:*`       | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create                        |
 | `github:*`    | renderer → main  | PR review queue, diff, file metrics, inline comments, submit, session persistence |
-| `shell:exec`  | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)          |
-| `fs:*`        | renderer ↔ main  | File watch start/stop; `fs:changed` push events              |
+| `shell:exec`  | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)                               |
+| `fs:*`        | renderer ↔ main | File watch start/stop; `fs:changed` push events                                   |
 
 Full channel specifications: [`specs/001-extension-first-terminal/contracts/ipc-channels.md`](../specs/001-extension-first-terminal/contracts/ipc-channels.md),
 [`specs/002-git-github-integration/contracts/ipc-channels-git.md`](../specs/002-git-github-integration/contracts/ipc-channels-git.md),
@@ -196,6 +196,16 @@ ExtensionHost.load(directoryPath)
       └─ errors in activate() set status: 'error', app stays stable (FR-028)
 ```
 
+### Extension build pipeline
+
+Extension main-process TypeScript (`extensions/*/src/index.ts` and its imports) is compiled to a CommonJS bundle (`extensions/*/src/index.js`) by `scripts/build-extensions.js` using esbuild. The compiled bundle is gitignored and must never be committed. `npm run dev` and `npm run build` both invoke this step automatically via the `build:extensions` script. Renderer-side extension code (`renderer.tsx` and React components) is bundled by electron-vite through the main renderer build.
+
+Extension authors must keep main-process entry points free of React/DOM imports — those belong in `renderer.tsx`.
+
+### Pop-out windows
+
+The `window:open-pr-review` IPC handler in `src/main/index.ts` creates a new `BrowserWindow` that loads the renderer URL with `?view=pr-review&repoRoot=<path>`. The renderer's `src/renderer/index.tsx` detects this query param and renders `PrReviewWindow` instead of `App` — a minimal wrapper around `PrReviewTab` with no workspace/terminal chrome. This pattern can be reused for other focused views.
+
 ### Sandboxed Shell Execution (v1.1.0)
 
 `api.shell.exec()` allows extensions to run `git` and `gh` commands in the main process. Since extensions run in the main process (not the renderer), this is a direct call to `shell-executor.ts` — not an IPC round-trip. The `shell:exec` IPC channel exists separately for renderer-initiated shell calls.
@@ -242,3 +252,24 @@ All store actions are async — they call IPC first, then update local state onl
 - All user input that crosses the IPC boundary is Zod-validated before use.
 - Extensions are loaded via `require()` in the main process — they run with full Node.js privileges. Phase 1 does not sandbox extensions. This is a known limitation documented for Phase 2 consideration (see ADR-002).
 - Reserved keyboard shortcuts are enforced in both preload.ts (renderer guard) and the extension API (main process throw).
+
+---
+
+## CSS Token Strategy
+
+The renderer uses two tiers of CSS custom properties:
+
+**Core-private tokens** (`--bg-*`, `--text-*`, `--border-*`, `--accent`, `--radius-*`, `--font-*`) are defined in `src/renderer/styles.css` and consumed only by core app components. Extensions MUST NOT use these directly — they are an implementation detail and may change without notice.
+
+**Published extension tokens** (`--tm-*`) are aliases for the core-private tokens, also defined in `src/renderer/styles.css` `:root`. These are the stable API surface for extensions. The `--tm-` prefix signals a versioned, stable contract. The full contract is documented in `specs/003-pr-review/contracts/extension-token-api.md` and `docs/EXTENSION-DEVELOPMENT.md`.
+
+```
+styles.css :root
+├── --bg-base: #0C0C0F        ← core private
+├── ...
+└── --tm-bg-base: var(--bg-base)  ← extension API alias
+```
+
+This alias layer allows the core design system to evolve (rename, restructure tokens) without breaking extensions, as long as the `--tm-*` values remain stable.
+
+**Adding a new extension token** requires a MINOR version bump in `specs/003-pr-review/contracts/extension-token-api.md` and an update to `docs/EXTENSION-DEVELOPMENT.md`.

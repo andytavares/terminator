@@ -40,12 +40,24 @@ npm run test:e2e        # E2E — launches real Electron app (Playwright)
 npm run test:coverage   # Coverage report in coverage/
 ```
 
+### Build extensions
+
+Extension TypeScript is compiled to CommonJS bundles by esbuild. The output is gitignored — never commit `extensions/*/src/index.js`. Always rebuild after changing extension source files:
+
+```bash
+npm run build:extensions   # compile all extensions
+```
+
+`npm run dev` and `npm run build` call this automatically.
+
 ### Lint and format
 
 ```bash
 npm run lint       # ESLint + TypeScript type check (zero errors required)
 npm run format     # Prettier (auto-fixes)
 ```
+
+Lint must pass with **0 errors** before opening a PR. Warnings are acceptable but should not accumulate.
 
 ---
 
@@ -157,8 +169,10 @@ Per the constitution (Principle II):
 Before opening a PR, verify:
 
 - [ ] All tests pass (`npm test`)
-- [ ] TypeScript compiles clean (`npm run lint`)
-- [ ] No ESLint errors (`npm run lint`)
+- [ ] `npm run lint` passes with 0 errors
+- [ ] `npm run build:extensions` succeeds (no compile errors)
+- [ ] No unused imports, variables, or dead code introduced
 - [ ] Documentation updated for every changed behavior (see table above)
+- [ ] New IPC channels documented in `ipc-channels.md` and typed in `electron.d.ts`
 - [ ] ADR written if a significant architectural decision was made
 - [ ] New IPC channels documented in contracts file
