@@ -21,14 +21,28 @@
     "format": "prettier --write .",
     "rebuild": "electron-rebuild",
     "create-extension": "node scripts/create-extension.js",
-    "package": "electron-builder --mac --arm64 --publish never"
+    "package": "electron-builder --mac --arm64 --publish never",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --ext .ts,.tsx",
+      "vitest related --run"
+    ],
+    "*.{js}": [
+      "prettier --write",
+      "eslint",
+      "vitest related --run"
+    ],
+    "*.{json,md,css,html}": "prettier --write"
   },
   "dependencies": {
     "electron-store": "^8.2.0",
     "node-pty": "1.0.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-"xterm": "5.3.0",
+    "xterm": "5.3.0",
     "xterm-addon-fit": "0.8.0",
     "zod": "3.23.8",
     "zustand": "4.5.5"
@@ -50,6 +64,8 @@
     "eslint-config-prettier": "9.1.0",
     "eslint-plugin-react": "7.35.0",
     "eslint-plugin-react-hooks": "4.6.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.4",
     "playwright": "1.45.3",
     "prettier": "3.3.3",
     "typescript": "5.5.4",
