@@ -1,8 +1,11 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
+import { PrReviewWindow } from './PrReviewWindow'
 import './styles.css'
 import { useSettingsStore } from './stores/settings.store'
+
+const view = new URLSearchParams(window.location.search).get('view')
 
 function Root(): JSX.Element {
   const theme = useSettingsStore((s) => s.resolvedTheme)
@@ -11,9 +14,12 @@ function Root(): JSX.Element {
   }, [theme])
 
   React.useEffect(() => {
-    window.electronAPI.terminal.cleanupOrphans().catch(() => {})
+    if (view !== 'pr-review') {
+      window.electronAPI.terminal.cleanupOrphans().catch(() => {})
+    }
   }, [])
 
+  if (view === 'pr-review') return <PrReviewWindow />
   return <App />
 }
 

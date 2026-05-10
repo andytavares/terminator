@@ -11,7 +11,8 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 - **Settings** — Global and per-workspace configuration for theme, scrollback limit, and default shell.
 - **Extension system** — Extensions install from local directories and contribute settings sections, sidebar items, sidebar panels, top-bar menu items, native View menu items, context menu entries, and terminal event hooks without modifying core code. See [Extension Development Guide](docs/EXTENSION-DEVELOPMENT.md).
 - **Git Integration** — Built-in first-party extension: toggleable right sidebar showing live git status, full git view for staging/committing, and PR creation via `gh` CLI. Configurable per-workspace. Auto-refreshes on file changes.
-- **Code Reviews tab** — PR review workflow inside the git-integration extension. Prioritised queue of open PRs with risk scoring (churn, blast radius, cyclomatic complexity delta), chapter-by-chapter review surface with syntax-highlighted diffs, inline comment threading, and one-click review submission (Approve / Request Changes / Comment) via `gh` CLI. Review sessions persist across restarts. Requires `gh auth login`.
+- **Code Reviews tab** — PR review workflow inside the git-integration extension. Paginated queue (20 at a time) of open/closed PRs with search by title or PR number, risk scoring (churn, blast radius, cyclomatic complexity delta), chapter-by-chapter review surface with syntax-highlighted diffs, inline comment threading, and one-click review submission (Approve / Request Changes / Comment) via `gh` CLI. Review sessions persist across restarts. Pop-out button opens a dedicated focused review window. Requires `gh auth login`.
+- **View menu** — Toggle Sidebar (shows/hides the Projects Panel), Open Settings (`Cmd+,`), and Code Reviews in New Window all work from the native View menu.
 - **Keyboard shortcuts** — `Cmd+1–9` (switch workspace), `Cmd++/-` (cycle workspaces), `Cmd+T` (new tab), `Cmd+Left/Right` (cycle tabs), `Cmd+,` (settings), `Cmd+W` (close tab), `Cmd+Shift+G` (toggle git sidebar).
 
 ## Tech Stack
@@ -58,18 +59,19 @@ npm run dev
 
 ## Available Scripts
 
-| Script                  | Description                               |
-| ----------------------- | ----------------------------------------- |
-| `npm run dev`           | Development mode with hot-reload          |
-| `npm run build`         | Production build                          |
-| `npm run preview`       | Preview production build                  |
-| `npm test`              | Unit + integration tests (Vitest)         |
-| `npm run test:watch`    | Tests in watch mode                       |
-| `npm run test:e2e`      | E2E tests (Playwright, launches Electron) |
-| `npm run test:coverage` | Tests with V8 coverage report             |
-| `npm run lint`          | ESLint + TypeScript type check            |
-| `npm run format`        | Prettier format                           |
-| `npm run rebuild`       | Recompile native modules for Electron     |
+| Script                       | Description                                              |
+| ---------------------------- | -------------------------------------------------------- |
+| `npm run dev`                | Build extensions + development mode with hot-reload      |
+| `npm run build`              | Build extensions + production build                      |
+| `npm run build:extensions`   | Compile extension TypeScript → `src/index.js` bundles   |
+| `npm run preview`            | Preview production build                                 |
+| `npm test`                   | Unit + integration tests (Vitest)                        |
+| `npm run test:watch`         | Tests in watch mode                                      |
+| `npm run test:e2e`           | E2E tests (Playwright, launches Electron)                |
+| `npm run test:coverage`      | Tests with V8 coverage report                            |
+| `npm run lint`               | ESLint + TypeScript type check                           |
+| `npm run format`             | Prettier format                                          |
+| `npm run rebuild`            | Recompile native modules for Electron                    |
 
 ## Project Structure
 

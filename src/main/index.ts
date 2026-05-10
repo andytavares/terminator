@@ -36,6 +36,27 @@ function createWindow(): void {
   })
 }
 
+function createPrReviewWindow(repoRoot: string): void {
+  const win = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    title: 'Code Reviews',
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: join(__dirname, '../preload/index.js'),
+    },
+  })
+
+  const params = new URLSearchParams({ view: 'pr-review', repoRoot })
+  if (process.env.NODE_ENV === 'development' || process.env['ELECTRON_RENDERER_URL']) {
+    const base = process.env['ELECTRON_RENDERER_URL'] || 'http://localhost:5173'
+    win.loadURL(`${base}?${params}`)
+  } else {
+    win.loadFile(join(__dirname, '../renderer/index.html'), { query: Object.fromEntries(params) })
+  }
+}
+
 function setupMenu(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
@@ -57,6 +78,11 @@ function setupMenu(): void {
           label: 'Open Settings',
           accelerator: 'CmdOrCtrl+,',
           click: () => mainWindow?.webContents.send('menu:open-settings'),
+        },
+        { type: 'separator' },
+        {
+          label: 'Code Reviews in New Window',
+          click: () => mainWindow?.webContents.send('menu:open-pr-review-window'),
         },
       ],
     },
@@ -98,6 +124,11 @@ app.whenReady().then(async () => {
   registerShellHandlers()
   registerFsHandlers(() => mainWindow)
   registerDialogHandlers()
+
+  ipcMain.handle('window:open-pr-review', (_event, payload) => {
+    const repoRoot = (payload as { repoRoot: string }).repoRoot
+    if (repoRoot) createPrReviewWindow(repoRoot)
+  })
 
   await extensionHost.loadAll()
   await extensionHost.loadBundledExtensions(join(__dirname, '../../extensions'))

@@ -81,6 +81,12 @@ interface ElectronAPI {
     onToast(handler: (payload: { type: string; message: string }) => void): () => void
     onTogglePanel(handler: (panelId: string) => void): () => void
     onSelectProjectTab(handler: (tabId: string) => void): () => void
+    onMenuOpenSettings(handler: () => void): () => void
+    onMenuToggleSidebar(handler: () => void): () => void
+    onMenuOpenPrReviewWindow(handler: () => void): () => void
+  }
+  window: {
+    openPrReview(repoRoot: string): Promise<void>
   }
   // github namespace is contributed by the git-integration extension (see extensions/git-integration/src/types/electron.d.ts)
 }

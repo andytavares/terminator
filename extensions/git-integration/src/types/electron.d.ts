@@ -35,6 +35,12 @@ declare global {
         sessionGet(key: string): Promise<{ session: unknown } | { session: null }>
         sessionSet(key: string, session: unknown): Promise<{ ok: true } | { error: string }>
       }
+      git: Window['electronAPI']['git'] & {
+        push(repoRoot: string): Promise<{ success: true } | { error: string }>
+      }
+      window: {
+        openPrReview(repoRoot: string): Promise<void>
+      }
     }
   }
 }

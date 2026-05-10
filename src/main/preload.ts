@@ -89,6 +89,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('git:pr-status', { repoRoot }),
     prCreate: (payload: unknown) =>
       ipcRenderer.invoke('git:pr-create', payload),
+    push: (repoRoot: string) =>
+      ipcRenderer.invoke('git:push', { repoRoot }),
   },
   settings: {
     getGlobal: () => ipcRenderer.invoke('settings:get-global'),
@@ -170,5 +172,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('extension:select-project-tab', listener)
       return () => ipcRenderer.removeListener('extension:select-project-tab', listener)
     },
+    onMenuOpenSettings: (handler: () => void) => {
+      const listener = () => handler()
+      ipcRenderer.on('menu:open-settings', listener)
+      return () => ipcRenderer.removeListener('menu:open-settings', listener)
+    },
+    onMenuToggleSidebar: (handler: () => void) => {
+      const listener = () => handler()
+      ipcRenderer.on('menu:toggle-sidebar', listener)
+      return () => ipcRenderer.removeListener('menu:toggle-sidebar', listener)
+    },
+    onMenuOpenPrReviewWindow: (handler: () => void) => {
+      const listener = () => handler()
+      ipcRenderer.on('menu:open-pr-review-window', listener)
+      return () => ipcRenderer.removeListener('menu:open-pr-review-window', listener)
+    },
+  },
+  window: {
+    openPrReview: (repoRoot: string) => ipcRenderer.invoke('window:open-pr-review', { repoRoot }),
   },
 })

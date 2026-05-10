@@ -66,6 +66,10 @@ export function PrReviewTab({ repoRoot }: Props) {
     })
   }
 
+  const handlePopOut = () => {
+    if (repoRoot) window.electronAPI.window.openPrReview(repoRoot)
+  }
+
   if (!repoRoot) {
     return (
       <div className="pr-review-empty">
@@ -79,13 +83,20 @@ export function PrReviewTab({ repoRoot }: Props) {
   }
 
   return (
-    <ReviewQueue
-      repoRoot={repoRoot}
-      onOpenPr={handleOpenPr}
-      onRefresh={handleRefreshQueue}
-      onLoadMore={handleLoadMore}
-      includeClosedPrs={includeClosedPrs}
-      onToggleClosedPrs={handleToggleClosed}
-    />
+    <div className="pr-review-tab-wrap">
+      <div className="pr-review-tab-toolbar">
+        <button className="pr-review-popout-btn" onClick={handlePopOut} title="Open in new window">
+          ⬡ Pop out
+        </button>
+      </div>
+      <ReviewQueue
+        repoRoot={repoRoot}
+        onOpenPr={handleOpenPr}
+        onRefresh={handleRefreshQueue}
+        onLoadMore={handleLoadMore}
+        includeClosedPrs={includeClosedPrs}
+        onToggleClosedPrs={handleToggleClosed}
+      />
+    </div>
   )
 }

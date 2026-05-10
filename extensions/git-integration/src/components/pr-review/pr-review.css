@@ -9,6 +9,40 @@
   font-size: 13px;
 }
 
+/* ─── PrReviewTab toolbar ─────────────────────────────────────────────────── */
+
+.pr-review-tab-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.pr-review-tab-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--color-border, #333);
+  background: var(--color-bg-secondary, #1a1a1a);
+  flex-shrink: 0;
+}
+
+.pr-review-popout-btn {
+  background: none;
+  border: 1px solid var(--color-border, #444);
+  color: var(--color-text-muted, #999);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.pr-review-popout-btn:hover {
+  color: var(--color-text, #eee);
+  border-color: var(--color-text-muted, #888);
+}
+
 /* ─── ReviewQueue ─────────────────────────────────────────────────────────── */
 
 .pr-review-queue {
@@ -45,18 +79,17 @@
 }
 
 .pr-refresh-btn {
-  padding: 4px 8px;
+  padding: 5px 10px;
   border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 4px;
+  border-radius: 6px;
   background: none;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
   color: var(--color-text-muted, #8b949e);
   transition: color 0.15s, border-color 0.15s, transform 0.15s;
   flex-shrink: 0;
-  align-self: flex-start;
-  margin-top: 2px;
+  white-space: nowrap;
 }
 .pr-refresh-btn:hover:not(:disabled) {
   color: var(--color-text, #e6edf3);

@@ -196,6 +196,16 @@ ExtensionHost.load(directoryPath)
       └─ errors in activate() set status: 'error', app stays stable (FR-028)
 ```
 
+### Extension build pipeline
+
+Extension main-process TypeScript (`extensions/*/src/index.ts` and its imports) is compiled to a CommonJS bundle (`extensions/*/src/index.js`) by `scripts/build-extensions.js` using esbuild. The compiled bundle is gitignored and must never be committed. `npm run dev` and `npm run build` both invoke this step automatically via the `build:extensions` script. Renderer-side extension code (`renderer.tsx` and React components) is bundled by electron-vite through the main renderer build.
+
+Extension authors must keep main-process entry points free of React/DOM imports — those belong in `renderer.tsx`.
+
+### Pop-out windows
+
+The `window:open-pr-review` IPC handler in `src/main/index.ts` creates a new `BrowserWindow` that loads the renderer URL with `?view=pr-review&repoRoot=<path>`. The renderer's `src/renderer/index.tsx` detects this query param and renders `PrReviewWindow` instead of `App` — a minimal wrapper around `PrReviewTab` with no workspace/terminal chrome. This pattern can be reused for other focused views.
+
 ### Sandboxed Shell Execution (v1.1.0)
 
 `api.shell.exec()` allows extensions to run `git` and `gh` commands in the main process. Since extensions run in the main process (not the renderer), this is a direct call to `shell-executor.ts` — not an IPC round-trip. The `shell:exec` IPC channel exists separately for renderer-initiated shell calls.

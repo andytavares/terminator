@@ -21,6 +21,7 @@ installLogInterceptor()
 export function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
+  const [sidebarVisible, setSidebarVisible] = useState(true)
   const { loadWorkspaces, activeWorkspaceId, activeProjectId, workspaces } = useWorkspaceStore()
   const { loadSettings } = useSettingsStore()
   const { handleProcessExit } = useSessionStore()
@@ -57,6 +58,23 @@ export function App(): JSX.Element {
     window.addEventListener('open-settings', handler)
     return () => window.removeEventListener('open-settings', handler)
   }, [])
+
+  useEffect(() => {
+    if (!window.electronAPI.extensionEvents?.onMenuOpenSettings) return
+    return window.electronAPI.extensionEvents.onMenuOpenSettings(() => setSettingsOpen(true))
+  }, [])
+
+  useEffect(() => {
+    if (!window.electronAPI.extensionEvents?.onMenuToggleSidebar) return
+    return window.electronAPI.extensionEvents.onMenuToggleSidebar(() => setSidebarVisible(v => !v))
+  }, [])
+
+  useEffect(() => {
+    if (!window.electronAPI.extensionEvents?.onMenuOpenPrReviewWindow) return
+    return window.electronAPI.extensionEvents.onMenuOpenPrReviewWindow(() => {
+      if (repoRoot) window.electronAPI.window.openPrReview(repoRoot)
+    })
+  }, [repoRoot])
 
   useEffect(() => {
     if (!window.electronAPI.extensionEvents) return
@@ -105,7 +123,7 @@ export function App(): JSX.Element {
       <div className="app-layout">
         <WorkspaceRail />
 
-        {activeWorkspaceId && (
+        {activeWorkspaceId && sidebarVisible && (
           <ProjectsPanel workspaceId={activeWorkspaceId} />
         )}
 

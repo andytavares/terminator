@@ -14,6 +14,7 @@ export function GitView({ repoRoot }: GitViewProps): JSX.Element {
   const { status, selectedFile, diffCache, setSelectedFile, setDiff, setLoading } = useGitStore()
   const [commitMessage, setCommitMessage] = useState('')
   const [isCommitting, setIsCommitting] = useState(false)
+  const [isPushing, setIsPushing] = useState(false)
   const [showPrDialog, setShowPrDialog] = useState(false)
   const [existingPr, setExistingPr] = useState<PullRequest | null>(null)
   const [commitError, setCommitError] = useState<string | null>(null)
@@ -66,6 +67,23 @@ export function GitView({ repoRoot }: GitViewProps): JSX.Element {
     }
   }, [repoRoot, commitMessage, canCommit])
 
+  const handlePush = useCallback(async () => {
+    setIsPushing(true)
+    setCommitError(null)
+    try {
+      const result = await window.electronAPI.git.push(repoRoot) as { success: true } | { error: string }
+      if ('error' in result) {
+        const errorMessages: Record<string, string> = {
+          NO_UPSTREAM: 'No upstream branch set. Use "git push -u origin <branch>" in the terminal.',
+          REJECTED: 'Push rejected — pull changes first.',
+        }
+        setCommitError(errorMessages[result.error] ?? result.error)
+      }
+    } finally {
+      setIsPushing(false)
+    }
+  }, [repoRoot])
+
   const handleOpenPr = useCallback(async () => {
     const prResult = await window.electronAPI.git.prStatus(repoRoot) as
       | { pr: PullRequest | null }
@@ -111,6 +129,13 @@ export function GitView({ repoRoot }: GitViewProps): JSX.Element {
                 onClick={handleOpenPr}
               >
                 Open Pull Request
+              </button>
+              <button
+                className="git-view__btn git-view__btn--secondary"
+                onClick={handlePush}
+                disabled={isPushing}
+              >
+                {isPushing ? 'Pushing…' : 'Push'}
               </button>
               <button
                 className="git-view__btn git-view__btn--primary"

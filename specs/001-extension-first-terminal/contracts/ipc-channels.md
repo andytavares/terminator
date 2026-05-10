@@ -580,3 +580,82 @@ Updates the tracked git branch for a project.
 ## Error Handling Convention
 
 All invoke/handle channels return a discriminated union of success and error shapes. The renderer MUST check for the `error` field before using response data. Zod validates all incoming payloads; malformed payloads return `{ error: 'VALIDATION_ERROR', message: string }`.
+
+---
+
+## Extension-contributed channels (git-integration)
+
+These channels are registered by the git-integration extension at runtime.
+
+### `shell:open-path`
+
+Opens a file or directory in the OS default application.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ filePath: string }`
+
+**Response**: `{ ok: true } | { error: string }`
+
+---
+
+### `window:open-pr-review`
+
+Creates a new focused BrowserWindow pre-loaded with the Code Reviews view for the given repo.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string }`
+
+**Response**: `void`
+
+---
+
+### `github:list-open-prs`
+
+Lists pull requests for the active repo with cursor-based pagination, optional text/number search, and open/closed state filter.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string; cursor?: string; search?: string; includeClosedPrs?: boolean }`
+
+**Response**: `{ prs: ReviewQueuePR[]; hasMore: boolean; nextCursor?: string } | { error: string } | { error: 'RATE_LIMITED'; resetAt: number }`
+
+---
+
+### `github:file-metrics`
+
+Returns churn, blast radius (actual code importers only — not prose), test file presence, and patch coverage for a changed file.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string; path: string }`
+
+**Response**: `{ churn90d: number; blastRadius: number; topImporters: string[]; importerCount: number; testFilePresent: boolean; patchCoverage: number | null } | { error: string }`
+
+---
+
+### Menu IPC (main → renderer, one-way)
+
+These channels are sent from the main process menu to the renderer via `webContents.send`.
+
+| Channel                      | Payload | Effect                                              |
+| ---------------------------- | ------- | --------------------------------------------------- |
+| `menu:open-settings`         | none    | Opens the Settings panel                            |
+| `menu:toggle-sidebar`        | none    | Toggles the Projects Panel sidebar                  |
+| `menu:open-pr-review-window` | none    | Triggers `window:open-pr-review` for active repo    |
+
+---
+
+### `git:push`
+
+Pushes the current branch to its configured remote. Runs `git push` with no arguments; requires an upstream to be set.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string }`
+
+**Response**: `{ success: true } | { error: 'NO_UPSTREAM' | 'REJECTED' | string }`
+
+- `NO_UPSTREAM` — branch has no upstream configured; user must run `git push -u origin <branch>` manually.
+- `REJECTED` — remote rejected the push (e.g. non-fast-forward); user must pull first.
