@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { ReviewQueuePR } from '../../schemas/pr-review.schema'
 
@@ -9,17 +9,36 @@ const STALE_DAYS = 3
 interface Props {
   repoRoot: string
   onOpenPr: (pr: ReviewQueuePR) => void
-  onRefresh: () => Promise<void>
+  onRefresh: (options?: { search?: string; includeClosedPrs?: boolean }) => Promise<void>
+  onLoadMore: () => Promise<void>
+  includeClosedPrs: boolean
+  onToggleClosedPrs: (include: boolean) => Promise<void>
 }
 
-export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr, onRefresh }: Props) {
-  const { prQueue, queueLoading, queueError, rateLimitState } = usePrReviewStore()
+export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr, onRefresh, onLoadMore, includeClosedPrs, onToggleClosedPrs }: Props) {
+  const { prQueue, queueLoading, loadingMorePrs, queueError, rateLimitState, hasMorePrs } = usePrReviewStore()
   const [activeFilter, setActiveFilter] = useState<Filter>('all')
   const [refreshing, setRefreshing] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isMountedRef = useRef(false)
+
+  useEffect(() => {
+    if (!isMountedRef.current) { isMountedRef.current = true; return }
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      onRefresh({ search: searchQuery.trim() || undefined })
+    }, 350)
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current) }
+  }, [searchQuery])
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    try { await onRefresh() } finally { setRefreshing(false) }
+    try { await onRefresh({ search: searchQuery.trim() || undefined }) } finally { setRefreshing(false) }
+  }
+
+  const handleLoadMore = async () => {
+    await onLoadMore()
   }
 
   const now = Date.now()
@@ -52,21 +71,6 @@ export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr, onRefresh }: Props)
     { id: 'stale',        label: 'Stale >3d' },
   ]
 
-  if (queueLoading) {
-    return <div className="pr-queue-loading">Loading pull requests…</div>
-  }
-
-  if (queueError) {
-    return (
-      <div className="pr-queue-error">
-        Failed to load queue: {queueError}
-        <button className="pr-refresh-btn" onClick={handleRefresh} disabled={refreshing}>
-          {refreshing ? '↻' : '↺'} Retry
-        </button>
-      </div>
-    )
-  }
-
   return (
     <div className="pr-review-queue">
       {rateLimitState && (
@@ -75,11 +79,20 @@ export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr, onRefresh }: Props)
         </div>
       )}
 
+      {queueError && (
+        <div className="pr-queue-error">
+          Failed to load queue: {queueError}
+          <button className="pr-refresh-btn" onClick={handleRefresh} disabled={refreshing}>
+            {refreshing ? '↻' : '↺'} Retry
+          </button>
+        </div>
+      )}
+
       {/* Stat cards + refresh */}
       <div className="pr-stat-cards-row">
       <div className="pr-stat-cards">
         <div className="pr-stat-card">
-          <span className="pr-stat-value">{prQueue.length}</span>
+          <span className="pr-stat-value">{prQueue.length}{hasMorePrs ? '+' : ''}</span>
           <span className="pr-stat-label">Awaiting review</span>
         </div>
         <div className="pr-stat-card pr-stat-card--high">
@@ -104,23 +117,47 @@ export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr, onRefresh }: Props)
       >↻</button>
       </div>
 
-      {/* Filter pills */}
-      <div className="pr-filter-pills">
-        {filters.map(f => (
-          <button
-            key={f.id}
-            className={`pr-filter-pill${activeFilter === f.id ? ' pr-filter-pill--active' : ''}`}
-            onClick={() => setActiveFilter(f.id)}
-          >
-            {f.label}
-          </button>
-        ))}
+      {/* Search bar + state toggle */}
+      <div className="pr-search-row">
+        <input
+          className="pr-search-input"
+          type="search"
+          placeholder="Search by title or PR number…"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          aria-label="Search pull requests"
+        />
+        <button
+          className={`pr-state-toggle${includeClosedPrs ? ' pr-state-toggle--active' : ''}`}
+          onClick={() => onToggleClosedPrs(!includeClosedPrs)}
+          title={includeClosedPrs ? 'Showing open + closed — click for open only' : 'Showing open only — click to include closed'}
+          aria-pressed={includeClosedPrs}
+        >
+          {includeClosedPrs ? 'Open + Closed' : 'Open only'}
+        </button>
       </div>
+
+      {/* Filter pills — only show when not searching */}
+      {!searchQuery && (
+        <div className="pr-filter-pills">
+          {filters.map(f => (
+            <button
+              key={f.id}
+              className={`pr-filter-pill${activeFilter === f.id ? ' pr-filter-pill--active' : ''}`}
+              onClick={() => setActiveFilter(f.id)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Sections */}
       <div className="pr-sections">
-        {prQueue.length === 0 ? (
-          <div className="pr-queue-empty">No open pull requests.</div>
+        {queueLoading ? (
+          <div className="pr-queue-loading">Loading pull requests…</div>
+        ) : prQueue.length === 0 ? (
+          <div className="pr-queue-empty">{searchQuery ? 'No matching pull requests.' : 'No open pull requests.'}</div>
         ) : (
           <>
             <PrSection title="In progress"    prs={inProgress} accent="blue"  onOpen={onOpenPr} />
@@ -130,6 +167,19 @@ export function ReviewQueue({ repoRoot: _repoRoot, onOpenPr, onRefresh }: Props)
           </>
         )}
       </div>
+
+      {/* Load more */}
+      {hasMorePrs && !searchQuery && !queueLoading && (
+        <div className="pr-load-more-row">
+          <button
+            className="pr-load-more-btn"
+            onClick={handleLoadMore}
+            disabled={loadingMorePrs}
+          >
+            {loadingMorePrs ? 'Loading…' : 'Load more pull requests'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

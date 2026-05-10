@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function PrReviewTab({ repoRoot }: Props) {
-  const { activePr, setActivePr, initSession, reset } = usePrReviewStore()
+  const { activePr, setActivePr, initSession, reset, nextPrCursor, includeClosedPrs, setIncludeClosedPrs } = usePrReviewStore()
   const loadQueue = useLoadPrQueue(repoRoot)
   const loadPrDetail = useLoadPrDetail(repoRoot)
   const fetchFileMetrics = useFetchFileMetrics(repoRoot)
@@ -20,6 +20,20 @@ export function PrReviewTab({ repoRoot }: Props) {
   useEffect(() => {
     if (repoRoot) loadQueue()
   }, [repoRoot])
+
+  const handleRefreshQueue = async (options?: { search?: string; includeClosedPrs?: boolean }) => {
+    await loadQueue({ search: options?.search, includeClosedPrs: options?.includeClosedPrs })
+  }
+
+  const handleToggleClosed = async (include: boolean) => {
+    setIncludeClosedPrs(include)
+    await loadQueue({ includeClosedPrs: include })
+  }
+
+  const handleLoadMore = async () => {
+    if (!nextPrCursor) return
+    await loadQueue({ cursor: nextPrCursor, append: true })
+  }
 
   const handleOpenPr = async (pr: ReviewQueuePR) => {
     if (!repoRoot) return
@@ -41,7 +55,7 @@ export function PrReviewTab({ repoRoot }: Props) {
   const handleClosePr = () => {
     setActivePr(null)
     reset()
-    if (repoRoot) loadQueue()
+    if (repoRoot) loadQueue({ search: undefined })
   }
 
   const handleRefreshPr = async () => {
@@ -64,5 +78,14 @@ export function PrReviewTab({ repoRoot }: Props) {
     return <PrReviewView repoRoot={repoRoot} pr={activePr} onClose={handleClosePr} onRefresh={handleRefreshPr} />
   }
 
-  return <ReviewQueue repoRoot={repoRoot} onOpenPr={handleOpenPr} onRefresh={loadQueue} />
+  return (
+    <ReviewQueue
+      repoRoot={repoRoot}
+      onOpenPr={handleOpenPr}
+      onRefresh={handleRefreshQueue}
+      onLoadMore={handleLoadMore}
+      includeClosedPrs={includeClosedPrs}
+      onToggleClosedPrs={handleToggleClosed}
+    />
+  )
 }

@@ -119,8 +119,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exec: (options: unknown) => ipcRenderer.invoke('shell:exec', options),
   },
   github: {
-    listOpenPrs: (repoRoot: string) =>
-      ipcRenderer.invoke('github:list-open-prs', { repoRoot }),
+    listOpenPrs: (repoRoot: string, options?: { cursor?: string; search?: string; includeClosedPrs?: boolean }) =>
+      ipcRenderer.invoke('github:list-open-prs', { repoRoot, ...options }),
     prReviewDetail: (repoRoot: string, prNumber: number) =>
       ipcRenderer.invoke('github:pr-review-detail', { repoRoot, prNumber }),
     prFileDiff: (repoRoot: string, prNumber: number, path: string) =>
