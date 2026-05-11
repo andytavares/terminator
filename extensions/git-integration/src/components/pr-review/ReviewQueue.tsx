@@ -215,6 +215,11 @@ export function ReviewQueue({
         ) : (
           <>
             <PrSection title="In progress" prs={inProgress} accent="blue" onOpen={onOpenPr} />
+            {activeFilter === 'in-progress' && inProgress.length === 0 && (
+              <div className="pr-queue-empty">
+                No in-progress reviews yet. Open a PR to start reviewing.
+              </div>
+            )}
             {activeFilter !== 'in-progress' && (
               <>
                 <PrSection
