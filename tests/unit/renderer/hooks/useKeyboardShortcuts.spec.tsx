@@ -197,4 +197,52 @@ describe('useKeyboardShortcuts', () => {
     pressKey('k', { metaKey: true, shiftKey: true })
     expect(shortcutAction).toHaveBeenCalled()
   })
+
+  it('suppresses bare-key extension shortcut when pressed inside an input', async () => {
+    const shortcutAction = vi.fn()
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      keyboardShortcuts: [{ accelerator: '1', action: shortcutAction }],
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    vi.mocked(matchesAccelerator).mockReturnValue(true)
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts())
+
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    const event = new KeyboardEvent('keydown', { key: '1', bubbles: true })
+    input.dispatchEvent(event)
+    document.body.removeChild(input)
+
+    expect(shortcutAction).not.toHaveBeenCalled()
+  })
+
+  it('fires bare-key extension shortcut when pressed outside an input', async () => {
+    const shortcutAction = vi.fn()
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      keyboardShortcuts: [{ accelerator: '1', action: shortcutAction }],
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    vi.mocked(matchesAccelerator).mockReturnValue(true)
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('1')
+    expect(shortcutAction).toHaveBeenCalled()
+  })
+
+  it('fires modifier+key extension shortcut even when pressed inside an input', async () => {
+    const shortcutAction = vi.fn()
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      keyboardShortcuts: [{ accelerator: 'CmdOrCtrl+1', action: shortcutAction }],
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    vi.mocked(matchesAccelerator).mockReturnValue(true)
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts())
+
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    const event = new KeyboardEvent('keydown', { key: '1', bubbles: true, metaKey: true })
+    input.dispatchEvent(event)
+    document.body.removeChild(input)
+
+    expect(shortcutAction).toHaveBeenCalled()
+  })
 })
