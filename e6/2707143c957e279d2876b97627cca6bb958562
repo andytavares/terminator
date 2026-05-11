@@ -1,0 +1,62 @@
+extensions/git-integration/tests/unit/ReviewQueue.spec.tsx
+  s_a6c5d45d077d6d::t_78991430de3c96 215
+extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx
+  s_a6c5d45d077d6d::t_5b0412d7aa0ba3 10
+  s_a6c5d45d077d6d::t_5f1379c718902e 61-69,89-90,95-104
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_a6c5d45d077d6d::t_be45bd2a06b1ad 488-499
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_a6c5d45d077d6d::t_8e39270d06fa1d 111
+src/main/index.ts
+  s_a6c5d45d077d6d::t_773040f25f2229 141-146
+  s_a6c5d45d077d6d::t_74eb58e634b389 14
+  s_a6c5d45d077d6d::t_b8bd05e1d67579 53-60
+  s_a6c5d45d077d6d::t_d47943e9da4c26 61-62,65,67
+extensions/git-integration/src/hooks/usePrReview.ts
+  s_a6c5d45d077d6d::t_2b2c198bac1f39 25-51,53-58
+  s_a6c5d45d077d6d::t_c1d3e8dfb31722 52
+  s_a6c5d45d077d6d::t_40e62926f40d19 3-5,7-11,13
+  s_a6c5d45d077d6d::t_e64f41459186d6 105,107,109
+extensions/git-integration/src/components/pr-review/ReviewQueue.tsx
+  s_a6c5d45d077d6d::t_4ed2b7cf8b5f43 262
+  s_a6c5d45d077d6d::t_cc46e76d6f134d 282,291-293,305-307
+  s_a6c5d45d077d6d::t_6626edc2c3018d 217
+extensions/git-integration/src/components/pr-review/PrReviewTab.tsx
+  s_a6c5d45d077d6d::t_23f6825b2a81ca 1
+  s_a6c5d45d077d6d::t_4bffe9622aa780 88
+  s_a6c5d45d077d6d::t_58e4b3cbb30100 24-25,28,30
+  s_a6c5d45d077d6d::t_f44005bb477fd2 106
+  s_a6c5d45d077d6d::t_2dac6945865851 26-27,29
+  s_a6c5d45d077d6d::t_03c9ad8e8589ee 113-123
+extensions/git-integration/src/components/pr-review/PrReviewView.tsx
+  s_a6c5d45d077d6d::t_7b2bfb5c39d346 144-147
+  s_a6c5d45d077d6d::t_afcdf53e05a46e 246-253
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_a6c5d45d077d6d::t_c27334b6897869 385-399
+extensions/git-integration/src/types/electron.d.ts
+  s_a6c5d45d077d6d::t_b6b9ca31d79bd9 75
+  s_a6c5d45d077d6d::t_e147e032a4acfe 68
+extensions/git-integration/tests/unit/PrReviewTab.spec.tsx
+  s_a6c5d45d077d6d::t_78c1116d46b564 67
+src/main/preload.ts
+  s_a6c5d45d077d6d::t_cd97cdf6a22e46 193-202
+  s_a6c5d45d077d6d::t_a30f50c6ff0bfd 140-141
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_a6c5d45d077d6d::t_db65153826abf4 626-637
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "e62707143c957e279d2876b97627cca6bb958562",
+  "prompts": {},
+  "sessions": {
+    "s_a6c5d45d077d6d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "86c9c8a7-b7d6-4540-aebd-a3c43734bd38",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
