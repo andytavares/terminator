@@ -3,7 +3,8 @@ import Store from 'electron-store'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { basename, join } from 'path'
-import { readFile, access } from 'fs/promises'
+import { readFile } from 'fs/promises'
+import { existsSync } from 'fs'
 import type {
   ReviewQueuePR,
   PrReviewDetail,
@@ -22,6 +23,11 @@ type RegisterFn = (
   handler: (payload: unknown) => Promise<unknown> | unknown
 ) => void
 
+interface GhOptions {
+  getGhPath: () => string
+  getToken: () => string
+}
+
 const sessionStore = new Store<Record<string, unknown>>({ name: 'pr-review-sessions' })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -34,32 +40,45 @@ const GH_CANDIDATE_PATHS = [
   '/usr/bin/gh',
 ]
 
-let resolvedGhPath: string | null = null
+let autoResolvedGhPath: string | null = null
 
-async function resolveGh(): Promise<string> {
-  if (resolvedGhPath) return resolvedGhPath
+async function resolveGh(configuredPath: string): Promise<string> {
+  if (configuredPath) return configuredPath
+  if (autoResolvedGhPath) return autoResolvedGhPath
   for (const p of GH_CANDIDATE_PATHS) {
-    try {
-      await access(p)
-      resolvedGhPath = p
+    if (existsSync(p)) {
+      autoResolvedGhPath = p
       return p
-    } catch {
-      // not found at this path
     }
   }
-  resolvedGhPath = 'gh'
-  return resolvedGhPath
+  autoResolvedGhPath = 'gh'
+  return autoResolvedGhPath
 }
 
-async function runGh(cwd: string, args: string[], timeoutMs = 30_000): Promise<string> {
-  const gh = await resolveGh()
-  const { stdout, stderr } = await execFileAsync(gh, args, { cwd, timeout: timeoutMs })
+function isAuthError(e: unknown): boolean {
+  const msg = String(e)
+  return msg.includes('gh auth login') || msg.includes('GH_TOKEN') || msg.includes('401')
+}
+
+async function runGh(
+  cwd: string,
+  args: string[],
+  opts: GhOptions,
+  timeoutMs = 30_000
+): Promise<string> {
+  const gh = await resolveGh(opts.getGhPath())
+  const token = opts.getToken()
+  const env = token ? { ...process.env, GH_TOKEN: token } : undefined
+  const { stdout, stderr } = await execFileAsync(gh, args, { cwd, timeout: timeoutMs, env })
   if (stderr && !stdout) throw new Error(stderr)
   return stdout.trim()
 }
 
-async function getRepoOwnerAndName(repoRoot: string): Promise<{ owner: string; repo: string }> {
-  const raw = await runGh(repoRoot, ['repo', 'view', '--json', 'owner,name'])
+async function getRepoOwnerAndName(
+  repoRoot: string,
+  opts: GhOptions
+): Promise<{ owner: string; repo: string }> {
+  const raw = await runGh(repoRoot, ['repo', 'view', '--json', 'owner,name'], opts)
   const data = JSON.parse(raw) as { owner: { login: string }; name: string }
   return { owner: data.owner.login, repo: data.name }
 }
@@ -84,17 +103,20 @@ async function runGit(cwd: string, args: string[]): Promise<string> {
   return stdout.trim()
 }
 
-function parseRateLimit(err: unknown): { error: 'RATE_LIMITED'; resetAt: number } | null {
-  const msg = String(err)
-  if (msg.includes('rate limit') || msg.includes('API rate limit')) {
-    return { error: 'RATE_LIMITED', resetAt: Date.now() + 60_000 }
-  }
-  return null
-}
-
 // ─── Registration ─────────────────────────────────────────────────────────────
 
-export function registerGithubHandlers(register: RegisterFn): void {
+export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): void {
+  const gh = (cwd: string, args: string[], timeoutMs?: number) => runGh(cwd, args, opts, timeoutMs)
+  const ownerAndName = (repoRoot: string) => getRepoOwnerAndName(repoRoot, opts)
+  const catchError = (e: unknown) => {
+    if (isAuthError(e)) return { error: 'NOT_AUTHENTICATED' as const }
+    const msg = String(e)
+    if (msg.includes('rate limit') || msg.includes('API rate limit')) {
+      return { error: 'RATE_LIMITED' as const, resetAt: Date.now() + 60_000 }
+    }
+    return { error: msg }
+  }
+
   register('github:list-open-prs', async (payload) => {
     const schema = z.object({
       repoRoot: z.string().min(1),
@@ -111,14 +133,14 @@ export function registerGithubHandlers(register: RegisterFn): void {
     try {
       // PR number lookup — always finds the PR regardless of state
       if (search && /^\d+$/.test(search.trim())) {
-        const raw = await runGh(repoRoot, ['pr', 'view', search.trim(), '--json', PR_JSON_FIELDS])
+        const raw = await gh(repoRoot, ['pr', 'view', search.trim(), '--json', PR_JSON_FIELDS])
         const pr = parseReviewQueuePR(JSON.parse(raw))
         return { prs: [pr], hasMore: false }
       }
 
       // Text search — always searches all states so nothing is missed
       if (search && search.trim()) {
-        const raw = await runGh(repoRoot, [
+        const raw = await gh(repoRoot, [
           'pr',
           'list',
           '--state',
@@ -135,7 +157,7 @@ export function registerGithubHandlers(register: RegisterFn): void {
       }
 
       // Paginated load via GraphQL
-      const { owner, repo } = await getRepoOwnerAndName(repoRoot)
+      const { owner, repo } = await ownerAndName(repoRoot)
       const gqlStates = includeClosedPrs ? '[OPEN,CLOSED,MERGED]' : 'OPEN'
       const gql = `query($owner:String!,$repo:String!,$cursor:String){repository(owner:$owner,name:$repo){pullRequests(first:20,states:${gqlStates},after:$cursor,orderBy:{field:CREATED_AT,direction:DESC}){pageInfo{endCursor hasNextPage}nodes{number title isDraft additions deletions createdAt headRefName baseRefName changedFiles author{login avatarUrl}commits(last:1){nodes{commit{statusCheckRollup{contexts(first:20){nodes{...on CheckRun{name conclusion status}...on StatusContext{context state}}}}}}}}}}}`
       const args = [
@@ -150,7 +172,7 @@ export function registerGithubHandlers(register: RegisterFn): void {
       ]
       if (cursor) args.push('-f', `cursor=${cursor}`)
 
-      const raw = await runGh(repoRoot, args, 60_000)
+      const raw = await gh(repoRoot, args, 60_000)
       type GQLResponse = {
         data: {
           repository: {
@@ -170,7 +192,7 @@ export function registerGithubHandlers(register: RegisterFn): void {
         nextCursor: pageInfo.hasNextPage ? pageInfo.endCursor : undefined,
       }
     } catch (e) {
-      return parseRateLimit(e) ?? { error: String(e) }
+      return catchError(e)
     }
   })
 
@@ -181,14 +203,14 @@ export function registerGithubHandlers(register: RegisterFn): void {
     const { repoRoot, prNumber } = parsed.data
     try {
       const [metaRaw, filesRaw] = await Promise.all([
-        runGh(repoRoot, [
+        gh(repoRoot, [
           'pr',
           'view',
           String(prNumber),
           '--json',
           'number,title,body,author,createdAt,headRefName,baseRefName,headRefOid,statusCheckRollup',
         ]),
-        runGh(repoRoot, ['pr', 'view', String(prNumber), '--json', 'files']),
+        gh(repoRoot, ['pr', 'view', String(prNumber), '--json', 'files']),
       ])
       const meta = JSON.parse(metaRaw) as Record<string, unknown>
       const filesData = (JSON.parse(filesRaw) as { files: unknown[] }).files
@@ -211,7 +233,7 @@ export function registerGithubHandlers(register: RegisterFn): void {
       }
       return { pr }
     } catch (e) {
-      return parseRateLimit(e) ?? { error: String(e) }
+      return catchError(e)
     }
   })
 
@@ -229,7 +251,7 @@ export function registerGithubHandlers(register: RegisterFn): void {
       await runGit(repoRoot, ['fetch', '--force', 'origin', `pull/${prNumber}/head:${prRef}`])
 
       const baseRefName = (
-        await runGh(repoRoot, [
+        await gh(repoRoot, [
           'pr',
           'view',
           String(prNumber),
@@ -298,7 +320,7 @@ export function registerGithubHandlers(register: RegisterFn): void {
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber } = parsed.data
     try {
-      const raw = await runGh(repoRoot, [
+      const raw = await gh(repoRoot, [
         'api',
         `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
         '--paginate',
@@ -309,7 +331,7 @@ export function registerGithubHandlers(register: RegisterFn): void {
       const comments: InlineComment[] = items.map(mapComment)
       return { comments }
     } catch (e) {
-      return parseRateLimit(e) ?? { error: String(e) }
+      return catchError(e)
     }
   })
 
@@ -347,7 +369,7 @@ export function registerGithubHandlers(register: RegisterFn): void {
       if (startLine != null) {
         args.push('--field', `start_line=${startLine}`, '--field', `start_side=${side}`)
       }
-      const raw = await runGh(repoRoot, args)
+      const raw = await gh(repoRoot, args)
       const comment = mapComment(JSON.parse(raw))
       return { comment }
     } catch (e) {
@@ -366,7 +388,7 @@ export function registerGithubHandlers(register: RegisterFn): void {
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber, inReplyToId, body } = parsed.data
     try {
-      const raw = await runGh(repoRoot, [
+      const raw = await gh(repoRoot, [
         'api',
         `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
         '--method',
@@ -395,7 +417,7 @@ export function registerGithubHandlers(register: RegisterFn): void {
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber, commitId, event, body } = parsed.data
     try {
-      const raw = await runGh(repoRoot, [
+      const raw = await gh(repoRoot, [
         'api',
         `repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
         '--method',
