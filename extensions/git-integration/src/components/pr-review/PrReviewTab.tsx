@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { ReviewQueue } from './ReviewQueue'
 import { PrReviewView } from './PrReviewView'
+import { PrOverviewPanel } from './PrOverviewPanel'
 import { useLoadPrQueue, useLoadPrDetail, useFetchFileMetrics } from '../../hooks/usePrReview'
 import { ReviewSessionSchema } from '../../schemas/pr-review.schema'
 import type { ReviewQueuePR } from '../../schemas/pr-review.schema'
@@ -17,12 +18,15 @@ export function PrReviewTab({ repoRoot }: Props) {
     setActivePr,
     initSession,
     reset,
+    markPrInProgress,
     nextPrCursor,
     includeClosedPrs,
     setIncludeClosedPrs,
   } = usePrReviewStore()
   const isPopoutWindow = new URLSearchParams(window.location.search).get('view') === 'pr-review'
   const [isPoppedOut, setIsPoppedOut] = useState(isPopoutWindow)
+  const [showOverview, setShowOverview] = useState(false)
+  const [activeQueuePr, setActiveQueuePr] = useState<ReviewQueuePR | null>(null)
 
   useEffect(() => {
     if (isPopoutWindow) return
@@ -55,6 +59,7 @@ export function PrReviewTab({ repoRoot }: Props) {
 
   const handleOpenPr = async (pr: ReviewQueuePR) => {
     if (!repoRoot) return
+    setActiveQueuePr(pr)
     await loadPrDetail(pr.number, async (detail) => {
       const key = `${repoRoot}:::${pr.number}:::${detail.headSHA}`
       const result = await window.electronAPI.github.sessionGet(key)
@@ -62,15 +67,33 @@ export function PrReviewTab({ repoRoot }: Props) {
       if (raw) {
         const parsed = ReviewSessionSchema.safeParse(raw)
         if (parsed.success) initSession(parsed.data)
+      } else {
+        // Persist an initial session so the PR shows as in-progress on next queue load.
+        await window.electronAPI.github.sessionSet(key, {
+          repoRoot,
+          prNumber: pr.number,
+          headSHA: detail.headSHA,
+          currentChapterId: null,
+          currentFilePath: null,
+          viewedFiles: [],
+          fileOrderOverrides: {},
+          scrollPosition: null,
+          pausedAt: null,
+          lastAccessedAt: new Date().toISOString(),
+        })
       }
+      // Immediately reflect in-progress in the queue without waiting for a refresh.
+      markPrInProgress(pr.number)
       setActivePr(detail)
+      setShowOverview(true)
       // Kick off risk score computation in the background (non-blocking).
-      // Pass detail directly so we don't depend on the store update flushing first.
       fetchFileMetrics(detail)
     })
   }
 
   const handleClosePr = () => {
+    setShowOverview(false)
+    setActiveQueuePr(null)
     setActivePr(null)
     reset()
     if (repoRoot) loadQueue({ search: undefined })
@@ -96,13 +119,26 @@ export function PrReviewTab({ repoRoot }: Props) {
     )
   }
 
-  if (activePr) {
+  if (activePr && showOverview) {
+    return (
+      <PrOverviewPanel
+        pr={activePr}
+        sessionStatus={activeQueuePr?.sessionStatus ?? 'not-started'}
+        onStartReview={() => setShowOverview(false)}
+        onClose={handleClosePr}
+        onPopOut={isPoppedOut ? undefined : handlePopOut}
+      />
+    )
+  }
+
+  if (activePr && !showOverview) {
     return (
       <PrReviewView
         repoRoot={repoRoot}
         pr={activePr}
         onClose={handleClosePr}
         onRefresh={handleRefreshPr}
+        onShowOverview={() => setShowOverview(true)}
         onPopOut={isPoppedOut ? undefined : handlePopOut}
       />
     )

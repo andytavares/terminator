@@ -15,12 +15,20 @@ interface Props {
   pr: PrReviewDetail
   onClose: () => void
   onRefresh: () => Promise<void>
+  onShowOverview?: () => void
   onPopOut?: () => void
 }
 
 type ViewMode = 'guided' | 'full'
 
-export function PrReviewView({ repoRoot, pr, onClose, onRefresh, onPopOut }: Props) {
+export function PrReviewView({
+  repoRoot,
+  pr,
+  onClose,
+  onRefresh,
+  onShowOverview,
+  onPopOut,
+}: Props) {
   const {
     currentChapterId,
     currentFilePath,
@@ -229,6 +237,15 @@ export function PrReviewView({ repoRoot, pr, onClose, onRefresh, onPopOut }: Pro
           #{pr.number} {pr.title}
         </span>
         <div className="pr-review-topbar-actions">
+          {onShowOverview && (
+            <button
+              className="pr-review-overview-btn"
+              onClick={onShowOverview}
+              title="Back to PR overview"
+            >
+              Overview
+            </button>
+          )}
           {onPopOut && (
             <button
               className="pr-review-popout-btn"

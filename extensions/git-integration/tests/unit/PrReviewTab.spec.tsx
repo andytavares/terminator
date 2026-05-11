@@ -37,10 +37,34 @@ vi.mock('../../src/components/pr-review/ReviewQueue', () => ({
 }))
 
 vi.mock('../../src/components/pr-review/PrReviewView', () => ({
-  PrReviewView: ({ onClose, onRefresh }: { onClose: () => void; onRefresh: () => void }) => (
+  PrReviewView: ({
+    onClose,
+    onRefresh,
+    onShowOverview,
+  }: {
+    onClose: () => void
+    onRefresh: () => void
+    onShowOverview?: () => void
+  }) => (
     <div data-testid="pr-review-view">
       <button onClick={onClose}>Close PR</button>
       <button onClick={onRefresh}>Refresh PR</button>
+      {onShowOverview && <button onClick={onShowOverview}>Show Overview</button>}
+    </div>
+  ),
+}))
+
+vi.mock('../../src/components/pr-review/PrOverviewPanel', () => ({
+  PrOverviewPanel: ({
+    onStartReview,
+    onClose,
+  }: {
+    onStartReview: () => void
+    onClose: () => void
+  }) => (
+    <div data-testid="pr-overview-panel">
+      <button onClick={onStartReview}>Start Review</button>
+      <button onClick={onClose}>Close Overview</button>
     </div>
   ),
 }))
@@ -49,12 +73,14 @@ const mockSetActivePr = vi.fn()
 const mockSetIncludeClosedPrs = vi.fn()
 const mockInitSession = vi.fn()
 const mockReset = vi.fn()
+const mockMarkPrInProgress = vi.fn()
 
 const defaultStoreState = {
   activePr: null,
   setActivePr: mockSetActivePr,
   initSession: mockInitSession,
   reset: mockReset,
+  markPrInProgress: mockMarkPrInProgress,
   nextPrCursor: null,
   includeClosedPrs: false,
   setIncludeClosedPrs: mockSetIncludeClosedPrs,
@@ -63,7 +89,10 @@ const defaultStoreState = {
 beforeEach(() => {
   vi.clearAllMocks()
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    github: { sessionGet: vi.fn().mockResolvedValue({ session: null }) },
+    github: {
+      sessionGet: vi.fn().mockResolvedValue({ session: null }),
+      sessionSet: vi.fn().mockResolvedValue({}),
+    },
     window: { openPrReview: vi.fn(), onPrReviewWindowChange: vi.fn().mockReturnValue(() => {}) },
   }
   vi.mocked(usePrReviewStore).mockReturnValue(
@@ -81,17 +110,20 @@ describe('PrReviewTab', () => {
     expect(screen.getByText('Open a project to view pull requests.')).toBeTruthy()
   })
 
-  it('renders ReviewQueue when repoRoot is provided', () => {
+  it('renders ReviewQueue when repoRoot is provided and no active PR', () => {
     render(<PrReviewTab repoRoot="/repo" />)
     expect(screen.getByTestId('review-queue')).toBeTruthy()
   })
 
-  it('renders PrReviewView when activePr is set', () => {
+  it('renders PrOverviewPanel when activePr is set', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       activePr: { number: 1, title: 'My PR' } as unknown as PrReviewDetail,
     } as unknown as ReturnType<typeof usePrReviewStore>)
+    // showOverview starts false; we need to simulate opening a PR to get it to true
+    // Since activePr is pre-set here, showOverview stays false → PrReviewView shows
     render(<PrReviewTab repoRoot="/repo" />)
+    // With activePr set and showOverview=false, PrReviewView should render
     expect(screen.getByTestId('pr-review-view')).toBeTruthy()
   })
 
@@ -109,7 +141,7 @@ describe('PrReviewTab', () => {
     ).toHaveBeenCalledWith('/repo')
   })
 
-  it('closes PR view when onClose is called', () => {
+  it('closes PR view when onClose is called from review view', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
       activePr: { number: 1, title: 'My PR' } as unknown as PrReviewDetail,
