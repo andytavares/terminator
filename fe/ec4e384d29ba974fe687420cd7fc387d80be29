@@ -1,0 +1,45 @@
+tests/unit/ipc/log.ipc.spec.ts
+  s_ed6792b8384e76::t_9d67821edeed91 13,17
+  s_ed6792b8384e76::t_22a043ef0b2f6b 3-7
+  s_ed6792b8384e76::t_f3b223422526d3 1-2,8-12,14-16,18-63
+.specify/memory/constitution.md
+  s_ed6792b8384e76::t_1032fa24aa3fe5 123-129
+  s_ed6792b8384e76::t_a9083c464286f9 215
+.claude/projects/-Users-atavares-repos-terminator/memory/feedback_test_coverage.md
+  s_ed6792b8384e76::t_0ea99f527b8971 1-16
+extensions/speckit-pilot/tests/types/electron.spec.ts
+  s_ed6792b8384e76::t_70e5fc1b576a0e 1-91
+extensions/speckit-pilot/tests/utils/markdown.spec.ts
+  s_ed6792b8384e76::t_377e958da9be2f 1-189
+tests/unit/renderer/logger.spec.ts
+  s_ed6792b8384e76::t_f989f46ba76185 5
+  s_ed6792b8384e76::t_bcf51db90055eb 17
+  s_ed6792b8384e76::t_2077d072abc913 1-4,6-10,12-16,18-127
+.claude/projects/-Users-atavares-repos-terminator/memory/MEMORY.md
+  s_ed6792b8384e76::t_c170f0d1deb2a9 1-6
+CLAUDE.md
+  s_ed6792b8384e76::t_22400b52c20987 59-68,74
+extensions/speckit-pilot/tests/components/SpecKitPilotView.spec.tsx
+  s_ed6792b8384e76::t_d8e8b74961ae81 33-37
+  s_ed6792b8384e76::t_3d93334bbd2ecf 1-32,38-71,73-274,276-284,288,290-297,301-305,308-519,521-536
+  s_ed6792b8384e76::t_44fc3a7500ef21 285-287,289
+  s_ed6792b8384e76::t_b71a411250e1f9 520
+  s_ed6792b8384e76::t_d1e63e250b3253 72
+  s_ed6792b8384e76::t_2166151ba67c8c 298-300,306-307
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "feec4e384d29ba974fe687420cd7fc387d80be29",
+  "prompts": {},
+  "sessions": {
+    "s_ed6792b8384e76": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e2773847-1a41-4cc8-a630-511c5a019812",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
