@@ -1,0 +1,21 @@
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_25b9837f813aa1::t_0dd8a952dc6ff0 60-64,67-75
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_25b9837f813aa1::t_21e0793b9ebe3c 200-247
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "bfab8886679c456858eaf0be4fe1e9043c8b3b85",
+  "prompts": {},
+  "sessions": {
+    "s_25b9837f813aa1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "68f69b07-6aed-4e7b-95cc-c2bd99113dbc",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
