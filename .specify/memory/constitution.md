@@ -120,6 +120,13 @@ a failing test exists that demands it.
 - Passing tests do not constitute completion. Work MUST be verified against the agreed
   spec and validated manually before being marked done.
 - Test coverage MUST be scoped to behavior, not implementation internals.
+- **Coverage gate: 80% minimum** — statements, branches, functions, and lines MUST
+  each be ≥ 80% before any session or PR is considered complete. The gate is enforced
+  by `vitest.config.ts` thresholds; a threshold failure is a **hard blocker**, not a
+  warning. Run `npx vitest run --coverage` explicitly before reporting done.
+- **No new file ships untested.** Every new production source file MUST have
+  corresponding tests that bring its individual coverage to ≥ 80% at merge time.
+  A file at 0% coverage is a defect, regardless of the project-wide aggregate.
 
 ### VII. SOLID Design & YAGNI
 
@@ -205,4 +212,4 @@ Compliance is not optional.
 - The constitution version and amendment history are the authoritative record of governance
   decisions affecting this project.
 
-**Version**: 1.3.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-05-10
+**Version**: 1.4.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-05-11
