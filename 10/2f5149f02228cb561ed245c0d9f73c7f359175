@@ -1,0 +1,26 @@
+extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx
+  s_94121bba51756d::t_97e41fa3a64385 322-323,325-326
+  s_94121bba51756d::t_771ca2a38b09a9 405-406,408-409
+  s_94121bba51756d::t_4dc9e2d2de6ecb 10
+  s_94121bba51756d::t_dcdee4074518f8 71
+  s_94121bba51756d::t_5d40cbfee2e4e4 236-237,239-240
+extensions/git-integration/src/components/FileDiffView.tsx
+  s_94121bba51756d::t_cf3a72552eb2aa 15
+  s_94121bba51756d::t_19b5877d2dd6d7 63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "102f5149f02228cb561ed245c0d9f73c7f359175",
+  "prompts": {},
+  "sessions": {
+    "s_94121bba51756d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9588e76d-be9b-46a6-ad3b-3800290b80dc",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
