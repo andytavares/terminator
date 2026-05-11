@@ -1,5 +1,5 @@
 {
-  "name": "@andytavares/app",
+  "name": "@andytavares/terminator",
   "version": "0.1.0",
   "description": "Extension-first AI-focused terminal emulator",
   "main": "out/main/index.js",
