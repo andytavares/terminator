@@ -194,7 +194,7 @@ export function registerGithubHandlers(register: RegisterFn): void {
     const { repoRoot, prNumber, path } = parsed.data
     try {
       const prRef = `refs/remotes/pull/${prNumber}/head`
-      await runGit(repoRoot, ['fetch', 'origin', `pull/${prNumber}/head:${prRef}`])
+      await runGit(repoRoot, ['fetch', '--force', 'origin', `pull/${prNumber}/head:${prRef}`])
 
       const baseRefName = (
         await runGh(repoRoot, [
