@@ -173,6 +173,15 @@ jobs:
         env:
           PYTHON: ${{ steps.python.outputs.python-path }}
 
+      - name: Bump patch version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          npm version patch --no-git-tag-version
+          git add package.json package-lock.json
+          git commit -m "chore: bump version [skip ci]"
+          git push
+
       - name: Build
         run: npm run build
 
