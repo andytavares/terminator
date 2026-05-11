@@ -69,9 +69,24 @@ async function runGh(
   const gh = await resolveGh(opts.getGhPath())
   const token = opts.getToken()
   const env = token ? { ...process.env, GH_TOKEN: token } : undefined
-  const { stdout, stderr } = await execFileAsync(gh, args, { cwd, timeout: timeoutMs, env })
-  if (stderr && !stdout) throw new Error(stderr)
-  return stdout.trim()
+  try {
+    const { stdout, stderr } = await execFileAsync(gh, args, { cwd, timeout: timeoutMs, env })
+    if (stderr && !stdout) throw new Error(stderr)
+    return stdout.trim()
+  } catch (e) {
+    // If an explicit token was set but auth failed, retry without it so the
+    // system gh auth / GH_TOKEN env var gets a chance (token may be expired).
+    if (token && isAuthError(e)) {
+      const { stdout, stderr } = await execFileAsync(gh, args, {
+        cwd,
+        timeout: timeoutMs,
+        env: undefined,
+      })
+      if (stderr && !stdout) throw new Error(stderr)
+      return stdout.trim()
+    }
+    throw e
+  }
 }
 
 async function getRepoOwnerAndName(

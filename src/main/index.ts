@@ -7,8 +7,10 @@ import { registerExtensionHandlers } from './ipc/extension.ipc.js'
 import { registerGitHandlers } from './ipc/git.ipc.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
 import { registerFsHandlers } from './ipc/fs.ipc.js'
+import { registerLogHandlers } from './ipc/log.ipc.js'
 import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
+import { logger } from './logger.js'
 
 let mainWindow: BrowserWindow | null = null
 let prReviewWin: BrowserWindow | null = null
@@ -125,6 +127,7 @@ function registerDialogHandlers(): void {
 }
 
 app.whenReady().then(async () => {
+  logger.info('App ready', { version: app.getVersion() })
   setupMenu()
   registerWorkspaceHandlers()
   registerTerminalHandlers(ptyManager, () => mainWindow)
@@ -133,6 +136,7 @@ app.whenReady().then(async () => {
   registerGitHandlers()
   registerShellHandlers()
   registerFsHandlers(() => mainWindow)
+  registerLogHandlers()
   registerDialogHandlers()
 
   ipcMain.handle('window:open-pr-review', (_event, payload) => {

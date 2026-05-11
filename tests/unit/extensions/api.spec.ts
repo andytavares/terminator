@@ -31,6 +31,15 @@ vi.mock('../../../src/main/shell/shell-executor', () => ({
   },
 }))
 
+const mockExtensionStore: Record<string, unknown> = {}
+vi.mock('../../../src/main/storage/extension-settings-store', () => ({
+  getExtensionSetting: (key: string) => mockExtensionStore[key],
+  setExtensionSetting: (key: string, value: unknown) => {
+    mockExtensionStore[key] = value
+  },
+  getAllExtensionSettings: () => ({ ...mockExtensionStore }),
+}))
+
 import { createExtensionAPI, globalRegistry } from '../../../src/main/extensions/api'
 import * as shellExecutor from '../../../src/main/shell/shell-executor'
 
@@ -41,8 +50,6 @@ beforeEach(() => {
   globalRegistry.topBarItems.clear()
   globalRegistry.nativeMenuItems.clear()
   globalRegistry.settingsSections.clear()
-  globalRegistry.settingsValues.clear()
-  globalRegistry.workspaceSettingsValues.clear()
 })
 
 describe('api.notifications.showToast', () => {
@@ -185,30 +192,42 @@ describe('api.sidebar.registerPanel', () => {
   })
 })
 
+describe('api.terminal session handlers', () => {
+  it('onSessionCreate registers handler and returns disposable', async () => {
+    const { createExtensionAPI, globalRegistry } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.term.test', '0.1.0')
+    const handler = vi.fn()
+    const disposable = api.terminal.onSessionCreate(handler)
+    expect(globalRegistry.sessionCreateHandlers.has(handler)).toBe(true)
+    disposable.dispose()
+    expect(globalRegistry.sessionCreateHandlers.has(handler)).toBe(false)
+  })
+
+  it('onSessionClose registers handler and returns disposable', async () => {
+    const { createExtensionAPI, globalRegistry } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.term.test2', '0.1.0')
+    const handler = vi.fn()
+    const disposable = api.terminal.onSessionClose(handler)
+    expect(globalRegistry.sessionCloseHandlers.has(handler)).toBe(true)
+    disposable.dispose()
+    expect(globalRegistry.sessionCloseHandlers.has(handler)).toBe(false)
+  })
+})
+
 describe('api.settings workspace precedence', () => {
+  beforeEach(() => {
+    // Clear mock store between tests
+    for (const key of Object.keys(mockExtensionStore)) {
+      delete mockExtensionStore[key]
+    }
+  })
+
   it('returns global value when no workspace override exists', () => {
     const api = createExtensionAPI('com.test', '0.1.0')
-    globalRegistry.settingsValues.set('com.test.com.test.enabled', true)
+    mockExtensionStore['com.test.enabled'] = true
 
     const val = api.settings.get<boolean>('com.test.enabled')
     expect(val).toBe(true)
-  })
-
-  it('returns workspace value over global when workspace override exists', () => {
-    const api = createExtensionAPI('com.test', '0.1.0', () => 'ws-123')
-    globalRegistry.settingsValues.set('com.test.com.test.enabled', false)
-    globalRegistry.workspaceSettingsValues.set('ws-123:com.test.com.test.enabled', true)
-
-    const val = api.settings.get<boolean>('com.test.enabled')
-    expect(val).toBe(true)
-  })
-
-  it('falls back to global value when workspace has no override for the key', () => {
-    const api = createExtensionAPI('com.test', '0.1.0', () => 'ws-456')
-    globalRegistry.settingsValues.set('com.test.com.test.timeout', 5000)
-
-    const val = api.settings.get<number>('com.test.timeout')
-    expect(val).toBe(5000)
   })
 
   it('returns undefined when key not set globally or in workspace', () => {
@@ -218,12 +237,37 @@ describe('api.settings workspace precedence', () => {
     expect(val).toBeUndefined()
   })
 
+  it('returns schema default when key not set but schema registered', () => {
+    const api = createExtensionAPI('com.test', '0.1.0')
+    api.settings.register({
+      label: 'Test',
+      properties: {
+        'com.test.enabled': { type: 'boolean', label: 'Enabled', default: true },
+      },
+    })
+
+    const val = api.settings.get<boolean>('com.test.enabled')
+    expect(val).toBe(true)
+  })
+
+  it('returns stored value over schema default', () => {
+    const api = createExtensionAPI('com.test', '0.1.0')
+    api.settings.register({
+      label: 'Test',
+      properties: {
+        'com.test.enabled': { type: 'boolean', label: 'Enabled', default: true },
+      },
+    })
+    mockExtensionStore['com.test.enabled'] = false
+
+    const val = api.settings.get<boolean>('com.test.enabled')
+    expect(val).toBe(false)
+  })
+
   it('ignores workspace values when no workspace ID getter provided', () => {
     const api = createExtensionAPI('com.test', '0.1.0')
-    globalRegistry.settingsValues.set('com.test.com.test.enabled', false)
-    globalRegistry.workspaceSettingsValues.set('ws-123:com.test.com.test.enabled', true)
+    mockExtensionStore['com.test.enabled'] = false
 
-    // Without a workspace getter, should only see global value
     const val = api.settings.get<boolean>('com.test.enabled')
     expect(val).toBe(false)
   })

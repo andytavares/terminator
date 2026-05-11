@@ -8,6 +8,9 @@ import '@fontsource/ibm-plex-sans/600.css'
 import './styles.css'
 import { useSettingsStore } from './stores/settings.store'
 import { initExtensions } from './extensions/loader'
+import { installLogInterceptor } from './logger'
+
+installLogInterceptor()
 
 const view = new URLSearchParams(window.location.search).get('view')
 

@@ -36,6 +36,19 @@ interface ExtensionAPI {
   }
 
   /**
+   * Structured, namespaced logger. All entries are written to the main-process
+   * log file (platform logs directory) prefixed with the extension id.
+   * Works in the main-process context (activate/deactivate and IPC handlers).
+   * For extension renderer code, use console.* which is intercepted automatically.
+   */
+  log: {
+    debug(message: string, ...meta: unknown[]): void
+    info(message: string, ...meta: unknown[]): void
+    warn(message: string, ...meta: unknown[]): void
+    error(message: string, ...meta: unknown[]): void
+  }
+
+  /**
    * Settings contribution and access point.
    */
   settings: {

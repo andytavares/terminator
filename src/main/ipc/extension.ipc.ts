@@ -1,6 +1,10 @@
 import { ipcMain } from 'electron'
 import type { ExtensionHost } from '../extensions/extension-host.js'
 import { globalRegistry } from '../extensions/api.js'
+import {
+  getAllExtensionSettings,
+  setExtensionSetting,
+} from '../storage/extension-settings-store.js'
 
 export function registerExtensionHandlers(extensionHost: ExtensionHost): void {
   ipcMain.handle('extension:list', () => {
@@ -15,6 +19,34 @@ export function registerExtensionHandlers(extensionHost: ExtensionHost): void {
     const extension = await extensionHost.toggle(id, enabled)
     if (!extension) return { error: 'NOT_FOUND' }
     return { extension }
+  })
+
+  ipcMain.handle('extension:uninstall', async (_event, { id }) => {
+    const removed = await extensionHost.uninstall(id)
+    if (!removed) return { error: 'NOT_FOUND' }
+    return { ok: true }
+  })
+
+  ipcMain.handle('extension:reload', async (_event, { id }) => {
+    return extensionHost.reload(id)
+  })
+
+  ipcMain.handle('extension:get-settings-schemas', () => {
+    const schemas = [...globalRegistry.settingsSections.entries()].map(([key, schema]) => ({
+      extensionId: key.replace(/\.settings$/, ''),
+      label: schema.label,
+      properties: schema.properties,
+    }))
+    return { schemas }
+  })
+
+  ipcMain.handle('extension:get-settings-values', () => {
+    return { values: getAllExtensionSettings() }
+  })
+
+  ipcMain.handle('extension:update-setting', (_event, { key, value }) => {
+    setExtensionSetting(key, value)
+    return { ok: true }
   })
 
   ipcMain.handle('extension:get-sidebar-items', () => {

@@ -35,6 +35,11 @@ beforeEach(() => {
       list: vi.fn().mockResolvedValue({ extensions: [] }),
       install: vi.fn(),
       toggle: vi.fn(),
+      uninstall: vi.fn().mockResolvedValue({ ok: true }),
+      reload: vi.fn().mockResolvedValue({ extension: {} }),
+      getSettingsSchemas: vi.fn().mockResolvedValue({ schemas: [] }),
+      getSettingsValues: vi.fn().mockResolvedValue({ values: {} }),
+      updateSetting: vi.fn().mockResolvedValue({ ok: true }),
     },
     dialog: {
       openDirectory: vi.fn(),

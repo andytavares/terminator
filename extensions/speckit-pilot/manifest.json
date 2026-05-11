@@ -1,0 +1,8 @@
+{
+  "id": "terminator.speckit-pilot",
+  "name": "SpecKit Pilot",
+  "version": "0.1.0",
+  "description": "Orchestrate the full Spec-Kit lifecycle with human-in-the-loop approval gates.",
+  "main": "src/index.js",
+  "minAppVersion": "0.1.0"
+}

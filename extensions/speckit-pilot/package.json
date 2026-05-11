@@ -1,0 +1,10 @@
+{
+  "name": "@terminator/extension-speckit-pilot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SpecKit Pilot — Spec-Kit lifecycle orchestration with human-in-the-loop gates",
+  "dependencies": {
+    "diff": "5.2.0",
+    "minimatch": "9.0.5"
+  }
+}

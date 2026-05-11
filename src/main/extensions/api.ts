@@ -16,6 +16,7 @@ export interface SettingDefinition {
   min?: number
   max?: number
   workspaceScoped?: boolean
+  secret?: boolean
 }
 
 // v1.1.0 types
@@ -75,6 +76,12 @@ export interface SessionSnapshot {
 
 export interface ExtensionAPI {
   readonly app: { readonly version: string }
+  log: {
+    debug(message: string, ...meta: unknown[]): void
+    info(message: string, ...meta: unknown[]): void
+    warn(message: string, ...meta: unknown[]): void
+    error(message: string, ...meta: unknown[]): void
+  }
   settings: {
     register(schema: ExtensionSettingsSchema): Disposable
     get<T>(key: string): T | undefined
@@ -124,6 +131,8 @@ export interface ExtensionAPI {
 import { BrowserWindow, Menu, MenuItem, ipcMain } from 'electron'
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
 import { fsWatcherService } from '../fs/fs-watcher.js'
+import { getExtensionSetting } from '../storage/extension-settings-store.js'
+import { makeLogger } from '../logger.js'
 
 const RESERVED_SHORTCUTS = new Set([
   'CmdOrCtrl+1',
@@ -208,7 +217,7 @@ function rebuildViewMenu(): void {
 export function createExtensionAPI(
   extensionId: string,
   appVersion: string,
-  getActiveWorkspaceId?: () => string | undefined
+  _getActiveWorkspaceId?: () => string | undefined
 ): ExtensionAPI {
   const disposables: Disposable[] = []
 
@@ -218,8 +227,11 @@ export function createExtensionAPI(
     return d
   }
 
+  const extLogger = makeLogger(extensionId)
+
   return {
     app: { version: appVersion },
+    log: extLogger,
     settings: {
       register(schema: ExtensionSettingsSchema): Disposable {
         const key = `${extensionId}.settings`
@@ -227,17 +239,15 @@ export function createExtensionAPI(
         return disposable(() => globalRegistry.settingsSections.delete(key))
       },
       get<T>(key: string): T | undefined {
-        const fullKey = `${extensionId}.${key}`
-        if (getActiveWorkspaceId) {
-          const workspaceId = getActiveWorkspaceId()
-          if (workspaceId !== undefined) {
-            const wsKey = `${workspaceId}:${fullKey}`
-            if (globalRegistry.workspaceSettingsValues.has(wsKey)) {
-              return globalRegistry.workspaceSettingsValues.get(wsKey) as T | undefined
-            }
-          }
+        const stored = getExtensionSetting(key)
+        if (stored !== undefined) return stored as T
+        // Fall back to the registered default
+        const sectionKey = `${extensionId}.settings`
+        const schema = globalRegistry.settingsSections.get(sectionKey)
+        if (schema?.properties[key] !== undefined) {
+          return schema.properties[key].default as T
         }
-        return globalRegistry.settingsValues.get(fullKey) as T | undefined
+        return undefined
       },
     },
     sidebar: {

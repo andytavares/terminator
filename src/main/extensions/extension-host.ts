@@ -5,6 +5,9 @@ import Store from 'electron-store'
 import type { Extension } from '../../shared/types/index.js'
 import { ExtensionManifestSchema } from '../../shared/schemas/extension.schema.js'
 import { createExtensionAPI, globalRegistry, type Disposable } from './api.js'
+import { makeLogger } from '../logger.js'
+
+const hostLogger = makeLogger('extension-host')
 
 interface ExtensionRecord extends Extension {
   directoryPath: string
@@ -39,26 +42,35 @@ export class ExtensionHost {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       manifest = require(join(directoryPath, 'manifest.json'))
     } catch (e) {
+      hostLogger.warn(`INVALID_MANIFEST: cannot read manifest.json at ${directoryPath}`)
       return { error: 'INVALID_MANIFEST', message: 'Cannot read manifest.json' }
     }
 
     const parsed = ExtensionManifestSchema.safeParse(manifest)
     if (!parsed.success) {
+      hostLogger.warn(`INVALID_MANIFEST: ${parsed.error.message}`)
       return { error: 'INVALID_MANIFEST', message: parsed.error.message }
     }
 
     const { id, name, version, description, main } = parsed.data
     const existing = store.get('extensions').find((e) => e.id === id)
-    if (existing) return { error: 'DUPLICATE_ID' }
+    if (existing) {
+      hostLogger.warn(`DUPLICATE_ID: extension ${id} is already registered`)
+      return { error: 'DUPLICATE_ID' }
+    }
 
     const appVersion = app.getVersion()
     if (!isVersionCompatible(parsed.data.minAppVersion, appVersion)) {
+      hostLogger.warn(
+        `VERSION_INCOMPATIBLE: ${id} requires >= ${parsed.data.minAppVersion}, got ${appVersion}`
+      )
       return {
         error: 'VERSION_INCOMPATIBLE',
         message: `Requires app >= ${parsed.data.minAppVersion}, got ${appVersion}`,
       }
     }
 
+    hostLogger.info(`Loading extension ${id} v${version} from ${directoryPath}`)
     const entryPoint = join(directoryPath, main)
     const record: ExtensionRecord = {
       id,
@@ -73,6 +85,7 @@ export class ExtensionHost {
 
     const loadResult = await this.activate(record)
     if ('error' in loadResult) {
+      hostLogger.error(`Extension ${id} activation failed: ${loadResult.message}`)
       const errorRecord: ExtensionRecord = {
         ...record,
         status: 'error',
@@ -83,6 +96,7 @@ export class ExtensionHost {
       return { extension: ext }
     }
 
+    hostLogger.info(`Extension ${id} loaded successfully`)
     store.set('extensions', [...store.get('extensions'), record])
     const { directoryPath: _dp, ...ext } = record
     return { extension: ext }
@@ -91,10 +105,13 @@ export class ExtensionHost {
   async unload(id: string): Promise<void> {
     const loaded = this.loaded.get(id)
     if (loaded) {
+      hostLogger.info(`Unloading extension ${id}`)
       try {
         await loaded.module.deactivate?.()
-      } catch {
-        // Ignore deactivate errors
+      } catch (e) {
+        hostLogger.warn(
+          `Extension ${id} deactivate error: ${e instanceof Error ? e.message : String(e)}`
+        )
       }
       for (const d of loaded.disposables) {
         try {
@@ -105,6 +122,36 @@ export class ExtensionHost {
       }
       this.loaded.delete(id)
     }
+  }
+
+  async uninstall(id: string): Promise<boolean> {
+    await this.unload(id)
+    const extensions = store.get('extensions')
+    const filtered = extensions.filter((e) => e.id !== id)
+    if (filtered.length === extensions.length) return false
+    store.set('extensions', filtered)
+    return true
+  }
+
+  async reload(id: string): Promise<{ extension: Extension } | { error: string }> {
+    const extensions = store.get('extensions')
+    const record = extensions.find((e) => e.id === id)
+    if (!record) return { error: 'NOT_FOUND' }
+
+    await this.unload(id)
+
+    // Clear Node module cache so the updated code is re-evaluated
+    try {
+      delete require.cache[require.resolve(record.entryPoint)]
+    } catch {
+      // Module may not be in cache (e.g. was never successfully loaded); safe to skip
+    }
+
+    const result = await this.activate(record)
+    if ('error' in result) return { error: result.message }
+
+    const { directoryPath: _dp, ...ext } = record
+    return { extension: ext }
   }
 
   async toggle(id: string, enabled: boolean): Promise<Extension | null> {
