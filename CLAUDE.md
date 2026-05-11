@@ -2,7 +2,7 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/003-pr-review/plan.md
+at specs/004-speckit-pilot-extension/plan.md
 
 <!-- SPECKIT END -->
 
@@ -56,11 +56,22 @@ Rules:
 
 ---
 
+# Test Coverage (Constitution Principle VI — MANDATORY)
+
+Coverage gate: **80% minimum** on statements, branches, functions, and lines — enforced by `vitest.config.ts` thresholds.
+
+1. **Run `npx vitest run --coverage` explicitly** before reporting any session or PR done. A threshold failure is a hard blocker.
+2. **Every new production file must reach ≥ 80% coverage at merge time.** A file at 0% is a defect regardless of the project-wide aggregate.
+3. **No new code ships untested.** Write the test first (Red → Green → Refactor).
+
+---
+
 # Code Cleanliness (Constitution Principle X — MANDATORY)
 
 See full rules in `.specify/memory/constitution.md` § X. Enforcement checklist for every session:
 
 - [ ] `npm run lint` passes with **0 errors** (run it explicitly before reporting done)
+- [ ] `npx vitest run --coverage` passes with **all thresholds ≥ 80%**
 - [ ] `npm run build:extensions` succeeds
 - [ ] No unused imports, variables, or dead code introduced
 - [ ] No dead exports left from refactors

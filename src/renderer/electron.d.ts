@@ -87,6 +87,29 @@ interface ElectronAPI {
     list(): Promise<{ extensions: Extension[] }>
     install(directoryPath: string): Promise<{ extension: Extension } | { error: string }>
     toggle(id: string, enabled: boolean): Promise<{ extension: Extension } | { error: string }>
+    uninstall(id: string): Promise<{ ok: true } | { error: string }>
+    reload(id: string): Promise<{ extension: Extension } | { error: string }>
+    getSettingsSchemas(): Promise<{
+      schemas: Array<{
+        extensionId: string
+        label: string
+        properties: Record<
+          string,
+          {
+            type: string
+            label: string
+            description?: string
+            default: unknown
+            secret?: boolean
+            options?: string[]
+            min?: number
+            max?: number
+          }
+        >
+      }>
+    }>
+    getSettingsValues(): Promise<{ values: Record<string, unknown> }>
+    updateSetting(key: string, value: unknown): Promise<{ ok: true }>
     getSidebarItems(): Promise<{ items: Array<{ id: string; label: string; tooltip?: string }> }>
     getContextMenuItems(target: string): Promise<{ items: Array<{ id: string; label: string }> }>
     contextMenuClick(target: string, itemId: string, targetId: string): void
@@ -102,10 +125,17 @@ interface ElectronAPI {
     onMenuToggleSidebar(handler: () => void): () => void
     onMenuOpenPrReviewWindow(handler: () => void): () => void
   }
+  logger: {
+    write(level: string, namespace: string, message: string): void
+  }
   window: {
     openPrReview(repoRoot: string, accentColor?: string): Promise<void>
   }
   // github namespace is contributed by the git-integration extension (see extensions/git-integration/src/types/electron.d.ts)
+  extensionBridge: {
+    invoke(channel: string, payload?: unknown): Promise<unknown>
+    on(channel: string, handler: (data: unknown) => void): () => void
+  }
 }
 
 declare global {

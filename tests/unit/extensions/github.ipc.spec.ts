@@ -57,7 +57,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   handlers.clear()
   Object.keys(storeData).forEach((k) => delete storeData[k])
-  registerGithubHandlers(register as Parameters<typeof registerGithubHandlers>[0])
+  registerGithubHandlers(register as Parameters<typeof registerGithubHandlers>[0], {
+    getGhPath: () => '',
+    getToken: () => '',
+  })
 })
 
 // ─── Helper: get registered handler ───────────────────────────────────────────

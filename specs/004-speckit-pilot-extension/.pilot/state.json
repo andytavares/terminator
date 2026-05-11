@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "featureDir": "specs/004-speckit-pilot-extension",
+  "phases": {
+    "constitution": {
+      "id": "constitution",
+      "status": "approved",
+      "approvedHash": null,
+      "approvedAt": "2026-05-11T03:11:54.907Z",
+      "approvedBy": "user",
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [".specify/memory/constitution.md"]
+    },
+    "specify": {
+      "id": "specify",
+      "status": "approved",
+      "approvedHash": null,
+      "approvedAt": "2026-05-11T03:24:11.283Z",
+      "approvedBy": "user",
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["specs/004-speckit-pilot-extension/spec.md"]
+    },
+    "clarify": {
+      "id": "clarify",
+      "status": "approved",
+      "approvedHash": null,
+      "approvedAt": "2026-05-11T03:24:13.229Z",
+      "approvedBy": "user",
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["specs/004-speckit-pilot-extension/spec.md"]
+    },
+    "plan": {
+      "id": "plan",
+      "status": "approved",
+      "approvedHash": null,
+      "approvedAt": "2026-05-11T03:24:16.224Z",
+      "approvedBy": "user",
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [
+        "specs/004-speckit-pilot-extension/plan.md",
+        "specs/004-speckit-pilot-extension/research.md",
+        "specs/004-speckit-pilot-extension/data-model.md"
+      ]
+    },
+    "checklist": {
+      "id": "checklist",
+      "status": "approved",
+      "approvedHash": null,
+      "approvedAt": "2026-05-11T03:24:20.315Z",
+      "approvedBy": "user",
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["specs/004-speckit-pilot-extension/checklists/requirements.md"]
+    },
+    "tasks": {
+      "id": "tasks",
+      "status": "approved",
+      "approvedHash": null,
+      "approvedAt": "2026-05-11T03:24:21.990Z",
+      "approvedBy": "user",
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["specs/004-speckit-pilot-extension/tasks.md"]
+    },
+    "analyze": {
+      "id": "analyze",
+      "status": "approved",
+      "approvedHash": null,
+      "approvedAt": "2026-05-11T03:24:23.612Z",
+      "approvedBy": "user",
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": []
+    },
+    "implement": {
+      "id": "implement",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": []
+    }
+  },
+  "settings": {
+    "defaultModel": "claude-opus-4-6",
+    "phaseGates": {
+      "constitution": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "specify": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "clarify": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "plan": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "checklist": {
+        "required": false,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "tasks": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "analyze": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "implement": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": true
+      }
+    },
+    "disallowedPaths": [".env*", "secrets/**", "*.pem", "*.key"],
+    "maxFilesPerImplementRun": 25,
+    "maxTokensPerCommand": 50000,
+    "commandTimeoutMs": 300000,
+    "requireCleanTreeForImplement": true,
+    "createCheckpointBeforeImplement": true,
+    "runConsolePosition": "bottom",
+    "reviewerIdentity": "git",
+    "customReviewerName": null,
+    "branchConvention": "sequential",
+    "customBranchPattern": null,
+    "openSidebarOnStart": true
+  }
+}

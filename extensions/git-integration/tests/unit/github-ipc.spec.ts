@@ -27,9 +27,12 @@ type ExecCallback = (err: Error | null, result?: { stdout: string; stderr: strin
 
 function captureHandlers(): Record<string, Handler> {
   const handlers: Record<string, Handler> = {}
-  registerGithubHandlers((channel, handler) => {
-    handlers[channel] = handler as Handler
-  })
+  registerGithubHandlers(
+    (channel, handler) => {
+      handlers[channel] = handler as Handler
+    },
+    { getGhPath: () => '', getToken: () => '' }
+  )
   return handlers
 }
 

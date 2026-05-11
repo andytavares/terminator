@@ -1,11 +1,23 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+
+const { mockLogError } = vi.hoisted(() => ({ mockLogError: vi.fn() }))
+vi.mock('../../../../src/renderer/logger.ts', () => ({
+  makeRendererLogger: () => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: mockLogError,
+  }),
+}))
+
 import { ErrorBoundary } from '../../../../src/renderer/components/ErrorBoundary'
 
-// Suppress expected console.error from ErrorBoundary
+// Suppress expected console.error output from React's own boundary reporting
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
+  mockLogError.mockClear()
 })
 
 afterEach(() => {
@@ -46,13 +58,13 @@ describe('ErrorBoundary', () => {
     expect(screen.getByRole('button', { name: /try to recover/i })).toBeTruthy()
   })
 
-  it('logs error to console when child throws', () => {
+  it('logs error when child throws', () => {
     render(
       <ErrorBoundary>
         <ThrowingChild shouldThrow={true} />
       </ErrorBoundary>
     )
-    expect(console.error).toHaveBeenCalled()
+    expect(mockLogError).toHaveBeenCalled()
   })
 
   it('clears error state when recovery button is clicked', () => {

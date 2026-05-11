@@ -7,8 +7,10 @@ import { registerExtensionHandlers } from './ipc/extension.ipc.js'
 import { registerGitHandlers } from './ipc/git.ipc.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
 import { registerFsHandlers } from './ipc/fs.ipc.js'
+import { registerLogHandlers } from './ipc/log.ipc.js'
 import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
+import { logger } from './logger.js'
 
 let mainWindow: BrowserWindow | null = null
 let prReviewWin: BrowserWindow | null = null
@@ -125,7 +127,7 @@ function registerDialogHandlers(): void {
 }
 
 app.whenReady().then(async () => {
-  createWindow()
+  logger.info('App ready', { version: app.getVersion() })
   setupMenu()
   registerWorkspaceHandlers()
   registerTerminalHandlers(ptyManager, () => mainWindow)
@@ -134,6 +136,7 @@ app.whenReady().then(async () => {
   registerGitHandlers()
   registerShellHandlers()
   registerFsHandlers(() => mainWindow)
+  registerLogHandlers()
   registerDialogHandlers()
 
   ipcMain.handle('window:open-pr-review', (_event, payload) => {
@@ -148,6 +151,10 @@ app.whenReady().then(async () => {
 
   await extensionHost.loadAll()
   await extensionHost.loadBundledExtensions(join(__dirname, '../../extensions'))
+
+  // Window is created after extensions load so the renderer can immediately
+  // query the active extension list and only mount the correct renderers.
+  createWindow()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

@@ -7,19 +7,23 @@ vi.mock('electron', () => ({
   },
 }))
 
-vi.mock('electron-store', () => {
-  const data: Record<string, unknown> = { extensions: [] }
-  return {
-    default: class MockStore {
-      get(key: string) {
-        return data[key]
-      }
-      set(key: string, value: unknown) {
-        data[key] = value
-      }
-    },
-  }
-})
+const storeData: Record<string, unknown> = { extensions: [] }
+vi.mock('electron-store', () => ({
+  default: class MockStore {
+    get(key: string) {
+      return storeData[key]
+    }
+    set(key: string, value: unknown) {
+      storeData[key] = value
+    }
+  },
+}))
+
+vi.mock('../../../src/main/storage/extension-settings-store', () => ({
+  getExtensionSetting: () => undefined,
+  setExtensionSetting: vi.fn(),
+  getAllExtensionSettings: () => ({}),
+}))
 
 describe('ExtensionAPI keyboard', () => {
   beforeEach(() => {
@@ -58,6 +62,7 @@ describe('ExtensionAPI keyboard', () => {
 describe('ExtensionHost', () => {
   beforeEach(() => {
     vi.resetModules()
+    storeData.extensions = []
   })
 
   it('activate error sets extension status to error without crashing host', async () => {
@@ -149,5 +154,80 @@ describe('ExtensionHost', () => {
     expect('error' in result1).toBe(true)
     // Store should still be empty since first load failed at manifest read stage
     expect(host.listExtensions()).toHaveLength(0)
+  })
+
+  it('uninstall returns false for unknown extension id', async () => {
+    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+    const host = new ExtensionHost()
+    const removed = await host.uninstall('nonexistent.ext')
+    expect(removed).toBe(false)
+  })
+
+  it('uninstall returns true and removes extension from store', async () => {
+    storeData.extensions = [
+      {
+        id: 'com.removable',
+        name: 'Removable',
+        version: '1.0.0',
+        description: '',
+        entryPoint: '/fake/removable/main.js',
+        status: 'disabled',
+        installedAt: new Date().toISOString(),
+        directoryPath: '/fake/removable',
+      },
+    ]
+    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+    const host = new ExtensionHost()
+    const removed = await host.uninstall('com.removable')
+    expect(removed).toBe(true)
+    expect(host.listExtensions()).toHaveLength(0)
+  })
+
+  it('reload returns NOT_FOUND error for unknown extension id', async () => {
+    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+    const host = new ExtensionHost()
+    const result = await host.reload('nonexistent.ext')
+    expect(result).toEqual({ error: 'NOT_FOUND' })
+  })
+
+  it('toggle enable path runs activate (even if activation fails) and returns extension', async () => {
+    storeData.extensions = [
+      {
+        id: 'com.togglable',
+        name: 'Toggle Me',
+        version: '1.0.0',
+        description: '',
+        entryPoint: '/nonexistent/toggle/main.js',
+        status: 'disabled',
+        installedAt: new Date().toISOString(),
+        directoryPath: '/nonexistent/toggle',
+      },
+    ]
+    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+    const host = new ExtensionHost()
+    // activate will fail (no real file) but toggle still updates status and returns extension
+    const result = await host.toggle('com.togglable', true)
+    expect(result?.id).toBe('com.togglable')
+  })
+
+  it('reload on an existing-but-unloadable extension returns an error result', async () => {
+    storeData.extensions = [
+      {
+        id: 'com.reload',
+        name: 'Reload Me',
+        version: '1.0.0',
+        description: '',
+        entryPoint: '/nonexistent/reload/main.js',
+        status: 'enabled',
+        installedAt: new Date().toISOString(),
+        directoryPath: '/nonexistent/reload',
+      },
+    ]
+    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+    const host = new ExtensionHost()
+    // The entry point doesn't exist, so reload will find the record but fail to activate
+    const result = await host.reload('com.reload')
+    // Reload finds the record (so no NOT_FOUND) but activation fails → error
+    expect('error' in result).toBe(true)
   })
 })

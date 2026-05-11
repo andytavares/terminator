@@ -467,6 +467,121 @@ Opens a native OS folder-picker dialog from the main process and returns the sel
 
 ---
 
+### `extension:uninstall`
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**:
+
+```typescript
+{
+  id: string
+}
+```
+
+**Response**:
+
+```typescript
+{ ok: true } | { error: 'NOT_FOUND' }
+```
+
+---
+
+### `extension:reload`
+
+**Direction**: renderer → main (invoke/handle)
+
+Unloads the extension, clears the Node module cache for its entry point, and re-activates it from the stored directory path. Useful during development to pick up code changes without reinstalling.
+
+**Request**:
+
+```typescript
+{
+  id: string
+}
+```
+
+**Response**:
+
+```typescript
+{ extension: Extension } | { error: string }
+```
+
+---
+
+### `extension:get-settings-schemas`
+
+**Direction**: renderer → main (invoke/handle)
+
+Returns the settings schemas registered by all active extensions.
+
+**Response**:
+
+```typescript
+{
+  schemas: Array<{
+    extensionId: string
+    label: string
+    properties: Record<
+      string,
+      {
+        type: 'string' | 'number' | 'boolean' | 'enum'
+        label: string
+        description?: string
+        default: unknown
+        secret?: boolean
+        options?: string[]
+        min?: number
+        max?: number
+      }
+    >
+  }>
+}
+```
+
+---
+
+### `extension:get-settings-values`
+
+**Direction**: renderer → main (invoke/handle)
+
+Returns all stored extension setting values from the persistent `extension-settings` electron-store.
+
+**Response**:
+
+```typescript
+{
+  values: Record<string, unknown>
+}
+```
+
+---
+
+### `extension:update-setting`
+
+**Direction**: renderer → main (invoke/handle)
+
+Persists a single extension setting value.
+
+**Request**:
+
+```typescript
+{
+  key: string
+  value: unknown
+}
+```
+
+**Response**:
+
+```typescript
+{
+  ok: true
+}
+```
+
+---
+
 ## Git Channels
 
 ### `git:is-repo`
@@ -577,6 +692,28 @@ Updates the tracked git branch for a project.
 
 ---
 
+## Logging Channel
+
+### `log:write`
+
+Ships a renderer-side log entry to the main process for persistence in the log file.
+
+**Direction**: renderer → main (send, fire-and-forget via `ipcRenderer.send`)
+
+**Payload**:
+
+```typescript
+{
+  level: 'debug' | 'info' | 'warn' | 'error'
+  namespace: string // e.g. 'renderer', 'error-boundary', or an extension id
+  message: string
+}
+```
+
+No response. Entries are appended to the platform log file (`~/Library/Logs/<app>/terminator.log` on macOS) by the main-process logger.
+
+---
+
 ## Error Handling Convention
 
 All invoke/handle channels return a discriminated union of success and error shapes. The renderer MUST check for the `error` field before using response data. Zod validates all incoming payloads; malformed payloads return `{ error: 'VALIDATION_ERROR', message: string }`.
@@ -671,3 +808,24 @@ Pushes the current branch to its configured remote. Runs `git push` with no argu
 
 - `NO_UPSTREAM` — branch has no upstream configured; user must run `git push -u origin <branch>` manually.
 - `REJECTED` — remote rejected the push (e.g. non-fast-forward); user must pull first.
+
+---
+
+## SpecKit Pilot Extension Channels (`speckit:*`)
+
+All channels below are registered by the `speckit-pilot` extension via `api.ipc.registerHandler` and accessed
+through the generic `extensionBridge.invoke()` in the renderer (the core app has no knowledge of these channels).
+
+| Channel                 | Direction       | Summary                                                                                 |
+| ----------------------- | --------------- | --------------------------------------------------------------------------------------- |
+| `speckit:feature-list`  | renderer → main | Scan `specs/` for feature dirs containing `spec.md`; return `Feature[]`                 |
+| `speckit:pilot-state`   | renderer → main | Load `.pilot/state.json` for a feature dir; returns `{ state }` or `{ notFound: true }` |
+| `speckit:phase-approve` | renderer → main | Mark a phase approved in `.pilot/state.json`; broadcast state-changed                   |
+| `speckit:phase-revoke`  | renderer → main | Revoke approval; reset phase to `ready`                                                 |
+| `speckit:file-write`    | renderer → main | Write arbitrary file content (for markdown editor saves)                                |
+
+### Push Events (main → renderer)
+
+| Event                   | Payload                 | Trigger                            |
+| ----------------------- | ----------------------- | ---------------------------------- |
+| `speckit:state-changed` | `{ state: PilotState }` | Phase approve/revoke updates state |

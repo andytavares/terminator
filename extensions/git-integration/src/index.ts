@@ -15,7 +15,10 @@ export function activate(api: ExtensionAPI): void {
     disposables.push(api.ipc.registerHandler(channel, handler))
   }
   registerGitExtensionHandlers(registerFn)
-  registerGithubHandlers(registerFn)
+  registerGithubHandlers(registerFn, {
+    getGhPath: () => api.settings.get<string>('terminator.git-integration.git.ghCliPath') ?? '',
+    getToken: () => api.settings.get<string>('terminator.git-integration.git.githubToken') ?? '',
+  })
 
   disposables.push(
     api.settings.register({
@@ -44,8 +47,16 @@ export function activate(api: ExtensionAPI): void {
         'terminator.git-integration.git.ghCliPath': {
           type: 'string',
           label: 'gh CLI path',
-          description: 'Path to the gh binary. Leave empty to use system PATH.',
+          description: 'Path to the gh binary. Leave empty to auto-detect.',
           default: '',
+        },
+        'terminator.git-integration.git.githubToken': {
+          type: 'string',
+          label: 'GitHub token',
+          description:
+            'Personal access token or fine-grained token with repo scope. Used as GH_TOKEN when running gh commands.',
+          default: '',
+          secret: true,
         },
         'terminator.git-integration.git.commit.signOff': {
           type: 'boolean',

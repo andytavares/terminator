@@ -66,14 +66,42 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
   )
 }
 
+type SettingPropDef = {
+  type: string
+  label: string
+  description?: string
+  default: unknown
+  secret?: boolean
+  options?: string[]
+  min?: number
+  max?: number
+}
+
+type ExtensionSchema = {
+  extensionId: string
+  label: string
+  properties: Record<string, SettingPropDef>
+}
+
 function ExtensionsSection(): JSX.Element {
   const [extensions, setExtensions] = React.useState<
     Array<{ id: string; name: string; version: string; status: string }>
   >([])
+  const [schemas, setSchemas] = React.useState<ExtensionSchema[]>([])
+  const [settingValues, setSettingValues] = React.useState<Record<string, unknown>>({})
+  const [expandedSettings, setExpandedSettings] = React.useState<Set<string>>(new Set())
   const { addToast } = useToastStore()
 
   React.useEffect(() => {
     window.electronAPI.extension.list().then((r) => setExtensions(r.extensions ?? []))
+    window.electronAPI.extension
+      .getSettingsSchemas()
+      .then((r) => setSchemas(r.schemas ?? []))
+      .catch(() => {})
+    window.electronAPI.extension
+      .getSettingsValues()
+      .then((r) => setSettingValues(r.values ?? {}))
+      .catch(() => {})
   }, [])
 
   async function handleInstall(): Promise<void> {
@@ -82,6 +110,7 @@ function ExtensionsSection(): JSX.Element {
     const installResult = await window.electronAPI.extension.install(result.filePath)
     if ('extension' in installResult) {
       setExtensions((prev) => [...prev, installResult.extension])
+      addToast({ type: 'info', message: `Extension installed. Reload the window to activate it.` })
     } else {
       addToast({ type: 'error', message: `Failed to install extension: ${installResult.error}` })
     }
@@ -91,7 +120,68 @@ function ExtensionsSection(): JSX.Element {
     const enabled = currentStatus !== 'enabled'
     const result = await window.electronAPI.extension.toggle(id, enabled)
     if ('extension' in result) {
+      window.location.reload()
+    }
+  }
+
+  async function handleReload(id: string): Promise<void> {
+    const result = await window.electronAPI.extension.reload(id)
+    if ('extension' in result) {
       setExtensions((prev) => prev.map((e) => (e.id === id ? result.extension : e)))
+      addToast({
+        type: 'info',
+        message: `Extension reloaded. Reload the window to see UI changes.`,
+      })
+    } else {
+      addToast({ type: 'error', message: `Reload failed: ${result.error}` })
+    }
+  }
+
+  async function handleUninstall(id: string, name: string): Promise<void> {
+    if (!window.confirm(`Uninstall "${name}"? This cannot be undone.`)) return
+    const result = await window.electronAPI.extension.uninstall(id)
+    if ('ok' in result) {
+      setExtensions((prev) => prev.filter((e) => e.id !== id))
+      addToast({
+        type: 'info',
+        message: `"${name}" uninstalled. Reload the window to remove its UI.`,
+      })
+    } else {
+      addToast({ type: 'error', message: `Uninstall failed: ${result.error}` })
+    }
+  }
+
+  async function handleSettingChange(key: string, value: unknown): Promise<void> {
+    await window.electronAPI.extension.updateSetting(key, value)
+    setSettingValues((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function toggleSettingsExpand(id: string): void {
+    setExpandedSettings((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  async function handleUpgrade(id: string): Promise<void> {
+    const result = await window.electronAPI.dialog.openDirectory()
+    if ('cancelled' in result) return
+    const uninstallResult = await window.electronAPI.extension.uninstall(id)
+    if ('error' in uninstallResult) {
+      addToast({ type: 'error', message: `Upgrade failed: ${uninstallResult.error}` })
+      return
+    }
+    const installResult = await window.electronAPI.extension.install(result.filePath)
+    if ('extension' in installResult) {
+      setExtensions((prev) => prev.map((e) => (e.id === id ? installResult.extension : e)))
+      addToast({ type: 'info', message: `Extension upgraded. Reload the window to activate.` })
+    } else {
+      addToast({ type: 'error', message: `Upgrade failed during install: ${installResult.error}` })
     }
   }
 
@@ -104,23 +194,155 @@ function ExtensionsSection(): JSX.Element {
       {extensions.length === 0 && (
         <p className="settings-section__empty">No extensions installed.</p>
       )}
-      {extensions.map((ext) => (
-        <div key={ext.id} className="extension-item">
-          <div className="extension-item__info">
-            <span className="extension-item__name">{ext.name}</span>
-            <span className="extension-item__version">v{ext.version}</span>
-            <span className={`extension-item__status extension-item__status--${ext.status}`}>
-              {ext.status}
-            </span>
+      {extensions.map((ext) => {
+        const schema = schemas.find((s) => s.extensionId === ext.id)
+        const isExpanded = expandedSettings.has(ext.id)
+        return (
+          <div key={ext.id} className="extension-item-wrapper">
+            <div className="extension-item">
+              <div className="extension-item__row">
+                <div className="extension-item__meta">
+                  <span className="extension-item__name">{ext.name}</span>
+                  <span className="extension-item__version">v{ext.version}</span>
+                  <span className={`extension-item__status extension-item__status--${ext.status}`}>
+                    {ext.status}
+                  </span>
+                </div>
+                <div className="extension-item__actions">
+                  <button className="ext-btn" onClick={() => handleToggle(ext.id, ext.status)}>
+                    {ext.status === 'enabled' ? 'Disable' : 'Enable'}
+                  </button>
+                  <button className="ext-btn" onClick={() => handleReload(ext.id)}>
+                    Reload
+                  </button>
+                  <button className="ext-btn" onClick={() => handleUpgrade(ext.id)}>
+                    Upgrade
+                  </button>
+                  <button
+                    className="ext-btn ext-btn--danger"
+                    onClick={() => handleUninstall(ext.id, ext.name)}
+                  >
+                    Uninstall
+                  </button>
+                  {schema && (
+                    <button
+                      className={`ext-btn ext-btn--settings${isExpanded ? ' ext-btn--settings-open' : ''}`}
+                      onClick={() => toggleSettingsExpand(ext.id)}
+                      title="Configure"
+                    >
+                      ⚙
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            {schema && isExpanded && (
+              <div className="extension-settings-panel">
+                {Object.entries(schema.properties).map(([key, def]) => (
+                  <ExtensionSettingRow
+                    key={key}
+                    propKey={key}
+                    def={def}
+                    value={settingValues[key] ?? def.default}
+                    onChange={handleSettingChange}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-          <button
-            className="settings-section__btn"
-            onClick={() => handleToggle(ext.id, ext.status)}
-          >
-            {ext.status === 'enabled' ? 'Disable' : 'Enable'}
-          </button>
-        </div>
-      ))}
+        )
+      })}
+    </div>
+  )
+}
+
+interface ExtensionSettingRowProps {
+  propKey: string
+  def: SettingPropDef
+  value: unknown
+  onChange: (key: string, value: unknown) => Promise<void>
+}
+
+function ExtensionSettingRow({
+  propKey,
+  def,
+  value,
+  onChange,
+}: ExtensionSettingRowProps): JSX.Element {
+  const [localValue, setLocalValue] = React.useState(String(value ?? def.default ?? ''))
+  const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestValue = React.useRef(localValue)
+
+  React.useEffect(() => {
+    latestValue.current = localValue
+  })
+
+  function scheduleSave(v: string): void {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null
+      const coerced = def.type === 'number' ? Number(v) : def.type === 'boolean' ? v === 'true' : v
+      void onChange(propKey, coerced)
+    }, 400)
+  }
+
+  function handleChange(v: string): void {
+    setLocalValue(v)
+    scheduleSave(v)
+  }
+
+  // Flush on unmount so closing the panel doesn't lose unsaved input
+  React.useEffect(() => {
+    return () => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current)
+        saveTimer.current = null
+        const v = latestValue.current
+        const coerced =
+          def.type === 'number' ? Number(v) : def.type === 'boolean' ? v === 'true' : v
+        void onChange(propKey, coerced)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <div className="extension-setting-row">
+      <label className="extension-setting-row__label">
+        {def.label}
+        {def.description && <span className="extension-setting-row__desc">{def.description}</span>}
+      </label>
+      {def.type === 'boolean' ? (
+        <select
+          className="extension-setting-row__input"
+          value={localValue}
+          onChange={(e) => handleChange(e.target.value)}
+        >
+          <option value="true">Enabled</option>
+          <option value="false">Disabled</option>
+        </select>
+      ) : def.type === 'enum' && def.options ? (
+        <select
+          className="extension-setting-row__input"
+          value={localValue}
+          onChange={(e) => handleChange(e.target.value)}
+        >
+          {def.options.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          className="extension-setting-row__input"
+          type={def.secret ? 'password' : def.type === 'number' ? 'number' : 'text'}
+          value={localValue}
+          min={def.min}
+          max={def.max}
+          onChange={(e) => handleChange(e.target.value)}
+        />
+      )}
     </div>
   )
 }

@@ -105,6 +105,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     install: (directoryPath: string) => ipcRenderer.invoke('extension:install', { directoryPath }),
     toggle: (id: string, enabled: boolean) =>
       ipcRenderer.invoke('extension:toggle', { id, enabled }),
+    uninstall: (id: string) => ipcRenderer.invoke('extension:uninstall', { id }),
+    reload: (id: string) => ipcRenderer.invoke('extension:reload', { id }),
+    getSettingsSchemas: () => ipcRenderer.invoke('extension:get-settings-schemas'),
+    getSettingsValues: () => ipcRenderer.invoke('extension:get-settings-values'),
+    updateSetting: (key: string, value: unknown) =>
+      ipcRenderer.invoke('extension:update-setting', { key, value }),
     getSidebarItems: () => ipcRenderer.invoke('extension:get-sidebar-items'),
     getContextMenuItems: (target: string) =>
       ipcRenderer.invoke('extension:get-context-menu-items', { target }),
@@ -186,6 +192,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:open-pr-review-window', listener)
       return () => ipcRenderer.removeListener('menu:open-pr-review-window', listener)
     },
+  },
+  extensionBridge: {
+    invoke: (channel: string, payload?: unknown) => ipcRenderer.invoke(channel, payload),
+    on: (channel: string, handler: (data: unknown) => void) => {
+      const listener = (_: Electron.IpcRendererEvent, data: unknown) => handler(data)
+      ipcRenderer.on(channel, listener)
+      return () => ipcRenderer.removeListener(channel, listener)
+    },
+  },
+  logger: {
+    write: (level: string, namespace: string, message: string) =>
+      ipcRenderer.send('log:write', { level, namespace, message }),
   },
   window: {
     openPrReview: (repoRoot: string, accentColor?: string) =>

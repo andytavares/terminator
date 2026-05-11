@@ -20,16 +20,12 @@ test.afterAll(async () => {
 
 // US4: git.enabled=false hides git integration UI
 test('US4: when git.enabled=false, git sidebar and top-bar items are absent', async () => {
-  // Disable git integration via globalRegistry settingsValues
+  // Disable git integration via extension settings store
   await electronApp.evaluate(() => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { globalRegistry } = require('./out/main/extensions/api.js')
-      // Set enabled = false for the git integration extension
-      globalRegistry.settingsValues.set(
-        'terminator.git-integration.terminator.git-integration.git.enabled',
-        false
-      )
+      const { setExtensionSetting } = require('./out/main/storage/extension-settings-store.js')
+      setExtensionSetting('terminator.git-integration.git.enabled', false)
     } catch {
       // Module path differs in dev mode; acceptable
     }

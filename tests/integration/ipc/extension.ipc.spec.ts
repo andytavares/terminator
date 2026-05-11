@@ -12,8 +12,19 @@ vi.mock('../../../src/main/extensions/api', () => ({
   globalRegistry: {
     sidebarItems: new Map(),
     contextMenuItems: new Map(),
+    settingsSections: new Map(),
   },
 }))
+
+vi.mock('../../../src/main/storage/extension-settings-store', () => {
+  const store: Record<string, unknown> = {}
+  return {
+    getAllExtensionSettings: () => ({ ...store }),
+    setExtensionSetting: (key: string, value: unknown) => {
+      store[key] = value
+    },
+  }
+})
 
 import { globalRegistry } from '../../../src/main/extensions/api'
 import { registerExtensionHandlers } from '../../../src/main/ipc/extension.ipc'
@@ -22,6 +33,8 @@ const mockExtensionHost = {
   listExtensions: vi.fn(),
   load: vi.fn(),
   toggle: vi.fn(),
+  uninstall: vi.fn(),
+  reload: vi.fn(),
 }
 
 function captureHandle(channel: string): (event: unknown, payload?: unknown) => unknown {
@@ -43,6 +56,7 @@ describe('extension IPC handlers', () => {
     vi.clearAllMocks()
     ;(globalRegistry.sidebarItems as Map<string, unknown>).clear()
     ;(globalRegistry.contextMenuItems as Map<string, unknown>).clear()
+    ;(globalRegistry.settingsSections as Map<string, unknown>).clear()
     registerExtensionHandlers(mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0])
   })
 
@@ -158,6 +172,79 @@ describe('extension IPC handlers', () => {
       expect(() =>
         listener({}, { target: 'file', itemId: 'nonexistent', targetId: 'file-1' })
       ).not.toThrow()
+    })
+  })
+
+  describe('extension:uninstall', () => {
+    it('returns ok when extension is removed', async () => {
+      mockExtensionHost.uninstall.mockResolvedValue(true)
+      const handler = captureHandle('extension:uninstall')
+      const result = (await handler({}, { id: 'com.test' })) as { ok: boolean }
+      expect(mockExtensionHost.uninstall).toHaveBeenCalledWith('com.test')
+      expect(result.ok).toBe(true)
+    })
+
+    it('returns NOT_FOUND when extension does not exist', async () => {
+      mockExtensionHost.uninstall.mockResolvedValue(false)
+      const handler = captureHandle('extension:uninstall')
+      const result = (await handler({}, { id: 'missing' })) as { error: string }
+      expect(result.error).toBe('NOT_FOUND')
+    })
+  })
+
+  describe('extension:reload', () => {
+    it('returns extension on successful reload', async () => {
+      const ext = { id: 'com.test', status: 'enabled' }
+      mockExtensionHost.reload.mockResolvedValue({ extension: ext })
+      const handler = captureHandle('extension:reload')
+      const result = (await handler({}, { id: 'com.test' })) as { extension: unknown }
+      expect(mockExtensionHost.reload).toHaveBeenCalledWith('com.test')
+      expect(result.extension).toEqual(ext)
+    })
+
+    it('returns error when extension not found', async () => {
+      mockExtensionHost.reload.mockResolvedValue({ error: 'NOT_FOUND' })
+      const handler = captureHandle('extension:reload')
+      const result = (await handler({}, { id: 'missing' })) as { error: string }
+      expect(result.error).toBe('NOT_FOUND')
+    })
+  })
+
+  describe('extension:get-settings-schemas', () => {
+    it('returns empty schemas when none registered', () => {
+      const handler = captureHandle('extension:get-settings-schemas')
+      const result = handler({}) as { schemas: unknown[] }
+      expect(result.schemas).toEqual([])
+    })
+
+    it('returns registered schemas with extensionId derived from key', () => {
+      ;(globalRegistry.settingsSections as Map<string, unknown>).set('com.test.settings', {
+        label: 'Test Extension',
+        properties: { 'com.test.key': { type: 'string', label: 'Key', default: '' } },
+      })
+      const handler = captureHandle('extension:get-settings-schemas')
+      const result = handler({}) as {
+        schemas: Array<{ extensionId: string; label: string }>
+      }
+      expect(result.schemas).toHaveLength(1)
+      expect(result.schemas[0].extensionId).toBe('com.test')
+      expect(result.schemas[0].label).toBe('Test Extension')
+    })
+  })
+
+  describe('extension:get-settings-values', () => {
+    it('returns values from the extension settings store', () => {
+      const handler = captureHandle('extension:get-settings-values')
+      const result = handler({}) as { values: Record<string, unknown> }
+      expect(typeof result.values).toBe('object')
+    })
+  })
+
+  describe('extension:update-setting', () => {
+    it('writes value to the extension settings store and returns ok', () => {
+      const handler = captureHandle('extension:update-setting')
+      const result = handler({}, { key: 'com.test.token', value: 'abc123' }) as { ok: boolean }
+      expect(result.ok).toBe(true)
     })
   })
 })

@@ -91,12 +91,17 @@ export function useLoadPrQueue(repoRoot: string | null) {
           includeClosedPrs: options?.includeClosedPrs ?? includeClosedPrs,
         })
         if ('error' in result) {
-          if ((result as { error: string }).error === 'RATE_LIMITED') {
+          const err = (result as { error: string }).error
+          if (err === 'RATE_LIMITED') {
             setRateLimitState({
               resetAt: (result as { resetAt?: number }).resetAt ?? Date.now() + 60_000,
             })
+          } else if (err === 'NOT_AUTHENTICATED') {
+            setQueueError(
+              'Not authenticated. Add a GitHub token in Settings → Git Integration, or run: gh auth login'
+            )
           } else {
-            setQueueError((result as { error: string }).error)
+            setQueueError(err)
           }
           return
         }
