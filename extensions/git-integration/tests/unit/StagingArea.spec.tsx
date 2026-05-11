@@ -31,7 +31,10 @@ const STATUS_TOOLTIP: Record<string, string> = {
   conflicted: 'conflicted',
 }
 
-function setupStore(files: any[] = [], overrides: any = {}) {
+function setupStore(
+  files: ReturnType<typeof makeFile>[] = [],
+  overrides: Record<string, unknown> = {}
+) {
   mockUseGitStore.mockReturnValue({
     status:
       files.length === 0 && !overrides.status
@@ -44,7 +47,7 @@ function setupStore(files: any[] = [], overrides: any = {}) {
     setDiff: vi.fn(),
     setLoading: vi.fn(),
     ...overrides,
-  } as any)
+  } as unknown as ReturnType<typeof useGitStore>)
 }
 
 beforeEach(() => {
@@ -84,7 +87,7 @@ describe('StagingArea — states', () => {
       status: null,
       setStatus: mockSetStatus,
       selectedFile: null,
-    } as any)
+    } as unknown as ReturnType<typeof useGitStore>)
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     expect(screen.getByText('Loading…')).toBeTruthy()
   })
@@ -94,7 +97,7 @@ describe('StagingArea — states', () => {
       status: { branch: 'main', files: [], truncated: false, hasConflicts: false },
       setStatus: mockSetStatus,
       selectedFile: null,
-    } as any)
+    } as unknown as ReturnType<typeof useGitStore>)
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     expect(screen.getAllByText('No staged changes').length).toBeGreaterThan(0)
     expect(screen.getAllByText('No unstaged changes').length).toBeGreaterThan(0)
@@ -105,7 +108,7 @@ describe('StagingArea — states', () => {
       status: { branch: 'main', files: [], truncated: true, hasConflicts: false },
       setStatus: mockSetStatus,
       selectedFile: null,
-    } as any)
+    } as unknown as ReturnType<typeof useGitStore>)
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     expect(screen.getByText('Showing first 500 files.')).toBeTruthy()
   })
@@ -116,7 +119,7 @@ describe('StagingArea — states', () => {
       status: { branch: 'main', files, truncated: false, hasConflicts: false },
       setStatus: mockSetStatus,
       selectedFile: null,
-    } as any)
+    } as unknown as ReturnType<typeof useGitStore>)
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     expect(screen.getByText('staged.ts')).toBeTruthy()
     expect(screen.getByText('unstaged.ts')).toBeTruthy()
@@ -128,7 +131,7 @@ describe('StagingArea — states', () => {
       status: { branch: 'main', files, truncated: false, hasConflicts: false },
       setStatus: mockSetStatus,
       selectedFile: null,
-    } as any)
+    } as unknown as ReturnType<typeof useGitStore>)
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     expect(screen.getByText('Unstage All')).toBeTruthy()
   })
@@ -139,7 +142,7 @@ describe('StagingArea — states', () => {
       status: { branch: 'main', files, truncated: false, hasConflicts: false },
       setStatus: mockSetStatus,
       selectedFile: null,
-    } as any)
+    } as unknown as ReturnType<typeof useGitStore>)
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     expect(screen.getByText('Stage All')).toBeTruthy()
   })
@@ -153,7 +156,7 @@ describe('StagingArea — interactions', () => {
       status: { branch: 'main', files, truncated: false, hasConflicts: false },
       setStatus: mockSetStatus,
       selectedFile: null,
-    } as any)
+    } as unknown as ReturnType<typeof useGitStore>)
     render(<StagingArea repoRoot="/repo" onFileSelect={onFileSelect} />)
     fireEvent.click(screen.getByText('src/a.ts'))
     expect(onFileSelect).toHaveBeenCalledWith('src/a.ts', false)
@@ -165,7 +168,7 @@ describe('StagingArea — interactions', () => {
       status: { branch: 'main', files, truncated: false, hasConflicts: false },
       setStatus: mockSetStatus,
       selectedFile: null,
-    } as any)
+    } as unknown as ReturnType<typeof useGitStore>)
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     const checkbox = screen.getByRole('checkbox')
     fireEvent.click(checkbox)
@@ -179,7 +182,7 @@ describe('StagingArea — interactions', () => {
       status: { branch: 'main', files, truncated: false, hasConflicts: false },
       setStatus: mockSetStatus,
       selectedFile: null,
-    } as any)
+    } as unknown as ReturnType<typeof useGitStore>)
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     const checkbox = screen.getByRole('checkbox')
     fireEvent.click(checkbox)
@@ -192,7 +195,7 @@ describe('StagingArea — interactions', () => {
       status: { branch: 'main', files, truncated: false, hasConflicts: false },
       setStatus: mockSetStatus,
       selectedFile: null,
-    } as any)
+    } as unknown as ReturnType<typeof useGitStore>)
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     fireEvent.click(screen.getByText('Stage All'))
     await waitFor(() => expect(mockStage).toHaveBeenCalledWith('/repo', ['a.ts', 'b.ts']))
@@ -204,7 +207,7 @@ describe('StagingArea — interactions', () => {
       status: { branch: 'main', files, truncated: false, hasConflicts: false },
       setStatus: mockSetStatus,
       selectedFile: null,
-    } as any)
+    } as unknown as ReturnType<typeof useGitStore>)
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     fireEvent.click(screen.getByText('Unstage All'))
     await waitFor(() => expect(mockUnstage).toHaveBeenCalledWith('/repo', ['a.ts', 'b.ts']))
@@ -216,7 +219,7 @@ describe('StagingArea — interactions', () => {
       status: { branch: 'main', files, truncated: false, hasConflicts: true },
       setStatus: mockSetStatus,
       selectedFile: null,
-    } as any)
+    } as unknown as ReturnType<typeof useGitStore>)
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     const checkbox = screen.getByRole('checkbox')
     expect(checkbox).toHaveProperty('disabled', true)
@@ -228,7 +231,7 @@ describe('StagingArea — interactions', () => {
       status: { branch: 'main', files, truncated: false, hasConflicts: false },
       setStatus: mockSetStatus,
       selectedFile: 'selected.ts',
-    } as any)
+    } as unknown as ReturnType<typeof useGitStore>)
     const { container } = render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     expect(container.querySelector('.staging-area__file-row--selected')).toBeTruthy()
   })

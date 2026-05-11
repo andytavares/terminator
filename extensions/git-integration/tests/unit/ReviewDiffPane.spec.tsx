@@ -11,7 +11,7 @@ vi.mock('../../src/components/pr-review/InlineCommentThread', () => ({
   InlineCommentThread: () => <div data-testid="thread" />,
 }))
 vi.mock('../../src/components/pr-review/CommentComposer', () => ({
-  CommentComposer: ({ onCancel }: any) => (
+  CommentComposer: ({ onCancel }: { onCancel?: () => void }) => (
     <div data-testid="composer">
       <button onClick={onCancel}>Cancel</button>
     </div>
@@ -92,18 +92,18 @@ const defaultProps = {
 beforeEach(() => {
   vi.clearAllMocks()
   mockPrFileDiff.mockResolvedValue({ diff: { hunks: [] } })
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     github: { prFileDiff: mockPrFileDiff },
   }
   vi.mocked(usePrReviewStore).mockReturnValue({
     viewedFiles: new Set<string>(),
     threads: {},
     patchFileComplexity: mockPatchFileComplexity,
-  } as any)
+  } as unknown as ReturnType<typeof usePrReviewStore>)
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 async function renderPane(props: Partial<typeof defaultProps> = {}) {
@@ -161,7 +161,7 @@ describe('ReviewDiffPane', () => {
       viewedFiles: new Set(['src/foo.ts']),
       threads: {},
       patchFileComplexity: mockPatchFileComplexity,
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     await renderPane()
     expect(screen.getByText('✓ Viewed')).toBeTruthy()
   })
@@ -231,5 +231,160 @@ describe('ReviewDiffPane', () => {
     mockPrFileDiff.mockResolvedValue({ diff })
     await renderPane()
     await waitFor(() => expect(mockPrFileDiff).toHaveBeenCalled())
+  })
+
+  it('switches to split view mode when Split button is clicked', async () => {
+    const diff = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ -1,3 +1,3 @@',
+          lines: [
+            { type: 'context' as const, content: 'x', oldLineNumber: 1, newLineNumber: 1 },
+            { type: 'add' as const, content: 'y', oldLineNumber: null, newLineNumber: 2 },
+            { type: 'remove' as const, content: 'z', oldLineNumber: 2, newLineNumber: null },
+          ],
+        },
+      ],
+    }
+    mockPrFileDiff.mockResolvedValue({ diff })
+    const { container } = await renderPane()
+    await waitFor(() => expect(screen.getByText('@@ -1,3 +1,3 @@')).toBeTruthy())
+
+    fireEvent.click(screen.getByTitle('Split diff view'))
+
+    await waitFor(() => expect(container.querySelector('.diff-table--split')).toBeTruthy())
+  })
+
+  it('opens composer when gutter button is clicked', async () => {
+    const diff = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ -1,1 +1,1 @@',
+          lines: [
+            {
+              type: 'context' as const,
+              content: 'const x = 1',
+              oldLineNumber: 1,
+              newLineNumber: 1,
+            },
+          ],
+        },
+      ],
+    }
+    mockPrFileDiff.mockResolvedValue({ diff })
+    await renderPane()
+    await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add comment' })[0])
+
+    expect(screen.getByTestId('composer')).toBeTruthy()
+  })
+
+  it('closes composer when cancel is clicked', async () => {
+    const diff = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ -1,1 +1,1 @@',
+          lines: [
+            {
+              type: 'context' as const,
+              content: 'const x = 1',
+              oldLineNumber: 1,
+              newLineNumber: 1,
+            },
+          ],
+        },
+      ],
+    }
+    mockPrFileDiff.mockResolvedValue({ diff })
+    await renderPane()
+    await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add comment' })[0])
+    expect(screen.getByTestId('composer')).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Cancel'))
+    await waitFor(() => expect(screen.queryByTestId('composer')).toBeNull())
+  })
+
+  it('renders inline comment threads on matching lines', async () => {
+    const thread = {
+      id: 'thread-1',
+      path: 'src/foo.ts',
+      line: 1,
+      startLine: null,
+      side: 'RIGHT' as const,
+      outdated: false,
+      collapsed: false,
+      comments: [
+        {
+          id: 1,
+          author: 'alice',
+          authorAvatarUrl: '',
+          body: 'LGTM',
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+          path: 'src/foo.ts',
+          line: 1,
+          startLine: null,
+          side: 'RIGHT' as const,
+          diffHunk: '',
+          outdated: false,
+          threadId: 'thread-1',
+          isReply: false,
+          parentId: null,
+        },
+      ],
+    }
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set<string>(),
+      threads: { 'src/foo.ts': [thread] },
+      patchFileComplexity: mockPatchFileComplexity,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+
+    const diff = {
+      path: 'src/foo.ts',
+      isBinary: false,
+      hunks: [
+        {
+          header: '@@ -1,1 +1,1 @@',
+          lines: [
+            {
+              type: 'context' as const,
+              content: 'const x = 1',
+              oldLineNumber: 1,
+              newLineNumber: 1,
+            },
+          ],
+        },
+      ],
+    }
+    mockPrFileDiff.mockResolvedValue({ diff })
+    await renderPane()
+    await waitFor(() => expect(screen.getByTestId('thread')).toBeTruthy())
+  })
+
+  it('fires keyboard navigation events for prev-file and mark-viewed-next', async () => {
+    const onPrevFile = vi.fn()
+    const onMarkViewed = vi.fn()
+    await renderPane({ onPrevFile, onMarkViewed })
+
+    window.dispatchEvent(new CustomEvent('pr-review:prev-file'))
+    window.dispatchEvent(new CustomEvent('pr-review:mark-viewed-next'))
+
+    expect(onPrevFile).toHaveBeenCalled()
+    expect(onMarkViewed).toHaveBeenCalled()
+  })
+
+  it('shows MED RISK label for medium risk file', async () => {
+    const medFile = { ...mockFile, riskScore: { ...mockFile.riskScore, level: 'medium' as const } }
+    await renderPane({ file: medFile })
+    expect(screen.getByText(/MED RISK/)).toBeTruthy()
   })
 })

@@ -95,14 +95,23 @@ test('US3: PR creation dispatches git:pr-created custom event', async () => {
   const eventReceived = await page.evaluate(() => {
     return new Promise<boolean>((resolve) => {
       const timeout = setTimeout(() => resolve(false), 500)
-      window.addEventListener('git:pr-created', () => {
-        clearTimeout(timeout)
-        resolve(true)
-      }, { once: true })
+      window.addEventListener(
+        'git:pr-created',
+        () => {
+          clearTimeout(timeout)
+          resolve(true)
+        },
+        { once: true }
+      )
       // Simulate the event dispatch
-      window.dispatchEvent(new CustomEvent('git:pr-created', {
-        detail: { pr: { url: 'https://github.com/test/repo/pull/1', isDraft: false }, msg: 'PR created' }
-      }))
+      window.dispatchEvent(
+        new CustomEvent('git:pr-created', {
+          detail: {
+            pr: { url: 'https://github.com/test/repo/pull/1', isDraft: false },
+            msg: 'PR created',
+          },
+        })
+      )
     })
   })
   expect(eventReceived).toBe(true)

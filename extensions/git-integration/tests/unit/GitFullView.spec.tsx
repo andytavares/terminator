@@ -6,7 +6,7 @@ import { useGitStore } from '../../src/stores/git.store'
 vi.mock('../../src/stores/git.store', () => ({ useGitStore: vi.fn() }))
 vi.mock('../../src/hooks/useGitStatus', () => ({ useGitStatus: vi.fn() }))
 vi.mock('../../src/components/StagingArea', () => ({
-  StagingArea: ({ onFileSelect }: any) => (
+  StagingArea: ({ onFileSelect }: { onFileSelect: (path: string, staged: boolean) => void }) => (
     <div data-testid="staging-area">
       <button onClick={() => onFileSelect('src/foo.ts', false)}>SelectFile</button>
     </div>
@@ -16,7 +16,13 @@ vi.mock('../../src/components/FileDiffView', () => ({
   FileDiffView: () => <div data-testid="file-diff-view" />,
 }))
 vi.mock('../../src/components/PrDialog', () => ({
-  PrDialog: ({ onClose, onCreated }: any) => (
+  PrDialog: ({
+    onClose,
+    onCreated,
+  }: {
+    onClose: () => void
+    onCreated: (pr: { number: number; url: string; title: string; state: string }) => void
+  }) => (
     <div data-testid="pr-dialog">
       <button onClick={onClose}>ClosePrDialog</button>
       <button
@@ -40,7 +46,7 @@ const mockGitPush = vi.fn()
 const mockGitPrStatus = vi.fn()
 const mockGitDiffFile = vi.fn()
 
-function setupStore(overrides: any = {}) {
+function setupStore(overrides: Record<string, unknown> = {}) {
   vi.mocked(useGitStore).mockReturnValue({
     status: { branch: 'feature', files: [] },
     selectedFile: null,
@@ -49,7 +55,7 @@ function setupStore(overrides: any = {}) {
     setDiff: mockSetDiff,
     setLoading: mockSetLoading,
     ...overrides,
-  } as any)
+  } as unknown as ReturnType<typeof useGitStore>)
 }
 
 beforeEach(() => {
@@ -59,7 +65,7 @@ beforeEach(() => {
   mockGitCommit.mockResolvedValue({ commitHash: 'abc123' })
   mockGitPush.mockResolvedValue({ success: true })
   mockGitPrStatus.mockResolvedValue({ pr: null })
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     git: {
       diffFile: mockGitDiffFile,
       commit: mockGitCommit,
@@ -70,10 +76,13 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
-async function renderView(repoRoot: string | null = '/repo', storeOverrides: any = {}) {
+async function renderView(
+  repoRoot: string | null = '/repo',
+  storeOverrides: Record<string, unknown> = {}
+) {
   setupStore(storeOverrides)
   const { GitFullView } = await import('../../src/components/GitFullView')
   return render(<GitFullView repoRoot={repoRoot} />)

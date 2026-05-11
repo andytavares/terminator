@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { ProjectItem } from '../../../../src/renderer/components/sidebar/ProjectItem'
+import type { Project } from '../../../../src/shared/types/index'
 
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
   useWorkspaceStore: vi.fn(),
@@ -11,7 +12,14 @@ vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
 const mockSetActive = vi.fn()
 const mockDeleteProject = vi.fn()
 
-const baseProject = { id: 'proj-1', name: 'My Project', workspaceId: 'ws-1' }
+const baseProject: Project = {
+  id: 'proj-1',
+  name: 'My Project',
+  workspaceId: 'ws-1',
+  isWorktree: false,
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -19,12 +27,12 @@ beforeEach(() => {
     activeProjectId: null,
     setActiveProject: mockSetActive,
     deleteProject: mockDeleteProject,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
 })
 
 describe('ProjectItem', () => {
   it('renders project name', () => {
-    render(<ProjectItem project={baseProject as any} />)
+    render(<ProjectItem project={baseProject} />)
     expect(screen.getByText('My Project')).toBeTruthy()
   })
 
@@ -33,32 +41,32 @@ describe('ProjectItem', () => {
       activeProjectId: 'proj-1',
       setActiveProject: mockSetActive,
       deleteProject: mockDeleteProject,
-    } as any)
-    const { container } = render(<ProjectItem project={baseProject as any} />)
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    const { container } = render(<ProjectItem project={baseProject} />)
     expect(container.querySelector('.project-item--active')).toBeTruthy()
   })
 
   it('calls setActiveProject when clicked', () => {
-    render(<ProjectItem project={baseProject as any} />)
+    render(<ProjectItem project={baseProject} />)
     fireEvent.click(screen.getByText('My Project'))
     expect(mockSetActive).toHaveBeenCalledWith('proj-1')
   })
 
   it('shows context menu on right-click', () => {
-    render(<ProjectItem project={baseProject as any} />)
+    render(<ProjectItem project={baseProject} />)
     fireEvent.contextMenu(screen.getByText('My Project'))
     expect(screen.getByText('Remove')).toBeTruthy()
   })
 
   it('shows ConfirmDialog when Remove is clicked', () => {
-    render(<ProjectItem project={baseProject as any} />)
+    render(<ProjectItem project={baseProject} />)
     fireEvent.contextMenu(screen.getByText('My Project'))
     fireEvent.click(screen.getByText('Remove'))
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
   it('calls deleteProject when ConfirmDialog is confirmed', () => {
-    render(<ProjectItem project={baseProject as any} />)
+    render(<ProjectItem project={baseProject} />)
     fireEvent.contextMenu(screen.getByText('My Project'))
     fireEvent.click(screen.getByText('Remove'))
     fireEvent.click(screen.getByText('Remove', { selector: 'button.dialog__btn-primary' }))
@@ -66,7 +74,7 @@ describe('ProjectItem', () => {
   })
 
   it('does not delete when ConfirmDialog is cancelled', () => {
-    render(<ProjectItem project={baseProject as any} />)
+    render(<ProjectItem project={baseProject} />)
     fireEvent.contextMenu(screen.getByText('My Project'))
     fireEvent.click(screen.getByText('Remove'))
     fireEvent.click(screen.getByText('Cancel'))
@@ -74,7 +82,7 @@ describe('ProjectItem', () => {
   })
 
   it('closes context menu when clicking elsewhere', () => {
-    render(<ProjectItem project={baseProject as any} />)
+    render(<ProjectItem project={baseProject} />)
     fireEvent.contextMenu(screen.getByText('My Project'))
     expect(screen.getByText('Remove')).toBeTruthy()
     fireEvent.click(document)

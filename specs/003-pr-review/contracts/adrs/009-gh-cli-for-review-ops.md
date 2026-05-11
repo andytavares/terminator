@@ -20,10 +20,10 @@ All GitHub API calls for the PR review feature (list PRs, fetch file diffs, read
 
 ## Alternatives Considered
 
-| Alternative | Why Rejected |
-|---|---|
-| `@octokit/rest` (REST SDK) | Second auth mechanism; new pinned dependency; no benefit over `gh api` for our access patterns |
-| GitHub GraphQL API via `gh api graphql` | More efficient batching but adds query complexity; can be adopted in v2 if REST proves too slow |
+| Alternative                                            | Why Rejected                                                                                                 |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `@octokit/rest` (REST SDK)                             | Second auth mechanism; new pinned dependency; no benefit over `gh api` for our access patterns               |
+| GitHub GraphQL API via `gh api graphql`                | More efficient batching but adds query complexity; can be adopted in v2 if REST proves too slow              |
 | Direct `fetch` from renderer via Electron `net` module | Bypasses sandbox entirely; requires managing tokens in renderer process; against established project pattern |
 
 ## Consequences

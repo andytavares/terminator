@@ -136,7 +136,10 @@ index abc123..def456 100644
 
   it('sets truncated flag for large output', () => {
     const bigLine = 'x'.repeat(1000)
-    const largeDiff = `diff --git a/big.ts b/big.ts\n--- a/big.ts\n+++ b/big.ts\n@@ -1 +1 @@\n+${bigLine}\n`.repeat(600)
+    const largeDiff =
+      `diff --git a/big.ts b/big.ts\n--- a/big.ts\n+++ b/big.ts\n@@ -1 +1 @@\n+${bigLine}\n`.repeat(
+        600
+      )
     const diff = parseDiff(largeDiff, 512 * 1024)
     expect(diff.truncated).toBe(true)
   })

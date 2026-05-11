@@ -26,14 +26,16 @@ const mockGetSidebarItems = vi.fn()
 
 beforeEach(() => {
   mockGetSidebarItems.mockResolvedValue({ items: [] })
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     extension: { getSidebarItems: mockGetSidebarItems },
   }
-  vi.mocked(useWorkspaceStore).mockReturnValue({ workspaces: [] } as any)
+  vi.mocked(useWorkspaceStore).mockReturnValue({ workspaces: [] } as unknown as ReturnType<
+    typeof useWorkspaceStore
+  >)
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('Sidebar', () => {
@@ -48,7 +50,7 @@ describe('Sidebar', () => {
         { id: 'ws-1', name: 'Work' },
         { id: 'ws-2', name: 'Personal' },
       ],
-    } as any)
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
     render(<Sidebar />)
     expect(screen.getByText('Work')).toBeTruthy()
     expect(screen.getByText('Personal')).toBeTruthy()

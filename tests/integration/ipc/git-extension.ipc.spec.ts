@@ -13,7 +13,10 @@ import { registerGitExtensionHandlers } from '../../../extensions/git-integratio
 
 type Handler = (payload: unknown) => Promise<unknown>
 
-function buildRegistry(): { register: (channel: string, handler: Handler) => void; getHandler: (channel: string) => Handler } {
+function buildRegistry(): {
+  register: (channel: string, handler: Handler) => void
+  getHandler: (channel: string) => Handler
+} {
   const handlers = new Map<string, Handler>()
   return {
     register: (channel, handler) => handlers.set(channel, handler as Handler),
@@ -50,12 +53,14 @@ describe('git-integration extension: git:status IPC handler', () => {
 
   it('returns error for non-repo path', async () => {
     vi.mocked(gitService.getStatus).mockRejectedValue(new Error('not a git repository'))
-    const result = await getHandler('git:status')({ path: '/tmp/not-a-repo', maxFiles: 500 }) as { error: string }
+    const result = (await getHandler('git:status')({ path: '/tmp/not-a-repo', maxFiles: 500 })) as {
+      error: string
+    }
     expect(result.error).toBeDefined()
   })
 
   it('returns VALIDATION_ERROR for missing path', async () => {
-    const result = await getHandler('git:status')({}) as { error: string }
+    const result = (await getHandler('git:status')({})) as { error: string }
     expect(result.error).toBe('VALIDATION_ERROR')
   })
 })
@@ -78,14 +83,27 @@ describe('git-integration extension: git:diff-file IPC handler', () => {
       truncated: false,
     })
 
-    const result = await getHandler('git:diff-file')({ repoRoot: '/tmp/repo', path: 'src/main.ts', staged: true })
+    const result = await getHandler('git:diff-file')({
+      repoRoot: '/tmp/repo',
+      path: 'src/main.ts',
+      staged: true,
+    })
     expect(gitService.getDiff).toHaveBeenCalledWith('/tmp/repo', 'src/main.ts', true)
     expect(result).toMatchObject({ diff: expect.objectContaining({ path: 'src/main.ts' }) })
   })
 
   it('returns binary flag for binary file', async () => {
-    vi.mocked(gitService.getDiff).mockResolvedValue({ path: 'img.png', hunks: [], isBinary: true, truncated: false })
-    const result = await getHandler('git:diff-file')({ repoRoot: '/tmp/repo', path: 'img.png', staged: false }) as { diff: { isBinary: boolean } }
+    vi.mocked(gitService.getDiff).mockResolvedValue({
+      path: 'img.png',
+      hunks: [],
+      isBinary: true,
+      truncated: false,
+    })
+    const result = (await getHandler('git:diff-file')({
+      repoRoot: '/tmp/repo',
+      path: 'img.png',
+      staged: false,
+    })) as { diff: { isBinary: boolean } }
     expect(result.diff.isBinary).toBe(true)
   })
 })
@@ -108,13 +126,18 @@ describe('git-integration extension: git:stage / git:unstage IPC handlers', () =
   })
 
   it('returns error for empty paths array on stage', async () => {
-    const result = await getHandler('git:stage')({ repoRoot: '/tmp/repo', paths: [] }) as { error: string }
+    const result = (await getHandler('git:stage')({ repoRoot: '/tmp/repo', paths: [] })) as {
+      error: string
+    }
     expect(result.error).toBeDefined()
   })
 
   it('unstages a file', async () => {
     vi.mocked(gitService.unstageFiles).mockResolvedValue(undefined)
-    const result = await getHandler('git:unstage')({ repoRoot: '/tmp/repo', paths: ['src/main.ts'] })
+    const result = await getHandler('git:unstage')({
+      repoRoot: '/tmp/repo',
+      paths: ['src/main.ts'],
+    })
     expect(result).toMatchObject({ success: true })
   })
 })
@@ -131,12 +154,17 @@ describe('git-integration extension: git:commit IPC handler', () => {
 
   it('commits staged changes and returns hash', async () => {
     vi.mocked(gitService.commitChanges).mockResolvedValue('abc123')
-    const result = await getHandler('git:commit')({ repoRoot: '/tmp/repo', message: 'feat: add feature' })
+    const result = await getHandler('git:commit')({
+      repoRoot: '/tmp/repo',
+      message: 'feat: add feature',
+    })
     expect(result).toMatchObject({ commitHash: 'abc123' })
   })
 
   it('returns EMPTY_MESSAGE when message is empty', async () => {
-    const result = await getHandler('git:commit')({ repoRoot: '/tmp/repo', message: '' }) as { error: string }
+    const result = (await getHandler('git:commit')({ repoRoot: '/tmp/repo', message: '' })) as {
+      error: string
+    }
     expect(result.error).toBe('EMPTY_MESSAGE')
   })
 
@@ -144,7 +172,9 @@ describe('git-integration extension: git:commit IPC handler', () => {
     vi.mocked(gitService.commitChanges).mockRejectedValue(
       Object.assign(new Error('nothing to commit'), { code: 'NOTHING_TO_COMMIT' })
     )
-    const result = await getHandler('git:commit')({ repoRoot: '/tmp/repo', message: 'test' }) as { error: string }
+    const result = (await getHandler('git:commit')({ repoRoot: '/tmp/repo', message: 'test' })) as {
+      error: string
+    }
     expect(result.error).toBeDefined()
   })
 })

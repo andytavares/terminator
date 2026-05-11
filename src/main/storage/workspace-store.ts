@@ -167,7 +167,12 @@ export function renameProject(
   const idx = projects.findIndex((p) => p.id === id)
   if (idx === -1) return { error: 'NOT_FOUND' }
   const { workspaceId } = projects[idx]
-  if (projects.some((p) => p.workspaceId === workspaceId && p.name.toLowerCase() === name.toLowerCase() && p.id !== id)) {
+  if (
+    projects.some(
+      (p) =>
+        p.workspaceId === workspaceId && p.name.toLowerCase() === name.toLowerCase() && p.id !== id
+    )
+  ) {
     return { error: 'DUPLICATE_NAME' }
   }
   const updated = { ...projects[idx], name, updatedAt: now() }

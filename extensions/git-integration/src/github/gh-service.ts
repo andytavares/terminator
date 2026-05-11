@@ -24,9 +24,12 @@ function parseGhPr(raw: unknown): PullRequest {
 
 function mapState(state: string): 'open' | 'closed' | 'merged' {
   switch (state.toUpperCase()) {
-    case 'CLOSED': return 'closed'
-    case 'MERGED': return 'merged'
-    default: return 'open'
+    case 'CLOSED':
+      return 'closed'
+    case 'MERGED':
+      return 'merged'
+    default:
+      return 'open'
   }
 }
 
@@ -65,11 +68,16 @@ export class GhService {
 
   async createPr(cwd: string, input: PrCreateInput): Promise<PullRequest> {
     const args = [
-      'pr', 'create',
-      '--title', input.title,
-      '--body', input.body,
-      '--base', input.base,
-      '--json', 'number,title,body,url,state,isDraft,baseRefName,headRefName',
+      'pr',
+      'create',
+      '--title',
+      input.title,
+      '--body',
+      input.body,
+      '--base',
+      input.base,
+      '--json',
+      'number,title,body,url,state,isDraft,baseRefName,headRefName',
     ]
     if (input.isDraft) args.push('--draft')
 

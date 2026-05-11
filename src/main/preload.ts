@@ -137,6 +137,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     sessionGet: (key: string) => ipcRenderer.invoke('github:session-get', { key }),
     sessionSet: (key: string, session: unknown) =>
       ipcRenderer.invoke('github:session-set', { key, session }),
+    sessionsForRepo: (repoRoot: string) =>
+      ipcRenderer.invoke('github:sessions-for-repo', { repoRoot }),
   },
   fs: {
     watchStart: (projectRoot: string) => ipcRenderer.invoke('fs:watch-start', { projectRoot }),
@@ -188,5 +190,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   window: {
     openPrReview: (repoRoot: string, accentColor?: string) =>
       ipcRenderer.invoke('window:open-pr-review', { repoRoot, accentColor }),
+    onPrReviewWindowChange: (handler: (isOpen: boolean) => void) => {
+      const onOpen = () => handler(true)
+      const onClose = () => handler(false)
+      ipcRenderer.on('window:pr-review-opened', onOpen)
+      ipcRenderer.on('window:pr-review-closed', onClose)
+      return () => {
+        ipcRenderer.removeListener('window:pr-review-opened', onOpen)
+        ipcRenderer.removeListener('window:pr-review-closed', onClose)
+      }
+    },
   },
 })

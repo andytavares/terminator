@@ -28,7 +28,10 @@ async function pushBranch(repoRoot: string): Promise<{ error: string } | null> {
   return null
 }
 
-async function checkCommitsAhead(repoRoot: string, base: string): Promise<{ count: number } | { error: string }> {
+async function checkCommitsAhead(
+  repoRoot: string,
+  base: string
+): Promise<{ count: number } | { error: string }> {
   // Try local base branch first; fall back to origin/<base> if local doesn't exist
   for (const ref of [base, `origin/${base}`]) {
     const result = await window.electronAPI.shell.exec({
@@ -68,7 +71,12 @@ async function ghPrCreate(
   onStatus('Creating pull request…')
   const args = ['pr', 'create', '--title', title, '--body', body, '--base', base, '--head', branch]
   if (isDraft) args.push('--draft')
-  const result = await window.electronAPI.shell.exec({ command: 'gh', args, cwd: repoRoot, timeoutMs: 30000 })
+  const result = await window.electronAPI.shell.exec({
+    command: 'gh',
+    args,
+    cwd: repoRoot,
+    timeoutMs: 30000,
+  })
   if ('error' in result) return { error: result.error }
   if (result.exitCode !== 0) return { error: result.stderr || 'gh pr create failed' }
   // Parse the PR URL from stdout to get number
@@ -106,7 +114,13 @@ async function loadPrTemplate(repoRoot: string): Promise<string> {
   return ''
 }
 
-export function PrDialog({ repoRoot, branch, existingPr, onClose, onCreated }: PrDialogProps): JSX.Element {
+export function PrDialog({
+  repoRoot,
+  branch,
+  existingPr,
+  onClose,
+  onCreated,
+}: PrDialogProps): JSX.Element {
   const [title, setTitle] = useState(() =>
     branch.replace(/^(feat|fix|chore|docs|refactor)\//i, '').replace(/-/g, ' ')
   )
@@ -149,7 +163,15 @@ export function PrDialog({ repoRoot, branch, existingPr, onClose, onCreated }: P
     setCreatingStatus('')
     setError(null)
     try {
-      const result = await ghPrCreate(repoRoot, branch, title.trim(), body, base, isDraft, setCreatingStatus)
+      const result = await ghPrCreate(
+        repoRoot,
+        branch,
+        title.trim(),
+        body,
+        base,
+        isDraft,
+        setCreatingStatus
+      )
       if ('error' in result) {
         setError(result.error)
       } else {
@@ -167,10 +189,18 @@ export function PrDialog({ repoRoot, branch, existingPr, onClose, onCreated }: P
 
   return (
     <div className="pr-dialog" onClick={onClose}>
-      <div className="pr-dialog__panel" role="dialog" aria-modal="true" aria-label="Create Pull Request" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="pr-dialog__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Create Pull Request"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="pr-dialog__header">
           <h2 className="pr-dialog__title">Open Pull Request</h2>
-          <button className="pr-dialog__close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="pr-dialog__close" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
         </div>
 
         {existingPr && (
@@ -225,10 +255,7 @@ export function PrDialog({ repoRoot, branch, existingPr, onClose, onCreated }: P
               rows={8}
             />
           ) : (
-            <div
-              className="pr-dialog__preview"
-              dangerouslySetInnerHTML={{ __html: previewHtml }}
-            />
+            <div className="pr-dialog__preview" dangerouslySetInnerHTML={{ __html: previewHtml }} />
           )}
         </div>
 
@@ -243,14 +270,18 @@ export function PrDialog({ repoRoot, branch, existingPr, onClose, onCreated }: P
               {localBranches.length > 0 && (
                 <optgroup label="Local">
                   {localBranches.map((b) => (
-                    <option key={b.name} value={b.name}>{b.name}</option>
+                    <option key={b.name} value={b.name}>
+                      {b.name}
+                    </option>
                   ))}
                 </optgroup>
               )}
               {remoteBranches.length > 0 && (
                 <optgroup label="Remote">
                   {remoteBranches.map((b) => (
-                    <option key={b.name} value={b.name}>{b.name}</option>
+                    <option key={b.name} value={b.name}>
+                      {b.name}
+                    </option>
                   ))}
                 </optgroup>
               )}

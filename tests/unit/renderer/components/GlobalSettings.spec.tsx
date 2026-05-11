@@ -27,19 +27,21 @@ beforeEach(() => {
     updateGlobalTheme: mockUpdateTheme,
     updateScrollbackLimit: mockUpdateScrollback,
     updateWorktreeBaseDir: mockUpdateWorktreeBaseDir,
-  } as any)
-  ;(globalThis as any).electronAPI = {
+  } as unknown as ReturnType<typeof useSettingsStore>)
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     settings: { updateGlobal: mockUpdateGlobal },
   }
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('GlobalSettings', () => {
   it('shows loading when globalSettings is null', () => {
-    vi.mocked(useSettingsStore).mockReturnValue({ globalSettings: null } as any)
+    vi.mocked(useSettingsStore).mockReturnValue({ globalSettings: null } as unknown as ReturnType<
+      typeof useSettingsStore
+    >)
     render(<GlobalSettings />)
     expect(screen.getByText('Loading...')).toBeTruthy()
   })

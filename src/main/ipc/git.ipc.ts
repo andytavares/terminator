@@ -70,7 +70,9 @@ export function registerGitHandlers(): void {
     })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { path: '' }
-    return { path: suggestWorktreePath(parsed.data.repoRoot, parsed.data.branch, parsed.data.baseDir) }
+    return {
+      path: suggestWorktreePath(parsed.data.repoRoot, parsed.data.branch, parsed.data.baseDir),
+    }
   })
 
   ipcMain.handle('git:create-worktree', async (_event, payload) => {
@@ -117,7 +119,6 @@ export function registerGitHandlers(): void {
       return { worktrees: [] }
     }
   })
-
 }
 // git:status, git:diff-file, git:stage, git:unstage, git:commit, git:pr-status, git:pr-create
 // are registered by the git-integration extension via api.ipc.registerHandler()

@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { TabBar } from '../../../../src/renderer/components/terminal/TabBar'
+import type { ComponentType } from 'react'
 
 vi.mock('../../../../src/renderer/stores/session.store', () => ({
   useSessionStore: vi.fn(),
@@ -32,11 +33,11 @@ beforeEach(() => {
     setActiveSessionForProject: mockSetActive,
     getActiveSessionForProject: mockGetActive,
     getBellCountForSession: mockGetBell,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useWorkspaceStore).mockReturnValue({
     workspaces: [],
     activeWorkspaceId: null,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   mockGetSessions.mockReturnValue([])
   mockGetActive.mockReturnValue(null)
   mockGetBell.mockReturnValue(0)
@@ -60,7 +61,13 @@ describe('TabBar', () => {
       <TabBar
         projectId="proj-1"
         activeProjectTabId={null}
-        projectTabs={[{ id: 'git', label: 'Git', component: null as any }]}
+        projectTabs={[
+          {
+            id: 'git',
+            label: 'Git',
+            component: null as unknown as ComponentType<{ repoRoot: string | null }>,
+          },
+        ]}
         onSelectProjectTab={vi.fn()}
       />
     )
@@ -84,7 +91,13 @@ describe('TabBar', () => {
       <TabBar
         projectId="proj-1"
         activeProjectTabId="git"
-        projectTabs={[{ id: 'git', label: 'Git', component: null as any }]}
+        projectTabs={[
+          {
+            id: 'git',
+            label: 'Git',
+            component: null as unknown as ComponentType<{ repoRoot: string | null }>,
+          },
+        ]}
         onSelectProjectTab={vi.fn()}
       />
     )

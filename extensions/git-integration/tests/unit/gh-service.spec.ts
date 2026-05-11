@@ -23,7 +23,12 @@ describe('GhService.checkAuth()', () => {
   })
 
   it('resolves false when gh exits non-zero', async () => {
-    mockExec.mockResolvedValue({ exitCode: 1, stdout: '', stderr: 'not logged in', timedOut: false })
+    mockExec.mockResolvedValue({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'not logged in',
+      timedOut: false,
+    })
     const result = await service.checkAuth('/tmp/repo')
     expect(result).toBe(false)
   })
@@ -56,13 +61,23 @@ describe('GhService.getPrForBranch()', () => {
   })
 
   it('returns null when no PR found', async () => {
-    mockExec.mockResolvedValue({ exitCode: 1, stdout: '', stderr: 'no pull requests found', timedOut: false })
+    mockExec.mockResolvedValue({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'no pull requests found',
+      timedOut: false,
+    })
     const pr = await service.getPrForBranch('/tmp/repo', 'feat/new-feature')
     expect(pr).toBeNull()
   })
 
   it('throws on unexpected gh error', async () => {
-    mockExec.mockResolvedValue({ exitCode: 1, stdout: '', stderr: 'network error', timedOut: false })
+    mockExec.mockResolvedValue({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'network error',
+      timedOut: false,
+    })
     await expect(service.getPrForBranch('/tmp/repo', 'feat/new-feature')).rejects.toThrow()
   })
 })

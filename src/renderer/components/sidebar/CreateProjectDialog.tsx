@@ -69,14 +69,20 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
 
     if (isWorktreeMode && gitRoot) {
       const branch = isNewBranch ? newBranchName.trim() : selectedBranch
-      if (!branch) { setError('Select or enter a branch name'); return }
+      if (!branch) {
+        setError('Select or enter a branch name')
+        return
+      }
       const wt = await window.electronAPI.git.createWorktree({
         repoRoot: gitRoot,
         worktreePath,
         branch,
         isNewBranch,
       })
-      if ('error' in wt) { setError(`Worktree error: ${wt.error}`); return }
+      if ('error' in wt) {
+        setError(`Worktree error: ${wt.error}`)
+        return
+      }
 
       const result = await createProject({
         workspaceId,
@@ -86,14 +92,16 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
         isWorktree: true,
       })
       if ('error' in result) {
-        if (result.error === 'DUPLICATE_NAME') setNameError('A project with this name already exists')
+        if (result.error === 'DUPLICATE_NAME')
+          setNameError('A project with this name already exists')
         else setError('Failed to create project')
         return
       }
     } else {
       const result = await createProject({ workspaceId, name: name.trim() })
       if ('error' in result) {
-        if (result.error === 'DUPLICATE_NAME') setNameError('A project with this name already exists')
+        if (result.error === 'DUPLICATE_NAME')
+          setNameError('A project with this name already exists')
         return
       }
     }
@@ -113,7 +121,10 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
             <input
               className={`dialog__input${nameError ? ' dialog__input--error' : ''}`}
               value={name}
-              onChange={(e) => { setName(e.target.value); setNameError('') }}
+              onChange={(e) => {
+                setName(e.target.value)
+                setNameError('')
+              }}
               onBlur={() => setNameError(validateName(name))}
               placeholder="My Project"
               autoFocus
@@ -143,13 +154,18 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
                     className="dialog__input"
                     value={isNewBranch ? '__new__' : selectedBranch}
                     onChange={(e) => {
-                      if (e.target.value === '__new__') { setIsNewBranch(true) }
-                      else { setIsNewBranch(false); setSelectedBranch(e.target.value) }
+                      if (e.target.value === '__new__') {
+                        setIsNewBranch(true)
+                      } else {
+                        setIsNewBranch(false)
+                        setSelectedBranch(e.target.value)
+                      }
                     }}
                   >
                     {localBranches.map((b) => (
                       <option key={b.name} value={b.name}>
-                        {b.name}{b.isCurrent ? ' (current)' : ''}
+                        {b.name}
+                        {b.isCurrent ? ' (current)' : ''}
                       </option>
                     ))}
                     <option value="__new__">+ New branch…</option>
@@ -176,7 +192,9 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
                     className="dialog__input"
                     value={worktreePath}
                     onChange={(e) => setWorktreePath(e.target.value)}
-                    placeholder={branchName ? `Suggested based on "${branchName}"` : '/path/to/worktree'}
+                    placeholder={
+                      branchName ? `Suggested based on "${branchName}"` : '/path/to/worktree'
+                    }
                   />
                 </div>
                 <span className="dialog__hint">Directory will be created by git</span>

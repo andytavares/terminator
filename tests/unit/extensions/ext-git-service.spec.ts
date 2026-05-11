@@ -5,7 +5,7 @@ const CUSTOM = Symbol.for('nodejs.util.promisify.custom')
 const { execFileMock } = vi.hoisted(() => {
   const CUSTOM_SYM = Symbol.for('nodejs.util.promisify.custom')
   const mock = vi.fn()
-  ;(mock as any)[CUSTOM_SYM] = vi.fn()
+  ;(mock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[CUSTOM_SYM] = vi.fn()
   return { execFileMock: mock }
 })
 
@@ -20,7 +20,7 @@ import {
 } from '../../../extensions/git-integration/src/git/git-service'
 
 function customMock() {
-  return (execFileMock as any)[CUSTOM]
+  return (execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[CUSTOM]
 }
 
 function mockResolve(stdout: string) {

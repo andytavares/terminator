@@ -1,15 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { existsSync, mkdirSync, readFileSync } from 'fs'
-import { join } from 'path'
-import { tmpdir } from 'os'
-import { rmSync } from 'fs'
+import { describe, it, expect, beforeEach } from 'vitest'
 
-// We import the pure functions from create-extension.js
+// We import the pure functions from create-extension.cjs
 // The script uses CommonJS; vitest handles the transform
 let generateManifest, generateIndex, validateName, validateId
 
 beforeEach(async () => {
-  const mod = await import('../../../scripts/create-extension.js')
+  const mod = await import('../../../scripts/create-extension.cjs')
   generateManifest = mod.generateManifest
   generateIndex = mod.generateIndex
   validateName = mod.validateName

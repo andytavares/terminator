@@ -20,11 +20,11 @@ Use `react-markdown@9` and `remark-gfm@4` to render all comment bodies and the P
 
 ## Alternatives Considered
 
-| Alternative | Why Rejected |
-|---|---|
-| `marked` + `dangerouslySetInnerHTML` | XSS risk without a dedicated sanitizer; adds `dompurify` dependency |
-| Hand-rolled subset parser | Brittle; violates Constitution §III (minimalism — don't reinvent well-solved problems) |
-| `@uiw/react-md-editor` | Includes a full editor; overkill for render-only use case |
+| Alternative                          | Why Rejected                                                                           |
+| ------------------------------------ | -------------------------------------------------------------------------------------- |
+| `marked` + `dangerouslySetInnerHTML` | XSS risk without a dedicated sanitizer; adds `dompurify` dependency                    |
+| Hand-rolled subset parser            | Brittle; violates Constitution §III (minimalism — don't reinvent well-solved problems) |
+| `@uiw/react-md-editor`               | Includes a full editor; overkill for render-only use case                              |
 
 ## Consequences
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { ChapterNav } from './ChapterNav'
 import { ChapterFileList } from './ChapterFileList'
@@ -7,6 +7,7 @@ import { ReviewDiffPane } from './ReviewDiffPane'
 import { RiskBreakdownPanel } from './RiskBreakdownPanel'
 import { ReviewSubmitPanel } from './ReviewSubmitPanel'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
+import { StatusChecksBar } from './StatusChecksBar'
 import type { PrReviewDetail, PrChangedFile } from '../../schemas/pr-review.schema'
 
 interface Props {
@@ -14,16 +15,21 @@ interface Props {
   pr: PrReviewDetail
   onClose: () => void
   onRefresh: () => Promise<void>
+  onPopOut?: () => void
 }
 
 type ViewMode = 'guided' | 'full'
 
-export function PrReviewView({ repoRoot, pr, onClose, onRefresh }: Props) {
+export function PrReviewView({ repoRoot, pr, onClose, onRefresh, onPopOut }: Props) {
   const {
-    currentChapterId, currentFilePath,
-    setCurrentChapter, setCurrentFile,
-    viewedFiles, fileOrderOverrides,
-    markFileViewed, setPaused,
+    currentChapterId,
+    currentFilePath,
+    setCurrentChapter,
+    setCurrentFile,
+    viewedFiles,
+    fileOrderOverrides,
+    markFileViewed,
+    setPaused,
   } = usePrReviewStore()
 
   const loadInlineComments = useLoadInlineComments(repoRoot)
@@ -34,48 +40,53 @@ export function PrReviewView({ repoRoot, pr, onClose, onRefresh }: Props) {
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    try { await onRefresh() } finally { setRefreshing(false) }
+    try {
+      await onRefresh()
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   // Resolve active chapter and file
   const activeChapterId = currentChapterId ?? pr.chapters[0]?.id ?? null
-  const activeChapter   = pr.chapters.find(c => c.id === activeChapterId) ?? pr.chapters[0] ?? null
+  const activeChapter = pr.chapters.find((c) => c.id === activeChapterId) ?? pr.chapters[0] ?? null
 
-  const orderedFiles: PrChangedFile[] = activeChapter
-    ? (() => {
-        const overrideOrder = fileOrderOverrides[activeChapter.id]
-        if (overrideOrder) {
-          return overrideOrder
-            .map(p => activeChapter.files.find(f => f.path === p))
-            .filter((f): f is PrChangedFile => !!f)
-        }
-        return activeChapter.files
-      })()
-    : []
+  const orderedFiles = useMemo<PrChangedFile[]>(() => {
+    if (!activeChapter) return []
+    const overrideOrder = fileOrderOverrides[activeChapter.id]
+    if (overrideOrder) {
+      return overrideOrder
+        .map((p) => activeChapter.files.find((f) => f.path === p))
+        .filter((f): f is PrChangedFile => !!f)
+    }
+    return activeChapter.files
+  }, [activeChapter, fileOrderOverrides])
 
   const currentFileIndex = currentFilePath
-    ? orderedFiles.findIndex(f => f.path === currentFilePath)
+    ? orderedFiles.findIndex((f) => f.path === currentFilePath)
     : 0
   const resolvedIndex = Math.max(0, currentFileIndex)
-  const activeFile    = orderedFiles[resolvedIndex] ?? null
+  const activeFile = orderedFiles[resolvedIndex] ?? null
 
   useEffect(() => {
     if (!currentFilePath && orderedFiles.length > 0) {
       setCurrentFile(orderedFiles[0].path)
     }
-  }, [activeChapterId])
+  }, [activeChapterId, currentFilePath, orderedFiles, setCurrentFile])
 
   useEffect(() => {
     loadInlineComments()
-  }, [pr.number])
+  }, [pr.number, loadInlineComments])
 
   const handleSelectChapter = (id: string) => {
     setCurrentChapter(id)
-    const chapter = pr.chapters.find(c => c.id === id)
+    const chapter = pr.chapters.find((c) => c.id === id)
     if (chapter) {
       const overrideOrder = fileOrderOverrides[chapter.id]
       const files = overrideOrder
-        ? overrideOrder.map(p => chapter.files.find(f => f.path === p)).filter((f): f is PrChangedFile => !!f)
+        ? overrideOrder
+            .map((p) => chapter.files.find((f) => f.path === p))
+            .filter((f): f is PrChangedFile => !!f)
         : chapter.files
       setCurrentFile(files[0]?.path ?? null)
     }
@@ -114,13 +125,13 @@ export function PrReviewView({ repoRoot, pr, onClose, onRefresh }: Props) {
 
   const handleFinishChapter = () => {
     if (!activeChapter) return
-    orderedFiles.forEach(f => {
+    orderedFiles.forEach((f) => {
       if (!viewedFiles.has(f.path)) {
         markFileViewed(repoRoot, pr.number, pr.headSHA, f.path)
       }
     })
-    const chapterIndex = pr.chapters.findIndex(c => c.id === activeChapterId)
-    const nextChapter  = pr.chapters[chapterIndex + 1]
+    const chapterIndex = pr.chapters.findIndex((c) => c.id === activeChapterId)
+    const nextChapter = pr.chapters[chapterIndex + 1]
     if (nextChapter) handleSelectChapter(nextChapter.id)
   }
 
@@ -131,74 +142,119 @@ export function PrReviewView({ repoRoot, pr, onClose, onRefresh }: Props) {
 
   const showMultipleChapters = pr.chapters.length > 1
 
+  const totalFiles = pr.chapters.flatMap((c) => c.files).length
+  const reviewedCount = viewedFiles.size
+  const reviewPct = totalFiles > 0 ? Math.round((reviewedCount / totalFiles) * 100) : 0
+
   // In guided mode: chapter tabs + single-chapter file list
   // In full mode:   all-chapters file list (no chapter tabs)
-  const leftPanel = viewMode === 'full' ? (
-    <aside className="pr-review-panel pr-review-panel--left">
-      <div className="pr-review-panel-header">
-        <span className="pr-review-chapter-name">All files</span>
-        <div className="pr-review-panel-header-right">
-          <button
-            className={`pr-refresh-btn${refreshing ? ' pr-refresh-btn--spinning' : ''}`}
-            onClick={handleRefresh}
-            disabled={refreshing}
-            title="Refresh PR"
-            aria-label="Refresh pull request"
-          >↻</button>
-          <button
-            className="pr-view-mode-btn pr-view-mode-btn--active"
-            onClick={() => setViewMode('guided')}
-            title="Switch to guided chapter view"
-          >Guided ↩</button>
-        </div>
-      </div>
-      <FullFileList
-        pr={pr}
-        repoRoot={repoRoot}
-        headSHA={pr.headSHA}
-        currentFilePath={currentFilePath}
-        onSelectFile={handleSelectFileFromFull}
-      />
-    </aside>
-  ) : (
-    activeChapter && (
+  const leftPanel =
+    viewMode === 'full' ? (
       <aside className="pr-review-panel pr-review-panel--left">
         <div className="pr-review-panel-header">
-          <span className="pr-review-chapter-name">{activeChapter.name}</span>
+          <span className="pr-review-chapter-name">All files</span>
           <div className="pr-review-panel-header-right">
-            <span className="pr-review-chapter-count">
-              {orderedFiles.filter(f => viewedFiles.has(f.path)).length}/{orderedFiles.length}
-            </span>
             <button
               className={`pr-refresh-btn${refreshing ? ' pr-refresh-btn--spinning' : ''}`}
               onClick={handleRefresh}
               disabled={refreshing}
               title="Refresh PR"
               aria-label="Refresh pull request"
-            >↻</button>
-            {showMultipleChapters && (
-              <button
-                className="pr-view-mode-btn"
-                onClick={() => setViewMode('full')}
-                title="Switch to full file view"
-              >All ↗</button>
-            )}
+            >
+              ↻
+            </button>
+            <button
+              className="pr-view-mode-btn pr-view-mode-btn--active"
+              onClick={() => setViewMode('guided')}
+              title="Switch to guided chapter view"
+            >
+              Guided ↩
+            </button>
           </div>
         </div>
-        <ChapterFileList
+        <FullFileList
+          pr={pr}
           repoRoot={repoRoot}
-          prNumber={pr.number}
           headSHA={pr.headSHA}
-          chapter={activeChapter}
-          currentFilePath={activeFile?.path ?? null}
-          onSelectFile={handleSelectFile}
+          currentFilePath={currentFilePath}
+          onSelectFile={handleSelectFileFromFull}
         />
       </aside>
+    ) : (
+      activeChapter && (
+        <aside className="pr-review-panel pr-review-panel--left">
+          <div className="pr-review-panel-header">
+            <span className="pr-review-chapter-name">{activeChapter.name}</span>
+            <div className="pr-review-panel-header-right">
+              <span className="pr-review-chapter-count">
+                {orderedFiles.filter((f) => viewedFiles.has(f.path)).length}/{orderedFiles.length}
+              </span>
+              <button
+                className={`pr-refresh-btn${refreshing ? ' pr-refresh-btn--spinning' : ''}`}
+                onClick={handleRefresh}
+                disabled={refreshing}
+                title="Refresh PR"
+                aria-label="Refresh pull request"
+              >
+                ↻
+              </button>
+              {showMultipleChapters && (
+                <button
+                  className="pr-view-mode-btn"
+                  onClick={() => setViewMode('full')}
+                  title="Switch to full file view"
+                >
+                  All ↗
+                </button>
+              )}
+            </div>
+          </div>
+          <ChapterFileList
+            repoRoot={repoRoot}
+            prNumber={pr.number}
+            headSHA={pr.headSHA}
+            chapter={activeChapter}
+            currentFilePath={activeFile?.path ?? null}
+            onSelectFile={handleSelectFile}
+          />
+        </aside>
+      )
     )
-  )
 
   return (
     <div className="pr-review-view">
+      {/* Top bar: PR title + pop-out */}
+      <div className="pr-review-topbar">
+        <span className="pr-review-topbar-title">
+          #{pr.number} {pr.title}
+        </span>
+        <div className="pr-review-topbar-actions">
+          {onPopOut && (
+            <button
+              className="pr-review-popout-btn"
+              onClick={onPopOut}
+              title="Open in focused window"
+            >
+              ⬡ Pop out
+            </button>
+          )}
+          <button className="pr-review-close-btn" onClick={onClose} aria-label="Close review">
+            ×
+          </button>
+        </div>
+      </div>
+
+      {/* Status checks */}
+      <StatusChecksBar checks={pr.statusChecks ?? []} />
+
+      {/* Review progress bar */}
+      <div
+        className="pr-review-progress-track"
+        aria-label={`${reviewedCount} of ${totalFiles} files reviewed`}
+      >
+        <div className="pr-review-progress-fill" style={{ width: `${reviewPct}%` }} />
+      </div>
+
       {/* Chapter tabs: only in guided mode, only for multi-chapter PRs */}
       {viewMode === 'guided' && showMultipleChapters && activeChapterId && (
         <ChapterNav
@@ -239,8 +295,14 @@ export function PrReviewView({ repoRoot, pr, onClose, onRefresh }: Props) {
               className="pr-review-panel-close"
               onClick={() => setShowRiskFor(null)}
               aria-label="Close risk panel"
-            >×</button>
-            <RiskBreakdownPanel filePath={activeFile.path} riskScore={activeFile.riskScore} repoRoot={repoRoot} />
+            >
+              ×
+            </button>
+            <RiskBreakdownPanel
+              filePath={activeFile.path}
+              riskScore={activeFile.riskScore}
+              repoRoot={repoRoot}
+            />
           </aside>
         )}
       </div>

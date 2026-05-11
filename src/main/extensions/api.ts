@@ -87,7 +87,12 @@ export interface ExtensionAPI {
     registerMenuItem(item: TopBarMenuContribution): Disposable
   }
   shell: {
-    exec(options: { command: 'git' | 'gh'; args: string[]; cwd: string; timeoutMs?: number }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut: boolean }>
+    exec(options: {
+      command: 'git' | 'gh'
+      args: string[]
+      cwd: string
+      timeoutMs?: number
+    }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut: boolean }>
   }
   notifications: {
     showToast(type: ToastType, message: string): void
@@ -105,7 +110,10 @@ export interface ExtensionAPI {
     register(accelerator: string, handler: () => void): Disposable
   }
   ipc: {
-    registerHandler(channel: string, handler: (payload: unknown) => Promise<unknown> | unknown): Disposable
+    registerHandler(
+      channel: string,
+      handler: (payload: unknown) => Promise<unknown> | unknown
+    ): Disposable
   }
   terminal: {
     onSessionCreate(handler: (session: Readonly<SessionSnapshot>) => void): Disposable
@@ -182,9 +190,7 @@ function rebuildViewMenu(): void {
     )
 
     // Rebuild submenu: keep non-extension items, append extension items
-    const baseItems = viewMenu.submenu.items.filter(
-      (item) => !item.label?.startsWith('[ext]')
-    )
+    const baseItems = viewMenu.submenu.items.filter((item) => !item.label?.startsWith('[ext]'))
     const newSubmenu = Menu.buildFromTemplate([
       ...baseItems.map((item) => item as Electron.MenuItemConstructorOptions),
       ...(extItems.length > 0 ? [{ type: 'separator' as const }] : []),
@@ -199,7 +205,11 @@ function rebuildViewMenu(): void {
   }
 }
 
-export function createExtensionAPI(extensionId: string, appVersion: string, getActiveWorkspaceId?: () => string | undefined): ExtensionAPI {
+export function createExtensionAPI(
+  extensionId: string,
+  appVersion: string,
+  getActiveWorkspaceId?: () => string | undefined
+): ExtensionAPI {
   const disposables: Disposable[] = []
 
   function disposable(dispose: () => void): Disposable {
@@ -239,7 +249,9 @@ export function createExtensionAPI(extensionId: string, appVersion: string, getA
       registerPanel(slot: PanelSlot, panel: PanelContribution): Disposable {
         const slotKey = `${extensionId}.panel.${slot}`
         if (globalRegistry.sidebarPanels.has(slotKey)) {
-          throw new Error(`SLOT_ALREADY_REGISTERED: "${slot}" is already registered for extension "${extensionId}"`)
+          throw new Error(
+            `SLOT_ALREADY_REGISTERED: "${slot}" is already registered for extension "${extensionId}"`
+          )
         }
         globalRegistry.sidebarPanels.set(slotKey, { slot, panel })
         return disposable(() => globalRegistry.sidebarPanels.delete(slotKey))
@@ -253,7 +265,12 @@ export function createExtensionAPI(extensionId: string, appVersion: string, getA
       },
     },
     shell: {
-      async exec(options: { command: 'git' | 'gh'; args: string[]; cwd: string; timeoutMs?: number }) {
+      async exec(options: {
+        command: 'git' | 'gh'
+        args: string[]
+        cwd: string
+        timeoutMs?: number
+      }) {
         assertCommandAllowed(options.command)
         return execShell({
           command: options.command,
@@ -305,7 +322,10 @@ export function createExtensionAPI(extensionId: string, appVersion: string, getA
       },
     },
     ipc: {
-      registerHandler(channel: string, handler: (payload: unknown) => Promise<unknown> | unknown): Disposable {
+      registerHandler(
+        channel: string,
+        handler: (payload: unknown) => Promise<unknown> | unknown
+      ): Disposable {
         ipcMain.handle(channel, (_event, payload) => handler(payload))
         return disposable(() => ipcMain.removeHandler(channel))
       },

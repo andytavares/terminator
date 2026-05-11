@@ -74,7 +74,7 @@ const validActivePr = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     github: {
       listOpenPrs: mockListOpenPrs,
       prReviewDetail: mockPrReviewDetail,
@@ -97,11 +97,11 @@ beforeEach(() => {
     updateQueuePrRisk: mockUpdateQueuePrRisk,
     includeClosedPrs: false,
     activePr: null,
-  } as any)
+  } as unknown as ReturnType<typeof usePrReviewStore>)
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('useLoadPrQueue', () => {
@@ -250,7 +250,7 @@ describe('useLoadInlineComments', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     const { result } = renderHook(() => useLoadInlineComments(null))
     await act(async () => {
       await result.current()
@@ -271,7 +271,7 @@ describe('useLoadInlineComments', () => {
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
       setThreads: mockSetThreads,
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     mockPrInlineComments.mockResolvedValue({ comments: [] })
     const { result } = renderHook(() => useLoadInlineComments('/repo'))
     await act(async () => {
@@ -286,7 +286,7 @@ describe('useLoadInlineComments', () => {
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
       setThreads: mockSetThreads,
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     mockPrInlineComments.mockResolvedValue({ error: 'RATE_LIMITED' })
     const { result } = renderHook(() => useLoadInlineComments('/repo'))
     await act(async () => {
@@ -306,7 +306,7 @@ describe('useFetchFileMetrics', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
       activePr: validActivePr,
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     const { result } = renderHook(() => useFetchFileMetrics(null))
     await act(async () => {
       await result.current()
@@ -367,7 +367,7 @@ describe('useFetchFileMetrics', () => {
       activePr: prWithFiles,
       updateFileRiskScore: mockUpdateFileRiskScore,
       updateQueuePrRisk: mockUpdateQueuePrRisk,
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     mockFileMetrics.mockResolvedValue({
       churn90d: 5,
       blastRadius: 2,

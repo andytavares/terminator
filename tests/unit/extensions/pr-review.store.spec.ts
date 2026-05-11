@@ -304,7 +304,13 @@ describe('usePrReviewStore', () => {
 
     it('is a no-op when activePr is null', () => {
       expect(() =>
-        usePrReviewStore.getState().updateFileRiskScore('ch-1', 'src/app.ts', {} as any)
+        usePrReviewStore
+          .getState()
+          .updateFileRiskScore(
+            'ch-1',
+            'src/app.ts',
+            {} as unknown as ReturnType<typeof usePrReviewStore>
+          )
       ).not.toThrow()
     })
   })

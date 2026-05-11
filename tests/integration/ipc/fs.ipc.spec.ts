@@ -33,7 +33,7 @@ function captureHandler(channel: string): (event: unknown, payload?: unknown) =>
 describe('fs IPC handlers', () => {
   const mockGetMainWindow = vi.fn(() => ({
     webContents: { send: vi.fn() },
-  })) as any
+  }))
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -73,7 +73,7 @@ describe('fs IPC handlers', () => {
 
   describe('fs:read-file', () => {
     it('reads file and returns content', async () => {
-      vi.mocked(fs.readFile).mockResolvedValue('file contents' as any)
+      vi.mocked(fs.readFile).mockResolvedValue('file contents' as unknown as Buffer)
       const handler = captureHandler('fs:read-file')
       const result = (await handler({}, { filePath: '/my/file.ts' })) as { content: string }
       expect(result.content).toBe('file contents')
@@ -105,14 +105,16 @@ describe('fs IPC handlers', () => {
       const mockSend = vi.fn()
       mockGetMainWindow.mockReturnValueOnce({ webContents: { send: mockSend } })
       const event = { type: 'change', path: '/my/file.ts' }
-      handlerCapture(event as any)
+      handlerCapture(event as Parameters<typeof handlerCapture>[0])
       expect(mockSend).toHaveBeenCalledWith('fs:changed', event)
     })
 
     it('does not crash when main window is null', () => {
       const handlerCapture = vi.mocked(fsWatcherService.addHandler).mock.calls[0][0]
       mockGetMainWindow.mockReturnValueOnce(null)
-      expect(() => handlerCapture({ type: 'change', path: '/file.ts' } as any)).not.toThrow()
+      expect(() =>
+        handlerCapture({ type: 'change', path: '/file.ts' } as Parameters<typeof handlerCapture>[0])
+      ).not.toThrow()
     })
   })
 })

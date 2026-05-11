@@ -22,6 +22,7 @@ This feature replaces the alphabetical wall-of-files with a **dependency-ordered
 A reviewer clicks the Pull Requests tab in the project nav and lands on a **review queue** — a prioritised, structured overview of all open PRs awaiting their attention, not a flat alphabetical list. The queue surfaces the most important information at a glance: how many PRs are waiting, how many are high-risk, the total estimated review time, and which reviews are already in progress.
 
 The queue is divided into labelled sections:
+
 - **Read these first** — high-risk PRs flagged with a red left border
 - **Quick wins** — low-risk PRs under 100 LOC that can be cleared in under 5 minutes, flagged with a green left border
 - **Larger reviews** — multi-chapter PRs that benefit from a scheduled focus block
@@ -266,7 +267,7 @@ While reviewing a diff, the reviewer sees existing inline comments anchored to s
 - Only open pull requests are shown; closed and merged PRs are out of scope for v1.
 - Per-file "viewed" state is stored locally and is not written to GitHub (GitHub has no API for this). It is keyed per repo + PR number + head commit SHA so a force-push correctly invalidates stale line positions.
 - Coverage metrics require a coverage report (e.g. lcov/cobertura) to already exist from CI; the application does not run the test suite. If no report is available, the coverage chip shows "?" rather than a value.
-- The dependency-ordering algorithm degrades gracefully to a heuristic order when a call graph cannot be built for a given language; the user always sees *some* logical ordering, never silently falls back to alphabetical.
+- The dependency-ordering algorithm degrades gracefully to a heuristic order when a call graph cannot be built for a given language; the user always sees _some_ logical ordering, never silently falls back to alphabetical.
 - Comment editing and deletion are out of scope for v1; submitted comments are treated as immutable in this view.
 - The feature targets the desktop application viewport; mobile/responsive layout is out of scope.
 - Self-hosted GitHub Enterprise support is a stretch goal, not a v1 requirement.

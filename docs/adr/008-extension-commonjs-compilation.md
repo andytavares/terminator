@@ -21,6 +21,7 @@ Two options were considered:
 **Option B — Plain CommonJS JavaScript** for the scaffolding CLI (`scripts/create-extension.js`) and generated extension skeletons (`src/index.js`).
 
 Rationale:
+
 - The git-integration extension is a first-party codebase extension — TypeScript provides type safety and IDE support against the `ExtensionAPI` interface.
 - The scaffolding CLI generates `.js` files (not `.ts`) so users can run generated extensions without a build step. The `manifest.json` `main` field points to `src/index.js`.
 - Vitest handles TypeScript transpilation for unit/integration tests, so tests import `.ts` files directly.

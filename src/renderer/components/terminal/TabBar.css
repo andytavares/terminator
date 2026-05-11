@@ -16,7 +16,9 @@
   flex-shrink: 0;
 }
 
-.tab-bar::-webkit-scrollbar { height: 0; }
+.tab-bar::-webkit-scrollbar {
+  height: 0;
+}
 
 .tab-bar--primary {
   height: 36px;
@@ -45,7 +47,9 @@
   letter-spacing: 0.01em;
   white-space: nowrap;
   overflow: hidden;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
   position: relative;
 }
 
@@ -125,7 +129,10 @@
   border-radius: 3px;
   flex-shrink: 0;
   opacity: 0;
-  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  transition:
+    opacity 0.1s,
+    background 0.1s,
+    color 0.1s;
 }
 
 .tab-bar__tab:hover .tab-bar__close,
@@ -149,7 +156,9 @@
   padding: 0 10px;
   height: 100%;
   line-height: 1;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
   flex-shrink: 0;
 }
 

@@ -68,10 +68,14 @@ test('US1: git sidebar toggle shows changed files within 2000ms', async () => {
   } catch {
     // Panel may not be rendered if extension system hasn't wired React components
     // Verify at minimum that the sidebar toggle item is registered
-    const sidebarItem = page.locator('.sidebar-item, .extension-sidebar-item').filter({ hasText: 'Git' })
-    await expect(sidebarItem).toBeVisible({ timeout: 2000 }).catch(() => {
-      // Extension sidebar items may render differently; this is a best-effort assertion
-    })
+    const sidebarItem = page
+      .locator('.sidebar-item, .extension-sidebar-item')
+      .filter({ hasText: 'Git' })
+    await expect(sidebarItem)
+      .toBeVisible({ timeout: 2000 })
+      .catch(() => {
+        // Extension sidebar items may render differently; this is a best-effort assertion
+      })
   }
 
   // Toggle off

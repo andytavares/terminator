@@ -8,7 +8,10 @@ export function activate(api: ExtensionAPI): void {
   const enabled = api.settings.get<boolean>('terminator.git-integration.git.enabled') ?? true
   if (!enabled) return
 
-  const registerFn = (channel: string, handler: (payload: unknown) => Promise<unknown> | unknown) => {
+  const registerFn = (
+    channel: string,
+    handler: (payload: unknown) => Promise<unknown> | unknown
+  ) => {
     disposables.push(api.ipc.registerHandler(channel, handler))
   }
   registerGitExtensionHandlers(registerFn)

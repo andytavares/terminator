@@ -46,10 +46,10 @@ beforeEach(() => {
       ['ws-1', []],
       ['ws-2', []],
     ]),
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSessionStore).mockReturnValue({
     getBellCountForProject: mockGetBellForProject,
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
   mockGetBellForProject.mockReturnValue(0)
 })
 
@@ -79,7 +79,7 @@ describe('WorkspaceRail', () => {
       setActiveWorkspace: mockSetActiveWorkspace,
       deleteWorkspace: mockDeleteWorkspace,
       projectsByWorkspaceId: new Map(),
-    } as any)
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
     const { container } = render(<WorkspaceRail />)
     expect(container.querySelector('.ws-rail')).toBeTruthy()
   })

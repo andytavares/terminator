@@ -63,7 +63,7 @@
 
 ### Tests for User Story 1 (TDD — write and verify FAILING before T025)
 
-- [X] T022 Write failing e2e tests in tests/e2e/workspace.spec.ts covering all 7 acceptance scenarios from spec.md US1: create workspace (FR-001), sidebar display (FR-002), collapse/expand with initials avatar (FR-003), right-click context menu (FR-004), edit workspace (FR-005), remove with confirmation (FR-006), duplicate name inline error (FR-001)
+- [x] T022 Write failing e2e tests in tests/e2e/workspace.spec.ts covering all 7 acceptance scenarios from spec.md US1: create workspace (FR-001), sidebar display (FR-002), collapse/expand with initials avatar (FR-003), right-click context menu (FR-004), edit workspace (FR-005), remove with confirmation (FR-006), duplicate name inline error (FR-001)
 - [x] T023 [P] Write failing unit tests in tests/unit/storage/workspace-store.spec.ts: create returns workspace, create rejects duplicate name with DUPLICATE_NAME error, update rejects duplicate name, list returns all workspaces, delete removes workspace and all its projects
 - [x] T024 [P] Write failing unit tests in tests/unit/schemas/workspace.schema.spec.ts: valid workspace passes, empty name fails, name over 100 chars fails, invalid hex color fails, more than 20 tags fails
 
@@ -91,7 +91,7 @@
 
 ### Tests for User Story 2 (TDD — write and verify FAILING before T036)
 
-- [X] T034 Write failing e2e tests in tests/e2e/project.spec.ts covering all 5 acceptance scenarios from spec.md US2: add project prompt (FR-007), project appears in sidebar (FR-008), click project opens tabbed view (FR-009), "+" opens new tab (FR-010), clicking between tabs shows independent content (FR-010)
+- [x] T034 Write failing e2e tests in tests/e2e/project.spec.ts covering all 5 acceptance scenarios from spec.md US2: add project prompt (FR-007), project appears in sidebar (FR-008), click project opens tabbed view (FR-009), "+" opens new tab (FR-010), clicking between tabs shows independent content (FR-010)
 - [x] T035 [P] Write failing unit tests in tests/unit/storage/workspace-store.spec.ts (project section): create project returns project, create rejects duplicate name within workspace but allows same name in different workspace, list projects for workspace, delete project
 
 ### Implementation for User Story 2
@@ -116,9 +116,9 @@
 
 ### Tests for User Story 3 (TDD — write and verify FAILING before T046)
 
-- [X] T043 Write failing e2e tests in tests/e2e/terminal.spec.ts covering all 4 acceptance scenarios from spec.md US3 plus keyboard scenarios: session continues running in background (FR-012), returning shows current state (FR-013), buffer and scroll preserved on return (FR-013), Cmd+Left/Right cycles tabs, Cmd+T opens new tab; add SC-002 timing assertion: measure elapsed time from workspace-switch click to terminal buffer visible and assert < 500ms using performance.now() in the Playwright test
+- [x] T043 Write failing e2e tests in tests/e2e/terminal.spec.ts covering all 4 acceptance scenarios from spec.md US3 plus keyboard scenarios: session continues running in background (FR-012), returning shows current state (FR-013), buffer and scroll preserved on return (FR-013), Cmd+Left/Right cycles tabs, Cmd+T opens new tab; add SC-002 timing assertion: measure elapsed time from workspace-switch click to terminal buffer visible and assert < 500ms using performance.now() in the Playwright test
 - [x] T044 [P] Write failing unit tests in tests/unit/terminal/pty-manager.spec.ts: spawn creates PTY and returns sessionId, resize calls pty.resize, write sends data to PTY, kill terminates process and emits exit event
-- [X] T045 [P] Write failing integration tests in tests/integration/ipc/terminal.ipc.spec.ts: terminal:create round-trip returns sessionId, terminal:input routes data to correct PTY, terminal:close terminates PTY
+- [x] T045 [P] Write failing integration tests in tests/integration/ipc/terminal.ipc.spec.ts: terminal:create round-trip returns sessionId, terminal:input routes data to correct PTY, terminal:close terminates PTY
 
 ### Implementation for User Story 3
 
@@ -143,7 +143,7 @@
 
 ### Tests for User Story 7 (TDD — write and verify FAILING before T055)
 
-- [X] T054 Write failing e2e tests in tests/e2e/terminal.spec.ts (agent badge section) covering US7 acceptance scenarios: agent tab shows badge (FR-035), human tab shows no badge, switching between human and agent tabs preserves both sessions (FR-036), closing agent tab cleans up resources identically to human tab
+- [x] T054 Write failing e2e tests in tests/e2e/terminal.spec.ts (agent badge section) covering US7 acceptance scenarios: agent tab shows badge (FR-035), human tab shows no badge, switching between human and agent tabs preserves both sessions (FR-036), closing agent tab cleans up resources identically to human tab
 
 ### Implementation for User Story 7
 
@@ -163,7 +163,7 @@
 
 ### Tests for User Story 4 (TDD — write and verify FAILING before T059)
 
-- [X] T058 Write failing e2e tests in tests/e2e/terminal.spec.ts (cleanup section) covering US4 acceptance scenarios: close tab terminates PTY (FR-014), resources freed within 2s (SC-003), app quit terminates all sessions (FR-015), relaunch after force-close cleans up orphans (FR-016)
+- [x] T058 Write failing e2e tests in tests/e2e/terminal.spec.ts (cleanup section) covering US4 acceptance scenarios: close tab terminates PTY (FR-014), resources freed within 2s (SC-003), app quit terminates all sessions (FR-015), relaunch after force-close cleans up orphans (FR-016)
 - [x] T059 [P] Expand tests/unit/terminal/pty-manager.spec.ts: killAll() terminates all tracked PTY processes, kill() emits cleanup event, orphan detection returns sessions from previous run
 
 ### Implementation for User Story 4
@@ -185,7 +185,7 @@
 
 ### Tests for User Story 5 (TDD — write and verify FAILING before T065)
 
-- [X] T064 Write failing e2e tests in tests/e2e/settings.spec.ts covering all 5 acceptance scenarios from spec.md US5: global settings accessible (FR-019), appearance section with theme toggle (FR-020), theme switches immediately (FR-018/FR-020), workspace settings panel (FR-021), workspace setting overrides global (FR-022), scrollback limit configuration (FR-020a); add SC-007 timing assertion: measure elapsed time from theme toggle click to CSS variable change on document.documentElement and assert < 200ms
+- [x] T064 Write failing e2e tests in tests/e2e/settings.spec.ts covering all 5 acceptance scenarios from spec.md US5: global settings accessible (FR-019), appearance section with theme toggle (FR-020), theme switches immediately (FR-018/FR-020), workspace settings panel (FR-021), workspace setting overrides global (FR-022), scrollback limit configuration (FR-020a); add SC-007 timing assertion: measure elapsed time from theme toggle click to CSS variable change on document.documentElement and assert < 200ms
 - [x] T065 [P] Write failing unit tests in tests/unit/storage/settings-store.spec.ts: getGlobalSettings returns defaults, updateGlobalSettings merges patch, getWorkspaceSettings returns global defaults when no override set, updateWorkspaceSettings stores workspace-scoped override, workspace override takes precedence over global
 
 ### Implementation for User Story 5
@@ -212,7 +212,7 @@
 
 ### Tests for User Story 6 (TDD — write and verify FAILING before T076)
 
-- [X] T075 Write failing e2e tests in tests/e2e/extension.spec.ts covering all 5 acceptance scenarios from spec.md US6 using a fixture sample extension: install from local path (FR-025), auto-reload on restart (FR-026), disable removes contributions (FR-027), extension settings appear in panel (FR-023), malformed extension shows error and app remains stable (FR-028)
+- [x] T075 Write failing e2e tests in tests/e2e/extension.spec.ts covering all 5 acceptance scenarios from spec.md US6 using a fixture sample extension: install from local path (FR-025), auto-reload on restart (FR-026), disable removes contributions (FR-027), extension settings appear in panel (FR-023), malformed extension shows error and app remains stable (FR-028)
 - [x] T076 [P] Write failing unit tests in tests/unit/extensions/extension-host.spec.ts: load() calls activate() with ExtensionAPI object, activate() error sets extension status to 'error' without crashing host, unload() calls deactivate() and disposes all registrations, invalid manifest rejected with INVALID_MANIFEST error, ExtensionAPI.settings.register() adds section to extension registry
 
 ### Implementation for User Story 6
@@ -236,13 +236,13 @@
 
 **Purpose**: Final validation, documentation accuracy, performance verification, and cross-cutting quality checks.
 
-- [X] T086 [P] Run full Playwright e2e suite (npm run test:e2e) and verify all acceptance scenarios across workspace.spec.ts, project.spec.ts, terminal.spec.ts, settings.spec.ts, extension.spec.ts pass — fix any regressions
-- [X] T087 [P] Run vitest coverage (npm run test:coverage) — identify any uncovered branches in pty-manager.ts, extension-host.ts, workspace-store.ts, and add targeted unit tests to reach meaningful coverage of critical paths
+- [x] T086 [P] Run full Playwright e2e suite (npm run test:e2e) and verify all acceptance scenarios across workspace.spec.ts, project.spec.ts, terminal.spec.ts, settings.spec.ts, extension.spec.ts pass — fix any regressions
+- [x] T087 [P] Run vitest coverage (npm run test:coverage) — identify any uncovered branches in pty-manager.ts, extension-host.ts, workspace-store.ts, and add targeted unit tests to reach meaningful coverage of critical paths
 - [x] T088 [P] Verify all four ADRs in docs/adr/ accurately reflect the final implementation — update any section that diverged during development
-- [X] T089 [P] Update quickstart.md to reflect final npm scripts, actual setup commands, and extension development workflow with reference to the sample extension in tests/fixtures/
-- [X] T090 Run full lint + type check (npm run lint) — resolve all TypeScript errors and ESLint warnings; run npm run format to normalize formatting
-- [X] T092 Write SC-008 concurrent session load test in tests/e2e/terminal.spec.ts: spawn 20 terminal sessions across multiple projects, background all but one, then measure UI responsiveness (click latency, tab switch timing) while all 20 are backgrounded — assert no degradation exceeds 500ms (SC-008 validation)
-- [X] T093 [P] Write SC-004 startup timing test in tests/e2e/workspace.spec.ts: measure elapsed time from electron app launch to first interactive state (sidebar visible, ready to create workspace) using Playwright \_electron.launch() timestamp vs first UI paint — assert < 3000ms (SC-004 validation)
+- [x] T089 [P] Update quickstart.md to reflect final npm scripts, actual setup commands, and extension development workflow with reference to the sample extension in tests/fixtures/
+- [x] T090 Run full lint + type check (npm run lint) — resolve all TypeScript errors and ESLint warnings; run npm run format to normalize formatting
+- [x] T092 Write SC-008 concurrent session load test in tests/e2e/terminal.spec.ts: spawn 20 terminal sessions across multiple projects, background all but one, then measure UI responsiveness (click latency, tab switch timing) while all 20 are backgrounded — assert no degradation exceeds 500ms (SC-008 validation)
+- [x] T093 [P] Write SC-004 startup timing test in tests/e2e/workspace.spec.ts: measure elapsed time from electron app launch to first interactive state (sidebar visible, ready to create workspace) using Playwright \_electron.launch() timestamp vs first UI paint — assert < 3000ms (SC-004 validation)
 - [x] T094 [P] Implement Electron application menu in src/main/index.ts: add standard File (Quit), Edit (Cut/Copy/Paste/Select All), View (Toggle Sidebar, Open Settings via Cmd+,), and Window (Close Tab via Cmd+W) menu items — Cmd+W dispatches tab-close to renderer via webContents.send; ensure Cmd+W is consistent with reserved shortcut list in extension-api.md and preload.ts keyboard guard
 
 ---

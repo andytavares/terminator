@@ -32,7 +32,11 @@ export async function getStatus(repoRoot: string, maxFiles: number = 500): Promi
   return { ...partial, branch: branch || 'HEAD' }
 }
 
-export async function getDiff(repoRoot: string, filePath: string, staged: boolean): Promise<FileDiff> {
+export async function getDiff(
+  repoRoot: string,
+  filePath: string,
+  staged: boolean
+): Promise<FileDiff> {
   const args = staged
     ? ['diff', '--cached', '--unified=3', '--', filePath]
     : ['diff', '--unified=3', '--', filePath]
@@ -124,9 +128,7 @@ export async function listWorktrees(dirPath: string): Promise<WorktreeInfo[]> {
     if (wtLine) {
       worktrees.push({
         path: wtLine.slice('worktree '.length),
-        branch: branchLine
-          ? branchLine.slice('branch refs/heads/'.length)
-          : 'HEAD',
+        branch: branchLine ? branchLine.slice('branch refs/heads/'.length) : 'HEAD',
         isMain: i === 0,
         head: headLine ? headLine.slice('HEAD '.length) : '',
       })

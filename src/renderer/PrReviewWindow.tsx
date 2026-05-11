@@ -12,7 +12,7 @@ export function PrReviewWindow(): JSX.Element {
 
   useEffect(() => {
     loadSettings()
-  }, [])
+  }, [loadSettings])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', resolvedTheme)

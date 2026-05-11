@@ -38,7 +38,11 @@ export class FsWatcherService {
 
   private emit(event: FsChangeEvent): void {
     for (const h of this.handlers) {
-      try { h(event) } catch { /* ignore handler errors */ }
+      try {
+        h(event)
+      } catch {
+        /* ignore handler errors */
+      }
     }
   }
 

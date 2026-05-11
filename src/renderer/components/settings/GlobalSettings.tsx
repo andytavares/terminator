@@ -3,7 +3,8 @@ import { useSettingsStore } from '../../stores/settings.store'
 import './SettingsPanel.css'
 
 export function GlobalSettings(): JSX.Element {
-  const { globalSettings, updateGlobalTheme, updateScrollbackLimit, updateWorktreeBaseDir } = useSettingsStore()
+  const { globalSettings, updateGlobalTheme, updateScrollbackLimit, updateWorktreeBaseDir } =
+    useSettingsStore()
 
   if (!globalSettings) return <div>Loading...</div>
 
@@ -76,7 +77,8 @@ export function GlobalSettings(): JSX.Element {
           onBlur={(e) => updateWorktreeBaseDir(e.target.value.trim())}
         />
         <span className="settings-section__hint">
-          Where new git worktrees are created. Leave empty for the default (<code>.worktrees</code> inside the repo).
+          Where new git worktrees are created. Leave empty for the default (<code>.worktrees</code>{' '}
+          inside the repo).
         </span>
       </div>
     </div>

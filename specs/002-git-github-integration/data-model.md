@@ -14,11 +14,11 @@ Represents the status of a single file in the working directory.
 
 ```typescript
 interface GitFileStatus {
-  path: string              // Relative path from repo root
-  oldPath?: string          // Previous path for renamed/copied files
-  indexStatus: FileStatus   // Staged (index) status
+  path: string // Relative path from repo root
+  oldPath?: string // Previous path for renamed/copied files
+  indexStatus: FileStatus // Staged (index) status
   workingStatus: FileStatus // Working tree (unstaged) status
-  isBinary: boolean         // True if file cannot be diffed as text
+  isBinary: boolean // True if file cannot be diffed as text
 }
 
 type FileStatus =
@@ -34,6 +34,7 @@ type FileStatus =
 ```
 
 **State transitions**:
+
 - `untracked` → `added` (after `git add`)
 - `modified` → `unmodified` (after `git add` + `git commit`)
 - `conflict` → blocks staging until resolved
@@ -44,12 +45,12 @@ The full status of a working directory, returned by `git:status`.
 
 ```typescript
 interface GitStatus {
-  repoRoot: string           // Absolute path to the .git directory root
-  branch: string             // Current branch name (or 'HEAD' if detached)
-  files: GitFileStatus[]     // All changed files (up to maxDisplayedFiles)
-  truncated: boolean         // True if file count exceeded git.maxDisplayedFiles
-  totalCount: number         // Actual total count before truncation
-  hasConflicts: boolean      // True if any file has indexStatus or workingStatus === 'conflict'
+  repoRoot: string // Absolute path to the .git directory root
+  branch: string // Current branch name (or 'HEAD' if detached)
+  files: GitFileStatus[] // All changed files (up to maxDisplayedFiles)
+  truncated: boolean // True if file count exceeded git.maxDisplayedFiles
+  totalCount: number // Actual total count before truncation
+  hasConflicts: boolean // True if any file has indexStatus or workingStatus === 'conflict'
 }
 ```
 
@@ -59,25 +60,25 @@ The parsed diff for a single file. Returned by `git:diff-file`.
 
 ```typescript
 interface FileDiff {
-  path: string           // Current file path
-  oldPath?: string       // Previous path (renames only)
-  isBinary: boolean      // True if binary diff — hunks will be empty
-  truncated: boolean     // True if diff exceeded size limit (500KB)
+  path: string // Current file path
+  oldPath?: string // Previous path (renames only)
+  isBinary: boolean // True if binary diff — hunks will be empty
+  truncated: boolean // True if diff exceeded size limit (500KB)
   hunks: DiffHunk[]
 }
 
 interface DiffHunk {
-  header: string         // Raw @@ header line (e.g., "@@ -1,4 +1,6 @@ function foo")
-  oldStart: number       // Starting line in old file
-  oldCount: number       // Number of lines from old file
-  newStart: number       // Starting line in new file
-  newCount: number       // Number of lines from new file
+  header: string // Raw @@ header line (e.g., "@@ -1,4 +1,6 @@ function foo")
+  oldStart: number // Starting line in old file
+  oldCount: number // Number of lines from old file
+  newStart: number // Starting line in new file
+  newCount: number // Number of lines from new file
   lines: DiffLine[]
 }
 
 interface DiffLine {
   type: 'add' | 'remove' | 'context'
-  content: string        // Line content (without leading +/-/ prefix)
+  content: string // Line content (without leading +/-/ prefix)
   oldLineNumber?: number // Present for 'remove' and 'context' lines
   newLineNumber?: number // Present for 'add' and 'context' lines
 }
@@ -89,13 +90,14 @@ Input to a `git commit` operation.
 
 ```typescript
 interface CommitPayload {
-  repoRoot: string       // Absolute path to repo root
-  message: string        // Commit message (must be non-empty)
-  signOff: boolean       // Append Signed-off-by trailer if true
+  repoRoot: string // Absolute path to repo root
+  message: string // Commit message (must be non-empty)
+  signOff: boolean // Append Signed-off-by trailer if true
 }
 ```
 
 **Validation rules**:
+
 - `message` must be non-empty after trimming
 - At least one file must be staged (enforced at UI layer before calling IPC)
 
@@ -129,8 +131,8 @@ interface PrCreatePayload {
   repoRoot: string
   title: string
   body: string
-  baseBranch: string     // Target branch (e.g., 'main')
-  isDraft: boolean       // True to create as draft PR
+  baseBranch: string // Target branch (e.g., 'main')
+  isDraft: boolean // True to create as draft PR
 }
 ```
 
@@ -144,14 +146,15 @@ Options for the sandboxed shell execution bridge.
 
 ```typescript
 interface ShellExecOptions {
-  command: 'git' | 'gh'  // Allowlisted commands only
+  command: 'git' | 'gh' // Allowlisted commands only
   args: string[]
-  cwd: string            // Must be within the current project root (validated server-side)
-  timeoutMs?: number     // Default: 10000 (10s)
+  cwd: string // Must be within the current project root (validated server-side)
+  timeoutMs?: number // Default: 10000 (10s)
 }
 ```
 
 **Validation rules**:
+
 - `command` must be `'git'` or `'gh'` (enforced by Zod enum in `shell.schema.ts`)
 - `cwd` must be a subdirectory of or equal to the current workspace's `folderPath` (enforced in `shell.ipc.ts`)
 - `args` must not contain `null` bytes or path traversal sequences (`../` beyond repo root)
@@ -179,9 +182,9 @@ An event emitted by the `fs:changed` push channel when files in the project dire
 
 ```typescript
 interface FsChangeEvent {
-  projectRoot: string       // Absolute path being watched
-  eventType: 'change' | 'rename'  // From Node.js fs.watch
-  filename: string | null   // Relative path of changed file (null on some platforms)
+  projectRoot: string // Absolute path being watched
+  eventType: 'change' | 'rename' // From Node.js fs.watch
+  filename: string | null // Relative path of changed file (null on some platforms)
 }
 ```
 

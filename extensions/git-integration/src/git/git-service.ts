@@ -30,7 +30,11 @@ export async function getStatus(repoRoot: string, maxFiles: number = 500): Promi
   return { ...partial, branch: branch || 'HEAD' }
 }
 
-export async function getDiff(repoRoot: string, filePath: string, staged: boolean): Promise<FileDiff> {
+export async function getDiff(
+  repoRoot: string,
+  filePath: string,
+  staged: boolean
+): Promise<FileDiff> {
   const args = staged
     ? ['diff', '--cached', '--unified=3', '--', filePath]
     : ['diff', '--unified=3', '--', filePath]

@@ -22,7 +22,14 @@ vi.mock('../../src/components/pr-review/ReviewDiffPane', () => ({
     onFinishChapter,
     onShowRisk,
     onPrevFile,
-  }: any) => (
+  }: {
+    onPause: () => void
+    onOpenSubmit: () => void
+    onMarkViewed: () => void
+    onFinishChapter: () => void
+    onShowRisk: () => void
+    onPrevFile: () => void
+  }) => (
     <div data-testid="review-diff-pane">
       <button onClick={onPause}>Pause</button>
       <button onClick={onOpenSubmit}>Submit</button>
@@ -37,7 +44,7 @@ vi.mock('../../src/components/pr-review/RiskBreakdownPanel', () => ({
   RiskBreakdownPanel: () => <div data-testid="risk-panel" />,
 }))
 vi.mock('../../src/components/pr-review/ReviewSubmitPanel', () => ({
-  ReviewSubmitPanel: ({ onClose }: any) => (
+  ReviewSubmitPanel: ({ onClose }: { onClose: () => void }) => (
     <div data-testid="submit-panel">
       <button onClick={onClose}>CloseSubmit</button>
     </div>
@@ -102,7 +109,7 @@ const mockPr = {
 const mockClose = vi.fn()
 const mockRefresh = vi.fn().mockResolvedValue(undefined)
 
-function setupStore(overrides: any = {}) {
+function setupStore(overrides: Record<string, unknown> = {}) {
   vi.mocked(usePrReviewStore).mockReturnValue({
     currentChapterId: null,
     currentFilePath: null,
@@ -113,7 +120,7 @@ function setupStore(overrides: any = {}) {
     markFileViewed: mockMarkFileViewed,
     setPaused: mockSetPaused,
     ...overrides,
-  } as any)
+  } as unknown as ReturnType<typeof usePrReviewStore>)
 }
 
 beforeEach(() => {
@@ -121,7 +128,10 @@ beforeEach(() => {
   setupStore()
 })
 
-async function renderView(prOverrides: any = {}, storeOverrides: any = {}) {
+async function renderView(
+  prOverrides: Record<string, unknown> = {},
+  storeOverrides: Record<string, unknown> = {}
+) {
   const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
   setupStore(storeOverrides)
   return render(

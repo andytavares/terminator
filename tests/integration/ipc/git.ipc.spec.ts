@@ -215,7 +215,9 @@ describe('core git IPC handlers', () => {
 
   it('git:list-worktrees returns worktrees on success', async () => {
     const trees = [{ path: '/wt', branch: 'feature', isMain: false }]
-    vi.mocked(gitService.listWorktrees).mockResolvedValue(trees as any)
+    vi.mocked(gitService.listWorktrees).mockResolvedValue(
+      trees as unknown as Awaited<ReturnType<typeof gitService.listWorktrees>>
+    )
     const handler = getHandler('git:list-worktrees')
     const result = await handler({}, { path: '/repo' })
     expect(result).toMatchObject({ worktrees: trees })

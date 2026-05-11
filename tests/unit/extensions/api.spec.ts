@@ -171,8 +171,16 @@ describe('api.sidebar.registerPanel', () => {
     const api2 = createExtensionAPI('ext.two', '0.1.0')
 
     expect(() => {
-      api1.sidebar.registerPanel('right-sidebar', { id: 'p1', title: 'P1', component: {} as unknown })
-      api2.sidebar.registerPanel('right-sidebar', { id: 'p2', title: 'P2', component: {} as unknown })
+      api1.sidebar.registerPanel('right-sidebar', {
+        id: 'p1',
+        title: 'P1',
+        component: {} as unknown,
+      })
+      api2.sidebar.registerPanel('right-sidebar', {
+        id: 'p2',
+        title: 'P2',
+        component: {} as unknown,
+      })
     }).not.toThrow()
   })
 })

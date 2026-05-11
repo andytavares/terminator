@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { PrReviewTab } from '../../src/components/pr-review/PrReviewTab'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
+import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
 
 vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
@@ -15,7 +16,17 @@ vi.mock('../../src/hooks/usePrReview', () => ({
 }))
 
 vi.mock('../../src/components/pr-review/ReviewQueue', () => ({
-  ReviewQueue: ({ onOpenPr, onRefresh, onLoadMore, onToggleClosedPrs }: any) => (
+  ReviewQueue: ({
+    onOpenPr,
+    onRefresh,
+    onLoadMore,
+    onToggleClosedPrs,
+  }: {
+    onOpenPr: (pr: { number: number; title: string }) => void
+    onRefresh: (opts: { search: string }) => void
+    onLoadMore: () => void
+    onToggleClosedPrs: (v: boolean) => void
+  }) => (
     <div data-testid="review-queue">
       <button onClick={() => onOpenPr({ number: 1, title: 'Test PR' })}>Open PR</button>
       <button onClick={() => onRefresh({ search: 'test' })}>Refresh</button>
@@ -26,7 +37,7 @@ vi.mock('../../src/components/pr-review/ReviewQueue', () => ({
 }))
 
 vi.mock('../../src/components/pr-review/PrReviewView', () => ({
-  PrReviewView: ({ onClose, onRefresh }: any) => (
+  PrReviewView: ({ onClose, onRefresh }: { onClose: () => void; onRefresh: () => void }) => (
     <div data-testid="pr-review-view">
       <button onClick={onClose}>Close PR</button>
       <button onClick={onRefresh}>Refresh PR</button>
@@ -51,15 +62,17 @@ const defaultStoreState = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as any).electronAPI = {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     github: { sessionGet: vi.fn().mockResolvedValue({ session: null }) },
-    window: { openPrReview: vi.fn() },
+    window: { openPrReview: vi.fn(), onPrReviewWindowChange: vi.fn().mockReturnValue(() => {}) },
   }
-  vi.mocked(usePrReviewStore).mockReturnValue(defaultStoreState as any)
+  vi.mocked(usePrReviewStore).mockReturnValue(
+    defaultStoreState as unknown as ReturnType<typeof usePrReviewStore>
+  )
 })
 
 afterEach(() => {
-  delete (globalThis as any).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('PrReviewTab', () => {
@@ -76,8 +89,8 @@ describe('PrReviewTab', () => {
   it('renders PrReviewView when activePr is set', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
-      activePr: { number: 1, title: 'My PR' } as any,
-    } as any)
+      activePr: { number: 1, title: 'My PR' } as unknown as PrReviewDetail,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<PrReviewTab repoRoot="/repo" />)
     expect(screen.getByTestId('pr-review-view')).toBeTruthy()
   })
@@ -90,14 +103,17 @@ describe('PrReviewTab', () => {
   it('calls openPrReview when pop out button is clicked', () => {
     render(<PrReviewTab repoRoot="/repo" />)
     fireEvent.click(screen.getByTitle('Open in new window'))
-    expect((globalThis as any).electronAPI.window.openPrReview).toHaveBeenCalledWith('/repo')
+    expect(
+      (window.electronAPI as unknown as { window: { openPrReview: ReturnType<typeof vi.fn> } })
+        .window.openPrReview
+    ).toHaveBeenCalledWith('/repo')
   })
 
   it('closes PR view when onClose is called', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
-      activePr: { number: 1, title: 'My PR' } as any,
-    } as any)
+      activePr: { number: 1, title: 'My PR' } as unknown as PrReviewDetail,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<PrReviewTab repoRoot="/repo" />)
     fireEvent.click(screen.getByText('Close PR'))
     expect(mockSetActivePr).toHaveBeenCalledWith(null)

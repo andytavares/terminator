@@ -61,7 +61,7 @@ beforeEach(() => {
     viewedFiles: new Set<string>(),
     fileOrderOverrides: {},
     reorderFiles: mockReorderFiles,
-  } as any)
+  } as unknown as ReturnType<typeof usePrReviewStore>)
 })
 
 describe('ChapterFileList', () => {
@@ -105,7 +105,7 @@ describe('ChapterFileList', () => {
       viewedFiles: new Set(['src/foo.ts']),
       fileOrderOverrides: {},
       reorderFiles: mockReorderFiles,
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ChapterFileList {...defaultProps} />)
     expect(screen.getByLabelText('Viewed')).toBeTruthy()
   })
@@ -125,7 +125,7 @@ describe('ChapterFileList', () => {
       viewedFiles: new Set<string>(),
       fileOrderOverrides: { 'ch-1': ['src/bar.ts', 'src/foo.ts'] },
       reorderFiles: mockReorderFiles,
-    } as any)
+    } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ChapterFileList {...defaultProps} />)
     const rows = screen.getAllByRole('button')
     expect(rows[0].textContent).toContain('bar.ts')

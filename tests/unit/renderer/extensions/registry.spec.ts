@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import type { ComponentType } from 'react'
+
+const NullComponent = null as unknown as ComponentType<Record<string, unknown>>
+
 import {
   useExtensionRegistry,
   matchesAccelerator,
@@ -21,32 +25,32 @@ describe('useExtensionRegistry', () => {
 
   describe('registerSidebarPanel', () => {
     it('adds panel to sidebarPanels map', () => {
-      const panel = { id: 'git', label: 'Git', component: {} as any }
+      const panel = { id: 'git', label: 'Git', component: NullComponent }
       useExtensionRegistry.getState().registerSidebarPanel(panel)
       expect(useExtensionRegistry.getState().sidebarPanels.has('git')).toBe(true)
     })
 
     it('opens panel when defaultOpen is true', () => {
-      const panel = { id: 'git', label: 'Git', component: {} as any, defaultOpen: true }
+      const panel = { id: 'git', label: 'Git', component: NullComponent, defaultOpen: true }
       useExtensionRegistry.getState().registerSidebarPanel(panel)
       expect(useExtensionRegistry.getState().openPanels.has('git')).toBe(true)
     })
 
     it('does not open panel when defaultOpen is false', () => {
-      const panel = { id: 'git', label: 'Git', component: {} as any, defaultOpen: false }
+      const panel = { id: 'git', label: 'Git', component: NullComponent, defaultOpen: false }
       useExtensionRegistry.getState().registerSidebarPanel(panel)
       expect(useExtensionRegistry.getState().openPanels.has('git')).toBe(false)
     })
 
     it('returns dispose function that removes the panel', () => {
-      const panel = { id: 'git', label: 'Git', component: {} as any }
+      const panel = { id: 'git', label: 'Git', component: NullComponent }
       const dispose = useExtensionRegistry.getState().registerSidebarPanel(panel)
       dispose()
       expect(useExtensionRegistry.getState().sidebarPanels.has('git')).toBe(false)
     })
 
     it('dispose also removes panel from openPanels', () => {
-      const panel = { id: 'git', label: 'Git', component: {} as any, defaultOpen: true }
+      const panel = { id: 'git', label: 'Git', component: NullComponent, defaultOpen: true }
       const dispose = useExtensionRegistry.getState().registerSidebarPanel(panel)
       dispose()
       expect(useExtensionRegistry.getState().openPanels.has('git')).toBe(false)
@@ -55,20 +59,20 @@ describe('useExtensionRegistry', () => {
 
   describe('registerProjectTab', () => {
     it('adds tab to projectTabs map', () => {
-      const tab = { id: 'pr-review', label: 'PR Review', component: {} as any }
+      const tab = { id: 'pr-review', label: 'PR Review', component: NullComponent }
       useExtensionRegistry.getState().registerProjectTab(tab)
       expect(useExtensionRegistry.getState().projectTabs.has('pr-review')).toBe(true)
     })
 
     it('returns dispose function that removes the tab', () => {
-      const tab = { id: 'pr-review', label: 'PR Review', component: {} as any }
+      const tab = { id: 'pr-review', label: 'PR Review', component: NullComponent }
       const dispose = useExtensionRegistry.getState().registerProjectTab(tab)
       dispose()
       expect(useExtensionRegistry.getState().projectTabs.has('pr-review')).toBe(false)
     })
 
     it('clears activeProjectTabId when active tab is disposed', () => {
-      const tab = { id: 'pr-review', label: 'PR Review', component: {} as any }
+      const tab = { id: 'pr-review', label: 'PR Review', component: NullComponent }
       const dispose = useExtensionRegistry.getState().registerProjectTab(tab)
       useExtensionRegistry.setState({ activeProjectTabId: 'pr-review' })
       dispose()
@@ -76,7 +80,7 @@ describe('useExtensionRegistry', () => {
     })
 
     it('does not clear activeProjectTabId when a different tab is disposed', () => {
-      const tab = { id: 'pr-review', label: 'PR Review', component: {} as any }
+      const tab = { id: 'pr-review', label: 'PR Review', component: NullComponent }
       const dispose = useExtensionRegistry.getState().registerProjectTab(tab)
       useExtensionRegistry.setState({ activeProjectTabId: 'other-tab' })
       dispose()

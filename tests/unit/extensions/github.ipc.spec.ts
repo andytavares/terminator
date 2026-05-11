@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const { execFileMock } = vi.hoisted(() => {
   const CUSTOM_SYM = Symbol.for('nodejs.util.promisify.custom')
   const mock = vi.fn()
-  ;(mock as any)[CUSTOM_SYM] = vi.fn()
+  ;(mock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[CUSTOM_SYM] = vi.fn()
   return { execFileMock: mock }
 })
 vi.mock('child_process', () => ({ execFile: execFileMock }))
@@ -13,6 +13,9 @@ vi.mock('child_process', () => ({ execFile: execFileMock }))
 const storeData: Record<string, unknown> = {}
 vi.mock('electron-store', () => ({
   default: class MockStore {
+    get store() {
+      return storeData
+    }
     get(key: string) {
       return storeData[key]
     }
@@ -37,7 +40,9 @@ function register(channel: string, handler: Handler) {
 }
 
 function customMock() {
-  return (execFileMock as any)[Symbol.for('nodejs.util.promisify.custom')]
+  return (execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[
+    Symbol.for('nodejs.util.promisify.custom')
+  ]
 }
 
 function mockResolve(stdout: string) {
@@ -52,7 +57,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   handlers.clear()
   Object.keys(storeData).forEach((k) => delete storeData[k])
-  registerGithubHandlers(register as any)
+  registerGithubHandlers(register as Parameters<typeof registerGithubHandlers>[0])
 })
 
 // ─── Helper: get registered handler ───────────────────────────────────────────
@@ -64,6 +69,21 @@ function getHandler(channel: string): Handler {
 }
 
 // ─── github:list-open-prs ─────────────────────────────────────────────────────
+
+const QUEUE_PR = {
+  number: 42,
+  title: 'Fix bug',
+  author: { login: 'alice', avatarUrl: '' },
+  createdAt: '2024-01-01T00:00:00Z',
+  headRefName: 'fix/bug',
+  baseRefName: 'main',
+  isDraft: false,
+  statusCheckRollup: [],
+  files: [],
+  additions: 10,
+  deletions: 5,
+  changedFiles: 1,
+}
 
 describe('github:list-open-prs', () => {
   it('returns VALIDATION_ERROR for missing repoRoot', async () => {
@@ -93,6 +113,27 @@ describe('github:list-open-prs', () => {
       error: string
     }
     expect(result.error).toBe('RATE_LIMITED')
+  })
+
+  it('looks up a single PR by number when search is a digit string', async () => {
+    mockResolve(JSON.stringify(QUEUE_PR))
+    const result = (await getHandler('github:list-open-prs')({
+      repoRoot: '/repo',
+      search: '42',
+    })) as { prs: Record<string, unknown>[]; hasMore: boolean }
+    expect(result.prs).toHaveLength(1)
+    expect(result.prs[0].number).toBe(42)
+    expect(result.hasMore).toBe(false)
+  })
+
+  it('searches PRs by text when search is non-numeric', async () => {
+    mockResolve(JSON.stringify([QUEUE_PR]))
+    const result = (await getHandler('github:list-open-prs')({
+      repoRoot: '/repo',
+      search: 'fix bug',
+    })) as { prs: Record<string, unknown>[]; hasMore: boolean }
+    expect(result.prs).toHaveLength(1)
+    expect(result.hasMore).toBe(false)
   })
 })
 
@@ -188,7 +229,7 @@ describe('github:file-metrics', () => {
     const result = (await getHandler('github:file-metrics')({
       repoRoot: '/repo',
       path: 'src/app.ts',
-    })) as any
+    })) as Record<string, unknown>
     expect(result.churn90d).toBe(3)
     expect(result.blastRadius).toBe(2) // importerLines excludes the file itself (src/app.ts not in importer list)
     expect(result.testFilePresent).toBe(true)
@@ -234,7 +275,7 @@ describe('github:pr-inline-comments', () => {
     const result = (await getHandler('github:pr-inline-comments')({
       repoRoot: '/repo',
       prNumber: 42,
-    })) as { comments: any[] }
+    })) as { comments: Record<string, unknown>[] }
     expect(result.comments).toHaveLength(1)
     expect(result.comments[0].author).toBe('alice')
     expect(result.comments[0].body).toBe('LGTM')
@@ -260,7 +301,7 @@ describe('github:pr-inline-comments', () => {
     const result = (await getHandler('github:pr-inline-comments')({
       repoRoot: '/repo',
       prNumber: 42,
-    })) as { comments: any[] }
+    })) as { comments: Record<string, unknown>[] }
     expect(result.comments[0].isReply).toBe(true)
     expect(result.comments[0].parentId).toBe(1)
     expect(result.comments[0].threadId).toBe('1')
@@ -304,6 +345,35 @@ describe('github:pr-comment-add', () => {
     })) as { error: string }
     expect(result.error).toContain('gh auth error')
   })
+
+  it('includes start_line and start_side fields when startLine is provided', async () => {
+    const rawComment = {
+      id: 99,
+      user: { login: 'bob', avatar_url: '' },
+      body: 'range comment',
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+      path: 'src/app.ts',
+      line: 15,
+      start_line: 10,
+      side: 'RIGHT',
+      diff_hunk: '',
+      in_reply_to_id: null,
+      pull_request_review_id: null,
+    }
+    mockResolve(JSON.stringify(rawComment))
+    const result = (await getHandler('github:pr-comment-add')({
+      repoRoot: '/repo',
+      prNumber: 42,
+      commitId: 'abc1234',
+      path: 'src/app.ts',
+      line: 15,
+      startLine: 10,
+      side: 'RIGHT',
+      body: 'Range nit',
+    })) as { comment: Record<string, unknown> }
+    expect(result.comment.startLine).toBe(10)
+  })
 })
 
 // ─── github:pr-comment-reply ──────────────────────────────────────────────────
@@ -327,6 +397,32 @@ describe('github:pr-comment-reply', () => {
       body: 'ACK',
     })) as { error: string }
     expect(result.error).toContain('unauthorized')
+  })
+
+  it('returns posted comment on success', async () => {
+    const rawReply = {
+      id: 7,
+      user: { login: 'carol', avatar_url: '' },
+      body: 'ACK',
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+      path: 'src/app.ts',
+      line: 5,
+      start_line: null,
+      side: 'RIGHT',
+      diff_hunk: '',
+      in_reply_to_id: 1,
+      pull_request_review_id: null,
+    }
+    mockResolve(JSON.stringify(rawReply))
+    const result = (await getHandler('github:pr-comment-reply')({
+      repoRoot: '/repo',
+      prNumber: 42,
+      inReplyToId: 1,
+      body: 'ACK',
+    })) as { comment: Record<string, unknown> }
+    expect(result.comment.author).toBe('carol')
+    expect(result.comment.isReply).toBe(true)
   })
 })
 
@@ -368,6 +464,65 @@ describe('github:pr-review-submit', () => {
       })) as { reviewId: number }
       expect(result.reviewId).toBe(1)
     }
+  })
+
+  it('returns error string on gh failure', async () => {
+    mockReject('forbidden')
+    const result = (await getHandler('github:pr-review-submit')({
+      repoRoot: '/repo',
+      prNumber: 42,
+      commitId: 'abc',
+      event: 'APPROVE',
+      body: '',
+    })) as { error: string }
+    expect(result.error).toContain('forbidden')
+  })
+})
+
+// ─── github:sessions-for-repo ────────────────────────────────────────────────
+
+describe('github:sessions-for-repo', () => {
+  const validSession = {
+    repoRoot: '/repo',
+    prNumber: 42,
+    headSHA: 'abc1234',
+    currentChapterId: null,
+    currentFilePath: null,
+    viewedFiles: [],
+    fileOrderOverrides: {},
+    scrollPosition: null,
+    pausedAt: null,
+    lastAccessedAt: '2024-01-01T00:00:00.000Z',
+  }
+
+  it('returns empty sessions for invalid payload', () => {
+    const result = getHandler('github:sessions-for-repo')({}) as { sessions: unknown[] }
+    expect(result.sessions).toHaveLength(0)
+  })
+
+  it('returns empty sessions when no keys match repoRoot', () => {
+    storeData['/other:::42:::abc'] = validSession
+    const result = getHandler('github:sessions-for-repo')({ repoRoot: '/repo' }) as {
+      sessions: unknown[]
+    }
+    expect(result.sessions).toHaveLength(0)
+  })
+
+  it('returns sessions whose keys start with repoRoot:::', () => {
+    storeData['/repo:::42:::abc1234'] = validSession
+    storeData['/other:::1:::xyz'] = validSession
+    const result = getHandler('github:sessions-for-repo')({ repoRoot: '/repo' }) as {
+      sessions: unknown[]
+    }
+    expect(result.sessions).toHaveLength(1)
+  })
+
+  it('skips entries that fail schema validation', () => {
+    storeData['/repo:::bad:::data'] = { invalid: true }
+    const result = getHandler('github:sessions-for-repo')({ repoRoot: '/repo' }) as {
+      sessions: unknown[]
+    }
+    expect(result.sessions).toHaveLength(0)
   })
 })
 

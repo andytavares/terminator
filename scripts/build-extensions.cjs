@@ -24,22 +24,20 @@ async function buildExtension(name) {
     target: 'node20',
     format: 'cjs',
     outfile,
-    external: [
-      'electron',
-      'electron-store',
-      'zod',
-      'node-pty',
-    ],
+    external: ['electron', 'electron-store', 'zod', 'node-pty'],
     logLevel: 'info',
   })
 }
 
 async function main() {
   const names = readdirSync(extensionsDir, { withFileTypes: true })
-    .filter(d => d.isDirectory())
-    .map(d => d.name)
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
 
   await Promise.all(names.map(buildExtension))
 }
 
-main().catch(e => { console.error(e); process.exit(1) })
+main().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})

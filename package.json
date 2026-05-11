@@ -1,26 +1,32 @@
 {
-  "name": "terminator",
+  "name": "@terminator/app",
   "version": "0.1.0",
   "description": "Extension-first AI-focused terminal emulator",
   "main": "out/main/index.js",
-  "private": true,
+  "type": "module",
   "workspaces": [
     "extensions/*"
   ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
   "scripts": {
     "postinstall": "electron-rebuild",
-    "build:extensions": "node scripts/build-extensions.js",
+    "build:extensions": "node scripts/build-extensions.cjs",
     "dev": "npm run build:extensions && electron-vite dev",
     "build": "npm run build:extensions && electron-vite build",
     "preview": "electron-vite preview",
-    "test": "vitest run",
+    "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:coverage": "vitest run --coverage --reporter=junit --outputFile=test-report.junit.xml",
-    "lint": "eslint . --ext .ts,.tsx && tsc --noEmit",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "rebuild": "electron-rebuild",
-    "create-extension": "node scripts/create-extension.js",
+    "create-extension": "node scripts/create-extension.cjs",
     "package": "electron-builder --mac --arm64 --publish never",
     "prepare": "husky"
   },
@@ -30,10 +36,9 @@
       "eslint --ext .ts,.tsx",
       "vitest related --run"
     ],
-    "*.{js}": [
+    "*.{js,cjs}": [
       "prettier --write",
-      "eslint",
-      "vitest related --run"
+      "eslint"
     ],
     "*.{json,md,css,html}": "prettier --write"
   },

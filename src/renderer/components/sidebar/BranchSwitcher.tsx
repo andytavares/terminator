@@ -43,7 +43,8 @@ export function BranchSwitcher({ project, workspaceFolderPath }: Props): JSX.Ele
     if (!open) return
     setLoading(true)
     setError('')
-    window.electronAPI.git.listBranches(cwd)
+    window.electronAPI.git
+      .listBranches(cwd)
       .then((r) => {
         setLocalBranches(r.branches.filter((b) => !b.isRemote))
         setRemoteBranches(r.branches.filter((b) => b.isRemote))
@@ -60,8 +61,10 @@ export function BranchSwitcher({ project, workspaceFolderPath }: Props): JSX.Ele
     if (!open) return
     function close(e: MouseEvent): void {
       if (
-        dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
-        triggerRef.current && !triggerRef.current.contains(e.target as Node)
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(e.target as Node)
       ) {
         setOpen(false)
       }
@@ -83,7 +86,10 @@ export function BranchSwitcher({ project, workspaceFolderPath }: Props): JSX.Ele
         await updateProjectBranch(project.id, branch)
       }
     } catch (err) {
-      addToast({ type: 'error', message: `Branch switch failed: ${err instanceof Error ? err.message : String(err)}` })
+      addToast({
+        type: 'error',
+        message: `Branch switch failed: ${err instanceof Error ? err.message : String(err)}`,
+      })
     } finally {
       setSwitching(false)
     }
@@ -96,7 +102,10 @@ export function BranchSwitcher({ project, workspaceFolderPath }: Props): JSX.Ele
       <button
         ref={triggerRef}
         className={`branch-sw__trigger${switching ? ' branch-sw__trigger--busy' : ''}`}
-        onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openDropdown() }}
+        onClick={(e) => {
+          e.stopPropagation()
+          open ? setOpen(false) : openDropdown()
+        }}
         title={switching ? 'Switching branch…' : `Branch: ${currentBranch}`}
       >
         <span className="branch-sw__icon">⎇</span>
@@ -104,35 +113,50 @@ export function BranchSwitcher({ project, workspaceFolderPath }: Props): JSX.Ele
         <span className="branch-sw__caret">{open ? '▴' : '▾'}</span>
       </button>
 
-      {open && pos && createPortal(
-        <div
-          ref={dropdownRef}
-          className="branch-sw__dropdown"
-          style={{ top: pos.top, left: pos.left, width: Math.max(pos.width, 200) }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {loading && <div className="branch-sw__status">Loading branches…</div>}
-          {error && <div className="branch-sw__status branch-sw__status--error">{error}</div>}
-          {!loading && !error && (
-            <>
-              <BranchSection label="Local" branches={localBranches} current={currentBranch} onSelect={handleSelect} />
-              {remoteBranches.length > 0 && (
-                <BranchSection label="Remote" branches={remoteBranches} current={currentBranch} onSelect={handleSelect} />
-              )}
-              {localBranches.length === 0 && remoteBranches.length === 0 && (
-                <div className="branch-sw__status">No branches found</div>
-              )}
-            </>
-          )}
-        </div>,
-        document.body
-      )}
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="branch-sw__dropdown"
+            style={{ top: pos.top, left: pos.left, width: Math.max(pos.width, 200) }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {loading && <div className="branch-sw__status">Loading branches…</div>}
+            {error && <div className="branch-sw__status branch-sw__status--error">{error}</div>}
+            {!loading && !error && (
+              <>
+                <BranchSection
+                  label="Local"
+                  branches={localBranches}
+                  current={currentBranch}
+                  onSelect={handleSelect}
+                />
+                {remoteBranches.length > 0 && (
+                  <BranchSection
+                    label="Remote"
+                    branches={remoteBranches}
+                    current={currentBranch}
+                    onSelect={handleSelect}
+                  />
+                )}
+                {localBranches.length === 0 && remoteBranches.length === 0 && (
+                  <div className="branch-sw__status">No branches found</div>
+                )}
+              </>
+            )}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }
 
 function BranchSection({
-  label, branches, current, onSelect,
+  label,
+  branches,
+  current,
+  onSelect,
 }: {
   label: string
   branches: Branch[]

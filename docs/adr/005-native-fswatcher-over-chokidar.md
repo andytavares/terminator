@@ -10,9 +10,10 @@ Use Node.js native `fs.watch` (stdlib) as the primary file-change detection mech
 
 ## Motivation
 
-The Terminator Constitution (Principle II — Dependency Stewardship) mandates: *"The standard library MUST be used when it fully satisfies the requirement; a third-party package MUST NOT be added if stdlib covers the need."*
+The Terminator Constitution (Principle II — Dependency Stewardship) mandates: _"The standard library MUST be used when it fully satisfies the requirement; a third-party package MUST NOT be added if stdlib covers the need."_
 
 Node.js `fs.watch` covers the primary use cases:
+
 - macOS: backed by `FSEvents`, reliable and efficient
 - Windows: backed by `ReadDirectoryChangesW`, reliable
 - Linux: backed by `inotify`, reliable for project-scale directories
@@ -26,6 +27,7 @@ The polling fallback (already required by FR-007 per the clarified spec) covers 
 Chokidar provides cross-platform normalization, debouncing, and recursive watching on Linux using `inotify`. It is widely used and generally well-maintained.
 
 **Rejection reasons**:
+
 1. Constitution II requires stdlib when sufficient — chokidar is not required because our polling fallback already covers the same gap.
 2. Historical maintainer risk: chokidar has gone through periods of low maintainer activity and security advisories. Adding it violates the spirit of Principle II.
 3. Adding a dependency for a non-critical enhancement (smoother Linux recursive watch) is not justified when a polling fallback already ships.

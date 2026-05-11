@@ -31,6 +31,7 @@ npm run create-extension -- hello-world --dir /path/to/my/ext
 ```
 
 The generated `src/index.ts`:
+
 - Registers a settings section, a sidebar item, and a keyboard shortcut using the v1.0.0 surfaces (all active by default)
 - Includes commented-out stubs (`// TODO:`) for v1.1.0 surfaces: `sidebar.registerPanel`, `topBar.registerMenuItem`, `api.shell.exec`, `api.fs.watch`
 - Disposes everything in `deactivate()`
@@ -183,11 +184,11 @@ Or in global settings via the app's Settings panel → Git Integration → Enabl
 
 ## Troubleshooting
 
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| Sidebar doesn't appear | `git.enabled` is false | Check workspace settings |
-| Sidebar shows "not a git repository" | Project folder is not inside a git repo | `git init` in the project root |
-| "gh CLI not found" toast | `gh` not on PATH | Install GitHub CLI or set `git.ghCliPath` |
-| Sidebar not refreshing | Watch fallback polling paused | Check `git.sidebar.refreshIntervalMs` setting |
-| Diff view shows "Diff too large" | File diff > 500KB | Open the file in an external editor |
-| File list shows cap banner | > 500 files changed | Review `.gitignore`; raise `git.maxDisplayedFiles` if intentional |
+| Symptom                              | Likely cause                            | Fix                                                               |
+| ------------------------------------ | --------------------------------------- | ----------------------------------------------------------------- |
+| Sidebar doesn't appear               | `git.enabled` is false                  | Check workspace settings                                          |
+| Sidebar shows "not a git repository" | Project folder is not inside a git repo | `git init` in the project root                                    |
+| "gh CLI not found" toast             | `gh` not on PATH                        | Install GitHub CLI or set `git.ghCliPath`                         |
+| Sidebar not refreshing               | Watch fallback polling paused           | Check `git.sidebar.refreshIntervalMs` setting                     |
+| Diff view shows "Diff too large"     | File diff > 500KB                       | Open the file in an external editor                               |
+| File list shows cap banner           | > 500 files changed                     | Review `.gitignore`; raise `git.maxDisplayedFiles` if intentional |

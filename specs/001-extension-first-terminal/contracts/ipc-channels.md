@@ -623,6 +623,18 @@ Lists pull requests for the active repo with cursor-based pagination, optional t
 
 ---
 
+### `github:sessions-for-repo`
+
+Returns all persisted review sessions for a given repo root, used to restore `sessionStatus` on queue PRs after loading.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string }`
+
+**Response**: `{ sessions: ReviewSession[] }`
+
+---
+
 ### `github:file-metrics`
 
 Returns churn, blast radius (actual code importers only — not prose), test file presence, and patch coverage for a changed file.
@@ -639,11 +651,11 @@ Returns churn, blast radius (actual code importers only — not prose), test fil
 
 These channels are sent from the main process menu to the renderer via `webContents.send`.
 
-| Channel                      | Payload | Effect                                              |
-| ---------------------------- | ------- | --------------------------------------------------- |
-| `menu:open-settings`         | none    | Opens the Settings panel                            |
-| `menu:toggle-sidebar`        | none    | Toggles the Projects Panel sidebar                  |
-| `menu:open-pr-review-window` | none    | Triggers `window:open-pr-review` for active repo    |
+| Channel                      | Payload | Effect                                           |
+| ---------------------------- | ------- | ------------------------------------------------ |
+| `menu:open-settings`         | none    | Opens the Settings panel                         |
+| `menu:toggle-sidebar`        | none    | Toggles the Projects Panel sidebar               |
+| `menu:open-pr-review-window` | none    | Triggers `window:open-pr-review` for active repo |
 
 ---
 

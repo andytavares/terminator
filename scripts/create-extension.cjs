@@ -72,7 +72,10 @@ function activate(api) {
   // Register settings
   disposables.push(
     api.settings.register({
-      label: '${name.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} Settings',
+      label: '${name
+        .split('-')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ')} Settings',
       properties: {
         '${id}.enabled': {
           type: 'boolean',
@@ -93,7 +96,10 @@ function activate(api) {
   disposables.push(
     api.sidebar.registerItem({
       id: '${id}-panel',
-      label: '${name.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}',
+      label: '${name
+        .split('-')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ')}',
       tooltip: 'Open ${name}',
       onClick: () => {
         const msg = api.settings.get('${id}.message') ?? 'Hello!'
@@ -123,7 +129,10 @@ function activate(api) {
   // disposables.push(
   //   api.sidebar.registerPanel('right-sidebar', {
   //     id: '${id}-right-panel',
-  //     title: '${name.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}',
+  //     title: '${name
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')}',
   //     component: MyPanelComponent,  // React component
   //     defaultVisible: false,
   //   })
@@ -133,7 +142,10 @@ function activate(api) {
   // disposables.push(
   //   api.topBar.registerMenuItem({
   //     id: '${id}-view',
-  //     label: '${name.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}',
+  //     label: '${name
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')}',
   //     onClick: () => { /* open your view */ },
   //   })
   // )
@@ -146,6 +158,14 @@ function activate(api) {
   // disposables.push(
   //   api.fs.watch((event) => {
   //     console.log('[${name}] file changed:', event.filename)
+  //   })
+  // )
+
+  // TODO: Register a custom IPC handler (callable from renderer via window.electronAPI.invoke)
+  // disposables.push(
+  //   api.ipc.registerHandler('${id}:my-action', async (payload) => {
+  //     // payload is what the renderer passes to invoke()
+  //     return { result: 'ok' }
   //   })
   // )
 }
@@ -226,9 +246,7 @@ function main(argv) {
   // Parse --dir
   const dirIdx = args.indexOf('--dir')
   const outDir =
-    dirIdx !== -1
-      ? path.resolve(args[dirIdx + 1])
-      : path.resolve(process.cwd(), 'extensions', name)
+    dirIdx !== -1 ? path.resolve(args[dirIdx + 1]) : path.resolve(process.cwd(), 'extensions', name)
 
   // Check for directory collision
   if (fs.existsSync(outDir)) {
@@ -252,7 +270,12 @@ function main(argv) {
   console.log(`✓ Created extension "${name}" at ${outDir}`)
   console.log(`  package.json  — workspace package (add npm deps here)`)
   console.log(`  manifest.json — id: ${id}`)
-  console.log(`  src/index.js  — hello-world with all v1.1.0 API stubs`)
+  console.log(`  src/index.js  — main-process entry with all v1.1.0 API stubs`)
+  console.log(``)
+  console.log(`To contribute UI (sidebar panels, project tabs), add src/renderer.tsx`)
+  console.log(
+    `and register components via useExtensionRegistry (see docs/EXTENSION-DEVELOPMENT.md).`
+  )
   console.log(`\nRun "npm install" then "npm run dev" to load the extension automatically.`)
 }
 
@@ -261,4 +284,11 @@ if (require.main === module) {
   main(process.argv)
 }
 
-module.exports = { validateName, validateId, generatePackageJson, generateManifest, generateIndex, writeExtension }
+module.exports = {
+  validateName,
+  validateId,
+  generatePackageJson,
+  generateManifest,
+  generateIndex,
+  writeExtension,
+}

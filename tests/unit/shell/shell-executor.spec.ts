@@ -92,8 +92,11 @@ vi.mock('child_process', async () => {
 })
 
 import { execFile } from 'child_process'
+import type { ExecFileOptions, ChildProcess, ExecException } from 'child_process'
 
-const mockExecFile = vi.mocked(execFile as any)
+type ExecFileCallback = (error: ExecException | null, stdout: string, stderr: string) => void
+
+const mockExecFile = vi.mocked(execFile)
 
 describe('execShell', () => {
   beforeEach(() => {
@@ -101,10 +104,12 @@ describe('execShell', () => {
   })
 
   it('resolves with exitCode 0 and stdout on success', async () => {
-    mockExecFile.mockImplementation((_cmd: any, _args: any, _opts: any, callback: any) => {
-      callback(null, 'hello\n', '')
-      return { on: vi.fn() } as any
-    })
+    mockExecFile.mockImplementation(
+      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
+        callback(null, 'hello\n', '')
+        return { on: vi.fn() } as unknown as ChildProcess
+      }
+    )
 
     const result = await execShell({ command: 'git', args: ['--version'], cwd: '/tmp' })
     expect(result.exitCode).toBe(0)
@@ -115,10 +120,12 @@ describe('execShell', () => {
 
   it('resolves with non-zero exitCode when process fails', async () => {
     const err = Object.assign(new Error('exit 1'), { code: 1 })
-    mockExecFile.mockImplementation((_cmd: any, _args: any, _opts: any, callback: any) => {
-      callback(err, '', 'error output')
-      return { on: vi.fn() } as any
-    })
+    mockExecFile.mockImplementation(
+      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
+        callback(err, '', 'error output')
+        return { on: vi.fn() } as unknown as ChildProcess
+      }
+    )
 
     const result = await execShell({ command: 'git', args: ['fail'], cwd: '/tmp' })
     expect(result.exitCode).toBe(1)
@@ -128,42 +135,48 @@ describe('execShell', () => {
 
   it('resolves with exitCode 1 when error code is non-numeric', async () => {
     const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
-    mockExecFile.mockImplementation((_cmd: any, _args: any, _opts: any, callback: any) => {
-      callback(err, '', '')
-      return { on: vi.fn() } as any
-    })
+    mockExecFile.mockImplementation(
+      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
+        callback(err, '', '')
+        return { on: vi.fn() } as unknown as ChildProcess
+      }
+    )
 
     const result = await execShell({ command: 'git', args: ['status'], cwd: '/tmp' })
     expect(result.exitCode).toBe(1)
   })
 
   it('marks timedOut when SIGTERM close signal fires before callback', async () => {
-    mockExecFile.mockImplementation((_cmd: any, _args: any, _opts: any, callback: any) => {
-      let closeHandler: ((code: null, signal: string) => void) | null = null
-      const child = {
-        on: (event: string, handler: any) => {
-          if (event === 'close') closeHandler = handler
-        },
+    mockExecFile.mockImplementation(
+      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
+        let closeHandler: ((code: null, signal: string) => void) | null = null
+        const child = {
+          on: (event: string, handler: (...args: unknown[]) => void) => {
+            if (event === 'close') closeHandler = handler
+          },
+        }
+        // Simulate real Node.js timeout: close event fires first, then the callback
+        setTimeout(() => {
+          closeHandler?.(null, 'SIGTERM')
+          callback(Object.assign(new Error('timeout'), { code: null }), '', '')
+        }, 0)
+        return child as unknown as ChildProcess
       }
-      // Simulate real Node.js timeout: close event fires first, then the callback
-      setTimeout(() => {
-        closeHandler?.(null, 'SIGTERM')
-        callback(Object.assign(new Error('timeout'), { code: null }), '', '')
-      }, 0)
-      return child as any
-    })
+    )
 
     const result = await execShell({ command: 'git', args: ['status'], cwd: '/tmp', timeoutMs: 1 })
     expect(result.timedOut).toBe(true)
   })
 
   it('passes sanitized env variables to child process', async () => {
-    let capturedOpts: any = null
-    mockExecFile.mockImplementation((_cmd: any, _args: any, opts: any, callback: any) => {
-      capturedOpts = opts
-      callback(null, '', '')
-      return { on: vi.fn() } as any
-    })
+    let capturedOpts: ExecFileOptions | null = null
+    mockExecFile.mockImplementation(
+      (_cmd: string, _args: string[], opts: ExecFileOptions, callback: ExecFileCallback) => {
+        capturedOpts = opts
+        callback(null, '', '')
+        return { on: vi.fn() } as unknown as ChildProcess
+      }
+    )
 
     await execShell({ command: 'git', args: ['status'], cwd: '/tmp' })
     expect(capturedOpts.env).toHaveProperty('GIT_TERMINAL_PROMPT', '0')

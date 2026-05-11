@@ -11,7 +11,13 @@ interface Options {
 }
 
 export function useKeyboardShortcuts({ onOpenSettings, onToggleLog }: Options = {}): void {
-  const { workspaces, activeWorkspaceId, setActiveWorkspace, activeProjectId, projectsByWorkspaceId } = useWorkspaceStore()
+  const {
+    workspaces,
+    activeWorkspaceId,
+    setActiveWorkspace,
+    activeProjectId,
+    projectsByWorkspaceId,
+  } = useWorkspaceStore()
   const { getActiveSessionForProject, setActiveSessionForProject, getSessionsForProject } =
     useSessionStore()
   const { createSession } = useTerminalSession()
@@ -19,6 +25,22 @@ export function useKeyboardShortcuts({ onOpenSettings, onToggleLog }: Options = 
   const { keyboardShortcuts } = useExtensionRegistry()
 
   useEffect(() => {
+    function cycleWorkspace(delta: number): void {
+      if (workspaces.length === 0) return
+      const idx = workspaces.findIndex((w) => w.id === activeWorkspaceId)
+      const next = (idx + delta + workspaces.length) % workspaces.length
+      setActiveWorkspace(workspaces[next].id)
+    }
+
+    function cycleTab(projectId: string, delta: number): void {
+      const sessions = getSessionsForProject(projectId)
+      if (sessions.length === 0) return
+      const activeId = getActiveSessionForProject(projectId)
+      const idx = sessions.findIndex((s) => s.id === activeId)
+      const next = (idx + delta + sessions.length) % sessions.length
+      setActiveSessionForProject(projectId, sessions[next].id)
+    }
+
     function handleKeyDown(e: KeyboardEvent): void {
       const isMeta = e.metaKey || e.ctrlKey
 
@@ -72,7 +94,9 @@ export function useKeyboardShortcuts({ onOpenSettings, onToggleLog }: Options = 
         if (activeProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
           const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
-          const projects = activeWorkspaceId ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? []) : []
+          const projects = activeWorkspaceId
+            ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? [])
+            : []
           const activeProject = projects.find((p) => p.id === activeProjectId)
           const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
           createSession(
@@ -103,21 +127,19 @@ export function useKeyboardShortcuts({ onOpenSettings, onToggleLog }: Options = 
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [workspaces, activeWorkspaceId, activeProjectId, keyboardShortcuts])
-
-  function cycleWorkspace(delta: number): void {
-    if (workspaces.length === 0) return
-    const idx = workspaces.findIndex((w) => w.id === activeWorkspaceId)
-    const next = (idx + delta + workspaces.length) % workspaces.length
-    setActiveWorkspace(workspaces[next].id)
-  }
-
-  function cycleTab(projectId: string, delta: number): void {
-    const sessions = getSessionsForProject(projectId)
-    if (sessions.length === 0) return
-    const activeId = getActiveSessionForProject(projectId)
-    const idx = sessions.findIndex((s) => s.id === activeId)
-    const next = (idx + delta + sessions.length) % sessions.length
-    setActiveSessionForProject(projectId, sessions[next].id)
-  }
+  }, [
+    workspaces,
+    activeWorkspaceId,
+    activeProjectId,
+    keyboardShortcuts,
+    setActiveWorkspace,
+    resolveSettings,
+    projectsByWorkspaceId,
+    createSession,
+    getSessionsForProject,
+    getActiveSessionForProject,
+    setActiveSessionForProject,
+    onOpenSettings,
+    onToggleLog,
+  ])
 }

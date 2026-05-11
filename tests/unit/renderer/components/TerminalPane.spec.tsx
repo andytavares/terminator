@@ -19,7 +19,7 @@ beforeEach(() => {
     getActiveSessionForProject: mockGetActive,
     getTerminalInstance: mockGetInstance,
     clearBellCount: mockClearBell,
-  } as any)
+  } as unknown as ReturnType<typeof useSessionStore>)
   mockGetSessions.mockReturnValue([])
   mockGetActive.mockReturnValue(null)
   mockGetInstance.mockReturnValue(undefined)

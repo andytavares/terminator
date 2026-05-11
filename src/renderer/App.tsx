@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { WorkspaceRail } from './components/sidebar/WorkspaceRail'
 import { ProjectsPanel } from './components/sidebar/ProjectsPanel'
 import { TerminalPane } from './components/terminal/TerminalPane'
@@ -39,32 +39,31 @@ export function App(): JSX.Element {
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
   const repoRoot = activeWorkspace?.folderPath ?? null
 
-  useKeyboardShortcuts({
-    onOpenSettings: () => setSettingsOpen(true),
-    onToggleLog: () => setLogOpen((v) => !v),
-  })
+  const handleOpenSettings = useCallback(() => setSettingsOpen(true), [])
+  const handleToggleLog = useCallback(() => setLogOpen((v) => !v), [])
+  useKeyboardShortcuts({ onOpenSettings: handleOpenSettings, onToggleLog: handleToggleLog })
 
   useEffect(() => {
     loadWorkspaces()
     loadSettings()
-  }, [])
+  }, [loadWorkspaces, loadSettings])
 
   useEffect(() => {
     if (activeWorkspaceId) loadSettings(activeWorkspaceId)
-  }, [activeWorkspaceId])
+  }, [activeWorkspaceId, loadSettings])
 
   useEffect(() => {
     if (activeProjectId && globalSettings && !globalSettings.ui?.hasSeenWelcome) {
       markWelcomeSeen()
     }
-  }, [activeProjectId])
+  }, [activeProjectId, globalSettings, markWelcomeSeen])
 
   useEffect(() => {
     const unsub = window.electronAPI.terminal.onProcessExit((sessionId, exitCode) => {
       handleProcessExit(sessionId, exitCode)
     })
     return unsub
-  }, [])
+  }, [handleProcessExit])
 
   useEffect(() => {
     const handler = (): void => setSettingsOpen(true)
@@ -89,7 +88,7 @@ export function App(): JSX.Element {
     return window.electronAPI.extensionEvents.onMenuOpenPrReviewWindow(() => {
       if (repoRoot) window.electronAPI.window.openPrReview(repoRoot, activeWorkspace?.color)
     })
-  }, [repoRoot])
+  }, [repoRoot, activeWorkspace?.color])
 
   useEffect(() => {
     if (!window.electronAPI.extensionEvents) return
@@ -131,7 +130,7 @@ export function App(): JSX.Element {
       })
       savedPanelsRef.current = new Set()
     }
-  }, [activeProjectTabId])
+  }, [activeProjectTabId, togglePanel])
 
   return (
     <ErrorBoundary>

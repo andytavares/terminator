@@ -29,10 +29,12 @@ const defaultWsStore = {
 beforeEach(() => {
   vi.clearAllMocks()
   mockCreateSession.mockResolvedValue(undefined)
-  vi.mocked(useWorkspaceStore).mockReturnValue(defaultWsStore as any)
+  vi.mocked(useWorkspaceStore).mockReturnValue(
+    defaultWsStore as unknown as ReturnType<typeof useWorkspaceStore>
+  )
   vi.mocked(useSettingsStore).mockReturnValue({
     resolveSettings: vi.fn().mockReturnValue({ terminal: { scrollbackLimit: 1000 } }),
-  } as any)
+  } as unknown as ReturnType<typeof useWorkspaceStore>)
 })
 
 describe('NewTabDialog', () => {
@@ -92,7 +94,7 @@ describe('NewTabDialog', () => {
       workspaces: [{ id: 'ws-1', name: 'Main', folderPath: '/home' }],
       activeWorkspaceId: 'ws-1',
       projectsByWorkspaceId: new Map([['ws-1', [{ id: 'proj-1', name: 'App' }]]]),
-    } as any)
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
     render(<NewTabDialog projectId="proj-1" onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Open'))
     await vi.waitFor(() => expect(mockCreateSession).toHaveBeenCalled())

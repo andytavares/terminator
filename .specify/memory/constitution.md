@@ -47,6 +47,7 @@ exists in the core application beyond the published Extension API. If it is not 
 API contract, the extension cannot rely on it — full stop.
 
 **Dependencies**
+
 - All npm packages an extension needs MUST be declared in that extension's own
   `package.json`. npm workspaces hoist them automatically; Vite resolves them without
   any root-level entry.
@@ -54,6 +55,7 @@ API contract, the extension cannot rely on it — full stop.
   manifest is for the core application only.
 
 **Code & Types**
+
 - An extension MUST NOT import from core application source files (`src/main/*`,
   `src/renderer/*`, `src/shared/*`, etc.). If shared types or utilities are needed,
   they MUST be exposed through the Extension API and the extension imports from there.
@@ -63,6 +65,7 @@ API contract, the extension cannot rely on it — full stop.
   inside the extension's own directory tree.
 
 **IPC & Runtime**
+
 - IPC channels introduced for an extension MUST be registered by the extension's own
   handler file. Core `index.ts` may wire in that handler file, but MUST NOT contain
   handler logic written for the extension.

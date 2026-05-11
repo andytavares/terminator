@@ -43,7 +43,7 @@ export function ReviewQueue({
     return () => {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
     }
-  }, [searchQuery])
+  }, [searchQuery, onRefresh])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -61,14 +61,22 @@ export function ReviewQueue({
   const now = Date.now()
   const staleMs = STALE_DAYS * 24 * 60 * 60 * 1000
 
+  // In-progress PRs always appear at the top regardless of active filter
+  const inProgress = prQueue.filter(
+    (p) => p.sessionStatus === 'in-progress' || p.sessionStatus === 'paused'
+  )
+  const inProgressNumbers = new Set(inProgress.map((p) => p.number))
+
   const filtered = prQueue.filter((pr) => {
+    // Already shown in the in-progress section
+    if (inProgressNumbers.has(pr.number)) return false
     switch (activeFilter) {
       case 'high-risk':
         return pr.riskLevel === 'high'
       case 'quick-wins':
         return pr.riskLevel === 'low' && pr.additions + pr.deletions <= 100
       case 'in-progress':
-        return pr.sessionStatus === 'in-progress' || pr.sessionStatus === 'paused'
+        return false // already captured above
       case 'stale':
         return now - new Date(pr.openedAt).getTime() > staleMs
       default:
@@ -80,12 +88,7 @@ export function ReviewQueue({
   const quickWins = filtered.filter(
     (p) => p.riskLevel === 'low' && p.additions + p.deletions <= 100
   )
-  const inProgress = filtered.filter(
-    (p) => p.sessionStatus === 'in-progress' || p.sessionStatus === 'paused'
-  )
-  const larger = filtered.filter(
-    (p) => !readFirst.includes(p) && !quickWins.includes(p) && !inProgress.includes(p)
-  )
+  const larger = filtered.filter((p) => !readFirst.includes(p) && !quickWins.includes(p))
 
   const totalMinutes = prQueue.reduce((s, p) => s + p.estimatedMinutes, 0)
   const highRiskCount = prQueue.filter((p) => p.riskLevel === 'high').length
@@ -212,9 +215,18 @@ export function ReviewQueue({
         ) : (
           <>
             <PrSection title="In progress" prs={inProgress} accent="blue" onOpen={onOpenPr} />
-            <PrSection title="Read these first" prs={readFirst} accent="red" onOpen={onOpenPr} />
-            <PrSection title="Quick wins" prs={quickWins} accent="green" onOpen={onOpenPr} />
-            <PrSection title="Larger reviews" prs={larger} accent="none" onOpen={onOpenPr} />
+            {activeFilter !== 'in-progress' && (
+              <>
+                <PrSection
+                  title="Read these first"
+                  prs={readFirst}
+                  accent="red"
+                  onOpen={onOpenPr}
+                />
+                <PrSection title="Quick wins" prs={quickWins} accent="green" onOpen={onOpenPr} />
+                <PrSection title="Larger reviews" prs={larger} accent="none" onOpen={onOpenPr} />
+              </>
+            )}
           </>
         )}
       </div>
@@ -267,7 +279,7 @@ function PrRow({ pr, onOpen }: { pr: ReviewQueuePR; onOpen: (pr: ReviewQueuePR) 
 
   const actionLabel =
     pr.sessionStatus === 'paused'
-      ? `Resume Ch ${pr.resumeChapter ?? 1}/${pr.resumeChapterTotal ?? '?'}`
+      ? 'Resume'
       : pr.sessionStatus === 'in-progress'
         ? 'Continue'
         : pr.riskLevel === 'high'
@@ -275,6 +287,11 @@ function PrRow({ pr, onOpen }: { pr: ReviewQueuePR; onOpen: (pr: ReviewQueuePR) 
           : 'Approve'
 
   const age = formatAge(pr.openedAt)
+
+  const fileProgress =
+    pr.sessionStatus !== 'not-started' && pr.fileCount > 0
+      ? Math.round((pr.viewedFileCount / pr.fileCount) * 100)
+      : null
 
   return (
     <button className={`pr-row pr-row--${pr.riskLevel}`} onClick={() => onOpen(pr)}>
@@ -285,6 +302,11 @@ function PrRow({ pr, onOpen }: { pr: ReviewQueuePR; onOpen: (pr: ReviewQueuePR) 
         <span className="pr-row-meta">
           {pr.author} · {age} · {pr.fileCount} files · +{pr.additions}/−{pr.deletions}
         </span>
+        {fileProgress !== null && (
+          <div className="pr-row-progress" aria-label={`${fileProgress}% of files reviewed`}>
+            <div className="pr-row-progress-bar" style={{ width: `${fileProgress}%` }} />
+          </div>
+        )}
       </div>
 
       <div className="pr-row-signals">

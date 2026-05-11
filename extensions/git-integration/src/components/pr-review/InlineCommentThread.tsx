@@ -14,13 +14,16 @@ export function InlineCommentThread({ thread, onReply }: Props) {
   const hiddenCount = thread.comments.length - 1
 
   return (
-    <div className={`inline-comment-thread${thread.outdated ? ' inline-comment-thread--outdated' : ''}`}>
-      {thread.outdated && (
-        <span className="inline-comment-outdated-label">Outdated</span>
-      )}
+    <div
+      className={`inline-comment-thread${thread.outdated ? ' inline-comment-thread--outdated' : ''}`}
+    >
+      {thread.outdated && <span className="inline-comment-outdated-label">Outdated</span>}
 
-      {visibleComments.map(comment => (
-        <div key={comment.id} className={`inline-comment${comment.isReply ? ' inline-comment--reply' : ''}`}>
+      {visibleComments.map((comment) => (
+        <div
+          key={comment.id}
+          className={`inline-comment${comment.isReply ? ' inline-comment--reply' : ''}`}
+        >
           <div className="inline-comment-header">
             <img
               src={comment.authorAvatarUrl}

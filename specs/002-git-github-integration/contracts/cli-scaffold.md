@@ -22,28 +22,28 @@ npm run create-extension -- <name> [options]
 
 ## Arguments
 
-| Argument | Required | Description |
-|---|---|---|
-| `<name>` | Yes | Short kebab-case name for the extension (e.g., `my-extension`). Used as the directory name under `extensions/` and as the default suffix of the extension ID. |
+| Argument | Required | Description                                                                                                                                                   |
+| -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<name>` | Yes      | Short kebab-case name for the extension (e.g., `my-extension`). Used as the directory name under `extensions/` and as the default suffix of the extension ID. |
 
 ## Options
 
-| Option | Default | Description |
-|---|---|---|
-| `--id <reverse-domain-id>` | `com.example.<name>` | Full reverse-domain extension ID (e.g., `com.acme.my-extension`). Must be globally unique. |
-| `--dir <output-dir>` | `extensions/<name>` | Absolute or relative output directory. Defaults to `extensions/<name>` relative to the repo root. |
-| `--help`, `-h` | — | Print usage information and exit. |
+| Option                     | Default              | Description                                                                                       |
+| -------------------------- | -------------------- | ------------------------------------------------------------------------------------------------- |
+| `--id <reverse-domain-id>` | `com.example.<name>` | Full reverse-domain extension ID (e.g., `com.acme.my-extension`). Must be globally unique.        |
+| `--dir <output-dir>`       | `extensions/<name>`  | Absolute or relative output directory. Defaults to `extensions/<name>` relative to the repo root. |
+| `--help`, `-h`             | —                    | Print usage information and exit.                                                                 |
 
 ---
 
 ## Exit Codes
 
-| Code | Meaning |
-|---|---|
-| `0` | Extension generated successfully. |
-| `1` | Bad arguments (missing name, invalid characters, etc.). |
-| `2` | Output directory already exists. The CLI will not overwrite an existing directory. |
-| `3` | Filesystem write error. |
+| Code | Meaning                                                                            |
+| ---- | ---------------------------------------------------------------------------------- |
+| `0`  | Extension generated successfully.                                                  |
+| `1`  | Bad arguments (missing name, invalid characters, etc.).                            |
+| `2`  | Output directory already exists. The CLI will not overwrite an existing directory. |
+| `3`  | Filesystem write error.                                                            |
 
 ---
 

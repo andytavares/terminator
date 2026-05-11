@@ -43,7 +43,9 @@
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
   border: 1.5px solid transparent;
   /* background set via inline style (workspace color with opacity) */
 }
@@ -53,20 +55,21 @@
   font-weight: 600;
   color: #fff;
   letter-spacing: -0.02em;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   line-height: 1;
   pointer-events: none;
 }
 
 .ws-tile:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .ws-tile--active {
-  border-color: rgba(255,255,255,0.35);
-  box-shadow: 0 0 0 2px var(--ws-color, var(--accent)),
-              0 4px 20px rgba(0,0,0,0.5);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 0 0 2px var(--ws-color, var(--accent)),
+    0 4px 20px rgba(0, 0, 0, 0.5);
   transform: translateY(-1px);
 }
 
@@ -105,7 +108,7 @@
   opacity: 0;
   transition: opacity 0.15s ease;
   z-index: 200;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .ws-tile:hover .ws-tile__tooltip {
@@ -121,7 +124,7 @@
   padding: 6px;
   min-width: 140px;
   z-index: 1000;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -157,7 +160,9 @@
 }
 
 /* ── Add workspace button ────────────────────────────────────── */
-.ws-rail__spacer { flex: 1; }
+.ws-rail__spacer {
+  flex: 1;
+}
 
 .ws-rail__add {
   width: 36px;
@@ -171,7 +176,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.15s, color 0.15s, transform 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.15s;
   margin-bottom: 4px;
 }
 
