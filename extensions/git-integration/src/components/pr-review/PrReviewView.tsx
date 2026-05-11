@@ -7,6 +7,7 @@ import { ReviewDiffPane } from './ReviewDiffPane'
 import { RiskBreakdownPanel } from './RiskBreakdownPanel'
 import { ReviewSubmitPanel } from './ReviewSubmitPanel'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
+import { StatusChecksBar } from './StatusChecksBar'
 import type { PrReviewDetail, PrChangedFile } from '../../schemas/pr-review.schema'
 
 interface Props {
@@ -242,6 +243,9 @@ export function PrReviewView({ repoRoot, pr, onClose, onRefresh, onPopOut }: Pro
           </button>
         </div>
       </div>
+
+      {/* Status checks */}
+      <StatusChecksBar checks={pr.statusChecks ?? []} />
 
       {/* Review progress bar */}
       <div

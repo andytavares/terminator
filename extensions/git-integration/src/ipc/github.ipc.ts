@@ -4,7 +4,12 @@ import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { basename, join } from 'path'
 import { readFile } from 'fs/promises'
-import type { ReviewQueuePR, PrReviewDetail, InlineComment } from '../schemas/pr-review.schema.js'
+import type {
+  ReviewQueuePR,
+  PrReviewDetail,
+  InlineComment,
+  StatusCheck,
+} from '../schemas/pr-review.schema.js'
 import { ReviewSessionSchema } from '../schemas/pr-review.schema.js'
 import { buildChapters, parseReviewQueuePR } from '../github/pr-review-service.js'
 import type { FileDiff } from '../schemas/git.schema.js'
@@ -175,6 +180,7 @@ export function registerGithubHandlers(register: RegisterFn): void {
         ciStatus: mapCiStatus(meta.statusCheckRollup),
         lintStatus: mapCheckStatus(meta.statusCheckRollup, LINT_CHECK_NAMES),
         coverageStatus: mapCheckStatus(meta.statusCheckRollup, COVERAGE_CHECK_NAMES),
+        statusChecks: mapStatusChecks(meta.statusCheckRollup),
         chapters,
       }
       return { pr }
@@ -474,6 +480,28 @@ function mapCheckStatus(rollup: unknown, names: string[]): 'pass' | 'fail' | 'wa
   if (statuses.some((s) => s === 'SUCCESS')) return 'pass'
   if (statuses.every((s) => NON_BLOCKING.has(s))) return 'unknown'
   return 'unknown'
+}
+
+function mapStatusChecks(rollup: unknown): StatusCheck[] {
+  if (!rollup || !Array.isArray(rollup)) return []
+  return (rollup as Array<Record<string, unknown>>).map((s) => {
+    const raw = String(s.conclusion ?? s.state ?? '').toUpperCase()
+    const state: StatusCheck['state'] =
+      raw === 'SUCCESS'
+        ? 'pass'
+        : raw === 'FAILURE' || raw === 'ERROR' || raw === 'TIMED_OUT' || raw === 'ACTION_REQUIRED'
+          ? 'fail'
+          : raw === 'PENDING' || raw === 'IN_PROGRESS' || raw === 'QUEUED' || raw === 'WAITING'
+            ? 'pending'
+            : raw === 'SKIPPED' || raw === 'NEUTRAL' || raw === 'CANCELLED'
+              ? 'skipped'
+              : 'unknown'
+    return {
+      name: String(s.name ?? s.context ?? 'Unknown check'),
+      state,
+      url: s.url ? String(s.url) : undefined,
+    }
+  })
 }
 
 async function readFileCoverage(repoRoot: string, filePath: string): Promise<number | null> {
