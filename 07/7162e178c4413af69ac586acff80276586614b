@@ -1,0 +1,25 @@
+package.json
+  s_0de71e12156b92::t_0b9b70530837c6 2
+electron-builder.yml
+  s_0de71e12156b92::t_ec3d27db745c3d 8
+.github/workflows/ci.yml
+  s_0de71e12156b92::t_dbea3574331e7a 203
+resources/icon.svg
+  ai_agent 1-234
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "077162e178c4413af69ac586acff80276586614b",
+  "prompts": {},
+  "sessions": {
+    "s_0de71e12156b92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3eb1c01f-7878-4745-9219-049c51a0f1df",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
