@@ -238,6 +238,30 @@ describe('github:file-metrics', () => {
     expect(result.testFilePresent).toBe(true)
     expect(result.patchCoverage).toBeNull() // no coverage file mocked
   })
+
+  it.each([
+    ['JS/TS .spec.', 'src/app.spec.ts'],
+    ['JS/TS .test.', 'src/utils.test.js'],
+    ['Python test_', 'tests/test_foo.py'],
+    ['Python _test', 'src/foo_test.py'],
+    ['Go _test', 'pkg/foo_test.go'],
+    ['Ruby _spec', 'spec/foo_spec.rb'],
+    ['Ruby test_', 'test/test_foo.rb'],
+    ['Java Test', 'src/FooTest.java'],
+    ['Java Tests', 'src/FooTests.java'],
+    ['Kotlin Spec', 'src/FooSpec.kt'],
+    ['C# Tests', 'FooTests.cs'],
+  ])('returns testFilePresent=true for %s file (%s)', async (_label, path) => {
+    customMock()
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })
+
+    const result = (await getHandler('github:file-metrics')({
+      repoRoot: '/repo',
+      path,
+    })) as Record<string, unknown>
+    expect(result.testFilePresent).toBe(true)
+  })
 })
 
 // ─── github:pr-inline-comments ────────────────────────────────────────────────

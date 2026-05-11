@@ -1,4 +1,4 @@
-import type { Feature, PhaseId, PilotState } from './speckit.types.js'
+import type { Feature, HistoryEntry, PhaseId, PilotState } from './speckit.types.js'
 
 export interface SpeckitAPI {
   featureList(payload: { repoRoot: string }): Promise<{ features: Feature[] } | { error: string }>
@@ -18,10 +18,39 @@ export interface SpeckitAPI {
     phase: PhaseId
     note?: string
   }): Promise<{ state: PilotState } | { error: string }>
+  phaseReject(payload: {
+    featureDir: string
+    phase: PhaseId
+    reason: string
+  }): Promise<{ state: PilotState } | { error: string }>
   phaseRevoke(payload: {
     featureDir: string
     phase: PhaseId
+    note?: string
   }): Promise<{ state: PilotState } | { error: string }>
+  artifactRead(payload: {
+    filePath: string
+    featureDir?: string
+    repoRoot?: string
+  }): Promise<{ current: string | null; approved: string | null } | { error: string }>
+  historyLoad(payload: {
+    featureDir: string
+  }): Promise<{ entries: HistoryEntry[] } | { error: string }>
+  sessionList(): Promise<{ sessions: { id: string; name: string }[] }>
+  implementStop(payload: {
+    featureDir: string
+    phase?: PhaseId
+  }): Promise<{ ok: true } | { error: string }>
+  checkpointCreate(payload: {
+    featureDir: string
+    repoRoot?: string
+  }): Promise<{ commitHash: string } | { error: string }>
+  implementFileDecision(payload: {
+    filePath: string
+    decision: 'approve' | 'skip'
+    featureDir: string
+    repoRoot?: string
+  }): Promise<{ ok: true } | { error: string }>
   onStateChanged(handler: (data: unknown) => void): () => void
 }
 
@@ -46,9 +75,35 @@ export function getSpeckitAPI(): SpeckitAPI {
       bridge.invoke('speckit:phase-approve', payload) as Promise<
         { state: PilotState } | { error: string }
       >,
+    phaseReject: (payload) =>
+      bridge.invoke('speckit:phase-reject', payload) as Promise<
+        { state: PilotState } | { error: string }
+      >,
     phaseRevoke: (payload) =>
       bridge.invoke('speckit:phase-revoke', payload) as Promise<
         { state: PilotState } | { error: string }
+      >,
+    artifactRead: (payload) =>
+      bridge.invoke('speckit:artifact-read', payload) as Promise<
+        { current: string | null; approved: string | null } | { error: string }
+      >,
+    historyLoad: (payload) =>
+      bridge.invoke('speckit:history-load', payload) as Promise<
+        { entries: HistoryEntry[] } | { error: string }
+      >,
+    sessionList: () =>
+      bridge.invoke('speckit:session-list', {}) as Promise<{
+        sessions: { id: string; name: string }[]
+      }>,
+    implementStop: (payload) =>
+      bridge.invoke('speckit:implement-stop', payload) as Promise<{ ok: true } | { error: string }>,
+    checkpointCreate: (payload) =>
+      bridge.invoke('speckit:checkpoint-create', payload) as Promise<
+        { commitHash: string } | { error: string }
+      >,
+    implementFileDecision: (payload) =>
+      bridge.invoke('speckit:implement-file-decision', payload) as Promise<
+        { ok: true } | { error: string }
       >,
     onStateChanged: (handler) => bridge.on('speckit:state-changed', handler),
   }

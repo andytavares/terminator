@@ -80,6 +80,59 @@ describe('getSpeckitAPI()', () => {
     })
   })
 
+  it('calls bridge.invoke with speckit:artifact-read', async () => {
+    mockInvoke.mockResolvedValue({ current: '# content', approved: null })
+    await api.artifactRead({ featureDir: '/repo/specs/001', filePath: 'plan.md' })
+    expect(mockInvoke).toHaveBeenCalledWith('speckit:artifact-read', {
+      featureDir: '/repo/specs/001',
+      filePath: 'plan.md',
+    })
+  })
+
+  it('calls bridge.invoke with speckit:history-load', async () => {
+    mockInvoke.mockResolvedValue({ entries: [] })
+    await api.historyLoad({ featureDir: '/repo/specs/001' })
+    expect(mockInvoke).toHaveBeenCalledWith('speckit:history-load', {
+      featureDir: '/repo/specs/001',
+    })
+  })
+
+  it('calls bridge.invoke with speckit:session-list', async () => {
+    mockInvoke.mockResolvedValue({ sessions: [] })
+    await api.sessionList()
+    expect(mockInvoke).toHaveBeenCalledWith('speckit:session-list', {})
+  })
+
+  it('calls bridge.invoke with speckit:implement-stop', async () => {
+    mockInvoke.mockResolvedValue({ ok: true })
+    await api.implementStop({ featureDir: '/repo/specs/001' })
+    expect(mockInvoke).toHaveBeenCalledWith('speckit:implement-stop', {
+      featureDir: '/repo/specs/001',
+    })
+  })
+
+  it('calls bridge.invoke with speckit:checkpoint-create', async () => {
+    mockInvoke.mockResolvedValue({ commitHash: 'abc123' })
+    await api.checkpointCreate({ featureDir: '/repo/specs/001' })
+    expect(mockInvoke).toHaveBeenCalledWith('speckit:checkpoint-create', {
+      featureDir: '/repo/specs/001',
+    })
+  })
+
+  it('calls bridge.invoke with speckit:implement-file-decision', async () => {
+    mockInvoke.mockResolvedValue({ ok: true })
+    await api.implementFileDecision({
+      featureDir: '/repo/specs/001',
+      filePath: 'src/app.ts',
+      decision: 'approve',
+    })
+    expect(mockInvoke).toHaveBeenCalledWith('speckit:implement-file-decision', {
+      featureDir: '/repo/specs/001',
+      filePath: 'src/app.ts',
+      decision: 'approve',
+    })
+  })
+
   it('calls bridge.on for onStateChanged and returns unsub', () => {
     const handler = vi.fn()
     const unsub = vi.fn()

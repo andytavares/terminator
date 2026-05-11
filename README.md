@@ -59,6 +59,18 @@ npm run rebuild
 npm run dev
 ```
 
+## Installing the Packaged App (macOS)
+
+Download the `.dmg` from the [latest release](../../releases/latest), mount it, and drag Terminator to your Applications folder.
+
+Because the app is not notarized, macOS Gatekeeper will block it on first launch. Remove the quarantine flag before opening:
+
+```bash
+xattr -cr /Applications/Terminator.app
+```
+
+Then open the app normally. You only need to run this once.
+
 ## Available Scripts
 
 | Script                     | Description                                           |
