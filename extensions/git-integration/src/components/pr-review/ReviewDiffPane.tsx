@@ -7,6 +7,7 @@ import {
   detectComplexityHotspots,
   computeFileCyclomaticDelta,
 } from '../../github/pr-review-service'
+import { detectLanguage, highlight } from '../FileDiffView'
 import type { PrChangedFile, PrReviewDetail, Chapter } from '../../schemas/pr-review.schema'
 import type { FileDiff } from '../../schemas/git.schema'
 import { FileDiffSchema } from '../../schemas/git.schema'
@@ -67,6 +68,7 @@ export function ReviewDiffPane({
   const prChaptersRef = useRef<Chapter[]>(pr.chapters)
   prChaptersRef.current = pr.chapters
 
+  const lang = detectLanguage(file.path)
   const isViewed = viewedFiles.has(file.path)
   const fileThreads = threads[file.path] ?? []
   const isLastFile = chapterProgress.index === chapterProgress.total - 1
@@ -231,7 +233,11 @@ export function ReviewDiffPane({
                                 {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
                               </td>
                               <td className="diff-line__content">
-                                <pre>{line.content}</pre>
+                                <pre
+                                  dangerouslySetInnerHTML={{
+                                    __html: highlight(line.content, lang),
+                                  }}
+                                />
                               </td>
                               <td className="diff-gutter">
                                 <button
@@ -313,7 +319,11 @@ export function ReviewDiffPane({
                                       {line.type === 'remove' ? '-' : ' '}
                                     </td>
                                     <td className="diff-line__content">
-                                      <pre>{line.content}</pre>
+                                      <pre
+                                        dangerouslySetInnerHTML={{
+                                          __html: highlight(line.content, lang),
+                                        }}
+                                      />
                                     </td>
                                     <td className="diff-gutter">
                                       <button
@@ -392,7 +402,11 @@ export function ReviewDiffPane({
                                       {line.type === 'add' ? '+' : ' '}
                                     </td>
                                     <td className="diff-line__content">
-                                      <pre>{line.content}</pre>
+                                      <pre
+                                        dangerouslySetInnerHTML={{
+                                          __html: highlight(line.content, lang),
+                                        }}
+                                      />
                                     </td>
                                     <td className="diff-gutter">
                                       <button

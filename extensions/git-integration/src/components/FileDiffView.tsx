@@ -12,7 +12,7 @@ interface FileDiffViewProps {
 
 // ── Language detection ────────────────────────────────────────────────────────
 
-function detectLanguage(path: string): string | undefined {
+export function detectLanguage(path: string): string | undefined {
   const ext = path.split('.').pop()?.toLowerCase()
   const map: Record<string, string> = {
     ts: 'typescript',
@@ -60,7 +60,7 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-function highlight(content: string, lang: string | undefined): string {
+export function highlight(content: string, lang: string | undefined): string {
   if (!lang) return escapeHtml(content)
   try {
     return hljs.highlight(content, { language: lang, ignoreIllegals: true }).value
