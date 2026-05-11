@@ -1,0 +1,19 @@
+.specify/feature.json
+  s_9dddbf7cfbd174::t_316e1768b7cb5a 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "a6969acf474275ce501c517b2a5b4d78e5e3b1cc",
+  "prompts": {},
+  "sessions": {
+    "s_9dddbf7cfbd174": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7497f941-5f66-448f-951e-9b4c873e429d",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
