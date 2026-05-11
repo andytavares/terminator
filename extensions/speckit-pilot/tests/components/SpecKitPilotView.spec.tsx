@@ -8,7 +8,12 @@ const mockCheckArtifacts = vi.fn()
 const mockFileWrite = vi.fn()
 const mockPilotState = vi.fn()
 const mockPhaseApprove = vi.fn()
+const mockPhaseReject = vi.fn()
 const mockPhaseRevoke = vi.fn()
+const mockHistoryLoad = vi.fn()
+const mockArtifactRead = vi.fn()
+const mockImplementStop = vi.fn()
+const mockSessionList = vi.fn()
 const mockOnStateChanged = vi.fn()
 
 vi.mock('../../src/types/electron.js', () => ({
@@ -18,7 +23,12 @@ vi.mock('../../src/types/electron.js', () => ({
     fileWrite: mockFileWrite,
     pilotState: mockPilotState,
     phaseApprove: mockPhaseApprove,
+    phaseReject: mockPhaseReject,
     phaseRevoke: mockPhaseRevoke,
+    historyLoad: mockHistoryLoad,
+    artifactRead: mockArtifactRead,
+    implementStop: mockImplementStop,
+    sessionList: mockSessionList,
     onStateChanged: mockOnStateChanged,
   }),
 }))
@@ -29,12 +39,15 @@ import type { PilotState } from '../../src/types/speckit.types.js'
 const mockReadFile = vi.fn()
 const mockOpenPath = vi.fn()
 
+const mockTerminalInput = vi.fn()
+
 function setupElectronAPI() {
   // Add electronAPI to the existing jsdom window — do NOT replace window, as that
   // breaks React's DOM helpers (Selection instanceof checks, etc.)
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     fs: { readFile: mockReadFile },
     shell: { openPath: mockOpenPath },
+    terminal: { input: mockTerminalInput },
   }
 }
 
@@ -65,6 +78,10 @@ describe('SpecKitPilotView', () => {
     mockFeatureList.mockResolvedValue({ features: [] })
     mockCheckArtifacts.mockResolvedValue({ exists: {} })
     mockPilotState.mockResolvedValue({ notFound: true })
+    mockHistoryLoad.mockResolvedValue({ entries: [] })
+    mockArtifactRead.mockResolvedValue({ current: null, approved: null })
+    mockImplementStop.mockResolvedValue({ ok: true })
+    mockSessionList.mockResolvedValue({ sessions: [] })
     mockReadFile.mockResolvedValue({ error: 'not found' })
   })
 
@@ -158,21 +175,30 @@ describe('SpecKitPilotView', () => {
     await waitFor(() => screen.getByText('Specify'))
     fireEvent.click(screen.getByText('Specify'))
     await waitFor(() => {
-      expect(screen.getByText('Artifact not found')).toBeTruthy()
+      // 'locked' status shows upstream-not-approved reason
+      expect(screen.getByText('Upstream not approved')).toBeTruthy()
       expect(screen.getByText(/speckit-specify/)).toBeTruthy()
     })
   })
 
-  it('shows Mark approved button for non-locked, non-approved phases', async () => {
+  it('shows Approve button for awaiting_review phases', async () => {
     mockFeatureList.mockResolvedValue({
       features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
     })
     mockCheckArtifacts.mockResolvedValue({ exists: { specify: true } })
+    mockPilotState.mockResolvedValue({
+      state: makePilotState({
+        phases: {
+          ...makePilotState().phases,
+          specify: { status: 'awaiting_review', artifactPaths: [], hashes: {} },
+        },
+      }),
+    })
     render(<SpecKitPilotView repoRoot="/repo" />)
     await waitFor(() => screen.getByText('Specify'))
     fireEvent.click(screen.getByText('Specify'))
     await waitFor(() => {
-      expect(screen.getByText('Mark approved')).toBeTruthy()
+      expect(screen.getByText('Approve & continue')).toBeTruthy()
     })
   })
 
@@ -202,26 +228,35 @@ describe('SpecKitPilotView', () => {
     })
   })
 
-  it('calls phaseApprove when Mark approved is clicked', async () => {
+  it('calls phaseApprove when Approve & continue is clicked', async () => {
     mockFeatureList.mockResolvedValue({
       features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
     })
     mockCheckArtifacts.mockResolvedValue({ exists: { specify: true } })
+    mockPilotState.mockResolvedValue({
+      state: makePilotState({
+        phases: {
+          ...makePilotState().phases,
+          specify: { status: 'awaiting_review', artifactPaths: [], hashes: {} },
+        },
+      }),
+    })
     mockPhaseApprove.mockResolvedValue({ state: makePilotState() })
     render(<SpecKitPilotView repoRoot="/repo" />)
     await waitFor(() => screen.getByText('Specify'))
     fireEvent.click(screen.getByText('Specify'))
-    await waitFor(() => screen.getByText('Mark approved'))
-    fireEvent.click(screen.getByText('Mark approved'))
+    await waitFor(() => screen.getAllByText('Approve & continue'))
+    fireEvent.click(screen.getAllByText('Approve & continue')[0])
     await waitFor(() => {
       expect(mockPhaseApprove).toHaveBeenCalledWith({
         featureDir: '/repo/specs/001',
         phase: 'specify',
+        note: undefined,
       })
     })
   })
 
-  it('calls phaseRevoke when Revoke approval is clicked', async () => {
+  it('calls phaseRevoke when Revoke approval is confirmed', async () => {
     mockFeatureList.mockResolvedValue({
       features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
     })
@@ -238,12 +273,20 @@ describe('SpecKitPilotView', () => {
     render(<SpecKitPilotView repoRoot="/repo" />)
     await waitFor(() => screen.getByText('Specify'))
     fireEvent.click(screen.getByText('Specify'))
+    // First click shows the confirm form
     await waitFor(() => screen.getByText('Revoke approval'))
     fireEvent.click(screen.getByText('Revoke approval'))
+    // Now confirm in the dialog — the button appears again in the confirm form
+    await waitFor(() => {
+      const revokeButtons = screen.getAllByText('Revoke approval')
+      // click the confirm button (the danger one in the form)
+      fireEvent.click(revokeButtons[revokeButtons.length - 1])
+    })
     await waitFor(() => {
       expect(mockPhaseRevoke).toHaveBeenCalledWith({
         featureDir: '/repo/specs/001',
         phase: 'specify',
+        note: undefined,
       })
     })
   })
@@ -323,7 +366,6 @@ describe('SpecKitPilotView', () => {
     render(<SpecKitPilotView repoRoot="/repo" />)
     await waitFor(() => screen.getByText('Specify'))
     fireEvent.click(screen.getByText('Specify'))
-    await waitFor(() => screen.getByText('Mark approved'))
 
     // Fire state change event with approved state
     await act(async () => {
@@ -496,6 +538,55 @@ describe('SpecKitPilotView', () => {
     })
   })
 
+  it('shows Skipped status when state is approved but artifact file is missing', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    // No artifact on disk for specify
+    mockCheckArtifacts.mockResolvedValue({ exists: { specify: false } })
+    mockPilotState.mockResolvedValue({
+      state: makePilotState({
+        phases: {
+          ...makePilotState().phases,
+          specify: {
+            status: 'approved',
+            artifactPaths: [],
+            hashes: {},
+            approvedAt: '2026-01-01T00:00:00Z',
+          },
+        },
+      }),
+    })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Specify'))
+    fireEvent.click(screen.getByText('Specify'))
+    await waitFor(() => {
+      expect(screen.getAllByText('Skipped').length).toBeGreaterThan(0)
+      expect(screen.getByText('Never run')).toBeTruthy()
+    })
+  })
+
+  it('shows Skipped status when state is stale but artifact file is missing', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { specify: false } })
+    mockPilotState.mockResolvedValue({
+      state: makePilotState({
+        phases: {
+          ...makePilotState().phases,
+          specify: { status: 'stale', artifactPaths: [], hashes: {} },
+        },
+      }),
+    })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Specify'))
+    fireEvent.click(screen.getByText('Specify'))
+    await waitFor(() => {
+      expect(screen.getAllByText('Skipped').length).toBeGreaterThan(0)
+    })
+  })
+
   it('unsubscribes from onStateChanged on unmount', async () => {
     const unsub = vi.fn()
     mockOnStateChanged.mockReturnValue(unsub)
@@ -504,6 +595,252 @@ describe('SpecKitPilotView', () => {
     await waitFor(() => screen.getByText('No features found'))
     unmount()
     expect(unsub).toHaveBeenCalled()
+  })
+
+  // ── Close tabs ──────────────────────────────────────────────────────────
+
+  it('closes the detail tab when × is clicked, returning to placeholder', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Specify'))
+    fireEvent.click(screen.getByText('Specify'))
+    await waitFor(() => screen.getByLabelText('Close tab'))
+    fireEvent.click(screen.getByLabelText('Close tab'))
+    await waitFor(() => {
+      expect(screen.getByText('Select a phase')).toBeTruthy()
+    })
+  })
+
+  it('closes the diff tab returning to detail view', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { specify: true } })
+    mockPilotState.mockResolvedValue({
+      state: makePilotState({
+        phases: {
+          ...makePilotState().phases,
+          specify: {
+            status: 'approved',
+            artifactPaths: [],
+            hashes: {},
+            approvedAt: '2026-01-01T00:00:00Z',
+          },
+        },
+      }),
+    })
+    mockReadFile.mockResolvedValue({ content: '# Spec' })
+    mockArtifactRead.mockResolvedValue({ current: '# Spec', approved: '# Old' })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Specify'))
+    fireEvent.click(screen.getByText('Specify'))
+    // Trigger diff load via "Open artifact diff" button in ApprovalPanel
+    await waitFor(() => screen.getByText('Open artifact diff'))
+    fireEvent.click(screen.getByText('Open artifact diff'))
+    // Diff tab appears once content is loaded
+    await waitFor(() => screen.getByLabelText('Close diff tab'))
+    fireEvent.click(screen.getByLabelText('Close diff tab'))
+    await waitFor(() => {
+      expect(screen.queryByText('spec.md (diff)')).toBeNull()
+      expect(screen.getByText(/Specify — approved/)).toBeTruthy()
+    })
+  })
+
+  // ── Run in terminal ──────────────────────────────────────────────────────
+
+  it('shows Run in terminal button for ready phases', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { specify: true } })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Specify'))
+    fireEvent.click(screen.getByText('Specify'))
+    await waitFor(() => {
+      expect(screen.getByText('▶ Run in terminal')).toBeTruthy()
+    })
+  })
+
+  it('opens run dialog when Run in terminal is clicked', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { specify: true } })
+    mockSessionList.mockResolvedValue({ sessions: [] })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Specify'))
+    fireEvent.click(screen.getByText('Specify'))
+    await waitFor(() => screen.getByText('▶ Run in terminal'))
+    fireEvent.click(screen.getByText('▶ Run in terminal'))
+    await waitFor(() => {
+      // Dialog title
+      expect(screen.getByText('Run in terminal')).toBeTruthy()
+      // Command shown in dialog (multiple occurrences are ok — at least one visible)
+      expect(screen.getAllByText('/speckit-specify').length).toBeGreaterThan(0)
+    })
+  })
+
+  it('shows session picker when sessions are available', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { specify: true } })
+    mockSessionList.mockResolvedValue({
+      sessions: [{ id: 'sess-1', name: 'Claude Session 1' }],
+    })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Specify'))
+    fireEvent.click(screen.getByText('Specify'))
+    await waitFor(() => screen.getByText('▶ Run in terminal'))
+    fireEvent.click(screen.getByText('▶ Run in terminal'))
+    await waitFor(() => {
+      expect(screen.getByText('Claude Session 1')).toBeTruthy()
+      expect(screen.getByText('Send command')).toBeTruthy()
+    })
+  })
+
+  it('sends command to selected session', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { specify: true } })
+    mockSessionList.mockResolvedValue({
+      sessions: [{ id: 'sess-1', name: 'Claude Session 1' }],
+    })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Specify'))
+    fireEvent.click(screen.getByText('Specify'))
+    await waitFor(() => screen.getByText('▶ Run in terminal'))
+    fireEvent.click(screen.getByText('▶ Run in terminal'))
+    await waitFor(() => screen.getByText('Claude Session 1'))
+    // Pick the last combobox — first one is the feature dropdown, second is the session picker
+    const combos = screen.getAllByRole('combobox')
+    fireEvent.change(combos[combos.length - 1], { target: { value: 'sess-1' } })
+    fireEvent.click(screen.getByText('Send command'))
+    await waitFor(() => {
+      expect(mockTerminalInput).toHaveBeenCalledWith('sess-1', '/speckit-specify\r')
+    })
+  })
+
+  it('shows copy fallback when no sessions available', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { specify: true } })
+    mockSessionList.mockResolvedValue({ sessions: [] })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Specify'))
+    fireEvent.click(screen.getByText('Specify'))
+    await waitFor(() => screen.getByText('▶ Run in terminal'))
+    fireEvent.click(screen.getByText('▶ Run in terminal'))
+    await waitFor(() => {
+      expect(screen.getByText(/No active terminal sessions found/)).toBeTruthy()
+      expect(screen.getByText('Copy')).toBeTruthy()
+    })
+  })
+
+  it('closes run dialog when Close is clicked', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { specify: true } })
+    mockSessionList.mockResolvedValue({ sessions: [] })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Specify'))
+    fireEvent.click(screen.getByText('Specify'))
+    await waitFor(() => screen.getByText('▶ Run in terminal'))
+    fireEvent.click(screen.getByText('▶ Run in terminal'))
+    await waitFor(() => screen.getByText('Close'))
+    fireEvent.click(screen.getByText('Close'))
+    await waitFor(() => {
+      expect(screen.queryByText('Run in terminal')).toBeFalsy()
+    })
+  })
+
+  // ── Approve from ready/stale state ──────────────────────────────────────
+
+  it('shows Approve button for ready phase when artifact file exists', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { specify: true } })
+    mockReadFile.mockResolvedValue({ content: '# Spec content' })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Specify'))
+    fireEvent.click(screen.getByText('Specify'))
+    await waitFor(() => {
+      expect(screen.getByText('Approve')).toBeTruthy()
+    })
+  })
+
+  it('calls phaseApprove when Approve is clicked from ready state', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { specify: true } })
+    mockReadFile.mockResolvedValue({ content: '# Spec content' })
+    mockPhaseApprove.mockResolvedValue({ state: makePilotState() })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Specify'))
+    fireEvent.click(screen.getByText('Specify'))
+    await waitFor(() => screen.getByText('Approve'))
+    fireEvent.click(screen.getByText('Approve'))
+    await waitFor(() => {
+      expect(mockPhaseApprove).toHaveBeenCalledWith({
+        featureDir: '/repo/specs/001',
+        phase: 'specify',
+        note: undefined,
+      })
+    })
+  })
+
+  it('does not show Approve button for ready phase when artifact file is missing', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { specify: true } })
+    mockReadFile.mockResolvedValue({ error: 'not found' })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Specify'))
+    fireEvent.click(screen.getByText('Specify'))
+    await waitFor(() => screen.getByText('▶ Run in terminal'))
+    expect(screen.queryByText('Approve')).toBeNull()
+  })
+
+  // ── File preview when approved ────────────────────────────────────────────
+
+  it('shows file content below approval panel when phase is approved', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { specify: true } })
+    mockPilotState.mockResolvedValue({
+      state: makePilotState({
+        phases: {
+          ...makePilotState().phases,
+          specify: {
+            status: 'approved',
+            artifactPaths: [],
+            hashes: {},
+            approvedAt: '2026-01-01T00:00:00Z',
+          },
+        },
+      }),
+    })
+    mockReadFile.mockResolvedValue({ content: '# My Spec' })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Specify'))
+    fireEvent.click(screen.getByText('Specify'))
+    await waitFor(() => {
+      // Approval panel is shown
+      expect(screen.getByText('Revoke approval')).toBeTruthy()
+    })
+    await waitFor(() => {
+      // File preview section rendered — the artifact-preview__filename span has the path
+      expect(screen.getAllByText('spec.md').length).toBeGreaterThan(0)
+    })
   })
 })
 

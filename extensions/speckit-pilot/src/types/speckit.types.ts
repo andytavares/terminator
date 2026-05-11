@@ -17,6 +17,7 @@ export type PhaseStatus =
   | 'stale'
   | 'modified'
   | 'failed'
+  | 'skipped'
 
 export interface PhaseState {
   id: PhaseId

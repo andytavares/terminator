@@ -208,6 +208,15 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  cleanup:
+    name: Delete old package versions
+    needs: release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    steps:
       - name: Delete old package versions (keep last 5)
         uses: actions/delete-package-versions@v5
         with:

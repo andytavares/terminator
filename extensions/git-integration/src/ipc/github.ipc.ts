@@ -293,6 +293,13 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, path } = parsed.data
     try {
+      const isTestFile =
+        /\.(spec|test)\.[^.]+$/.test(path) || // JS/TS: foo.spec.ts, foo.test.js
+        /(?:^|\/)test_[^/]+$/.test(path) || // Python/Ruby: test_foo.py
+        /_test\.[^.]+$/.test(path) || // Go/Python: foo_test.go, foo_test.py
+        /_spec\.[^.]+$/.test(path) || // Ruby: foo_spec.rb
+        /Tests?\.[^.]+$/.test(path) || // Java/Kotlin/C#: FooTest.java, FooTests.cs
+        /Spec\.[^.]+$/.test(path) // JVM/C#: FooSpec.kt
       const stem = basename(path, `.${basename(path).split('.').pop()}`)
       // Match actual import/require/from statements only — not plain-text mentions in markdown or comments.
       // No extension allowlist: the pattern itself is the filter. Any language that uses import/require/from
@@ -301,9 +308,11 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
       const [churnRaw, blastRaw, testRaw] = await Promise.all([
         runGit(repoRoot, ['log', '--oneline', '--since=90 days ago', '--', path]),
         runGit(repoRoot, ['grep', '-rl', '--extended-regexp', importPattern]).catch(() => ''),
-        runGit(repoRoot, ['ls-files', '--', `**/${stem}*.spec.*`, `**/${stem}*.test.*`]).catch(
-          () => ''
-        ),
+        isTestFile
+          ? Promise.resolve(null)
+          : runGit(repoRoot, ['ls-files', '--', `**/${stem}*.spec.*`, `**/${stem}*.test.*`]).catch(
+              () => ''
+            ),
       ])
       const churn90d = churnRaw ? churnRaw.split('\n').filter(Boolean).length : 0
       const importerLines = blastRaw
@@ -314,7 +323,7 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
         : []
       const blastRadius = importerLines.length
       const importerCount = importerLines.length
-      const testFilePresent = testRaw ? testRaw.trim().length > 0 : false
+      const testFilePresent = isTestFile ? true : testRaw ? testRaw.trim().length > 0 : false
       const patchCoverage = await readFileCoverage(repoRoot, path)
       return {
         churn90d,
