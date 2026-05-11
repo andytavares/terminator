@@ -7,7 +7,7 @@ import {
   detectComplexityHotspots,
   computeFileCyclomaticDelta,
 } from '../../github/pr-review-service'
-import type { PrChangedFile, PrReviewDetail } from '../../schemas/pr-review.schema'
+import type { PrChangedFile, PrReviewDetail, Chapter } from '../../schemas/pr-review.schema'
 import type { FileDiff } from '../../schemas/git.schema'
 import { FileDiffSchema } from '../../schemas/git.schema'
 
@@ -58,6 +58,15 @@ export function ReviewDiffPane({
   const { viewedFiles, threads, patchFileComplexity } = usePrReviewStore()
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Use refs so the complexity-patch effect always has current values without
+  // making them deps of the diff-loading effect (which would cause an infinite
+  // loop: patchFileComplexity updates activePr.chapters → pr.chapters ref
+  // changes → effect re-runs → setDiff(null) → blank screen).
+  const patchFileComplexityRef = useRef(patchFileComplexity)
+  patchFileComplexityRef.current = patchFileComplexity
+  const prChaptersRef = useRef<Chapter[]>(pr.chapters)
+  prChaptersRef.current = pr.chapters
+
   const isViewed = viewedFiles.has(file.path)
   const fileThreads = threads[file.path] ?? []
   const isLastFile = chapterProgress.index === chapterProgress.total - 1
@@ -77,15 +86,22 @@ export function ReviewDiffPane({
         const parsed = FileDiffSchema.safeParse((result as { diff: unknown }).diff)
         if (parsed.success) {
           setDiff(parsed.data)
-          // Feed complexity delta back to the risk score
-          const delta = computeFileCyclomaticDelta(parsed.data)
-          const chapter = pr.chapters.find((c) => c.files.some((f) => f.path === file.path))
-          if (chapter) patchFileComplexity(chapter.id, file.path, delta)
+        } else {
+          setDiffError('Unexpected diff format from server')
         }
       })
       .catch((e) => setDiffError(String(e)))
       .finally(() => setDiffLoading(false))
-  }, [file.path, file.isBinary, repoRoot, pr.number, pr.chapters, patchFileComplexity])
+  }, [file.path, file.isBinary, repoRoot, pr.number])
+
+  // Feed complexity delta into the risk score whenever the diff changes.
+  // Runs independently so it doesn't trigger a diff reload.
+  useEffect(() => {
+    if (!diff) return
+    const delta = computeFileCyclomaticDelta(diff)
+    const chapter = prChaptersRef.current.find((c) => c.files.some((f) => f.path === file.path))
+    if (chapter) patchFileComplexityRef.current(chapter.id, file.path, delta)
+  }, [diff, file.path])
 
   // Keyboard navigation
   useEffect(() => {

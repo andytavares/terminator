@@ -141,6 +141,10 @@ export function PrReviewView({ repoRoot, pr, onClose, onRefresh, onPopOut }: Pro
 
   const showMultipleChapters = pr.chapters.length > 1
 
+  const totalFiles = pr.chapters.flatMap((c) => c.files).length
+  const reviewedCount = viewedFiles.size
+  const reviewPct = totalFiles > 0 ? Math.round((reviewedCount / totalFiles) * 100) : 0
+
   // In guided mode: chapter tabs + single-chapter file list
   // In full mode:   all-chapters file list (no chapter tabs)
   const leftPanel =
@@ -237,6 +241,14 @@ export function PrReviewView({ repoRoot, pr, onClose, onRefresh, onPopOut }: Pro
             ×
           </button>
         </div>
+      </div>
+
+      {/* Review progress bar */}
+      <div
+        className="pr-review-progress-track"
+        aria-label={`${reviewedCount} of ${totalFiles} files reviewed`}
+      >
+        <div className="pr-review-progress-fill" style={{ width: `${reviewPct}%` }} />
       </div>
 
       {/* Chapter tabs: only in guided mode, only for multi-chapter PRs */}

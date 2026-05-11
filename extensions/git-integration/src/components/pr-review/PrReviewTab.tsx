@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { ReviewQueue } from './ReviewQueue'
 import { PrReviewView } from './PrReviewView'
@@ -21,6 +21,13 @@ export function PrReviewTab({ repoRoot }: Props) {
     includeClosedPrs,
     setIncludeClosedPrs,
   } = usePrReviewStore()
+  const isPopoutWindow = new URLSearchParams(window.location.search).get('view') === 'pr-review'
+  const [isPoppedOut, setIsPoppedOut] = useState(isPopoutWindow)
+
+  useEffect(() => {
+    if (isPopoutWindow) return
+    return window.electronAPI.window.onPrReviewWindowChange(setIsPoppedOut)
+  }, [isPopoutWindow])
   const loadQueue = useLoadPrQueue(repoRoot)
   const loadPrDetail = useLoadPrDetail(repoRoot)
   const fetchFileMetrics = useFetchFileMetrics(repoRoot)
@@ -78,7 +85,7 @@ export function PrReviewTab({ repoRoot }: Props) {
   }
 
   const handlePopOut = () => {
-    if (repoRoot) window.electronAPI.window.openPrReview(repoRoot)
+    if (repoRoot) void window.electronAPI.window.openPrReview(repoRoot)
   }
 
   if (!repoRoot) {
@@ -96,18 +103,24 @@ export function PrReviewTab({ repoRoot }: Props) {
         pr={activePr}
         onClose={handleClosePr}
         onRefresh={handleRefreshPr}
-        onPopOut={handlePopOut}
+        onPopOut={isPoppedOut ? undefined : handlePopOut}
       />
     )
   }
 
   return (
     <div className="pr-review-tab-wrap">
-      <div className="pr-review-tab-toolbar">
-        <button className="pr-review-popout-btn" onClick={handlePopOut} title="Open in new window">
-          ⬡ Pop out
-        </button>
-      </div>
+      {!isPoppedOut && (
+        <div className="pr-review-tab-toolbar">
+          <button
+            className="pr-review-popout-btn"
+            onClick={handlePopOut}
+            title="Open in new window"
+          >
+            ⬡ Pop out
+          </button>
+        </div>
+      )}
       <ReviewQueue
         repoRoot={repoRoot}
         onOpenPr={handleOpenPr}

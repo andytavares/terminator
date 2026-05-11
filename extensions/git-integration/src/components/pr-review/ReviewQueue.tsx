@@ -214,13 +214,7 @@ export function ReviewQueue({
           </div>
         ) : (
           <>
-            <PrSection
-              title="In progress"
-              prs={inProgress}
-              accent="blue"
-              onOpen={onOpenPr}
-              showProgress
-            />
+            <PrSection title="In progress" prs={inProgress} accent="blue" onOpen={onOpenPr} />
             {activeFilter !== 'in-progress' && (
               <>
                 <PrSection
@@ -254,20 +248,18 @@ function PrSection({
   prs,
   accent,
   onOpen,
-  showProgress = false,
 }: {
   title: string
   prs: ReviewQueuePR[]
   accent: 'red' | 'green' | 'blue' | 'none'
   onOpen: (pr: ReviewQueuePR) => void
-  showProgress?: boolean
 }) {
   if (prs.length === 0) return null
   return (
     <div className={`pr-section pr-section--${accent}`}>
       <h3 className="pr-section-title">{title}</h3>
       {prs.map((pr) => (
-        <PrRow key={pr.number} pr={pr} onOpen={onOpen} showProgress={showProgress} />
+        <PrRow key={pr.number} pr={pr} onOpen={onOpen} />
       ))}
     </div>
   )
@@ -275,15 +267,7 @@ function PrSection({
 
 const SIGNAL_LABELS = ['Tests', 'Coverage', 'CI', 'Lint', 'Churn', 'Blast'] as const
 
-function PrRow({
-  pr,
-  onOpen,
-  showProgress = false,
-}: {
-  pr: ReviewQueuePR
-  onOpen: (pr: ReviewQueuePR) => void
-  showProgress?: boolean
-}) {
+function PrRow({ pr, onOpen }: { pr: ReviewQueuePR; onOpen: (pr: ReviewQueuePR) => void }) {
   const dots = [
     pr.signalDots.tests,
     pr.signalDots.coverage,
@@ -295,7 +279,7 @@ function PrRow({
 
   const actionLabel =
     pr.sessionStatus === 'paused'
-      ? `Resume Ch ${pr.resumeChapter ?? 1}/${pr.resumeChapterTotal ?? '?'}`
+      ? 'Resume'
       : pr.sessionStatus === 'in-progress'
         ? 'Continue'
         : pr.riskLevel === 'high'
@@ -304,12 +288,9 @@ function PrRow({
 
   const age = formatAge(pr.openedAt)
 
-  const chapterProgress =
-    showProgress &&
-    pr.resumeChapter != null &&
-    pr.resumeChapterTotal != null &&
-    pr.resumeChapterTotal > 0
-      ? Math.round(((pr.resumeChapter - 1) / pr.resumeChapterTotal) * 100)
+  const fileProgress =
+    pr.sessionStatus !== 'not-started' && pr.fileCount > 0
+      ? Math.round((pr.viewedFileCount / pr.fileCount) * 100)
       : null
 
   return (
@@ -321,9 +302,9 @@ function PrRow({
         <span className="pr-row-meta">
           {pr.author} · {age} · {pr.fileCount} files · +{pr.additions}/−{pr.deletions}
         </span>
-        {chapterProgress !== null && (
-          <div className="pr-row-progress" aria-label={`${chapterProgress}% reviewed`}>
-            <div className="pr-row-progress-bar" style={{ width: `${chapterProgress}%` }} />
+        {fileProgress !== null && (
+          <div className="pr-row-progress" aria-label={`${fileProgress}% of files reviewed`}>
+            <div className="pr-row-progress-bar" style={{ width: `${fileProgress}%` }} />
           </div>
         )}
       </div>

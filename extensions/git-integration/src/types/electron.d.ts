@@ -65,12 +65,14 @@ declare global {
         prReviewSubmit(payload: unknown): Promise<{ reviewId: number } | { error: string }>
         sessionGet(key: string): Promise<{ session: unknown } | { session: null }>
         sessionSet(key: string, session: unknown): Promise<{ ok: true } | { error: string }>
+        sessionsForRepo(repoRoot: string): Promise<{ sessions: unknown[] }>
       }
       git: Window['electronAPI']['git'] & {
         push(repoRoot: string): Promise<{ success: true } | { error: string }>
       }
       window: {
         openPrReview(repoRoot: string): Promise<void>
+        onPrReviewWindowChange(handler: (isOpen: boolean) => void): () => void
       }
     }
   }

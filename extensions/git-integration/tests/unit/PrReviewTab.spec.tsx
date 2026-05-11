@@ -64,7 +64,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     github: { sessionGet: vi.fn().mockResolvedValue({ session: null }) },
-    window: { openPrReview: vi.fn() },
+    window: { openPrReview: vi.fn(), onPrReviewWindowChange: vi.fn().mockReturnValue(() => {}) },
   }
   vi.mocked(usePrReviewStore).mockReturnValue(
     defaultStoreState as unknown as ReturnType<typeof usePrReviewStore>

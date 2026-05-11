@@ -1,7 +1,16 @@
 import { useCallback } from 'react'
 import { usePrReviewStore } from '../stores/pr-review.store'
-import { ReviewQueuePRSchema, PrReviewDetailSchema } from '../schemas/pr-review.schema'
-import type { PrReviewDetail, FileMetrics, SignalDots } from '../schemas/pr-review.schema'
+import {
+  ReviewQueuePRSchema,
+  PrReviewDetailSchema,
+  ReviewSessionSchema,
+} from '../schemas/pr-review.schema'
+import type {
+  PrReviewDetail,
+  FileMetrics,
+  SignalDots,
+  ReviewQueuePR,
+} from '../schemas/pr-review.schema'
 import { computeRiskScore } from '../github/pr-review-service'
 
 // ─── Queue loading ────────────────────────────────────────────────────────────
@@ -11,6 +20,40 @@ function parsePrList(raw: unknown[]): ReturnType<typeof ReviewQueuePRSchema.safe
     .map((p) => ReviewQueuePRSchema.safeParse(p))
     .filter((r) => r.success)
     .map((r) => r.data!)
+}
+
+async function mergeSessionStatuses(
+  repoRoot: string,
+  prs: ReviewQueuePR[]
+): Promise<ReviewQueuePR[]> {
+  try {
+    const result = await window.electronAPI.github.sessionsForRepo(repoRoot)
+    const sessions = (result.sessions as unknown[])
+      .map((s) => ReviewSessionSchema.safeParse(s))
+      .filter((r) => r.success)
+      .map((r) => r.data!)
+
+    // Keep the most-recently-accessed session per PR number
+    const latestByPr = new Map<number, (typeof sessions)[0]>()
+    for (const session of sessions) {
+      const existing = latestByPr.get(session.prNumber)
+      if (!existing || session.lastAccessedAt > existing.lastAccessedAt) {
+        latestByPr.set(session.prNumber, session)
+      }
+    }
+
+    return prs.map((pr) => {
+      if (!pr) return pr
+      const session = latestByPr.get(pr.number)
+      if (!session) return pr
+      const sessionStatus: ReviewQueuePR['sessionStatus'] = session.pausedAt
+        ? 'paused'
+        : 'in-progress'
+      return { ...pr, sessionStatus, viewedFileCount: session.viewedFiles.length }
+    })
+  } catch {
+    return prs
+  }
 }
 
 export function useLoadPrQueue(repoRoot: string | null) {
@@ -59,10 +102,11 @@ export function useLoadPrQueue(repoRoot: string | null) {
         }
         const res = result as { prs: unknown[]; hasMore: boolean; nextCursor?: string }
         const prs = parsePrList(res.prs)
+        const prsWithStatus = await mergeSessionStatuses(repoRoot, prs)
         if (isAppend) {
-          appendQueue(prs)
+          appendQueue(prsWithStatus)
         } else {
-          setQueue(prs)
+          setQueue(prsWithStatus)
         }
         setHasMorePrs(res.hasMore)
         setNextPrCursor(res.nextCursor)

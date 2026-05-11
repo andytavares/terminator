@@ -212,7 +212,7 @@ describe('ReviewQueue', () => {
       ],
     } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<ReviewQueue {...defaultProps} />)
-    expect(screen.getAllByText('Resume Ch 2/3').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Resume').length).toBeGreaterThan(0)
   })
 
   it('applies active filter pill when clicked', () => {

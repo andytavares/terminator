@@ -108,6 +108,7 @@ export const ReviewQueuePRSchema = z.object({
   riskLevel: z.enum(['low', 'medium', 'high']),
   signalDots: SignalDotsSchema,
   sessionStatus: z.enum(['not-started', 'in-progress', 'paused']),
+  viewedFileCount: z.number().default(0),
   resumeChapter: z.number().optional(),
   resumeChapterTotal: z.number().optional(),
 })

@@ -382,6 +382,21 @@ export function registerGithubHandlers(register: RegisterFn): void {
     }
   })
 
+  register('github:sessions-for-repo', (payload) => {
+    const schema = z.object({ repoRoot: z.string().min(1) })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { sessions: [] }
+    const { repoRoot } = parsed.data
+    const all = sessionStore.store
+    const sessions: unknown[] = []
+    for (const [key, value] of Object.entries(all)) {
+      if (!key.startsWith(`${repoRoot}:::`)) continue
+      const result = ReviewSessionSchema.safeParse(value)
+      if (result.success) sessions.push(result.data)
+    }
+    return { sessions }
+  })
+
   register('github:session-get', (payload) => {
     const schema = z.object({ key: z.string().min(1) })
     const parsed = schema.safeParse(payload)
