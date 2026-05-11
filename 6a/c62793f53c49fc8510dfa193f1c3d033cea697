@@ -1,0 +1,19 @@
+.github/workflows/ci.yml
+  s_cfc95e4fe21417::t_0791f26a59d2f5 176-184
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "6ac62793f53c49fc8510dfa193f1c3d033cea697",
+  "prompts": {},
+  "sessions": {
+    "s_cfc95e4fe21417": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "33a7a043-8c1f-4542-864d-9d6bea49be34",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
