@@ -1,0 +1,23 @@
+extensions/git-integration/tests/unit/StatusChecksBar.spec.tsx
+  s_3b30f216396193::t_5147a7fdc5e3fd 1-16,18-85,87-109,113-114
+  s_3b30f216396193::t_5a91484b46b290 111
+  s_3b30f216396193::t_6f8eb2f733f54b 110,112
+extensions/git-integration/tests/unit/github-ipc.spec.ts
+  s_3b30f216396193::t_6c26ddb125c55f 51-240
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "26c66a9c4ac2c5ecea303ecf94db71a189a66e7c",
+  "prompts": {},
+  "sessions": {
+    "s_3b30f216396193": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08452989-bfcf-4278-ac65-943d7e832777",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
