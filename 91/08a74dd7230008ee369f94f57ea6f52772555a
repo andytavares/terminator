@@ -1,0 +1,224 @@
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_0de71e12156b92::t_cb4210602dc2cb 470-476,480-498,502-511
+  ai_agent 477-479,499-501,525-537,553-555,569-572,578-580,708,819-825,829-830
+  s_0de71e12156b92::t_a6b9cee31c370f 512-524,538-552,556-568,573-577,581-584
+  s_0de71e12156b92::t_8cd76ec05bc095 695-707,709-716
+  s_9dddbf7cfbd174::t_503ffcbb1bf7d4 811-815,818,826-828
+  s_9dddbf7cfbd174::t_5b06dfa305e638 816-817,831
+extensions/speckit-pilot/src/state/artifact-hash.ts
+  s_9dddbf7cfbd174::t_2f2cf176765c0c 1-16
+extensions/speckit-pilot/src/index.ts
+  s_9dddbf7cfbd174::t_8566b82a298f67 7-9,37,40,51,61,79,199-216
+  s_9dddbf7cfbd174::t_087674099957f5 1,3,5-6,10-36,38-39,41-50,52-60,62-78,80-85,121-129,138-196
+  ai_agent 105-107
+  s_9dddbf7cfbd174::t_08efa9185c1c49 86-104,108-120
+  s_9dddbf7cfbd174::t_efbb2329baf711 130-137
+  s_9dddbf7cfbd174::t_c4862e28b54f1a 2,4,197-198
+specs/004-speckit-pilot-extension/quickstart.md
+  ai_agent 1-88
+extensions/speckit-pilot/src/types/electron.ts
+  s_9dddbf7cfbd174::t_a08ea1c3e37fac 5-8
+  s_9dddbf7cfbd174::t_d2dae39bd6883b 35-38
+  s_9dddbf7cfbd174::t_f7d7c7dc1718cb 1-4,9-34,39-55
+src/main/index.ts
+  s_0de71e12156b92::t_2cc03919d45c98 10,13
+  s_0de71e12156b92::t_f46d4707b7a171 130,139
+src/main/ipc/extension.ipc.ts
+  s_0de71e12156b92::t_e22c8b5957237b 4-7
+  s_0de71e12156b92::t_686d433a2a6348 24-33
+  s_0de71e12156b92::t_2e70ae7306a2c1 34-49
+extensions/speckit-pilot/tests/state/artifact-hash.spec.ts
+  ai_agent 1-72
+tests/unit/renderer/components/ErrorBoundary.spec.tsx
+  s_0de71e12156b92::t_904311c0f3ac73 5
+  s_0de71e12156b92::t_399a5121eb582f 61,67
+  s_0de71e12156b92::t_5b66a6e93531de 6
+  s_0de71e12156b92::t_91fbc346f871bf 4,7-14,17,20
+src/main/storage/extension-settings-store.ts
+  s_0de71e12156b92::t_1c39e6fac823a6 1-23
+src/renderer/logger.ts
+  s_0de71e12156b92::t_4fcc780d8b6a21 1-56
+vitest.workspace.ts
+  s_9dddbf7cfbd174::t_198238da7f05c4 1-17,19-29,31-35
+  ai_agent 18,30
+extensions/speckit-pilot/src/components/SpecKitPilotView.tsx
+  s_9dddbf7cfbd174::t_cadd6e37ee1937 23-32,35-57,71,74,78-97,106,109,139,141,143,146-156,171,177,179,181,183-185,187,189,192,200,214-217,223-226,228-233,245-246,273-274,276,288-291,306,322,336-338,350,367,388-396,399-401,404-408,410-413,415-424,428,438,459,472,477-480,483-486,491,505-506,538,560
+  ai_agent 186,299,397-398,409,414,481-482,500
+  s_9dddbf7cfbd174::t_5170a19996c677 1-22,33-34,58-70,72-73,75-77,98-105,107-108,110-138,140,142,144-145,157-170,172-176,178,180,182,188,190-191,193-199,201-213,218-222,227,234-244,247-272,275,277-287,292-298,300-305,307-321,323-335,339-349,351-366,368-387,402-403,425-427,429-437,439-458,460-471,473-476,487-490,492-499,501-504,507-537,539-559,561-570
+extensions/speckit-pilot/tests/schemas/speckit.schemas.spec.ts
+  ai_agent 1-273
+specs/004-speckit-pilot-extension/.pilot/state.json
+  ai_agent 13-147
+tests/integration/ipc/extension.ipc.spec.ts
+  s_0de71e12156b92::t_23635e82808852 36-37
+  s_0de71e12156b92::t_9488ee87eb3deb 15,19-27
+  s_0de71e12156b92::t_5717e7aa25ec55 177-249
+  s_0de71e12156b92::t_95c14ea372eee7 59
+src/renderer/electron.d.ts
+  s_0de71e12156b92::t_4a69eb63ee6904 128-130
+  s_9dddbf7cfbd174::t_2fe23d30b7c835 138
+  s_0de71e12156b92::t_f4d106d255762a 90-91
+  s_0de71e12156b92::t_41b21126d7c623 92-112
+  s_9dddbf7cfbd174::t_3d70c959dfeafd 135-137
+specs/004-speckit-pilot-extension/plan.md
+  ai_agent 1-246
+extensions/speckit-pilot/src/components/PhaseRow.tsx
+  s_9dddbf7cfbd174::t_2ddd03f4da19c1 1-41,45-59
+  ai_agent 42-44
+tests/e2e/git-settings.spec.ts
+  s_0de71e12156b92::t_51266ef542adae 23,27-28
+extensions/speckit-pilot/manifest.json
+  s_9dddbf7cfbd174::t_f822bf4ec9d654 1,4,6-7
+  s_9dddbf7cfbd174::t_3f361693d75be8 2-3,5,8
+README.md
+  s_9dddbf7cfbd174::t_827bd95ee712b2 15
+specs/004-speckit-pilot-extension/contracts/ipc-channels-speckit.md
+  ai_agent 16,18-20,24,40,54,64,80,94,105,119,124,130,144,154,168,171,178,196,209,223,225-227,231,245,256,270,272-274,278,292,294-297,301,317,319-321,329,332,334
+  s_9dddbf7cfbd174::t_c2a3a590ba5405 1-15,17,21-23,25-39,41-53,55-63,65-79,81-93,95-104,106-118,120-123,125-129,131-143,145-153,155-167,169-170,172-177,179-195,197-208,210-222,224,228-230,232-244,246-255,257-269,271,275-277,279-291,293,298-300,302-316,318,322-328,330-331,333,335-338
+extensions/speckit-pilot/src/renderer.tsx
+  s_9dddbf7cfbd174::t_09da435e4f048f 1-2,4-6,11
+  s_9dddbf7cfbd174::t_7482bdb4786ba3 3,7-10
+extensions/speckit-pilot/tests/components/PhaseRow.spec.tsx
+  ai_agent 42,48
+  s_9dddbf7cfbd174::t_cae10046f6e4c7 1-41,43-47,49-77
+src/renderer/components/settings/SettingsPanel.tsx
+  s_0de71e12156b92::t_deae29a79fdea4 113,127-128,135-144,149-153,171-184
+  s_0de71e12156b92::t_2d83ca0863839d 258-272,275,289-290,292-293,308-312,314-327,329-345
+  s_0de71e12156b92::t_f5d76857f7cf95 203-211,213,216-217,219-236
+  s_0de71e12156b92::t_9a140a822e0759 273,280-282,284-288,291,294-298,301,303-307,328
+  s_0de71e12156b92::t_6d07a3ea9a4370 274,276-279,283,299-300
+  s_0de71e12156b92::t_fba273a41584c1 69-85,90-92,97-104
+  s_0de71e12156b92::t_b6b981a124178b 154-170
+  s_0de71e12156b92::t_8fb2593550755a 197-202,214,237-251,253-254
+  s_0de71e12156b92::t_df872f86005b4c 123
+  ai_agent 131-134,145-148,212,215,218,302,313
+extensions/speckit-pilot/src/state/phase-state-machine.ts
+  s_9dddbf7cfbd174::t_29ed5b3e82106c 1-57,59-126
+  ai_agent 58
+specs/004-speckit-pilot-extension/research.md
+  ai_agent 1-165
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_0de71e12156b92::t_8cff1697c85d1b 72-89
+src/main/logger.ts
+  s_0de71e12156b92::t_0ac7a2f98d4436 1-59,61-72,74-87
+  ai_agent 60,73
+tests/unit/storage/extension-settings-store.spec.ts
+  s_0de71e12156b92::t_2053102e7f8d0f 1-61
+specs/004-speckit-pilot-extension/spec.md
+  ai_agent 1-212
+src/main/extensions/extension-host.ts
+  ai_agent 64-66,112-114
+  s_0de71e12156b92::t_00195fcedfea6e 127-143,149-156
+  s_0de71e12156b92::t_4334314bf78f06 8-10
+  s_0de71e12156b92::t_a84f104ada3601 45,51,57-60,73,88,99,108,111
+  s_0de71e12156b92::t_490a5a759627c4 144-148
+extensions/speckit-pilot/package.json
+  s_9dddbf7cfbd174::t_f822bf4ec9d654 1-4
+  s_9dddbf7cfbd174::t_4fa3fa97b45ed9 5-10
+extensions/speckit-pilot/src/components/speckit-pilot.css
+  s_9dddbf7cfbd174::t_b037bfc348f75b 322-376
+  s_9dddbf7cfbd174::t_ef56ce71210514 435-441
+  ai_agent 178-184,219-227,229-234,278-298,300-307,543-633,636-649
+  s_9dddbf7cfbd174::t_9a57fb9f584af5 1-177,185-218,228,235-277,299,308-321,377-434,442-542,634-635,650-692
+src/main/extensions/api.ts
+  s_0de71e12156b92::t_c2d961846e3766 230-231,234
+  s_0de71e12156b92::t_2bad92235941a7 242-248,250
+  s_0de71e12156b92::t_ea0e1bde113a01 79-84
+  s_9dddbf7cfbd174::t_b03174102bc98f 134
+  s_0de71e12156b92::t_9d2d67975774cf 135
+  s_0de71e12156b92::t_1f4d424252bad5 19
+  s_9dddbf7cfbd174::t_8447706183223d 220
+tests/unit/extensions/api.spec.ts
+  s_0de71e12156b92::t_6ccb81b70d3a77 34-42
+  s_0de71e12156b92::t_6a91f5bfb45a7f 195-216
+  s_0de71e12156b92::t_5b25e9a2c2efbd 218-224,227,233-234,236-237,240-247,249-250,253-261,263-264,269
+specs/004-speckit-pilot-extension/checklists/requirements.md
+  ai_agent 1-34
+src/renderer/components/settings/SettingsPanel.css
+  s_0de71e12156b92::t_0843042e46ab97 295-297,299,318-319,324-325,327,329-330,333
+  ai_agent 314-317
+  s_0de71e12156b92::t_1dc6cb5b36b634 334-335,339-340,344-346,348-352,354-356,363-371,374,376-381,383-392,395-400
+  s_0de71e12156b92::t_b50bf0ae070893 220-223,231-236,240-248,253,255-257,263-264,269,272,274-275,298,300-313,320-323,326,328,331-332,336-338,341-343,347,353,357-362,372-373,375,382,393-394
+src/main/ipc/log.ipc.ts
+  s_0de71e12156b92::t_40323b1010a75e 1-4,13
+  ai_agent 5-12
+extensions/speckit-pilot/src/types/electron.d.ts
+  s_9dddbf7cfbd174::t_ebf4f3ada9254a 1-3
+CLAUDE.md
+  s_9dddbf7cfbd174::t_316e1768b7cb5a 5
+extensions/speckit-pilot/src/schemas/speckit.schemas.ts
+  s_9dddbf7cfbd174::t_3b67593efb00f2 1-135
+src/main/preload.ts
+  s_0de71e12156b92::t_12e55bd8bb9e9b 204-207
+  s_9dddbf7cfbd174::t_ea7fed6243c540 202-203
+  s_0de71e12156b92::t_c2d3ad6769e968 108-109
+  s_0de71e12156b92::t_be094e8e94db8d 110-113
+  s_9dddbf7cfbd174::t_6433cab1abf7c4 196-201
+extensions/speckit-pilot/tests/ipc/speckit.ipc.spec.ts
+  s_9dddbf7cfbd174::t_0a5da470c2e807 1
+  ai_agent 9-14,57,81-82,143-150
+  s_9dddbf7cfbd174::t_c597fcaebade66 2-8,15-56,58-80,83-142,151-173
+specs/004-speckit-pilot-extension/data-model.md
+  ai_agent 31-33,35-38,66-71,82,94,96-100,111-113,123-124,133,135,137-141,151,153-155,161-162,166,177-180,188-194,200-209
+  s_9dddbf7cfbd174::t_2d4be733fc803c 1-30,34,39-65,72-81,83-93,95,101-110,114-122,125-132,134,136,142-150,152,156-160,163-165,167-176,181-187,195-199
+extensions/speckit-pilot/src/types/speckit.types.ts
+  s_9dddbf7cfbd174::t_93371859ddc534 1-152
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_0de71e12156b92::t_9948fe660070ba 38-42
+src/renderer/components/ErrorBoundary.tsx
+  s_0de71e12156b92::t_50f8c60839a22c 25
+  s_0de71e12156b92::t_2aabdc7d368650 2
+  s_0de71e12156b92::t_d16b3c6692abf8 3-4
+extensions/speckit-pilot/src/state/state-persistence.ts
+  s_9dddbf7cfbd174::t_7af19fc0557295 1-46,48-86,88-97
+  ai_agent 47,87
+specs/001-extension-first-terminal/contracts/extension-api.md
+  s_0de71e12156b92::t_57b483f34e3042 39-50
+src/renderer/index.tsx
+  s_0de71e12156b92::t_405a7fa21eb416 11-13
+specs/004-speckit-pilot-extension/tasks.md
+  ai_agent 22-27,39-55,69-70,74-80,378-384
+  s_9dddbf7cfbd174::t_27afc43ede6efa 1-21,28-38,56-68,71-73,81-238,240,284-377,385-396
+  s_9dddbf7cfbd174::t_774ddf12f3b6cb 239,241-283
+package-lock.json
+  ai_agent 2,8,71-93,2244-2247,4889-4895
+extensions/speckit-pilot/src/utils/markdown.ts
+  ai_agent 9,30-32
+  s_9dddbf7cfbd174::t_972f645392b80f 1-8,10-29,33-140
+extensions/speckit-pilot/tests/state/phase-state-machine.spec.ts
+  ai_agent 1-227
+specs/004-speckit-pilot-extension/contracts/extension-api-delta.md
+  ai_agent 1-37
+tests/unit/extensions/extension-host.spec.ts
+  s_0de71e12156b92::t_a8b2a362761a7a 166-185
+  s_0de71e12156b92::t_9fd3c81a4afa03 192,214-219,221-222,224-227,229,232
+  s_0de71e12156b92::t_940ee38c4e6c08 193-212
+  s_0de71e12156b92::t_17baa797b2abd9 158-165,186-191
+  s_0de71e12156b92::t_6f4204da66ca68 10-26
+  s_0de71e12156b92::t_669b079ed797f0 213,220,223,228,230-231
+  s_0de71e12156b92::t_1c19376d6dd701 65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "9108a74dd7230008ee369f94f57ea6f52772555a",
+  "prompts": {},
+  "sessions": {
+    "s_0de71e12156b92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3eb1c01f-7878-4745-9219-049c51a0f1df",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_9dddbf7cfbd174": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7497f941-5f66-448f-951e-9b4c873e429d",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
