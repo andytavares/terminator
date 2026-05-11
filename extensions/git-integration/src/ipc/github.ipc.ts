@@ -3,7 +3,7 @@ import Store from 'electron-store'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { basename, join } from 'path'
-import { readFile } from 'fs/promises'
+import { readFile, access } from 'fs/promises'
 import type {
   ReviewQueuePR,
   PrReviewDetail,
@@ -26,8 +26,34 @@ const sessionStore = new Store<Record<string, unknown>>({ name: 'pr-review-sessi
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Packaged Electron apps don't inherit the shell PATH, so we probe common
+// locations where `gh` is installed on macOS before falling back to the name.
+const GH_CANDIDATE_PATHS = [
+  '/opt/homebrew/bin/gh', // Apple Silicon Homebrew
+  '/usr/local/bin/gh', // Intel Homebrew
+  '/usr/bin/gh',
+]
+
+let resolvedGhPath: string | null = null
+
+async function resolveGh(): Promise<string> {
+  if (resolvedGhPath) return resolvedGhPath
+  for (const p of GH_CANDIDATE_PATHS) {
+    try {
+      await access(p)
+      resolvedGhPath = p
+      return p
+    } catch {
+      // not found at this path
+    }
+  }
+  resolvedGhPath = 'gh'
+  return resolvedGhPath
+}
+
 async function runGh(cwd: string, args: string[], timeoutMs = 30_000): Promise<string> {
-  const { stdout, stderr } = await execFileAsync('gh', args, { cwd, timeout: timeoutMs })
+  const gh = await resolveGh()
+  const { stdout, stderr } = await execFileAsync(gh, args, { cwd, timeout: timeoutMs })
   if (stderr && !stdout) throw new Error(stderr)
   return stdout.trim()
 }

@@ -125,7 +125,6 @@ function registerDialogHandlers(): void {
 }
 
 app.whenReady().then(async () => {
-  createWindow()
   setupMenu()
   registerWorkspaceHandlers()
   registerTerminalHandlers(ptyManager, () => mainWindow)
@@ -148,6 +147,10 @@ app.whenReady().then(async () => {
 
   await extensionHost.loadAll()
   await extensionHost.loadBundledExtensions(join(__dirname, '../../extensions'))
+
+  // Window is created after extensions load so the renderer can immediately
+  // query the active extension list and only mount the correct renderers.
+  createWindow()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

@@ -15,7 +15,6 @@ import { installLogInterceptor } from './stores/log.store'
 import { useToastStore } from './stores/toast.store'
 import { useExtensionRegistry } from './extensions/registry'
 import { EmptyState } from './components/EmptyState'
-import './extensions/loader'
 
 installLogInterceptor()
 
