@@ -1,0 +1,19 @@
+package.json
+  s_0de71e12156b92::t_b999aeb1eac26a 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "48eee14f2bfe77684fcac1db8ebb3fadceb2a662",
+  "prompts": {},
+  "sessions": {
+    "s_0de71e12156b92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3eb1c01f-7878-4745-9219-049c51a0f1df",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
