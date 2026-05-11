@@ -1,0 +1,29 @@
+docs/EXTENSION-DEVELOPMENT.md
+  s_94121bba51756d::t_c5181e6c1cb5bd 404-463,465-481
+  s_94121bba51756d::t_543097ac5d0a8e 549,556
+  s_94121bba51756d::t_a01a6558c17d2a 352-372
+  s_94121bba51756d::t_7f070dd8f74eac 515,520-522
+specs/002-git-github-integration/contracts/extension-api-additions.md
+  s_94121bba51756d::t_4a36ff8c5bf367 270-272
+  s_94121bba51756d::t_1d9176f4f1f6da 21
+  s_94121bba51756d::t_2487bb420d023a 114-134
+scripts/create-extension.cjs
+  s_94121bba51756d::t_ecb509a03f57ad 163-170
+  s_94121bba51756d::t_fe984e0e8da4b1 273-278
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "c816c7e3f58c96dc5aa6675239f40162f8871fcb",
+  "prompts": {},
+  "sessions": {
+    "s_94121bba51756d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9588e76d-be9b-46a6-ad3b-3800290b80dc",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
