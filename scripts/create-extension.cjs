@@ -160,6 +160,14 @@ function activate(api) {
   //     console.log('[${name}] file changed:', event.filename)
   //   })
   // )
+
+  // TODO: Register a custom IPC handler (callable from renderer via window.electronAPI.invoke)
+  // disposables.push(
+  //   api.ipc.registerHandler('${id}:my-action', async (payload) => {
+  //     // payload is what the renderer passes to invoke()
+  //     return { result: 'ok' }
+  //   })
+  // )
 }
 
 function deactivate() {
@@ -262,7 +270,12 @@ function main(argv) {
   console.log(`✓ Created extension "${name}" at ${outDir}`)
   console.log(`  package.json  — workspace package (add npm deps here)`)
   console.log(`  manifest.json — id: ${id}`)
-  console.log(`  src/index.js  — hello-world with all v1.1.0 API stubs`)
+  console.log(`  src/index.js  — main-process entry with all v1.1.0 API stubs`)
+  console.log(``)
+  console.log(`To contribute UI (sidebar panels, project tabs), add src/renderer.tsx`)
+  console.log(
+    `and register components via useExtensionRegistry (see docs/EXTENSION-DEVELOPMENT.md).`
+  )
   console.log(`\nRun "npm install" then "npm run dev" to load the extension automatically.`)
 }
 

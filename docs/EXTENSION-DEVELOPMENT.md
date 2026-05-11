@@ -349,6 +349,27 @@ watcher.dispose()
 
 ---
 
+### `api.ipc` — Custom IPC Handlers _(v1.1.0)_
+
+Register named IPC handlers in the main process. The renderer side calls these via `window.electronAPI.invoke(channel, payload)`.
+
+```typescript
+const handler = api.ipc.registerHandler('my-ext:do-thing', async (payload) => {
+  // payload is the argument passed from the renderer
+  const result = await someMainProcessWork(payload)
+  return result // returned value is resolved to the renderer's invoke() call
+})
+
+// In deactivate():
+handler.dispose()
+```
+
+**Channel naming**: prefix every channel with your extension ID followed by `:` to avoid collisions with core channels and other extensions. For example `com.acme.my-ext:fetch-data`.
+
+**Error handling**: throw or return `{ error: string }` to signal failure. The renderer receives the rejection or error payload.
+
+---
+
 ## Disposables
 
 Every registration method returns a `Disposable`:
@@ -377,6 +398,84 @@ export function deactivate(): void {
   disposables.length = 0
 }
 ```
+
+---
+
+## Renderer Extensions (`renderer.tsx`)
+
+Some extensions need to contribute UI directly into the renderer: sidebar panels with React components, additional project tabs, or renderer-side keyboard shortcuts. This is done through a second entry point — `renderer.tsx` — that runs in the renderer process.
+
+### When you need `renderer.tsx`
+
+- Your extension contributes a **sidebar panel** (React component in the right sidebar)
+- Your extension contributes a **project tab** (a new tab in the project view)
+- Your extension needs **renderer-side keyboard shortcuts** (beyond the main-process bindings from `api.keyboard`)
+
+### Structure
+
+```
+my-extension/
+├── manifest.json
+├── package.json
+└── src/
+    ├── index.ts        # Main process: activate(api), IPC handlers, settings, etc.
+    └── renderer.tsx    # Renderer process: self-registers UI components
+```
+
+### How it works
+
+The host app uses a Vite glob import to discover `extensions/*/src/renderer.tsx` at build time. Each `renderer.tsx` is executed as a side effect on import and self-registers into the extension registry via `useExtensionRegistry`. The core app never imports your extension directly.
+
+### Example `renderer.tsx`
+
+```typescript
+import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
+import { MyPanel } from './components/MyPanel'
+import { MyProjectView } from './components/MyProjectView'
+
+const registry = useExtensionRegistry.getState()
+
+// Register a sidebar panel
+registry.registerSidebarPanel({
+  id: 'my-sidebar-panel',
+  label: 'My Panel',
+  component: MyPanel, // ComponentType<{ repoRoot: string | null; onClose: () => void }>
+  defaultOpen: false,
+})
+
+// Register a project tab
+registry.registerProjectTab({
+  id: 'my-project-tab',
+  label: 'My Tab',
+  component: MyProjectView, // ComponentType<{ repoRoot: string | null }>
+})
+
+// Register a renderer-side keyboard shortcut
+registry.registerKeyboardShortcut({
+  accelerator: 'CmdOrCtrl+Shift+M',
+  description: 'Toggle my panel',
+  action: () => useExtensionRegistry.getState().togglePanel('my-sidebar-panel'),
+})
+```
+
+### Registry API
+
+| Method                               | Description                                                                  |
+| ------------------------------------ | ---------------------------------------------------------------------------- |
+| `registerSidebarPanel(panel)`        | Adds a React component to the right sidebar. Returns an unregister function. |
+| `registerProjectTab(tab)`            | Adds a tab to the project view. Returns an unregister function.              |
+| `registerKeyboardShortcut(shortcut)` | Binds a renderer-side keyboard shortcut. Returns an unregister function.     |
+| `togglePanel(panelId)`               | Opens or closes a registered sidebar panel.                                  |
+| `setActiveProjectTab(tabId)`         | Activates a registered project tab.                                          |
+
+Component prop shapes:
+
+- Sidebar panel: `{ repoRoot: string | null; onClose: () => void }`
+- Project tab: `{ repoRoot: string | null }`
+
+### Note on the internal import
+
+`renderer.tsx` is the **only** place where importing from `src/renderer/extensions/registry` is permitted. All other extension code (including `index.ts`) must use only the `ExtensionAPI` object.
 
 ---
 
@@ -413,13 +512,14 @@ To disable per-workspace, add to `.terminator/settings.json` in your project roo
 
 ## Constraints
 
-1. **No internal imports** — only the `ExtensionAPI` object. Do not import from `src/main/`, `src/renderer/`, or `src/shared/`.
+1. **No internal imports** — only the `ExtensionAPI` object. Do not import from `src/main/`, `src/renderer/`, or `src/shared/`. Exception: `renderer.tsx` may import `useExtensionRegistry` from `src/renderer/extensions/registry`.
 2. **Shell commands**: `api.shell.exec` only allows `git` and `gh`. Any other command is rejected with `COMMAND_NOT_ALLOWED`.
 3. **CWD scope**: `api.shell.exec` `cwd` must be within the current workspace folder.
 4. **Panel slots**: only one panel per slot per extension.
 5. **Settings key namespacing**: all setting keys must be prefixed with the extension ID (enforced at registration).
-6. **Native menu**: `api.nativeMenu.addViewMenuItem` adds to the View submenu only. Other native menus (File, Edit, Help) are not exposed.
-7. **API versioning**: breaking changes bump the MAJOR version. Additive changes bump MINOR. Check `api.app.version` to feature-detect if needed.
+6. **IPC channel namespacing**: all channels registered via `api.ipc.registerHandler` must be prefixed with the extension ID followed by `:` (e.g., `com.acme.my-ext:channel-name`).
+7. **Native menu**: `api.nativeMenu.addViewMenuItem` adds to the View submenu only. Other native menus (File, Edit, Help) are not exposed.
+8. **API versioning**: breaking changes bump the MAJOR version. Additive changes bump MINOR. Check `api.app.version` to feature-detect if needed.
 
 ---
 
@@ -446,12 +546,14 @@ The generated `src/index.ts` is a complete working hello-world demonstrating all
 
 The pre-bundled git integration extension at `extensions/git-integration/` is the canonical real-world example. It demonstrates:
 
+- `api.ipc.registerHandler` (custom git: and github: IPC channels)
 - `api.sidebar.registerPanel` (right sidebar git status)
 - `api.topBar.registerMenuItem` (Git view in project top bar)
 - `api.shell.exec` (git status, diff, stage, commit; gh pr create)
 - `api.notifications.showToast` (all operation outcomes)
 - `api.fs.watch` (sidebar auto-refresh)
 - `api.settings.register` with `workspaceScoped` settings
+- `renderer.tsx` with sidebar panel, two project tabs, and renderer keyboard shortcuts
 
 ---
 

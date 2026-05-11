@@ -18,6 +18,7 @@ This document defines the **additions** to the `ExtensionAPI` interface required
 | `notifications`     | `showToast(type, message)`   | FR-026      |
 | `fs`                | `watch(handler)`             | FR-027      |
 | `nativeMenu`        | `addViewMenuItem(item)`      | FR-030      |
+| `ipc`               | `registerHandler(ch, fn)`    | FR-031      |
 | `SettingDefinition` | `workspaceScoped?: boolean`  | FR-025      |
 
 ---
@@ -109,6 +110,27 @@ interface ExtensionAPI {
      * Returns a Disposable; disposing unregisters the handler.
      */
     watch(handler: (event: FsChangeEvent) => void): Disposable
+  }
+
+  /**
+   * Custom IPC handler registration.
+   * Allows extensions to expose named channels callable from the renderer
+   * via window.electronAPI.invoke(channel, payload).
+   * FR-031
+   */
+  ipc: {
+    /**
+     * Register a named IPC handler in the main process.
+     * The channel must be prefixed with the extension ID (e.g., "com.acme.my-ext:action").
+     * The handler receives the payload passed by the renderer and may return a value
+     * or a Promise. Thrown errors or rejected Promises are surfaced as rejections to
+     * the renderer's invoke() call.
+     * Returns a Disposable; disposing removes the handler.
+     */
+    registerHandler(
+      channel: string,
+      handler: (payload: unknown) => Promise<unknown> | unknown
+    ): Disposable
   }
 }
 ```
@@ -245,7 +267,9 @@ interface SettingDefinition {
 
 4. **fs.watch scope**: Watch events are scoped to the project root. The extension cannot watch paths outside the current project.
 
-5. **API versioning**: These additions bump the `ExtensionAPI` version to `1.1.0`. The version is exposed via `api.app.version` for extensions that need to feature-detect.
+5. **IPC channel namespacing**: Channel names passed to `ipc.registerHandler` must be prefixed with the extension ID followed by `:` to prevent collisions with core channels and other extensions. The host does not enforce this at runtime, but violating it risks shadowing core IPC channels.
+
+6. **API versioning**: These additions bump the `ExtensionAPI` version to `1.1.0`. The version is exposed via `api.app.version` for extensions that need to feature-detect.
 
 ---
 
