@@ -57,9 +57,22 @@ export function useKeyboardShortcuts({ onOpenSettings, onToggleLog }: Options = 
         return
       }
 
-      // Extension-registered keyboard shortcuts
+      // Extension-registered keyboard shortcuts — skip bare-key shortcuts when focus is in a text field
+      const inTextField =
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable)
       for (const shortcut of keyboardShortcuts) {
         if (matchesAccelerator(e, shortcut.accelerator)) {
+          // Bare-key shortcuts (no Cmd/Ctrl/Alt/Shift) must not fire while typing
+          const hasModifier =
+            shortcut.accelerator.includes('CmdOrCtrl') ||
+            shortcut.accelerator.includes('Cmd') ||
+            shortcut.accelerator.includes('Ctrl') ||
+            shortcut.accelerator.includes('Alt') ||
+            shortcut.accelerator.includes('Option') ||
+            shortcut.accelerator.includes('Shift')
+          if (inTextField && !hasModifier) continue
           e.preventDefault()
           shortcut.action()
           return
