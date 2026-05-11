@@ -1,0 +1,24 @@
+tests/unit/extensions/github.ipc.spec.ts
+  s_94121bba51756d::t_492a92dfa3196a 16-18
+  s_94121bba51756d::t_930b2c5fe34fad 73-87,117-136
+  s_94121bba51756d::t_0f22b095984d73 348-376
+  s_94121bba51756d::t_96c484619e3538 401-426
+  s_94121bba51756d::t_f2882d8182c332 468-479
+  s_94121bba51756d::t_40f0fc5ed5444f 482-526
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "0927a102b094f4573bd2a06083a7826e7b4ed321",
+  "prompts": {},
+  "sessions": {
+    "s_94121bba51756d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9588e76d-be9b-46a6-ad3b-3800290b80dc",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
