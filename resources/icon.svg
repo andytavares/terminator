@@ -1,0 +1,234 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Background gradient: deep terminal black with subtle warm tint -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1008"/>
+      <stop offset="100%" stop-color="#0a0a0a"/>
+    </linearGradient>
+
+    <!-- Red eye glow -->
+    <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ff2200" stop-opacity="1"/>
+      <stop offset="40%" stop-color="#cc1100" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#660000" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Iris gradient -->
+    <radialGradient id="iris" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#ff4422"/>
+      <stop offset="30%" stop-color="#cc1100"/>
+      <stop offset="70%" stop-color="#880000"/>
+      <stop offset="100%" stop-color="#330000"/>
+    </radialGradient>
+
+    <!-- Pupil / cursor glow -->
+    <radialGradient id="cursorGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="60%" stop-color="#ffaa88" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#ff2200" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Amber HUD text glow -->
+    <filter id="hudGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Red glow filter -->
+    <filter id="redGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Tight red glow -->
+    <filter id="tightGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Scanline pattern -->
+    <pattern id="scanlines" x="0" y="0" width="1024" height="3" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="1024" height="1" fill="rgba(0,0,0,0.18)"/>
+      <rect x="0" y="1" width="1024" height="2" fill="transparent"/>
+    </pattern>
+
+    <!-- Clip for rounded rect icon shape -->
+    <clipPath id="iconClip">
+      <rect x="0" y="0" width="1024" height="1024" rx="230" ry="230"/>
+    </clipPath>
+  </defs>
+
+  <!-- Clipped icon area -->
+  <g clip-path="url(#iconClip)">
+
+    <!-- Background -->
+    <rect width="1024" height="1024" fill="url(#bg)"/>
+
+    <!-- Subtle warm grid (terminal feel) -->
+    <g opacity="0.06" stroke="#ff6622" stroke-width="1" fill="none">
+      <!-- Horizontal lines -->
+      <line x1="0" y1="128" x2="1024" y2="128"/>
+      <line x1="0" y1="256" x2="1024" y2="256"/>
+      <line x1="0" y1="384" x2="1024" y2="384"/>
+      <line x1="0" y1="512" x2="1024" y2="512"/>
+      <line x1="0" y1="640" x2="1024" y2="640"/>
+      <line x1="0" y1="768" x2="1024" y2="768"/>
+      <line x1="0" y1="896" x2="1024" y2="896"/>
+      <!-- Vertical lines -->
+      <line x1="128" y1="0" x2="128" y2="1024"/>
+      <line x1="256" y1="0" x2="256" y2="1024"/>
+      <line x1="384" y1="0" x2="384" y2="1024"/>
+      <line x1="512" y1="0" x2="512" y2="1024"/>
+      <line x1="640" y1="0" x2="640" y2="1024"/>
+      <line x1="768" y1="0" x2="768" y2="1024"/>
+      <line x1="896" y1="0" x2="896" y2="1024"/>
+    </g>
+
+    <!-- Outer ambient eye glow (very wide) -->
+    <circle cx="512" cy="470" r="320" fill="url(#eyeGlow)" opacity="0.25"/>
+
+    <!-- HUD targeting rings — outermost -->
+    <circle cx="512" cy="470" r="310" fill="none" stroke="#cc2200" stroke-width="1.5" opacity="0.3" filter="url(#tightGlow)"/>
+    <circle cx="512" cy="470" r="285" fill="none" stroke="#ff3300" stroke-width="1" opacity="0.2"/>
+
+    <!-- Tick marks on outer ring -->
+    <g stroke="#ff3300" stroke-width="2.5" opacity="0.5" filter="url(#tightGlow)">
+      <!-- Top -->
+      <line x1="512" y1="158" x2="512" y2="178"/>
+      <!-- Bottom -->
+      <line x1="512" y1="752" x2="512" y2="772"/>
+      <!-- Left -->
+      <line x1="198" y1="470" x2="218" y2="470"/>
+      <!-- Right -->
+      <line x1="806" y1="470" x2="826" y2="470"/>
+      <!-- Diagonal ticks at 45° -->
+      <line x1="290" y1="250" x2="304" y2="264"/>
+      <line x1="734" y1="250" x2="720" y2="264"/>
+      <line x1="290" y1="690" x2="304" y2="676"/>
+      <line x1="734" y1="690" x2="720" y2="676"/>
+    </g>
+
+    <!-- Main HUD targeting ring -->
+    <circle cx="512" cy="470" r="248" fill="none" stroke="#ff2200" stroke-width="3" opacity="0.7" filter="url(#redGlow)"/>
+
+    <!-- Crosshair lines (HUD aiming reticle) -->
+    <g stroke="#ff2200" stroke-width="2" opacity="0.55" filter="url(#redGlow)">
+      <!-- Horizontal crosshair - left gap for eye -->
+      <line x1="202" y1="470" x2="342" y2="470"/>
+      <line x1="682" y1="470" x2="822" y2="470"/>
+      <!-- Vertical crosshair - top gap -->
+      <line x1="512" y1="220" x2="512" y2="348"/>
+      <line x1="512" y1="592" x2="512" y2="720"/>
+    </g>
+
+    <!-- Inner targeting ring -->
+    <circle cx="512" cy="470" r="190" fill="none" stroke="#ff3311" stroke-width="2" opacity="0.5" filter="url(#tightGlow)"/>
+
+    <!-- Eye socket shadow -->
+    <circle cx="512" cy="470" r="158" fill="#1a0000" opacity="0.9"/>
+
+    <!-- Iris -->
+    <circle cx="512" cy="470" r="145" fill="url(#iris)"/>
+
+    <!-- Iris detail rings -->
+    <circle cx="512" cy="470" r="120" fill="none" stroke="#ff5533" stroke-width="1" opacity="0.4"/>
+    <circle cx="512" cy="470" r="95" fill="none" stroke="#ff4422" stroke-width="1" opacity="0.3"/>
+
+    <!-- Eye rim highlight -->
+    <circle cx="512" cy="470" r="145" fill="none" stroke="#ff6644" stroke-width="3" opacity="0.8" filter="url(#tightGlow)"/>
+
+    <!-- Pupil dark -->
+    <circle cx="512" cy="470" r="68" fill="#0a0000"/>
+
+    <!-- Cursor block inside pupil — this is the terminal >_ -->
+    <!-- White blinking cursor block -->
+    <rect x="480" y="445" width="18" height="50" rx="2" fill="#ffffff" opacity="0.95" filter="url(#cursorGlow)"/>
+
+    <!-- > chevron in pupil -->
+    <g fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" filter="url(#cursorGlow)">
+      <polyline points="430,445 453,470 430,495"/>
+    </g>
+
+    <!-- Pupil center glow -->
+    <circle cx="512" cy="470" r="30" fill="url(#cursorGlow)" opacity="0.3"/>
+
+    <!-- Specular highlight on eye (top-left) -->
+    <ellipse cx="478" cy="435" rx="22" ry="14" fill="white" opacity="0.18"/>
+
+    <!-- Scanlines over everything -->
+    <rect width="1024" height="1024" fill="url(#scanlines)"/>
+
+    <!-- Bottom prompt bar — terminal chrome -->
+    <rect x="0" y="830" width="1024" height="194" fill="#0d0804" opacity="0.92"/>
+    <rect x="0" y="830" width="1024" height="1.5" fill="#ff2200" opacity="0.6"/>
+
+    <!-- Terminal prompt text -->
+    <!-- $ prompt -->
+    <text
+      x="88"
+      y="918"
+      font-family="'SF Mono', 'Menlo', 'Courier New', monospace"
+      font-size="88"
+      font-weight="700"
+      fill="#ff3300"
+      opacity="0.9"
+      filter="url(#redGlow)"
+    >$</text>
+
+    <!-- Command text - cheeky -->
+    <text
+      x="175"
+      y="918"
+      font-family="'SF Mono', 'Menlo', 'Courier New', monospace"
+      font-size="72"
+      font-weight="400"
+      fill="#cc4422"
+      opacity="0.75"
+      filter="url(#hudGlow)"
+    >terminate</text>
+
+    <!-- Blinking cursor at end of prompt -->
+    <rect x="840" y="848" width="42" height="68" rx="3" fill="#ff3300" opacity="0.85" filter="url(#tightGlow)"/>
+
+    <!-- Top HUD readout bar -->
+    <rect x="0" y="0" width="1024" height="90" fill="#0d0804" opacity="0.88"/>
+    <rect x="0" y="89" width="1024" height="1.5" fill="#ff2200" opacity="0.5"/>
+
+    <!-- HUD top-left: SYS label -->
+    <text
+      x="68"
+      y="62"
+      font-family="'SF Mono', 'Menlo', 'Courier New', monospace"
+      font-size="42"
+      font-weight="700"
+      fill="#ff4400"
+      opacity="0.7"
+      letter-spacing="6"
+      filter="url(#hudGlow)"
+    >TERMINATOR</text>
+
+    <!-- HUD top-right: version -->
+    <text
+      x="850"
+      y="62"
+      font-family="'SF Mono', 'Menlo', 'Courier New', monospace"
+      font-size="38"
+      font-weight="400"
+      fill="#ff3300"
+      opacity="0.5"
+      filter="url(#hudGlow)"
+    >v1.0</text>
+
+  </g>
+</svg>

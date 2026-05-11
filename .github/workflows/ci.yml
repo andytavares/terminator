@@ -200,7 +200,7 @@ jobs:
       - name: Delete old package versions (keep last 5)
         uses: actions/delete-package-versions@v5
         with:
-          package-name: 'app'
+          package-name: 'terminator'
           package-type: 'npm'
           min-versions-to-keep: 5
           delete-only-pre-release-versions: false
