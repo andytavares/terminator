@@ -1089,8 +1089,9 @@
   width: 100%;
 }
 .diff-table--split {
-  width: 50%;
+  flex: 0 1 auto;
   min-width: 0;
+  table-layout: fixed;
   font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
   font-size: 12px;
   border-collapse: collapse;

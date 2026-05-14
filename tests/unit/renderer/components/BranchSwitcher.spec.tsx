@@ -11,6 +11,9 @@ vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
 vi.mock('../../../../src/renderer/stores/toast.store', () => ({
   useToastStore: vi.fn(),
 }))
+vi.mock('../../../../src/renderer/hooks/useBranchSync', () => ({
+  useBranchSync: vi.fn(),
+}))
 
 const mockUpdateProjectBranch = vi.fn()
 const mockAddToast = vi.fn()
