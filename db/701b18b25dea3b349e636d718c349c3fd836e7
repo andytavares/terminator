@@ -1,0 +1,19 @@
+extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx
+  ai_agent 1,59-60,122-157,341-344,426-429,431-434
+extensions/git-integration/src/components/GitFullView.tsx
+  ai_agent 5,18-24,142-143,145
+extensions/git-integration/src/components/pr-review/pr-review.css
+  ai_agent 668,679,685-698,1093,1098-1110,1326-1327,1381-1382,1815-1816
+extensions/git-integration/src/hooks/useResizePanel.ts
+  ai_agent 1-49
+extensions/git-integration/src/components/git-integration.css
+  ai_agent 860,878-890
+extensions/git-integration/src/components/pr-review/PrReviewView.tsx
+  ai_agent 10,46-57,174,206,300-301,325-341
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "db701b18b25dea3b349e636d718c349c3fd836e7",
+  "prompts": {}
+}
