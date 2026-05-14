@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react'
 import './git-integration.css'
 import { useGitStore } from '../stores/git.store'
 import { useGitStatus } from '../hooks/useGitStatus'
+import { useResizePanel } from '../hooks/useResizePanel'
 import { StagingArea } from './StagingArea'
 import { FileDiffView } from './FileDiffView'
 import { PrDialog } from './PrDialog'
@@ -13,6 +14,13 @@ interface Props {
 
 export function GitFullView({ repoRoot }: Props): JSX.Element {
   useGitStatus(repoRoot)
+
+  const { size: changesWidth, handleMouseDown: handleDividerMouseDown } = useResizePanel(
+    300,
+    160,
+    600,
+    -1
+  )
 
   const { status, selectedFile, diffCache, setSelectedFile, setDiff, setLoading } = useGitStore()
   const [commitMessage, setCommitMessage] = useState('')
@@ -131,8 +139,10 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
         <FileDiffView diff={selectedDiff} />
       </div>
 
+      <div className="git-resize-handle" onMouseDown={handleDividerMouseDown} />
+
       {/* Right: changes list + commit */}
-      <div className="git-full-view__changes-pane">
+      <div className="git-full-view__changes-pane" style={{ width: changesWidth }}>
         <div className="git-full-view__staging">
           <StagingArea repoRoot={repoRoot} onFileSelect={handleFileSelect} />
         </div>

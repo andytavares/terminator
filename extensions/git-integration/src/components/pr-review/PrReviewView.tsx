@@ -7,6 +7,7 @@ import { ReviewDiffPane } from './ReviewDiffPane'
 import { RiskBreakdownPanel } from './RiskBreakdownPanel'
 import { ReviewSubmitPanel } from './ReviewSubmitPanel'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
+import { useResizePanel } from '../../hooks/useResizePanel'
 import { StatusChecksBar } from './StatusChecksBar'
 import type { PrReviewDetail, PrChangedFile } from '../../schemas/pr-review.schema'
 
@@ -42,6 +43,18 @@ export function PrReviewView({
 
   const loadInlineComments = useLoadInlineComments(repoRoot)
   const [showSubmit, setShowSubmit] = useState(false)
+  const { size: leftWidth, handleMouseDown: handleLeftDividerMouseDown } = useResizePanel(
+    240,
+    120,
+    500,
+    1
+  )
+  const { size: rightWidth, handleMouseDown: handleRightDividerMouseDown } = useResizePanel(
+    280,
+    160,
+    600,
+    -1
+  )
   const [showRiskFor, setShowRiskFor] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('guided')
   const [refreshing, setRefreshing] = useState(false)
@@ -158,7 +171,7 @@ export function PrReviewView({
   // In full mode:   all-chapters file list (no chapter tabs)
   const leftPanel =
     viewMode === 'full' ? (
-      <aside className="pr-review-panel pr-review-panel--left">
+      <aside className="pr-review-panel pr-review-panel--left" style={{ width: leftWidth }}>
         <div className="pr-review-panel-header">
           <span className="pr-review-chapter-name">All files</span>
           <div className="pr-review-panel-header-right">
@@ -190,7 +203,7 @@ export function PrReviewView({
       </aside>
     ) : (
       activeChapter && (
-        <aside className="pr-review-panel pr-review-panel--left">
+        <aside className="pr-review-panel pr-review-panel--left" style={{ width: leftWidth }}>
           <div className="pr-review-panel-header">
             <span className="pr-review-chapter-name">{activeChapter.name}</span>
             <div className="pr-review-panel-header-right">
@@ -284,6 +297,8 @@ export function PrReviewView({
       <div className="pr-review-panels">
         {leftPanel}
 
+        {leftPanel && <div className="pr-resize-handle" onMouseDown={handleLeftDividerMouseDown} />}
+
         {/* Centre panel: diff */}
         <main className="pr-review-panel pr-review-panel--centre">
           {activeFile && activeChapter ? (
@@ -307,20 +322,23 @@ export function PrReviewView({
 
         {/* Right panel: risk breakdown (shown on demand) */}
         {showRiskFor && activeFile && activeFile.path === showRiskFor && (
-          <aside className="pr-review-panel pr-review-panel--right">
-            <button
-              className="pr-review-panel-close"
-              onClick={() => setShowRiskFor(null)}
-              aria-label="Close risk panel"
-            >
-              ×
-            </button>
-            <RiskBreakdownPanel
-              filePath={activeFile.path}
-              riskScore={activeFile.riskScore}
-              repoRoot={repoRoot}
-            />
-          </aside>
+          <>
+            <div className="pr-resize-handle" onMouseDown={handleRightDividerMouseDown} />
+            <aside className="pr-review-panel pr-review-panel--right" style={{ width: rightWidth }}>
+              <button
+                className="pr-review-panel-close"
+                onClick={() => setShowRiskFor(null)}
+                aria-label="Close risk panel"
+              >
+                ×
+              </button>
+              <RiskBreakdownPanel
+                filePath={activeFile.path}
+                riskScore={activeFile.riskScore}
+                repoRoot={repoRoot}
+              />
+            </aside>
+          </>
         )}
       </div>
 

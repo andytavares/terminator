@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react'
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { HealthChips } from './HealthChips'
 import { InlineCommentThread } from './InlineCommentThread'
 import { CommentComposer } from './CommentComposer'
@@ -56,6 +56,8 @@ export function ReviewDiffPane({
   )
   const [selectionStart, setSelectionStart] = useState<number | null>(null)
   const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>('unified')
+  const [splitLeftPct, setSplitLeftPct] = useState(50)
+  const splitDragState = useRef({ active: false, startX: 0, startPct: 50, containerWidth: 0 })
   const { viewedFiles, threads, patchFileComplexity } = usePrReviewStore()
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -116,6 +118,42 @@ export function ReviewDiffPane({
       window.removeEventListener('pr-review:mark-viewed-next', handleMarkNext)
     }
   }, [onPrevFile, onMarkViewed])
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const state = splitDragState.current
+      if (!state.active || state.containerWidth === 0) return
+      const delta = e.clientX - state.startX
+      const deltaPct = (delta / state.containerWidth) * 100
+      setSplitLeftPct(Math.max(20, Math.min(80, state.startPct + deltaPct)))
+    }
+    const onUp = () => {
+      splitDragState.current.active = false
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [])
+
+  const handleSplitDividerMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const container = e.currentTarget.parentElement
+      if (!container) return
+      splitDragState.current = {
+        active: true,
+        startX: e.clientX,
+        startPct: splitLeftPct,
+        containerWidth: container.getBoundingClientRect().width,
+      }
+      e.preventDefault()
+    },
+    [splitLeftPct]
+  )
+
+  const splitRightPct = useMemo(() => 100 - splitLeftPct, [splitLeftPct])
 
   const hotspots = diff ? detectComplexityHotspots(diff) : []
   const hotspotHunks = new Set(hotspots.map((h) => h.hunkIndex))
@@ -300,7 +338,10 @@ export function ReviewDiffPane({
                     <div className="diff-split-header">{hunk.header}</div>
                     <div className="diff-split-tables">
                       {/* Left: old (context + removed) */}
-                      <table className="diff-table diff-table--split diff-table--left">
+                      <table
+                        className="diff-table diff-table--split diff-table--left"
+                        style={{ width: `${splitLeftPct}%` }}
+                      >
                         <tbody>
                           {hunk.lines
                             .filter((l) => l.type !== 'add')
@@ -382,8 +423,15 @@ export function ReviewDiffPane({
                             })}
                         </tbody>
                       </table>
+                      <div
+                        className="diff-split-resize-handle"
+                        onMouseDown={handleSplitDividerMouseDown}
+                      />
                       {/* Right: new (context + added) */}
-                      <table className="diff-table diff-table--split diff-table--right">
+                      <table
+                        className="diff-table diff-table--split diff-table--right"
+                        style={{ width: `${splitRightPct}%` }}
+                      >
                         <tbody>
                           {hunk.lines
                             .filter((l) => l.type !== 'remove')

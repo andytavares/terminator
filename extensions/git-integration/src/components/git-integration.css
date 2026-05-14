@@ -853,11 +853,11 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  border-right: 1px solid var(--tm-border);
 }
 
 .git-full-view__changes-pane {
   width: 300px;
+  min-width: 160px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -874,4 +874,18 @@
   padding: 8px;
   border-top: 1px solid var(--tm-border);
   flex-shrink: 0;
+}
+
+.git-resize-handle {
+  width: 5px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: var(--tm-border);
+  transition: background 0.15s;
+  position: relative;
+  z-index: 1;
+}
+.git-resize-handle:hover {
+  background: var(--tm-accent);
+  opacity: 0.5;
 }
