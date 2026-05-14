@@ -1,0 +1,29 @@
+tests/unit/renderer/components/BranchSwitcher.spec.tsx
+  s_af5b42ac4e8601::t_8052ad8218e472 14-16
+tests/unit/renderer/hooks/useBranchSync.spec.tsx
+  ai_agent 1-131
+src/renderer/components/sidebar/BranchSwitcher.tsx
+  s_af5b42ac4e8601::t_b9d8ced9d36f17 6
+  s_af5b42ac4e8601::t_2debea76aa918b 38-39
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_af5b42ac4e8601::t_19e72e30b8fbb4 1094
+  s_af5b42ac4e8601::t_916d6733044c69 1092
+src/renderer/hooks/useBranchSync.ts
+  s_af5b42ac4e8601::t_3a9f7f9354e569 1-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "e3b9a935aa0a28ffda05e94c9190c2b84b35f78c",
+  "prompts": {},
+  "sessions": {
+    "s_af5b42ac4e8601": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5e167585-7ab4-4f55-8524-c4f88c9e2d47",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
