@@ -230,21 +230,9 @@ function ProjectCard({
               {renameError && <span className="proj-card__rename-error">{renameError}</span>}
             </div>
           ) : (
-            <>
-              <span className="proj-card__name" onDoubleClick={startRename}>
-                {project.name}
-              </span>
-              <span
-                className="proj-card__rename-icon"
-                title="Rename"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  startRename()
-                }}
-              >
-                ✎
-              </span>
-            </>
+            <span className="proj-card__name" onDoubleClick={startRename}>
+              {project.name}
+            </span>
           )}
 
           {isActive && (project.gitBranch || project.worktreePath) && !renaming && (

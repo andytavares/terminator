@@ -24,10 +24,12 @@ export function BranchSwitcher({ project, workspaceFolderPath }: Props): JSX.Ele
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [switching, setSwitching] = useState(false)
+  const [filter, setFilter] = useState('')
   const { updateProjectBranch } = useWorkspaceStore()
   const { addToast } = useToastStore()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const filterRef = useRef<HTMLInputElement>(null)
 
   const cwd = project.worktreePath ?? workspaceFolderPath
   const currentBranch = project.gitBranch ?? '—'
@@ -36,7 +38,9 @@ export function BranchSwitcher({ project, workspaceFolderPath }: Props): JSX.Ele
     if (!triggerRef.current || switching) return
     const rect = triggerRef.current.getBoundingClientRect()
     setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+    setFilter('')
     setOpen(true)
+    setTimeout(() => filterRef.current?.focus(), 0)
   }
 
   useEffect(() => {
@@ -119,30 +123,51 @@ export function BranchSwitcher({ project, workspaceFolderPath }: Props): JSX.Ele
           <div
             ref={dropdownRef}
             className="branch-sw__dropdown"
-            style={{ top: pos.top, left: pos.left, width: Math.max(pos.width, 200) }}
+            style={{ top: pos.top, left: pos.left, width: Math.max(pos.width, 220) }}
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="branch-sw__filter-wrap">
+              <input
+                ref={filterRef}
+                className="branch-sw__filter"
+                placeholder="Filter branches…"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setOpen(false)
+                }}
+              />
+            </div>
             {loading && <div className="branch-sw__status">Loading branches…</div>}
             {error && <div className="branch-sw__status branch-sw__status--error">{error}</div>}
             {!loading && !error && (
               <>
                 <BranchSection
                   label="Local"
-                  branches={localBranches}
+                  branches={localBranches.filter((b) =>
+                    b.name.toLowerCase().includes(filter.toLowerCase())
+                  )}
                   current={currentBranch}
                   onSelect={handleSelect}
                 />
                 {remoteBranches.length > 0 && (
                   <BranchSection
                     label="Remote"
-                    branches={remoteBranches}
+                    branches={remoteBranches.filter((b) =>
+                      b.name.toLowerCase().includes(filter.toLowerCase())
+                    )}
                     current={currentBranch}
                     onSelect={handleSelect}
                   />
                 )}
-                {localBranches.length === 0 && remoteBranches.length === 0 && (
-                  <div className="branch-sw__status">No branches found</div>
-                )}
+                {localBranches.filter((b) => b.name.toLowerCase().includes(filter.toLowerCase()))
+                  .length === 0 &&
+                  remoteBranches.filter((b) => b.name.toLowerCase().includes(filter.toLowerCase()))
+                    .length === 0 && (
+                    <div className="branch-sw__status">
+                      {filter ? 'No matching branches' : 'No branches found'}
+                    </div>
+                  )}
               </>
             )}
           </div>,

@@ -84,4 +84,21 @@ export function registerExtensionHandlers(extensionHost: ExtensionHost): void {
       }
     }
   )
+
+  ipcMain.handle('extension:get-commands', () => {
+    const commands = [...globalRegistry.commandContributions.entries()].map(([key, cmd]) => ({
+      key,
+      id: cmd.id,
+      label: cmd.label,
+      description: cmd.description,
+      shortcut: cmd.shortcut,
+      category: cmd.category,
+    }))
+    return { commands }
+  })
+
+  ipcMain.on('extension:execute-command', (_event, { key }: { key: string }) => {
+    const handler = globalRegistry.commandHandlers.get(key)
+    if (handler) handler()
+  })
 }

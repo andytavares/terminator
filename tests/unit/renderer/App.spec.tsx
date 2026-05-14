@@ -16,8 +16,26 @@ vi.mock('../../../src/renderer/stores/toast.store', () => ({ useToastStore: vi.f
 vi.mock('../../../src/renderer/stores/log.store', () => ({ installLogInterceptor: vi.fn() }))
 vi.mock('../../../src/renderer/extensions/registry', () => ({ useExtensionRegistry: vi.fn() }))
 vi.mock('../../../src/renderer/extensions/loader', () => ({}))
+type ShortcutCallbacks = {
+  onOpenSettings?: () => void
+  onToggleLog?: () => void
+  onOpenCommandPalette?: () => void
+}
+let capturedShortcutCallbacks: ShortcutCallbacks = {}
 vi.mock('../../../src/renderer/hooks/useKeyboardShortcuts', () => ({
-  useKeyboardShortcuts: vi.fn(),
+  useKeyboardShortcuts: vi.fn().mockImplementation((opts: ShortcutCallbacks = {}) => {
+    capturedShortcutCallbacks = opts
+  }),
+}))
+vi.mock('../../../src/renderer/hooks/useTerminalSession', () => ({
+  useTerminalSession: vi.fn(() => ({ createSession: vi.fn() })),
+}))
+vi.mock('../../../src/renderer/components/CommandPalette', () => ({
+  CommandPalette: ({ onClose }: { onClose: () => void }) => (
+    <div data-testid="command-palette">
+      <button onClick={onClose}>Close Palette</button>
+    </div>
+  ),
 }))
 
 vi.mock('../../../src/renderer/components/sidebar/WorkspaceRail', () => ({
@@ -72,6 +90,7 @@ const defaultExtensionRegistry = {
   togglePanel: vi.fn(),
   setActiveProjectTab: vi.fn(),
   keyboardShortcuts: [],
+  commands: [],
 }
 
 function setupMocks(
@@ -94,11 +113,14 @@ function setupMocks(
     activeWorkspaceId,
     activeProjectId,
     workspaces,
+    projectsByWorkspaceId: new Map(),
+    setActiveWorkspace: vi.fn(),
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSettingsStore).mockReturnValue({
     loadSettings: mockLoadSettings,
     globalSettings,
     markWelcomeSeen: mockMarkWelcomeSeen,
+    resolveSettings: vi.fn().mockReturnValue({ terminal: { scrollbackLimit: 5000 } }),
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSessionStore).mockReturnValue({
     handleProcessExit: mockHandleProcessExit,
@@ -249,6 +271,61 @@ describe('App', () => {
     })
     render(<App />)
     expect(mockMarkWelcomeSeen).toHaveBeenCalled()
+  })
+
+  it('opens SettingsPanel via onOpenSettings keyboard shortcut callback', async () => {
+    render(<App />)
+    expect(screen.queryByTestId('settings-panel')).toBeNull()
+    capturedShortcutCallbacks.onOpenSettings?.()
+    await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
+  })
+
+  it('opens LogWindow via onToggleLog keyboard shortcut callback', async () => {
+    render(<App />)
+    expect(screen.queryByTestId('log-window')).toBeNull()
+    capturedShortcutCallbacks.onToggleLog?.()
+    await waitFor(() => expect(screen.getByTestId('log-window')).toBeTruthy())
+  })
+
+  it('closes LogWindow when its onClose is called', async () => {
+    render(<App />)
+    capturedShortcutCallbacks.onToggleLog?.()
+    await waitFor(() => screen.getByText('Close Log'))
+    fireEvent.click(screen.getByText('Close Log'))
+    await waitFor(() => expect(screen.queryByTestId('log-window')).toBeNull())
+  })
+
+  it('opens CommandPalette via onOpenCommandPalette keyboard shortcut callback', async () => {
+    render(<App />)
+    expect(screen.queryByTestId('command-palette')).toBeNull()
+    capturedShortcutCallbacks.onOpenCommandPalette?.()
+    await waitFor(() => expect(screen.getByTestId('command-palette')).toBeTruthy())
+  })
+
+  it('closes CommandPalette when its onClose is called', async () => {
+    render(<App />)
+    capturedShortcutCallbacks.onOpenCommandPalette?.()
+    await waitFor(() => screen.getByText('Close Palette'))
+    fireEvent.click(screen.getByText('Close Palette'))
+    await waitFor(() => expect(screen.queryByTestId('command-palette')).toBeNull())
+  })
+
+  it('renders extension sidebar panels when openPanels is non-empty', async () => {
+    const MockPanel = ({ onClose }: { onClose: () => void }) => (
+      <div data-testid="mock-panel">
+        <button onClick={onClose}>Close Panel</button>
+      </div>
+    )
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      openPanels: new Set(['git-changes']),
+      sidebarPanels: new Map([
+        ['git-changes', { id: 'git-changes', label: 'Git', component: MockPanel }],
+      ]),
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    render(<App />)
+    expect(screen.getByTestId('mock-panel')).toBeTruthy()
+    fireEvent.click(screen.getByText('Close Panel'))
   })
 
   it('calls onMenuOpenSettings extensionEvent to open settings panel', async () => {

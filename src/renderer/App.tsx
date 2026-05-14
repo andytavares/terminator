@@ -7,13 +7,16 @@ import { SettingsPanel } from './components/settings/SettingsPanel'
 import { ToastContainer } from './components/ToastContainer'
 import { LogWindow } from './components/LogWindow'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { CommandPalette } from './components/CommandPalette'
 import { useWorkspaceStore } from './stores/workspace.store'
 import { useSettingsStore } from './stores/settings.store'
 import { useSessionStore } from './stores/session.store'
+import { useTerminalSession } from './hooks/useTerminalSession'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { installLogInterceptor } from './stores/log.store'
 import { useToastStore } from './stores/toast.store'
 import { useExtensionRegistry } from './extensions/registry'
+import type { CommandRegistration } from './extensions/registry'
 import { EmptyState } from './components/EmptyState'
 
 installLogInterceptor()
@@ -22,10 +25,19 @@ export function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState(true)
-  const { loadWorkspaces, activeWorkspaceId, activeProjectId, workspaces } = useWorkspaceStore()
-  const { loadSettings, globalSettings, markWelcomeSeen } = useSettingsStore()
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const {
+    loadWorkspaces,
+    activeWorkspaceId,
+    activeProjectId,
+    workspaces,
+    setActiveWorkspace,
+    projectsByWorkspaceId,
+  } = useWorkspaceStore()
+  const { loadSettings, globalSettings, markWelcomeSeen, resolveSettings } = useSettingsStore()
   const { handleProcessExit } = useSessionStore()
   const { addToast } = useToastStore()
+  const { createSession } = useTerminalSession()
   const {
     sidebarPanels,
     projectTabs,
@@ -33,6 +45,7 @@ export function App(): JSX.Element {
     activeProjectTabId,
     togglePanel,
     setActiveProjectTab,
+    commands: extensionCommands,
   } = useExtensionRegistry()
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
@@ -40,7 +53,82 @@ export function App(): JSX.Element {
 
   const handleOpenSettings = useCallback(() => setSettingsOpen(true), [])
   const handleToggleLog = useCallback(() => setLogOpen((v) => !v), [])
-  useKeyboardShortcuts({ onOpenSettings: handleOpenSettings, onToggleLog: handleToggleLog })
+  const handleOpenCommandPalette = useCallback(() => setPaletteOpen(true), [])
+  useKeyboardShortcuts({
+    onOpenSettings: handleOpenSettings,
+    onToggleLog: handleToggleLog,
+    onOpenCommandPalette: handleOpenCommandPalette,
+  })
+
+  const builtinCommands = useCallback((): CommandRegistration[] => {
+    const cmds: CommandRegistration[] = [
+      {
+        id: 'core.open-settings',
+        label: 'Open Settings',
+        shortcut: '⌘,',
+        category: 'App',
+        action: () => setSettingsOpen(true),
+      },
+      {
+        id: 'core.toggle-sidebar',
+        label: 'Toggle Sidebar',
+        category: 'App',
+        action: () => setSidebarVisible((v) => !v),
+      },
+      {
+        id: 'core.toggle-log',
+        label: 'Toggle Log Window',
+        shortcut: '⌘⇧L',
+        category: 'App',
+        action: () => setLogOpen((v) => !v),
+      },
+    ]
+
+    if (activeProjectId) {
+      const settings = resolveSettings(activeWorkspaceId)
+      const projects = activeWorkspaceId ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? []) : []
+      const activeProject = projects.find((p) => p.id === activeProjectId)
+      const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
+      cmds.push({
+        id: 'core.new-tab',
+        label: 'New Terminal Tab',
+        shortcut: '⌘T',
+        category: 'Terminal',
+        action: () =>
+          createSession(
+            activeProjectId,
+            'human',
+            'Terminal',
+            cwd,
+            settings.terminal.scrollbackLimit
+          ),
+      })
+    }
+
+    workspaces.forEach((ws, i) => {
+      cmds.push({
+        id: `core.switch-workspace-${ws.id}`,
+        label: `Switch to Workspace: ${ws.name}`,
+        shortcut: i < 9 ? `⌘${i + 1}` : undefined,
+        category: 'Workspaces',
+        action: () => setActiveWorkspace(ws.id),
+      })
+    })
+
+    return cmds
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    activeProjectId,
+    activeWorkspaceId,
+    activeWorkspace,
+    workspaces,
+    resolveSettings,
+    projectsByWorkspaceId,
+    createSession,
+    setActiveWorkspace,
+  ])
+
+  const paletteCommands = [...builtinCommands(), ...extensionCommands]
 
   useEffect(() => {
     loadWorkspaces()
@@ -195,6 +283,9 @@ export function App(): JSX.Element {
 
         {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
         {logOpen && <LogWindow onClose={() => setLogOpen(false)} />}
+        {paletteOpen && (
+          <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />
+        )}
         <ToastContainer />
       </div>
     </ErrorBoundary>

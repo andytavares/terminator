@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import hljs from 'highlight.js'
 import type { FileDiff, DiffLine, DiffHunk } from '../schemas/git.schema'
 
@@ -155,16 +155,18 @@ function SplitCell({
   lang: string | undefined
 }): JSX.Element {
   const html = useMemo(() => (line ? highlight(line.content, lang) : ''), [line, lang])
+  const sideClass =
+    side === 'old' ? ' diff-line__content--old-side' : ' diff-line__content--new-side'
   if (!line) {
     return (
       <>
         <td className="diff-line__old-num" />
-        <td className="diff-line__content diff-line__content--empty" />
+        <td className={`diff-line__content diff-line__content--empty${sideClass}`} />
       </>
     )
   }
   const lineNum = side === 'old' ? line.oldLineNumber : line.newLineNumber
-  const cls =
+  const baseCls =
     line.type === 'remove'
       ? 'diff-line__content diff-line__content--remove'
       : line.type === 'add'
@@ -173,14 +175,22 @@ function SplitCell({
   return (
     <>
       <td className="diff-line__old-num">{lineNum ?? ''}</td>
-      <td className={cls}>
+      <td className={`${baseCls}${sideClass}`}>
         <pre dangerouslySetInnerHTML={{ __html: html }} />
       </td>
     </>
   )
 }
 
-function SplitTable({ hunks, lang }: { hunks: DiffHunk[]; lang: string | undefined }): JSX.Element {
+function SplitTable({
+  hunks,
+  lang,
+  onDividerMouseDown,
+}: {
+  hunks: DiffHunk[]
+  lang: string | undefined
+  onDividerMouseDown: (e: React.MouseEvent) => void
+}): JSX.Element {
   return (
     <table className="diff-table diff-table--split">
       <tbody>
@@ -189,7 +199,7 @@ function SplitTable({ hunks, lang }: { hunks: DiffHunk[]; lang: string | undefin
           return (
             <React.Fragment key={hi}>
               <tr>
-                <td colSpan={4} className="diff-hunk-header">
+                <td colSpan={5} className="diff-hunk-header">
                   {hunk.header}
                 </td>
               </tr>
@@ -198,7 +208,7 @@ function SplitTable({ hunks, lang }: { hunks: DiffHunk[]; lang: string | undefin
                   return (
                     <tr key={ri} className="diff-line diff-line--context">
                       <SplitCell line={row.line} side="old" lang={lang} />
-                      <td className="diff-table__split-divider" />
+                      <td className="diff-table__split-divider" onMouseDown={onDividerMouseDown} />
                       <SplitCell line={row.line} side="new" lang={lang} />
                     </tr>
                   )
@@ -206,7 +216,7 @@ function SplitTable({ hunks, lang }: { hunks: DiffHunk[]; lang: string | undefin
                 return (
                   <tr key={ri} className="diff-line">
                     <SplitCell line={row.oldLine} side="old" lang={lang} />
-                    <td className="diff-table__split-divider" />
+                    <td className="diff-table__split-divider" onMouseDown={onDividerMouseDown} />
                     <SplitCell line={row.newLine} side="new" lang={lang} />
                   </tr>
                 )
@@ -223,6 +233,42 @@ function SplitTable({ hunks, lang }: { hunks: DiffHunk[]; lang: string | undefin
 
 export function FileDiffView({ diff, isStale, onRefresh }: FileDiffViewProps): JSX.Element {
   const [viewMode, setViewMode] = useState<ViewMode>('unified')
+  const [splitLeftPct, setSplitLeftPct] = useState(50)
+  const splitDragState = useRef({ active: false, startX: 0, startPct: 50, containerWidth: 0 })
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const s = splitDragState.current
+      if (!s.active || s.containerWidth === 0) return
+      const deltaPct = ((e.clientX - s.startX) / s.containerWidth) * 100
+      setSplitLeftPct(Math.max(20, Math.min(80, s.startPct + deltaPct)))
+    }
+    const onUp = () => {
+      splitDragState.current.active = false
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [])
+
+  const handleDividerMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      const container = scrollRef.current
+      if (!container) return
+      splitDragState.current = {
+        active: true,
+        startX: e.clientX,
+        startPct: splitLeftPct,
+        containerWidth: container.getBoundingClientRect().width,
+      }
+      e.preventDefault()
+    },
+    [splitLeftPct]
+  )
 
   if (!diff) {
     return (
@@ -274,11 +320,19 @@ export function FileDiffView({ diff, isStale, onRefresh }: FileDiffViewProps): J
         <div className="file-diff-view__truncation-notice">Diff truncated at 500 KB.</div>
       )}
 
-      <div className="file-diff-view__scroll">
+      <div
+        className="file-diff-view__scroll"
+        ref={scrollRef}
+        style={
+          viewMode === 'split'
+            ? ({ '--split-left': `${splitLeftPct}%` } as React.CSSProperties)
+            : undefined
+        }
+      >
         {viewMode === 'unified' ? (
           <UnifiedTable hunks={diff.hunks} lang={lang} />
         ) : (
-          <SplitTable hunks={diff.hunks} lang={lang} />
+          <SplitTable hunks={diff.hunks} lang={lang} onDividerMouseDown={handleDividerMouseDown} />
         )}
       </div>
     </div>

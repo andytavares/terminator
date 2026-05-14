@@ -74,6 +74,14 @@ export interface SessionSnapshot {
   readonly type: 'human' | 'agent'
 }
 
+export interface CommandContribution {
+  id: string
+  label: string
+  description?: string
+  shortcut?: string
+  category?: string
+}
+
 export interface ExtensionAPI {
   readonly app: { readonly version: string }
   log: {
@@ -115,6 +123,9 @@ export interface ExtensionAPI {
   }
   keyboard: {
     register(accelerator: string, handler: () => void): Disposable
+  }
+  commands: {
+    register(command: CommandContribution, handler: () => void): Disposable
   }
   ipc: {
     registerHandler(
@@ -163,6 +174,8 @@ interface Registry {
   nativeMenuItems: Map<string, NativeMenuItemContribution>
   contextMenuItems: Map<string, { target: ContextMenuTarget; item: MenuItemContribution }>
   keyboardHandlers: Map<string, () => void>
+  commandContributions: Map<string, CommandContribution>
+  commandHandlers: Map<string, () => void>
   sessionCreateHandlers: Set<(session: Readonly<SessionSnapshot>) => void>
   sessionCloseHandlers: Set<(sessionId: string) => void>
 }
@@ -177,6 +190,8 @@ export const globalRegistry: Registry = {
   nativeMenuItems: new Map(),
   contextMenuItems: new Map(),
   keyboardHandlers: new Map(),
+  commandContributions: new Map(),
+  commandHandlers: new Map(),
   sessionCreateHandlers: new Set(),
   sessionCloseHandlers: new Set(),
 }
@@ -329,6 +344,17 @@ export function createExtensionAPI(
         const key = `${extensionId}.keyboard.${accelerator}`
         globalRegistry.keyboardHandlers.set(key, handler)
         return disposable(() => globalRegistry.keyboardHandlers.delete(key))
+      },
+    },
+    commands: {
+      register(command: CommandContribution, handler: () => void): Disposable {
+        const key = `${extensionId}.command.${command.id}`
+        globalRegistry.commandContributions.set(key, command)
+        globalRegistry.commandHandlers.set(key, handler)
+        return disposable(() => {
+          globalRegistry.commandContributions.delete(key)
+          globalRegistry.commandHandlers.delete(key)
+        })
       },
     },
     ipc: {
