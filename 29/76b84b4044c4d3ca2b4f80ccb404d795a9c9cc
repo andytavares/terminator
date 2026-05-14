@@ -1,0 +1,40 @@
+extensions/git-integration/src/components/GitFullView.tsx
+  s_af5b42ac4e8601::t_e4fbcb4193ab24 32-35
+  s_af5b42ac4e8601::t_50583b92a4ff23 1
+  s_af5b42ac4e8601::t_e3b182e9146d16 134-161,163-166,168-170
+  s_af5b42ac4e8601::t_d859bd406114f7 211-230,233-243,246,256,259,263,266
+  s_af5b42ac4e8601::t_c9fd40caea6835 63-75,77-78,83-84,87-118,120-122
+extensions/git-integration/src/ipc/git.ipc.ts
+  s_af5b42ac4e8601::t_5ee2bf4954bab0 73,78-84
+extensions/git-integration/src/git/git-service.ts
+  s_af5b42ac4e8601::t_bc89f21be2fc57 80-82,85-113
+  s_af5b42ac4e8601::t_b413ca60797de2 9,12-27
+extensions/git-integration/tests/unit/GitFullView.spec.tsx
+  s_af5b42ac4e8601::t_736221470b2f5c 136-138
+  s_af5b42ac4e8601::t_3ce972a558bddd 211-234,236-272
+tests/integration/ipc/git-extension.ipc.spec.ts
+  s_af5b42ac4e8601::t_c51bd32aaa3c29 156,172,176-197
+tests/unit/extensions/ext-git-service.spec.ts
+  s_af5b42ac4e8601::t_d0a80b583e3873 95,97-98,101,103-104,113-157,159-163
+extensions/git-integration/src/components/git-integration.css
+  s_af5b42ac4e8601::t_4ea45836f2b6b7 149-187
+  s_af5b42ac4e8601::t_812410b4bc26ed 248-277
+extensions/git-integration/src/types/electron.d.ts
+  s_af5b42ac4e8601::t_aa8c84f6cdb8c9 26-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "2976b84b4044c4d3ca2b4f80ccb404d795a9c9cc",
+  "prompts": {},
+  "sessions": {
+    "s_af5b42ac4e8601": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5e167585-7ab4-4f55-8524-c4f88c9e2d47",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
