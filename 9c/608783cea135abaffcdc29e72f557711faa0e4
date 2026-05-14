@@ -1,0 +1,92 @@
+src/main/preload.ts
+  s_af5b42ac4e8601::t_57ee0dc2d2503d 119-120
+src/main/ipc/extension.ipc.ts
+  s_af5b42ac4e8601::t_b032b3fc51a83f 87-103
+src/renderer/components/CommandPalette.tsx
+  s_af5b42ac4e8601::t_1b3d0f3f1351ba 1-157,159-167,169-174
+extensions/git-integration/src/components/git-integration.css
+  s_af5b42ac4e8601::t_24a743ebdb7b43 550-557,561-563,565-573
+  s_af5b42ac4e8601::t_f95ba891658644 899,906
+tests/unit/extensions/PrDialog.spec.tsx
+  s_af5b42ac4e8601::t_1d0b768ca21b8a 1-47,50-91,93-96,99-196
+  s_af5b42ac4e8601::t_177a5de2076ffa 48-49
+  s_af5b42ac4e8601::t_c16bd68f85a62c 92,97-98
+src/renderer/extensions/registry.ts
+  s_af5b42ac4e8601::t_00b96c7cdde8c8 38,45
+  s_af5b42ac4e8601::t_eb0f60e971bda5 24-33
+  s_af5b42ac4e8601::t_fb573a7ad91f15 98-102
+  s_af5b42ac4e8601::t_136e340c7eab7a 54
+tests/unit/renderer/components/CommandPalette.spec.tsx
+  s_af5b42ac4e8601::t_8123b9cae51776 1-8,12-34,36-41,43-48,50-74,76-90,92-112,114-161
+  s_af5b42ac4e8601::t_8cd01cb5e62b13 9-11
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_af5b42ac4e8601::t_a60192f2609001 154-170
+  s_af5b42ac4e8601::t_5be226ffffac26 171-225
+src/renderer/components/sidebar/ProjectsPanel.tsx
+  s_af5b42ac4e8601::t_3ff987e0816e2c 233-235
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_af5b42ac4e8601::t_55d3163bccbc20 150-184
+src/renderer/electron.d.ts
+  s_af5b42ac4e8601::t_e414574b6aee33 116-126
+src/renderer/components/CommandPalette.css
+  s_af5b42ac4e8601::t_06f092f9db6c8f 1-199
+src/renderer/App.tsx
+  s_af5b42ac4e8601::t_a4189dd421153f 28,40,48,56-131
+  s_af5b42ac4e8601::t_22cbc262511fe7 29-37
+  s_af5b42ac4e8601::t_1e481a9b69b2a0 286-288
+  s_af5b42ac4e8601::t_83dba3963c351a 10,14,19
+tests/unit/renderer/App.spec.tsx
+  s_af5b42ac4e8601::t_952d16f948c702 19-24,26-28
+  s_af5b42ac4e8601::t_08cff4fe01ba63 93
+  s_af5b42ac4e8601::t_30f0bc0272d3de 30-33
+  s_af5b42ac4e8601::t_f9bf2a15f0f362 276-282
+  s_af5b42ac4e8601::t_3a87d9bcd6aa7d 283-304,313-322,324-330
+  s_af5b42ac4e8601::t_f7071dc55890ec 116-117,123
+  s_af5b42ac4e8601::t_ba1bc3ab8d65a7 34-38
+  s_af5b42ac4e8601::t_0012e128eaae2d 305-312
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_af5b42ac4e8601::t_d6a66f867ee7b0 116-127
+  s_af5b42ac4e8601::t_7067de910415f5 181
+  s_af5b42ac4e8601::t_5ae94e87f7636f 11,14-18
+  s_af5b42ac4e8601::t_91ea99ab369c12 58-64
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_af5b42ac4e8601::t_e9711c4b84ab23 689,696
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_af5b42ac4e8601::t_4cb6b097829fe4 3
+  s_af5b42ac4e8601::t_830216f7e2deee 55-62,64-87
+src/renderer/components/sidebar/BranchSwitcher.css
+  s_af5b42ac4e8601::t_3f83c1327d63b8 80-107
+src/main/extensions/api.ts
+  s_af5b42ac4e8601::t_1c2ad1b3f35305 77-84
+  s_af5b42ac4e8601::t_1610dad5536bfd 177-178,193-194
+  s_af5b42ac4e8601::t_0177574a88ace1 349-359
+  s_af5b42ac4e8601::t_1c5fcbe0a90bb8 127-129
+extensions/git-integration/tests/unit/FileDiffView.spec.tsx
+  s_af5b42ac4e8601::t_b712aab537fc3c 140-176
+extensions/git-integration/src/components/FileDiffView.tsx
+  s_af5b42ac4e8601::t_6af42682b467b2 158-159,164,169,178
+  s_af5b42ac4e8601::t_60afd94a273650 323-331,335
+  s_af5b42ac4e8601::t_01a11a048d5d68 185-193,202,211,219
+  s_af5b42ac4e8601::t_08ef46461368cf 1
+  s_af5b42ac4e8601::t_e04f6a1d1bf509 236-271
+src/renderer/components/sidebar/BranchSwitcher.tsx
+  s_af5b42ac4e8601::t_906bafe06af021 41,43
+  s_af5b42ac4e8601::t_17486e15bb59ed 27,32
+  s_af5b42ac4e8601::t_abb4a38c09e7bc 126,129-140,147-149,156-158,163-169
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "9c608783cea135abaffcdc29e72f557711faa0e4",
+  "prompts": {},
+  "sessions": {
+    "s_af5b42ac4e8601": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5e167585-7ab4-4f55-8524-c4f88c9e2d47",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
