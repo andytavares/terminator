@@ -133,7 +133,9 @@ describe('GitFullView', () => {
       target: { value: 'fix: something' },
     })
     fireEvent.click(screen.getByText('Commit'))
-    await waitFor(() => expect(mockGitCommit).toHaveBeenCalledWith('/repo', 'fix: something'))
+    await waitFor(() =>
+      expect(mockGitCommit).toHaveBeenCalledWith('/repo', 'fix: something', false, false)
+    )
   })
 
   it('shows commit error message when commit returns error', async () => {
@@ -204,6 +206,68 @@ describe('GitFullView', () => {
     await renderView()
     fireEvent.click(screen.getByText('SelectFile'))
     await waitFor(() => expect(mockGitDiffFile).toHaveBeenCalledWith('/repo', 'src/foo.ts', false))
+  })
+
+  it('shows hook output when commit fails due to hook failure', async () => {
+    mockGitCommit.mockResolvedValue({
+      error: 'HOOK_FAILED',
+      hookOutput: 'eslint found 3 errors',
+      isHookFailure: true,
+    })
+    const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
+    setupStore({ status: { branch: 'feature', files: [stagedFile] } })
+    const { GitFullView } = await import('../../src/components/GitFullView')
+    render(<GitFullView repoRoot="/repo" />)
+    fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
+      target: { value: 'fix: something' },
+    })
+    fireEvent.click(screen.getByText('Commit'))
+    await waitFor(() => expect(screen.getByText('Pre-commit hooks failed.')).toBeTruthy())
+    expect(screen.getByText('Hook output')).toBeTruthy()
+    expect(screen.getByText('Commit without hooks')).toBeTruthy()
+  })
+
+  it('commits with --no-verify when Commit without hooks is clicked', async () => {
+    mockGitCommit
+      .mockResolvedValueOnce({
+        error: 'HOOK_FAILED',
+        hookOutput: 'lint failed',
+        isHookFailure: true,
+      })
+      .mockResolvedValueOnce({ commitHash: 'def456' })
+    const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
+    setupStore({ status: { branch: 'feature', files: [stagedFile] } })
+    const { GitFullView } = await import('../../src/components/GitFullView')
+    render(<GitFullView repoRoot="/repo" />)
+    fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
+      target: { value: 'fix: skip hooks' },
+    })
+    fireEvent.click(screen.getByText('Commit'))
+    await waitFor(() => screen.getByText('Commit without hooks'))
+    fireEvent.click(screen.getByText('Commit without hooks'))
+    await waitFor(() =>
+      expect(mockGitCommit).toHaveBeenCalledWith('/repo', 'fix: skip hooks', false, true)
+    )
+  })
+
+  it('shows running hooks status text while committing', async () => {
+    let resolve: (v: unknown) => void
+    mockGitCommit.mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolve = r
+        })
+    )
+    const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
+    setupStore({ status: { branch: 'feature', files: [stagedFile] } })
+    const { GitFullView } = await import('../../src/components/GitFullView')
+    render(<GitFullView repoRoot="/repo" />)
+    fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
+      target: { value: 'wip' },
+    })
+    fireEvent.click(screen.getByText('Commit'))
+    await waitFor(() => expect(screen.getByText(/Running pre-commit hooks/)).toBeTruthy())
+    resolve!({ commitHash: 'abc' })
   })
 
   it('shows push error when push fails after commit & push', async () => {

@@ -23,8 +23,11 @@ declare global {
         commit(
           repoRoot: string,
           message: string,
-          signOff?: boolean
-        ): Promise<{ commitHash: string } | { error: string }>
+          signOff?: boolean,
+          noVerify?: boolean
+        ): Promise<
+          { commitHash: string } | { error: string; hookOutput?: string; isHookFailure?: boolean }
+        >
         prStatus(repoRoot: string): Promise<{ pr: unknown | null } | { error: string }>
         prCreate(payload: unknown): Promise<{ pr: unknown } | { error: string }>
       }
