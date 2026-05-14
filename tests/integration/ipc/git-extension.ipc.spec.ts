@@ -153,7 +153,7 @@ describe('git-integration extension: git:commit IPC handler', () => {
   })
 
   it('commits staged changes and returns hash', async () => {
-    vi.mocked(gitService.commitChanges).mockResolvedValue('abc123')
+    vi.mocked(gitService.commitChanges).mockResolvedValue({ commitHash: 'abc123' })
     const result = await getHandler('git:commit')({
       repoRoot: '/tmp/repo',
       message: 'feat: add feature',
@@ -169,12 +169,31 @@ describe('git-integration extension: git:commit IPC handler', () => {
   })
 
   it('returns NOTHING_TO_COMMIT when no staged files', async () => {
-    vi.mocked(gitService.commitChanges).mockRejectedValue(
-      Object.assign(new Error('nothing to commit'), { code: 'NOTHING_TO_COMMIT' })
-    )
+    vi.mocked(gitService.commitChanges).mockResolvedValue({ error: 'NOTHING_TO_COMMIT' })
     const result = (await getHandler('git:commit')({ repoRoot: '/tmp/repo', message: 'test' })) as {
       error: string
     }
-    expect(result.error).toBeDefined()
+    expect(result.error).toBe('NOTHING_TO_COMMIT')
+  })
+
+  it('returns hook error with hookOutput when a pre-commit hook fails', async () => {
+    vi.mocked(gitService.commitChanges).mockResolvedValue({
+      error: 'HOOK_FAILED',
+      hookOutput: 'lint: 3 errors',
+      isHookFailure: true,
+    })
+    const result = (await getHandler('git:commit')({
+      repoRoot: '/tmp/repo',
+      message: 'test',
+    })) as { error: string; hookOutput?: string; isHookFailure?: boolean }
+    expect(result.error).toBe('HOOK_FAILED')
+    expect(result.hookOutput).toBe('lint: 3 errors')
+    expect(result.isHookFailure).toBe(true)
+  })
+
+  it('passes noVerify to commitChanges', async () => {
+    vi.mocked(gitService.commitChanges).mockResolvedValue({ commitHash: 'def456' })
+    await getHandler('git:commit')({ repoRoot: '/tmp/repo', message: 'skip', noVerify: true })
+    expect(gitService.commitChanges).toHaveBeenCalledWith('/tmp/repo', 'skip', false, true)
   })
 })

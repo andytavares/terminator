@@ -206,27 +206,6 @@
   color: var(--danger);
 }
 
-/* ── Rename pencil icon ──────────────────────────────────────── */
-.proj-card__rename-icon {
-  font-size: 11px;
-  color: var(--text-muted);
-  opacity: 0;
-  flex-shrink: 0;
-  transition: opacity 0.1s;
-  cursor: pointer;
-  padding: 1px 3px;
-  border-radius: 3px;
-}
-
-.proj-card:hover .proj-card__rename-icon {
-  opacity: 1;
-}
-
-.proj-card__rename-icon:hover {
-  color: var(--text-primary);
-  background: var(--bg-card-hover);
-}
-
 /* ── Menu button ─────────────────────────────────────────────── */
 .proj-card__menu-btn {
   background: none;

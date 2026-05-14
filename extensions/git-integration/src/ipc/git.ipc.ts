@@ -70,22 +70,18 @@ export function registerGitExtensionHandlers(register: RegisterFn): void {
       repoRoot: z.string().min(1),
       message: z.string(),
       signOff: z.boolean().optional(),
+      noVerify: z.boolean().optional(),
     })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     if (!parsed.data.message.trim()) return { error: 'EMPTY_MESSAGE' }
-    try {
-      const commitHash = await commitChanges(
-        parsed.data.repoRoot,
-        parsed.data.message,
-        parsed.data.signOff ?? false
-      )
-      return { commitHash }
-    } catch (e) {
-      const msg = String(e)
-      if (msg.includes('nothing to commit')) return { error: 'NOTHING_TO_COMMIT' }
-      return { error: msg }
-    }
+    const result = await commitChanges(
+      parsed.data.repoRoot,
+      parsed.data.message,
+      parsed.data.signOff ?? false,
+      parsed.data.noVerify ?? false
+    )
+    return result
   })
 
   register('git:push', async (payload) => {

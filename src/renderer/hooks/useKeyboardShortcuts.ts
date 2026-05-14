@@ -8,9 +8,14 @@ import { useExtensionRegistry, matchesAccelerator } from '../extensions/registry
 interface Options {
   onOpenSettings?: () => void
   onToggleLog?: () => void
+  onOpenCommandPalette?: () => void
 }
 
-export function useKeyboardShortcuts({ onOpenSettings, onToggleLog }: Options = {}): void {
+export function useKeyboardShortcuts({
+  onOpenSettings,
+  onToggleLog,
+  onOpenCommandPalette,
+}: Options = {}): void {
   const {
     workspaces,
     activeWorkspaceId,
@@ -47,6 +52,13 @@ export function useKeyboardShortcuts({ onOpenSettings, onToggleLog }: Options = 
       if (isMeta && e.key === ',') {
         e.preventDefault()
         onOpenSettings?.()
+        return
+      }
+
+      // Cmd+P: open command palette
+      if (isMeta && e.key === 'p') {
+        e.preventDefault()
+        onOpenCommandPalette?.()
         return
       }
 
@@ -98,6 +110,18 @@ export function useKeyboardShortcuts({ onOpenSettings, onToggleLog }: Options = 
       if (isMeta && e.key === '-') {
         e.preventDefault()
         cycleWorkspace(-1)
+        return
+      }
+
+      // Cmd+K: clear terminal screen
+      if (isMeta && e.key === 'k') {
+        e.preventDefault()
+        if (activeProjectId) {
+          const activeSessionId = getActiveSessionForProject(activeProjectId)
+          if (activeSessionId) {
+            window.electronAPI.terminal.input(activeSessionId, '\x0c')
+          }
+        }
         return
       }
 
@@ -154,5 +178,6 @@ export function useKeyboardShortcuts({ onOpenSettings, onToggleLog }: Options = 
     setActiveSessionForProject,
     onOpenSettings,
     onToggleLog,
+    onOpenCommandPalette,
   ])
 }

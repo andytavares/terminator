@@ -116,6 +116,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('extension:get-context-menu-items', { target }),
     contextMenuClick: (target: string, itemId: string, targetId: string) =>
       ipcRenderer.send('extension:context-menu-click', { target, itemId, targetId }),
+    getCommands: () => ipcRenderer.invoke('extension:get-commands'),
+    executeCommand: (key: string) => ipcRenderer.send('extension:execute-command', { key }),
   },
   keyboard: {
     isReserved: (accelerator: string) => RESERVED_SHORTCUTS.has(accelerator),

@@ -77,6 +77,34 @@
   }
 }
 
+/* ── Filter input ────────────────────────────────────────────── */
+.branch-sw__filter-wrap {
+  padding: 8px 8px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.branch-sw__filter {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  padding: 5px 9px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  outline: none;
+}
+
+.branch-sw__filter::placeholder {
+  color: var(--text-muted);
+}
+
+.branch-sw__filter:focus {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+}
+
 /* ── Sections ────────────────────────────────────────────────── */
 .branch-sw__section {
   padding: 4px 0;

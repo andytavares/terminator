@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useRef } from 'react'
 import './git-integration.css'
 import { useGitStore } from '../stores/git.store'
 import { useGitStatus } from '../hooks/useGitStatus'
@@ -29,6 +29,10 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
   const [showPrDialog, setShowPrDialog] = useState(false)
   const [existingPr, setExistingPr] = useState<PullRequest | null>(null)
   const [commitError, setCommitError] = useState<string | null>(null)
+  const [hookOutput, setHookOutput] = useState<string | null>(null)
+  const [isHookFailure, setIsHookFailure] = useState(false)
+  const [commitPhase, setCommitPhase] = useState<'idle' | 'hooks' | 'committing'>('idle')
+  const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const selectedDiff: FileDiff | null = selectedFile ? (diffCache.get(selectedFile) ?? null) : null
 
@@ -56,27 +60,66 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
   const charCount = commitMessage.length
   const showCharCount = charCount > 50
 
-  const handleCommit = useCallback(async () => {
-    if (!canCommit || !repoRoot) return
-    setIsCommitting(true)
-    setCommitError(null)
-    try {
-      const result = (await window.electronAPI.git.commit(repoRoot, commitMessage.trim())) as
+  const startCommitPhase = useCallback(() => {
+    setCommitPhase('hooks')
+    phaseTimerRef.current = setTimeout(() => setCommitPhase('committing'), 3000)
+  }, [])
+
+  const endCommitPhase = useCallback(() => {
+    if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current)
+    setCommitPhase('idle')
+  }, [])
+
+  const applyCommitResult = useCallback(
+    (
+      result:
         | { commitHash: string }
-        | { error: string }
+        | { error: string; hookOutput?: string; isHookFailure?: boolean }
+    ) => {
       if ('error' in result) {
         const msgs: Record<string, string> = {
           NOTHING_TO_COMMIT: 'Nothing staged to commit. Stage at least one file first.',
           EMPTY_MESSAGE: 'Commit message cannot be empty.',
+          TIMEOUT: 'Commit timed out — a pre-commit hook may have hung.',
+          HOOK_FAILED: 'Pre-commit hooks failed.',
         }
         setCommitError(msgs[result.error] ?? result.error)
-      } else {
-        setCommitMessage('')
+        setHookOutput(result.hookOutput ?? null)
+        setIsHookFailure(result.isHookFailure ?? false)
+        return false
       }
-    } finally {
-      setIsCommitting(false)
-    }
-  }, [repoRoot, commitMessage, canCommit])
+      setCommitMessage('')
+      setHookOutput(null)
+      setIsHookFailure(false)
+      setCommitError(null)
+      return true
+    },
+    [setCommitMessage]
+  )
+
+  const handleCommit = useCallback(
+    async (noVerify = false) => {
+      if (!canCommit || !repoRoot) return
+      setIsCommitting(true)
+      setCommitError(null)
+      setHookOutput(null)
+      setIsHookFailure(false)
+      startCommitPhase()
+      try {
+        const result = await window.electronAPI.git.commit(
+          repoRoot,
+          commitMessage.trim(),
+          false,
+          noVerify
+        )
+        applyCommitResult(result)
+      } finally {
+        setIsCommitting(false)
+        endCommitPhase()
+      }
+    },
+    [repoRoot, commitMessage, canCommit, startCommitPhase, endCommitPhase, applyCommitResult]
+  )
 
   const handleOpenPr = useCallback(async () => {
     if (!repoRoot) return
@@ -88,40 +131,43 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
     setShowPrDialog(true)
   }, [repoRoot])
 
-  const handleCommitAndPush = useCallback(async () => {
-    if (!canCommit || !repoRoot) return
-    setIsCommitting(true)
-    setCommitError(null)
-    try {
-      const result = (await window.electronAPI.git.commit(repoRoot, commitMessage.trim())) as
-        | { commitHash: string }
-        | { error: string }
-      if ('error' in result) {
-        const msgs: Record<string, string> = {
-          NOTHING_TO_COMMIT: 'Nothing staged to commit.',
-          EMPTY_MESSAGE: 'Commit message cannot be empty.',
+  const handleCommitAndPush = useCallback(
+    async (noVerify = false) => {
+      if (!canCommit || !repoRoot) return
+      setIsCommitting(true)
+      setCommitError(null)
+      setHookOutput(null)
+      setIsHookFailure(false)
+      startCommitPhase()
+      try {
+        const result = await window.electronAPI.git.commit(
+          repoRoot,
+          commitMessage.trim(),
+          false,
+          noVerify
+        )
+        if (!applyCommitResult(result)) return
+        setIsCommitting(false)
+        endCommitPhase()
+        setIsPushing(true)
+        const pushResult = (await window.electronAPI.git.push(repoRoot)) as
+          | { success: true }
+          | { error: string }
+        if ('error' in pushResult) {
+          const msgs: Record<string, string> = {
+            NO_UPSTREAM: 'Committed but push failed — no upstream branch set.',
+            REJECTED: 'Committed but push rejected — pull changes first.',
+          }
+          setCommitError(msgs[pushResult.error] ?? pushResult.error)
         }
-        setCommitError(msgs[result.error] ?? result.error)
-        return
+      } finally {
+        setIsCommitting(false)
+        setIsPushing(false)
+        endCommitPhase()
       }
-      setCommitMessage('')
-      setIsCommitting(false)
-      setIsPushing(true)
-      const pushResult = (await window.electronAPI.git.push(repoRoot)) as
-        | { success: true }
-        | { error: string }
-      if ('error' in pushResult) {
-        const msgs: Record<string, string> = {
-          NO_UPSTREAM: 'Committed but push failed — no upstream branch set.',
-          REJECTED: 'Committed but push rejected — pull changes first.',
-        }
-        setCommitError(msgs[pushResult.error] ?? pushResult.error)
-      }
-    } finally {
-      setIsCommitting(false)
-      setIsPushing(false)
-    }
-  }, [repoRoot, commitMessage, canCommit])
+    },
+    [repoRoot, commitMessage, canCommit, startCommitPhase, endCommitPhase, applyCommitResult]
+  )
 
   const handlePrCreated = useCallback((pr: PullRequest) => {
     setShowPrDialog(false)
@@ -162,13 +208,42 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
               {charCount} chars
             </span>
           )}
-          {commitError && <div className="git-view__commit-error">{commitError}</div>}
+          {commitError && (
+            <div className="git-view__commit-error">
+              <span className="git-view__commit-error-msg">{commitError}</span>
+              {hookOutput && (
+                <details className="git-view__hook-output">
+                  <summary className="git-view__hook-output-summary">Hook output</summary>
+                  <pre className="git-view__hook-output-pre">{hookOutput}</pre>
+                </details>
+              )}
+              {isHookFailure && (
+                <button
+                  className="git-view__btn git-view__btn--danger git-view__btn--sm"
+                  onClick={() => handleCommit(true)}
+                  disabled={isCommitting || isPushing}
+                >
+                  Commit without hooks
+                </button>
+              )}
+            </div>
+          )}
           <div className="git-view__commit-actions">
             <div className="git-view__commit-hint">
-              {stagedFiles.length === 0 && (
+              {isCommitting && commitPhase === 'hooks' && (
+                <span className="git-view__hint-text git-view__hint-text--status">
+                  ⟳ Running pre-commit hooks…
+                </span>
+              )}
+              {isCommitting && commitPhase === 'committing' && (
+                <span className="git-view__hint-text git-view__hint-text--status">
+                  ⟳ Committing…
+                </span>
+              )}
+              {!isCommitting && stagedFiles.length === 0 && (
                 <span className="git-view__hint-text">Stage at least one file to commit</span>
               )}
-              {stagedFiles.length > 0 && !commitMessage.trim() && (
+              {!isCommitting && stagedFiles.length > 0 && !commitMessage.trim() && (
                 <span className="git-view__hint-text">Enter a commit message</span>
               )}
             </div>
@@ -178,17 +253,17 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
               </button>
               <button
                 className="git-view__btn git-view__btn--secondary"
-                onClick={handleCommit}
+                onClick={() => handleCommit(false)}
                 disabled={!canCommit || isCommitting || isPushing}
               >
-                {isCommitting ? '⟳ Committing…' : 'Commit'}
+                Commit
               </button>
               <button
                 className="git-view__btn git-view__btn--primary"
-                onClick={handleCommitAndPush}
+                onClick={() => handleCommitAndPush(false)}
                 disabled={!canCommit || isCommitting || isPushing}
               >
-                {isPushing ? '⟳ Pushing…' : isCommitting ? '⟳ Committing…' : 'Commit & Push'}
+                {isPushing ? '⟳ Pushing…' : 'Commit & Push'}
               </button>
             </div>
           </div>

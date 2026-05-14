@@ -92,16 +92,16 @@ describe('extension git-service', () => {
   })
 
   describe('commitChanges', () => {
-    it('extracts short hash from commit output', async () => {
+    it('returns commitHash on success', async () => {
       mockResolve('[main abc1234] commit message')
-      const hash = await commitChanges('/repo', 'commit message')
-      expect(hash).toBe('abc1234')
+      const result = await commitChanges('/repo', 'commit message')
+      expect('commitHash' in result && result.commitHash).toBe('abc1234')
     })
 
-    it('returns empty string when hash not found', async () => {
+    it('returns empty commitHash when hash not found in output', async () => {
       mockResolve('nothing useful')
-      const hash = await commitChanges('/repo', 'msg')
-      expect(hash).toBe('')
+      const result = await commitChanges('/repo', 'msg')
+      expect('commitHash' in result && result.commitHash).toBe('')
     })
 
     it('appends --signoff when requested', async () => {
@@ -109,6 +109,58 @@ describe('extension git-service', () => {
       await commitChanges('/repo', 'signed', true)
       const args = customMock().mock.calls[0][1] as string[]
       expect(args).toContain('--signoff')
+    })
+
+    it('appends --no-verify when noVerify is true', async () => {
+      mockResolve('[main abc1234] skip')
+      await commitChanges('/repo', 'skip', false, true)
+      const args = customMock().mock.calls[0][1] as string[]
+      expect(args).toContain('--no-verify')
+    })
+
+    it('returns NOTHING_TO_COMMIT error when git output says nothing to commit', async () => {
+      customMock().mockRejectedValue(
+        Object.assign(new Error('Command failed'), {
+          stdout: 'nothing to commit, working tree clean',
+          stderr: '',
+        })
+      )
+      const result = await commitChanges('/repo', 'msg')
+      expect('error' in result && result.error).toBe('NOTHING_TO_COMMIT')
+    })
+
+    it('returns HOOK_FAILED with hookOutput when pre-commit hook fails', async () => {
+      customMock().mockRejectedValue(
+        Object.assign(new Error('Command failed'), {
+          stdout: 'lint-staged output: 3 errors',
+          stderr:
+            "husky - pre-commit hook exited with code 1 (error)\nerror: 'pre-commit' hook failed",
+        })
+      )
+      const result = await commitChanges('/repo', 'msg')
+      expect('error' in result && result.error).toBe('HOOK_FAILED')
+      expect('hookOutput' in result && result.hookOutput).toContain('lint-staged output')
+      expect('isHookFailure' in result && result.isHookFailure).toBe(true)
+    })
+
+    it('returns TIMEOUT error when process is killed', async () => {
+      customMock().mockRejectedValue(
+        Object.assign(new Error('Command failed'), { killed: true, stdout: '', stderr: '' })
+      )
+      const result = await commitChanges('/repo', 'msg')
+      expect('error' in result && result.error).toBe('TIMEOUT')
+    })
+
+    it('strips ANSI escape codes from hook output', async () => {
+      customMock().mockRejectedValue(
+        Object.assign(new Error('Command failed'), {
+          stdout: '',
+          stderr: '\x1b[31merror\x1b[0m: hook failed\nhook exited with code 1',
+        })
+      )
+      const result = await commitChanges('/repo', 'msg')
+      expect('hookOutput' in result && result.hookOutput).not.toContain('\x1b[')
+      expect('hookOutput' in result && result.hookOutput).toContain('error: hook failed')
     })
   })
 })

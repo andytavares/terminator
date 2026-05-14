@@ -21,16 +21,28 @@ export interface KeyboardShortcutRegistration {
   description?: string
 }
 
+export interface CommandRegistration {
+  id: string
+  label: string
+  description?: string
+  /** Display hint shown on the right, e.g. "⌘T" */
+  shortcut?: string
+  category?: string
+  action(): void
+}
+
 interface ExtensionRegistry {
   sidebarPanels: Map<string, SidebarPanelRegistration>
   projectTabs: Map<string, ProjectTabRegistration>
   keyboardShortcuts: KeyboardShortcutRegistration[]
+  commands: CommandRegistration[]
   openPanels: Set<string>
   activeProjectTabId: string | null
 
   registerSidebarPanel(panel: SidebarPanelRegistration): () => void
   registerProjectTab(tab: ProjectTabRegistration): () => void
   registerKeyboardShortcut(shortcut: KeyboardShortcutRegistration): () => void
+  registerCommand(command: CommandRegistration): () => void
   togglePanel(panelId: string): void
   setActiveProjectTab(tabId: string | null): void
 }
@@ -39,6 +51,7 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
   sidebarPanels: new Map(),
   projectTabs: new Map(),
   keyboardShortcuts: [],
+  commands: [],
   openPanels: new Set(),
   activeProjectTabId: null,
 
@@ -80,6 +93,11 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
     set((s) => ({ keyboardShortcuts: [...s.keyboardShortcuts, shortcut] }))
     return () =>
       set((s) => ({ keyboardShortcuts: s.keyboardShortcuts.filter((sc) => sc !== shortcut) }))
+  },
+
+  registerCommand(command) {
+    set((s) => ({ commands: [...s.commands, command] }))
+    return () => set((s) => ({ commands: s.commands.filter((c) => c !== command) }))
   },
 
   togglePanel(panelId) {

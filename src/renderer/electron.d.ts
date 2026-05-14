@@ -113,6 +113,17 @@ interface ElectronAPI {
     getSidebarItems(): Promise<{ items: Array<{ id: string; label: string; tooltip?: string }> }>
     getContextMenuItems(target: string): Promise<{ items: Array<{ id: string; label: string }> }>
     contextMenuClick(target: string, itemId: string, targetId: string): void
+    getCommands(): Promise<{
+      commands: Array<{
+        key: string
+        id: string
+        label: string
+        description?: string
+        shortcut?: string
+        category?: string
+      }>
+    }>
+    executeCommand(key: string): void
   }
   keyboard: {
     isReserved(accelerator: string): boolean

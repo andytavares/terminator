@@ -147,6 +147,41 @@ describe('useKeyboardShortcuts', () => {
     )
   })
 
+  it('calls onOpenCommandPalette when Cmd+P is pressed', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onOpenCommandPalette = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onOpenCommandPalette }))
+    pressKey('p', { metaKey: true })
+    expect(onOpenCommandPalette).toHaveBeenCalled()
+  })
+
+  it('sends clear escape to active terminal on Cmd+K when project and session active', async () => {
+    const mockTerminalInput = vi.fn()
+    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+      terminal: { input: mockTerminalInput },
+    }
+    mockGetActiveSessionForProject.mockReturnValue('session-1')
+    setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('k', { metaKey: true })
+    expect(mockTerminalInput).toHaveBeenCalledWith('session-1', '\x0c')
+    delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  })
+
+  it('does nothing on Cmd+K when no active project', async () => {
+    const mockTerminalInput = vi.fn()
+    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+      terminal: { input: mockTerminalInput },
+    }
+    setupMocks({ activeProjectId: null })
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('k', { metaKey: true })
+    expect(mockTerminalInput).not.toHaveBeenCalled()
+    delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  })
+
   it('does not create session on Cmd+T when no active project', async () => {
     setupMocks({ activeProjectId: null })
     const useKeyboardShortcuts = await importHook()

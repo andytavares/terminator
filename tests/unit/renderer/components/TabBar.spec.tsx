@@ -151,6 +151,78 @@ describe('TabBar', () => {
     expect(screen.getByTestId('new-tab-dialog')).toBeTruthy()
   })
 
+  it('applies workspace color css variable when workspace matches', () => {
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [{ id: 'ws-1', color: '#ff0000', name: 'Test', folderPath: '/', tags: [] }],
+      activeWorkspaceId: 'ws-1',
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    const { container } = render(
+      <TabBar
+        projectId="proj-1"
+        activeProjectTabId={null}
+        projectTabs={[]}
+        onSelectProjectTab={vi.fn()}
+      />
+    )
+    const tabBarStack = container.querySelector('.tab-bar-stack') as HTMLElement
+    expect(tabBarStack.style.getPropertyValue('--ws-color')).toBe('#ff0000')
+  })
+
+  it('calls onSelectProjectTab(null) when Terminal tab is clicked', () => {
+    const onSelectProjectTab = vi.fn()
+    render(
+      <TabBar
+        projectId="proj-1"
+        activeProjectTabId="git"
+        projectTabs={[
+          {
+            id: 'git',
+            label: 'Git',
+            component: null as unknown as ComponentType<{ repoRoot: string | null }>,
+          },
+        ]}
+        onSelectProjectTab={onSelectProjectTab}
+      />
+    )
+    fireEvent.click(screen.getByText('Terminal'))
+    expect(onSelectProjectTab).toHaveBeenCalledWith(null)
+  })
+
+  it('calls onSelectProjectTab with tab id when extension tab is clicked', () => {
+    const onSelectProjectTab = vi.fn()
+    render(
+      <TabBar
+        projectId="proj-1"
+        activeProjectTabId={null}
+        projectTabs={[
+          {
+            id: 'git',
+            label: 'Git',
+            component: null as unknown as ComponentType<{ repoRoot: string | null }>,
+          },
+        ]}
+        onSelectProjectTab={onSelectProjectTab}
+      />
+    )
+    fireEvent.click(screen.getByText('Git'))
+    expect(onSelectProjectTab).toHaveBeenCalledWith('git')
+  })
+
+  it('closes new tab dialog when dialog onClose is called', () => {
+    render(
+      <TabBar
+        projectId="proj-1"
+        activeProjectTabId={null}
+        projectTabs={[]}
+        onSelectProjectTab={vi.fn()}
+      />
+    )
+    fireEvent.click(screen.getByTitle('New tab (⌘T)'))
+    expect(screen.getByTestId('new-tab-dialog')).toBeTruthy()
+    fireEvent.click(screen.getByText('Close Dialog'))
+    expect(screen.queryByTestId('new-tab-dialog')).toBeNull()
+  })
+
   it('calls setActiveSessionForProject when session tab is clicked', () => {
     mockGetSessions.mockReturnValue([
       { id: 'ses-1', tabTitle: 'bash', type: 'human' },
