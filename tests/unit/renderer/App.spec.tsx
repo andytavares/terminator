@@ -124,6 +124,7 @@ function setupMocks(
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSessionStore).mockReturnValue({
     handleProcessExit: mockHandleProcessExit,
+    getSessionsForProject: vi.fn().mockReturnValue([]),
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useToastStore).mockReturnValue({
     addToast: mockAddToast,

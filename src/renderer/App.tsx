@@ -35,7 +35,7 @@ export function App(): JSX.Element {
     projectsByWorkspaceId,
   } = useWorkspaceStore()
   const { loadSettings, globalSettings, markWelcomeSeen, resolveSettings } = useSettingsStore()
-  const { handleProcessExit } = useSessionStore()
+  const { handleProcessExit, getSessionsForProject } = useSessionStore()
   const { addToast } = useToastStore()
   const { createSession } = useTerminalSession()
   const {
@@ -151,6 +151,27 @@ export function App(): JSX.Element {
     })
     return unsub
   }, [handleProcessExit])
+
+  // Auto-open a terminal whenever the Terminal tab is active and has no sessions.
+  // Covers: first project selection, switching back from an extension tab, all sessions closed.
+  useEffect(() => {
+    if (!activeProjectId || activeProjectTabId !== null) return
+    if (getSessionsForProject(activeProjectId).length > 0) return
+    const settings = resolveSettings(activeWorkspaceId)
+    const projects = activeWorkspaceId ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? []) : []
+    const activeProject = projects.find((p) => p.id === activeProjectId)
+    const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
+    void createSession(activeProjectId, 'human', 'Terminal', cwd, settings.terminal.scrollbackLimit)
+  }, [
+    activeProjectId,
+    activeProjectTabId,
+    activeWorkspaceId,
+    activeWorkspace,
+    projectsByWorkspaceId,
+    resolveSettings,
+    createSession,
+    getSessionsForProject,
+  ])
 
   useEffect(() => {
     const handler = (): void => setSettingsOpen(true)

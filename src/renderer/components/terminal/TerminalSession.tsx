@@ -54,6 +54,7 @@ export class TerminalInstance {
       this.opened = true
     }
     this.fitAddon.fit()
+    this.terminal.scrollToBottom()
     this.terminal.focus()
     this.resizeObserver = new ResizeObserver(() => this.fitAddon.fit())
     this.resizeObserver.observe(container)

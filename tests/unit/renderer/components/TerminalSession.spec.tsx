@@ -18,6 +18,7 @@ vi.mock('xterm', () => {
     focus: vi.fn(),
     write: vi.fn(),
     dispose: vi.fn(),
+    scrollToBottom: vi.fn(),
   }))
   return { Terminal }
 })

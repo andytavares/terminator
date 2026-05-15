@@ -31,7 +31,7 @@ export class PtyManager {
     onData: (data: string) => void,
     onExit: (exitCode: number) => void
   ): string {
-    const ptyProcess = pty.spawn(shell, [], {
+    const ptyProcess = pty.spawn(shell, ['-l'], {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
