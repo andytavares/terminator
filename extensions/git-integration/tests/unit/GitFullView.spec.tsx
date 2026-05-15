@@ -54,6 +54,7 @@ function setupStore(overrides: Record<string, unknown> = {}) {
     setSelectedFile: mockSetSelectedFile,
     setDiff: mockSetDiff,
     setLoading: mockSetLoading,
+    clearDiffCache: vi.fn(),
     ...overrides,
   } as unknown as ReturnType<typeof useGitStore>)
 }
@@ -205,7 +206,9 @@ describe('GitFullView', () => {
   it('fetches diff when file is selected', async () => {
     await renderView()
     fireEvent.click(screen.getByText('SelectFile'))
-    await waitFor(() => expect(mockGitDiffFile).toHaveBeenCalledWith('/repo', 'src/foo.ts', false))
+    await waitFor(() =>
+      expect(mockGitDiffFile).toHaveBeenCalledWith('/repo', 'src/foo.ts', false, false)
+    )
   })
 
   it('shows hook output when commit fails due to hook failure', async () => {

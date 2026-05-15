@@ -16,7 +16,8 @@ declare global {
         diffFile(
           repoRoot: string,
           path: string,
-          staged: boolean
+          staged: boolean,
+          isUntracked?: boolean
         ): Promise<{ diff: unknown } | { error: string }>
         stage(repoRoot: string, paths: string[]): Promise<{ success: true } | { error: string }>
         unstage(repoRoot: string, paths: string[]): Promise<{ success: true } | { error: string }>

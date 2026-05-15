@@ -31,6 +31,33 @@ describe('buildChapters()', () => {
     expect(ids).toContain('docs')
   })
 
+  it('splits directories with subdirectories when group exceeds 15 files', () => {
+    // 9 files in src/auth and 9 files in src/payments — 18 total under src, split by subdir
+    const authFiles = Array.from({ length: 9 }, (_, i) => f(`src/auth/file${i}.ts`))
+    const paymentFiles = Array.from({ length: 9 }, (_, i) => f(`src/payments/file${i}.ts`))
+    const chapters = buildChapters([...authFiles, ...paymentFiles])
+    // Each subdir group (9 files) is ≤ 15, so we should get two separate chapters
+    expect(chapters.length).toBeGreaterThanOrEqual(2)
+    expect(chapters.every((c) => c.files.length <= 15)).toBe(true)
+  })
+
+  it('keeps flat directories together even if large (no subdirs to split on)', () => {
+    const manyFiles = Array.from({ length: 18 }, (_, i) => f(`src/payments/file${i}.ts`))
+    const chapters = buildChapters(manyFiles)
+    // All files are directly in src/payments with no subdirectory — cannot split further
+    expect(chapters).toHaveLength(1)
+  })
+
+  it('keeps small directories together in one chapter', () => {
+    const chapters = buildChapters([
+      f('src/auth/login.ts'),
+      f('src/auth/logout.ts'),
+      f('src/auth/register.ts'),
+    ])
+    expect(chapters).toHaveLength(1)
+    expect(chapters[0].id).toBe('src')
+  })
+
   it('places type/interface files in tier 0', () => {
     const chapters = buildChapters([f('src/auth.types.ts'), f('src/auth.ts')])
     const files = chapters.flatMap((c) => c.files)
@@ -53,11 +80,12 @@ describe('buildChapters()', () => {
     expect(files.find((f) => f.path === 'package-lock.json')?.tier).toBe(3)
   })
 
-  it('tier 0 files appear before tier 1 within the same chapter', () => {
+  it('implementation files (tier 1) appear before type files (tier 0) within the same chapter', () => {
     const chapters = buildChapters([f('src/types.ts'), f('src/service.ts')])
     const files = chapters[0].files
-    expect(files[0].path).toBe('src/types.ts')
-    expect(files[1].path).toBe('src/service.ts')
+    const implIdx = files.findIndex((f) => f.path === 'src/service.ts')
+    const typeIdx = files.findIndex((f) => f.path === 'src/types.ts')
+    expect(implIdx).toBeLessThan(typeIdx)
   })
 
   it('tier 2 files appear after tier 1 within the same chapter', () => {
@@ -66,6 +94,14 @@ describe('buildChapters()', () => {
     const sourceIdx = files.findIndex((f) => f.path === 'src/service.ts')
     const testIdx = files.findIndex((f) => f.path === 'src/service.spec.ts')
     expect(sourceIdx).toBeLessThan(testIdx)
+  })
+
+  it('higher-layer files (e.g. component) appear before lower-layer files (e.g. util) within tier 1', () => {
+    const chapters = buildChapters([f('src/util.ts'), f('src/component.ts')])
+    const files = chapters[0].files.filter((f) => f.tier === 1)
+    const compIdx = files.findIndex((f) => f.path === 'src/component.ts')
+    const utilIdx = files.findIndex((f) => f.path === 'src/util.ts')
+    expect(compIdx).toBeLessThan(utilIdx)
   })
 
   it('all-mechanical files form their own chapter with tier 3', () => {

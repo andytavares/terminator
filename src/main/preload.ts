@@ -77,8 +77,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     listWorktrees: (path: string) => ipcRenderer.invoke('git:list-worktrees', { path }),
     status: (path: string, maxFiles?: number) =>
       ipcRenderer.invoke('git:status', { path, maxFiles }),
-    diffFile: (repoRoot: string, path: string, staged: boolean) =>
-      ipcRenderer.invoke('git:diff-file', { repoRoot, path, staged }),
+    diffFile: (repoRoot: string, path: string, staged: boolean, isUntracked?: boolean) =>
+      ipcRenderer.invoke('git:diff-file', { repoRoot, path, staged, isUntracked }),
     stage: (repoRoot: string, paths: string[]) =>
       ipcRenderer.invoke('git:stage', { repoRoot, paths }),
     unstage: (repoRoot: string, paths: string[]) =>

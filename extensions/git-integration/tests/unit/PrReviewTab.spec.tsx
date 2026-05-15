@@ -84,6 +84,11 @@ const defaultStoreState = {
   nextPrCursor: null,
   includeClosedPrs: false,
   setIncludeClosedPrs: mockSetIncludeClosedPrs,
+  viewedFiles: new Set<string>(),
+  currentChapterId: null,
+  currentFilePath: null,
+  fileOrderOverrides: {},
+  scrollPosition: null,
 }
 
 beforeEach(() => {
@@ -141,15 +146,25 @@ describe('PrReviewTab', () => {
     ).toHaveBeenCalledWith('/repo')
   })
 
-  it('closes PR view when onClose is called from review view', () => {
+  it('closes PR view and persists paused session when onClose is called', async () => {
+    const activePr = { number: 1, title: 'My PR', headSHA: 'abc123' } as unknown as PrReviewDetail
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
-      activePr: { number: 1, title: 'My PR' } as unknown as PrReviewDetail,
+      activePr,
     } as unknown as ReturnType<typeof usePrReviewStore>)
     render(<PrReviewTab repoRoot="/repo" />)
     fireEvent.click(screen.getByText('Close PR'))
+    // Allow async handleClosePr to settle
+    await new Promise((r) => setTimeout(r, 0))
     expect(mockSetActivePr).toHaveBeenCalledWith(null)
     expect(mockReset).toHaveBeenCalled()
+    const sessionSet = (
+      window.electronAPI as unknown as { github: { sessionSet: ReturnType<typeof vi.fn> } }
+    ).github.sessionSet
+    expect(sessionSet).toHaveBeenCalledWith(
+      '/repo:::1:::abc123',
+      expect.objectContaining({ pausedAt: expect.any(String) })
+    )
   })
 
   it('calls setIncludeClosedPrs when toggle closed is clicked', () => {

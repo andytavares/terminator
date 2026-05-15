@@ -856,7 +856,9 @@
 }
 
 .pr-dialog__existing-pr a {
-  color: var(--tm-accent);
+  color: #58a6ff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .pr-dialog__error {

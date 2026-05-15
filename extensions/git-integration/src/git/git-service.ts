@@ -51,7 +51,8 @@ export async function getStatus(repoRoot: string, maxFiles: number = 500): Promi
 export async function getDiff(
   repoRoot: string,
   filePath: string,
-  staged: boolean
+  staged: boolean,
+  isUntracked = false
 ): Promise<FileDiff> {
   const args = staged
     ? ['diff', '--cached', '--unified=3', '--', filePath]
@@ -63,6 +64,29 @@ export async function getDiff(
     maxBuffer: DIFF_MAX_BYTES + 1024,
     env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
   })
+
+  // Untracked files produce no output from `git diff` because git has no index entry.
+  // Use --no-index to compare /dev/null against the file, showing all lines as additions.
+  // git diff --no-index exits with code 1 when files differ (normal), so stdout is in the error.
+  if (!staged && isUntracked && !stdout.trim()) {
+    try {
+      const { stdout: noIndexOut } = await execFile(
+        'git',
+        ['diff', '--no-index', '--unified=3', '--', '/dev/null', filePath],
+        {
+          cwd: repoRoot,
+          timeout: GIT_TIMEOUT,
+          maxBuffer: DIFF_MAX_BYTES + 1024,
+          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+        }
+      )
+      return { ...parseDiff(noIndexOut, DIFF_MAX_BYTES), path: filePath }
+    } catch (e: unknown) {
+      const err = e as { stdout?: string }
+      if (err.stdout) return { ...parseDiff(err.stdout, DIFF_MAX_BYTES), path: filePath }
+    }
+  }
+
   return { ...parseDiff(stdout, DIFF_MAX_BYTES), path: filePath }
 }
 

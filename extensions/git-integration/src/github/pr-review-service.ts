@@ -213,12 +213,30 @@ function classifyTier(path: string): 0 | 1 | 2 | 3 {
   return 1
 }
 
+// Layer score for tier-1 files: higher = more likely a consumer/dependent → shown first.
+// Lower = more likely a provider/dependee → shown after its consumers.
+function layerScore(path: string): number {
+  const stem = (path.split('/').pop() ?? path).toLowerCase().replace(/\.[^.]+$/, '')
+  if (/\b(route|router|routing)\b/.test(stem)) return 9
+  if (/\b(page|screen|app|main)\b/.test(stem)) return 8
+  if (/\b(component|widget|panel|dialog|modal)\b/.test(stem)) return 7
+  if (/^use[a-z]/.test(stem) || /\bhook\b/.test(stem)) return 6
+  if (/\b(store|slice|context|state)\b/.test(stem)) return 5
+  if (/\b(service|handler|controller|api|manager|middleware)\b/.test(stem)) return 4
+  if (/\b(repository|gateway|client|adapter)\b/.test(stem)) return 3
+  if (/\b(model|entity|domain|schema|validator|dto)\b/.test(stem)) return 2
+  if (/\b(util|utils|helper|helpers|lib|common|shared|format|parse|transform)\b/.test(stem))
+    return 1
+  if (/\b(config|constant|constants|env|settings)\b/.test(stem)) return 1
+  return 4
+}
+
 function whyHere(tier: 0 | 1 | 2 | 3): string {
   switch (tier) {
     case 0:
-      return 'Interface/type file — defines contracts used by the files below'
+      return 'Interface/type file — contract foundation for the source files above'
     case 1:
-      return 'Source file — implementation; read after type definitions'
+      return 'Source file — implementation'
     case 2:
       return 'Test file — validates the implementation above'
     case 3:
@@ -235,6 +253,66 @@ function chapterName(paths: string[]): string {
     if (segments.every((s) => s.slice(0, d).join('/') === prefix)) return prefix
   }
   return segments[0][0] ?? 'Changes'
+}
+
+const MAX_GROUP_SIZE = 15
+
+// Returns the group key for a file at the given directory depth.
+// E.g., 'src/auth/login.ts' at depth=0 → 'src', depth=1 → 'src/auth'
+function assignGroupKey(filePath: string, depth: number): string {
+  const parts = filePath.split('/')
+  if (parts.length <= 1) return '.'
+  const dirParts = parts.slice(0, -1)
+  if (dirParts.length === 0) return '.'
+  return dirParts.slice(0, depth + 1).join('/')
+}
+
+function groupByKey(files: RawFile[], depth: number): Map<string, RawFile[]> {
+  const groups = new Map<string, RawFile[]>()
+  for (const file of files) {
+    const key = assignGroupKey(file.path, depth)
+    const existing = groups.get(key) ?? []
+    existing.push(file)
+    groups.set(key, existing)
+  }
+  return groups
+}
+
+// Recursively splits files into groups of at most MAX_GROUP_SIZE.
+// Groups by progressively deeper directory segments until groups are small enough.
+function groupFilesIntoChapters(files: RawFile[]): Map<string, RawFile[]> {
+  let depth = 0
+  let groups = groupByKey(files, depth)
+  let hadLargeGroup = [...groups.values()].some((g) => g.length > MAX_GROUP_SIZE)
+
+  while (hadLargeGroup && depth < 8) {
+    const nextDepth = depth + 1
+    const nextGroups = new Map<string, RawFile[]>()
+    hadLargeGroup = false
+
+    for (const [key, groupFiles] of groups) {
+      if (groupFiles.length <= MAX_GROUP_SIZE) {
+        nextGroups.set(key, groupFiles)
+      } else {
+        const subGroups = groupByKey(groupFiles, nextDepth)
+        // Detect stall: if splitting produced a single group with the same key, can't go deeper
+        const stalled = subGroups.size === 1 && [...subGroups.keys()][0] === key
+        if (stalled) {
+          nextGroups.set(key, groupFiles)
+        } else {
+          for (const [subKey, subFiles] of subGroups) {
+            nextGroups.set(subKey, subFiles)
+            if (subFiles.length > MAX_GROUP_SIZE) hadLargeGroup = true
+          }
+        }
+      }
+    }
+
+    groups = nextGroups
+    depth = nextDepth
+  }
+
+  return groups
 }
 
 interface RawFile {
@@ -280,19 +358,11 @@ export function buildChapters(
 
   if (files.length === 0) return []
 
-  const groups = new Map<string, RawFile[]>()
-  for (const file of files) {
-    const parts = file.path.split('/')
-    const groupKey = parts.length > 1 ? parts[0] : '.'
-    const existing = groups.get(groupKey) ?? []
-    existing.push(file)
-    groups.set(groupKey, existing)
-  }
+  const groups = groupFilesIntoChapters(files)
 
   const chapters: Chapter[] = []
-  const groupEntries = [...groups.entries()]
 
-  const buildGroupChapters = (groupKey: string, groupFiles: RawFile[]) => {
+  const buildGroupChapter = (groupKey: string, groupFiles: RawFile[]) => {
     const byTier = new Map<0 | 1 | 2 | 3, RawFile[]>()
     for (const f of groupFiles) {
       const tier = classifyTier(f.path)
@@ -301,14 +371,26 @@ export function buildChapters(
       byTier.set(tier, existing)
     }
 
+    // Order: tier 1 (consumers/implementation) first sorted by layer desc then size desc,
+    // then tier 0 (types/interfaces — what implementation depends on),
+    // then tier 2 (tests), then tier 3 (mechanical).
+    const tier1 = [...(byTier.get(1) ?? [])].sort((a, b) => {
+      const ld = layerScore(b.path) - layerScore(a.path)
+      if (ld !== 0) return ld
+      return b.additions + b.deletions - (a.additions + a.deletions)
+    })
+    const tier0 = byTier.get(0) ?? []
+    const tier2 = byTier.get(2) ?? []
+    const tier3 = byTier.get(3) ?? []
+
     const tieredFiles: PrChangedFile[] = []
-    for (const tier of [0, 1, 2, 3] as const) {
-      const tFiles = byTier.get(tier) ?? []
-      const sorted =
-        tier === 1
-          ? [...tFiles].sort((a, b) => b.additions + b.deletions - (a.additions + a.deletions))
-          : tFiles
-      for (const f of sorted) {
+    for (const [tFiles, tier] of [
+      [tier1, 1],
+      [tier0, 0],
+      [tier2, 2],
+      [tier3, 3],
+    ] as [RawFile[], 0 | 1 | 2 | 3][]) {
+      for (const f of tFiles) {
         tieredFiles.push({
           path: f.path,
           changeType: mapChangeType(f.changeType ?? 'modified'),
@@ -338,14 +420,14 @@ export function buildChapters(
   const regularGroups: [string, RawFile[]][] = []
   const mechanicalGroups: [string, RawFile[]][] = []
 
-  for (const entry of groupEntries) {
-    const allMech = entry[1].every((f) => classifyTier(f.path) === 3)
-    if (allMech) mechanicalGroups.push(entry)
-    else regularGroups.push(entry)
+  for (const [key, groupFiles] of groups) {
+    const allMech = groupFiles.every((f) => classifyTier(f.path) === 3)
+    if (allMech) mechanicalGroups.push([key, groupFiles])
+    else regularGroups.push([key, groupFiles])
   }
 
-  for (const [key, files] of regularGroups) buildGroupChapters(key, files)
-  for (const [key, files] of mechanicalGroups) buildGroupChapters(key, files)
+  for (const [key, groupFiles] of regularGroups) buildGroupChapter(key, groupFiles)
+  for (const [key, groupFiles] of mechanicalGroups) buildGroupChapter(key, groupFiles)
 
   return chapters
 }

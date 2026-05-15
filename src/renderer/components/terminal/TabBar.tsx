@@ -1,8 +1,7 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { useSessionStore } from '../../stores/session.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { AlertBadge } from '../AlertBadge'
-import { NewTabDialog } from './NewTabDialog'
 import type { ProjectTabRegistration } from '../../extensions/registry'
 import './TabBar.css'
 
@@ -11,6 +10,7 @@ interface Props {
   activeProjectTabId: string | null
   projectTabs: ProjectTabRegistration[]
   onSelectProjectTab: (tabId: string | null) => void
+  onNewTab: () => void
 }
 
 export function TabBar({
@@ -18,8 +18,8 @@ export function TabBar({
   activeProjectTabId,
   projectTabs,
   onSelectProjectTab,
+  onNewTab,
 }: Props): JSX.Element {
-  const [newTabOpen, setNewTabOpen] = useState(false)
   const {
     getSessionsForProject,
     closeSession,
@@ -77,9 +77,6 @@ export function TabBar({
               onClick={() => handleSessionTabClick(session.id)}
             >
               <span className="tab-bar__title">{session.tabTitle}</span>
-              {session.type === 'agent' && (
-                <span className="tab-bar__badge tab-bar__badge--agent">agent</span>
-              )}
               {session.id !== activeSessionId && (
                 <AlertBadge
                   count={getBellCountForSession(session.id)}
@@ -95,17 +92,11 @@ export function TabBar({
               </button>
             </div>
           ))}
-          <button
-            className="tab-bar__new-tab"
-            onClick={() => setNewTabOpen(true)}
-            title="New tab (⌘T)"
-          >
+          <button className="tab-bar__new-tab" onClick={onNewTab} title="New tab (⌘T)">
             +
           </button>
         </div>
       )}
-
-      {newTabOpen && <NewTabDialog projectId={projectId} onClose={() => setNewTabOpen(false)} />}
     </div>
   )
 }

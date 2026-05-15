@@ -154,7 +154,14 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
     set((state) => {
       const next = new Set(state.viewedFiles)
       next.add(filePath)
-      return { viewedFiles: next }
+      return {
+        viewedFiles: next,
+        prQueue: state.prQueue.map((pr) =>
+          pr.number === prNumber
+            ? { ...pr, sessionStatus: 'in-progress' as const, viewedFileCount: next.size }
+            : pr
+        ),
+      }
     })
     const state = get()
     persistSession(state, repoRoot, prNumber, headSHA)
@@ -164,7 +171,12 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
     set((state) => {
       const next = new Set(state.viewedFiles)
       next.delete(filePath)
-      return { viewedFiles: next }
+      return {
+        viewedFiles: next,
+        prQueue: state.prQueue.map((pr) =>
+          pr.number === prNumber ? { ...pr, viewedFileCount: next.size } : pr
+        ),
+      }
     })
     const state = get()
     persistSession(state, repoRoot, prNumber, headSHA)
