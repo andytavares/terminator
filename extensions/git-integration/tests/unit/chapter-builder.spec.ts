@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { buildChapters } from '../../src/github/pr-review-service'
 
-const f = (path: string, additions = 10, deletions = 2) => ({
+const f = (path: string, additions = 10, deletions = 2, patch?: string) => ({
   path,
   additions,
   deletions,
   status: 'modified',
+  patch,
 })
 
 describe('buildChapters()', () => {
@@ -20,23 +21,28 @@ describe('buildChapters()', () => {
     expect(chapters[0].files[0].path).toBe('src/index.ts')
   })
 
-  it('groups files by top-level directory segment', () => {
+  it('groups files in the same immediate directory into one chapter', () => {
     const chapters = buildChapters([
       f('src/auth/login.ts'),
       f('src/auth/logout.ts'),
       f('docs/README.md'),
     ])
     const ids = chapters.map((c) => c.id)
-    expect(ids).toContain('src')
+    expect(ids).toContain('auth')
     expect(ids).toContain('docs')
   })
 
-  it('splits directories with subdirectories when group exceeds 15 files', () => {
-    // 9 files in src/auth and 9 files in src/payments — 18 total under src, split by subdir
-    const authFiles = Array.from({ length: 9 }, (_, i) => f(`src/auth/file${i}.ts`))
-    const paymentFiles = Array.from({ length: 9 }, (_, i) => f(`src/payments/file${i}.ts`))
+  it('assigns semantic group names for canonical directories', () => {
+    const chapters = buildChapters([f('services/auth.ts'), f('components/Button.tsx')])
+    const names = chapters.map((c) => c.name)
+    expect(names).toContain('Business Logic')
+    expect(names).toContain('UI')
+  })
+
+  it('sub-splits semantic groups that exceed 15 files', () => {
+    const authFiles = Array.from({ length: 9 }, (_, i) => f(`services/auth/file${i}.ts`))
+    const paymentFiles = Array.from({ length: 9 }, (_, i) => f(`services/payments/file${i}.ts`))
     const chapters = buildChapters([...authFiles, ...paymentFiles])
-    // Each subdir group (9 files) is ≤ 15, so we should get two separate chapters
     expect(chapters.length).toBeGreaterThanOrEqual(2)
     expect(chapters.every((c) => c.files.length <= 15)).toBe(true)
   })
@@ -44,27 +50,14 @@ describe('buildChapters()', () => {
   it('keeps flat directories together even if large (no subdirs to split on)', () => {
     const manyFiles = Array.from({ length: 18 }, (_, i) => f(`src/payments/file${i}.ts`))
     const chapters = buildChapters(manyFiles)
-    // All files are directly in src/payments with no subdirectory — cannot split further
     expect(chapters).toHaveLength(1)
-  })
-
-  it('keeps small directories together in one chapter', () => {
-    const chapters = buildChapters([
-      f('src/auth/login.ts'),
-      f('src/auth/logout.ts'),
-      f('src/auth/register.ts'),
-    ])
-    expect(chapters).toHaveLength(1)
-    expect(chapters[0].id).toBe('src')
   })
 
   it('places type/interface files in tier 0', () => {
     const chapters = buildChapters([f('src/auth.types.ts'), f('src/auth.ts')])
     const files = chapters.flatMap((c) => c.files)
-    const typesFile = files.find((f) => f.path === 'src/auth.types.ts')
-    const sourceFile = files.find((f) => f.path === 'src/auth.ts')
-    expect(typesFile?.tier).toBe(0)
-    expect(sourceFile?.tier).toBe(1)
+    expect(files.find((f) => f.path === 'src/auth.types.ts')?.tier).toBe(0)
+    expect(files.find((f) => f.path === 'src/auth.ts')?.tier).toBe(1)
   })
 
   it('places *.spec.* and *.test.* files in tier 2', () => {
@@ -133,5 +126,86 @@ describe('buildChapters()', () => {
     ])
     const chap = chapters.find((c) => c.id === 'src')
     expect(chap?.estimatedMinutes).toBe(3)
+  })
+
+  // ─── Signal 1: Semantic grouping ────────────────────────────────────────────
+
+  it('uses canonical group name for well-known directories', () => {
+    const chapters = buildChapters([
+      f('services/auth.ts'),
+      f('routes/users.ts'),
+      f('types/payment.ts'),
+    ])
+    const names = chapters.map((c) => c.name)
+    expect(names).toContain('Business Logic')
+    expect(names).toContain('API Layer')
+    expect(names).toContain('Types & Contracts')
+  })
+
+  it('falls back to immediate parent directory name for unknown directories', () => {
+    const chapters = buildChapters([f('src/auth/login.ts'), f('src/auth/logout.ts')])
+    expect(chapters).toHaveLength(1)
+    expect(chapters[0].name).toBe('auth')
+  })
+
+  // ─── Signal 2: Feature-stem merge ───────────────────────────────────────────
+
+  it('groups cross-directory files that share a feature stem', () => {
+    // The core case: types in a types/ dir, implementation elsewhere
+    const chapters = buildChapters([f('types/feature.ts'), f('src/code/feature/feature.ts')])
+    expect(chapters).toHaveLength(1)
+    const paths = chapters[0].files.map((f) => f.path)
+    expect(paths).toContain('types/feature.ts')
+    expect(paths).toContain('src/code/feature/feature.ts')
+  })
+
+  it('merges types/ file with its matching service implementation', () => {
+    const chapters = buildChapters([f('types/auth.ts'), f('services/auth.ts')])
+    expect(chapters).toHaveLength(1)
+    expect(chapters[0].files).toHaveLength(2)
+  })
+
+  it('does not merge files with different stems into the same chapter', () => {
+    const chapters = buildChapters([
+      f('types/auth.ts'),
+      f('types/payment.ts'),
+      f('services/auth.ts'),
+    ])
+    // auth.ts files should merge; payment.ts should be separate
+    const allPaths = chapters.flatMap((c) => c.files.map((f) => f.path))
+    const authChapter = chapters.find((c) => c.files.some((f) => f.path === 'services/auth.ts'))
+    expect(authChapter?.files.map((f) => f.path)).toContain('types/auth.ts')
+    const paymentChapter = chapters.find((c) => c.files.some((f) => f.path === 'types/payment.ts'))
+    expect(paymentChapter).toBeDefined()
+    expect(allPaths).toHaveLength(3)
+  })
+
+  it('strips role suffixes when computing feature stems', () => {
+    const chapters = buildChapters([
+      f('src/auth.service.ts'),
+      f('src/auth.types.ts'),
+      f('src/auth.spec.ts'),
+    ])
+    // All three share stem "auth" → one chapter
+    expect(chapters).toHaveLength(1)
+    expect(chapters[0].files).toHaveLength(3)
+  })
+
+  // ─── Signal 3: Import-graph merge ───────────────────────────────────────────
+
+  it('merges groups connected by an import in patch text', () => {
+    const patch = "@@ -0,0 +1 @@\n+import { Foo } from '../utils/foo'"
+    const chapters = buildChapters([f('components/Bar.tsx', 10, 0, patch), f('utils/foo.ts')])
+    // import connects the two files even though their stems differ
+    expect(chapters).toHaveLength(1)
+    const paths = chapters[0].files.map((f) => f.path)
+    expect(paths).toContain('components/Bar.tsx')
+    expect(paths).toContain('utils/foo.ts')
+  })
+
+  it('files without patches are still grouped by other signals', () => {
+    // No patch provided — falls back to semantic + stem signals
+    const chapters = buildChapters([f('types/auth.ts'), f('services/auth.ts')])
+    expect(chapters).toHaveLength(1)
   })
 })

@@ -244,75 +244,172 @@ function whyHere(tier: 0 | 1 | 2 | 3): string {
   }
 }
 
-function chapterName(paths: string[]): string {
-  if (paths.length === 0) return 'Changes'
-  const segments = paths.map((p) => p.split('/'))
-  const depth = Math.min(...segments.map((s) => s.length)) - 1
-  for (let d = depth; d >= 1; d--) {
-    const prefix = segments[0].slice(0, d).join('/')
-    if (segments.every((s) => s.slice(0, d).join('/') === prefix)) return prefix
+// ─── Semantic grouping (Signal 1) ─────────────────────────────────────────────
+
+// Ordered from most foundational to least. Lower index wins when groups are merged.
+const CANONICAL_GROUPS: [RegExp, string][] = [
+  [/\b(migrations?|db)\b/, 'Data Layer'],
+  [/\b(models?|entities|entity|schemas?)\b/, 'Data Layer'],
+  [/\b(config|settings?|env)\b/, 'Configuration'],
+  [/\b(types?|interfaces?|contracts?)\b/, 'Types & Contracts'],
+  [/\b(services?|core|lib|utils?|helpers?)\b/, 'Business Logic'],
+  [/\b(api|routes?|controllers?|endpoints?|handlers?)\b/, 'API Layer'],
+  [/\b(components?|pages?|views?|ui|screens?)\b/, 'UI'],
+  [/\b(tests?|__tests__|specs?|e2e)\b/, 'Tests'],
+]
+
+// Matches only against directory segments (not the filename) to avoid false positives.
+function semanticGroupName(filePath: string): string {
+  const parts = filePath.split('/')
+  const dirPath = parts.slice(0, -1).join('/').toLowerCase()
+  for (const [pattern, name] of CANONICAL_GROUPS) {
+    if (pattern.test(dirPath)) return name
   }
-  return segments[0][0] ?? 'Changes'
+  return parts.length > 1 ? parts[parts.length - 2] : 'root'
 }
+
+// ─── Feature-stem merge (Signal 2) ────────────────────────────────────────────
+
+const ROLE_SUFFIX_RE =
+  /[._-](types?|d|service|store|spec|test|handler|controller|router?|reducer|action|selector|hook|util|helper|dto|schema|model|entity|middleware|resolver|repo(?:sitory)?|gateway|client|adapter|factory|builder|provider|context|state|slice|saga|epic|effect|guard|interceptor|validator|mapper|transformer|formatter|parser)$/i
+
+function featureStem(filePath: string): string {
+  const base = (filePath.split('/').pop() ?? filePath).replace(/\.[^.]+$/, '')
+  const stripped = base.replace(ROLE_SUFFIX_RE, '')
+  return (stripped || base).toLowerCase().replace(/[._-]/g, '')
+}
+
+// ─── Import graph (Signal 3) ───────────────────────────────────────────────────
+
+const IMPORT_RE = /(?:import\s+[^'"]*from\s+|require\s*\(\s*)['"]([^'"]+)['"]/g
+
+function resolvePath(fromDir: string, spec: string): string {
+  const parts = (fromDir ? fromDir + '/' + spec : spec).split('/')
+  const result: string[] = []
+  for (const part of parts) {
+    if (part === '..') result.pop()
+    else if (part !== '.') result.push(part)
+  }
+  return result.join('/')
+}
+
+function extractImports(patch: string, fromPath: string, knownPaths: Set<string>): string[] {
+  const fromDir = fromPath.split('/').slice(0, -1).join('/')
+  const found: string[] = []
+  IMPORT_RE.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = IMPORT_RE.exec(patch)) !== null) {
+    const spec = match[1]
+    if (!spec.startsWith('.')) continue
+    const resolved = resolvePath(fromDir, spec)
+    const hit = [...knownPaths].find(
+      (p) => p === resolved || p.startsWith(resolved + '.') || p.startsWith(resolved + '/index.')
+    )
+    if (hit) found.push(hit)
+  }
+  return found
+}
+
+// ─── Union-find for group merging ──────────────────────────────────────────────
+
+class UnionFind {
+  private parent = new Map<string, string>()
+
+  find(x: string): string {
+    if (!this.parent.has(x)) this.parent.set(x, x)
+    let root = x
+    while (this.parent.get(root) !== root) root = this.parent.get(root)!
+    let cur = x
+    while (cur !== root) {
+      const next = this.parent.get(cur)!
+      this.parent.set(cur, root)
+      cur = next
+    }
+    return root
+  }
+
+  union(a: string, b: string): void {
+    const ra = this.find(a)
+    const rb = this.find(b)
+    if (ra === rb) return
+    // Lower CANONICAL_GROUPS index = more foundational = wins. Fallback groups lose to canonical ones.
+    const ia = CANONICAL_GROUPS.findIndex(([, n]) => n === ra)
+    const ib = CANONICAL_GROUPS.findIndex(([, n]) => n === rb)
+    const prioA = ia === -1 ? 999 : ia
+    const prioB = ib === -1 ? 999 : ib
+    if (prioA <= prioB) this.parent.set(rb, ra)
+    else this.parent.set(ra, rb)
+  }
+}
+
+// ─── Three-signal grouping ─────────────────────────────────────────────────────
 
 const MAX_GROUP_SIZE = 15
 
-// Returns the group key for a file at the given directory depth.
-// E.g., 'src/auth/login.ts' at depth=0 → 'src', depth=1 → 'src/auth'
-function assignGroupKey(filePath: string, depth: number): string {
-  const parts = filePath.split('/')
-  if (parts.length <= 1) return '.'
-  const dirParts = parts.slice(0, -1)
-  if (dirParts.length === 0) return '.'
-  return dirParts.slice(0, depth + 1).join('/')
-}
-
-function groupByKey(files: RawFile[], depth: number): Map<string, RawFile[]> {
-  const groups = new Map<string, RawFile[]>()
-  for (const file of files) {
-    const key = assignGroupKey(file.path, depth)
-    const existing = groups.get(key) ?? []
-    existing.push(file)
-    groups.set(key, existing)
-  }
-  return groups
-}
-
-// Recursively splits files into groups of at most MAX_GROUP_SIZE.
-// Groups by progressively deeper directory segments until groups are small enough.
 function groupFilesIntoChapters(files: RawFile[]): Map<string, RawFile[]> {
-  let depth = 0
-  let groups = groupByKey(files, depth)
-  let hadLargeGroup = [...groups.values()].some((g) => g.length > MAX_GROUP_SIZE)
+  const uf = new UnionFind()
+  const fileGroup = new Map<string, string>()
 
-  while (hadLargeGroup && depth < 8) {
-    const nextDepth = depth + 1
-    const nextGroups = new Map<string, RawFile[]>()
-    hadLargeGroup = false
-
-    for (const [key, groupFiles] of groups) {
-      if (groupFiles.length <= MAX_GROUP_SIZE) {
-        nextGroups.set(key, groupFiles)
-      } else {
-        const subGroups = groupByKey(groupFiles, nextDepth)
-        // Detect stall: if splitting produced a single group with the same key, can't go deeper
-        const stalled = subGroups.size === 1 && [...subGroups.keys()][0] === key
-        if (stalled) {
-          nextGroups.set(key, groupFiles)
-        } else {
-          for (const [subKey, subFiles] of subGroups) {
-            nextGroups.set(subKey, subFiles)
-            if (subFiles.length > MAX_GROUP_SIZE) hadLargeGroup = true
-          }
-        }
-      }
-    }
-
-    groups = nextGroups
-    depth = nextDepth
+  // Signal 1: assign each file to a semantic group
+  for (const f of files) {
+    fileGroup.set(f.path, semanticGroupName(f.path))
   }
 
-  return groups
+  // Signal 2: merge groups whose files share a feature stem (≥ 3 chars to skip noise)
+  const stemToGroups = new Map<string, string[]>()
+  for (const [path, group] of fileGroup) {
+    const stem = featureStem(path)
+    if (stem.length >= 3) {
+      const list = stemToGroups.get(stem) ?? []
+      list.push(group)
+      stemToGroups.set(stem, list)
+    }
+  }
+  for (const groups of stemToGroups.values()) {
+    for (let i = 1; i < groups.length; i++) uf.union(groups[0], groups[i])
+  }
+
+  // Signal 3: merge groups connected by direct imports in patch text
+  const knownPaths = new Set(files.map((f) => f.path))
+  for (const f of files) {
+    if (!f.patch) continue
+    for (const imported of extractImports(f.patch, f.path, knownPaths)) {
+      const ga = fileGroup.get(f.path)
+      const gb = fileGroup.get(imported)
+      if (ga && gb) uf.union(ga, gb)
+    }
+  }
+
+  // Collect files by canonical group
+  const groups = new Map<string, RawFile[]>()
+  for (const f of files) {
+    const canonical = uf.find(fileGroup.get(f.path)!)
+    const list = groups.get(canonical) ?? []
+    list.push(f)
+    groups.set(canonical, list)
+  }
+
+  // Sub-split any group that still exceeds MAX_GROUP_SIZE (by directory depth)
+  const result = new Map<string, RawFile[]>()
+  for (const [key, groupFiles] of groups) {
+    if (groupFiles.length <= MAX_GROUP_SIZE) {
+      result.set(key, groupFiles)
+    } else {
+      // Split by immediate parent directory, prefixed with the semantic group key
+      const byDir = new Map<string, RawFile[]>()
+      for (const f of groupFiles) {
+        const parts = f.path.split('/')
+        const dir = parts.length > 1 ? parts[parts.length - 2] : 'root'
+        const subKey = `${key} / ${dir}`
+        const list = byDir.get(subKey) ?? []
+        list.push(f)
+        byDir.set(subKey, list)
+      }
+      for (const [subKey, subFiles] of byDir) result.set(subKey, subFiles)
+    }
+  }
+
+  return result
 }
 
 interface RawFile {
@@ -320,6 +417,7 @@ interface RawFile {
   additions: number
   deletions: number
   changeType?: string
+  patch?: string
 }
 
 function defaultRiskScore(): RiskScore {
@@ -352,6 +450,7 @@ export function buildChapters(
         additions: Number(obj.additions ?? 0),
         deletions: Number(obj.deletions ?? 0),
         changeType: String(obj.changeType ?? obj.status ?? 'modified'),
+        patch: obj.patch ? String(obj.patch) : undefined,
       }
     })
     .filter((f) => f.path.length > 0)
@@ -405,12 +504,12 @@ export function buildChapters(
       }
     }
 
-    const chapterId = groupKey === '.' ? 'root' : groupKey.replace(/[^a-z0-9]/gi, '-').toLowerCase()
+    const chapterId = groupKey.replace(/[^a-z0-9]/gi, '-').toLowerCase()
     const ordered = applyOverrides(tieredFiles, overrides?.[chapterId])
 
     chapters.push({
       id: chapterId,
-      name: groupKey === '.' ? chapterName(groupFiles.map((f) => f.path)) : groupKey,
+      name: groupKey,
       files: ordered,
       estimatedMinutes: ordered.reduce((s, f) => s + f.estimatedMinutes, 0),
       status: 'not-started',
