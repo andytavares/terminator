@@ -1,0 +1,30 @@
+extensions/git-integration/tests/unit/github-ipc.spec.ts
+  s_2b76e54ba3e92a::t_5ce1e3c50f0b7e 67-79,90,104,107,120,132,145,158,170,173,184,187,199,206
+extensions/git-integration/src/ipc/github.ipc.ts
+  ai_agent 230
+  s_2b76e54ba3e92a::t_94c331575abd35 220,229,233
+extensions/git-integration/tests/unit/chapter-builder.spec.ts
+  s_2b76e54ba3e92a::t_7b4a00f070eea7 4,9,24,31,35,37-44,59-60,130-135,138-154,156-162,164-175,177,179-197,199-207,209
+  s_2b76e54ba3e92a::t_d2a374848398b5 136-137
+  ai_agent 36,155,163,176,178,198,208
+extensions/git-integration/src/github/pr-review-service.ts
+  s_2b76e54ba3e92a::t_b1ebe924699301 247-266,268,271,273-279,282-341,345-348,350-365,367-370,372-409,412,420
+  s_2b76e54ba3e92a::t_08c52547ea066c 507,512
+  s_2b76e54ba3e92a::t_af93a6967d24cf 453
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "35a12cf9a90ecd4a4135898ad27774aef8c2d5ac",
+  "prompts": {},
+  "sessions": {
+    "s_2b76e54ba3e92a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7c1b592b-4be6-4aa1-aaba-5789de8b2922",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
