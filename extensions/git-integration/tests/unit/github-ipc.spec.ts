@@ -64,7 +64,19 @@ const PR_META = {
   statusCheckRollup: [],
 }
 
-const PR_FILES = { files: [] }
+// REST API format (filename + patch); handler now fetches this instead of gh pr view --json files
+const PR_FILES_REST: unknown[] = []
+const REPO_VIEW = { owner: { login: 'test-owner' }, name: 'test-repo' }
+
+// Queue the three gh calls the pr-review-detail handler makes:
+//   1. gh repo view (ownerAndName)
+//   2. gh pr view --json ... (meta)  } parallel
+//   3. gh api --paginate .../files   }
+function mockPrDetail(meta: unknown, files: unknown[] = PR_FILES_REST) {
+  mockGitSuccess(JSON.stringify(REPO_VIEW))
+  mockGitSuccess(JSON.stringify(meta))
+  mockGitSuccess(JSON.stringify(files))
+}
 
 describe('github:pr-review-detail', () => {
   let handlers: Record<string, Handler>
@@ -75,8 +87,7 @@ describe('github:pr-review-detail', () => {
   })
 
   it('returns a pr object on success with no status checks', async () => {
-    mockGitSuccess(JSON.stringify(PR_META))
-    mockGitSuccess(JSON.stringify(PR_FILES))
+    mockPrDetail(PR_META)
 
     const result = (await handlers['github:pr-review-detail']({
       repoRoot: '/repo',
@@ -90,12 +101,10 @@ describe('github:pr-review-detail', () => {
   })
 
   it('maps SUCCESS conclusion to pass state', async () => {
-    const meta = {
+    mockPrDetail({
       ...PR_META,
       statusCheckRollup: [{ name: 'ci / build', conclusion: 'SUCCESS', url: 'https://ci/1' }],
-    }
-    mockGitSuccess(JSON.stringify(meta))
-    mockGitSuccess(JSON.stringify(PR_FILES))
+    })
 
     const result = (await handlers['github:pr-review-detail']({
       repoRoot: '/repo',
@@ -108,12 +117,7 @@ describe('github:pr-review-detail', () => {
   })
 
   it('maps FAILURE conclusion to fail state', async () => {
-    const meta = {
-      ...PR_META,
-      statusCheckRollup: [{ name: 'lint', conclusion: 'FAILURE' }],
-    }
-    mockGitSuccess(JSON.stringify(meta))
-    mockGitSuccess(JSON.stringify(PR_FILES))
+    mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'lint', conclusion: 'FAILURE' }] })
 
     const result = (await handlers['github:pr-review-detail']({
       repoRoot: '/repo',
@@ -125,12 +129,7 @@ describe('github:pr-review-detail', () => {
 
   it('maps TIMED_OUT and ACTION_REQUIRED conclusions to fail', async () => {
     for (const conclusion of ['TIMED_OUT', 'ACTION_REQUIRED', 'ERROR']) {
-      const meta = {
-        ...PR_META,
-        statusCheckRollup: [{ name: 'check', conclusion }],
-      }
-      mockGitSuccess(JSON.stringify(meta))
-      mockGitSuccess(JSON.stringify(PR_FILES))
+      mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'check', conclusion }] })
 
       const result = (await handlers['github:pr-review-detail']({
         repoRoot: '/repo',
@@ -143,12 +142,7 @@ describe('github:pr-review-detail', () => {
 
   it('maps IN_PROGRESS and QUEUED to pending state', async () => {
     for (const conclusion of ['IN_PROGRESS', 'QUEUED', 'PENDING', 'WAITING']) {
-      const meta = {
-        ...PR_META,
-        statusCheckRollup: [{ name: 'check', conclusion }],
-      }
-      mockGitSuccess(JSON.stringify(meta))
-      mockGitSuccess(JSON.stringify(PR_FILES))
+      mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'check', conclusion }] })
 
       const result = (await handlers['github:pr-review-detail']({
         repoRoot: '/repo',
@@ -161,12 +155,7 @@ describe('github:pr-review-detail', () => {
 
   it('maps SKIPPED, NEUTRAL, CANCELLED to skipped state', async () => {
     for (const conclusion of ['SKIPPED', 'NEUTRAL', 'CANCELLED']) {
-      const meta = {
-        ...PR_META,
-        statusCheckRollup: [{ name: 'check', conclusion }],
-      }
-      mockGitSuccess(JSON.stringify(meta))
-      mockGitSuccess(JSON.stringify(PR_FILES))
+      mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'check', conclusion }] })
 
       const result = (await handlers['github:pr-review-detail']({
         repoRoot: '/repo',
@@ -178,12 +167,10 @@ describe('github:pr-review-detail', () => {
   })
 
   it('maps unknown conclusion string to unknown state', async () => {
-    const meta = {
+    mockPrDetail({
       ...PR_META,
       statusCheckRollup: [{ name: 'check', conclusion: 'SOMETHING_NEW' }],
-    }
-    mockGitSuccess(JSON.stringify(meta))
-    mockGitSuccess(JSON.stringify(PR_FILES))
+    })
 
     const result = (await handlers['github:pr-review-detail']({
       repoRoot: '/repo',
@@ -194,12 +181,10 @@ describe('github:pr-review-detail', () => {
   })
 
   it('uses state field when conclusion is absent (StatusContext)', async () => {
-    const meta = {
+    mockPrDetail({
       ...PR_META,
       statusCheckRollup: [{ context: 'legacy/check', state: 'SUCCESS' }],
-    }
-    mockGitSuccess(JSON.stringify(meta))
-    mockGitSuccess(JSON.stringify(PR_FILES))
+    })
 
     const result = (await handlers['github:pr-review-detail']({
       repoRoot: '/repo',
@@ -211,16 +196,14 @@ describe('github:pr-review-detail', () => {
   })
 
   it('preserves multiple checks with mixed states', async () => {
-    const meta = {
+    mockPrDetail({
       ...PR_META,
       statusCheckRollup: [
         { name: 'build', conclusion: 'SUCCESS' },
         { name: 'lint', conclusion: 'FAILURE' },
         { name: 'deploy', conclusion: 'IN_PROGRESS' },
       ],
-    }
-    mockGitSuccess(JSON.stringify(meta))
-    mockGitSuccess(JSON.stringify(PR_FILES))
+    })
 
     const result = (await handlers['github:pr-review-detail']({
       repoRoot: '/repo',

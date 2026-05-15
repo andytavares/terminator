@@ -22,7 +22,8 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
     -1
   )
 
-  const { status, selectedFile, diffCache, setSelectedFile, setDiff, setLoading } = useGitStore()
+  const { status, selectedFile, diffCache, setSelectedFile, setDiff, setLoading, clearDiffCache } =
+    useGitStore()
   const [commitMessage, setCommitMessage] = useState('')
   const [isCommitting, setIsCommitting] = useState(false)
   const [isPushing, setIsPushing] = useState(false)
@@ -43,16 +44,21 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
       if (!diffCache.has(path)) {
         setLoading(true)
         try {
-          const result = (await window.electronAPI.git.diffFile(repoRoot, path, staged)) as
-            | { diff: FileDiff }
-            | { error: string }
+          const fileStatus = status?.files.find((f) => f.path === path)
+          const isUntracked = fileStatus?.status === 'untracked'
+          const result = (await window.electronAPI.git.diffFile(
+            repoRoot,
+            path,
+            staged,
+            isUntracked
+          )) as { diff: FileDiff } | { error: string }
           if ('diff' in result) setDiff(path, result.diff)
         } finally {
           setLoading(false)
         }
       }
     },
-    [repoRoot, diffCache, setSelectedFile, setDiff, setLoading]
+    [repoRoot, status, diffCache, setSelectedFile, setDiff, setLoading]
   )
 
   const stagedFiles = status?.files.filter((f) => f.staged) ?? []
@@ -190,7 +196,11 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
       {/* Right: changes list + commit */}
       <div className="git-full-view__changes-pane" style={{ width: changesWidth }}>
         <div className="git-full-view__staging">
-          <StagingArea repoRoot={repoRoot} onFileSelect={handleFileSelect} />
+          <StagingArea
+            repoRoot={repoRoot}
+            onFileSelect={handleFileSelect}
+            onStagingChange={clearDiffCache}
+          />
         </div>
 
         <div className="git-full-view__commit-section">

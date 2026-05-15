@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { Terminal } from 'xterm'
 import { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
 
 const mockResizeObserver = vi.fn().mockImplementation(() => ({
@@ -11,6 +12,7 @@ vi.stubGlobal('ResizeObserver', mockResizeObserver)
 vi.mock('xterm', () => {
   const Terminal = vi.fn().mockImplementation(() => ({
     loadAddon: vi.fn(),
+    attachCustomKeyEventHandler: vi.fn(),
     onData: vi.fn(),
     onResize: vi.fn(),
     onBell: vi.fn(),
@@ -18,6 +20,7 @@ vi.mock('xterm', () => {
     focus: vi.fn(),
     write: vi.fn(),
     dispose: vi.fn(),
+    scrollToBottom: vi.fn(),
   }))
   return { Terminal }
 })
@@ -51,6 +54,23 @@ beforeEach(() => {
 describe('TerminalInstance', () => {
   it('constructs without throwing', () => {
     expect(() => new TerminalInstance('ses-1', 1000)).not.toThrow()
+  })
+
+  it('sends \\n when Cmd+Enter is pressed via custom key handler', () => {
+    new TerminalInstance('ses-1', 1000)
+    const instance = vi.mocked(Terminal).mock.results[0].value
+    const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
+    const result = handler({ metaKey: true, ctrlKey: false, key: 'Enter', type: 'keydown' })
+    expect(result).toBe(false)
+    expect(mockInput).toHaveBeenCalledWith('ses-1', '\n')
+  })
+
+  it('does not intercept non-Cmd+Enter keys', () => {
+    new TerminalInstance('ses-1', 1000)
+    const instance = vi.mocked(Terminal).mock.results[0].value
+    const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
+    const result = handler({ metaKey: false, ctrlKey: false, key: 'Enter', type: 'keydown' })
+    expect(result).toBe(true)
   })
 
   it('subscribes to terminal output on construction', () => {

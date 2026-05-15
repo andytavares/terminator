@@ -88,7 +88,7 @@ describe('git-integration extension: git:diff-file IPC handler', () => {
       path: 'src/main.ts',
       staged: true,
     })
-    expect(gitService.getDiff).toHaveBeenCalledWith('/tmp/repo', 'src/main.ts', true)
+    expect(gitService.getDiff).toHaveBeenCalledWith('/tmp/repo', 'src/main.ts', true, undefined)
     expect(result).toMatchObject({ diff: expect.objectContaining({ path: 'src/main.ts' }) })
   })
 

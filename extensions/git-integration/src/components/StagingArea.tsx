@@ -23,6 +23,7 @@ const STATUS_LABEL: Record<string, string> = {
 interface StagingAreaProps {
   repoRoot: string
   onFileSelect: (path: string, staged: boolean) => void
+  onStagingChange?: () => void
 }
 
 function FileItem({
@@ -78,7 +79,11 @@ async function refreshStatus(
   }
 }
 
-export function StagingArea({ repoRoot, onFileSelect }: StagingAreaProps): JSX.Element {
+export function StagingArea({
+  repoRoot,
+  onFileSelect,
+  onStagingChange,
+}: StagingAreaProps): JSX.Element {
   const { status, setStatus, selectedFile } = useGitStore()
 
   const toggleFile = useCallback(
@@ -89,12 +94,14 @@ export function StagingArea({ repoRoot, onFileSelect }: StagingAreaProps): JSX.E
         } else {
           await window.electronAPI.git.stage(repoRoot, [filePath])
         }
+        // Bust the diff cache so the next click on this file fetches a fresh diff.
+        onStagingChange?.()
         await refreshStatus(repoRoot, setStatus)
       } catch {
         // errors surface via next status poll
       }
     },
-    [repoRoot, setStatus]
+    [repoRoot, setStatus, onStagingChange]
   )
 
   const stageAll = useCallback(async () => {
@@ -104,8 +111,9 @@ export function StagingArea({ repoRoot, onFileSelect }: StagingAreaProps): JSX.E
       repoRoot,
       unstaged.map((f) => f.path)
     )
+    onStagingChange?.()
     await refreshStatus(repoRoot, setStatus)
-  }, [repoRoot, status, setStatus])
+  }, [repoRoot, status, setStatus, onStagingChange])
 
   const unstageAll = useCallback(async () => {
     const staged = status?.files.filter((f) => f.staged) ?? []
@@ -114,8 +122,9 @@ export function StagingArea({ repoRoot, onFileSelect }: StagingAreaProps): JSX.E
       repoRoot,
       staged.map((f) => f.path)
     )
+    onStagingChange?.()
     await refreshStatus(repoRoot, setStatus)
-  }, [repoRoot, status, setStatus])
+  }, [repoRoot, status, setStatus, onStagingChange])
 
   if (!status) {
     return (

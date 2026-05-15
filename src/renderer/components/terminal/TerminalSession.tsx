@@ -29,6 +29,14 @@ export class TerminalInstance {
     this.element = document.createElement('div')
     this.element.style.cssText = 'width:100%;height:100%;'
 
+    this.terminal.attachCustomKeyEventHandler((e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && e.type === 'keydown') {
+        window.electronAPI.terminal.input(sessionId, '\n')
+        return false
+      }
+      return true
+    })
+
     this.terminal.onData((data) => {
       window.electronAPI.terminal.input(sessionId, data)
     })
@@ -54,6 +62,7 @@ export class TerminalInstance {
       this.opened = true
     }
     this.fitAddon.fit()
+    this.terminal.scrollToBottom()
     this.terminal.focus()
     this.resizeObserver = new ResizeObserver(() => this.fitAddon.fit())
     this.resizeObserver.observe(container)

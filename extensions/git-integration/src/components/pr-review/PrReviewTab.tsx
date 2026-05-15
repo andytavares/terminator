@@ -22,6 +22,11 @@ export function PrReviewTab({ repoRoot }: Props) {
     nextPrCursor,
     includeClosedPrs,
     setIncludeClosedPrs,
+    viewedFiles,
+    currentChapterId,
+    currentFilePath,
+    fileOrderOverrides,
+    scrollPosition,
   } = usePrReviewStore()
   const isPopoutWindow = new URLSearchParams(window.location.search).get('view') === 'pr-review'
   const [isPoppedOut, setIsPoppedOut] = useState(isPopoutWindow)
@@ -91,12 +96,29 @@ export function PrReviewTab({ repoRoot }: Props) {
     })
   }
 
-  const handleClosePr = () => {
+  const handleClosePr = async () => {
+    // Persist paused state synchronously before resetting, so mergeSessionStatuses
+    // on the next queue load reliably finds this session and shows it as paused.
+    if (repoRoot && activePr) {
+      const key = `${repoRoot}:::${activePr.number}:::${activePr.headSHA}`
+      await window.electronAPI.github.sessionSet(key, {
+        repoRoot,
+        prNumber: activePr.number,
+        headSHA: activePr.headSHA,
+        currentChapterId,
+        currentFilePath,
+        viewedFiles: [...viewedFiles],
+        fileOrderOverrides,
+        scrollPosition,
+        pausedAt: new Date().toISOString(),
+        lastAccessedAt: new Date().toISOString(),
+      })
+    }
     setShowOverview(false)
     setActiveQueuePr(null)
     setActivePr(null)
     reset()
-    if (repoRoot) loadQueue({ search: undefined })
+    if (repoRoot) void loadQueue({ search: undefined })
   }
 
   const handleRefreshPr = async () => {

@@ -213,12 +213,30 @@ function classifyTier(path: string): 0 | 1 | 2 | 3 {
   return 1
 }
 
+// Layer score for tier-1 files: higher = more likely a consumer/dependent → shown first.
+// Lower = more likely a provider/dependee → shown after its consumers.
+function layerScore(path: string): number {
+  const stem = (path.split('/').pop() ?? path).toLowerCase().replace(/\.[^.]+$/, '')
+  if (/\b(route|router|routing)\b/.test(stem)) return 9
+  if (/\b(page|screen|app|main)\b/.test(stem)) return 8
+  if (/\b(component|widget|panel|dialog|modal)\b/.test(stem)) return 7
+  if (/^use[a-z]/.test(stem) || /\bhook\b/.test(stem)) return 6
+  if (/\b(store|slice|context|state)\b/.test(stem)) return 5
+  if (/\b(service|handler|controller|api|manager|middleware)\b/.test(stem)) return 4
+  if (/\b(repository|gateway|client|adapter)\b/.test(stem)) return 3
+  if (/\b(model|entity|domain|schema|validator|dto)\b/.test(stem)) return 2
+  if (/\b(util|utils|helper|helpers|lib|common|shared|format|parse|transform)\b/.test(stem))
+    return 1
+  if (/\b(config|constant|constants|env|settings)\b/.test(stem)) return 1
+  return 4
+}
+
 function whyHere(tier: 0 | 1 | 2 | 3): string {
   switch (tier) {
     case 0:
-      return 'Interface/type file — defines contracts used by the files below'
+      return 'Interface/type file — contract foundation for the source files above'
     case 1:
-      return 'Source file — implementation; read after type definitions'
+      return 'Source file — implementation'
     case 2:
       return 'Test file — validates the implementation above'
     case 3:
@@ -226,15 +244,172 @@ function whyHere(tier: 0 | 1 | 2 | 3): string {
   }
 }
 
-function chapterName(paths: string[]): string {
-  if (paths.length === 0) return 'Changes'
-  const segments = paths.map((p) => p.split('/'))
-  const depth = Math.min(...segments.map((s) => s.length)) - 1
-  for (let d = depth; d >= 1; d--) {
-    const prefix = segments[0].slice(0, d).join('/')
-    if (segments.every((s) => s.slice(0, d).join('/') === prefix)) return prefix
+// ─── Semantic grouping (Signal 1) ─────────────────────────────────────────────
+
+// Ordered from most foundational to least. Lower index wins when groups are merged.
+const CANONICAL_GROUPS: [RegExp, string][] = [
+  [/\b(migrations?|db)\b/, 'Data Layer'],
+  [/\b(models?|entities|entity|schemas?)\b/, 'Data Layer'],
+  [/\b(config|settings?|env)\b/, 'Configuration'],
+  [/\b(types?|interfaces?|contracts?)\b/, 'Types & Contracts'],
+  [/\b(services?|core|lib|utils?|helpers?)\b/, 'Business Logic'],
+  [/\b(api|routes?|controllers?|endpoints?|handlers?)\b/, 'API Layer'],
+  [/\b(components?|pages?|views?|ui|screens?)\b/, 'UI'],
+  [/\b(tests?|__tests__|specs?|e2e)\b/, 'Tests'],
+]
+
+// Matches only against directory segments (not the filename) to avoid false positives.
+function semanticGroupName(filePath: string): string {
+  const parts = filePath.split('/')
+  const dirPath = parts.slice(0, -1).join('/').toLowerCase()
+  for (const [pattern, name] of CANONICAL_GROUPS) {
+    if (pattern.test(dirPath)) return name
   }
-  return segments[0][0] ?? 'Changes'
+  return parts.length > 1 ? parts[parts.length - 2] : 'root'
+}
+
+// ─── Feature-stem merge (Signal 2) ────────────────────────────────────────────
+
+const ROLE_SUFFIX_RE =
+  /[._-](types?|d|service|store|spec|test|handler|controller|router?|reducer|action|selector|hook|util|helper|dto|schema|model|entity|middleware|resolver|repo(?:sitory)?|gateway|client|adapter|factory|builder|provider|context|state|slice|saga|epic|effect|guard|interceptor|validator|mapper|transformer|formatter|parser)$/i
+
+function featureStem(filePath: string): string {
+  const base = (filePath.split('/').pop() ?? filePath).replace(/\.[^.]+$/, '')
+  const stripped = base.replace(ROLE_SUFFIX_RE, '')
+  return (stripped || base).toLowerCase().replace(/[._-]/g, '')
+}
+
+// ─── Import graph (Signal 3) ───────────────────────────────────────────────────
+
+const IMPORT_RE = /(?:import\s+[^'"]*from\s+|require\s*\(\s*)['"]([^'"]+)['"]/g
+
+function resolvePath(fromDir: string, spec: string): string {
+  const parts = (fromDir ? fromDir + '/' + spec : spec).split('/')
+  const result: string[] = []
+  for (const part of parts) {
+    if (part === '..') result.pop()
+    else if (part !== '.') result.push(part)
+  }
+  return result.join('/')
+}
+
+function extractImports(patch: string, fromPath: string, knownPaths: Set<string>): string[] {
+  const fromDir = fromPath.split('/').slice(0, -1).join('/')
+  const found: string[] = []
+  IMPORT_RE.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = IMPORT_RE.exec(patch)) !== null) {
+    const spec = match[1]
+    if (!spec.startsWith('.')) continue
+    const resolved = resolvePath(fromDir, spec)
+    const hit = [...knownPaths].find(
+      (p) => p === resolved || p.startsWith(resolved + '.') || p.startsWith(resolved + '/index.')
+    )
+    if (hit) found.push(hit)
+  }
+  return found
+}
+
+// ─── Union-find for group merging ──────────────────────────────────────────────
+
+class UnionFind {
+  private parent = new Map<string, string>()
+
+  find(x: string): string {
+    if (!this.parent.has(x)) this.parent.set(x, x)
+    let root = x
+    while (this.parent.get(root) !== root) root = this.parent.get(root)!
+    let cur = x
+    while (cur !== root) {
+      const next = this.parent.get(cur)!
+      this.parent.set(cur, root)
+      cur = next
+    }
+    return root
+  }
+
+  union(a: string, b: string): void {
+    const ra = this.find(a)
+    const rb = this.find(b)
+    if (ra === rb) return
+    // Lower CANONICAL_GROUPS index = more foundational = wins. Fallback groups lose to canonical ones.
+    const ia = CANONICAL_GROUPS.findIndex(([, n]) => n === ra)
+    const ib = CANONICAL_GROUPS.findIndex(([, n]) => n === rb)
+    const prioA = ia === -1 ? 999 : ia
+    const prioB = ib === -1 ? 999 : ib
+    if (prioA <= prioB) this.parent.set(rb, ra)
+    else this.parent.set(ra, rb)
+  }
+}
+
+// ─── Three-signal grouping ─────────────────────────────────────────────────────
+
+const MAX_GROUP_SIZE = 15
+
+function groupFilesIntoChapters(files: RawFile[]): Map<string, RawFile[]> {
+  const uf = new UnionFind()
+  const fileGroup = new Map<string, string>()
+
+  // Signal 1: assign each file to a semantic group
+  for (const f of files) {
+    fileGroup.set(f.path, semanticGroupName(f.path))
+  }
+
+  // Signal 2: merge groups whose files share a feature stem (≥ 3 chars to skip noise)
+  const stemToGroups = new Map<string, string[]>()
+  for (const [path, group] of fileGroup) {
+    const stem = featureStem(path)
+    if (stem.length >= 3) {
+      const list = stemToGroups.get(stem) ?? []
+      list.push(group)
+      stemToGroups.set(stem, list)
+    }
+  }
+  for (const groups of stemToGroups.values()) {
+    for (let i = 1; i < groups.length; i++) uf.union(groups[0], groups[i])
+  }
+
+  // Signal 3: merge groups connected by direct imports in patch text
+  const knownPaths = new Set(files.map((f) => f.path))
+  for (const f of files) {
+    if (!f.patch) continue
+    for (const imported of extractImports(f.patch, f.path, knownPaths)) {
+      const ga = fileGroup.get(f.path)
+      const gb = fileGroup.get(imported)
+      if (ga && gb) uf.union(ga, gb)
+    }
+  }
+
+  // Collect files by canonical group
+  const groups = new Map<string, RawFile[]>()
+  for (const f of files) {
+    const canonical = uf.find(fileGroup.get(f.path)!)
+    const list = groups.get(canonical) ?? []
+    list.push(f)
+    groups.set(canonical, list)
+  }
+
+  // Sub-split any group that still exceeds MAX_GROUP_SIZE (by directory depth)
+  const result = new Map<string, RawFile[]>()
+  for (const [key, groupFiles] of groups) {
+    if (groupFiles.length <= MAX_GROUP_SIZE) {
+      result.set(key, groupFiles)
+    } else {
+      // Split by immediate parent directory, prefixed with the semantic group key
+      const byDir = new Map<string, RawFile[]>()
+      for (const f of groupFiles) {
+        const parts = f.path.split('/')
+        const dir = parts.length > 1 ? parts[parts.length - 2] : 'root'
+        const subKey = `${key} / ${dir}`
+        const list = byDir.get(subKey) ?? []
+        list.push(f)
+        byDir.set(subKey, list)
+      }
+      for (const [subKey, subFiles] of byDir) result.set(subKey, subFiles)
+    }
+  }
+
+  return result
 }
 
 interface RawFile {
@@ -242,6 +417,7 @@ interface RawFile {
   additions: number
   deletions: number
   changeType?: string
+  patch?: string
 }
 
 function defaultRiskScore(): RiskScore {
@@ -274,25 +450,18 @@ export function buildChapters(
         additions: Number(obj.additions ?? 0),
         deletions: Number(obj.deletions ?? 0),
         changeType: String(obj.changeType ?? obj.status ?? 'modified'),
+        patch: obj.patch ? String(obj.patch) : undefined,
       }
     })
     .filter((f) => f.path.length > 0)
 
   if (files.length === 0) return []
 
-  const groups = new Map<string, RawFile[]>()
-  for (const file of files) {
-    const parts = file.path.split('/')
-    const groupKey = parts.length > 1 ? parts[0] : '.'
-    const existing = groups.get(groupKey) ?? []
-    existing.push(file)
-    groups.set(groupKey, existing)
-  }
+  const groups = groupFilesIntoChapters(files)
 
   const chapters: Chapter[] = []
-  const groupEntries = [...groups.entries()]
 
-  const buildGroupChapters = (groupKey: string, groupFiles: RawFile[]) => {
+  const buildGroupChapter = (groupKey: string, groupFiles: RawFile[]) => {
     const byTier = new Map<0 | 1 | 2 | 3, RawFile[]>()
     for (const f of groupFiles) {
       const tier = classifyTier(f.path)
@@ -301,14 +470,26 @@ export function buildChapters(
       byTier.set(tier, existing)
     }
 
+    // Order: tier 1 (consumers/implementation) first sorted by layer desc then size desc,
+    // then tier 0 (types/interfaces — what implementation depends on),
+    // then tier 2 (tests), then tier 3 (mechanical).
+    const tier1 = [...(byTier.get(1) ?? [])].sort((a, b) => {
+      const ld = layerScore(b.path) - layerScore(a.path)
+      if (ld !== 0) return ld
+      return b.additions + b.deletions - (a.additions + a.deletions)
+    })
+    const tier0 = byTier.get(0) ?? []
+    const tier2 = byTier.get(2) ?? []
+    const tier3 = byTier.get(3) ?? []
+
     const tieredFiles: PrChangedFile[] = []
-    for (const tier of [0, 1, 2, 3] as const) {
-      const tFiles = byTier.get(tier) ?? []
-      const sorted =
-        tier === 1
-          ? [...tFiles].sort((a, b) => b.additions + b.deletions - (a.additions + a.deletions))
-          : tFiles
-      for (const f of sorted) {
+    for (const [tFiles, tier] of [
+      [tier1, 1],
+      [tier0, 0],
+      [tier2, 2],
+      [tier3, 3],
+    ] as [RawFile[], 0 | 1 | 2 | 3][]) {
+      for (const f of tFiles) {
         tieredFiles.push({
           path: f.path,
           changeType: mapChangeType(f.changeType ?? 'modified'),
@@ -323,12 +504,12 @@ export function buildChapters(
       }
     }
 
-    const chapterId = groupKey === '.' ? 'root' : groupKey.replace(/[^a-z0-9]/gi, '-').toLowerCase()
+    const chapterId = groupKey.replace(/[^a-z0-9]/gi, '-').toLowerCase()
     const ordered = applyOverrides(tieredFiles, overrides?.[chapterId])
 
     chapters.push({
       id: chapterId,
-      name: groupKey === '.' ? chapterName(groupFiles.map((f) => f.path)) : groupKey,
+      name: groupKey,
       files: ordered,
       estimatedMinutes: ordered.reduce((s, f) => s + f.estimatedMinutes, 0),
       status: 'not-started',
@@ -338,14 +519,14 @@ export function buildChapters(
   const regularGroups: [string, RawFile[]][] = []
   const mechanicalGroups: [string, RawFile[]][] = []
 
-  for (const entry of groupEntries) {
-    const allMech = entry[1].every((f) => classifyTier(f.path) === 3)
-    if (allMech) mechanicalGroups.push(entry)
-    else regularGroups.push(entry)
+  for (const [key, groupFiles] of groups) {
+    const allMech = groupFiles.every((f) => classifyTier(f.path) === 3)
+    if (allMech) mechanicalGroups.push([key, groupFiles])
+    else regularGroups.push([key, groupFiles])
   }
 
-  for (const [key, files] of regularGroups) buildGroupChapters(key, files)
-  for (const [key, files] of mechanicalGroups) buildGroupChapters(key, files)
+  for (const [key, groupFiles] of regularGroups) buildGroupChapter(key, groupFiles)
+  for (const [key, groupFiles] of mechanicalGroups) buildGroupChapter(key, groupFiles)
 
   return chapters
 }

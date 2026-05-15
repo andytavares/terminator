@@ -30,11 +30,17 @@ export function registerGitExtensionHandlers(register: RegisterFn): void {
       repoRoot: z.string().min(1),
       path: z.string().min(1),
       staged: z.boolean(),
+      isUntracked: z.boolean().optional(),
     })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     try {
-      const diff = await getDiff(parsed.data.repoRoot, parsed.data.path, parsed.data.staged)
+      const diff = await getDiff(
+        parsed.data.repoRoot,
+        parsed.data.path,
+        parsed.data.staged,
+        parsed.data.isUntracked
+      )
       return { diff }
     } catch (e) {
       return { error: String(e) }

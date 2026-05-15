@@ -217,6 +217,7 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber } = parsed.data
     try {
+      const { owner, repo } = await ownerAndName(repoRoot)
       const [metaRaw, filesRaw] = await Promise.all([
         gh(repoRoot, [
           'pr',
@@ -225,10 +226,11 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
           '--json',
           'number,title,body,author,createdAt,headRefName,baseRefName,headRefOid,statusCheckRollup',
         ]),
-        gh(repoRoot, ['pr', 'view', String(prNumber), '--json', 'files']),
+        // Use REST API to get file list with patch content for import-graph grouping
+        gh(repoRoot, ['api', '--paginate', `repos/${owner}/${repo}/pulls/${prNumber}/files`]),
       ])
       const meta = JSON.parse(metaRaw) as Record<string, unknown>
-      const filesData = (JSON.parse(filesRaw) as { files: unknown[] }).files
+      const filesData = JSON.parse(filesRaw) as unknown[]
       const chapters = buildChapters(filesData)
       const pr: PrReviewDetail = {
         number: Number(meta.number),

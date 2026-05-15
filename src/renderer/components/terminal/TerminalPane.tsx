@@ -53,8 +53,28 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     }
   }
 
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
+    if (e.dataTransfer.types.includes('Files')) e.preventDefault()
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>): void {
+    e.preventDefault()
+    if (!activeSessionId) return
+    const paths = Array.from(e.dataTransfer.files)
+      .map((f) => (f as unknown as { path: string }).path)
+      .filter(Boolean)
+      .map((p) => (/\s/.test(p) ? `'${p.replace(/'/g, "'\\''")}'` : p))
+      .join(' ')
+    if (paths) window.electronAPI.terminal.input(activeSessionId, paths)
+  }
+
   return (
-    <div className="terminal-pane" onClick={handleClick}>
+    <div
+      className="terminal-pane"
+      onClick={handleClick}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <div ref={containerRef} className="terminal-pane__container" />
     </div>
   )

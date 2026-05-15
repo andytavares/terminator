@@ -35,7 +35,7 @@ export function App(): JSX.Element {
     projectsByWorkspaceId,
   } = useWorkspaceStore()
   const { loadSettings, globalSettings, markWelcomeSeen, resolveSettings } = useSettingsStore()
-  const { handleProcessExit } = useSessionStore()
+  const { handleProcessExit, getSessionsForProject } = useSessionStore()
   const { addToast } = useToastStore()
   const { createSession } = useTerminalSession()
   const {
@@ -54,6 +54,22 @@ export function App(): JSX.Element {
   const handleOpenSettings = useCallback(() => setSettingsOpen(true), [])
   const handleToggleLog = useCallback(() => setLogOpen((v) => !v), [])
   const handleOpenCommandPalette = useCallback(() => setPaletteOpen(true), [])
+
+  const handleNewTab = useCallback(() => {
+    if (!activeProjectId) return
+    const settings = resolveSettings(activeWorkspaceId)
+    const projects = activeWorkspaceId ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? []) : []
+    const activeProject = projects.find((p) => p.id === activeProjectId)
+    const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
+    void createSession(activeProjectId, 'human', 'Terminal', cwd, settings.terminal.scrollbackLimit)
+  }, [
+    activeProjectId,
+    activeWorkspaceId,
+    activeWorkspace,
+    projectsByWorkspaceId,
+    resolveSettings,
+    createSession,
+  ])
   useKeyboardShortcuts({
     onOpenSettings: handleOpenSettings,
     onToggleLog: handleToggleLog,
@@ -85,23 +101,12 @@ export function App(): JSX.Element {
     ]
 
     if (activeProjectId) {
-      const settings = resolveSettings(activeWorkspaceId)
-      const projects = activeWorkspaceId ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? []) : []
-      const activeProject = projects.find((p) => p.id === activeProjectId)
-      const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
       cmds.push({
         id: 'core.new-tab',
         label: 'New Terminal Tab',
         shortcut: '⌘T',
         category: 'Terminal',
-        action: () =>
-          createSession(
-            activeProjectId,
-            'human',
-            'Terminal',
-            cwd,
-            settings.terminal.scrollbackLimit
-          ),
+        action: handleNewTab,
       })
     }
 
@@ -117,16 +122,7 @@ export function App(): JSX.Element {
 
     return cmds
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    activeProjectId,
-    activeWorkspaceId,
-    activeWorkspace,
-    workspaces,
-    resolveSettings,
-    projectsByWorkspaceId,
-    createSession,
-    setActiveWorkspace,
-  ])
+  }, [activeProjectId, workspaces, handleNewTab, setActiveWorkspace])
 
   const paletteCommands = [...builtinCommands(), ...extensionCommands]
 
@@ -151,6 +147,27 @@ export function App(): JSX.Element {
     })
     return unsub
   }, [handleProcessExit])
+
+  // Auto-open a terminal whenever the Terminal tab is active and has no sessions.
+  // Covers: first project selection, switching back from an extension tab, all sessions closed.
+  useEffect(() => {
+    if (!activeProjectId || activeProjectTabId !== null) return
+    if (getSessionsForProject(activeProjectId).length > 0) return
+    const settings = resolveSettings(activeWorkspaceId)
+    const projects = activeWorkspaceId ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? []) : []
+    const activeProject = projects.find((p) => p.id === activeProjectId)
+    const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
+    void createSession(activeProjectId, 'human', 'Terminal', cwd, settings.terminal.scrollbackLimit)
+  }, [
+    activeProjectId,
+    activeProjectTabId,
+    activeWorkspaceId,
+    activeWorkspace,
+    projectsByWorkspaceId,
+    resolveSettings,
+    createSession,
+    getSessionsForProject,
+  ])
 
   useEffect(() => {
     const handler = (): void => setSettingsOpen(true)
@@ -234,6 +251,7 @@ export function App(): JSX.Element {
                 activeProjectTabId={activeProjectTabId}
                 projectTabs={Array.from(projectTabs.values())}
                 onSelectProjectTab={setActiveProjectTab}
+                onNewTab={handleNewTab}
               />
               {activeProjectTabId && projectTabs.has(activeProjectTabId) ? (
                 (() => {
