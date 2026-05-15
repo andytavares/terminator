@@ -1,0 +1,87 @@
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_af5b42ac4e8601::t_f3f73f6523cb0a 2034
+  s_af5b42ac4e8601::t_f727c2a6a2c772 1962
+  s_af5b42ac4e8601::t_a7d4f7b62a1f3f 1998
+  s_af5b42ac4e8601::t_a928f516c17784 1989
+  s_af5b42ac4e8601::t_9906da0b4b7fce 1728
+  s_af5b42ac4e8601::t_e69706cb1bc8f0 1818-1827
+  s_af5b42ac4e8601::t_2f370944392dd0 581,587
+  s_af5b42ac4e8601::t_d295fc5d2efb0f 1146,1157
+  s_af5b42ac4e8601::t_c14d5810b85a38 1804
+  s_af5b42ac4e8601::t_9d2bf4964344e6 1951
+  s_af5b42ac4e8601::t_4ac08faab03b7e 564,567
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_af5b42ac4e8601::t_f9dcd6aa943941 2
+  s_af5b42ac4e8601::t_f6287c7d56c0ba 59-60,62-69,71-75
+  s_af5b42ac4e8601::t_7aab17c026e8f9 15
+  s_af5b42ac4e8601::t_5549aa5c152da5 61,70
+extensions/git-integration/src/github/pr-review-service.ts
+  s_af5b42ac4e8601::t_895d293896ed17 361,365,374-385,387-393,423-426,429-430
+  s_af5b42ac4e8601::t_d51974789292b3 216-233,237,239
+  s_af5b42ac4e8601::t_26441f52061fa3 258-317
+extensions/git-integration/src/ipc/git.ipc.ts
+  s_af5b42ac4e8601::t_8170366b59ca01 33,38-43
+src/renderer/components/terminal/TerminalSession.tsx
+  s_af5b42ac4e8601::t_3d4373c21c1b19 32-39
+extensions/git-integration/tests/unit/chapter-builder.spec.ts
+  s_af5b42ac4e8601::t_a423e98baec82b 34-40,42-48
+  s_af5b42ac4e8601::t_54658a26a6dce0 41,49-60,83,86-88,99-104
+src/renderer/styles.css
+  s_af5b42ac4e8601::t_32b302161c0e30 17
+extensions/git-integration/src/git/git-service.ts
+  s_af5b42ac4e8601::t_06e997d48741da 54-55,67-79,81-89
+extensions/git-integration/src/components/StagingArea.tsx
+  s_af5b42ac4e8601::t_1a004946462a51 82-84,86,97-98,104
+  s_af5b42ac4e8601::t_b5e15a06c23bc5 114,116,125,127
+  s_af5b42ac4e8601::t_9b90a74984abbe 26
+src/renderer/App.tsx
+  s_af5b42ac4e8601::t_044678a6fa56d1 254
+  s_af5b42ac4e8601::t_e5eab2dd7b64e1 109
+  s_af5b42ac4e8601::t_82eb43087feafd 125
+  s_af5b42ac4e8601::t_6bdd23ec72874b 57-70,72
+extensions/git-integration/src/components/pr-review/PrReviewTab.tsx
+  s_af5b42ac4e8601::t_b9297002e69a81 99-116,121
+  s_af5b42ac4e8601::t_629f6d732e27eb 25-29
+extensions/git-integration/tests/unit/GitFullView.spec.tsx
+  s_af5b42ac4e8601::t_d3d06f99c2533a 209-211
+  s_af5b42ac4e8601::t_421302a703c04b 57
+extensions/git-integration/src/components/git-integration.css
+  s_af5b42ac4e8601::t_ad20ceb7d76849 859-861
+tests/integration/ipc/git-extension.ipc.spec.ts
+  s_af5b42ac4e8601::t_36a252704fa233 91
+src/renderer/components/terminal/TabBar.tsx
+  s_af5b42ac4e8601::t_1202791cc609a9 1,13
+  s_af5b42ac4e8601::t_6117f540720ad3 95
+  s_af5b42ac4e8601::t_3288d322c58676 21
+src/main/preload.ts
+  s_af5b42ac4e8601::t_7a53dfb3854f4d 80-81
+extensions/git-integration/src/components/GitFullView.tsx
+  s_af5b42ac4e8601::t_b661f9dc0afe3d 47-54,61
+  s_af5b42ac4e8601::t_51c1f440e08710 199-203
+  s_af5b42ac4e8601::t_a52ee80e7aa8d4 25-26
+extensions/git-integration/tests/unit/PrReviewTab.spec.tsx
+  s_af5b42ac4e8601::t_f7aabc9339af96 87-91
+  s_af5b42ac4e8601::t_50f504822200fc 149-150,153,157-158,161-167
+extensions/git-integration/src/types/electron.d.ts
+  s_af5b42ac4e8601::t_36ccf39541a033 19-20
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_af5b42ac4e8601::t_db22b2dc3adf18 21-34,37,56,61-69,74,79-88,92,95,98,101,107,112-113,115,123,130-140,147-156,167
+extensions/git-integration/src/stores/pr-review.store.ts
+  s_af5b42ac4e8601::t_09c8a765354df9 157-164,174-179
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "7ce109dd38a1c5491e4af5f57301bb9539a5a249",
+  "prompts": {},
+  "sessions": {
+    "s_af5b42ac4e8601": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5e167585-7ab4-4f55-8524-c4f88c9e2d47",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
