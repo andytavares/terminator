@@ -1,0 +1,36 @@
+tests/unit/renderer/App.spec.tsx
+  s_af5b42ac4e8601::t_153a20903256b6 127
+src/main/terminal/pty-manager.ts
+  s_af5b42ac4e8601::t_892d4099be0116 34
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_af5b42ac4e8601::t_56c58b57ca0abc 2
+  s_af5b42ac4e8601::t_0be5ba499212fa 15,28-34
+  s_af5b42ac4e8601::t_ed8ce3470c3692 79-119
+  s_af5b42ac4e8601::t_c0f45728211583 18
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_af5b42ac4e8601::t_aa2e97d8dae57e 21
+src/renderer/components/terminal/TerminalSession.tsx
+  s_af5b42ac4e8601::t_15334138f876db 57
+src/renderer/App.tsx
+  s_af5b42ac4e8601::t_8f4d89138edbb3 38
+  s_af5b42ac4e8601::t_cc31654cca0159 173
+  s_af5b42ac4e8601::t_24e6ebaa2e4a54 155-172,174-175
+src/renderer/components/terminal/TerminalPane.tsx
+  s_af5b42ac4e8601::t_ae9e2151cc4c26 56-70,72-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "2f94075f5a673553e06b95c609887bfe83797c88",
+  "prompts": {},
+  "sessions": {
+    "s_af5b42ac4e8601": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5e167585-7ab4-4f55-8524-c4f88c9e2d47",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
