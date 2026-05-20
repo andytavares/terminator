@@ -29,6 +29,7 @@ declare global {
         ): Promise<
           { commitHash: string } | { error: string; hookOutput?: string; isHookFailure?: boolean }
         >
+        commitOutputPoll(repoRoot: string): Promise<{ lines: string[] }>
         prStatus(repoRoot: string): Promise<{ pr: unknown | null } | { error: string }>
         prCreate(payload: unknown): Promise<{ pr: unknown } | { error: string }>
       }

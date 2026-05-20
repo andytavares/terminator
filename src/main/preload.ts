@@ -83,8 +83,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('git:stage', { repoRoot, paths }),
     unstage: (repoRoot: string, paths: string[]) =>
       ipcRenderer.invoke('git:unstage', { repoRoot, paths }),
-    commit: (repoRoot: string, message: string, signOff?: boolean) =>
-      ipcRenderer.invoke('git:commit', { repoRoot, message, signOff }),
+    commit: (repoRoot: string, message: string, signOff?: boolean, noVerify?: boolean) =>
+      ipcRenderer.invoke('git:commit', { repoRoot, message, signOff, noVerify }),
+    commitOutputPoll: (repoRoot: string) =>
+      ipcRenderer.invoke('git:commit-output-poll', { repoRoot }),
     prStatus: (repoRoot: string) => ipcRenderer.invoke('git:pr-status', { repoRoot }),
     prCreate: (payload: unknown) => ipcRenderer.invoke('git:pr-create', payload),
     push: (repoRoot: string) => ipcRenderer.invoke('git:push', { repoRoot }),

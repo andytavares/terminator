@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { EventEmitter } from 'events'
 
 const CUSTOM = Symbol.for('nodejs.util.promisify.custom')
 
-const { execFileMock } = vi.hoisted(() => {
+const { execFileMock, spawnMock } = vi.hoisted(() => {
   const CUSTOM_SYM = Symbol.for('nodejs.util.promisify.custom')
-  const mock = vi.fn()
-  ;(mock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[CUSTOM_SYM] = vi.fn()
-  return { execFileMock: mock }
+  const execMock = vi.fn()
+  ;(execMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[CUSTOM_SYM] = vi.fn()
+  const spMock = vi.fn()
+  return { execFileMock: execMock, spawnMock: spMock }
 })
 
-vi.mock('child_process', () => ({ execFile: execFileMock }))
+vi.mock('child_process', () => ({ execFile: execFileMock, spawn: spawnMock }))
 
 import {
   getStatus,
@@ -25,6 +27,30 @@ function customMock() {
 
 function mockResolve(stdout: string) {
   customMock().mockResolvedValue({ stdout, stderr: '' })
+}
+
+// Creates a fake child process. Call proc.resolve(code) or proc.fail(err) to
+// drive it; stdout/stderr chunks can be pushed before resolving.
+function makeFakeProc() {
+  const stdout = new EventEmitter()
+  const stderr = new EventEmitter()
+  const proc = new EventEmitter() as EventEmitter & {
+    stdout: EventEmitter
+    stderr: EventEmitter
+    kill: () => void
+    pushStdout: (s: string) => void
+    pushStderr: (s: string) => void
+    resolve: (code?: number) => void
+    fail: (err: Error) => void
+  }
+  proc.stdout = stdout
+  proc.stderr = stderr
+  proc.kill = () => proc.emit('close', null)
+  proc.pushStdout = (s: string) => stdout.emit('data', Buffer.from(s))
+  proc.pushStderr = (s: string) => stderr.emit('data', Buffer.from(s))
+  proc.resolve = (code = 0) => proc.emit('close', code)
+  proc.fail = (err: Error) => proc.emit('error', err)
+  return proc
 }
 
 beforeEach(() => {
@@ -93,74 +119,105 @@ describe('extension git-service', () => {
 
   describe('commitChanges', () => {
     it('returns commitHash on success', async () => {
-      mockResolve('[main abc1234] commit message')
-      const result = await commitChanges('/repo', 'commit message')
+      const proc = makeFakeProc()
+      spawnMock.mockReturnValue(proc)
+      const p = commitChanges('/repo', 'commit message')
+      proc.pushStdout('[main abc1234] commit message\n')
+      proc.resolve(0)
+      const result = await p
       expect('commitHash' in result && result.commitHash).toBe('abc1234')
     })
 
     it('returns empty commitHash when hash not found in output', async () => {
-      mockResolve('nothing useful')
-      const result = await commitChanges('/repo', 'msg')
+      const proc = makeFakeProc()
+      spawnMock.mockReturnValue(proc)
+      const p = commitChanges('/repo', 'msg')
+      proc.pushStdout('nothing useful\n')
+      proc.resolve(0)
+      const result = await p
       expect('commitHash' in result && result.commitHash).toBe('')
     })
 
     it('appends --signoff when requested', async () => {
-      mockResolve('[main abc1234] signed')
-      await commitChanges('/repo', 'signed', true)
-      const args = customMock().mock.calls[0][1] as string[]
+      const proc = makeFakeProc()
+      spawnMock.mockReturnValue(proc)
+      const p = commitChanges('/repo', 'signed', true)
+      proc.resolve(0)
+      await p
+      const args = spawnMock.mock.calls[0][1] as string[]
       expect(args).toContain('--signoff')
     })
 
     it('appends --no-verify when noVerify is true', async () => {
-      mockResolve('[main abc1234] skip')
-      await commitChanges('/repo', 'skip', false, true)
-      const args = customMock().mock.calls[0][1] as string[]
+      const proc = makeFakeProc()
+      spawnMock.mockReturnValue(proc)
+      const p = commitChanges('/repo', 'skip', false, true)
+      proc.resolve(0)
+      await p
+      const args = spawnMock.mock.calls[0][1] as string[]
       expect(args).toContain('--no-verify')
     })
 
-    it('returns NOTHING_TO_COMMIT error when git output says nothing to commit', async () => {
-      customMock().mockRejectedValue(
-        Object.assign(new Error('Command failed'), {
-          stdout: 'nothing to commit, working tree clean',
-          stderr: '',
-        })
-      )
-      const result = await commitChanges('/repo', 'msg')
+    it('returns NOTHING_TO_COMMIT when git output says nothing to commit', async () => {
+      const proc = makeFakeProc()
+      spawnMock.mockReturnValue(proc)
+      const p = commitChanges('/repo', 'msg')
+      proc.pushStdout('nothing to commit, working tree clean\n')
+      proc.resolve(1)
+      const result = await p
       expect('error' in result && result.error).toBe('NOTHING_TO_COMMIT')
     })
 
     it('returns HOOK_FAILED with hookOutput when pre-commit hook fails', async () => {
-      customMock().mockRejectedValue(
-        Object.assign(new Error('Command failed'), {
-          stdout: 'lint-staged output: 3 errors',
-          stderr:
-            "husky - pre-commit hook exited with code 1 (error)\nerror: 'pre-commit' hook failed",
-        })
+      const proc = makeFakeProc()
+      spawnMock.mockReturnValue(proc)
+      const p = commitChanges('/repo', 'msg')
+      proc.pushStdout('lint-staged output: 3 errors\n')
+      proc.pushStderr(
+        "husky - pre-commit hook exited with code 1 (error)\nerror: 'pre-commit' hook failed\n"
       )
-      const result = await commitChanges('/repo', 'msg')
+      proc.resolve(1)
+      const result = await p
       expect('error' in result && result.error).toBe('HOOK_FAILED')
       expect('hookOutput' in result && result.hookOutput).toContain('lint-staged output')
       expect('isHookFailure' in result && result.isHookFailure).toBe(true)
     })
 
-    it('returns TIMEOUT error when process is killed', async () => {
-      customMock().mockRejectedValue(
-        Object.assign(new Error('Command failed'), { killed: true, stdout: '', stderr: '' })
-      )
-      const result = await commitChanges('/repo', 'msg')
+    it('returns TIMEOUT when kill timer fires', async () => {
+      vi.useFakeTimers()
+      const proc = makeFakeProc()
+      spawnMock.mockReturnValue(proc)
+      const p = commitChanges('/repo', 'msg')
+      vi.advanceTimersByTime(120_001)
+      proc.resolve(null as unknown as number) // kill fires close
+      const result = await p
       expect('error' in result && result.error).toBe('TIMEOUT')
+      vi.useRealTimers()
     })
 
     it('strips ANSI escape codes from hook output', async () => {
-      customMock().mockRejectedValue(
-        Object.assign(new Error('Command failed'), {
-          stdout: '',
-          stderr: '\x1b[31merror\x1b[0m: hook failed\nhook exited with code 1',
-        })
-      )
-      const result = await commitChanges('/repo', 'msg')
+      const proc = makeFakeProc()
+      spawnMock.mockReturnValue(proc)
+      const p = commitChanges('/repo', 'msg')
+      proc.pushStderr('\x1b[31merror\x1b[0m: hook failed\nhook exited with code 1\n')
+      proc.resolve(1)
+      const result = await p
       expect('hookOutput' in result && result.hookOutput).not.toContain('\x1b[')
       expect('hookOutput' in result && result.hookOutput).toContain('error: hook failed')
+    })
+
+    it('calls onOutput callback with streamed lines', async () => {
+      const proc = makeFakeProc()
+      spawnMock.mockReturnValue(proc)
+      const lines: string[] = []
+      const p = commitChanges('/repo', 'msg', false, false, (l) => lines.push(l))
+      proc.pushStdout('running eslint...\n')
+      proc.pushStderr('warning: found 1 issue\n')
+      proc.pushStdout('[main abc1234] msg\n')
+      proc.resolve(0)
+      await p
+      expect(lines).toContain('running eslint...')
+      expect(lines).toContain('warning: found 1 issue')
     })
   })
 })

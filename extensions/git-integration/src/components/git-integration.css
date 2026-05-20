@@ -187,6 +187,22 @@
   border-top: 1px solid var(--tm-danger);
 }
 
+.git-view__hook-live {
+  margin: 0 0 4px;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-family: var(--tm-font-mono, monospace);
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-secondary, rgba(0, 0, 0, 0.2));
+  border-radius: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .git-view__commit-actions {
   display: flex;
   flex-direction: column;
