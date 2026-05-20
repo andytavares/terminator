@@ -87,6 +87,9 @@ export function PrReviewTab({ repoRoot }: Props) {
           lastAccessedAt: new Date().toISOString(),
         })
       }
+      // Persist the PR snapshot so it always appears in the in-progress section,
+      // even if it falls beyond the first page on next load.
+      void window.electronAPI.github.saveActiveReview(repoRoot, pr)
       // Immediately reflect in-progress in the queue without waiting for a refresh.
       markPrInProgress(pr.number)
       setActivePr(detail)

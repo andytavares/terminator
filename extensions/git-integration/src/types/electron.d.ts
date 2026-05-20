@@ -70,6 +70,8 @@ declare global {
         sessionGet(key: string): Promise<{ session: unknown } | { session: null }>
         sessionSet(key: string, session: unknown): Promise<{ ok: true } | { error: string }>
         sessionsForRepo(repoRoot: string): Promise<{ sessions: unknown[] }>
+        saveActiveReview(repoRoot: string, pr: unknown): Promise<{ ok: true } | { error: string }>
+        activeReviewsForRepo(repoRoot: string): Promise<{ prs: unknown[] } | { error: string }>
       }
       git: Window['electronAPI']['git'] & {
         push(repoRoot: string): Promise<{ success: true } | { error: string }>

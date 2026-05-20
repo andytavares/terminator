@@ -147,6 +147,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('github:session-set', { key, session }),
     sessionsForRepo: (repoRoot: string) =>
       ipcRenderer.invoke('github:sessions-for-repo', { repoRoot }),
+    saveActiveReview: (repoRoot: string, pr: unknown) =>
+      ipcRenderer.invoke('github:save-active-review', { repoRoot, pr }),
+    activeReviewsForRepo: (repoRoot: string) =>
+      ipcRenderer.invoke('github:active-reviews-for-repo', { repoRoot }),
   },
   fs: {
     watchStart: (projectRoot: string) => ipcRenderer.invoke('fs:watch-start', { projectRoot }),
