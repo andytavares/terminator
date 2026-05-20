@@ -1,0 +1,57 @@
+scripts/cleanup-test-prs.sh
+  s_aca83d4c24baed::t_4bdc2128d633cd 1-56
+scripts/generate-test-prs.sh
+  s_aca83d4c24baed::t_64f1e585b943f0 29-35
+  s_aca83d4c24baed::t_b7cd122353d06b 195
+  s_aca83d4c24baed::t_eb245c5b682e28 2,5,14,18,22,25,27,42-72,74-130,132-135,140-146,148-157,159-194,196-218,220-289,292-293,298-313,326
+  s_aca83d4c24baed::t_72ea7e9489417d 136-139,147
+  s_aca83d4c24baed::t_dc967ce3590c2f 1,3-4,6-13,15-17,19-21,23-24,26,28,36-41,73,131,158,219,290-291,294-297,314-325,327
+extensions/git-integration/src/components/PrDialog.tsx
+  s_aca83d4c24baed::t_e9af0f01f68e7e 266-272,277,279-280,282-288,291-292,294-300
+  s_aca83d4c24baed::t_4d06cf6b6b222d 136
+src/renderer/components/sidebar/CreateProjectDialog.tsx
+  s_198d72ed2f3b08::t_c6c96acbd73c84 120-121
+  s_198d72ed2f3b08::t_e5633a097651cf 174
+  s_198d72ed2f3b08::t_30bc9e0ac0ed58 40-41
+  s_198d72ed2f3b08::t_8ef1a5fdc3b446 17
+  s_198d72ed2f3b08::t_2901f5f39301ab 4
+  s_198d72ed2f3b08::t_c34ec101d2e2cb 42
+  s_198d72ed2f3b08::t_c4f2114d3f011f 48-50
+tests/unit/git/git-service.spec.ts
+  s_aca83d4c24baed::t_c9217d68c09131 243-249
+.gitignore
+  h_16ba00fe96244d 19
+src/main/git/git-service.ts
+  s_aca83d4c24baed::t_49eacc97500e24 106
+tests/unit/extensions/PrDialog.spec.tsx
+  s_aca83d4c24baed::t_45d299fb837c13 132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "6dde972a70b5eaa2b816b3ced4d04fc66f9b34ce",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_198d72ed2f3b08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ab601d4e-4e61-4244-bc05-e67d47a534d5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_aca83d4c24baed": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22208e79-afc4-4553-8e40-3f7602033b11",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
