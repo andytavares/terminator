@@ -1,0 +1,23 @@
+extensions/task-vault/tests/mcp/tools/auto-execute.spec.ts
+  s_7aa3262fa06679::t_49afa58f3478f3 31-38
+extensions/task-vault/tests/mcp/tools/migrate-task.spec.ts
+  s_7aa3262fa06679::t_49afa58f3478f3 43-50
+extensions/task-vault/tests/mcp/tools/complete-task.spec.ts
+  s_7aa3262fa06679::t_49afa58f3478f3 43-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "cde69d91663a5c4fca1c324372ed2bd6f3fe71e7",
+  "prompts": {},
+  "sessions": {
+    "s_7aa3262fa06679": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f194d32b-de41-4c48-9570-92bc6d6c5398",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
