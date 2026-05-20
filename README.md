@@ -13,6 +13,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 - **Git Integration** — Built-in first-party extension: toggleable right sidebar showing live git status, full git view for staging/committing, and PR creation via `gh` CLI. Configurable per-workspace. Auto-refreshes on file changes.
 - **Code Reviews tab** — PR review workflow inside the git-integration extension. Paginated queue (20 at a time) of open/closed PRs with search by title or PR number, risk scoring (churn, blast radius, cyclomatic complexity delta), chapter-by-chapter review surface with syntax-highlighted diffs, inline comment threading, and one-click review submission (Approve / Request Changes / Comment) via `gh` CLI. Review sessions persist across restarts. Pop-out button opens a dedicated focused review window. Requires `gh auth login`.
 - **SpecKit Pilot** — Extension that orchestrates the full Spec-Kit lifecycle (Constitution → Specify → Clarify → Plan → Checklist → Tasks → Analyze → Implement) with human-in-the-loop approval gates between every phase. Sidebar panel shows phase status glyphs with approve/reject/revoke controls; file watcher detects artifact changes; per-file confirm gate during Implement. State persisted to `.specify/.pilot/state.json`; audit log in `history.jsonl`.
+- **Task Vault** — GTD + Bullet Journal + PARA productivity extension. Plain-markdown vault with daily logs, inbox, projects, areas, and someday list. Global quick-capture hotkey (`Cmd+Shift+Space`). MCP stdio server lets AI agents capture tasks, complete/migrate items, and query the vault. 6-step guided weekly review wizard with optional ICS calendar feed integration. Bidirectional links between vault items and terminal sessions. Vault indexed to `.todo/index.json` for fast queries; file changes auto-rebuild the index via chokidar watcher.
 - **View menu** — Toggle Sidebar (shows/hides the Projects Panel), Open Settings (`Cmd+,`), and Code Reviews in New Window all work from the native View menu.
 - **Keyboard shortcuts** — `Cmd+1–9` (switch workspace), `Cmd++/-` (cycle workspaces), `Cmd+T` (new tab), `Cmd+Left/Right` (cycle tabs), `Cmd+,` (settings), `Cmd+W` (close tab), `Cmd+Shift+G` (toggle git sidebar).
 
@@ -27,6 +28,10 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 | PTY management         | node-pty 1.x (main process only) |
 | Persistence            | electron-store 8.x               |
 | Schema validation      | Zod 3.x                          |
+| MCP protocol           | @modelcontextprotocol/sdk 1.x    |
+| File watching          | chokidar 3.x                     |
+| Frontmatter parsing    | gray-matter 4.x                  |
+| ICS calendar parsing   | node-ical 0.x                    |
 | Build                  | electron-vite 2.x                |
 | Unit/integration tests | Vitest 2.x                       |
 | E2E tests              | Playwright 1.x                   |

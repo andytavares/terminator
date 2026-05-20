@@ -633,3 +633,57 @@ If your extension was written before this contract existed, use this table:
 | `#d19a66` (orange)                   | `var(--tm-warning)`      |
 
 Full contract reference: [`specs/003-pr-review/contracts/extension-token-api.md`](../specs/003-pr-review/contracts/extension-token-api.md)
+
+---
+
+## Extension API v1.2.0 — New Namespaces
+
+These namespaces were added alongside the Task Vault extension (ADR-012).
+
+### `api.sidebar.registerGlobalTab(tab)`
+
+Registers a permanent tab in the top-level tab bar (next to terminal tabs). Survives workspace navigation.
+
+```typescript
+api.sidebar.registerGlobalTab({
+  id: 'my-extension',
+  label: 'My Extension',
+  component: MyViewComponent,
+  permanent: true,
+})
+```
+
+### `api.globalShortcut.register(accelerator, handler)`
+
+Registers a global keyboard shortcut. Returns a `Disposable` — call `.dispose()` in `deactivate()`.
+
+```typescript
+const disposable = api.globalShortcut.register('CommandOrControl+Shift+Space', () => {
+  // open overlay
+})
+disposables.push(disposable)
+```
+
+### `api.notifications.showToast(type, message)`
+
+Shows a toast notification from the main process. `type` is `'info' | 'success' | 'warning' | 'error'`.
+
+```typescript
+api.notifications.showToast('info', 'Weekly review is ready')
+```
+
+### Renderer-side: `registry.registerKeyboardShortcut(shortcut)`
+
+Registers a keyboard shortcut that fires a renderer-side action.
+
+```typescript
+registry.registerKeyboardShortcut({
+  accelerator: 'CmdOrCtrl+R',
+  description: 'Open Weekly Review',
+  action: () => myStore.getState().setView('review'),
+})
+```
+
+### MCP Sidecar Pattern
+
+Extensions can ship a standalone MCP stdio server. See ADR-013. The server reads `TASK_VAULT_PATH` from environment and registers tools via `@modelcontextprotocol/sdk`. Users configure it in their MCP client (Claude Desktop, etc.) pointing to the compiled `src/mcp/server.js` within the extension directory.

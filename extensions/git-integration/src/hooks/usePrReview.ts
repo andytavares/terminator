@@ -42,7 +42,7 @@ async function mergeSessionStatuses(
       }
     }
 
-    return prs.map((pr) => {
+    const merged = prs.map((pr) => {
       if (!pr) return pr
       const session = latestByPr.get(pr.number)
       if (!session) return pr
@@ -51,6 +51,28 @@ async function mergeSessionStatuses(
         : 'in-progress'
       return { ...pr, sessionStatus, viewedFileCount: session.viewedFiles.length }
     })
+
+    // Load persisted active-review snapshots and prepend any not already in the
+    // current page — guarantees in-progress PRs appear regardless of pagination.
+    const activeResult = await window.electronAPI.github.activeReviewsForRepo(repoRoot)
+    if ('error' in activeResult) return merged
+
+    const queueNumbers = new Set(prs.map((p) => p.number))
+    const activePrs = parsePrList((activeResult as { prs: unknown[] }).prs)
+    const orphans = activePrs
+      .filter((pr): pr is ReviewQueuePR => pr != null && !queueNumbers.has(pr.number))
+      .map((pr) => {
+        const session = latestByPr.get(pr.number)
+        const sessionStatus: ReviewQueuePR['sessionStatus'] = session
+          ? session.pausedAt
+            ? 'paused'
+            : 'in-progress'
+          : 'in-progress'
+        const viewedFileCount = session?.viewedFiles.length ?? 0
+        return { ...pr, sessionStatus, viewedFileCount }
+      })
+
+    return [...orphans, ...merged]
   } catch {
     return prs
   }

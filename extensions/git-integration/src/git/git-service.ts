@@ -1,4 +1,4 @@
-import { execFile as execFileCb } from 'child_process'
+import { execFile as execFileCb, spawn } from 'child_process'
 import { promisify } from 'util'
 import type { GitStatus, FileDiff } from '../schemas/git.schema.js'
 import { parseStatus, parseDiff } from './git-parser.js'
@@ -98,41 +98,85 @@ export async function unstageFiles(repoRoot: string, paths: string[]): Promise<v
   await git(['restore', '--staged', '--', ...paths], repoRoot)
 }
 
-export async function commitChanges(
+export function commitChanges(
   repoRoot: string,
   message: string,
   signOff = false,
-  noVerify = false
+  noVerify = false,
+  onOutput?: (line: string) => void
 ): Promise<CommitResult> {
   const args = ['commit', '-m', message]
   if (signOff) args.push('--signoff')
   if (noVerify) args.push('--no-verify')
-  try {
-    const { stdout } = await execFile('git', args, {
+
+  return new Promise((resolve) => {
+    const proc = spawn('git', args, {
       cwd: repoRoot,
-      timeout: HOOK_TIMEOUT,
       env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
     })
-    const match = stdout.trim().match(/\[[\w/]+ ([a-f0-9]+)\]/)
-    return { commitHash: match?.[1] ?? '' }
-  } catch (e: unknown) {
-    const err = e as { stdout?: string; stderr?: string; killed?: boolean; message?: string }
-    if (err.killed) return { error: 'TIMEOUT' }
-    const combined = stripAnsi([err.stdout, err.stderr].filter(Boolean).join('\n').trim())
-    if (combined.includes('nothing to commit')) return { error: 'NOTHING_TO_COMMIT' }
-    // Detect hook failures: git reports "hook failed" / "hook exited with code" in stderr,
-    // or a hook runner (husky, lefthook) writes output before failing.
-    const isHookFailure = !!(
-      err.stderr &&
-      (err.stderr.includes('hook failed') ||
-        err.stderr.includes('hook exited with code') ||
-        err.stderr.includes('husky -') ||
-        err.stderr.includes('lefthook'))
-    )
-    return {
-      error: isHookFailure ? 'HOOK_FAILED' : combined || String(e),
-      hookOutput: combined || undefined,
-      isHookFailure,
+
+    let stdout = ''
+    let stderr = ''
+    let timedOut = false
+
+    const killTimer = setTimeout(() => {
+      timedOut = true
+      proc.kill()
+    }, HOOK_TIMEOUT)
+
+    const emit = (chunk: Buffer) => {
+      const text = stripAnsi(chunk.toString())
+      if (onOutput) {
+        for (const line of text.split('\n')) {
+          if (line.trim()) onOutput(line.trimEnd())
+        }
+      }
     }
-  }
+
+    proc.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString()
+      emit(chunk)
+    })
+    proc.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString()
+      emit(chunk)
+    })
+
+    proc.on('close', (code) => {
+      clearTimeout(killTimer)
+      if (timedOut) {
+        resolve({ error: 'TIMEOUT' })
+        return
+      }
+      if (code === 0) {
+        const match = stdout.trim().match(/\[[\w/]+ ([a-f0-9]+)\]/)
+        resolve({ commitHash: match?.[1] ?? '' })
+        return
+      }
+      const combined = stripAnsi([stdout, stderr].filter(Boolean).join('\n').trim())
+      if (combined.includes('nothing to commit')) {
+        resolve({ error: 'NOTHING_TO_COMMIT' })
+        return
+      }
+      // Detect hook failures: git reports "hook failed" / "hook exited with code" in stderr,
+      // or a hook runner (husky, lefthook) writes output before failing.
+      const isHookFailure = !!(
+        stderr &&
+        (stderr.includes('hook failed') ||
+          stderr.includes('hook exited with code') ||
+          stderr.includes('husky -') ||
+          stderr.includes('lefthook'))
+      )
+      resolve({
+        error: isHookFailure ? 'HOOK_FAILED' : combined || 'Commit failed',
+        hookOutput: combined || undefined,
+        isHookFailure,
+      })
+    })
+
+    proc.on('error', (err) => {
+      clearTimeout(killTimer)
+      resolve({ error: String(err) })
+    })
+  })
 }

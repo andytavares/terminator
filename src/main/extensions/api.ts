@@ -21,7 +21,7 @@ export interface SettingDefinition {
 
 // v1.1.0 types
 
-export type PanelSlot = 'right-sidebar'
+export type PanelSlot = 'right-sidebar' | 'global-tab'
 
 export interface PanelContribution {
   id: string
@@ -82,6 +82,28 @@ export interface CommandContribution {
   category?: string
 }
 
+// v1.2.0 types
+
+export interface GlobalTabContribution {
+  id: string
+  label: string
+  icon?: string
+  component: unknown
+  permanent?: boolean
+}
+
+export interface WorkspaceSnapshot {
+  readonly id: string
+  readonly name: string
+  readonly folderPath: string
+}
+
+export interface ProjectSnapshot {
+  readonly id: string
+  readonly workspaceId: string
+  readonly name: string
+}
+
 export interface ExtensionAPI {
   readonly app: { readonly version: string }
   log: {
@@ -97,6 +119,16 @@ export interface ExtensionAPI {
   sidebar: {
     registerItem(item: SidebarContribution): Disposable
     registerPanel(slot: PanelSlot, panel: PanelContribution): Disposable
+    registerGlobalTab(tab: GlobalTabContribution): Disposable
+  }
+  globalShortcut: {
+    register(accelerator: string, handler: () => void): Disposable
+  }
+  workspace: {
+    list(): WorkspaceSnapshot[]
+    listProjects(workspaceId: string): ProjectSnapshot[]
+    onDelete(handler: (workspaceId: string) => void): Disposable
+    onProjectDelete(handler: (projectId: string) => void): Disposable
   }
   topBar: {
     registerMenuItem(item: TopBarMenuContribution): Disposable
@@ -139,11 +171,22 @@ export interface ExtensionAPI {
   }
 }
 
-import { BrowserWindow, Menu, MenuItem, ipcMain } from 'electron'
+import {
+  BrowserWindow,
+  Menu,
+  MenuItem,
+  ipcMain,
+  globalShortcut as electronGlobalShortcut,
+} from 'electron'
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
 import { fsWatcherService } from '../fs/fs-watcher.js'
 import { getExtensionSetting } from '../storage/extension-settings-store.js'
 import { makeLogger } from '../logger.js'
+import {
+  listWorkspaces,
+  listProjects as listProjectsFromStore,
+} from '../storage/workspace-store.js'
+import { onWorkspaceDelete, onProjectDelete } from './workspace-events.js'
 
 const RESERVED_SHORTCUTS = new Set([
   'CmdOrCtrl+1',
@@ -170,6 +213,7 @@ interface Registry {
   workspaceSettingsValues: Map<string, unknown>
   sidebarItems: Map<string, SidebarContribution>
   sidebarPanels: Map<string, { slot: PanelSlot; panel: PanelContribution }>
+  globalTabs: Map<string, GlobalTabContribution>
   topBarItems: Map<string, TopBarMenuContribution>
   nativeMenuItems: Map<string, NativeMenuItemContribution>
   contextMenuItems: Map<string, { target: ContextMenuTarget; item: MenuItemContribution }>
@@ -186,6 +230,7 @@ export const globalRegistry: Registry = {
   workspaceSettingsValues: new Map(),
   sidebarItems: new Map(),
   sidebarPanels: new Map(),
+  globalTabs: new Map(),
   topBarItems: new Map(),
   nativeMenuItems: new Map(),
   contextMenuItems: new Map(),
@@ -280,6 +325,47 @@ export function createExtensionAPI(
         }
         globalRegistry.sidebarPanels.set(slotKey, { slot, panel })
         return disposable(() => globalRegistry.sidebarPanels.delete(slotKey))
+      },
+      registerGlobalTab(tab: GlobalTabContribution): Disposable {
+        const key = `${extensionId}.globaltab.${tab.id}`
+        if (globalRegistry.globalTabs.has(key)) {
+          throw new Error(
+            `GLOBAL_TAB_ALREADY_REGISTERED: tab "${tab.id}" is already registered for extension "${extensionId}"`
+          )
+        }
+        globalRegistry.globalTabs.set(key, tab)
+        return disposable(() => globalRegistry.globalTabs.delete(key))
+      },
+    },
+    globalShortcut: {
+      register(accelerator: string, handler: () => void): Disposable {
+        const registered = electronGlobalShortcut.register(accelerator, handler)
+        if (!registered) {
+          throw new Error(
+            `ACCELERATOR_TAKEN: "${accelerator}" could not be registered (already in use by OS or another app)`
+          )
+        }
+        return disposable(() => electronGlobalShortcut.unregister(accelerator))
+      },
+    },
+    workspace: {
+      list(): WorkspaceSnapshot[] {
+        return listWorkspaces().map(({ id, name, folderPath }) => ({ id, name, folderPath }))
+      },
+      listProjects(workspaceId: string): ProjectSnapshot[] {
+        return listProjectsFromStore(workspaceId).map(({ id, workspaceId: wsId, name }) => ({
+          id,
+          workspaceId: wsId,
+          name,
+        }))
+      },
+      onDelete(handler: (workspaceId: string) => void): Disposable {
+        const unsub = onWorkspaceDelete(handler)
+        return disposable(unsub)
+      },
+      onProjectDelete(handler: (projectId: string) => void): Disposable {
+        const unsub = onProjectDelete(handler)
+        return disposable(unsub)
       },
     },
     topBar: {

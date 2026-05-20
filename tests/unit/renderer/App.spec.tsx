@@ -85,10 +85,13 @@ const mockAddToast = vi.fn()
 const defaultExtensionRegistry = {
   sidebarPanels: new Map(),
   projectTabs: new Map(),
+  globalTabs: new Map(),
   openPanels: new Set<string>(),
   activeProjectTabId: null,
+  activeGlobalTabId: null,
   togglePanel: vi.fn(),
   setActiveProjectTab: vi.fn(),
+  setActiveGlobalTab: vi.fn(),
   keyboardShortcuts: [],
   commands: [],
 }

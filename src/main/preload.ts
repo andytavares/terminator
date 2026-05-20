@@ -83,8 +83,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('git:stage', { repoRoot, paths }),
     unstage: (repoRoot: string, paths: string[]) =>
       ipcRenderer.invoke('git:unstage', { repoRoot, paths }),
-    commit: (repoRoot: string, message: string, signOff?: boolean) =>
-      ipcRenderer.invoke('git:commit', { repoRoot, message, signOff }),
+    commit: (repoRoot: string, message: string, signOff?: boolean, noVerify?: boolean) =>
+      ipcRenderer.invoke('git:commit', { repoRoot, message, signOff, noVerify }),
+    commitOutputPoll: (repoRoot: string) =>
+      ipcRenderer.invoke('git:commit-output-poll', { repoRoot }),
     prStatus: (repoRoot: string) => ipcRenderer.invoke('git:pr-status', { repoRoot }),
     prCreate: (payload: unknown) => ipcRenderer.invoke('git:pr-create', payload),
     push: (repoRoot: string) => ipcRenderer.invoke('git:push', { repoRoot }),
@@ -147,6 +149,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('github:session-set', { key, session }),
     sessionsForRepo: (repoRoot: string) =>
       ipcRenderer.invoke('github:sessions-for-repo', { repoRoot }),
+    saveActiveReview: (repoRoot: string, pr: unknown) =>
+      ipcRenderer.invoke('github:save-active-review', { repoRoot, pr }),
+    activeReviewsForRepo: (repoRoot: string) =>
+      ipcRenderer.invoke('github:active-reviews-for-repo', { repoRoot }),
   },
   fs: {
     watchStart: (projectRoot: string) => ipcRenderer.invoke('fs:watch-start', { projectRoot }),

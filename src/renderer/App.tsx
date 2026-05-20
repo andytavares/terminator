@@ -41,10 +41,13 @@ export function App(): JSX.Element {
   const {
     sidebarPanels,
     projectTabs,
+    globalTabs,
+    activeGlobalTabId,
     openPanels,
     activeProjectTabId,
     togglePanel,
     setActiveProjectTab,
+    setActiveGlobalTab,
     commands: extensionCommands,
   } = useExtensionRegistry()
 
@@ -239,65 +242,88 @@ export function App(): JSX.Element {
   return (
     <ErrorBoundary>
       <div className="app-layout">
-        <WorkspaceRail />
+        <WorkspaceRail
+          globalTabs={Array.from(globalTabs.values())}
+          activeGlobalTabId={activeGlobalTabId}
+          onSelectGlobalTab={(id) => setActiveGlobalTab(id === activeGlobalTabId ? null : id)}
+        />
 
-        {activeWorkspaceId && sidebarVisible && <ProjectsPanel workspaceId={activeWorkspaceId} />}
-
-        <div className="main-content">
-          {activeProjectId ? (
-            <>
-              <TabBar
-                projectId={activeProjectId}
-                activeProjectTabId={activeProjectTabId}
-                projectTabs={Array.from(projectTabs.values())}
-                onSelectProjectTab={setActiveProjectTab}
-                onNewTab={handleNewTab}
-              />
-              {activeProjectTabId && projectTabs.has(activeProjectTabId) ? (
-                (() => {
-                  const tab = projectTabs.get(activeProjectTabId)!
-                  const TabComponent = tab.component
-                  return <TabComponent repoRoot={repoRoot} />
-                })()
+        {activeGlobalTabId && globalTabs.has(activeGlobalTabId) ? (
+          (() => {
+            const tab = globalTabs.get(activeGlobalTabId)!
+            const TabComponent = tab.component as React.ComponentType<Record<string, never>>
+            return (
+              <div className="main-content">
+                <TabComponent />
+              </div>
+            )
+          })()
+        ) : (
+          <>
+            {activeWorkspaceId && sidebarVisible && (
+              <ProjectsPanel workspaceId={activeWorkspaceId} />
+            )}
+            <div className="main-content">
+              {activeProjectId ? (
+                <>
+                  <TabBar
+                    projectId={activeProjectId}
+                    activeProjectTabId={activeProjectTabId}
+                    projectTabs={Array.from(projectTabs.values())}
+                    onSelectProjectTab={setActiveProjectTab}
+                    onNewTab={handleNewTab}
+                  />
+                  {activeProjectTabId && projectTabs.has(activeProjectTabId) ? (
+                    (() => {
+                      const tab = projectTabs.get(activeProjectTabId)!
+                      const TabComponent = tab.component
+                      return <TabComponent repoRoot={repoRoot} />
+                    })()
+                  ) : (
+                    <TerminalPane projectId={activeProjectId} />
+                  )}
+                </>
+              ) : globalSettings && !globalSettings.ui?.hasSeenWelcome ? (
+                <EmptyState
+                  icon="⬡"
+                  title="Welcome to Terminator"
+                  subtitle="A keyboard-first terminal for developers. Open a project to get started."
+                  actions={[
+                    { label: 'New Tab', shortcut: '⌘T', onClick: () => {} },
+                    {
+                      label: 'Open Settings',
+                      shortcut: '⌘,',
+                      onClick: () => setSettingsOpen(true),
+                    },
+                  ]}
+                />
               ) : (
-                <TerminalPane projectId={activeProjectId} />
+                <EmptyState
+                  icon="⌥"
+                  title={
+                    activeWorkspaceId
+                      ? 'Select or create a project'
+                      : 'Select a workspace to get started'
+                  }
+                />
               )}
-            </>
-          ) : globalSettings && !globalSettings.ui?.hasSeenWelcome ? (
-            <EmptyState
-              icon="⬡"
-              title="Welcome to Terminator"
-              subtitle="A keyboard-first terminal for developers. Open a project to get started."
-              actions={[
-                { label: 'New Tab', shortcut: '⌘T', onClick: () => {} },
-                { label: 'Open Settings', shortcut: '⌘,', onClick: () => setSettingsOpen(true) },
-              ]}
-            />
-          ) : (
-            <EmptyState
-              icon="⌥"
-              title={
-                activeWorkspaceId
-                  ? 'Select or create a project'
-                  : 'Select a workspace to get started'
-              }
-            />
-          )}
-        </div>
+            </div>
 
-        {/* Extension-contributed sidebar panels */}
-        {Array.from(openPanels).map((panelId) => {
-          const panel = sidebarPanels.get(panelId)
-          if (!panel) return null
-          const PanelComponent = panel.component
-          return (
-            <PanelComponent
-              key={panelId}
-              repoRoot={repoRoot}
-              onClose={() => togglePanel(panelId)}
-            />
-          )
-        })}
+            {/* Extension-contributed sidebar panels */}
+            {Array.from(openPanels).map((panelId) => {
+              const panel = sidebarPanels.get(panelId)
+              if (!panel) return null
+              const PanelComponent = panel.component
+              return (
+                <PanelComponent
+                  key={panelId}
+                  repoRoot={repoRoot}
+                  onClose={() => togglePanel(panelId)}
+                />
+              )
+            })}
+          </>
+        )}
 
         {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
         {logOpen && <LogWindow onClose={() => setLogOpen(false)} />}

@@ -273,3 +273,41 @@ styles.css :root
 This alias layer allows the core design system to evolve (rename, restructure tokens) without breaking extensions, as long as the `--tm-*` values remain stable.
 
 **Adding a new extension token** requires a MINOR version bump in `specs/003-pr-review/contracts/extension-token-api.md` and an update to `docs/EXTENSION-DEVELOPMENT.md`.
+
+---
+
+## Task Vault Extension Architecture
+
+The task-vault extension (`extensions/task-vault/`) implements a GTD+BuJo+PARA productivity system backed by plain markdown files. Key subsystems:
+
+### Vault Layer (`src/vault/`)
+
+- **parser.ts** — Pure function `parseFile(content, filePath)` extracts tasks, events, notes, frontmatter, and `terminator:<uuid>` links from markdown content. Returns structured `ParseResult`.
+- **writer.ts** — Atomic file writes (`writeFileAtomic` = write to tmp + `fs.rename`). Task mutation: `completeTask`, `migrateTask`, `addTask`. All check for stale line references (STALE_ID ADR-014).
+- **indexer.ts** — `buildIndex(vaultPath)` walks vault directories, parses all `.md` files, writes `.todo/index.json`. `readIndex` returns cached index. `getTaskById` resolves `filepath:line` IDs.
+- **watcher.ts** — chokidar watcher on vault root (excludes `archive/`) with 200ms debounce. Calls `buildIndex` on change and notifies callers via callback.
+
+### IPC Layer (`src/ipc/`)
+
+- **vault.ipc.ts** — 9 handlers for vault CRUD (capture, get-today, add-task, complete-task, migrate-task, query, process-inbox-item, update-project-status). All validate with Zod; stale IDs return `{ error: 'STALE_ID' }`.
+- **projects.ipc.ts** — project list, update-project-status, and weekly-review payload handler.
+- **links.ipc.ts** — bidirectional link handlers (create/remove/get-for-terminator-target).
+- **ics.ipc.ts** — returns ICS events from `.todo/ics-cache.json` in a ±7 day window.
+
+### MCP Sidecar (`src/mcp/`)
+
+- Standalone stdio server (`server.ts`) runs as a separate process: `TASK_VAULT_PATH=/path node extensions/task-vault/src/mcp/server.js`.
+- Registers 8 tools: capture, today, add_task, complete_task, migrate_task, query, list_projects, weekly_review.
+- Auto-execute gate (`auto-execute.ts`): reads per-tool toggle from `.todo/settings.json`; returns `makeSuggestion()` without writing if off; `confirmed: true` bypasses.
+
+### Task ID Format
+
+Tasks are identified as `filepath:lineNumber` (ADR-014). IDs are session-scoped and rebuilt after every write. STALE_ID is returned when a task has moved to a different line.
+
+### Extension API v1.2.0
+
+New namespaces added in this extension cycle (ADR-012):
+
+- `api.sidebar.registerGlobalTab` — register a permanent app-level tab
+- `api.globalShortcut.register` — register global keyboard shortcuts
+- `api.notifications.showToast` — show toast notifications from main process
