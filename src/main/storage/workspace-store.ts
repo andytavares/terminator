@@ -151,6 +151,10 @@ export function updateProjectBranch(
   return { project: updated }
 }
 
+export function getProjectById(id: string): Project | undefined {
+  return store.get('projects').find((p) => p.id === id)
+}
+
 export function deleteProject(id: string): { success: boolean } {
   const projects = store.get('projects').filter((p) => p.id !== id)
   store.set('projects', projects)

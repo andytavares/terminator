@@ -17,6 +17,11 @@ vi.mock('../../../src/main/storage/workspace-store', () => ({
   renameProject: vi.fn(),
   reorderProjects: vi.fn(),
   deleteProject: vi.fn(),
+  getProjectById: vi.fn(),
+}))
+
+vi.mock('../../../src/main/git/git-service', () => ({
+  removeWorktree: vi.fn(),
 }))
 
 import * as store from '../../../src/main/storage/workspace-store'
@@ -154,12 +159,13 @@ describe('workspace IPC handlers', () => {
   })
 
   describe('project:delete', () => {
-    it('calls deleteProject with the id', () => {
+    it('calls deleteProject with the id', async () => {
+      vi.mocked(store.getProjectById).mockReturnValue(undefined)
       vi.mocked(store.deleteProject).mockReturnValue(
         undefined as unknown as ReturnType<typeof store.deleteWorkspace>
       )
       const handler = captureHandler('project:delete')
-      handler({}, { id: 'p1' })
+      await handler({}, { id: 'p1' })
       expect(store.deleteProject).toHaveBeenCalledWith('p1')
     })
   })

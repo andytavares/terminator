@@ -194,6 +194,12 @@ describe('git-integration extension: git:commit IPC handler', () => {
   it('passes noVerify to commitChanges', async () => {
     vi.mocked(gitService.commitChanges).mockResolvedValue({ commitHash: 'def456' })
     await getHandler('git:commit')({ repoRoot: '/tmp/repo', message: 'skip', noVerify: true })
-    expect(gitService.commitChanges).toHaveBeenCalledWith('/tmp/repo', 'skip', false, true)
+    expect(gitService.commitChanges).toHaveBeenCalledWith(
+      '/tmp/repo',
+      'skip',
+      false,
+      true,
+      expect.any(Function)
+    )
   })
 })

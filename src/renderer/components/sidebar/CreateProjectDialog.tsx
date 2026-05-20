@@ -187,7 +187,15 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
                   <input
                     className="dialog__input"
                     value={newBranchName}
-                    onChange={(e) => setNewBranchName(e.target.value)}
+                    onChange={(e) => {
+                      const sanitized = e.target.value
+                        .replace(/ /g, '-')
+                        // eslint-disable-next-line no-control-regex
+                        .replace(/[~^:?*[\\\x00-\x1f\x7f]/g, '')
+                        .replace(/\.\.+/g, '.')
+                        .replace(/^[./]+|[./]+$/g, '')
+                      setNewBranchName(sanitized)
+                    }}
                     placeholder="feature/my-feature"
                   />
                 </div>

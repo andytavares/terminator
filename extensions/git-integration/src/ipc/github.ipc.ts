@@ -29,6 +29,7 @@ interface GhOptions {
 }
 
 const sessionStore = new Store<Record<string, unknown>>({ name: 'pr-review-sessions' })
+const activeReviewStore = new Store<Record<string, unknown>>({ name: 'pr-active-reviews' })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -118,6 +119,9 @@ async function runGit(cwd: string, args: string[]): Promise<string> {
   return stdout.trim()
 }
 
+const PR_JSON_FIELDS =
+  'number,title,author,createdAt,headRefName,baseRefName,isDraft,statusCheckRollup,files,additions,deletions'
+
 // ─── Registration ─────────────────────────────────────────────────────────────
 
 export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): void {
@@ -142,8 +146,6 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, cursor, search, includeClosedPrs } = parsed.data
-    const PR_JSON_FIELDS =
-      'number,title,author,createdAt,headRefName,baseRefName,isDraft,statusCheckRollup,files,additions,deletions'
 
     try {
       // PR number lookup — always finds the PR regardless of state
@@ -496,6 +498,41 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
     try {
       sessionStore.set(parsed.data.key, result.data)
       return { ok: true as const }
+    } catch (e) {
+      return { error: String(e) }
+    }
+  })
+
+  // Persist a ReviewQueuePR snapshot so it appears in-progress on every load,
+  // regardless of which page it falls on. Key: "<repoRoot>:<prNumber>".
+  register('github:save-active-review', (payload) => {
+    const schema = z.object({ repoRoot: z.string().min(1), pr: z.unknown() })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    try {
+      const key = `${parsed.data.repoRoot}:${(parsed.data.pr as { number: number }).number}`
+      activeReviewStore.set(key, { repoRoot: parsed.data.repoRoot, pr: parsed.data.pr })
+      return { ok: true as const }
+    } catch (e) {
+      return { error: String(e) }
+    }
+  })
+
+  register('github:active-reviews-for-repo', (payload) => {
+    const schema = z.object({ repoRoot: z.string().min(1) })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    try {
+      const all = activeReviewStore.store
+      const prs = Object.values(all)
+        .filter(
+          (entry): entry is { repoRoot: string; pr: unknown } =>
+            typeof entry === 'object' &&
+            entry !== null &&
+            (entry as { repoRoot: string }).repoRoot === parsed.data.repoRoot
+        )
+        .map((entry) => entry.pr)
+      return { prs }
     } catch (e) {
       return { error: String(e) }
     }

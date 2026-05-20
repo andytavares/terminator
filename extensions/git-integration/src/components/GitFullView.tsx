@@ -33,7 +33,9 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
   const [hookOutput, setHookOutput] = useState<string | null>(null)
   const [isHookFailure, setIsHookFailure] = useState(false)
   const [commitPhase, setCommitPhase] = useState<'idle' | 'hooks' | 'committing'>('idle')
+  const [hookLines, setHookLines] = useState<string[]>([])
   const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const selectedDiff: FileDiff | null = selectedFile ? (diffCache.get(selectedFile) ?? null) : null
 
@@ -66,13 +68,28 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
   const charCount = commitMessage.length
   const showCharCount = charCount > 50
 
-  const startCommitPhase = useCallback(() => {
+  const startCommitPhase = useCallback((root: string) => {
     setCommitPhase('hooks')
+    setHookLines([])
+    // After 3s with no output switch label; actual output still streams in
     phaseTimerRef.current = setTimeout(() => setCommitPhase('committing'), 3000)
+    pollIntervalRef.current = setInterval(async () => {
+      const result = await window.electronAPI.git.commitOutputPoll(root)
+      const { lines } = result as { lines: string[] }
+      if (lines.length > 0) {
+        setCommitPhase('hooks')
+        if (phaseTimerRef.current) {
+          clearTimeout(phaseTimerRef.current)
+          phaseTimerRef.current = setTimeout(() => setCommitPhase('committing'), 3000)
+        }
+        setHookLines((prev) => [...prev, ...lines])
+      }
+    }, 300)
   }, [])
 
   const endCommitPhase = useCallback(() => {
     if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current)
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
     setCommitPhase('idle')
   }, [])
 
@@ -98,6 +115,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
       setHookOutput(null)
       setIsHookFailure(false)
       setCommitError(null)
+      setHookLines([])
       return true
     },
     [setCommitMessage]
@@ -110,7 +128,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
       setCommitError(null)
       setHookOutput(null)
       setIsHookFailure(false)
-      startCommitPhase()
+      startCommitPhase(repoRoot)
       try {
         const result = await window.electronAPI.git.commit(
           repoRoot,
@@ -144,7 +162,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
       setCommitError(null)
       setHookOutput(null)
       setIsHookFailure(false)
-      startCommitPhase()
+      startCommitPhase(repoRoot)
       try {
         const result = await window.electronAPI.git.commit(
           repoRoot,
@@ -240,12 +258,15 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
           )}
           <div className="git-view__commit-actions">
             <div className="git-view__commit-hint">
-              {isCommitting && commitPhase === 'hooks' && (
+              {isCommitting && hookLines.length > 0 && (
+                <pre className="git-view__hook-live">{hookLines.join('\n')}</pre>
+              )}
+              {isCommitting && hookLines.length === 0 && commitPhase === 'hooks' && (
                 <span className="git-view__hint-text git-view__hint-text--status">
                   ⟳ Running pre-commit hooks…
                 </span>
               )}
-              {isCommitting && commitPhase === 'committing' && (
+              {isCommitting && hookLines.length === 0 && commitPhase === 'committing' && (
                 <span className="git-view__hint-text git-view__hint-text--status">
                   ⟳ Committing…
                 </span>

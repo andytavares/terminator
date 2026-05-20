@@ -10,6 +10,10 @@ type RegisterFn = (
   handler: (payload: unknown) => Promise<unknown> | unknown
 ) => void
 
+// Lines emitted by the running commit process, keyed by repoRoot.
+// Cleared when commit finishes; consumed incrementally by commitOutputPoll.
+const commitOutputBuffer = new Map<string, string[]>()
+
 export function registerGitExtensionHandlers(register: RegisterFn): void {
   register('git:status', async (payload) => {
     const schema = z.object({
@@ -81,13 +85,31 @@ export function registerGitExtensionHandlers(register: RegisterFn): void {
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     if (!parsed.data.message.trim()) return { error: 'EMPTY_MESSAGE' }
+    const { repoRoot } = parsed.data
+    commitOutputBuffer.set(repoRoot, [])
     const result = await commitChanges(
-      parsed.data.repoRoot,
+      repoRoot,
       parsed.data.message,
       parsed.data.signOff ?? false,
-      parsed.data.noVerify ?? false
+      parsed.data.noVerify ?? false,
+      (line) => {
+        const buf = commitOutputBuffer.get(repoRoot)
+        if (buf) buf.push(line)
+      }
     )
+    commitOutputBuffer.delete(repoRoot)
     return result
+  })
+
+  register('git:commit-output-poll', (payload) => {
+    const schema = z.object({ repoRoot: z.string().min(1) })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { lines: [] as string[] }
+    const buf = commitOutputBuffer.get(parsed.data.repoRoot)
+    if (!buf) return { lines: [] as string[] }
+    const lines = [...buf]
+    buf.length = 0 // consume in-place so next poll gets only new lines
+    return { lines }
   })
 
   register('git:push', async (payload) => {
