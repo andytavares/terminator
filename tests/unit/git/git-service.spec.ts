@@ -240,6 +240,13 @@ describe('listBranches', () => {
     expect(branches.some((b) => b.name === 'HEAD')).toBe(false)
   })
 
+  it('filters out pull request refs', async () => {
+    mockResolve(' |main\n |remotes/origin/pull/123/head\n |remotes/origin/pull/456/head\n')
+    const branches = await listBranches('/repo')
+    expect(branches.every((b) => !b.name.startsWith('pull/'))).toBe(true)
+    expect(branches.some((b) => b.name === 'main')).toBe(true)
+  })
+
   it('returns empty array for empty output', async () => {
     mockResolve('')
     expect(await listBranches('/repo')).toHaveLength(0)

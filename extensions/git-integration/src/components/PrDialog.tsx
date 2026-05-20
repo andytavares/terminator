@@ -133,6 +133,7 @@ export function PrDialog({
   const [descMode, setDescMode] = useState<DescriptionMode>('write')
   const [localBranches, setLocalBranches] = useState<Branch[]>([])
   const [remoteBranches, setRemoteBranches] = useState<Branch[]>([])
+  const [baseFilter, setBaseFilter] = useState('')
 
   const isDefaultBranch = branch === 'main' || branch === 'master'
 
@@ -262,27 +263,41 @@ export function PrDialog({
         <div className="pr-dialog__inline">
           <div className="pr-dialog__field pr-dialog__field--flex">
             <label className="pr-dialog__label">Base branch</label>
+            <input
+              className="pr-dialog__input"
+              placeholder="Filter branches…"
+              value={baseFilter}
+              onChange={(e) => setBaseFilter(e.target.value)}
+              style={{ marginBottom: 4 }}
+            />
             <select
               className="pr-dialog__input pr-dialog__select"
               value={base}
               onChange={(e) => setBase(e.target.value)}
+              size={6}
             >
-              {localBranches.length > 0 && (
+              {localBranches.filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
+                .length > 0 && (
                 <optgroup label="Local">
-                  {localBranches.map((b) => (
-                    <option key={b.name} value={b.name}>
-                      {b.name}
-                    </option>
-                  ))}
+                  {localBranches
+                    .filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
+                    .map((b) => (
+                      <option key={b.name} value={b.name}>
+                        {b.name}
+                      </option>
+                    ))}
                 </optgroup>
               )}
-              {remoteBranches.length > 0 && (
+              {remoteBranches.filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
+                .length > 0 && (
                 <optgroup label="Remote">
-                  {remoteBranches.map((b) => (
-                    <option key={b.name} value={b.name}>
-                      {b.name}
-                    </option>
-                  ))}
+                  {remoteBranches
+                    .filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
+                    .map((b) => (
+                      <option key={b.name} value={b.name}>
+                        {b.name}
+                      </option>
+                    ))}
                 </optgroup>
               )}
             </select>

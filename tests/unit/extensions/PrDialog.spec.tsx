@@ -129,7 +129,7 @@ describe('PrDialog', () => {
     render(<PrDialog {...defaultProps} />)
     await waitFor(() => screen.getByRole('dialog'))
     await waitFor(() => {
-      const select = screen.getByRole('combobox') as HTMLSelectElement
+      const select = screen.getByRole('listbox') as HTMLSelectElement
       expect(select.value).toBe('main')
     })
   })
