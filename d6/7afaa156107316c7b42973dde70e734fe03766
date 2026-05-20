@@ -1,0 +1,24 @@
+scripts/generate-test-prs.sh
+  s_aca83d4c24baed::t_507b6b82021c9c 247
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "d67afaa156107316c7b42973dde70e734fe03766",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_aca83d4c24baed": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22208e79-afc4-4553-8e40-3f7602033b11",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
