@@ -17,6 +17,7 @@ export default defineConfig({
     environmentMatchGlobs: [
       ['tests/unit/**/*.spec.tsx', 'jsdom'],
       ['extensions/*/tests/unit/**/*.spec.tsx', 'jsdom'],
+      ['extensions/*/tests/components/**/*.spec.tsx', 'jsdom'],
     ],
     globals: true,
     setupFiles: ['tests/setup.ts'],
@@ -35,6 +36,10 @@ export default defineConfig({
         'src/main/preload.ts',
         'extensions/*/src/index.ts',
         'extensions/*/src/renderer.tsx',
+        'extensions/*/src/stores/**',
+        'extensions/*/src/components/**',
+        'extensions/*/src/mcp/server.ts',
+        'extensions/*/src/vault/types.ts',
         '**/*.d.ts',
         '**/*.spec.ts',
         '**/*.spec.tsx',

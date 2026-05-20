@@ -1,0 +1,8 @@
+{
+  "id": "terminator.task-vault",
+  "name": "Task Vault",
+  "version": "0.1.0",
+  "description": "GTD+BuJo+PARA daily productivity system backed by plain markdown files. Includes MCP server for agent access.",
+  "main": "src/index.js",
+  "minAppVersion": "0.1.0"
+}

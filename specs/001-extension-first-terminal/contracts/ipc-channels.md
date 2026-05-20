@@ -829,3 +829,44 @@ through the generic `extensionBridge.invoke()` in the renderer (the core app has
 | Event                   | Payload                 | Trigger                            |
 | ----------------------- | ----------------------- | ---------------------------------- |
 | `speckit:state-changed` | `{ state: PilotState }` | Phase approve/revoke updates state |
+
+---
+
+## Task Vault Extension Channels (`task-vault:*`)
+
+All channels below are registered by the `task-vault` extension and accessed through `extensionBridge.invoke()`.
+
+### Vault Channels
+
+| Channel                                  | Direction       | Summary                                                                |
+| ---------------------------------------- | --------------- | ---------------------------------------------------------------------- |
+| `task-vault:vault:capture`               | renderer → main | Append task to inbox.md                                                |
+| `task-vault:vault:get-today`             | renderer → main | Return today's daily log (auto-create if absent)                       |
+| `task-vault:vault:get-daily`             | renderer → main | Return daily log for a given date                                      |
+| `task-vault:vault:add-task`              | renderer → main | Append task to a target file                                           |
+| `task-vault:vault:complete-task`         | renderer → main | Mark task `[x]` by file+line ID; returns `STALE_ID` if line changed    |
+| `task-vault:vault:migrate-task`          | renderer → main | Migrate task `[>]` to target date file; returns `STALE_ID` if stale    |
+| `task-vault:vault:query`                 | renderer → main | Filter tasks by status, context, project, area, dueBefore, filePattern |
+| `task-vault:vault:process-inbox-item`    | renderer → main | Process inbox item: trash / do-now / someday / file                    |
+| `task-vault:vault:update-project-status` | renderer → main | Rewrite project frontmatter `status:` field                            |
+
+### Project Channels
+
+| Channel                             | Direction       | Summary                                                         |
+| ----------------------------------- | --------------- | --------------------------------------------------------------- |
+| `task-vault:projects:list`          | renderer → main | List projects filtered by status                                |
+| `task-vault:projects:weekly-review` | renderer → main | Return full weekly review payload (inbox, projects, completed…) |
+
+### Link Channels
+
+| Channel                                      | Direction       | Summary                                         |
+| -------------------------------------------- | --------------- | ----------------------------------------------- |
+| `task-vault:links:create`                    | renderer → main | Append `terminator:<uuid>` to vault file        |
+| `task-vault:links:remove`                    | renderer → main | Remove `terminator:<uuid>` annotation from file |
+| `task-vault:links:get-for-terminator-target` | renderer → main | Return tasks/projects linked to a terminal UUID |
+
+### ICS Channels
+
+| Channel                     | Direction       | Summary                                                       |
+| --------------------------- | --------------- | ------------------------------------------------------------- |
+| `task-vault:ics:get-events` | renderer → main | Return cached ICS events in ±7 day window with staleness flag |

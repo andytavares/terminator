@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react'
 import type { Workspace } from '../../../shared/types/index'
+import type { GlobalTabRegistration } from '../../extensions/registry'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
 import { AlertBadge } from '../AlertBadge'
@@ -23,7 +24,17 @@ function colorWithAlpha(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`
 }
 
-export function WorkspaceRail(): JSX.Element {
+interface WorkspaceRailProps {
+  globalTabs?: GlobalTabRegistration[]
+  activeGlobalTabId?: string | null
+  onSelectGlobalTab?: (id: string) => void
+}
+
+export function WorkspaceRail({
+  globalTabs = [],
+  activeGlobalTabId = null,
+  onSelectGlobalTab,
+}: WorkspaceRailProps): JSX.Element {
   const [createOpen, setCreateOpen] = useState(false)
   const { workspaces, reorderWorkspaces } = useWorkspaceStore()
   const dragIndexRef = useRef<number | null>(null)
@@ -74,6 +85,17 @@ export function WorkspaceRail(): JSX.Element {
       ))}
 
       <div className="ws-rail__spacer" />
+
+      {globalTabs.map((tab) => (
+        <button
+          key={tab.id}
+          className={`ws-rail__global-tab${activeGlobalTabId === tab.id ? ' ws-rail__global-tab--active' : ''}`}
+          onClick={() => onSelectGlobalTab?.(tab.id)}
+          title={tab.label}
+        >
+          {tab.icon ?? tab.label[0]}
+        </button>
+      ))}
 
       <button className="ws-rail__add" onClick={() => setCreateOpen(true)} title="Create workspace">
         +

@@ -14,6 +14,7 @@ import {
   getProjectById,
 } from '../storage/workspace-store.js'
 import { removeWorktree } from '../git/git-service.js'
+import { emitWorkspaceDelete, emitProjectDelete } from '../extensions/workspace-events.js'
 
 export function registerWorkspaceHandlers(): void {
   ipcMain.handle('workspace:list', () => {
@@ -29,7 +30,9 @@ export function registerWorkspaceHandlers(): void {
   })
 
   ipcMain.handle('workspace:delete', (_event, { id }) => {
-    return deleteWorkspace(id)
+    const result = deleteWorkspace(id)
+    emitWorkspaceDelete(id)
+    return result
   })
 
   ipcMain.handle('workspace:reorder', (_event, payload) => {
@@ -68,6 +71,8 @@ export function registerWorkspaceHandlers(): void {
         }
       }
     }
-    return deleteProject(id)
+    const result = deleteProject(id)
+    emitProjectDelete(id)
+    return result
   })
 }
