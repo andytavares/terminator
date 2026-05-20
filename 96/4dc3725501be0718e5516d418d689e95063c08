@@ -1,0 +1,34 @@
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_aca83d4c24baed::t_2aa0cb6773d6c7 122-124
+  s_aca83d4c24baed::t_e37a0722f80985 505,510-512,533,535-536,538-539
+  s_aca83d4c24baed::t_933876f7705fc0 506-509,513-532,534,537
+  s_aca83d4c24baed::t_4f018b03dc51b0 32
+tests/unit/extensions/github.ipc.spec.ts
+  s_aca83d4c24baed::t_9a82dde453a2c8 630,632,636-638,641,653-655,658,661-662,667,669-672
+  s_aca83d4c24baed::t_5aa5a265a929fb 631,633-635,639-640,642-652,656-657,659-660,663-666,668
+src/main/preload.ts
+  s_aca83d4c24baed::t_204c45c2fd3342 150-153
+extensions/git-integration/src/components/pr-review/PrReviewTab.tsx
+  s_aca83d4c24baed::t_517432baf02b28 90-92
+extensions/git-integration/src/hooks/usePrReview.ts
+  s_aca83d4c24baed::t_6d9ed7197788ff 45,54,59,64,70,73-74
+  s_aca83d4c24baed::t_e1486525fb47ed 55-58,60-63,65-69,71-72,75
+extensions/git-integration/src/types/electron.d.ts
+  s_aca83d4c24baed::t_7e6c55ba98f0ec 73-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "964dc3725501be0718e5516d418d689e95063c08",
+  "prompts": {},
+  "sessions": {
+    "s_aca83d4c24baed": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "22208e79-afc4-4553-8e40-3f7602033b11",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
