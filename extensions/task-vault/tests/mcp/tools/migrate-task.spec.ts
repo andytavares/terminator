@@ -40,16 +40,14 @@ vi.mock('../../../src/vault/indexer', () => ({
     projects: [],
     inboxCount: 0,
   }),
-  getTaskById: vi
-    .fn()
-    .mockReturnValue({
-      id: '/vault/daily/2026-05-19.md:1',
-      filePath: '/vault/daily/2026-05-19.md',
-      line: 1,
-      status: 'open',
-      text: 'Task',
-      terminatorLinks: [],
-    }),
+  getTaskById: vi.fn().mockReturnValue({
+    id: '/vault/daily/2026-05-19.md:1',
+    filePath: '/vault/daily/2026-05-19.md',
+    line: 1,
+    status: 'open',
+    text: 'Task',
+    terminatorLinks: [],
+  }),
 }))
 
 import { migrateTaskMcp } from '../../../src/mcp/tools/migrate-task'
