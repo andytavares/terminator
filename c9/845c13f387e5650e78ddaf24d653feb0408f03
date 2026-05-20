@@ -1,0 +1,405 @@
+specs/005-task-vault-extension/spec.md
+  ai_agent 5
+  s_7aa3262fa06679::t_949b18163f8bb8 163
+  s_7aa3262fa06679::t_257a1bd8055ce3 193
+  s_7aa3262fa06679::t_f1f1bb12bed409 188
+  s_7aa3262fa06679::t_cd4c1f9552b106 164
+  s_7aa3262fa06679::t_e1705f5ae252d6 26
+  s_7aa3262fa06679::t_da9edf0c1ff67d 28
+  s_7aa3262fa06679::t_306007ab196aac 7-8,11,21
+  s_7aa3262fa06679::t_00938012ef4352 139
+  s_7aa3262fa06679::t_5137bd0b4f3f74 194
+  s_7aa3262fa06679::t_9620f094876e9e 230
+  s_7aa3262fa06679::t_7725abb55d1058 14
+  s_7aa3262fa06679::t_0be75e16fbc3b6 158
+  s_7aa3262fa06679::t_6e0cc5a2f4ea58 27
+  s_7aa3262fa06679::t_6399b16d2501a3 190-192
+  s_7aa3262fa06679::t_dce37e27a8af3c 200
+  s_7aa3262fa06679::t_36b81e35bfe9cc 182
+  s_7aa3262fa06679::t_dcccada219c828 201
+  s_7aa3262fa06679::t_311e591a8bdc62 223
+  s_7aa3262fa06679::t_0f8177c0ed049a 22-24,29
+  s_7aa3262fa06679::t_4c6cf308ab7615 25
+  s_7aa3262fa06679::t_f65578b7867f2f 137-138,140-154
+  s_7aa3262fa06679::t_bda98695cd0294 198-199,202-204
+  s_7aa3262fa06679::t_c020fabfbcb7bc 234
+  s_7aa3262fa06679::t_07ce23c31842e9 197
+  s_7aa3262fa06679::t_26256d0a962dba 1-4,6,30-136,155-157,159-161,165-181,183-187,189,195,205-213,215-222,224-229,231-233,235-239
+  s_7aa3262fa06679::t_06fc1ff8b90b6a 196
+  s_7aa3262fa06679::t_ebcd63737217a2 16-20
+  s_7aa3262fa06679::t_941b4b0fbf43cc 13
+  s_7aa3262fa06679::t_9040e853f0e3b2 162
+  s_7aa3262fa06679::t_c63c2504765170 214
+  s_7aa3262fa06679::t_ccad2062f81ec9 15
+  s_7aa3262fa06679::t_b2fae1c744bdf3 9-10
+  s_7aa3262fa06679::t_ac2201f6179001 12
+extensions/task-vault/src/vault/parser.ts
+  s_7aa3262fa06679::t_bf3ae95cdcd6df 162
+  s_7aa3262fa06679::t_7045db81f70a14 107,114-121
+  s_7aa3262fa06679::t_02ecdc80a33d44 80
+  s_7aa3262fa06679::t_ffa8d82b045c6a 148
+  s_7aa3262fa06679::t_169b12e6ac53b2 1-19,22-66,69-79,81-106,108-113,122-147,149-161,163-164,169-194
+  s_7aa3262fa06679::t_a7571c11cdde89 165-168
+  ai_agent 20-21,67-68
+extensions/task-vault/tests/ipc/inbox.ipc.spec.ts
+  s_7aa3262fa06679::t_6533a6e3c12786 87-90,99-101
+  s_7aa3262fa06679::t_b039e20f309e64 1-5,15-45,49-86,91-98,102-110
+  ai_agent 6-14,46-48
+specs/005-task-vault-extension/.pilot/history.jsonl
+  ai_agent 2-4
+docs/adr/014-line-based-task-ids.md
+  ai_agent 15-20
+  s_7aa3262fa06679::t_61d976e10bd881 1-14,21-29
+extensions/task-vault/tests/vault/capture.spec.ts
+  s_7aa3262fa06679::t_fd822ff7542b25 1-37,41-49
+  ai_agent 38-40
+src/renderer/components/sidebar/WorkspaceRail.tsx
+  s_7aa3262fa06679::t_f9dbbfc51be8bb 3
+  s_7aa3262fa06679::t_af17447cfdf547 27-37
+  s_7aa3262fa06679::t_b06a29a624fca4 89-99
+extensions/task-vault/src/components/QuickCaptureOverlay.tsx
+  ai_agent 74-77
+  s_7aa3262fa06679::t_a81037fa6ed3dc 1-73,78-91
+vitest.config.ts
+  s_7aa3262fa06679::t_98ece47139d3ee 39
+  s_7aa3262fa06679::t_bb7ab2fae95066 20
+  s_7aa3262fa06679::t_8807d566932381 41-42
+  s_7aa3262fa06679::t_5329c0107c4b88 40
+docs/adr/012-extension-api-v1.2.0.md
+  ai_agent 27-28,30-32
+  s_7aa3262fa06679::t_025891d372ad41 1-26,29,33-38
+extensions/task-vault/tests/vault/writer.spec.ts
+  ai_agent 72-74
+extensions/task-vault/src/mcp/tools/today.ts
+  s_7aa3262fa06679::t_f34e71235bd30f 1-25
+scripts/build-extensions.cjs
+  ai_agent 27-37
+specs/005-task-vault-extension/data-model.md
+  s_7aa3262fa06679::t_ef41be15c217ea 1-17,31-36,38-46,48-64,71-73,75-94,97-110,112,122-127,129-135,137-152,156-170,175-179,181-192,194-200,202-216,218,221-224,226-230,232,234-255,257,260-294
+  ai_agent 18-30,37,47,65-70,74,95-96,111,113-121,128,136,153-155,171-174,180,193,201,217,219-220,225,231,233,256,258-259,295-301
+extensions/task-vault/tests/vault/watcher.spec.ts
+  s_7aa3262fa06679::t_6be091c74224ce 3-39,57-99
+  ai_agent 40-46
+extensions/task-vault/src/index.ts
+  s_7aa3262fa06679::t_c48993f0967fa8 191-194
+  s_7aa3262fa06679::t_e06c8242b95c8a 10,13
+  ai_agent 5-8,109-110,129-132,168-170,175-180
+  s_7aa3262fa06679::t_bec543962b359f 85
+  s_7aa3262fa06679::t_a62a7ae67d62eb 122-123
+  s_7aa3262fa06679::t_99520455f1ce55 127-128,133-135
+  s_7aa3262fa06679::t_e5254fc64b6b33 84
+  s_7aa3262fa06679::t_f7007dd593cfb2 9
+  s_7aa3262fa06679::t_94ad5913fd2d68 190
+  s_7aa3262fa06679::t_99c1b5ffaaf191 150-167,171-174,181-182
+  s_7aa3262fa06679::t_f6eb1836b1882a 1-4,11-12,14-82,86-105,115-119,126,136-149,183-189,195-199
+  s_7aa3262fa06679::t_6805cfcdeff592 83
+  s_7aa3262fa06679::t_2e5f4b16d6f09d 106-108,111-114,124-125
+  s_7aa3262fa06679::t_ddd7a66b5662f6 120-121
+extensions/task-vault/tests/ics/parser.spec.ts
+  ai_agent 62-64,72-74,91-93
+  s_7aa3262fa06679::t_be2259cad6df95 1-61,65-71,75-90,94-112
+extensions/task-vault/src/mcp/tools/migrate-task.ts
+  ai_agent 17-21,29-32
+  s_7aa3262fa06679::t_1a5296b3c8175a 1-16,22-28,33-45
+extensions/task-vault/src/components/WeeklyReviewStep6Reflect.tsx
+  s_7aa3262fa06679::t_7bbdefb79ffb97 1-57,59-63
+  ai_agent 58
+specs/005-task-vault-extension/contracts/ipc-channels.md
+  s_7aa3262fa06679::t_5baa4673774de9 1-17,19-27,29-41,43-69,71-109,111-130,132-149,151-152,154-180,182-201,203-220,222-252,254-280
+  ai_agent 18,28,42,70,110,131,150,153,181,202,221,253
+src/renderer/extensions/registry.ts
+  s_7aa3262fa06679::t_2433b1d184e913 4-11
+  s_7aa3262fa06679::t_02e95ce8c91386 45-46,54,59
+  s_7aa3262fa06679::t_cb1210fdeded10 74-75
+  s_7aa3262fa06679::t_c943aeebe29bb1 115-130
+  s_7aa3262fa06679::t_d62fbc108d5544 154-157
+  s_7aa3262fa06679::t_c05d4ee7286318 62-70
+specs/005-task-vault-extension/contracts/extension-api-v1.2.0.md
+  ai_agent 63,116
+  s_7aa3262fa06679::t_4b9d8655981b51 142-159
+  s_7aa3262fa06679::t_f69f3765720304 1-62,64-115,117-141
+docs/adr/013-mcp-stdio-sidecar.md
+  ai_agent 13,17-21
+  s_7aa3262fa06679::t_306227e8e5a87f 1-12,14-16,22-28
+src/main/ipc/workspace.ipc.ts
+  s_7aa3262fa06679::t_9d1828acf4d2cc 74-76
+  s_7aa3262fa06679::t_ca6e367d5cfc24 17
+  s_7aa3262fa06679::t_5ec377a9506493 33-35
+extensions/task-vault/src/schemas/vault.schema.ts
+  s_7aa3262fa06679::t_723aa7d1680850 1-12,17-184
+  ai_agent 13-16
+extensions/task-vault/src/components/VaultSidebar.tsx
+  s_7aa3262fa06679::t_186394ef25c70d 1-32
+extensions/task-vault/tests/vault/links.spec.ts
+  s_7aa3262fa06679::t_d6938adc37286c 1-13,18-21,25-33
+  ai_agent 14-17,22-24
+extensions/task-vault/src/mcp/auto-execute.ts
+  s_7aa3262fa06679::t_f9c912cd6a2d49 1-43
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_7aa3262fa06679::t_300c18b33a38f1 66
+  s_7aa3262fa06679::t_0601025035d0d3 1-4,7-55,57-58,62-65,67-72,74-77
+  s_7aa3262fa06679::t_97d22db72264f7 5
+  s_7aa3262fa06679::t_2755b29e5a32a1 6
+  ai_agent 56,59-61
+  s_7aa3262fa06679::t_d2e2649e8c9f8c 73
+extensions/task-vault/src/mcp/tools/query.ts
+  s_7aa3262fa06679::t_81356db3b31ef7 1-33
+extensions/task-vault/src/components/WeeklyReviewStep3Projects.tsx
+  s_7aa3262fa06679::t_30e1d3c210149a 1-8,13-36,38-41,45-53,57-59
+  ai_agent 9-12,37,42-44,54-56
+extensions/task-vault/tests/ipc/links.ipc.spec.ts
+  ai_agent 19-21,23-31,34-42,45,90-93,118-121,128-131
+  s_7aa3262fa06679::t_59bed036dfe9d7 1-18,22,32-33,43-44,46-89,94-117,122-127,132-141
+extensions/task-vault/src/vault/writer.ts
+  s_7aa3262fa06679::t_6f40661a0b1553 1-93
+extensions/task-vault/tests/mcp/tools/add-task.spec.ts
+  s_7aa3262fa06679::t_44693dc15974f1 1-14,20-39,44-48,54-55,57-69,74-76
+  ai_agent 15-19,40-43,49-53,56,70-73
+extensions/task-vault/tests/mcp/tools/list-projects.spec.ts
+  s_7aa3262fa06679::t_f3f69d085d1099 1-2,44-56,58-61,63-66,70-73,77-79
+  s_7aa3262fa06679::t_889994adfc843d 3-4,8-9,40-41,43
+  ai_agent 5-7,10-39,42,57,62,67-69,74-76
+specs/005-task-vault-extension/quickstart.md
+  s_7aa3262fa06679::t_fc953ae3e05c8f 1-11,21-28,30-38,40-54,56-73,84-89,91-111,113-123,125-145
+  ai_agent 12-20,29,39,55,74-83,90,112,124
+src/main/extensions/workspace-events.ts
+  s_7aa3262fa06679::t_76b101cf43552d 1-23
+CLAUDE.md
+  s_7aa3262fa06679::t_7bd6ad00038bf0 5
+src/renderer/App.tsx
+  s_7aa3262fa06679::t_935c88c12ca013 268-292,298-299,301-308,310,312-326
+  s_7aa3262fa06679::t_11bea96e6898e6 245-249,251-267
+  ai_agent 293-297
+  s_7aa3262fa06679::t_7fd70642971079 44-45,50
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_7aa3262fa06679::t_8e6d4a169fc0ea 7
+  s_7aa3262fa06679::t_925b7099990591 64
+  s_7aa3262fa06679::t_62a49dd36ed4e6 1-6,8-45,50-63,65-100,102-129,131-203,205-232
+  s_7aa3262fa06679::t_6d766e00fe1d36 101
+  s_7aa3262fa06679::t_09a1a2240d07ba 130
+  s_7aa3262fa06679::t_c9743b9b44f5bd 204
+  ai_agent 46-49
+extensions/task-vault/src/renderer.tsx
+  s_7aa3262fa06679::t_82e39e81d947cf 33-37,39-40
+  s_7aa3262fa06679::t_d1017dc9e915f9 38
+  s_7aa3262fa06679::t_886a93c856133a 2-3,6,19-24,32,41
+  s_7aa3262fa06679::t_5acb654d11d5b5 1,4,7-18,25-31
+  s_7aa3262fa06679::t_f5d6f62c3509f3 5
+extensions/task-vault/src/mcp/tools/weekly-review.ts
+  s_7aa3262fa06679::t_79bd6665d27441 1-46
+specs/005-task-vault-extension/plan.md
+  s_7aa3262fa06679::t_fdb4a8ec98d489 1,3,7,11-19,37-39,42,49-57,60,63-73,75-119,121-134,137-139,141-151,153-157,159-162,164-171,173-178,180-191,193-197,199-204
+  s_7aa3262fa06679::t_f9c17b22eac6ce 2,4-6,8-10,20-24,43-48,58-59,61-62,74,120,135-136
+  ai_agent 25-36,40-41,140,152,163,172,179,192,198
+  s_7aa3262fa06679::t_9ae4f7d9908d2e 158
+extensions/task-vault/src/mcp/server.ts
+  s_7aa3262fa06679::t_c6cc7b16b617c5 1-3,5-12,21-28,30-69,71-141,153-203
+  ai_agent 4,13-20,29,70,142-152
+extensions/task-vault/src/vault/watcher.ts
+  s_7aa3262fa06679::t_4050daa5e8c36a 1-43
+extensions/task-vault/src/mcp/tools/capture.ts
+  ai_agent 18-20
+  s_7aa3262fa06679::t_02c03f3bb01544 1-17,21-45
+extensions/task-vault/src/vault/stale.ts
+  s_7aa3262fa06679::t_ff42c613add96b 1-7
+extensions/task-vault/src/ics/fetcher.ts
+  s_7aa3262fa06679::t_a7faa6b9851749 1-71,77-94
+  ai_agent 72-76
+extensions/task-vault/src/components/WeeklyReviewStep1GetClear.tsx
+  s_7aa3262fa06679::t_9735e1ad03d769 1-9,15-42,44-48
+  ai_agent 10-14,43
+specs/005-task-vault-extension/research.md
+  s_7aa3262fa06679::t_f659f8c1d98a3d 1-14,16-30,32-45,47-60,62-87,89-102,104-114,126-127
+  ai_agent 15,31,46,61,88,103,115-125
+extensions/task-vault/src/components/DailyLog.tsx
+  s_7aa3262fa06679::t_04ba520bfe6df9 10-25,42-50,54-58
+  s_7aa3262fa06679::t_68ace180bd40fd 1-9,59-64,75-100,104-121,123-156,160-164,168-171
+  ai_agent 26-41,51-53,65-74,101-103,157-159,165-167
+  s_7aa3262fa06679::t_20130a16ed677e 122
+extensions/task-vault/src/components/LinkedVaultPanel.tsx
+  s_7aa3262fa06679::t_23a39fc9dab67b 1-103
+extensions/task-vault/src/ipc/ics.ipc.ts
+  s_7aa3262fa06679::t_67deacdccdb2ff 1-21,26-76
+  ai_agent 22-25
+extensions/task-vault/src/components/WeeklyReview.tsx
+  ai_agent 85-92,110-115,128,136,143
+  s_7aa3262fa06679::t_f173a71a445f29 1-84,93-109,116-127,129-135,137-142,144-147
+docs/EXTENSION-DEVELOPMENT.md
+  s_7aa3262fa06679::t_df5c4e40aa420d 636-689
+specs/005-task-vault-extension/.pilot/state.json
+  ai_agent 17-143
+extensions/task-vault/tests/ipc/capture.ipc.spec.ts
+  s_7aa3262fa06679::t_c4ee6caa8b1c1b 17-20
+  s_7aa3262fa06679::t_630264d466deae 1-5,15-16,21-46,50-115
+  ai_agent 6-14,47-49
+.specify/feature.json
+  s_7aa3262fa06679::t_4125cfcbcc8881 2
+src/main/extensions/api.ts
+  s_7aa3262fa06679::t_0310a8b9759ca7 329-369
+  s_7aa3262fa06679::t_c978c97200280e 24
+  s_7aa3262fa06679::t_364b5f5b842ebc 85-106
+  s_7aa3262fa06679::t_d25168ec679b20 122-131
+  ai_agent 174-180,185-188
+  s_7aa3262fa06679::t_230c2264dc1f0c 189
+  s_7aa3262fa06679::t_3e4375fa5e322f 216,233
+extensions/task-vault/src/ipc/projects.ipc.ts
+  s_7aa3262fa06679::t_d0c83f0afd9663 1-6,11-21,26-37,39-45,107-128
+  s_7aa3262fa06679::t_39ca403a60d463 46-56,60-85,89-92,105-106
+  ai_agent 7-10,22-25,38,57-59,86-88,93-104
+extensions/task-vault/src/stores/vault.store.ts
+  s_7aa3262fa06679::t_e720a7aac31faa 19
+  s_7aa3262fa06679::t_4e71fe2c1dfb57 34-36,47-50
+  s_7aa3262fa06679::t_f9c38f1cb540d6 1-18,20-33,37-46,51-56
+extensions/task-vault/manifest.json
+  s_7aa3262fa06679::t_f0e5daf38e3280 1-8
+extensions/task-vault/tests/vault/stale.spec.ts
+  ai_agent 28-38,47-57,66-76
+  s_7aa3262fa06679::t_9512b2aed31615 1-27,39-46,58-65,77-82
+extensions/task-vault/tests/ics/fetcher.spec.ts
+  ai_agent 30-38
+  s_7aa3262fa06679::t_9f5fa1533c734d 1-29,39-98
+extensions/task-vault/tests/schemas/mcp.schema.spec.ts
+  s_7aa3262fa06679::t_830e15b255c9fe 1-86
+README.md
+  s_7aa3262fa06679::t_0b0e9de39df60c 16
+  s_7aa3262fa06679::t_7b92cb221353bd 31-34
+specs/005-task-vault-extension/tasks.md
+  s_7aa3262fa06679::t_8abc5897c01d08 1-105,107-108,110-142,151-212,218-230,235-237,242-244,247-249,258-266,278-297,307-376,378-393
+  s_7aa3262fa06679::t_acad0531c76e79 106
+  s_7aa3262fa06679::t_4c52483da7534a 143-150
+  ai_agent 213-217,231-234,238-241,245-246,250-257,267-277,298-306,377
+  s_7aa3262fa06679::t_e590b9a25c3860 109
+extensions/task-vault/src/schemas/project.schema.ts
+  s_7aa3262fa06679::t_cb472dfb3c69e2 1-5,10-15
+  ai_agent 6-9
+extensions/task-vault/src/components/WeeklyReviewStep4Calendar.tsx
+  s_7aa3262fa06679::t_286d82e1ff5037 1-32,37-54,56-67,69-70,74-93,97-99
+  s_7aa3262fa06679::t_0796bdbbe8996e 55
+  ai_agent 33-36,68,71-73,94-96
+extensions/task-vault/src/components/WeeklyReviewStep2Inbox.tsx
+  s_7aa3262fa06679::t_e7c43019544906 1-18,22-28,31-35
+  ai_agent 19-21,29-30
+extensions/task-vault/tests/ipc/projects.ipc.spec.ts
+  s_7aa3262fa06679::t_48da1f61644c2a 1-5,15-25,35-38,42-43,64-65,67-74,79-99,101-109,111-114,181-202
+  ai_agent 6-14,26-34,39-41,44-63,66,75-78,100,110,127-129,132,140-143,152,166,176
+  s_7aa3262fa06679::t_1966a6a8535b06 115-126,130-131,133-139,144-151,153-165,167-175,177-180
+extensions/task-vault/src/ipc/links.ipc.ts
+  ai_agent 5-9,41-44
+  s_7aa3262fa06679::t_00597746147693 1-4,10-40,45-107
+extensions/task-vault/src/mcp/tools/list-projects.ts
+  s_7aa3262fa06679::t_ed8e702e241ee2 1-23
+extensions/task-vault/src/components/LinkPicker.tsx
+  s_7aa3262fa06679::t_88bb333eaf8db8 1-88
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  ai_agent 841-851,855-858,862-866,870-872
+  s_7aa3262fa06679::t_9544e7d7989c72 832-840,852-854,859-861,867-869
+extensions/task-vault/tests/mcp/tools/query.spec.ts
+  s_7aa3262fa06679::t_94d0524e7fb196 3-4,8,41,45
+  s_7aa3262fa06679::t_65f2890a723a11 1-2,46-64,66-70,72-75,77-80,82-85,87-90,92-97,99-101
+  ai_agent 5-7,9-40,42-44,65,71,76,81,86,91,98
+extensions/task-vault/src/mcp/tools/add-task.ts
+  s_7aa3262fa06679::t_7a9b502dc4494c 1-19,23-35,39-46
+  ai_agent 20-22,36-38
+extensions/task-vault/tests/mcp/tools/capture.spec.ts
+  s_7aa3262fa06679::t_e6d5f95eba8d7d 19-20,26
+  s_7aa3262fa06679::t_c7aad2dfde17a5 1-5,15-18,27-38,42-62
+  ai_agent 6-14,21-25,39-41
+extensions/task-vault/src/schemas/mcp.schema.ts
+  ai_agent 16-19,51-54
+  s_7aa3262fa06679::t_3e19414bd5cbb2 1-15,20-50,55-67
+extensions/task-vault/tests/components/WeeklyReview.spec.tsx
+  s_7aa3262fa06679::t_f58f9d68c2e090 1,4-5,9-10,12-13,16-20,22-25,37,56-57,67-68,78-84,89-90,92-93,96-104,106-110,112,119-125,127-128,133-145,147,149,152-166
+  s_7aa3262fa06679::t_d3804a6acf7f35 21
+  s_7aa3262fa06679::t_e32cd291cdf7c4 105,111,116,118,126,130,132,146
+  s_7aa3262fa06679::t_abf4074eb6c84e 2-3
+  ai_agent 26-36,38-55,58-66,69-77,94-95
+  s_7aa3262fa06679::t_c7d5e7d44340ca 6-8,11,14-15
+  s_7aa3262fa06679::t_35079f90bbe2a4 91
+  s_7aa3262fa06679::t_840b1d152a1b64 85-88
+  s_7aa3262fa06679::t_4d141cb604315b 113-115,117,129,131,148,150-151
+extensions/task-vault/tests/mcp/tools/auto-execute.spec.ts
+  s_7aa3262fa06679::t_00c9d9a731aa9b 1-14,30,41-45,55-70,74-108,113-119,125-126
+  ai_agent 15-29,31-40,46-54,71-73,109-112,120-124
+extensions/task-vault/src/types/electron.d.ts
+  ai_agent 20-28,69-88
+  s_7aa3262fa06679::t_4d4345f1d8d2ea 1-19,29-68
+tests/unit/renderer/App.spec.tsx
+  s_7aa3262fa06679::t_bd11be24f2f39f 88,91,94
+extensions/task-vault/tests/mcp/tools/complete-task.spec.ts
+  s_7aa3262fa06679::t_46fbc129170076 1-5,15,24-26,42,53-58,60-65,79-99
+  s_7aa3262fa06679::t_3c9ac5ca677336 69-70
+  s_7aa3262fa06679::t_3b6c72563a400f 59
+  s_7aa3262fa06679::t_1da64c072d968e 16-17,23
+  ai_agent 6-14,18-22,27-41,43-52,66-68,71-78
+extensions/task-vault/tests/mcp/tools/weekly-review.spec.ts
+  s_7aa3262fa06679::t_ca0292c02044e7 3-6,10,27-28,59-60,62-63
+  s_7aa3262fa06679::t_2980d450be599a 1-2,64-76,78-81,83-86,88-91,93-96,98-100
+  ai_agent 7-9,11-26,29-58,61,77,82,87,92,97
+tests/unit/extensions/api-v1.2.0.spec.ts
+  ai_agent 70-73
+  s_7aa3262fa06679::t_bc6a57d53fa01e 1-69,74-221
+extensions/task-vault/src/components/ProjectsBrowser.tsx
+  ai_agent 20-35,45-47,66-68,92-94
+  s_7aa3262fa06679::t_5d4e4db0de8299 1-3,53-65,69-91,95-97,99-125
+  s_7aa3262fa06679::t_8a96e29faded3f 98
+  s_7aa3262fa06679::t_d052052e0fa065 4-19,36-44,48-52
+extensions/task-vault/src/components/InboxProcessor.tsx
+  s_7aa3262fa06679::t_d74d60799e517a 2-85,87-96
+  s_7aa3262fa06679::t_f7c7b0b3f52483 1
+  ai_agent 86
+extensions/task-vault/src/ics/parser.ts
+  s_7aa3262fa06679::t_17b6e19bec933a 1-43
+extensions/task-vault/src/components/WeeklyReviewStep5Someday.tsx
+  ai_agent 9-12,38,44-46
+  s_7aa3262fa06679::t_54c8392cacf58d 1-8,13-37,39-43,47-49
+extensions/task-vault/tests/ipc/ics.ipc.spec.ts
+  s_7aa3262fa06679::t_f16f69d868ecab 1-61,63-69,71-76,85-86,88-96
+  ai_agent 62,70,77-84,87
+specs/005-task-vault-extension/checklists/requirements.md
+  s_7aa3262fa06679::t_4d37828483195d 1-34
+extensions/task-vault/package.json
+  s_7aa3262fa06679::t_f2520c3784c266 1-17
+extensions/task-vault/src/vault/types.ts
+  s_7aa3262fa06679::t_fd66cbe1ea6a01 1-123
+extensions/task-vault/src/mcp/tools/complete-task.ts
+  ai_agent 17-19,27-30
+  s_7aa3262fa06679::t_4f09fa93911477 1-16,20-26,31-38
+extensions/task-vault/README.md
+  s_7aa3262fa06679::t_2d51ed022d5ef8 1-25,29-67,78-90
+  ai_agent 26-28,68-77
+extensions/task-vault/tests/mcp/tools/today.spec.ts
+  s_7aa3262fa06679::t_5777da7e64bcd1 1-39,41-43
+  ai_agent 40
+docs/ARCHITECTURE.md
+  s_7aa3262fa06679::t_82a477e8edff0d 276-283,285-290,292-297,299-303,305-307,309,311-313
+  ai_agent 284,291,298,304,308,310
+extensions/task-vault/src/vault/indexer.ts
+  s_7aa3262fa06679::t_1f53aa8d44f1ac 1-139
+extensions/task-vault/tests/vault/indexer.spec.ts
+  ai_agent 1-175
+extensions/task-vault/tests/mcp/tools/migrate-task.spec.ts
+  s_7aa3262fa06679::t_5e0eebd8fc43d1 1-5,15,24-26,42,53-58,60-61,65-68,82-85,90-95,100-103,108-115
+  s_7aa3262fa06679::t_16571acff8bf84 72-73
+  s_7aa3262fa06679::t_e57b644beeadc0 16-17,23
+  ai_agent 6-14,18-22,27-41,43-52,69-71,74-81,86-89,96-99,104-107
+  s_7aa3262fa06679::t_b465d9fabd92f6 59
+  s_7aa3262fa06679::t_d2c5208565fd25 62-64
+extensions/task-vault/tests/vault/parser.spec.ts
+  ai_agent 1-146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "c9845c13f387e5650e78ddaf24d653feb0408f03",
+  "prompts": {},
+  "sessions": {
+    "s_7aa3262fa06679": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f194d32b-de41-4c48-9570-92bc6d6c5398",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
