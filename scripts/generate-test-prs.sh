@@ -244,7 +244,7 @@ export function BatchPanel$N({ filter, onItemClick }: Props): JSX.Element {
   }, [fetch, filter])
 
   if (loading) {
-    return <div data-testid={\`\${BATCH_KEY}-loading\`}>Loading batch $N…</div>
+    return <div data-testid={\`\${BATCH_KEY}-loading\`}>Loading batch $N...</div>
   }
 
   if (error) {
