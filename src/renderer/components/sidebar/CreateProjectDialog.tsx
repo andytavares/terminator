@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSettingsStore } from '../../stores/settings.store'
-import type { Branch } from '../../../shared/types/index'
+import type { Branch, WorktreeInfo } from '../../../shared/types/index'
 import './Dialog.css'
 
 interface Props {
@@ -14,6 +14,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
   const [nameError, setNameError] = useState('')
   const [isWorktreeMode, setIsWorktreeMode] = useState(false)
   const [branches, setBranches] = useState<Branch[]>([])
+  const [worktrees, setWorktrees] = useState<WorktreeInfo[]>([])
   const [selectedBranch, setSelectedBranch] = useState('')
   const [isNewBranch, setIsNewBranch] = useState(false)
   const [newBranchName, setNewBranchName] = useState('')
@@ -36,9 +37,16 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
           const current = r.branches.find((b) => b.isCurrent && !b.isRemote)
           if (current) setSelectedBranch(current.name)
         })
+        window.electronAPI.git.listWorktrees(info.root).then((r) => {
+          setWorktrees(r.worktrees)
+        })
       }
     })
   }, [workspace?.folderPath])
+
+  useEffect(() => {
+    if (isWorktreeMode) setIsNewBranch(true)
+  }, [isWorktreeMode])
 
   useEffect(() => {
     if (!gitRoot || !isWorktreeMode) return
@@ -109,7 +117,8 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
   }
 
   const branchName = isNewBranch ? newBranchName : selectedBranch
-  const localBranches = branches.filter((b) => !b.isRemote)
+  const usedBranchNames = new Set(worktrees.map((w) => w.branch))
+  const localBranches = branches.filter((b) => !b.isRemote && !usedBranchNames.has(b.name))
 
   return (
     <div className="dialog-overlay" onClick={onClose}>
@@ -162,13 +171,12 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
                       }
                     }}
                   >
+                    <option value="__new__">+ New branch…</option>
                     {localBranches.map((b) => (
                       <option key={b.name} value={b.name}>
                         {b.name}
-                        {b.isCurrent ? ' (current)' : ''}
                       </option>
                     ))}
-                    <option value="__new__">+ New branch…</option>
                   </select>
                 </div>
               </div>

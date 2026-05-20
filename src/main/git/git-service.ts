@@ -103,6 +103,7 @@ export async function listBranches(dirPath: string): Promise<Branch[]> {
     const isRemote = ref.startsWith('remotes/')
     const name = isRemote ? ref.replace(/^remotes\/[^/]+\//, '') : ref.trim()
     if (name === 'HEAD') continue
+    if (name.startsWith('pull/')) continue
     if (!isRemote) localNames.add(name)
     all.push({ name, isCurrent, isRemote })
   }
