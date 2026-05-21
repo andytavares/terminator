@@ -19,13 +19,13 @@ describe('validateCaptureText', () => {
 describe('suggestDestination tag detection', () => {
   const emptyIndex = { tasks: [] }
 
-  it('detects +project tag', () => {
-    const result = suggestDestination('Fix bug +terminator', emptyIndex)
+  it('detects @project tag', () => {
+    const result = suggestDestination('Fix bug @terminator', emptyIndex)
     expect(result.tags.project).toBe('terminator')
   })
 
-  it('detects @context tag', () => {
-    const result = suggestDestination('Call dentist @phone', emptyIndex)
+  it('detects +context tag', () => {
+    const result = suggestDestination('Call dentist +phone', emptyIndex)
     expect(result.tags.context).toBe('phone')
   })
 

@@ -22,7 +22,9 @@ export function ExtensionWindowView({ view }: { view: string }): JSX.Element {
 
   return (
     <ErrorBoundary>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      <div
+        style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}
+      >
         {accentColor && <div style={{ height: 3, background: accentColor, flexShrink: 0 }} />}
         {ViewComponent ? (
           <ViewComponent repoRoot={repoRoot} />

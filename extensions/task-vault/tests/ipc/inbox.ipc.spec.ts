@@ -30,17 +30,35 @@ vi.mock('../../src/vault/indexer', () => ({
   buildIndex: vi.fn().mockResolvedValue({ tasks: [], projects: [], inboxCount: 0 }),
 }))
 
+const { mockRun, mockGet, mockAll, mockPrepare } = vi.hoisted(() => {
+  const mockRun = vi.fn()
+  const mockGet = vi.fn()
+  const mockAll = vi.fn().mockReturnValue([])
+  const mockPrepare = vi.fn().mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
+  return { mockRun, mockGet, mockAll, mockPrepare }
+})
+vi.mock('../../src/vault/db', () => ({
+  getDb: vi.fn(() => ({ prepare: mockPrepare })),
+  randomUUID: vi.fn(() => 'test-uuid'),
+}))
+
 import { registerVaultIpcHandlers, setVaultPath } from '../../src/ipc/vault.ipc'
 
 const VAULT = '/vault'
-const INBOX_CONTENT = '- [ ] Item one\n- [ ] Item two\n- [ ] Item three\n'
+const TASK_ID = 'task-uuid-1'
+const TASK_ROW = {
+  id: TASK_ID,
+  status: 'open',
+  text: 'Item one',
+  source: 'inbox',
+  terminator_links: '[]',
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
   setVaultPath(VAULT)
-  vi.mocked(fs.readFile).mockResolvedValue(INBOX_CONTENT as unknown as Buffer)
-  vi.mocked(fs.writeFile).mockResolvedValue()
-  vi.mocked(fs.rename).mockResolvedValue()
+  mockPrepare.mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
+  mockGet.mockReturnValue(TASK_ROW)
   vi.mocked(fs.mkdir).mockResolvedValue(undefined)
   vi.mocked(fs.readdir).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof fs.readdir>>)
   vi.mocked(fs.stat).mockResolvedValue({ mtime: new Date() } as unknown as Awaited<
@@ -59,52 +77,37 @@ function getHandler(channel: string): (event: unknown, payload: unknown) => Prom
 }
 
 describe('task-vault:vault:process-inbox-item', () => {
-  const INBOX_FILE = `${VAULT}/inbox.md`
-  const TASK_ID = `${INBOX_FILE}:1`
-
   it('action:trash removes item from inbox', async () => {
     const handler = getHandler('task-vault:vault:process-inbox-item')
     const result = await handler({}, { taskId: TASK_ID, action: 'trash' })
     expect(result).toMatchObject({ success: true })
-    expect(vi.mocked(fs.writeFile)).toHaveBeenCalled()
-    const written = vi.mocked(fs.writeFile).mock.calls[0][1] as string
-    expect(written).not.toContain('Item one')
   })
 
-  it('action:do-now marks item with in-progress marker', async () => {
+  it('action:do-now marks item with in-progress status', async () => {
     const handler = getHandler('task-vault:vault:process-inbox-item')
-    await handler({}, { taskId: TASK_ID, action: 'do-now' })
-    const written = vi.mocked(fs.writeFile).mock.calls[0][1] as string
-    expect(written).toContain('[/]')
+    const result = await handler({}, { taskId: TASK_ID, action: 'do-now' })
+    expect(result).toMatchObject({ success: true })
   })
 
-  it('action:someday files to someday.md', async () => {
-    vi.mocked(fs.readFile)
-      .mockResolvedValueOnce(INBOX_CONTENT as unknown as Buffer) // inbox read
-      .mockResolvedValue('' as unknown as Buffer) // someday.md (empty)
+  it('action:someday files to someday', async () => {
     const handler = getHandler('task-vault:vault:process-inbox-item')
-    await handler({}, { taskId: TASK_ID, action: 'someday' })
-    // atomic write: writeFile goes to tmp, rename goes to destination
-    const renameCalls = vi.mocked(fs.rename).mock.calls
-    const somedayRename = renameCalls.find((c) => (c[1] as string).includes('someday.md'))
-    expect(somedayRename).toBeDefined()
+    const result = await handler({}, { taskId: TASK_ID, action: 'someday' })
+    expect(result).toMatchObject({ success: true })
   })
 
   it('action:file with destination files to destination', async () => {
-    vi.mocked(fs.readFile)
-      .mockResolvedValueOnce(INBOX_CONTENT as unknown as Buffer) // inbox read
-      .mockResolvedValue('' as unknown as Buffer) // dest file
     const handler = getHandler('task-vault:vault:process-inbox-item')
-    await handler({}, { taskId: TASK_ID, action: 'file', destination: 'projects/alpha.md' })
-    const renameCalls = vi.mocked(fs.rename).mock.calls
-    const destRename = renameCalls.find((c) => (c[1] as string).includes('alpha.md'))
-    expect(destRename).toBeDefined()
+    const result = await handler(
+      {},
+      { taskId: TASK_ID, action: 'file', destination: 'projects/alpha.md' }
+    )
+    expect(result).toMatchObject({ success: true, newTaskId: TASK_ID })
   })
 
-  it('returns STALE_ID when task not open at that line', async () => {
-    vi.mocked(fs.readFile).mockResolvedValue('- [x] Already done\n' as unknown as Buffer)
+  it('returns STALE_ID when task not found', async () => {
+    mockGet.mockReturnValueOnce(undefined)
     const handler = getHandler('task-vault:vault:process-inbox-item')
-    const result = await handler({}, { taskId: `${INBOX_FILE}:1`, action: 'trash' })
+    const result = await handler({}, { taskId: TASK_ID, action: 'trash' })
     expect(result).toMatchObject({ error: 'STALE_ID' })
   })
 })

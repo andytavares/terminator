@@ -13,19 +13,25 @@ interface DailyLogProps {
   onRefresh: () => Promise<void>
 }
 
-function SessionPicker({ onSelect, onClose }: { onSelect: (id: string) => void; onClose: () => void }): React.JSX.Element {
+function SessionPicker({
+  onSelect,
+  onClose,
+}: {
+  onSelect: (id: string) => void
+  onClose: () => void
+}): React.JSX.Element {
   const sessions = useSessionStore((s) => Array.from(s.sessions.values()))
-  const activeSessions = sessions.filter(s => s.status !== 'closed')
+  const activeSessions = sessions.filter((s) => s.status !== 'closed')
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const projectsByWs = useWorkspaceStore((s) => s.projectsByWorkspaceId)
 
   function sessionLabel(s: { id: string; tabTitle?: string; projectId: string }): string {
     let project: { name: string; workspaceId: string } | undefined
     for (const [, projects] of projectsByWs) {
-      project = projects.find(p => p.id === s.projectId)
+      project = projects.find((p) => p.id === s.projectId)
       if (project) break
     }
-    const workspace = project ? workspaces.find(w => w.id === project!.workspaceId) : undefined
+    const workspace = project ? workspaces.find((w) => w.id === project!.workspaceId) : undefined
     const parts: string[] = []
     if (workspace) parts.push(workspace.name)
     if (project) parts.push(project.name)
@@ -36,81 +42,149 @@ function SessionPicker({ onSelect, onClose }: { onSelect: (id: string) => void; 
   if (activeSessions.length === 0) {
     return (
       <span className="daily-log__link-picker">
-        <span style={{ fontSize: 12, color: 'var(--tm-text-muted)' }}>No active terminal sessions.</span>
-        <button className="tv-btn tv-btn--icon" onClick={onClose}><X size={14} /></button>
+        <span style={{ fontSize: 12, color: 'var(--tm-text-muted)' }}>
+          No active terminal sessions.
+        </span>
+        <button className="tv-btn tv-btn--icon" onClick={onClose}>
+          <X size={14} />
+        </button>
       </span>
     )
   }
 
   return (
     <span className="daily-log__link-picker">
-      <select onChange={(e) => { if (e.target.value) onSelect(e.target.value) }} defaultValue="">
-        <option value="" disabled>Select a terminal session…</option>
-        {activeSessions.map(s => (
-          <option key={s.id} value={s.id}>{sessionLabel(s)}</option>
+      <select
+        onChange={(e) => {
+          if (e.target.value) onSelect(e.target.value)
+        }}
+        defaultValue=""
+      >
+        <option value="" disabled>
+          Select a terminal session…
+        </option>
+        {activeSessions.map((s) => (
+          <option key={s.id} value={s.id}>
+            {sessionLabel(s)}
+          </option>
         ))}
       </select>
-      <button className="tv-btn tv-btn--icon" onClick={onClose}><X size={14} /></button>
+      <button className="tv-btn tv-btn--icon" onClick={onClose}>
+        <X size={14} />
+      </button>
     </span>
   )
 }
 
-function SubtaskRow({ subtask, onRefresh }: { subtask: IndexedTask; onRefresh: () => Promise<void> }): React.JSX.Element {
+function SubtaskRow({
+  subtask,
+  onRefresh,
+}: {
+  subtask: IndexedTask
+  onRefresh: () => Promise<void>
+}): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(subtask.text)
 
   async function saveEdit() {
     if (!editText.trim()) return
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:edit-task', {
-      taskId: subtask.id, text: editText.trim()
+      taskId: subtask.id,
+      text: editText.trim(),
     })
     setEditing(false)
     await onRefresh()
   }
   async function handleComplete() {
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', { taskId: subtask.id })
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', {
+      taskId: subtask.id,
+    })
     await onRefresh()
   }
   async function handleDelete() {
     if (!confirm(`Delete subtask: "${subtask.text}"?`)) return
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-task', { taskId: subtask.id })
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-task', {
+      taskId: subtask.id,
+    })
     await onRefresh()
   }
   function statusIcon(status: IndexedTask['status']): string {
     switch (status) {
-      case 'done': return '[x]'
-      case 'cancelled': return '[-]'
-      case 'in-progress': return '[/]'
-      default: return '[ ]'
+      case 'done':
+        return '[x]'
+      case 'cancelled':
+        return '[-]'
+      case 'in-progress':
+        return '[/]'
+      default:
+        return '[ ]'
     }
   }
   const isOpen = subtask.status === 'open'
   return (
-    <div className={`daily-log__subtask${subtask.status === 'done' ? ' daily-log__subtask--done' : ''}`}>
+    <div
+      className={`daily-log__subtask${subtask.status === 'done' ? ' daily-log__subtask--done' : ''}`}
+    >
       <span className="daily-log__subtask-marker">{statusIcon(subtask.status)}</span>
       {editing ? (
         <span className="daily-log__subtask-edit">
-          <input type="text" value={editText} onChange={e => setEditText(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { void saveEdit() } if (e.key === 'Escape') setEditing(false) }} autoFocus />
-          <button className="tv-btn tv-btn--primary" onClick={() => void saveEdit()}>Save</button>
-          <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)}><X size={14} /></button>
+          <input
+            type="text"
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                void saveEdit()
+              }
+              if (e.key === 'Escape') setEditing(false)
+            }}
+            autoFocus
+          />
+          <button className="tv-btn tv-btn--primary" onClick={() => void saveEdit()}>
+            Save
+          </button>
+          <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)}>
+            <X size={14} />
+          </button>
         </span>
       ) : (
-        <span className={`daily-log__subtask-text${subtask.status === 'done' ? ' daily-log__task-text--strikethrough' : ''}`}
-          onDoubleClick={isOpen ? () => setEditing(true) : undefined}>
+        <span
+          className={`daily-log__subtask-text${subtask.status === 'done' ? ' daily-log__task-text--strikethrough' : ''}`}
+          onDoubleClick={isOpen ? () => setEditing(true) : undefined}
+        >
           {subtask.text}
         </span>
       )}
       {isOpen && !editing && (
         <span className="daily-log__subtask-actions">
-          <button className="tv-btn tv-btn--outline" onClick={() => void handleComplete()} title="Complete"><Check size={14} /></button>
-          <button className="tv-btn tv-btn--outline" onClick={() => setEditing(true)} title="Edit"><Pencil size={14} /></button>
-          <button className="tv-btn tv-btn--outline" onClick={() => void handleDelete()} title="Delete"><Trash2 size={14} /></button>
+          <button
+            className="tv-btn tv-btn--outline"
+            onClick={() => void handleComplete()}
+            title="Complete"
+          >
+            <Check size={14} />
+          </button>
+          <button className="tv-btn tv-btn--outline" onClick={() => setEditing(true)} title="Edit">
+            <Pencil size={14} />
+          </button>
+          <button
+            className="tv-btn tv-btn--outline"
+            onClick={() => void handleDelete()}
+            title="Delete"
+          >
+            <Trash2 size={14} />
+          </button>
         </span>
       )}
       {!isOpen && !editing && (
         <span className="daily-log__subtask-actions">
-          <button className="tv-btn tv-btn--outline" onClick={() => void handleDelete()} title="Delete"><Trash2 size={14} /></button>
+          <button
+            className="tv-btn tv-btn--outline"
+            onClick={() => void handleDelete()}
+            title="Delete"
+          >
+            <Trash2 size={14} />
+          </button>
         </span>
       )}
     </div>
@@ -212,7 +286,9 @@ function TaskRow({
   }
 
   async function handleRestore() {
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:restore-task', { taskId: task.id })
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:restore-task', {
+      taskId: task.id,
+    })
     await onRefresh()
   }
 
@@ -231,7 +307,9 @@ function TaskRow({
   const isDone = task.status === 'done'
 
   return (
-    <div className={`daily-log__task${isDone ? ' daily-log__task--done' : task.status === 'cancelled' ? ' daily-log__task--cancelled' : ''}`}>
+    <div
+      className={`daily-log__task${isDone ? ' daily-log__task--done' : task.status === 'cancelled' ? ' daily-log__task--cancelled' : ''}`}
+    >
       <span className="daily-log__task-marker">{statusIcon(task.status)}</span>
 
       {editing ? (
@@ -243,8 +321,12 @@ function TaskRow({
             onCancel={() => setEditing(false)}
             autoFocus
           />
-          <button className="tv-btn tv-btn--primary" onClick={() => void saveEdit()}>Save</button>
-          <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)}><X size={14} /></button>
+          <button className="tv-btn tv-btn--primary" onClick={() => void saveEdit()}>
+            Save
+          </button>
+          <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)}>
+            <X size={14} />
+          </button>
         </span>
       ) : (
         <span
@@ -253,21 +335,59 @@ function TaskRow({
           title={isOpen ? 'Double-click to edit' : undefined}
         >
           {task.text}
-          {task.project && <span className="daily-log__tag daily-log__tag--project">@{task.project}</span>}
-          {task.context && <span className="daily-log__tag daily-log__tag--context">+{task.context}</span>}
+          {task.project && (
+            <span className="daily-log__tag daily-log__tag--project">@{task.project}</span>
+          )}
+          {task.context && (
+            <span className="daily-log__tag daily-log__tag--context">+{task.context}</span>
+          )}
           {task.area && <span className="daily-log__tag daily-log__tag--area">#{task.area}</span>}
-          {task.dueDate && <span className="daily-log__tag daily-log__tag--due">due:{task.dueDate}</span>}
+          {task.dueDate && (
+            <span className="daily-log__tag daily-log__tag--due">due:{task.dueDate}</span>
+          )}
         </span>
       )}
 
       {isOpen && !editing && (
         <span className="daily-log__task-actions">
-          <button className="tv-btn tv-btn--outline" onClick={() => void onComplete(task.id)} title="Complete"><Check size={14} /></button>
-          <button className="tv-btn tv-btn--outline" onClick={startEdit} title="Edit"><Pencil size={14} /></button>
-          <button className="tv-btn tv-btn--outline" onClick={() => setMigratingOpen(true)} title="Migrate"><ArrowRight size={14} /></button>
-          <button className="tv-btn tv-btn--outline" onClick={() => void handleCancel()} title="Cancel task"><X size={14} /></button>
-          <button className="tv-btn tv-btn--outline" onClick={() => void handleDelete()} title="Delete"><Trash2 size={14} /></button>
-          <button className="tv-btn tv-btn--outline" onClick={() => setAddingSubtask(true)} title="Add subtask"><ListPlus size={14} /></button>
+          <button
+            className="tv-btn tv-btn--outline"
+            onClick={() => void onComplete(task.id)}
+            title="Complete"
+          >
+            <Check size={14} />
+          </button>
+          <button className="tv-btn tv-btn--outline" onClick={startEdit} title="Edit">
+            <Pencil size={14} />
+          </button>
+          <button
+            className="tv-btn tv-btn--outline"
+            onClick={() => setMigratingOpen(true)}
+            title="Migrate"
+          >
+            <ArrowRight size={14} />
+          </button>
+          <button
+            className="tv-btn tv-btn--outline"
+            onClick={() => void handleCancel()}
+            title="Cancel task"
+          >
+            <X size={14} />
+          </button>
+          <button
+            className="tv-btn tv-btn--outline"
+            onClick={() => void handleDelete()}
+            title="Delete"
+          >
+            <Trash2 size={14} />
+          </button>
+          <button
+            className="tv-btn tv-btn--outline"
+            onClick={() => setAddingSubtask(true)}
+            title="Add subtask"
+          >
+            <ListPlus size={14} />
+          </button>
           {linked || task.terminatorLinks.length > 0 ? (
             <button
               className="tv-btn tv-btn--outline"
@@ -275,9 +395,17 @@ function TaskRow({
               onClick={() => {
                 useExtensionRegistry.getState().setActiveGlobalTab(null)
               }}
-            ><Zap size={14} /></button>
+            >
+              <Zap size={14} />
+            </button>
           ) : (
-            <button className="tv-btn tv-btn--outline" onClick={() => setLinking(true)} title="Link to session"><Zap size={14} /></button>
+            <button
+              className="tv-btn tv-btn--outline"
+              onClick={() => setLinking(true)}
+              title="Link to session"
+            >
+              <Zap size={14} />
+            </button>
           )}
         </span>
       )}
@@ -285,27 +413,45 @@ function TaskRow({
       {!isOpen && !editing && (
         <span className="daily-log__task-actions">
           {task.status === 'done' && (
-            <button className="tv-btn tv-btn--outline" onClick={() => void handleRestore()} title="Restore to open">↩</button>
+            <button
+              className="tv-btn tv-btn--outline"
+              onClick={() => void handleRestore()}
+              title="Restore to open"
+            >
+              ↩
+            </button>
           )}
-          <button className="tv-btn tv-btn--outline" onClick={() => void handleDelete()} title="Delete"><Trash2 size={14} /></button>
+          <button
+            className="tv-btn tv-btn--outline"
+            onClick={() => void handleDelete()}
+            title="Delete"
+          >
+            <Trash2 size={14} />
+          </button>
         </span>
       )}
 
       {migratingOpen && (
         <span className="daily-log__migrate-picker">
-          <input
-            type="date"
-            value={migrateDate}
-            onChange={(e) => setMigrateDate(e.target.value)}
-          />
-          <button className="tv-btn tv-btn--primary" onClick={() => void handleMigrate()} disabled={!migrateDate}>Go</button>
-          <button className="tv-btn tv-btn--icon" onClick={() => setMigratingOpen(false)}><X size={14} /></button>
+          <input type="date" value={migrateDate} onChange={(e) => setMigrateDate(e.target.value)} />
+          <button
+            className="tv-btn tv-btn--primary"
+            onClick={() => void handleMigrate()}
+            disabled={!migrateDate}
+          >
+            Go
+          </button>
+          <button className="tv-btn tv-btn--icon" onClick={() => setMigratingOpen(false)}>
+            <X size={14} />
+          </button>
         </span>
       )}
 
       {linking && (
         <SessionPicker
-          onSelect={(sessionId) => { void handleLinkSession(sessionId) }}
+          onSelect={(sessionId) => {
+            void handleLinkSession(sessionId)
+          }}
           onClose={() => setLinking(false)}
         />
       )}
@@ -316,12 +462,34 @@ function TaskRow({
             type="text"
             placeholder="Subtask text…"
             value={subtaskText}
-            onChange={e => setSubtaskText(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { void handleAddSubtask() } if (e.key === 'Escape') { setAddingSubtask(false); setSubtaskText('') } }}
+            onChange={(e) => setSubtaskText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                void handleAddSubtask()
+              }
+              if (e.key === 'Escape') {
+                setAddingSubtask(false)
+                setSubtaskText('')
+              }
+            }}
             autoFocus
           />
-          <button className="tv-btn tv-btn--outline" onClick={() => void handleAddSubtask()} disabled={!subtaskText.trim()}>Add</button>
-          <button className="tv-btn tv-btn--icon" onClick={() => { setAddingSubtask(false); setSubtaskText('') }}><X size={14} /></button>
+          <button
+            className="tv-btn tv-btn--outline"
+            onClick={() => void handleAddSubtask()}
+            disabled={!subtaskText.trim()}
+          >
+            Add
+          </button>
+          <button
+            className="tv-btn tv-btn--icon"
+            onClick={() => {
+              setAddingSubtask(false)
+              setSubtaskText('')
+            }}
+          >
+            <X size={14} />
+          </button>
         </span>
       )}
     </div>
@@ -363,15 +531,26 @@ function AddTaskRow({ onAdd }: { onAdd: (text: string) => Promise<void> }): Reac
         disabled={adding}
         autoFocus
       />
-      <button className="daily-log__save-btn" onClick={() => void submit()} disabled={adding || !text.trim()}>
+      <button
+        className="daily-log__save-btn"
+        onClick={() => void submit()}
+        disabled={adding || !text.trim()}
+      >
         Add
       </button>
-      <button className="daily-log__cancel-edit-btn" onClick={() => setOpen(false)}><X size={14} /></button>
+      <button className="daily-log__cancel-edit-btn" onClick={() => setOpen(false)}>
+        <X size={14} />
+      </button>
     </div>
   )
 }
 
-export function DailyLog({ log, onTaskComplete, onTaskMigrate, onRefresh }: DailyLogProps): React.JSX.Element {
+export function DailyLog({
+  log,
+  onTaskComplete,
+  onTaskMigrate,
+  onRefresh,
+}: DailyLogProps): React.JSX.Element {
   async function handleAddTask(text: string) {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:add-task', {
       filePath: log.filePath,
@@ -429,9 +608,7 @@ export function DailyLog({ log, onTaskComplete, onTaskMigrate, onRefresh }: Dail
       )}
 
       {!log.exists && (
-        <p className="daily-log__new-file">
-          No log for today yet. Add a task to create this file.
-        </p>
+        <p className="daily-log__new-file">No log for today yet. Add a task to create this file.</p>
       )}
     </div>
   )

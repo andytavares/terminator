@@ -497,9 +497,7 @@ export function createExtensionAPI(
           typeof MAIN_WINDOW_VITE_DEV_SERVER_URL !== 'undefined' &&
           MAIN_WINDOW_VITE_DEV_SERVER_URL
         ) {
-          win.loadURL(
-            `${MAIN_WINDOW_VITE_DEV_SERVER_URL}?${new URLSearchParams(query).toString()}`
-          )
+          win.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}?${new URLSearchParams(query).toString()}`)
         } else {
           win.loadFile(join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`), {
             query,

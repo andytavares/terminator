@@ -54,8 +54,7 @@ export async function getTodayLog(_vaultPath: string): Promise<DailyLog | { erro
       tasks,
       events,
       notes,
-      exists:
-        tasks.length > 0 || events.length > 0 || notes.length > 0,
+      exists: tasks.length > 0 || events.length > 0 || notes.length > 0,
     }
   } catch (err) {
     return { error: String(err) }

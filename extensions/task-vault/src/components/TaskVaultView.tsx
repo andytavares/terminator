@@ -52,7 +52,9 @@ function CaptureModal(): React.JSX.Element | null {
       <div className="capture-modal" onClick={(e) => e.stopPropagation()}>
         <div className="capture-modal__header">
           <span className="capture-modal__title">Capture to Inbox</span>
-          <button className="capture-modal__close" onClick={close}><X size={14} /></button>
+          <button className="capture-modal__close" onClick={close}>
+            <X size={14} />
+          </button>
         </div>
         <div className="capture-modal__body">
           <SmartTaskInput
@@ -130,9 +132,7 @@ export function TaskVaultView(): React.JSX.Element {
         {activeView === 'daily' && isLoading && (
           <div className="task-vault-view__loading">Loading…</div>
         )}
-        {activeView === 'daily' && error && (
-          <div className="task-vault-view__error">{error}</div>
-        )}
+        {activeView === 'daily' && error && <div className="task-vault-view__error">{error}</div>}
         {activeView === 'daily' && !isLoading && !error && todayLog && (
           <DailyLog
             log={todayLog}

@@ -97,7 +97,9 @@ function ensureProjectAndArea(
 ): void {
   if (area) {
     db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
-      randomUUID(), area, now
+      randomUUID(),
+      area,
+      now
     )
   }
   if (project) {
@@ -169,9 +171,7 @@ export function registerVaultIpcHandlers(): () => void {
       for (const task of tasks) {
         task.subtasks = (
           db
-            .prepare(
-              `SELECT * FROM tasks WHERE parent_id=? ORDER BY sort_order, created_at`
-            )
+            .prepare(`SELECT * FROM tasks WHERE parent_id=? ORDER BY sort_order, created_at`)
             .all(task.id) as Record<string, unknown>[]
         ).map(rowToTask)
       }
@@ -183,7 +183,8 @@ export function registerVaultIpcHandlers(): () => void {
         tasks,
         events,
         notes,
-        exists: tasks.length > 0 || (events as unknown[]).length > 0 || (notes as unknown[]).length > 0,
+        exists:
+          tasks.length > 0 || (events as unknown[]).length > 0 || (notes as unknown[]).length > 0,
       }
     } catch (err) {
       return { error: String(err) }
@@ -219,7 +220,8 @@ export function registerVaultIpcHandlers(): () => void {
         tasks,
         events,
         notes,
-        exists: tasks.length > 0 || (events as unknown[]).length > 0 || (notes as unknown[]).length > 0,
+        exists:
+          tasks.length > 0 || (events as unknown[]).length > 0 || (notes as unknown[]).length > 0,
       }
     } catch (err) {
       return { error: String(err) }
@@ -287,7 +289,9 @@ export function registerVaultIpcHandlers(): () => void {
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, targetDate } = parsed.data
     const db = getDb()
-    const task = db.prepare(`SELECT * FROM tasks WHERE id=?`).get(taskId) as Record<string, unknown> | undefined
+    const task = db.prepare(`SELECT * FROM tasks WHERE id=?`).get(taskId) as
+      | Record<string, unknown>
+      | undefined
     if (!task) return { error: 'STALE_ID' }
     const now = new Date().toISOString()
     db.prepare(`UPDATE tasks SET status='migrated', migrated_to=?, updated_at=? WHERE id=?`).run(
@@ -332,13 +336,27 @@ export function registerVaultIpcHandlers(): () => void {
       conditions.push(`status IN (${statuses.map(() => '?').join(',')})`)
       params.push(...statuses)
     }
-    if (context) { conditions.push(`context=?`); params.push(context) }
-    if (project) { conditions.push(`project=?`); params.push(project) }
-    if (area) { conditions.push(`area=?`); params.push(area) }
-    if (dueBefore) { conditions.push(`due_date < ?`); params.push(dueBefore) }
+    if (context) {
+      conditions.push(`context=?`)
+      params.push(context)
+    }
+    if (project) {
+      conditions.push(`project=?`)
+      params.push(project)
+    }
+    if (area) {
+      conditions.push(`area=?`)
+      params.push(area)
+    }
+    if (dueBefore) {
+      conditions.push(`due_date < ?`)
+      params.push(dueBefore)
+    }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-    const rows = db.prepare(`SELECT * FROM tasks ${where} ORDER BY created_at`).all(...params) as Record<string, unknown>[]
+    const rows = db
+      .prepare(`SELECT * FROM tasks ${where} ORDER BY created_at`)
+      .all(...params) as Record<string, unknown>[]
     return { tasks: rows.map(rowToTask) }
   })
 
@@ -351,7 +369,9 @@ export function registerVaultIpcHandlers(): () => void {
     const db = getDb()
     const now = new Date().toISOString()
 
-    const task = db.prepare(`SELECT * FROM tasks WHERE id=?`).get(taskId) as Record<string, unknown> | undefined
+    const task = db.prepare(`SELECT * FROM tasks WHERE id=?`).get(taskId) as
+      | Record<string, unknown>
+      | undefined
     if (!task) return { error: 'STALE_ID' }
 
     if (action === 'trash') {
@@ -365,9 +385,14 @@ export function registerVaultIpcHandlers(): () => void {
     }
 
     if (action === 'someday') {
-      db.prepare(`UPDATE tasks SET source='someday', source_ref=NULL, updated_at=? WHERE id=?`).run(now, taskId)
+      db.prepare(`UPDATE tasks SET source='someday', source_ref=NULL, updated_at=? WHERE id=?`).run(
+        now,
+        taskId
+      )
       // Move subtasks too
-      db.prepare(`UPDATE tasks SET source='someday', source_ref=NULL, updated_at=? WHERE parent_id=?`).run(now, taskId)
+      db.prepare(
+        `UPDATE tasks SET source='someday', source_ref=NULL, updated_at=? WHERE parent_id=?`
+      ).run(now, taskId)
       return { success: true }
     }
 
@@ -394,10 +419,16 @@ export function registerVaultIpcHandlers(): () => void {
     }
 
     db.prepare(`UPDATE tasks SET source=?, source_ref=?, updated_at=? WHERE id=?`).run(
-      source, sourceRef, now, taskId
+      source,
+      sourceRef,
+      now,
+      taskId
     )
     db.prepare(`UPDATE tasks SET source=?, source_ref=?, updated_at=? WHERE parent_id=?`).run(
-      source, sourceRef, now, taskId
+      source,
+      sourceRef,
+      now,
+      taskId
     )
 
     return { success: true, newTaskId: taskId }
@@ -485,7 +516,9 @@ export function registerVaultIpcHandlers(): () => void {
     const existing = db.prepare(`SELECT id FROM areas WHERE name=?`).get(name.trim())
     if (existing) return { error: 'AREA_EXISTS' }
     db.prepare(`INSERT INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
-      randomUUID(), name.trim(), now
+      randomUUID(),
+      name.trim(),
+      now
     )
     return { success: true, filePath: name.trim() }
   })
@@ -534,7 +567,10 @@ export function registerVaultIpcHandlers(): () => void {
   handle('task-vault:vault:list-areas', async () => {
     try {
       const db = getDb()
-      const areaRows = db.prepare(`SELECT * FROM areas ORDER BY name`).all() as Record<string, unknown>[]
+      const areaRows = db.prepare(`SELECT * FROM areas ORDER BY name`).all() as Record<
+        string,
+        unknown
+      >[]
       const result: unknown[] = []
 
       for (const a of areaRows) {
@@ -550,9 +586,9 @@ export function registerVaultIpcHandlers(): () => void {
           .all(areaName) as Record<string, unknown>[]
         const projects = projectRows.map((p) => {
           const nextActionCount = (
-            db.prepare(`SELECT COUNT(*) as c FROM tasks WHERE project=? AND status='open'`).get(
-              p.name
-            ) as { c: number }
+            db
+              .prepare(`SELECT COUNT(*) as c FROM tasks WHERE project=? AND status='open'`)
+              .get(p.name) as { c: number }
           ).c
           return { ...rowToProject(p), nextActionCount, isStale: nextActionCount === 0 }
         })

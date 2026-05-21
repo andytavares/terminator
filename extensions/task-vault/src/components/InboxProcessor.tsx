@@ -54,9 +54,15 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
         <div className="inbox-processor__step">
           <p className="inbox-processor__question">Is this actionable?</p>
           <div className="inbox-processor__actions">
-            <button className="tv-btn tv-btn--primary" onClick={() => setStep('two-minute')}>Yes</button>
-            <button className="tv-btn tv-btn--danger" onClick={() => processItem('trash')}>No — trash it</button>
-            <button className="tv-btn tv-btn--secondary" onClick={() => processItem('someday')}>Incubate (someday)</button>
+            <button className="tv-btn tv-btn--primary" onClick={() => setStep('two-minute')}>
+              Yes
+            </button>
+            <button className="tv-btn tv-btn--danger" onClick={() => processItem('trash')}>
+              No — trash it
+            </button>
+            <button className="tv-btn tv-btn--secondary" onClick={() => processItem('someday')}>
+              Incubate (someday)
+            </button>
           </div>
         </div>
       )}
@@ -65,8 +71,12 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
         <div className="inbox-processor__step">
           <p className="inbox-processor__question">Can it be done in &lt;2 minutes?</p>
           <div className="inbox-processor__actions">
-            <button className="tv-btn tv-btn--primary" onClick={() => processItem('do-now')}>Do now</button>
-            <button className="tv-btn tv-btn--secondary" onClick={() => setStep('destination')}>No — file it</button>
+            <button className="tv-btn tv-btn--primary" onClick={() => processItem('do-now')}>
+              Do now
+            </button>
+            <button className="tv-btn tv-btn--secondary" onClick={() => setStep('destination')}>
+              No — file it
+            </button>
           </div>
         </div>
       )}
@@ -80,8 +90,12 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
             onClose={() => setStep('actionable')}
           />
           <div className="inbox-processor__actions">
-            <button className="tv-btn tv-btn--secondary" onClick={() => processItem('someday')}>Move to Someday</button>
-            <button className="tv-btn tv-btn--secondary" onClick={() => setStep('actionable')}>Back</button>
+            <button className="tv-btn tv-btn--secondary" onClick={() => processItem('someday')}>
+              Move to Someday
+            </button>
+            <button className="tv-btn tv-btn--secondary" onClick={() => setStep('actionable')}>
+              Back
+            </button>
           </div>
         </div>
       )}

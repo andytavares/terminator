@@ -36,12 +36,25 @@ vi.mock('../../src/vault/indexer', () => ({
   getTaskById: vi.fn().mockReturnValue(null),
 }))
 
+const { mockRun, mockGet, mockAll, mockPrepare } = vi.hoisted(() => {
+  const mockRun = vi.fn()
+  const mockGet = vi.fn()
+  const mockAll = vi.fn().mockReturnValue([])
+  const mockPrepare = vi.fn().mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
+  return { mockRun, mockGet, mockAll, mockPrepare }
+})
+vi.mock('../../src/vault/db', () => ({
+  getDb: vi.fn(() => ({ prepare: mockPrepare })),
+  randomUUID: vi.fn(() => 'test-uuid'),
+}))
+
 import { registerVaultIpcHandlers, setVaultPath } from '../../src/ipc/vault.ipc'
 
 const VAULT = '/vault'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockPrepare.mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
   vi.mocked(fs.mkdir).mockResolvedValue(undefined)
   vi.mocked(fs.readdir).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof fs.readdir>>)
   vi.mocked(fs.stat).mockResolvedValue({ mtime: new Date() } as unknown as Awaited<
@@ -84,21 +97,15 @@ describe('task-vault:vault:capture IPC handler', () => {
     expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
   })
 
-  it('writes to inbox.md for valid text', async () => {
-    vi.mocked(fs.readFile).mockResolvedValue('- [ ] Existing\n' as unknown as Buffer)
-    vi.mocked(fs.writeFile).mockResolvedValue()
-    vi.mocked(fs.rename).mockResolvedValue()
-
+  it('inserts into DB and returns taskId for valid text', async () => {
     let captureHandler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
     vi.mocked(mockHandle).mockImplementation((channel, fn) => {
       if (channel === 'task-vault:vault:capture') captureHandler = fn as typeof captureHandler
     })
     registerVaultIpcHandlers()
 
-    await captureHandler!({} as Electron.IpcMainInvokeEvent, { text: 'New task' })
-    expect(vi.mocked(fs.writeFile)).toHaveBeenCalled()
-    const written = vi.mocked(fs.writeFile).mock.calls[0][1] as string
-    expect(written).toContain('New task')
+    const result = await captureHandler!({} as Electron.IpcMainInvokeEvent, { text: 'New task' })
+    expect(result).toMatchObject({ taskId: 'test-uuid' })
   })
 
   it('validates payload with Zod schema', async () => {

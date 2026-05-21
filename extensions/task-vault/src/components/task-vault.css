@@ -59,7 +59,9 @@
   font-size: 13px;
   text-align: left;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .vault-sidebar__item:hover {
@@ -172,7 +174,9 @@
   font-size: 12px;
   padding: 2px 6px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .daily-log__complete-btn:hover {
@@ -204,7 +208,9 @@
   font-size: 12px;
   padding: 2px 6px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
   line-height: 1;
 }
 
@@ -353,7 +359,9 @@
   font-size: 11px;
   padding: 2px 8px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .projects-browser__link-btn:hover {
@@ -430,7 +438,9 @@
   font-size: 11px;
   padding: 3px 10px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .projects-browser__action-btn:hover {
@@ -533,7 +543,9 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .weekly-review__nav button:hover:not(:disabled) {
@@ -631,7 +643,9 @@
   font-size: 11px;
   padding: 3px 10px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .wr-step__project-actions button:hover,
@@ -674,7 +688,9 @@
   padding: 6px 16px;
   cursor: pointer;
   margin-left: 8px;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .wr-step__skip:hover {
@@ -807,7 +823,9 @@
   font-size: 12px;
   padding: 6px 14px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .inbox-processor__actions button:hover:not(:disabled) {
@@ -1181,7 +1199,9 @@
   font-size: 12px;
   padding: 2px 6px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .daily-log__edit-btn:hover {
@@ -1232,7 +1252,10 @@
   width: 100%;
   text-align: left;
   margin-top: 6px;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s,
+    border-color 0.1s;
 }
 
 .daily-log__add-btn:hover {
@@ -1347,7 +1370,9 @@
   color: var(--tm-text-secondary);
 }
 
-.inbox-view__empty p { margin: 4px 0; }
+.inbox-view__empty p {
+  margin: 4px 0;
+}
 
 .inbox-view__empty-hint {
   font-size: 12px;
@@ -1366,7 +1391,9 @@
   font-size: 12px;
   padding: 7px 16px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .inbox-view__process-btn:hover {
@@ -1435,7 +1462,9 @@
   font-size: 11px;
   padding: 2px 8px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .inbox-item__btn:hover {
@@ -1452,7 +1481,9 @@
   font-size: 11px;
   padding: 2px 6px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .inbox-item__btn--delete:hover {
@@ -1517,7 +1548,9 @@
   font-size: 11px;
   padding: 3px 10px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .projects-browser__filter-btn:hover {
@@ -1581,7 +1614,9 @@
   cursor: pointer;
   font-size: 11px;
   padding: 1px 5px;
-  transition: color 0.1s, border-color 0.1s;
+  transition:
+    color 0.1s,
+    border-color 0.1s;
 }
 
 .projects-browser__area-edit-btn:hover,
@@ -1881,8 +1916,12 @@
   text-align: center;
 }
 
-.areas-view__error { color: var(--tm-danger, #e05c5c); }
-.areas-view__empty p { margin: 4px 0; }
+.areas-view__error {
+  color: var(--tm-danger, #e05c5c);
+}
+.areas-view__empty p {
+  margin: 4px 0;
+}
 
 .areas-view__create-btn {
   background: var(--tm-accent);
@@ -1896,7 +1935,9 @@
   transition: opacity 0.1s;
 }
 
-.areas-view__create-btn:hover { opacity: 0.85; }
+.areas-view__create-btn:hover {
+  opacity: 0.85;
+}
 
 .areas-view__create-form {
   display: flex;
@@ -1928,7 +1969,9 @@
   font-size: 12px;
   padding: 6px 12px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .areas-view__create-form button:first-of-type:not(:disabled):hover {
@@ -1949,7 +1992,9 @@
   border-radius: var(--tm-radius-md, 10px);
   padding: 16px;
   cursor: pointer;
-  transition: background 0.1s, border-color 0.1s;
+  transition:
+    background 0.1s,
+    border-color 0.1s;
 }
 
 .areas-view__card:hover {
@@ -2108,7 +2153,9 @@
   font-size: 12px;
   padding: 2px 6px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .area-detail__task-actions button:hover {
@@ -2142,7 +2189,9 @@
   text-align: center;
 }
 
-.archive-view__error { color: var(--tm-danger, #e05c5c); }
+.archive-view__error {
+  color: var(--tm-danger, #e05c5c);
+}
 
 .archive-view__window-picker {
   display: flex;
@@ -2161,7 +2210,9 @@
   font-size: 11px;
   padding: 2px 8px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .archive-view__window-btn:hover {
@@ -2191,7 +2242,9 @@
   padding: 8px 16px;
   cursor: pointer;
   margin-bottom: -1px;
-  transition: color 0.1s, border-color 0.1s;
+  transition:
+    color 0.1s,
+    border-color 0.1s;
 }
 
 .archive-view__tab:hover {
@@ -2302,7 +2355,9 @@
   font-size: 12px;
   padding: 5px 12px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .archive-view__restore-btn:hover {
@@ -2343,7 +2398,9 @@
   font-size: 12px;
   padding: 2px 6px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .archive-task__restore-btn:hover {
@@ -2769,9 +2826,9 @@
 
 .capture-modal {
   background: var(--tm-bg-elevated, #1e1e2e);
-  border: 1px solid var(--tm-border, rgba(255,255,255,0.1));
+  border: 1px solid var(--tm-border, rgba(255, 255, 255, 0.1));
   border-radius: var(--tm-radius, 10px);
-  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
   width: min(560px, 90vw);
   display: flex;
   flex-direction: column;
@@ -2784,7 +2841,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px 10px;
-  border-bottom: 1px solid var(--tm-border, rgba(255,255,255,0.08));
+  border-bottom: 1px solid var(--tm-border, rgba(255, 255, 255, 0.08));
 }
 
 .capture-modal__title {
@@ -2807,7 +2864,7 @@
 }
 
 .capture-modal__close:hover {
-  background: var(--tm-bg-hover, rgba(255,255,255,0.07));
+  background: var(--tm-bg-hover, rgba(255, 255, 255, 0.07));
   color: var(--tm-text-primary, #e0e0e0);
 }
 
@@ -2820,7 +2877,7 @@
   align-items: center;
   gap: 12px;
   padding: 10px 16px 14px;
-  border-top: 1px solid var(--tm-border, rgba(255,255,255,0.08));
+  border-top: 1px solid var(--tm-border, rgba(255, 255, 255, 0.08));
 }
 
 .capture-modal__capture-btn {
@@ -2928,7 +2985,9 @@
   cursor: pointer;
   font-size: 12px;
   padding: 2px 6px;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 /* ── Area detail projects ─────────────────────────────────────── */
@@ -3017,32 +3076,45 @@
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
-  transition: background 80ms, color 80ms, border-color 80ms;
+  transition:
+    background 80ms,
+    color 80ms,
+    border-color 80ms;
   white-space: nowrap;
   line-height: 1.4;
 }
-.tv-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.tv-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 .tv-btn--primary {
   background: var(--tm-accent);
   color: #fff;
   border-color: var(--tm-accent);
 }
-.tv-btn--primary:hover:not(:disabled) { filter: brightness(1.12); }
+.tv-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
 
 .tv-btn--secondary {
-  background: var(--tm-surface-2, rgba(255,255,255,.06));
+  background: var(--tm-surface-2, rgba(255, 255, 255, 0.06));
   color: var(--tm-text);
-  border-color: var(--tm-border, rgba(255,255,255,.12));
+  border-color: var(--tm-border, rgba(255, 255, 255, 0.12));
 }
-.tv-btn--secondary:hover:not(:disabled) { background: var(--tm-surface-3, rgba(255,255,255,.1)); }
+.tv-btn--secondary:hover:not(:disabled) {
+  background: var(--tm-surface-3, rgba(255, 255, 255, 0.1));
+}
 
 .tv-btn--danger {
   background: transparent;
   color: var(--tm-danger, #e05260);
   border-color: var(--tm-danger, #e05260);
 }
-.tv-btn--danger:hover:not(:disabled) { background: var(--tm-danger, #e05260); color: #fff; }
+.tv-btn--danger:hover:not(:disabled) {
+  background: var(--tm-danger, #e05260);
+  color: #fff;
+}
 
 .tv-btn--ghost {
   background: transparent;
@@ -3050,14 +3122,21 @@
   border: none;
   padding: 3px 7px;
 }
-.tv-btn--ghost:hover:not(:disabled) { background: var(--tm-surface-2, rgba(255,255,255,.06)); color: var(--tm-text); }
+.tv-btn--ghost:hover:not(:disabled) {
+  background: var(--tm-surface-2, rgba(255, 255, 255, 0.06));
+  color: var(--tm-text);
+}
 
 .tv-btn--outline {
   background: transparent;
   color: var(--tm-text-secondary, var(--tm-text-muted));
-  border-color: var(--tm-border-strong, rgba(255,255,255,.2));
+  border-color: var(--tm-border-strong, rgba(255, 255, 255, 0.2));
 }
-.tv-btn--outline:hover:not(:disabled) { background: var(--tm-surface-2, rgba(255,255,255,.06)); color: var(--tm-text); border-color: var(--tm-accent); }
+.tv-btn--outline:hover:not(:disabled) {
+  background: var(--tm-surface-2, rgba(255, 255, 255, 0.06));
+  color: var(--tm-text);
+  border-color: var(--tm-accent);
+}
 
 .tv-btn--icon {
   background: transparent;
@@ -3067,4 +3146,7 @@
   line-height: 1;
   border-radius: 3px;
 }
-.tv-btn--icon:hover:not(:disabled) { color: var(--tm-text); background: var(--tm-surface-2, rgba(255,255,255,.06)); }
+.tv-btn--icon:hover:not(:disabled) {
+  color: var(--tm-text);
+  background: var(--tm-surface-2, rgba(255, 255, 255, 0.06));
+}

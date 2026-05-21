@@ -267,7 +267,10 @@ export function SmartTaskInput({
                 onChange={(e) => setDateValue(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleDateSelect(dateValue)
-                  if (e.key === 'Escape') { e.stopPropagation(); setActive(null) }
+                  if (e.key === 'Escape') {
+                    e.stopPropagation()
+                    setActive(null)
+                  }
                 }}
                 autoFocus
               />

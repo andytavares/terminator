@@ -126,9 +126,7 @@ export function ArchiveView(): React.JSX.Element {
             <>
               {doneTasks.length > 0 && (
                 <section>
-                  <h3 className="archive-view__section-title">
-                    Completed ({doneTasks.length})
-                  </h3>
+                  <h3 className="archive-view__section-title">Completed ({doneTasks.length})</h3>
                   {doneTasks.map((task) => (
                     <ArchiveTaskRow
                       key={task.id}
@@ -156,9 +154,7 @@ export function ArchiveView(): React.JSX.Element {
               )}
               {migratedTasks.length > 0 && (
                 <section>
-                  <h3 className="archive-view__section-title">
-                    Migrated ({migratedTasks.length})
-                  </h3>
+                  <h3 className="archive-view__section-title">Migrated ({migratedTasks.length})</h3>
                   {migratedTasks.map((task) => (
                     <ArchiveTaskRow
                       key={task.id}

@@ -111,7 +111,6 @@ beforeEach(() => {
   } as unknown as ReturnType<typeof usePrReviewStore>)
 })
 
-
 describe('useLoadPrQueue', () => {
   it('returns a function', () => {
     const { result } = renderHook(() => useLoadPrQueue('/repo'))

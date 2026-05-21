@@ -88,7 +88,8 @@ export function parseFile(content: string, filePath: string): ParseResult {
       const marker = subtaskMatch[1]
       const rawText = subtaskMatch[2]
       const status: TaskStatus = STATUS_MAP[marker] ?? 'open'
-      const { text, project, context, area, dueDate, metadata, terminatorLinks } = extractTags(rawText)
+      const { text, project, context, area, dueDate, metadata, terminatorLinks } =
+        extractTags(rawText)
       const subtask: Task = {
         id: `${filePath}:${lineNum}`,
         filePath,

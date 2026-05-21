@@ -10,7 +10,13 @@ interface AreaData {
   taskCount: number
   openTaskCount: number
   tasks: IndexedTask[]
-  projects?: Array<{ id: string; filePath: string; name: string; status: string; nextActionCount: number }>
+  projects?: Array<{
+    id: string
+    filePath: string
+    name: string
+    status: string
+    nextActionCount: number
+  }>
 }
 
 export function AreasView(): React.JSX.Element {
@@ -47,7 +53,7 @@ export function AreasView(): React.JSX.Element {
 
   useEffect(() => {
     if (selectedAreaName && areas.length > 0) {
-      const found = areas.find(a => a.name === selectedAreaName)
+      const found = areas.find((a) => a.name === selectedAreaName)
       if (found) setSelectedArea(found)
     }
   }, [selectedAreaName, areas])
@@ -129,10 +135,16 @@ export function AreasView(): React.JSX.Element {
             placeholder="Area name (e.g. health, finances, work)"
             autoFocus
           />
-          <button className="tv-btn tv-btn--primary" onClick={handleCreateArea} disabled={creating || !newAreaName.trim()}>
+          <button
+            className="tv-btn tv-btn--primary"
+            onClick={handleCreateArea}
+            disabled={creating || !newAreaName.trim()}
+          >
             {creating ? '…' : 'Create'}
           </button>
-          <button className="tv-btn tv-btn--secondary" onClick={() => setCreatingArea(false)}>Cancel</button>
+          <button className="tv-btn tv-btn--secondary" onClick={() => setCreatingArea(false)}>
+            Cancel
+          </button>
         </div>
       )}
 
@@ -276,11 +288,7 @@ function AreaDetail({
           ← Areas
         </button>
         <h2>{area.name}</h2>
-        <button
-          className="area-detail__delete-btn"
-          onClick={onDelete}
-          title="Delete area"
-        >
+        <button className="area-detail__delete-btn" onClick={onDelete} title="Delete area">
           Delete area
         </button>
       </div>
@@ -294,7 +302,11 @@ function AreaDetail({
           disabled={adding}
           autoFocus
         />
-        <button className="tv-btn tv-btn--primary" onClick={handleAddTask} disabled={adding || !newTaskText.trim()}>
+        <button
+          className="tv-btn tv-btn--primary"
+          onClick={handleAddTask}
+          disabled={adding || !newTaskText.trim()}
+        >
           Add
         </button>
       </div>
@@ -319,8 +331,12 @@ function AreaDetail({
                     onCancel={() => setEditingId(null)}
                     autoFocus
                   />
-                  <button className="tv-btn tv-btn--primary" onClick={() => handleEdit(task.id)}>Save</button>
-                  <button className="tv-btn tv-btn--icon" onClick={() => setEditingId(null)}><X size={14} /></button>
+                  <button className="tv-btn tv-btn--primary" onClick={() => handleEdit(task.id)}>
+                    Save
+                  </button>
+                  <button className="tv-btn tv-btn--icon" onClick={() => setEditingId(null)}>
+                    <X size={14} />
+                  </button>
                 </span>
               ) : (
                 <span
@@ -330,19 +346,13 @@ function AreaDetail({
                 >
                   {task.text}
                   {task.project && (
-                    <span className="daily-log__tag daily-log__tag--project">
-                      @{task.project}
-                    </span>
+                    <span className="daily-log__tag daily-log__tag--project">@{task.project}</span>
                   )}
                   {task.context && (
-                    <span className="daily-log__tag daily-log__tag--context">
-                      +{task.context}
-                    </span>
+                    <span className="daily-log__tag daily-log__tag--context">+{task.context}</span>
                   )}
                   {task.dueDate && (
-                    <span className="daily-log__tag daily-log__tag--due">
-                      due:{task.dueDate}
-                    </span>
+                    <span className="daily-log__tag daily-log__tag--due">due:{task.dueDate}</span>
                   )}
                 </span>
               )}
@@ -351,15 +361,45 @@ function AreaDetail({
                 <span className="area-detail__task-actions">
                   {task.status === 'open' && (
                     <>
-                      <button className="tv-btn tv-btn--outline" onClick={() => handleComplete(task.id)} title="Complete"><Check size={14} /></button>
-                      <button className="tv-btn tv-btn--outline" onClick={() => startEdit(task)} title="Edit"><Pencil size={14} /></button>
-                      <button className="tv-btn tv-btn--icon" onClick={() => handleCancel(task.id)} title="Cancel task"><X size={14} /></button>
+                      <button
+                        className="tv-btn tv-btn--outline"
+                        onClick={() => handleComplete(task.id)}
+                        title="Complete"
+                      >
+                        <Check size={14} />
+                      </button>
+                      <button
+                        className="tv-btn tv-btn--outline"
+                        onClick={() => startEdit(task)}
+                        title="Edit"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        className="tv-btn tv-btn--icon"
+                        onClick={() => handleCancel(task.id)}
+                        title="Cancel task"
+                      >
+                        <X size={14} />
+                      </button>
                     </>
                   )}
                   {(task.status === 'done' || task.status === 'cancelled') && (
-                    <button className="tv-btn tv-btn--outline" onClick={() => handleRestore(task.id)} title="Restore to open">↩</button>
+                    <button
+                      className="tv-btn tv-btn--outline"
+                      onClick={() => handleRestore(task.id)}
+                      title="Restore to open"
+                    >
+                      ↩
+                    </button>
                   )}
-                  <button className="tv-btn tv-btn--outline" onClick={() => handleDelete(task.id, task.text)} title="Delete"><Trash2 size={14} /></button>
+                  <button
+                    className="tv-btn tv-btn--outline"
+                    onClick={() => handleDelete(task.id, task.text)}
+                    title="Delete"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </span>
               )}
             </div>
@@ -370,10 +410,17 @@ function AreaDetail({
       {area.projects && area.projects.length > 0 && (
         <section className="area-detail__projects">
           <h4>Projects</h4>
-          {area.projects.map(p => (
-            <div key={p.id} className="area-detail__project-card" onClick={() => onNavToProject(p.name)} style={{ cursor: 'pointer' }}>
+          {area.projects.map((p) => (
+            <div
+              key={p.id}
+              className="area-detail__project-card"
+              onClick={() => onNavToProject(p.name)}
+              style={{ cursor: 'pointer' }}
+            >
               <span className="area-detail__project-name">@{p.name}</span>
-              <span className="area-detail__project-meta">{p.nextActionCount} action{p.nextActionCount !== 1 ? 's' : ''}</span>
+              <span className="area-detail__project-meta">
+                {p.nextActionCount} action{p.nextActionCount !== 1 ? 's' : ''}
+              </span>
             </div>
           ))}
         </section>

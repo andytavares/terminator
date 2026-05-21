@@ -74,14 +74,16 @@ export function registerLinksIpcHandlers(): () => void {
     const now = new Date().toISOString()
     try {
       if (taskId) {
-        const task = db
-          .prepare(`SELECT terminator_links FROM tasks WHERE id=?`)
-          .get(taskId) as { terminator_links: string } | undefined
+        const task = db.prepare(`SELECT terminator_links FROM tasks WHERE id=?`).get(taskId) as
+          | { terminator_links: string }
+          | undefined
         if (!task) return { error: 'NOT_FOUND' }
         const links: string[] = JSON.parse(task.terminator_links || '[]')
         if (!links.includes(targetId)) links.push(targetId)
         db.prepare(`UPDATE tasks SET terminator_links=?, updated_at=? WHERE id=?`).run(
-          JSON.stringify(links), now, taskId
+          JSON.stringify(links),
+          now,
+          taskId
         )
       } else if (projectFilePath) {
         // projectFilePath is now the project name
@@ -92,7 +94,9 @@ export function registerLinksIpcHandlers(): () => void {
         const links: string[] = JSON.parse(project.terminator_links || '[]')
         if (!links.includes(targetId)) links.push(targetId)
         db.prepare(`UPDATE projects SET terminator_links=?, updated_at=? WHERE name=?`).run(
-          JSON.stringify(links), now, projectFilePath
+          JSON.stringify(links),
+          now,
+          projectFilePath
         )
       }
       return { success: true }
@@ -111,15 +115,17 @@ export function registerLinksIpcHandlers(): () => void {
     const now = new Date().toISOString()
     try {
       if (taskId) {
-        const task = db
-          .prepare(`SELECT terminator_links FROM tasks WHERE id=?`)
-          .get(taskId) as { terminator_links: string } | undefined
+        const task = db.prepare(`SELECT terminator_links FROM tasks WHERE id=?`).get(taskId) as
+          | { terminator_links: string }
+          | undefined
         if (!task) return { error: 'NOT_FOUND' }
         const links: string[] = JSON.parse(task.terminator_links || '[]').filter(
           (l: string) => l !== targetId
         )
         db.prepare(`UPDATE tasks SET terminator_links=?, updated_at=? WHERE id=?`).run(
-          JSON.stringify(links), now, taskId
+          JSON.stringify(links),
+          now,
+          taskId
         )
       } else if (projectFilePath) {
         const project = db
@@ -130,7 +136,9 @@ export function registerLinksIpcHandlers(): () => void {
           (l: string) => l !== targetId
         )
         db.prepare(`UPDATE projects SET terminator_links=?, updated_at=? WHERE name=?`).run(
-          JSON.stringify(links), now, projectFilePath
+          JSON.stringify(links),
+          now,
+          projectFilePath
         )
       }
       return { success: true }
@@ -151,9 +159,7 @@ export function registerLinksIpcHandlers(): () => void {
     const taskRows = db
       .prepare(`SELECT * FROM tasks WHERE terminator_links LIKE ? ESCAPE '\\'`)
       .all(`%${escapedId}%`) as Record<string, unknown>[]
-    const tasks = taskRows
-      .map(rowToTask)
-      .filter((t) => t.terminatorLinks.includes(targetId))
+    const tasks = taskRows.map(rowToTask).filter((t) => t.terminatorLinks.includes(targetId))
 
     const projectRows = db
       .prepare(`SELECT * FROM projects WHERE terminator_links LIKE ? ESCAPE '\\'`)

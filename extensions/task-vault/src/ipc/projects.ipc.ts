@@ -105,9 +105,10 @@ export function registerProjectsIpcHandlers(): () => void {
       .all() as Record<string, unknown>[]
     const inboxItems = inboxRows.map(rowToTask)
 
-    const activeRows = db
-      .prepare(`SELECT * FROM projects WHERE status='active'`)
-      .all() as Record<string, unknown>[]
+    const activeRows = db.prepare(`SELECT * FROM projects WHERE status='active'`).all() as Record<
+      string,
+      unknown
+    >[]
     const activeProjects = activeRows.map((p) => {
       const nextActionCount = (
         db
@@ -118,9 +119,10 @@ export function registerProjectsIpcHandlers(): () => void {
     })
     const staleProjects = activeProjects.filter((p) => p.isStale)
 
-    const somedayRows = db
-      .prepare(`SELECT * FROM projects WHERE status='someday'`)
-      .all() as Record<string, unknown>[]
+    const somedayRows = db.prepare(`SELECT * FROM projects WHERE status='someday'`).all() as Record<
+      string,
+      unknown
+    >[]
     const somedayProjects = somedayRows.map(rowToProject)
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -156,7 +158,9 @@ export function registerProjectsIpcHandlers(): () => void {
     // Ensure area record exists
     if (area) {
       db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
-        randomUUID(), area, now
+        randomUUID(),
+        area,
+        now
       )
     }
     return { success: true, filePath: name }
@@ -213,7 +217,9 @@ export function registerProjectsIpcHandlers(): () => void {
     )
     if (area) {
       db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
-        randomUUID(), area, now
+        randomUUID(),
+        area,
+        now
       )
     }
     return { success: true }

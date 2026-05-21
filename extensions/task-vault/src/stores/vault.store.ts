@@ -39,9 +39,11 @@ export const useVaultStore = create<VaultStore>((set, _get) => ({
 
   setShowCaptureModal: (show: boolean) => set({ showCaptureModal: show }),
 
-  navToArea: (name: string) => set({ activeView: 'areas', selectedAreaName: name, selectedProjectName: null }),
+  navToArea: (name: string) =>
+    set({ activeView: 'areas', selectedAreaName: name, selectedProjectName: null }),
 
-  navToProject: (name: string) => set({ activeView: 'projects', selectedProjectName: name, selectedAreaName: null }),
+  navToProject: (name: string) =>
+    set({ activeView: 'projects', selectedProjectName: name, selectedAreaName: null }),
 
   loadToday: async () => {
     set({ isLoading: true, error: null })

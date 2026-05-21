@@ -108,10 +108,20 @@ export function WeeklyReview(): React.JSX.Element {
           ))}
         </div>
         <div className="weekly-review__nav">
-          <button className="tv-btn tv-btn--secondary" onClick={prevStep} disabled={step === 1} aria-label="Previous step">
+          <button
+            className="tv-btn tv-btn--secondary"
+            onClick={prevStep}
+            disabled={step === 1}
+            aria-label="Previous step"
+          >
             <ChevronLeft size={14} />
           </button>
-          <button className="tv-btn tv-btn--primary" onClick={nextStep} disabled={step === TOTAL_STEPS} aria-label="Next step">
+          <button
+            className="tv-btn tv-btn--primary"
+            onClick={nextStep}
+            disabled={step === TOTAL_STEPS}
+            aria-label="Next step"
+          >
             <ChevronRight size={14} />
           </button>
         </div>

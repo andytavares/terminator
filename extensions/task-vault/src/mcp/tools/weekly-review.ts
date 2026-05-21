@@ -58,9 +58,10 @@ export async function weeklyReviewMcp(
       .all() as Record<string, unknown>[]
     const inboxItems = inboxRows.map(rowToTask)
 
-    const activeRows = db
-      .prepare(`SELECT * FROM projects WHERE status='active'`)
-      .all() as Record<string, unknown>[]
+    const activeRows = db.prepare(`SELECT * FROM projects WHERE status='active'`).all() as Record<
+      string,
+      unknown
+    >[]
     const activeProjects = activeRows.map((p) => {
       const nextActionCount = (
         db
@@ -71,9 +72,10 @@ export async function weeklyReviewMcp(
     })
     const staleProjects = activeProjects.filter((p) => p.isStale)
 
-    const somedayRows = db
-      .prepare(`SELECT * FROM projects WHERE status='someday'`)
-      .all() as Record<string, unknown>[]
+    const somedayRows = db.prepare(`SELECT * FROM projects WHERE status='someday'`).all() as Record<
+      string,
+      unknown
+    >[]
     const someDayProjects = somedayRows.map(rowToProject)
 
     const completedRows = db

@@ -210,8 +210,12 @@ function InboxItem({
             onCancel={() => setEditing(false)}
             autoFocus
           />
-          <button className="tv-btn tv-btn--primary" onClick={saveEdit}>Save</button>
-          <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)}><X size={14} /></button>
+          <button className="tv-btn tv-btn--primary" onClick={saveEdit}>
+            Save
+          </button>
+          <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)}>
+            <X size={14} />
+          </button>
         </div>
       ) : (
         <span
@@ -238,7 +242,11 @@ function InboxItem({
 
       {!editing && (
         <div className="inbox-item__actions">
-          <button className="inbox-item__promote-btn" onClick={handleMoveToToday} title="Move to Today's log">
+          <button
+            className="inbox-item__promote-btn"
+            onClick={handleMoveToToday}
+            title="Move to Today's log"
+          >
             → Today
           </button>
           <button

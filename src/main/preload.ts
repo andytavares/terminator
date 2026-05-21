@@ -183,4 +183,3 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.send('log:write', { level, namespace, message }),
   },
 })
-

@@ -26,7 +26,9 @@ function AreaCombobox({
   const showCreate = value.trim() && !existingAreas.some((a) => a.name.toLowerCase() === query)
   const options: Array<{ label: string; value: string; isCreate?: boolean }> = [
     ...matches.map((a) => ({ label: a.name, value: a.name })),
-    ...(showCreate ? [{ label: `Create area "${value.trim()}"`, value: value.trim(), isCreate: true }] : []),
+    ...(showCreate
+      ? [{ label: `Create area "${value.trim()}"`, value: value.trim(), isCreate: true }]
+      : []),
   ]
 
   useEffect(() => {
@@ -72,7 +74,10 @@ function AreaCombobox({
       <input
         type="text"
         value={value}
-        onChange={(e) => { onChange(e.target.value); setOpen(true) }}
+        onChange={(e) => {
+          onChange(e.target.value)
+          setOpen(true)
+        }}
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
         placeholder="e.g. work"
@@ -84,7 +89,10 @@ function AreaCombobox({
             <li
               key={opt.value + String(opt.isCreate)}
               className={`area-combobox__option${i === highlighted ? ' area-combobox__option--highlighted' : ''}${opt.isCreate ? ' area-combobox__option--create' : ''}`}
-              onMouseDown={(e) => { e.preventDefault(); select(opt) }}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                select(opt)
+              }}
               onMouseEnter={() => setHighlighted(i)}
             >
               {opt.label}
@@ -140,7 +148,9 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
       <button className="tv-btn tv-btn--primary" onClick={confirm} disabled={!targetId.trim()}>
         Link
       </button>
-      <button className="tv-btn tv-btn--icon" onClick={() => setLinking(false)}><X size={14} /></button>
+      <button className="tv-btn tv-btn--icon" onClick={() => setLinking(false)}>
+        <X size={14} />
+      </button>
     </span>
   )
 }
@@ -230,11 +240,7 @@ function CreateProjectForm({ onCreated, onCancel }: CreateProjectFormProps): Rea
         </div>
         <div className="create-project-form__field">
           <label>Deadline</label>
-          <input
-            type="date"
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
-          />
+          <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
         </div>
       </div>
       <div className="create-project-form__actions">
@@ -277,30 +283,46 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
   if (!expanded) {
     return (
       <button className="projects-browser__tasks-toggle" onClick={toggle}>
-        {loaded ? `${tasks.length} task${tasks.length !== 1 ? 's' : ''} tagged @${projectName}` : `Show tasks tagged @${projectName}`}
+        {loaded
+          ? `${tasks.length} task${tasks.length !== 1 ? 's' : ''} tagged @${projectName}`
+          : `Show tasks tagged @${projectName}`}
       </button>
     )
   }
 
-  const STATUS_ICON: Record<string, string> = { done: '[x]', migrated: '[>]', cancelled: '[-]', 'in-progress': '[/]', open: '[ ]' }
+  const STATUS_ICON: Record<string, string> = {
+    done: '[x]',
+    migrated: '[>]',
+    cancelled: '[-]',
+    'in-progress': '[/]',
+    open: '[ ]',
+  }
   const openTasks = tasks.filter((t) => t.status === 'open')
   const doneTasks = tasks.filter((t) => t.status !== 'open')
 
   return (
     <div className="projects-browser__task-list">
       <div className="projects-browser__task-list-header">
-        <span>{tasks.length} task{tasks.length !== 1 ? 's' : ''} tagged @{projectName}</span>
-        <button className="tv-btn tv-btn--ghost" onClick={() => setExpanded(false)}>▲</button>
+        <span>
+          {tasks.length} task{tasks.length !== 1 ? 's' : ''} tagged @{projectName}
+        </span>
+        <button className="tv-btn tv-btn--ghost" onClick={() => setExpanded(false)}>
+          ▲
+        </button>
       </div>
       {tasks.length === 0 && (
-        <div className="projects-browser__task-list-empty">No tasks tagged @{projectName} across vault.</div>
+        <div className="projects-browser__task-list-empty">
+          No tasks tagged @{projectName} across vault.
+        </div>
       )}
       {openTasks.map((t) => (
         <div key={t.id} className="projects-browser__task-row">
           <span className="projects-browser__task-marker">{STATUS_ICON[t.status] ?? '[ ]'}</span>
           <span className="projects-browser__task-text">{t.text}</span>
           {t.area && <span className="daily-log__tag daily-log__tag--area">#{t.area}</span>}
-          <span className="projects-browser__task-file">{t.filePath.split('/').pop()?.replace('.md', '')}</span>
+          <span className="projects-browser__task-file">
+            {t.filePath.split('/').pop()?.replace('.md', '')}
+          </span>
         </div>
       ))}
       {doneTasks.length > 0 && (
@@ -308,7 +330,9 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
           <summary>{doneTasks.length} completed</summary>
           {doneTasks.map((t) => (
             <div key={t.id} className="projects-browser__task-row projects-browser__task-row--done">
-              <span className="projects-browser__task-marker">{STATUS_ICON[t.status] ?? '[x]'}</span>
+              <span className="projects-browser__task-marker">
+                {STATUS_ICON[t.status] ?? '[x]'}
+              </span>
               <span className="projects-browser__task-text">{t.text}</span>
             </div>
           ))}
@@ -342,7 +366,9 @@ function ProjectAreaBadge({
   async function save() {
     const areaName = areaValue.trim()
     if (areaName && !existingAreas.some((a) => a.name.toLowerCase() === areaName.toLowerCase())) {
-      await window.electronAPI.extensionBridge.invoke('task-vault:vault:create-area', { name: areaName })
+      await window.electronAPI.extensionBridge.invoke('task-vault:vault:create-area', {
+        name: areaName,
+      })
     }
     await window.electronAPI.extensionBridge.invoke('task-vault:projects:update-area', {
       projectFilePath: project.filePath,
@@ -356,8 +382,16 @@ function ProjectAreaBadge({
     return (
       <span className="projects-browser__area-edit">
         <AreaCombobox value={areaValue} onChange={setAreaValue} existingAreas={existingAreas} />
-        <button className="tv-btn tv-btn--primary" onClick={save} title="Save area"><Check size={14} /></button>
-        <button className="tv-btn tv-btn--secondary" onClick={() => setEditing(false)} title="Cancel"><X size={14} /></button>
+        <button className="tv-btn tv-btn--primary" onClick={save} title="Save area">
+          <Check size={14} />
+        </button>
+        <button
+          className="tv-btn tv-btn--secondary"
+          onClick={() => setEditing(false)}
+          title="Cancel"
+        >
+          <X size={14} />
+        </button>
       </span>
     )
   }
@@ -373,7 +407,9 @@ function ProjectAreaBadge({
         >
           #{project.area}
         </span>
-        <button className="projects-browser__area-edit-btn" onClick={openEdit} title="Change area"><Pencil size={14} /></button>
+        <button className="projects-browser__area-edit-btn" onClick={openEdit} title="Change area">
+          <Pencil size={14} />
+        </button>
       </span>
     )
   }
@@ -441,10 +477,7 @@ export function ProjectsBrowser(): React.JSX.Element {
             </button>
           ))}
         </div>
-        <button
-          className="projects-browser__create-btn"
-          onClick={() => setShowCreateForm(true)}
-        >
+        <button className="projects-browser__create-btn" onClick={() => setShowCreateForm(true)}>
           + New project
         </button>
       </div>
@@ -481,7 +514,9 @@ export function ProjectsBrowser(): React.JSX.Element {
             )}
           </div>
           <div className="projects-browser__stats">
-            <span>{project.nextActionCount} next action{project.nextActionCount !== 1 ? 's' : ''}</span>
+            <span>
+              {project.nextActionCount} next action{project.nextActionCount !== 1 ? 's' : ''}
+            </span>
             <LinkToTerminator filePath={project.filePath} />
           </div>
           <ProjectTaskList projectName={project.name} />

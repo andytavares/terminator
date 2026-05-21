@@ -43,13 +43,27 @@ export async function queryTasks(
       conditions.push(`status IN (${statuses.map(() => '?').join(',')})`)
       params.push(...statuses)
     }
-    if (input.context) { conditions.push(`context=?`); params.push(input.context) }
-    if (input.project) { conditions.push(`project=?`); params.push(input.project) }
-    if (input.area) { conditions.push(`area=?`); params.push(input.area) }
-    if (input.dueBefore) { conditions.push(`due_date < ?`); params.push(input.dueBefore) }
+    if (input.context) {
+      conditions.push(`context=?`)
+      params.push(input.context)
+    }
+    if (input.project) {
+      conditions.push(`project=?`)
+      params.push(input.project)
+    }
+    if (input.area) {
+      conditions.push(`area=?`)
+      params.push(input.area)
+    }
+    if (input.dueBefore) {
+      conditions.push(`due_date < ?`)
+      params.push(input.dueBefore)
+    }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-    let rows = db.prepare(`SELECT * FROM tasks ${where} ORDER BY created_at`).all(...params) as Record<string, unknown>[]
+    let rows = db
+      .prepare(`SELECT * FROM tasks ${where} ORDER BY created_at`)
+      .all(...params) as Record<string, unknown>[]
 
     // filePattern still supported: filter by virtual filePath
     if (input.filePattern) {

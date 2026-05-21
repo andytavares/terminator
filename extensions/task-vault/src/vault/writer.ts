@@ -120,9 +120,16 @@ export async function cancelTask(
   await writeFileAtomic(filePath, lines.join('\n'))
 }
 
-export async function readTaskLines(filePath: string, line: number): Promise<string[] | { error: string }> {
+export async function readTaskLines(
+  filePath: string,
+  line: number
+): Promise<string[] | { error: string }> {
   let content = ''
-  try { content = await fs.readFile(filePath, 'utf-8') } catch { return { error: 'NOT_FOUND' } }
+  try {
+    content = await fs.readFile(filePath, 'utf-8')
+  } catch {
+    return { error: 'NOT_FOUND' }
+  }
   const lines = content.split('\n')
   const idx = line - 1
   if (idx < 0 || idx >= lines.length) return { error: 'STALE_ID' }

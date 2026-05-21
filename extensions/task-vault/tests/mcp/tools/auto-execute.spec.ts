@@ -9,48 +9,18 @@ vi.mock('../../../src/mcp/auto-execute', async (importOriginal) => {
   }
 })
 
-vi.mock('../../../src/vault/indexer', () => ({
-  buildIndex: vi.fn().mockResolvedValue({ tasks: [], projects: [], inboxCount: 0 }),
-  readIndex: vi.fn().mockResolvedValue({
-    version: 1,
-    builtAt: '',
-    vaultPath: '/vault',
-    tasks: [
-      {
-        id: '/vault/daily/2026-05-19.md:1',
-        filePath: '/vault/daily/2026-05-19.md',
-        line: 1,
-        status: 'open',
-        text: 'Task',
-        terminatorLinks: [],
-      },
-    ],
-    projects: [],
-    inboxCount: 0,
-  }),
-  getTaskById: vi.fn().mockReturnValue({
-    id: '/vault/daily/2026-05-19.md:1',
-    filePath: '/vault/daily/2026-05-19.md',
-    line: 1,
-    status: 'open',
-    text: 'Task',
-    terminatorLinks: [],
-  }),
-}))
-
-import * as fs from 'node:fs/promises'
-vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>()
-  return {
-    ...actual,
-    readFile: vi.fn(),
-    writeFile: vi.fn(),
-    rename: vi.fn(),
-    mkdir: vi.fn(),
-    stat: vi.fn(),
-    readdir: vi.fn(),
-  }
+const { mockRun, mockGet, mockAll, mockPrepare } = vi.hoisted(() => {
+  const mockRun = vi.fn().mockReturnValue({ changes: 1 })
+  const mockGet = vi.fn()
+  const mockAll = vi.fn().mockReturnValue([])
+  const mockPrepare = vi.fn().mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
+  return { mockRun, mockGet, mockAll, mockPrepare }
 })
+
+vi.mock('../../../src/vault/db', () => ({
+  getDb: vi.fn(() => ({ prepare: mockPrepare })),
+  randomUUID: vi.fn(() => 'test-uuid'),
+}))
 
 import { captureTask } from '../../../src/mcp/tools/capture'
 import { completeTaskMcp } from '../../../src/mcp/tools/complete-task'
@@ -59,16 +29,25 @@ import { makeSuggestion } from '../../../src/mcp/auto-execute'
 
 const VAULT = '/vault'
 
+const taskRow = {
+  id: '/vault/daily/2026-05-19.md:1',
+  text: 'Task',
+  status: 'open',
+  project: null,
+  context: null,
+  area: null,
+  due_date: null,
+  source: 'daily',
+  source_ref: '2026-05-19',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(fs.readFile).mockResolvedValue('- [ ] Task\n' as unknown as Buffer)
-  vi.mocked(fs.writeFile).mockResolvedValue()
-  vi.mocked(fs.rename).mockResolvedValue()
-  vi.mocked(fs.mkdir).mockResolvedValue(undefined)
-  vi.mocked(fs.readdir).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof fs.readdir>>)
-  vi.mocked(fs.stat).mockResolvedValue({ mtime: new Date() } as unknown as Awaited<
-    ReturnType<typeof fs.stat>
-  >)
+  mockGet.mockReturnValue(taskRow)
+  mockRun.mockReturnValue({ changes: 1 })
+  mockAll.mockReturnValue([])
 })
 
 describe('auto-execute gate', () => {
@@ -76,21 +55,21 @@ describe('auto-execute gate', () => {
     mockGetSetting.mockResolvedValue(false)
     const result = await captureTask({ text: 'Test task' }, VAULT)
     expect('suggestion' in result).toBe(true)
-    expect(vi.mocked(fs.writeFile)).not.toHaveBeenCalled()
+    expect(mockRun).not.toHaveBeenCalled()
   })
 
   it('writes immediately when toggle is on', async () => {
     mockGetSetting.mockResolvedValue(true)
     const result = await captureTask({ text: 'Test task' }, VAULT)
     expect('taskId' in result).toBe(true)
-    expect(vi.mocked(fs.writeFile)).toHaveBeenCalled()
+    expect(mockRun).toHaveBeenCalled()
   })
 
   it('bypasses toggle when confirmed=true', async () => {
     mockGetSetting.mockResolvedValue(false)
     const result = await captureTask({ text: 'Test task', confirmed: true }, VAULT)
     expect('taskId' in result).toBe(true)
-    expect(vi.mocked(fs.writeFile)).toHaveBeenCalled()
+    expect(mockRun).toHaveBeenCalled()
   })
 
   it('complete-task returns suggestion when toggle off', async () => {
@@ -101,9 +80,6 @@ describe('auto-execute gate', () => {
 
   it('migrate-task returns suggestion when toggle off', async () => {
     mockGetSetting.mockResolvedValue(false)
-    vi.mocked(fs.readFile)
-      .mockResolvedValueOnce('- [ ] Task\n' as unknown as Buffer)
-      .mockResolvedValueOnce('' as unknown as Buffer)
     const result = await migrateTaskMcp(
       { taskId: '/vault/daily/2026-05-19.md:1', targetDate: '2026-05-20' },
       VAULT
