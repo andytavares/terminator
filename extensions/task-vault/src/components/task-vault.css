@@ -3397,3 +3397,211 @@
     color 150ms ease-out,
     border-color 150ms ease-out;
 }
+
+/* ── Sidebar: icon + label layout ────────────────────────────────── */
+.vault-sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vault-sidebar__item-icon {
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition:
+    opacity 150ms ease-out,
+    color 150ms ease-out;
+  display: inline-flex;
+  align-items: center;
+}
+
+.vault-sidebar__item-label {
+  flex: 1;
+  text-align: left;
+}
+
+.vault-sidebar__item:hover .vault-sidebar__item-icon {
+  opacity: 0.8;
+}
+
+.vault-sidebar__item--active .vault-sidebar__item-icon {
+  opacity: 1;
+  color: var(--tm-accent);
+}
+
+/* ── Task status icons ────────────────────────────────────────────── */
+.task-status {
+  display: block;
+  flex-shrink: 0;
+}
+
+.task-status--open {
+  color: var(--tm-border-strong, rgba(255, 255, 255, 0.2));
+}
+
+.task-status--done {
+  color: var(--tm-success, #4ade80);
+}
+
+.task-status--cancelled {
+  color: var(--tm-text-muted);
+  opacity: 0.4;
+}
+
+.task-status--migrated {
+  color: var(--tm-accent);
+  opacity: 0.65;
+}
+
+.task-status--in-progress {
+  color: var(--tm-warning, #facc15);
+}
+
+/* ── Clickable task checkbox ──────────────────────────────────────── */
+.daily-log__task-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 1px;
+  margin: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition:
+    background 120ms ease-out,
+    transform 100ms ease-out;
+  line-height: 0;
+  width: 22px;
+  height: 22px;
+}
+
+.daily-log__task-checkbox:hover {
+  background: color-mix(in srgb, var(--tm-success, #4ade80) 15%, transparent);
+  transform: scale(1.1);
+}
+
+.daily-log__task-checkbox:hover .task-status--open {
+  color: var(--tm-success, #4ade80);
+  opacity: 0.7;
+}
+
+/* Non-clickable status marker (done/cancelled/migrated) */
+.daily-log__task-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  line-height: 0;
+}
+
+/* ── Human-readable date header ──────────────────────────────────── */
+.daily-log__date {
+  margin: 0 0 28px;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.daily-log__date-weekday {
+  display: block;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--tm-text-primary);
+  line-height: 1.1;
+}
+
+.daily-log__date-detail {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--tm-text-muted);
+  letter-spacing: 0.02em;
+  margin-top: 3px;
+}
+
+/* ── Section header with task count ──────────────────────────────── */
+.daily-log__section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.daily-log__section-header h3 {
+  margin: 0;
+  flex: 1;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.daily-log__task-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--tm-text-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+}
+
+/* ── Progress bar ─────────────────────────────────────────────────── */
+.daily-log__progress-bar {
+  width: 100%;
+  height: 2px;
+  background: var(--tm-border);
+  border-radius: 1px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.daily-log__progress-fill {
+  height: 100%;
+  background: var(--tm-success, #4ade80);
+  border-radius: 1px;
+  transition: width 500ms cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 0;
+}
+
+.daily-log__progress-fill--complete {
+  background: linear-gradient(
+    90deg,
+    var(--tm-success, #4ade80),
+    color-mix(in srgb, var(--tm-success, #4ade80) 60%, var(--tm-accent))
+  );
+}
+
+/* ── Danger hover variant for destructive buttons ────────────────── */
+.tv-btn--danger-hover:hover:not(:disabled) {
+  background: rgba(224, 92, 92, 0.12);
+  color: var(--tm-danger, #e05c5c);
+  border-color: rgba(224, 92, 92, 0.35);
+}
+
+/* ── Task row: tighter gap with icon checkbox ─────────────────────── */
+.daily-log__task {
+  gap: 6px;
+}
+
+/* ── Subtask: tighter with icon marker ───────────────────────────── */
+.daily-log__subtask {
+  gap: 4px;
+}
+
+.daily-log__subtask-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* ── Override old h2-targeting for date ──────────────────────────── */
+h2.daily-log__date {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 24px;
+}

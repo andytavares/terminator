@@ -1,13 +1,14 @@
 import React from 'react'
+import { CalendarDays, Inbox, FolderOpen, Layers, Archive, ClipboardList } from 'lucide-react'
 import { useVaultStore, type VaultView } from '../stores/vault.store'
 
-const NAV_ITEMS: Array<{ view: VaultView; label: string }> = [
-  { view: 'daily', label: 'Today' },
-  { view: 'inbox', label: 'Inbox' },
-  { view: 'projects', label: 'Projects' },
-  { view: 'areas', label: 'Areas' },
-  { view: 'archive', label: 'Archive' },
-  { view: 'review', label: 'Weekly Review' },
+const NAV_ITEMS: Array<{ view: VaultView; label: string; icon: React.ReactNode }> = [
+  { view: 'daily', label: 'Today', icon: <CalendarDays size={15} /> },
+  { view: 'inbox', label: 'Inbox', icon: <Inbox size={15} /> },
+  { view: 'projects', label: 'Projects', icon: <FolderOpen size={15} /> },
+  { view: 'areas', label: 'Areas', icon: <Layers size={15} /> },
+  { view: 'archive', label: 'Archive', icon: <Archive size={15} /> },
+  { view: 'review', label: 'Weekly Review', icon: <ClipboardList size={15} /> },
 ]
 
 export function VaultSidebar(): React.JSX.Element {
@@ -15,13 +16,14 @@ export function VaultSidebar(): React.JSX.Element {
 
   return (
     <nav className="vault-sidebar">
-      {NAV_ITEMS.map(({ view, label }) => (
+      {NAV_ITEMS.map(({ view, label, icon }) => (
         <button
           key={view}
           className={`vault-sidebar__item${activeView === view ? ' vault-sidebar__item--active' : ''}`}
           onClick={() => setView(view)}
         >
-          {label}
+          <span className="vault-sidebar__item-icon">{icon}</span>
+          <span className="vault-sidebar__item-label">{label}</span>
           {view === 'inbox' && inboxCount > 0 && (
             <span className="vault-sidebar__badge">{inboxCount}</span>
           )}
