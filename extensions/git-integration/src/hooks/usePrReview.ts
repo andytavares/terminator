@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { githubAPI } from '../api/github'
 import { usePrReviewStore } from '../stores/pr-review.store'
 import {
   ReviewQueuePRSchema,
@@ -27,7 +28,7 @@ async function mergeSessionStatuses(
   prs: ReviewQueuePR[]
 ): Promise<ReviewQueuePR[]> {
   try {
-    const result = await window.electronAPI.github.sessionsForRepo(repoRoot)
+    const result = await githubAPI.sessionsForRepo(repoRoot)
     const sessions = (result.sessions as unknown[])
       .map((s) => ReviewSessionSchema.safeParse(s))
       .filter((r) => r.success)
@@ -54,7 +55,7 @@ async function mergeSessionStatuses(
 
     // Load persisted active-review snapshots and prepend any not already in the
     // current page — guarantees in-progress PRs appear regardless of pagination.
-    const activeResult = await window.electronAPI.github.activeReviewsForRepo(repoRoot)
+    const activeResult = await githubAPI.activeReviewsForRepo(repoRoot)
     if ('error' in activeResult) return merged
 
     const queueNumbers = new Set(prs.map((p) => p.number))
@@ -107,7 +108,7 @@ export function useLoadPrQueue(repoRoot: string | null) {
         setQueueError(null)
       }
       try {
-        const result = await window.electronAPI.github.listOpenPrs(repoRoot, {
+        const result = await githubAPI.listOpenPrs(repoRoot, {
           cursor: options?.cursor,
           search: options?.search,
           includeClosedPrs: options?.includeClosedPrs ?? includeClosedPrs,
@@ -171,7 +172,7 @@ export function useLoadPrDetail(repoRoot: string | null) {
     async (prNumber: number, onSuccess: (detail: PrReviewDetail) => Promise<void>) => {
       if (!repoRoot) return
       try {
-        const result = await window.electronAPI.github.prReviewDetail(repoRoot, prNumber)
+        const result = await githubAPI.prReviewDetail(repoRoot, prNumber)
         if ('error' in result) {
           if ((result as { error: string }).error === 'RATE_LIMITED') {
             setRateLimitState({
@@ -205,7 +206,7 @@ export function useFetchFileMetrics(repoRoot: string | null) {
       // Fetch raw metrics for all files in parallel
       const results = await Promise.allSettled(
         allFiles.map(async (file) => {
-          const result = await window.electronAPI.github.fileMetrics(repoRoot, file.path)
+          const result = await githubAPI.fileMetrics(repoRoot, file.path)
           if ('error' in result) return null
           const raw = result as {
             churn90d: number
@@ -313,7 +314,7 @@ export function useLoadInlineComments(repoRoot: string | null) {
   return useCallback(async () => {
     if (!repoRoot || !activePr) return
     try {
-      const result = await window.electronAPI.github.prInlineComments(repoRoot, activePr.number)
+      const result = await githubAPI.prInlineComments(repoRoot, activePr.number)
       if ('error' in result) return
       const { buildThreads } = await import('../github/pr-review-service-renderer')
       const comments = (result as { comments: unknown[] }).comments

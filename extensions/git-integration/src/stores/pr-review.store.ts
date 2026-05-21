@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { githubAPI } from '../api/github'
 import type {
   ReviewSession,
   PrReviewDetail,
@@ -116,7 +117,7 @@ async function persistSession(
     lastAccessedAt: new Date().toISOString(),
   }
   const key = sessionKey(repoRoot, prNumber, headSHA)
-  await window.electronAPI.github.sessionSet(key, session)
+  await githubAPI.sessionSet(key, session)
 }
 
 export const usePrReviewStore = create<PrReviewStore>((set, get) => ({

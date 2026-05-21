@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Check } from 'lucide-react'
 import type { IndexedProject } from '../vault/types'
 
 interface Props {
@@ -38,13 +39,13 @@ export function WeeklyReviewStep3Projects({
             <span className="wr-step__project-actions">
               {project.isStale ? (
                 <>
-                  <button onClick={() => updateStatus(project.filePath, 'someday')}>Someday</button>
-                  <button onClick={() => updateStatus(project.filePath, 'archived')}>
+                  <button className="tv-btn tv-btn--secondary" onClick={() => updateStatus(project.filePath, 'someday')}>Someday</button>
+                  <button className="tv-btn tv-btn--secondary" onClick={() => updateStatus(project.filePath, 'archived')}>
                     Archive
                   </button>
                 </>
               ) : (
-                <button onClick={() => updateStatus(project.filePath, 'active')}>Keep ✓</button>
+                <button className="tv-btn tv-btn--primary" onClick={() => updateStatus(project.filePath, 'active')}>Keep <Check size={14} /></button>
               )}
             </span>
           </li>

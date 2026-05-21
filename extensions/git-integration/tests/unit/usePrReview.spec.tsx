@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import {
@@ -10,6 +10,24 @@ import {
 
 vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
+}))
+
+const mockListOpenPrsAPI = vi.fn()
+const mockPrReviewDetailAPI = vi.fn()
+const mockFileMetricsAPI = vi.fn()
+const mockPrInlineCommentsAPI = vi.fn()
+const mockSessionsForRepoAPI = vi.fn().mockResolvedValue({ sessions: [] })
+const mockActiveReviewsForRepoAPI = vi.fn().mockResolvedValue({ error: 'NOT_FOUND' })
+
+vi.mock('../../src/api/github', () => ({
+  githubAPI: {
+    listOpenPrs: (...args: unknown[]) => mockListOpenPrsAPI(...args),
+    prReviewDetail: (...args: unknown[]) => mockPrReviewDetailAPI(...args),
+    fileMetrics: (...args: unknown[]) => mockFileMetricsAPI(...args),
+    prInlineComments: (...args: unknown[]) => mockPrInlineCommentsAPI(...args),
+    sessionsForRepo: (...args: unknown[]) => mockSessionsForRepoAPI(...args),
+    activeReviewsForRepo: (...args: unknown[]) => mockActiveReviewsForRepoAPI(...args),
+  },
 }))
 
 vi.mock('../../src/github/pr-review-service', () => ({
@@ -51,10 +69,11 @@ const mockSetThreads = vi.fn()
 const mockUpdateFileRiskScore = vi.fn()
 const mockUpdateQueuePrRisk = vi.fn()
 
-const mockListOpenPrs = vi.fn()
-const mockPrReviewDetail = vi.fn()
-const mockFileMetrics = vi.fn()
-const mockPrInlineComments = vi.fn()
+// Aliases so existing test assertions still work without changes
+const mockListOpenPrs = mockListOpenPrsAPI
+const mockPrReviewDetail = mockPrReviewDetailAPI
+const mockFileMetrics = mockFileMetricsAPI
+const mockPrInlineComments = mockPrInlineCommentsAPI
 
 const validActivePr = {
   number: 42,
@@ -74,14 +93,6 @@ const validActivePr = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    github: {
-      listOpenPrs: mockListOpenPrs,
-      prReviewDetail: mockPrReviewDetail,
-      fileMetrics: mockFileMetrics,
-      prInlineComments: mockPrInlineComments,
-    },
-  }
   vi.mocked(usePrReviewStore).mockReturnValue({
     setQueue: mockSetQueue,
     appendQueue: mockAppendQueue,
@@ -100,9 +111,6 @@ beforeEach(() => {
   } as unknown as ReturnType<typeof usePrReviewStore>)
 })
 
-afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
-})
 
 describe('useLoadPrQueue', () => {
   it('returns a function', () => {

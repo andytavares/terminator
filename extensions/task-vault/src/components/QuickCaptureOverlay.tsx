@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import './task-vault.css'
 
 interface SuggestionBadge {
   type: 'project' | 'context' | 'area'
@@ -7,9 +8,9 @@ interface SuggestionBadge {
 
 function detectTags(text: string): SuggestionBadge[] {
   const badges: SuggestionBadge[] = []
-  const projMatch = /\+(\S+)/.exec(text)
+  const projMatch = /@(\S+)/.exec(text)
   if (projMatch) badges.push({ type: 'project', value: projMatch[1] })
-  const ctxMatch = /@(\S+)/.exec(text)
+  const ctxMatch = /\+(\S+)/.exec(text)
   if (ctxMatch) badges.push({ type: 'context', value: ctxMatch[1] })
   const areaMatch = /#(\S+)/.exec(text)
   if (areaMatch) badges.push({ type: 'area', value: areaMatch[1] })
@@ -75,8 +76,8 @@ export function QuickCaptureOverlay(): React.JSX.Element {
               key={`${b.type}-${b.value}`}
               className={`quick-capture__badge quick-capture__badge--${b.type}`}
             >
-              {b.type === 'project' && '+'}
-              {b.type === 'context' && '@'}
+              {b.type === 'project' && '@'}
+              {b.type === 'context' && '+'}
               {b.type === 'area' && '#'}
               {b.value}
             </span>

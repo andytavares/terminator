@@ -32,10 +32,10 @@ export function WeeklyReviewStep5Someday({
           <li key={project.id} className="wr-step__item">
             <span className="wr-step__project-name">{project.name}</span>
             <span className="wr-step__project-actions">
-              <button onClick={() => updateStatus(project.filePath, 'active')}>
+              <button className="tv-btn tv-btn--primary" onClick={() => updateStatus(project.filePath, 'active')}>
                 Promote to active
               </button>
-              <button onClick={() => updateStatus(project.filePath, 'archived')}>Archive</button>
+              <button className="tv-btn tv-btn--secondary" onClick={() => updateStatus(project.filePath, 'archived')}>Archive</button>
             </span>
           </li>
         ))}

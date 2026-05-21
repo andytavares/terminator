@@ -11,10 +11,11 @@ const STATUS_MAP: Record<string, TaskStatus> = {
 }
 
 const TASK_RE = /^- \[([^\]])\] (.*)$/
+const SUBTASK_RE = /^ {2,}- \[([^\]])\] (.*)$/
 const EVENT_RE = /^o (?:(\d{2}:\d{2}) )?(.+)$/
 const NOTE_RE = /^\* (.+)$/
-const TAG_PROJECT = /\+(\S+)/g
-const TAG_CONTEXT = /@(\S+)/g
+const TAG_PROJECT = /@(\S+)/g
+const TAG_CONTEXT = /\+(\S+)/g
 const TAG_AREA = /#(\S+)/g
 const TAG_META = /\b([a-z][a-z0-9_-]*):([\S]+)/g
 const TERMINATOR_LINK_RE =
@@ -79,6 +80,31 @@ export function parseFile(content: string, filePath: string): ParseResult {
         metadata,
         terminatorLinks,
       })
+      continue
+    }
+
+    const subtaskMatch = SUBTASK_RE.exec(line)
+    if (subtaskMatch && tasks.length > 0) {
+      const marker = subtaskMatch[1]
+      const rawText = subtaskMatch[2]
+      const status: TaskStatus = STATUS_MAP[marker] ?? 'open'
+      const { text, project, context, area, dueDate, metadata, terminatorLinks } = extractTags(rawText)
+      const subtask: Task = {
+        id: `${filePath}:${lineNum}`,
+        filePath,
+        line: lineNum,
+        status,
+        text,
+        project,
+        context,
+        area,
+        dueDate,
+        metadata,
+        terminatorLinks,
+      }
+      const lastTask = tasks[tasks.length - 1]
+      if (!lastTask.subtasks) lastTask.subtasks = []
+      lastTask.subtasks.push(subtask)
       continue
     }
 
@@ -152,8 +178,8 @@ function extractTags(raw: string): {
 
   // Strip tags from text
   text = text
-    .replace(/\+\S+/g, '')
     .replace(/@\S+/g, '')
+    .replace(/\+\S+/g, '')
     .replace(/#\S+/g, '')
     .replace(/\b[a-z][a-z0-9_-]*:[\S]+/g, '')
     .replace(/\s+/g, ' ')
@@ -172,6 +198,7 @@ export function suggestDestination(
 ): { tags: { project?: string; context?: string; area?: string }; destination?: string } {
   const tags: { project?: string; context?: string; area?: string } = {}
 
+  // @ = project, + = context, # = area
   TAG_PROJECT.lastIndex = 0
   const proj = TAG_PROJECT.exec(text)
   if (proj) tags.project = proj[1]

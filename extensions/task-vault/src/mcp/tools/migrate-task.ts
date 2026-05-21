@@ -1,8 +1,4 @@
-import * as path from 'node:path'
-import * as fs from 'node:fs/promises'
-import { migrateTask } from '../../vault/writer'
-import { buildIndex, readIndex, getTaskById } from '../../vault/indexer'
-import { parseFile } from '../../vault/parser'
+import { getDb, randomUUID } from '../../vault/db'
 import { getAutoExecuteSetting, makeSuggestion } from '../auto-execute'
 
 interface MigrateTaskInput {
@@ -19,8 +15,10 @@ export async function migrateTaskMcp(
   | { error: string }
   | { suggestion: string; tool: string; description: string }
 > {
-  const index = await readIndex(vaultPath)
-  const task = index ? getTaskById(index, input.taskId) : null
+  const db = getDb()
+  const task = db.prepare(`SELECT * FROM tasks WHERE id=?`).get(input.taskId) as
+    | Record<string, unknown>
+    | undefined
   if (!task) return { error: 'STALE_ID' }
 
   if (!input.confirmed) {
@@ -28,18 +26,34 @@ export async function migrateTaskMcp(
     if (!autoExecute) {
       return makeSuggestion(
         'migrate_task',
-        `Would migrate task "${task.text}" to ${input.targetDate}`
+        `Would migrate task "${task.text as string}" to ${input.targetDate}`
       )
     }
   }
 
-  const result = await migrateTask(task.filePath, task.line, input.targetDate, vaultPath)
-  if (result && 'error' in result) return result
-  await buildIndex(vaultPath)
+  const now = new Date().toISOString()
+  db.prepare(`UPDATE tasks SET status='migrated', migrated_to=?, updated_at=? WHERE id=?`).run(
+    input.targetDate,
+    now,
+    input.taskId
+  )
 
-  const targetFile = path.join(vaultPath, 'daily', `${input.targetDate}.md`)
-  const content = await fs.readFile(targetFile, 'utf-8').catch(() => '')
-  const { tasks } = parseFile(content, targetFile)
-  const last = tasks[tasks.length - 1]
-  return { newTaskId: last?.id ?? '' }
+  const newId = randomUUID()
+  db.prepare(
+    `INSERT INTO tasks (id,text,status,project,context,area,due_date,source,source_ref,created_at,updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+  ).run(
+    newId,
+    task.text,
+    'open',
+    task.project ?? null,
+    task.context ?? null,
+    task.area ?? null,
+    task.due_date ?? null,
+    'daily',
+    input.targetDate,
+    now,
+    now
+  )
+  return { newTaskId: newId }
 }

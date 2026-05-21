@@ -10,10 +10,16 @@ interface VaultStore {
   activeView: VaultView
   isLoading: boolean
   error: string | null
+  showCaptureModal: boolean
+  selectedAreaName: string | null
+  selectedProjectName: string | null
   loadToday: () => Promise<void>
   setView: (view: VaultView) => void
   refreshInboxCount: () => Promise<void>
   setVaultPath: (p: string) => void
+  setShowCaptureModal: (show: boolean) => void
+  navToArea: (name: string) => void
+  navToProject: (name: string) => void
 }
 
 export const useVaultStore = create<VaultStore>((set, _get) => ({
@@ -23,10 +29,19 @@ export const useVaultStore = create<VaultStore>((set, _get) => ({
   activeView: 'daily',
   isLoading: false,
   error: null,
+  showCaptureModal: false,
+  selectedAreaName: null,
+  selectedProjectName: null,
 
   setVaultPath: (p: string) => set({ vaultPath: p }),
 
   setView: (view: VaultView) => set({ activeView: view }),
+
+  setShowCaptureModal: (show: boolean) => set({ showCaptureModal: show }),
+
+  navToArea: (name: string) => set({ activeView: 'areas', selectedAreaName: name, selectedProjectName: null }),
+
+  navToProject: (name: string) => set({ activeView: 'projects', selectedProjectName: name, selectedAreaName: null }),
 
   loadToday: async () => {
     set({ isLoading: true, error: null })
@@ -44,10 +59,10 @@ export const useVaultStore = create<VaultStore>((set, _get) => ({
 
   refreshInboxCount: async () => {
     try {
-      const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:get-today')
+      const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:get-inbox')
       if (result && typeof result === 'object' && 'tasks' in result) {
-        const log = result as DailyLog
-        set({ inboxCount: log.tasks.filter((t) => t.status === 'open').length })
+        const { tasks } = result as { tasks: { status: string }[] }
+        set({ inboxCount: tasks.length })
       }
     } catch {
       // non-critical

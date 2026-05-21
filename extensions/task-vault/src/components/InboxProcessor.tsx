@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import type { IndexedTask } from '../vault/types'
+import { FileToPicker } from './FileToPicker'
 
 type InboxStep = 'actionable' | 'two-minute' | 'destination'
 
@@ -12,7 +13,6 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
   const [currentIdx, setCurrentIdx] = useState(0)
   const [step, setStep] = useState<InboxStep>('actionable')
   const [isProcessing, setIsProcessing] = useState(false)
-  const [destination, setDestination] = useState('')
 
   const current = items[currentIdx]
 
@@ -30,7 +30,6 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
   function advanceToNext() {
     setIsProcessing(false)
     setStep('actionable')
-    setDestination('')
     if (currentIdx + 1 >= items.length) {
       onDone()
     } else {
@@ -55,9 +54,9 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
         <div className="inbox-processor__step">
           <p className="inbox-processor__question">Is this actionable?</p>
           <div className="inbox-processor__actions">
-            <button onClick={() => setStep('two-minute')}>Yes</button>
-            <button onClick={() => processItem('trash')}>No — trash it</button>
-            <button onClick={() => processItem('someday')}>Incubate (someday)</button>
+            <button className="tv-btn tv-btn--primary" onClick={() => setStep('two-minute')}>Yes</button>
+            <button className="tv-btn tv-btn--danger" onClick={() => processItem('trash')}>No — trash it</button>
+            <button className="tv-btn tv-btn--secondary" onClick={() => processItem('someday')}>Incubate (someday)</button>
           </div>
         </div>
       )}
@@ -66,8 +65,8 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
         <div className="inbox-processor__step">
           <p className="inbox-processor__question">Can it be done in &lt;2 minutes?</p>
           <div className="inbox-processor__actions">
-            <button onClick={() => processItem('do-now')}>Do now</button>
-            <button onClick={() => setStep('destination')}>No — file it</button>
+            <button className="tv-btn tv-btn--primary" onClick={() => processItem('do-now')}>Do now</button>
+            <button className="tv-btn tv-btn--secondary" onClick={() => setStep('destination')}>No — file it</button>
           </div>
         </div>
       )}
@@ -75,19 +74,14 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
       {step === 'destination' && (
         <div className="inbox-processor__step">
           <p className="inbox-processor__question">Where does it belong?</p>
-          <input
-            type="text"
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-            placeholder="Relative path within vault (e.g., projects/alpha.md)"
-            className="inbox-processor__dest-input"
+          <FileToPicker
+            prefilledQuery={current.project ?? current.area ?? ''}
+            onSelect={(filePath) => processItem('file', filePath)}
+            onClose={() => setStep('actionable')}
           />
           <div className="inbox-processor__actions">
-            <button onClick={() => processItem('file', destination)} disabled={!destination.trim()}>
-              File it
-            </button>
-            <button onClick={() => processItem('someday')}>Move to Someday</button>
-            <button onClick={() => setStep('actionable')}>Back</button>
+            <button className="tv-btn tv-btn--secondary" onClick={() => processItem('someday')}>Move to Someday</button>
+            <button className="tv-btn tv-btn--secondary" onClick={() => setStep('actionable')}>Back</button>
           </div>
         </div>
       )}

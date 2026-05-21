@@ -2,15 +2,11 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { useSettingsStore } from '../../../src/renderer/stores/settings.store'
-import { PrReviewWindow } from '../../../src/renderer/PrReviewWindow'
+import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
+import { ExtensionWindowView } from '../../../src/renderer/ExtensionWindowView'
 
 vi.mock('../../../src/renderer/stores/settings.store', () => ({ useSettingsStore: vi.fn() }))
-
-vi.mock('../../../extensions/git-integration/src/components/pr-review/PrReviewTab', () => ({
-  PrReviewTab: ({ repoRoot }: { repoRoot: string | null }) => (
-    <div data-testid="pr-review-tab" data-repo-root={repoRoot ?? ''} />
-  ),
-}))
+vi.mock('../../../src/renderer/extensions/registry', () => ({ useExtensionRegistry: vi.fn() }))
 vi.mock('../../../src/renderer/components/ToastContainer', () => ({
   ToastContainer: () => <div data-testid="toast-container" />,
 }))
@@ -20,71 +16,80 @@ vi.mock('../../../src/renderer/components/ErrorBoundary', () => ({
 
 const mockLoadSettings = vi.fn()
 
-beforeEach(() => {
-  vi.clearAllMocks()
+function setupMocks(windowViews = new Map()) {
   vi.mocked(useSettingsStore).mockReturnValue({
     loadSettings: mockLoadSettings,
     resolvedTheme: 'dark',
   } as unknown as ReturnType<typeof useSettingsStore>)
+  vi.mocked(useExtensionRegistry).mockReturnValue(
+    windowViews as unknown as ReturnType<typeof useExtensionRegistry>
+  )
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  setupMocks()
 })
 
 afterEach(() => {
-  // Reset location search
   Object.defineProperty(window, 'location', {
     value: { search: '' },
     writable: true,
   })
 })
 
-describe('PrReviewWindow', () => {
-  it('renders PrReviewTab and ToastContainer', () => {
-    render(<PrReviewWindow />)
-    expect(screen.getByTestId('pr-review-tab')).toBeTruthy()
+describe('ExtensionWindowView', () => {
+  it('renders ToastContainer', () => {
+    setupMocks()
+    render(<ExtensionWindowView view="pr-review" />)
     expect(screen.getByTestId('toast-container')).toBeTruthy()
   })
 
-  it('passes repoRoot from URL params to PrReviewTab', () => {
+  it('shows "not found" message when view is not registered', () => {
+    setupMocks(new Map())
+    render(<ExtensionWindowView view="unknown-view" />)
+    expect(screen.getByText('Extension view not found: unknown-view')).toBeTruthy()
+  })
+
+  it('renders the registered view component', () => {
+    const FakeView = ({ repoRoot }: { repoRoot: string | null }) => (
+      <div data-testid="fake-view" data-repo-root={repoRoot ?? ''} />
+    )
+    const views = new Map([['pr-review', FakeView]])
+    setupMocks(views)
     Object.defineProperty(window, 'location', {
       value: { search: '?repoRoot=/home/user/myrepo' },
       writable: true,
     })
-    render(<PrReviewWindow />)
-    expect(screen.getByTestId('pr-review-tab').getAttribute('data-repo-root')).toBe(
-      '/home/user/myrepo'
-    )
-  })
-
-  it('passes null repoRoot when not in URL params', () => {
-    Object.defineProperty(window, 'location', {
-      value: { search: '' },
-      writable: true,
-    })
-    render(<PrReviewWindow />)
-    expect(screen.getByTestId('pr-review-tab').getAttribute('data-repo-root')).toBe('')
+    render(<ExtensionWindowView view="pr-review" />)
+    expect(screen.getByTestId('fake-view').getAttribute('data-repo-root')).toBe('/home/user/myrepo')
   })
 
   it('renders accent bar when accentColor param is present', () => {
+    setupMocks()
     Object.defineProperty(window, 'location', {
       value: { search: '?accentColor=%23ff0000' },
       writable: true,
     })
-    const { container } = render(<PrReviewWindow />)
+    const { container } = render(<ExtensionWindowView view="pr-review" />)
     const accentBar = container.querySelector('div[style*="height: 3px"]')
     expect(accentBar).toBeTruthy()
   })
 
   it('does not render accent bar when accentColor param is absent', () => {
+    setupMocks()
     Object.defineProperty(window, 'location', {
       value: { search: '' },
       writable: true,
     })
-    const { container } = render(<PrReviewWindow />)
+    const { container } = render(<ExtensionWindowView view="pr-review" />)
     const accentBar = container.querySelector('div[style*="height: 3px"]')
     expect(accentBar).toBeFalsy()
   })
 
   it('calls loadSettings on mount', () => {
-    render(<PrReviewWindow />)
+    setupMocks()
+    render(<ExtensionWindowView view="pr-review" />)
     expect(mockLoadSettings).toHaveBeenCalledTimes(1)
   })
 
@@ -93,7 +98,10 @@ describe('PrReviewWindow', () => {
       loadSettings: mockLoadSettings,
       resolvedTheme: 'light',
     } as unknown as ReturnType<typeof useSettingsStore>)
-    render(<PrReviewWindow />)
+    vi.mocked(useExtensionRegistry).mockReturnValue(
+      new Map() as unknown as ReturnType<typeof useExtensionRegistry>
+    )
+    render(<ExtensionWindowView view="pr-review" />)
     expect(document.documentElement.getAttribute('data-theme')).toBe('light')
   })
 })

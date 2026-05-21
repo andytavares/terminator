@@ -128,32 +128,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exec: (options: unknown) => ipcRenderer.invoke('shell:exec', options),
     openPath: (filePath: string) => ipcRenderer.invoke('shell:open-path', { filePath }),
   },
-  github: {
-    listOpenPrs: (
-      repoRoot: string,
-      options?: { cursor?: string; search?: string; includeClosedPrs?: boolean }
-    ) => ipcRenderer.invoke('github:list-open-prs', { repoRoot, ...options }),
-    prReviewDetail: (repoRoot: string, prNumber: number) =>
-      ipcRenderer.invoke('github:pr-review-detail', { repoRoot, prNumber }),
-    prFileDiff: (repoRoot: string, prNumber: number, path: string) =>
-      ipcRenderer.invoke('github:pr-file-diff', { repoRoot, prNumber, path }),
-    fileMetrics: (repoRoot: string, path: string) =>
-      ipcRenderer.invoke('github:file-metrics', { repoRoot, path }),
-    prInlineComments: (repoRoot: string, prNumber: number) =>
-      ipcRenderer.invoke('github:pr-inline-comments', { repoRoot, prNumber }),
-    prCommentAdd: (payload: unknown) => ipcRenderer.invoke('github:pr-comment-add', payload),
-    prCommentReply: (payload: unknown) => ipcRenderer.invoke('github:pr-comment-reply', payload),
-    prReviewSubmit: (payload: unknown) => ipcRenderer.invoke('github:pr-review-submit', payload),
-    sessionGet: (key: string) => ipcRenderer.invoke('github:session-get', { key }),
-    sessionSet: (key: string, session: unknown) =>
-      ipcRenderer.invoke('github:session-set', { key, session }),
-    sessionsForRepo: (repoRoot: string) =>
-      ipcRenderer.invoke('github:sessions-for-repo', { repoRoot }),
-    saveActiveReview: (repoRoot: string, pr: unknown) =>
-      ipcRenderer.invoke('github:save-active-review', { repoRoot, pr }),
-    activeReviewsForRepo: (repoRoot: string) =>
-      ipcRenderer.invoke('github:active-reviews-for-repo', { repoRoot }),
-  },
   fs: {
     watchStart: (projectRoot: string) => ipcRenderer.invoke('fs:watch-start', { projectRoot }),
     watchStop: () => ipcRenderer.invoke('fs:watch-stop'),
@@ -195,11 +169,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:toggle-sidebar', listener)
       return () => ipcRenderer.removeListener('menu:toggle-sidebar', listener)
     },
-    onMenuOpenPrReviewWindow: (handler: () => void) => {
-      const listener = () => handler()
-      ipcRenderer.on('menu:open-pr-review-window', listener)
-      return () => ipcRenderer.removeListener('menu:open-pr-review-window', listener)
-    },
   },
   extensionBridge: {
     invoke: (channel: string, payload?: unknown) => ipcRenderer.invoke(channel, payload),
@@ -213,18 +182,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     write: (level: string, namespace: string, message: string) =>
       ipcRenderer.send('log:write', { level, namespace, message }),
   },
-  window: {
-    openPrReview: (repoRoot: string, accentColor?: string) =>
-      ipcRenderer.invoke('window:open-pr-review', { repoRoot, accentColor }),
-    onPrReviewWindowChange: (handler: (isOpen: boolean) => void) => {
-      const onOpen = () => handler(true)
-      const onClose = () => handler(false)
-      ipcRenderer.on('window:pr-review-opened', onOpen)
-      ipcRenderer.on('window:pr-review-closed', onClose)
-      return () => {
-        ipcRenderer.removeListener('window:pr-review-opened', onOpen)
-        ipcRenderer.removeListener('window:pr-review-closed', onClose)
-      }
-    },
-  },
 })
+

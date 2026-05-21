@@ -43,6 +43,7 @@ interface ExtensionRegistry {
   sidebarPanels: Map<string, SidebarPanelRegistration>
   projectTabs: Map<string, ProjectTabRegistration>
   globalTabs: Map<string, GlobalTabRegistration>
+  windowViews: Map<string, ComponentType<{ repoRoot: string | null }>>
   activeGlobalTabId: string | null
   keyboardShortcuts: KeyboardShortcutRegistration[]
   commands: CommandRegistration[]
@@ -52,6 +53,7 @@ interface ExtensionRegistry {
   registerSidebarPanel(panel: SidebarPanelRegistration): () => void
   registerProjectTab(tab: ProjectTabRegistration): () => void
   registerGlobalTab(tab: GlobalTabRegistration): () => void
+  registerWindowView(id: string, component: ComponentType<{ repoRoot: string | null }>): void
   registerKeyboardShortcut(shortcut: KeyboardShortcutRegistration): () => void
   registerCommand(command: CommandRegistration): () => void
   togglePanel(panelId: string): void
@@ -64,6 +66,7 @@ export type ExtensionRendererAPI = Pick<
   | 'registerGlobalTab'
   | 'registerSidebarPanel'
   | 'registerProjectTab'
+  | 'registerWindowView'
   | 'registerKeyboardShortcut'
   | 'registerCommand'
 >
@@ -72,6 +75,7 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
   sidebarPanels: new Map(),
   projectTabs: new Map(),
   globalTabs: new Map(),
+  windowViews: new Map(),
   activeGlobalTabId: null,
   keyboardShortcuts: [],
   commands: [],
@@ -126,6 +130,14 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
         if (s.activeGlobalTabId === tab.id) next.activeGlobalTabId = null
         return next
       })
+  },
+
+  registerWindowView(id, component) {
+    set((s) => {
+      const views = new Map(s.windowViews)
+      views.set(id, component)
+      return { windowViews: views }
+    })
   },
 
   registerKeyboardShortcut(shortcut) {

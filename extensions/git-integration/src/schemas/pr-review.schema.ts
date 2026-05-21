@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 const SignalValueSchema = z.enum(['pass', 'warn', 'fail', 'unknown'])
 
-const SignalDotsSchema = z.object({
+export const SignalDotsSchema = z.object({
   tests: SignalValueSchema,
   coverage: SignalValueSchema,
   ci: SignalValueSchema,
@@ -15,7 +15,7 @@ const SignalDotsSchema = z.object({
 
 // ─── Risk score ───────────────────────────────────────────────────────────────
 
-const RiskScoreSchema = z.object({
+export const RiskScoreSchema = z.object({
   level: z.enum(['low', 'medium', 'high']),
   composite: z.number().nullable(),
   metrics: z.object({
@@ -33,7 +33,7 @@ const RiskScoreSchema = z.object({
 
 // ─── File metrics (raw input to computeRiskScore) ────────────────────────────
 
-const FileMetricsSchema = z.object({
+export const FileMetricsSchema = z.object({
   path: z.string(),
   additions: z.number(),
   deletions: z.number(),
@@ -48,7 +48,7 @@ const FileMetricsSchema = z.object({
 
 // ─── Changed file ─────────────────────────────────────────────────────────────
 
-const PrChangedFileSchema = z.object({
+export const PrChangedFileSchema = z.object({
   path: z.string(),
   oldPath: z.string().optional(),
   changeType: z.enum(['added', 'modified', 'deleted', 'renamed']),
@@ -63,7 +63,7 @@ const PrChangedFileSchema = z.object({
 
 // ─── Chapter ──────────────────────────────────────────────────────────────────
 
-const ChapterSchema = z.object({
+export const ChapterSchema = z.object({
   id: z.string(),
   name: z.string(),
   files: z.array(PrChangedFileSchema),
@@ -126,7 +126,7 @@ export const ReviewQueuePRSchema = z.object({
 
 // ─── Inline comments ─────────────────────────────────────────────────────────
 
-const InlineCommentSchema = z.object({
+export const InlineCommentSchema = z.object({
   id: z.number(),
   author: z.string(),
   authorAvatarUrl: z.string(),
@@ -144,7 +144,7 @@ const InlineCommentSchema = z.object({
   parentId: z.number().nullable(),
 })
 
-const ThreadSchema = z.object({
+export const ThreadSchema = z.object({
   id: z.string(),
   path: z.string(),
   line: z.number(),
@@ -174,6 +174,7 @@ export const ReviewSessionSchema = z.object({
 
 // ─── Type exports ─────────────────────────────────────────────────────────────
 
+export type SignalValue = z.infer<typeof SignalValueSchema>
 export type SignalDots = z.infer<typeof SignalDotsSchema>
 export type RiskScore = z.infer<typeof RiskScoreSchema>
 export type FileMetrics = z.infer<typeof FileMetricsSchema>

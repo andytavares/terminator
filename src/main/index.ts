@@ -13,7 +13,6 @@ import { ExtensionHost } from './extensions/extension-host.js'
 import { logger } from './logger.js'
 
 let mainWindow: BrowserWindow | null = null
-let prReviewWin: BrowserWindow | null = null
 const ptyManager = new PtyManager()
 const extensionHost = new ExtensionHost()
 
@@ -39,37 +38,6 @@ function createWindow(): void {
   })
 }
 
-function createPrReviewWindow(repoRoot: string, accentColor?: string): void {
-  const repoName = repoRoot.split('/').filter(Boolean).pop() ?? 'Code Review'
-  const win = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    title: `Code Review — ${repoName}`,
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: join(__dirname, '../preload/index.js'),
-    },
-  })
-
-  prReviewWin = win
-  mainWindow?.webContents.send('window:pr-review-opened')
-
-  win.on('closed', () => {
-    prReviewWin = null
-    mainWindow?.webContents.send('window:pr-review-closed')
-  })
-
-  const params: Record<string, string> = { view: 'pr-review', repoRoot }
-  if (accentColor) params.accentColor = accentColor
-  if (process.env.NODE_ENV === 'development' || process.env['ELECTRON_RENDERER_URL']) {
-    const base = process.env['ELECTRON_RENDERER_URL'] || 'http://localhost:5173'
-    win.loadURL(`${base}?${new URLSearchParams(params).toString()}`)
-  } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'), { query: params })
-  }
-}
-
 function setupMenu(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
@@ -91,11 +59,6 @@ function setupMenu(): void {
           label: 'Open Settings',
           accelerator: 'CmdOrCtrl+,',
           click: () => mainWindow?.webContents.send('menu:open-settings'),
-        },
-        { type: 'separator' },
-        {
-          label: 'Code Reviews in New Window',
-          click: () => mainWindow?.webContents.send('menu:open-pr-review-window'),
         },
       ],
     },
@@ -138,16 +101,6 @@ app.whenReady().then(async () => {
   registerFsHandlers(() => mainWindow)
   registerLogHandlers()
   registerDialogHandlers()
-
-  ipcMain.handle('window:open-pr-review', (_event, payload) => {
-    const { repoRoot, accentColor } = payload as { repoRoot: string; accentColor?: string }
-    if (!repoRoot) return
-    if (prReviewWin && !prReviewWin.isDestroyed()) {
-      prReviewWin.focus()
-      return
-    }
-    createPrReviewWindow(repoRoot, accentColor)
-  })
 
   await extensionHost.loadAll()
   await extensionHost.loadBundledExtensions(join(__dirname, '../../extensions'))

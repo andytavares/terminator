@@ -134,13 +134,9 @@ interface ElectronAPI {
     onSelectProjectTab(handler: (tabId: string) => void): () => void
     onMenuOpenSettings(handler: () => void): () => void
     onMenuToggleSidebar(handler: () => void): () => void
-    onMenuOpenPrReviewWindow(handler: () => void): () => void
   }
   logger: {
     write(level: string, namespace: string, message: string): void
-  }
-  window: {
-    openPrReview(repoRoot: string, accentColor?: string): Promise<void>
   }
   // github namespace is contributed by the git-integration extension (see extensions/git-integration/src/types/electron.d.ts)
   extensionBridge: {

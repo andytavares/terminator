@@ -15,6 +15,7 @@ export interface Task {
   migratedTo?: string
   metadata: Record<string, string>
   terminatorLinks: string[]
+  subtasks?: Task[]
 }
 
 export interface Event {
@@ -74,6 +75,7 @@ export interface IndexedTask {
   area?: string
   dueDate?: string
   terminatorLinks: string[]
+  subtasks?: IndexedTask[]
 }
 
 export interface IndexedProject {

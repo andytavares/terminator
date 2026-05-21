@@ -1,19 +1,18 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ReviewSubmitPanel } from '../../src/components/pr-review/ReviewSubmitPanel'
 
 const mockPrReviewSubmit = vi.fn()
 
+vi.mock('../../src/api/github', () => ({
+  githubAPI: {
+    prReviewSubmit: (...args: unknown[]) => mockPrReviewSubmit(...args),
+  },
+}))
+
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    github: { prReviewSubmit: mockPrReviewSubmit },
-  }
-})
-
-afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('ReviewSubmitPanel', () => {

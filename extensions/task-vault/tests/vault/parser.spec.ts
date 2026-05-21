@@ -34,14 +34,14 @@ describe('parseFile', () => {
     expect(result.tasks[0].status).toBe('in-progress')
   })
 
-  it('parses +project tag', () => {
-    const result = parseFile('- [ ] Write report +terminator', '/vault/daily/2026-05-19.md')
+  it('parses @project tag', () => {
+    const result = parseFile('- [ ] Write report @terminator', '/vault/daily/2026-05-19.md')
     expect(result.tasks[0].project).toBe('terminator')
     expect(result.tasks[0].text).toBe('Write report')
   })
 
-  it('parses @context tag', () => {
-    const result = parseFile('- [ ] Call dentist @phone', '/vault/daily/2026-05-19.md')
+  it('parses +context tag', () => {
+    const result = parseFile('- [ ] Call dentist +phone', '/vault/daily/2026-05-19.md')
     expect(result.tasks[0].context).toBe('phone')
   })
 
@@ -122,7 +122,7 @@ area: work
 
   it('parses multiple tags in one task', () => {
     const result = parseFile(
-      '- [ ] Fix bug +terminator @computer #work due:2026-05-20',
+      '- [ ] Fix bug @terminator +computer #work due:2026-05-20',
       '/vault/daily/2026-05-19.md'
     )
     const task = result.tasks[0]
