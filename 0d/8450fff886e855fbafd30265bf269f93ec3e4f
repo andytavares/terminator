@@ -1,0 +1,19 @@
+extensions/task-vault/src/components/task-vault.css
+  s_df69d73d47552a::t_7bbdf768abf21e 3153-3399
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "0d8450fff886e855fbafd30265bf269f93ec3e4f",
+  "prompts": {},
+  "sessions": {
+    "s_df69d73d47552a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a67ad385-9ea8-4b73-96b3-9b8160b0ec71",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
