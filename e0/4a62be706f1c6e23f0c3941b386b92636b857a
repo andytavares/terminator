@@ -1,0 +1,19 @@
+extensions/task-vault/tests/mcp/tools/list-projects.spec.ts
+  s_df69d73d47552a::t_738d0f42bd986a 3,8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "e04a62be706f1c6e23f0c3941b386b92636b857a",
+  "prompts": {},
+  "sessions": {
+    "s_df69d73d47552a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a67ad385-9ea8-4b73-96b3-9b8160b0ec71",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
