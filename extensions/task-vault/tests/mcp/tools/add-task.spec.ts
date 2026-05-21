@@ -1,13 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import * as fs from 'node:fs/promises'
 
-vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>()
-  return { ...actual, readFile: vi.fn(), writeFile: vi.fn(), rename: vi.fn(), mkdir: vi.fn() }
+const { mockRun, mockGet, mockAll, mockPrepare } = vi.hoisted(() => {
+  const mockRun = vi.fn().mockReturnValue({ changes: 1 })
+  const mockGet = vi.fn()
+  const mockAll = vi.fn().mockReturnValue([])
+  const mockPrepare = vi.fn().mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
+  return { mockRun, mockGet, mockAll, mockPrepare }
 })
 
-vi.mock('gray-matter', () => ({
-  default: vi.fn((content: string) => ({ content, data: {} })),
+vi.mock('../../../src/vault/db', () => ({
+  getDb: vi.fn(() => ({ prepare: mockPrepare })),
+  randomUUID: vi.fn(() => 'test-uuid'),
 }))
 
 vi.mock('../../../src/mcp/auto-execute', () => ({
@@ -19,20 +22,16 @@ vi.mock('../../../src/mcp/auto-execute', () => ({
   })),
 }))
 
-vi.mock('../../../src/vault/indexer', () => ({
-  buildIndex: vi.fn().mockResolvedValue({}),
-}))
-
 import { addTaskMcp } from '../../../src/mcp/tools/add-task'
 
 const VAULT = '/vault'
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(fs.readFile).mockResolvedValue('- [ ] New task +proj\n' as unknown as Buffer)
-  vi.mocked(fs.writeFile).mockResolvedValue()
-  vi.mocked(fs.rename).mockResolvedValue()
-  vi.mocked(fs.mkdir).mockResolvedValue(undefined)
+  mockAll.mockReturnValue([])
+  mockGet.mockReturnValue(undefined)
+  mockRun.mockReturnValue({ changes: 1 })
+  mockPrepare.mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
 })
 
 describe('addTaskMcp', () => {
@@ -41,10 +40,10 @@ describe('addTaskMcp', () => {
       { filePath: '/vault/daily/2026-05-20.md', text: 'New task' },
       VAULT
     )
-    expect('taskId' in result).toBe(true)
+    expect(result).toEqual({ taskId: 'test-uuid' })
   })
 
-  it('appends tags to task text', async () => {
+  it('calls db.prepare with INSERT when adding a task', async () => {
     await addTaskMcp(
       {
         filePath: '/vault/daily/2026-05-20.md',
@@ -53,8 +52,8 @@ describe('addTaskMcp', () => {
       },
       VAULT
     )
-    const written = (vi.mocked(fs.writeFile).mock.calls[0]?.[1] as string) ?? ''
-    expect(written).toContain('+alpha')
+    expect(mockPrepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO tasks'))
+    expect(mockRun).toHaveBeenCalled()
   })
 
   it('returns suggestion when auto-execute is off', async () => {
@@ -71,6 +70,6 @@ describe('addTaskMcp', () => {
       { filePath: '/vault/daily/2026-05-20.md', text: 'Task', confirmed: true },
       VAULT
     )
-    expect('taskId' in result).toBe(true)
+    expect(result).toEqual({ taskId: 'test-uuid' })
   })
 })

@@ -1,5 +1,4 @@
 import * as path from 'node:path'
-import * as fs from 'node:fs/promises'
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import { registerVaultIpcHandlers, setVaultPath } from './ipc/vault.ipc.js'
 import {
@@ -8,8 +7,7 @@ import {
 } from './ipc/projects.ipc.js'
 import { registerLinksIpcHandlers, setVaultPath as setLinksVaultPath } from './ipc/links.ipc.js'
 import { registerIcsIpcHandlers, setVaultPath as setIcsVaultPath } from './ipc/ics.ipc.js'
-import { startWatcher, stopWatcher } from './vault/watcher.js'
-import { buildIndex } from './vault/indexer.js'
+import { initDb, closeDb } from './vault/db.js'
 import { startPolling, stopPolling } from './ics/fetcher.js'
 
 const disposables: Disposable[] = []
@@ -23,7 +21,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
         'terminator.task-vault.vaultPath': {
           type: 'string',
           label: 'Vault Path',
-          description: 'Absolute path to your markdown vault directory',
+          description: 'Absolute path to your vault directory',
           default: '',
         },
         'terminator.task-vault.captureHotkey': {
@@ -45,6 +43,13 @@ export async function activate(api: ExtensionAPI): Promise<void> {
           label: 'Weekly Review Day',
           description: 'Day of the week for weekly review reminder (0=Sun, 6=Sat)',
           default: '0',
+        },
+        'terminator.task-vault.contexts': {
+          type: 'string',
+          label: 'Contexts',
+          description:
+            'Comma-separated list of contexts shown in the + picker (e.g. home,work,computer,phone,errands)',
+          default: 'home,work,computer,phone,errands',
         },
         'terminator.task-vault.mcpAutoExecute.capture': {
           type: 'boolean',
@@ -78,31 +83,27 @@ export async function activate(api: ExtensionAPI): Promise<void> {
 
   const vaultPath = api.settings.get<string>('terminator.task-vault.vaultPath') ?? ''
 
+  // Register IPC handlers first so they're always available
+  const disposeIpc = registerVaultIpcHandlers()
+  disposables.push({ dispose: disposeIpc })
+  const disposeProjectsIpc = registerProjectsIpcHandlers()
+  disposables.push({ dispose: disposeProjectsIpc })
+  const disposeLinksIpc = registerLinksIpcHandlers()
+  disposables.push({ dispose: disposeLinksIpc })
+  const disposeIcsIpc = registerIcsIpcHandlers()
+  disposables.push({ dispose: disposeIcsIpc })
+
   if (vaultPath) {
     setVaultPath(vaultPath)
     setProjectsVaultPath(vaultPath)
     setLinksVaultPath(vaultPath)
     setIcsVaultPath(vaultPath)
 
-    // Ensure vault directory structure exists
-    await fs.mkdir(path.join(vaultPath, '.todo'), { recursive: true })
-    await fs.mkdir(path.join(vaultPath, 'daily'), { recursive: true })
-
-    // Create inbox.md if it doesn't exist
-    const inboxFile = path.join(vaultPath, 'inbox.md')
     try {
-      await fs.access(inboxFile)
-    } catch {
-      await fs.writeFile(inboxFile, '# Inbox\n\n', 'utf-8')
+      initDb(vaultPath)
+    } catch (err) {
+      console.error('[task-vault] Failed to initialize SQLite DB:', err)
     }
-
-    // Build initial index
-    await buildIndex(vaultPath)
-
-    // Start watcher
-    await startWatcher(vaultPath, (_index) => {
-      // TODO: push index-updated event to renderer windows
-    })
 
     // Start ICS feed polling
     const feedUrls = api.settings.get<string[]>('terminator.task-vault.icsFeedUrls') ?? []
@@ -114,23 +115,13 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     }
   }
 
-  // Register IPC handlers
-  const disposeIpc = registerVaultIpcHandlers()
-  disposables.push({ dispose: disposeIpc })
-  const disposeProjectsIpc = registerProjectsIpcHandlers()
-  disposables.push({ dispose: disposeProjectsIpc })
-  const disposeLinksIpc = registerLinksIpcHandlers()
-  disposables.push({ dispose: disposeLinksIpc })
-  const disposeIcsIpc = registerIcsIpcHandlers()
-  disposables.push({ dispose: disposeIcsIpc })
-
   // Weekly review nudge
   if (vaultPath) {
     const reviewDay = parseInt(
       api.settings.get<string>('terminator.task-vault.weeklyReviewDay') ?? '0',
       10
     )
-    scheduleWeeklyReviewNudge(api, vaultPath, reviewDay)
+    scheduleWeeklyReviewNudge(api, reviewDay)
   }
 
   // Register capture hotkey
@@ -149,32 +140,17 @@ export async function activate(api: ExtensionAPI): Promise<void> {
 
 let reviewNudgeInterval: ReturnType<typeof setInterval> | null = null
 
-function scheduleWeeklyReviewNudge(api: ExtensionAPI, vaultPath: string, reviewDay: number): void {
-  async function checkAndNudge() {
+function scheduleWeeklyReviewNudge(api: ExtensionAPI, reviewDay: number): void {
+  function checkAndNudge() {
     const now = new Date()
     if (now.getDay() !== reviewDay) return
-    // Check if review done this week
-    const dailyDir = `${vaultPath}/daily`
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    try {
-      const entries = await fs.readdir(dailyDir, { withFileTypes: true })
-      for (const entry of entries) {
-        if (!entry.isFile() || !entry.name.endsWith('.md')) continue
-        const fileDate = new Date(entry.name.replace('.md', ''))
-        if (fileDate < sevenDaysAgo) continue
-        const content = await fs.readFile(`${dailyDir}/${entry.name}`, 'utf-8').catch(() => '')
-        if (content.toLowerCase().includes('weekly review')) return
-      }
-    } catch {
-      /* ignore */
-    }
     api.notifications.showToast('info', 'Weekly review is ready — open Task Vault to start')
   }
 
-  checkAndNudge().catch(() => {})
+  checkAndNudge()
   reviewNudgeInterval = setInterval(
     () => {
-      checkAndNudge().catch(() => {})
+      checkAndNudge()
     },
     24 * 60 * 60 * 1000
   )
@@ -182,12 +158,11 @@ function scheduleWeeklyReviewNudge(api: ExtensionAPI, vaultPath: string, reviewD
 
 function openCaptureOverlay(_api: ExtensionAPI): void {
   // Implemented in renderer; main-side just signals renderer
-  // Full BrowserWindow implementation handled by renderer overlay
 }
 
 export async function deactivate(): Promise<void> {
-  await stopWatcher()
   stopPolling()
+  closeDb()
   if (reviewNudgeInterval !== null) {
     clearInterval(reviewNudgeInterval)
     reviewNudgeInterval = null

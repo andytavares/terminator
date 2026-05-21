@@ -106,6 +106,54 @@ export const QueryResponseSchema = z.union([
   z.object({ error: z.string() }),
 ])
 
+// ── vault:edit-task ──────────────────────────────────────────────────────────
+
+export const EditTaskRequestSchema = z.object({
+  taskId: TaskIdSchema,
+  text: z.string().min(1),
+})
+
+// ── vault:delete-task ────────────────────────────────────────────────────────
+
+export const DeleteTaskRequestSchema = z.object({ taskId: TaskIdSchema })
+
+// ── vault:cancel-task ────────────────────────────────────────────────────────
+
+export const CancelTaskRequestSchema = z.object({ taskId: TaskIdSchema })
+
+// ── vault:restore-task ───────────────────────────────────────────────────────
+
+export const RestoreTaskRequestSchema = z.object({ taskId: TaskIdSchema })
+
+// ── vault:create-area ────────────────────────────────────────────────────────
+
+export const CreateAreaRequestSchema = z.object({ name: z.string().min(1) })
+
+// ── vault:delete-area ────────────────────────────────────────────────────────
+
+export const DeleteAreaRequestSchema = z.object({ areaFilePath: z.string().min(1) })
+
+// ── vault:list-archive ───────────────────────────────────────────────────────
+
+export const ListArchiveRequestSchema = z.object({
+  days: z.number().optional(), // how many days back to look for done tasks
+})
+
+// ── projects:create ──────────────────────────────────────────────────────────
+
+export const CreateProjectRequestSchema = z.object({
+  name: z.string().min(1),
+  area: z.string().optional(),
+  deadline: DateSchema.optional(),
+  outcome: z.string().optional(),
+})
+
+// ── projects:delete ──────────────────────────────────────────────────────────
+
+export const DeleteProjectRequestSchema = z.object({
+  projectFilePath: z.string().min(1),
+})
+
 // ── vault:process-inbox-item ─────────────────────────────────────────────────
 
 export const ProcessInboxRequestSchema = z.object({

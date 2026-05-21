@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { CommentComposer } from '../../src/components/pr-review/CommentComposer'
 
@@ -12,18 +12,15 @@ vi.mock('../../src/components/pr-review/RichContent', () => ({
 const mockPrCommentAdd = vi.fn()
 const mockPrCommentReply = vi.fn()
 
+vi.mock('../../src/api/github', () => ({
+  githubAPI: {
+    prCommentAdd: (...args: unknown[]) => mockPrCommentAdd(...args),
+    prCommentReply: (...args: unknown[]) => mockPrCommentReply(...args),
+  },
+}))
+
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    github: {
-      prCommentAdd: mockPrCommentAdd,
-      prCommentReply: mockPrCommentReply,
-    },
-  }
-})
-
-afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 const newCommentProps = {

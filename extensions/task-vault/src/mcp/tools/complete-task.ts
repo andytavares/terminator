@@ -1,5 +1,4 @@
-import { completeTask } from '../../vault/writer'
-import { buildIndex, readIndex, getTaskById } from '../../vault/indexer'
+import { getDb } from '../../vault/db'
 import { getAutoExecuteSetting, makeSuggestion } from '../auto-execute'
 
 interface CompleteTaskInput {
@@ -17,8 +16,10 @@ export async function completeTaskMcp(
 ): Promise<
   { success: true } | { error: string } | { suggestion: string; tool: string; description: string }
 > {
-  const index = await readIndex(vaultPath)
-  const task = index ? getTaskById(index, input.taskId) : null
+  const db = getDb()
+  const task = db.prepare(`SELECT id, text FROM tasks WHERE id=?`).get(input.taskId) as
+    | { id: string; text: string }
+    | undefined
   if (!task) return { error: 'STALE_ID' }
 
   if (!input.confirmed) {
@@ -31,8 +32,11 @@ export async function completeTaskMcp(
     }
   }
 
-  const result = await completeTask(task.filePath, task.line, today())
-  if (result && 'error' in result) return result
-  await buildIndex(vaultPath)
+  const now = new Date().toISOString()
+  db.prepare(`UPDATE tasks SET status='done', completed_date=?, updated_at=? WHERE id=?`).run(
+    today(),
+    now,
+    input.taskId
+  )
   return { success: true }
 }

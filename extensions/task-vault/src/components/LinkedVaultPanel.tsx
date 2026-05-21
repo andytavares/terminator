@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import './task-vault.css'
 import type { IndexedTask, IndexedProject } from '../vault/types'
 
 interface LinkedVaultPanelProps {

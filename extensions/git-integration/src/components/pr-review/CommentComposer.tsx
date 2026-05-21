@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { RichContent } from './RichContent'
+import { githubAPI } from '../../api/github'
 
 interface NewCommentProps {
   repoRoot: string
@@ -39,7 +40,7 @@ export function CommentComposer(props: Props) {
     setError(null)
     try {
       if (isReply(props)) {
-        const result = await window.electronAPI.github.prCommentReply({
+        const result = await githubAPI.prCommentReply({
           repoRoot: props.repoRoot,
           prNumber: props.prNumber,
           inReplyToId: props.inReplyToId,
@@ -47,7 +48,7 @@ export function CommentComposer(props: Props) {
         })
         if ('error' in result) throw new Error((result as { error: string }).error)
       } else {
-        const result = await window.electronAPI.github.prCommentAdd({
+        const result = await githubAPI.prCommentAdd({
           repoRoot: props.repoRoot,
           prNumber: props.prNumber,
           commitId: props.commitId,

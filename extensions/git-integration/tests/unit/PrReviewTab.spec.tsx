@@ -3,10 +3,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { PrReviewTab } from '../../src/components/pr-review/PrReviewTab'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
+import * as githubModule from '../../src/api/github'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
 
 vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
+}))
+
+vi.mock('../../src/api/github', () => ({
+  githubAPI: {
+    sessionGet: vi.fn().mockResolvedValue({ session: null }),
+    sessionSet: vi.fn().mockResolvedValue({}),
+    saveActiveReview: vi.fn().mockResolvedValue({ ok: true }),
+  },
 }))
 
 vi.mock('../../src/hooks/usePrReview', () => ({
@@ -91,14 +100,23 @@ const defaultStoreState = {
   scrollPosition: null,
 }
 
+const mockInvoke = vi.fn().mockResolvedValue({ ok: true })
+const mockOn = vi.fn().mockReturnValue(() => {})
+
 beforeEach(() => {
   vi.clearAllMocks()
+  ;(githubModule.githubAPI.sessionGet as ReturnType<typeof vi.fn>).mockResolvedValue({
+    session: null,
+  })
+  ;(githubModule.githubAPI.sessionSet as ReturnType<typeof vi.fn>).mockResolvedValue({})
+  ;(githubModule.githubAPI.saveActiveReview as ReturnType<typeof vi.fn>).mockResolvedValue({
+    ok: true,
+  })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    github: {
-      sessionGet: vi.fn().mockResolvedValue({ session: null }),
-      sessionSet: vi.fn().mockResolvedValue({}),
+    extensionBridge: {
+      invoke: mockInvoke,
+      on: mockOn,
     },
-    window: { openPrReview: vi.fn(), onPrReviewWindowChange: vi.fn().mockReturnValue(() => {}) },
   }
   vi.mocked(usePrReviewStore).mockReturnValue(
     defaultStoreState as unknown as ReturnType<typeof usePrReviewStore>
@@ -137,13 +155,10 @@ describe('PrReviewTab', () => {
     expect(screen.getByTitle('Open in new window')).toBeTruthy()
   })
 
-  it('calls openPrReview when pop out button is clicked', () => {
+  it('calls extensionBridge.invoke with window:open-pr-review when pop out button is clicked', () => {
     render(<PrReviewTab repoRoot="/repo" />)
     fireEvent.click(screen.getByTitle('Open in new window'))
-    expect(
-      (window.electronAPI as unknown as { window: { openPrReview: ReturnType<typeof vi.fn> } })
-        .window.openPrReview
-    ).toHaveBeenCalledWith('/repo')
+    expect(mockInvoke).toHaveBeenCalledWith('window:open-pr-review', { repoRoot: '/repo' })
   })
 
   it('closes PR view and persists paused session when onClose is called', async () => {
@@ -158,10 +173,7 @@ describe('PrReviewTab', () => {
     await new Promise((r) => setTimeout(r, 0))
     expect(mockSetActivePr).toHaveBeenCalledWith(null)
     expect(mockReset).toHaveBeenCalled()
-    const sessionSet = (
-      window.electronAPI as unknown as { github: { sessionSet: ReturnType<typeof vi.fn> } }
-    ).github.sessionSet
-    expect(sessionSet).toHaveBeenCalledWith(
+    expect(githubModule.githubAPI.sessionSet).toHaveBeenCalledWith(
       '/repo:::1:::abc123',
       expect.objectContaining({ pausedAt: expect.any(String) })
     )

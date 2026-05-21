@@ -169,6 +169,9 @@ export interface ExtensionAPI {
     onSessionCreate(handler: (session: Readonly<SessionSnapshot>) => void): Disposable
     onSessionClose(handler: (sessionId: string) => void): Disposable
   }
+  window: {
+    openAuxiliary(view: string, params?: Record<string, string>): void
+  }
 }
 
 import {
@@ -178,6 +181,10 @@ import {
   ipcMain,
   globalShortcut as electronGlobalShortcut,
 } from 'electron'
+import { join } from 'path'
+
+declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string
+declare const MAIN_WINDOW_VITE_NAME: string
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
 import { fsWatcherService } from '../fs/fs-watcher.js'
 import { getExtensionSetting } from '../storage/extension-settings-store.js'
@@ -273,6 +280,9 @@ function rebuildViewMenu(): void {
     // Menu may not exist in test environments; ignore
   }
 }
+
+// Map from view name to open auxiliary BrowserWindow (shared across all extensions)
+const auxiliaryWindows = new Map<string, BrowserWindow>()
 
 export function createExtensionAPI(
   extensionId: string,
@@ -460,6 +470,39 @@ export function createExtensionAPI(
       onSessionClose(handler: (sessionId: string) => void): Disposable {
         globalRegistry.sessionCloseHandlers.add(handler)
         return disposable(() => globalRegistry.sessionCloseHandlers.delete(handler))
+      },
+    },
+    window: {
+      openAuxiliary(view: string, params?: Record<string, string>): void {
+        const existing = auxiliaryWindows.get(view)
+        if (existing && !existing.isDestroyed()) {
+          existing.focus()
+          return
+        }
+        const win = new BrowserWindow({
+          width: 1400,
+          height: 900,
+          webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+            preload: join(__dirname, '../preload/index.js'),
+          },
+        })
+        auxiliaryWindows.set(view, win)
+        win.on('closed', () => {
+          auxiliaryWindows.delete(view)
+        })
+        const query: Record<string, string> = { view, ...params }
+        if (
+          typeof MAIN_WINDOW_VITE_DEV_SERVER_URL !== 'undefined' &&
+          MAIN_WINDOW_VITE_DEV_SERVER_URL
+        ) {
+          win.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}?${new URLSearchParams(query).toString()}`)
+        } else {
+          win.loadFile(join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`), {
+            query,
+          })
+        }
       },
     },
   }

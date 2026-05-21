@@ -34,6 +34,7 @@ async function buildExtension(name) {
       'gray-matter',
       'node-ical',
       '@modelcontextprotocol/sdk',
+      'better-sqlite3',
     ],
     logLevel: 'info',
   })

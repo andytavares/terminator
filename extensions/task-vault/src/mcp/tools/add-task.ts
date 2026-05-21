@@ -1,8 +1,5 @@
-import * as path from 'node:path'
-import * as fs from 'node:fs/promises'
-import { addTask } from '../../vault/writer'
-import { buildIndex } from '../../vault/indexer'
-import { parseFile } from '../../vault/parser'
+import { getDb, randomUUID } from '../../vault/db'
+import { extractTags } from '../../vault/tags'
 import { getAutoExecuteSetting, makeSuggestion } from '../auto-execute'
 
 interface AddTaskInput {
@@ -12,6 +9,18 @@ interface AddTaskInput {
   dueDate?: string
   tags?: { project?: string; context?: string; area?: string }
   confirmed?: boolean
+}
+
+function resolveSource(filePath: string): { source: string; sourceRef: string | null } {
+  const normalized = filePath.replace(/\\/g, '/')
+  const dailyMatch = /daily\/(\d{4}-\d{2}-\d{2})\.md$/.exec(normalized)
+  if (dailyMatch) return { source: 'daily', sourceRef: dailyMatch[1] }
+  const projectMatch = /projects\/(.+)\.md$/.exec(normalized)
+  if (projectMatch) return { source: 'project', sourceRef: projectMatch[1] }
+  const areaMatch = /areas\/(.+)\.md$/.exec(normalized)
+  if (areaMatch) return { source: 'area', sourceRef: areaMatch[1] }
+  if (normalized.endsWith('someday.md')) return { source: 'someday', sourceRef: null }
+  return { source: 'inbox', sourceRef: null }
 }
 
 export async function addTaskMcp(
@@ -28,19 +37,31 @@ export async function addTaskMcp(
   }
 
   const parts: string[] = [input.text]
-  if (input.tags?.project) parts.push(`+${input.tags.project}`)
-  if (input.tags?.context) parts.push(`@${input.tags.context}`)
+  if (input.tags?.project) parts.push(`@${input.tags.project}`)
+  if (input.tags?.context) parts.push(`+${input.tags.context}`)
   if (input.tags?.area) parts.push(`#${input.tags.area}`)
   if (input.dueDate) parts.push(`due:${input.dueDate}`)
+  const extracted = extractTags(parts.join(' '))
 
-  const fullPath = path.isAbsolute(input.filePath)
-    ? input.filePath
-    : path.join(vaultPath, input.filePath)
-  await addTask(fullPath, parts.join(' '), input.section)
-  await buildIndex(vaultPath)
-
-  const content = await fs.readFile(fullPath, 'utf-8').catch(() => '')
-  const { tasks } = parseFile(content, fullPath)
-  const last = tasks[tasks.length - 1]
-  return { taskId: last?.id ?? '' }
+  const { source, sourceRef } = resolveSource(input.filePath)
+  const db = getDb()
+  const now = new Date().toISOString()
+  const id = randomUUID()
+  db.prepare(
+    `INSERT INTO tasks (id,text,status,project,context,area,due_date,source,source_ref,created_at,updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+  ).run(
+    id,
+    extracted.text,
+    'open',
+    extracted.project ?? null,
+    extracted.context ?? null,
+    extracted.area ?? null,
+    extracted.dueDate ?? null,
+    source,
+    sourceRef,
+    now,
+    now
+  )
+  return { taskId: id }
 }

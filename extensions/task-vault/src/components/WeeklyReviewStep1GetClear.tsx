@@ -34,7 +34,9 @@ export function WeeklyReviewStep1GetClear({
           {remaining.map((item) => (
             <li key={item.id} className="wr-step__item">
               <span>{item.text}</span>
-              <button onClick={() => fileToInbox(item.id)}>File to inbox</button>
+              <button className="tv-btn tv-btn--secondary" onClick={() => fileToInbox(item.id)}>
+                File to inbox
+              </button>
             </li>
           ))}
         </ul>

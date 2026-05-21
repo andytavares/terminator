@@ -191,13 +191,6 @@ export function App(): JSX.Element {
   }, [])
 
   useEffect(() => {
-    if (!window.electronAPI.extensionEvents?.onMenuOpenPrReviewWindow) return
-    return window.electronAPI.extensionEvents.onMenuOpenPrReviewWindow(() => {
-      if (repoRoot) window.electronAPI.window.openPrReview(repoRoot, activeWorkspace?.color)
-    })
-  }, [repoRoot, activeWorkspace?.color])
-
-  useEffect(() => {
     if (!window.electronAPI.extensionEvents) return
     return window.electronAPI.extensionEvents.onToast(({ type, message }) => {
       addToast({ type: type as 'info' | 'success' | 'warning' | 'error', message })

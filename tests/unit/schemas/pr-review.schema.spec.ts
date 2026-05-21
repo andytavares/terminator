@@ -9,7 +9,7 @@ import {
   ReviewSessionSchema,
   InlineCommentSchema,
   ThreadSchema,
-} from '../../../src/shared/schemas/pr-review.schema'
+} from '../../../extensions/git-integration/src/schemas/pr-review.schema'
 
 const validSignalDots = {
   tests: 'pass' as const,

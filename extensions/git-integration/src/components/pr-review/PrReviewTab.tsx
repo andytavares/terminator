@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import { githubAPI } from '../../api/github'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { ReviewQueue } from './ReviewQueue'
 import { PrReviewView } from './PrReviewView'
@@ -35,7 +36,17 @@ export function PrReviewTab({ repoRoot }: Props) {
 
   useEffect(() => {
     if (isPopoutWindow) return
-    return window.electronAPI.window.onPrReviewWindowChange(setIsPoppedOut)
+    // Listen for auxiliary window open/close events via extensionBridge
+    const unsubOpen = window.electronAPI.extensionBridge.on('window:pr-review-opened', () =>
+      setIsPoppedOut(true)
+    )
+    const unsubClose = window.electronAPI.extensionBridge.on('window:pr-review-closed', () =>
+      setIsPoppedOut(false)
+    )
+    return () => {
+      unsubOpen()
+      unsubClose()
+    }
   }, [isPopoutWindow])
   const loadQueue = useLoadPrQueue(repoRoot)
   const loadPrDetail = useLoadPrDetail(repoRoot)
@@ -67,14 +78,14 @@ export function PrReviewTab({ repoRoot }: Props) {
     setActiveQueuePr(pr)
     await loadPrDetail(pr.number, async (detail) => {
       const key = `${repoRoot}:::${pr.number}:::${detail.headSHA}`
-      const result = await window.electronAPI.github.sessionGet(key)
+      const result = await githubAPI.sessionGet(key)
       const raw = (result as { session: unknown }).session
       if (raw) {
         const parsed = ReviewSessionSchema.safeParse(raw)
         if (parsed.success) initSession(parsed.data)
       } else {
         // Persist an initial session so the PR shows as in-progress on next queue load.
-        await window.electronAPI.github.sessionSet(key, {
+        await githubAPI.sessionSet(key, {
           repoRoot,
           prNumber: pr.number,
           headSHA: detail.headSHA,
@@ -89,7 +100,7 @@ export function PrReviewTab({ repoRoot }: Props) {
       }
       // Persist the PR snapshot so it always appears in the in-progress section,
       // even if it falls beyond the first page on next load.
-      void window.electronAPI.github.saveActiveReview(repoRoot, pr)
+      void githubAPI.saveActiveReview(repoRoot, pr)
       // Immediately reflect in-progress in the queue without waiting for a refresh.
       markPrInProgress(pr.number)
       setActivePr(detail)
@@ -104,7 +115,7 @@ export function PrReviewTab({ repoRoot }: Props) {
     // on the next queue load reliably finds this session and shows it as paused.
     if (repoRoot && activePr) {
       const key = `${repoRoot}:::${activePr.number}:::${activePr.headSHA}`
-      await window.electronAPI.github.sessionSet(key, {
+      await githubAPI.sessionSet(key, {
         repoRoot,
         prNumber: activePr.number,
         headSHA: activePr.headSHA,
@@ -133,7 +144,8 @@ export function PrReviewTab({ repoRoot }: Props) {
   }
 
   const handlePopOut = () => {
-    if (repoRoot) void window.electronAPI.window.openPrReview(repoRoot)
+    if (repoRoot)
+      void window.electronAPI.extensionBridge.invoke('window:open-pr-review', { repoRoot })
   }
 
   if (!repoRoot) {
