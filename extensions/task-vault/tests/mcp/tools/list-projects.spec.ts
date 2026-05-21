@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockRun, mockGet, mockAll, mockPrepare } = vi.hoisted(() => {
+const { mockGet, mockAll, mockPrepare } = vi.hoisted(() => {
   const mockRun = vi.fn().mockReturnValue({ changes: 1 })
   const mockGet = vi.fn()
   const mockAll = vi.fn().mockReturnValue([])
   const mockPrepare = vi.fn().mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
-  return { mockRun, mockGet, mockAll, mockPrepare }
+  return { mockGet, mockAll, mockPrepare }
 })
 
 vi.mock('../../../src/vault/db', () => ({
