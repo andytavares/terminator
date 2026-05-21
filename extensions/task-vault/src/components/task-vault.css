@@ -3150,3 +3150,250 @@
   color: var(--tm-text);
   background: var(--tm-surface-2, rgba(255, 255, 255, 0.06));
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   VISUAL REFINEMENTS — refined dark productivity aesthetic
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Global transition upgrade ───────────────────────────────────── */
+.tv-btn {
+  transition:
+    background 150ms ease-out,
+    color 150ms ease-out,
+    border-color 150ms ease-out,
+    box-shadow 150ms ease-out,
+    filter 150ms ease-out,
+    transform 80ms ease-out;
+}
+
+.tv-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.tv-btn--primary:hover:not(:disabled) {
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--tm-accent, #7c6af7) 40%, transparent);
+}
+
+/* ── Sidebar: polished rounded active state ──────────────────────── */
+.vault-sidebar {
+  padding: 8px 6px;
+}
+
+.vault-sidebar__item {
+  border-radius: 6px;
+  margin: 0;
+  padding: 7px 10px;
+  transition:
+    background 150ms ease-out,
+    color 150ms ease-out;
+}
+
+.vault-sidebar__item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.vault-sidebar__item--active {
+  background: color-mix(in srgb, var(--tm-accent, #7c6af7) 13%, transparent);
+  border-left: 2px solid var(--tm-accent);
+  padding-left: 8px;
+}
+
+/* ── Daily log: typographic hierarchy ────────────────────────────── */
+.daily-log__date {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.daily-log__tasks h3,
+.daily-log__events h3,
+.daily-log__notes h3 {
+  letter-spacing: 0.1em;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+/* Task row hover with action reveal */
+.daily-log__task {
+  border-radius: 5px;
+  padding-left: 4px;
+  padding-right: 4px;
+  transition: background 120ms ease-out;
+}
+
+.daily-log__task:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.daily-log__task-actions {
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.daily-log__task:hover .daily-log__task-actions {
+  opacity: 1;
+}
+
+/* Subtask action reveal */
+.daily-log__subtask-actions {
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.daily-log__subtask:hover .daily-log__subtask-actions {
+  opacity: 1;
+}
+
+/* ── Project cards: hover elevation ──────────────────────────────── */
+.projects-browser__card {
+  transition:
+    background 150ms ease-out,
+    border-color 150ms ease-out,
+    box-shadow 200ms ease-out,
+    transform 150ms ease-out;
+}
+
+.projects-browser__card:hover {
+  background: var(--tm-bg-card-hover);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.3),
+    0 1px 3px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+  border-color: var(--tm-border-strong);
+}
+
+.projects-browser__name {
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+
+/* ── Inbox items: elevation on hover ─────────────────────────────── */
+.inbox-item {
+  transition:
+    background 150ms ease-out,
+    border-color 150ms ease-out,
+    box-shadow 200ms ease-out;
+}
+
+.inbox-item:hover {
+  background: var(--tm-bg-card-hover);
+  border-color: var(--tm-border-strong);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Area cards: elevation on hover ──────────────────────────────── */
+.areas-view__card {
+  transition:
+    background 150ms ease-out,
+    border-color 150ms ease-out,
+    box-shadow 200ms ease-out,
+    transform 150ms ease-out;
+}
+
+.areas-view__card:hover {
+  background: var(--tm-bg-card-hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transform: translateY(-1px);
+  border-color: var(--tm-border-strong);
+}
+
+/* ── Page headers: consistent typographic treatment ─────────────── */
+.inbox-view__header h2,
+.projects-browser__header h2,
+.projects-browser h2,
+.areas-view__header h2,
+.archive-view__header h2,
+.area-detail__header h2 {
+  letter-spacing: -0.02em;
+}
+
+/* ── Tags: consistent presence ───────────────────────────────────── */
+.daily-log__tag {
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+
+.link-picker__result-type {
+  font-size: 9px;
+}
+
+/* ── Weekly review: pill-expanding progress dots ─────────────────── */
+.weekly-review__dot {
+  transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.weekly-review__dot--active {
+  width: 20px !important;
+  border-radius: 4px !important;
+}
+
+/* ── Archive tabs: refined transition ────────────────────────────── */
+.archive-view__tab {
+  transition:
+    color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+
+/* ── Dropdowns: stronger elevation ───────────────────────────────── */
+.smart-input__dropdown,
+.area-combobox__dropdown {
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.5),
+    0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Capture modal: stronger shadow ──────────────────────────────── */
+.capture-modal {
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.7),
+    0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Focus rings: consistent glow ────────────────────────────────── */
+.smart-input__field:focus,
+.quick-capture__input:focus,
+.inbox-view__capture-input:focus,
+.area-detail__add-input:focus,
+.daily-log__add-input:focus,
+.daily-log__edit-input:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tm-accent, #7c6af7) 20%, transparent);
+}
+
+/* ── Add task button: more inviting ──────────────────────────────── */
+.daily-log__add-btn {
+  transition:
+    background 150ms ease-out,
+    color 150ms ease-out,
+    border-color 150ms ease-out,
+    border-style 150ms ease-out;
+}
+
+/* ── Sidebar badge: subtle pulse breathing ───────────────────────── */
+@keyframes tv-badge-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--tm-accent, #7c6af7) 30%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--tm-accent, #7c6af7) 0%, transparent);
+  }
+}
+
+.vault-sidebar__badge {
+  animation: tv-badge-pulse 2.5s ease-in-out infinite;
+}
+
+/* ── Weekly review step content: better readability ──────────────── */
+.weekly-review__content {
+  line-height: 1.65;
+}
+
+/* ── Section content transitions ─────────────────────────────────── */
+.projects-browser__filter-btn,
+.archive-view__window-btn,
+.inbox-view__process-btn,
+.inbox-view__back-btn {
+  transition:
+    background 150ms ease-out,
+    color 150ms ease-out,
+    border-color 150ms ease-out;
+}
