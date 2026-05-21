@@ -1,0 +1,25 @@
+extensions/task-vault/src/components/VaultSidebar.tsx
+  s_df69d73d47552a::t_3a7b72a0af396e 2
+  s_df69d73d47552a::t_00059d3b950de4 5-11,19,25-26
+extensions/task-vault/src/components/DailyLog.tsx
+  s_df69d73d47552a::t_6918c124de8987 2-14,28-61,144,151,159,161,166-179,187,207,211,218,222,230,342-354,395,400,402,409,419,425,427,430-443,459,463,476,497,501,594-599,602-605,608-623,668
+extensions/task-vault/src/components/task-vault.css
+  s_df69d73d47552a::t_3a7b72a0af396e 3411-3413
+  s_df69d73d47552a::t_a03a93f942f155 3400-3410,3414-3607
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "25be37093ec258009b203271807f8e9126525aa6",
+  "prompts": {},
+  "sessions": {
+    "s_df69d73d47552a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a67ad385-9ea8-4b73-96b3-9b8160b0ec71",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
