@@ -1,0 +1,332 @@
+extensions/task-vault/src/components/WeeklyReview.tsx
+  s_df69d73d47552a::t_d5b73cc98d60d8 2
+  s_df69d73d47552a::t_8e2a53767ffcd5 111,114
+  s_df69d73d47552a::t_7e16f7ecdd7aab 112,115
+extensions/task-vault/src/schemas/vault.schema.ts
+  s_df69d73d47552a::t_179494db4e01a0 109-123,136-156
+  s_df69d73d47552a::t_be018e43656bd1 124-135
+extensions/task-vault/src/components/WeeklyReviewStep3Projects.tsx
+  s_df69d73d47552a::t_ddd84b4097dfa0 42-43
+  s_df69d73d47552a::t_6a1f4683fa8a87 2
+  s_df69d73d47552a::t_7a71d25ae7224d 48
+extensions/task-vault/src/components/ArchiveView.tsx
+  s_df69d73d47552a::t_11218e92be7c8e 252
+  s_df69d73d47552a::t_1d5fbd04379e5a 70-80,93,111,129-131,133-138,144-146,148-153,159-161,163-168,190,216-224,229-233,235-236,238-251,253
+  s_df69d73d47552a::t_45929850bd5310 1,3-69,81-92,94-110,112-128,132,139-143,147,154-158,162,169-189,191-215,225-228,234,237,254-257
+  s_df69d73d47552a::t_8beb62d7b0f67b 2
+extensions/task-vault/package.json
+  s_df69d73d47552a::t_0d9e0ba197c835 5,8,18-20
+  s_df69d73d47552a::t_94f63f3cee4521 12
+extensions/task-vault/src/ipc/projects.ipc.ts
+  s_df69d73d47552a::t_9cacff4605cc0c 144-147,163-164,167-169
+  s_df69d73d47552a::t_4817d9aa02cb77 2,9,11,18-56,68-69,80-95,99-100,102-106,108-118,120-130,138-143,148-160,162,165-166,170-176,179-181,184-200,202-213,215-217
+  s_df69d73d47552a::t_b1014e1d70fab8 6-7
+  s_df69d73d47552a::t_4127a723bff264 201,214,218
+src/renderer/components/sidebar/WorkspaceRail.css
+  s_df69d73d47552a::t_4f38a0ded72ea8 162-200
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_df69d73d47552a::t_17c054b347cb0e 2
+  s_df69d73d47552a::t_c02b3392de33ac 55
+  s_df69d73d47552a::t_15aea61a7432fb 4
+  s_df69d73d47552a::t_0867d4761cb5fe 1,3,13
+  s_df69d73d47552a::t_36e61c9fe48cd5 10-12,130-134,136-144,149,151-152
+  s_df69d73d47552a::t_7af9d65bd735bc 15-54,56-82
+  s_df69d73d47552a::t_eb3ead911ebb2d 127
+extensions/task-vault/src/components/LinkedVaultPanel.tsx
+  s_df69d73d47552a::t_20962cecc12bb2 2
+src/main/extensions/api.ts
+  s_df69d73d47552a::t_3844e0c30a26dc 184-187
+  s_df69d73d47552a::t_3e8503e21989d7 475-509
+  s_df69d73d47552a::t_7f369cc1547b6b 172-174
+  s_df69d73d47552a::t_463f547cec2c4a 284-286
+extensions/task-vault/src/components/task-vault.css
+  s_df69d73d47552a::t_7ee1d7241027d2 1174-1176
+  s_df69d73d47552a::t_e79a7552d40449 1-164,168-196,209-1128
+  s_df69d73d47552a::t_05d081343fe79b 200-205,207
+  s_df69d73d47552a::t_6a0a34c28bbac1 3006-3054,3062-3070
+  s_df69d73d47552a::t_d0ff666619b728 2851-2924,2928,2932-3005
+  s_df69d73d47552a::t_c2b7476c2b6627 165-167
+  s_df69d73d47552a::t_2cc34db86dd9d4 3055-3061
+  s_df69d73d47552a::t_38c8af9ddedb2c 2328-2515,2619-2756
+  s_df69d73d47552a::t_2dd3136dba63ba 1129-1173,1177-1567,1714-1767,1812-2327
+  s_df69d73d47552a::t_651408119ca86d 2925-2927,2929-2931
+  s_df69d73d47552a::t_64d7cd907fb303 1568-1713
+  s_df69d73d47552a::t_83886ea0ed90ec 2516-2618
+  s_df69d73d47552a::t_66313f93c2521d 197-199,206,208
+  s_df69d73d47552a::t_3515121f95be7f 2757-2850
+  s_df69d73d47552a::t_4b73c5d5367935 1768-1811
+src/renderer/extensions/registry.ts
+  s_df69d73d47552a::t_e6c17bc8860ebe 135-142
+  s_df69d73d47552a::t_7f071f1802b5d9 78
+  s_df69d73d47552a::t_3cf661069af504 46,56
+  s_df69d73d47552a::t_0cd3662657efc0 69
+extensions/task-vault/src/vault/types.ts
+  s_df69d73d47552a::t_41e3d8081b32e0 18
+  s_df69d73d47552a::t_7e5a8df7921e11 78
+extensions/task-vault/src/index.ts
+  s_df69d73d47552a::t_fb73890d0a45a0 103-105
+  s_df69d73d47552a::t_f5180ac5ed4af4 10,24,124,143-144,150,153,165
+  s_df69d73d47552a::t_bb61fc63e5b103 47-53
+  s_df69d73d47552a::t_26e31444c0b335 86
+extensions/task-vault/src/components/InboxProcessor.tsx
+  s_df69d73d47552a::t_d1ece8c8367297 57-59
+  s_df69d73d47552a::t_3f7eba071baacf 68-69
+  s_df69d73d47552a::t_fd31daf388c616 83-84
+  s_df69d73d47552a::t_33498786cf1950 3
+  s_df69d73d47552a::t_4bb28995aae26a 77-80
+extensions/git-integration/src/hooks/usePrReview.ts
+  s_df69d73d47552a::t_86c50241da09f1 2
+  s_df69d73d47552a::t_13ef483b6358f3 31
+  s_df69d73d47552a::t_f7e5538ac20234 175
+  s_df69d73d47552a::t_62e8cb23d14a1b 317
+  s_df69d73d47552a::t_1b2364c3ebfcd1 58
+  s_df69d73d47552a::t_3a8342c3e9d12b 111
+  s_df69d73d47552a::t_e100124895767c 209
+extensions/git-integration/src/renderer.tsx
+  s_df69d73d47552a::t_5fff224acccc0b 32-36
+  s_df69d73d47552a::t_d0ef14e3508b18 5
+extensions/task-vault/src/components/AreasView.tsx
+  s_df69d73d47552a::t_9c90b02310485e 1,6-12,14-20,22-24,26-47,55-57,59,73-77,88-94,100-102,104-118,120-131,134,136-138,140-141,143-159,170-180,182,184-186,188,190,192-193,207-216,218-224,231-235,270-274,278,286-288,290,294,296,300-306,365-368,381-383
+  s_df69d73d47552a::t_bcf43d705dc06f 322
+  s_df69d73d47552a::t_fdef70f1101fa7 3
+  s_df69d73d47552a::t_530a67035d4215 5,13,21
+  s_df69d73d47552a::t_107eece255ff70 4,25,58,60-72,78-87,95-99,119,133,139,142,160-167,169,181,187,191,194-206,217,225-230,236-269,275-277,279-285,289,291-293,295,298-299,307-321,324-353,357-359,361,363-364
+  s_df69d73d47552a::t_e8db5c1452742e 323
+  s_df69d73d47552a::t_fffc582fd1335d 132,135
+  s_df69d73d47552a::t_520ee14a442c82 354-355,360,362
+  s_df69d73d47552a::t_06422ab307da3d 103
+  s_df69d73d47552a::t_85af24c527a0c7 48-54
+  s_df69d73d47552a::t_4656ff627cb2b0 2
+  s_df69d73d47552a::t_8f000301f39c5f 183,189
+  s_df69d73d47552a::t_74344e1a8096f6 297
+  s_df69d73d47552a::t_4186294fa69fab 369-380
+  s_df69d73d47552a::t_d917eed2b7a373 168
+  s_df69d73d47552a::t_43e2014957bfad 356
+extensions/git-integration/src/components/pr-review/CommentComposer.tsx
+  s_df69d73d47552a::t_811f8c1f0d7b44 3
+  s_df69d73d47552a::t_fad020bf4b107b 51
+  s_df69d73d47552a::t_830356e3fe068d 43
+extensions/task-vault/src/mcp/tools/today.ts
+  s_df69d73d47552a::t_621f459d9ea9b4 1-2,8-27,29-61
+extensions/git-integration/src/api/github.ts
+  s_df69d73d47552a::t_7f694d2c5cb7d9 1-42
+extensions/task-vault/src/components/WeeklyReviewStep5Someday.tsx
+  s_df69d73d47552a::t_d0084e61503820 35,38
+tests/unit/renderer/PrReviewWindow.spec.tsx
+  s_df69d73d47552a::t_007f09f4be80b3 5-6,9,19,24-31,41-44,48-51,54-59,61,64-65,69,74,80,85,91-92,101-104
+extensions/git-integration/src/components/pr-review/ReviewSubmitPanel.tsx
+  s_df69d73d47552a::t_a9ae93c3f38cf8 2
+  s_df69d73d47552a::t_5cc5eeb1b65532 24
+src/main/extensions/extension-host.ts
+  s_df69d73d47552a::t_78884cde8fbaa9 183-186
+extensions/git-integration/tests/unit/usePrReview.spec.tsx
+  s_df69d73d47552a::t_e3885dec799ef8 72-76
+  s_df69d73d47552a::t_8cf9d5518a3ea3 15-32
+  s_df69d73d47552a::t_034704cc4d7a7c 1
+extensions/task-vault/src/components/QuickCaptureOverlay.tsx
+  s_df69d73d47552a::t_1c83ddd3e15b59 79-80
+  s_df69d73d47552a::t_63dd1874a820e3 2
+  s_df69d73d47552a::t_00546677d96d6f 11,13
+extensions/task-vault/src/components/DailyLog.tsx
+  s_df69d73d47552a::t_e633009432dec0 239,241-243
+  s_df69d73d47552a::t_d7dee15f28287b 6
+  s_df69d73d47552a::t_9028ded670539c 19,22-33,50
+  s_df69d73d47552a::t_3568dc303769dc 20
+  s_df69d73d47552a::t_0843b6d35d68cd 161-163
+  s_df69d73d47552a::t_23f8c7d948b567 4
+  s_df69d73d47552a::t_4060a7040bca3d 13,120-131,133-134,139,159-160,164-195,198,200-201,207,230-238,240,244-245,248-255,258-264,279,281-286,291-300,303-306,315-316,321-322,325-333,335-337,346-347,351-357,359,370-382,387-388,404-406,433
+  s_df69d73d47552a::t_eed16a1f4cca2b 256-257
+  s_df69d73d47552a::t_e484e5690c6cbe 96
+  s_df69d73d47552a::t_ccec3c0d05c243 246-247
+  s_df69d73d47552a::t_5290b4d1e49f51 301
+  s_df69d73d47552a::t_64deab8ee02296 2
+  s_df69d73d47552a::t_32f921ab0edaa3 369
+  s_df69d73d47552a::t_a8f5fdad675063 95
+  s_df69d73d47552a::t_23c49d80fa36b7 1,5,7,16-18,36,38-39,43-44,47-49,51-52,58-94,97-105,109-112,114-119,136-138,140-142,205,208-227,271-272,274-277,287,289,307,309-314,317-320,366,389-403
+  s_df69d73d47552a::t_13fbfaa1cbcd52 324
+  s_df69d73d47552a::t_567750e3e238c2 278
+  s_df69d73d47552a::t_72912615a9d6db 106-108,113,265-270,273,280,288,290,323
+  s_df69d73d47552a::t_ab54419f56bd7e 302
+  s_df69d73d47552a::t_06c06196057158 308
+  s_df69d73d47552a::t_172d224e3cf967 334,338-345,348-350,358,360-363,367-368
+  s_df69d73d47552a::t_eb3bf02603f1a4 40,53
+extensions/task-vault/src/vault/writer.ts
+  s_df69d73d47552a::t_c8e451b3d52378 92-109
+  s_df69d73d47552a::t_7961e9de46b7a4 84-88
+  s_df69d73d47552a::t_779bc98cfb237d 5
+  s_df69d73d47552a::t_de64598bc16ed6 123-137
+  s_df69d73d47552a::t_930f90aed0d242 61-83,89-91,110-122
+scripts/build-extensions.cjs
+  s_df69d73d47552a::t_ab3cdfffb35d49 37
+src/main/preload.ts
+  s_df69d73d47552a::t_8400be226486a0 186
+extensions/task-vault/src/mcp/tools/query.ts
+  s_df69d73d47552a::t_e0ebd715105b22 1,13-31,34,36-39,41-49,51-62,64-67
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_df69d73d47552a::t_c67edc3a3d88d9 147
+  s_df69d73d47552a::t_832b2dec182a5d 51
+  s_df69d73d47552a::t_08dbbd6313306b 66
+  s_df69d73d47552a::t_e005e3703d115d 36
+  s_df69d73d47552a::t_8d538738b57c72 177
+  s_df69d73d47552a::t_0399d9e7890d27 7
+  s_df69d73d47552a::t_830f04caa342e2 129
+  s_df69d73d47552a::t_3bdddf661a995a 18
+extensions/task-vault/tests/vault/parser.spec.ts
+  s_df69d73d47552a::t_6b67b5b898b4af 125
+  s_df69d73d47552a::t_bd2a40a469621a 37-38,43-44
+extensions/task-vault/src/mcp/tools/weekly-review.ts
+  s_df69d73d47552a::t_d8c21d84a4aecb 1-2,15-48,50,52-54,56-59,61-72,74-77,79-82,84-92
+extensions/task-vault/src/vault/tags.ts
+  s_df69d73d47552a::t_9987f4ca73bb98 36,41,46
+  s_df69d73d47552a::t_c89bd551fc6721 1-32,34-35,37-40,42-45,47-71
+  s_df69d73d47552a::t_20c517bcae087e 33
+extensions/task-vault/src/components/InboxView.tsx
+  s_df69d73d47552a::t_dcb01f4e871455 199
+  s_df69d73d47552a::t_d71a3943fd0293 5
+  s_df69d73d47552a::t_11285a7bec10a4 8,66-68,72,74-75,77,91-93,98-101,173-186,188-189,192-195,206,208-210,219-222,226-231,233-235,238,241-243,250-261,263-264,266-269
+  s_df69d73d47552a::t_afa8cec472cf41 133
+  s_df69d73d47552a::t_9aa44fee9f5057 213
+  s_df69d73d47552a::t_98b8c9c47971b0 137-139
+  s_df69d73d47552a::t_1f24a619cd6a1c 1,3,6
+  s_df69d73d47552a::t_b7d64080475636 2
+  s_df69d73d47552a::t_92eb437c1bd9f9 132,144-149,190-191,244-249,270-275
+  s_df69d73d47552a::t_942393c3e64f8a 187
+  s_df69d73d47552a::t_45b02d56d5c910 214
+  s_df69d73d47552a::t_82aa5fa312540f 262
+  s_df69d73d47552a::t_1c22ce98b1b5dd 4,7,9-65,69-71,73,76,78-90,94-97,102-131,134-136,140-143,150-172,196-198,200-205,207,211-212,215-218,223-225,232,236-237,239-240,276-279
+  s_df69d73d47552a::t_8aa948189b20f3 265
+extensions/task-vault/src/components/ProjectsBrowser.tsx
+  s_df69d73d47552a::t_8b48fafc5588b7 471
+  s_df69d73d47552a::t_3708bd2e282a79 256-292,294-320
+  s_df69d73d47552a::t_d2c4c2d819b4e8 478
+  s_df69d73d47552a::t_228bbfd5008dd3 359-360
+  s_df69d73d47552a::t_0e5be592f4444a 4
+  s_df69d73d47552a::t_3baf97eff639de 321-358,361-375,377-387
+  s_df69d73d47552a::t_755fc62dbd66b8 487
+  s_df69d73d47552a::t_c155560af7fbcd 293
+  s_df69d73d47552a::t_10f03f204e552f 128,148-159,161,173-177,185-186,188-228,230-255,391-392,397-400,409,419-426,431-467,475-477,484,509-532
+  s_df69d73d47552a::t_ed960ca05be22f 393
+  s_df69d73d47552a::t_edc73672442110 143
+  s_df69d73d47552a::t_e2e1e1d81613f8 140
+  s_df69d73d47552a::t_cbb3f2aed1a596 160,162-172,178-184,187,229
+  s_df69d73d47552a::t_dcf75352b34a1d 3
+  s_df69d73d47552a::t_b8d6b322cfb853 1,5-97
+  s_df69d73d47552a::t_b4b4fd9b3d6fd7 2
+  s_df69d73d47552a::t_dc04293c8be3d3 376
+  s_df69d73d47552a::t_5f30e2238798ab 118
+extensions/git-integration/tests/unit/ReviewSubmitPanel.spec.tsx
+  s_df69d73d47552a::t_951a66418d1092 2,8-13
+extensions/git-integration/tests/unit/CommentComposer.spec.tsx
+  s_df69d73d47552a::t_45625bd2fcee82 2,15-21
+extensions/task-vault/src/mcp/tools/capture.ts
+  s_df69d73d47552a::t_dced3128bf3cb8 1-2,18,25,30,33,35-54
+extensions/task-vault/src/stores/vault.store.ts
+  s_df69d73d47552a::t_e1e53161ae3418 32,40
+  s_df69d73d47552a::t_5efa5ff376f5f1 13,20
+  s_df69d73d47552a::t_e3690abdae409a 33-34,41-44
+  s_df69d73d47552a::t_c591eaaaaf5c11 62,64-65
+  s_df69d73d47552a::t_b13a8433abb943 14-15,21-22
+extensions/task-vault/src/vault/db.ts
+  s_df69d73d47552a::t_3cc761fa4547b4 1-97
+src/renderer/index.tsx
+  s_df69d73d47552a::t_29aca1b4da3eb2 4
+  s_df69d73d47552a::t_9d96c0939dec93 24,29
+extensions/git-integration/src/index.ts
+  s_df69d73d47552a::t_b1b7c5a4898b26 111-133
+extensions/task-vault/src/renderer.tsx
+  s_df69d73d47552a::t_1869e763365eda 44-53,55
+  s_7aa3262fa06679::t_dd3c3d2cb336f2 2,20,22-24,26-28,30-43
+  s_df69d73d47552a::t_127ea9dac4620b 25
+  s_df69d73d47552a::t_6b8819e1826f2e 6
+extensions/task-vault/src/components/WeeklyReviewStep1GetClear.tsx
+  s_df69d73d47552a::t_fbb08c7c3ce9ba 37
+extensions/git-integration/src/stores/pr-review.store.ts
+  s_df69d73d47552a::t_c3522c48af7528 120
+  s_df69d73d47552a::t_7756008c0b7def 2
+extensions/task-vault/src/components/SmartTaskInput.tsx
+  s_df69d73d47552a::t_9f376f94bcbc9c 136
+  s_df69d73d47552a::t_844b259facaa8e 139,141,143
+  s_df69d73d47552a::t_874d3566c889f5 1-135,137-138,140,142,144-171,174-241,243-274,276-318
+  s_df69d73d47552a::t_7c5b5fe5469f8f 172
+  s_df69d73d47552a::t_0a1a305ea0316c 242
+  s_df69d73d47552a::t_2868b2bea3f525 275
+  s_df69d73d47552a::t_ab166a5328fc78 173
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_df69d73d47552a::t_2f6b911d0d5352 248
+  s_df69d73d47552a::t_b8ad81f0b50246 17-19
+  s_df69d73d47552a::t_e6204ccc2a0490 633-634,647-649
+  s_df69d73d47552a::t_04ec087ddbf659 137
+  s_df69d73d47552a::t_c9274bb1a0fbc5 415
+  s_df69d73d47552a::t_fcdb1a2c66afee 353
+  s_df69d73d47552a::t_f4881239a6808f 531,533,568,589,593-595,598-599
+  s_df69d73d47552a::t_407aab78183942 402
+  s_df69d73d47552a::t_4c53a9f5ce5b4c 408-411,430-432,435-438,442-443,446-450,457-459,510-511,527-530,535,567,606-607,610-613,628-629,632
+  s_df69d73d47552a::t_53521685c2bb61 462-465,474-476,479-482,491,494-498,506-507
+  s_df69d73d47552a::t_28e8ecf778c17c 3-4,22,24,31-35,40-89,121-122,127,129,132-136,138-154,157-158,161-187,193-194,199-223,229-230,234-235,237-238,241-247,249-265,268-269,274-279,283-284,289-316,319-320,324-329,332-333,335-342,345-346,351-352,354-355,358,363,368-387,389-391,396-401,403,406-407,412-414,416-429,433-434,439-441,444-445,451-456,460-461,466-473,477-478,483-490,492-493,499-505,508-509,512-526,532,534,536-566,569-588,590-592,596-597,600-605,608-609,614-627,630-631,635-646,650-651,655-668
+  s_df69d73d47552a::t_5a6daecba863ed 92-106
+  s_df69d73d47552a::t_b8e2856250d52d 14-16,20
+extensions/git-integration/src/components/pr-review/PrReviewTab.tsx
+  s_df69d73d47552a::t_f351427a12ff13 81
+  s_df69d73d47552a::t_666982a58bb6c7 39-49
+  s_df69d73d47552a::t_5970a148eb7eb6 88
+  s_df69d73d47552a::t_59b22ff7a7c170 103
+  s_df69d73d47552a::t_d4fa618822d9d9 118
+  s_df69d73d47552a::t_1d3e95bf1e6299 147-148
+  s_df69d73d47552a::t_e24af56e1fb70b 2
+extensions/task-vault/src/vault/parser.ts
+  s_df69d73d47552a::t_feec2b0d86a4f1 86-110
+  s_df69d73d47552a::t_6aca4424100297 17-18
+  s_df69d73d47552a::t_fe4c0ba039708f 201
+  s_df69d73d47552a::t_5f7e805ae76a4a 182
+  s_df69d73d47552a::t_9bc18becd2e73c 14
+extensions/git-integration/tests/unit/PrReviewTab.spec.tsx
+  s_df69d73d47552a::t_fcd2eb26069ac1 14-18
+  s_df69d73d47552a::t_abf748d49f8230 176
+  s_df69d73d47552a::t_cf803c4dab3d82 6
+  s_df69d73d47552a::t_e40d98cb126c2f 108-114
+  s_df69d73d47552a::t_475037fec45cf8 103-105,116-118
+  s_df69d73d47552a::t_863a52ce6ece11 13,19-20
+  s_df69d73d47552a::t_6c09d38e263da6 158,161
+extensions/task-vault/src/ipc/links.ipc.ts
+  s_df69d73d47552a::t_15bc7ea86e5e20 2,8,10,17-37,41-53,67-68,73-74,77-85,87-96,104-105,110-111,114-123,125-134,142-143,148-164
+extensions/task-vault/src/components/FileToPicker.tsx
+  s_df69d73d47552a::t_4df7bbd7e3cc38 1,3-99,101-130
+  s_df69d73d47552a::t_13458c267ec4bc 100
+  s_df69d73d47552a::t_1db8819a2caa66 2
+extensions/task-vault/src/mcp/tools/add-task.ts
+  s_df69d73d47552a::t_a3e71a2230d927 1-2,14-25,40-41,44,46-66
+extensions/task-vault/src/mcp/tools/list-projects.ts
+  s_df69d73d47552a::t_417ae29feabedc 1,8-22,25,27-38,40-47,49-52
+src/renderer/ExtensionWindowView.tsx
+  s_df69d73d47552a::t_469853b0a176cc 1-36
+extensions/task-vault/src/mcp/tools/complete-task.ts
+  s_df69d73d47552a::t_7f7c713efcd036 1,19-22,35-40
+extensions/task-vault/src/mcp/tools/migrate-task.ts
+  s_df69d73d47552a::t_91906c05f07225 1,18-21,29,34-39,41-58
+tests/unit/schemas/pr-review.schema.spec.ts
+  s_df69d73d47552a::t_1c90df38db4a17 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "2254d4613a6b9b42c5c5277a02928731dd1e0316",
+  "prompts": {},
+  "sessions": {
+    "s_7aa3262fa06679": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f194d32b-de41-4c48-9570-92bc6d6c5398",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_df69d73d47552a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a67ad385-9ea8-4b73-96b3-9b8160b0ec71",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
