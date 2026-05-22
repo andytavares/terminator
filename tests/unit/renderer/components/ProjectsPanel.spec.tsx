@@ -225,4 +225,187 @@ describe('ProjectsPanel', () => {
     fireEvent.click(screen.getByText('Remove'))
     expect(mockDeleteProject).toHaveBeenCalledWith('proj-1')
   })
+
+  it('context menu closes when a window click fires', () => {
+    render(<ProjectsPanel workspaceId="ws-1" />)
+    fireEvent.click(screen.getByTitle('Options'))
+    expect(screen.getByText('Rename')).toBeTruthy()
+    // Simulate a click outside — the ContextMenu useEffect adds a window click listener
+    fireEvent.click(window)
+    expect(screen.queryByText('Rename')).toBeNull()
+  })
+
+  it('closes context menu when Rename is clicked and enters rename mode', () => {
+    render(<ProjectsPanel workspaceId="ws-1" />)
+    fireEvent.click(screen.getByTitle('Options'))
+    fireEvent.click(screen.getByText('Rename'))
+    expect(screen.getByDisplayValue('My Project')).toBeTruthy()
+  })
+
+  it('shows rename error when name is duplicate', async () => {
+    mockRenameProject.mockResolvedValue({ error: 'DUPLICATE_NAME' })
+    render(<ProjectsPanel workspaceId="ws-1" />)
+    fireEvent.dblClick(screen.getByText('My Project'))
+    const input = screen.getByDisplayValue('My Project')
+    fireEvent.change(input, { target: { value: 'Duplicate Name' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await vi.waitFor(() => expect(screen.getByText('Name already in use')).toBeTruthy())
+  })
+
+  it('cancels rename without committing when value is unchanged', async () => {
+    render(<ProjectsPanel workspaceId="ws-1" />)
+    fireEvent.dblClick(screen.getByText('My Project'))
+    // Blur without changing value — should just exit rename mode
+    fireEvent.blur(screen.getByDisplayValue('My Project'))
+    await vi.waitFor(() => expect(screen.queryByDisplayValue('My Project')).toBeNull())
+    expect(mockRenameProject).not.toHaveBeenCalled()
+  })
+
+  it('starts drag on project item (handleDragStart)', () => {
+    const project2 = { ...project, id: 'proj-2', name: 'Second Project' }
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [workspace],
+      projectsByWorkspaceId: new Map([['ws-1', [project, project2]]]),
+      activeProjectId: null,
+      setActiveProject: mockSetActiveProject,
+      deleteProject: mockDeleteProject,
+      renameProject: mockRenameProject,
+      reorderProjects: mockReorderProjects,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    const { container } = render(<ProjectsPanel workspaceId="ws-1" />)
+    const draggables = container.querySelectorAll('[draggable="true"]')
+    expect(draggables.length).toBe(2)
+    // Should not throw
+    fireEvent.dragStart(draggables[0])
+  })
+
+  it('handles dragOver on a project item', () => {
+    const project2 = { ...project, id: 'proj-2', name: 'Second Project' }
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [workspace],
+      projectsByWorkspaceId: new Map([['ws-1', [project, project2]]]),
+      activeProjectId: null,
+      setActiveProject: mockSetActiveProject,
+      deleteProject: mockDeleteProject,
+      renameProject: mockRenameProject,
+      reorderProjects: mockReorderProjects,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    const { container } = render(<ProjectsPanel workspaceId="ws-1" />)
+    const draggables = container.querySelectorAll('[draggable="true"]')
+    fireEvent.dragStart(draggables[0])
+    // dragOver should not throw and should add the target class
+    fireEvent.dragOver(draggables[1])
+    expect(draggables[1].className).toContain('proj-dnd-target')
+  })
+
+  it('reorders projects when drop occurs on different item', () => {
+    const project2 = { ...project, id: 'proj-2', name: 'Second Project' }
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [workspace],
+      projectsByWorkspaceId: new Map([['ws-1', [project, project2]]]),
+      activeProjectId: null,
+      setActiveProject: mockSetActiveProject,
+      deleteProject: mockDeleteProject,
+      renameProject: mockRenameProject,
+      reorderProjects: mockReorderProjects,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    const { container } = render(<ProjectsPanel workspaceId="ws-1" />)
+    const draggables = container.querySelectorAll('[draggable="true"]')
+    fireEvent.dragStart(draggables[0])
+    fireEvent.drop(draggables[1])
+    expect(mockReorderProjects).toHaveBeenCalledWith('ws-1', ['proj-2', 'proj-1'])
+  })
+
+  it('does not reorder when drop is on same item as drag start', () => {
+    const project2 = { ...project, id: 'proj-2', name: 'Second Project' }
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [workspace],
+      projectsByWorkspaceId: new Map([['ws-1', [project, project2]]]),
+      activeProjectId: null,
+      setActiveProject: mockSetActiveProject,
+      deleteProject: mockDeleteProject,
+      renameProject: mockRenameProject,
+      reorderProjects: mockReorderProjects,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    const { container } = render(<ProjectsPanel workspaceId="ws-1" />)
+    const draggables = container.querySelectorAll('[draggable="true"]')
+    fireEvent.dragStart(draggables[0])
+    fireEvent.drop(draggables[0])
+    expect(mockReorderProjects).not.toHaveBeenCalled()
+  })
+
+  it('clears dragOver highlight on dragLeave', () => {
+    const project2 = { ...project, id: 'proj-2', name: 'Second Project' }
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [workspace],
+      projectsByWorkspaceId: new Map([['ws-1', [project, project2]]]),
+      activeProjectId: null,
+      setActiveProject: mockSetActiveProject,
+      deleteProject: mockDeleteProject,
+      renameProject: mockRenameProject,
+      reorderProjects: mockReorderProjects,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    const { container } = render(<ProjectsPanel workspaceId="ws-1" />)
+    const draggables = container.querySelectorAll('[draggable="true"]')
+    fireEvent.dragStart(draggables[0])
+    fireEvent.dragOver(draggables[1])
+    expect(draggables[1].className).toContain('proj-dnd-target')
+    fireEvent.dragLeave(draggables[1])
+    expect(draggables[1].className).not.toContain('proj-dnd-target')
+  })
+
+  it('clears drag state on dragEnd', () => {
+    const project2 = { ...project, id: 'proj-2', name: 'Second Project' }
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [workspace],
+      projectsByWorkspaceId: new Map([['ws-1', [project, project2]]]),
+      activeProjectId: null,
+      setActiveProject: mockSetActiveProject,
+      deleteProject: mockDeleteProject,
+      renameProject: mockRenameProject,
+      reorderProjects: mockReorderProjects,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    const { container } = render(<ProjectsPanel workspaceId="ws-1" />)
+    const draggables = container.querySelectorAll('[draggable="true"]')
+    fireEvent.dragStart(draggables[0])
+    fireEvent.dragOver(draggables[1])
+    fireEvent.dragEnd(draggables[0])
+    // dragOver class should be cleared
+    expect(draggables[1].className).not.toContain('proj-dnd-target')
+  })
+
+  it('handles drop without prior drag start gracefully (fromIndex null)', () => {
+    const { container } = render(<ProjectsPanel workspaceId="ws-1" />)
+    const draggables = container.querySelectorAll('[draggable="true"]')
+    // Drop without preceding drag start — fromIndex is null, should not call reorder
+    fireEvent.drop(draggables[0])
+    expect(mockReorderProjects).not.toHaveBeenCalled()
+  })
+
+  it('opens context menu via right-click on project card', () => {
+    render(<ProjectsPanel workspaceId="ws-1" />)
+    // Right-click on the project card element
+    const projectCard = document.querySelector('.proj-card')!
+    fireEvent.contextMenu(projectCard)
+    expect(screen.getByText('Rename')).toBeTruthy()
+    expect(screen.getByText('Remove project')).toBeTruthy()
+  })
+
+  it('does not setActiveProject when in rename mode and clicking', () => {
+    render(<ProjectsPanel workspaceId="ws-1" />)
+    fireEvent.dblClick(screen.getByText('My Project'))
+    // While in rename mode, clicking the card should not call setActiveProject
+    const projectCard = document.querySelector('.proj-card')!
+    fireEvent.click(projectCard)
+    expect(mockSetActiveProject).not.toHaveBeenCalled()
+  })
+
+  it('closes confirm dialog without deleting when Cancel is clicked', () => {
+    render(<ProjectsPanel workspaceId="ws-1" />)
+    fireEvent.click(screen.getByTitle('Options'))
+    fireEvent.click(screen.getByText('Remove project'))
+    fireEvent.click(screen.getByText('Cancel'))
+    expect(mockDeleteProject).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Remove project "My Project"/)).toBeNull()
+  })
 })

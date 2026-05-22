@@ -13,6 +13,7 @@ interface VaultStore {
   showCaptureModal: boolean
   selectedAreaName: string | null
   selectedProjectName: string | null
+  lastRolledOver: number
   loadToday: () => Promise<void>
   setView: (view: VaultView) => void
   refreshInboxCount: () => Promise<void>
@@ -32,6 +33,7 @@ export const useVaultStore = create<VaultStore>((set, _get) => ({
   showCaptureModal: false,
   selectedAreaName: null,
   selectedProjectName: null,
+  lastRolledOver: 0,
 
   setVaultPath: (p: string) => set({ vaultPath: p }),
 
@@ -53,7 +55,8 @@ export const useVaultStore = create<VaultStore>((set, _get) => ({
         set({ error: (result as { error: string }).error, isLoading: false })
         return
       }
-      set({ todayLog: result as DailyLog, isLoading: false })
+      const res = result as DailyLog & { rolledOver?: number }
+      set({ todayLog: res, isLoading: false, lastRolledOver: res.rolledOver ?? 0 })
     } catch (err) {
       set({ error: String(err), isLoading: false })
     }

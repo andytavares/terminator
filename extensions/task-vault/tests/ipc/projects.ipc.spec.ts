@@ -24,6 +24,7 @@ vi.mock('electron', () => ({
 import {
   registerProjectsIpcHandlers,
   setVaultPath as setProjectsVaultPath,
+  getVaultPath as getProjectsVaultPath,
 } from '../../src/ipc/projects.ipc'
 
 const VAULT = '/vault'
@@ -127,6 +128,16 @@ describe('task-vault:projects:list IPC handler', () => {
     const handler = getHandler('task-vault:projects:list')
     const result = (await handler({}, {})) as { projects: { isStale: boolean }[] }
     expect(result.projects[0].isStale).toBe(false)
+  })
+
+  it('accepts status as an array (line 76 — Array.isArray branch)', async () => {
+    mockAll.mockReturnValue([makeProjectRow({ status: 'active' })])
+    mockGet.mockReturnValue({ c: 1 })
+    const handler = getHandler('task-vault:projects:list')
+    const result = (await handler({}, { status: ['active', 'someday'] })) as {
+      projects: unknown[]
+    }
+    expect(Array.isArray(result.projects)).toBe(true)
   })
 })
 
@@ -236,5 +247,97 @@ describe('task-vault:projects:update-status IPC handler', () => {
     const handler = getHandler('task-vault:projects:update-status')
     const result = await handler({}, {})
     expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+})
+
+describe('task-vault:projects:create IPC handler', () => {
+  it('creates a new project and returns success', async () => {
+    mockGet.mockReturnValue(undefined) // no existing project
+    const handler = getHandler('task-vault:projects:create')
+    const result = await handler({}, { name: 'New Project' })
+    expect(result).toMatchObject({ success: true, filePath: 'New Project' })
+    expect(mockRun).toHaveBeenCalled()
+  })
+
+  it('returns PROJECT_EXISTS when project already exists', async () => {
+    mockGet.mockReturnValue({ id: 'existing-id' })
+    const handler = getHandler('task-vault:projects:create')
+    const result = await handler({}, { name: 'Existing Project' })
+    expect(result).toMatchObject({ error: 'PROJECT_EXISTS' })
+  })
+
+  it('creates area record when area is provided', async () => {
+    mockGet.mockReturnValue(undefined)
+    const handler = getHandler('task-vault:projects:create')
+    const result = await handler({}, { name: 'Work Project', area: 'Work' })
+    expect(result).toMatchObject({ success: true })
+    // run called for both insert project + insert area
+    expect(mockRun).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns VALIDATION_ERROR for missing name', async () => {
+    const handler = getHandler('task-vault:projects:create')
+    const result = await handler({}, {})
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+})
+
+describe('task-vault:projects:delete IPC handler', () => {
+  it('deletes project and orphans tasks', async () => {
+    const handler = getHandler('task-vault:projects:delete')
+    const result = await handler({}, { projectFilePath: 'Alpha' })
+    expect(result).toMatchObject({ success: true })
+    expect(mockRun).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns VALIDATION_ERROR for missing projectFilePath', async () => {
+    const handler = getHandler('task-vault:projects:delete')
+    const result = await handler({}, {})
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+})
+
+describe('task-vault:projects:update-area IPC handler (lines 206-225)', () => {
+  it('updates area for project', async () => {
+    const handler = getHandler('task-vault:projects:update-area')
+    const result = await handler({}, { projectFilePath: 'Alpha', area: 'Work' })
+    expect(result).toMatchObject({ success: true })
+    // run once for UPDATE projects, once for INSERT area
+    expect(mockRun).toHaveBeenCalledTimes(2)
+  })
+
+  it('updates area to null when area is not provided', async () => {
+    const handler = getHandler('task-vault:projects:update-area')
+    const result = await handler({}, { projectFilePath: 'Alpha', area: null })
+    expect(result).toMatchObject({ success: true })
+    // run called once for UPDATE only (no area insert when null)
+    expect(mockRun).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns VALIDATION_ERROR when projectFilePath missing', async () => {
+    const handler = getHandler('task-vault:projects:update-area')
+    const result = await handler({}, { area: 'Work' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+})
+
+describe('getVaultPath (projects.ipc)', () => {
+  it('returns the vault path set via setVaultPath', () => {
+    setProjectsVaultPath('/projects/vault')
+    expect(getProjectsVaultPath()).toBe('/projects/vault')
+    setProjectsVaultPath(VAULT) // restore
+  })
+})
+
+describe('registerProjectsIpcHandlers dispose (lines 229-232)', () => {
+  it('calls ipcMain.removeHandler for all registered channels', () => {
+    const dispose = registerProjectsIpcHandlers()
+    dispose()
+    const removedChannels = vi.mocked(mockRemoveHandler).mock.calls.map((c) => c[0])
+    expect(removedChannels).toContain('task-vault:projects:list')
+    expect(removedChannels).toContain('task-vault:projects:create')
+    expect(removedChannels).toContain('task-vault:projects:delete')
+    expect(removedChannels).toContain('task-vault:projects:update-status')
+    expect(removedChannels).toContain('task-vault:projects:update-area')
   })
 })

@@ -20,7 +20,7 @@ vi.mock('../../src/vault/db', () => ({
   randomUUID: vi.fn(() => 'test-uuid'),
 }))
 
-import { registerVaultIpcHandlers, setVaultPath } from '../../src/ipc/vault.ipc'
+import { registerVaultIpcHandlers, setVaultPath, getVaultPath } from '../../src/ipc/vault.ipc'
 
 const VAULT = '/vault'
 
@@ -282,16 +282,32 @@ describe('task-vault:vault:get-today', () => {
 
   it('maps task rows and sets exists=true when tasks present', async () => {
     const row = makeTaskRow({ source: 'daily', source_ref: '2026-05-20' })
-    // tasks query → [row], subtasks query → [], events → [], notes → []
+    // rollover stale tasks → [], tasks query → [row], subtasks query → [], events → [], notes → []
     mockAll
-      .mockReturnValueOnce([row])
-      .mockReturnValueOnce([])
-      .mockReturnValueOnce([])
-      .mockReturnValueOnce([])
+      .mockReturnValueOnce([]) // rollover: no stale tasks
+      .mockReturnValueOnce([row]) // main task fetch
+      .mockReturnValueOnce([]) // subtasks
+      .mockReturnValueOnce([]) // events
+      .mockReturnValueOnce([]) // notes
     const handler = getHandler('task-vault:vault:get-today')
     const result = (await handler({}, undefined)) as Record<string, unknown>
     expect(result).toMatchObject({ exists: true })
     expect((result.tasks as unknown[]).length).toBe(1)
+  })
+
+  it('rolls over stale open tasks from past daily logs', async () => {
+    const staleRow = makeTaskRow({ source: 'daily', source_ref: '2026-05-01', status: 'open' })
+    // rollover query returns stale task → triggers insert + migrate statements
+    mockAll
+      .mockReturnValueOnce([staleRow]) // rollover: one stale task found
+      .mockReturnValueOnce([]) // main task fetch (after rollover inserts)
+      .mockReturnValueOnce([]) // subtasks
+      .mockReturnValueOnce([]) // events
+      .mockReturnValueOnce([]) // notes
+    const handler = getHandler('task-vault:vault:get-today')
+    const result = (await handler({}, undefined)) as Record<string, unknown>
+    expect(result.rolledOver).toBe(1)
+    expect(mockRun).toHaveBeenCalled()
   })
 
   it('returns error string when db throws', async () => {
@@ -383,5 +399,429 @@ describe('task-vault:vault:update-project-status', () => {
     const handler = getHandler('task-vault:vault:update-project-status')
     const result = await handler({}, { status: 'archived' })
     expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
+  })
+})
+
+// ── list-archive ──────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:list-archive (lines 647-664)', () => {
+  const makeProjectRow = (overrides: Record<string, unknown> = {}) => ({
+    id: 'proj-archived-1',
+    name: 'Old Project',
+    status: 'archived',
+    area: null,
+    deadline: null,
+    terminator_links: '[]',
+    updated_at: new Date().toISOString(),
+    ...overrides,
+  })
+
+  it('returns empty tasks and projects when nothing archived', async () => {
+    mockAll.mockReturnValue([])
+    const handler = getHandler('task-vault:vault:list-archive')
+    const result = (await handler({}, {})) as { tasks: unknown[]; projects: unknown[] }
+    expect(result.tasks).toHaveLength(0)
+    expect(result.projects).toHaveLength(0)
+  })
+
+  it('returns archived tasks and projects', async () => {
+    const taskRow = makeTaskRow({ status: 'done', source: 'daily', source_ref: '2026-04-01' })
+    const projRow = makeProjectRow()
+    mockAll.mockReturnValueOnce([taskRow]).mockReturnValueOnce([projRow])
+    const handler = getHandler('task-vault:vault:list-archive')
+    const result = (await handler({}, { days: 30 })) as {
+      tasks: { status: string }[]
+      projects: { name: string }[]
+    }
+    expect(result.tasks).toHaveLength(1)
+    expect(result.tasks[0].status).toBe('done')
+    expect(result.projects).toHaveLength(1)
+    expect(result.projects[0].name).toBe('Old Project')
+  })
+
+  it('uses default 30 days when payload is invalid', async () => {
+    mockAll.mockReturnValue([])
+    const handler = getHandler('task-vault:vault:list-archive')
+    const result = (await handler({}, null)) as { tasks: unknown[]; projects: unknown[] }
+    expect(result.tasks).toHaveLength(0)
+    expect(result.projects).toHaveLength(0)
+  })
+
+  it('rowToProject maps all fields correctly via list-archive', async () => {
+    const projRow = makeProjectRow({
+      area: 'Work',
+      deadline: '2026-01-01',
+      terminator_links: '["link-1"]',
+    })
+    mockAll.mockReturnValueOnce([]).mockReturnValueOnce([projRow])
+    const handler = getHandler('task-vault:vault:list-archive')
+    const result = (await handler({}, {})) as {
+      projects: { area?: string; deadline?: string; terminatorLinks: string[] }[]
+    }
+    expect(result.projects[0].area).toBe('Work')
+    expect(result.projects[0].deadline).toBe('2026-01-01')
+    expect(result.projects[0].terminatorLinks).toContain('link-1')
+  })
+
+  it('returns error string when db throws', async () => {
+    mockPrepare.mockImplementationOnce(() => {
+      throw new Error('archive db error')
+    })
+    const handler = getHandler('task-vault:vault:list-archive')
+    const result = await handler({}, {})
+    expect(result).toMatchObject({ error: expect.stringContaining('archive db error') })
+  })
+})
+
+// ── projects:get-tasks ────────────────────────────────────────────────────────
+
+describe('task-vault:projects:get-tasks', () => {
+  it('returns tasks for given projectName', async () => {
+    const row = makeTaskRow({ project: 'MyProject' })
+    mockAll.mockReturnValueOnce([row])
+    const handler = getHandler('task-vault:projects:get-tasks')
+    const result = (await handler({}, { projectName: 'MyProject' })) as { tasks: unknown[] }
+    expect(result.tasks).toHaveLength(1)
+  })
+
+  it('returns empty tasks when projectName is missing', async () => {
+    const handler = getHandler('task-vault:projects:get-tasks')
+    const result = (await handler({}, {})) as { tasks: unknown[] }
+    expect(result.tasks).toHaveLength(0)
+  })
+})
+
+// ── delete-area ───────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:delete-area', () => {
+  it('deletes area and untags tasks', async () => {
+    const handler = getHandler('task-vault:vault:delete-area')
+    const result = await handler({}, { areaFilePath: 'areas/Work.md' })
+    expect(result).toMatchObject({ success: true })
+    expect(mockRun).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns VALIDATION_ERROR for missing areaFilePath', async () => {
+    const handler = getHandler('task-vault:vault:delete-area')
+    const result = await handler({}, {})
+    expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
+  })
+})
+
+// ── get-daily ─────────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:get-daily', () => {
+  it('returns daily tasks for a given date', async () => {
+    const row = makeTaskRow({ source: 'daily', source_ref: '2026-05-20' })
+    mockAll
+      .mockReturnValueOnce([row]) // tasks
+      .mockReturnValueOnce([]) // subtasks
+      .mockReturnValueOnce([]) // events
+      .mockReturnValueOnce([]) // notes
+    const handler = getHandler('task-vault:vault:get-daily')
+    const result = (await handler({}, { date: '2026-05-20' })) as Record<string, unknown>
+    expect(result.date).toBe('2026-05-20')
+    expect((result.tasks as unknown[]).length).toBe(1)
+  })
+
+  it('returns VALIDATION_ERROR for missing date', async () => {
+    const handler = getHandler('task-vault:vault:get-daily')
+    const result = await handler({}, {})
+    expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
+  })
+
+  it('returns error string when db throws', async () => {
+    mockPrepare.mockImplementationOnce(() => {
+      throw new Error('daily db error')
+    })
+    const handler = getHandler('task-vault:vault:get-daily')
+    const result = await handler({}, { date: '2026-05-20' })
+    expect(result).toMatchObject({ error: expect.stringContaining('daily db error') })
+  })
+})
+
+// ── migrate-task ──────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:migrate-task', () => {
+  it('migrates task to target date and returns newTaskId', async () => {
+    const row = makeTaskRow()
+    mockGet.mockReturnValue(row)
+    const handler = getHandler('task-vault:vault:migrate-task')
+    const result = (await handler({}, { taskId: 'task-1', targetDate: '2026-05-21' })) as {
+      newTaskId: string
+    }
+    expect(result.newTaskId).toBe('test-uuid')
+  })
+
+  it('returns STALE_ID when task not found', async () => {
+    mockGet.mockReturnValue(undefined)
+    const handler = getHandler('task-vault:vault:migrate-task')
+    const result = await handler({}, { taskId: 'ghost', targetDate: '2026-05-21' })
+    expect(result).toMatchObject({ error: 'STALE_ID' })
+  })
+
+  it('returns VALIDATION_ERROR for missing taskId', async () => {
+    const handler = getHandler('task-vault:vault:migrate-task')
+    const result = await handler({}, { targetDate: '2026-05-21' })
+    expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
+  })
+})
+
+// ── vault:query ───────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:query', () => {
+  it('returns all tasks when no filters provided', async () => {
+    mockAll.mockReturnValueOnce([makeTaskRow()])
+    const handler = getHandler('task-vault:vault:query')
+    const result = (await handler({}, {})) as { tasks: unknown[] }
+    expect(result.tasks).toHaveLength(1)
+  })
+
+  it('filters by status array', async () => {
+    mockAll.mockReturnValueOnce([makeTaskRow()])
+    const handler = getHandler('task-vault:vault:query')
+    const result = (await handler({}, { status: ['open', 'in-progress'] })) as { tasks: unknown[] }
+    expect(result.tasks).toHaveLength(1)
+  })
+
+  it('filters by context, project, area, and dueBefore', async () => {
+    mockAll.mockReturnValueOnce([])
+    const handler = getHandler('task-vault:vault:query')
+    const result = (await handler(
+      {},
+      {
+        context: 'office',
+        project: 'Alpha',
+        area: 'Work',
+        dueBefore: '2026-06-01',
+      }
+    )) as { tasks: unknown[] }
+    expect(result.tasks).toHaveLength(0)
+  })
+
+  it('returns VALIDATION_ERROR for invalid payload', async () => {
+    const handler = getHandler('task-vault:vault:query')
+    const result = await handler({}, { status: 123 })
+    expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
+  })
+})
+
+// ── vault:list-areas with area data ──────────────────────────────────────────
+
+describe('task-vault:vault:list-areas with data', () => {
+  it('returns areas with tasks, projects, and combined counts', async () => {
+    const areaRow = { id: 'area-1', name: 'Work', created_at: new Date().toISOString() }
+    const taskRow = makeTaskRow({ area: 'Work' })
+    const projRow = {
+      id: 'proj-1',
+      name: 'Work Project',
+      status: 'active',
+      area: 'Work',
+      deadline: null,
+      terminator_links: '[]',
+      updated_at: new Date().toISOString(),
+    }
+    mockAll
+      .mockReturnValueOnce([areaRow]) // areaRows (SELECT * FROM areas)
+      .mockReturnValueOnce([taskRow]) // taskRows for 'Work' area
+      .mockReturnValueOnce([projRow]) // projectRows for 'Work' area
+      .mockReturnValueOnce([]) // orphan areas (no orphans)
+    // get() is called: nextActionCount, totalCount, doneCount (per project) + combinedOpen, combinedTotal (per area)
+    mockGet.mockReturnValue({ c: 2 })
+    const handler = getHandler('task-vault:vault:list-areas')
+    const result = (await handler({}, undefined)) as {
+      areas: { name: string; tasks: unknown[]; openTaskCount: number; taskCount: number }[]
+    }
+    expect(result.areas.length).toBeGreaterThan(0)
+    expect(result.areas[0].name).toBe('Work')
+    expect(result.areas[0].openTaskCount).toBe(2)
+    expect(result.areas[0].taskCount).toBe(2)
+  })
+
+  it('includes orphan area tasks not in areas table', async () => {
+    const taskRow = makeTaskRow({ area: 'Orphan Area' })
+    mockAll
+      .mockReturnValueOnce([]) // no areas in table (SELECT * FROM areas)
+      .mockReturnValueOnce([{ area: 'Orphan Area' }]) // orphan areas
+      .mockReturnValueOnce([taskRow]) // tasks for orphan area
+    const handler = getHandler('task-vault:vault:list-areas')
+    const result = (await handler({}, undefined)) as { areas: { name: string }[] }
+    expect(result.areas.some((a) => a.name === 'Orphan Area')).toBe(true)
+  })
+})
+
+// ── vault:capture ─────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:capture', () => {
+  it('captures a task with project and area hints', async () => {
+    const handler = getHandler('task-vault:vault:capture')
+    const result = (await handler(
+      {},
+      {
+        text: 'Do something',
+        hintProject: 'MyProject',
+        hintArea: 'Work',
+      }
+    )) as { taskId: string }
+    expect(result.taskId).toBe('test-uuid')
+  })
+
+  it('returns VALIDATION_ERROR for invalid payload', async () => {
+    const handler = getHandler('task-vault:vault:capture')
+    const result = await handler({}, null)
+    expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
+  })
+})
+
+// ── vault:export-json ─────────────────────────────────────────────────────────
+
+describe('task-vault:vault:export-json', () => {
+  it('returns all tables with metadata', async () => {
+    const taskRow = makeTaskRow()
+    const projRow = {
+      id: 'p1',
+      name: 'Alpha',
+      status: 'active',
+      area: null,
+      deadline: null,
+      outcome: null,
+      terminator_links: '[]',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    const areaRow = { id: 'a1', name: 'Work', created_at: new Date().toISOString() }
+    mockAll
+      .mockReturnValueOnce([taskRow]) // tasks
+      .mockReturnValueOnce([projRow]) // projects
+      .mockReturnValueOnce([areaRow]) // areas
+      .mockReturnValueOnce([]) // events
+      .mockReturnValueOnce([]) // notes
+    const handler = getHandler('task-vault:vault:export-json')
+    const result = (await handler({}, undefined)) as {
+      tasks: unknown[]
+      projects: unknown[]
+      areas: unknown[]
+      events: unknown[]
+      notes: unknown[]
+      exportedAt: string
+      version: number
+    }
+    expect(result.tasks).toHaveLength(1)
+    expect(result.projects).toHaveLength(1)
+    expect(result.areas).toHaveLength(1)
+    expect(result.events).toHaveLength(0)
+    expect(result.notes).toHaveLength(0)
+    expect(result.version).toBe(1)
+    expect(typeof result.exportedAt).toBe('string')
+  })
+
+  it('returns error string when db throws', async () => {
+    mockPrepare.mockImplementationOnce(() => {
+      throw new Error('export db error')
+    })
+    const handler = getHandler('task-vault:vault:export-json')
+    const result = await handler({}, undefined)
+    expect(result).toMatchObject({ error: expect.stringContaining('export db error') })
+  })
+})
+
+// ── vault:import-json ─────────────────────────────────────────────────────────
+
+describe('task-vault:vault:import-json', () => {
+  const now = new Date().toISOString()
+
+  it('imports all table types and returns imported count', async () => {
+    const importData = {
+      version: 1,
+      tasks: [
+        {
+          id: 't1',
+          text: 'Task',
+          status: 'open',
+          source: 'inbox',
+          created_at: now,
+          updated_at: now,
+        },
+      ],
+      projects: [{ id: 'p1', name: 'Project', status: 'active', created_at: now, updated_at: now }],
+      areas: [{ id: 'a1', name: 'Work', created_at: now }],
+      events: [{ id: 'e1', date: '2026-05-22', text: 'Meeting', created_at: now }],
+      notes: [{ id: 'n1', date: '2026-05-22', text: 'Note text', created_at: now }],
+    }
+    const handler = getHandler('task-vault:vault:import-json')
+    const result = (await handler({}, importData)) as { success: boolean; imported: number }
+    expect(result.success).toBe(true)
+    expect(result.imported).toBe(5)
+  })
+
+  it('imports tasks only when other arrays absent', async () => {
+    const importData = {
+      tasks: [
+        {
+          id: 't1',
+          text: 'Task',
+          status: 'open',
+          source: 'inbox',
+          created_at: now,
+          updated_at: now,
+        },
+      ],
+    }
+    const handler = getHandler('task-vault:vault:import-json')
+    const result = (await handler({}, importData)) as { success: boolean; imported: number }
+    expect(result.success).toBe(true)
+    expect(result.imported).toBe(1)
+  })
+
+  it('returns INVALID_PAYLOAD for null payload', async () => {
+    const handler = getHandler('task-vault:vault:import-json')
+    const result = await handler({}, null)
+    expect(result).toMatchObject({ error: 'INVALID_PAYLOAD' })
+  })
+
+  it('returns INVALID_PAYLOAD for non-object payload', async () => {
+    const handler = getHandler('task-vault:vault:import-json')
+    const result = await handler({}, 'not-an-object')
+    expect(result).toMatchObject({ error: 'INVALID_PAYLOAD' })
+  })
+
+  it('returns error string when db throws during import', async () => {
+    mockPrepare.mockImplementationOnce(() => {
+      throw new Error('import db error')
+    })
+    const handler = getHandler('task-vault:vault:import-json')
+    const result = await handler({}, { areas: [{ id: 'a1', name: 'Work', created_at: now }] })
+    expect(result).toMatchObject({ error: expect.stringContaining('import db error') })
+  })
+
+  it('handles empty import payload gracefully', async () => {
+    const handler = getHandler('task-vault:vault:import-json')
+    const result = (await handler({}, {})) as { success: boolean; imported: number }
+    expect(result.success).toBe(true)
+    expect(result.imported).toBe(0)
+  })
+})
+
+// ── getVaultPath (vault.ipc) ──────────────────────────────────────────────────
+
+describe('getVaultPath (vault.ipc)', () => {
+  it('returns the vault path set via setVaultPath', () => {
+    setVaultPath('/test/vault/path')
+    expect(getVaultPath()).toBe('/test/vault/path')
+    setVaultPath(VAULT) // restore
+  })
+})
+
+// ── registerVaultIpcHandlers dispose (lines 709-712) ─────────────────────────
+
+describe('registerVaultIpcHandlers dispose', () => {
+  it('calls ipcMain.removeHandler for all registered channels', () => {
+    const dispose = registerVaultIpcHandlers()
+    dispose()
+    const removedChannels = vi.mocked(mockRemoveHandler).mock.calls.map((c) => c[0])
+    expect(removedChannels).toContain('task-vault:vault:capture')
+    expect(removedChannels).toContain('task-vault:vault:get-inbox')
+    expect(removedChannels).toContain('task-vault:vault:list-archive')
+    expect(removedChannels).toContain('task-vault:vault:add-task')
   })
 })

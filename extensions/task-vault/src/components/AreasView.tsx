@@ -4,19 +4,23 @@ import type { IndexedTask } from '../vault/types'
 import { SmartTaskInput, invalidateSmartInputCache } from './SmartTaskInput'
 import { useVaultStore } from '../stores/vault.store'
 
+interface AreaProject {
+  id: string
+  filePath: string
+  name: string
+  status: string
+  nextActionCount: number
+  totalTaskCount: number
+  doneTaskCount: number
+}
+
 interface AreaData {
   filePath: string
   name: string
   taskCount: number
   openTaskCount: number
   tasks: IndexedTask[]
-  projects?: Array<{
-    id: string
-    filePath: string
-    name: string
-    status: string
-    nextActionCount: number
-  }>
+  projects?: AreaProject[]
 }
 
 export function AreasView(): React.JSX.Element {
@@ -169,6 +173,11 @@ export function AreasView(): React.JSX.Element {
                 <div className="areas-view__card-stats">
                   <span className="areas-view__open-count">{area.openTaskCount}</span>
                   <span className="areas-view__total-count">/ {area.taskCount} tasks</span>
+                  {area.projects && area.projects.length > 0 && (
+                    <span className="areas-view__project-count">
+                      · {area.projects.length} project{area.projects.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
                 </div>
                 <div className="areas-view__card-progress">
                   <div
@@ -181,6 +190,25 @@ export function AreasView(): React.JSX.Element {
                     }}
                   />
                 </div>
+                {area.projects && area.projects.length > 0 && (
+                  <div className="areas-view__card-projects">
+                    {area.projects.slice(0, 3).map((p) => (
+                      <span key={p.id} className="areas-view__card-project-chip">
+                        @{p.name}
+                        {p.nextActionCount > 0 && (
+                          <span className="areas-view__card-project-actions">
+                            {p.nextActionCount}
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                    {area.projects.length > 3 && (
+                      <span className="areas-view__card-project-chip areas-view__card-project-chip--more">
+                        +{area.projects.length - 3}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <button
                 className="areas-view__card-delete"
@@ -422,20 +450,31 @@ function AreaDetail({
 
       {area.projects && area.projects.length > 0 && (
         <section className="area-detail__projects">
-          <h4>Projects</h4>
-          {area.projects.map((p) => (
-            <div
-              key={p.id}
-              className="area-detail__project-card"
-              onClick={() => onNavToProject(p.name)}
-              style={{ cursor: 'pointer' }}
-            >
-              <span className="area-detail__project-name">@{p.name}</span>
-              <span className="area-detail__project-meta">
-                {p.nextActionCount} action{p.nextActionCount !== 1 ? 's' : ''}
-              </span>
-            </div>
-          ))}
+          <h4>Projects ({area.projects.length})</h4>
+          {area.projects.map((p) => {
+            const pct =
+              p.totalTaskCount > 0 ? Math.round((p.doneTaskCount / p.totalTaskCount) * 100) : 0
+            return (
+              <div
+                key={p.id}
+                className="area-detail__project-card"
+                onClick={() => onNavToProject(p.name)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="area-detail__project-header">
+                  <span className="area-detail__project-name">@{p.name}</span>
+                  <span className="area-detail__project-meta">
+                    {p.nextActionCount} open · {pct}% done
+                  </span>
+                </div>
+                {p.totalTaskCount > 0 && (
+                  <div className="areas-view__card-progress">
+                    <div className="areas-view__card-progress-fill" style={{ width: `${pct}%` }} />
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </section>
       )}
     </div>

@@ -10,10 +10,15 @@ vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
   useWorkspaceStore: Object.assign(vi.fn(), { getState: vi.fn() }),
 }))
 
+// Track the bell callback so we can invoke it in tests
+let capturedBellCallback: (() => void) | undefined
+
 // Mock TerminalSession to avoid xterm import issues in test environment
 vi.mock('../../../../src/renderer/components/terminal/TerminalSession', () => ({
   TerminalInstance: class MockTerminalInstance {
-    constructor(_sessionId: string, _scrollbackLimit: number, _onBell?: () => void) {}
+    constructor(_sessionId: string, _scrollbackLimit: number, onBell?: () => void) {
+      capturedBellCallback = onBell
+    }
   },
 }))
 
@@ -88,5 +93,95 @@ describe('useTerminalSession', () => {
       5000
     )
     expect(sessionId).toBe('session-123')
+  })
+
+  it('bell callback increments bell count when session is not the active session', async () => {
+    // Session exists but a different session is the active one for the project
+    Object.assign(useSessionStore, {
+      getState: vi.fn().mockReturnValue({
+        activeSessionIdByProject: new Map([['proj-1', 'other-session']]),
+        sessions: new Map([
+          ['session-123', { id: 'session-123', projectId: 'proj-1', tabTitle: 'T', type: 'human' }],
+        ]),
+      }),
+    })
+    Object.assign(useWorkspaceStore, {
+      getState: vi.fn().mockReturnValue({ activeProjectId: 'proj-1' }),
+    })
+
+    const { useTerminalSession } = await import('../../../../src/renderer/hooks/useTerminalSession')
+    const { result } = renderHook(() => useTerminalSession())
+    capturedBellCallback = undefined
+    await result.current.createSession('proj-1', 'human', 'Terminal', '/cwd', 5000)
+
+    // Invoke the captured bell callback — session is not active, so count should increment
+    capturedBellCallback?.()
+    expect(mockIncrementBellCount).toHaveBeenCalledWith('session-123')
+  })
+
+  it('bell callback increments when session is active but project is not active', async () => {
+    Object.assign(useSessionStore, {
+      getState: vi.fn().mockReturnValue({
+        activeSessionIdByProject: new Map([['proj-1', 'session-123']]),
+        sessions: new Map([
+          ['session-123', { id: 'session-123', projectId: 'proj-1', tabTitle: 'T', type: 'human' }],
+        ]),
+      }),
+    })
+    // Different project is active
+    Object.assign(useWorkspaceStore, {
+      getState: vi.fn().mockReturnValue({ activeProjectId: 'proj-2' }),
+    })
+
+    const { useTerminalSession } = await import('../../../../src/renderer/hooks/useTerminalSession')
+    const { result } = renderHook(() => useTerminalSession())
+    capturedBellCallback = undefined
+    await result.current.createSession('proj-1', 'human', 'Terminal', '/cwd', 5000)
+    capturedBellCallback?.()
+    expect(mockIncrementBellCount).toHaveBeenCalledWith('session-123')
+  })
+
+  it('bell callback does not increment when session is active and project is active', async () => {
+    Object.assign(useSessionStore, {
+      getState: vi.fn().mockReturnValue({
+        activeSessionIdByProject: new Map([['proj-1', 'session-123']]),
+        sessions: new Map([
+          ['session-123', { id: 'session-123', projectId: 'proj-1', tabTitle: 'T', type: 'human' }],
+        ]),
+      }),
+    })
+    Object.assign(useWorkspaceStore, {
+      getState: vi.fn().mockReturnValue({ activeProjectId: 'proj-1' }),
+    })
+
+    const { useTerminalSession } = await import('../../../../src/renderer/hooks/useTerminalSession')
+    const { result } = renderHook(() => useTerminalSession())
+    capturedBellCallback = undefined
+    await result.current.createSession('proj-1', 'human', 'Terminal', '/cwd', 5000)
+    capturedBellCallback?.()
+    // Both active — should NOT increment
+    expect(mockIncrementBellCount).not.toHaveBeenCalled()
+  })
+
+  it('bell callback does not crash when session is not found in store', async () => {
+    // Session not in the sessions map
+    Object.assign(useSessionStore, {
+      getState: vi.fn().mockReturnValue({
+        activeSessionIdByProject: new Map(),
+        sessions: new Map(), // empty — session not found
+      }),
+    })
+    Object.assign(useWorkspaceStore, {
+      getState: vi.fn().mockReturnValue({ activeProjectId: null }),
+    })
+
+    const { useTerminalSession } = await import('../../../../src/renderer/hooks/useTerminalSession')
+    const { result } = renderHook(() => useTerminalSession())
+    capturedBellCallback = undefined
+    await result.current.createSession('proj-1', 'human', 'Terminal', '/cwd', 5000)
+
+    // Should not throw and should not call incrementBellCount
+    expect(() => capturedBellCallback?.()).not.toThrow()
+    expect(mockIncrementBellCount).not.toHaveBeenCalled()
   })
 })

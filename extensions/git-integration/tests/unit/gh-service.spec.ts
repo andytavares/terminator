@@ -131,4 +131,81 @@ describe('GhService.createPr()', () => {
     const execCall = mockExec.mock.calls[0][0]
     expect(execCall.args).toContain('--draft')
   })
+
+  it('throws when gh pr create fails', async () => {
+    mockExec.mockResolvedValue({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'Unauthorized',
+      timedOut: false,
+    })
+    await expect(
+      service.createPr('/tmp/repo', { title: 'test', body: '', base: 'main', isDraft: false })
+    ).rejects.toThrow('gh pr create failed: Unauthorized')
+  })
+})
+
+describe('GhService — parseGhPr null/undefined branches (lines 15-21)', () => {
+  it('uses fallback values when fields are null/undefined', async () => {
+    // Pass a JSON object where all optional fields are missing
+    const prJson = JSON.stringify({
+      number: 99,
+      // title, body, url, state, isDraft, baseRefName, headRefName all missing
+    })
+    mockExec.mockResolvedValue({ exitCode: 0, stdout: prJson, stderr: '', timedOut: false })
+    const pr = await service.getPrForBranch('/tmp/repo', 'some-branch')
+    expect(pr).not.toBeNull()
+    expect(pr?.title).toBe('') // null ?? '' fallback
+    expect(pr?.body).toBe('') // null ?? '' fallback
+    expect(pr?.url).toBe('') // null ?? '' fallback
+    expect(pr?.state).toBe('open') // null ?? 'OPEN' → default
+    expect(pr?.baseRefName).toBe('main') // null ?? 'main' fallback
+    expect(pr?.headRefName).toBe('') // null ?? '' fallback
+    expect(pr?.isDraft).toBe(false) // Boolean(undefined) = false
+  })
+})
+
+describe('GhService — mapState coverage', () => {
+  it('maps CLOSED state to closed', async () => {
+    const prJson = JSON.stringify({
+      number: 50,
+      title: 'closed PR',
+      body: '',
+      url: 'https://github.com/org/repo/pull/50',
+      state: 'CLOSED',
+      isDraft: false,
+      baseRefName: 'main',
+      headRefName: 'feat/closed',
+    })
+    mockExec.mockResolvedValue({ exitCode: 0, stdout: prJson, stderr: '', timedOut: false })
+    const pr = await service.getPrForBranch('/tmp/repo', 'feat/closed')
+    expect(pr?.state).toBe('closed')
+  })
+
+  it('maps MERGED state to merged', async () => {
+    const prJson = JSON.stringify({
+      number: 51,
+      title: 'merged PR',
+      body: '',
+      url: 'https://github.com/org/repo/pull/51',
+      state: 'MERGED',
+      isDraft: false,
+      baseRefName: 'main',
+      headRefName: 'feat/merged',
+    })
+    mockExec.mockResolvedValue({ exitCode: 0, stdout: prJson, stderr: '', timedOut: false })
+    const pr = await service.getPrForBranch('/tmp/repo', 'feat/merged')
+    expect(pr?.state).toBe('merged')
+  })
+
+  it('returns null when stderr includes "not found"', async () => {
+    mockExec.mockResolvedValue({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'could not find remote ref not found',
+      timedOut: false,
+    })
+    const pr = await service.getPrForBranch('/tmp/repo', 'feat/gone')
+    expect(pr).toBeNull()
+  })
 })

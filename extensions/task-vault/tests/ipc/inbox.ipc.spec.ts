@@ -83,10 +83,12 @@ describe('task-vault:vault:process-inbox-item', () => {
     expect(result).toMatchObject({ success: true })
   })
 
-  it('action:do-now marks item with in-progress status', async () => {
+  it('action:do-now moves task to today daily log', async () => {
     const handler = getHandler('task-vault:vault:process-inbox-item')
     const result = await handler({}, { taskId: TASK_ID, action: 'do-now' })
     expect(result).toMatchObject({ success: true })
+    // Two UPDATE statements: one for task, one for subtasks
+    expect(mockRun).toHaveBeenCalledTimes(2)
   })
 
   it('action:someday files to someday', async () => {
@@ -104,10 +106,44 @@ describe('task-vault:vault:process-inbox-item', () => {
     expect(result).toMatchObject({ success: true, newTaskId: TASK_ID })
   })
 
+  it('action:file with newProjectName creates project if missing and files task', async () => {
+    // First get() returns the task, second get() returns undefined (project not found)
+    mockGet.mockReturnValueOnce(TASK_ROW).mockReturnValueOnce(undefined)
+    const handler = getHandler('task-vault:vault:process-inbox-item')
+    const result = await handler(
+      {},
+      { taskId: TASK_ID, action: 'file', newProjectName: 'Brand New Project' }
+    )
+    expect(result).toMatchObject({ success: true, newTaskId: TASK_ID })
+  })
+
+  it('action:file with newProjectName skips insert when project exists', async () => {
+    // First get() returns the task, second get() returns existing project
+    mockGet.mockReturnValueOnce(TASK_ROW).mockReturnValueOnce({ id: 'existing-proj' })
+    const handler = getHandler('task-vault:vault:process-inbox-item')
+    const result = await handler(
+      {},
+      { taskId: TASK_ID, action: 'file', newProjectName: 'Existing Project' }
+    )
+    expect(result).toMatchObject({ success: true, newTaskId: TASK_ID })
+  })
+
+  it('action:file without destination or newProjectName returns error', async () => {
+    const handler = getHandler('task-vault:vault:process-inbox-item')
+    const result = await handler({}, { taskId: TASK_ID, action: 'file' })
+    expect(result).toMatchObject({ error: 'destination required for action: file' })
+  })
+
   it('returns STALE_ID when task not found', async () => {
     mockGet.mockReturnValueOnce(undefined)
     const handler = getHandler('task-vault:vault:process-inbox-item')
     const result = await handler({}, { taskId: TASK_ID, action: 'trash' })
     expect(result).toMatchObject({ error: 'STALE_ID' })
+  })
+
+  it('returns VALIDATION_ERROR for invalid payload', async () => {
+    const handler = getHandler('task-vault:vault:process-inbox-item')
+    const result = await handler({}, { taskId: TASK_ID, action: 'invalid-action' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
   })
 })

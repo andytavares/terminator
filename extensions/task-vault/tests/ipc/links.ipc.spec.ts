@@ -21,7 +21,7 @@ vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
 }))
 
-import { registerLinksIpcHandlers, setVaultPath } from '../../src/ipc/links.ipc'
+import { registerLinksIpcHandlers, setVaultPath, getVaultPath } from '../../src/ipc/links.ipc'
 
 const VAULT = '/vault'
 const UUID = '550e8400-e29b-41d4-a716-446655440000'
@@ -94,6 +94,21 @@ describe('task-vault:links:remove', () => {
     expect(written).not.toContain(UUID)
   })
 
+  it('removes terminator link from project via projectFilePath (lines 130-147)', async () => {
+    mockGet.mockReturnValue({ terminator_links: JSON.stringify([UUID]) })
+    const { handler } = getHandler('task-vault:links:remove')
+    const result = await handler({}, { projectFilePath: PROJECT_NAME, targetId: UUID })
+    expect(result).toMatchObject({ success: true })
+    expect(mockRun).toHaveBeenCalled()
+  })
+
+  it('returns NOT_FOUND when project does not exist during remove', async () => {
+    mockGet.mockReturnValue(undefined)
+    const { handler } = getHandler('task-vault:links:remove')
+    const result = await handler({}, { projectFilePath: 'nonexistent-proj', targetId: UUID })
+    expect(result).toMatchObject({ error: 'NOT_FOUND' })
+  })
+
   it('returns NOT_FOUND when task does not exist', async () => {
     mockGet.mockReturnValue(undefined)
     const { handler } = getHandler('task-vault:links:remove')
@@ -154,5 +169,69 @@ describe('task-vault:links:get-for-terminator-target', () => {
     const { handler } = getHandler('task-vault:links:get-for-terminator-target')
     const result = await handler({}, {})
     expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+
+  it('returns linked projects for targetId via rowToProject (line 168-169)', async () => {
+    const projectRow = {
+      id: 'proj-uuid-1',
+      name: PROJECT_NAME,
+      status: 'active',
+      area: null,
+      deadline: null,
+      terminator_links: JSON.stringify([UUID]),
+      updated_at: new Date().toISOString(),
+    }
+    // First all() → no tasks, second all() → project rows
+    mockAll.mockReturnValueOnce([]).mockReturnValueOnce([projectRow])
+    const { handler } = getHandler('task-vault:links:get-for-terminator-target')
+    const result = (await handler({}, { targetId: UUID })) as {
+      tasks: unknown[]
+      projects: { name: string }[]
+    }
+    expect(result.projects).toHaveLength(1)
+    expect(result.projects[0].name).toBe(PROJECT_NAME)
+  })
+})
+
+describe('task-vault:links:create error handling (lines 103-105)', () => {
+  it('returns error string when db throws during task update', async () => {
+    mockGet.mockReturnValue({ terminator_links: '[]' })
+    mockRun.mockImplementation(() => {
+      throw new Error('db write error')
+    })
+    const { handler } = getHandler('task-vault:links:create')
+    const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
+    expect(result).toMatchObject({ error: expect.stringContaining('db write error') })
+  })
+})
+
+describe('task-vault:links:remove error handling (lines 145-147)', () => {
+  it('returns error string when db throws during task remove', async () => {
+    mockGet.mockReturnValue({ terminator_links: JSON.stringify([UUID]) })
+    mockRun.mockImplementation(() => {
+      throw new Error('db remove error')
+    })
+    const { handler } = getHandler('task-vault:links:remove')
+    const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
+    expect(result).toMatchObject({ error: expect.stringContaining('db remove error') })
+  })
+})
+
+describe('getVaultPath', () => {
+  it('returns the vault path set via setVaultPath', () => {
+    setVaultPath('/my/vault')
+    expect(getVaultPath()).toBe('/my/vault')
+    setVaultPath(VAULT) // restore
+  })
+})
+
+describe('registerLinksIpcHandlers dispose', () => {
+  it('calls ipcMain.removeHandler for all registered channels (lines 175-178)', () => {
+    const dispose = registerLinksIpcHandlers()
+    dispose()
+    const removedChannels = vi.mocked(mockRemoveHandler).mock.calls.map((c) => c[0])
+    expect(removedChannels).toContain('task-vault:links:create')
+    expect(removedChannels).toContain('task-vault:links:remove')
+    expect(removedChannels).toContain('task-vault:links:get-for-terminator-target')
   })
 })

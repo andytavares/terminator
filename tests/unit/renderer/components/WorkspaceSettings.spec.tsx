@@ -105,4 +105,73 @@ describe('WorkspaceSettings', () => {
     fireEvent.change(input, { target: { value: '100' } })
     expect(mockUpdateScrollback).not.toHaveBeenCalled()
   })
+
+  it('calls updateWorkspace to clear theme override when "Use global default" radio is changed', () => {
+    // Set a theme override so the "Use global default" radio is not already checked
+    vi.mocked(useSettingsStore).mockReturnValue({
+      globalSettings,
+      workspaceSettings: new Map([
+        ['ws-1', { overrides: { appearance: { theme: 'light' as const } } }],
+      ]),
+      updateWorkspaceTheme: mockUpdateTheme,
+      updateWorkspaceScrollback: mockUpdateScrollback,
+      updateWorkspaceWorktreeBaseDir: mockUpdateWorktreeDir,
+      loadSettings: mockLoadSettings,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    render(<WorkspaceSettings workspaceId="ws-1" />)
+    // The "Use global default" radio for theme is the third radio in the theme group
+    const radios = screen.getAllByRole('radio')
+    // First two are dark/light, third is "use global default" for theme
+    // fireEvent.click triggers onChange in React for radio inputs
+    fireEvent.click(radios[2])
+    expect(mockUpdateWorkspace).toHaveBeenCalledWith('ws-1', { appearance: undefined })
+  })
+
+  it('calls updateWorkspace to clear scrollback override when "Use global default" link is clicked', () => {
+    render(<WorkspaceSettings workspaceId="ws-1" />)
+    // The button-link for scrollback reset — filter by role=button
+    const buttons = screen.getAllByRole('button')
+    // The "Use global default" button for scrollback
+    const scrollbackBtn = buttons.find((b) => b.textContent === 'Use global default')
+    expect(scrollbackBtn).toBeTruthy()
+    fireEvent.click(scrollbackBtn!)
+    expect(mockUpdateWorkspace).toHaveBeenCalledWith('ws-1', { terminal: undefined })
+  })
+
+  it('calls updateWorkspaceWorktreeBaseDir on blur of worktree dir input', () => {
+    render(<WorkspaceSettings workspaceId="ws-1" />)
+    const input = screen.getByPlaceholderText('Leave empty to use <repo>/.worktrees')
+    fireEvent.blur(input)
+    expect(mockUpdateWorktreeDir).toHaveBeenCalledWith('ws-1', undefined)
+  })
+
+  it('calls updateWorkspaceWorktreeBaseDir with trimmed value on blur', () => {
+    render(<WorkspaceSettings workspaceId="ws-1" />)
+    const input = screen.getByPlaceholderText('Leave empty to use <repo>/.worktrees')
+    // defaultValue is controlled by key; simulate blur with a new value via Object.defineProperty
+    Object.defineProperty(input, 'value', { value: '  /custom/dir  ', writable: true })
+    fireEvent.blur(input)
+    expect(mockUpdateWorktreeDir).toHaveBeenCalledWith('ws-1', '/custom/dir')
+  })
+
+  it('shows "Use global default" button for worktree override when override is set', () => {
+    vi.mocked(useSettingsStore).mockReturnValue({
+      globalSettings,
+      workspaceSettings: new Map([
+        ['ws-1', { overrides: { git: { worktreeBaseDir: '/custom' } } }],
+      ]),
+      updateWorkspaceTheme: mockUpdateTheme,
+      updateWorkspaceScrollback: mockUpdateScrollback,
+      updateWorkspaceWorktreeBaseDir: mockUpdateWorktreeDir,
+      loadSettings: mockLoadSettings,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    render(<WorkspaceSettings workspaceId="ws-1" />)
+    // When override is set, a second "Use global default" button appears for worktree dir
+    const buttons = screen.getAllByRole('button')
+    const globalDefaults = buttons.filter((b) => b.textContent === 'Use global default')
+    expect(globalDefaults.length).toBeGreaterThanOrEqual(2)
+    // Click the worktree "Use global default" (last one)
+    fireEvent.click(globalDefaults[globalDefaults.length - 1])
+    expect(mockUpdateWorktreeDir).toHaveBeenCalledWith('ws-1', undefined)
+  })
 })

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Zap, Pencil, Check, X } from 'lucide-react'
+import { Zap, Pencil, Check, X, Trash2 } from 'lucide-react'
 import type { IndexedProject, IndexedTask } from '../vault/types'
 import { useVaultStore } from '../stores/vault.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
@@ -292,6 +292,10 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
   const [tasks, setTasks] = useState<IndexedTask[]>([])
   const [expanded, setExpanded] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [addingText, setAddingText] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
 
   async function load() {
     const result = await window.electronAPI.extensionBridge.invoke(
@@ -307,6 +311,62 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
   async function toggle() {
     if (!loaded) await load()
     setExpanded((v) => !v)
+  }
+
+  async function handleComplete(taskId: string) {
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', { taskId })
+    await load()
+  }
+
+  async function handleCancel(taskId: string) {
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:cancel-task', { taskId })
+    await load()
+  }
+
+  async function handleRestore(taskId: string) {
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:restore-task', { taskId })
+    await load()
+  }
+
+  async function handleDelete(taskId: string, text: string) {
+    if (!confirm(`Delete task: "${text}"?`)) return
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-task', { taskId })
+    await load()
+  }
+
+  async function handleSaveEdit(taskId: string) {
+    if (!editText.trim()) return
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:edit-task', {
+      taskId,
+      text: editText.trim(),
+    })
+    setEditingId(null)
+    await load()
+  }
+
+  function startEdit(t: IndexedTask) {
+    const parts = [t.text]
+    if (t.project) parts.push(`@${t.project}`)
+    if (t.context) parts.push(`+${t.context}`)
+    if (t.area) parts.push(`#${t.area}`)
+    if (t.dueDate) parts.push(`due:${t.dueDate}`)
+    setEditText(parts.join(' '))
+    setEditingId(t.id)
+  }
+
+  async function handleAddTask() {
+    if (!addingText.trim()) return
+    setAdding(true)
+    try {
+      await window.electronAPI.extensionBridge.invoke('task-vault:vault:add-task', {
+        filePath: `projects/${projectName}.md`,
+        text: addingText.trim() + ` @${projectName}`,
+      })
+      setAddingText('')
+      await load()
+    } finally {
+      setAdding(false)
+    }
   }
 
   if (!expanded) {
@@ -326,8 +386,10 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
     'in-progress': '[/]',
     open: '[ ]',
   }
-  const openTasks = tasks.filter((t) => t.status === 'open')
-  const doneTasks = tasks.filter((t) => t.status !== 'open')
+  const openTasks = tasks.filter((t) => t.status === 'open' || t.status === 'in-progress')
+  const doneTasks = tasks.filter(
+    (t) => t.status === 'done' || t.status === 'cancelled' || t.status === 'migrated'
+  )
 
   return (
     <div className="projects-browser__task-list">
@@ -339,6 +401,28 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
           ▲
         </button>
       </div>
+
+      <div className="projects-browser__add-task-row">
+        <input
+          type="text"
+          className="projects-browser__add-task-input"
+          value={addingText}
+          onChange={(e) => setAddingText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void handleAddTask()
+          }}
+          placeholder={`Add task to @${projectName}…`}
+          disabled={adding}
+        />
+        <button
+          className="tv-btn tv-btn--primary"
+          onClick={() => void handleAddTask()}
+          disabled={adding || !addingText.trim()}
+        >
+          Add
+        </button>
+      </div>
+
       {tasks.length === 0 && (
         <div className="projects-browser__task-list-empty">
           No tasks tagged @{projectName} across vault.
@@ -346,23 +430,97 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
       )}
       {openTasks.map((t) => (
         <div key={t.id} className="projects-browser__task-row">
-          <span className="projects-browser__task-marker">{STATUS_ICON[t.status] ?? '[ ]'}</span>
-          <span className="projects-browser__task-text">{t.text}</span>
-          {t.area && <span className="daily-log__tag daily-log__tag--area">#{t.area}</span>}
-          <span className="projects-browser__task-file">
-            {t.filePath.split('/').pop()?.replace('.md', '')}
-          </span>
+          <button
+            className="projects-browser__task-check"
+            onClick={() => void handleComplete(t.id)}
+            title="Complete"
+          >
+            {STATUS_ICON[t.status] ?? '[ ]'}
+          </button>
+          {editingId === t.id ? (
+            <span className="projects-browser__task-edit">
+              <input
+                type="text"
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleSaveEdit(t.id)
+                  if (e.key === 'Escape') setEditingId(null)
+                }}
+                autoFocus
+              />
+              <button className="tv-btn tv-btn--primary" onClick={() => void handleSaveEdit(t.id)}>
+                <Check size={13} />
+              </button>
+              <button className="tv-btn tv-btn--icon" onClick={() => setEditingId(null)}>
+                <X size={13} />
+              </button>
+            </span>
+          ) : (
+            <>
+              <span
+                className="projects-browser__task-text"
+                onDoubleClick={() => startEdit(t)}
+                title="Double-click to edit"
+              >
+                {t.text}
+                {t.area && <span className="daily-log__tag daily-log__tag--area">#{t.area}</span>}
+              </span>
+              <span className="projects-browser__task-file">
+                {t.filePath.split('/').pop()?.replace('.md', '')}
+              </span>
+              <span className="projects-browser__task-actions">
+                <button
+                  className="tv-btn tv-btn--outline"
+                  onClick={() => startEdit(t)}
+                  title="Edit"
+                >
+                  <Pencil size={12} />
+                </button>
+                <button
+                  className="tv-btn tv-btn--outline"
+                  onClick={() => void handleCancel(t.id)}
+                  title="Cancel task"
+                >
+                  <X size={12} />
+                </button>
+                <button
+                  className="tv-btn tv-btn--outline"
+                  onClick={() => void handleDelete(t.id, t.text)}
+                  title="Delete"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </span>
+            </>
+          )}
         </div>
       ))}
       {doneTasks.length > 0 && (
         <details className="projects-browser__done-tasks">
-          <summary>{doneTasks.length} completed</summary>
+          <summary>{doneTasks.length} completed/cancelled</summary>
           {doneTasks.map((t) => (
             <div key={t.id} className="projects-browser__task-row projects-browser__task-row--done">
               <span className="projects-browser__task-marker">
                 {STATUS_ICON[t.status] ?? '[x]'}
               </span>
               <span className="projects-browser__task-text">{t.text}</span>
+              <span className="projects-browser__task-actions">
+                <button
+                  className="tv-btn tv-btn--outline"
+                  onClick={() => void handleRestore(t.id)}
+                  title="Restore to inbox"
+                >
+                  ↩
+                </button>
+                <button
+                  className="tv-btn tv-btn--outline"
+                  onClick={() => void handleDelete(t.id, t.text)}
+                  title="Delete"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </span>
             </div>
           ))}
         </details>

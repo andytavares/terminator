@@ -79,4 +79,148 @@ describe('PtyManager', () => {
     await mgr.killAll()
     expect(mgr.getSessionIds()).toHaveLength(0)
   })
+
+  it('kill is a no-op for unknown sessionId', async () => {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    // Should not throw
+    expect(() => mgr.kill('nonexistent-session')).not.toThrow()
+    expect(mockPty.kill).not.toHaveBeenCalled()
+  })
+
+  it('kill swallows errors thrown by pty.kill()', async () => {
+    mockPty.kill.mockImplementationOnce(() => {
+      throw new Error('already dead')
+    })
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    const id = 'kill-err'
+    mgr.spawn(id, '/', '/bin/bash', 'human', vi.fn(), vi.fn())
+    expect(() => mgr.kill(id)).not.toThrow()
+    expect(mgr.getSessionIds()).not.toContain(id)
+  })
+
+  it('onExit callback removes session and calls user onExit', async () => {
+    let capturedOnExit: ((args: { exitCode: number }) => void) | undefined
+    mockPty.onExit.mockImplementation((cb: (args: { exitCode: number }) => void) => {
+      capturedOnExit = cb
+    })
+
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    const onExit = vi.fn()
+    const id = 'exit-session'
+    mgr.spawn(id, '/', '/bin/bash', 'human', vi.fn(), onExit)
+
+    expect(mgr.getSessionIds()).toContain(id)
+    capturedOnExit?.({ exitCode: 0 })
+    expect(onExit).toHaveBeenCalledWith(0)
+    expect(mgr.getSessionIds()).not.toContain(id)
+  })
+
+  it('cleanupOrphans returns 0 when registry file does not exist', async () => {
+    const fs = await import('fs')
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    const result = mgr.cleanupOrphans()
+    expect(result).toEqual({ cleanedCount: 0 })
+  })
+
+  it('cleanupOrphans returns 0 when registry JSON is malformed', async () => {
+    const fs = await import('fs')
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readFileSync).mockReturnValue('NOT_JSON' as unknown as Buffer)
+
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    const result = mgr.cleanupOrphans()
+    expect(result).toEqual({ cleanedCount: 0 })
+  })
+
+  it('cleanupOrphans sends SIGTERM to running orphan processes', async () => {
+    const fs = await import('fs')
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    // Provide a registry with one orphan PID
+    const orphanPid = 99999
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify([
+        { sessionId: 'orphan', pid: orphanPid, cwd: '/', shell: '/bin/sh' },
+      ]) as unknown as Buffer
+    )
+
+    // Spy on process.kill — first call (signal 0) returns true (process running),
+    // second call (SIGTERM) should succeed
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (signal === 0) return true // isProcessRunning check
+      return true // SIGTERM
+    })
+
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    const result = mgr.cleanupOrphans()
+
+    expect(result.cleanedCount).toBe(1)
+    expect(killSpy).toHaveBeenCalledWith(orphanPid, 'SIGTERM')
+    killSpy.mockRestore()
+  })
+
+  it('cleanupOrphans handles SIGTERM failure gracefully', async () => {
+    const fs = await import('fs')
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    const orphanPid = 88888
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify([
+        { sessionId: 'zombie', pid: orphanPid, cwd: '/', shell: '/bin/sh' },
+      ]) as unknown as Buffer
+    )
+
+    // isProcessRunning returns true, SIGTERM throws
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (signal === 0) return true
+      throw new Error('EPERM')
+    })
+
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    // Should not throw
+    expect(() => mgr.cleanupOrphans()).not.toThrow()
+    killSpy.mockRestore()
+  })
+
+  it('cleanupOrphans skips non-running PIDs', async () => {
+    const fs = await import('fs')
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify([
+        { sessionId: 'dead', pid: 77777, cwd: '/', shell: '/bin/sh' },
+      ]) as unknown as Buffer
+    )
+
+    // isProcessRunning signal 0 throws → process not running
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw new Error('ESRCH')
+    })
+
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    const result = mgr.cleanupOrphans()
+    expect(result.cleanedCount).toBe(0)
+    killSpy.mockRestore()
+  })
+
+  it('resize is a no-op for unknown sessionId', async () => {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    expect(() => mgr.resize('no-such', 80, 24)).not.toThrow()
+    expect(mockPty.resize).not.toHaveBeenCalled()
+  })
+
+  it('write is a no-op for unknown sessionId', async () => {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    expect(() => mgr.write('no-such', 'data')).not.toThrow()
+    expect(mockPty.write).not.toHaveBeenCalled()
+  })
 })

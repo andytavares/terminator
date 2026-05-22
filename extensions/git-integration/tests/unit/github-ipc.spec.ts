@@ -264,4 +264,564 @@ describe('github:pr-file-diff', () => {
 
     expect(result).toMatchObject({ error: expect.stringContaining('cannot lock ref') })
   })
+
+  it('returns VALIDATION_ERROR for missing path', async () => {
+    const result = (await handlers['github:pr-file-diff']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('parses a diff with binary file indicator', async () => {
+    mockGitSuccess('') // git fetch
+    mockGitSuccess('main\n') // gh pr view
+    mockGitSuccess('abc123\n') // git merge-base
+    mockGitSuccess('Binary files a/image.png and b/image.png differ\n') // git diff
+
+    const result = (await handlers['github:pr-file-diff']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      path: 'image.png',
+    })) as { diff: { isBinary: boolean } }
+
+    expect(result.diff.isBinary).toBe(true)
+  })
+
+  it('parses a diff with actual hunks', async () => {
+    const diffContent = `diff --git a/src/foo.ts b/src/foo.ts
+--- a/src/foo.ts
++++ b/src/foo.ts
+@@ -1,3 +1,4 @@
+ const x = 1
++const y = 2
+ const z = 3
+-const w = 4
+ export { x }
+`
+    mockGitSuccess('') // git fetch
+    mockGitSuccess('main\n') // gh pr view
+    mockGitSuccess('abc123\n') // git merge-base
+    mockGitSuccess(diffContent) // git diff
+
+    const result = (await handlers['github:pr-file-diff']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      path: 'src/foo.ts',
+    })) as { diff: { hunks: Array<{ lines: unknown[] }> } }
+
+    expect(result.diff.hunks).toHaveLength(1)
+    expect(result.diff.hunks[0].lines.length).toBeGreaterThan(0)
+  })
+})
+
+describe('github:list-open-prs', () => {
+  let handlers: Record<string, Handler>
+  const REPO_VIEW = { owner: { login: 'test-owner' }, name: 'test-repo' }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
+    const result = (await handlers['github:list-open-prs']({})) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns NOT_AUTHENTICATED when auth error is thrown', async () => {
+    mockGitFailure('You need to run: gh auth login')
+    const result = (await handlers['github:list-open-prs']({
+      repoRoot: '/repo',
+    })) as { error: string }
+    expect(result.error).toBe('NOT_AUTHENTICATED')
+  })
+
+  it('returns RATE_LIMITED error when rate limit message appears', async () => {
+    mockGitFailure('API rate limit exceeded for user')
+    const result = (await handlers['github:list-open-prs']({
+      repoRoot: '/repo',
+    })) as { error: string; resetAt?: number }
+    expect(result.error).toBe('RATE_LIMITED')
+    expect(result.resetAt).toBeTypeOf('number')
+  })
+
+  it('returns generic error message for other failures', async () => {
+    mockGitFailure('network timeout')
+    const result = (await handlers['github:list-open-prs']({
+      repoRoot: '/repo',
+    })) as { error: string }
+    expect(result.error).toContain('network timeout')
+  })
+
+  it('handles numeric PR number search', async () => {
+    const prData = {
+      number: 42,
+      title: 'Test PR',
+      author: { login: 'alice', avatarUrl: '' },
+      createdAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat/thing',
+      baseRefName: 'main',
+      isDraft: false,
+      statusCheckRollup: [],
+      files: [],
+      additions: 0,
+      deletions: 0,
+    }
+    mockGitSuccess(JSON.stringify(prData))
+
+    const result = (await handlers['github:list-open-prs']({
+      repoRoot: '/repo',
+      search: '42',
+    })) as { prs: unknown[]; hasMore: boolean }
+    expect(result.prs).toHaveLength(1)
+    expect(result.hasMore).toBe(false)
+  })
+
+  it('handles text search', async () => {
+    const prList = [
+      {
+        number: 10,
+        title: 'Fix bug',
+        author: { login: 'bob', avatarUrl: '' },
+        createdAt: '2025-01-01T00:00:00Z',
+        headRefName: 'fix/bug',
+        baseRefName: 'main',
+        isDraft: false,
+        statusCheckRollup: [],
+        files: [],
+        additions: 5,
+        deletions: 2,
+      },
+    ]
+    mockGitSuccess(JSON.stringify(prList))
+
+    const result = (await handlers['github:list-open-prs']({
+      repoRoot: '/repo',
+      search: 'fix bug',
+    })) as { prs: unknown[]; hasMore: boolean }
+    expect(result.prs).toHaveLength(1)
+    expect(result.hasMore).toBe(false)
+  })
+
+  it('handles paginated GraphQL load with cursor', async () => {
+    mockGitSuccess(JSON.stringify(REPO_VIEW)) // repo view
+    const gqlResponse = {
+      data: {
+        repository: {
+          pullRequests: {
+            pageInfo: { endCursor: 'cursor-xyz', hasNextPage: true },
+            nodes: [],
+          },
+        },
+      },
+    }
+    mockGitSuccess(JSON.stringify(gqlResponse)) // graphql query
+
+    const result = (await handlers['github:list-open-prs']({
+      repoRoot: '/repo',
+      cursor: 'cursor-abc',
+    })) as { prs: unknown[]; hasMore: boolean; nextCursor?: string }
+    expect(result.hasMore).toBe(true)
+    expect(result.nextCursor).toBe('cursor-xyz')
+  })
+
+  it('handles paginated load with includeClosedPrs=true', async () => {
+    mockGitSuccess(JSON.stringify(REPO_VIEW)) // repo view
+    const gqlResponse = {
+      data: {
+        repository: {
+          pullRequests: {
+            pageInfo: { endCursor: null, hasNextPage: false },
+            nodes: [],
+          },
+        },
+      },
+    }
+    mockGitSuccess(JSON.stringify(gqlResponse))
+
+    const result = (await handlers['github:list-open-prs']({
+      repoRoot: '/repo',
+      includeClosedPrs: true,
+    })) as { prs: unknown[]; hasMore: boolean }
+    expect(result.hasMore).toBe(false)
+  })
+})
+
+describe('github:file-metrics', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
+    const result = (await handlers['github:file-metrics']({ path: 'src/foo.ts' })) as {
+      error: string
+    }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns file metrics for a regular source file', async () => {
+    mockGitSuccess('abc1234 fix bug\ndef5678 refactor\n') // git log (churn)
+    mockGitSuccess('src/bar.ts\n') // git grep (importers)
+    mockGitSuccess('src/foo.spec.ts\n') // git ls-files (test file check)
+
+    const result = (await handlers['github:file-metrics']({
+      repoRoot: '/repo',
+      path: 'src/foo.ts',
+    })) as Record<string, unknown>
+    expect(result.churn90d).toBe(2)
+    expect(result.blastRadius).toBe(1) // bar.ts imports foo.ts
+    expect(result.testFilePresent).toBe(true)
+  })
+
+  it('returns testFilePresent=true for a test file itself', async () => {
+    mockGitSuccess('') // git log (churn)
+    mockGitSuccess('') // git grep (importers)
+    // No third call needed because isTestFile = true
+
+    const result = (await handlers['github:file-metrics']({
+      repoRoot: '/repo',
+      path: 'src/foo.spec.ts',
+    })) as Record<string, unknown>
+    expect(result.testFilePresent).toBe(true)
+  })
+
+  it('returns error when git commands fail', async () => {
+    // All three parallel git calls fail
+    mockGitFailure('not a git repo')
+    mockGitFailure('not a git repo')
+    mockGitFailure('not a git repo')
+
+    const result = (await handlers['github:file-metrics']({
+      repoRoot: '/repo',
+      path: 'src/foo.ts',
+    })) as { error: string }
+    expect(result.error).toBeDefined()
+  })
+})
+
+describe('github:pr-inline-comments', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR for invalid payload', async () => {
+    const result = (await handlers['github:pr-inline-comments']({ repoRoot: '/repo' })) as {
+      error: string
+    }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns comments on success', async () => {
+    const comments = [
+      {
+        id: 1,
+        user: { login: 'alice', avatar_url: '' },
+        body: 'Nice code',
+        created_at: '2025-01-01T00:00:00Z',
+        updated_at: '2025-01-01T00:00:00Z',
+        path: 'src/foo.ts',
+        line: 10,
+        start_line: null,
+        side: 'RIGHT',
+        diff_hunk: '@@ -1,3 +1,4 @@',
+        in_reply_to_id: null,
+        pull_request_review_id: 1,
+      },
+    ]
+    mockGitSuccess(JSON.stringify(comments))
+
+    const result = (await handlers['github:pr-inline-comments']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { comments: unknown[] }
+    expect(result.comments).toHaveLength(1)
+  })
+
+  it('returns NOT_AUTHENTICATED on auth error', async () => {
+    mockGitFailure('GH_TOKEN is not set — run: gh auth login')
+    const result = (await handlers['github:pr-inline-comments']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { error: string }
+    expect(result.error).toBe('NOT_AUTHENTICATED')
+  })
+})
+
+describe('github:pr-comment-add', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR for missing required fields', async () => {
+    const result = (await handlers['github:pr-comment-add']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('posts a comment without startLine', async () => {
+    const comment = {
+      id: 100,
+      user: { login: 'alice', avatar_url: '' },
+      body: 'LGTM',
+      created_at: '2025-01-01T00:00:00Z',
+      updated_at: '2025-01-01T00:00:00Z',
+      path: 'src/foo.ts',
+      line: 5,
+      start_line: null,
+      side: 'RIGHT',
+      diff_hunk: '',
+      in_reply_to_id: null,
+      pull_request_review_id: 1,
+    }
+    mockGitSuccess(JSON.stringify(comment))
+
+    const result = (await handlers['github:pr-comment-add']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      commitId: 'abc123',
+      path: 'src/foo.ts',
+      line: 5,
+      side: 'RIGHT',
+      body: 'LGTM',
+    })) as { comment: { id: number } }
+    expect(result.comment.id).toBe(100)
+  })
+
+  it('posts a comment with startLine for multi-line comment', async () => {
+    const comment = {
+      id: 101,
+      user: { login: 'alice', avatar_url: '' },
+      body: 'Multi-line',
+      created_at: '2025-01-01T00:00:00Z',
+      updated_at: '2025-01-01T00:00:00Z',
+      path: 'src/foo.ts',
+      line: 10,
+      start_line: 5,
+      side: 'RIGHT',
+      diff_hunk: '',
+      in_reply_to_id: null,
+      pull_request_review_id: 1,
+    }
+    mockGitSuccess(JSON.stringify(comment))
+
+    const result = (await handlers['github:pr-comment-add']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      commitId: 'abc123',
+      path: 'src/foo.ts',
+      line: 10,
+      startLine: 5,
+      side: 'RIGHT',
+      body: 'Multi-line',
+    })) as { comment: { id: number } }
+    expect(result.comment.id).toBe(101)
+
+    // Verify start_line and start_side args were included
+    const args: string[] = mockExecFile.mock.calls[0][1]
+    expect(args).toContain('start_line=5')
+  })
+})
+
+describe('github:pr-comment-reply', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR for missing required fields', async () => {
+    const result = (await handlers['github:pr-comment-reply']({ repoRoot: '/repo' })) as {
+      error: string
+    }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('posts a reply and returns comment', async () => {
+    const reply = {
+      id: 200,
+      user: { login: 'bob', avatar_url: '' },
+      body: 'Agreed',
+      created_at: '2025-01-01T00:00:00Z',
+      updated_at: '2025-01-01T00:00:00Z',
+      path: 'src/foo.ts',
+      line: 5,
+      start_line: null,
+      side: 'RIGHT',
+      diff_hunk: '',
+      in_reply_to_id: 100,
+      pull_request_review_id: 1,
+    }
+    mockGitSuccess(JSON.stringify(reply))
+
+    const result = (await handlers['github:pr-comment-reply']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      inReplyToId: 100,
+      body: 'Agreed',
+    })) as { comment: { id: number; isReply: boolean } }
+    expect(result.comment.id).toBe(200)
+    expect(result.comment.isReply).toBe(true)
+  })
+})
+
+describe('github:pr-review-submit', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR for missing required fields', async () => {
+    const result = (await handlers['github:pr-review-submit']({ repoRoot: '/repo' })) as {
+      error: string
+    }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('submits an APPROVE review and returns reviewId', async () => {
+    mockGitSuccess(JSON.stringify({ id: 999 }))
+
+    const result = (await handlers['github:pr-review-submit']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      commitId: 'abc123',
+      event: 'APPROVE',
+      body: 'LGTM!',
+    })) as { reviewId: number }
+    expect(result.reviewId).toBe(999)
+  })
+
+  it('returns error string on failure', async () => {
+    mockGitFailure('permission denied')
+
+    const result = (await handlers['github:pr-review-submit']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      commitId: 'abc123',
+      event: 'COMMENT',
+      body: '',
+    })) as { error: string }
+    expect(result.error).toContain('permission denied')
+  })
+})
+
+describe('github:sessions-for-repo and github:session-get/set', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('github:sessions-for-repo returns empty sessions for invalid payload', async () => {
+    const result = (await handlers['github:sessions-for-repo']({})) as { sessions: unknown[] }
+    expect(result.sessions).toEqual([])
+  })
+
+  it('github:sessions-for-repo returns sessions for valid repo', async () => {
+    const result = (await handlers['github:sessions-for-repo']({
+      repoRoot: '/repo',
+    })) as { sessions: unknown[] }
+    expect(Array.isArray(result.sessions)).toBe(true)
+  })
+
+  it('github:session-get returns { session: null } for invalid payload', async () => {
+    const result = (await handlers['github:session-get']({})) as { session: null }
+    expect(result.session).toBeNull()
+  })
+
+  it('github:session-get returns { session: null } for unknown key', async () => {
+    const result = (await handlers['github:session-get']({ key: 'unknown-key' })) as {
+      session: null
+    }
+    expect(result.session).toBeNull()
+  })
+
+  it('github:session-set returns VALIDATION_ERROR for invalid payload', async () => {
+    const result = (await handlers['github:session-set']({})) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('github:session-set returns VALIDATION_ERROR for invalid session data', async () => {
+    const result = (await handlers['github:session-set']({
+      key: 'test-key',
+      session: { invalid: true },
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('github:session-set stores a valid session', async () => {
+    const validSession = {
+      repoRoot: '/repo',
+      prNumber: 42,
+      headSHA: 'abc123',
+      currentChapterId: null,
+      currentFilePath: null,
+      viewedFiles: [],
+      fileOrderOverrides: {},
+      scrollPosition: null,
+      pausedAt: null,
+      lastAccessedAt: '2026-01-01T00:00:00Z',
+    }
+
+    const result = (await handlers['github:session-set']({
+      key: '/repo:::42:::abc123',
+      session: validSession,
+    })) as { ok?: boolean; error?: string }
+    expect(result.ok).toBe(true)
+  })
+})
+
+describe('github:pr-review-detail — catchError branches', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('returns NOT_AUTHENTICATED when auth error thrown', async () => {
+    mockGitFailure('You need to run: gh auth login')
+
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { error: string }
+    expect(result.error).toBe('NOT_AUTHENTICATED')
+  })
+
+  it('returns RATE_LIMITED when rate limit error thrown', async () => {
+    mockGitFailure('rate limit exceeded')
+
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { error: string; resetAt?: number }
+    expect(result.error).toBe('RATE_LIMITED')
+    expect(result.resetAt).toBeTypeOf('number')
+  })
+
+  it('returns generic error string for other failures', async () => {
+    mockGitFailure('ENOENT: gh not found')
+
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { error: string }
+    expect(result.error).toContain('ENOENT')
+  })
 })
