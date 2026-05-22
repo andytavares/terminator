@@ -1,0 +1,34 @@
+tests/unit/renderer/App.spec.tsx
+  s_ec1e9bc361504e::t_681397586c030d 413-416,420-444
+  s_ec1e9bc361504e::t_97e57fdf70ace3 399-412
+  s_ec1e9bc361504e::t_c7607003e45581 417-419
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_ec1e9bc361504e::t_dc67ca8da02cc9 45
+  s_ec1e9bc361504e::t_ce8dc6249f6aeb 173-222
+  s_ec1e9bc361504e::t_bc81d37fc08a53 22
+tests/unit/renderer/stores/session.store.spec.ts
+  s_ec1e9bc361504e::t_f39228b8e60c19 37
+  s_ec1e9bc361504e::t_2366d59048d361 71-106
+tests/unit/extensions/extension-host.spec.ts
+  s_ec1e9bc361504e::t_84306a54e07aec 37-59
+  s_ec1e9bc361504e::t_f1f20fe2fd8899 8,14-16
+  s_ec1e9bc361504e::t_98dd8ae8b1ff41 60-117
+  s_ec1e9bc361504e::t_6e28a6b0e558fa 118-134,138-159,165-178
+  s_ec1e9bc361504e::t_c7607003e45581 9-13,135-137,160-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "f704a1e46c64da5915c6373349ebb29e55aee274",
+  "prompts": {},
+  "sessions": {
+    "s_ec1e9bc361504e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2bba96d5-0273-42ac-ad58-a9271753d5e0",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
