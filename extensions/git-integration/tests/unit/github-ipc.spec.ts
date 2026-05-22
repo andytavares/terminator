@@ -11,6 +11,7 @@ vi.mock('electron-store', () => ({
       return undefined
     }
     set() {}
+    delete() {}
     store = {}
   },
 }))
@@ -783,6 +784,124 @@ describe('github:sessions-for-repo and github:session-get/set', () => {
       session: validSession,
     })) as { ok?: boolean; error?: string }
     expect(result.ok).toBe(true)
+  })
+})
+
+describe('github:remove-active-review', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR when repoRoot is missing', async () => {
+    const result = (await handlers['github:remove-active-review']({
+      prNumber: 5,
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns VALIDATION_ERROR when prNumber is missing', async () => {
+    const result = (await handlers['github:remove-active-review']({
+      repoRoot: '/repo',
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns VALIDATION_ERROR when prNumber is not a positive integer', async () => {
+    const result = (await handlers['github:remove-active-review']({
+      repoRoot: '/repo',
+      prNumber: -1,
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns { ok: true } when entry is deleted successfully', async () => {
+    const result = (await handlers['github:remove-active-review']({
+      repoRoot: '/repo',
+      prNumber: 42,
+    })) as { ok: boolean }
+    expect(result.ok).toBe(true)
+  })
+})
+
+describe('github:prune-active-reviews', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR when repoRoot is missing', async () => {
+    const result = (await handlers['github:prune-active-reviews']({
+      prNumbers: [1],
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns VALIDATION_ERROR when prNumbers is missing', async () => {
+    const result = (await handlers['github:prune-active-reviews']({
+      repoRoot: '/repo',
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns { openNumbers: [] } immediately for empty prNumbers array (no gh calls)', async () => {
+    const result = (await handlers['github:prune-active-reviews']({
+      repoRoot: '/repo',
+      prNumbers: [],
+    })) as { openNumbers: number[] }
+    expect(result.openNumbers).toEqual([])
+    expect(mockExecFile).not.toHaveBeenCalled()
+  })
+
+  it('includes OPEN PRs in openNumbers', async () => {
+    mockGitSuccess(JSON.stringify({ number: 7, state: 'OPEN' }))
+    const result = (await handlers['github:prune-active-reviews']({
+      repoRoot: '/repo',
+      prNumbers: [7],
+    })) as { openNumbers: number[] }
+    expect(result.openNumbers).toEqual([7])
+  })
+
+  it('excludes CLOSED PRs from openNumbers and removes them from the store', async () => {
+    mockGitSuccess(JSON.stringify({ number: 8, state: 'CLOSED' }))
+    const result = (await handlers['github:prune-active-reviews']({
+      repoRoot: '/repo',
+      prNumbers: [8],
+    })) as { openNumbers: number[] }
+    expect(result.openNumbers).toEqual([])
+  })
+
+  it('excludes MERGED PRs from openNumbers', async () => {
+    mockGitSuccess(JSON.stringify({ number: 9, state: 'MERGED' }))
+    const result = (await handlers['github:prune-active-reviews']({
+      repoRoot: '/repo',
+      prNumbers: [9],
+    })) as { openNumbers: number[] }
+    expect(result.openNumbers).toEqual([])
+  })
+
+  it('silently skips PRs whose gh call fails and excludes them from openNumbers', async () => {
+    mockGitFailure('not found')
+    const result = (await handlers['github:prune-active-reviews']({
+      repoRoot: '/repo',
+      prNumbers: [10],
+    })) as { openNumbers: number[] }
+    expect(result.openNumbers).toEqual([])
+  })
+
+  it('handles mixed results: OPEN kept, CLOSED excluded, failed silently skipped', async () => {
+    mockGitSuccess(JSON.stringify({ number: 1, state: 'OPEN' }))
+    mockGitSuccess(JSON.stringify({ number: 2, state: 'CLOSED' }))
+    mockGitFailure('network error')
+    const result = (await handlers['github:prune-active-reviews']({
+      repoRoot: '/repo',
+      prNumbers: [1, 2, 3],
+    })) as { openNumbers: number[] }
+    expect(result.openNumbers).toEqual([1])
   })
 })
 

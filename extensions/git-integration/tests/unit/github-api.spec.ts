@@ -115,4 +115,22 @@ describe('githubAPI bridge', () => {
     await githubAPI.activeReviewsForRepo('/repo')
     expect(mockInvoke).toHaveBeenCalledWith('github:active-reviews-for-repo', { repoRoot: '/repo' })
   })
+
+  it('removeActiveReview calls correct channel with repoRoot and prNumber', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    await githubAPI.removeActiveReview('/repo', 42)
+    expect(mockInvoke).toHaveBeenCalledWith('github:remove-active-review', {
+      repoRoot: '/repo',
+      prNumber: 42,
+    })
+  })
+
+  it('pruneActiveReviews calls correct channel with repoRoot and prNumbers', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    await githubAPI.pruneActiveReviews('/repo', [1, 2, 3])
+    expect(mockInvoke).toHaveBeenCalledWith('github:prune-active-reviews', {
+      repoRoot: '/repo',
+      prNumbers: [1, 2, 3],
+    })
+  })
 })
