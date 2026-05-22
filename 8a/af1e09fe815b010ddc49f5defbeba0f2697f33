@@ -1,0 +1,14 @@
+.gitignore
+  h_16ba00fe96244d 16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "8aaf1e09fe815b010ddc49f5defbeba0f2697f33",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
