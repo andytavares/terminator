@@ -25,7 +25,9 @@ function parsePrList(raw: unknown[]): ReturnType<typeof ReviewQueuePRSchema.safe
 
 async function mergeSessionStatuses(
   repoRoot: string,
-  prs: ReviewQueuePR[]
+  prs: ReviewQueuePR[],
+  hasMore: boolean,
+  isAppend: boolean = false
 ): Promise<ReviewQueuePR[]> {
   try {
     const result = await githubAPI.sessionsForRepo(repoRoot)
@@ -55,6 +57,9 @@ async function mergeSessionStatuses(
 
     // Load persisted active-review snapshots and prepend any not already in the
     // current page — guarantees in-progress PRs appear regardless of pagination.
+    // Skip orphan logic on append loads (orphans were already prepended on the first page).
+    if (isAppend) return merged
+
     const activeResult = await githubAPI.activeReviewsForRepo(repoRoot)
     if ('error' in activeResult) return merged
 
@@ -62,6 +67,9 @@ async function mergeSessionStatuses(
     const activePrs = parsePrList((activeResult as { prs: unknown[] }).prs)
     const orphans = activePrs
       .filter((pr): pr is ReviewQueuePR => pr != null && !queueNumbers.has(pr.number))
+      // When all pages are loaded (hasMore === false), any PR missing from the open list
+      // is closed or merged — exclude it from in-progress display.
+      .filter(() => hasMore)
       .map((pr) => {
         const session = latestByPr.get(pr.number)
         const sessionStatus: ReviewQueuePR['sessionStatus'] = session
@@ -130,7 +138,7 @@ export function useLoadPrQueue(repoRoot: string | null) {
         }
         const res = result as { prs: unknown[]; hasMore: boolean; nextCursor?: string }
         const prs = parsePrList(res.prs)
-        const prsWithStatus = await mergeSessionStatuses(repoRoot, prs)
+        const prsWithStatus = await mergeSessionStatuses(repoRoot, prs, res.hasMore, isAppend)
         if (isAppend) {
           appendQueue(prsWithStatus)
         } else {

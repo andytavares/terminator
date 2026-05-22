@@ -119,14 +119,21 @@ export function activate(api: ExtensionAPI): void {
 
   disposables.push(
     api.ipc.registerHandler('window:open-pr-review', (payload) => {
-      const { repoRoot, accentColor } = (payload ?? {}) as {
+      const { repoRoot, accentColor, prNumber, showOverview } = (payload ?? {}) as {
         repoRoot?: string
         accentColor?: string
+        prNumber?: string
+        showOverview?: string
       }
-      api.window.openAuxiliary('pr-review', {
+      const params: Record<string, string> = {
         repoRoot: repoRoot ?? '',
         accentColor: accentColor ?? '',
-      })
+      }
+      if (prNumber) {
+        params.prNumber = prNumber
+        params.showOverview = showOverview ?? 'false'
+      }
+      api.window.openAuxiliary('pr-review', params)
       return { ok: true }
     })
   )
