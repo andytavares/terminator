@@ -1,0 +1,123 @@
+src/renderer/components/terminal/TabBar.tsx
+  s_a586d6245bb263::t_b7554d269aaeb2 1
+  s_a586d6245bb263::t_bdcc2936c11ef1 29,31-32
+  s_a586d6245bb263::t_cce9254d156d75 48-63
+  s_a586d6245bb263::t_d476e95568a5e9 98-121,127-134
+extensions/git-integration/src/components/GitSidebarPanel.tsx
+  s_a586d6245bb263::t_784d95e45d9d51 8
+  s_a586d6245bb263::t_a7109728790ff6 25
+src/renderer/components/terminal/TabBar.css
+  s_a586d6245bb263::t_71593593d0780d 169-182
+extensions/task-vault/src/components/task-vault.css
+  s_a586d6245bb263::t_f04df3dcd2c877 3608-4614
+package.json
+  s_a586d6245bb263::t_7377539e9e408c 28
+  s_a586d6245bb263::t_1db50fedeff6f1 15
+  s_a586d6245bb263::t_769834b91d3a0f 70
+extensions/task-vault/package.json
+  s_a586d6245bb263::t_8d9460625bb9c8 8
+extensions/task-vault/src/components/WeeklyReview.tsx
+  s_a586d6245bb263::t_c4fef5d1447bc9 105-112
+  s_ec1e9bc361504e::t_b084b34ca32990 159,165
+  s_a586d6245bb263::t_7c378356e4b2ca 89-93,96-97
+  s_ec1e9bc361504e::t_25a321d398cb6f 19
+extensions/speckit-pilot/CLAUDE.md
+  s_a586d6245bb263::t_c5d9ddec748d1f 1-38
+extensions/task-vault/src/components/ProjectsBrowser.tsx
+  s_a586d6245bb263::t_353c3fd0e7c37c 112-115,117-132,135,152,157-167,170-179
+  s_a586d6245bb263::t_dffb17dccd77fd 5-6
+src/main/extensions/api.ts
+  s_ec1e9bc361504e::t_318d544dd635b4 494-496,498
+extensions/task-vault/src/components/AreasView.tsx
+  s_a586d6245bb263::t_08f0473fa5943d 168-179,181-183
+extensions/git-integration/tests/unit/github-api.spec.ts
+  s_ec1e9bc361504e::t_357b698a237d58 2-31,33-41,43-50,52-59,61-95,97-118
+  s_ec1e9bc361504e::t_b6ac3524c5b46f 1
+src/renderer/App.tsx
+  s_a586d6245bb263::t_e8fed0924a4e12 67,163
+  s_a586d6245bb263::t_ecc7fcab1b54d8 221-230
+extensions/git-integration/src/components/GitFullView.tsx
+  s_a586d6245bb263::t_52e2372793af34 131,143
+  s_a586d6245bb263::t_c6e6e33cfeddff 75
+  s_a586d6245bb263::t_d7fb5478aa5fd2 10
+  s_a586d6245bb263::t_bd03dd8833cdca 160
+  s_a586d6245bb263::t_858c538bef95dd 52
+extensions/git-integration/src/api/git.ts
+  s_a586d6245bb263::t_66dd2a0cf924ef 1-27
+extensions/git-integration/tests/unit/GitFullView.spec.tsx
+  s_ec1e9bc361504e::t_50eb04c5f980cb 266-269,271
+  s_ec1e9bc361504e::t_5d87e6d4f75b83 142-145,147
+  s_ec1e9bc361504e::t_f4652512b258cf 70-77,79
+  s_ec1e9bc361504e::t_a18ad68b4e1d5e 48
+  s_ec1e9bc361504e::t_997d65c378f58d 219-222,224
+extensions/task-vault/tests/components/WeeklyReview.spec.tsx
+  s_ec1e9bc361504e::t_9c19c014b89948 102,105,111,116,118
+  s_ec1e9bc361504e::t_5aa18e7f0fedfe 146
+  s_ec1e9bc361504e::t_8af3759feac1da 126,130,132
+extensions/task-vault/CLAUDE.md
+  s_a586d6245bb263::t_216a420e2cc989 1-42
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_ec1e9bc361504e::t_923b494854b9c7 27
+  s_ec1e9bc361504e::t_f7b909e0a9c520 96-99,101
+extensions/git-integration/src/components/StagingArea.tsx
+  s_a586d6245bb263::t_12d80ba55cee90 4
+  s_a586d6245bb263::t_f2d3e7b1145686 94,96
+  s_a586d6245bb263::t_ba7e7643318ed8 122
+  s_a586d6245bb263::t_2fd339180075d9 75
+  s_a586d6245bb263::t_4af8d1d9034fa5 111
+extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx
+  s_a586d6245bb263::t_bc54fc04605e5b 84
+  s_a586d6245bb263::t_72fdebe08f06b9 14
+src/renderer/stores/session.store.ts
+  s_a586d6245bb263::t_aa8da73284fb77 37,40-51,55,65
+  s_a586d6245bb263::t_f9b5704525544f 182-191
+  s_a586d6245bb263::t_8274cb81c55ae7 9,29
+extensions/git-integration/src/types/electron.d.ts
+  s_a586d6245bb263::t_0b570ef11a53d1 1-2
+electron-builder.yml
+  s_a586d6245bb263::t_0d3f8a824714a9 7-8
+scripts/CLAUDE.md
+  s_a586d6245bb263::t_d19ee8a1e26d26 1-26
+extensions/git-integration/src/hooks/useGitStatus.ts
+  s_a586d6245bb263::t_df48ab96adcc45 4
+extensions/task-vault/src/components/ArchiveView.tsx
+  s_a586d6245bb263::t_93dd61400ab89a 261-263
+  s_a586d6245bb263::t_46221548f4aeda 280
+  s_a586d6245bb263::t_f74a0ccce7c119 2-8,10,18-20,22-27,29-34,36-41,43-48,50-52
+extensions/git-integration/tests/unit/useGitStatus.spec.tsx
+  s_ec1e9bc361504e::t_909729d54fc578 56
+  s_ec1e9bc361504e::t_eb8f6064a7e502 15,20-24,26
+extensions/git-integration/CLAUDE.md
+  s_a586d6245bb263::t_b276a166971382 1-56
+extensions/git-integration/tests/unit/StagingArea.spec.tsx
+  s_ec1e9bc361504e::t_156c6d6ca84eb4 198-200
+  s_ec1e9bc361504e::t_5e3faa02144aac 226-228
+  s_ec1e9bc361504e::t_af1b3167cbd569 212-214
+  s_ec1e9bc361504e::t_f43bbe64e876e6 182-184
+  s_ec1e9bc361504e::t_c2cd19b0ebb4aa 59-64,66
+  s_ec1e9bc361504e::t_ac68ba93d790f2 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "1eab26739030c984d6dac1df9c3727a56746ec70",
+  "prompts": {},
+  "sessions": {
+    "s_a586d6245bb263": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2d397279-fc3f-453e-a150-d8cc9717b97d",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_ec1e9bc361504e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2bba96d5-0273-42ac-ad58-a9271753d5e0",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
