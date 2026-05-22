@@ -5,7 +5,7 @@ directories:
 files:
   - out/**/*
 asarUnpack:
-  - "**/*.node"
+  - '**/*.node'
 mac:
   icon: resources/icon.png
   target:
