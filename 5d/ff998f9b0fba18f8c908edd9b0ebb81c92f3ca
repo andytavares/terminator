@@ -1,0 +1,25 @@
+tests/unit/terminal/pty-manager.spec.ts
+  s_ec1e9bc361504e::t_19021c47fd876c 82-219
+tests/unit/extensions/extension-host.spec.ts
+  s_ec1e9bc361504e::t_19021c47fd876c 1-4,237-717
+tests/unit/fs/fs-watcher.spec.ts
+  s_ec1e9bc361504e::t_19021c47fd876c 98-199
+tests/unit/logger.spec.ts
+  s_ec1e9bc361504e::t_19021c47fd876c 1-265
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "5dff998f9b0fba18f8c908edd9b0ebb81c92f3ca",
+  "prompts": {},
+  "sessions": {
+    "s_ec1e9bc361504e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2bba96d5-0273-42ac-ad58-a9271753d5e0",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
