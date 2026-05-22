@@ -34,6 +34,7 @@ function resetStore() {
     terminalInstances: new Map(),
     activeSessionIdByProject: new Map(),
     bellCounts: new Map(),
+    terminalCountByProject: new Map(),
   })
 }
 
@@ -66,6 +67,42 @@ describe('useSessionStore', () => {
       await expect(
         useSessionStore.getState().createSession('proj-1', 'human', 'Shell', '/home', 10000)
       ).rejects.toThrow('FAILED')
+    })
+
+    it('auto-numbers title as "Terminal 1" when empty title given', async () => {
+      mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
+      await useSessionStore.getState().createSession('proj-1', 'human', '', '/home', 10000)
+      const session = useSessionStore.getState().sessions.get('sess-1')
+      expect(session?.tabTitle).toBe('Terminal 1')
+    })
+
+    it('increments counter per project for subsequent empty-title sessions', async () => {
+      mockElectronAPI.terminal.create
+        .mockResolvedValueOnce({ sessionId: 'sess-1' })
+        .mockResolvedValueOnce({ sessionId: 'sess-2' })
+      await useSessionStore.getState().createSession('proj-1', 'human', '', '/home', 10000)
+      await useSessionStore.getState().createSession('proj-1', 'human', '', '/home', 10000)
+      expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('Terminal 1')
+      expect(useSessionStore.getState().sessions.get('sess-2')?.tabTitle).toBe('Terminal 2')
+    })
+
+    it('uses explicit title when provided (no auto-numbering)', async () => {
+      mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
+      await useSessionStore.getState().createSession('proj-1', 'human', 'My Tab', '/home', 10000)
+      expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('My Tab')
+    })
+  })
+
+  describe('renameSession', () => {
+    it('updates tabTitle of existing session', () => {
+      const session = makeSession({ id: 'sess-1', tabTitle: 'Shell' })
+      useSessionStore.setState({ sessions: new Map([['sess-1', session]]) })
+      useSessionStore.getState().renameSession('sess-1', 'My Custom Name')
+      expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('My Custom Name')
+    })
+
+    it('is a no-op for unknown session id', () => {
+      expect(() => useSessionStore.getState().renameSession('nonexistent', 'Title')).not.toThrow()
     })
   })
 

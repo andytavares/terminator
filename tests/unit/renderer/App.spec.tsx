@@ -396,6 +396,53 @@ describe('App', () => {
     expect(mockTogglePanel).toHaveBeenCalledWith('git-changes')
   })
 
+  it('renders extension project tab component when activeProjectTabId matches projectTabs', () => {
+    const MockProjectTab = ({ repoRoot }: { repoRoot: string | null }) => (
+      <div data-testid="project-tab-content">{repoRoot ?? 'no-root'}</div>
+    )
+    setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      activeProjectTabId: 'git',
+      projectTabs: new Map([['git', { id: 'git', label: 'Git', component: MockProjectTab }]]),
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    render(<App />)
+    expect(screen.getByTestId('project-tab-content')).toBeTruthy()
+  })
+
+  it('renders global tab component when activeGlobalTabId is set', () => {
+    const MockGlobalTab = () => <div data-testid="global-tab-content">Global Tab</div>
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      globalTabs: new Map([
+        ['task-vault', { id: 'task-vault', label: 'Tasks', component: MockGlobalTab }],
+      ]),
+      activeGlobalTabId: 'task-vault',
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    render(<App />)
+    expect(screen.getByTestId('global-tab-content')).toBeTruthy()
+  })
+
+  it('calls togglePanel for each open panel when workspace changes', async () => {
+    const mockTogglePanel = vi.fn()
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      openPanels: new Set(['panel-a']),
+      togglePanel: mockTogglePanel,
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    setupMocks({ activeWorkspaceId: 'ws-1' })
+    const { rerender } = render(<App />)
+    // Switch to a different workspace — should trigger the close-panels effect
+    setupMocks({ activeWorkspaceId: 'ws-2' })
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      openPanels: new Set(['panel-a']),
+      togglePanel: mockTogglePanel,
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    rerender(<App />)
+    expect(mockTogglePanel).toHaveBeenCalledWith('panel-a')
+  })
+
   it('calls onSelectProjectTab extensionEvent to set active tab', () => {
     const mockSetActiveProjectTab = vi.fn()
     vi.mocked(useExtensionRegistry).mockReturnValue({
