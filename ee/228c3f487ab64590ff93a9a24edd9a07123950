@@ -1,0 +1,33 @@
+tests/unit/renderer/App.spec.tsx
+  s_ec1e9bc361504e::t_206d25853a2602 91,93-102
+  s_ec1e9bc361504e::t_e3bbecef958ae7 33-34,36-49,52-53,55-58
+  s_ec1e9bc361504e::t_bd8de2bd841671 497-569
+  s_ec1e9bc361504e::t_ecb4e75dcf0948 170-171
+tests/unit/extensions/extension-host.spec.ts
+  s_ec1e9bc361504e::t_339a6ff46725a0 213-273,275-307,312-316
+  ai_agent 274,308-311
+.husky/pre-commit
+  s_ec1e9bc361504e::t_19c376fb100bcc 2
+scripts/check-patch-coverage.cjs
+  s_ec1e9bc361504e::t_10e69785c7962d 74-86
+  s_ec1e9bc361504e::t_27088d77003d58 4-5,113
+  s_ec1e9bc361504e::t_f956b3e5b177b2 1-3,6-73,87-112,114-141
+package.json
+  s_ec1e9bc361504e::t_d36030735376b3 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "ee228c3f487ab64590ff93a9a24edd9a07123950",
+  "prompts": {},
+  "sessions": {
+    "s_ec1e9bc361504e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2bba96d5-0273-42ac-ad58-a9271753d5e0",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
