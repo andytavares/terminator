@@ -165,9 +165,22 @@ export function AreasView(): React.JSX.Element {
               onKeyDown={(e) => e.key === 'Enter' && setSelectedArea(area)}
             >
               <div className="areas-view__card-name">{area.name}</div>
-              <div className="areas-view__card-stats">
-                <span className="areas-view__open-count">{area.openTaskCount} open</span>
-                <span className="areas-view__total-count">{area.taskCount} total</span>
+              <div>
+                <div className="areas-view__card-stats">
+                  <span className="areas-view__open-count">{area.openTaskCount}</span>
+                  <span className="areas-view__total-count">/ {area.taskCount} tasks</span>
+                </div>
+                <div className="areas-view__card-progress">
+                  <div
+                    className="areas-view__card-progress-fill"
+                    style={{
+                      width:
+                        area.taskCount > 0
+                          ? `${Math.round(((area.taskCount - area.openTaskCount) / area.taskCount) * 100)}%`
+                          : '0%',
+                    }}
+                  />
+                </div>
               </div>
               <button
                 className="areas-view__card-delete"

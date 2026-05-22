@@ -6,6 +6,7 @@ interface SessionState {
   terminalInstances: Map<string, unknown>
   activeSessionIdByProject: Map<string, string>
   bellCounts: Map<string, number>
+  terminalCountByProject: Map<string, number>
 
   createSession: (
     projectId: string,
@@ -25,6 +26,7 @@ interface SessionState {
   clearBellCount: (sessionId: string) => void
   getBellCountForSession: (sessionId: string) => number
   getBellCountForProject: (projectId: string) => number
+  renameSession: (sessionId: string, title: string) => void
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -32,12 +34,25 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   terminalInstances: new Map(),
   activeSessionIdByProject: new Map(),
   bellCounts: new Map(),
+  terminalCountByProject: new Map(),
 
   createSession: async (projectId, type, title, cwd, scrollbackLimit) => {
+    let resolvedTitle = title
+    if (!resolvedTitle) {
+      const counts = get().terminalCountByProject
+      const next = (counts.get(projectId) ?? 0) + 1
+      set((s) => {
+        const terminalCountByProject = new Map(s.terminalCountByProject)
+        terminalCountByProject.set(projectId, next)
+        return { terminalCountByProject }
+      })
+      resolvedTitle = `Terminal ${next}`
+    }
+
     const result = await window.electronAPI.terminal.create({
       projectId,
       type,
-      tabTitle: title,
+      tabTitle: resolvedTitle,
       scrollbackLimit,
       cwd,
     })
@@ -47,7 +62,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const session: TerminalSession = {
       id: sessionId,
       projectId,
-      tabTitle: title,
+      tabTitle: resolvedTitle,
       status: 'active',
       type,
       scrollbackLimit,
@@ -161,6 +176,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           tabTitle: `${session.tabTitle} [exited]`,
         })
       }
+      return { sessions }
+    })
+  },
+
+  renameSession: (sessionId, title) => {
+    set((s) => {
+      const sessions = new Map(s.sessions)
+      const session = sessions.get(sessionId)
+      if (!session) return s
+      sessions.set(sessionId, { ...session, tabTitle: title })
       return { sessions }
     })
   },

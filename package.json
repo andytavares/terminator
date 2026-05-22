@@ -12,7 +12,7 @@
     "access": "restricted"
   },
   "scripts": {
-    "postinstall": "electron-rebuild",
+    "postinstall": "electron-rebuild -w better-sqlite3",
     "build:extensions": "node scripts/build-extensions.cjs",
     "dev": "npm run build:extensions && electron-vite dev",
     "build": "npm run build:extensions && electron-vite build",
@@ -25,7 +25,7 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "rebuild": "electron-rebuild",
+    "rebuild": "electron-rebuild -w better-sqlite3",
     "create-extension": "node scripts/create-extension.cjs",
     "package": "electron-builder --mac --arm64 --publish never",
     "prepare": "husky"
@@ -40,7 +40,7 @@
       "prettier --write",
       "eslint"
     ],
-    "*.{json,md,css,html}": "prettier --write"
+    "*.{json,md,css,html,yml,yaml}": "prettier --write"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans": "^5.2.8",
@@ -67,7 +67,7 @@
     "@vitest/coverage-v8": "2.0.5",
     "electron": "30.4.0",
     "electron-builder": "24.13.3",
-    "electron-rebuild": "3.2.9",
+    "@electron/rebuild": "^4.0.4",
     "electron-vite": "2.3.0",
     "eslint": "8.57.0",
     "eslint-config-prettier": "9.1.0",

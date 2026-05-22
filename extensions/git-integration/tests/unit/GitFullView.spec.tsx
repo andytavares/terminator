@@ -45,6 +45,7 @@ const mockGitCommit = vi.fn()
 const mockGitPush = vi.fn()
 const mockGitPrStatus = vi.fn()
 const mockGitDiffFile = vi.fn()
+const mockInvoke = vi.fn()
 
 function setupStore(overrides: Record<string, unknown> = {}) {
   vi.mocked(useGitStore).mockReturnValue({
@@ -66,13 +67,16 @@ beforeEach(() => {
   mockGitCommit.mockResolvedValue({ commitHash: 'abc123' })
   mockGitPush.mockResolvedValue({ success: true })
   mockGitPrStatus.mockResolvedValue({ pr: null })
+  mockInvoke.mockImplementation((channel: string, payload: unknown) => {
+    if (channel === 'git:diff-file') return mockGitDiffFile(payload)
+    if (channel === 'git:commit') return mockGitCommit(payload)
+    if (channel === 'git:push') return mockGitPush(payload)
+    if (channel === 'git:pr-status') return mockGitPrStatus(payload)
+    if (channel === 'git:commit-output-poll') return Promise.resolve({ lines: [] })
+    return Promise.resolve({})
+  })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    git: {
-      diffFile: mockGitDiffFile,
-      commit: mockGitCommit,
-      push: mockGitPush,
-      prStatus: mockGitPrStatus,
-    },
+    extensionBridge: { invoke: mockInvoke },
   }
 })
 
@@ -135,7 +139,12 @@ describe('GitFullView', () => {
     })
     fireEvent.click(screen.getByText('Commit'))
     await waitFor(() =>
-      expect(mockGitCommit).toHaveBeenCalledWith('/repo', 'fix: something', false, false)
+      expect(mockGitCommit).toHaveBeenCalledWith({
+        repoRoot: '/repo',
+        message: 'fix: something',
+        signOff: false,
+        noVerify: false,
+      })
     )
   })
 
@@ -207,7 +216,12 @@ describe('GitFullView', () => {
     await renderView()
     fireEvent.click(screen.getByText('SelectFile'))
     await waitFor(() =>
-      expect(mockGitDiffFile).toHaveBeenCalledWith('/repo', 'src/foo.ts', false, false)
+      expect(mockGitDiffFile).toHaveBeenCalledWith({
+        repoRoot: '/repo',
+        path: 'src/foo.ts',
+        staged: false,
+        isUntracked: false,
+      })
     )
   })
 
@@ -249,7 +263,12 @@ describe('GitFullView', () => {
     await waitFor(() => screen.getByText('Commit without hooks'))
     fireEvent.click(screen.getByText('Commit without hooks'))
     await waitFor(() =>
-      expect(mockGitCommit).toHaveBeenCalledWith('/repo', 'fix: skip hooks', false, true)
+      expect(mockGitCommit).toHaveBeenCalledWith({
+        repoRoot: '/repo',
+        message: 'fix: skip hooks',
+        signOff: false,
+        noVerify: true,
+      })
     )
   })
 

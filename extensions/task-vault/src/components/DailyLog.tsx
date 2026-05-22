@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react'
-import { Trash2, Pencil, Check, X, ArrowRight, Zap, ListPlus } from 'lucide-react'
+import {
+  Trash2,
+  Pencil,
+  X,
+  ArrowRight,
+  Zap,
+  ListPlus,
+  Circle,
+  CheckCircle2,
+  MinusCircle,
+  ArrowRightCircle,
+  Timer,
+} from 'lucide-react'
 import type { DailyLog as DailyLogData, IndexedTask } from '../vault/types'
 import { SmartTaskInput } from './SmartTaskInput'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
@@ -11,6 +23,40 @@ interface DailyLogProps {
   onTaskComplete: (taskId: string) => Promise<void>
   onTaskMigrate: (taskId: string, targetDate: string) => Promise<void>
   onRefresh: () => Promise<void>
+}
+
+function StatusIcon({
+  status,
+  size = 15,
+}: {
+  status: IndexedTask['status']
+  size?: number
+}): React.JSX.Element {
+  switch (status) {
+    case 'done':
+      return <CheckCircle2 size={size} className="task-status task-status--done" />
+    case 'cancelled':
+      return <MinusCircle size={size} className="task-status task-status--cancelled" />
+    case 'migrated':
+      return <ArrowRightCircle size={size} className="task-status task-status--migrated" />
+    case 'in-progress':
+      return <Timer size={size} className="task-status task-status--in-progress" />
+    default:
+      return <Circle size={size} className="task-status task-status--open" />
+  }
+}
+
+function formatDate(iso: string): { weekday: string; detail: string } {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  return {
+    weekday: dt.toLocaleDateString('en-US', { weekday: 'long' }),
+    detail: dt.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+  }
 }
 
 function SessionPicker({
@@ -95,12 +141,14 @@ function SubtaskRow({
     setEditing(false)
     await onRefresh()
   }
+
   async function handleComplete() {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', {
       taskId: subtask.id,
     })
     await onRefresh()
   }
+
   async function handleDelete() {
     if (!confirm(`Delete subtask: "${subtask.text}"?`)) return
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-task', {
@@ -108,24 +156,27 @@ function SubtaskRow({
     })
     await onRefresh()
   }
-  function statusIcon(status: IndexedTask['status']): string {
-    switch (status) {
-      case 'done':
-        return '[x]'
-      case 'cancelled':
-        return '[-]'
-      case 'in-progress':
-        return '[/]'
-      default:
-        return '[ ]'
-    }
-  }
+
   const isOpen = subtask.status === 'open'
+
   return (
     <div
       className={`daily-log__subtask${subtask.status === 'done' ? ' daily-log__subtask--done' : ''}`}
     >
-      <span className="daily-log__subtask-marker">{statusIcon(subtask.status)}</span>
+      {isOpen ? (
+        <button
+          className="daily-log__task-checkbox"
+          onClick={() => void handleComplete()}
+          title="Complete subtask"
+        >
+          <StatusIcon status={subtask.status} />
+        </button>
+      ) : (
+        <span className="daily-log__task-marker">
+          <StatusIcon status={subtask.status} />
+        </span>
+      )}
+
       {editing ? (
         <span className="daily-log__subtask-edit">
           <input
@@ -133,9 +184,7 @@ function SubtaskRow({
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                void saveEdit()
-              }
+              if (e.key === 'Enter') void saveEdit()
               if (e.key === 'Escape') setEditing(false)
             }}
             autoFocus
@@ -155,27 +204,22 @@ function SubtaskRow({
           {subtask.text}
         </span>
       )}
+
       {isOpen && !editing && (
         <span className="daily-log__subtask-actions">
-          <button
-            className="tv-btn tv-btn--outline"
-            onClick={() => void handleComplete()}
-            title="Complete"
-          >
-            <Check size={14} />
-          </button>
           <button className="tv-btn tv-btn--outline" onClick={() => setEditing(true)} title="Edit">
-            <Pencil size={14} />
+            <Pencil size={13} />
           </button>
           <button
             className="tv-btn tv-btn--outline"
             onClick={() => void handleDelete()}
             title="Delete"
           >
-            <Trash2 size={14} />
+            <Trash2 size={13} />
           </button>
         </span>
       )}
+
       {!isOpen && !editing && (
         <span className="daily-log__subtask-actions">
           <button
@@ -183,7 +227,7 @@ function SubtaskRow({
             onClick={() => void handleDelete()}
             title="Delete"
           >
-            <Trash2 size={14} />
+            <Trash2 size={13} />
           </button>
         </span>
       )}
@@ -214,21 +258,6 @@ function TaskRow({
   useEffect(() => {
     setLinked(task.terminatorLinks.length > 0)
   }, [task.terminatorLinks])
-
-  function statusIcon(status: IndexedTask['status']): string {
-    switch (status) {
-      case 'done':
-        return '[x]'
-      case 'migrated':
-        return '[>]'
-      case 'cancelled':
-        return '[-]'
-      case 'in-progress':
-        return '[/]'
-      default:
-        return '[ ]'
-    }
-  }
 
   function rawText(): string {
     const parts = [task.text]
@@ -310,7 +339,19 @@ function TaskRow({
     <div
       className={`daily-log__task${isDone ? ' daily-log__task--done' : task.status === 'cancelled' ? ' daily-log__task--cancelled' : ''}`}
     >
-      <span className="daily-log__task-marker">{statusIcon(task.status)}</span>
+      {isOpen ? (
+        <button
+          className="daily-log__task-checkbox"
+          onClick={() => void onComplete(task.id)}
+          title="Complete task"
+        >
+          <StatusIcon status={task.status} />
+        </button>
+      ) : (
+        <span className="daily-log__task-marker">
+          <StatusIcon status={task.status} />
+        </span>
+      )}
 
       {editing ? (
         <span className="daily-log__task-edit">
@@ -350,43 +391,22 @@ function TaskRow({
 
       {isOpen && !editing && (
         <span className="daily-log__task-actions">
-          <button
-            className="tv-btn tv-btn--outline"
-            onClick={() => void onComplete(task.id)}
-            title="Complete"
-          >
-            <Check size={14} />
-          </button>
           <button className="tv-btn tv-btn--outline" onClick={startEdit} title="Edit">
-            <Pencil size={14} />
+            <Pencil size={13} />
           </button>
           <button
             className="tv-btn tv-btn--outline"
             onClick={() => setMigratingOpen(true)}
-            title="Migrate"
+            title="Migrate to another day"
           >
-            <ArrowRight size={14} />
-          </button>
-          <button
-            className="tv-btn tv-btn--outline"
-            onClick={() => void handleCancel()}
-            title="Cancel task"
-          >
-            <X size={14} />
-          </button>
-          <button
-            className="tv-btn tv-btn--outline"
-            onClick={() => void handleDelete()}
-            title="Delete"
-          >
-            <Trash2 size={14} />
+            <ArrowRight size={13} />
           </button>
           <button
             className="tv-btn tv-btn--outline"
             onClick={() => setAddingSubtask(true)}
             title="Add subtask"
           >
-            <ListPlus size={14} />
+            <ListPlus size={13} />
           </button>
           {linked || task.terminatorLinks.length > 0 ? (
             <button
@@ -396,17 +416,31 @@ function TaskRow({
                 useExtensionRegistry.getState().setActiveGlobalTab(null)
               }}
             >
-              <Zap size={14} />
+              <Zap size={13} />
             </button>
           ) : (
             <button
               className="tv-btn tv-btn--outline"
               onClick={() => setLinking(true)}
-              title="Link to session"
+              title="Link to terminal session"
             >
-              <Zap size={14} />
+              <Zap size={13} />
             </button>
           )}
+          <button
+            className="tv-btn tv-btn--outline tv-btn--danger-hover"
+            onClick={() => void handleCancel()}
+            title="Cancel task"
+          >
+            <X size={13} />
+          </button>
+          <button
+            className="tv-btn tv-btn--outline tv-btn--danger-hover"
+            onClick={() => void handleDelete()}
+            title="Delete"
+          >
+            <Trash2 size={13} />
+          </button>
         </span>
       )}
 
@@ -422,11 +456,11 @@ function TaskRow({
             </button>
           )}
           <button
-            className="tv-btn tv-btn--outline"
+            className="tv-btn tv-btn--outline tv-btn--danger-hover"
             onClick={() => void handleDelete()}
             title="Delete"
           >
-            <Trash2 size={14} />
+            <Trash2 size={13} />
           </button>
         </span>
       )}
@@ -439,7 +473,7 @@ function TaskRow({
             onClick={() => void handleMigrate()}
             disabled={!migrateDate}
           >
-            Go
+            Move
           </button>
           <button className="tv-btn tv-btn--icon" onClick={() => setMigratingOpen(false)}>
             <X size={14} />
@@ -460,13 +494,11 @@ function TaskRow({
         <span className="daily-log__subtask-edit">
           <input
             type="text"
-            placeholder="Subtask text…"
+            placeholder="Subtask…"
             value={subtaskText}
             onChange={(e) => setSubtaskText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                void handleAddSubtask()
-              }
+              if (e.key === 'Enter') void handleAddSubtask()
               if (e.key === 'Escape') {
                 setAddingSubtask(false)
                 setSubtaskText('')
@@ -559,11 +591,36 @@ export function DailyLog({
     await onRefresh()
   }
 
+  const doneTasks = log.tasks.filter((t) => t.status === 'done').length
+  const totalTasks = log.tasks.length
+  const progressPct = totalTasks > 0 ? (doneTasks / totalTasks) * 100 : 0
+  const allDone = totalTasks > 0 && doneTasks === totalTasks
+  const { weekday, detail } = formatDate(log.date)
+
   return (
     <div className="daily-log">
-      <h2 className="daily-log__date">{log.date}</h2>
+      <div className="daily-log__date">
+        <span className="daily-log__date-weekday">{weekday}</span>
+        <span className="daily-log__date-detail">{detail}</span>
+      </div>
 
       <section className="daily-log__tasks">
+        <div className="daily-log__section-header">
+          <h3>Tasks</h3>
+          {totalTasks > 0 && (
+            <span className="daily-log__task-count">
+              {doneTasks}/{totalTasks}
+            </span>
+          )}
+        </div>
+        {totalTasks > 0 && (
+          <div className="daily-log__progress-bar">
+            <div
+              className={`daily-log__progress-fill${allDone ? ' daily-log__progress-fill--complete' : ''}`}
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        )}
         {log.tasks.map((task) => (
           <div key={task.id}>
             <TaskRow
@@ -608,7 +665,7 @@ export function DailyLog({
       )}
 
       {!log.exists && (
-        <p className="daily-log__new-file">No log for today yet. Add a task to create this file.</p>
+        <p className="daily-log__new-file">No log for today yet. Add a task to get started.</p>
       )}
     </div>
   )

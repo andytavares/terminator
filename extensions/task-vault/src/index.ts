@@ -1,4 +1,3 @@
-import * as path from 'node:path'
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import { registerVaultIpcHandlers, setVaultPath } from './ipc/vault.ipc.js'
 import {
@@ -6,9 +5,7 @@ import {
   setVaultPath as setProjectsVaultPath,
 } from './ipc/projects.ipc.js'
 import { registerLinksIpcHandlers, setVaultPath as setLinksVaultPath } from './ipc/links.ipc.js'
-import { registerIcsIpcHandlers, setVaultPath as setIcsVaultPath } from './ipc/ics.ipc.js'
 import { initDb, closeDb } from './vault/db.js'
-import { startPolling, stopPolling } from './ics/fetcher.js'
 
 const disposables: Disposable[] = []
 
@@ -51,32 +48,6 @@ export async function activate(api: ExtensionAPI): Promise<void> {
             'Comma-separated list of contexts shown in the + picker (e.g. home,work,computer,phone,errands)',
           default: 'home,work,computer,phone,errands',
         },
-        'terminator.task-vault.mcpAutoExecute.capture': {
-          type: 'boolean',
-          label: 'MCP Auto-Execute: capture',
-          description: 'If enabled, MCP capture tool writes immediately without confirmation',
-          default: false,
-        },
-        'terminator.task-vault.mcpAutoExecute.add_task': {
-          type: 'boolean',
-          label: 'MCP Auto-Execute: add_task',
-          default: false,
-        },
-        'terminator.task-vault.mcpAutoExecute.complete_task': {
-          type: 'boolean',
-          label: 'MCP Auto-Execute: complete_task',
-          default: false,
-        },
-        'terminator.task-vault.mcpAutoExecute.migrate_task': {
-          type: 'boolean',
-          label: 'MCP Auto-Execute: migrate_task',
-          default: false,
-        },
-        'terminator.task-vault.mcpAutoExecute.process_inbox_item': {
-          type: 'boolean',
-          label: 'MCP Auto-Execute: process_inbox_item',
-          default: false,
-        },
       },
     })
   )
@@ -90,28 +61,15 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   disposables.push({ dispose: disposeProjectsIpc })
   const disposeLinksIpc = registerLinksIpcHandlers()
   disposables.push({ dispose: disposeLinksIpc })
-  const disposeIcsIpc = registerIcsIpcHandlers()
-  disposables.push({ dispose: disposeIcsIpc })
-
   if (vaultPath) {
     setVaultPath(vaultPath)
     setProjectsVaultPath(vaultPath)
     setLinksVaultPath(vaultPath)
-    setIcsVaultPath(vaultPath)
 
     try {
       initDb(vaultPath)
     } catch (err) {
       console.error('[task-vault] Failed to initialize SQLite DB:', err)
-    }
-
-    // Start ICS feed polling
-    const feedUrls = api.settings.get<string[]>('terminator.task-vault.icsFeedUrls') ?? []
-    const icsPollIntervalMs =
-      (api.settings.get<number>('terminator.task-vault.icsPollIntervalMinutes') ?? 30) * 60 * 1000
-    const icsCachePath = path.join(vaultPath, '.todo', 'ics-cache.json')
-    if (feedUrls.length > 0) {
-      startPolling(feedUrls, icsCachePath, icsPollIntervalMs)
     }
   }
 
@@ -161,7 +119,6 @@ function openCaptureOverlay(_api: ExtensionAPI): void {
 }
 
 export async function deactivate(): Promise<void> {
-  stopPolling()
   closeDb()
   if (reviewNudgeInterval !== null) {
     clearInterval(reviewNudgeInterval)

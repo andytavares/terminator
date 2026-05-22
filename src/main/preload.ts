@@ -75,21 +75,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeWorktree: (repoRoot: string, worktreePath: string) =>
       ipcRenderer.invoke('git:remove-worktree', { repoRoot, worktreePath }),
     listWorktrees: (path: string) => ipcRenderer.invoke('git:list-worktrees', { path }),
-    status: (path: string, maxFiles?: number) =>
-      ipcRenderer.invoke('git:status', { path, maxFiles }),
-    diffFile: (repoRoot: string, path: string, staged: boolean, isUntracked?: boolean) =>
-      ipcRenderer.invoke('git:diff-file', { repoRoot, path, staged, isUntracked }),
-    stage: (repoRoot: string, paths: string[]) =>
-      ipcRenderer.invoke('git:stage', { repoRoot, paths }),
-    unstage: (repoRoot: string, paths: string[]) =>
-      ipcRenderer.invoke('git:unstage', { repoRoot, paths }),
-    commit: (repoRoot: string, message: string, signOff?: boolean, noVerify?: boolean) =>
-      ipcRenderer.invoke('git:commit', { repoRoot, message, signOff, noVerify }),
-    commitOutputPoll: (repoRoot: string) =>
-      ipcRenderer.invoke('git:commit-output-poll', { repoRoot }),
-    prStatus: (repoRoot: string) => ipcRenderer.invoke('git:pr-status', { repoRoot }),
-    prCreate: (payload: unknown) => ipcRenderer.invoke('git:pr-create', payload),
-    push: (repoRoot: string) => ipcRenderer.invoke('git:push', { repoRoot }),
   },
   settings: {
     getGlobal: () => ipcRenderer.invoke('settings:get-global'),

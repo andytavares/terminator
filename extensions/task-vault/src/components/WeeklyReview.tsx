@@ -4,7 +4,6 @@ import type { IndexedTask, IndexedProject } from '../vault/types'
 import { WeeklyReviewStep1GetClear } from './WeeklyReviewStep1GetClear'
 import { WeeklyReviewStep2Inbox } from './WeeklyReviewStep2Inbox'
 import { WeeklyReviewStep3Projects } from './WeeklyReviewStep3Projects'
-import { WeeklyReviewStep4Calendar } from './WeeklyReviewStep4Calendar'
 import { WeeklyReviewStep5Someday } from './WeeklyReviewStep5Someday'
 import { WeeklyReviewStep6Reflect } from './WeeklyReviewStep6Reflect'
 
@@ -17,7 +16,7 @@ interface WeeklyReviewPayload {
   lastReviewDate: string | null
 }
 
-const TOTAL_STEPS = 6
+const TOTAL_STEPS = 5
 
 const DRAFT_KEY = 'task-vault:weekly-review-draft'
 
@@ -87,7 +86,15 @@ export function WeeklyReview(): React.JSX.Element {
     return <div className="weekly-review weekly-review--loading">Loading review data…</div>
   if (done)
     return (
-      <div className="weekly-review weekly-review--done">Weekly review complete! Well done.</div>
+      <div className="weekly-review weekly-review--done">
+        <div className="weekly-review__complete">
+          <span className="weekly-review__complete-icon">✦</span>
+          <p className="weekly-review__complete-title">Review complete</p>
+          <p className="weekly-review__complete-sub">
+            Your mind is clear. You're ready for the week.
+          </p>
+        </div>
+      </div>
     )
   if (!payload)
     return <div className="weekly-review weekly-review--error">Could not load review data.</div>
@@ -95,9 +102,14 @@ export function WeeklyReview(): React.JSX.Element {
   return (
     <div className="weekly-review">
       <div className="weekly-review__header">
-        <h2>Weekly Review</h2>
-        <div className="weekly-review__stepper">
-          step {step} of {TOTAL_STEPS}
+        <div className="weekly-review__header-left">
+          <span className="weekly-review__step-num">{step}</span>
+          <div>
+            <h2>Weekly Review</h2>
+            <span className="weekly-review__stepper">
+              step {step} of {TOTAL_STEPS}
+            </span>
+          </div>
         </div>
         <div className="weekly-review__progress">
           {Array.from({ length: TOTAL_STEPS }, (_, i) => (
@@ -144,14 +156,13 @@ export function WeeklyReview(): React.JSX.Element {
             onComplete={nextStep}
           />
         )}
-        {step === 4 && <WeeklyReviewStep4Calendar onComplete={nextStep} />}
-        {step === 5 && (
+        {step === 4 && (
           <WeeklyReviewStep5Someday
             somedayProjects={payload.somedayProjects}
             onComplete={nextStep}
           />
         )}
-        {step === 6 && <WeeklyReviewStep6Reflect onComplete={handleDone} />}
+        {step === 5 && <WeeklyReviewStep6Reflect onComplete={handleDone} />}
       </div>
     </div>
   )

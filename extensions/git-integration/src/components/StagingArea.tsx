@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react'
 import { useGitStore } from '../stores/git.store'
 import type { GitFileStatus, GitStatus } from '../schemas/git.schema'
+import { gitAPI } from '../api/git'
 
 const STATUS_BADGE: Record<string, string> = {
   modified: 'M',
@@ -71,7 +72,7 @@ async function refreshStatus(
   setStatus: (s: GitStatus | null) => void
 ): Promise<void> {
   try {
-    const result = (await window.electronAPI.git.status(repoRoot)) as GitStatus | { error: string }
+    const result = (await gitAPI.status(repoRoot)) as GitStatus | { error: string }
     if ('error' in result) setStatus(null)
     else setStatus(result as unknown as GitStatus)
   } catch {
@@ -90,9 +91,9 @@ export function StagingArea({
     async (filePath: string, currentlyStaged: boolean) => {
       try {
         if (currentlyStaged) {
-          await window.electronAPI.git.unstage(repoRoot, [filePath])
+          await gitAPI.unstage(repoRoot, [filePath])
         } else {
-          await window.electronAPI.git.stage(repoRoot, [filePath])
+          await gitAPI.stage(repoRoot, [filePath])
         }
         // Bust the diff cache so the next click on this file fetches a fresh diff.
         onStagingChange?.()
@@ -107,7 +108,7 @@ export function StagingArea({
   const stageAll = useCallback(async () => {
     const unstaged = status?.files.filter((f) => !f.staged && f.status !== 'conflicted') ?? []
     if (unstaged.length === 0) return
-    await window.electronAPI.git.stage(
+    await gitAPI.stage(
       repoRoot,
       unstaged.map((f) => f.path)
     )
@@ -118,7 +119,7 @@ export function StagingArea({
   const unstageAll = useCallback(async () => {
     const staged = status?.files.filter((f) => f.staged) ?? []
     if (staged.length === 0) return
-    await window.electronAPI.git.unstage(
+    await gitAPI.unstage(
       repoRoot,
       staged.map((f) => f.path)
     )

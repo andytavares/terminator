@@ -5,6 +5,15 @@ vi.mock('electron', () => ({
     getPath: () => '/tmp',
     getVersion: () => '0.1.0',
   },
+  ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
+  Menu: {
+    getApplicationMenu: vi.fn(() => null),
+    setApplicationMenu: vi.fn(),
+    buildFromTemplate: vi.fn(() => ({})),
+  },
+  MenuItem: vi.fn(),
+  globalShortcut: { register: vi.fn(() => true), unregister: vi.fn() },
+  BrowserWindow: { getAllWindows: vi.fn(() => []) },
 }))
 
 const storeData: Record<string, unknown> = { extensions: [] }
@@ -24,6 +33,148 @@ vi.mock('../../../src/main/storage/extension-settings-store', () => ({
   setExtensionSetting: vi.fn(),
   getAllExtensionSettings: () => ({}),
 }))
+
+vi.mock('../../../src/main/storage/workspace-store', () => ({
+  listWorkspaces: vi.fn(() => [{ id: 'ws-1', name: 'Test', folderPath: '/test' }]),
+  listProjects: vi.fn(() => [{ id: 'proj-1', workspaceId: 'ws-1', name: 'Project' }]),
+}))
+
+vi.mock('../../../src/main/extensions/workspace-events', () => ({
+  onWorkspaceDelete: vi.fn(() => vi.fn()),
+  onProjectDelete: vi.fn(() => vi.fn()),
+}))
+
+vi.mock('../../../src/main/logger', () => ({
+  makeLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
+}))
+
+vi.mock('../../../src/main/shell/shell-executor', () => ({
+  execShell: vi.fn(),
+  assertCommandAllowed: vi.fn(),
+}))
+
+vi.mock('../../../src/main/fs/fs-watcher', () => ({
+  fsWatcherService: { addHandler: vi.fn(), removeHandler: vi.fn() },
+}))
+
+describe('ExtensionAPI registerGlobalTab', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('registerGlobalTab registers and returns disposable', async () => {
+    const { createExtensionAPI, globalRegistry } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.ext', '0.1.0')
+    const tab = { id: 'my-tab', label: 'My Tab', component: null }
+    const disposable = api.sidebar.registerGlobalTab(tab)
+    expect(globalRegistry.globalTabs.has('com.test.ext.globaltab.my-tab')).toBe(true)
+    disposable.dispose()
+    expect(globalRegistry.globalTabs.has('com.test.ext.globaltab.my-tab')).toBe(false)
+  })
+
+  it('registerGlobalTab throws when same tab registered twice', async () => {
+    const { createExtensionAPI } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.ext.dup', '0.1.0')
+    const tab = { id: 'dup-tab', label: 'Dup', component: null }
+    api.sidebar.registerGlobalTab(tab)
+    expect(() => api.sidebar.registerGlobalTab(tab)).toThrow('GLOBAL_TAB_ALREADY_REGISTERED')
+  })
+})
+
+describe('ExtensionAPI workspace', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('workspace.list returns mapped workspaces', async () => {
+    const { createExtensionAPI } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.ws', '0.1.0')
+    const result = api.workspace.list()
+    expect(result).toEqual([{ id: 'ws-1', name: 'Test', folderPath: '/test' }])
+  })
+
+  it('workspace.listProjects returns mapped projects', async () => {
+    const { createExtensionAPI } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.ws2', '0.1.0')
+    const result = api.workspace.listProjects('ws-1')
+    expect(result).toEqual([{ id: 'proj-1', workspaceId: 'ws-1', name: 'Project' }])
+  })
+
+  it('workspace.onDelete returns disposable', async () => {
+    const { createExtensionAPI } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.ws3', '0.1.0')
+    const disposable = api.workspace.onDelete(vi.fn())
+    expect(typeof disposable.dispose).toBe('function')
+  })
+
+  it('workspace.onProjectDelete returns disposable', async () => {
+    const { createExtensionAPI } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.ws4', '0.1.0')
+    const disposable = api.workspace.onProjectDelete(vi.fn())
+    expect(typeof disposable.dispose).toBe('function')
+  })
+})
+
+describe('ExtensionAPI globalShortcut', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('globalShortcut.register returns disposable when accelerator registers successfully', async () => {
+    const { createExtensionAPI } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.gs', '0.1.0')
+    const disposable = api.globalShortcut.register('CmdOrCtrl+Shift+F9', vi.fn())
+    expect(typeof disposable.dispose).toBe('function')
+  })
+
+  it('globalShortcut.register throws when accelerator is already taken', async () => {
+    const electron = await import('electron')
+    vi.mocked(electron.globalShortcut.register).mockReturnValueOnce(false)
+    const { createExtensionAPI } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.gs2', '0.1.0')
+    expect(() => api.globalShortcut.register('CmdOrCtrl+Shift+F10', vi.fn())).toThrow(
+      'ACCELERATOR_TAKEN'
+    )
+  })
+})
+
+describe('ExtensionAPI window.openAuxiliary', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('openAuxiliary creates a new BrowserWindow and loads dev URL', async () => {
+    const mockLoadURL = vi.fn()
+    const mockOn = vi.fn()
+    const mockIsDestroyed = vi.fn(() => false)
+    const MockBrowserWindow = vi.fn().mockImplementation(() => ({
+      loadURL: mockLoadURL,
+      loadFile: vi.fn(),
+      on: mockOn,
+      focus: vi.fn(),
+      isDestroyed: mockIsDestroyed,
+    }))
+    vi.doMock('electron', () => ({
+      app: { getPath: () => '/tmp', getVersion: () => '0.1.0' },
+      ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
+      Menu: {
+        getApplicationMenu: vi.fn(() => null),
+        setApplicationMenu: vi.fn(),
+        buildFromTemplate: vi.fn(() => ({})),
+      },
+      MenuItem: vi.fn(),
+      globalShortcut: { register: vi.fn(() => true), unregister: vi.fn() },
+      BrowserWindow: Object.assign(MockBrowserWindow, { getAllWindows: vi.fn(() => []) }),
+    }))
+    process.env['ELECTRON_RENDERER_URL'] = 'http://localhost:5173'
+    const { createExtensionAPI } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.win', '0.1.0')
+    api.window.openAuxiliary('my-view', { param: 'value' })
+    expect(MockBrowserWindow).toHaveBeenCalled()
+    expect(mockLoadURL).toHaveBeenCalledWith(expect.stringContaining('my-view'))
+    delete process.env['ELECTRON_RENDERER_URL']
+  })
+})
 
 describe('ExtensionAPI keyboard', () => {
   beforeEach(() => {

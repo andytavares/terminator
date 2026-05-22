@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Zap, Pencil, Check, X } from 'lucide-react'
 import type { IndexedProject, IndexedTask } from '../vault/types'
 import { useVaultStore } from '../stores/vault.store'
+import { useSessionStore } from '../../../../src/renderer/stores/session.store'
+import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 
 interface AreaOption {
   name: string
@@ -106,18 +108,34 @@ function AreaCombobox({
 
 function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element {
   const [linking, setLinking] = useState(false)
-  const [targetId, setTargetId] = useState('')
   const [linked, setLinked] = useState(false)
+  const sessions = useSessionStore((s) => Array.from(s.sessions.values()))
+  const activeSessions = sessions.filter((s) => s.status !== 'closed')
+  const workspaces = useWorkspaceStore((s) => s.workspaces)
+  const projectsByWs = useWorkspaceStore((s) => s.projectsByWorkspaceId)
 
-  async function confirm() {
-    if (!targetId.trim()) return
+  function sessionLabel(s: { id: string; tabTitle?: string; projectId: string }): string {
+    let project: { name: string; workspaceId: string } | undefined
+    for (const [, projects] of projectsByWs) {
+      project = projects.find((p) => p.id === s.projectId)
+      if (project) break
+    }
+    const workspace = project ? workspaces.find((w) => w.id === project!.workspaceId) : undefined
+    const parts: string[] = []
+    if (workspace) parts.push(workspace.name)
+    if (project) parts.push(project.name)
+    if (s.tabTitle) parts.push(s.tabTitle)
+    return parts.length ? parts.join(' › ') : s.id.slice(0, 8)
+  }
+
+  async function handleSelect(sessionId: string) {
+    if (!sessionId) return
     await window.electronAPI.extensionBridge.invoke('task-vault:links:create', {
       projectFilePath: filePath,
-      targetId: targetId.trim(),
+      targetId: sessionId,
     })
     setLinked(true)
     setLinking(false)
-    setTargetId('')
   }
 
   if (linked)
@@ -131,23 +149,34 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
       <button
         className="projects-browser__link-btn"
         onClick={() => setLinking(true)}
-        title="Link to Terminator session"
+        title="Link to terminal session"
       >
         Link…
       </button>
     )
+
+  if (activeSessions.length === 0)
+    return (
+      <span className="projects-browser__link-picker">
+        <span style={{ fontSize: 11, color: 'var(--tm-text-muted)' }}>No active sessions</span>
+        <button className="tv-btn tv-btn--icon" onClick={() => setLinking(false)}>
+          <X size={14} />
+        </button>
+      </span>
+    )
+
   return (
     <span className="projects-browser__link-picker">
-      <input
-        type="text"
-        placeholder="Paste terminal UUID…"
-        value={targetId}
-        onChange={(e) => setTargetId(e.target.value)}
-        autoFocus
-      />
-      <button className="tv-btn tv-btn--primary" onClick={confirm} disabled={!targetId.trim()}>
-        Link
-      </button>
+      <select defaultValue="" onChange={(e) => void handleSelect(e.target.value)} autoFocus>
+        <option value="" disabled>
+          Select terminal…
+        </option>
+        {activeSessions.map((s) => (
+          <option key={s.id} value={s.id}>
+            {sessionLabel(s)}
+          </option>
+        ))}
+      </select>
       <button className="tv-btn tv-btn--icon" onClick={() => setLinking(false)}>
         <X size={14} />
       </button>

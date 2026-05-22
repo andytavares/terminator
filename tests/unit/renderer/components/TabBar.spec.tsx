@@ -19,6 +19,7 @@ const mockGetActive = vi.fn()
 const mockGetSessions = vi.fn()
 const mockGetBell = vi.fn()
 const mockOnNewTab = vi.fn()
+const mockRenameSession = vi.fn()
 
 function renderTabBar(overrides: Partial<React.ComponentProps<typeof TabBar>> = {}) {
   return render(
@@ -41,6 +42,7 @@ beforeEach(() => {
     setActiveSessionForProject: mockSetActive,
     getActiveSessionForProject: mockGetActive,
     getBellCountForSession: mockGetBell,
+    renameSession: mockRenameSession,
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useWorkspaceStore).mockReturnValue({
     workspaces: [],
@@ -167,5 +169,55 @@ describe('TabBar', () => {
     renderTabBar()
     fireEvent.click(screen.getByText('zsh'))
     expect(mockSetActive).toHaveBeenCalledWith('proj-1', 'ses-2')
+  })
+
+  it('double-click on session title shows rename input', () => {
+    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+    mockGetActive.mockReturnValue('ses-1')
+    renderTabBar()
+    fireEvent.doubleClick(screen.getByTitle('Double-click to rename'))
+    expect(screen.getByRole('textbox')).toBeTruthy()
+  })
+
+  it('Enter in rename input commits the rename', () => {
+    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+    mockGetActive.mockReturnValue('ses-1')
+    renderTabBar()
+    fireEvent.doubleClick(screen.getByTitle('Double-click to rename'))
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'my-shell' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(mockRenameSession).toHaveBeenCalledWith('ses-1', 'my-shell')
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('Escape in rename input cancels the rename', () => {
+    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+    mockGetActive.mockReturnValue('ses-1')
+    renderTabBar()
+    fireEvent.doubleClick(screen.getByTitle('Double-click to rename'))
+    const input = screen.getByRole('textbox')
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(mockRenameSession).not.toHaveBeenCalled()
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('blur on rename input commits the rename', () => {
+    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+    mockGetActive.mockReturnValue('ses-1')
+    renderTabBar()
+    fireEvent.doubleClick(screen.getByTitle('Double-click to rename'))
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'renamed' } })
+    fireEvent.blur(input)
+    expect(mockRenameSession).toHaveBeenCalledWith('ses-1', 'renamed')
+  })
+
+  it('close button is hidden while renaming', () => {
+    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'bash', type: 'human' }])
+    mockGetActive.mockReturnValue('ses-1')
+    renderTabBar()
+    fireEvent.doubleClick(screen.getByTitle('Double-click to rename'))
+    expect(screen.queryByTitle('Close tab')).toBeNull()
   })
 })
