@@ -1,0 +1,50 @@
+tests/unit/renderer/components/WorkspaceItem.spec.tsx
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 236-238,261-267
+extensions/git-integration/tests/unit/usePrReview.spec.tsx
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 528,655-658,721-723,750-752,778-780,805-807,832-834,859-861,888-890
+extensions/git-integration/tests/unit/pr-review-service.spec.ts
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 222,386,656
+tests/unit/fs/fs-watcher.spec.ts
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 198-202
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 460
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 574-582,637-644
+extensions/git-integration/tests/unit/gh-service.spec.ts
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 158-161,163-164
+tests/unit/logger.spec.ts
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 138-140
+tests/unit/extensions/extension-host.spec.ts
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 334-338,382-389,394-398,433-437,452-455,469-473,649-650,677
+extensions/git-integration/tests/unit/useResizePanel.spec.tsx
+  s_8bd40778193d7c::t_670b1639289555 1
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 24-27,38-41,57-60,76-79,95-98,126-129,164-167
+tests/unit/terminal/pty-manager.spec.ts
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 148-150,174-176,196-198
+tests/unit/renderer/hooks/useTerminalSession.spec.tsx
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 104,127,149
+tests/unit/renderer/components/BranchSwitcher.spec.tsx
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 229-232
+extensions/task-vault/tests/vault/indexer.spec.ts
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 146,180
+tests/unit/renderer/components/CreateWorkspaceDialog.spec.tsx
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 100
+tests/unit/schemas/settings.schema.spec.ts
+  s_8bd40778193d7c::t_dfb9f5273b0f5f 41-44,49-52,165-168
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "aa98f32708687b62e8f96a8b4299cb7306bc6c44",
+  "prompts": {},
+  "sessions": {
+    "s_8bd40778193d7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "384de120-903a-4d7f-837a-8f00d400649a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
