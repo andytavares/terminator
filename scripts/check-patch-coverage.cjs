@@ -14,6 +14,30 @@ const path = require('path')
 const THRESHOLD = 80
 const COVERAGE_FILE = path.join(__dirname, '..', 'coverage', 'coverage-final.json')
 
+// Glob patterns excluded from coverage in vitest.config.ts — files matching these
+// are never instrumented and will never appear in coverage-final.json.
+// Keep in sync with the `coverage.exclude` array in vitest.config.ts.
+const COVERAGE_EXCLUDED_PATTERNS = [
+  /src\/renderer\/index\.tsx$/,
+  /src\/main\/index\.ts$/,
+  /src\/main\/preload\.ts$/,
+  /extensions\/[^/]+\/src\/index\.ts$/,
+  /extensions\/[^/]+\/src\/renderer\.tsx$/,
+  /extensions\/[^/]+\/src\/stores\//,
+  /extensions\/[^/]+\/src\/components\//,
+  /extensions\/[^/]+\/src\/mcp\/server\.ts$/,
+  /extensions\/[^/]+\/src\/vault\/types\.ts$/,
+  /extensions\/[^/]+\/src\/vault\/db\.ts$/,
+  /extensions\/[^/]+\/src\/vault\/writer\.ts$/,
+  /extensions\/[^/]+\/src\/schemas\/project\.schema\.ts$/,
+  /src\/shared\/types\//,
+  /\.d\.ts$/,
+]
+
+function isCoverageExcluded(filePath) {
+  return COVERAGE_EXCLUDED_PATTERNS.some((re) => re.test(filePath))
+}
+
 function getStagedSourceFiles() {
   const out = execSync('git diff --cached --name-only --diff-filter=ACM', { encoding: 'utf8' })
   return out
@@ -29,6 +53,9 @@ function getStagedSourceFiles() {
       if (/\/(tests?|__tests?__)\//.test(f)) return false
       // Skip type declaration files
       if (/\.d\.ts$/.test(f)) return false
+      // Skip files that vitest.config.ts excludes from coverage collection —
+      // they will never appear in coverage-final.json regardless of test count.
+      if (isCoverageExcluded(f)) return false
       return true
     })
 }

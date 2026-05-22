@@ -162,6 +162,48 @@ export function registerVaultIpcHandlers(): () => void {
     try {
       const date = today()
       const db = getDb()
+      const now = new Date().toISOString()
+
+      // Rollover: move open/in-progress tasks from past daily logs to today
+      const staleRows = db
+        .prepare(
+          `SELECT id, text, project, context, area, due_date FROM tasks
+           WHERE source='daily' AND source_ref < ? AND source_ref IS NOT NULL
+             AND status IN ('open','in-progress') AND parent_id IS NULL`
+        )
+        .all(date) as Record<string, unknown>[]
+
+      if (staleRows.length > 0) {
+        const insertStmt = db.prepare(
+          `INSERT OR IGNORE INTO tasks (id,text,status,project,context,area,due_date,source,source_ref,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+        )
+        const migrateStmt = db.prepare(
+          `UPDATE tasks SET status='migrated', migrated_to=?, updated_at=? WHERE id=?`
+        )
+        const migrateSubStmt = db.prepare(
+          `UPDATE tasks SET source='daily', source_ref=?, updated_at=? WHERE parent_id=?`
+        )
+        for (const row of staleRows) {
+          const newId = randomUUID()
+          insertStmt.run(
+            newId,
+            row.text,
+            'open',
+            row.project ?? null,
+            row.context ?? null,
+            row.area ?? null,
+            row.due_date ?? null,
+            'daily',
+            date,
+            now,
+            now
+          )
+          migrateStmt.run(date, now, row.id)
+          migrateSubStmt.run(date, now, row.id)
+        }
+      }
+
       const taskRows = db
         .prepare(
           `SELECT * FROM tasks WHERE source='daily' AND source_ref=? AND parent_id IS NULL ORDER BY sort_order, created_at`
@@ -183,6 +225,7 @@ export function registerVaultIpcHandlers(): () => void {
         tasks,
         events,
         notes,
+        rolledOver: staleRows.length,
         exists:
           tasks.length > 0 || (events as unknown[]).length > 0 || (notes as unknown[]).length > 0,
       }
@@ -380,7 +423,14 @@ export function registerVaultIpcHandlers(): () => void {
     }
 
     if (action === 'do-now') {
-      db.prepare(`UPDATE tasks SET status='in-progress', updated_at=? WHERE id=?`).run(now, taskId)
+      // Move to today's daily log so the task stays visible
+      const todayDate = today()
+      db.prepare(
+        `UPDATE tasks SET status='in-progress', source='daily', source_ref=?, updated_at=? WHERE id=?`
+      ).run(todayDate, now, taskId)
+      db.prepare(
+        `UPDATE tasks SET source='daily', source_ref=?, updated_at=? WHERE parent_id=?`
+      ).run(todayDate, now, taskId)
       return { success: true }
     }
 
@@ -496,9 +546,10 @@ export function registerVaultIpcHandlers(): () => void {
     const { taskId } = parsed.data
     const db = getDb()
     const now = new Date().toISOString()
+    // Always move back to inbox so the task is findable regardless of original source
     const changes = db
       .prepare(
-        `UPDATE tasks SET status='open', completed_date=NULL, migrated_to=NULL, updated_at=? WHERE id=?`
+        `UPDATE tasks SET status='open', source='inbox', source_ref=NULL, completed_date=NULL, migrated_to=NULL, updated_at=? WHERE id=?`
       )
       .run(now, taskId)
     if (changes.changes === 0) return { error: 'STALE_ID' }
@@ -577,7 +628,7 @@ export function registerVaultIpcHandlers(): () => void {
         const areaName = a.name as string
         const taskRows = db
           .prepare(
-            `SELECT * FROM tasks WHERE area=? AND parent_id IS NULL AND status != 'done' ORDER BY created_at`
+            `SELECT * FROM tasks WHERE area=? AND parent_id IS NULL AND status NOT IN ('done','cancelled','migrated') ORDER BY created_at`
           )
           .all(areaName) as Record<string, unknown>[]
         const tasks = taskRows.map(rowToTask)
@@ -590,13 +641,46 @@ export function registerVaultIpcHandlers(): () => void {
               .prepare(`SELECT COUNT(*) as c FROM tasks WHERE project=? AND status='open'`)
               .get(p.name) as { c: number }
           ).c
-          return { ...rowToProject(p), nextActionCount, isStale: nextActionCount === 0 }
+          const totalCount = (
+            db
+              .prepare(`SELECT COUNT(*) as c FROM tasks WHERE project=? AND parent_id IS NULL`)
+              .get(p.name) as { c: number }
+          ).c
+          const doneCount = (
+            db
+              .prepare(
+                `SELECT COUNT(*) as c FROM tasks WHERE project=? AND status IN ('done','cancelled','migrated') AND parent_id IS NULL`
+              )
+              .get(p.name) as { c: number }
+          ).c
+          return {
+            ...rowToProject(p),
+            nextActionCount,
+            isStale: nextActionCount === 0,
+            totalTaskCount: totalCount,
+            doneTaskCount: doneCount,
+          }
         })
+        // Combined counts: area-direct tasks + tasks from projects in this area
+        const combinedOpenCount = (
+          db
+            .prepare(
+              `SELECT COUNT(DISTINCT id) as c FROM tasks WHERE parent_id IS NULL AND status='open' AND (area=? OR project IN (SELECT name FROM projects WHERE area=?))`
+            )
+            .get(areaName, areaName) as { c: number }
+        ).c
+        const combinedTotalCount = (
+          db
+            .prepare(
+              `SELECT COUNT(DISTINCT id) as c FROM tasks WHERE parent_id IS NULL AND (area=? OR project IN (SELECT name FROM projects WHERE area=?))`
+            )
+            .get(areaName, areaName) as { c: number }
+        ).c
         result.push({
           filePath: areaName,
           name: areaName,
-          taskCount: tasks.length,
-          openTaskCount: tasks.filter((t) => t.status === 'open').length,
+          taskCount: combinedTotalCount,
+          openTaskCount: combinedOpenCount,
           tasks,
           projects,
         })
@@ -681,6 +765,131 @@ export function registerVaultIpcHandlers(): () => void {
        VALUES (?,?,?,?,?,?,?,?)`
     ).run(newId, text.trim(), 'open', parent.source, parent.source_ref, taskId, now, now)
     return { success: true }
+  })
+
+  // ── vault:export-json ────────────────────────────────────────────────────────
+
+  handle('task-vault:vault:export-json', async () => {
+    try {
+      const db = getDb()
+      const tasks = db.prepare(`SELECT * FROM tasks ORDER BY created_at`).all()
+      const projects = db.prepare(`SELECT * FROM projects ORDER BY name`).all()
+      const areas = db.prepare(`SELECT * FROM areas ORDER BY name`).all()
+      const events = db.prepare(`SELECT * FROM events ORDER BY date, time`).all()
+      const notes = db.prepare(`SELECT * FROM notes ORDER BY date`).all()
+      return {
+        exportedAt: new Date().toISOString(),
+        version: 1,
+        tasks,
+        projects,
+        areas,
+        events,
+        notes,
+      }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  // ── vault:import-json ────────────────────────────────────────────────────────
+
+  handle('task-vault:vault:import-json', async (_event, payload) => {
+    try {
+      const data = payload as {
+        version?: number
+        tasks?: Record<string, unknown>[]
+        projects?: Record<string, unknown>[]
+        areas?: Record<string, unknown>[]
+        events?: Record<string, unknown>[]
+        notes?: Record<string, unknown>[]
+      }
+      if (!data || typeof data !== 'object') return { error: 'INVALID_PAYLOAD' }
+
+      const db = getDb()
+      let imported = 0
+
+      const txn = db.transaction(() => {
+        if (Array.isArray(data.areas)) {
+          const stmt = db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`)
+          for (const a of data.areas) {
+            stmt.run(a.id, a.name, a.created_at)
+            imported++
+          }
+        }
+        if (Array.isArray(data.projects)) {
+          const stmt = db.prepare(
+            `INSERT OR IGNORE INTO projects (id,name,status,area,deadline,outcome,terminator_links,created_at,updated_at)
+             VALUES (?,?,?,?,?,?,?,?,?)`
+          )
+          for (const p of data.projects) {
+            stmt.run(
+              p.id,
+              p.name,
+              p.status ?? 'active',
+              p.area ?? null,
+              p.deadline ?? null,
+              p.outcome ?? null,
+              p.terminator_links ?? '[]',
+              p.created_at,
+              p.updated_at
+            )
+            imported++
+          }
+        }
+        if (Array.isArray(data.tasks)) {
+          const stmt = db.prepare(
+            `INSERT OR IGNORE INTO tasks
+               (id,text,status,project,context,area,due_date,completed_date,migrated_to,
+                source,source_ref,parent_id,sort_order,metadata,terminator_links,created_at,updated_at)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+          )
+          for (const t of data.tasks) {
+            stmt.run(
+              t.id,
+              t.text,
+              t.status ?? 'open',
+              t.project ?? null,
+              t.context ?? null,
+              t.area ?? null,
+              t.due_date ?? null,
+              t.completed_date ?? null,
+              t.migrated_to ?? null,
+              t.source ?? 'inbox',
+              t.source_ref ?? null,
+              t.parent_id ?? null,
+              t.sort_order ?? 0,
+              t.metadata ?? '{}',
+              t.terminator_links ?? '[]',
+              t.created_at,
+              t.updated_at
+            )
+            imported++
+          }
+        }
+        if (Array.isArray(data.events)) {
+          const stmt = db.prepare(
+            `INSERT OR IGNORE INTO events (id,date,time,text,created_at) VALUES (?,?,?,?,?)`
+          )
+          for (const e of data.events) {
+            stmt.run(e.id, e.date, e.time ?? null, e.text, e.created_at)
+            imported++
+          }
+        }
+        if (Array.isArray(data.notes)) {
+          const stmt = db.prepare(
+            `INSERT OR IGNORE INTO notes (id,date,text,created_at) VALUES (?,?,?,?)`
+          )
+          for (const n of data.notes) {
+            stmt.run(n.id, n.date, n.text, n.created_at)
+            imported++
+          }
+        }
+      })
+      txn()
+      return { success: true, imported }
+    } catch (err) {
+      return { error: String(err) }
+    }
   })
 
   // ── vault:update-project-status ──────────────────────────────────────────────

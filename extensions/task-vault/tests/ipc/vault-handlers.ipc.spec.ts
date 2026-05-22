@@ -282,12 +282,13 @@ describe('task-vault:vault:get-today', () => {
 
   it('maps task rows and sets exists=true when tasks present', async () => {
     const row = makeTaskRow({ source: 'daily', source_ref: '2026-05-20' })
-    // tasks query → [row], subtasks query → [], events → [], notes → []
+    // rollover stale tasks → [], tasks query → [row], subtasks query → [], events → [], notes → []
     mockAll
-      .mockReturnValueOnce([row])
-      .mockReturnValueOnce([])
-      .mockReturnValueOnce([])
-      .mockReturnValueOnce([])
+      .mockReturnValueOnce([]) // rollover: no stale tasks
+      .mockReturnValueOnce([row]) // main task fetch
+      .mockReturnValueOnce([]) // subtasks
+      .mockReturnValueOnce([]) // events
+      .mockReturnValueOnce([]) // notes
     const handler = getHandler('task-vault:vault:get-today')
     const result = (await handler({}, undefined)) as Record<string, unknown>
     expect(result).toMatchObject({ exists: true })

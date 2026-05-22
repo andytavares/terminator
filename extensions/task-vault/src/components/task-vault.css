@@ -4612,3 +4612,159 @@ h2.daily-log__date {
   transition: width 600ms cubic-bezier(0.16, 1, 0.3, 1);
   min-width: 0;
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   AREA CARDS — project chips
+   ════════════════════════════════════════════════════════════════════ */
+
+.areas-view__project-count {
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.areas-view__card-projects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.areas-view__card-project-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-muted);
+  border: 1px solid var(--tm-border);
+}
+
+.areas-view__card-project-chip--more {
+  opacity: 0.6;
+}
+
+.areas-view__card-project-actions {
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--tm-accent);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0 4px;
+  min-width: 14px;
+  text-align: center;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   AREA DETAIL — project cards with progress
+   ════════════════════════════════════════════════════════════════════ */
+
+.area-detail__project-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PROJECT BROWSER — task list CRUD
+   ════════════════════════════════════════════════════════════════════ */
+
+.projects-browser__add-task-row {
+  display: flex;
+  gap: 6px;
+  padding: 8px 0 4px;
+}
+
+.projects-browser__add-task-input {
+  flex: 1;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-bg);
+  color: var(--tm-text);
+}
+
+.projects-browser__add-task-input:focus {
+  outline: none;
+  border-color: var(--tm-accent);
+}
+
+.projects-browser__task-check {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--tm-text-muted);
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.projects-browser__task-check:hover {
+  color: var(--tm-accent);
+}
+
+.projects-browser__task-actions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.projects-browser__task-row:hover .projects-browser__task-actions {
+  display: flex;
+}
+
+.projects-browser__task-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.projects-browser__task-edit input {
+  flex: 1;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--tm-accent);
+  background: var(--tm-bg);
+  color: var(--tm-text);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   TASK VAULT — toolbar + rollover banner
+   ════════════════════════════════════════════════════════════════════ */
+
+.task-vault-view__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 16px 0;
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 10;
+}
+
+.task-vault-view__tools-btn {
+  opacity: 0.4;
+  transition: opacity 200ms;
+}
+
+.task-vault-view__tools-btn:hover {
+  opacity: 1;
+}
+
+.task-vault-view__rollover-banner {
+  margin: 8px 16px 0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--tm-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tm-accent) 30%, transparent);
+  font-size: 12px;
+  color: var(--tm-text-muted);
+}

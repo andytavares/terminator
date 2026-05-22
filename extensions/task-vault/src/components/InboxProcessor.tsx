@@ -16,15 +16,26 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
 
   const current = items[currentIdx]
 
-  async function processItem(action: string, dest?: string) {
+  async function processItem(action: string, dest?: string, newProjectName?: string) {
     if (!current || isProcessing) return
     setIsProcessing(true)
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:process-inbox-item', {
-      taskId: current.id,
-      action,
-      destination: dest,
-    })
-    advanceToNext()
+    try {
+      const result = await window.electronAPI.extensionBridge.invoke(
+        'task-vault:vault:process-inbox-item',
+        { taskId: current.id, action, destination: dest, newProjectName }
+      )
+      // STALE_ID means the item was already processed — still advance
+      if (result && typeof result === 'object' && 'error' in result) {
+        const err = (result as { error: string }).error
+        if (err !== 'STALE_ID') {
+          setIsProcessing(false)
+          return
+        }
+      }
+      advanceToNext()
+    } catch {
+      setIsProcessing(false)
+    }
   }
 
   function advanceToNext() {
