@@ -5,6 +5,7 @@ import { useExtensionRegistry } from '../../../../src/renderer/extensions/regist
 import { StagingArea } from './StagingArea'
 import './git-integration.css'
 import type { FileDiff } from '../schemas/git.schema'
+import { gitAPI } from '../api/git'
 
 interface Props {
   repoRoot: string | null
@@ -21,7 +22,7 @@ export function GitSidebarPanel({ repoRoot, onClose }: Props): JSX.Element {
       setSelectedFile(path)
       setActiveProjectTab('git')
       if (repoRoot) {
-        void window.electronAPI.git.diffFile(repoRoot, path, staged).then((result) => {
+        void gitAPI.diffFile(repoRoot, path, staged).then((result) => {
           const r = result as { diff: FileDiff } | { error: string }
           if ('diff' in r) setDiff(path, r.diff)
         })

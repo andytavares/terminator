@@ -12,19 +12,24 @@ const mockSetLoading = vi.fn()
 const mockUnsubFs = vi.fn()
 const mockGitStatus = vi.fn()
 const mockOnChanged = vi.fn().mockReturnValue(mockUnsubFs)
+const mockInvoke = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers()
+  mockGitStatus.mockResolvedValue({ branch: 'main', staged: [], unstaged: [], untracked: [] })
+  mockInvoke.mockImplementation((channel: string, payload: unknown) => {
+    if (channel === 'git:status') return mockGitStatus(payload)
+    return Promise.resolve({})
+  })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    git: { status: mockGitStatus },
+    extensionBridge: { invoke: mockInvoke },
     fs: { onChanged: mockOnChanged },
   }
   vi.mocked(useGitStore).mockReturnValue({
     setStatus: mockSetStatus,
     setLoading: mockSetLoading,
   } as unknown as ReturnType<typeof useGitStore>)
-  mockGitStatus.mockResolvedValue({ branch: 'main', staged: [], unstaged: [], untracked: [] })
 })
 
 afterEach(() => {
@@ -48,7 +53,7 @@ describe('useGitStatus', () => {
     await act(async () => {
       await Promise.resolve()
     })
-    expect(mockGitStatus).toHaveBeenCalledWith('/repo')
+    expect(mockGitStatus).toHaveBeenCalledWith({ path: '/repo', maxFiles: undefined })
   })
 
   it('sets status from successful response', async () => {

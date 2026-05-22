@@ -11,6 +11,7 @@ import { detectLanguage, highlight } from '../FileDiffView'
 import type { PrChangedFile, PrReviewDetail, Chapter } from '../../schemas/pr-review.schema'
 import type { FileDiff } from '../../schemas/git.schema'
 import { FileDiffSchema } from '../../schemas/git.schema'
+import { githubAPI } from '../../api/github'
 
 interface Props {
   repoRoot: string
@@ -80,7 +81,7 @@ export function ReviewDiffPane({
     setDiffError(null)
     if (file.isBinary) return
     setDiffLoading(true)
-    window.electronAPI.github
+    githubAPI
       .prFileDiff(repoRoot, pr.number, file.path)
       .then((result) => {
         if ('error' in result) {

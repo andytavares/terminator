@@ -24,6 +24,7 @@ vi.mock('../../src/github/pr-review-service', () => ({
 
 const mockPatchFileComplexity = vi.fn()
 const mockPrFileDiff = vi.fn()
+const mockInvoke = vi.fn()
 
 const mockFile = {
   path: 'src/foo.ts',
@@ -92,8 +93,12 @@ const defaultProps = {
 beforeEach(() => {
   vi.clearAllMocks()
   mockPrFileDiff.mockResolvedValue({ diff: { hunks: [] } })
+  mockInvoke.mockImplementation((channel: string, payload: unknown) => {
+    if (channel === 'github:pr-file-diff') return mockPrFileDiff(payload)
+    return Promise.resolve({})
+  })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    github: { prFileDiff: mockPrFileDiff },
+    extensionBridge: { invoke: mockInvoke },
   }
   vi.mocked(usePrReviewStore).mockReturnValue({
     viewedFiles: new Set<string>(),

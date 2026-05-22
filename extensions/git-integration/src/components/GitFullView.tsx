@@ -7,6 +7,7 @@ import { StagingArea } from './StagingArea'
 import { FileDiffView } from './FileDiffView'
 import { PrDialog } from './PrDialog'
 import type { FileDiff, PullRequest } from '../schemas/git.schema'
+import { gitAPI } from '../api/git'
 
 interface Props {
   repoRoot: string | null
@@ -48,12 +49,9 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
         try {
           const fileStatus = status?.files.find((f) => f.path === path)
           const isUntracked = fileStatus?.status === 'untracked'
-          const result = (await window.electronAPI.git.diffFile(
-            repoRoot,
-            path,
-            staged,
-            isUntracked
-          )) as { diff: FileDiff } | { error: string }
+          const result = (await gitAPI.diffFile(repoRoot, path, staged, isUntracked)) as
+            | { diff: FileDiff }
+            | { error: string }
           if ('diff' in result) setDiff(path, result.diff)
         } finally {
           setLoading(false)
@@ -74,7 +72,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
     // After 3s with no output switch label; actual output still streams in
     phaseTimerRef.current = setTimeout(() => setCommitPhase('committing'), 3000)
     pollIntervalRef.current = setInterval(async () => {
-      const result = await window.electronAPI.git.commitOutputPoll(root)
+      const result = await gitAPI.commitOutputPoll(root)
       const { lines } = result as { lines: string[] }
       if (lines.length > 0) {
         setCommitPhase('hooks')
@@ -130,12 +128,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
       setIsHookFailure(false)
       startCommitPhase(repoRoot)
       try {
-        const result = await window.electronAPI.git.commit(
-          repoRoot,
-          commitMessage.trim(),
-          false,
-          noVerify
-        )
+        const result = await gitAPI.commit(repoRoot, commitMessage.trim(), false, noVerify)
         applyCommitResult(result)
       } finally {
         setIsCommitting(false)
@@ -147,7 +140,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
 
   const handleOpenPr = useCallback(async () => {
     if (!repoRoot) return
-    const prResult = (await window.electronAPI.git.prStatus(repoRoot)) as
+    const prResult = (await gitAPI.prStatus(repoRoot)) as
       | { pr: PullRequest | null }
       | { error: string }
     const pr = 'pr' in prResult ? prResult.pr : null
@@ -164,19 +157,12 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
       setIsHookFailure(false)
       startCommitPhase(repoRoot)
       try {
-        const result = await window.electronAPI.git.commit(
-          repoRoot,
-          commitMessage.trim(),
-          false,
-          noVerify
-        )
+        const result = await gitAPI.commit(repoRoot, commitMessage.trim(), false, noVerify)
         if (!applyCommitResult(result)) return
         setIsCommitting(false)
         endCommitPhase()
         setIsPushing(true)
-        const pushResult = (await window.electronAPI.git.push(repoRoot)) as
-          | { success: true }
-          | { error: string }
+        const pushResult = (await gitAPI.push(repoRoot)) as { success: true } | { error: string }
         if ('error' in pushResult) {
           const msgs: Record<string, string> = {
             NO_UPSTREAM: 'Committed but push failed — no upstream branch set.',

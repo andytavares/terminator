@@ -50,8 +50,6 @@ interface ElectronAPI {
       worktreePath: string
     ): Promise<{ success: true } | { error: string }>
     listWorktrees(path: string): Promise<{ worktrees: WorktreeInfo[] }>
-    // git:status, diffFile, stage, unstage, commit, prStatus, prCreate are augmented by the git-integration extension
-    [key: string]: unknown
   }
   shell: {
     exec(options: {
@@ -138,7 +136,6 @@ interface ElectronAPI {
   logger: {
     write(level: string, namespace: string, message: string): void
   }
-  // github namespace is contributed by the git-integration extension (see extensions/git-integration/src/types/electron.d.ts)
   extensionBridge: {
     invoke(channel: string, payload?: unknown): Promise<unknown>
     on(channel: string, handler: (data: unknown) => void): () => void

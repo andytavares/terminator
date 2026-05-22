@@ -14,6 +14,7 @@ const mockStage = vi.fn()
 const mockUnstage = vi.fn()
 const mockStatus = vi.fn()
 const mockSetStatus = vi.fn()
+const mockInvoke = vi.fn()
 
 const makeFile = (status: string, staged: boolean, path?: string) => ({
   path: path ?? `test.${status}.ts`,
@@ -55,8 +56,14 @@ beforeEach(() => {
   mockStatus.mockResolvedValue({ branch: 'main', files: [], truncated: false, hasConflicts: false })
   mockStage.mockResolvedValue({ success: true })
   mockUnstage.mockResolvedValue({ success: true })
+  mockInvoke.mockImplementation((channel: string, payload: unknown) => {
+    if (channel === 'git:status') return mockStatus(payload)
+    if (channel === 'git:stage') return mockStage(payload)
+    if (channel === 'git:unstage') return mockUnstage(payload)
+    return Promise.resolve({})
+  })
   Object.defineProperty(window, 'electronAPI', {
-    value: { git: { status: mockStatus, stage: mockStage, unstage: mockUnstage } },
+    value: { extensionBridge: { invoke: mockInvoke } },
     writable: true,
     configurable: true,
   })
@@ -172,7 +179,9 @@ describe('StagingArea — interactions', () => {
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     const checkbox = screen.getByRole('checkbox')
     fireEvent.click(checkbox)
-    await waitFor(() => expect(mockStage).toHaveBeenCalledWith('/repo', ['src/a.ts']))
+    await waitFor(() =>
+      expect(mockStage).toHaveBeenCalledWith({ repoRoot: '/repo', paths: ['src/a.ts'] })
+    )
     expect(mockStatus).toHaveBeenCalled()
   })
 
@@ -186,7 +195,9 @@ describe('StagingArea — interactions', () => {
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     const checkbox = screen.getByRole('checkbox')
     fireEvent.click(checkbox)
-    await waitFor(() => expect(mockUnstage).toHaveBeenCalledWith('/repo', ['src/b.ts']))
+    await waitFor(() =>
+      expect(mockUnstage).toHaveBeenCalledWith({ repoRoot: '/repo', paths: ['src/b.ts'] })
+    )
   })
 
   it('calls git.stage for all unstaged files when Stage All is clicked', async () => {
@@ -198,7 +209,9 @@ describe('StagingArea — interactions', () => {
     } as unknown as ReturnType<typeof useGitStore>)
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     fireEvent.click(screen.getByText('Stage All'))
-    await waitFor(() => expect(mockStage).toHaveBeenCalledWith('/repo', ['a.ts', 'b.ts']))
+    await waitFor(() =>
+      expect(mockStage).toHaveBeenCalledWith({ repoRoot: '/repo', paths: ['a.ts', 'b.ts'] })
+    )
   })
 
   it('calls git.unstage for all staged files when Unstage All is clicked', async () => {
@@ -210,7 +223,9 @@ describe('StagingArea — interactions', () => {
     } as unknown as ReturnType<typeof useGitStore>)
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
     fireEvent.click(screen.getByText('Unstage All'))
-    await waitFor(() => expect(mockUnstage).toHaveBeenCalledWith('/repo', ['a.ts', 'b.ts']))
+    await waitFor(() =>
+      expect(mockUnstage).toHaveBeenCalledWith({ repoRoot: '/repo', paths: ['a.ts', 'b.ts'] })
+    )
   })
 
   it('disables checkbox for conflicted files', () => {

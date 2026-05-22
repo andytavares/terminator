@@ -64,7 +64,7 @@ export function App(): JSX.Element {
     const projects = activeWorkspaceId ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? []) : []
     const activeProject = projects.find((p) => p.id === activeProjectId)
     const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
-    void createSession(activeProjectId, 'human', 'Terminal', cwd, settings.terminal.scrollbackLimit)
+    void createSession(activeProjectId, 'human', '', cwd, settings.terminal.scrollbackLimit)
   }, [
     activeProjectId,
     activeWorkspaceId,
@@ -160,7 +160,7 @@ export function App(): JSX.Element {
     const projects = activeWorkspaceId ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? []) : []
     const activeProject = projects.find((p) => p.id === activeProjectId)
     const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
-    void createSession(activeProjectId, 'human', 'Terminal', cwd, settings.terminal.scrollbackLimit)
+    void createSession(activeProjectId, 'human', '', cwd, settings.terminal.scrollbackLimit)
   }, [
     activeProjectId,
     activeProjectTabId,
@@ -217,6 +217,16 @@ export function App(): JSX.Element {
 
   // Snapshot of panels that were open before switching to an extension tab
   const savedPanelsRef = useRef<Set<string>>(new Set())
+
+  // Close all open panels when switching workspaces
+  const prevWorkspaceIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (prevWorkspaceIdRef.current !== null && prevWorkspaceIdRef.current !== activeWorkspaceId) {
+      openPanelsRef.current.forEach((panelId) => togglePanel(panelId))
+      savedPanelsRef.current = new Set()
+    }
+    prevWorkspaceIdRef.current = activeWorkspaceId
+  }, [activeWorkspaceId, togglePanel])
 
   useEffect(() => {
     if (activeProjectTabId !== null) {

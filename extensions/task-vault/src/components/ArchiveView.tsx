@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import {
+  Trash2,
+  CheckCircle2,
+  MinusCircle,
+  ArrowRightCircle,
+  Circle,
+  Timer,
+  Undo2,
+} from 'lucide-react'
 import type { IndexedTask, IndexedProject } from '../vault/types'
 
 interface ArchiveData {
@@ -7,12 +15,41 @@ interface ArchiveData {
   projects: IndexedProject[]
 }
 
-const STATUS_ICON: Record<string, string> = {
-  done: '[x]',
-  migrated: '[>]',
-  cancelled: '[-]',
-  open: '[ ]',
-  'in-progress': '[/]',
+function ArchiveStatusIcon({ status }: { status: string }): React.JSX.Element {
+  switch (status) {
+    case 'done':
+      return (
+        <CheckCircle2
+          size={14}
+          className="archive-task__status-icon archive-task__status-icon--done"
+        />
+      )
+    case 'cancelled':
+      return (
+        <MinusCircle
+          size={14}
+          className="archive-task__status-icon archive-task__status-icon--cancelled"
+        />
+      )
+    case 'migrated':
+      return (
+        <ArrowRightCircle
+          size={14}
+          className="archive-task__status-icon archive-task__status-icon--migrated"
+        />
+      )
+    case 'in-progress':
+      return (
+        <Timer
+          size={14}
+          className="archive-task__status-icon archive-task__status-icon--in-progress"
+        />
+      )
+    default:
+      return (
+        <Circle size={14} className="archive-task__status-icon archive-task__status-icon--open" />
+      )
+  }
 }
 
 export function ArchiveView(): React.JSX.Element {
@@ -221,7 +258,9 @@ function ArchiveTaskRow({
   const fileName = task.filePath.split('/').pop()?.replace('.md', '') ?? ''
   return (
     <div className="archive-task">
-      <span className="archive-task__icon">{STATUS_ICON[task.status] ?? '[ ]'}</span>
+      <span className="archive-task__icon">
+        <ArchiveStatusIcon status={task.status} />
+      </span>
       <span className="archive-task__text">
         {task.text}
         {task.project && (
@@ -238,7 +277,7 @@ function ArchiveTaskRow({
           onClick={() => onRestore(task.id)}
           title="Restore to open"
         >
-          ↩
+          <Undo2 size={13} />
         </button>
         <button
           className="archive-task__delete-btn"

@@ -183,8 +183,6 @@ import {
 } from 'electron'
 import { join } from 'path'
 
-declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string
-declare const MAIN_WINDOW_VITE_NAME: string
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
 import { fsWatcherService } from '../fs/fs-watcher.js'
 import { getExtensionSetting } from '../storage/extension-settings-store.js'
@@ -493,15 +491,11 @@ export function createExtensionAPI(
           auxiliaryWindows.delete(view)
         })
         const query: Record<string, string> = { view, ...params }
-        if (
-          typeof MAIN_WINDOW_VITE_DEV_SERVER_URL !== 'undefined' &&
-          MAIN_WINDOW_VITE_DEV_SERVER_URL
-        ) {
-          win.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}?${new URLSearchParams(query).toString()}`)
+        const devUrl = process.env['ELECTRON_RENDERER_URL']
+        if (devUrl) {
+          win.loadURL(`${devUrl}?${new URLSearchParams(query).toString()}`)
         } else {
-          win.loadFile(join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`), {
-            query,
-          })
+          win.loadFile(join(__dirname, '../renderer/index.html'), { query })
         }
       },
     },
