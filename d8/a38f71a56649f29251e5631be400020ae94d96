@@ -1,0 +1,32 @@
+extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx
+  s_2e9158e679b6d7::t_39cc196ed7bb19 100
+extensions/git-integration/src/index.ts
+  s_2e9158e679b6d7::t_1d9bd853172adf 122,125-126,128,131-136
+extensions/git-integration/tests/unit/PrReviewTab.spec.tsx
+  s_2e9158e679b6d7::t_c35f7e54eaf518 168-190
+  s_2e9158e679b6d7::t_f745a2be60919e 53,58,65-67
+extensions/git-integration/src/hooks/usePrReview.ts
+  s_2e9158e679b6d7::t_e364bf0d04a3ba 141
+  s_2e9158e679b6d7::t_08954849c19358 28-30
+  s_2e9158e679b6d7::t_007d5654fff490 60-62,70-72
+extensions/git-integration/src/components/pr-review/PrReviewTab.tsx
+  s_2e9158e679b6d7::t_a89f6b1714e232 147-153,156-178
+extensions/git-integration/tests/unit/usePrReview.spec.tsx
+  s_2e9158e679b6d7::t_23f9334b1c2d13 187-262
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "d8a38f71a56649f29251e5631be400020ae94d96",
+  "prompts": {},
+  "sessions": {
+    "s_2e9158e679b6d7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45ce711b-3c6a-4077-bfbf-5ae59e07020e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
