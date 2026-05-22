@@ -15,6 +15,7 @@ vi.mock('../../src/api/github', () => ({
     sessionGet: vi.fn().mockResolvedValue({ session: null }),
     sessionSet: vi.fn().mockResolvedValue({}),
     saveActiveReview: vi.fn().mockResolvedValue({ ok: true }),
+    removeActiveReview: vi.fn().mockResolvedValue({ ok: true }),
   },
 }))
 
@@ -90,6 +91,7 @@ const mockSetIncludeClosedPrs = vi.fn()
 const mockInitSession = vi.fn()
 const mockReset = vi.fn()
 const mockMarkPrInProgress = vi.fn()
+const mockDismissPr = vi.fn()
 
 const defaultStoreState = {
   activePr: null,
@@ -97,6 +99,7 @@ const defaultStoreState = {
   initSession: mockInitSession,
   reset: mockReset,
   markPrInProgress: mockMarkPrInProgress,
+  dismissPr: mockDismissPr,
   nextPrCursor: null,
   includeClosedPrs: false,
   setIncludeClosedPrs: mockSetIncludeClosedPrs,

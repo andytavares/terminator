@@ -26,7 +26,6 @@ function parsePrList(raw: unknown[]): ReturnType<typeof ReviewQueuePRSchema.safe
 async function mergeSessionStatuses(
   repoRoot: string,
   prs: ReviewQueuePR[],
-  hasMore: boolean,
   isAppend: boolean = false
 ): Promise<ReviewQueuePR[]> {
   try {
@@ -65,11 +64,29 @@ async function mergeSessionStatuses(
 
     const queueNumbers = new Set(prs.map((p) => p.number))
     const activePrs = parsePrList((activeResult as { prs: unknown[] }).prs)
-    const orphans = activePrs
-      .filter((pr): pr is ReviewQueuePR => pr != null && !queueNumbers.has(pr.number))
-      // When all pages are loaded (hasMore === false), any PR missing from the open list
-      // is closed or merged — exclude it from in-progress display.
-      .filter(() => hasMore)
+    const candidateOrphans = activePrs.filter(
+      (pr): pr is ReviewQueuePR => pr != null && !queueNumbers.has(pr.number)
+    )
+
+    // Verify each orphan's current state against GitHub. Any PR that is now CLOSED
+    // or MERGED is removed from the store and excluded from the queue.
+    let openOrphanNumbers = new Set(candidateOrphans.map((p) => p.number))
+    if (candidateOrphans.length > 0) {
+      try {
+        const pruneResult = await githubAPI.pruneActiveReviews(
+          repoRoot,
+          candidateOrphans.map((p) => p.number)
+        )
+        if (!('error' in pruneResult)) {
+          openOrphanNumbers = new Set((pruneResult as { openNumbers: number[] }).openNumbers)
+        }
+      } catch {
+        // If the prune check fails (e.g. no network), keep all orphans visible.
+      }
+    }
+
+    const orphans = candidateOrphans
+      .filter((pr) => openOrphanNumbers.has(pr.number))
       .map((pr) => {
         const session = latestByPr.get(pr.number)
         const sessionStatus: ReviewQueuePR['sessionStatus'] = session
@@ -138,7 +155,7 @@ export function useLoadPrQueue(repoRoot: string | null) {
         }
         const res = result as { prs: unknown[]; hasMore: boolean; nextCursor?: string }
         const prs = parsePrList(res.prs)
-        const prsWithStatus = await mergeSessionStatuses(repoRoot, prs, res.hasMore, isAppend)
+        const prsWithStatus = await mergeSessionStatuses(repoRoot, prs, isAppend)
         if (isAppend) {
           appendQueue(prsWithStatus)
         } else {

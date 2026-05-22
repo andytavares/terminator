@@ -18,6 +18,7 @@ const mockFileMetricsAPI = vi.fn()
 const mockPrInlineCommentsAPI = vi.fn()
 const mockSessionsForRepoAPI = vi.fn().mockResolvedValue({ sessions: [] })
 const mockActiveReviewsForRepoAPI = vi.fn().mockResolvedValue({ error: 'NOT_FOUND' })
+const mockPruneActiveReviewsAPI = vi.fn().mockResolvedValue({ openNumbers: [] })
 
 vi.mock('../../src/api/github', () => ({
   githubAPI: {
@@ -27,6 +28,7 @@ vi.mock('../../src/api/github', () => ({
     prInlineComments: (...args: unknown[]) => mockPrInlineCommentsAPI(...args),
     sessionsForRepo: (...args: unknown[]) => mockSessionsForRepoAPI(...args),
     activeReviewsForRepo: (...args: unknown[]) => mockActiveReviewsForRepoAPI(...args),
+    pruneActiveReviews: (...args: unknown[]) => mockPruneActiveReviewsAPI(...args),
   },
 }))
 
@@ -184,7 +186,7 @@ describe('useLoadPrQueue', () => {
     expect(mockSetQueue).not.toHaveBeenCalled()
   })
 
-  it('excludes orphan PRs from activeReviews when hasMore is false (all pages loaded)', async () => {
+  it('excludes orphan PRs when pruneActiveReviews reports them closed/merged', async () => {
     const orphanPr = {
       number: 99,
       title: 'Orphan PR',
@@ -214,6 +216,8 @@ describe('useLoadPrQueue', () => {
     mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: false })
     mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
     mockActiveReviewsForRepoAPI.mockResolvedValue({ prs: [orphanPr] })
+    // pruneActiveReviews returns empty openNumbers → PR 99 is closed/merged
+    mockPruneActiveReviewsAPI.mockResolvedValue({ openNumbers: [] })
     const { result } = renderHook(() => useLoadPrQueue('/repo'))
     await act(async () => {
       await result.current()
@@ -222,7 +226,7 @@ describe('useLoadPrQueue', () => {
     expect(queue.find((p: { number: number }) => p.number === 99)).toBeUndefined()
   })
 
-  it('includes orphan PRs from activeReviews when hasMore is true', async () => {
+  it('includes orphan PRs when pruneActiveReviews confirms they are still open', async () => {
     const orphanPr = {
       number: 99,
       title: 'Orphan PR',
@@ -252,12 +256,94 @@ describe('useLoadPrQueue', () => {
     mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: true, nextCursor: 'cursor-1' })
     mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
     mockActiveReviewsForRepoAPI.mockResolvedValue({ prs: [orphanPr] })
+    // pruneActiveReviews returns 99 → PR is still open (just on a later page)
+    mockPruneActiveReviewsAPI.mockResolvedValue({ openNumbers: [99] })
     const { result } = renderHook(() => useLoadPrQueue('/repo'))
     await act(async () => {
       await result.current()
     })
     const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
     expect(queue.find((p: { number: number }) => p.number === 99)).toBeDefined()
+  })
+
+  it('keeps all orphans when pruneActiveReviews returns an error object', async () => {
+    const orphanPr = {
+      number: 55,
+      title: 'Orphan',
+      author: 'carol',
+      authorAvatarUrl: '',
+      openedAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat',
+      baseRefName: 'main',
+      isDraft: false,
+      ciStatus: 'none',
+      fileCount: 1,
+      additions: 1,
+      deletions: 0,
+      estimatedMinutes: 2,
+      riskLevel: 'low',
+      signalDots: {
+        tests: 'unknown',
+        coverage: 'unknown',
+        ci: 'unknown',
+        lint: 'unknown',
+        churn: 'unknown',
+        blast: 'unknown',
+      },
+      sessionStatus: 'in-progress',
+      viewedFileCount: 0,
+    }
+    mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: false })
+    mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
+    mockActiveReviewsForRepoAPI.mockResolvedValue({ prs: [orphanPr] })
+    // pruneActiveReviews returns an error — orphan should still appear
+    mockPruneActiveReviewsAPI.mockResolvedValue({ error: 'NETWORK_ERROR' })
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
+    expect(queue.find((p: { number: number }) => p.number === 55)).toBeDefined()
+  })
+
+  it('keeps all orphans when pruneActiveReviews throws', async () => {
+    const orphanPr = {
+      number: 66,
+      title: 'Orphan throw',
+      author: 'dave',
+      authorAvatarUrl: '',
+      openedAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat',
+      baseRefName: 'main',
+      isDraft: false,
+      ciStatus: 'none',
+      fileCount: 1,
+      additions: 1,
+      deletions: 0,
+      estimatedMinutes: 2,
+      riskLevel: 'low',
+      signalDots: {
+        tests: 'unknown',
+        coverage: 'unknown',
+        ci: 'unknown',
+        lint: 'unknown',
+        churn: 'unknown',
+        blast: 'unknown',
+      },
+      sessionStatus: 'paused',
+      viewedFileCount: 0,
+    }
+    mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: false })
+    mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
+    mockActiveReviewsForRepoAPI.mockResolvedValue({ prs: [orphanPr] })
+    // pruneActiveReviews throws — orphan should still appear
+    mockPruneActiveReviewsAPI.mockRejectedValue(new Error('bridge disconnected'))
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
+    expect(queue.find((p: { number: number }) => p.number === 66)).toBeDefined()
   })
 
   it('sets hasMorePrs and nextCursor from response', async () => {
