@@ -26,6 +26,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "rebuild": "electron-rebuild -w better-sqlite3",
+    "check-patch-coverage": "node scripts/check-patch-coverage.cjs",
     "create-extension": "node scripts/create-extension.cjs",
     "package": "electron-builder --mac --arm64 --publish never",
     "prepare": "husky"

@@ -210,6 +210,110 @@ describe('ExtensionAPI keyboard', () => {
   })
 })
 
+describe('ExtensionAPI sidebar.registerItem', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('registerItem registers and returns disposable', async () => {
+    const { createExtensionAPI, globalRegistry } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.si', '0.1.0')
+    const item = { id: 'my-item', label: 'Item', component: null }
+    const disposable = api.sidebar.registerItem(item)
+    expect(globalRegistry.sidebarItems.has('com.test.si.sidebar.my-item')).toBe(true)
+    disposable.dispose()
+    expect(globalRegistry.sidebarItems.has('com.test.si.sidebar.my-item')).toBe(false)
+  })
+})
+
+describe('ExtensionAPI topBar.registerMenuItem', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('registerMenuItem registers and returns disposable', async () => {
+    const { createExtensionAPI, globalRegistry } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.tb', '0.1.0')
+    const item = { id: 'my-menu-item', label: 'Menu Item', action: vi.fn() }
+    const disposable = api.topBar.registerMenuItem(item)
+    expect(globalRegistry.topBarItems.has('com.test.tb.topbar.my-menu-item')).toBe(true)
+    disposable.dispose()
+    expect(globalRegistry.topBarItems.has('com.test.tb.topbar.my-menu-item')).toBe(false)
+  })
+})
+
+describe('ExtensionAPI fs.watch', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('watch registers handler and returns disposable', async () => {
+    const { fsWatcherService } = await import('../../../src/main/fs/fs-watcher')
+    const { createExtensionAPI } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.fs', '0.1.0')
+    const handler = vi.fn()
+    const disposable = api.fs.watch(handler)
+    expect(fsWatcherService.addHandler).toHaveBeenCalledWith(handler)
+    disposable.dispose()
+    expect(fsWatcherService.removeHandler).toHaveBeenCalledWith(handler)
+  })
+})
+
+describe('ExtensionAPI contextMenu.registerItem', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('registerItem registers and returns disposable', async () => {
+    const { createExtensionAPI, globalRegistry } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.cm', '0.1.0')
+    const item = { id: 'ctx-item', label: 'Context Item', action: vi.fn() }
+    const disposable = api.contextMenu.registerItem('file', item)
+    expect(globalRegistry.contextMenuItems.has('com.test.cm.contextmenu.file.ctx-item')).toBe(true)
+    disposable.dispose()
+    expect(globalRegistry.contextMenuItems.has('com.test.cm.contextmenu.file.ctx-item')).toBe(false)
+  })
+})
+
+describe('ExtensionAPI commands.register', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('register stores command contribution and handler, dispose removes both', async () => {
+    const { createExtensionAPI, globalRegistry } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.cmd', '0.1.0')
+    const command = { id: 'do-thing', label: 'Do Thing', category: 'Test' }
+    const handler = vi.fn()
+    const disposable = api.commands.register(command, handler)
+    expect(globalRegistry.commandContributions.has('com.test.cmd.command.do-thing')).toBe(true)
+    expect(globalRegistry.commandHandlers.has('com.test.cmd.command.do-thing')).toBe(true)
+    disposable.dispose()
+    expect(globalRegistry.commandContributions.has('com.test.cmd.command.do-thing')).toBe(false)
+    expect(globalRegistry.commandHandlers.has('com.test.cmd.command.do-thing')).toBe(false)
+  })
+})
+
+describe('ExtensionAPI ipc.registerHandler', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('registerHandler calls ipcMain.handle and dispose calls removeHandler', async () => {
+    const electron = await import('electron')
+    const { createExtensionAPI } = await import('../../../src/main/extensions/api')
+    const api = createExtensionAPI('com.test.ipc', '0.1.0')
+    const handler = vi.fn().mockResolvedValue({ ok: true })
+    const disposable = api.ipc.registerHandler('com.test.ipc:my-channel', handler)
+    expect(electron.ipcMain.handle).toHaveBeenCalledWith(
+      'com.test.ipc:my-channel',
+      expect.any(Function)
+    )
+    disposable.dispose()
+    expect(electron.ipcMain.removeHandler).toHaveBeenCalledWith('com.test.ipc:my-channel')
+  })
+})
+
 describe('ExtensionHost', () => {
   beforeEach(() => {
     vi.resetModules()
