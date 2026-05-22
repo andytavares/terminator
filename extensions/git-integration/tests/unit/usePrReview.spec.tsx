@@ -525,9 +525,7 @@ describe('useLoadPrQueue — NOT_AUTHENTICATED branch', () => {
     await act(async () => {
       await result.current()
     })
-    expect(mockSetQueueError).toHaveBeenCalledWith(
-      expect.stringContaining('Not authenticated')
-    )
+    expect(mockSetQueueError).toHaveBeenCalledWith(expect.stringContaining('Not authenticated'))
   })
 
   it('uses fallback resetAt when RATE_LIMITED has no resetAt', async () => {
@@ -654,7 +652,10 @@ describe('useLoadPrDetail — additional branches', () => {
 })
 
 describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
-  function makePrWithFile(patchCoverage: number | null, ciStatus: 'passing' | 'failing' | 'pending' | 'none' = 'passing') {
+  function makePrWithFile(
+    patchCoverage: number | null,
+    ciStatus: 'passing' | 'failing' | 'pending' | 'none' = 'passing'
+  ) {
     return {
       ...validActivePr,
       ciStatus,
@@ -717,7 +718,9 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     })
 
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await act(async () => { await result.current() })
+    await act(async () => {
+      await result.current()
+    })
 
     // updateQueuePrRisk was called — verify signalDots included
     expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
@@ -744,7 +747,9 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     })
 
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await act(async () => { await result.current() })
+    await act(async () => {
+      await result.current()
+    })
 
     expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
     const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
@@ -770,7 +775,9 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     })
 
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await act(async () => { await result.current() })
+    await act(async () => {
+      await result.current()
+    })
 
     expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
     const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
@@ -795,7 +802,9 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     })
 
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await act(async () => { await result.current() })
+    await act(async () => {
+      await result.current()
+    })
 
     expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
     const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
@@ -820,7 +829,9 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     })
 
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await act(async () => { await result.current() })
+    await act(async () => {
+      await result.current()
+    })
 
     expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
     const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
@@ -845,7 +856,9 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     })
 
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await act(async () => { await result.current() })
+    await act(async () => {
+      await result.current()
+    })
 
     expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
     const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
@@ -872,7 +885,9 @@ describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
     })
 
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await act(async () => { await result.current(prDetail) })
+    await act(async () => {
+      await result.current(prDetail)
+    })
 
     expect(mockFileMetrics).toHaveBeenCalledWith('/repo', 'src/foo.ts')
     expect(mockUpdateQueuePrRisk).toHaveBeenCalled()

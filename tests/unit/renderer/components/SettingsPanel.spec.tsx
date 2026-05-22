@@ -457,8 +457,7 @@ describe('ExtensionsSection', () => {
     fireEvent.change(screen.getByDisplayValue('hello'), { target: { value: 'world' } })
     // Wait for debounce timer (400ms) to fire
     await waitFor(
-      () =>
-        expect(extAPI.extension.updateSetting).toHaveBeenCalledWith('com.test.myKey', 'world'),
+      () => expect(extAPI.extension.updateSetting).toHaveBeenCalledWith('com.test.myKey', 'world'),
       { timeout: 2000 }
     )
   })

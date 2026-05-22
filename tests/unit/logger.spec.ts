@@ -135,10 +135,9 @@ describe('logger (src/main/logger.ts)', () => {
   it('getStream opens a write-stream at the correct path', async () => {
     const { makeLogger } = await import('../../src/main/logger')
     makeLogger('stream-test').info('ping')
-    expect(mockCreateWriteStream).toHaveBeenCalledWith(
-      expect.stringContaining('terminator.log'),
-      { flags: 'a' }
-    )
+    expect(mockCreateWriteStream).toHaveBeenCalledWith(expect.stringContaining('terminator.log'), {
+      flags: 'a',
+    })
   })
 
   it('rotates log file when it exceeds 5 MB', async () => {

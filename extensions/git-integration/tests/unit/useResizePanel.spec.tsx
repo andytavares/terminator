@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useResizePanel } from '../../src/hooks/useResizePanel'
 
@@ -21,7 +21,10 @@ describe('useResizePanel', () => {
     const { result } = renderHook(() => useResizePanel(300, 100, 600))
     const preventDefault = vi.fn()
     act(() => {
-      result.current.handleMouseDown({ clientX: 500, preventDefault } as unknown as React.MouseEvent)
+      result.current.handleMouseDown({
+        clientX: 500,
+        preventDefault,
+      } as unknown as React.MouseEvent)
     })
     expect(preventDefault).toHaveBeenCalled()
   })
@@ -32,7 +35,10 @@ describe('useResizePanel', () => {
 
     // Start drag
     act(() => {
-      result.current.handleMouseDown({ clientX: 500, preventDefault } as unknown as React.MouseEvent)
+      result.current.handleMouseDown({
+        clientX: 500,
+        preventDefault,
+      } as unknown as React.MouseEvent)
     })
 
     // Simulate mousemove event
@@ -48,7 +54,10 @@ describe('useResizePanel', () => {
     const preventDefault = vi.fn()
 
     act(() => {
-      result.current.handleMouseDown({ clientX: 500, preventDefault } as unknown as React.MouseEvent)
+      result.current.handleMouseDown({
+        clientX: 500,
+        preventDefault,
+      } as unknown as React.MouseEvent)
     })
 
     act(() => {
@@ -64,7 +73,10 @@ describe('useResizePanel', () => {
     const preventDefault = vi.fn()
 
     act(() => {
-      result.current.handleMouseDown({ clientX: 500, preventDefault } as unknown as React.MouseEvent)
+      result.current.handleMouseDown({
+        clientX: 500,
+        preventDefault,
+      } as unknown as React.MouseEvent)
     })
 
     // Move left by 200px — would give 100, but min is 200
@@ -80,7 +92,10 @@ describe('useResizePanel', () => {
     const preventDefault = vi.fn()
 
     act(() => {
-      result.current.handleMouseDown({ clientX: 500, preventDefault } as unknown as React.MouseEvent)
+      result.current.handleMouseDown({
+        clientX: 500,
+        preventDefault,
+      } as unknown as React.MouseEvent)
     })
 
     // Move right by 300px — would give 600, but max is 400
@@ -108,7 +123,10 @@ describe('useResizePanel', () => {
     const preventDefault = vi.fn()
 
     act(() => {
-      result.current.handleMouseDown({ clientX: 500, preventDefault } as unknown as React.MouseEvent)
+      result.current.handleMouseDown({
+        clientX: 500,
+        preventDefault,
+      } as unknown as React.MouseEvent)
     })
 
     // Move to change size
@@ -143,7 +161,10 @@ describe('useResizePanel', () => {
     const preventDefault = vi.fn()
 
     act(() => {
-      result.current.handleMouseDown({ clientX: 500, preventDefault } as unknown as React.MouseEvent)
+      result.current.handleMouseDown({
+        clientX: 500,
+        preventDefault,
+      } as unknown as React.MouseEvent)
     })
 
     act(() => {

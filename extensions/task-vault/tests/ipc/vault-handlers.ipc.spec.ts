@@ -571,12 +571,15 @@ describe('task-vault:vault:query', () => {
   it('filters by context, project, area, and dueBefore', async () => {
     mockAll.mockReturnValueOnce([])
     const handler = getHandler('task-vault:vault:query')
-    const result = (await handler({}, {
-      context: 'office',
-      project: 'Alpha',
-      area: 'Work',
-      dueBefore: '2026-06-01',
-    })) as { tasks: unknown[] }
+    const result = (await handler(
+      {},
+      {
+        context: 'office',
+        project: 'Alpha',
+        area: 'Work',
+        dueBefore: '2026-06-01',
+      }
+    )) as { tasks: unknown[] }
     expect(result.tasks).toHaveLength(0)
   })
 
@@ -631,11 +634,14 @@ describe('task-vault:vault:list-areas with data', () => {
 describe('task-vault:vault:capture', () => {
   it('captures a task with project and area hints', async () => {
     const handler = getHandler('task-vault:vault:capture')
-    const result = (await handler({}, {
-      text: 'Do something',
-      hintProject: 'MyProject',
-      hintArea: 'Work',
-    })) as { taskId: string }
+    const result = (await handler(
+      {},
+      {
+        text: 'Do something',
+        hintProject: 'MyProject',
+        hintArea: 'Work',
+      }
+    )) as { taskId: string }
     expect(result.taskId).toBe('test-uuid')
   })
 

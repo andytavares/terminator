@@ -145,7 +145,9 @@ describe('PtyManager', () => {
     // Provide a registry with one orphan PID
     const orphanPid = 99999
     vi.mocked(fs.readFileSync).mockReturnValue(
-      JSON.stringify([{ sessionId: 'orphan', pid: orphanPid, cwd: '/', shell: '/bin/sh' }]) as unknown as Buffer
+      JSON.stringify([
+        { sessionId: 'orphan', pid: orphanPid, cwd: '/', shell: '/bin/sh' },
+      ]) as unknown as Buffer
     )
 
     // Spy on process.kill — first call (signal 0) returns true (process running),
@@ -169,7 +171,9 @@ describe('PtyManager', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true)
     const orphanPid = 88888
     vi.mocked(fs.readFileSync).mockReturnValue(
-      JSON.stringify([{ sessionId: 'zombie', pid: orphanPid, cwd: '/', shell: '/bin/sh' }]) as unknown as Buffer
+      JSON.stringify([
+        { sessionId: 'zombie', pid: orphanPid, cwd: '/', shell: '/bin/sh' },
+      ]) as unknown as Buffer
     )
 
     // isProcessRunning returns true, SIGTERM throws
@@ -189,7 +193,9 @@ describe('PtyManager', () => {
     const fs = await import('fs')
     vi.mocked(fs.existsSync).mockReturnValue(true)
     vi.mocked(fs.readFileSync).mockReturnValue(
-      JSON.stringify([{ sessionId: 'dead', pid: 77777, cwd: '/', shell: '/bin/sh' }]) as unknown as Buffer
+      JSON.stringify([
+        { sessionId: 'dead', pid: 77777, cwd: '/', shell: '/bin/sh' },
+      ]) as unknown as Buffer
     )
 
     // isProcessRunning signal 0 throws → process not running

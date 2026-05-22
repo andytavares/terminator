@@ -219,10 +219,7 @@ describe('computeRiskScore()', () => {
       blastRadius: 2,
       patchCoverage: 30, // low coverage
     })
-    const allMetrics = [
-      metrics,
-      makeFileMetrics({ churn90d: 0, blastRadius: 0 }),
-    ]
+    const allMetrics = [metrics, makeFileMetrics({ churn90d: 0, blastRadius: 0 })]
     const score = computeRiskScore(metrics, allMetrics)
     expect(score.metrics.patchCoverage).toBe(30)
   })
@@ -386,9 +383,7 @@ describe('parseReviewQueuePR()', () => {
       headRefName: 'feat/test',
       baseRefName: 'main',
       isDraft: false,
-      files: [
-        { path: 'src/service.ts', additions: 50, deletions: 0 },
-      ],
+      files: [{ path: 'src/service.ts', additions: 50, deletions: 0 }],
       statusCheckRollup: [],
     }
     const pr = parseReviewQueuePR(raw)
@@ -658,9 +653,7 @@ describe('buildChapters() — additional branches', () => {
   })
 
   it('handles filename field instead of path', () => {
-    const rawFiles = [
-      { filename: 'src/component.ts', additions: 10, deletions: 0 },
-    ]
+    const rawFiles = [{ filename: 'src/component.ts', additions: 10, deletions: 0 }]
     const chapters = buildChapters(rawFiles)
     expect(chapters[0].files[0].path).toBe('src/component.ts')
   })

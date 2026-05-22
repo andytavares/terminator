@@ -101,10 +101,7 @@ describe('useTerminalSession', () => {
       getState: vi.fn().mockReturnValue({
         activeSessionIdByProject: new Map([['proj-1', 'other-session']]),
         sessions: new Map([
-          [
-            'session-123',
-            { id: 'session-123', projectId: 'proj-1', tabTitle: 'T', type: 'human' },
-          ],
+          ['session-123', { id: 'session-123', projectId: 'proj-1', tabTitle: 'T', type: 'human' }],
         ]),
       }),
     })
@@ -127,10 +124,7 @@ describe('useTerminalSession', () => {
       getState: vi.fn().mockReturnValue({
         activeSessionIdByProject: new Map([['proj-1', 'session-123']]),
         sessions: new Map([
-          [
-            'session-123',
-            { id: 'session-123', projectId: 'proj-1', tabTitle: 'T', type: 'human' },
-          ],
+          ['session-123', { id: 'session-123', projectId: 'proj-1', tabTitle: 'T', type: 'human' }],
         ]),
       }),
     })
@@ -152,10 +146,7 @@ describe('useTerminalSession', () => {
       getState: vi.fn().mockReturnValue({
         activeSessionIdByProject: new Map([['proj-1', 'session-123']]),
         sessions: new Map([
-          [
-            'session-123',
-            { id: 'session-123', projectId: 'proj-1', tabTitle: 'T', type: 'human' },
-          ],
+          ['session-123', { id: 'session-123', projectId: 'proj-1', tabTitle: 'T', type: 'human' }],
         ]),
       }),
     })

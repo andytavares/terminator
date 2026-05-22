@@ -195,6 +195,10 @@ describe('FsWatcherService', () => {
     // old watcher should have been closed
     expect(closeA).toHaveBeenCalled()
     // new watcher opened for repo-b
-    expect(fs.watch).toHaveBeenLastCalledWith('/tmp/repo-b', { recursive: true }, expect.any(Function))
+    expect(fs.watch).toHaveBeenLastCalledWith(
+      '/tmp/repo-b',
+      { recursive: true },
+      expect.any(Function)
+    )
   })
 })

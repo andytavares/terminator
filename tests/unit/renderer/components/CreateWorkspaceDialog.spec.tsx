@@ -97,9 +97,7 @@ describe('CreateWorkspaceDialog', () => {
   it('calls openDirectory when Browse is clicked and updates folder path', async () => {
     render(<CreateWorkspaceDialog onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Browse'))
-    await vi.waitFor(() =>
-      expect(screen.getByDisplayValue('/selected/path')).toBeTruthy()
-    )
+    await vi.waitFor(() => expect(screen.getByDisplayValue('/selected/path')).toBeTruthy())
     expect(mockOpenDirectory).toHaveBeenCalled()
   })
 

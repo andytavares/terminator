@@ -233,7 +233,9 @@ describe('WorkspaceItem', () => {
         contextMenuClick: mockContextMenuClick,
       },
     }
-    mockGetContextMenuItems.mockResolvedValue({ items: [{ id: 'ext-collapsed', label: 'Open In Browser' }] })
+    mockGetContextMenuItems.mockResolvedValue({
+      items: [{ id: 'ext-collapsed', label: 'Open In Browser' }],
+    })
     render(<WorkspaceItem workspace={ws} collapsed={true} />)
     await waitFor(() => {})
     fireEvent.contextMenu(screen.getByText('MW'))
@@ -256,7 +258,13 @@ describe('WorkspaceItem', () => {
       setActiveWorkspace: mockSetActiveWorkspace,
       deleteWorkspace: mockDeleteWorkspace,
       projectsByWorkspaceId: new Map([
-        ['ws-1', [{ id: 'proj-1', name: 'App' }, { id: 'proj-2', name: 'Docs' }]],
+        [
+          'ws-1',
+          [
+            { id: 'proj-1', name: 'App' },
+            { id: 'proj-2', name: 'Docs' },
+          ],
+        ],
       ]),
     } as unknown as ReturnType<typeof useWorkspaceStore>)
     render(<WorkspaceItem workspace={ws} collapsed={false} />)

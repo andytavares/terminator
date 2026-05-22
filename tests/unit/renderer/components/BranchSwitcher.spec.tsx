@@ -226,7 +226,10 @@ describe('BranchSwitcher', () => {
     fireEvent.click(screen.getByText('feature/test'))
     await waitFor(() =>
       expect(mockAddToast).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'error', message: expect.stringContaining('network failure') })
+        expect.objectContaining({
+          type: 'error',
+          message: expect.stringContaining('network failure'),
+        })
       )
     )
   })

@@ -331,7 +331,11 @@ describe('ExtensionHost – DUPLICATE_ID after successful first load', () => {
   })
 
   afterEach(() => {
-    try { rmSync(tmpDir, { recursive: true, force: true }) } catch { /* ignore */ }
+    try {
+      rmSync(tmpDir, { recursive: true, force: true })
+    } catch {
+      /* ignore */
+    }
   })
 
   it('returns DUPLICATE_ID on second load attempt for same extension id', async () => {
@@ -375,16 +379,23 @@ describe('ExtensionHost – unload deactivate error path', () => {
     const host = new ExtensionHost()
 
     // Access private loaded map via cast
-    const loadedMap: Map<string, {
-      record: unknown
-      disposables: { dispose(): void }[]
-      module: { deactivate?: () => void | Promise<void> }
-    }> = (host as unknown as { loaded: typeof loadedMap }).loaded
+    const loadedMap: Map<
+      string,
+      {
+        record: unknown
+        disposables: { dispose(): void }[]
+        module: { deactivate?: () => void | Promise<void> }
+      }
+    > = (host as unknown as { loaded: typeof loadedMap }).loaded
 
     loadedMap.set('com.deact.err', {
       record: {},
       disposables: [
-        { dispose: () => { throw new Error('dispose failed') } },
+        {
+          dispose: () => {
+            throw new Error('dispose failed')
+          },
+        },
       ],
       module: {
         deactivate: () => {
@@ -419,7 +430,11 @@ describe('ExtensionHost – loadBundledExtensions paths', () => {
 // compatibility branches (isVersionCompatible lines 229-238).
 // ─────────────────────────────────────────────────────────────────────────────
 
-function makeExtDir(id: string, minAppVersion: string, extraManifest: Record<string, unknown> = {}): string {
+function makeExtDir(
+  id: string,
+  minAppVersion: string,
+  extraManifest: Record<string, unknown> = {}
+): string {
   const dir = join(os.tmpdir(), `ext-${id}-${Date.now()}`)
   mkdirSync(dir, { recursive: true })
   writeFileSync(
@@ -434,7 +449,10 @@ function makeExtDir(id: string, minAppVersion: string, extraManifest: Record<str
       ...extraManifest,
     })
   )
-  writeFileSync(join(dir, 'main.js'), 'module.exports = { activate: () => {}, deactivate: () => {} }')
+  writeFileSync(
+    join(dir, 'main.js'),
+    'module.exports = { activate: () => {}, deactivate: () => {} }'
+  )
   return dir
 }
 
@@ -448,7 +466,11 @@ describe('ExtensionHost – successful load paths (real temp extensions)', () =>
 
   afterEach(() => {
     for (const d of tmpDirs.splice(0)) {
-      try { rmSync(d, { recursive: true, force: true }) } catch { /* ignore */ }
+      try {
+        rmSync(d, { recursive: true, force: true })
+      } catch {
+        /* ignore */
+      }
     }
   })
 
@@ -624,7 +646,8 @@ describe('ExtensionHost – successful load paths (real temp extensions)', () =>
     const host = new ExtensionHost()
 
     // Pre-populate the internal loaded map to simulate already loaded
-    const loadedMap: Map<string, unknown> = (host as unknown as { loaded: Map<string, unknown> }).loaded
+    const loadedMap: Map<string, unknown> = (host as unknown as { loaded: Map<string, unknown> })
+      .loaded
     loadedMap.set('com.skip.test', {})
 
     // Should not try to load again
@@ -651,7 +674,7 @@ describe('ExtensionHost – successful load paths (real temp extensions)', () =>
     writeFileSync(
       join(dir, 'manifest.json'),
       JSON.stringify({
-        id: 'INVALID ID!',       // fails the regex
+        id: 'INVALID ID!', // fails the regex
         name: 'Bad',
         version: '1.0.0',
         description: 'Bad schema',

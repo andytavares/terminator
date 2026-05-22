@@ -38,12 +38,18 @@ describe('GlobalSettingsSchema', () => {
   })
 
   it('accepts light theme', () => {
-    const result = GlobalSettingsSchema.safeParse({ ...validGlobal, appearance: { theme: 'light' } })
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      appearance: { theme: 'light' },
+    })
     expect(result.success).toBe(true)
   })
 
   it('rejects unknown theme in appearance', () => {
-    const result = GlobalSettingsSchema.safeParse({ ...validGlobal, appearance: { theme: 'monokai' } })
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      appearance: { theme: 'monokai' },
+    })
     expect(result.success).toBe(false)
   })
 
@@ -156,7 +162,10 @@ describe('WorkspaceSettingsSchema', () => {
   })
 
   it('rejects a non-UUID workspaceId', () => {
-    const result = WorkspaceSettingsSchema.safeParse({ ...validWorkspace, workspaceId: 'not-a-uuid' })
+    const result = WorkspaceSettingsSchema.safeParse({
+      ...validWorkspace,
+      workspaceId: 'not-a-uuid',
+    })
     expect(result.success).toBe(false)
   })
 

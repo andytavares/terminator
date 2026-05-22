@@ -143,8 +143,7 @@ deadline: 2026-12-31
     vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
       const p = filePath.toString()
       if (p.endsWith('my-project.md')) return projectContent as unknown as Buffer
-      if (p.endsWith('inbox.md'))
-        return '' as unknown as Buffer // empty inbox
+      if (p.endsWith('inbox.md')) return '' as unknown as Buffer // empty inbox
       return '' as unknown as Buffer
     })
     vi.mocked(fs.stat).mockResolvedValue({
@@ -178,9 +177,7 @@ status: active
       const p = dirPath.toString()
       if (p.endsWith('/daily')) return [] as unknown as Awaited<ReturnType<typeof fs.readdir>>
       if (p.endsWith('/projects'))
-        return [makeDirent('stale-project.md')] as unknown as Awaited<
-          ReturnType<typeof fs.readdir>
-        >
+        return [makeDirent('stale-project.md')] as unknown as Awaited<ReturnType<typeof fs.readdir>>
       return [] as unknown as Awaited<ReturnType<typeof fs.readdir>>
     })
     vi.mocked(fs.readFile).mockImplementation(async (filePath) => {

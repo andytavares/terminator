@@ -155,13 +155,13 @@ describe('GhService — parseGhPr null/undefined branches (lines 15-21)', () => 
     mockExec.mockResolvedValue({ exitCode: 0, stdout: prJson, stderr: '', timedOut: false })
     const pr = await service.getPrForBranch('/tmp/repo', 'some-branch')
     expect(pr).not.toBeNull()
-    expect(pr?.title).toBe('')          // null ?? '' fallback
-    expect(pr?.body).toBe('')           // null ?? '' fallback
-    expect(pr?.url).toBe('')            // null ?? '' fallback
-    expect(pr?.state).toBe('open')      // null ?? 'OPEN' → default
+    expect(pr?.title).toBe('') // null ?? '' fallback
+    expect(pr?.body).toBe('') // null ?? '' fallback
+    expect(pr?.url).toBe('') // null ?? '' fallback
+    expect(pr?.state).toBe('open') // null ?? 'OPEN' → default
     expect(pr?.baseRefName).toBe('main') // null ?? 'main' fallback
-    expect(pr?.headRefName).toBe('')    // null ?? '' fallback
-    expect(pr?.isDraft).toBe(false)     // Boolean(undefined) = false
+    expect(pr?.headRefName).toBe('') // null ?? '' fallback
+    expect(pr?.isDraft).toBe(false) // Boolean(undefined) = false
   })
 })
 
