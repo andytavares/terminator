@@ -93,4 +93,69 @@ describe('CreateWorkspaceDialog', () => {
     await new Promise((r) => setTimeout(r, 10))
     expect(mockCreateWorkspace).not.toHaveBeenCalled()
   })
+
+  it('calls openDirectory when Browse is clicked and updates folder path', async () => {
+    render(<CreateWorkspaceDialog onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Browse'))
+    await vi.waitFor(() =>
+      expect(screen.getByDisplayValue('/selected/path')).toBeTruthy()
+    )
+    expect(mockOpenDirectory).toHaveBeenCalled()
+  })
+
+  it('does not update folder path when Browse is cancelled', async () => {
+    mockOpenDirectory.mockResolvedValue({ cancelled: true })
+    render(<CreateWorkspaceDialog onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Browse'))
+    await new Promise((r) => setTimeout(r, 50))
+    // folder path input should remain at placeholder with empty value
+    expect(screen.getByPlaceholderText('/path/to/folder')).toBeTruthy()
+    expect((screen.getByPlaceholderText('/path/to/folder') as HTMLInputElement).value).toBe('')
+  })
+
+  it('updates folder path input when typed', () => {
+    render(<CreateWorkspaceDialog onClose={vi.fn()} />)
+    const folderInput = screen.getByPlaceholderText('/path/to/folder')
+    fireEvent.change(folderInput, { target: { value: '/my/custom/path' } })
+    expect(screen.getByDisplayValue('/my/custom/path')).toBeTruthy()
+  })
+
+  it('selects a color swatch on click', () => {
+    const { container } = render(<CreateWorkspaceDialog onClose={vi.fn()} />)
+    const swatches = container.querySelectorAll('.dialog__color-swatch')
+    // Click second color swatch (index 1 = #7B68EE)
+    fireEvent.click(swatches[1])
+    expect(swatches[1].classList.contains('dialog__color-swatch--selected')).toBe(true)
+  })
+
+  it('updates tags input when typed', () => {
+    render(<CreateWorkspaceDialog onClose={vi.fn()} />)
+    const tagsInput = screen.getByPlaceholderText('frontend, work, personal')
+    fireEvent.change(tagsInput, { target: { value: 'a, b' } })
+    expect(screen.getByDisplayValue('a, b')).toBeTruthy()
+  })
+
+  it('clears nameError when name input changes', () => {
+    render(<CreateWorkspaceDialog onClose={vi.fn()} />)
+    const nameInput = screen.getByPlaceholderText('My Workspace')
+    fireEvent.blur(nameInput) // sets "Name is required"
+    expect(screen.getByText('Name is required')).toBeTruthy()
+    fireEvent.change(nameInput, { target: { value: 'New WS' } })
+    expect(screen.queryByText('Name is required')).toBeNull()
+  })
+
+  it('closes after successful create with no folder path', async () => {
+    const onClose = vi.fn()
+    render(<CreateWorkspaceDialog onClose={onClose} />)
+    fireEvent.change(screen.getByPlaceholderText('My Workspace'), { target: { value: 'WS A' } })
+    fireEvent.click(screen.getByText('Create'))
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
+  })
+
+  it('calls onClose when overlay is clicked', () => {
+    const onClose = vi.fn()
+    render(<CreateWorkspaceDialog onClose={onClose} />)
+    fireEvent.click(screen.getByText('Create Workspace').closest('.dialog-overlay')!)
+    expect(onClose).toHaveBeenCalled()
+  })
 })

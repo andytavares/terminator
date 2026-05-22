@@ -117,6 +117,37 @@ describe('TerminalPane', () => {
     expect(mockTerminalInput).not.toHaveBeenCalled()
   })
 
+  it('handleDragOver prevents default when Files type is included', () => {
+    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
+    mockGetActive.mockReturnValue('ses-1')
+    const { container } = render(<TerminalPane projectId="proj-1" />)
+    const pane = container.querySelector('.terminal-pane')!
+
+    // Build a real DragEvent and spy on preventDefault
+    const event = new Event('dragover', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', {
+      value: { types: ['Files'] },
+    })
+    const spy = vi.spyOn(event, 'preventDefault')
+    pane.dispatchEvent(event)
+    expect(spy).toHaveBeenCalled()
+  })
+
+  it('handleDragOver does not prevent default when Files type is not included', () => {
+    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
+    mockGetActive.mockReturnValue('ses-1')
+    const { container } = render(<TerminalPane projectId="proj-1" />)
+    const pane = container.querySelector('.terminal-pane')!
+
+    const event = new Event('dragover', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', {
+      value: { types: ['text/plain'] },
+    })
+    const spy = vi.spyOn(event, 'preventDefault')
+    pane.dispatchEvent(event)
+    expect(spy).not.toHaveBeenCalled()
+  })
+
   it('unmounts previous session instance when active session changes', () => {
     const mockUnmount = vi.fn()
     const mockMount = vi.fn()

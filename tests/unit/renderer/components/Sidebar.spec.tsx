@@ -83,4 +83,22 @@ describe('Sidebar', () => {
     fireEvent.click(screen.getByText('+ Create Workspace'))
     expect(screen.getByTestId('create-ws-dialog')).toBeTruthy()
   })
+
+  it('closes CreateWorkspaceDialog when onClose is called', () => {
+    render(<Sidebar />)
+    fireEvent.click(screen.getByText('+ Create Workspace'))
+    expect(screen.getByTestId('create-ws-dialog')).toBeTruthy()
+    fireEvent.click(screen.getByText('Close'))
+    expect(screen.queryByTestId('create-ws-dialog')).toBeNull()
+  })
+
+  it('hides extension items when sidebar is collapsed', async () => {
+    mockGetSidebarItems.mockResolvedValue({
+      items: [{ id: 'ext-1', label: 'Git Panel', tooltip: 'Show git' }],
+    })
+    render(<Sidebar />)
+    await waitFor(() => screen.getByText('Git Panel'))
+    fireEvent.click(screen.getByTitle('Collapse sidebar'))
+    expect(screen.queryByText('Git Panel')).toBeNull()
+  })
 })
