@@ -1,0 +1,29 @@
+README.md
+  s_2e9158e679b6d7::t_2cfc9d3312f4b6 9,11,16-18,36-37,58,112-116,126
+  s_2e9158e679b6d7::t_d3418e4bb50665 129-133
+  s_2e9158e679b6d7::t_619ba532fbcc64 14
+  s_2e9158e679b6d7::t_cc8e73ed41286a 148,156,163-166,172-177,180
+docs/EXTENSION-DEVELOPMENT.md
+  s_2e9158e679b6d7::t_89c838289f628d 5
+docs/ARCHITECTURE.md
+  s_2e9158e679b6d7::t_bf1e6d32488dd4 3
+  s_2e9158e679b6d7::t_c97c504c08cc75 281,285-289,293,300-301
+  s_2e9158e679b6d7::t_d9e030655706ef 67
+  s_2e9158e679b6d7::t_8160ebb2b546a8 207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "1738e06385ba48cc09501efb0876c2cd8bc7ff42",
+  "prompts": {},
+  "sessions": {
+    "s_2e9158e679b6d7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45ce711b-3c6a-4077-bfbf-5ae59e07020e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
