@@ -1,0 +1,56 @@
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_2e9158e679b6d7::t_b2abd2091b7692 470-471,475-483,494-495
+  s_2e9158e679b6d7::t_c84ea5ee6a827b 312-313,316-320,323,326,328,330-333,339-340
+  s_2e9158e679b6d7::t_535351909c428b 346-347
+  s_2e9158e679b6d7::t_0fededdf895894 1214,1220
+  s_2e9158e679b6d7::t_d099c4838a958d 311,314-315,321-322,324-325,327,329,334-338,341-342
+extensions/git-integration/src/hooks/usePrReview.ts
+  s_2e9158e679b6d7::t_54cfd6c53dd2e5 67-89
+  s_2e9158e679b6d7::t_01e9adbf54f86c 158
+extensions/git-integration/src/stores/pr-review.store.ts
+  s_2e9158e679b6d7::t_767c4394fc0fa8 83
+  s_2e9158e679b6d7::t_3bcfa1a7a910a8 273-277
+extensions/git-integration/tests/unit/ReviewQueue.spec.tsx
+  s_2e9158e679b6d7::t_87e5cec645546f 59
+extensions/git-integration/tests/unit/PrReviewTab.spec.tsx
+  s_2e9158e679b6d7::t_70a9f09ec46f88 94,102
+  s_2e9158e679b6d7::t_03a7c0dcbc140c 18
+extensions/git-integration/src/components/pr-review/ReviewQueue.tsx
+  s_2e9158e679b6d7::t_85b19652a0a72c 14,24
+  s_2e9158e679b6d7::t_494d543d8940be 303,312
+  s_2e9158e679b6d7::t_d2d31dc04c3774 322-336,338-346,348-352,354-366
+  s_2e9158e679b6d7::t_ed4183d5805a78 353
+  s_2e9158e679b6d7::t_11c3708ac2c12c 219-225
+  s_2e9158e679b6d7::t_39c6ed2afb781f 264,270,277
+  s_2e9158e679b6d7::t_0f168a4796d786 285-293
+extensions/git-integration/src/api/github.ts
+  s_2e9158e679b6d7::t_a17a4ad88d9fb4 42-47
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_2e9158e679b6d7::t_d60c0496b1ee0c 540-593
+extensions/git-integration/src/components/pr-review/PrReviewTab.tsx
+  s_2e9158e679b6d7::t_65cdd297cdbc03 23
+  s_2e9158e679b6d7::t_63bbacd72e30e6 139-147
+  s_2e9158e679b6d7::t_ed4692ec250c9f 241
+extensions/git-integration/tests/unit/usePrReview.spec.tsx
+  s_2e9158e679b6d7::t_01beb921b06023 21,31
+  s_2e9158e679b6d7::t_8d5a16dd17c039 189,219-220,229,259-260
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_2e9158e679b6d7::t_cf82cafed2e54d 741,745-748
+  s_2e9158e679b6d7::t_6f047741beee47 790-827
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "896fcf3b72d954e7bf3d169a280aa923f7c0d298",
+  "prompts": {},
+  "sessions": {
+    "s_2e9158e679b6d7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45ce711b-3c6a-4077-bfbf-5ae59e07020e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
