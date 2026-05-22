@@ -295,6 +295,21 @@ describe('task-vault:vault:get-today', () => {
     expect((result.tasks as unknown[]).length).toBe(1)
   })
 
+  it('rolls over stale open tasks from past daily logs', async () => {
+    const staleRow = makeTaskRow({ source: 'daily', source_ref: '2026-05-01', status: 'open' })
+    // rollover query returns stale task → triggers insert + migrate statements
+    mockAll
+      .mockReturnValueOnce([staleRow]) // rollover: one stale task found
+      .mockReturnValueOnce([]) // main task fetch (after rollover inserts)
+      .mockReturnValueOnce([]) // subtasks
+      .mockReturnValueOnce([]) // events
+      .mockReturnValueOnce([]) // notes
+    const handler = getHandler('task-vault:vault:get-today')
+    const result = (await handler({}, undefined)) as Record<string, unknown>
+    expect(result.rolledOver).toBe(1)
+    expect(mockRun).toHaveBeenCalled()
+  })
+
   it('returns error string when db throws', async () => {
     mockPrepare.mockImplementationOnce(() => {
       throw new Error('disk error')
@@ -594,7 +609,7 @@ describe('task-vault:vault:query', () => {
 // ── vault:list-areas with area data ──────────────────────────────────────────
 
 describe('task-vault:vault:list-areas with data', () => {
-  it('returns areas with tasks and projects', async () => {
+  it('returns areas with tasks, projects, and combined counts', async () => {
     const areaRow = { id: 'area-1', name: 'Work', created_at: new Date().toISOString() }
     const taskRow = makeTaskRow({ area: 'Work' })
     const projRow = {
@@ -611,11 +626,16 @@ describe('task-vault:vault:list-areas with data', () => {
       .mockReturnValueOnce([taskRow]) // taskRows for 'Work' area
       .mockReturnValueOnce([projRow]) // projectRows for 'Work' area
       .mockReturnValueOnce([]) // orphan areas (no orphans)
-    mockGet.mockReturnValue({ c: 1 }) // count query for project next actions
+    // get() is called: nextActionCount, totalCount, doneCount (per project) + combinedOpen, combinedTotal (per area)
+    mockGet.mockReturnValue({ c: 2 })
     const handler = getHandler('task-vault:vault:list-areas')
-    const result = (await handler({}, undefined)) as { areas: { name: string; tasks: unknown[] }[] }
+    const result = (await handler({}, undefined)) as {
+      areas: { name: string; tasks: unknown[]; openTaskCount: number; taskCount: number }[]
+    }
     expect(result.areas.length).toBeGreaterThan(0)
     expect(result.areas[0].name).toBe('Work')
+    expect(result.areas[0].openTaskCount).toBe(2)
+    expect(result.areas[0].taskCount).toBe(2)
   })
 
   it('includes orphan area tasks not in areas table', async () => {
@@ -650,6 +670,135 @@ describe('task-vault:vault:capture', () => {
     const handler = getHandler('task-vault:vault:capture')
     const result = await handler({}, null)
     expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
+  })
+})
+
+// ── vault:export-json ─────────────────────────────────────────────────────────
+
+describe('task-vault:vault:export-json', () => {
+  it('returns all tables with metadata', async () => {
+    const taskRow = makeTaskRow()
+    const projRow = {
+      id: 'p1',
+      name: 'Alpha',
+      status: 'active',
+      area: null,
+      deadline: null,
+      outcome: null,
+      terminator_links: '[]',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    const areaRow = { id: 'a1', name: 'Work', created_at: new Date().toISOString() }
+    mockAll
+      .mockReturnValueOnce([taskRow]) // tasks
+      .mockReturnValueOnce([projRow]) // projects
+      .mockReturnValueOnce([areaRow]) // areas
+      .mockReturnValueOnce([]) // events
+      .mockReturnValueOnce([]) // notes
+    const handler = getHandler('task-vault:vault:export-json')
+    const result = (await handler({}, undefined)) as {
+      tasks: unknown[]
+      projects: unknown[]
+      areas: unknown[]
+      events: unknown[]
+      notes: unknown[]
+      exportedAt: string
+      version: number
+    }
+    expect(result.tasks).toHaveLength(1)
+    expect(result.projects).toHaveLength(1)
+    expect(result.areas).toHaveLength(1)
+    expect(result.events).toHaveLength(0)
+    expect(result.notes).toHaveLength(0)
+    expect(result.version).toBe(1)
+    expect(typeof result.exportedAt).toBe('string')
+  })
+
+  it('returns error string when db throws', async () => {
+    mockPrepare.mockImplementationOnce(() => {
+      throw new Error('export db error')
+    })
+    const handler = getHandler('task-vault:vault:export-json')
+    const result = await handler({}, undefined)
+    expect(result).toMatchObject({ error: expect.stringContaining('export db error') })
+  })
+})
+
+// ── vault:import-json ─────────────────────────────────────────────────────────
+
+describe('task-vault:vault:import-json', () => {
+  const now = new Date().toISOString()
+
+  it('imports all table types and returns imported count', async () => {
+    const importData = {
+      version: 1,
+      tasks: [
+        {
+          id: 't1',
+          text: 'Task',
+          status: 'open',
+          source: 'inbox',
+          created_at: now,
+          updated_at: now,
+        },
+      ],
+      projects: [{ id: 'p1', name: 'Project', status: 'active', created_at: now, updated_at: now }],
+      areas: [{ id: 'a1', name: 'Work', created_at: now }],
+      events: [{ id: 'e1', date: '2026-05-22', text: 'Meeting', created_at: now }],
+      notes: [{ id: 'n1', date: '2026-05-22', text: 'Note text', created_at: now }],
+    }
+    const handler = getHandler('task-vault:vault:import-json')
+    const result = (await handler({}, importData)) as { success: boolean; imported: number }
+    expect(result.success).toBe(true)
+    expect(result.imported).toBe(5)
+  })
+
+  it('imports tasks only when other arrays absent', async () => {
+    const importData = {
+      tasks: [
+        {
+          id: 't1',
+          text: 'Task',
+          status: 'open',
+          source: 'inbox',
+          created_at: now,
+          updated_at: now,
+        },
+      ],
+    }
+    const handler = getHandler('task-vault:vault:import-json')
+    const result = (await handler({}, importData)) as { success: boolean; imported: number }
+    expect(result.success).toBe(true)
+    expect(result.imported).toBe(1)
+  })
+
+  it('returns INVALID_PAYLOAD for null payload', async () => {
+    const handler = getHandler('task-vault:vault:import-json')
+    const result = await handler({}, null)
+    expect(result).toMatchObject({ error: 'INVALID_PAYLOAD' })
+  })
+
+  it('returns INVALID_PAYLOAD for non-object payload', async () => {
+    const handler = getHandler('task-vault:vault:import-json')
+    const result = await handler({}, 'not-an-object')
+    expect(result).toMatchObject({ error: 'INVALID_PAYLOAD' })
+  })
+
+  it('returns error string when db throws during import', async () => {
+    mockPrepare.mockImplementationOnce(() => {
+      throw new Error('import db error')
+    })
+    const handler = getHandler('task-vault:vault:import-json')
+    const result = await handler({}, { areas: [{ id: 'a1', name: 'Work', created_at: now }] })
+    expect(result).toMatchObject({ error: expect.stringContaining('import db error') })
+  })
+
+  it('handles empty import payload gracefully', async () => {
+    const handler = getHandler('task-vault:vault:import-json')
+    const result = (await handler({}, {})) as { success: boolean; imported: number }
+    expect(result.success).toBe(true)
+    expect(result.imported).toBe(0)
   })
 })
 

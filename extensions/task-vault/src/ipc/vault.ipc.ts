@@ -808,84 +808,81 @@ export function registerVaultIpcHandlers(): () => void {
       const db = getDb()
       let imported = 0
 
-      const txn = db.transaction(() => {
-        if (Array.isArray(data.areas)) {
-          const stmt = db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`)
-          for (const a of data.areas) {
-            stmt.run(a.id, a.name, a.created_at)
-            imported++
-          }
+      if (Array.isArray(data.areas)) {
+        const stmt = db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`)
+        for (const a of data.areas) {
+          stmt.run(a.id, a.name, a.created_at)
+          imported++
         }
-        if (Array.isArray(data.projects)) {
-          const stmt = db.prepare(
-            `INSERT OR IGNORE INTO projects (id,name,status,area,deadline,outcome,terminator_links,created_at,updated_at)
-             VALUES (?,?,?,?,?,?,?,?,?)`
+      }
+      if (Array.isArray(data.projects)) {
+        const stmt = db.prepare(
+          `INSERT OR IGNORE INTO projects (id,name,status,area,deadline,outcome,terminator_links,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?)`
+        )
+        for (const p of data.projects) {
+          stmt.run(
+            p.id,
+            p.name,
+            p.status ?? 'active',
+            p.area ?? null,
+            p.deadline ?? null,
+            p.outcome ?? null,
+            p.terminator_links ?? '[]',
+            p.created_at,
+            p.updated_at
           )
-          for (const p of data.projects) {
-            stmt.run(
-              p.id,
-              p.name,
-              p.status ?? 'active',
-              p.area ?? null,
-              p.deadline ?? null,
-              p.outcome ?? null,
-              p.terminator_links ?? '[]',
-              p.created_at,
-              p.updated_at
-            )
-            imported++
-          }
+          imported++
         }
-        if (Array.isArray(data.tasks)) {
-          const stmt = db.prepare(
-            `INSERT OR IGNORE INTO tasks
-               (id,text,status,project,context,area,due_date,completed_date,migrated_to,
-                source,source_ref,parent_id,sort_order,metadata,terminator_links,created_at,updated_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      }
+      if (Array.isArray(data.tasks)) {
+        const stmt = db.prepare(
+          `INSERT OR IGNORE INTO tasks
+             (id,text,status,project,context,area,due_date,completed_date,migrated_to,
+              source,source_ref,parent_id,sort_order,metadata,terminator_links,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+        )
+        for (const t of data.tasks) {
+          stmt.run(
+            t.id,
+            t.text,
+            t.status ?? 'open',
+            t.project ?? null,
+            t.context ?? null,
+            t.area ?? null,
+            t.due_date ?? null,
+            t.completed_date ?? null,
+            t.migrated_to ?? null,
+            t.source ?? 'inbox',
+            t.source_ref ?? null,
+            t.parent_id ?? null,
+            t.sort_order ?? 0,
+            t.metadata ?? '{}',
+            t.terminator_links ?? '[]',
+            t.created_at,
+            t.updated_at
           )
-          for (const t of data.tasks) {
-            stmt.run(
-              t.id,
-              t.text,
-              t.status ?? 'open',
-              t.project ?? null,
-              t.context ?? null,
-              t.area ?? null,
-              t.due_date ?? null,
-              t.completed_date ?? null,
-              t.migrated_to ?? null,
-              t.source ?? 'inbox',
-              t.source_ref ?? null,
-              t.parent_id ?? null,
-              t.sort_order ?? 0,
-              t.metadata ?? '{}',
-              t.terminator_links ?? '[]',
-              t.created_at,
-              t.updated_at
-            )
-            imported++
-          }
+          imported++
         }
-        if (Array.isArray(data.events)) {
-          const stmt = db.prepare(
-            `INSERT OR IGNORE INTO events (id,date,time,text,created_at) VALUES (?,?,?,?,?)`
-          )
-          for (const e of data.events) {
-            stmt.run(e.id, e.date, e.time ?? null, e.text, e.created_at)
-            imported++
-          }
+      }
+      if (Array.isArray(data.events)) {
+        const stmt = db.prepare(
+          `INSERT OR IGNORE INTO events (id,date,time,text,created_at) VALUES (?,?,?,?,?)`
+        )
+        for (const e of data.events) {
+          stmt.run(e.id, e.date, e.time ?? null, e.text, e.created_at)
+          imported++
         }
-        if (Array.isArray(data.notes)) {
-          const stmt = db.prepare(
-            `INSERT OR IGNORE INTO notes (id,date,text,created_at) VALUES (?,?,?,?)`
-          )
-          for (const n of data.notes) {
-            stmt.run(n.id, n.date, n.text, n.created_at)
-            imported++
-          }
+      }
+      if (Array.isArray(data.notes)) {
+        const stmt = db.prepare(
+          `INSERT OR IGNORE INTO notes (id,date,text,created_at) VALUES (?,?,?,?)`
+        )
+        for (const n of data.notes) {
+          stmt.run(n.id, n.date, n.text, n.created_at)
+          imported++
         }
-      })
-      txn()
+      }
       return { success: true, imported }
     } catch (err) {
       return { error: String(err) }
