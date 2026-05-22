@@ -738,11 +738,14 @@ Opens a file or directory in the OS default application.
 
 ### `window:open-pr-review`
 
-Creates a new focused BrowserWindow pre-loaded with the Code Reviews view for the given repo.
+Creates a new focused BrowserWindow pre-loaded with the Code Reviews view for the given repo. When `prNumber` is supplied the window auto-navigates to that PR on mount, skipping the queue screen.
 
 **Direction**: renderer → main (invoke/handle)
 
-**Request**: `{ repoRoot: string }`
+**Request**: `{ repoRoot: string; accentColor?: string; prNumber?: string; showOverview?: string }`
+
+- `prNumber` — optional stringified PR number; when present the popout restores directly to that PR
+- `showOverview` — `"true"` | `"false"` (default `"false"`); whether to land on the overview panel vs. the diff view
 
 **Response**: `void`
 
@@ -781,6 +784,44 @@ Returns churn, blast radius (actual code importers only — not prose), test fil
 **Request**: `{ repoRoot: string; path: string }`
 
 **Response**: `{ churn90d: number; blastRadius: number; topImporters: string[]; importerCount: number; testFilePresent: boolean; patchCoverage: number | null } | { error: string }`
+
+---
+
+### `github:active-reviews-for-repo`
+
+Returns all PRs that the user has opened a review session for in the given repo (stored in `pr-active-reviews` electron-store). Used to surface orphan in-progress PRs that are no longer in the paginated queue.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string }`
+
+**Response**: `{ prs: ReviewQueuePR[] } | { error: string }`
+
+---
+
+### `github:remove-active-review`
+
+Removes a single PR from the `pr-active-reviews` store, effectively dismissing it from the in-progress section.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string; prNumber: number }`
+
+**Response**: `{ ok: true } | { error: string }`
+
+---
+
+### `github:prune-active-reviews`
+
+Batch-checks the current GitHub state of the given PR numbers via `gh pr view --json state`. PRs confirmed closed or merged are deleted from `pr-active-reviews` automatically. Returns only the numbers that are still OPEN.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string; prNumbers: number[] }`
+
+**Response**: `{ openNumbers: number[] } | { error: string }`
+
+Used on queue load to prevent closed/merged PRs from appearing as in-progress orphans.
 
 ---
 

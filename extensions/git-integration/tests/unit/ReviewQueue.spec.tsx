@@ -56,6 +56,7 @@ const defaultProps = {
   onOpenPr: vi.fn(),
   onRefresh: vi.fn().mockResolvedValue(undefined),
   onLoadMore: vi.fn().mockResolvedValue(undefined),
+  onDismissPr: vi.fn().mockResolvedValue(undefined),
   includeClosedPrs: false,
   onToggleClosedPrs: vi.fn().mockResolvedValue(undefined),
 }

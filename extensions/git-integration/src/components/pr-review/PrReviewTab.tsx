@@ -20,6 +20,7 @@ export function PrReviewTab({ repoRoot }: Props) {
     initSession,
     reset,
     markPrInProgress,
+    dismissPr,
     nextPrCursor,
     includeClosedPrs,
     setIncludeClosedPrs,
@@ -135,6 +136,15 @@ export function PrReviewTab({ repoRoot }: Props) {
     if (repoRoot) void loadQueue({ search: undefined })
   }
 
+  const handleDismissPr = useCallback(
+    async (prNumber: number) => {
+      if (!repoRoot) return
+      dismissPr(prNumber)
+      await githubAPI.removeActiveReview(repoRoot, prNumber)
+    },
+    [repoRoot, dismissPr]
+  )
+
   const handleRefreshPr = async () => {
     if (!activePr) return
     await loadPrDetail(activePr.number, async (detail) => {
@@ -228,6 +238,7 @@ export function PrReviewTab({ repoRoot }: Props) {
         onOpenPr={handleOpenPr}
         onRefresh={handleRefreshQueue}
         onLoadMore={handleLoadMore}
+        onDismissPr={handleDismissPr}
         includeClosedPrs={includeClosedPrs}
         onToggleClosedPrs={handleToggleClosed}
       />

@@ -39,4 +39,10 @@ export const githubAPI = {
 
   activeReviewsForRepo: (repoRoot: string) =>
     bridge().invoke('github:active-reviews-for-repo', { repoRoot }),
+
+  removeActiveReview: (repoRoot: string, prNumber: number) =>
+    bridge().invoke('github:remove-active-review', { repoRoot, prNumber }),
+
+  pruneActiveReviews: (repoRoot: string, prNumbers: number[]) =>
+    bridge().invoke('github:prune-active-reviews', { repoRoot, prNumbers }),
 }

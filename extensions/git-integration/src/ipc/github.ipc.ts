@@ -537,6 +537,60 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
       return { error: String(e) }
     }
   })
+
+  // Remove a single active-review entry (used when user dismisses an in-progress PR or
+  // when a PR is confirmed closed/merged).
+  register('github:remove-active-review', (payload) => {
+    const schema = z.object({ repoRoot: z.string().min(1), prNumber: z.number().int().positive() })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    try {
+      const key = `${parsed.data.repoRoot}:${parsed.data.prNumber}`
+      activeReviewStore.delete(key)
+      return { ok: true as const }
+    } catch (e) {
+      return { error: String(e) }
+    }
+  })
+
+  // Check all supplied orphan PR numbers against GitHub and remove any that are
+  // now CLOSED or MERGED from the active-review store.
+  // Returns the subset of prNumbers that are still OPEN.
+  register('github:prune-active-reviews', async (payload) => {
+    const schema = z.object({
+      repoRoot: z.string().min(1),
+      prNumbers: z.array(z.number().int().positive()),
+    })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repoRoot, prNumbers } = parsed.data
+    if (prNumbers.length === 0) return { openNumbers: [] }
+    try {
+      const results = await Promise.allSettled(
+        prNumbers.map(async (num) => {
+          const raw = await gh(repoRoot, ['pr', 'view', String(num), '--json', 'number,state'])
+          const data = JSON.parse(raw) as { number: number; state: string }
+          return { number: data.number, state: data.state }
+        })
+      )
+      const openNumbers: number[] = []
+      for (const r of results) {
+        if (r.status === 'fulfilled') {
+          const { number: num, state } = r.value
+          if (state === 'OPEN') {
+            openNumbers.push(num)
+          } else {
+            // PR is CLOSED or MERGED — clean up the persisted snapshot
+            const key = `${repoRoot}:${num}`
+            activeReviewStore.delete(key)
+          }
+        }
+      }
+      return { openNumbers }
+    } catch (e) {
+      return catchError(e)
+    }
+  })
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────

@@ -80,6 +80,7 @@ interface PrReviewStore {
   setRateLimitState(state: RateLimitState | null): void
 
   markPrInProgress(prNumber: number): void
+  dismissPr(prNumber: number): void
 
   initSession(session: ReviewSession): void
   reset(): void
@@ -267,6 +268,11 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
           ? { ...pr, sessionStatus: 'in-progress' }
           : pr
       ),
+    })),
+
+  dismissPr: (prNumber) =>
+    set((state) => ({
+      prQueue: state.prQueue.filter((pr) => pr.number !== prNumber),
     })),
 
   initSession: (session) => {
