@@ -1,0 +1,67 @@
+extensions/speckit-pilot/tests/state/state-persistence.spec.ts
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 1-226
+extensions/git-integration/tests/unit/usePrReview.spec.tsx
+  s_ec1e9bc361504e::t_46fbf167c71a26 72
+  s_8bd40778193d7c::t_5f393abd49143e 559,590,598,604,620
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 1,96-103,122-125,405-558,560-589,591-597,599-603,605-619,621-898
+tests/unit/renderer/hooks/useTerminalSession.spec.tsx
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 13-15,19-21,97-194
+extensions/git-integration/tests/unit/github-ipc.spec.ts
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 267-826
+tests/unit/renderer/components/BranchSwitcher.spec.tsx
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 173-260
+tests/unit/renderer/components/WorkspaceItem.spec.tsx
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 183-268
+tests/unit/renderer/components/CreateWorkspaceDialog.spec.tsx
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 96-160
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 24,75-210
+extensions/git-integration/tests/unit/pr-review-service.spec.ts
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 2-8,10,134-698
+tests/unit/renderer/components/Sidebar.spec.tsx
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 86-103
+tests/unit/renderer/components/WorkspaceSettings.spec.tsx
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 108-176
+tests/unit/renderer/extensions/loader.spec.ts
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 1-147
+extensions/git-integration/tests/unit/git-ipc-extra.spec.ts
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 1-182
+extensions/git-integration/tests/unit/useResizePanel.spec.tsx
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 1-155
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 237-572
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 120-150
+tests/unit/renderer/components/EditWorkspaceDialog.spec.tsx
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 81-154
+tests/unit/renderer/components/ProjectsPanel.spec.tsx
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 228-410
+tests/unit/schemas/settings.schema.spec.ts
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 1-248
+extensions/git-integration/tests/unit/gh-service.spec.ts
+  s_ec1e9bc361504e::t_f5b1d07b5a4411 134-210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "1529afaff327e3db62a566ab82649165b3ea2a72",
+  "prompts": {},
+  "sessions": {
+    "s_8bd40778193d7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "384de120-903a-4d7f-837a-8f00d400649a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_ec1e9bc361504e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2bba96d5-0273-42ac-ad58-a9271753d5e0",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
