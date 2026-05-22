@@ -97,7 +97,7 @@ export function ReviewDiffPane({
       })
       .catch((e) => setDiffError(String(e)))
       .finally(() => setDiffLoading(false))
-  }, [file.path, file.isBinary, repoRoot, pr.number])
+  }, [file.path, file.isBinary, repoRoot, pr.number, pr.headSHA])
 
   // Feed complexity delta into the risk score whenever the diff changes.
   // Runs independently so it doesn't trigger a diff reload.

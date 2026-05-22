@@ -50,15 +50,22 @@ vi.mock('../../src/components/pr-review/PrReviewView', () => ({
     onClose,
     onRefresh,
     onShowOverview,
+    onPopOut,
   }: {
     onClose: () => void
     onRefresh: () => void
     onShowOverview?: () => void
+    onPopOut?: () => void
   }) => (
     <div data-testid="pr-review-view">
       <button onClick={onClose}>Close PR</button>
       <button onClick={onRefresh}>Refresh PR</button>
       {onShowOverview && <button onClick={onShowOverview}>Show Overview</button>}
+      {onPopOut && (
+        <button onClick={onPopOut} title="Open in focused window">
+          Pop out
+        </button>
+      )}
     </div>
   ),
 }))
@@ -158,7 +165,29 @@ describe('PrReviewTab', () => {
   it('calls extensionBridge.invoke with window:open-pr-review when pop out button is clicked', () => {
     render(<PrReviewTab repoRoot="/repo" />)
     fireEvent.click(screen.getByTitle('Open in new window'))
-    expect(mockInvoke).toHaveBeenCalledWith('window:open-pr-review', { repoRoot: '/repo' })
+    expect(mockInvoke).toHaveBeenCalledWith(
+      'window:open-pr-review',
+      expect.objectContaining({ repoRoot: '/repo' })
+    )
+  })
+
+  it('includes prNumber and showOverview in popout payload when a PR is active', async () => {
+    const activePr = {
+      number: 42,
+      title: 'Active PR',
+      headSHA: 'sha123',
+    } as unknown as PrReviewDetail
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...defaultStoreState,
+      activePr,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<PrReviewTab repoRoot="/repo" />)
+    // activePr is set + showOverview defaults to false → PrReviewView renders
+    fireEvent.click(screen.getByTitle('Open in focused window'))
+    expect(mockInvoke).toHaveBeenCalledWith(
+      'window:open-pr-review',
+      expect.objectContaining({ repoRoot: '/repo', prNumber: '42', showOverview: 'false' })
+    )
   })
 
   it('closes PR view and persists paused session when onClose is called', async () => {

@@ -144,9 +144,38 @@ export function PrReviewTab({ repoRoot }: Props) {
   }
 
   const handlePopOut = () => {
-    if (repoRoot)
-      void window.electronAPI.extensionBridge.invoke('window:open-pr-review', { repoRoot })
+    if (!repoRoot) return
+    const params: Record<string, string> = { repoRoot }
+    if (activePr) {
+      params.prNumber = String(activePr.number)
+      params.showOverview = showOverview ? 'true' : 'false'
+    }
+    void window.electronAPI.extensionBridge.invoke('window:open-pr-review', params)
   }
+
+  // Auto-open the active PR when the popout window is initialized with a prNumber URL param
+  useEffect(() => {
+    if (!isPopoutWindow || !repoRoot) return
+    const urlParams = new URLSearchParams(window.location.search)
+    const prNumberParam = urlParams.get('prNumber')
+    if (!prNumberParam) return
+    const prNumber = parseInt(prNumberParam, 10)
+    if (isNaN(prNumber)) return
+    const shouldShowOverview = urlParams.get('showOverview') === 'true'
+    loadPrDetail(prNumber, async (detail) => {
+      const key = `${repoRoot}:::${prNumber}:::${detail.headSHA}`
+      const result = await githubAPI.sessionGet(key)
+      const raw = (result as { session: unknown }).session
+      if (raw) {
+        const parsed = ReviewSessionSchema.safeParse(raw)
+        if (parsed.success) initSession(parsed.data)
+      }
+      setActivePr(detail)
+      setShowOverview(shouldShowOverview)
+      fetchFileMetrics(detail)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   if (!repoRoot) {
     return (

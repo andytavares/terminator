@@ -184,6 +184,82 @@ describe('useLoadPrQueue', () => {
     expect(mockSetQueue).not.toHaveBeenCalled()
   })
 
+  it('excludes orphan PRs from activeReviews when hasMore is false (all pages loaded)', async () => {
+    const orphanPr = {
+      number: 99,
+      title: 'Orphan PR',
+      author: 'bob',
+      authorAvatarUrl: '',
+      openedAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat',
+      baseRefName: 'main',
+      isDraft: false,
+      ciStatus: 'none',
+      fileCount: 1,
+      additions: 5,
+      deletions: 2,
+      estimatedMinutes: 5,
+      riskLevel: 'low',
+      signalDots: {
+        tests: 'unknown',
+        coverage: 'unknown',
+        ci: 'unknown',
+        lint: 'unknown',
+        churn: 'unknown',
+        blast: 'unknown',
+      },
+      sessionStatus: 'in-progress',
+      viewedFileCount: 1,
+    }
+    mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: false })
+    mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
+    mockActiveReviewsForRepoAPI.mockResolvedValue({ prs: [orphanPr] })
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
+    expect(queue.find((p: { number: number }) => p.number === 99)).toBeUndefined()
+  })
+
+  it('includes orphan PRs from activeReviews when hasMore is true', async () => {
+    const orphanPr = {
+      number: 99,
+      title: 'Orphan PR',
+      author: 'bob',
+      authorAvatarUrl: '',
+      openedAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat',
+      baseRefName: 'main',
+      isDraft: false,
+      ciStatus: 'none',
+      fileCount: 1,
+      additions: 5,
+      deletions: 2,
+      estimatedMinutes: 5,
+      riskLevel: 'low',
+      signalDots: {
+        tests: 'unknown',
+        coverage: 'unknown',
+        ci: 'unknown',
+        lint: 'unknown',
+        churn: 'unknown',
+        blast: 'unknown',
+      },
+      sessionStatus: 'in-progress',
+      viewedFileCount: 1,
+    }
+    mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: true, nextCursor: 'cursor-1' })
+    mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
+    mockActiveReviewsForRepoAPI.mockResolvedValue({ prs: [orphanPr] })
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
+    expect(queue.find((p: { number: number }) => p.number === 99)).toBeDefined()
+  })
+
   it('sets hasMorePrs and nextCursor from response', async () => {
     mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: true, nextCursor: 'cursor-abc' })
     const { result } = renderHook(() => useLoadPrQueue('/repo'))
