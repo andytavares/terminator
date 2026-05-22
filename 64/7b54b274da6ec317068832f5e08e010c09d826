@@ -1,0 +1,47 @@
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_63a57c0f0c6253::t_f9d0e7f4da52b7 549,552
+  s_63a57c0f0c6253::t_32407ecc2fdd87 631,644-662,664-678,682-683
+  s_63a57c0f0c6253::t_65cf5f131bf20a 165-186,205-206,228
+  s_63a57c0f0c6253::t_7cda14529e1a85 187-204
+  s_63a57c0f0c6253::t_5e1fe18e3cee37 426-433
+  s_63a57c0f0c6253::t_cc3ae47412e9c0 770-894
+extensions/task-vault/src/components/AreasView.tsx
+  s_63a57c0f0c6253::t_9a6de5e75005cc 176-180,193-211
+  s_63a57c0f0c6253::t_0fe3b725311100 453-477
+  s_63a57c0f0c6253::t_940bd3c97eed71 7-16,23
+extensions/task-vault/src/components/ProjectsBrowser.tsx
+  s_63a57c0f0c6253::t_98f93320dea1f9 295-298,316-371,389-392,404-425,433-496,501,508-523
+  s_63a57c0f0c6253::t_8d3593068f814f 2
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_63a57c0f0c6253::t_f76a4eecdc440d 285,287-291
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_63a57c0f0c6253::t_4538be648da7f4 1-2
+  s_63a57c0f0c6253::t_0031f00c77bbf8 86-193,195-206,208-210
+  s_63a57c0f0c6253::t_08ee206539d6ef 253,256-264,270-283
+extensions/task-vault/src/components/InboxProcessor.tsx
+  s_63a57c0f0c6253::t_2a70965b59ac4a 19,22-38
+extensions/task-vault/src/stores/vault.store.ts
+  s_63a57c0f0c6253::t_9e2f529c0ea1d1 16
+  s_63a57c0f0c6253::t_1ecd3f695ad139 36
+  s_63a57c0f0c6253::t_36c0fdea6299fd 58-59
+extensions/task-vault/src/components/task-vault.css
+  s_63a57c0f0c6253::t_b7a7fa3d49cf4d 4615-4770
+scripts/check-patch-coverage.cjs
+  s_63a57c0f0c6253::t_bcdc5dee7b594b 17-40,56-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "647b54b274da6ec317068832f5e08e010c09d826",
+  "prompts": {},
+  "sessions": {
+    "s_63a57c0f0c6253": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "27d40b37-f0d3-4fbf-90b3-c10414d80f29",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
