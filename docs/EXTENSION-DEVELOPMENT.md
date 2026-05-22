@@ -2,7 +2,7 @@
 
 Extensions let you add functionality to Terminator without touching its core code. They contribute to the application through the `ExtensionAPI` — a stable, versioned interface. This guide covers everything you need to write, test, and distribute an extension.
 
-**Current API version**: 1.1.0
+**Current API version**: 1.2.0
 
 ---
 
