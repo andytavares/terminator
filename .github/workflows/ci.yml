@@ -224,3 +224,5 @@ jobs:
           package-type: 'npm'
           min-versions-to-keep: 5
           delete-only-pre-release-versions: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          owner: ${{ github.repository_owner }}
