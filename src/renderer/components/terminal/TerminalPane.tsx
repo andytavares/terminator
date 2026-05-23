@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useRef } from 'react'
 import { useSessionStore } from '../../stores/session.store'
 import type { TerminalInstance } from './TerminalSession'
 import './TerminalPane.css'
@@ -38,6 +38,19 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     prevSessionIdRef.current = nextId
   }, [activeSessionId, getTerminalInstance])
 
+  const scrollActiveToBottom = useCallback(() => {
+    if (activeSessionId) {
+      const instance = getTerminalInstance(activeSessionId) as TerminalInstance | undefined
+      instance?.terminal.scrollToBottom()
+      instance?.terminal.focus()
+    }
+  }, [activeSessionId, getTerminalInstance])
+
+  useEffect(() => {
+    window.addEventListener('focus', scrollActiveToBottom)
+    return () => window.removeEventListener('focus', scrollActiveToBottom)
+  }, [scrollActiveToBottom])
+
   if (sessions.length === 0) {
     return (
       <div className="terminal-pane terminal-pane--empty">
@@ -47,10 +60,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
   }
 
   function handleClick(): void {
-    if (activeSessionId) {
-      const instance = getTerminalInstance(activeSessionId) as TerminalInstance | undefined
-      instance?.terminal.focus()
-    }
+    scrollActiveToBottom()
   }
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {

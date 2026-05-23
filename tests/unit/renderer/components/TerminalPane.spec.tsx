@@ -64,10 +64,11 @@ describe('TerminalPane', () => {
 
   it('calls terminal focus when pane is clicked with an active session', () => {
     const mockFocus = vi.fn()
+    const mockScrollToBottom = vi.fn()
     mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
     mockGetActive.mockReturnValue('ses-1')
     mockGetInstance.mockReturnValue({
-      terminal: { focus: mockFocus },
+      terminal: { focus: mockFocus, scrollToBottom: mockScrollToBottom },
       mount: vi.fn(),
       unmount: vi.fn(),
     })
@@ -158,8 +159,16 @@ describe('TerminalPane', () => {
     mockGetActive.mockReturnValue('ses-1')
     mockGetInstance.mockImplementation((id: string) => {
       if (id === 'ses-1')
-        return { terminal: { focus: vi.fn() }, mount: mockMount, unmount: mockUnmount }
-      return { terminal: { focus: vi.fn() }, mount: mockMount, unmount: mockUnmount }
+        return {
+          terminal: { focus: vi.fn(), scrollToBottom: vi.fn() },
+          mount: mockMount,
+          unmount: mockUnmount,
+        }
+      return {
+        terminal: { focus: vi.fn(), scrollToBottom: vi.fn() },
+        mount: mockMount,
+        unmount: mockUnmount,
+      }
     })
     const { rerender } = render(<TerminalPane projectId="proj-1" />)
     mockGetActive.mockReturnValue('ses-2')
