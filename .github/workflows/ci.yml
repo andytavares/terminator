@@ -202,6 +202,7 @@ jobs:
           draft: false
           prerelease: false
           files: dist/*.dmg
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to GitHub Packages
         run: npm publish --access restricted
