@@ -4759,12 +4759,44 @@ h2.daily-log__date {
   opacity: 1;
 }
 
-.task-vault-view__rollover-banner {
-  margin: 8px 16px 0;
-  padding: 6px 12px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--tm-accent) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--tm-accent) 30%, transparent);
-  font-size: 12px;
+.daily-log__rollover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  margin-bottom: 2px;
+  cursor: pointer;
+  color: color-mix(in srgb, var(--tm-accent) 80%, var(--tm-text-muted));
+  gap: 6px;
+}
+
+.daily-log__rollover-header:hover {
+  color: var(--tm-accent);
+}
+
+.daily-log__rollover-header-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex: 1;
+  text-align: left;
+}
+
+.daily-log__rollover-divider {
+  border: none;
+  border-top: 1px dashed color-mix(in srgb, var(--tm-text-muted) 30%, transparent);
+  margin: 8px 0;
+}
+
+.daily-log__today-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--tm-text-muted);
+  padding: 2px 0 4px;
 }

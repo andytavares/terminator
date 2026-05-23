@@ -3,6 +3,7 @@ import type { Workspace } from '../../../shared/types/index'
 import type { GlobalTabRegistration } from '../../extensions/registry'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
+import { useExtensionRegistry } from '../../extensions/registry'
 import { AlertBadge } from '../AlertBadge'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
@@ -119,6 +120,7 @@ function WorkspaceTile({ workspace }: { workspace: Workspace }): JSX.Element {
 
   function handleClick(): void {
     setActiveWorkspace(workspace.id)
+    useExtensionRegistry.getState().setActiveGlobalTab(null)
   }
 
   function handleContextMenu(e: React.MouseEvent): void {

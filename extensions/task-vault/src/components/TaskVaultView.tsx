@@ -205,8 +205,15 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
 }
 
 export function TaskVaultView(): React.JSX.Element {
-  const { todayLog, activeView, isLoading, error, loadToday, refreshInboxCount, lastRolledOver } =
-    useVaultStore()
+  const {
+    todayLog,
+    activeView,
+    isLoading,
+    error,
+    loadToday,
+    refreshInboxCount,
+    rolledOverTaskIds,
+  } = useVaultStore()
   const [showDataTools, setShowDataTools] = useState(false)
 
   useEffect(() => {
@@ -267,20 +274,13 @@ export function TaskVaultView(): React.JSX.Element {
         )}
         {activeView === 'daily' && error && <div className="task-vault-view__error">{error}</div>}
         {activeView === 'daily' && !isLoading && !error && todayLog && (
-          <>
-            {lastRolledOver > 0 && (
-              <div className="task-vault-view__rollover-banner">
-                {lastRolledOver} unfinished task{lastRolledOver !== 1 ? 's' : ''} carried forward
-                from previous days
-              </div>
-            )}
-            <DailyLog
-              log={todayLog}
-              onTaskComplete={handleComplete}
-              onTaskMigrate={handleMigrate}
-              onRefresh={loadToday}
-            />
-          </>
+          <DailyLog
+            log={todayLog}
+            rolledOverTaskIds={rolledOverTaskIds}
+            onTaskComplete={handleComplete}
+            onTaskMigrate={handleMigrate}
+            onRefresh={loadToday}
+          />
         )}
         {activeView === 'daily' && !isLoading && !error && !todayLog && (
           <div className="task-vault-view__empty">

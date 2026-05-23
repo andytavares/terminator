@@ -14,6 +14,7 @@ interface VaultStore {
   selectedAreaName: string | null
   selectedProjectName: string | null
   lastRolledOver: number
+  rolledOverTaskIds: string[]
   loadToday: () => Promise<void>
   setView: (view: VaultView) => void
   refreshInboxCount: () => Promise<void>
@@ -34,6 +35,7 @@ export const useVaultStore = create<VaultStore>((set, _get) => ({
   selectedAreaName: null,
   selectedProjectName: null,
   lastRolledOver: 0,
+  rolledOverTaskIds: [],
 
   setVaultPath: (p: string) => set({ vaultPath: p }),
 
@@ -55,8 +57,13 @@ export const useVaultStore = create<VaultStore>((set, _get) => ({
         set({ error: (result as { error: string }).error, isLoading: false })
         return
       }
-      const res = result as DailyLog & { rolledOver?: number }
-      set({ todayLog: res, isLoading: false, lastRolledOver: res.rolledOver ?? 0 })
+      const res = result as DailyLog & { rolledOver?: number; rolledOverIds?: string[] }
+      set({
+        todayLog: res,
+        isLoading: false,
+        lastRolledOver: res.rolledOver ?? 0,
+        rolledOverTaskIds: res.rolledOverIds ?? [],
+      })
     } catch (err) {
       set({ error: String(err), isLoading: false })
     }

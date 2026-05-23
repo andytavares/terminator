@@ -173,6 +173,7 @@ export function registerVaultIpcHandlers(): () => void {
         )
         .all(date) as Record<string, unknown>[]
 
+      const rolledOverIds: string[] = []
       if (staleRows.length > 0) {
         const insertStmt = db.prepare(
           `INSERT OR IGNORE INTO tasks (id,text,status,project,context,area,due_date,source,source_ref,created_at,updated_at)
@@ -201,6 +202,7 @@ export function registerVaultIpcHandlers(): () => void {
           )
           migrateStmt.run(date, now, row.id)
           migrateSubStmt.run(date, now, row.id)
+          rolledOverIds.push(newId)
         }
       }
 
@@ -226,6 +228,7 @@ export function registerVaultIpcHandlers(): () => void {
         events,
         notes,
         rolledOver: staleRows.length,
+        rolledOverIds,
         exists:
           tasks.length > 0 || (events as unknown[]).length > 0 || (notes as unknown[]).length > 0,
       }

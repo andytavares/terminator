@@ -11,6 +11,8 @@ import {
   MinusCircle,
   ArrowRightCircle,
   Timer,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import type { DailyLog as DailyLogData, IndexedTask } from '../vault/types'
 import { SmartTaskInput } from './SmartTaskInput'
@@ -20,6 +22,7 @@ import { useExtensionRegistry } from '../../../../src/renderer/extensions/regist
 
 interface DailyLogProps {
   log: DailyLogData
+  rolledOverTaskIds?: string[]
   onTaskComplete: (taskId: string) => Promise<void>
   onTaskMigrate: (taskId: string, targetDate: string) => Promise<void>
   onRefresh: () => Promise<void>
@@ -579,10 +582,13 @@ function AddTaskRow({ onAdd }: { onAdd: (text: string) => Promise<void> }): Reac
 
 export function DailyLog({
   log,
+  rolledOverTaskIds = [],
   onTaskComplete,
   onTaskMigrate,
   onRefresh,
 }: DailyLogProps): React.JSX.Element {
+  const [rolloverExpanded, setRolloverExpanded] = useState(true)
+
   async function handleAddTask(text: string) {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:add-task', {
       filePath: log.filePath,
@@ -590,6 +596,11 @@ export function DailyLog({
     })
     await onRefresh()
   }
+
+  const rolledOverSet = new Set(rolledOverTaskIds)
+  const rolledOverTasks = log.tasks.filter((t) => rolledOverSet.has(t.id))
+  const todayTasks = log.tasks.filter((t) => !rolledOverSet.has(t.id))
+  const hasRolledOver = rolledOverTasks.length > 0
 
   const doneTasks = log.tasks.filter((t) => t.status === 'done').length
   const totalTasks = log.tasks.length
@@ -621,7 +632,40 @@ export function DailyLog({
             />
           </div>
         )}
-        {log.tasks.map((task) => (
+        {hasRolledOver && (
+          <>
+            <button
+              className="daily-log__rollover-header"
+              onClick={() => setRolloverExpanded((v) => !v)}
+            >
+              <span className="daily-log__rollover-header-label">
+                ↩ From previous days ({rolledOverTasks.length})
+              </span>
+              {rolloverExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </button>
+            {rolloverExpanded &&
+              rolledOverTasks.map((task) => (
+                <div key={task.id}>
+                  <TaskRow
+                    task={task as IndexedTask}
+                    onComplete={onTaskComplete}
+                    onMigrate={onTaskMigrate}
+                    onRefresh={onRefresh}
+                  />
+                  {task.subtasks && task.subtasks.length > 0 && (
+                    <div className="daily-log__subtasks">
+                      {task.subtasks.map((st) => (
+                        <SubtaskRow key={st.id} subtask={st as IndexedTask} onRefresh={onRefresh} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            <div className="daily-log__rollover-divider" />
+            <div className="daily-log__today-label">Today</div>
+          </>
+        )}
+        {todayTasks.map((task) => (
           <div key={task.id}>
             <TaskRow
               task={task as IndexedTask}
