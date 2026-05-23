@@ -1,0 +1,38 @@
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_1c7a1c40f29b75::t_04f6ff0fd9eb74 277-283
+  s_1c7a1c40f29b75::t_89a7a055a31759 208-214,216
+extensions/task-vault/src/stores/vault.store.ts
+  s_1c7a1c40f29b75::t_169d67092dc404 38
+  s_1c7a1c40f29b75::t_5eacf301ffb98d 60-66
+  s_1c7a1c40f29b75::t_ee2e796a6df791 17
+extensions/task-vault/src/components/DailyLog.tsx
+  s_1c7a1c40f29b75::t_ba77d6a7b65b08 14-15
+  s_1c7a1c40f29b75::t_66e4b293d55551 25
+  s_1c7a1c40f29b75::t_e26749cafa34d5 585,590-591
+  s_1c7a1c40f29b75::t_ff90b7bae65990 600-604
+  s_1c7a1c40f29b75::t_0157af353f8664 635-668
+src/renderer/components/sidebar/WorkspaceRail.tsx
+  s_1c7a1c40f29b75::t_de64ab3975efcd 6
+  s_1c7a1c40f29b75::t_463fd4dbc81cd7 123
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_1c7a1c40f29b75::t_bc66f63b11dd1e 176,205
+  s_1c7a1c40f29b75::t_6d9f8ddbe16930 231
+extensions/task-vault/src/components/task-vault.css
+  s_1c7a1c40f29b75::t_0cad8a5ef2c199 4762-4799,4801
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "2d79cc266efe0fdeb05a87a22678a433dc99d3a2",
+  "prompts": {},
+  "sessions": {
+    "s_1c7a1c40f29b75": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb9d14de-587c-48fe-a5a0-1f8de87c976a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
