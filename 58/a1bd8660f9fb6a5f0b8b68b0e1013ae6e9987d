@@ -1,0 +1,23 @@
+.github/workflows/ci.yml
+  s_90a3a0f68381b2::t_ed0e180193fab9 187-191,198-202
+.github/workflows/notarize-test.yml
+  s_90a3a0f68381b2::t_d1f2622de9d5e4 14-15,17,19-23,25-28,30-31,33-35,37-39,45-46,50,62,64,67,70-72,78,82,84-87
+electron-builder.yml
+  s_90a3a0f68381b2::t_2a8788e1df3b33 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "58a1bd8660f9fb6a5f0b8b68b0e1013ae6e9987d",
+  "prompts": {},
+  "sessions": {
+    "s_90a3a0f68381b2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8206b459-5f10-4cfd-83b0-fc3afb307a93",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
