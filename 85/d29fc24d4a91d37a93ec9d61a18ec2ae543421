@@ -1,0 +1,19 @@
+electron-builder.yml
+  s_90a3a0f68381b2::t_b4fbd0114ffd8c 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "85d29fc24d4a91d37a93ec9d61a18ec2ae543421",
+  "prompts": {},
+  "sessions": {
+    "s_90a3a0f68381b2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8206b459-5f10-4cfd-83b0-fc3afb307a93",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
