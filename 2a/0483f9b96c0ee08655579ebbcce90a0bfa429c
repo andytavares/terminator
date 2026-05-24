@@ -1,0 +1,19 @@
+.github/workflows/notarize-test.yml
+  s_90a3a0f68381b2::t_6a0fc5441a7868 14,16-21,23,25-30,68,70-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "2a0483f9b96c0ee08655579ebbcce90a0bfa429c",
+  "prompts": {},
+  "sessions": {
+    "s_90a3a0f68381b2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8206b459-5f10-4cfd-83b0-fc3afb307a93",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
