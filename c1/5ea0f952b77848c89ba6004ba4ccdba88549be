@@ -1,0 +1,21 @@
+.github/workflows/ci.yml
+  s_90a3a0f68381b2::t_53321e5eac8e67 192,194-196
+.github/workflows/notarize-test.yml
+  s_90a3a0f68381b2::t_2d0f890921b619 8,14-17,19-22,24-25,27,29-30,32-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "c15ea0f952b77848c89ba6004ba4ccdba88549be",
+  "prompts": {},
+  "sessions": {
+    "s_90a3a0f68381b2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8206b459-5f10-4cfd-83b0-fc3afb307a93",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
