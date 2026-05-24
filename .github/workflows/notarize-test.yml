@@ -1,0 +1,91 @@
+name: Test Notarization
+
+on:
+  workflow_dispatch:
+
+jobs:
+  notarize-test:
+    name: Test signing & notarization credentials
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Import signing certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "$CERTIFICATE_BASE64" | base64 --decode -o $RUNNER_TEMP/cert.p12
+          security import $RUNNER_TEMP/cert.p12 \
+            -k "$KEYCHAIN_PATH" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      - name: Verify certificate imported
+        run: |
+          security find-identity -v -p codesigning "$RUNNER_TEMP/build.keychain"
+
+      - name: Verify notarytool credentials
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          echo "APPLE_ID=${APPLE_ID}"
+          echo "APPLE_TEAM_ID=${APPLE_TEAM_ID}"
+          echo ""
+          echo "--- notarytool history (auth test) ---"
+          xcrun notarytool history \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --output-format json 2>&1
+
+      - name: Sign and notarize minimal app bundle
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # Build a minimal .app bundle to test the full sign + notarize flow
+          APP_PATH=$RUNNER_TEMP/TestApp.app
+          mkdir -p "$APP_PATH/Contents/MacOS"
+          cat > "$APP_PATH/Contents/MacOS/TestApp" <<'SCRIPT'
+          #!/bin/bash
+          echo "hello"
+          SCRIPT
+          chmod +x "$APP_PATH/Contents/MacOS/TestApp"
+          cat > "$APP_PATH/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleIdentifier</key><string>com.terminator.notarizetest</string>
+            <key>CFBundleExecutable</key><string>TestApp</string>
+            <key>CFBundleVersion</key><string>1</string>
+          </dict></plist>
+          PLIST
+
+          IDENTITY=$(security find-identity -v -p codesigning "$RUNNER_TEMP/build.keychain" | grep "Developer ID Application" | head -1 | awk '{print $2}')
+          echo "Signing with identity: $IDENTITY"
+          codesign --force --options runtime --sign "$IDENTITY" --keychain "$RUNNER_TEMP/build.keychain" "$APP_PATH"
+          codesign -vvv --deep --strict "$APP_PATH"
+
+          echo ""
+          echo "--- submitting to notary service ---"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$RUNNER_TEMP/TestApp.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/TestApp.zip" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --output-format json 2>&1
