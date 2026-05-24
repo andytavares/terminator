@@ -213,12 +213,12 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          echo "Testing notarytool authentication..."
+          echo "Testing notarytool authentication (APPLE_ID=${APPLE_ID}, APPLE_TEAM_ID=${APPLE_TEAM_ID})..."
           xcrun notarytool history \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --output-format json 2>&1 | head -20 || true
+            --output-format json 2>&1
 
       - name: Package
         env:
