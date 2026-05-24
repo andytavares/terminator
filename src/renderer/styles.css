@@ -105,9 +105,28 @@ button {
 /* ── Layout ──────────────────────────────────────────────────── */
 .app-layout {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+}
+
+.app-body {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-global-metrics {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+}
+
+.app-global-metrics .metrics-bar {
+  border-bottom: none;
+  border-top: none;
 }
 
 .main-content {

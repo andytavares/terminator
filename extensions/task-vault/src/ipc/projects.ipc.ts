@@ -39,6 +39,9 @@ function rowToTask(row: Record<string, unknown>): IndexedTask {
   }
 }
 
+const PROJECT_COLS = `p.id, p.name, p.status, ar.name AS area, p.deadline, p.outcome, p.terminator_links, p.created_at, p.updated_at`
+const PROJECT_JOINS = `LEFT JOIN areas ar ON p.area_id = ar.id`
+
 function rowToProject(row: Record<string, unknown>): IndexedProject {
   return {
     id: row.id as string,
@@ -80,14 +83,16 @@ export function registerProjectsIpcHandlers(): () => void {
     const db = getDb()
     const placeholders = statusFilter.map(() => '?').join(',')
     const rows = db
-      .prepare(`SELECT * FROM projects WHERE status IN (${placeholders}) ORDER BY name`)
+      .prepare(
+        `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status IN (${placeholders}) ORDER BY p.name`
+      )
       .all(...statusFilter) as Record<string, unknown>[]
 
     const projects = rows.map((p) => {
       const nextActionCount = (
         db
-          .prepare(`SELECT COUNT(*) as c FROM tasks WHERE project=? AND status='open'`)
-          .get(p.name) as { c: number }
+          .prepare(`SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND status='open'`)
+          .get(p.id) as { c: number }
       ).c
       const isStale = nextActionCount === 0
       return { ...rowToProject(p), nextActionCount, isStale }
@@ -105,24 +110,22 @@ export function registerProjectsIpcHandlers(): () => void {
       .all() as Record<string, unknown>[]
     const inboxItems = inboxRows.map(rowToTask)
 
-    const activeRows = db.prepare(`SELECT * FROM projects WHERE status='active'`).all() as Record<
-      string,
-      unknown
-    >[]
+    const activeRows = db
+      .prepare(`SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status='active'`)
+      .all() as Record<string, unknown>[]
     const activeProjects = activeRows.map((p) => {
       const nextActionCount = (
         db
-          .prepare(`SELECT COUNT(*) as c FROM tasks WHERE project=? AND status='open'`)
-          .get(p.name) as { c: number }
+          .prepare(`SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND status='open'`)
+          .get(p.id) as { c: number }
       ).c
       return { ...rowToProject(p), nextActionCount, isStale: nextActionCount === 0 }
     })
     const staleProjects = activeProjects.filter((p) => p.isStale)
 
-    const somedayRows = db.prepare(`SELECT * FROM projects WHERE status='someday'`).all() as Record<
-      string,
-      unknown
-    >[]
+    const somedayRows = db
+      .prepare(`SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status='someday'`)
+      .all() as Record<string, unknown>[]
     const somedayProjects = somedayRows.map(rowToProject)
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -151,18 +154,26 @@ export function registerProjectsIpcHandlers(): () => void {
     const existing = db.prepare(`SELECT id FROM projects WHERE name=?`).get(name)
     if (existing) return { error: 'PROJECT_EXISTS' }
     const now = new Date().toISOString()
-    db.prepare(
-      `INSERT INTO projects (id,name,status,area,deadline,outcome,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?)`
-    ).run(randomUUID(), name, 'active', area ?? null, deadline ?? null, outcome ?? null, now, now)
-    // Ensure area record exists
+    let areaId: string | null = null
     if (area) {
-      db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
-        randomUUID(),
-        area,
-        now
-      )
+      const existingArea = db.prepare(`SELECT id FROM areas WHERE name=?`).get(area) as
+        | { id: string }
+        | undefined
+      if (existingArea) {
+        areaId = existingArea.id
+      } else {
+        areaId = randomUUID()
+        db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
+          areaId,
+          area,
+          now
+        )
+      }
     }
+    db.prepare(
+      `INSERT INTO projects (id,name,status,area_id,deadline,outcome,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?)`
+    ).run(randomUUID(), name, 'active', areaId, deadline ?? null, outcome ?? null, now, now)
     return { success: true, filePath: name }
   })
 
@@ -174,9 +185,8 @@ export function registerProjectsIpcHandlers(): () => void {
     // projectFilePath is now the project name
     const { projectFilePath: projectName } = parsed.data
     const db = getDb()
+    // FK ON DELETE SET NULL handles tasks.project_id automatically
     db.prepare(`DELETE FROM projects WHERE name=?`).run(projectName)
-    // Orphan tasks — remove project tag instead of deleting
-    db.prepare(`UPDATE tasks SET project=NULL WHERE project=?`).run(projectName)
     return { success: true }
   })
 
@@ -210,18 +220,27 @@ export function registerProjectsIpcHandlers(): () => void {
     if (!projectName) return { error: 'VALIDATION_ERROR' }
     const db = getDb()
     const now = new Date().toISOString()
-    db.prepare(`UPDATE projects SET area=?, updated_at=? WHERE name=?`).run(
-      area ?? null,
+    let areaId: string | null = null
+    if (area) {
+      const existingArea = db.prepare(`SELECT id FROM areas WHERE name=?`).get(area) as
+        | { id: string }
+        | undefined
+      if (existingArea) {
+        areaId = existingArea.id
+      } else {
+        areaId = randomUUID()
+        db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
+          areaId,
+          area,
+          now
+        )
+      }
+    }
+    db.prepare(`UPDATE projects SET area_id=?, updated_at=? WHERE name=?`).run(
+      areaId,
       now,
       projectName
     )
-    if (area) {
-      db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
-        randomUUID(),
-        area,
-        now
-      )
-    }
     return { success: true }
   })
 

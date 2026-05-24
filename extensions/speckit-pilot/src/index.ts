@@ -375,6 +375,59 @@ export function activate(api: ExtensionAPI): void {
     }
   })
 
+  // speckit:phase-skip — mark a phase as intentionally skipped
+  reg(api, 'speckit:phase-skip', async (payload: unknown) => {
+    const { featureDir, phase, note } = payload as {
+      featureDir: string
+      phase: PhaseId
+      note?: string
+    }
+    if (!featureDir || !phase) return { error: 'featureDir and phase required' }
+    let state = await readPilotState(featureDir)
+    if (!state) state = createPilotState(featureDir)
+    const ps = state.phases[phase]
+    if (!ps) return { error: `Unknown phase: ${phase}` }
+    ps.status = 'skipped'
+    ps.approvedAt = null
+    ps.approvedBy = null
+    ps.approvedHash = null
+    await writePilotState(featureDir, state)
+    await appendHistory(featureDir, {
+      ts: new Date().toISOString(),
+      actor: 'user',
+      action: 'skipped',
+      phase,
+      note,
+    })
+    broadcastStateChanged(state)
+    return { state }
+  })
+
+  // speckit:phase-unskip — restore a skipped phase back to ready
+  reg(api, 'speckit:phase-unskip', async (payload: unknown) => {
+    const { featureDir, phase, note } = payload as {
+      featureDir: string
+      phase: PhaseId
+      note?: string
+    }
+    if (!featureDir || !phase) return { error: 'featureDir and phase required' }
+    let state = await readPilotState(featureDir)
+    if (!state) state = createPilotState(featureDir)
+    const ps = state.phases[phase]
+    if (!ps) return { error: `Unknown phase: ${phase}` }
+    ps.status = 'ready'
+    await writePilotState(featureDir, state)
+    await appendHistory(featureDir, {
+      ts: new Date().toISOString(),
+      actor: 'user',
+      action: 'unskipped',
+      phase,
+      note,
+    })
+    broadcastStateChanged(state)
+    return { state }
+  })
+
   // speckit:implement-file-decision — approve or skip a pending file write
   reg(api, 'speckit:implement-file-decision', async (payload: unknown) => {
     const { filePath, decision, featureDir, repoRoot } = payload as {

@@ -16,12 +16,20 @@ vi.mock('../../../../src/renderer/extensions/registry', () => ({
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
   useTerminalSession: vi.fn(),
 }))
+vi.mock('../../../../src/renderer/stores/toast.store', () => ({
+  useToastStore: vi.fn(() => ({ addToast: vi.fn() })),
+}))
 
 const mockSetActiveWorkspace = vi.fn()
 const mockGetActiveSessionForProject = vi.fn().mockReturnValue(null)
 const mockSetActiveSessionForProject = vi.fn()
 const mockGetSessionsForProject = vi.fn().mockReturnValue([])
 const mockCreateSession = vi.fn().mockResolvedValue('session-id')
+const mockSplitSession = vi.fn().mockResolvedValue(undefined)
+const mockGetPaneLayout = vi.fn().mockReturnValue(null)
+const mockGetFocusedSession = vi.fn().mockReturnValue(null)
+const mockCloseSplitLeaf = vi.fn()
+const mockCloseSession = vi.fn().mockResolvedValue(undefined)
 const mockResolveSettings = vi.fn().mockReturnValue({ terminal: { scrollbackLimit: 5000 } })
 const { matchesAccelerator } = await import('../../../../src/renderer/extensions/registry')
 
@@ -48,6 +56,10 @@ function setupMocks(
     getActiveSessionForProject: mockGetActiveSessionForProject,
     setActiveSessionForProject: mockSetActiveSessionForProject,
     getSessionsForProject: mockGetSessionsForProject,
+    getPaneLayout: mockGetPaneLayout,
+    getFocusedSession: mockGetFocusedSession,
+    closeSplitLeaf: mockCloseSplitLeaf,
+    closeSession: mockCloseSession,
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSettingsStore).mockReturnValue({
     resolveSettings: mockResolveSettings,
@@ -57,6 +69,7 @@ function setupMocks(
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useTerminalSession).mockReturnValue({
     createSession: mockCreateSession,
+    splitSession: mockSplitSession,
   } as unknown as ReturnType<typeof useWorkspaceStore>)
 }
 
@@ -279,5 +292,59 @@ describe('useKeyboardShortcuts', () => {
     document.body.removeChild(input)
 
     expect(shortcutAction).toHaveBeenCalled()
+  })
+
+  it('Cmd+D splits vertically when activeProjectId is set', async () => {
+    setupMocks({ activeProjectId: 'proj-1' })
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('d', { metaKey: true })
+    expect(mockSplitSession).toHaveBeenCalledWith('proj-1', 'vertical', expect.any(String), 5000)
+  })
+
+  it('Cmd+D does nothing when no activeProjectId', async () => {
+    setupMocks({ activeProjectId: null })
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('d', { metaKey: true })
+    expect(mockSplitSession).not.toHaveBeenCalled()
+  })
+
+  it('Cmd+Shift+D splits horizontally when activeProjectId is set', async () => {
+    setupMocks({ activeProjectId: 'proj-1' })
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('d', { metaKey: true, shiftKey: true })
+    expect(mockSplitSession).toHaveBeenCalledWith('proj-1', 'horizontal', expect.any(String), 5000)
+  })
+
+  it('Cmd+W closes focused split pane when in split mode', async () => {
+    mockGetPaneLayout.mockReturnValue({ type: 'split' })
+    mockGetFocusedSession.mockReturnValue('ses-focused')
+    mockGetActiveSessionForProject.mockReturnValue('ses-focused')
+    setupMocks({ activeProjectId: 'proj-1' })
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('w', { metaKey: true })
+    expect(mockCloseSplitLeaf).toHaveBeenCalledWith('proj-1', 'ses-focused')
+    expect(mockCloseSession).toHaveBeenCalledWith('ses-focused')
+  })
+
+  it('Cmd+W closes active tab when not in split mode', async () => {
+    mockGetPaneLayout.mockReturnValue(null)
+    mockGetActiveSessionForProject.mockReturnValue('ses-active')
+    setupMocks({ activeProjectId: 'proj-1' })
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('w', { metaKey: true })
+    expect(mockCloseSession).toHaveBeenCalledWith('ses-active')
+  })
+
+  it('Cmd+W does nothing when no activeProjectId', async () => {
+    setupMocks({ activeProjectId: null })
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('w', { metaKey: true })
+    expect(mockCloseSession).not.toHaveBeenCalled()
   })
 })

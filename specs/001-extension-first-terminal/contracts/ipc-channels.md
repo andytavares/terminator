@@ -890,6 +890,8 @@ All channels below are registered by the `task-vault` extension and accessed thr
 | `task-vault:vault:query`                 | renderer → main | Filter tasks by status, context, project, area, dueBefore, filePattern |
 | `task-vault:vault:process-inbox-item`    | renderer → main | Process inbox item: trash / do-now / someday / file                    |
 | `task-vault:vault:update-project-status` | renderer → main | Rewrite project frontmatter `status:` field                            |
+| `task-vault:vault:get-task-detail`       | renderer → main | Return description, acceptanceCriteria, devHints from task metadata    |
+| `task-vault:vault:save-task-detail`      | renderer → main | Write description, acceptanceCriteria, devHints into task metadata     |
 
 ### Project Channels
 
@@ -911,3 +913,102 @@ All channels below are registered by the `task-vault` extension and accessed thr
 | Channel                     | Direction       | Summary                                                       |
 | --------------------------- | --------------- | ------------------------------------------------------------- |
 | `task-vault:ics:get-events` | renderer → main | Return cached ICS events in ±7 day window with staleness flag |
+
+### Kanban Channels
+
+| Channel                         | Direction       | Summary                                                                      |
+| ------------------------------- | --------------- | ---------------------------------------------------------------------------- |
+| `task-vault:kanban:get-config`  | renderer → main | Return persisted `KanbanConfig` (lanes, swimlaneGrouping, viewMode)          |
+| `task-vault:kanban:save-config` | renderer → main | Persist updated `KanbanConfig` to `.todo/kanban.json`                        |
+| `task-vault:kanban:list-tasks`  | renderer → main | Return all non-archived tasks (excludes migrated/cancelled) for kanban board |
+| `task-vault:kanban:move-task`   | renderer → main | Update a task's `status` in the DB (used on drag-and-drop between lanes)     |
+
+---
+
+## Metrics Channels
+
+System and per-process resource metrics for the Overview screen. All three channels use invoke/handle (request–response).
+
+### `metrics:system`
+
+Returns current system-wide CPU, memory, and network metrics.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: _(none)_
+
+**Response**:
+
+```typescript
+{ data: SystemMetrics } | { error: string }
+
+interface SystemMetrics {
+  cpuPercent: number        // 0–100, averaged across all cores
+  memUsedBytes: number      // os.totalmem() - os.freemem()
+  memTotalBytes: number     // os.totalmem()
+  netInBytesPerSec: number  // inbound bytes/s across non-loopback interfaces
+  netOutBytesPerSec: number // outbound bytes/s across non-loopback interfaces
+}
+```
+
+CPU is computed by diffing `os.cpus()` samples taken every 1 s in a background sampler started at app boot. Network is computed from `netstat -ib` (macOS) or `/proc/net/dev` (Linux) between samples.
+
+---
+
+### `metrics:processes`
+
+Returns CPU and memory usage for a specific set of PIDs.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**:
+
+```typescript
+{ pids: number[] }
+```
+
+**Response**:
+
+```typescript
+{ data: ProcessMetrics[] } | { error: string }
+
+interface ProcessMetrics {
+  pid: number
+  cpuPercent: number  // from ps %cpu column
+  rssBytes: number    // resident set size in bytes (ps rss column × 1024)
+}
+```
+
+Uses a single `ps -p <pids> -o pid=,%cpu=,rss=` call (macOS) or `ps -p <pids> -o pid,%cpu,rss --no-headers` (Linux). Returns `[]` on failure.
+
+---
+
+### `metrics:pids`
+
+Resolves terminal session IDs to their PTY process PIDs.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**:
+
+```typescript
+{ sessionIds: string[] }
+```
+
+**Response**:
+
+```typescript
+{ data: Array<{ sessionId: string; pid: number }> } | { error: string }
+```
+
+Calls `ptyManager.getPid(sessionId)` for each ID; sessions without a live PTY are omitted from the result.
+
+---
+
+### Channel Summary
+
+| Channel             | Direction       | Summary                                           |
+| ------------------- | --------------- | ------------------------------------------------- |
+| `metrics:system`    | renderer → main | CPU%, memory used/total, network in/out bytes/sec |
+| `metrics:processes` | renderer → main | Per-PID CPU% and RSS bytes from `ps`              |
+| `metrics:pids`      | renderer → main | Resolve session UUIDs to live PTY PIDs            |

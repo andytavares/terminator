@@ -163,6 +163,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener(channel, listener)
     },
   },
+  notification: {
+    show: (title: string, body: string) => ipcRenderer.send('notification:show', { title, body }),
+  },
+  metrics: {
+    getSystem: () => ipcRenderer.invoke('metrics:system'),
+    getProcesses: (pids: number[]) => ipcRenderer.invoke('metrics:processes', { pids }),
+    getPids: (sessionIds: string[]) => ipcRenderer.invoke('metrics:pids', { sessionIds }),
+  },
   logger: {
     write: (level: string, namespace: string, message: string) =>
       ipcRenderer.send('log:write', { level, namespace, message }),

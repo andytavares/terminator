@@ -8,6 +8,8 @@ import { registerGitHandlers } from './ipc/git.ipc.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
 import { registerFsHandlers } from './ipc/fs.ipc.js'
 import { registerLogHandlers } from './ipc/log.ipc.js'
+import { registerNotificationHandlers } from './ipc/notification.ipc.js'
+import { registerMetricsHandlers } from './ipc/metrics.ipc.js'
 import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
 import { logger } from './logger.js'
@@ -100,6 +102,8 @@ app.whenReady().then(async () => {
   registerShellHandlers()
   registerFsHandlers(() => mainWindow)
   registerLogHandlers()
+  registerNotificationHandlers()
+  registerMetricsHandlers(ptyManager)
   registerDialogHandlers()
 
   await extensionHost.loadAll()

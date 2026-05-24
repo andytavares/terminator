@@ -70,6 +70,7 @@ beforeEach(() => {
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSessionStore).mockReturnValue({
     getBellCountForProject: mockGetBellCountForProject,
+    isProjectBusy: vi.fn().mockReturnValue(false),
   } as unknown as ReturnType<typeof useWorkspaceStore>)
 })
 

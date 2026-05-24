@@ -198,6 +198,14 @@
   transform: translateY(-1px);
 }
 
+.ws-rail__divider {
+  width: 28px;
+  height: 1px;
+  background: var(--border);
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
 /* ── Add workspace button ────────────────────────────────────── */
 .ws-rail__spacer {
   flex: 1;
@@ -226,4 +234,16 @@
   border-color: var(--text-secondary);
   color: var(--text-secondary);
   transform: rotate(90deg);
+}
+
+.ws-tile__indicators {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 2px;
+  z-index: 5;
+  pointer-events: none;
 }

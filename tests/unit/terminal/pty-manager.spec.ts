@@ -223,4 +223,17 @@ describe('PtyManager', () => {
     expect(() => mgr.write('no-such', 'data')).not.toThrow()
     expect(mockPty.write).not.toHaveBeenCalled()
   })
+
+  it('getPid returns the PID of a live session', async () => {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    mgr.spawn('s1', '/', '/bin/sh', 'human', vi.fn(), vi.fn())
+    expect(mgr.getPid('s1')).toBe(12345)
+  })
+
+  it('getPid returns undefined for unknown sessionId', async () => {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    expect(mgr.getPid('nope')).toBeUndefined()
+  })
 })

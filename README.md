@@ -12,26 +12,30 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 - **Extension system** — Extensions install from local directories and contribute settings sections, sidebar items, sidebar panels, top-bar menu items, native View menu items, context menu entries, and terminal event hooks without modifying core code. See [Extension Development Guide](docs/EXTENSION-DEVELOPMENT.md).
 - **Git Integration** — Built-in first-party extension: toggleable right sidebar showing live git status, full git view for staging/committing, and PR creation via `gh` CLI. Configurable per-workspace. Auto-refreshes on file changes.
 - **Code Reviews tab** — PR review workflow inside the git-integration extension. Paginated queue of open/closed PRs with search by title or PR number, five filter pills (All, High risk, Quick wins, In progress, Stale >3d), and stat cards (awaiting count, high-risk count, total review time, in-progress count). PRs are scored across six signals: tests, coverage, CI, lint, churn, and blast radius. Chapter-by-chapter review surface with syntax-highlighted diffs, inline comment threading, and one-click review submission (Approve / Request Changes / Comment) via `gh` CLI. Review sessions (chapter position, file, scroll) persist across restarts. In-progress PRs surface at the top of the queue even when they fall on a later pagination page; closed/merged PRs are automatically pruned from the in-progress list. Hover a paused/in-progress row to reveal a dismiss (×) button that removes it from the list. The pop-out button opens a dedicated focused review window and restores the exact PR, session, and view state. Requires `gh auth login`.
-- **SpecKit Pilot** — Extension that orchestrates the full Spec-Kit lifecycle (Constitution → Specify → Clarify → Plan → Checklist → Tasks → Analyze → Implement) with human-in-the-loop approval gates between every phase. Sidebar panel shows phase status glyphs with approve/reject/revoke controls; file watcher detects artifact changes; per-file confirm gate during Implement. State persisted to `.specify/.pilot/state.json`; audit log in `history.jsonl`.
-- **Task Vault** — GTD + Bullet Journal + PARA productivity extension. SQLite-backed vault with daily logs, inbox, projects, areas, and someday list. Global quick-capture hotkey (`Cmd+Shift+Space`). MCP stdio server lets AI agents capture tasks, complete/migrate items, and query the vault. 6-step guided weekly review wizard with optional ICS calendar feed integration. Bidirectional links between vault items and terminal sessions.
+- **SpecKit Pilot** — Extension that orchestrates the full Spec-Kit lifecycle (Constitution → Specify → Clarify → Plan → Checklist → Tasks → Analyze → Implement) with human-in-the-loop approval gates between every phase. Sidebar panel shows phase status glyphs with approve/reject/revoke controls; file watcher detects artifact changes; per-file confirm gate during Implement. State persisted to `.specify/.pilot/state.json`; audit log in `history.jsonl`. Toggle **kanban view** (⊞) to see tasks.md tasks in a 4-column board (Todo / In Progress / In Review / Done); view mode persists across restarts.
+- **Task Vault** — GTD + Bullet Journal + PARA productivity extension. SQLite-backed vault with daily logs, inbox, projects, areas, and someday list. Global quick-capture hotkey (`Cmd+Shift+Space`). MCP stdio server lets AI agents capture tasks, complete/migrate items, and query the vault. 6-step guided weekly review wizard with optional ICS calendar feed integration. Bidirectional links between vault items and terminal sessions. Toggle **kanban view** (grid icon in toolbar) to see all vault tasks in configurable lanes; drag tasks between lanes to change their status; lanes scroll horizontally when there are more lanes than space allows; group tasks into **swimlanes** by project or area; add, rename, reorder, and remove lanes via the Lanes editor; default lanes are Todo / In Progress / In Review / Done; config and view mode persist across restarts. Kanban cards display a markdown-rendered description preview (capped at 2 lines). **Context filter** button always visible in toolbar — click to open a multiselect dropdown to filter all views by one or more `+context` tags; toolbar action buttons are right-aligned. **Task detail panel** — click any task (daily log or kanban card) to open a right-side panel with markdown-capable Description, Acceptance Criteria, and Dev Hints fields (stored in task metadata). **Ghost subtask row** — a faint `· + Add subtask…` row at the bottom of each open task's subtask list expands into an inline input on click.
 - **View menu** — Toggle Sidebar and Open Settings (`Cmd+,`) are in the core View menu. Extensions contribute additional items: Toggle Git Sidebar (`Cmd+Shift+G`) and Code Reviews in New Window are added by the git-integration extension.
-- **Keyboard shortcuts** — `Cmd+1–9` (switch workspace), `Cmd++/-` (cycle workspaces), `Cmd+T` (new tab), `Cmd+W` (close tab), `Cmd+Left/Right` (cycle tabs), `Cmd+K` (clear terminal), `Cmd+P` (command palette), `Cmd+,` (settings), `Cmd+Shift+G` (toggle git sidebar).
+- **Split panes** — Split the current terminal vertically (`Cmd+D`, side by side) or horizontally (`Cmd+Shift+D`, top/bottom). Splits are recursive — each pane can be split further. Drag the divider bar to resize. Click a pane to focus it; keyboard input goes to the focused pane. `Cmd+W` closes the focused pane (collapsing the split) or the active tab when not in split mode. Each pane shows a blue focus border.
+- **Activity indicators** — Spinning indicator on workspace tiles, project cards, and session tabs while a terminal is running a command or producing output (1.5 s idle debounce). Alert badge (red dot + count) coexists alongside the spinner for sessions awaiting input. OS-level system notification + Dock bounce fires on terminal bell.
+- **Overview screen** — Press `⊞` in the workspace rail or `Cmd+Shift+O` to open a full-screen tiled grid of all open sessions. Each tile shows a live canvas snapshot of the terminal (refreshed every ~3 s), the project name, and per-session CPU% and memory. A top bar shows system-wide CPU%, memory used/total, and network in/out rates updated every 2 s. Click any tile to navigate directly to that session.
+- **Global metrics bar** — Optional CPU / Memory / Network bar pinned to the bottom of every screen. Enable via Settings → Interface → "Show CPU / Memory / Network bar".
+- **Keyboard shortcuts** — `Cmd+1–9` (switch workspace), `Cmd++/-` (cycle workspaces), `Cmd+T` (new tab), `Cmd+W` (close focused pane / active tab), `Cmd+D` (split pane vertically), `Cmd+Shift+D` (split pane horizontally), `Cmd+Left/Right` (cycle tabs), `Cmd+K` (clear terminal), `Cmd+P` (command palette), `Cmd+,` (settings), `Cmd+Shift+G` (toggle git sidebar), `Cmd+Shift+O` (toggle Overview).
 
 ## Tech Stack
 
-| Layer                  | Technology                       |
-| ---------------------- | -------------------------------- |
-| Framework              | Electron 30.x                    |
-| Language               | TypeScript 5.x (strict)          |
-| UI                     | React 18.x + Zustand             |
-| Terminal rendering     | xterm.js 5.x + xterm-addon-fit   |
-| PTY management         | node-pty 1.x (main process only) |
-| Persistence            | electron-store 8.x               |
-| Schema validation      | Zod 3.x                          |
-| Build                  | electron-vite 2.x                |
-| Unit/integration tests | Vitest 2.x                       |
-| E2E tests              | Playwright 1.x                   |
-| UI font                | IBM Plex Sans (@fontsource)      |
+| Layer                  | Technology                                          |
+| ---------------------- | --------------------------------------------------- |
+| Framework              | Electron 30.x                                       |
+| Language               | TypeScript 5.x (strict)                             |
+| UI                     | React 18.x + Zustand                                |
+| Terminal rendering     | xterm.js 5.x + xterm-addon-fit + xterm-addon-canvas |
+| PTY management         | node-pty 1.x (main process only)                    |
+| Persistence            | electron-store 8.x                                  |
+| Schema validation      | Zod 3.x                                             |
+| Build                  | electron-vite 2.x                                   |
+| Unit/integration tests | Vitest 2.x                                          |
+| E2E tests              | Playwright 1.x                                      |
+| UI font                | IBM Plex Sans (@fontsource)                         |
 
 Extension dependencies (not part of the core app): `better-sqlite3`, `@modelcontextprotocol/sdk`, `chokidar`, `gray-matter`, `node-ical` — declared in each extension's own `package.json`.
 
