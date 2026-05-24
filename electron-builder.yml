@@ -16,4 +16,5 @@ mac:
   gatekeeperAssess: false
   entitlements: resources/entitlements.mac.plist
   entitlementsInherit: resources/entitlements.mac.plist
-  notarize: true
+  notarize:
+    teamId: ${APPLE_TEAM_ID}
