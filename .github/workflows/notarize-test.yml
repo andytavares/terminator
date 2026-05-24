@@ -52,6 +52,7 @@ jobs:
             --output-format json 2>&1
 
       - name: Sign and notarize minimal app bundle
+        timeout-minutes: 10
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -81,11 +82,26 @@ jobs:
           codesign -vvv --deep --strict "$APP_PATH"
 
           echo ""
-          echo "--- submitting to notary service ---"
+          echo "--- submitting to notary service (no wait) ---"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$RUNNER_TEMP/TestApp.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/TestApp.zip" \
+          SUBMIT_OUTPUT=$(xcrun notarytool submit "$RUNNER_TEMP/TestApp.zip" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --wait \
-            --output-format json 2>&1
+            --output-format json 2>&1)
+          echo "$SUBMIT_OUTPUT"
+
+          SUBMISSION_ID=$(echo "$SUBMIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || echo "")
+          if [ -z "$SUBMISSION_ID" ]; then
+            echo "ERROR: could not parse submission ID from output above"
+            exit 1
+          fi
+
+          echo ""
+          echo "--- waiting for notarization (submission: $SUBMISSION_ID) ---"
+          xcrun notarytool wait "$SUBMISSION_ID" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --output-format json \
+            --timeout 300 2>&1
