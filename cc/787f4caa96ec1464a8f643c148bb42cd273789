@@ -1,0 +1,21 @@
+electron-builder.yml
+  s_90a3a0f68381b2::t_ff67d499d6d813 15-20
+resources/entitlements.mac.plist
+  s_90a3a0f68381b2::t_03d2c3ce9c3310 1-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "cc787f4caa96ec1464a8f643c148bb42cd273789",
+  "prompts": {},
+  "sessions": {
+    "s_90a3a0f68381b2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8206b459-5f10-4cfd-83b0-fc3afb307a93",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
