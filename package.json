@@ -1,6 +1,6 @@
 {
   "name": "@andytavares/terminator",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "description": "Extension-first AI-focused terminal emulator",
   "main": "out/main/index.js",
   "type": "module",
