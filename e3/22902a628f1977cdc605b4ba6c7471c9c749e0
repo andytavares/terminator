@@ -1,0 +1,53 @@
+tests/unit/terminal/metrics.ipc.spec.ts
+  s_90a3a0f68381b2::t_b8cf7bd99e526f 1-116,118-165
+extensions/task-vault/tests/ipc/kanban.ipc.spec.ts
+  s_90a3a0f68381b2::t_4dc975b79311a3 236,248
+  s_90a3a0f68381b2::t_443cdbd6888857 204-235,237-247,249-281
+tests/unit/terminal/notification.ipc.spec.ts
+  s_90a3a0f68381b2::t_0e76425a30e66b 1-83
+tests/unit/renderer/components/MetricsBar.spec.tsx
+  s_90a3a0f68381b2::t_4352ba19be3555 56-99,102-116,119
+  s_90a3a0f68381b2::t_8501ee4d9f5bfd 100-101,117-118
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_90a3a0f68381b2::t_1cf5f2dba55b2b 234-300
+  s_90a3a0f68381b2::t_0d22576ac97107 10,21-35,37-60
+  s_90a3a0f68381b2::t_a6d2ac8df637e2 11-14,16
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_90a3a0f68381b2::t_57cac365dbaf84 63-73
+  s_90a3a0f68381b2::t_4f8cfaaff59eab 12-36,49
+  s_90a3a0f68381b2::t_f2f4ecb9fee284 207-213,215,217-223,225-243,245-248,282-315,317,319-322
+  s_90a3a0f68381b2::t_c22cbc0f3996ec 214,216,224
+  s_90a3a0f68381b2::t_91b49a33b7bd25 74-89,97
+  s_90a3a0f68381b2::t_ef0e297739a2ee 316,318
+  s_90a3a0f68381b2::t_b7f5b4908a0e86 244,251-268
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_90a3a0f68381b2::t_a3749de245e65e 59-62
+  s_90a3a0f68381b2::t_635355b3d0be01 28-32
+  s_90a3a0f68381b2::t_50d318a772b9db 72
+  s_90a3a0f68381b2::t_c218f0459ca50b 296-349
+  s_90a3a0f68381b2::t_4421959e66ac13 19-21
+tests/unit/renderer/components/WorkspaceRail.spec.tsx
+  s_90a3a0f68381b2::t_5b169ed9327c28 246-252,254-255,265-271,273-274
+  s_90a3a0f68381b2::t_5a68d0f6510415 235,245,256-264,275-295
+  s_90a3a0f68381b2::t_431393fe7cdc82 236-244
+tests/unit/renderer/hooks/useTerminalSession.spec.tsx
+  s_90a3a0f68381b2::t_efdd1d971e73d3 190-289
+tests/unit/renderer/components/SplitContainer.spec.tsx
+  s_90a3a0f68381b2::t_9abb6bc7f4de1b 174-210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "e322902a628f1977cdc605b4ba6c7471c9c749e0",
+  "prompts": {},
+  "sessions": {
+    "s_90a3a0f68381b2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8206b459-5f10-4cfd-83b0-fc3afb307a93",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
