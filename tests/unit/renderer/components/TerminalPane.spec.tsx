@@ -7,12 +7,65 @@ import { TerminalPane } from '../../../../src/renderer/components/terminal/Termi
 vi.mock('../../../../src/renderer/stores/session.store', () => ({
   useSessionStore: vi.fn(),
 }))
+vi.mock('../../../../src/renderer/components/terminal/SplitContainer', () => ({
+  SplitContainer: ({
+    splitId,
+    direction,
+    onRatioChange,
+    children,
+  }: {
+    splitId: string
+    direction: string
+    ratio: number
+    onRatioChange: (id: string, r: number) => void
+    children: React.ReactNode[]
+  }) => {
+    const containerRef = React.useRef<HTMLDivElement>(null)
+    return (
+      <div ref={containerRef} className={`split-container split-container--${direction}`}>
+        <div className="split-container__child">{(children as React.ReactNode[])[0]}</div>
+        <div
+          className={`split-container__divider split-container__divider--${direction}`}
+          onMouseDown={(e) => {
+            e.preventDefault()
+            const onMove = (ev: MouseEvent) => {
+              const rect = containerRef.current?.getBoundingClientRect() ?? {
+                left: 0,
+                top: 0,
+                width: 400,
+                height: 300,
+              }
+              const pos = direction === 'vertical' ? ev.clientX : ev.clientY
+              const start = direction === 'vertical' ? rect.left : rect.top
+              const size = direction === 'vertical' ? rect.width : rect.height
+              onRatioChange(splitId, Math.max(0.1, Math.min(0.9, (pos - start) / size)))
+            }
+            const onUp = () => {
+              document.removeEventListener('mousemove', onMove)
+              document.removeEventListener('mouseup', onUp)
+            }
+            document.addEventListener('mousemove', onMove)
+            document.addEventListener('mouseup', onUp)
+          }}
+        />
+        <div className="split-container__child">{(children as React.ReactNode[])[1]}</div>
+      </div>
+    )
+  },
+}))
+vi.mock('../../../../src/renderer/components/terminal/LeafPane', () => ({
+  LeafPane: ({ sessionId }: { sessionId: string }) => (
+    <div data-testid={`leaf-${sessionId}`}>{sessionId}</div>
+  ),
+}))
 
 const mockGetSessions = vi.fn()
 const mockGetActive = vi.fn()
 const mockGetInstance = vi.fn()
 const mockClearBell = vi.fn()
 const mockTerminalInput = vi.fn()
+const mockGetPaneLayout = vi.fn(() => null)
+const mockSetSplitRatio = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -21,10 +74,13 @@ beforeEach(() => {
     getActiveSessionForProject: mockGetActive,
     getTerminalInstance: mockGetInstance,
     clearBellCount: mockClearBell,
+    getPaneLayout: mockGetPaneLayout,
+    setSplitRatio: mockSetSplitRatio,
   } as unknown as ReturnType<typeof useSessionStore>)
   mockGetSessions.mockReturnValue([])
   mockGetActive.mockReturnValue(null)
   mockGetInstance.mockReturnValue(undefined)
+  mockGetPaneLayout.mockReturnValue(null)
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     terminal: { input: mockTerminalInput },
   }
@@ -174,5 +230,72 @@ describe('TerminalPane', () => {
     mockGetActive.mockReturnValue('ses-2')
     rerender(<TerminalPane projectId="proj-1" />)
     expect(mockUnmount).toHaveBeenCalled()
+  })
+
+  describe('split mode (layout present)', () => {
+    it('renders split container instead of single pane when layout exists', () => {
+      const layout = {
+        type: 'split',
+        id: 'split-1',
+        direction: 'vertical',
+        ratio: 0.5,
+        first: { type: 'leaf', sessionId: 'ses-1' },
+        second: { type: 'leaf', sessionId: 'ses-2' },
+      }
+      mockGetPaneLayout.mockReturnValue(layout)
+      mockGetSessions.mockReturnValue([
+        { id: 'ses-1', tabTitle: 'T1', type: 'human' },
+        { id: 'ses-2', tabTitle: 'T2', type: 'human' },
+      ])
+      mockGetActive.mockReturnValue('ses-1')
+      const { container } = render(<TerminalPane projectId="proj-1" />)
+      expect(container.querySelector('.terminal-pane--split')).toBeTruthy()
+    })
+
+    it('calls setSplitRatio when ratio changes in split mode', () => {
+      const mockSetSplitRatio = vi.fn()
+      vi.mocked(useSessionStore).mockReturnValue({
+        getSessionsForProject: mockGetSessions,
+        getActiveSessionForProject: mockGetActive,
+        getTerminalInstance: mockGetInstance,
+        clearBellCount: mockClearBell,
+        getPaneLayout: mockGetPaneLayout,
+        setSplitRatio: mockSetSplitRatio,
+      } as unknown as ReturnType<typeof useSessionStore>)
+      const layout = {
+        type: 'split',
+        id: 'split-1',
+        direction: 'vertical',
+        ratio: 0.5,
+        first: { type: 'leaf', sessionId: 'ses-1' },
+        second: { type: 'leaf', sessionId: 'ses-2' },
+      }
+      mockGetPaneLayout.mockReturnValue(layout)
+      mockGetSessions.mockReturnValue([
+        { id: 'ses-1', tabTitle: 'T1', type: 'human' },
+        { id: 'ses-2', tabTitle: 'T2', type: 'human' },
+      ])
+      mockGetActive.mockReturnValue('ses-1')
+      const { container } = render(<TerminalPane projectId="proj-1" />)
+      const divider = container.querySelector('.split-container__divider') as HTMLElement
+      const outerContainer = container.querySelector('.split-container') as HTMLElement
+      if (outerContainer) {
+        outerContainer.getBoundingClientRect = vi.fn(() => ({
+          left: 0,
+          top: 0,
+          width: 400,
+          height: 300,
+          right: 400,
+          bottom: 300,
+          x: 0,
+          y: 0,
+          toJSON: vi.fn(),
+        }))
+        fireEvent.mouseDown(divider, { clientX: 200 })
+        fireEvent.mouseMove(document, { clientX: 300 })
+        fireEvent.mouseUp(document)
+        expect(mockSetSplitRatio).toHaveBeenCalledWith('proj-1', 'split-1', expect.any(Number))
+      }
+    })
   })
 })

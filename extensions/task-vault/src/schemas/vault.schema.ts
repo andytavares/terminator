@@ -2,7 +2,14 @@ import { z } from 'zod'
 
 // ── Shared fragments ─────────────────────────────────────────────────────────
 
-const TaskStatusSchema = z.enum(['open', 'done', 'migrated', 'cancelled', 'in-progress'])
+const TaskStatusSchema = z.enum([
+  'open',
+  'done',
+  'migrated',
+  'cancelled',
+  'in-progress',
+  'in-review',
+])
 const ProjectStatusSchema = z.enum(['active', 'someday', 'done', 'archived'])
 const DateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 const TaskIdSchema = z.string().min(1)
@@ -230,3 +237,14 @@ export const McpAutoExecuteSchema = z.object({
 })
 
 export type McpAutoExecute = z.infer<typeof McpAutoExecuteSchema>
+
+// ── vault:get-task-detail / save-task-detail ──────────────────────────────────
+
+export const GetTaskDetailRequestSchema = z.object({ taskId: TaskIdSchema })
+
+export const SaveTaskDetailRequestSchema = z.object({
+  taskId: TaskIdSchema,
+  description: z.string(),
+  acceptanceCriteria: z.string(),
+  devHints: z.string(),
+})

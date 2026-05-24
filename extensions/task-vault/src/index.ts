@@ -5,6 +5,8 @@ import {
   setVaultPath as setProjectsVaultPath,
 } from './ipc/projects.ipc.js'
 import { registerLinksIpcHandlers, setVaultPath as setLinksVaultPath } from './ipc/links.ipc.js'
+import { registerKanbanIpcHandlers, setVaultPath as setKanbanVaultPath } from './ipc/kanban.ipc.js'
+import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
 import { initDb, closeDb } from './vault/db.js'
 
 const disposables: Disposable[] = []
@@ -61,10 +63,15 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   disposables.push({ dispose: disposeProjectsIpc })
   const disposeLinksIpc = registerLinksIpcHandlers()
   disposables.push({ dispose: disposeLinksIpc })
+  const disposeKanbanIpc = registerKanbanIpcHandlers()
+  disposables.push({ dispose: disposeKanbanIpc })
+  const disposeAdminIpc = registerAdminIpcHandlers()
+  disposables.push({ dispose: disposeAdminIpc })
   if (vaultPath) {
     setVaultPath(vaultPath)
     setProjectsVaultPath(vaultPath)
     setLinksVaultPath(vaultPath)
+    setKanbanVaultPath(vaultPath)
 
     try {
       initDb(vaultPath)

@@ -6,6 +6,8 @@ import type {
   Extension,
   Branch,
   WorktreeInfo,
+  SystemMetrics,
+  ProcessMetrics,
 } from '../shared/types/index'
 
 interface ElectronAPI {
@@ -132,6 +134,16 @@ interface ElectronAPI {
     onSelectProjectTab(handler: (tabId: string) => void): () => void
     onMenuOpenSettings(handler: () => void): () => void
     onMenuToggleSidebar(handler: () => void): () => void
+  }
+  notification: {
+    show(title: string, body: string): void
+  }
+  metrics: {
+    getSystem(): Promise<{ data: SystemMetrics } | { error: string }>
+    getProcesses(pids: number[]): Promise<{ data: ProcessMetrics[] } | { error: string }>
+    getPids(
+      sessionIds: string[]
+    ): Promise<{ data: Array<{ sessionId: string; pid: number }> } | { error: string }>
   }
   logger: {
     write(level: string, namespace: string, message: string): void

@@ -283,11 +283,11 @@ describe('task-vault:projects:create IPC handler', () => {
 })
 
 describe('task-vault:projects:delete IPC handler', () => {
-  it('deletes project and orphans tasks', async () => {
+  it('deletes project (FK ON DELETE SET NULL handles task orphaning)', async () => {
     const handler = getHandler('task-vault:projects:delete')
     const result = await handler({}, { projectFilePath: 'Alpha' })
     expect(result).toMatchObject({ success: true })
-    expect(mockRun).toHaveBeenCalledTimes(2)
+    expect(mockRun).toHaveBeenCalledTimes(1)
   })
 
   it('returns VALIDATION_ERROR for missing projectFilePath', async () => {

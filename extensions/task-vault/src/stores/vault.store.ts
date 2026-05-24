@@ -2,12 +2,30 @@ import { create } from 'zustand'
 import type { DailyLog } from '../vault/types'
 
 export type VaultView = 'daily' | 'inbox' | 'projects' | 'areas' | 'archive' | 'review'
+export type ViewMode = 'list' | 'kanban'
+
+const KANBAN_MODE_KEY = 'task-vault.kanbanMode'
+const CONTEXT_FILTER_KEY = 'task-vault.selectedContexts'
+
+function loadSelectedContexts(): string[] {
+  try {
+    const raw = localStorage.getItem(CONTEXT_FILTER_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    if (Array.isArray(parsed)) return parsed as string[]
+    return []
+  } catch {
+    return []
+  }
+}
 
 interface VaultStore {
   vaultPath: string
   todayLog: DailyLog | null
   inboxCount: number
   activeView: VaultView
+  viewMode: ViewMode
+  selectedContexts: string[]
   isLoading: boolean
   error: string | null
   showCaptureModal: boolean
@@ -17,6 +35,9 @@ interface VaultStore {
   rolledOverTaskIds: string[]
   loadToday: () => Promise<void>
   setView: (view: VaultView) => void
+  setViewMode: (mode: ViewMode) => void
+  setSelectedContexts: (ctxs: string[]) => void
+  toggleContext: (ctx: string) => void
   refreshInboxCount: () => Promise<void>
   setVaultPath: (p: string) => void
   setShowCaptureModal: (show: boolean) => void
@@ -24,11 +45,13 @@ interface VaultStore {
   navToProject: (name: string) => void
 }
 
-export const useVaultStore = create<VaultStore>((set, _get) => ({
+export const useVaultStore = create<VaultStore>((set, get) => ({
   vaultPath: '',
   todayLog: null,
   inboxCount: 0,
   activeView: 'daily',
+  viewMode: (localStorage.getItem(KANBAN_MODE_KEY) as ViewMode | null) ?? 'list',
+  selectedContexts: loadSelectedContexts(),
   isLoading: false,
   error: null,
   showCaptureModal: false,
@@ -40,6 +63,27 @@ export const useVaultStore = create<VaultStore>((set, _get) => ({
   setVaultPath: (p: string) => set({ vaultPath: p }),
 
   setView: (view: VaultView) => set({ activeView: view }),
+
+  setViewMode: (mode: ViewMode) => {
+    localStorage.setItem(KANBAN_MODE_KEY, mode)
+    set({ viewMode: mode })
+  },
+
+  setSelectedContexts: (ctxs: string[]) => {
+    if (ctxs.length === 0) {
+      localStorage.removeItem(CONTEXT_FILTER_KEY)
+    } else {
+      localStorage.setItem(CONTEXT_FILTER_KEY, JSON.stringify(ctxs))
+    }
+    set({ selectedContexts: ctxs })
+  },
+
+  toggleContext: (ctx: string) => {
+    const current = get().selectedContexts
+    const next = current.includes(ctx) ? current.filter((c) => c !== ctx) : [...current, ctx]
+    const store = get()
+    store.setSelectedContexts(next)
+  },
 
   setShowCaptureModal: (show: boolean) => set({ showCaptureModal: show }),
 

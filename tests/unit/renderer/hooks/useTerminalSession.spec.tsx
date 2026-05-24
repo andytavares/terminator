@@ -53,6 +53,9 @@ beforeEach(() => {
       resize: vi.fn(),
       onOutput: vi.fn().mockReturnValue(vi.fn()),
     },
+    notification: {
+      show: vi.fn(),
+    },
   }
 })
 
@@ -183,5 +186,105 @@ describe('useTerminalSession', () => {
     // Should not throw and should not call incrementBellCount
     expect(() => capturedBellCallback?.()).not.toThrow()
     expect(mockIncrementBellCount).not.toHaveBeenCalled()
+  })
+
+  describe('splitSession', () => {
+    it('returns a splitSession function', async () => {
+      const mockActivateSplit = vi.fn()
+      vi.mocked(useSessionStore).mockReturnValue({
+        createSession: mockCreateSession,
+        setTerminalInstance: mockSetTerminalInstance,
+        setActiveSessionForProject: mockSetActiveSessionForProject,
+        incrementBellCount: mockIncrementBellCount,
+        activateSplit: mockActivateSplit,
+        getFocusedSession: vi.fn().mockReturnValue(null),
+        getActiveSessionForProject: vi.fn().mockReturnValue(null),
+      } as unknown as ReturnType<typeof useSessionStore>)
+      const { useTerminalSession } = await import(
+        '../../../../src/renderer/hooks/useTerminalSession'
+      )
+      const { result } = renderHook(() => useTerminalSession())
+      expect(typeof result.current.splitSession).toBe('function')
+    })
+
+    it('splitSession does nothing when no focused or active session', async () => {
+      vi.mocked(useSessionStore).mockReturnValue({
+        createSession: mockCreateSession,
+        setTerminalInstance: mockSetTerminalInstance,
+        setActiveSessionForProject: mockSetActiveSessionForProject,
+        incrementBellCount: mockIncrementBellCount,
+        activateSplit: vi.fn(),
+        getFocusedSession: vi.fn().mockReturnValue(null),
+        getActiveSessionForProject: vi.fn().mockReturnValue(null),
+      } as unknown as ReturnType<typeof useSessionStore>)
+      const { useTerminalSession } = await import(
+        '../../../../src/renderer/hooks/useTerminalSession'
+      )
+      const { result } = renderHook(() => useTerminalSession())
+      await result.current.splitSession('proj-1', 'vertical', '/cwd', 5000)
+      expect(mockCreateSession).not.toHaveBeenCalled()
+    })
+
+    it('creates a session and activates split when focused session exists', async () => {
+      const mockActivateSplit = vi.fn()
+      vi.mocked(useSessionStore).mockReturnValue({
+        createSession: mockCreateSession,
+        setTerminalInstance: mockSetTerminalInstance,
+        setActiveSessionForProject: mockSetActiveSessionForProject,
+        incrementBellCount: mockIncrementBellCount,
+        activateSplit: mockActivateSplit,
+        getFocusedSession: vi.fn().mockReturnValue('ses-focused'),
+        getActiveSessionForProject: vi.fn().mockReturnValue('ses-focused'),
+      } as unknown as ReturnType<typeof useSessionStore>)
+      Object.assign(useSessionStore, {
+        getState: vi.fn().mockReturnValue({
+          sessions: new Map([['session-123', { tabTitle: 'Terminal' }]]),
+          activeSessionIdByProject: new Map(),
+        }),
+      })
+      const { useTerminalSession } = await import(
+        '../../../../src/renderer/hooks/useTerminalSession'
+      )
+      const { result } = renderHook(() => useTerminalSession())
+      await result.current.splitSession('proj-1', 'vertical', '/cwd', 5000)
+      expect(mockCreateSession).toHaveBeenCalledWith('proj-1', 'human', '', '/cwd', 5000)
+      expect(mockSetTerminalInstance).toHaveBeenCalled()
+      expect(mockActivateSplit).toHaveBeenCalledWith(
+        'proj-1',
+        'ses-focused',
+        'session-123',
+        'vertical'
+      )
+    })
+
+    it('uses getActiveSessionForProject when getFocusedSession returns null', async () => {
+      const mockActivateSplit = vi.fn()
+      vi.mocked(useSessionStore).mockReturnValue({
+        createSession: mockCreateSession,
+        setTerminalInstance: mockSetTerminalInstance,
+        setActiveSessionForProject: mockSetActiveSessionForProject,
+        incrementBellCount: mockIncrementBellCount,
+        activateSplit: mockActivateSplit,
+        getFocusedSession: vi.fn().mockReturnValue(null),
+        getActiveSessionForProject: vi.fn().mockReturnValue('ses-active'),
+      } as unknown as ReturnType<typeof useSessionStore>)
+      Object.assign(useSessionStore, {
+        getState: vi.fn().mockReturnValue({
+          sessions: new Map([['session-123', { tabTitle: 'Terminal' }]]),
+          activeSessionIdByProject: new Map(),
+        }),
+      })
+      const { useTerminalSession } = await import(
+        '../../../../src/renderer/hooks/useTerminalSession'
+      )
+      const { result } = renderHook(() => useTerminalSession())
+      await result.current.splitSession('proj-1', 'horizontal', '/cwd', 5000)
+      expect(mockActivateSplit).toHaveBeenCalledWith(
+        'proj-1',
+        'ses-active',
+        'session-123',
+        'horizontal'
+      )
+    })
   })
 })

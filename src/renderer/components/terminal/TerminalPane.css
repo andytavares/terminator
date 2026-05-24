@@ -5,6 +5,11 @@
   position: relative;
 }
 
+.terminal-pane--split {
+  display: flex;
+  background: transparent;
+}
+
 .terminal-pane--empty {
   display: flex;
   align-items: center;

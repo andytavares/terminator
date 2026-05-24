@@ -5,6 +5,7 @@ import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { AlertBadge } from '../AlertBadge'
+import { ActivitySpinner } from '../ActivitySpinner'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { EditWorkspaceDialog } from './EditWorkspaceDialog'
@@ -65,8 +66,24 @@ export function WorkspaceRail({
     setDragOver(null)
   }
 
+  const pinnedTab = globalTabs.find((t) => t.id === 'core.overview')
+  const otherTabs = globalTabs.filter((t) => t.id !== 'core.overview')
+
   return (
     <aside className="ws-rail">
+      {pinnedTab && (
+        <>
+          <button
+            className={`ws-rail__global-tab${activeGlobalTabId === pinnedTab.id ? ' ws-rail__global-tab--active' : ''}`}
+            onClick={() => onSelectGlobalTab?.(pinnedTab.id)}
+            title={pinnedTab.label}
+          >
+            {pinnedTab.icon ?? pinnedTab.label[0]}
+          </button>
+          <div className="ws-rail__divider" />
+        </>
+      )}
+
       {workspaces.map((ws, index) => (
         <div
           key={ws.id}
@@ -87,7 +104,7 @@ export function WorkspaceRail({
 
       <div className="ws-rail__spacer" />
 
-      {globalTabs.map((tab) => (
+      {otherTabs.map((tab) => (
         <button
           key={tab.id}
           className={`ws-rail__global-tab${activeGlobalTabId === tab.id ? ' ws-rail__global-tab--active' : ''}`}
@@ -113,10 +130,11 @@ function WorkspaceTile({ workspace }: { workspace: Workspace }): JSX.Element {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const { activeWorkspaceId, setActiveWorkspace, deleteWorkspace, projectsByWorkspaceId } =
     useWorkspaceStore()
-  const { getBellCountForProject } = useSessionStore()
+  const { getBellCountForProject, isProjectBusy } = useSessionStore()
   const isActive = activeWorkspaceId === workspace.id
   const projects = projectsByWorkspaceId.get(workspace.id) ?? []
   const bellCount = projects.reduce((sum, p) => sum + getBellCountForProject(p.id), 0)
+  const isBusy = projects.some((p) => isProjectBusy(p.id))
 
   function handleClick(): void {
     setActiveWorkspace(workspace.id)
@@ -145,7 +163,10 @@ function WorkspaceTile({ workspace }: { workspace: Workspace }): JSX.Element {
         onContextMenu={handleContextMenu}
         title=""
       >
-        <AlertBadge count={bellCount} className="alert-badge--corner" />
+        <div className="ws-tile__indicators">
+          <AlertBadge count={bellCount} />
+          {isBusy && <ActivitySpinner />}
+        </div>
         <span className="ws-tile__initials">{getInitials(workspace.name)}</span>
         <span className="ws-tile__tooltip">{workspace.name}</span>
       </div>

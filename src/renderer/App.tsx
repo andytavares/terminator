@@ -18,6 +18,9 @@ import { useToastStore } from './stores/toast.store'
 import { useExtensionRegistry } from './extensions/registry'
 import type { CommandRegistration } from './extensions/registry'
 import { EmptyState } from './components/EmptyState'
+import { OverviewScreen } from './components/overview/OverviewScreen'
+import { MetricsBar } from './components/overview/MetricsBar'
+import { useMetricsStore } from './stores/metrics.store'
 
 installLogInterceptor()
 
@@ -35,6 +38,7 @@ export function App(): JSX.Element {
     projectsByWorkspaceId,
   } = useWorkspaceStore()
   const { loadSettings, globalSettings, markWelcomeSeen, resolveSettings } = useSettingsStore()
+  const { system, enableGlobalMetrics, disableGlobalMetrics } = useMetricsStore()
   const { handleProcessExit, getSessionsForProject } = useSessionStore()
   const { addToast } = useToastStore()
   const { createSession } = useTerminalSession()
@@ -101,6 +105,16 @@ export function App(): JSX.Element {
         category: 'App',
         action: () => setLogOpen((v) => !v),
       },
+      {
+        id: 'core.toggle-overview',
+        label: 'Toggle Overview',
+        shortcut: '⌘⇧O',
+        category: 'App',
+        action: () => {
+          const { activeGlobalTabId, setActiveGlobalTab } = useExtensionRegistry.getState()
+          setActiveGlobalTab(activeGlobalTabId === 'core.overview' ? null : 'core.overview')
+        },
+      },
     ]
 
     if (activeProjectId) {
@@ -137,6 +151,14 @@ export function App(): JSX.Element {
   useEffect(() => {
     if (activeWorkspaceId) loadSettings(activeWorkspaceId)
   }, [activeWorkspaceId, loadSettings])
+
+  useEffect(() => {
+    if (globalSettings?.ui?.showMetricsBar) {
+      enableGlobalMetrics()
+    } else {
+      disableGlobalMetrics()
+    }
+  }, [globalSettings?.ui?.showMetricsBar, enableGlobalMetrics, disableGlobalMetrics])
 
   useEffect(() => {
     if (activeProjectId && globalSettings && !globalSettings.ui?.hasSeenWelcome) {
@@ -242,98 +264,118 @@ export function App(): JSX.Element {
     }
   }, [activeProjectTabId, togglePanel])
 
+  // Register Overview as a built-in global tab
+  useEffect(() => {
+    return useExtensionRegistry.getState().registerGlobalTab({
+      id: 'core.overview',
+      label: 'Overview',
+      icon: '⊞',
+      component: OverviewScreen,
+      permanent: true,
+    })
+  }, [])
+
+  const showMetricsBar = globalSettings?.ui?.showMetricsBar ?? false
+
   return (
     <ErrorBoundary>
       <div className="app-layout">
-        <WorkspaceRail
-          globalTabs={Array.from(globalTabs.values())}
-          activeGlobalTabId={activeGlobalTabId}
-          onSelectGlobalTab={(id) => setActiveGlobalTab(id === activeGlobalTabId ? null : id)}
-        />
+        <div className="app-body">
+          <WorkspaceRail
+            globalTabs={Array.from(globalTabs.values())}
+            activeGlobalTabId={activeGlobalTabId}
+            onSelectGlobalTab={(id) => setActiveGlobalTab(id === activeGlobalTabId ? null : id)}
+          />
 
-        {activeGlobalTabId && globalTabs.has(activeGlobalTabId) ? (
-          (() => {
-            const tab = globalTabs.get(activeGlobalTabId)!
-            const TabComponent = tab.component as React.ComponentType<Record<string, never>>
-            return (
-              <div className="main-content">
-                <TabComponent />
-              </div>
-            )
-          })()
-        ) : (
-          <>
-            {activeWorkspaceId && sidebarVisible && (
-              <ProjectsPanel workspaceId={activeWorkspaceId} />
-            )}
-            <div className="main-content">
-              {activeProjectId ? (
-                <>
-                  <TabBar
-                    projectId={activeProjectId}
-                    activeProjectTabId={activeProjectTabId}
-                    projectTabs={Array.from(projectTabs.values())}
-                    onSelectProjectTab={setActiveProjectTab}
-                    onNewTab={handleNewTab}
-                  />
-                  {activeProjectTabId && projectTabs.has(activeProjectTabId) ? (
-                    (() => {
-                      const tab = projectTabs.get(activeProjectTabId)!
-                      const TabComponent = tab.component
-                      return <TabComponent repoRoot={repoRoot} />
-                    })()
-                  ) : (
-                    <TerminalPane projectId={activeProjectId} />
-                  )}
-                </>
-              ) : globalSettings && !globalSettings.ui?.hasSeenWelcome ? (
-                <EmptyState
-                  icon="⬡"
-                  title="Welcome to Terminator"
-                  subtitle="A keyboard-first terminal for developers. Open a project to get started."
-                  actions={[
-                    { label: 'New Tab', shortcut: '⌘T', onClick: () => {} },
-                    {
-                      label: 'Open Settings',
-                      shortcut: '⌘,',
-                      onClick: () => setSettingsOpen(true),
-                    },
-                  ]}
-                />
-              ) : (
-                <EmptyState
-                  icon="⌥"
-                  title={
-                    activeWorkspaceId
-                      ? 'Select or create a project'
-                      : 'Select a workspace to get started'
-                  }
-                />
-              )}
-            </div>
-
-            {/* Extension-contributed sidebar panels */}
-            {Array.from(openPanels).map((panelId) => {
-              const panel = sidebarPanels.get(panelId)
-              if (!panel) return null
-              const PanelComponent = panel.component
+          {activeGlobalTabId && globalTabs.has(activeGlobalTabId) ? (
+            (() => {
+              const tab = globalTabs.get(activeGlobalTabId)!
+              const TabComponent = tab.component as React.ComponentType<Record<string, never>>
               return (
-                <PanelComponent
-                  key={panelId}
-                  repoRoot={repoRoot}
-                  onClose={() => togglePanel(panelId)}
-                />
+                <div className="main-content">
+                  <TabComponent />
+                </div>
               )
-            })}
-          </>
-        )}
+            })()
+          ) : (
+            <>
+              {activeWorkspaceId && sidebarVisible && (
+                <ProjectsPanel workspaceId={activeWorkspaceId} />
+              )}
+              <div className="main-content">
+                {activeProjectId ? (
+                  <>
+                    <TabBar
+                      projectId={activeProjectId}
+                      activeProjectTabId={activeProjectTabId}
+                      projectTabs={Array.from(projectTabs.values())}
+                      onSelectProjectTab={setActiveProjectTab}
+                      onNewTab={handleNewTab}
+                    />
+                    {activeProjectTabId && projectTabs.has(activeProjectTabId) ? (
+                      (() => {
+                        const tab = projectTabs.get(activeProjectTabId)!
+                        const TabComponent = tab.component
+                        return <TabComponent repoRoot={repoRoot} />
+                      })()
+                    ) : (
+                      <TerminalPane projectId={activeProjectId} />
+                    )}
+                  </>
+                ) : globalSettings && !globalSettings.ui?.hasSeenWelcome ? (
+                  <EmptyState
+                    icon="⬡"
+                    title="Welcome to Terminator"
+                    subtitle="A keyboard-first terminal for developers. Open a project to get started."
+                    actions={[
+                      { label: 'New Tab', shortcut: '⌘T', onClick: () => {} },
+                      {
+                        label: 'Open Settings',
+                        shortcut: '⌘,',
+                        onClick: () => setSettingsOpen(true),
+                      },
+                    ]}
+                  />
+                ) : (
+                  <EmptyState
+                    icon="⌥"
+                    title={
+                      activeWorkspaceId
+                        ? 'Select or create a project'
+                        : 'Select a workspace to get started'
+                    }
+                  />
+                )}
+              </div>
 
-        {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
-        {logOpen && <LogWindow onClose={() => setLogOpen(false)} />}
-        {paletteOpen && (
-          <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />
+              {/* Extension-contributed sidebar panels */}
+              {Array.from(openPanels).map((panelId) => {
+                const panel = sidebarPanels.get(panelId)
+                if (!panel) return null
+                const PanelComponent = panel.component
+                return (
+                  <PanelComponent
+                    key={panelId}
+                    repoRoot={repoRoot}
+                    onClose={() => togglePanel(panelId)}
+                  />
+                )
+              })}
+            </>
+          )}
+
+          {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+          {logOpen && <LogWindow onClose={() => setLogOpen(false)} />}
+          {paletteOpen && (
+            <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />
+          )}
+          <ToastContainer />
+        </div>
+        {showMetricsBar && (
+          <div className="app-global-metrics">
+            <MetricsBar system={system} />
+          </div>
         )}
-        <ToastContainer />
       </div>
     </ErrorBoundary>
   )

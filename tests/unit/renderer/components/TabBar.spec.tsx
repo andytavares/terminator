@@ -42,6 +42,7 @@ beforeEach(() => {
     setActiveSessionForProject: mockSetActive,
     getActiveSessionForProject: mockGetActive,
     getBellCountForSession: mockGetBell,
+    isSessionBusy: vi.fn().mockReturnValue(false),
     renameSession: mockRenameSession,
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useWorkspaceStore).mockReturnValue({

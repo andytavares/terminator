@@ -44,7 +44,7 @@
     },
     "checklist": {
       "id": "checklist",
-      "status": "locked",
+      "status": "skipped",
       "approvedHash": null,
       "approvedAt": null,
       "approvedBy": null,
@@ -54,30 +54,30 @@
     },
     "tasks": {
       "id": "tasks",
-      "status": "locked",
+      "status": "approved",
       "approvedHash": null,
-      "approvedAt": null,
-      "approvedBy": null,
+      "approvedAt": "2026-05-24T17:00:44.429Z",
+      "approvedBy": "user",
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": []
     },
     "analyze": {
       "id": "analyze",
-      "status": "locked",
+      "status": "approved",
       "approvedHash": null,
-      "approvedAt": null,
-      "approvedBy": null,
+      "approvedAt": "2026-05-24T17:00:46.729Z",
+      "approvedBy": "user",
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": []
     },
     "implement": {
       "id": "implement",
-      "status": "locked",
+      "status": "approved",
       "approvedHash": null,
-      "approvedAt": null,
-      "approvedBy": null,
+      "approvedAt": "2026-05-24T17:00:57.370Z",
+      "approvedBy": "user",
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": []

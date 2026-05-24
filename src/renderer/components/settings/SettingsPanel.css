@@ -127,6 +127,17 @@
   margin-bottom: 6px;
 }
 
+.settings-section__label--inline {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-primary);
+}
+
 .settings-section__input {
   background: var(--bg-input);
   border: 1px solid var(--border-strong);

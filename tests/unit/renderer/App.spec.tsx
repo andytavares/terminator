@@ -14,7 +14,14 @@ vi.mock('../../../src/renderer/stores/settings.store', () => ({ useSettingsStore
 vi.mock('../../../src/renderer/stores/session.store', () => ({ useSessionStore: vi.fn() }))
 vi.mock('../../../src/renderer/stores/toast.store', () => ({ useToastStore: vi.fn() }))
 vi.mock('../../../src/renderer/stores/log.store', () => ({ installLogInterceptor: vi.fn() }))
-vi.mock('../../../src/renderer/extensions/registry', () => ({ useExtensionRegistry: vi.fn() }))
+vi.mock('../../../src/renderer/extensions/registry', () => {
+  const useExtensionRegistry = vi.fn()
+  ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
+    registerGlobalTab: vi.fn(() => vi.fn()),
+    setActiveGlobalTab: vi.fn(),
+  }))
+  return { useExtensionRegistry }
+})
 vi.mock('../../../src/renderer/extensions/loader', () => ({}))
 type ShortcutCallbacks = {
   onOpenSettings?: () => void

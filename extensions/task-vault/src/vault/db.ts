@@ -15,6 +15,7 @@ export function initDb(vaultPath: string): Database.Database {
   _db.pragma('journal_mode = WAL')
   _db.pragma('foreign_keys = ON')
   applySchema(_db)
+  applyMigrations(_db)
   return _db
 }
 
@@ -30,6 +31,38 @@ export function closeDb(): void {
   }
 }
 
+function hasColumn(db: Database.Database, table: string, column: string): boolean {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
+  return cols.some((c) => c.name === column)
+}
+
+function applyMigrations(db: Database.Database): void {
+  if (!hasColumn(db, 'tasks', 'project_id')) {
+    db.exec(
+      `ALTER TABLE tasks ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL`
+    )
+    db.exec(
+      `UPDATE tasks SET project_id = (SELECT id FROM projects WHERE name = tasks.project) WHERE project IS NOT NULL`
+    )
+  }
+  if (!hasColumn(db, 'tasks', 'area_id')) {
+    db.exec(`ALTER TABLE tasks ADD COLUMN area_id TEXT REFERENCES areas(id) ON DELETE SET NULL`)
+    db.exec(
+      `UPDATE tasks SET area_id = (SELECT id FROM areas WHERE name = tasks.area) WHERE area IS NOT NULL`
+    )
+  }
+  if (!hasColumn(db, 'projects', 'area_id')) {
+    db.exec(`ALTER TABLE projects ADD COLUMN area_id TEXT REFERENCES areas(id) ON DELETE SET NULL`)
+    db.exec(
+      `UPDATE projects SET area_id = (SELECT id FROM areas WHERE name = projects.area) WHERE area IS NOT NULL`
+    )
+  }
+  // Always ensure indexes exist (CREATE INDEX IF NOT EXISTS is idempotent)
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id)`)
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_area_id ON tasks(area_id)`)
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_projects_area_id ON projects(area_id)`)
+}
+
 function applySchema(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS tasks (
@@ -39,6 +72,8 @@ function applySchema(db: Database.Database): void {
       project     TEXT,
       context     TEXT,
       area        TEXT,
+      project_id  TEXT REFERENCES projects(id) ON DELETE SET NULL,
+      area_id     TEXT REFERENCES areas(id) ON DELETE SET NULL,
       due_date    TEXT,
       completed_date TEXT,
       migrated_to TEXT,
@@ -51,17 +86,16 @@ function applySchema(db: Database.Database): void {
       created_at  TEXT NOT NULL,
       updated_at  TEXT NOT NULL
     );
-    CREATE INDEX IF NOT EXISTS idx_tasks_source  ON tasks(source, source_ref);
-    CREATE INDEX IF NOT EXISTS idx_tasks_status  ON tasks(status);
-    CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project);
-    CREATE INDEX IF NOT EXISTS idx_tasks_area    ON tasks(area);
-    CREATE INDEX IF NOT EXISTS idx_tasks_parent  ON tasks(parent_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_source ON tasks(source, source_ref);
+    CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id);
 
     CREATE TABLE IF NOT EXISTS projects (
       id               TEXT PRIMARY KEY,
       name             TEXT UNIQUE NOT NULL,
       status           TEXT NOT NULL DEFAULT 'active',
       area             TEXT,
+      area_id          TEXT REFERENCES areas(id) ON DELETE SET NULL,
       deadline         TEXT,
       outcome          TEXT,
       terminator_links TEXT NOT NULL DEFAULT '[]',
@@ -69,7 +103,6 @@ function applySchema(db: Database.Database): void {
       updated_at       TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
-    CREATE INDEX IF NOT EXISTS idx_projects_area   ON projects(area);
 
     CREATE TABLE IF NOT EXISTS areas (
       id         TEXT PRIMARY KEY,

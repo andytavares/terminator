@@ -14,6 +14,7 @@ interface SettingsState {
   updateWorktreeBaseDir: (dir: string) => Promise<void>
   updateWorkspaceWorktreeBaseDir: (workspaceId: string, dir: string | undefined) => Promise<void>
   markWelcomeSeen: () => Promise<void>
+  updateShowMetricsBar: (show: boolean) => Promise<void>
   resolveSettings: (workspaceId?: string | null) => GlobalSettings
 }
 
@@ -122,6 +123,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   markWelcomeSeen: async () => {
     const result = await window.electronAPI.settings.updateGlobal({ ui: { hasSeenWelcome: true } })
+    set({ globalSettings: result.settings })
+  },
+
+  updateShowMetricsBar: async (show) => {
+    const result = await window.electronAPI.settings.updateGlobal({ ui: { showMetricsBar: show } })
     set({ globalSettings: result.settings })
   },
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useSessionStore } from '../../stores/session.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { AlertBadge } from '../AlertBadge'
+import { ActivitySpinner } from '../ActivitySpinner'
 import type { ProjectTabRegistration } from '../../extensions/registry'
 import './TabBar.css'
 
@@ -26,6 +27,7 @@ export function TabBar({
     setActiveSessionForProject,
     getActiveSessionForProject,
     getBellCountForSession,
+    isSessionBusy,
     renameSession,
   } = useSessionStore()
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -118,6 +120,7 @@ export function TabBar({
                   {session.tabTitle}
                 </span>
               )}
+              {renamingId !== session.id && isSessionBusy(session.id) && <ActivitySpinner />}
               {session.id !== activeSessionId && renamingId !== session.id && (
                 <AlertBadge
                   count={getBellCountForSession(session.id)}

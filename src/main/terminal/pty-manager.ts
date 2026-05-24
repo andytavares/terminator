@@ -92,6 +92,10 @@ export class PtyManager {
     return [...this.sessions.keys()]
   }
 
+  getPid(sessionId: string): number | undefined {
+    return this.sessions.get(sessionId)?.pty.pid
+  }
+
   cleanupOrphans(): { cleanedCount: number } {
     const registryPath = REGISTRY_FILE()
     if (!existsSync(registryPath)) return { cleanedCount: 0 }

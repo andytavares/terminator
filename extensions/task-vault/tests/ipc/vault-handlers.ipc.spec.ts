@@ -140,6 +140,17 @@ describe('task-vault:vault:delete-task', () => {
     const result = await handler({}, null)
     expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
   })
+
+  it('uses recursive CTE to delete subtasks at all depths', async () => {
+    mockRun.mockReturnValue({ changes: 3 })
+    const handler = getHandler('task-vault:vault:delete-task')
+    await handler({}, { taskId: 'parent-1' })
+    const sql: string = mockPrepare.mock.calls.at(-1)?.[0] ?? ''
+    expect(sql).toMatch(/WITH RECURSIVE/i)
+    expect(sql).toMatch(/subtree/)
+    // Only the parent id is bound — cascade handles the rest
+    expect(mockRun).toHaveBeenCalledWith('parent-1')
+  })
 })
 
 // ── cancel-task ───────────────────────────────────────────────────────────────
@@ -494,11 +505,11 @@ describe('task-vault:projects:get-tasks', () => {
 // ── delete-area ───────────────────────────────────────────────────────────────
 
 describe('task-vault:vault:delete-area', () => {
-  it('deletes area and untags tasks', async () => {
+  it('deletes area (FK ON DELETE SET NULL handles task untag)', async () => {
     const handler = getHandler('task-vault:vault:delete-area')
     const result = await handler({}, { areaFilePath: 'areas/Work.md' })
     expect(result).toMatchObject({ success: true })
-    expect(mockRun).toHaveBeenCalledTimes(2)
+    expect(mockRun).toHaveBeenCalledTimes(1)
   })
 
   it('returns VALIDATION_ERROR for missing areaFilePath', async () => {
@@ -623,9 +634,8 @@ describe('task-vault:vault:list-areas with data', () => {
     }
     mockAll
       .mockReturnValueOnce([areaRow]) // areaRows (SELECT * FROM areas)
-      .mockReturnValueOnce([taskRow]) // taskRows for 'Work' area
-      .mockReturnValueOnce([projRow]) // projectRows for 'Work' area
-      .mockReturnValueOnce([]) // orphan areas (no orphans)
+      .mockReturnValueOnce([taskRow]) // taskRows for 'Work' area (filtered by area_id)
+      .mockReturnValueOnce([projRow]) // projectRows for 'Work' area (filtered by area_id)
     // get() is called: nextActionCount, totalCount, doneCount (per project) + combinedOpen, combinedTotal (per area)
     mockGet.mockReturnValue({ c: 2 })
     const handler = getHandler('task-vault:vault:list-areas')
@@ -638,15 +648,11 @@ describe('task-vault:vault:list-areas with data', () => {
     expect(result.areas[0].taskCount).toBe(2)
   })
 
-  it('includes orphan area tasks not in areas table', async () => {
-    const taskRow = makeTaskRow({ area: 'Orphan Area' })
-    mockAll
-      .mockReturnValueOnce([]) // no areas in table (SELECT * FROM areas)
-      .mockReturnValueOnce([{ area: 'Orphan Area' }]) // orphan areas
-      .mockReturnValueOnce([taskRow]) // tasks for orphan area
+  it('returns empty areas array when no areas exist', async () => {
+    mockAll.mockReturnValueOnce([]) // no areas in table
     const handler = getHandler('task-vault:vault:list-areas')
     const result = (await handler({}, undefined)) as { areas: { name: string }[] }
-    expect(result.areas.some((a) => a.name === 'Orphan Area')).toBe(true)
+    expect(result.areas).toHaveLength(0)
   })
 })
 
@@ -812,7 +818,93 @@ describe('getVaultPath (vault.ipc)', () => {
   })
 })
 
-// ── registerVaultIpcHandlers dispose (lines 709-712) ─────────────────────────
+// ── vault:get-task-detail ─────────────────────────────────────────────────────
+
+describe('task-vault:vault:get-task-detail', () => {
+  it('returns detail fields from metadata JSON', async () => {
+    const meta = JSON.stringify({
+      description: 'Describe it',
+      acceptance_criteria: '- [ ] criterion',
+      dev_hints: 'Use X pattern',
+    })
+    mockGet.mockReturnValue({ metadata: meta })
+    const handler = getHandler('task-vault:vault:get-task-detail')
+    const result = (await handler({}, { taskId: 'task-1' })) as Record<string, string>
+    expect(result.description).toBe('Describe it')
+    expect(result.acceptanceCriteria).toBe('- [ ] criterion')
+    expect(result.devHints).toBe('Use X pattern')
+  })
+
+  it('returns empty strings when metadata has no detail fields', async () => {
+    mockGet.mockReturnValue({ metadata: '{}' })
+    const handler = getHandler('task-vault:vault:get-task-detail')
+    const result = (await handler({}, { taskId: 'task-1' })) as Record<string, string>
+    expect(result.description).toBe('')
+    expect(result.acceptanceCriteria).toBe('')
+    expect(result.devHints).toBe('')
+  })
+
+  it('returns error when task not found', async () => {
+    mockGet.mockReturnValue(undefined)
+    const handler = getHandler('task-vault:vault:get-task-detail')
+    const result = (await handler({}, { taskId: 'nonexistent' })) as { error: string }
+    expect(result.error).toBe('Task not found')
+  })
+
+  it('returns validation error for invalid payload', async () => {
+    const handler = getHandler('task-vault:vault:get-task-detail')
+    const result = (await handler({}, {})) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+})
+
+// ── vault:save-task-detail ────────────────────────────────────────────────────
+
+describe('task-vault:vault:save-task-detail', () => {
+  it('writes merged metadata back to DB', async () => {
+    mockGet.mockReturnValue({ metadata: '{"other":"value"}' })
+    const handler = getHandler('task-vault:vault:save-task-detail')
+    const result = await handler(
+      {},
+      {
+        taskId: 'task-1',
+        description: 'New desc',
+        acceptanceCriteria: '- [ ] AC',
+        devHints: 'Hint',
+      }
+    )
+    expect(result).toEqual({ ok: true })
+    expect(mockRun).toHaveBeenCalled()
+    const savedMeta = JSON.parse(mockRun.mock.calls[0][0] as string) as Record<string, string>
+    expect(savedMeta.other).toBe('value')
+    expect(savedMeta.description).toBe('New desc')
+    expect(savedMeta.acceptance_criteria).toBe('- [ ] AC')
+    expect(savedMeta.dev_hints).toBe('Hint')
+  })
+
+  it('returns error when task not found', async () => {
+    mockGet.mockReturnValue(undefined)
+    const handler = getHandler('task-vault:vault:save-task-detail')
+    const result = (await handler(
+      {},
+      {
+        taskId: 'missing',
+        description: '',
+        acceptanceCriteria: '',
+        devHints: '',
+      }
+    )) as { error: string }
+    expect(result.error).toBe('Task not found')
+  })
+
+  it('returns validation error for invalid payload', async () => {
+    const handler = getHandler('task-vault:vault:save-task-detail')
+    const result = (await handler({}, { taskId: 'task-1' })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+})
+
+// ── registerVaultIpcHandlers dispose ──────────────────────────────────────────
 
 describe('registerVaultIpcHandlers dispose', () => {
   it('calls ipcMain.removeHandler for all registered channels', () => {
@@ -823,5 +915,7 @@ describe('registerVaultIpcHandlers dispose', () => {
     expect(removedChannels).toContain('task-vault:vault:get-inbox')
     expect(removedChannels).toContain('task-vault:vault:list-archive')
     expect(removedChannels).toContain('task-vault:vault:add-task')
+    expect(removedChannels).toContain('task-vault:vault:get-task-detail')
+    expect(removedChannels).toContain('task-vault:vault:save-task-detail')
   })
 })

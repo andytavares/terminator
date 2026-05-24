@@ -3,6 +3,7 @@ import type { Project } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
 import { AlertBadge } from '../AlertBadge'
+import { ActivitySpinner } from '../ActivitySpinner'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { BranchSwitcher } from './BranchSwitcher'
@@ -150,7 +151,7 @@ function ProjectCard({
   const [renameError, setRenameError] = useState('')
   const renameRef = useRef<HTMLInputElement>(null)
   const { activeProjectId, setActiveProject, deleteProject, renameProject } = useWorkspaceStore()
-  const { getBellCountForProject } = useSessionStore()
+  const { getBellCountForProject, isProjectBusy } = useSessionStore()
   const isActive = activeProjectId === project.id
   const bellCount = getBellCountForProject(project.id)
 
@@ -206,7 +207,10 @@ function ProjectCard({
         onClick={handleClick}
         onContextMenu={handleContextMenu}
       >
-        <AlertBadge count={bellCount} className="alert-badge--corner" />
+        <div className="proj-card__indicators">
+          <AlertBadge count={bellCount} />
+          {isProjectBusy(project.id) && <ActivitySpinner />}
+        </div>
         <span className="proj-card__drag-handle" title="Drag to reorder">
           ⠿
         </span>

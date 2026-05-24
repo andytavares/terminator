@@ -18,6 +18,8 @@ import {
   CreateAreaRequestSchema,
   DeleteAreaRequestSchema,
   ListArchiveRequestSchema,
+  GetTaskDetailRequestSchema,
+  SaveTaskDetailRequestSchema,
 } from '../schemas/vault.schema'
 import type { IndexedTask, IndexedProject, TaskStatus, ProjectStatus } from '../vault/types'
 
@@ -89,24 +91,54 @@ function resolveSource(filePath: string): { source: string; sourceRef: string | 
   return { source: 'inbox', sourceRef: null }
 }
 
-function ensureProjectAndArea(
+const TASK_COLS = `
+  t.id, t.text, t.status, p.name AS project, t.context, a.name AS area,
+  t.due_date, t.completed_date, t.migrated_to,
+  t.terminator_links, t.source, t.source_ref, t.parent_id,
+  t.sort_order, t.metadata, t.created_at, t.updated_at,
+  t.project_id, t.area_id
+`
+const TASK_JOINS = `LEFT JOIN projects p ON t.project_id = p.id LEFT JOIN areas a ON t.area_id = a.id`
+
+function resolveProjectAndAreaIds(
   db: ReturnType<typeof getDb>,
   project: string | undefined,
   area: string | undefined,
   now: string
-): void {
+): { projectId: string | null; areaId: string | null } {
+  let areaId: string | null = null
   if (area) {
-    db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
-      randomUUID(),
-      area,
-      now
-    )
+    const existingArea = db.prepare(`SELECT id FROM areas WHERE name=?`).get(area) as
+      | { id: string }
+      | undefined
+    if (existingArea) {
+      areaId = existingArea.id
+    } else {
+      areaId = randomUUID()
+      db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
+        areaId,
+        area,
+        now
+      )
+    }
   }
+
+  let projectId: string | null = null
   if (project) {
-    db.prepare(
-      `INSERT OR IGNORE INTO projects (id,name,status,area,created_at,updated_at) VALUES (?,?,?,?,?,?)`
-    ).run(randomUUID(), project, 'active', area ?? null, now, now)
+    const existingProject = db.prepare(`SELECT id FROM projects WHERE name=?`).get(project) as
+      | { id: string }
+      | undefined
+    if (existingProject) {
+      projectId = existingProject.id
+    } else {
+      projectId = randomUUID()
+      db.prepare(
+        `INSERT OR IGNORE INTO projects (id,name,status,area_id,created_at,updated_at) VALUES (?,?,?,?,?,?)`
+      ).run(projectId, project, 'active', areaId, now, now)
+    }
   }
+
+  return { projectId, areaId }
 }
 
 export function registerVaultIpcHandlers(): () => void {
@@ -136,17 +168,22 @@ export function registerVaultIpcHandlers(): () => void {
     const db = getDb()
     const now = new Date().toISOString()
     const id = randomUUID()
-    ensureProjectAndArea(db, extracted.project, extracted.area, now)
+    const { projectId, areaId } = resolveProjectAndAreaIds(
+      db,
+      extracted.project,
+      extracted.area,
+      now
+    )
     db.prepare(
-      `INSERT INTO tasks (id,text,status,project,context,area,due_date,source,source_ref,created_at,updated_at)
+      `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,created_at,updated_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?)`
     ).run(
       id,
       extracted.text,
       'open',
-      extracted.project ?? null,
+      projectId,
       extracted.context ?? null,
-      extracted.area ?? null,
+      areaId,
       extracted.dueDate ?? null,
       'inbox',
       null,
@@ -167,16 +204,17 @@ export function registerVaultIpcHandlers(): () => void {
       // Rollover: move open/in-progress tasks from past daily logs to today
       const staleRows = db
         .prepare(
-          `SELECT id, text, project, context, area, due_date FROM tasks
-           WHERE source='daily' AND source_ref < ? AND source_ref IS NOT NULL
-             AND status IN ('open','in-progress') AND parent_id IS NULL`
+          `SELECT t.id, t.text, p.name AS project, t.context, a.name AS area, t.due_date, t.project_id, t.area_id
+           FROM tasks t ${TASK_JOINS}
+           WHERE t.source='daily' AND t.source_ref < ? AND t.source_ref IS NOT NULL
+             AND t.status IN ('open','in-progress') AND t.parent_id IS NULL`
         )
         .all(date) as Record<string, unknown>[]
 
       const rolledOverIds: string[] = []
       if (staleRows.length > 0) {
         const insertStmt = db.prepare(
-          `INSERT OR IGNORE INTO tasks (id,text,status,project,context,area,due_date,source,source_ref,created_at,updated_at)
+          `INSERT OR IGNORE INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,created_at,updated_at)
            VALUES (?,?,?,?,?,?,?,?,?,?,?)`
         )
         const migrateStmt = db.prepare(
@@ -191,9 +229,9 @@ export function registerVaultIpcHandlers(): () => void {
             newId,
             row.text,
             'open',
-            row.project ?? null,
+            row.project_id ?? null,
             row.context ?? null,
-            row.area ?? null,
+            row.area_id ?? null,
             row.due_date ?? null,
             'daily',
             date,
@@ -208,14 +246,17 @@ export function registerVaultIpcHandlers(): () => void {
 
       const taskRows = db
         .prepare(
-          `SELECT * FROM tasks WHERE source='daily' AND source_ref=? AND parent_id IS NULL ORDER BY sort_order, created_at`
+          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+           WHERE t.source='daily' AND t.source_ref=? AND t.parent_id IS NULL ORDER BY t.sort_order, t.created_at`
         )
         .all(date) as Record<string, unknown>[]
       const tasks = taskRows.map(rowToTask)
       for (const task of tasks) {
         task.subtasks = (
           db
-            .prepare(`SELECT * FROM tasks WHERE parent_id=? ORDER BY sort_order, created_at`)
+            .prepare(
+              `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE t.parent_id=? ORDER BY t.sort_order, t.created_at`
+            )
             .all(task.id) as Record<string, unknown>[]
         ).map(rowToTask)
       }
@@ -247,14 +288,17 @@ export function registerVaultIpcHandlers(): () => void {
       const db = getDb()
       const taskRows = db
         .prepare(
-          `SELECT * FROM tasks WHERE source='daily' AND source_ref=? AND parent_id IS NULL ORDER BY sort_order, created_at`
+          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+           WHERE t.source='daily' AND t.source_ref=? AND t.parent_id IS NULL ORDER BY t.sort_order, t.created_at`
         )
         .all(date) as Record<string, unknown>[]
       const tasks = taskRows.map(rowToTask)
       for (const task of tasks) {
         task.subtasks = (
           db
-            .prepare(`SELECT * FROM tasks WHERE parent_id=? ORDER BY sort_order, created_at`)
+            .prepare(
+              `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE t.parent_id=? ORDER BY t.sort_order, t.created_at`
+            )
             .all(task.id) as Record<string, unknown>[]
         ).map(rowToTask)
       }
@@ -293,17 +337,22 @@ export function registerVaultIpcHandlers(): () => void {
     const db = getDb()
     const now = new Date().toISOString()
     const id = randomUUID()
-    ensureProjectAndArea(db, extracted.project, extracted.area, now)
+    const { projectId, areaId } = resolveProjectAndAreaIds(
+      db,
+      extracted.project,
+      extracted.area,
+      now
+    )
     db.prepare(
-      `INSERT INTO tasks (id,text,status,project,context,area,due_date,source,source_ref,created_at,updated_at)
+      `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,created_at,updated_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?)`
     ).run(
       id,
       extracted.text,
       'open',
-      extracted.project ?? null,
+      projectId,
       extracted.context ?? null,
-      extracted.area ?? null,
+      areaId,
       extracted.dueDate ?? null,
       source,
       sourceRef,
@@ -335,9 +384,9 @@ export function registerVaultIpcHandlers(): () => void {
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, targetDate } = parsed.data
     const db = getDb()
-    const task = db.prepare(`SELECT * FROM tasks WHERE id=?`).get(taskId) as
-      | Record<string, unknown>
-      | undefined
+    const task = db
+      .prepare(`SELECT t.*, t.project_id, t.area_id FROM tasks t WHERE t.id=?`)
+      .get(taskId) as Record<string, unknown> | undefined
     if (!task) return { error: 'STALE_ID' }
     const now = new Date().toISOString()
     db.prepare(`UPDATE tasks SET status='migrated', migrated_to=?, updated_at=? WHERE id=?`).run(
@@ -345,18 +394,18 @@ export function registerVaultIpcHandlers(): () => void {
       now,
       taskId
     )
-    // Create new task on target date
+    // Create new task on target date, preserving ID-based links
     const newId = randomUUID()
     db.prepare(
-      `INSERT INTO tasks (id,text,status,project,context,area,due_date,source,source_ref,created_at,updated_at)
+      `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,created_at,updated_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?)`
     ).run(
       newId,
       task.text,
       'open',
-      task.project ?? null,
+      task.project_id ?? null,
       task.context ?? null,
-      task.area ?? null,
+      task.area_id ?? null,
       task.due_date ?? null,
       'daily',
       targetDate,
@@ -379,29 +428,29 @@ export function registerVaultIpcHandlers(): () => void {
 
     if (status) {
       const statuses = Array.isArray(status) ? status : [status]
-      conditions.push(`status IN (${statuses.map(() => '?').join(',')})`)
+      conditions.push(`t.status IN (${statuses.map(() => '?').join(',')})`)
       params.push(...statuses)
     }
     if (context) {
-      conditions.push(`context=?`)
+      conditions.push(`t.context=?`)
       params.push(context)
     }
     if (project) {
-      conditions.push(`project=?`)
+      conditions.push(`p.name=?`)
       params.push(project)
     }
     if (area) {
-      conditions.push(`area=?`)
+      conditions.push(`a.name=?`)
       params.push(area)
     }
     if (dueBefore) {
-      conditions.push(`due_date < ?`)
+      conditions.push(`t.due_date < ?`)
       params.push(dueBefore)
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
     const rows = db
-      .prepare(`SELECT * FROM tasks ${where} ORDER BY created_at`)
+      .prepare(`SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} ${where} ORDER BY t.created_at`)
       .all(...params) as Record<string, unknown>[]
     return { tasks: rows.map(rowToTask) }
   })
@@ -421,7 +470,16 @@ export function registerVaultIpcHandlers(): () => void {
     if (!task) return { error: 'STALE_ID' }
 
     if (action === 'trash') {
-      db.prepare(`DELETE FROM tasks WHERE id=? OR parent_id=?`).run(taskId, taskId)
+      db.prepare(
+        `
+        WITH RECURSIVE subtree(id) AS (
+          SELECT id FROM tasks WHERE id = ?
+          UNION ALL
+          SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
+        )
+        DELETE FROM tasks WHERE id IN (SELECT id FROM subtree)
+      `
+      ).run(taskId)
       return { success: true }
     }
 
@@ -496,16 +554,21 @@ export function registerVaultIpcHandlers(): () => void {
     const extracted = extractTags(text)
     const db = getDb()
     const now = new Date().toISOString()
-    ensureProjectAndArea(db, extracted.project, extracted.area, now)
+    const { projectId, areaId } = resolveProjectAndAreaIds(
+      db,
+      extracted.project,
+      extracted.area,
+      now
+    )
     const changes = db
       .prepare(
-        `UPDATE tasks SET text=?,project=?,context=?,area=?,due_date=?,updated_at=? WHERE id=?`
+        `UPDATE tasks SET text=?,project_id=?,context=?,area_id=?,due_date=?,updated_at=? WHERE id=?`
       )
       .run(
         extracted.text,
-        extracted.project ?? null,
+        projectId,
         extracted.context ?? null,
-        extracted.area ?? null,
+        areaId,
         extracted.dueDate ?? null,
         now,
         taskId
@@ -521,7 +584,18 @@ export function registerVaultIpcHandlers(): () => void {
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
     const db = getDb()
-    const changes = db.prepare(`DELETE FROM tasks WHERE id=? OR parent_id=?`).run(taskId, taskId)
+    const changes = db
+      .prepare(
+        `
+      WITH RECURSIVE subtree(id) AS (
+        SELECT id FROM tasks WHERE id = ?
+        UNION ALL
+        SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
+      )
+      DELETE FROM tasks WHERE id IN (SELECT id FROM subtree)
+    `
+      )
+      .run(taskId)
     if (changes.changes === 0) return { error: 'STALE_ID' }
     return { success: true }
   })
@@ -586,9 +660,8 @@ export function registerVaultIpcHandlers(): () => void {
     // Extract area name from path (basename without .md)
     const areaName = path.basename(areaFilePath, '.md')
     const db = getDb()
+    // FK ON DELETE SET NULL handles tasks.area_id and projects.area_id automatically
     db.prepare(`DELETE FROM areas WHERE name=?`).run(areaName)
-    // Orphan tasks tagged with this area (don't delete them — just untag)
-    db.prepare(`UPDATE tasks SET area=NULL WHERE area=?`).run(areaName)
     return { success: true }
   })
 
@@ -599,14 +672,17 @@ export function registerVaultIpcHandlers(): () => void {
       const db = getDb()
       const rows = db
         .prepare(
-          `SELECT * FROM tasks WHERE source='inbox' AND status='open' AND parent_id IS NULL ORDER BY created_at`
+          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+           WHERE t.source='inbox' AND t.status='open' AND t.parent_id IS NULL ORDER BY t.created_at`
         )
         .all() as Record<string, unknown>[]
       const tasks = rows.map(rowToTask)
       for (const task of tasks) {
         task.subtasks = (
           db
-            .prepare(`SELECT * FROM tasks WHERE parent_id=? ORDER BY sort_order, created_at`)
+            .prepare(
+              `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE t.parent_id=? ORDER BY t.sort_order, t.created_at`
+            )
             .all(task.id) as Record<string, unknown>[]
         ).map(rowToTask)
       }
@@ -628,33 +704,35 @@ export function registerVaultIpcHandlers(): () => void {
       const result: unknown[] = []
 
       for (const a of areaRows) {
+        const areaId = a.id as string
         const areaName = a.name as string
         const taskRows = db
           .prepare(
-            `SELECT * FROM tasks WHERE area=? AND parent_id IS NULL AND status NOT IN ('done','cancelled','migrated') ORDER BY created_at`
+            `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+             WHERE t.area_id=? AND t.parent_id IS NULL AND t.status NOT IN ('done','cancelled','migrated') ORDER BY t.created_at`
           )
-          .all(areaName) as Record<string, unknown>[]
+          .all(areaId) as Record<string, unknown>[]
         const tasks = taskRows.map(rowToTask)
         const projectRows = db
-          .prepare(`SELECT * FROM projects WHERE area=? ORDER BY name`)
-          .all(areaName) as Record<string, unknown>[]
+          .prepare(`SELECT * FROM projects WHERE area_id=? ORDER BY name`)
+          .all(areaId) as Record<string, unknown>[]
         const projects = projectRows.map((p) => {
           const nextActionCount = (
             db
-              .prepare(`SELECT COUNT(*) as c FROM tasks WHERE project=? AND status='open'`)
-              .get(p.name) as { c: number }
+              .prepare(`SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND status='open'`)
+              .get(p.id) as { c: number }
           ).c
           const totalCount = (
             db
-              .prepare(`SELECT COUNT(*) as c FROM tasks WHERE project=? AND parent_id IS NULL`)
-              .get(p.name) as { c: number }
+              .prepare(`SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND parent_id IS NULL`)
+              .get(p.id) as { c: number }
           ).c
           const doneCount = (
             db
               .prepare(
-                `SELECT COUNT(*) as c FROM tasks WHERE project=? AND status IN ('done','cancelled','migrated') AND parent_id IS NULL`
+                `SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND status IN ('done','cancelled','migrated') AND parent_id IS NULL`
               )
-              .get(p.name) as { c: number }
+              .get(p.id) as { c: number }
           ).c
           return {
             ...rowToProject(p),
@@ -668,16 +746,16 @@ export function registerVaultIpcHandlers(): () => void {
         const combinedOpenCount = (
           db
             .prepare(
-              `SELECT COUNT(DISTINCT id) as c FROM tasks WHERE parent_id IS NULL AND status='open' AND (area=? OR project IN (SELECT name FROM projects WHERE area=?))`
+              `SELECT COUNT(DISTINCT t.id) as c FROM tasks t WHERE t.parent_id IS NULL AND t.status='open' AND (t.area_id=? OR t.project_id IN (SELECT id FROM projects WHERE area_id=?))`
             )
-            .get(areaName, areaName) as { c: number }
+            .get(areaId, areaId) as { c: number }
         ).c
         const combinedTotalCount = (
           db
             .prepare(
-              `SELECT COUNT(DISTINCT id) as c FROM tasks WHERE parent_id IS NULL AND (area=? OR project IN (SELECT name FROM projects WHERE area=?))`
+              `SELECT COUNT(DISTINCT t.id) as c FROM tasks t WHERE t.parent_id IS NULL AND (t.area_id=? OR t.project_id IN (SELECT id FROM projects WHERE area_id=?))`
             )
-            .get(areaName, areaName) as { c: number }
+            .get(areaId, areaId) as { c: number }
         ).c
         result.push({
           filePath: areaName,
@@ -686,27 +764,6 @@ export function registerVaultIpcHandlers(): () => void {
           openTaskCount: combinedOpenCount,
           tasks,
           projects,
-        })
-      }
-
-      // Also include tasks tagged with areas not in the areas table
-      const orphanRows = db
-        .prepare(
-          `SELECT DISTINCT area FROM tasks WHERE area IS NOT NULL AND area NOT IN (SELECT name FROM areas)`
-        )
-        .all() as { area: string }[]
-      for (const { area } of orphanRows) {
-        const taskRows = db
-          .prepare(`SELECT * FROM tasks WHERE area=? AND parent_id IS NULL ORDER BY created_at`)
-          .all(area) as Record<string, unknown>[]
-        const tasks = taskRows.map(rowToTask)
-        result.push({
-          filePath: area,
-          name: area,
-          taskCount: tasks.length,
-          openTaskCount: tasks.filter((t) => t.status === 'open').length,
-          tasks,
-          projects: [],
         })
       }
 
@@ -723,7 +780,9 @@ export function registerVaultIpcHandlers(): () => void {
     if (!projectName) return { tasks: [] }
     const db = getDb()
     const rows = db
-      .prepare(`SELECT * FROM tasks WHERE project=? ORDER BY status, created_at`)
+      .prepare(
+        `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE p.name=? ORDER BY t.status, t.created_at`
+      )
       .all(projectName) as Record<string, unknown>[]
     return { tasks: rows.map(rowToTask) }
   })
@@ -738,7 +797,8 @@ export function registerVaultIpcHandlers(): () => void {
       const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
       const taskRows = db
         .prepare(
-          `SELECT * FROM tasks WHERE status IN ('done','cancelled','migrated') AND updated_at >= ? ORDER BY updated_at DESC`
+          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+           WHERE t.status IN ('done','cancelled','migrated') AND t.updated_at >= ? ORDER BY t.updated_at DESC`
         )
         .all(cutoff) as Record<string, unknown>[]
       const projectRows = db
@@ -820,15 +880,22 @@ export function registerVaultIpcHandlers(): () => void {
       }
       if (Array.isArray(data.projects)) {
         const stmt = db.prepare(
-          `INSERT OR IGNORE INTO projects (id,name,status,area,deadline,outcome,terminator_links,created_at,updated_at)
+          `INSERT OR IGNORE INTO projects (id,name,status,area_id,deadline,outcome,terminator_links,created_at,updated_at)
            VALUES (?,?,?,?,?,?,?,?,?)`
         )
         for (const p of data.projects) {
+          const areaId = p.area
+            ? ((
+                db.prepare(`SELECT id FROM areas WHERE name=?`).get(p.area) as
+                  | { id: string }
+                  | undefined
+              )?.id ?? null)
+            : null
           stmt.run(
             p.id,
             p.name,
             p.status ?? 'active',
-            p.area ?? null,
+            areaId,
             p.deadline ?? null,
             p.outcome ?? null,
             p.terminator_links ?? '[]',
@@ -841,18 +908,32 @@ export function registerVaultIpcHandlers(): () => void {
       if (Array.isArray(data.tasks)) {
         const stmt = db.prepare(
           `INSERT OR IGNORE INTO tasks
-             (id,text,status,project,context,area,due_date,completed_date,migrated_to,
+             (id,text,status,project_id,context,area_id,due_date,completed_date,migrated_to,
               source,source_ref,parent_id,sort_order,metadata,terminator_links,created_at,updated_at)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
         )
         for (const t of data.tasks) {
+          const projectId = t.project
+            ? ((
+                db.prepare(`SELECT id FROM projects WHERE name=?`).get(t.project) as
+                  | { id: string }
+                  | undefined
+              )?.id ?? null)
+            : null
+          const areaId = t.area
+            ? ((
+                db.prepare(`SELECT id FROM areas WHERE name=?`).get(t.area) as
+                  | { id: string }
+                  | undefined
+              )?.id ?? null)
+            : null
           stmt.run(
             t.id,
             t.text,
             t.status ?? 'open',
-            t.project ?? null,
+            projectId,
             t.context ?? null,
-            t.area ?? null,
+            areaId,
             t.due_date ?? null,
             t.completed_date ?? null,
             t.migrated_to ?? null,
@@ -912,6 +993,56 @@ export function registerVaultIpcHandlers(): () => void {
     }
     if (changes.changes === 0) return { error: 'NOT_FOUND' }
     return { success: true }
+  })
+
+  // ── vault:get-task-detail ────────────────────────────────────────────────────
+
+  handle('task-vault:vault:get-task-detail', async (_event, payload) => {
+    const parsed = GetTaskDetailRequestSchema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { taskId } = parsed.data
+    try {
+      const db = getDb()
+      const row = db.prepare(`SELECT metadata FROM tasks WHERE id=?`).get(taskId) as
+        | { metadata: string }
+        | undefined
+      if (!row) return { error: 'Task not found' }
+      const meta = JSON.parse(row.metadata || '{}') as Record<string, string>
+      return {
+        description: meta.description ?? '',
+        acceptanceCriteria: meta.acceptance_criteria ?? '',
+        devHints: meta.dev_hints ?? '',
+      }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  // ── vault:save-task-detail ───────────────────────────────────────────────────
+
+  handle('task-vault:vault:save-task-detail', async (_event, payload) => {
+    const parsed = SaveTaskDetailRequestSchema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { taskId, description, acceptanceCriteria, devHints } = parsed.data
+    try {
+      const db = getDb()
+      const row = db.prepare(`SELECT metadata FROM tasks WHERE id=?`).get(taskId) as
+        | { metadata: string }
+        | undefined
+      if (!row) return { error: 'Task not found' }
+      const meta = JSON.parse(row.metadata || '{}') as Record<string, string>
+      meta.description = description
+      meta.acceptance_criteria = acceptanceCriteria
+      meta.dev_hints = devHints
+      db.prepare(`UPDATE tasks SET metadata=?, updated_at=? WHERE id=?`).run(
+        JSON.stringify(meta),
+        new Date().toISOString(),
+        taskId
+      )
+      return { ok: true }
+    } catch (err) {
+      return { error: String(err) }
+    }
   })
 
   return () => {
