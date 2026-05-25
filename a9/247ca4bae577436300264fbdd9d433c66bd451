@@ -1,0 +1,27 @@
+extensions/git-integration/tests/unit/github-api.spec.ts
+  s_837276b88ea77e::t_6641ab3e908279 136-163
+extensions/git-integration/tests/unit/github-ipc.spec.ts
+  s_837276b88ea77e::t_217529f0a810dd 1000-1162
+  s_837276b88ea77e::t_06747218b443b1 105-156
+extensions/git-integration/tests/unit/usePrReview.spec.tsx
+  s_837276b88ea77e::t_7f58d4e8670404 9
+  s_837276b88ea77e::t_fb9844e7922cbc 75
+  s_837276b88ea77e::t_de8b5e5c4997f2 24-25,32
+  s_837276b88ea77e::t_493b1a08420a7b 1083-1166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "a9247ca4bae577436300264fbdd9d433c66bd451",
+  "prompts": {},
+  "sessions": {
+    "s_837276b88ea77e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4838bd3f-b288-4833-902f-2dbdbd272759",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
