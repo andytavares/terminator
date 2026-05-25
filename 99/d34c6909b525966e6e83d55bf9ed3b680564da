@@ -1,0 +1,47 @@
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_837276b88ea77e::t_bc3859b60c05f4 303-315
+  s_837276b88ea77e::t_42c0116920ba35 230
+  s_837276b88ea77e::t_bbe25b65b2a37f 277
+  s_837276b88ea77e::t_7eb67218a67875 713-720
+extensions/git-integration/src/api/github.ts
+  s_837276b88ea77e::t_ba33a39658d624 18-20
+extensions/git-integration/tests/unit/PrOverviewPanel.spec.tsx
+  s_837276b88ea77e::t_2c6ccaf62383be 77-78
+  s_837276b88ea77e::t_e9d79be1d2c540 18
+  s_837276b88ea77e::t_a400dfa5cb9453 354,385-487
+  s_837276b88ea77e::t_76fb688d1fa0e5 355-384
+  s_837276b88ea77e::t_955b7233b70a0f 3
+extensions/git-integration/tests/unit/github-api.spec.ts
+  s_837276b88ea77e::t_5cd886baa9b0d6 164-172
+extensions/git-integration/tests/unit/github-ipc.spec.ts
+  s_837276b88ea77e::t_64d780b56bee08 1163-1208
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_837276b88ea77e::t_648021e9eccd0e 2629
+  s_837276b88ea77e::t_3e254f37e83fb8 2441-2464
+  s_837276b88ea77e::t_33f52b4037871d 2513-2542
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_837276b88ea77e::t_fb544686f2541f 97
+extensions/git-integration/src/components/pr-review/PrOverviewPanel.tsx
+  s_837276b88ea77e::t_c85cfed35c7373 302-340,342
+  s_837276b88ea77e::t_2426d458db566b 93-109
+  s_837276b88ea77e::t_c7abe9c1f8f70a 38
+  s_837276b88ea77e::t_13e5b443586bba 43-44
+  s_837276b88ea77e::t_af4423f8a54050 183-190
+  s_837276b88ea77e::t_0f711a6723e2fb 359-367
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "99d34c6909b525966e6e83d55bf9ed3b680564da",
+  "prompts": {},
+  "sessions": {
+    "s_837276b88ea77e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4838bd3f-b288-4833-902f-2dbdbd272759",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
