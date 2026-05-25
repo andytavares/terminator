@@ -1,0 +1,20 @@
+scripts/check-patch-coverage.cjs
+  ai_agent 72-75,86-90
+  s_9fc98237e0f015::t_fe2a7affd4d701 64-65,67-69,71,83-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "ae0ff0f277bc7b5f46b1f1e955fba5937b99842f",
+  "prompts": {},
+  "sessions": {
+    "s_9fc98237e0f015": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "55af2546-7603-48c9-8dd8-10a912c413e9",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
