@@ -150,17 +150,25 @@ describe('PrReviewView', () => {
     expect(screen.getByTestId('review-diff-pane')).toBeTruthy()
   })
 
-  it('renders chapter file list in guided mode', async () => {
-    await renderView()
-    expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
-  })
-
-  it('shows chapter nav for multi-chapter PRs', async () => {
+  it('renders chapter file list when switched to guided mode', async () => {
     const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2' }
     await renderView(
       { chapters: [mockChapter, ch2] },
       { currentChapterId: 'ch-1', currentFilePath: 'src/foo.ts' }
     )
+    // Default is full mode; switch to guided
+    fireEvent.click(screen.getByTitle('Switch to guided chapter view'))
+    expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
+  })
+
+  it('shows chapter nav for multi-chapter PRs in guided mode', async () => {
+    const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2' }
+    await renderView(
+      { chapters: [mockChapter, ch2] },
+      { currentChapterId: 'ch-1', currentFilePath: 'src/foo.ts' }
+    )
+    // Default is full mode; chapter nav only visible in guided mode
+    fireEvent.click(screen.getByTitle('Switch to guided chapter view'))
     expect(screen.getByTestId('chapter-nav')).toBeTruthy()
   })
 
@@ -229,7 +237,7 @@ describe('PrReviewView', () => {
     expect(mockSetCurrentFile).toHaveBeenCalledWith('src/bar.ts')
   })
 
-  it('shows All-files mode when viewMode is switched to full', async () => {
+  it('shows full-file-list by default, restores it after switching to guided and back', async () => {
     const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2' }
     const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
     setupStore({ currentFilePath: 'src/foo.ts', currentChapterId: 'ch-1' })
@@ -241,11 +249,17 @@ describe('PrReviewView', () => {
         onRefresh={mockRefresh}
       />
     )
+    // Full is default
+    expect(screen.getByTestId('full-file-list')).toBeTruthy()
+    // Switch to guided
+    fireEvent.click(screen.getByTitle('Switch to guided chapter view'))
+    expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
+    // Switch back to full
     fireEvent.click(screen.getByTitle('Switch to full file view'))
     expect(screen.getByTestId('full-file-list')).toBeTruthy()
   })
 
-  it('switches back to guided mode from full mode', async () => {
+  it('switches to guided mode from full mode', async () => {
     const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2' }
     const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
     setupStore({ currentFilePath: 'src/foo.ts', currentChapterId: 'ch-1' })
@@ -257,7 +271,6 @@ describe('PrReviewView', () => {
         onRefresh={mockRefresh}
       />
     )
-    fireEvent.click(screen.getByTitle('Switch to full file view'))
     fireEvent.click(screen.getByTitle('Switch to guided chapter view'))
     expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
   })

@@ -7,6 +7,17 @@ import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
 
 vi.mock('../../src/stores/pr-review.store', () => ({ usePrReviewStore: vi.fn() }))
 
+vi.mock('../../src/hooks/usePrReview', () => ({
+  useLoadIssueComments: vi.fn(() => vi.fn()),
+}))
+
+vi.mock('../../src/api/github', () => ({
+  githubAPI: {
+    prMarkReady: vi.fn().mockResolvedValue({}),
+    prIssueCommentAdd: vi.fn().mockResolvedValue({}),
+  },
+}))
+
 vi.mock('../../src/components/pr-review/StatusChecksBar', () => ({
   StatusChecksBar: ({ checks }: { checks: unknown[] }) => (
     <div data-testid="status-checks-bar" data-count={checks.length} />
@@ -84,6 +95,7 @@ const basePr: PrReviewDetail = {
 beforeEach(() => {
   vi.mocked(usePrReviewStore).mockReturnValue({
     viewedFiles: new Set(),
+    issueComments: [],
   } as unknown as ReturnType<typeof usePrReviewStore>)
 })
 
@@ -93,6 +105,7 @@ describe('PrOverviewPanel', () => {
     const onClose = vi.fn()
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="not-started"
         onStartReview={onStartReview}
@@ -106,6 +119,7 @@ describe('PrOverviewPanel', () => {
   it('renders author and branch info', () => {
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="not-started"
         onStartReview={vi.fn()}
@@ -119,6 +133,7 @@ describe('PrOverviewPanel', () => {
   it('renders status checks bar', () => {
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="not-started"
         onStartReview={vi.fn()}
@@ -133,6 +148,7 @@ describe('PrOverviewPanel', () => {
   it('shows Start Review for not-started PRs', () => {
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="not-started"
         onStartReview={vi.fn()}
@@ -145,6 +161,7 @@ describe('PrOverviewPanel', () => {
   it('shows Resume Review for paused PRs', () => {
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="paused"
         onStartReview={vi.fn()}
@@ -157,6 +174,7 @@ describe('PrOverviewPanel', () => {
   it('shows Continue Review for in-progress PRs', () => {
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="in-progress"
         onStartReview={vi.fn()}
@@ -170,6 +188,7 @@ describe('PrOverviewPanel', () => {
     const onStartReview = vi.fn()
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="not-started"
         onStartReview={onStartReview}
@@ -184,6 +203,7 @@ describe('PrOverviewPanel', () => {
     const onClose = vi.fn()
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="not-started"
         onStartReview={vi.fn()}
@@ -197,6 +217,7 @@ describe('PrOverviewPanel', () => {
   it('renders PR description via RichContent', () => {
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="not-started"
         onStartReview={vi.fn()}
@@ -210,6 +231,7 @@ describe('PrOverviewPanel', () => {
   it('shows no-description message when body is empty', () => {
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={{ ...basePr, body: '' }}
         sessionStatus="not-started"
         onStartReview={vi.fn()}
@@ -222,6 +244,7 @@ describe('PrOverviewPanel', () => {
   it('renders hotspot files for high and medium risk', () => {
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="not-started"
         onStartReview={vi.fn()}
@@ -237,9 +260,11 @@ describe('PrOverviewPanel', () => {
   it('shows progress bar for in-progress reviews', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set(['src/high.ts']),
+      issueComments: [],
     } as unknown as ReturnType<typeof usePrReviewStore>)
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="in-progress"
         onStartReview={vi.fn()}
@@ -252,6 +277,7 @@ describe('PrOverviewPanel', () => {
   it('renders metric values', () => {
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="not-started"
         onStartReview={vi.fn()}
@@ -269,6 +295,7 @@ describe('PrOverviewPanel', () => {
   it('renders age as "2d ago"', () => {
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="not-started"
         onStartReview={vi.fn()}
@@ -281,6 +308,7 @@ describe('PrOverviewPanel', () => {
   it('renders age as "today" for same-day PRs', () => {
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={{ ...basePr, openedAt: new Date().toISOString() }}
         sessionStatus="not-started"
         onStartReview={vi.fn()}
@@ -294,6 +322,7 @@ describe('PrOverviewPanel', () => {
     const onPopOut = vi.fn()
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="not-started"
         onStartReview={vi.fn()}
@@ -310,6 +339,7 @@ describe('PrOverviewPanel', () => {
   it('does not render pop out button when onPopOut is absent', () => {
     render(
       <PrOverviewPanel
+        repoRoot="/repo"
         pr={basePr}
         sessionStatus="not-started"
         onStartReview={vi.fn()}

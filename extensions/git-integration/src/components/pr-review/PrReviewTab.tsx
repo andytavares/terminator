@@ -4,7 +4,12 @@ import { usePrReviewStore } from '../../stores/pr-review.store'
 import { ReviewQueue } from './ReviewQueue'
 import { PrReviewView } from './PrReviewView'
 import { PrOverviewPanel } from './PrOverviewPanel'
-import { useLoadPrQueue, useLoadPrDetail, useFetchFileMetrics } from '../../hooks/usePrReview'
+import {
+  useLoadPrQueue,
+  useLoadPrDetail,
+  useFetchFileMetrics,
+  useLoadIssueComments,
+} from '../../hooks/usePrReview'
 import { ReviewSessionSchema } from '../../schemas/pr-review.schema'
 import type { ReviewQueuePR } from '../../schemas/pr-review.schema'
 import './pr-review.css'
@@ -52,6 +57,7 @@ export function PrReviewTab({ repoRoot }: Props) {
   const loadQueue = useLoadPrQueue(repoRoot)
   const loadPrDetail = useLoadPrDetail(repoRoot)
   const fetchFileMetrics = useFetchFileMetrics(repoRoot)
+  const loadIssueComments = useLoadIssueComments(repoRoot)
 
   useEffect(() => {
     if (repoRoot) loadQueue()
@@ -108,6 +114,8 @@ export function PrReviewTab({ repoRoot }: Props) {
       setShowOverview(true)
       // Kick off risk score computation in the background (non-blocking).
       fetchFileMetrics(detail)
+      // Load conversation comments in the background (pass prNumber directly to avoid stale closure).
+      void loadIssueComments(detail.number)
     })
   }
 
@@ -198,10 +206,12 @@ export function PrReviewTab({ repoRoot }: Props) {
   if (activePr && showOverview) {
     return (
       <PrOverviewPanel
+        repoRoot={repoRoot}
         pr={activePr}
         sessionStatus={activeQueuePr?.sessionStatus ?? 'not-started'}
         onStartReview={() => setShowOverview(false)}
         onClose={handleClosePr}
+        onRefresh={handleRefreshPr}
         onPopOut={isPoppedOut ? undefined : handlePopOut}
       />
     )

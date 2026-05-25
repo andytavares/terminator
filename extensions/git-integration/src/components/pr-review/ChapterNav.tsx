@@ -5,9 +5,10 @@ import { chapterRiskLevel } from '../../github/pr-review-service'
 
 interface Props {
   chapters: Chapter[]
+  onSelectChapter?: (id: string) => void
 }
 
-export function ChapterNav({ chapters }: Props) {
+export function ChapterNav({ chapters, onSelectChapter }: Props) {
   const { currentChapterId, setCurrentChapter, viewedFiles } = usePrReviewStore()
 
   function chapterStatus(chapter: Chapter): 'not-started' | 'in-progress' | 'complete' {
@@ -30,7 +31,10 @@ export function ChapterNav({ chapters }: Props) {
             role="tab"
             aria-selected={isActive}
             className={`chapter-nav-tab chapter-nav-tab--${status}${isActive ? ' chapter-nav-tab--active' : ''}`}
-            onClick={() => setCurrentChapter(ch.id)}
+            onClick={() => {
+              setCurrentChapter(ch.id)
+              onSelectChapter?.(ch.id)
+            }}
           >
             <span
               className={`chapter-nav-risk-dot chapter-nav-risk-dot--${chapterRiskLevel(ch)}`}

@@ -322,8 +322,10 @@ function PrRow({
     <div className="pr-row-wrap">
       <button className={`pr-row pr-row--${pr.riskLevel}`} onClick={() => onOpen(pr)}>
         <div className="pr-row-left">
-          <span className="pr-row-number">#{pr.number}</span>
-          {pr.isDraft && <span className="pr-row-draft">Draft</span>}
+          <div className="pr-row-header">
+            <span className="pr-row-number">#{pr.number}</span>
+            {pr.isDraft && <span className="pr-row-draft">Draft</span>}
+          </div>
           <span className="pr-row-title">{pr.title}</span>
           <span className="pr-row-meta">
             {pr.author} · {age} · {pr.fileCount} files · +{pr.additions}/−{pr.deletions}

@@ -284,9 +284,11 @@ describe('ReviewDiffPane', () => {
     await renderPane()
     await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Add comment' })[0])
+    const btn = screen.getAllByRole('button', { name: 'Add comment' })[0]
+    fireEvent.mouseDown(btn)
+    fireEvent.mouseUp(btn)
 
-    expect(screen.getByTestId('composer')).toBeTruthy()
+    await waitFor(() => expect(screen.getByTestId('composer')).toBeTruthy())
   })
 
   it('closes composer when cancel is clicked', async () => {
@@ -311,8 +313,10 @@ describe('ReviewDiffPane', () => {
     await renderPane()
     await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Add comment' })[0])
-    expect(screen.getByTestId('composer')).toBeTruthy()
+    const btn = screen.getAllByRole('button', { name: 'Add comment' })[0]
+    fireEvent.mouseDown(btn)
+    fireEvent.mouseUp(btn)
+    await waitFor(() => expect(screen.getByTestId('composer')).toBeTruthy())
 
     fireEvent.click(screen.getByText('Cancel'))
     await waitFor(() => expect(screen.queryByTestId('composer')).toBeNull())

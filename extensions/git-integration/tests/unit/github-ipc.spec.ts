@@ -89,6 +89,7 @@ describe('github:pr-review-detail', () => {
 
   it('returns a pr object on success with no status checks', async () => {
     mockPrDetail(PR_META)
+    mockGitFailure('not found') // check-suites fallback when rollup is empty (best-effort, caught)
 
     const result = (await handlers['github:pr-review-detail']({
       repoRoot: '/repo',

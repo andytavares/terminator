@@ -23,6 +23,7 @@ vi.mock('../../src/hooks/usePrReview', () => ({
   useLoadPrQueue: vi.fn(() => vi.fn().mockResolvedValue(undefined)),
   useLoadPrDetail: vi.fn(() => vi.fn().mockResolvedValue(undefined)),
   useFetchFileMetrics: vi.fn(() => vi.fn().mockResolvedValue(undefined)),
+  useLoadIssueComments: vi.fn(() => vi.fn().mockResolvedValue(undefined)),
 }))
 
 vi.mock('../../src/components/pr-review/ReviewQueue', () => ({

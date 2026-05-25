@@ -69,7 +69,7 @@ export function CommentComposer(props: Props) {
   }
 
   return (
-    <div className="comment-composer">
+    <div className="comment-composer" data-testid="composer">
       <div className="comment-composer-tabs">
         <button
           className={`comment-composer-tab${tab === 'write' ? ' comment-composer-tab--active' : ''}`}

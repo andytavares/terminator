@@ -5,6 +5,7 @@ import type {
   PrReviewDetail,
   ReviewQueuePR,
   Thread,
+  IssueComment,
   RiskScore,
   SignalDots,
 } from '../schemas/pr-review.schema'
@@ -37,6 +38,9 @@ interface PrReviewStore {
   // Inline comments (keyed by path)
   threads: Record<string, Thread[]>
 
+  // PR-level conversation comments
+  issueComments: IssueComment[]
+
   // Cross-cutting
   rateLimitState: RateLimitState | null
 
@@ -68,6 +72,7 @@ interface PrReviewStore {
   setPaused(repoRoot: string, prNumber: number, headSHA: string, isoTimestamp: string | null): void
 
   setThreads(path: string, threads: Thread[]): void
+  setIssueComments(comments: IssueComment[]): void
 
   updateFileRiskScore(chapterId: string, filePath: string, riskScore: RiskScore): void
   patchFileComplexity(chapterId: string, filePath: string, complexityDelta: number): void
@@ -137,6 +142,7 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   scrollPosition: null,
   pausedAt: null,
   threads: {},
+  issueComments: [],
   rateLimitState: null,
 
   setQueue: (prs) => set({ prQueue: prs }),
@@ -202,6 +208,8 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
 
   setThreads: (path, threads) =>
     set((state) => ({ threads: { ...state.threads, [path]: threads } })),
+
+  setIssueComments: (comments) => set({ issueComments: comments }),
 
   updateFileRiskScore: (chapterId, filePath, riskScore) =>
     set((state) => {
@@ -296,6 +304,7 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
       scrollPosition: null,
       pausedAt: null,
       threads: {},
+      issueComments: [],
       rateLimitState: null,
     }),
 }))

@@ -3,6 +3,7 @@ import type { StatusCheck } from '../../schemas/pr-review.schema'
 
 interface Props {
   checks: StatusCheck[]
+  defaultExpanded?: boolean
 }
 
 const STATE_ICON: Record<StatusCheck['state'], string> = {
@@ -13,8 +14,8 @@ const STATE_ICON: Record<StatusCheck['state'], string> = {
   unknown: '?',
 }
 
-export function StatusChecksBar({ checks }: Props) {
-  const [expanded, setExpanded] = useState(false)
+export function StatusChecksBar({ checks, defaultExpanded = false }: Props) {
+  const [expanded, setExpanded] = useState(defaultExpanded)
 
   if (checks.length === 0) return null
 
