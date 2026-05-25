@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { Eye } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { useLoadIssueComments } from '../../hooks/usePrReview'
 import { githubAPI } from '../../api/github'
@@ -32,7 +33,7 @@ export function PrOverviewPanel({
   onRefresh,
   onPopOut,
 }: Props) {
-  const { viewedFiles, issueComments } = usePrReviewStore()
+  const { viewedFiles, issueComments, currentUserLogin } = usePrReviewStore()
   const loadIssueComments = useLoadIssueComments(repoRoot)
   const [commentBody, setCommentBody] = useState('')
   const [commentTab, setCommentTab] = useState<'write' | 'preview'>('write')
@@ -180,6 +181,17 @@ export function PrOverviewPanel({
         <span className="pr-overview-meta-branch">
           {pr.headRefName} → {pr.baseRefName}
         </span>
+        {currentUserLogin &&
+          (pr.requestedReviewers?.includes(currentUserLogin) ||
+            pr.assigneeLogins?.includes(currentUserLogin)) && (
+            <span
+              className="pr-overview-your-review-badge"
+              title="You have been requested to review this PR"
+            >
+              <Eye size={11} strokeWidth={2} />
+              Your review requested
+            </span>
+          )}
         {pr.mergeStateStatus === 'behind' && (
           <span className="pr-merge-state-badge pr-merge-state-badge--behind">
             ↓ Behind {pr.baseRefName}
@@ -191,6 +203,49 @@ export function PrOverviewPanel({
       </div>
 
       <StatusChecksBar checks={pr.statusChecks ?? []} defaultExpanded={true} />
+
+      {((pr.approvals && pr.approvals.length > 0) ||
+        (pr.requestedReviewers && pr.requestedReviewers.length > 0)) && (
+        <div className="pr-overview-approvals-bar">
+          {pr.approvals && pr.approvals.length > 0 && (
+            <>
+              <span className="pr-overview-approvals-label">Approved by</span>
+              {pr.approvals.map((approval) => (
+                <span
+                  key={approval.author}
+                  className="pr-overview-approver"
+                  title={approval.author}
+                >
+                  <img
+                    src={approval.authorAvatarUrl}
+                    alt={approval.author}
+                    className="pr-overview-approver-avatar"
+                    width={16}
+                    height={16}
+                  />
+                  <span className="pr-overview-approver-name">{approval.author}</span>
+                </span>
+              ))}
+            </>
+          )}
+          {pr.requestedReviewers && pr.requestedReviewers.length > 0 && (
+            <>
+              <span className="pr-overview-approvals-label pr-overview-approvals-label--pending">
+                {pr.approvals && pr.approvals.length > 0 ? 'Awaiting' : 'Review requested from'}
+              </span>
+              {pr.requestedReviewers.map((reviewer) => (
+                <span
+                  key={reviewer}
+                  className="pr-overview-approver pr-overview-approver--pending"
+                  title={reviewer}
+                >
+                  <span className="pr-overview-approver-name">{reviewer}</span>
+                </span>
+              ))}
+            </>
+          )}
+        </div>
+      )}
 
       <div className="pr-overview-body-scroll">
         {/* Metrics row */}

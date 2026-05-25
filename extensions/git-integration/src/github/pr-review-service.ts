@@ -677,6 +677,37 @@ export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
   const ciStatus: ReviewQueuePR['ciStatus'] =
     ciSt === 'pass' ? 'passing' : ciSt === 'fail' ? 'failing' : ciSt === 'warn' ? 'pending' : 'none'
 
+  // Extract approvals from REST `reviews` field or GraphQL `latestReviews.nodes`
+  const rawReviews =
+    (obj.reviews as unknown[] | undefined) ??
+    (obj.latestReviews as { nodes?: unknown[] } | undefined)?.nodes ??
+    []
+  const approvedBy = [
+    ...new Set(
+      (rawReviews as Array<Record<string, unknown>>)
+        .filter((r) => String(r.state ?? '').toUpperCase() === 'APPROVED')
+        .map((r) => {
+          const author = (r.author as Record<string, unknown>) ?? {}
+          return String(author.login ?? '')
+        })
+        .filter(Boolean)
+    ),
+  ]
+
+  // Extract requested reviewers (already flattened by normalizeGraphQLNode or raw REST field)
+  const requestedReviewers: string[] = Array.isArray(obj.requestedReviewers)
+    ? (obj.requestedReviewers as string[])
+    : []
+
+  // Extract assignees (flattened by normalizeGraphQLNode or REST assignees field)
+  const assigneeLogins: string[] = Array.isArray(obj.assigneeLogins)
+    ? (obj.assigneeLogins as string[])
+    : Array.isArray(obj.assignees)
+      ? (obj.assignees as Array<Record<string, unknown>>)
+          .map((a) => String(a.login ?? ''))
+          .filter(Boolean)
+      : []
+
   return {
     number: Number(obj.number),
     title: String(obj.title ?? ''),
@@ -694,6 +725,10 @@ export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
     riskLevel: 'low',
     signalDots,
     sessionStatus: 'not-started',
+    approvalCount: approvedBy.length,
+    approvedBy,
+    requestedReviewers,
+    assigneeLogins,
   }
 }
 

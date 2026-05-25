@@ -67,11 +67,35 @@ function runCoverage() {
     ['vitest', 'run', '--coverage', '--coverage.reporter=json', '--coverage.reporter=text'],
     {
       cwd: path.join(__dirname, '..'),
-      stdio: 'inherit',
+      stdio: 'pipe',
       encoding: 'utf8',
     }
   )
+
+  const combined = (result.stdout || '') + (result.stderr || '')
+
+  // Always print the coverage table
+  const coverageIdx = combined.indexOf('% Coverage report')
+  if (coverageIdx !== -1) {
+    process.stdout.write('\n' + combined.slice(coverageIdx))
+  }
+
   if (result.status !== 0) {
+    // Extract and show only the failing test sections
+    const lines = combined.split('\n')
+    const failLines = []
+    let capture = false
+    for (const line of lines) {
+      // Start capturing on suite FAIL header or the ⎯ divider blocks
+      if (/^\s+FAIL\s/.test(line) || /^⎯+/.test(line)) capture = true
+      // Stop capturing when we hit the coverage table or summary footer
+      if (line.includes('% Coverage report') || /^\s+Test Files\s/.test(line)) capture = false
+      if (capture) failLines.push(line)
+    }
+    if (failLines.length > 0) {
+      console.error('\n--- Failing tests ---')
+      console.error(failLines.join('\n'))
+    }
     console.error('\n✗ Tests failed — fix failing tests before committing.\n')
     process.exit(1)
   }

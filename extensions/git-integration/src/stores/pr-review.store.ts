@@ -43,6 +43,7 @@ interface PrReviewStore {
 
   // Cross-cutting
   rateLimitState: RateLimitState | null
+  currentUserLogin: string | null
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ interface PrReviewStore {
   ): void
 
   setRateLimitState(state: RateLimitState | null): void
+  setCurrentUserLogin(login: string | null): void
 
   markPrInProgress(prNumber: number): void
   dismissPr(prNumber: number): void
@@ -144,6 +146,7 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   threads: {},
   issueComments: [],
   rateLimitState: null,
+  currentUserLogin: null,
 
   setQueue: (prs) => set({ prQueue: prs }),
   appendQueue: (prs) => set((state) => ({ prQueue: [...state.prQueue, ...prs] })),
@@ -268,6 +271,7 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
     })),
 
   setRateLimitState: (s) => set({ rateLimitState: s }),
+  setCurrentUserLogin: (login) => set({ currentUserLogin: login }),
 
   markPrInProgress: (prNumber) =>
     set((state) => ({

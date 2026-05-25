@@ -25,8 +25,15 @@ export function ReviewQueue({
   includeClosedPrs,
   onToggleClosedPrs,
 }: Props) {
-  const { prQueue, queueLoading, loadingMorePrs, queueError, rateLimitState, hasMorePrs } =
-    usePrReviewStore()
+  const {
+    prQueue,
+    queueLoading,
+    loadingMorePrs,
+    queueError,
+    rateLimitState,
+    hasMorePrs,
+    currentUserLogin,
+  } = usePrReviewStore()
   const [activeFilter, setActiveFilter] = useState<Filter>('all')
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -69,9 +76,21 @@ export function ReviewQueue({
   )
   const inProgressNumbers = new Set(inProgress.map((p) => p.number))
 
+  // PRs where current user is a requested reviewer or assignee (not already in-progress)
+  const needsMyReview = currentUserLogin
+    ? prQueue.filter(
+        (p) =>
+          !inProgressNumbers.has(p.number) &&
+          (p.requestedReviewers?.includes(currentUserLogin) ||
+            p.assigneeLogins?.includes(currentUserLogin))
+      )
+    : []
+  const needsMyReviewNumbers = new Set(needsMyReview.map((p) => p.number))
+
   const filtered = prQueue.filter((pr) => {
-    // Already shown in the in-progress section
+    // Already shown in the in-progress or needs-my-review sections
     if (inProgressNumbers.has(pr.number)) return false
+    if (needsMyReviewNumbers.has(pr.number)) return false
     switch (activeFilter) {
       case 'high-risk':
         return pr.riskLevel === 'high'
@@ -223,6 +242,12 @@ export function ReviewQueue({
               onOpen={onOpenPr}
               onDismiss={onDismissPr}
             />
+            <PrSection
+              title="Needs your review"
+              prs={needsMyReview}
+              accent="yellow"
+              onOpen={onOpenPr}
+            />
             {activeFilter === 'in-progress' && inProgress.length === 0 && (
               <div className="pr-queue-empty">
                 No in-progress reviews yet. Open a PR to start reviewing.
@@ -265,7 +290,7 @@ function PrSection({
 }: {
   title: string
   prs: ReviewQueuePR[]
-  accent: 'red' | 'green' | 'blue' | 'none'
+  accent: 'red' | 'green' | 'blue' | 'yellow' | 'none'
   onOpen: (pr: ReviewQueuePR) => void
   onDismiss?: (prNumber: number) => Promise<void>
 }) {
@@ -330,6 +355,11 @@ function PrRow({
           <span className="pr-row-meta">
             {pr.author} · {age} · {pr.fileCount} files · +{pr.additions}/−{pr.deletions}
           </span>
+          {pr.approvalCount > 0 && (
+            <span className="pr-row-approved" title={`Approved by: ${pr.approvedBy.join(', ')}`}>
+              ✓ {pr.approvalCount} approved
+            </span>
+          )}
           {fileProgress !== null && (
             <div className="pr-row-progress" aria-label={`${fileProgress}% of files reviewed`}>
               <div className="pr-row-progress-bar" style={{ width: `${fileProgress}%` }} />

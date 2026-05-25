@@ -116,6 +116,7 @@ export function useLoadPrQueue(repoRoot: string | null) {
     setHasMorePrs,
     setNextPrCursor,
     includeClosedPrs,
+    setCurrentUserLogin,
   } = usePrReviewStore()
 
   return useCallback(
@@ -132,6 +133,18 @@ export function useLoadPrQueue(repoRoot: string | null) {
       } else {
         setQueueLoading(true)
         setQueueError(null)
+      }
+      // Fetch current user in parallel with PR list (best-effort)
+      if (!isAppend) {
+        githubAPI
+          .currentUser(repoRoot)
+          .then((res) => {
+            const login = (res as { login?: string }).login ?? null
+            setCurrentUserLogin(login)
+          })
+          .catch(() => {
+            /* non-critical */
+          })
       }
       try {
         const result = await githubAPI.listOpenPrs(repoRoot, {
@@ -185,6 +198,7 @@ export function useLoadPrQueue(repoRoot: string | null) {
       setRateLimitState,
       setHasMorePrs,
       setNextPrCursor,
+      setCurrentUserLogin,
     ]
   )
 }

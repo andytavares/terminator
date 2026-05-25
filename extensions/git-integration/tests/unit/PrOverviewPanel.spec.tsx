@@ -80,6 +80,9 @@ const basePr: PrReviewDetail = {
   lintStatus: 'pass',
   coverageStatus: 'pass',
   statusChecks: [{ name: 'CI', state: 'pass' }],
+  approvals: [],
+  requestedReviewers: [],
+  assigneeLogins: [],
   chapters: [
     {
       id: 'ch1',
@@ -99,6 +102,7 @@ beforeEach(() => {
   vi.mocked(usePrReviewStore).mockReturnValue({
     viewedFiles: new Set(),
     issueComments: [],
+    currentUserLogin: null,
   } as unknown as ReturnType<typeof usePrReviewStore>)
 })
 
@@ -339,6 +343,40 @@ describe('PrOverviewPanel', () => {
     expect(onPopOut).toHaveBeenCalledOnce()
   })
 
+  it('shows approvals bar when PR has approvals', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{
+          ...basePr,
+          approvals: [
+            { author: 'bob', authorAvatarUrl: '', submittedAt: new Date().toISOString() },
+            { author: 'carol', authorAvatarUrl: '', submittedAt: new Date().toISOString() },
+          ],
+        }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Approved by')).toBeTruthy()
+    expect(screen.getByText('bob')).toBeTruthy()
+    expect(screen.getByText('carol')).toBeTruthy()
+  })
+
+  it('does not show approvals bar when PR has no approvals', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={basePr}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryByText('Approved by')).toBeNull()
+  })
+
   it('does not render pop out button when onPopOut is absent', () => {
     render(
       <PrOverviewPanel
@@ -484,5 +522,109 @@ describe('PrOverviewPanel', () => {
     await waitFor(() => {
       expect(screen.getByText('update failed')).toBeTruthy()
     })
+  })
+
+  it('shows requested reviewers as pending when no approvals', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, requestedReviewers: ['dave', 'eve'] }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Review requested from')).toBeTruthy()
+    expect(screen.getByText('dave')).toBeTruthy()
+    expect(screen.getByText('eve')).toBeTruthy()
+  })
+
+  it('shows "Awaiting" label for pending reviewers when approvals already exist', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{
+          ...basePr,
+          approvals: [
+            { author: 'bob', authorAvatarUrl: '', submittedAt: new Date().toISOString() },
+          ],
+          requestedReviewers: ['dave'],
+        }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Approved by')).toBeTruthy()
+    expect(screen.getByText('Awaiting')).toBeTruthy()
+    expect(screen.getByText('dave')).toBeTruthy()
+  })
+
+  it('does not show reviewer bar when no approvals and no requested reviewers', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={basePr}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryByText('Approved by')).toBeNull()
+    expect(screen.queryByText('Review requested from')).toBeNull()
+  })
+
+  it('shows "Your review requested" badge when current user is a requested reviewer', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set(),
+      issueComments: [],
+      currentUserLogin: 'alice',
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, requestedReviewers: ['alice', 'bob'] }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Your review requested')).toBeTruthy()
+  })
+
+  it('shows "Your review requested" badge when current user is an assignee', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set(),
+      issueComments: [],
+      currentUserLogin: 'alice',
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, assigneeLogins: ['alice'] }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Your review requested')).toBeTruthy()
+  })
+
+  it('does not show "Your review requested" badge when current user is not a reviewer or assignee', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set(),
+      issueComments: [],
+      currentUserLogin: 'alice',
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, requestedReviewers: ['bob'] }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryByText('Your review requested')).toBeNull()
   })
 })

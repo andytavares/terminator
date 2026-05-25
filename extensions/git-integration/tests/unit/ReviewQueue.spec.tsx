@@ -31,6 +31,10 @@ function makePr(overrides: Partial<ReviewQueuePR> = {}): ReviewQueuePR {
       churn: 'pass',
       blast: 'pass',
     },
+    approvalCount: 0,
+    approvedBy: [],
+    requestedReviewers: [],
+    assigneeLogins: [],
     ...overrides,
   }
 }
@@ -42,6 +46,7 @@ const defaultStoreState = {
   queueError: null,
   rateLimitState: null,
   hasMorePrs: false,
+  currentUserLogin: null,
 }
 
 beforeEach(() => {
@@ -221,5 +226,74 @@ describe('ReviewQueue', () => {
     fireEvent.click(screen.getByText('High risk'))
     const highRiskBtn = screen.getByText('High risk')
     expect(highRiskBtn.className).toContain('pr-filter-pill--active')
+  })
+
+  it('shows approval chip when PR has approvals', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...defaultStoreState,
+      prQueue: [
+        makePr({
+          number: 99,
+          title: 'Approved PR',
+          approvalCount: 2,
+          approvedBy: ['bob', 'carol'],
+        }),
+      ],
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<ReviewQueue {...defaultProps} />)
+    expect(screen.getByText('✓ 2 approved')).toBeTruthy()
+  })
+
+  it('does not show approval chip when PR has no approvals', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...defaultStoreState,
+      prQueue: [
+        makePr({ number: 100, title: 'No approvals PR', approvalCount: 0, approvedBy: [] }),
+      ],
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<ReviewQueue {...defaultProps} />)
+    expect(screen.queryByText(/✓.*approved/)).toBeNull()
+  })
+
+  it('shows Needs your review section when current user is a requested reviewer', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...defaultStoreState,
+      currentUserLogin: 'me',
+      prQueue: [makePr({ number: 55, title: 'Review me', requestedReviewers: ['me', 'other'] })],
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<ReviewQueue {...defaultProps} />)
+    expect(screen.getByText('Needs your review')).toBeTruthy()
+    expect(screen.getByText('Review me')).toBeTruthy()
+  })
+
+  it('shows Needs your review section when current user is an assignee', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...defaultStoreState,
+      currentUserLogin: 'me',
+      prQueue: [makePr({ number: 58, title: 'Assigned to me', assigneeLogins: ['me'] })],
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<ReviewQueue {...defaultProps} />)
+    expect(screen.getByText('Needs your review')).toBeTruthy()
+    expect(screen.getByText('Assigned to me')).toBeTruthy()
+  })
+
+  it('does not show Needs your review section when current user is not a requested reviewer', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...defaultStoreState,
+      currentUserLogin: 'me',
+      prQueue: [makePr({ number: 56, title: 'Not for me', requestedReviewers: ['other'] })],
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<ReviewQueue {...defaultProps} />)
+    expect(screen.queryByText('Needs your review')).toBeNull()
+  })
+
+  it('does not show Needs your review section when currentUserLogin is null', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...defaultStoreState,
+      currentUserLogin: null,
+      prQueue: [makePr({ number: 57, title: 'No user', requestedReviewers: ['anyone'] })],
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(<ReviewQueue {...defaultProps} />)
+    expect(screen.queryByText('Needs your review')).toBeNull()
   })
 })

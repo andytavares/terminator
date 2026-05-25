@@ -66,4 +66,74 @@ describe('parseReviewQueuePR()', () => {
     expect(pr.deletions).toBe(0)
     expect(pr.estimatedMinutes).toBeGreaterThanOrEqual(1)
   })
+
+  it('defaults approvalCount to 0 when no reviews present', () => {
+    const pr = parseReviewQueuePR(makeRawPr())
+    expect(pr.approvalCount).toBe(0)
+    expect(pr.approvedBy).toEqual([])
+  })
+
+  it('extracts approvals from REST reviews field', () => {
+    const pr = parseReviewQueuePR(
+      makeRawPr({
+        reviews: [
+          { author: { login: 'bob' }, state: 'APPROVED', submittedAt: '2026-05-01T10:00:00Z' },
+          {
+            author: { login: 'carol' },
+            state: 'CHANGES_REQUESTED',
+            submittedAt: '2026-05-01T11:00:00Z',
+          },
+        ],
+      })
+    )
+    expect(pr.approvalCount).toBe(1)
+    expect(pr.approvedBy).toEqual(['bob'])
+  })
+
+  it('extracts approvals from GraphQL latestReviews field', () => {
+    const pr = parseReviewQueuePR(
+      makeRawPr({
+        latestReviews: {
+          nodes: [
+            {
+              author: { login: 'alice', avatarUrl: '' },
+              state: 'APPROVED',
+              submittedAt: '2026-05-01T10:00:00Z',
+            },
+            {
+              author: { login: 'dave', avatarUrl: '' },
+              state: 'APPROVED',
+              submittedAt: '2026-05-01T11:00:00Z',
+            },
+          ],
+        },
+      })
+    )
+    expect(pr.approvalCount).toBe(2)
+    expect(pr.approvedBy).toContain('alice')
+    expect(pr.approvedBy).toContain('dave')
+  })
+
+  it('deduplicates approvals from the same author', () => {
+    const pr = parseReviewQueuePR(
+      makeRawPr({
+        reviews: [
+          { author: { login: 'bob' }, state: 'APPROVED', submittedAt: '2026-05-01T10:00:00Z' },
+          { author: { login: 'bob' }, state: 'APPROVED', submittedAt: '2026-05-01T12:00:00Z' },
+        ],
+      })
+    )
+    expect(pr.approvalCount).toBe(1)
+    expect(pr.approvedBy).toEqual(['bob'])
+  })
+
+  it('defaults requestedReviewers to empty array when not present', () => {
+    const pr = parseReviewQueuePR(makeRawPr())
+    expect(pr.requestedReviewers).toEqual([])
+  })
+
+  it('uses pre-flattened requestedReviewers array from normalizeGraphQLNode', () => {
+    const pr = parseReviewQueuePR(makeRawPr({ requestedReviewers: ['alice', 'bob'] }))
+    expect(pr.requestedReviewers).toEqual(['alice', 'bob'])
+  })
 })

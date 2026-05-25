@@ -81,6 +81,14 @@ const StatusCheckSchema = z.object({
   url: z.string().optional(),
 })
 
+// ─── PR approval ─────────────────────────────────────────────────────────────
+
+export const PrApprovalSchema = z.object({
+  author: z.string(),
+  authorAvatarUrl: z.string(),
+  submittedAt: z.string(),
+})
+
 // ─── PR review detail ─────────────────────────────────────────────────────────
 
 export const PrReviewDetailSchema = z.object({
@@ -99,6 +107,9 @@ export const PrReviewDetailSchema = z.object({
   lintStatus: SignalValueSchema.default('unknown'),
   coverageStatus: SignalValueSchema.default('unknown'),
   statusChecks: z.array(StatusCheckSchema).default([]),
+  approvals: z.array(PrApprovalSchema).default([]),
+  requestedReviewers: z.array(z.string()).default([]),
+  assigneeLogins: z.array(z.string()).default([]),
   chapters: z.array(ChapterSchema),
 })
 
@@ -122,6 +133,10 @@ export const ReviewQueuePRSchema = z.object({
   signalDots: SignalDotsSchema,
   sessionStatus: z.enum(['not-started', 'in-progress', 'paused']),
   viewedFileCount: z.number().default(0),
+  approvalCount: z.number().default(0),
+  approvedBy: z.array(z.string()).default([]),
+  requestedReviewers: z.array(z.string()).default([]),
+  assigneeLogins: z.array(z.string()).default([]),
   resumeChapter: z.number().optional(),
   resumeChapterTotal: z.number().optional(),
 })
@@ -196,6 +211,7 @@ export type Chapter = z.infer<typeof ChapterSchema>
 export type PrReviewDetail = z.infer<typeof PrReviewDetailSchema>
 export type ReviewQueuePR = z.infer<typeof ReviewQueuePRSchema>
 export type StatusCheck = z.infer<typeof StatusCheckSchema>
+export type PrApproval = z.infer<typeof PrApprovalSchema>
 export type IssueComment = z.infer<typeof IssueCommentSchema>
 export type InlineComment = z.infer<typeof InlineCommentSchema>
 export type Thread = z.infer<typeof ThreadSchema>

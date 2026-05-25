@@ -4,6 +4,8 @@
 const bridge = () => window.electronAPI.extensionBridge
 
 export const githubAPI = {
+  currentUser: (repoRoot: string) => bridge().invoke('github:current-user', { repoRoot }),
+
   listOpenPrs: (
     repoRoot: string,
     options?: { cursor?: string; search?: string; includeClosedPrs?: boolean }
