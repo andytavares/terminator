@@ -16,8 +16,7 @@ export const MAX_CONFLICTS_SHOWN = 10
 // ---------------------------------------------------------------------------
 
 export function formatConflictCount(n: number): string {
-  if (n === 0) return 'no conflicts'
-  return n === 1 ? '1 conflict' : `${n} conflicts`
+  return `${n} conflict${n !== 1 ? 's' : ''}`
 }
 
 // ---------------------------------------------------------------------------
@@ -31,6 +30,10 @@ export const MERGE_FLOW_DEFAULTS = {
   defaultStrategy: 'manual' as const,
   confirmOnSingleConflict: true,
   persistSessionOnExit: true,
+  autoAdvance: true,
+  showContextLines: 3,
+  defaultStrategy: 'ours' as const,
+  confirmOnSingleConflict: false,
 }
 
 // ---------------------------------------------------------------------------
@@ -39,6 +42,8 @@ export const MERGE_FLOW_DEFAULTS = {
 // ---------------------------------------------------------------------------
 
 export function estimateResolutionTime(conflictCount: number): string {
+// TESTING 123
+
   if (conflictCount === 0) return 'no conflicts to resolve'
   const minutesPerConflict = 3
   const total = Math.ceil(conflictCount * minutesPerConflict)
@@ -56,11 +61,5 @@ export function estimateResolutionTime(conflictCount: number): string {
 import type { ConflictFile } from './schemas/merge-flow.schema'
 
 export function rankConflictsByDifficulty(files: ConflictFile[]): ConflictFile[] {
-  return [...files].sort((a, b) => {
-    const largeBlockPenalty = (f: ConflictFile) =>
-      f.blocks.some((bl) => bl.theirsText.length > 100) ? 5 : 0
-    const scoreA = a.conflictCount * 3 + largeBlockPenalty(a)
-    const scoreB = b.conflictCount * 3 + largeBlockPenalty(b)
-    return scoreB - scoreA
-  })
+  return [...files].sort((a, b) => b.conflictCount - a.conflictCount)
 }
