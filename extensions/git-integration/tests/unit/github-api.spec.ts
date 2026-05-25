@@ -161,4 +161,13 @@ describe('githubAPI bridge', () => {
       body: 'hello',
     })
   })
+
+  it('prUpdateBranch calls correct channel', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    await githubAPI.prUpdateBranch('/repo', 42)
+    expect(mockInvoke).toHaveBeenCalledWith('github:pr-update-branch', {
+      repoRoot: '/repo',
+      prNumber: 42,
+    })
+  })
 })

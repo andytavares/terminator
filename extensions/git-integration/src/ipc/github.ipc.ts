@@ -227,7 +227,7 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
           'view',
           String(prNumber),
           '--json',
-          'number,title,body,author,createdAt,headRefName,baseRefName,headRefOid,isDraft,statusCheckRollup',
+          'number,title,body,author,createdAt,headRefName,baseRefName,headRefOid,isDraft,mergeStateStatus,statusCheckRollup',
         ]),
         // Use REST API to get file list with patch content for import-graph grouping
         gh(repoRoot, ['api', '--paginate', `repos/${owner}/${repo}/pulls/${prNumber}/files`]),
@@ -274,6 +274,7 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
         baseRefName: String(meta.baseRefName ?? ''),
         headSHA: String(meta.headRefOid ?? ''),
         isDraft: Boolean(meta.isDraft),
+        mergeStateStatus: mapMergeStateStatus(String(meta.mergeStateStatus ?? '')),
         ciStatus: mapCiStatus(rollup),
         lintStatus: mapCheckStatus(rollup, LINT_CHECK_NAMES),
         coverageStatus: mapCheckStatus(rollup, COVERAGE_CHECK_NAMES),
@@ -293,6 +294,19 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
     const { repoRoot, prNumber } = parsed.data
     try {
       await gh(repoRoot, ['pr', 'ready', String(prNumber)])
+      return { ok: true }
+    } catch (e) {
+      return catchError(e)
+    }
+  })
+
+  register('github:pr-update-branch', async (payload) => {
+    const schema = z.object({ repoRoot: z.string().min(1), prNumber: z.number().int().positive() })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repoRoot, prNumber } = parsed.data
+    try {
+      await gh(repoRoot, ['pr', 'update-branch', String(prNumber), '--rebase=false'], 30_000)
       return { ok: true }
     } catch (e) {
       return catchError(e)
@@ -695,6 +709,14 @@ const LINT_CHECK_NAMES = [
 const COVERAGE_CHECK_NAMES = ['coverage', 'codecov', 'coveralls', 'sonar', 'codeclimate', 'lcov']
 
 const NON_BLOCKING = new Set(['SKIPPED', 'NEUTRAL', 'CANCELLED', 'STALE'])
+
+function mapMergeStateStatus(raw: string): 'behind' | 'dirty' | 'clean' | 'unknown' {
+  const s = raw.toUpperCase()
+  if (s === 'BEHIND') return 'behind'
+  if (s === 'DIRTY' || s === 'CONFLICTING') return 'dirty'
+  if (s === 'CLEAN' || s === 'HAS_HOOKS' || s === 'UNSTABLE' || s === 'BLOCKED') return 'clean'
+  return 'unknown'
+}
 
 function mapCiStatus(rollup: unknown): 'passing' | 'failing' | 'pending' | 'none' {
   if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'none'

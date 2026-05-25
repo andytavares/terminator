@@ -1160,3 +1160,49 @@ describe('github:pr-issue-comment-add', () => {
     expect(result.error).toContain('forbidden')
   })
 })
+
+describe('github:pr-update-branch', () => {
+  let handlers: Record<string, Handler>
+  beforeEach(() => {
+    mockExecFile.mockReset()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
+    const result = (await handlers['github:pr-update-branch']({
+      prNumber: 6,
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns VALIDATION_ERROR for missing prNumber', async () => {
+    const result = (await handlers['github:pr-update-branch']({
+      repoRoot: '/repo',
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns ok:true on success', async () => {
+    mockGitSuccess('')
+
+    const result = (await handlers['github:pr-update-branch']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { ok: boolean }
+    expect(result.ok).toBe(true)
+    const args: string[] = mockExecFile.mock.calls[0][1]
+    expect(args).toContain('update-branch')
+    expect(args).toContain('6')
+    expect(args).toContain('--rebase=false')
+  })
+
+  it('returns error string when gh fails', async () => {
+    mockGitFailure('merge conflict')
+
+    const result = (await handlers['github:pr-update-branch']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { error: string }
+    expect(result.error).toContain('merge conflict')
+  })
+})

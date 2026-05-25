@@ -2438,6 +2438,30 @@
   overflow-y: auto;
 }
 
+/* Merge state badges */
+
+.pr-merge-state-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+
+.pr-merge-state-badge--behind {
+  background: rgba(210, 153, 34, 0.15);
+  color: #d29922;
+  border: 1px solid rgba(210, 153, 34, 0.35);
+}
+
+.pr-merge-state-badge--dirty {
+  background: rgba(248, 81, 73, 0.12);
+  color: #f85149;
+  border: 1px solid rgba(248, 81, 73, 0.3);
+}
+
 /* CTA */
 
 .pr-draft-badge {
@@ -2484,6 +2508,36 @@
 .pr-overview-ready-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.pr-overview-update-branch-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid rgba(210, 153, 34, 0.5);
+  border-radius: 6px;
+  color: #d29922;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.pr-overview-update-branch-btn:hover:not(:disabled) {
+  border-color: #d29922;
+  color: #e3b341;
+}
+.pr-overview-update-branch-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pr-update-branch-error {
+  font-size: 11px;
+  color: #f85149;
+  margin: 0;
+  flex: 1;
+  text-align: left;
 }
 
 .pr-overview-start-btn {
@@ -2572,10 +2626,7 @@
 }
 
 .pr-issue-composer {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
+  margin: 8px 0 0;
 }
 
 .pr-issue-composer-textarea {

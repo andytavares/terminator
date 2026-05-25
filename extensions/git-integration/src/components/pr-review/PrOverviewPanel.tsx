@@ -35,10 +35,13 @@ export function PrOverviewPanel({
   const { viewedFiles, issueComments } = usePrReviewStore()
   const loadIssueComments = useLoadIssueComments(repoRoot)
   const [commentBody, setCommentBody] = useState('')
+  const [commentTab, setCommentTab] = useState<'write' | 'preview'>('write')
   const [submitting, setSubmitting] = useState(false)
   const [commentError, setCommentError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [markingReady, setMarkingReady] = useState(false)
+  const [updatingBranch, setUpdatingBranch] = useState(false)
+  const [updateBranchError, setUpdateBranchError] = useState<string | null>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
 
   const handleRefresh = async () => {
@@ -84,6 +87,23 @@ export function PrOverviewPanel({
       await onRefresh?.()
     } finally {
       setMarkingReady(false)
+    }
+  }
+
+  const handleUpdateBranch = async () => {
+    setUpdatingBranch(true)
+    setUpdateBranchError(null)
+    try {
+      const result = await githubAPI.prUpdateBranch(repoRoot, pr.number)
+      if (result && typeof result === 'object' && 'error' in result) {
+        setUpdateBranchError(String((result as { error: string }).error))
+      } else {
+        await onRefresh?.()
+      }
+    } catch (e) {
+      setUpdateBranchError(String(e))
+    } finally {
+      setUpdatingBranch(false)
     }
   }
 
@@ -160,6 +180,14 @@ export function PrOverviewPanel({
         <span className="pr-overview-meta-branch">
           {pr.headRefName} → {pr.baseRefName}
         </span>
+        {pr.mergeStateStatus === 'behind' && (
+          <span className="pr-merge-state-badge pr-merge-state-badge--behind">
+            ↓ Behind {pr.baseRefName}
+          </span>
+        )}
+        {pr.mergeStateStatus === 'dirty' && (
+          <span className="pr-merge-state-badge pr-merge-state-badge--dirty">⚠ Conflicts</span>
+        )}
       </div>
 
       <StatusChecksBar checks={pr.statusChecks ?? []} defaultExpanded={true} />
@@ -271,21 +299,47 @@ export function PrOverviewPanel({
             </div>
           )}
 
-          <div className="pr-issue-composer">
-            <textarea
-              ref={composerRef}
-              className="pr-issue-composer-textarea"
-              value={commentBody}
-              onChange={(e) => setCommentBody(e.target.value)}
-              placeholder="Leave a comment…"
-              rows={3}
-              disabled={submitting}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCommentSubmit()
-              }}
-            />
+          <div className="comment-composer pr-issue-composer">
+            <div className="comment-composer-tabs">
+              <button
+                className={`comment-composer-tab${commentTab === 'write' ? ' comment-composer-tab--active' : ''}`}
+                onClick={() => setCommentTab('write')}
+              >
+                Write
+              </button>
+              <button
+                className={`comment-composer-tab${commentTab === 'preview' ? ' comment-composer-tab--active' : ''}`}
+                onClick={() => setCommentTab('preview')}
+              >
+                Preview
+              </button>
+            </div>
+
+            {commentTab === 'write' ? (
+              <textarea
+                ref={composerRef}
+                className="comment-composer-textarea"
+                value={commentBody}
+                onChange={(e) => setCommentBody(e.target.value)}
+                placeholder="Leave a comment…"
+                rows={4}
+                disabled={submitting}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCommentSubmit()
+                }}
+              />
+            ) : (
+              <div className="comment-composer-preview">
+                {commentBody.trim() ? (
+                  <RichContent>{commentBody}</RichContent>
+                ) : (
+                  <em>Nothing to preview.</em>
+                )}
+              </div>
+            )}
+
             {commentError && <p className="comment-composer-error">{commentError}</p>}
-            <div className="pr-issue-composer-actions">
+            <div className="comment-composer-actions">
               <span className="pr-issue-composer-hint">⌘↵ to submit</span>
               <button
                 className="comment-composer-submit"
@@ -301,6 +355,16 @@ export function PrOverviewPanel({
 
       {/* CTA */}
       <div className="pr-overview-cta">
+        {updateBranchError && <p className="pr-update-branch-error">{updateBranchError}</p>}
+        {pr.mergeStateStatus === 'behind' && (
+          <button
+            className="pr-overview-update-branch-btn"
+            onClick={handleUpdateBranch}
+            disabled={updatingBranch}
+          >
+            {updatingBranch ? 'Updating…' : `↓ Update from ${pr.baseRefName}`}
+          </button>
+        )}
         {pr.isDraft && (
           <button
             className="pr-overview-ready-btn"

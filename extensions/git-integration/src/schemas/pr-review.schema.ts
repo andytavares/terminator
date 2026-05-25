@@ -94,6 +94,7 @@ export const PrReviewDetailSchema = z.object({
   baseRefName: z.string(),
   headSHA: z.string(),
   isDraft: z.boolean().default(false),
+  mergeStateStatus: z.enum(['behind', 'dirty', 'clean', 'unknown']).default('unknown'),
   ciStatus: z.enum(['passing', 'failing', 'pending', 'none']),
   lintStatus: SignalValueSchema.default('unknown'),
   coverageStatus: SignalValueSchema.default('unknown'),
