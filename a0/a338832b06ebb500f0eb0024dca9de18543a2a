@@ -1,0 +1,19 @@
+.github/workflows/approve-pr.yml
+  s_6e5f81f8632ff1::t_9caa99b77ab13d 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "a0a338832b06ebb500f0eb0024dca9de18543a2a",
+  "prompts": {},
+  "sessions": {
+    "s_6e5f81f8632ff1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a3adea54-fa24-4901-90c2-28e01c86ca05",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
