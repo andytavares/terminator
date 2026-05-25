@@ -133,4 +133,32 @@ describe('githubAPI bridge', () => {
       prNumbers: [1, 2, 3],
     })
   })
+
+  it('prMarkReady calls correct channel', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    await githubAPI.prMarkReady('/repo', 42)
+    expect(mockInvoke).toHaveBeenCalledWith('github:pr-mark-ready', {
+      repoRoot: '/repo',
+      prNumber: 42,
+    })
+  })
+
+  it('prIssueComments calls correct channel', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    await githubAPI.prIssueComments('/repo', 42)
+    expect(mockInvoke).toHaveBeenCalledWith('github:pr-issue-comments', {
+      repoRoot: '/repo',
+      prNumber: 42,
+    })
+  })
+
+  it('prIssueCommentAdd calls correct channel', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    await githubAPI.prIssueCommentAdd({ repoRoot: '/repo', prNumber: 42, body: 'hello' })
+    expect(mockInvoke).toHaveBeenCalledWith('github:pr-issue-comment-add', {
+      repoRoot: '/repo',
+      prNumber: 42,
+      body: 'hello',
+    })
+  })
 })

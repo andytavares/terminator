@@ -247,23 +247,33 @@ function whyHere(tier: 0 | 1 | 2 | 3): string {
 // ─── Semantic grouping (Signal 1) ─────────────────────────────────────────────
 
 // Ordered from most foundational to least. Lower index wins when groups are merged.
+// Each entry is [segmentPattern, groupName] — pattern is matched against WHOLE directory
+// segments (split by '/') so 'test-batch' won't spuriously match 'tests'.
 const CANONICAL_GROUPS: [RegExp, string][] = [
-  [/\b(migrations?|db)\b/, 'Data Layer'],
-  [/\b(models?|entities|entity|schemas?)\b/, 'Data Layer'],
-  [/\b(config|settings?|env)\b/, 'Configuration'],
-  [/\b(types?|interfaces?|contracts?)\b/, 'Types & Contracts'],
-  [/\b(services?|core|lib|utils?|helpers?)\b/, 'Business Logic'],
-  [/\b(api|routes?|controllers?|endpoints?|handlers?)\b/, 'API Layer'],
-  [/\b(components?|pages?|views?|ui|screens?)\b/, 'UI'],
-  [/\b(tests?|__tests__|specs?|e2e)\b/, 'Tests'],
+  [/^(migrations?|db)$/, 'Data Layer'],
+  [/^(models?|entities|entity|schemas?)$/, 'Data Layer'],
+  [/^(config|settings?|env)$/, 'Configuration'],
+  [/^(types?|interfaces?|contracts?)$/, 'Types & Contracts'],
+  [/^(services?|core|lib|utils?|helpers?)$/, 'Business Logic'],
+  [/^(api|routes?|controllers?|endpoints?|handlers?)$/, 'API Layer'],
+  [/^(components?|pages?|views?|ui|screens?)$/, 'UI'],
+  [/^(tests?|__tests__|specs?|e2e)$/, 'Tests'],
 ]
 
-// Matches only against directory segments (not the filename) to avoid false positives.
+// Matches against individual directory segments (not the joined path) to avoid false
+// positives like 'test-batch' matching 'tests'. Iterates deepest segment first so
+// that e.g. '__tests__' inside 'components/' correctly classifies as Tests, not UI.
 function semanticGroupName(filePath: string): string {
   const parts = filePath.split('/')
-  const dirPath = parts.slice(0, -1).join('/').toLowerCase()
-  for (const [pattern, name] of CANONICAL_GROUPS) {
-    if (pattern.test(dirPath)) return name
+  // Iterate from deepest to shallowest directory segment (excluding the filename)
+  const dirSegments = parts
+    .slice(0, -1)
+    .map((s) => s.toLowerCase())
+    .reverse()
+  for (const segment of dirSegments) {
+    for (const [pattern, name] of CANONICAL_GROUPS) {
+      if (pattern.test(segment)) return name
+    }
   }
   return parts.length > 1 ? parts[parts.length - 2] : 'root'
 }

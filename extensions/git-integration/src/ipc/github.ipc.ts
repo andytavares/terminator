@@ -9,6 +9,7 @@ import type {
   ReviewQueuePR,
   PrReviewDetail,
   InlineComment,
+  IssueComment,
   StatusCheck,
 } from '../schemas/pr-review.schema.js'
 import { ReviewSessionSchema } from '../schemas/pr-review.schema.js'
@@ -226,7 +227,7 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
           'view',
           String(prNumber),
           '--json',
-          'number,title,body,author,createdAt,headRefName,baseRefName,headRefOid,statusCheckRollup',
+          'number,title,body,author,createdAt,headRefName,baseRefName,headRefOid,isDraft,statusCheckRollup',
         ]),
         // Use REST API to get file list with patch content for import-graph grouping
         gh(repoRoot, ['api', '--paginate', `repos/${owner}/${repo}/pulls/${prNumber}/files`]),
@@ -234,6 +235,34 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
       const meta = JSON.parse(metaRaw) as Record<string, unknown>
       const filesData = JSON.parse(filesRaw) as unknown[]
       const chapters = buildChapters(filesData)
+
+      // When statusCheckRollup is null/empty (checks queued but not yet reported),
+      // fall back to check-suites so "Expected" checks are visible.
+      let rollup = meta.statusCheckRollup
+      if (!rollup || !Array.isArray(rollup) || rollup.length === 0) {
+        try {
+          const headSHA = String(meta.headRefOid ?? '')
+          if (headSHA) {
+            const suitesRaw = await gh(repoRoot, [
+              'api',
+              `repos/${owner}/${repo}/commits/${headSHA}/check-suites`,
+              '--jq',
+              '[.check_suites[] | {name: .app.name, state: .status, conclusion}]',
+            ])
+            const suites = JSON.parse(suitesRaw) as Array<Record<string, unknown>>
+            if (suites.length > 0) {
+              rollup = suites.map((s) => ({
+                name: s.name,
+                conclusion: s.conclusion ?? s.state,
+                state: s.state,
+              }))
+            }
+          }
+        } catch {
+          // ignore — check-suites fetch is best-effort
+        }
+      }
+
       const pr: PrReviewDetail = {
         number: Number(meta.number),
         title: String(meta.title ?? ''),
@@ -244,13 +273,27 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
         headRefName: String(meta.headRefName ?? ''),
         baseRefName: String(meta.baseRefName ?? ''),
         headSHA: String(meta.headRefOid ?? ''),
-        ciStatus: mapCiStatus(meta.statusCheckRollup),
-        lintStatus: mapCheckStatus(meta.statusCheckRollup, LINT_CHECK_NAMES),
-        coverageStatus: mapCheckStatus(meta.statusCheckRollup, COVERAGE_CHECK_NAMES),
-        statusChecks: mapStatusChecks(meta.statusCheckRollup),
+        isDraft: Boolean(meta.isDraft),
+        ciStatus: mapCiStatus(rollup),
+        lintStatus: mapCheckStatus(rollup, LINT_CHECK_NAMES),
+        coverageStatus: mapCheckStatus(rollup, COVERAGE_CHECK_NAMES),
+        statusChecks: mapStatusChecks(rollup),
         chapters,
       }
       return { pr }
+    } catch (e) {
+      return catchError(e)
+    }
+  })
+
+  register('github:pr-mark-ready', async (payload) => {
+    const schema = z.object({ repoRoot: z.string().min(1), prNumber: z.number().int().positive() })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repoRoot, prNumber } = parsed.data
+    try {
+      await gh(repoRoot, ['pr', 'ready', String(prNumber)])
+      return { ok: true }
     } catch (e) {
       return catchError(e)
     }
@@ -363,6 +406,52 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
     }
   })
 
+  register('github:pr-issue-comments', async (payload) => {
+    const schema = z.object({ repoRoot: z.string().min(1), prNumber: z.number().int().positive() })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repoRoot, prNumber } = parsed.data
+    try {
+      const raw = await gh(repoRoot, [
+        'api',
+        `repos/{owner}/{repo}/issues/${prNumber}/comments`,
+        '--paginate',
+        '--jq',
+        '[.[] | {id,user,body,created_at,updated_at}]',
+      ])
+      const items = JSON.parse(raw) as unknown[]
+      const comments: IssueComment[] = items.map(mapIssueComment)
+      return { comments }
+    } catch (e) {
+      return catchError(e)
+    }
+  })
+
+  register('github:pr-issue-comment-add', async (payload) => {
+    const schema = z.object({
+      repoRoot: z.string().min(1),
+      prNumber: z.number().int().positive(),
+      body: z.string().min(1),
+    })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repoRoot, prNumber, body } = parsed.data
+    try {
+      const raw = await gh(repoRoot, [
+        'api',
+        `repos/{owner}/{repo}/issues/${prNumber}/comments`,
+        '--method',
+        'POST',
+        '--field',
+        `body=${body}`,
+      ])
+      const comment = mapIssueComment(JSON.parse(raw))
+      return { comment }
+    } catch (e) {
+      return { error: String(e) }
+    }
+  })
+
   register('github:pr-comment-add', async (payload) => {
     const schema = z.object({
       repoRoot: z.string().min(1),
@@ -418,11 +507,9 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
     try {
       const raw = await gh(repoRoot, [
         'api',
-        `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
+        `repos/{owner}/{repo}/pulls/${prNumber}/comments/${inReplyToId}/replies`,
         '--method',
         'POST',
-        '--field',
-        `in_reply_to_id=${inReplyToId}`,
         '--field',
         `body=${body}`,
       ])
@@ -703,6 +790,19 @@ async function readFileCoverage(repoRoot: string, filePath: string): Promise<num
   }
 
   return null
+}
+
+function mapIssueComment(raw: unknown): IssueComment {
+  const obj = raw as Record<string, unknown>
+  const user = (obj.user ?? obj.author ?? {}) as Record<string, unknown>
+  return {
+    id: Number(obj.id),
+    author: String(user.login ?? ''),
+    authorAvatarUrl: String(user.avatar_url ?? ''),
+    body: String(obj.body ?? ''),
+    createdAt: String(obj.created_at ?? ''),
+    updatedAt: String(obj.updated_at ?? ''),
+  }
 }
 
 function mapComment(raw: unknown): InlineComment {

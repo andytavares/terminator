@@ -128,13 +128,6 @@ describe('OverviewScreen', () => {
     expect(screen.getByText('No open terminals')).toBeTruthy()
   })
 
-  it('renders MetricsBar', async () => {
-    await act(async () => {
-      render(<OverviewScreen />)
-    })
-    expect(screen.getByTestId('metrics-bar')).toBeTruthy()
-  })
-
   it('renders tile for each active session', async () => {
     const session = makeSession()
     const workspace = makeWorkspace()

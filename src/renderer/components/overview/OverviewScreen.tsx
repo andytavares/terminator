@@ -3,7 +3,6 @@ import { useSessionStore } from '../../stores/session.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useMetricsStore } from '../../stores/metrics.store'
 import { useExtensionRegistry } from '../../extensions/registry'
-import { MetricsBar } from './MetricsBar'
 import { SessionTile } from './SessionTile'
 import type { Project, Workspace, TerminalSession } from '../../../../shared/types/index'
 import './OverviewScreen.css'
@@ -17,7 +16,7 @@ interface TileData {
 export function OverviewScreen(): JSX.Element {
   const { sessions } = useSessionStore()
   const { workspaces, projectsByWorkspaceId } = useWorkspaceStore()
-  const { system, processesBySessionId, startPolling, stopPolling } = useMetricsStore()
+  const { processesBySessionId, startPolling, stopPolling } = useMetricsStore()
 
   // Build fast lookup maps
   const projectById = useMemo(() => {
@@ -92,8 +91,6 @@ export function OverviewScreen(): JSX.Element {
 
   return (
     <div className="overview-screen">
-      <MetricsBar system={system} />
-
       {tiles.length === 0 ? (
         <div className="overview-screen__empty">No open terminals</div>
       ) : (

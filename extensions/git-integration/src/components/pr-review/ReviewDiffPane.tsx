@@ -7,7 +7,8 @@ import {
   detectComplexityHotspots,
   computeFileCyclomaticDelta,
 } from '../../github/pr-review-service'
-import { detectLanguage, highlight } from '../FileDiffView'
+import { detectLanguage, highlight, buildSplitRows } from '../FileDiffView'
+import { useLoadInlineComments } from '../../hooks/usePrReview'
 import type { PrChangedFile, PrReviewDetail, Chapter } from '../../schemas/pr-review.schema'
 import type { FileDiff } from '../../schemas/git.schema'
 import { FileDiffSchema } from '../../schemas/git.schema'
@@ -55,8 +56,18 @@ export function ReviewDiffPane({
   const [replyTarget, setReplyTarget] = useState<{ threadId: string; inReplyToId: number } | null>(
     null
   )
-  const [selectionStart, setSelectionStart] = useState<number | null>(null)
   const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>('unified')
+  const lineDragRef = useRef<{
+    active: boolean
+    side: 'LEFT' | 'RIGHT' | null
+    startLine: number
+    endLine: number
+  }>({ active: false, side: null, startLine: 0, endLine: 0 })
+  const [selectionRange, setSelectionRange] = useState<{
+    side: 'LEFT' | 'RIGHT'
+    startLine: number
+    endLine: number
+  } | null>(null)
   const [splitLeftPct, setSplitLeftPct] = useState(50)
   const splitDragState = useRef({ active: false, startX: 0, startPct: 50, containerWidth: 0 })
   const { viewedFiles, threads, patchFileComplexity } = usePrReviewStore()
@@ -73,7 +84,7 @@ export function ReviewDiffPane({
 
   const lang = detectLanguage(file.path)
   const isViewed = viewedFiles.has(file.path)
-  const fileThreads = threads[file.path] ?? []
+  const fileThreads = useMemo(() => threads[file.path] ?? [], [threads, file.path])
   const isLastFile = chapterProgress.index === chapterProgress.total - 1
 
   useEffect(() => {
@@ -139,9 +150,27 @@ export function ReviewDiffPane({
     }
   }, [])
 
+  useEffect(() => {
+    const onMouseUp = () => {
+      const drag = lineDragRef.current
+      if (!drag.active || drag.side == null) return
+      drag.active = false
+      const lo = Math.min(drag.startLine, drag.endLine)
+      const hi = Math.max(drag.startLine, drag.endLine)
+      setSelectionRange(null)
+      setComposerAnchor({
+        line: hi,
+        startLine: lo !== hi ? lo : null,
+        side: drag.side,
+      })
+    }
+    window.addEventListener('mouseup', onMouseUp)
+    return () => window.removeEventListener('mouseup', onMouseUp)
+  }, [])
+
   const handleSplitDividerMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      const container = e.currentTarget.parentElement
+      const container = scrollRef.current
       if (!container) return
       splitDragState.current = {
         active: true,
@@ -156,19 +185,66 @@ export function ReviewDiffPane({
 
   const splitRightPct = useMemo(() => 100 - splitLeftPct, [splitLeftPct])
 
+  const refreshComments = useLoadInlineComments(repoRoot)
+
+  const numColWidth = useMemo(() => {
+    if (!diff) return 44
+    let max = 0
+    for (const hunk of diff.hunks) {
+      for (const line of hunk.lines) {
+        if ((line.oldLineNumber ?? 0) > max) max = line.oldLineNumber ?? 0
+        if ((line.newLineNumber ?? 0) > max) max = line.newLineNumber ?? 0
+      }
+    }
+    const digits = String(max || 1).length
+    return 20 + digits * 8 + 8
+  }, [diff])
+
+  const commentedLines = useMemo(() => {
+    const set = new Set<string>()
+    for (const thread of fileThreads) {
+      const start = thread.startLine ?? thread.line
+      for (let n = start; n <= thread.line; n++) {
+        set.add(`${thread.side}:${n}`)
+      }
+    }
+    return set
+  }, [fileThreads])
+
+  const isCommented = useCallback(
+    (lineNum: number, side: 'LEFT' | 'RIGHT') =>
+      lineNum > 0 && commentedLines.has(`${side}:${lineNum}`),
+    [commentedLines]
+  )
+
   const hotspots = diff ? detectComplexityHotspots(diff) : []
   const hotspotHunks = new Set(hotspots.map((h) => h.hunkIndex))
 
-  const handleGutterClick = useCallback(
-    (lineNum: number, side: 'LEFT' | 'RIGHT') => {
-      setComposerAnchor({
-        line: selectionStart != null && selectionStart !== lineNum ? lineNum : lineNum,
-        startLine: selectionStart != null && selectionStart !== lineNum ? selectionStart : null,
-        side,
-      })
-      setSelectionStart(null)
+  const handleGutterMouseDown = useCallback(
+    (e: React.MouseEvent, lineNum: number, side: 'LEFT' | 'RIGHT') => {
+      e.preventDefault()
+      e.stopPropagation()
+      lineDragRef.current = { active: true, side, startLine: lineNum, endLine: lineNum }
+      setSelectionRange({ side, startLine: lineNum, endLine: lineNum })
     },
-    [selectionStart]
+    []
+  )
+
+  const handleRowMouseEnter = useCallback((lineNum: number, side: 'LEFT' | 'RIGHT') => {
+    const drag = lineDragRef.current
+    if (!drag.active || drag.side !== side || lineNum === 0) return
+    drag.endLine = lineNum
+    setSelectionRange({ side, startLine: drag.startLine, endLine: lineNum })
+  }, [])
+
+  const isLineSelected = useCallback(
+    (lineNum: number, side: 'LEFT' | 'RIGHT') => {
+      if (!selectionRange || selectionRange.side !== side || lineNum === 0) return false
+      const lo = Math.min(selectionRange.startLine, selectionRange.endLine)
+      const hi = Math.max(selectionRange.startLine, selectionRange.endLine)
+      return lineNum >= lo && lineNum <= hi
+    },
+    [selectionRange]
   )
 
   return (
@@ -235,21 +311,14 @@ export function ReviewDiffPane({
         ) : diffError ? (
           <div className="review-diff-error">Failed to load diff: {diffError}</div>
         ) : diff ? (
-          <div
-            className={`review-diff-table-wrap review-diff-table-wrap--${diffViewMode}`}
-            onMouseDown={(e) => {
-              const row = (e.target as HTMLElement).closest('tr')
-              const lineAttr = row?.dataset.newLine ?? row?.dataset.oldLine
-              if (lineAttr) setSelectionStart(parseInt(lineAttr, 10))
-            }}
-          >
+          <div className={`review-diff-table-wrap review-diff-table-wrap--${diffViewMode}`}>
             {diff.hunks.map((hunk, hi) => (
               <React.Fragment key={hi}>
                 {diffViewMode === 'unified' ? (
                   <table className="diff-table diff-table--review">
                     <tbody>
                       <tr>
-                        <td colSpan={5} className="diff-hunk-header">
+                        <td colSpan={4} className="diff-hunk-header">
                           {hunk.header}
                         </td>
                       </tr>
@@ -262,12 +331,35 @@ export function ReviewDiffPane({
                         return (
                           <React.Fragment key={`${hi}-${li}`}>
                             <tr
-                              className={`diff-line diff-line--${line.type}`}
+                              className={`diff-line diff-line--${line.type}${isLineSelected(lineNum, side) ? ' diff-line--selecting' : ''}${isCommented(lineNum, side) ? ' diff-line--commented' : ''}`}
                               data-new-line={line.newLineNumber ?? undefined}
                               data-old-line={line.oldLineNumber ?? undefined}
+                              onMouseEnter={() => handleRowMouseEnter(lineNum, side)}
                             >
-                              <td className="diff-line__old-num">{line.oldLineNumber ?? ''}</td>
-                              <td className="diff-line__new-num">{line.newLineNumber ?? ''}</td>
+                              <td className="diff-line__old-num diff-line__num-gutter">
+                                {line.oldLineNumber ?? ''}
+                                {side === 'LEFT' && (
+                                  <button
+                                    className="diff-gutter-btn"
+                                    aria-label="Add comment"
+                                    onMouseDown={(e) => handleGutterMouseDown(e, lineNum, side)}
+                                  >
+                                    +
+                                  </button>
+                                )}
+                              </td>
+                              <td className="diff-line__new-num diff-line__num-gutter">
+                                {line.newLineNumber ?? ''}
+                                {side === 'RIGHT' && (
+                                  <button
+                                    className="diff-gutter-btn"
+                                    aria-label="Add comment"
+                                    onMouseDown={(e) => handleGutterMouseDown(e, lineNum, side)}
+                                  >
+                                    +
+                                  </button>
+                                )}
+                              </td>
                               <td className="diff-line__prefix">
                                 {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
                               </td>
@@ -278,19 +370,10 @@ export function ReviewDiffPane({
                                   }}
                                 />
                               </td>
-                              <td className="diff-gutter">
-                                <button
-                                  className="diff-gutter-btn"
-                                  aria-label="Add comment"
-                                  onClick={() => handleGutterClick(lineNum, side)}
-                                >
-                                  +
-                                </button>
-                              </td>
                             </tr>
                             {composerAnchor?.line === lineNum && composerAnchor.side === side && (
                               <tr>
-                                <td colSpan={5}>
+                                <td colSpan={4}>
                                   <CommentComposer
                                     repoRoot={repoRoot}
                                     prNumber={pr.number}
@@ -299,7 +382,10 @@ export function ReviewDiffPane({
                                     line={composerAnchor.line}
                                     startLine={composerAnchor.startLine ?? undefined}
                                     side={composerAnchor.side}
-                                    onSubmitted={() => setComposerAnchor(null)}
+                                    onSubmitted={() => {
+                                      setComposerAnchor(null)
+                                      refreshComments()
+                                    }}
                                     onCancel={() => setComposerAnchor(null)}
                                   />
                                 </td>
@@ -307,7 +393,7 @@ export function ReviewDiffPane({
                             )}
                             {lineThreads.map((thread) => (
                               <tr key={thread.id}>
-                                <td colSpan={5}>
+                                <td colSpan={4}>
                                   <InlineCommentThread
                                     thread={thread}
                                     onReply={(tid) =>
@@ -322,7 +408,10 @@ export function ReviewDiffPane({
                                       repoRoot={repoRoot}
                                       prNumber={pr.number}
                                       inReplyToId={replyTarget.inReplyToId}
-                                      onSubmitted={() => setReplyTarget(null)}
+                                      onSubmitted={() => {
+                                        setReplyTarget(null)
+                                        refreshComments()
+                                      }}
                                       onCancel={() => setReplyTarget(null)}
                                     />
                                   )}
@@ -337,67 +426,158 @@ export function ReviewDiffPane({
                 ) : (
                   <div className="diff-split-hunk">
                     <div className="diff-split-header">{hunk.header}</div>
-                    <div className="diff-split-tables">
-                      {/* Left: old (context + removed) */}
-                      <table
-                        className="diff-table diff-table--split diff-table--left"
-                        style={{ width: `${splitLeftPct}%` }}
-                      >
-                        <tbody>
-                          {hunk.lines
-                            .filter((l) => l.type !== 'add')
-                            .map((line, li) => {
-                              const lineNum = line.oldLineNumber ?? 0
-                              const lineThreads = fileThreads.filter(
-                                (t) => t.line === lineNum && t.side === 'LEFT'
-                              )
-                              return (
-                                <React.Fragment key={`left-${hi}-${li}`}>
-                                  <tr className={`diff-line diff-line--${line.type}`}>
-                                    <td className="diff-line__old-num">
-                                      {line.oldLineNumber ?? ''}
-                                    </td>
-                                    <td className="diff-line__prefix">
-                                      {line.type === 'remove' ? '-' : ' '}
-                                    </td>
-                                    <td className="diff-line__content">
-                                      <pre
-                                        dangerouslySetInnerHTML={{
-                                          __html: highlight(line.content, lang),
-                                        }}
-                                      />
-                                    </td>
-                                    <td className="diff-gutter">
+                    {buildSplitRows(hunk.lines).map((row, ri) => {
+                      const leftLine = row.kind === 'context' ? row.line : row.oldLine
+                      const rightLine = row.kind === 'context' ? row.line : row.newLine
+                      const leftLineNum = leftLine?.oldLineNumber ?? 0
+                      const rightLineNum = rightLine?.newLineNumber ?? 0
+                      const leftThreads = leftLine
+                        ? fileThreads.filter((t) => t.line === leftLineNum && t.side === 'LEFT')
+                        : []
+                      const rightThreads = rightLine
+                        ? fileThreads.filter((t) => t.line === rightLineNum && t.side === 'RIGHT')
+                        : []
+                      const showComposerLeft =
+                        leftLine != null &&
+                        composerAnchor?.line === leftLineNum &&
+                        composerAnchor.side === 'LEFT'
+                      const showComposerRight =
+                        rightLine != null &&
+                        composerAnchor?.line === rightLineNum &&
+                        composerAnchor.side === 'RIGHT'
+                      const hasComments =
+                        leftThreads.length > 0 ||
+                        rightThreads.length > 0 ||
+                        showComposerLeft ||
+                        showComposerRight
+
+                      return (
+                        <React.Fragment key={`${hi}-row-${ri}`}>
+                          {/* One flex row per line pair — identical structure to diff-split-tables */}
+                          <div className="diff-split-tables">
+                            <table
+                              className="diff-table diff-table--split diff-table--left"
+                              style={{ width: `${splitLeftPct}%` }}
+                            >
+                              <tbody>
+                                {leftLine ? (
+                                  <tr
+                                    className={`diff-line diff-line--${leftLine.type}${isLineSelected(leftLineNum, 'LEFT') ? ' diff-line--selecting' : ''}${isCommented(leftLineNum, 'LEFT') ? ' diff-line--commented' : ''}`}
+                                    data-old-line={leftLine.oldLineNumber ?? undefined}
+                                    onMouseEnter={() => handleRowMouseEnter(leftLineNum, 'LEFT')}
+                                  >
+                                    <td
+                                      className="diff-line__old-num diff-line__num-gutter"
+                                      style={{ width: numColWidth, minWidth: numColWidth }}
+                                    >
+                                      {leftLine.oldLineNumber ?? ''}
                                       <button
                                         className="diff-gutter-btn"
                                         aria-label="Add comment"
-                                        onClick={() => handleGutterClick(lineNum, 'LEFT')}
+                                        onMouseDown={(e) =>
+                                          handleGutterMouseDown(e, leftLineNum, 'LEFT')
+                                        }
                                       >
                                         +
                                       </button>
                                     </td>
+                                    <td className="diff-line__prefix">
+                                      {leftLine.type === 'remove' ? '-' : ' '}
+                                    </td>
+                                    <td className="diff-line__content">
+                                      <pre
+                                        dangerouslySetInnerHTML={{
+                                          __html: highlight(leftLine.content, lang),
+                                        }}
+                                      />
+                                    </td>
                                   </tr>
-                                  {composerAnchor?.line === lineNum &&
-                                    composerAnchor.side === 'LEFT' && (
-                                      <tr>
-                                        <td colSpan={4}>
-                                          <CommentComposer
-                                            repoRoot={repoRoot}
-                                            prNumber={pr.number}
-                                            commitId={pr.headSHA}
-                                            path={file.path}
-                                            line={composerAnchor.line}
-                                            startLine={composerAnchor.startLine ?? undefined}
-                                            side="LEFT"
-                                            onSubmitted={() => setComposerAnchor(null)}
-                                            onCancel={() => setComposerAnchor(null)}
-                                          />
-                                        </td>
-                                      </tr>
+                                ) : (
+                                  <tr className="diff-line">
+                                    <td colSpan={3} className="diff-line__empty-cell" />
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                            <div
+                              className="diff-split-resize-handle"
+                              onMouseDown={handleSplitDividerMouseDown}
+                            />
+                            <table
+                              className="diff-table diff-table--split diff-table--right"
+                              style={{ width: `${splitRightPct}%` }}
+                            >
+                              <tbody>
+                                {rightLine ? (
+                                  <tr
+                                    className={`diff-line diff-line--${rightLine.type}${isLineSelected(rightLineNum, 'RIGHT') ? ' diff-line--selecting' : ''}${isCommented(rightLineNum, 'RIGHT') ? ' diff-line--commented' : ''}`}
+                                    data-new-line={rightLine.newLineNumber ?? undefined}
+                                    onMouseEnter={() => handleRowMouseEnter(rightLineNum, 'RIGHT')}
+                                  >
+                                    <td
+                                      className="diff-line__new-num diff-line__num-gutter"
+                                      style={{ width: numColWidth, minWidth: numColWidth }}
+                                    >
+                                      {rightLine.newLineNumber ?? ''}
+                                      <button
+                                        className="diff-gutter-btn"
+                                        aria-label="Add comment"
+                                        onMouseDown={(e) =>
+                                          handleGutterMouseDown(e, rightLineNum, 'RIGHT')
+                                        }
+                                      >
+                                        +
+                                      </button>
+                                    </td>
+                                    <td className="diff-line__prefix">
+                                      {rightLine.type === 'add' ? '+' : ' '}
+                                    </td>
+                                    <td className="diff-line__content">
+                                      <pre
+                                        dangerouslySetInnerHTML={{
+                                          __html: highlight(rightLine.content, lang),
+                                        }}
+                                      />
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  <tr className="diff-line">
+                                    <td colSpan={3} className="diff-line__empty-cell" />
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                          {/* Comment row: uses exact same flex classes as code rows for pixel-perfect alignment */}
+                          {hasComments && (
+                            <div className="diff-split-tables">
+                              <div
+                                className="diff-table--split"
+                                style={{ width: `${splitLeftPct}%` }}
+                              >
+                                {(showComposerLeft || leftThreads.length > 0) && (
+                                  <div
+                                    className="diff-split-comment-inner"
+                                    style={{ paddingLeft: numColWidth + 18 }}
+                                  >
+                                    {showComposerLeft && (
+                                      <CommentComposer
+                                        repoRoot={repoRoot}
+                                        prNumber={pr.number}
+                                        commitId={pr.headSHA}
+                                        path={file.path}
+                                        line={composerAnchor!.line}
+                                        startLine={composerAnchor!.startLine ?? undefined}
+                                        side="LEFT"
+                                        onSubmitted={() => {
+                                          setComposerAnchor(null)
+                                          refreshComments()
+                                        }}
+                                        onCancel={() => setComposerAnchor(null)}
+                                      />
                                     )}
-                                  {lineThreads.map((thread) => (
-                                    <tr key={thread.id}>
-                                      <td colSpan={4}>
+                                    {leftThreads.map((thread) => (
+                                      <React.Fragment key={thread.id}>
                                         <InlineCommentThread
                                           thread={thread}
                                           onReply={(tid) =>
@@ -412,82 +592,49 @@ export function ReviewDiffPane({
                                             repoRoot={repoRoot}
                                             prNumber={pr.number}
                                             inReplyToId={replyTarget.inReplyToId}
-                                            onSubmitted={() => setReplyTarget(null)}
+                                            onSubmitted={() => {
+                                              setReplyTarget(null)
+                                              refreshComments()
+                                            }}
                                             onCancel={() => setReplyTarget(null)}
                                           />
                                         )}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </React.Fragment>
-                              )
-                            })}
-                        </tbody>
-                      </table>
-                      <div
-                        className="diff-split-resize-handle"
-                        onMouseDown={handleSplitDividerMouseDown}
-                      />
-                      {/* Right: new (context + added) */}
-                      <table
-                        className="diff-table diff-table--split diff-table--right"
-                        style={{ width: `${splitRightPct}%` }}
-                      >
-                        <tbody>
-                          {hunk.lines
-                            .filter((l) => l.type !== 'remove')
-                            .map((line, li) => {
-                              const lineNum = line.newLineNumber ?? 0
-                              const lineThreads = fileThreads.filter(
-                                (t) => t.line === lineNum && t.side === 'RIGHT'
-                              )
-                              return (
-                                <React.Fragment key={`right-${hi}-${li}`}>
-                                  <tr className={`diff-line diff-line--${line.type}`}>
-                                    <td className="diff-line__new-num">
-                                      {line.newLineNumber ?? ''}
-                                    </td>
-                                    <td className="diff-line__prefix">
-                                      {line.type === 'add' ? '+' : ' '}
-                                    </td>
-                                    <td className="diff-line__content">
-                                      <pre
-                                        dangerouslySetInnerHTML={{
-                                          __html: highlight(line.content, lang),
+                                      </React.Fragment>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <div
+                                className="diff-split-resize-handle"
+                                onMouseDown={handleSplitDividerMouseDown}
+                              />
+                              <div
+                                className="diff-table--split"
+                                style={{ width: `${splitRightPct}%` }}
+                              >
+                                {(showComposerRight || rightThreads.length > 0) && (
+                                  <div
+                                    className="diff-split-comment-inner"
+                                    style={{ paddingLeft: numColWidth + 18 }}
+                                  >
+                                    {showComposerRight && (
+                                      <CommentComposer
+                                        repoRoot={repoRoot}
+                                        prNumber={pr.number}
+                                        commitId={pr.headSHA}
+                                        path={file.path}
+                                        line={composerAnchor!.line}
+                                        startLine={composerAnchor!.startLine ?? undefined}
+                                        side="RIGHT"
+                                        onSubmitted={() => {
+                                          setComposerAnchor(null)
+                                          refreshComments()
                                         }}
+                                        onCancel={() => setComposerAnchor(null)}
                                       />
-                                    </td>
-                                    <td className="diff-gutter">
-                                      <button
-                                        className="diff-gutter-btn"
-                                        aria-label="Add comment"
-                                        onClick={() => handleGutterClick(lineNum, 'RIGHT')}
-                                      >
-                                        +
-                                      </button>
-                                    </td>
-                                  </tr>
-                                  {composerAnchor?.line === lineNum &&
-                                    composerAnchor.side === 'RIGHT' && (
-                                      <tr>
-                                        <td colSpan={4}>
-                                          <CommentComposer
-                                            repoRoot={repoRoot}
-                                            prNumber={pr.number}
-                                            commitId={pr.headSHA}
-                                            path={file.path}
-                                            line={composerAnchor.line}
-                                            startLine={composerAnchor.startLine ?? undefined}
-                                            side="RIGHT"
-                                            onSubmitted={() => setComposerAnchor(null)}
-                                            onCancel={() => setComposerAnchor(null)}
-                                          />
-                                        </td>
-                                      </tr>
                                     )}
-                                  {lineThreads.map((thread) => (
-                                    <tr key={thread.id}>
-                                      <td colSpan={4}>
+                                    {rightThreads.map((thread) => (
+                                      <React.Fragment key={thread.id}>
                                         <InlineCommentThread
                                           thread={thread}
                                           onReply={(tid) =>
@@ -502,19 +649,23 @@ export function ReviewDiffPane({
                                             repoRoot={repoRoot}
                                             prNumber={pr.number}
                                             inReplyToId={replyTarget.inReplyToId}
-                                            onSubmitted={() => setReplyTarget(null)}
+                                            onSubmitted={() => {
+                                              setReplyTarget(null)
+                                              refreshComments()
+                                            }}
                                             onCancel={() => setReplyTarget(null)}
                                           />
                                         )}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </React.Fragment>
-                              )
-                            })}
-                        </tbody>
-                      </table>
-                    </div>
+                                      </React.Fragment>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </React.Fragment>
+                      )
+                    })}
                   </div>
                 )}
 

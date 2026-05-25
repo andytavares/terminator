@@ -379,6 +379,12 @@
   gap: 3px;
 }
 
+.pr-row-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .pr-row-number {
   font-size: 11px;
   color: var(--tm-accent);
@@ -1153,6 +1159,15 @@
   opacity: 0.5;
 }
 
+.diff-line__empty-cell {
+  background: var(--tm-bg-elevated);
+  opacity: 0.4;
+}
+
+.diff-split-comment-inner {
+  padding-left: 62px; /* num(44px) + prefix(18px) — aligns with code content column */
+}
+
 /* Diff table */
 .diff-table {
   width: 100%;
@@ -1179,11 +1194,19 @@
 .diff-line--remove {
   background: rgba(248, 81, 73, 0.08);
 }
+.diff-line--selecting,
+.diff-line--selecting td {
+  background: rgba(88, 166, 255, 0.18) !important;
+}
+.diff-line--selecting .diff-gutter-btn {
+  opacity: 1;
+}
 
 .diff-line__old-num,
 .diff-line__new-num {
-  width: 44px;
-  min-width: 44px;
+  width: 1%;
+  min-width: 36px;
+  white-space: nowrap;
   text-align: right;
   padding: 0 8px;
   color: rgba(255, 255, 255, 0.45);
@@ -1191,6 +1214,11 @@
   border-right: 1px solid rgba(255, 255, 255, 0.06);
   vertical-align: top;
   font-size: 11px;
+}
+.diff-line__num-gutter {
+  position: relative;
+  cursor: pointer;
+  padding-left: 20px;
 }
 
 .diff-line__prefix {
@@ -1223,22 +1251,21 @@
   color: var(--tm-text-primary);
 }
 
-.diff-gutter {
-  width: 28px;
-  min-width: 28px;
-  text-align: center;
-  vertical-align: top;
-  padding: 0;
-}
-
 .diff-gutter-btn {
-  background: none;
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(88, 166, 255, 0.2);
   border: none;
   cursor: pointer;
   color: var(--tm-accent);
-  font-size: 14px;
-  width: 28px;
-  height: 100%;
+  font-size: 13px;
+  font-weight: bold;
   opacity: 0;
   transition: opacity 0.1s;
   padding: 0;
@@ -1246,6 +1273,20 @@
 }
 .diff-line:hover .diff-gutter-btn {
   opacity: 1;
+}
+.diff-line--commented td:first-child {
+  position: relative;
+}
+.diff-line--commented td:first-child::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: rgba(88, 166, 255, 0.8);
+  pointer-events: none;
+  z-index: 2;
 }
 
 /* Complexity hotspot annotation */
@@ -1909,15 +1950,16 @@
 }
 
 .pr-view-mode-btn {
-  padding: 2px 7px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
   background: none;
   cursor: pointer;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--tm-text-muted);
   white-space: nowrap;
+  line-height: 1;
   transition:
     border-color 0.15s,
     color 0.15s;
@@ -2398,12 +2440,50 @@
 
 /* CTA */
 
+.pr-draft-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(139, 148, 158, 0.2);
+  color: #8b949e;
+  border: 1px solid rgba(139, 148, 158, 0.3);
+  vertical-align: middle;
+  margin: 0 4px;
+  letter-spacing: 0.02em;
+}
+
 .pr-overview-cta {
   padding: 12px 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
   display: flex;
+  align-items: center;
+  gap: 8px;
   justify-content: flex-end;
+}
+
+.pr-overview-ready-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid rgba(139, 148, 158, 0.5);
+  border-radius: 6px;
+  color: #8b949e;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.pr-overview-ready-btn:hover:not(:disabled) {
+  border-color: var(--tm-text-primary);
+  color: var(--tm-text-primary);
+}
+.pr-overview-ready-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .pr-overview-start-btn {
@@ -2426,4 +2506,108 @@
 .pr-overview-start-btn:active {
   transform: none;
   opacity: 1;
+}
+
+/* ─── PR Overview Discussion (issue comments) ─────────────────────────────── */
+
+.pr-overview-comment-count {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.pr-issue-comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.pr-issue-comment {
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.pr-issue-comment:last-child {
+  border-bottom: none;
+}
+
+.pr-issue-comment-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.pr-issue-comment-reply-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--tm-text-muted);
+  cursor: pointer;
+  border-radius: 3px;
+  opacity: 0;
+  transition:
+    opacity 0.1s,
+    color 0.1s;
+}
+.pr-issue-comment:hover .pr-issue-comment-reply-btn {
+  opacity: 1;
+}
+.pr-issue-comment-reply-btn:hover {
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-hover);
+}
+
+.pr-issue-comment-body {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--tm-text-primary);
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.pr-issue-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.pr-issue-composer-textarea {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--tm-text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 9px 12px;
+  resize: vertical;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+.pr-issue-composer-textarea:focus {
+  outline: none;
+  border-color: var(--tm-accent);
+}
+.pr-issue-composer-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.pr-issue-composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.pr-issue-composer-hint {
+  font-size: 11px;
+  color: var(--tm-text-muted);
 }

@@ -12,6 +12,9 @@ export const githubAPI = {
   prReviewDetail: (repoRoot: string, prNumber: number) =>
     bridge().invoke('github:pr-review-detail', { repoRoot, prNumber }),
 
+  prMarkReady: (repoRoot: string, prNumber: number) =>
+    bridge().invoke('github:pr-mark-ready', { repoRoot, prNumber }),
+
   prFileDiff: (repoRoot: string, prNumber: number, path: string) =>
     bridge().invoke('github:pr-file-diff', { repoRoot, prNumber, path }),
 
@@ -20,6 +23,12 @@ export const githubAPI = {
 
   prInlineComments: (repoRoot: string, prNumber: number) =>
     bridge().invoke('github:pr-inline-comments', { repoRoot, prNumber }),
+
+  prIssueComments: (repoRoot: string, prNumber: number) =>
+    bridge().invoke('github:pr-issue-comments', { repoRoot, prNumber }),
+
+  prIssueCommentAdd: (payload: { repoRoot: string; prNumber: number; body: string }) =>
+    bridge().invoke('github:pr-issue-comment-add', payload),
 
   prCommentAdd: (payload: unknown) => bridge().invoke('github:pr-comment-add', payload),
 

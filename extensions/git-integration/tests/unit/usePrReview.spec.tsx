@@ -6,6 +6,7 @@ import {
   useLoadPrDetail,
   useFetchFileMetrics,
   useLoadInlineComments,
+  useLoadIssueComments,
 } from '../../src/hooks/usePrReview'
 
 vi.mock('../../src/stores/pr-review.store', () => ({
@@ -20,12 +21,15 @@ const mockSessionsForRepoAPI = vi.fn().mockResolvedValue({ sessions: [] })
 const mockActiveReviewsForRepoAPI = vi.fn().mockResolvedValue({ error: 'NOT_FOUND' })
 const mockPruneActiveReviewsAPI = vi.fn().mockResolvedValue({ openNumbers: [] })
 
+const mockPrIssueCommentsAPI = vi.fn()
+
 vi.mock('../../src/api/github', () => ({
   githubAPI: {
     listOpenPrs: (...args: unknown[]) => mockListOpenPrsAPI(...args),
     prReviewDetail: (...args: unknown[]) => mockPrReviewDetailAPI(...args),
     fileMetrics: (...args: unknown[]) => mockFileMetricsAPI(...args),
     prInlineComments: (...args: unknown[]) => mockPrInlineCommentsAPI(...args),
+    prIssueComments: (...args: unknown[]) => mockPrIssueCommentsAPI(...args),
     sessionsForRepo: (...args: unknown[]) => mockSessionsForRepoAPI(...args),
     activeReviewsForRepo: (...args: unknown[]) => mockActiveReviewsForRepoAPI(...args),
     pruneActiveReviews: (...args: unknown[]) => mockPruneActiveReviewsAPI(...args),
@@ -68,6 +72,7 @@ const mockSetHasMorePrs = vi.fn()
 const mockSetNextPrCursor = vi.fn()
 const mockSetActivePr = vi.fn()
 const mockSetThreads = vi.fn()
+const mockSetIssueComments = vi.fn()
 const mockUpdateFileRiskScore = vi.fn()
 const mockUpdateQueuePrRisk = vi.fn()
 
@@ -1073,5 +1078,89 @@ describe('useLoadInlineComments — catch branch (line 309)', () => {
 
     // Should not crash, setThreads should not be called
     expect(mockSetThreads).not.toHaveBeenCalled()
+  })
+})
+
+describe('useLoadIssueComments', () => {
+  beforeEach(() => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: validActivePr,
+      setIssueComments: mockSetIssueComments,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+  })
+
+  it('does nothing when repoRoot is null', async () => {
+    const { result } = renderHook(() => useLoadIssueComments(null))
+    await act(async () => {
+      await result.current()
+    })
+    expect(mockPrIssueCommentsAPI).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when no prNumber (no activePr and no override)', async () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: null,
+      setIssueComments: mockSetIssueComments,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+
+    const { result } = renderHook(() => useLoadIssueComments('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    expect(mockPrIssueCommentsAPI).not.toHaveBeenCalled()
+  })
+
+  it('loads comments using activePr.number when no override given', async () => {
+    const comments = [
+      { id: 1, author: 'alice', authorAvatarUrl: '', body: 'hi', createdAt: '', updatedAt: '' },
+    ]
+    mockPrIssueCommentsAPI.mockResolvedValue({ comments })
+
+    const { result } = renderHook(() => useLoadIssueComments('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    expect(mockPrIssueCommentsAPI).toHaveBeenCalledWith('/repo', validActivePr.number)
+    expect(mockSetIssueComments).toHaveBeenCalledWith(comments)
+  })
+
+  it('loads comments using prNumber override', async () => {
+    const comments = [
+      { id: 2, author: 'bob', authorAvatarUrl: '', body: 'ok', createdAt: '', updatedAt: '' },
+    ]
+    mockPrIssueCommentsAPI.mockResolvedValue({ comments })
+
+    const { result } = renderHook(() => useLoadIssueComments('/repo'))
+    await act(async () => {
+      await result.current(99)
+    })
+
+    expect(mockPrIssueCommentsAPI).toHaveBeenCalledWith('/repo', 99)
+    expect(mockSetIssueComments).toHaveBeenCalledWith(comments)
+  })
+
+  it('does not call setIssueComments when result contains an error', async () => {
+    mockPrIssueCommentsAPI.mockResolvedValue({ error: 'NOT_AUTHENTICATED' })
+
+    const { result } = renderHook(() => useLoadIssueComments('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    expect(mockSetIssueComments).not.toHaveBeenCalled()
+  })
+
+  it('handles thrown exceptions gracefully without crashing', async () => {
+    mockPrIssueCommentsAPI.mockRejectedValue(new Error('network fail'))
+
+    const { result } = renderHook(() => useLoadIssueComments('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    expect(mockSetIssueComments).not.toHaveBeenCalled()
   })
 })

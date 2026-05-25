@@ -93,6 +93,7 @@ export const PrReviewDetailSchema = z.object({
   headRefName: z.string(),
   baseRefName: z.string(),
   headSHA: z.string(),
+  isDraft: z.boolean().default(false),
   ciStatus: z.enum(['passing', 'failing', 'pending', 'none']),
   lintStatus: SignalValueSchema.default('unknown'),
   coverageStatus: SignalValueSchema.default('unknown'),
@@ -122,6 +123,17 @@ export const ReviewQueuePRSchema = z.object({
   viewedFileCount: z.number().default(0),
   resumeChapter: z.number().optional(),
   resumeChapterTotal: z.number().optional(),
+})
+
+// ─── PR issue (conversation) comments ────────────────────────────────────────
+
+export const IssueCommentSchema = z.object({
+  id: z.number(),
+  author: z.string(),
+  authorAvatarUrl: z.string(),
+  body: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 })
 
 // ─── Inline comments ─────────────────────────────────────────────────────────
@@ -183,6 +195,7 @@ export type Chapter = z.infer<typeof ChapterSchema>
 export type PrReviewDetail = z.infer<typeof PrReviewDetailSchema>
 export type ReviewQueuePR = z.infer<typeof ReviewQueuePRSchema>
 export type StatusCheck = z.infer<typeof StatusCheckSchema>
+export type IssueComment = z.infer<typeof IssueCommentSchema>
 export type InlineComment = z.infer<typeof InlineCommentSchema>
 export type Thread = z.infer<typeof ThreadSchema>
 export type ReviewSession = z.infer<typeof ReviewSessionSchema>

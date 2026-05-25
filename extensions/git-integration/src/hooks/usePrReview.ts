@@ -9,6 +9,7 @@ import {
 import type {
   PrReviewDetail,
   FileMetrics,
+  IssueComment,
   SignalDots,
   ReviewQueuePR,
 } from '../schemas/pr-review.schema'
@@ -207,7 +208,11 @@ export function useLoadPrDetail(repoRoot: string | null) {
           return
         }
         const parsed = PrReviewDetailSchema.safeParse((result as { pr: unknown }).pr)
-        if (parsed.success) await onSuccess(parsed.data)
+        if (parsed.success) {
+          await onSuccess(parsed.data)
+        } else {
+          console.error('PR detail schema validation failed', parsed.error.issues)
+        }
       } catch (e) {
         console.error('Failed to load PR detail', e)
       }
@@ -328,6 +333,27 @@ export function useFetchFileMetrics(repoRoot: string | null) {
       updateQueuePrRisk(pr.number, prRiskLevel, signalDots)
     },
     [repoRoot, activePr, updateFileRiskScore, updateQueuePrRisk]
+  )
+}
+
+// ─── Issue (conversation) comments loading ────────────────────────────────────
+
+export function useLoadIssueComments(repoRoot: string | null) {
+  const { activePr, setIssueComments } = usePrReviewStore()
+
+  return useCallback(
+    async (prNumberOverride?: number) => {
+      const prNumber = prNumberOverride ?? activePr?.number
+      if (!repoRoot || !prNumber) return
+      try {
+        const result = await githubAPI.prIssueComments(repoRoot, prNumber)
+        if ('error' in result) return
+        setIssueComments((result as { comments: IssueComment[] }).comments)
+      } catch (e) {
+        console.error('Failed to load issue comments', e)
+      }
+    },
+    [repoRoot, activePr, setIssueComments]
   )
 }
 
