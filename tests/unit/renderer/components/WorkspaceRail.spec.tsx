@@ -49,6 +49,7 @@ beforeEach(() => {
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSessionStore).mockReturnValue({
     getBellCountForProject: mockGetBellForProject,
+    isProjectBusy: vi.fn().mockReturnValue(false),
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   mockGetBellForProject.mockReturnValue(0)
 })
@@ -131,6 +132,73 @@ describe('WorkspaceRail', () => {
     expect(mockDeleteWorkspace).not.toHaveBeenCalled()
   })
 
+  it('renders core.overview tab before workspace tiles', () => {
+    const onSelect = vi.fn()
+    const { container } = render(
+      <WorkspaceRail
+        globalTabs={[
+          {
+            id: 'core.overview',
+            label: 'Overview',
+            icon: '⊞',
+            component: () => null,
+            permanent: true,
+          },
+        ]}
+        activeGlobalTabId={null}
+        onSelectGlobalTab={onSelect}
+      />
+    )
+    const rail = container.querySelector('.ws-rail')!
+    const children = Array.from(rail.children)
+    const overviewIdx = children.findIndex((el) => el.textContent?.includes('⊞'))
+    const firstTileIdx = children.findIndex((el) => el.classList.contains('ws-tile-wrap'))
+    expect(overviewIdx).toBeLessThan(firstTileIdx)
+  })
+
+  it('renders a divider between overview and workspace tiles', () => {
+    const { container } = render(
+      <WorkspaceRail
+        globalTabs={[
+          {
+            id: 'core.overview',
+            label: 'Overview',
+            icon: '⊞',
+            component: () => null,
+            permanent: true,
+          },
+        ]}
+        activeGlobalTabId={null}
+        onSelectGlobalTab={vi.fn()}
+      />
+    )
+    expect(container.querySelector('.ws-rail__divider')).toBeTruthy()
+  })
+
+  it('non-overview global tabs stay at the bottom (after spacer)', () => {
+    const { container } = render(
+      <WorkspaceRail
+        globalTabs={[
+          {
+            id: 'core.overview',
+            label: 'Overview',
+            icon: '⊞',
+            component: () => null,
+            permanent: true,
+          },
+          { id: 'ext.other', label: 'Other', icon: '◉', component: () => null, permanent: false },
+        ]}
+        activeGlobalTabId={null}
+        onSelectGlobalTab={vi.fn()}
+      />
+    )
+    const rail = container.querySelector('.ws-rail')!
+    const children = Array.from(rail.children)
+    const spacerIdx = children.findIndex((el) => el.classList.contains('ws-rail__spacer'))
+    const otherIdx = children.findIndex((el) => el.textContent === '◉')
+    expect(otherIdx).toBeGreaterThan(spacerIdx)
+  })
+
   it('calls reorderWorkspaces on drag and drop between tiles', async () => {
     const { container } = render(<WorkspaceRail />)
     const tiles = container.querySelectorAll('.ws-tile-wrap')
@@ -163,5 +231,66 @@ describe('WorkspaceRail', () => {
     fireEvent.dragOver(tiles[1])
     fireEvent.dragLeave(tiles[1])
     expect(tiles[1].classList.contains('ws-tile-wrap--dnd-over')).toBe(false)
+  })
+
+  it('clears drag state on dragEnd', () => {
+    const { container } = render(<WorkspaceRail />)
+    const tiles = container.querySelectorAll('.ws-tile-wrap')
+    fireEvent.dragStart(tiles[0])
+    fireEvent.dragOver(tiles[1])
+    fireEvent.dragEnd(tiles[0])
+    expect(tiles[1].classList.contains('ws-tile-wrap--dnd-over')).toBe(false)
+  })
+
+  it('shows ActivitySpinner when a project in the workspace is busy', () => {
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [ws1],
+      reorderWorkspaces: mockReorderWorkspaces,
+      activeWorkspaceId: 'ws-1',
+      setActiveWorkspace: mockSetActiveWorkspace,
+      deleteWorkspace: mockDeleteWorkspace,
+      projectsByWorkspaceId: new Map([
+        ['ws-1', [{ id: 'proj-1', name: 'Project A', worktreePath: '' }]],
+      ]),
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    vi.mocked(useSessionStore).mockReturnValue({
+      getBellCountForProject: vi.fn().mockReturnValue(0),
+      isProjectBusy: vi.fn().mockReturnValue(true),
+    } as unknown as ReturnType<typeof useSessionStore>)
+    const { container } = render(<WorkspaceRail />)
+    expect(container.querySelector('.activity-spinner')).toBeTruthy()
+  })
+
+  it('does not show ActivitySpinner when no project is busy', () => {
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [ws1],
+      reorderWorkspaces: mockReorderWorkspaces,
+      activeWorkspaceId: 'ws-1',
+      setActiveWorkspace: mockSetActiveWorkspace,
+      deleteWorkspace: mockDeleteWorkspace,
+      projectsByWorkspaceId: new Map([
+        ['ws-1', [{ id: 'proj-1', name: 'Project A', worktreePath: '' }]],
+      ]),
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    vi.mocked(useSessionStore).mockReturnValue({
+      getBellCountForProject: vi.fn().mockReturnValue(0),
+      isProjectBusy: vi.fn().mockReturnValue(false),
+    } as unknown as ReturnType<typeof useSessionStore>)
+    const { container } = render(<WorkspaceRail />)
+    expect(container.querySelector('.activity-spinner')).toBeNull()
+  })
+
+  it('calls onSelectGlobalTab with pinned tab id when overview button is clicked', () => {
+    const onSelectGlobalTab = vi.fn()
+    render(
+      <WorkspaceRail
+        globalTabs={[{ id: 'core.overview', label: 'Overview', icon: '⊞' }] as never}
+        activeGlobalTabId={null}
+        onSelectGlobalTab={onSelectGlobalTab}
+      />
+    )
+    const btn = document.querySelector('.ws-rail__global-tab') as HTMLButtonElement
+    fireEvent.click(btn)
+    expect(onSelectGlobalTab).toHaveBeenCalledWith('core.overview')
   })
 })

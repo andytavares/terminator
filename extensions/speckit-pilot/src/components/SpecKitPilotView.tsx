@@ -15,7 +15,7 @@ import { ApprovalPanel } from './ApprovalPanel.js'
 import { ArtifactDiff } from './ArtifactDiff.js'
 import { ImplementDashboard } from './ImplementDashboard.js'
 import { SettingsPage } from './SettingsPage.js'
-import { StalePropagationModal } from './StalePropagationModal.js'
+import { KanbanBoard } from './KanbanBoard.js'
 
 interface Props {
   repoRoot: string | null
@@ -107,9 +107,11 @@ function deriveStatus(
   if (!artifactExists) {
     if (pilotPhase?.status === 'running') return 'running'
     if (pilotPhase?.status === 'failed') return 'failed'
+    if (pilotPhase?.status === 'skipped') return 'skipped'
     if (pilotPhase?.status === 'approved' || pilotPhase?.status === 'stale') return 'skipped'
     return pilotPhase?.status === 'awaiting_review' ? 'awaiting_review' : 'locked'
   }
+  if (pilotPhase?.status === 'skipped') return 'skipped'
   if (pilotPhase?.status === 'approved') return 'approved'
   if (pilotPhase?.status === 'stale') return 'stale'
   if (pilotPhase?.status === 'modified') return 'modified'
@@ -122,6 +124,9 @@ function deriveStatus(
 export function SpecKitPilotView({ repoRoot }: Props): JSX.Element {
   const api = useRef(getSpeckitAPI())
 
+  const [kanbanMode, setKanbanMode] = useState<boolean>(
+    () => localStorage.getItem('speckit-pilot.kanbanMode') === 'true'
+  )
   const [features, setFeatures] = useState<Feature[]>([])
   const [selectedFeatureDir, setSelectedFeatureDir] = useState<string | null>(null)
   const [pilotState, setPilotState] = useState<PilotState | null>(null)
@@ -152,14 +157,18 @@ export function SpecKitPilotView({ repoRoot }: Props): JSX.Element {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [activeFile, setActiveFile] = useState<string | null>(null)
 
-  // Stale propagation
-  const [showStaleModal, setShowStaleModal] = useState(false)
-  const [staleChangedPhase, setStaleChangedPhase] = useState<PhaseId | null>(null)
-
   // Run-in-terminal dialog
   const [showRunDialog, setShowRunDialog] = useState(false)
   const [runSessions, setRunSessions] = useState<ActiveSession[]>([])
   const [runSessionId, setRunSessionId] = useState('')
+
+  const toggleKanban = () => {
+    setKanbanMode((prev) => {
+      const next = !prev
+      localStorage.setItem('speckit-pilot.kanbanMode', String(next))
+      return next
+    })
+  }
 
   const loadFeatures = useCallback(async () => {
     if (!repoRoot) return
@@ -304,14 +313,6 @@ export function SpecKitPilotView({ repoRoot }: Props): JSX.Element {
     if ('state' in result) {
       setPilotState(result.state)
       await refreshHistory()
-      // Check if we need to show stale modal
-      const stale = PHASE_ORDER.slice(PHASE_ORDER.indexOf(selectedPhase) + 1).filter(
-        (id) => result.state.phases[id]?.status === 'stale'
-      )
-      if (stale.length > 0) {
-        setStaleChangedPhase(selectedPhase)
-        setShowStaleModal(true)
-      }
     }
   }
 
@@ -335,6 +336,30 @@ export function SpecKitPilotView({ repoRoot }: Props): JSX.Element {
       featureDir: selectedFeatureDir,
       phase: selectedPhase,
       note,
+    })
+    if ('state' in result) {
+      setPilotState(result.state)
+      await refreshHistory()
+    }
+  }
+
+  const handleSkip = async () => {
+    if (!selectedFeatureDir || !selectedPhase) return
+    const result = await api.current.phaseSkip({
+      featureDir: selectedFeatureDir,
+      phase: selectedPhase,
+    })
+    if ('state' in result) {
+      setPilotState(result.state)
+      await refreshHistory()
+    }
+  }
+
+  const handleUnskip = async () => {
+    if (!selectedFeatureDir || !selectedPhase) return
+    const result = await api.current.phaseUnskip({
+      featureDir: selectedFeatureDir,
+      phase: selectedPhase,
     })
     if ('state' in result) {
       setPilotState(result.state)
@@ -438,19 +463,6 @@ export function SpecKitPilotView({ repoRoot }: Props): JSX.Element {
   // Phase history entries (for the approval panel activity feed)
   const phaseHistory = selectedPhase ? history.filter((e) => e.phase === selectedPhase) : history
 
-  // Stale phases for modal
-  const stalePhaseList = staleChangedPhase
-    ? PHASE_ORDER.slice(PHASE_ORDER.indexOf(staleChangedPhase) + 1)
-        .filter((id) => pilotState?.phases[id]?.status === 'stale')
-        .map((id) => ({
-          id,
-          label: PHASE_LABELS[id],
-          state: pilotState!.phases[id],
-          lastGeneratedAgainst: `${staleChangedPhase}@previous`,
-          canRegenerate: true,
-        }))
-    : []
-
   return (
     <div className="sk-view">
       {/* ── Left panel ── */}
@@ -458,6 +470,15 @@ export function SpecKitPilotView({ repoRoot }: Props): JSX.Element {
         <div className="sk-left__header">
           <span className="sk-left__title">SpecKit Pilot</span>
           <div className="sk-left__actions">
+            {selectedFeatureDir && (
+              <button
+                className={`sk-icon-btn${kanbanMode ? ' sk-icon-btn--active' : ''}`}
+                title={kanbanMode ? 'Switch to list view' : 'Switch to kanban view'}
+                onClick={toggleKanban}
+              >
+                ⊞
+              </button>
+            )}
             <button
               className="sk-icon-btn"
               title="Settings"
@@ -581,14 +602,20 @@ export function SpecKitPilotView({ repoRoot }: Props): JSX.Element {
           </div>
         )}
 
-        {rightView !== 'settings' && !selectedPhase && (
+        {kanbanMode && selectedFeatureDir && rightView !== 'settings' && (
+          <div className="sk-right__body sk-right__body--scrollable">
+            <KanbanBoard featureDir={selectedFeatureDir} />
+          </div>
+        )}
+
+        {!kanbanMode && rightView !== 'settings' && !selectedPhase && (
           <div className="sk-empty">
             <div className="sk-empty__title">Select a phase</div>
             <div className="sk-empty__sub">Click a phase to view its artifact and actions.</div>
           </div>
         )}
 
-        {rightView !== 'settings' && selectedPhase && selectedStatus && (
+        {!kanbanMode && rightView !== 'settings' && selectedPhase && selectedStatus && (
           <>
             {/* Tab bar */}
             <div className="sk-right__tabs">
@@ -660,7 +687,6 @@ export function SpecKitPilotView({ repoRoot }: Props): JSX.Element {
                       <ImplementDashboard
                         featureDir={selectedFeatureDir}
                         onStop={handleImplementStop}
-                        onPause={() => {}}
                         onOpenTasks={handleOpenInSystem}
                       />
                     </div>
@@ -803,13 +829,32 @@ export function SpecKitPilotView({ repoRoot }: Props): JSX.Element {
                               Approve
                             </button>
                           )}
-                        <button
-                          className="sk-btn sk-btn--secondary sk-btn--xs"
-                          onClick={() => void handleOpenRunDialog()}
-                          title={`Run ${PHASE_COMMAND[selectedPhase]} in an active terminal session`}
-                        >
-                          ▶ Run in terminal
-                        </button>
+                        {selectedStatus !== 'skipped' && (
+                          <button
+                            className="sk-btn sk-btn--secondary sk-btn--xs"
+                            onClick={() => void handleOpenRunDialog()}
+                            title={`Run ${PHASE_COMMAND[selectedPhase]} in an active terminal session`}
+                          >
+                            ▶ Run in terminal
+                          </button>
+                        )}
+                        {selectedStatus !== 'skipped' ? (
+                          <button
+                            className="sk-btn sk-btn--ghost sk-btn--xs"
+                            onClick={() => void handleSkip()}
+                            title="Mark this phase as skipped — useful for smaller features that don't need every step"
+                          >
+                            Skip phase
+                          </button>
+                        ) : (
+                          <button
+                            className="sk-btn sk-btn--secondary sk-btn--xs"
+                            onClick={() => void handleUnskip()}
+                            title="Restore this phase to ready so it can be run"
+                          >
+                            Unskip phase
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -908,25 +953,6 @@ export function SpecKitPilotView({ repoRoot }: Props): JSX.Element {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Stale propagation modal */}
-      {showStaleModal && staleChangedPhase && pilotState && (
-        <StalePropagationModal
-          changedPhase={staleChangedPhase}
-          changedPhaseLabel={PHASE_LABELS[staleChangedPhase]}
-          stalePhases={stalePhaseList}
-          onReapproveAndQueue={async (_phases) => {
-            setShowStaleModal(false)
-          }}
-          onReapproveOnly={async () => {
-            setShowStaleModal(false)
-          }}
-          onRevert={async () => {
-            setShowStaleModal(false)
-          }}
-          onDismiss={() => setShowStaleModal(false)}
-        />
       )}
     </div>
   )

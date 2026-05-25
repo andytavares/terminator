@@ -6,31 +6,38 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 
 - **Workspaces & Projects** — Two-level hierarchy. Workspaces map to local directories; Projects hold terminal sessions. Collapsible sidebar with color coding and tag chips.
 - **Persistent terminal sessions** — xterm.js `Terminal` instances are never destroyed on tab switch. Buffer, scroll position, and running process survive navigation.
-- **Agent tab labeling** — Tabs can be designated `human` or `agent`. Agent tabs show a visible badge in the tab strip.
-- **Theme system** — Dark/light themes switch immediately app-wide via CSS custom properties. Workspace-level overrides are supported.
+- **Theme system** — Dark/light themes switch immediately app-wide via CSS custom properties. Per-workspace theme overrides are supported.
 - **Settings** — Global and per-workspace configuration for theme, scrollback limit, and default shell.
+- **Command palette** — `Cmd+P` opens a quick-action palette for common operations.
 - **Extension system** — Extensions install from local directories and contribute settings sections, sidebar items, sidebar panels, top-bar menu items, native View menu items, context menu entries, and terminal event hooks without modifying core code. See [Extension Development Guide](docs/EXTENSION-DEVELOPMENT.md).
 - **Git Integration** — Built-in first-party extension: toggleable right sidebar showing live git status, full git view for staging/committing, and PR creation via `gh` CLI. Configurable per-workspace. Auto-refreshes on file changes.
-- **Code Reviews tab** — PR review workflow inside the git-integration extension. Paginated queue (20 at a time) of open/closed PRs with search by title or PR number, risk scoring (churn, blast radius, cyclomatic complexity delta), chapter-by-chapter review surface with syntax-highlighted diffs, inline comment threading, and one-click review submission (Approve / Request Changes / Comment) via `gh` CLI. Review sessions persist across restarts. Pop-out button opens a dedicated focused review window. Requires `gh auth login`.
-- **SpecKit Pilot** — Extension that orchestrates the full Spec-Kit lifecycle (Constitution → Specify → Clarify → Plan → Checklist → Tasks → Analyze → Implement) with human-in-the-loop approval gates between every phase. Sidebar panel shows phase status glyphs with approve/reject/revoke controls; file watcher detects artifact changes; per-file confirm gate during Implement. State persisted to `.specify/.pilot/state.json`; audit log in `history.jsonl`.
-- **View menu** — Toggle Sidebar (shows/hides the Projects Panel), Open Settings (`Cmd+,`), and Code Reviews in New Window all work from the native View menu.
-- **Keyboard shortcuts** — `Cmd+1–9` (switch workspace), `Cmd++/-` (cycle workspaces), `Cmd+T` (new tab), `Cmd+Left/Right` (cycle tabs), `Cmd+,` (settings), `Cmd+W` (close tab), `Cmd+Shift+G` (toggle git sidebar).
+- **Code Reviews tab** — PR review workflow inside the git-integration extension. Paginated queue of open/closed PRs with search by title or PR number, five filter pills (All, High risk, Quick wins, In progress, Stale >3d), and stat cards (awaiting count, high-risk count, total review time, in-progress count). PRs are scored across six signals: tests, coverage, CI, lint, churn, and blast radius. Chapter-by-chapter review surface with syntax-highlighted diffs, inline comment threading, and one-click review submission (Approve / Request Changes / Comment) via `gh` CLI. Review sessions (chapter position, file, scroll) persist across restarts. In-progress PRs surface at the top of the queue even when they fall on a later pagination page; closed/merged PRs are automatically pruned from the in-progress list. Hover a paused/in-progress row to reveal a dismiss (×) button that removes it from the list. The pop-out button opens a dedicated focused review window and restores the exact PR, session, and view state. Requires `gh auth login`.
+- **SpecKit Pilot** — Extension that orchestrates the full Spec-Kit lifecycle (Constitution → Specify → Clarify → Plan → Checklist → Tasks → Analyze → Implement) with human-in-the-loop approval gates between every phase. Sidebar panel shows phase status glyphs with approve/reject/revoke controls; file watcher detects artifact changes; per-file confirm gate during Implement. State persisted to `.specify/.pilot/state.json`; audit log in `history.jsonl`. Toggle **kanban view** (⊞) to see tasks.md tasks in a 4-column board (Todo / In Progress / In Review / Done); view mode persists across restarts.
+- **Task Vault** — GTD + Bullet Journal + PARA productivity extension. SQLite-backed vault with daily logs, inbox, projects, areas, and someday list. Global quick-capture hotkey (`Cmd+Shift+Space`). MCP stdio server lets AI agents capture tasks, complete/migrate items, and query the vault. 6-step guided weekly review wizard with optional ICS calendar feed integration. Bidirectional links between vault items and terminal sessions. Toggle **kanban view** (grid icon in toolbar) to see all vault tasks in configurable lanes; drag tasks between lanes to change their status; lanes scroll horizontally when there are more lanes than space allows; group tasks into **swimlanes** by project or area; add, rename, reorder, and remove lanes via the Lanes editor; default lanes are Todo / In Progress / In Review / Done; config and view mode persist across restarts. Kanban cards display a markdown-rendered description preview (capped at 2 lines). **Context filter** button always visible in toolbar — click to open a multiselect dropdown to filter all views by one or more `+context` tags; toolbar action buttons are right-aligned. **Task detail panel** — click any task (daily log or kanban card) to open a right-side panel with markdown-capable Description, Acceptance Criteria, and Dev Hints fields (stored in task metadata). **Ghost subtask row** — a faint `· + Add subtask…` row at the bottom of each open task's subtask list expands into an inline input on click.
+- **View menu** — Toggle Sidebar and Open Settings (`Cmd+,`) are in the core View menu. Extensions contribute additional items: Toggle Git Sidebar (`Cmd+Shift+G`) and Code Reviews in New Window are added by the git-integration extension.
+- **Split panes** — Split the current terminal vertically (`Cmd+D`, side by side) or horizontally (`Cmd+Shift+D`, top/bottom). Splits are recursive — each pane can be split further. Drag the divider bar to resize. Click a pane to focus it; keyboard input goes to the focused pane. `Cmd+W` closes the focused pane (collapsing the split) or the active tab when not in split mode. Each pane shows a blue focus border.
+- **Activity indicators** — Spinning indicator on workspace tiles, project cards, and session tabs while a terminal is running a command or producing output (1.5 s idle debounce). Alert badge (red dot + count) coexists alongside the spinner for sessions awaiting input. OS-level system notification + Dock bounce fires on terminal bell.
+- **Overview screen** — Press `⊞` in the workspace rail or `Cmd+Shift+O` to open a full-screen tiled grid of all open sessions. Each tile shows a live canvas snapshot of the terminal (refreshed every ~3 s), the project name, and per-session CPU% and memory. A top bar shows system-wide CPU%, memory used/total, and network in/out rates updated every 2 s. Click any tile to navigate directly to that session.
+- **Global metrics bar** — Optional CPU / Memory / Network bar pinned to the bottom of every screen. Enable via Settings → Interface → "Show CPU / Memory / Network bar".
+- **Keyboard shortcuts** — `Cmd+1–9` (switch workspace), `Cmd++/-` (cycle workspaces), `Cmd+T` (new tab), `Cmd+W` (close focused pane / active tab), `Cmd+D` (split pane vertically), `Cmd+Shift+D` (split pane horizontally), `Cmd+Left/Right` (cycle tabs), `Cmd+K` (clear terminal), `Cmd+P` (command palette), `Cmd+,` (settings), `Cmd+Shift+G` (toggle git sidebar), `Cmd+Shift+O` (toggle Overview).
 
 ## Tech Stack
 
-| Layer                  | Technology                       |
-| ---------------------- | -------------------------------- |
-| Framework              | Electron 30.x                    |
-| Language               | TypeScript 5.x (strict)          |
-| UI                     | React 18.x + Zustand             |
-| Terminal rendering     | xterm.js 5.x + xterm-addon-fit   |
-| PTY management         | node-pty 1.x (main process only) |
-| Persistence            | electron-store 8.x               |
-| Schema validation      | Zod 3.x                          |
-| Build                  | electron-vite 2.x                |
-| Unit/integration tests | Vitest 2.x                       |
-| E2E tests              | Playwright 1.x                   |
-| UI font                | IBM Plex Sans (@fontsource)      |
+| Layer                  | Technology                                          |
+| ---------------------- | --------------------------------------------------- |
+| Framework              | Electron 30.x                                       |
+| Language               | TypeScript 5.x (strict)                             |
+| UI                     | React 18.x + Zustand                                |
+| Terminal rendering     | xterm.js 5.x + xterm-addon-fit + xterm-addon-canvas |
+| PTY management         | node-pty 1.x (main process only)                    |
+| Persistence            | electron-store 8.x                                  |
+| Schema validation      | Zod 3.x                                             |
+| Build                  | electron-vite 2.x                                   |
+| Unit/integration tests | Vitest 2.x                                          |
+| E2E tests              | Playwright 1.x                                      |
+| UI font                | IBM Plex Sans (@fontsource)                         |
+
+Extension dependencies (not part of the core app): `better-sqlite3`, `@modelcontextprotocol/sdk`, `chokidar`, `gray-matter`, `node-ical` — declared in each extension's own `package.json`.
 
 ## Prerequisites
 
@@ -52,7 +59,7 @@ cd terminator
 # Install dependencies (all versions pinned)
 npm install
 
-# Rebuild native modules (node-pty requires native compilation for Electron)
+# Rebuild native modules (node-pty and better-sqlite3 require native compilation for Electron)
 npm run rebuild
 
 # Start in development mode (hot-reload via electron-vite)
@@ -106,6 +113,11 @@ src/
     ├── types/index.ts        # TypeScript interfaces shared across processes
     └── schemas/              # Zod schemas (workspace, session, settings, extension)
 
+extensions/
+├── git-integration/          # Git status, PR creation, Code Reviews tab
+├── speckit-pilot/            # Spec-Kit lifecycle orchestration
+└── task-vault/               # GTD+BuJo+PARA productivity vault
+
 tests/
 ├── unit/                     # Pure logic: storage, schemas, pty-manager, extensions
 ├── integration/              # IPC round-trip tests
@@ -115,10 +127,14 @@ docs/
 ├── ARCHITECTURE.md           # Deep-dive: process model, IPC, extension system
 ├── CONTRIBUTING.md           # Development setup, conventions, PR process
 ├── EXTENSION-DEVELOPMENT.md  # Guide for building Terminator extensions
-└── adr/                      # Architectural Decision Records (ADR-001 to ADR-004)
+└── adr/                      # Architectural Decision Records
 
 specs/
-└── 001-extension-first-terminal/  # Feature spec, plan, contracts, tasks
+├── 001-extension-first-terminal/  # Core terminal + extension system spec & contracts
+├── 002-git-github-integration/    # Git integration spec
+├── 003-pr-review/                 # Code Reviews feature spec & CSS token contract
+├── 004-speckit-pilot-extension/   # SpecKit Pilot spec
+└── 005-task-vault-extension/      # Task Vault spec
 ```
 
 ## Architecture Overview
@@ -133,7 +149,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a full breakdown.
 
 ## Developing an Extension
 
-Extensions install from local directories. Create a directory with an `extension.json` manifest and a JavaScript entry point:
+Extensions install from local directories. Create a directory with a `manifest.json` and a TypeScript entry point:
 
 ```json
 {
@@ -141,23 +157,31 @@ Extensions install from local directories. Create a directory with an `extension
   "name": "My Extension",
   "version": "1.0.0",
   "description": "Does something useful",
-  "main": "index.js",
+  "main": "src/index.ts",
   "minAppVersion": "0.1.0"
 }
 ```
 
 The entry point exports an `activate(api)` function:
 
-```js
-export function activate(api) {
+```typescript
+import type { ExtensionAPI } from '../../src/main/extensions/api'
+
+export function activate(api: ExtensionAPI): void {
   api.settings.register({ label: 'My Settings', properties: { ... } })
   api.contextMenu.registerItem('workspace', { id: 'my-action', label: 'Do Thing', onClick: (id) => {} })
 }
 ```
 
+Scaffold a new extension in seconds:
+
+```bash
+npm run create-extension -- my-extension
+```
+
 A working example is in `tests/fixtures/sample-extension/`.
 
-See [docs/EXTENSION-DEVELOPMENT.md](docs/EXTENSION-DEVELOPMENT.md) for the full guide.
+See [docs/EXTENSION-DEVELOPMENT.md](docs/EXTENSION-DEVELOPMENT.md) for the full guide including the v1.2.0 API (global tabs, global shortcuts, MCP sidecar pattern).
 
 ## Key Design Decisions
 

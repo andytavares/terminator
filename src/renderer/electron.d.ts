@@ -6,6 +6,8 @@ import type {
   Extension,
   Branch,
   WorktreeInfo,
+  SystemMetrics,
+  ProcessMetrics,
 } from '../shared/types/index'
 
 interface ElectronAPI {
@@ -50,8 +52,6 @@ interface ElectronAPI {
       worktreePath: string
     ): Promise<{ success: true } | { error: string }>
     listWorktrees(path: string): Promise<{ worktrees: WorktreeInfo[] }>
-    // git:status, diffFile, stage, unstage, commit, prStatus, prCreate are augmented by the git-integration extension
-    [key: string]: unknown
   }
   shell: {
     exec(options: {
@@ -134,15 +134,20 @@ interface ElectronAPI {
     onSelectProjectTab(handler: (tabId: string) => void): () => void
     onMenuOpenSettings(handler: () => void): () => void
     onMenuToggleSidebar(handler: () => void): () => void
-    onMenuOpenPrReviewWindow(handler: () => void): () => void
+  }
+  notification: {
+    show(title: string, body: string): void
+  }
+  metrics: {
+    getSystem(): Promise<{ data: SystemMetrics } | { error: string }>
+    getProcesses(pids: number[]): Promise<{ data: ProcessMetrics[] } | { error: string }>
+    getPids(
+      sessionIds: string[]
+    ): Promise<{ data: Array<{ sessionId: string; pid: number }> } | { error: string }>
   }
   logger: {
     write(level: string, namespace: string, message: string): void
   }
-  window: {
-    openPrReview(repoRoot: string, accentColor?: string): Promise<void>
-  }
-  // github namespace is contributed by the git-integration extension (see extensions/git-integration/src/types/electron.d.ts)
   extensionBridge: {
     invoke(channel: string, payload?: unknown): Promise<unknown>
     on(channel: string, handler: (data: unknown) => void): () => void

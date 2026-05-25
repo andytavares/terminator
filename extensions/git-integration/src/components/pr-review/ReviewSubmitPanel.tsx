@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { githubAPI } from '../../api/github'
 
 interface Props {
   repoRoot: string
@@ -20,7 +21,7 @@ export function ReviewSubmitPanel({ repoRoot, prNumber, commitId, onClose }: Pro
     setSubmitting(true)
     setError(null)
     try {
-      const result = await window.electronAPI.github.prReviewSubmit({
+      const result = await githubAPI.prReviewSubmit({
         repoRoot,
         prNumber,
         commitId,

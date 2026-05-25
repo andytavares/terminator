@@ -1,6 +1,6 @@
 # Architecture: Terminator
 
-**Version**: 0.1.0 | **Updated**: 2026-05-05
+**Version**: 0.1.0 | **Updated**: 2026-05-22
 
 ---
 
@@ -55,18 +55,18 @@ All renderer-to-main communication goes through `window.electronAPI`, exposed by
 
 ### Channel namespaces
 
-| Namespace     | Direction        | Description                                                                       |
-| ------------- | ---------------- | --------------------------------------------------------------------------------- |
-| `terminal:*`  | renderer ↔ main | PTY lifecycle: create, close, input, output, resize, cleanup                      |
-| `workspace:*` | renderer → main  | Workspace and project CRUD                                                        |
-| `project:*`   | renderer → main  | Project CRUD (scoped under workspace)                                             |
-| `settings:*`  | renderer → main  | Global and per-workspace settings                                                 |
-| `dialog:*`    | renderer → main  | Native OS dialogs (folder picker)                                                 |
-| `extension:*` | renderer → main  | Extension install, toggle, contribution queries                                   |
-| `git:*`       | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create                        |
-| `github:*`    | renderer → main  | PR review queue, diff, file metrics, inline comments, submit, session persistence |
-| `shell:exec`  | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)                               |
-| `fs:*`        | renderer ↔ main | File watch start/stop; `fs:changed` push events                                   |
+| Namespace     | Direction        | Description                                                                                                                    |
+| ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `terminal:*`  | renderer ↔ main | PTY lifecycle: create, close, input, output, resize, cleanup                                                                   |
+| `workspace:*` | renderer → main  | Workspace and project CRUD                                                                                                     |
+| `project:*`   | renderer → main  | Project CRUD (scoped under workspace)                                                                                          |
+| `settings:*`  | renderer → main  | Global and per-workspace settings                                                                                              |
+| `dialog:*`    | renderer → main  | Native OS dialogs (folder picker)                                                                                              |
+| `extension:*` | renderer → main  | Extension install, toggle, contribution queries                                                                                |
+| `git:*`       | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create                                                                     |
+| `github:*`    | renderer → main  | PR review queue, diff, file metrics, inline comments, submit, session persistence, active-review tracking, prune closed/merged |
+| `shell:exec`  | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)                                                                            |
+| `fs:*`        | renderer ↔ main | File watch start/stop; `fs:changed` push events                                                                                |
 
 Full channel specifications: [`specs/001-extension-first-terminal/contracts/ipc-channels.md`](../specs/001-extension-first-terminal/contracts/ipc-channels.md),
 [`specs/002-git-github-integration/contracts/ipc-channels-git.md`](../specs/002-git-github-integration/contracts/ipc-channels-git.md),
@@ -204,7 +204,7 @@ Extension authors must keep main-process entry points free of React/DOM imports 
 
 ### Pop-out windows
 
-The `window:open-pr-review` IPC handler in `src/main/index.ts` creates a new `BrowserWindow` that loads the renderer URL with `?view=pr-review&repoRoot=<path>`. The renderer's `src/renderer/index.tsx` detects this query param and renders `PrReviewWindow` instead of `App` — a minimal wrapper around `PrReviewTab` with no workspace/terminal chrome. This pattern can be reused for other focused views.
+The `window:open-pr-review` IPC handler, registered by the git-integration extension in `extensions/git-integration/src/index.ts` via `api.ipc.registerHandler`, calls `api.window.openAuxiliary('pr-review', params)`. The host creates a new `BrowserWindow` that loads the renderer URL with `?view=pr-review&repoRoot=<path>` (and optionally `&prNumber=<n>&showOverview=<bool>` to restore directly into an active review). The renderer's `src/renderer/index.tsx` detects the `view` query param and renders `PrReviewWindow` instead of `App` — a minimal wrapper around `PrReviewTab` with no workspace/terminal chrome. `PrReviewTab` reads the remaining URL params on mount to auto-navigate to the correct PR and session state. This pattern can be reused for other focused views.
 
 ### Sandboxed Shell Execution (v1.1.0)
 
@@ -273,3 +273,41 @@ styles.css :root
 This alias layer allows the core design system to evolve (rename, restructure tokens) without breaking extensions, as long as the `--tm-*` values remain stable.
 
 **Adding a new extension token** requires a MINOR version bump in `specs/003-pr-review/contracts/extension-token-api.md` and an update to `docs/EXTENSION-DEVELOPMENT.md`.
+
+---
+
+## Task Vault Extension Architecture
+
+The task-vault extension (`extensions/task-vault/`) implements a GTD+BuJo+PARA productivity system. Markdown files are the human-editable source of truth for daily logs; SQLite (`better-sqlite3`) is the primary datastore for all structured queries and CRUD. Key subsystems:
+
+### Vault Layer (`src/vault/`)
+
+- **db.ts** — Initialises the SQLite database at `.todo/vault.db`, applies schema (WAL mode, FK enforcement), and exports `getDb()` / `initDb()` / `closeDb()`. All IPC handlers access data through this layer.
+- **parser.ts** — Pure function `parseFile(content, filePath)` extracts tasks, events, notes, frontmatter, and `terminator:<uuid>` links from markdown content using `gray-matter`. Returns structured `ParseResult` used to sync records into SQLite.
+- **writer.ts** — Atomic markdown file writes (tmp + `fs.rename`). Task mutation: `completeTask`, `migrateTask`, `addTask`. Checks stale line references (STALE_ID per ADR-014).
+- **indexer.ts** — Walks vault directories, parses all `.md` files, writes a lightweight `.todo/index.json` summary for bulk queries. `getTaskById` resolves `filepath:line` IDs.
+- **watcher.ts** — chokidar watcher on vault root (excludes `archive/`) with debounce. Triggers re-parse and SQLite sync on file change.
+
+### IPC Layer (`src/ipc/`)
+
+- **vault.ipc.ts** — Handlers for vault CRUD (capture, get-today, add-task, complete-task, migrate-task, query, process-inbox-item). All validate with Zod; stale IDs return `{ error: 'STALE_ID' }`.
+- **projects.ipc.ts** — project list, update-project-status, and weekly-review payload handler.
+- **links.ipc.ts** — bidirectional link handlers (create/remove/get-for-terminator-target).
+
+### MCP Sidecar (`src/mcp/`)
+
+- Standalone stdio server (`server.ts`) runs as a separate process: `TASK_VAULT_PATH=/path node extensions/task-vault/src/mcp/server.js`.
+- Registers tools: capture, today, add_task, complete_task, migrate_task, query, list_projects, weekly_review.
+- Auto-execute gate: reads per-tool toggle from `.todo/settings.json`; returns a suggestion without writing if disabled; `confirmed: true` bypasses.
+
+### Task ID Format
+
+Tasks are identified as `filepath:lineNumber` (ADR-014). IDs are session-scoped and rebuilt after every write. STALE_ID is returned when a task has moved to a different line.
+
+### Extension API v1.2.0
+
+New namespaces added in this extension cycle (ADR-012):
+
+- `api.sidebar.registerGlobalTab` — register a permanent app-level tab
+- `api.globalShortcut.register` — register global keyboard shortcuts
+- `api.notifications.showToast` — show toast notifications from main process

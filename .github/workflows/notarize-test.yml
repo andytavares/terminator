@@ -1,0 +1,59 @@
+name: Test Notarization
+
+on:
+  workflow_dispatch:
+
+jobs:
+  notarize-test:
+    name: Test signing & notarization
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - uses: actions/setup-python@v5
+        id: python
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          PYTHON: ${{ steps.python.outputs.python-path }}
+
+      - name: Build
+        run: npm run build
+
+      - name: Patch notarize to log full output before JSON.parse
+        run: |
+          python3 - <<'EOF'
+          import sys
+          path = 'node_modules/@electron/notarize/lib/notarytool.js'
+          with open(path, 'r') as f:
+              content = f.read()
+          needle = 'const parsed = JSON.parse(result.output.trim());'
+          if needle not in content:
+              print('ERROR: needle not found in file. Actual content around JSON.parse:')
+              for i, line in enumerate(content.splitlines()):
+                  if 'JSON.parse' in line or 'result.output' in line:
+                      print(f'  line {i+1}: {repr(line)}')
+              sys.exit(1)
+          patched = content.replace(needle, f'console.error("[notarytool raw output]", result.output); {needle}')
+          with open(path, 'w') as f:
+              f.write(patched)
+          print('patched successfully')
+          EOF
+
+      - name: Package
+        env:
+          CSC_LINK: ${{ secrets.APPLE_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run package

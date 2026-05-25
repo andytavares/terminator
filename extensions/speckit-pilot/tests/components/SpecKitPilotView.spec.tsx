@@ -10,6 +10,8 @@ const mockPilotState = vi.fn()
 const mockPhaseApprove = vi.fn()
 const mockPhaseReject = vi.fn()
 const mockPhaseRevoke = vi.fn()
+const mockPhaseSkip = vi.fn()
+const mockPhaseUnskip = vi.fn()
 const mockHistoryLoad = vi.fn()
 const mockArtifactRead = vi.fn()
 const mockImplementStop = vi.fn()
@@ -25,6 +27,8 @@ vi.mock('../../src/types/electron.js', () => ({
     phaseApprove: mockPhaseApprove,
     phaseReject: mockPhaseReject,
     phaseRevoke: mockPhaseRevoke,
+    phaseSkip: mockPhaseSkip,
+    phaseUnskip: mockPhaseUnskip,
     historyLoad: mockHistoryLoad,
     artifactRead: mockArtifactRead,
     implementStop: mockImplementStop,
@@ -82,6 +86,8 @@ describe('SpecKitPilotView', () => {
     mockArtifactRead.mockResolvedValue({ current: null, approved: null })
     mockImplementStop.mockResolvedValue({ ok: true })
     mockSessionList.mockResolvedValue({ sessions: [] })
+    mockPhaseSkip.mockResolvedValue({ state: makePilotState() })
+    mockPhaseUnskip.mockResolvedValue({ state: makePilotState() })
     mockReadFile.mockResolvedValue({ error: 'not found' })
   })
 
@@ -807,6 +813,106 @@ describe('SpecKitPilotView', () => {
     fireEvent.click(screen.getByText('Specify'))
     await waitFor(() => screen.getByText('▶ Run in terminal'))
     expect(screen.queryByText('Approve')).toBeNull()
+  })
+
+  // ── Skip / Unskip ───────────────────────────────────────────────────────
+
+  it('shows Skip phase button for ready phases', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { clarify: true } })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Clarify'))
+    fireEvent.click(screen.getByText('Clarify'))
+    await waitFor(() => {
+      expect(screen.getByText('Skip phase')).toBeTruthy()
+    })
+  })
+
+  it('calls phaseSkip when Skip phase is clicked', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { clarify: true } })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Clarify'))
+    fireEvent.click(screen.getByText('Clarify'))
+    await waitFor(() => screen.getByText('Skip phase'))
+    fireEvent.click(screen.getByText('Skip phase'))
+    await waitFor(() => {
+      expect(mockPhaseSkip).toHaveBeenCalledWith({
+        featureDir: '/repo/specs/001',
+        phase: 'clarify',
+      })
+    })
+  })
+
+  it('shows Unskip phase button for skipped phases', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { clarify: false } })
+    mockPilotState.mockResolvedValue({
+      state: makePilotState({
+        phases: {
+          ...makePilotState().phases,
+          clarify: { status: 'skipped', artifactPaths: [], hashes: {} },
+        },
+      }),
+    })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Clarify'))
+    fireEvent.click(screen.getByText('Clarify'))
+    await waitFor(() => {
+      expect(screen.getByText('Unskip phase')).toBeTruthy()
+    })
+  })
+
+  it('calls phaseUnskip when Unskip phase is clicked', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { clarify: false } })
+    mockPilotState.mockResolvedValue({
+      state: makePilotState({
+        phases: {
+          ...makePilotState().phases,
+          clarify: { status: 'skipped', artifactPaths: [], hashes: {} },
+        },
+      }),
+    })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Clarify'))
+    fireEvent.click(screen.getByText('Clarify'))
+    await waitFor(() => screen.getByText('Unskip phase'))
+    fireEvent.click(screen.getByText('Unskip phase'))
+    await waitFor(() => {
+      expect(mockPhaseUnskip).toHaveBeenCalledWith({
+        featureDir: '/repo/specs/001',
+        phase: 'clarify',
+      })
+    })
+  })
+
+  it('does not show Run in terminal for skipped phases', async () => {
+    mockFeatureList.mockResolvedValue({
+      features: [{ name: 'My Feature', dir: '/repo/specs/001' }],
+    })
+    mockCheckArtifacts.mockResolvedValue({ exists: { clarify: false } })
+    mockPilotState.mockResolvedValue({
+      state: makePilotState({
+        phases: {
+          ...makePilotState().phases,
+          clarify: { status: 'skipped', artifactPaths: [], hashes: {} },
+        },
+      }),
+    })
+    render(<SpecKitPilotView repoRoot="/repo" />)
+    await waitFor(() => screen.getByText('Clarify'))
+    fireEvent.click(screen.getByText('Clarify'))
+    await waitFor(() => screen.getByText('Unskip phase'))
+    expect(screen.queryByText('▶ Run in terminal')).toBeNull()
   })
 
   // ── File preview when approved ────────────────────────────────────────────

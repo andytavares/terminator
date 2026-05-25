@@ -24,6 +24,7 @@ vi.mock('../../src/github/pr-review-service', () => ({
 
 const mockPatchFileComplexity = vi.fn()
 const mockPrFileDiff = vi.fn()
+const mockInvoke = vi.fn()
 
 const mockFile = {
   path: 'src/foo.ts',
@@ -92,8 +93,12 @@ const defaultProps = {
 beforeEach(() => {
   vi.clearAllMocks()
   mockPrFileDiff.mockResolvedValue({ diff: { hunks: [] } })
+  mockInvoke.mockImplementation((channel: string, payload: unknown) => {
+    if (channel === 'github:pr-file-diff') return mockPrFileDiff(payload)
+    return Promise.resolve({})
+  })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    github: { prFileDiff: mockPrFileDiff },
+    extensionBridge: { invoke: mockInvoke },
   }
   vi.mocked(usePrReviewStore).mockReturnValue({
     viewedFiles: new Set<string>(),
@@ -279,9 +284,11 @@ describe('ReviewDiffPane', () => {
     await renderPane()
     await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Add comment' })[0])
+    const btn = screen.getAllByRole('button', { name: 'Add comment' })[0]
+    fireEvent.mouseDown(btn)
+    fireEvent.mouseUp(btn)
 
-    expect(screen.getByTestId('composer')).toBeTruthy()
+    await waitFor(() => expect(screen.getByTestId('composer')).toBeTruthy())
   })
 
   it('closes composer when cancel is clicked', async () => {
@@ -306,8 +313,10 @@ describe('ReviewDiffPane', () => {
     await renderPane()
     await waitFor(() => expect(screen.getByText('@@ -1,1 +1,1 @@')).toBeTruthy())
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Add comment' })[0])
-    expect(screen.getByTestId('composer')).toBeTruthy()
+    const btn = screen.getAllByRole('button', { name: 'Add comment' })[0]
+    fireEvent.mouseDown(btn)
+    fireEvent.mouseUp(btn)
+    await waitFor(() => expect(screen.getByTestId('composer')).toBeTruthy())
 
     fireEvent.click(screen.getByText('Cancel'))
     await waitFor(() => expect(screen.queryByTestId('composer')).toBeNull())

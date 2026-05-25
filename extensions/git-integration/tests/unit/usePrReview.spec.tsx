@@ -6,10 +6,34 @@ import {
   useLoadPrDetail,
   useFetchFileMetrics,
   useLoadInlineComments,
+  useLoadIssueComments,
 } from '../../src/hooks/usePrReview'
 
 vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
+}))
+
+const mockListOpenPrsAPI = vi.fn()
+const mockPrReviewDetailAPI = vi.fn()
+const mockFileMetricsAPI = vi.fn()
+const mockPrInlineCommentsAPI = vi.fn()
+const mockSessionsForRepoAPI = vi.fn().mockResolvedValue({ sessions: [] })
+const mockActiveReviewsForRepoAPI = vi.fn().mockResolvedValue({ error: 'NOT_FOUND' })
+const mockPruneActiveReviewsAPI = vi.fn().mockResolvedValue({ openNumbers: [] })
+
+const mockPrIssueCommentsAPI = vi.fn()
+
+vi.mock('../../src/api/github', () => ({
+  githubAPI: {
+    listOpenPrs: (...args: unknown[]) => mockListOpenPrsAPI(...args),
+    prReviewDetail: (...args: unknown[]) => mockPrReviewDetailAPI(...args),
+    fileMetrics: (...args: unknown[]) => mockFileMetricsAPI(...args),
+    prInlineComments: (...args: unknown[]) => mockPrInlineCommentsAPI(...args),
+    prIssueComments: (...args: unknown[]) => mockPrIssueCommentsAPI(...args),
+    sessionsForRepo: (...args: unknown[]) => mockSessionsForRepoAPI(...args),
+    activeReviewsForRepo: (...args: unknown[]) => mockActiveReviewsForRepoAPI(...args),
+    pruneActiveReviews: (...args: unknown[]) => mockPruneActiveReviewsAPI(...args),
+  },
 }))
 
 vi.mock('../../src/github/pr-review-service', () => ({
@@ -48,13 +72,15 @@ const mockSetHasMorePrs = vi.fn()
 const mockSetNextPrCursor = vi.fn()
 const mockSetActivePr = vi.fn()
 const mockSetThreads = vi.fn()
+const mockSetIssueComments = vi.fn()
 const mockUpdateFileRiskScore = vi.fn()
 const mockUpdateQueuePrRisk = vi.fn()
 
-const mockListOpenPrs = vi.fn()
-const mockPrReviewDetail = vi.fn()
-const mockFileMetrics = vi.fn()
-const mockPrInlineComments = vi.fn()
+// Aliases so test assertions work without changes
+const mockListOpenPrs = mockListOpenPrsAPI
+const mockPrReviewDetail = mockPrReviewDetailAPI
+const mockFileMetrics = mockFileMetricsAPI
+const mockPrInlineComments = mockPrInlineCommentsAPI
 
 const validActivePr = {
   number: 42,
@@ -163,6 +189,166 @@ describe('useLoadPrQueue', () => {
     })
     expect(mockAppendQueue).toHaveBeenCalled()
     expect(mockSetQueue).not.toHaveBeenCalled()
+  })
+
+  it('excludes orphan PRs when pruneActiveReviews reports them closed/merged', async () => {
+    const orphanPr = {
+      number: 99,
+      title: 'Orphan PR',
+      author: 'bob',
+      authorAvatarUrl: '',
+      openedAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat',
+      baseRefName: 'main',
+      isDraft: false,
+      ciStatus: 'none',
+      fileCount: 1,
+      additions: 5,
+      deletions: 2,
+      estimatedMinutes: 5,
+      riskLevel: 'low',
+      signalDots: {
+        tests: 'unknown',
+        coverage: 'unknown',
+        ci: 'unknown',
+        lint: 'unknown',
+        churn: 'unknown',
+        blast: 'unknown',
+      },
+      sessionStatus: 'in-progress',
+      viewedFileCount: 1,
+    }
+    mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: false })
+    mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
+    mockActiveReviewsForRepoAPI.mockResolvedValue({ prs: [orphanPr] })
+    // pruneActiveReviews returns empty openNumbers → PR 99 is closed/merged
+    mockPruneActiveReviewsAPI.mockResolvedValue({ openNumbers: [] })
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
+    expect(queue.find((p: { number: number }) => p.number === 99)).toBeUndefined()
+  })
+
+  it('includes orphan PRs when pruneActiveReviews confirms they are still open', async () => {
+    const orphanPr = {
+      number: 99,
+      title: 'Orphan PR',
+      author: 'bob',
+      authorAvatarUrl: '',
+      openedAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat',
+      baseRefName: 'main',
+      isDraft: false,
+      ciStatus: 'none',
+      fileCount: 1,
+      additions: 5,
+      deletions: 2,
+      estimatedMinutes: 5,
+      riskLevel: 'low',
+      signalDots: {
+        tests: 'unknown',
+        coverage: 'unknown',
+        ci: 'unknown',
+        lint: 'unknown',
+        churn: 'unknown',
+        blast: 'unknown',
+      },
+      sessionStatus: 'in-progress',
+      viewedFileCount: 1,
+    }
+    mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: true, nextCursor: 'cursor-1' })
+    mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
+    mockActiveReviewsForRepoAPI.mockResolvedValue({ prs: [orphanPr] })
+    // pruneActiveReviews returns 99 → PR is still open (just on a later page)
+    mockPruneActiveReviewsAPI.mockResolvedValue({ openNumbers: [99] })
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
+    expect(queue.find((p: { number: number }) => p.number === 99)).toBeDefined()
+  })
+
+  it('keeps all orphans when pruneActiveReviews returns an error object', async () => {
+    const orphanPr = {
+      number: 55,
+      title: 'Orphan',
+      author: 'carol',
+      authorAvatarUrl: '',
+      openedAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat',
+      baseRefName: 'main',
+      isDraft: false,
+      ciStatus: 'none',
+      fileCount: 1,
+      additions: 1,
+      deletions: 0,
+      estimatedMinutes: 2,
+      riskLevel: 'low',
+      signalDots: {
+        tests: 'unknown',
+        coverage: 'unknown',
+        ci: 'unknown',
+        lint: 'unknown',
+        churn: 'unknown',
+        blast: 'unknown',
+      },
+      sessionStatus: 'in-progress',
+      viewedFileCount: 0,
+    }
+    mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: false })
+    mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
+    mockActiveReviewsForRepoAPI.mockResolvedValue({ prs: [orphanPr] })
+    // pruneActiveReviews returns an error — orphan should still appear
+    mockPruneActiveReviewsAPI.mockResolvedValue({ error: 'NETWORK_ERROR' })
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
+    expect(queue.find((p: { number: number }) => p.number === 55)).toBeDefined()
+  })
+
+  it('keeps all orphans when pruneActiveReviews throws', async () => {
+    const orphanPr = {
+      number: 66,
+      title: 'Orphan throw',
+      author: 'dave',
+      authorAvatarUrl: '',
+      openedAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat',
+      baseRefName: 'main',
+      isDraft: false,
+      ciStatus: 'none',
+      fileCount: 1,
+      additions: 1,
+      deletions: 0,
+      estimatedMinutes: 2,
+      riskLevel: 'low',
+      signalDots: {
+        tests: 'unknown',
+        coverage: 'unknown',
+        ci: 'unknown',
+        lint: 'unknown',
+        churn: 'unknown',
+        blast: 'unknown',
+      },
+      sessionStatus: 'paused',
+      viewedFileCount: 0,
+    }
+    mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: false })
+    mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
+    mockActiveReviewsForRepoAPI.mockResolvedValue({ prs: [orphanPr] })
+    // pruneActiveReviews throws — orphan should still appear
+    mockPruneActiveReviewsAPI.mockRejectedValue(new Error('bridge disconnected'))
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
+    expect(queue.find((p: { number: number }) => p.number === 66)).toBeDefined()
   })
 
   it('sets hasMorePrs and nextCursor from response', async () => {
@@ -382,5 +568,599 @@ describe('useFetchFileMetrics', () => {
     expect(mockFileMetrics).toHaveBeenCalledWith('/repo', 'src/foo.ts')
     expect(mockUpdateFileRiskScore).toHaveBeenCalled()
     expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
+  })
+
+  it('does nothing when all files are tier-3 (lock files excluded from risk scoring)', async () => {
+    const prWithLockFiles = {
+      ...validActivePr,
+      chapters: [
+        {
+          id: 'ch-1',
+          name: 'Chapter 1',
+          estimatedMinutes: 1,
+          status: 'not-started' as const,
+          files: [
+            {
+              path: 'package-lock.json',
+              oldPath: undefined,
+              changeType: 'modified' as const,
+              additions: 1000,
+              deletions: 1000,
+              isBinary: false,
+              tier: 3 as const, // tier 3 — excluded
+              whyHere: 'Mechanical change',
+              estimatedMinutes: 1,
+              riskScore: {
+                level: 'low' as const,
+                composite: null,
+                dominantDriver: '',
+                topImporters: [],
+                importerCount: 0,
+                metrics: {
+                  changeSize: null,
+                  churn90d: null,
+                  blastRadius: null,
+                  testFilePresent: null,
+                  complexityDelta: null,
+                  patchCoverage: null,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    }
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: prWithLockFiles,
+      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateQueuePrRisk: mockUpdateQueuePrRisk,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+
+    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    // Tier 3 files are excluded, so no metrics calls
+    expect(mockFileMetrics).not.toHaveBeenCalled()
+  })
+
+  it('handles fileMetrics returning an error object (null value)', async () => {
+    const prWithFiles = {
+      ...validActivePr,
+      chapters: [
+        {
+          id: 'ch-1',
+          name: 'Chapter 1',
+          estimatedMinutes: 5,
+          status: 'not-started' as const,
+          files: [
+            {
+              path: 'src/foo.ts',
+              oldPath: undefined,
+              changeType: 'modified' as const,
+              additions: 10,
+              deletions: 2,
+              isBinary: false,
+              tier: 1 as const,
+              whyHere: 'changed',
+              estimatedMinutes: 3,
+              riskScore: {
+                level: 'low' as const,
+                composite: null,
+                dominantDriver: '',
+                topImporters: [],
+                importerCount: 0,
+                metrics: {
+                  changeSize: null,
+                  churn90d: null,
+                  blastRadius: null,
+                  testFilePresent: null,
+                  complexityDelta: null,
+                  patchCoverage: null,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    }
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: prWithFiles,
+      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateQueuePrRisk: mockUpdateQueuePrRisk,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+
+    // Return an error — should produce null (filtered out)
+    mockFileMetrics.mockResolvedValue({ error: 'RATE_LIMITED' })
+
+    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    // collected.length === 0 so no updateFileRiskScore or updateQueuePrRisk
+    expect(mockUpdateFileRiskScore).not.toHaveBeenCalled()
+    expect(mockUpdateQueuePrRisk).not.toHaveBeenCalled()
+  })
+})
+
+describe('useLoadPrQueue — NOT_AUTHENTICATED branch', () => {
+  it('sets queue error with auth message when NOT_AUTHENTICATED error', async () => {
+    mockListOpenPrs.mockResolvedValue({ error: 'NOT_AUTHENTICATED' })
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    expect(mockSetQueueError).toHaveBeenCalledWith(expect.stringContaining('Not authenticated'))
+  })
+
+  it('uses fallback resetAt when RATE_LIMITED has no resetAt', async () => {
+    // resetAt is undefined — falls back to Date.now() + 60_000
+    mockListOpenPrs.mockResolvedValue({ error: 'RATE_LIMITED' })
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    expect(mockSetRateLimitState).toHaveBeenCalledWith({
+      resetAt: expect.any(Number),
+    })
+  })
+
+  it('passes cursor and search options to listOpenPrs', async () => {
+    mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: false, nextCursor: undefined })
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+    await act(async () => {
+      await result.current({ cursor: 'cursor-123', search: 'fix bug' })
+    })
+    expect(mockListOpenPrs).toHaveBeenCalledWith('/repo', {
+      cursor: 'cursor-123',
+      search: 'fix bug',
+      includeClosedPrs: false,
+    })
+  })
+
+  it('mergeSessionStatuses: session with pausedAt=null is in-progress', async () => {
+    mockSessionsForRepoAPI.mockResolvedValue({
+      sessions: [
+        {
+          repoRoot: '/repo',
+          prNumber: 42,
+          headSHA: 'abc123',
+          currentChapterId: null,
+          currentFilePath: null,
+          viewedFiles: ['src/foo.ts'],
+          fileOrderOverrides: {},
+          scrollPosition: null,
+          pausedAt: null, // in-progress (not paused)
+          lastAccessedAt: '2026-01-01T00:00:00Z',
+        },
+      ],
+    })
+
+    const prData = {
+      number: 42,
+      title: 'Test',
+      author: { login: 'alice', avatarUrl: '' },
+      createdAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat/test',
+      baseRefName: 'main',
+      isDraft: false,
+      statusCheckRollup: [],
+      files: [],
+      additions: 0,
+      deletions: 0,
+    }
+
+    mockListOpenPrs.mockResolvedValue({ prs: [prData], hasMore: false })
+
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    // Should call sessionsForRepo to merge statuses
+    expect(mockSessionsForRepoAPI).toHaveBeenCalledWith('/repo')
+    // Queue should be set (with merged session status)
+    expect(mockSetQueue).toHaveBeenCalled()
+  })
+
+  it('mergeSessionStatuses: falls back to original prs on error', async () => {
+    mockSessionsForRepoAPI.mockRejectedValue(new Error('IPC error'))
+
+    const prData = {
+      number: 42,
+      title: 'Test',
+      author: { login: 'alice', avatarUrl: '' },
+      createdAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat/test',
+      baseRefName: 'main',
+      isDraft: false,
+      statusCheckRollup: [],
+      files: [],
+      additions: 0,
+      deletions: 0,
+    }
+
+    mockListOpenPrs.mockResolvedValue({ prs: [prData], hasMore: false })
+
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    // Should still set queue (with original prs, fallback on error)
+    expect(mockSetQueue).toHaveBeenCalled()
+  })
+})
+
+describe('useLoadPrDetail — additional branches', () => {
+  it('handles RATE_LIMITED with no explicit resetAt (uses fallback)', async () => {
+    mockPrReviewDetail.mockResolvedValue({ error: 'RATE_LIMITED' })
+    const { result } = renderHook(() => useLoadPrDetail('/repo'))
+    await act(async () => {
+      await result.current(1, vi.fn())
+    })
+    expect(mockSetRateLimitState).toHaveBeenCalledWith({
+      resetAt: expect.any(Number),
+    })
+  })
+
+  it('does not call onSuccess when parsed schema fails', async () => {
+    // Return a pr object that fails schema validation
+    mockPrReviewDetail.mockResolvedValue({ pr: { invalid: true } })
+    const onSuccess = vi.fn()
+    const { result } = renderHook(() => useLoadPrDetail('/repo'))
+    await act(async () => {
+      await result.current(1, onSuccess)
+    })
+    expect(onSuccess).not.toHaveBeenCalled()
+  })
+})
+
+describe('useFetchFileMetrics — avgCoverage branches (lines 264-268)', () => {
+  function makePrWithFile(
+    patchCoverage: number | null,
+    ciStatus: 'passing' | 'failing' | 'pending' | 'none' = 'passing'
+  ) {
+    return {
+      ...validActivePr,
+      ciStatus,
+      coverageStatus: 'unknown' as const,
+      chapters: [
+        {
+          id: 'ch-1',
+          name: 'Chapter 1',
+          estimatedMinutes: 5,
+          status: 'not-started' as const,
+          files: [
+            {
+              path: 'src/foo.ts',
+              oldPath: undefined,
+              changeType: 'modified' as const,
+              additions: 10,
+              deletions: 2,
+              isBinary: false,
+              tier: 1 as const,
+              whyHere: 'changed',
+              estimatedMinutes: 3,
+              riskScore: {
+                level: 'low' as const,
+                composite: null,
+                dominantDriver: '',
+                topImporters: [],
+                importerCount: 0,
+                metrics: {
+                  changeSize: null,
+                  churn90d: null,
+                  blastRadius: null,
+                  testFilePresent: null,
+                  complexityDelta: null,
+                  patchCoverage: null,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    }
+  }
+
+  it('coverageDot=pass when avgCoverage >= 80', async () => {
+    const pr = makePrWithFile(null)
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: pr,
+      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateQueuePrRisk: mockUpdateQueuePrRisk,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+
+    mockFileMetrics.mockResolvedValue({
+      churn90d: 5,
+      blastRadius: 2,
+      topImporters: [],
+      importerCount: 0,
+      testFilePresent: true,
+      patchCoverage: 90, // >= 80 → 'pass'
+    })
+
+    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    // updateQueuePrRisk was called — verify signalDots included
+    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
+    const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
+    expect(signalDots.coverage).toBe('pass')
+  })
+
+  it('coverageDot=warn when avgCoverage is 50-79', async () => {
+    const pr = makePrWithFile(null)
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: pr,
+      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateQueuePrRisk: mockUpdateQueuePrRisk,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+
+    mockFileMetrics.mockResolvedValue({
+      churn90d: 5,
+      blastRadius: 2,
+      topImporters: [],
+      importerCount: 0,
+      testFilePresent: true,
+      patchCoverage: 60, // >= 50 but < 80 → 'warn'
+    })
+
+    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
+    const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
+    expect(signalDots.coverage).toBe('warn')
+  })
+
+  it('coverageDot=fail when avgCoverage < 50', async () => {
+    const pr = makePrWithFile(null)
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: pr,
+      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateQueuePrRisk: mockUpdateQueuePrRisk,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+
+    mockFileMetrics.mockResolvedValue({
+      churn90d: 5,
+      blastRadius: 2,
+      topImporters: [],
+      importerCount: 0,
+      testFilePresent: true,
+      patchCoverage: 30, // < 50 → 'fail'
+    })
+
+    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
+    const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
+    expect(signalDots.coverage).toBe('fail')
+  })
+
+  it('ciDot=fail when pr.ciStatus=failing', async () => {
+    const pr = makePrWithFile(null, 'failing')
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: pr,
+      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateQueuePrRisk: mockUpdateQueuePrRisk,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+
+    mockFileMetrics.mockResolvedValue({
+      churn90d: 5,
+      blastRadius: 2,
+      topImporters: [],
+      importerCount: 0,
+      testFilePresent: true,
+    })
+
+    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
+    const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
+    expect(signalDots.ci).toBe('fail')
+  })
+
+  it('ciDot=warn when pr.ciStatus=pending', async () => {
+    const pr = makePrWithFile(null, 'pending')
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: pr,
+      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateQueuePrRisk: mockUpdateQueuePrRisk,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+
+    mockFileMetrics.mockResolvedValue({
+      churn90d: 5,
+      blastRadius: 2,
+      topImporters: [],
+      importerCount: 0,
+      testFilePresent: true,
+    })
+
+    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
+    const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
+    expect(signalDots.ci).toBe('warn')
+  })
+
+  it('ciDot=unknown when pr.ciStatus=none', async () => {
+    const pr = makePrWithFile(null, 'none')
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: pr,
+      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateQueuePrRisk: mockUpdateQueuePrRisk,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+
+    mockFileMetrics.mockResolvedValue({
+      churn90d: 5,
+      blastRadius: 2,
+      topImporters: [],
+      importerCount: 0,
+      testFilePresent: true,
+    })
+
+    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
+    const [, , signalDots] = mockUpdateQueuePrRisk.mock.calls[0]
+    expect(signalDots.ci).toBe('unknown')
+  })
+
+  it('accepts prDetail argument instead of activePr', async () => {
+    // useFetchFileMetrics with explicit prDetail arg (prDetail ?? activePr branch)
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: null, // no activePr
+      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateQueuePrRisk: mockUpdateQueuePrRisk,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+
+    const prDetail = makePrWithFile(null)
+
+    mockFileMetrics.mockResolvedValue({
+      churn90d: 5,
+      blastRadius: 2,
+      topImporters: [],
+      importerCount: 0,
+      testFilePresent: true,
+    })
+
+    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
+    await act(async () => {
+      await result.current(prDetail)
+    })
+
+    expect(mockFileMetrics).toHaveBeenCalledWith('/repo', 'src/foo.ts')
+    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
+  })
+})
+
+describe('useLoadInlineComments — catch branch (line 309)', () => {
+  it('handles thrown exceptions gracefully', async () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: validActivePr,
+      setThreads: mockSetThreads,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+
+    mockPrInlineComments.mockRejectedValue(new Error('connection refused'))
+
+    const { result } = renderHook(() => useLoadInlineComments('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    // Should not crash, setThreads should not be called
+    expect(mockSetThreads).not.toHaveBeenCalled()
+  })
+})
+
+describe('useLoadIssueComments', () => {
+  beforeEach(() => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: validActivePr,
+      setIssueComments: mockSetIssueComments,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+  })
+
+  it('does nothing when repoRoot is null', async () => {
+    const { result } = renderHook(() => useLoadIssueComments(null))
+    await act(async () => {
+      await result.current()
+    })
+    expect(mockPrIssueCommentsAPI).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when no prNumber (no activePr and no override)', async () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: null,
+      setIssueComments: mockSetIssueComments,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+
+    const { result } = renderHook(() => useLoadIssueComments('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    expect(mockPrIssueCommentsAPI).not.toHaveBeenCalled()
+  })
+
+  it('loads comments using activePr.number when no override given', async () => {
+    const comments = [
+      { id: 1, author: 'alice', authorAvatarUrl: '', body: 'hi', createdAt: '', updatedAt: '' },
+    ]
+    mockPrIssueCommentsAPI.mockResolvedValue({ comments })
+
+    const { result } = renderHook(() => useLoadIssueComments('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    expect(mockPrIssueCommentsAPI).toHaveBeenCalledWith('/repo', validActivePr.number)
+    expect(mockSetIssueComments).toHaveBeenCalledWith(comments)
+  })
+
+  it('loads comments using prNumber override', async () => {
+    const comments = [
+      { id: 2, author: 'bob', authorAvatarUrl: '', body: 'ok', createdAt: '', updatedAt: '' },
+    ]
+    mockPrIssueCommentsAPI.mockResolvedValue({ comments })
+
+    const { result } = renderHook(() => useLoadIssueComments('/repo'))
+    await act(async () => {
+      await result.current(99)
+    })
+
+    expect(mockPrIssueCommentsAPI).toHaveBeenCalledWith('/repo', 99)
+    expect(mockSetIssueComments).toHaveBeenCalledWith(comments)
+  })
+
+  it('does not call setIssueComments when result contains an error', async () => {
+    mockPrIssueCommentsAPI.mockResolvedValue({ error: 'NOT_AUTHENTICATED' })
+
+    const { result } = renderHook(() => useLoadIssueComments('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    expect(mockSetIssueComments).not.toHaveBeenCalled()
+  })
+
+  it('handles thrown exceptions gracefully without crashing', async () => {
+    mockPrIssueCommentsAPI.mockRejectedValue(new Error('network fail'))
+
+    const { result } = renderHook(() => useLoadIssueComments('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    expect(mockSetIssueComments).not.toHaveBeenCalled()
   })
 })

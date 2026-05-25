@@ -20,8 +20,6 @@ interface Props {
   onPopOut?: () => void
 }
 
-type ViewMode = 'guided' | 'full'
-
 export function PrReviewView({
   repoRoot,
   pr,
@@ -56,8 +54,10 @@ export function PrReviewView({
     -1
   )
   const [showRiskFor, setShowRiskFor] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<ViewMode>('guided')
+  const [viewMode, setViewMode] = useState<'guided' | 'full'>('full')
   const [refreshing, setRefreshing] = useState(false)
+
+  const showMultipleChapters = pr.chapters.length > 1
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -161,14 +161,10 @@ export function PrReviewView({
     onClose()
   }
 
-  const showMultipleChapters = pr.chapters.length > 1
-
   const totalFiles = pr.chapters.flatMap((c) => c.files).length
   const reviewedCount = viewedFiles.size
   const reviewPct = totalFiles > 0 ? Math.round((reviewedCount / totalFiles) * 100) : 0
 
-  // In guided mode: chapter tabs + single-chapter file list
-  // In full mode:   all-chapters file list (no chapter tabs)
   const leftPanel =
     viewMode === 'full' ? (
       <aside className="pr-review-panel pr-review-panel--left" style={{ width: leftWidth }}>
@@ -184,13 +180,15 @@ export function PrReviewView({
             >
               ↻
             </button>
-            <button
-              className="pr-view-mode-btn pr-view-mode-btn--active"
-              onClick={() => setViewMode('guided')}
-              title="Switch to guided chapter view"
-            >
-              Guided ↩
-            </button>
+            {showMultipleChapters && (
+              <button
+                className="pr-view-mode-btn"
+                onClick={() => setViewMode('guided')}
+                title="Switch to guided chapter view"
+              >
+                Guided ↩
+              </button>
+            )}
           </div>
         </div>
         <FullFileList
@@ -199,6 +197,7 @@ export function PrReviewView({
           headSHA={pr.headSHA}
           currentFilePath={currentFilePath}
           onSelectFile={handleSelectFileFromFull}
+          showChapterHeaders={showMultipleChapters}
         />
       </aside>
     ) : (
@@ -219,15 +218,13 @@ export function PrReviewView({
               >
                 ↻
               </button>
-              {showMultipleChapters && (
-                <button
-                  className="pr-view-mode-btn"
-                  onClick={() => setViewMode('full')}
-                  title="Switch to full file view"
-                >
-                  All ↗
-                </button>
-              )}
+              <button
+                className="pr-view-mode-btn"
+                onClick={() => setViewMode('full')}
+                title="Switch to full file view"
+              >
+                All ↗
+              </button>
             </div>
           </div>
           <ChapterFileList
@@ -247,7 +244,8 @@ export function PrReviewView({
       {/* Top bar: PR title + pop-out */}
       <div className="pr-review-topbar">
         <span className="pr-review-topbar-title">
-          #{pr.number} {pr.title}
+          #{pr.number}
+          {pr.isDraft && <span className="pr-draft-badge">Draft</span>} {pr.title}
         </span>
         <div className="pr-review-topbar-actions">
           {onShowOverview && (
@@ -285,13 +283,9 @@ export function PrReviewView({
         <div className="pr-review-progress-fill" style={{ width: `${reviewPct}%` }} />
       </div>
 
-      {/* Chapter tabs: only in guided mode, only for multi-chapter PRs */}
-      {viewMode === 'guided' && showMultipleChapters && activeChapterId && (
-        <ChapterNav
-          chapters={pr.chapters}
-          activeChapterId={activeChapterId}
-          onSelectChapter={handleSelectChapter}
-        />
+      {/* Chapter nav: guided mode only, hidden when ≤1 chapter */}
+      {viewMode === 'guided' && showMultipleChapters && (
+        <ChapterNav chapters={pr.chapters} onSelectChapter={handleSelectChapter} />
       )}
 
       <div className="pr-review-panels">

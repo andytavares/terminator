@@ -738,11 +738,14 @@ Opens a file or directory in the OS default application.
 
 ### `window:open-pr-review`
 
-Creates a new focused BrowserWindow pre-loaded with the Code Reviews view for the given repo.
+Creates a new focused BrowserWindow pre-loaded with the Code Reviews view for the given repo. When `prNumber` is supplied the window auto-navigates to that PR on mount, skipping the queue screen.
 
 **Direction**: renderer → main (invoke/handle)
 
-**Request**: `{ repoRoot: string }`
+**Request**: `{ repoRoot: string; accentColor?: string; prNumber?: string; showOverview?: string }`
+
+- `prNumber` — optional stringified PR number; when present the popout restores directly to that PR
+- `showOverview` — `"true"` | `"false"` (default `"false"`); whether to land on the overview panel vs. the diff view
 
 **Response**: `void`
 
@@ -781,6 +784,44 @@ Returns churn, blast radius (actual code importers only — not prose), test fil
 **Request**: `{ repoRoot: string; path: string }`
 
 **Response**: `{ churn90d: number; blastRadius: number; topImporters: string[]; importerCount: number; testFilePresent: boolean; patchCoverage: number | null } | { error: string }`
+
+---
+
+### `github:active-reviews-for-repo`
+
+Returns all PRs that the user has opened a review session for in the given repo (stored in `pr-active-reviews` electron-store). Used to surface orphan in-progress PRs that are no longer in the paginated queue.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string }`
+
+**Response**: `{ prs: ReviewQueuePR[] } | { error: string }`
+
+---
+
+### `github:remove-active-review`
+
+Removes a single PR from the `pr-active-reviews` store, effectively dismissing it from the in-progress section.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string; prNumber: number }`
+
+**Response**: `{ ok: true } | { error: string }`
+
+---
+
+### `github:prune-active-reviews`
+
+Batch-checks the current GitHub state of the given PR numbers via `gh pr view --json state`. PRs confirmed closed or merged are deleted from `pr-active-reviews` automatically. Returns only the numbers that are still OPEN.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string; prNumbers: number[] }`
+
+**Response**: `{ openNumbers: number[] } | { error: string }`
+
+Used on queue load to prevent closed/merged PRs from appearing as in-progress orphans.
 
 ---
 
@@ -829,3 +870,145 @@ through the generic `extensionBridge.invoke()` in the renderer (the core app has
 | Event                   | Payload                 | Trigger                            |
 | ----------------------- | ----------------------- | ---------------------------------- |
 | `speckit:state-changed` | `{ state: PilotState }` | Phase approve/revoke updates state |
+
+---
+
+## Task Vault Extension Channels (`task-vault:*`)
+
+All channels below are registered by the `task-vault` extension and accessed through `extensionBridge.invoke()`.
+
+### Vault Channels
+
+| Channel                                  | Direction       | Summary                                                                |
+| ---------------------------------------- | --------------- | ---------------------------------------------------------------------- |
+| `task-vault:vault:capture`               | renderer → main | Append task to inbox.md                                                |
+| `task-vault:vault:get-today`             | renderer → main | Return today's daily log (auto-create if absent)                       |
+| `task-vault:vault:get-daily`             | renderer → main | Return daily log for a given date                                      |
+| `task-vault:vault:add-task`              | renderer → main | Append task to a target file                                           |
+| `task-vault:vault:complete-task`         | renderer → main | Mark task `[x]` by file+line ID; returns `STALE_ID` if line changed    |
+| `task-vault:vault:migrate-task`          | renderer → main | Migrate task `[>]` to target date file; returns `STALE_ID` if stale    |
+| `task-vault:vault:query`                 | renderer → main | Filter tasks by status, context, project, area, dueBefore, filePattern |
+| `task-vault:vault:process-inbox-item`    | renderer → main | Process inbox item: trash / do-now / someday / file                    |
+| `task-vault:vault:update-project-status` | renderer → main | Rewrite project frontmatter `status:` field                            |
+| `task-vault:vault:get-task-detail`       | renderer → main | Return description, acceptanceCriteria, devHints from task metadata    |
+| `task-vault:vault:save-task-detail`      | renderer → main | Write description, acceptanceCriteria, devHints into task metadata     |
+
+### Project Channels
+
+| Channel                             | Direction       | Summary                                                         |
+| ----------------------------------- | --------------- | --------------------------------------------------------------- |
+| `task-vault:projects:list`          | renderer → main | List projects filtered by status                                |
+| `task-vault:projects:weekly-review` | renderer → main | Return full weekly review payload (inbox, projects, completed…) |
+
+### Link Channels
+
+| Channel                                      | Direction       | Summary                                         |
+| -------------------------------------------- | --------------- | ----------------------------------------------- |
+| `task-vault:links:create`                    | renderer → main | Append `terminator:<uuid>` to vault file        |
+| `task-vault:links:remove`                    | renderer → main | Remove `terminator:<uuid>` annotation from file |
+| `task-vault:links:get-for-terminator-target` | renderer → main | Return tasks/projects linked to a terminal UUID |
+
+### ICS Channels
+
+| Channel                     | Direction       | Summary                                                       |
+| --------------------------- | --------------- | ------------------------------------------------------------- |
+| `task-vault:ics:get-events` | renderer → main | Return cached ICS events in ±7 day window with staleness flag |
+
+### Kanban Channels
+
+| Channel                         | Direction       | Summary                                                                      |
+| ------------------------------- | --------------- | ---------------------------------------------------------------------------- |
+| `task-vault:kanban:get-config`  | renderer → main | Return persisted `KanbanConfig` (lanes, swimlaneGrouping, viewMode)          |
+| `task-vault:kanban:save-config` | renderer → main | Persist updated `KanbanConfig` to `.todo/kanban.json`                        |
+| `task-vault:kanban:list-tasks`  | renderer → main | Return all non-archived tasks (excludes migrated/cancelled) for kanban board |
+| `task-vault:kanban:move-task`   | renderer → main | Update a task's `status` in the DB (used on drag-and-drop between lanes)     |
+
+---
+
+## Metrics Channels
+
+System and per-process resource metrics for the Overview screen. All three channels use invoke/handle (request–response).
+
+### `metrics:system`
+
+Returns current system-wide CPU, memory, and network metrics.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: _(none)_
+
+**Response**:
+
+```typescript
+{ data: SystemMetrics } | { error: string }
+
+interface SystemMetrics {
+  cpuPercent: number        // 0–100, averaged across all cores
+  memUsedBytes: number      // os.totalmem() - os.freemem()
+  memTotalBytes: number     // os.totalmem()
+  netInBytesPerSec: number  // inbound bytes/s across non-loopback interfaces
+  netOutBytesPerSec: number // outbound bytes/s across non-loopback interfaces
+}
+```
+
+CPU is computed by diffing `os.cpus()` samples taken every 1 s in a background sampler started at app boot. Network is computed from `netstat -ib` (macOS) or `/proc/net/dev` (Linux) between samples.
+
+---
+
+### `metrics:processes`
+
+Returns CPU and memory usage for a specific set of PIDs.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**:
+
+```typescript
+{ pids: number[] }
+```
+
+**Response**:
+
+```typescript
+{ data: ProcessMetrics[] } | { error: string }
+
+interface ProcessMetrics {
+  pid: number
+  cpuPercent: number  // from ps %cpu column
+  rssBytes: number    // resident set size in bytes (ps rss column × 1024)
+}
+```
+
+Uses a single `ps -p <pids> -o pid=,%cpu=,rss=` call (macOS) or `ps -p <pids> -o pid,%cpu,rss --no-headers` (Linux). Returns `[]` on failure.
+
+---
+
+### `metrics:pids`
+
+Resolves terminal session IDs to their PTY process PIDs.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**:
+
+```typescript
+{ sessionIds: string[] }
+```
+
+**Response**:
+
+```typescript
+{ data: Array<{ sessionId: string; pid: number }> } | { error: string }
+```
+
+Calls `ptyManager.getPid(sessionId)` for each ID; sessions without a live PTY are omitted from the result.
+
+---
+
+### Channel Summary
+
+| Channel             | Direction       | Summary                                           |
+| ------------------- | --------------- | ------------------------------------------------- |
+| `metrics:system`    | renderer → main | CPU%, memory used/total, network in/out bytes/sec |
+| `metrics:processes` | renderer → main | Per-PID CPU% and RSS bytes from `ps`              |
+| `metrics:pids`      | renderer → main | Resolve session UUIDs to live PTY PIDs            |

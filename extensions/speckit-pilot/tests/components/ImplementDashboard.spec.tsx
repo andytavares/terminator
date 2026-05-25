@@ -29,7 +29,6 @@ describe('ImplementDashboard', () => {
       <ImplementDashboard
         featureDir="/repo/specs/001"
         onStop={vi.fn().mockResolvedValue(undefined)}
-        onPause={vi.fn()}
         onOpenTasks={vi.fn()}
       />
     )
@@ -42,11 +41,9 @@ describe('ImplementDashboard', () => {
       <ImplementDashboard
         featureDir="/repo/specs/001"
         onStop={vi.fn().mockResolvedValue(undefined)}
-        onPause={vi.fn()}
         onOpenTasks={vi.fn()}
       />
     )
-    expect(screen.getByText('Pause after current task')).toBeTruthy()
     expect(screen.getByText('Stop')).toBeTruthy()
     expect(screen.getByText('Open tasks.md')).toBeTruthy()
   })
@@ -54,31 +51,12 @@ describe('ImplementDashboard', () => {
   it('calls onStop when Stop is clicked', async () => {
     const onStop = vi.fn().mockResolvedValue(undefined)
     render(
-      <ImplementDashboard
-        featureDir="/repo/specs/001"
-        onStop={onStop}
-        onPause={vi.fn()}
-        onOpenTasks={vi.fn()}
-      />
+      <ImplementDashboard featureDir="/repo/specs/001" onStop={onStop} onOpenTasks={vi.fn()} />
     )
     fireEvent.click(screen.getByText('Stop'))
     await waitFor(() => {
       expect(onStop).toHaveBeenCalledOnce()
     })
-  })
-
-  it('calls onPause when Pause is clicked', () => {
-    const onPause = vi.fn()
-    render(
-      <ImplementDashboard
-        featureDir="/repo/specs/001"
-        onStop={vi.fn().mockResolvedValue(undefined)}
-        onPause={onPause}
-        onOpenTasks={vi.fn()}
-      />
-    )
-    fireEvent.click(screen.getByText('Pause after current task'))
-    expect(onPause).toHaveBeenCalledOnce()
   })
 
   it('calls onOpenTasks when Open tasks.md is clicked', () => {
@@ -87,7 +65,6 @@ describe('ImplementDashboard', () => {
       <ImplementDashboard
         featureDir="/repo/specs/001"
         onStop={vi.fn().mockResolvedValue(undefined)}
-        onPause={vi.fn()}
         onOpenTasks={onOpenTasks}
       />
     )
@@ -109,7 +86,6 @@ describe('ImplementDashboard', () => {
       <ImplementDashboard
         featureDir="/repo/specs/001"
         onStop={vi.fn().mockResolvedValue(undefined)}
-        onPause={vi.fn()}
         onOpenTasks={vi.fn()}
       />
     )
@@ -130,7 +106,6 @@ describe('ImplementDashboard', () => {
       <ImplementDashboard
         featureDir="/repo/specs/001"
         onStop={vi.fn().mockResolvedValue(undefined)}
-        onPause={vi.fn()}
         onOpenTasks={vi.fn()}
       />
     )
@@ -145,7 +120,6 @@ describe('ImplementDashboard', () => {
       <ImplementDashboard
         featureDir="/repo/specs/001"
         onStop={vi.fn().mockResolvedValue(undefined)}
-        onPause={vi.fn()}
         onOpenTasks={vi.fn()}
       />
     )
@@ -157,7 +131,6 @@ describe('ImplementDashboard', () => {
       <ImplementDashboard
         featureDir="/repo/specs/001"
         onStop={vi.fn().mockResolvedValue(undefined)}
-        onPause={vi.fn()}
         onOpenTasks={vi.fn()}
       />
     )
@@ -171,7 +144,6 @@ describe('ImplementDashboard', () => {
       <ImplementDashboard
         featureDir="/repo/specs/001"
         onStop={vi.fn().mockResolvedValue(undefined)}
-        onPause={vi.fn()}
         onOpenTasks={vi.fn()}
       />
     )
@@ -189,7 +161,6 @@ describe('ImplementDashboard', () => {
       <ImplementDashboard
         featureDir="/repo/specs/001"
         onStop={vi.fn().mockResolvedValue(undefined)}
-        onPause={vi.fn()}
         onOpenTasks={vi.fn()}
       />
     )

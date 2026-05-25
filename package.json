@@ -1,6 +1,6 @@
 {
   "name": "@andytavares/terminator",
-  "version": "0.1.7",
+  "version": "0.1.36",
   "description": "Extension-first AI-focused terminal emulator",
   "main": "out/main/index.js",
   "type": "module",
@@ -12,7 +12,7 @@
     "access": "restricted"
   },
   "scripts": {
-    "postinstall": "electron-rebuild",
+    "postinstall": "electron-rebuild -w better-sqlite3",
     "build:extensions": "node scripts/build-extensions.cjs",
     "dev": "npm run build:extensions && electron-vite dev",
     "build": "npm run build:extensions && electron-vite build",
@@ -25,7 +25,8 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "rebuild": "electron-rebuild",
+    "rebuild": "electron-rebuild -w better-sqlite3",
+    "check-patch-coverage": "node scripts/check-patch-coverage.cjs",
     "create-extension": "node scripts/create-extension.cjs",
     "package": "electron-builder --mac --arm64 --publish never",
     "prepare": "husky"
@@ -40,10 +41,11 @@
       "prettier --write",
       "eslint"
     ],
-    "*.{json,md,css,html}": "prettier --write"
+    "*.{json,md,css,html,yml,yaml}": "prettier --write"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans": "^5.2.8",
+    "@testing-library/dom": "^10.4.1",
     "electron-store": "^8.2.0",
     "node-pty": "1.0.0",
     "react": "18.3.1",
@@ -54,6 +56,7 @@
     "zustand": "4.5.5"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
     "@playwright/test": "1.45.3",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -67,7 +70,6 @@
     "@vitest/coverage-v8": "2.0.5",
     "electron": "30.4.0",
     "electron-builder": "24.13.3",
-    "electron-rebuild": "3.2.9",
     "electron-vite": "2.3.0",
     "eslint": "8.57.0",
     "eslint-config-prettier": "9.1.0",

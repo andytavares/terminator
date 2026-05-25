@@ -1,6 +1,14 @@
 import { create } from 'zustand'
 import type { ComponentType } from 'react'
 
+export interface GlobalTabRegistration {
+  id: string
+  label: string
+  icon?: string
+  component: ComponentType<Record<string, never>>
+  permanent?: boolean
+}
+
 export interface SidebarPanelRegistration {
   id: string
   label: string
@@ -34,6 +42,9 @@ export interface CommandRegistration {
 interface ExtensionRegistry {
   sidebarPanels: Map<string, SidebarPanelRegistration>
   projectTabs: Map<string, ProjectTabRegistration>
+  globalTabs: Map<string, GlobalTabRegistration>
+  windowViews: Map<string, ComponentType<{ repoRoot: string | null }>>
+  activeGlobalTabId: string | null
   keyboardShortcuts: KeyboardShortcutRegistration[]
   commands: CommandRegistration[]
   openPanels: Set<string>
@@ -41,15 +52,31 @@ interface ExtensionRegistry {
 
   registerSidebarPanel(panel: SidebarPanelRegistration): () => void
   registerProjectTab(tab: ProjectTabRegistration): () => void
+  registerGlobalTab(tab: GlobalTabRegistration): () => void
+  registerWindowView(id: string, component: ComponentType<{ repoRoot: string | null }>): void
   registerKeyboardShortcut(shortcut: KeyboardShortcutRegistration): () => void
   registerCommand(command: CommandRegistration): () => void
   togglePanel(panelId: string): void
   setActiveProjectTab(tabId: string | null): void
+  setActiveGlobalTab(tabId: string | null): void
 }
+
+export type ExtensionRendererAPI = Pick<
+  ExtensionRegistry,
+  | 'registerGlobalTab'
+  | 'registerSidebarPanel'
+  | 'registerProjectTab'
+  | 'registerWindowView'
+  | 'registerKeyboardShortcut'
+  | 'registerCommand'
+>
 
 export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
   sidebarPanels: new Map(),
   projectTabs: new Map(),
+  globalTabs: new Map(),
+  windowViews: new Map(),
+  activeGlobalTabId: null,
   keyboardShortcuts: [],
   commands: [],
   openPanels: new Set(),
@@ -89,6 +116,30 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
       })
   },
 
+  registerGlobalTab(tab) {
+    set((s) => {
+      const tabs = new Map(s.globalTabs)
+      tabs.set(tab.id, tab)
+      return { globalTabs: tabs }
+    })
+    return () =>
+      set((s) => {
+        const tabs = new Map(s.globalTabs)
+        tabs.delete(tab.id)
+        const next: Partial<ExtensionRegistry> = { globalTabs: tabs }
+        if (s.activeGlobalTabId === tab.id) next.activeGlobalTabId = null
+        return next
+      })
+  },
+
+  registerWindowView(id, component) {
+    set((s) => {
+      const views = new Map(s.windowViews)
+      views.set(id, component)
+      return { windowViews: views }
+    })
+  },
+
   registerKeyboardShortcut(shortcut) {
     set((s) => ({ keyboardShortcuts: [...s.keyboardShortcuts, shortcut] }))
     return () =>
@@ -111,6 +162,10 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
 
   setActiveProjectTab(tabId) {
     set({ activeProjectTabId: tabId })
+  },
+
+  setActiveGlobalTab(tabId) {
+    set({ activeGlobalTabId: tabId, ...(tabId !== null ? { activeProjectTabId: null } : {}) })
   },
 }))
 

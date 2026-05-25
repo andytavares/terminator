@@ -1,8 +1,11 @@
 import React, { useState, useRef } from 'react'
 import type { Workspace } from '../../../shared/types/index'
+import type { GlobalTabRegistration } from '../../extensions/registry'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
+import { useExtensionRegistry } from '../../extensions/registry'
 import { AlertBadge } from '../AlertBadge'
+import { ActivitySpinner } from '../ActivitySpinner'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { EditWorkspaceDialog } from './EditWorkspaceDialog'
@@ -23,7 +26,17 @@ function colorWithAlpha(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`
 }
 
-export function WorkspaceRail(): JSX.Element {
+interface WorkspaceRailProps {
+  globalTabs?: GlobalTabRegistration[]
+  activeGlobalTabId?: string | null
+  onSelectGlobalTab?: (id: string) => void
+}
+
+export function WorkspaceRail({
+  globalTabs = [],
+  activeGlobalTabId = null,
+  onSelectGlobalTab,
+}: WorkspaceRailProps): JSX.Element {
   const [createOpen, setCreateOpen] = useState(false)
   const { workspaces, reorderWorkspaces } = useWorkspaceStore()
   const dragIndexRef = useRef<number | null>(null)
@@ -53,8 +66,24 @@ export function WorkspaceRail(): JSX.Element {
     setDragOver(null)
   }
 
+  const pinnedTab = globalTabs.find((t) => t.id === 'core.overview')
+  const otherTabs = globalTabs.filter((t) => t.id !== 'core.overview')
+
   return (
     <aside className="ws-rail">
+      {pinnedTab && (
+        <>
+          <button
+            className={`ws-rail__global-tab${activeGlobalTabId === pinnedTab.id ? ' ws-rail__global-tab--active' : ''}`}
+            onClick={() => onSelectGlobalTab?.(pinnedTab.id)}
+            title={pinnedTab.label}
+          >
+            {pinnedTab.icon ?? pinnedTab.label[0]}
+          </button>
+          <div className="ws-rail__divider" />
+        </>
+      )}
+
       {workspaces.map((ws, index) => (
         <div
           key={ws.id}
@@ -75,6 +104,17 @@ export function WorkspaceRail(): JSX.Element {
 
       <div className="ws-rail__spacer" />
 
+      {otherTabs.map((tab) => (
+        <button
+          key={tab.id}
+          className={`ws-rail__global-tab${activeGlobalTabId === tab.id ? ' ws-rail__global-tab--active' : ''}`}
+          onClick={() => onSelectGlobalTab?.(tab.id)}
+          title={tab.label}
+        >
+          {tab.icon ?? tab.label[0]}
+        </button>
+      ))}
+
       <button className="ws-rail__add" onClick={() => setCreateOpen(true)} title="Create workspace">
         +
       </button>
@@ -90,13 +130,15 @@ function WorkspaceTile({ workspace }: { workspace: Workspace }): JSX.Element {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const { activeWorkspaceId, setActiveWorkspace, deleteWorkspace, projectsByWorkspaceId } =
     useWorkspaceStore()
-  const { getBellCountForProject } = useSessionStore()
+  const { getBellCountForProject, isProjectBusy } = useSessionStore()
   const isActive = activeWorkspaceId === workspace.id
   const projects = projectsByWorkspaceId.get(workspace.id) ?? []
   const bellCount = projects.reduce((sum, p) => sum + getBellCountForProject(p.id), 0)
+  const isBusy = projects.some((p) => isProjectBusy(p.id))
 
   function handleClick(): void {
     setActiveWorkspace(workspace.id)
+    useExtensionRegistry.getState().setActiveGlobalTab(null)
   }
 
   function handleContextMenu(e: React.MouseEvent): void {
@@ -121,7 +163,10 @@ function WorkspaceTile({ workspace }: { workspace: Workspace }): JSX.Element {
         onContextMenu={handleContextMenu}
         title=""
       >
-        <AlertBadge count={bellCount} className="alert-badge--corner" />
+        <div className="ws-tile__indicators">
+          <AlertBadge count={bellCount} />
+          {isBusy && <ActivitySpinner />}
+        </div>
         <span className="ws-tile__initials">{getInitials(workspace.name)}</span>
         <span className="ws-tile__tooltip">{workspace.name}</span>
       </div>

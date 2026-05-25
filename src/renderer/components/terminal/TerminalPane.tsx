@@ -1,6 +1,9 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useSessionStore } from '../../stores/session.store'
 import type { TerminalInstance } from './TerminalSession'
+import type { PaneNode } from '../../../../shared/types/index'
+import { SplitContainer } from './SplitContainer'
+import { LeafPane } from './LeafPane'
 import './TerminalPane.css'
 
 interface Props {
@@ -10,17 +13,32 @@ interface Props {
 export function TerminalPane({ projectId }: Props): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const prevSessionIdRef = useRef<string | null>(null)
-  const { getSessionsForProject, getActiveSessionForProject, getTerminalInstance, clearBellCount } =
-    useSessionStore()
+  const {
+    getSessionsForProject,
+    getActiveSessionForProject,
+    getTerminalInstance,
+    clearBellCount,
+    getPaneLayout,
+    setSplitRatio,
+  } = useSessionStore()
 
   const activeSessionId = getActiveSessionForProject(projectId)
   const sessions = getSessionsForProject(projectId)
+  const layout = getPaneLayout(projectId)
 
+  // All hooks must run unconditionally before any early return.
   useEffect(() => {
     if (activeSessionId) clearBellCount(activeSessionId)
   }, [activeSessionId, clearBellCount])
 
+  // Single-pane mode: mount/unmount the active terminal when it changes.
   useEffect(() => {
+    if (layout) {
+      // LeafPane handles mounting in split mode. Reset ref so when the split
+      // collapses, the surviving terminal gets remounted correctly.
+      prevSessionIdRef.current = null
+      return
+    }
     const prevId = prevSessionIdRef.current
     const nextId = activeSessionId
     if (prevId === nextId) return
@@ -36,7 +54,40 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     }
 
     prevSessionIdRef.current = nextId
+  }, [activeSessionId, layout, getTerminalInstance])
+
+  // Cleanup on unmount — useLayoutEffect so snapshot capture precedes browser layout.
+  useLayoutEffect(() => {
+    return () => {
+      const currentId = prevSessionIdRef.current
+      prevSessionIdRef.current = null
+      if (currentId) {
+        const instance = getTerminalInstance(currentId) as TerminalInstance | undefined
+        instance?.unmount()
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const scrollActiveToBottom = useCallback(() => {
+    if (activeSessionId) {
+      const instance = getTerminalInstance(activeSessionId) as TerminalInstance | undefined
+      instance?.terminal.scrollToBottom()
+      instance?.terminal.focus()
+    }
   }, [activeSessionId, getTerminalInstance])
+
+  useEffect(() => {
+    window.addEventListener('focus', scrollActiveToBottom)
+    return () => window.removeEventListener('focus', scrollActiveToBottom)
+  }, [scrollActiveToBottom])
+
+  const handleRatioChange = useCallback(
+    (splitId: string, ratio: number) => {
+      setSplitRatio(projectId, splitId, ratio)
+    },
+    [projectId, setSplitRatio]
+  )
 
   if (sessions.length === 0) {
     return (
@@ -46,11 +97,16 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     )
   }
 
+  if (layout) {
+    return (
+      <div className="terminal-pane terminal-pane--split">
+        {renderNode(layout, projectId, handleRatioChange)}
+      </div>
+    )
+  }
+
   function handleClick(): void {
-    if (activeSessionId) {
-      const instance = getTerminalInstance(activeSessionId) as TerminalInstance | undefined
-      instance?.terminal.focus()
-    }
+    scrollActiveToBottom()
   }
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
@@ -77,5 +133,29 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     >
       <div ref={containerRef} className="terminal-pane__container" />
     </div>
+  )
+}
+
+function renderNode(
+  node: PaneNode,
+  projectId: string,
+  onRatioChange: (splitId: string, ratio: number) => void
+): JSX.Element {
+  if (node.type === 'leaf') {
+    return <LeafPane key={node.sessionId} sessionId={node.sessionId} projectId={projectId} />
+  }
+  return (
+    <SplitContainer
+      key={node.id}
+      splitId={node.id}
+      direction={node.direction}
+      ratio={node.ratio}
+      onRatioChange={onRatioChange}
+    >
+      {[
+        renderNode(node.first, projectId, onRatioChange),
+        renderNode(node.second, projectId, onRatioChange),
+      ]}
+    </SplitContainer>
   )
 }

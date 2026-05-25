@@ -1821,3 +1821,94 @@
   gap: 8px;
   justify-content: flex-end;
 }
+
+/* ── Kanban Board ────────────────────────────────────────────────────────────── */
+
+.sk-kanban {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 16px;
+  align-items: start;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.sk-kanban__lane {
+  background: color-mix(in srgb, var(--tm-bg) 60%, var(--tm-surface));
+  border: 1px solid var(--tm-border);
+  border-radius: 6px;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+}
+
+.sk-kanban__lane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.sk-kanban__lane-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--tm-text-muted);
+}
+
+.sk-kanban__lane-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tm-text-muted);
+  background: color-mix(in srgb, var(--tm-text-muted) 15%, transparent);
+  border-radius: 10px;
+  padding: 1px 6px;
+}
+
+.sk-kanban__lane-body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.sk-kanban__lane-empty {
+  font-size: 11px;
+  color: color-mix(in srgb, var(--tm-text-muted) 40%, transparent);
+  text-align: center;
+  padding: 16px 0;
+}
+
+.sk-kanban__card {
+  background: var(--tm-surface);
+  border: 1px solid var(--tm-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sk-kanban__card-id {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--tm-text-muted);
+  font-family: var(--tm-font-mono);
+}
+
+.sk-kanban__card-text {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--tm-text);
+}
+
+/* Active state for the kanban toggle button */
+.sk-icon-btn--active {
+  background: color-mix(in srgb, var(--tm-accent) 15%, transparent);
+  color: var(--tm-accent);
+  border-radius: 4px;
+}

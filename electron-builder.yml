@@ -4,9 +4,17 @@ directories:
   output: dist
 files:
   - out/**/*
+asarUnpack:
+  - '**/*.node'
 mac:
   icon: resources/icon.png
   target:
     - target: dmg
       arch: arm64
   category: public.app-category.developer-tools
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+  notarize:
+    teamId: ZU752J39BG

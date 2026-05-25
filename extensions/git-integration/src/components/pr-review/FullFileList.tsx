@@ -9,6 +9,7 @@ interface Props {
   headSHA: string
   currentFilePath: string | null
   onSelectFile: (path: string, chapterId: string) => void
+  showChapterHeaders?: boolean
 }
 
 export function FullFileList({
@@ -17,6 +18,7 @@ export function FullFileList({
   headSHA: _headSHA,
   currentFilePath,
   onSelectFile,
+  showChapterHeaders = true,
 }: Props) {
   const { viewedFiles, fileOrderOverrides } = usePrReviewStore()
 
@@ -63,35 +65,39 @@ export function FullFileList({
 
         const viewedInChapter = files.filter((f) => viewedFiles.has(f.path)).length
 
+        const showFiles = !showChapterHeaders || isOpen
+
         return (
           <div key={chapter.id} className={`full-file-chapter full-file-chapter--${status}`}>
-            {/* Chapter header */}
-            <button
-              className="full-file-chapter-header"
-              onClick={() => toggleCollapsed(chapter.id)}
-              aria-expanded={isOpen}
-            >
-              <span className={`full-file-chapter-status full-file-chapter-status--${status}`} />
-              <span className="full-file-chapter-num">Ch {ci + 1}</span>
-              <span className="full-file-chapter-name">{chapter.name}</span>
-              {chapter.files.some((f) => f.tier !== 3) ? (
-                <span
-                  className={`full-file-chapter-risk full-file-chapter-risk--${chapterRiskLevel(chapter)}`}
-                >
-                  {chapterRiskLevel(chapter)}
+            {/* Chapter header — hidden when there's only one chapter */}
+            {showChapterHeaders && (
+              <button
+                className="full-file-chapter-header"
+                onClick={() => toggleCollapsed(chapter.id)}
+                aria-expanded={isOpen}
+              >
+                <span className={`full-file-chapter-status full-file-chapter-status--${status}`} />
+                <span className="full-file-chapter-num">Ch {ci + 1}</span>
+                <span className="full-file-chapter-name">{chapter.name}</span>
+                {chapter.files.some((f) => f.tier !== 3) ? (
+                  <span
+                    className={`full-file-chapter-risk full-file-chapter-risk--${chapterRiskLevel(chapter)}`}
+                  >
+                    {chapterRiskLevel(chapter)}
+                  </span>
+                ) : (
+                  <span className="full-file-chapter-risk full-file-chapter-risk--none">auto</span>
+                )}
+                <span className="full-file-chapter-progress">
+                  {viewedInChapter}/{files.length}
                 </span>
-              ) : (
-                <span className="full-file-chapter-risk full-file-chapter-risk--none">auto</span>
-              )}
-              <span className="full-file-chapter-progress">
-                {viewedInChapter}/{files.length}
-              </span>
-              {status === 'complete' && <span className="full-file-chapter-done">✓</span>}
-              <span className="full-file-chapter-chevron">{isOpen ? '▾' : '▸'}</span>
-            </button>
+                {status === 'complete' && <span className="full-file-chapter-done">✓</span>}
+                <span className="full-file-chapter-chevron">{isOpen ? '▾' : '▸'}</span>
+              </button>
+            )}
 
             {/* File rows */}
-            {isOpen &&
+            {showFiles &&
               files.map((file, fi) => {
                 const isActive = file.path === currentFilePath
                 const isViewed = viewedFiles.has(file.path)

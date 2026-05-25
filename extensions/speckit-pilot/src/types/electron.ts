@@ -51,6 +51,16 @@ export interface SpeckitAPI {
     featureDir: string
     repoRoot?: string
   }): Promise<{ ok: true } | { error: string }>
+  phaseSkip(payload: {
+    featureDir: string
+    phase: PhaseId
+    note?: string
+  }): Promise<{ state: PilotState } | { error: string }>
+  phaseUnskip(payload: {
+    featureDir: string
+    phase: PhaseId
+    note?: string
+  }): Promise<{ state: PilotState } | { error: string }>
   onStateChanged(handler: (data: unknown) => void): () => void
 }
 
@@ -104,6 +114,14 @@ export function getSpeckitAPI(): SpeckitAPI {
     implementFileDecision: (payload) =>
       bridge.invoke('speckit:implement-file-decision', payload) as Promise<
         { ok: true } | { error: string }
+      >,
+    phaseSkip: (payload) =>
+      bridge.invoke('speckit:phase-skip', payload) as Promise<
+        { state: PilotState } | { error: string }
+      >,
+    phaseUnskip: (payload) =>
+      bridge.invoke('speckit:phase-unskip', payload) as Promise<
+        { state: PilotState } | { error: string }
       >,
     onStateChanged: (handler) => bridge.on('speckit:state-changed', handler),
   }

@@ -108,6 +108,37 @@ export function activate(api: ExtensionAPI): void {
   )
 
   disposables.push(
+    api.nativeMenu.addViewMenuItem({
+      id: 'open-pr-review',
+      label: 'Code Reviews in New Window',
+      onClick: () => {
+        api.window.openAuxiliary('pr-review', {})
+      },
+    })
+  )
+
+  disposables.push(
+    api.ipc.registerHandler('window:open-pr-review', (payload) => {
+      const { repoRoot, accentColor, prNumber, showOverview } = (payload ?? {}) as {
+        repoRoot?: string
+        accentColor?: string
+        prNumber?: string
+        showOverview?: string
+      }
+      const params: Record<string, string> = {
+        repoRoot: repoRoot ?? '',
+        accentColor: accentColor ?? '',
+      }
+      if (prNumber) {
+        params.prNumber = prNumber
+        params.showOverview = showOverview ?? 'false'
+      }
+      api.window.openAuxiliary('pr-review', params)
+      return { ok: true }
+    })
+  )
+
+  disposables.push(
     api.topBar.registerMenuItem({
       id: 'git-view',
       label: 'Git',

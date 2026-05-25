@@ -78,4 +78,78 @@ describe('EditWorkspaceDialog', () => {
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
     expect(screen.getByDisplayValue('/home/work')).toBeTruthy()
   })
+
+  it('calls openDirectory when Browse is clicked and updates folder path', async () => {
+    render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Browse'))
+    await vi.waitFor(() => expect(screen.getByDisplayValue('/new/path')).toBeTruthy())
+    expect(mockOpenDirectory).toHaveBeenCalled()
+  })
+
+  it('does not update folder path when Browse is cancelled', async () => {
+    mockOpenDirectory.mockResolvedValue({ cancelled: true })
+    render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Browse'))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.getByDisplayValue('/home/work')).toBeTruthy()
+  })
+
+  it('updates folder path input when typed', () => {
+    render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
+    const folderInput = screen.getByDisplayValue('/home/work')
+    fireEvent.change(folderInput, { target: { value: '/changed/path' } })
+    expect(screen.getByDisplayValue('/changed/path')).toBeTruthy()
+  })
+
+  it('selects a color swatch on click', () => {
+    const { container } = render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
+    const swatches = container.querySelectorAll('.dialog__color-swatch')
+    fireEvent.click(swatches[1])
+    expect(swatches[1].classList.contains('dialog__color-swatch--selected')).toBe(true)
+  })
+
+  it('updates tags input when typed', () => {
+    render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
+    const tagsInput = screen.getByDisplayValue('tag1')
+    fireEvent.change(tagsInput, { target: { value: 'tag1, tag2' } })
+    expect(screen.getByDisplayValue('tag1, tag2')).toBeTruthy()
+  })
+
+  it('clears nameError when name input changes', () => {
+    render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
+    const nameInput = screen.getByDisplayValue('My Work')
+    fireEvent.change(nameInput, { target: { value: '' } })
+    fireEvent.blur(nameInput)
+    expect(screen.getByText('Name is required')).toBeTruthy()
+    fireEvent.change(nameInput, { target: { value: 'Fixed' } })
+    expect(screen.queryByText('Name is required')).toBeNull()
+  })
+
+  it('shows error when duplicate name on blur', () => {
+    const otherWs = { ...ws, id: 'ws-2', name: 'Other' }
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [ws, otherWs],
+      updateWorkspace: mockUpdateWorkspace,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
+    const nameInput = screen.getByDisplayValue('My Work')
+    fireEvent.change(nameInput, { target: { value: 'Other' } })
+    fireEvent.blur(nameInput)
+    expect(screen.getByText('A workspace with this name already exists')).toBeTruthy()
+  })
+
+  it('calls onClose when overlay is clicked', () => {
+    const onClose = vi.fn()
+    render(<EditWorkspaceDialog workspace={ws} onClose={onClose} />)
+    fireEvent.click(screen.getByText('Edit Workspace').closest('.dialog-overlay')!)
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('closes after successful save', async () => {
+    const onClose = vi.fn()
+    mockUpdateWorkspace.mockResolvedValue({ workspace: ws })
+    render(<EditWorkspaceDialog workspace={ws} onClose={onClose} />)
+    fireEvent.click(screen.getByText('Save'))
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
+  })
 })

@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { githubAPI } from '../api/github'
 import { usePrReviewStore } from '../stores/pr-review.store'
 import {
   ReviewQueuePRSchema,
@@ -8,6 +9,7 @@ import {
 import type {
   PrReviewDetail,
   FileMetrics,
+  IssueComment,
   SignalDots,
   ReviewQueuePR,
 } from '../schemas/pr-review.schema'
@@ -24,10 +26,11 @@ function parsePrList(raw: unknown[]): ReturnType<typeof ReviewQueuePRSchema.safe
 
 async function mergeSessionStatuses(
   repoRoot: string,
-  prs: ReviewQueuePR[]
+  prs: ReviewQueuePR[],
+  isAppend: boolean = false
 ): Promise<ReviewQueuePR[]> {
   try {
-    const result = await window.electronAPI.github.sessionsForRepo(repoRoot)
+    const result = await githubAPI.sessionsForRepo(repoRoot)
     const sessions = (result.sessions as unknown[])
       .map((s) => ReviewSessionSchema.safeParse(s))
       .filter((r) => r.success)
@@ -42,7 +45,7 @@ async function mergeSessionStatuses(
       }
     }
 
-    return prs.map((pr) => {
+    const merged = prs.map((pr) => {
       if (!pr) return pr
       const session = latestByPr.get(pr.number)
       if (!session) return pr
@@ -51,6 +54,52 @@ async function mergeSessionStatuses(
         : 'in-progress'
       return { ...pr, sessionStatus, viewedFileCount: session.viewedFiles.length }
     })
+
+    // Load persisted active-review snapshots and prepend any not already in the
+    // current page — guarantees in-progress PRs appear regardless of pagination.
+    // Skip orphan logic on append loads (orphans were already prepended on the first page).
+    if (isAppend) return merged
+
+    const activeResult = await githubAPI.activeReviewsForRepo(repoRoot)
+    if ('error' in activeResult) return merged
+
+    const queueNumbers = new Set(prs.map((p) => p.number))
+    const activePrs = parsePrList((activeResult as { prs: unknown[] }).prs)
+    const candidateOrphans = activePrs.filter(
+      (pr): pr is ReviewQueuePR => pr != null && !queueNumbers.has(pr.number)
+    )
+
+    // Verify each orphan's current state against GitHub. Any PR that is now CLOSED
+    // or MERGED is removed from the store and excluded from the queue.
+    let openOrphanNumbers = new Set(candidateOrphans.map((p) => p.number))
+    if (candidateOrphans.length > 0) {
+      try {
+        const pruneResult = await githubAPI.pruneActiveReviews(
+          repoRoot,
+          candidateOrphans.map((p) => p.number)
+        )
+        if (!('error' in pruneResult)) {
+          openOrphanNumbers = new Set((pruneResult as { openNumbers: number[] }).openNumbers)
+        }
+      } catch {
+        // If the prune check fails (e.g. no network), keep all orphans visible.
+      }
+    }
+
+    const orphans = candidateOrphans
+      .filter((pr) => openOrphanNumbers.has(pr.number))
+      .map((pr) => {
+        const session = latestByPr.get(pr.number)
+        const sessionStatus: ReviewQueuePR['sessionStatus'] = session
+          ? session.pausedAt
+            ? 'paused'
+            : 'in-progress'
+          : 'in-progress'
+        const viewedFileCount = session?.viewedFiles.length ?? 0
+        return { ...pr, sessionStatus, viewedFileCount }
+      })
+
+    return [...orphans, ...merged]
   } catch {
     return prs
   }
@@ -85,7 +134,7 @@ export function useLoadPrQueue(repoRoot: string | null) {
         setQueueError(null)
       }
       try {
-        const result = await window.electronAPI.github.listOpenPrs(repoRoot, {
+        const result = await githubAPI.listOpenPrs(repoRoot, {
           cursor: options?.cursor,
           search: options?.search,
           includeClosedPrs: options?.includeClosedPrs ?? includeClosedPrs,
@@ -107,7 +156,7 @@ export function useLoadPrQueue(repoRoot: string | null) {
         }
         const res = result as { prs: unknown[]; hasMore: boolean; nextCursor?: string }
         const prs = parsePrList(res.prs)
-        const prsWithStatus = await mergeSessionStatuses(repoRoot, prs)
+        const prsWithStatus = await mergeSessionStatuses(repoRoot, prs, isAppend)
         if (isAppend) {
           appendQueue(prsWithStatus)
         } else {
@@ -149,7 +198,7 @@ export function useLoadPrDetail(repoRoot: string | null) {
     async (prNumber: number, onSuccess: (detail: PrReviewDetail) => Promise<void>) => {
       if (!repoRoot) return
       try {
-        const result = await window.electronAPI.github.prReviewDetail(repoRoot, prNumber)
+        const result = await githubAPI.prReviewDetail(repoRoot, prNumber)
         if ('error' in result) {
           if ((result as { error: string }).error === 'RATE_LIMITED') {
             setRateLimitState({
@@ -159,7 +208,11 @@ export function useLoadPrDetail(repoRoot: string | null) {
           return
         }
         const parsed = PrReviewDetailSchema.safeParse((result as { pr: unknown }).pr)
-        if (parsed.success) await onSuccess(parsed.data)
+        if (parsed.success) {
+          await onSuccess(parsed.data)
+        } else {
+          console.error('PR detail schema validation failed', parsed.error.issues)
+        }
       } catch (e) {
         console.error('Failed to load PR detail', e)
       }
@@ -183,7 +236,7 @@ export function useFetchFileMetrics(repoRoot: string | null) {
       // Fetch raw metrics for all files in parallel
       const results = await Promise.allSettled(
         allFiles.map(async (file) => {
-          const result = await window.electronAPI.github.fileMetrics(repoRoot, file.path)
+          const result = await githubAPI.fileMetrics(repoRoot, file.path)
           if ('error' in result) return null
           const raw = result as {
             churn90d: number
@@ -283,6 +336,27 @@ export function useFetchFileMetrics(repoRoot: string | null) {
   )
 }
 
+// ─── Issue (conversation) comments loading ────────────────────────────────────
+
+export function useLoadIssueComments(repoRoot: string | null) {
+  const { activePr, setIssueComments } = usePrReviewStore()
+
+  return useCallback(
+    async (prNumberOverride?: number) => {
+      const prNumber = prNumberOverride ?? activePr?.number
+      if (!repoRoot || !prNumber) return
+      try {
+        const result = await githubAPI.prIssueComments(repoRoot, prNumber)
+        if ('error' in result) return
+        setIssueComments((result as { comments: IssueComment[] }).comments)
+      } catch (e) {
+        console.error('Failed to load issue comments', e)
+      }
+    },
+    [repoRoot, activePr, setIssueComments]
+  )
+}
+
 // ─── Inline comments loading ──────────────────────────────────────────────────
 
 export function useLoadInlineComments(repoRoot: string | null) {
@@ -291,7 +365,7 @@ export function useLoadInlineComments(repoRoot: string | null) {
   return useCallback(async () => {
     if (!repoRoot || !activePr) return
     try {
-      const result = await window.electronAPI.github.prInlineComments(repoRoot, activePr.number)
+      const result = await githubAPI.prInlineComments(repoRoot, activePr.number)
       if ('error' in result) return
       const { buildThreads } = await import('../github/pr-review-service-renderer')
       const comments = (result as { comments: unknown[] }).comments

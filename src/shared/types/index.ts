@@ -88,6 +88,7 @@ export interface GlobalSettings {
   }
   ui: {
     hasSeenWelcome: boolean
+    showMetricsBar?: boolean
   }
 }
 
@@ -100,3 +101,30 @@ export interface WorkspaceSettings {
 }
 
 export type SettingsScope = 'global' | 'workspace'
+
+export interface SystemMetrics {
+  cpuPercent: number
+  memUsedBytes: number
+  memTotalBytes: number
+  netInBytesPerSec: number
+  netOutBytesPerSec: number
+}
+
+export interface ProcessMetrics {
+  pid: number
+  cpuPercent: number
+  rssBytes: number
+}
+
+export type PaneSplitDirection = 'horizontal' | 'vertical'
+
+export type PaneNode =
+  | { type: 'leaf'; sessionId: string }
+  | {
+      type: 'split'
+      id: string
+      direction: PaneSplitDirection
+      ratio: number
+      first: PaneNode
+      second: PaneNode
+    }

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useGitStore } from '../stores/git.store'
 import type { GitStatus } from '../schemas/git.schema'
+import { gitAPI } from '../api/git'
 
 export function useGitStatus(repoRoot: string | null, refreshIntervalMs = 3000): void {
   const { setStatus, setLoading } = useGitStore()
@@ -16,9 +17,7 @@ export function useGitStatus(repoRoot: string | null, refreshIntervalMs = 3000):
     async function refresh(): Promise<void> {
       if (cancelled) return
       try {
-        const result = (await window.electronAPI.git.status(repoRoot!)) as
-          | GitStatus
-          | { error: string }
+        const result = (await gitAPI.status(repoRoot!)) as GitStatus | { error: string }
         if (!cancelled) {
           if ('error' in result) setStatus(null)
           else setStatus(result as unknown as GitStatus)

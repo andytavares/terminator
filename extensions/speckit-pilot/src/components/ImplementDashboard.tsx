@@ -10,7 +10,6 @@ interface TaskProgress {
 interface ImplementDashboardProps {
   featureDir: string
   onStop: () => Promise<void>
-  onPause: () => void
   onOpenTasks: () => void
 }
 
@@ -36,12 +35,7 @@ function parseTasksFromMarkdown(content: string): TaskProgress[] {
   return tasks
 }
 
-export function ImplementDashboard({
-  featureDir,
-  onStop,
-  onPause,
-  onOpenTasks,
-}: ImplementDashboardProps) {
+export function ImplementDashboard({ featureDir, onStop, onOpenTasks }: ImplementDashboardProps) {
   const [tasks, setTasks] = useState<TaskProgress[]>([])
   const [elapsed, setElapsed] = useState(0)
   const [startTime] = useState(Date.now())
@@ -113,9 +107,6 @@ export function ImplementDashboard({
       </div>
 
       <div className="sk-implement__controls">
-        <button className="sk-btn sk-btn--secondary" onClick={onPause}>
-          Pause after current task
-        </button>
         <button
           className="sk-btn sk-btn--danger-outline"
           onClick={() => void handleStop()}

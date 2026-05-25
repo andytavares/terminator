@@ -14,7 +14,14 @@ vi.mock('../../../src/renderer/stores/settings.store', () => ({ useSettingsStore
 vi.mock('../../../src/renderer/stores/session.store', () => ({ useSessionStore: vi.fn() }))
 vi.mock('../../../src/renderer/stores/toast.store', () => ({ useToastStore: vi.fn() }))
 vi.mock('../../../src/renderer/stores/log.store', () => ({ installLogInterceptor: vi.fn() }))
-vi.mock('../../../src/renderer/extensions/registry', () => ({ useExtensionRegistry: vi.fn() }))
+vi.mock('../../../src/renderer/extensions/registry', () => {
+  const useExtensionRegistry = vi.fn()
+  ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
+    registerGlobalTab: vi.fn(() => vi.fn()),
+    setActiveGlobalTab: vi.fn(),
+  }))
+  return { useExtensionRegistry }
+})
 vi.mock('../../../src/renderer/extensions/loader', () => ({}))
 type ShortcutCallbacks = {
   onOpenSettings?: () => void
@@ -30,16 +37,32 @@ vi.mock('../../../src/renderer/hooks/useKeyboardShortcuts', () => ({
 vi.mock('../../../src/renderer/hooks/useTerminalSession', () => ({
   useTerminalSession: vi.fn(() => ({ createSession: vi.fn() })),
 }))
+type CommandRegistration = { id: string; label: string; action: () => void }
+let capturedPaletteCommands: CommandRegistration[] = []
 vi.mock('../../../src/renderer/components/CommandPalette', () => ({
-  CommandPalette: ({ onClose }: { onClose: () => void }) => (
-    <div data-testid="command-palette">
-      <button onClick={onClose}>Close Palette</button>
-    </div>
-  ),
+  CommandPalette: ({
+    onClose,
+    commands,
+  }: {
+    onClose: () => void
+    commands: CommandRegistration[]
+  }) => {
+    capturedPaletteCommands = commands
+    return (
+      <div data-testid="command-palette">
+        <button onClick={onClose}>Close Palette</button>
+      </div>
+    )
+  },
 }))
 
+type GlobalTabCallback = (id: string) => void
+let capturedOnSelectGlobalTab: GlobalTabCallback | null = null
 vi.mock('../../../src/renderer/components/sidebar/WorkspaceRail', () => ({
-  WorkspaceRail: () => <div data-testid="workspace-rail" />,
+  WorkspaceRail: ({ onSelectGlobalTab }: { onSelectGlobalTab: GlobalTabCallback }) => {
+    capturedOnSelectGlobalTab = onSelectGlobalTab
+    return <div data-testid="workspace-rail" />
+  },
 }))
 vi.mock('../../../src/renderer/components/sidebar/ProjectsPanel', () => ({
   ProjectsPanel: ({ workspaceId }: { workspaceId: string }) => (
@@ -72,8 +95,18 @@ vi.mock('../../../src/renderer/components/LogWindow', () => ({
 vi.mock('../../../src/renderer/components/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
+type EmptyStateAction = { label: string; onClick: () => void }
 vi.mock('../../../src/renderer/components/EmptyState', () => ({
-  EmptyState: ({ title }: { title: string }) => <div data-testid="empty-state">{title}</div>,
+  EmptyState: ({ title, actions }: { title: string; actions?: EmptyStateAction[] }) => (
+    <div data-testid="empty-state">
+      {title}
+      {actions?.map((a) => (
+        <button key={a.label} onClick={a.onClick}>
+          {a.label}
+        </button>
+      ))}
+    </div>
+  ),
 }))
 
 const mockLoadWorkspaces = vi.fn()
@@ -85,10 +118,13 @@ const mockAddToast = vi.fn()
 const defaultExtensionRegistry = {
   sidebarPanels: new Map(),
   projectTabs: new Map(),
+  globalTabs: new Map(),
   openPanels: new Set<string>(),
   activeProjectTabId: null,
+  activeGlobalTabId: null,
   togglePanel: vi.fn(),
   setActiveProjectTab: vi.fn(),
+  setActiveGlobalTab: vi.fn(),
   keyboardShortcuts: [],
   commands: [],
 }
@@ -138,6 +174,8 @@ let mockUnsubscribe: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  capturedPaletteCommands = []
+  capturedOnSelectGlobalTab = null
   mockUnsubscribe = vi.fn()
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     terminal: {
@@ -393,6 +431,53 @@ describe('App', () => {
     expect(mockTogglePanel).toHaveBeenCalledWith('git-changes')
   })
 
+  it('renders extension project tab component when activeProjectTabId matches projectTabs', () => {
+    const MockProjectTab = ({ repoRoot }: { repoRoot: string | null }) => (
+      <div data-testid="project-tab-content">{repoRoot ?? 'no-root'}</div>
+    )
+    setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      activeProjectTabId: 'git',
+      projectTabs: new Map([['git', { id: 'git', label: 'Git', component: MockProjectTab }]]),
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    render(<App />)
+    expect(screen.getByTestId('project-tab-content')).toBeTruthy()
+  })
+
+  it('renders global tab component when activeGlobalTabId is set', () => {
+    const MockGlobalTab = () => <div data-testid="global-tab-content">Global Tab</div>
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      globalTabs: new Map([
+        ['task-vault', { id: 'task-vault', label: 'Tasks', component: MockGlobalTab }],
+      ]),
+      activeGlobalTabId: 'task-vault',
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    render(<App />)
+    expect(screen.getByTestId('global-tab-content')).toBeTruthy()
+  })
+
+  it('calls togglePanel for each open panel when workspace changes', async () => {
+    const mockTogglePanel = vi.fn()
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      openPanels: new Set(['panel-a']),
+      togglePanel: mockTogglePanel,
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    setupMocks({ activeWorkspaceId: 'ws-1' })
+    const { rerender } = render(<App />)
+    // Switch to a different workspace — should trigger the close-panels effect
+    setupMocks({ activeWorkspaceId: 'ws-2' })
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      openPanels: new Set(['panel-a']),
+      togglePanel: mockTogglePanel,
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    rerender(<App />)
+    expect(mockTogglePanel).toHaveBeenCalledWith('panel-a')
+  })
+
   it('calls onSelectProjectTab extensionEvent to set active tab', () => {
     const mockSetActiveProjectTab = vi.fn()
     vi.mocked(useExtensionRegistry).mockReturnValue({
@@ -415,5 +500,78 @@ describe('App', () => {
     }
     render(<App />)
     expect(mockSetActiveProjectTab).toHaveBeenCalledWith('git')
+  })
+
+  it('command core.open-settings action opens SettingsPanel', async () => {
+    render(<App />)
+    capturedShortcutCallbacks.onOpenCommandPalette?.()
+    await waitFor(() => screen.getByTestId('command-palette'))
+    const cmd = capturedPaletteCommands.find((c) => c.id === 'core.open-settings')
+    cmd?.action()
+    await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
+  })
+
+  it('command core.toggle-sidebar action hides ProjectsPanel', async () => {
+    setupMocks({ activeWorkspaceId: 'ws-1' })
+    render(<App />)
+    expect(screen.getByTestId('projects-panel')).toBeTruthy()
+    capturedShortcutCallbacks.onOpenCommandPalette?.()
+    await waitFor(() => screen.getByTestId('command-palette'))
+    const cmd = capturedPaletteCommands.find((c) => c.id === 'core.toggle-sidebar')
+    cmd?.action()
+    await waitFor(() => expect(screen.queryByTestId('projects-panel')).toBeNull())
+  })
+
+  it('command core.toggle-log action opens LogWindow', async () => {
+    render(<App />)
+    capturedShortcutCallbacks.onOpenCommandPalette?.()
+    await waitFor(() => screen.getByTestId('command-palette'))
+    const cmd = capturedPaletteCommands.find((c) => c.id === 'core.toggle-log')
+    cmd?.action()
+    await waitFor(() => expect(screen.getByTestId('log-window')).toBeTruthy())
+  })
+
+  it('command core.switch-workspace-{id} action calls setActiveWorkspace', async () => {
+    const mockSetActiveWorkspace = vi.fn()
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      loadWorkspaces: mockLoadWorkspaces,
+      activeWorkspaceId: 'ws-1',
+      activeProjectId: null,
+      workspaces: [{ id: 'ws-1', name: 'Work', folderPath: '/', color: '#fff', tags: [] }],
+      projectsByWorkspaceId: new Map(),
+      setActiveWorkspace: mockSetActiveWorkspace,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    render(<App />)
+    capturedShortcutCallbacks.onOpenCommandPalette?.()
+    await waitFor(() => screen.getByTestId('command-palette'))
+    const cmd = capturedPaletteCommands.find((c) => c.id === 'core.switch-workspace-ws-1')
+    cmd?.action()
+    expect(mockSetActiveWorkspace).toHaveBeenCalledWith('ws-1')
+  })
+
+  it('onSelectGlobalTab toggles activeGlobalTab off when same id clicked', async () => {
+    const mockSetActiveGlobalTab = vi.fn()
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      globalTabs: new Map([
+        ['task-vault', { id: 'task-vault', label: 'Tasks', component: () => null }],
+      ]),
+      activeGlobalTabId: 'task-vault',
+      setActiveGlobalTab: mockSetActiveGlobalTab,
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    render(<App />)
+    capturedOnSelectGlobalTab?.('task-vault')
+    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
+  })
+
+  it('EmptyState Open Settings action opens SettingsPanel', async () => {
+    setupMocks({
+      activeWorkspaceId: null,
+      activeProjectId: null,
+      globalSettings: { ui: { hasSeenWelcome: false } },
+    })
+    render(<App />)
+    fireEvent.click(screen.getByText('Open Settings'))
+    await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
   })
 })

@@ -166,3 +166,17 @@
   color: var(--text-primary);
   background: var(--bg-elevated);
 }
+
+/* ── Inline rename input ─────────────────────────────────────── */
+.tab-bar__rename-input {
+  flex: 1;
+  background: var(--bg-base);
+  border: 1px solid var(--ws-color, var(--accent));
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: inherit;
+  padding: 1px 4px;
+  outline: none;
+  min-width: 0;
+}
