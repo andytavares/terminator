@@ -69,14 +69,18 @@ const PR_META = {
 const PR_FILES_REST: unknown[] = []
 const REPO_VIEW = { owner: { login: 'test-owner' }, name: 'test-repo' }
 
-// Queue the three gh calls the pr-review-detail handler makes:
+// Queue the five gh calls the pr-review-detail handler makes:
 //   1. gh repo view (ownerAndName)
-//   2. gh pr view --json ... (meta)  } parallel
-//   3. gh api --paginate .../files   }
-function mockPrDetail(meta: unknown, files: unknown[] = PR_FILES_REST) {
+//   2. gh pr view --json ... (meta)         } parallel
+//   3. gh api --paginate .../files          }
+//   4. gh api .../reviews                  }
+//   5. gh api .../requested_reviewers      }
+function mockPrDetail(meta: unknown, files: unknown[] = PR_FILES_REST, reviews: unknown[] = []) {
   mockGitSuccess(JSON.stringify(REPO_VIEW))
   mockGitSuccess(JSON.stringify(meta))
   mockGitSuccess(JSON.stringify(files))
+  mockGitSuccess(JSON.stringify(reviews))
+  mockGitSuccess('{"users":[],"teams":[]}') // requested_reviewers — empty by default
 }
 
 describe('github:pr-review-detail', () => {
@@ -138,8 +142,8 @@ describe('github:pr-review-detail', () => {
     })) as { pr: { statusChecks: unknown[] } }
 
     expect(result.pr.statusChecks).toEqual([])
-    // Only 3 execFile calls (repo view + pr view + files), not 4
-    expect(mockExecFile).toHaveBeenCalledTimes(3)
+    // Only 5 execFile calls (repo view + pr view + files + reviews + requested_reviewers), check-suites skipped
+    expect(mockExecFile).toHaveBeenCalledTimes(5)
   })
 
   it('maps isDraft=true onto pr object', async () => {
@@ -275,6 +279,142 @@ describe('github:pr-review-detail', () => {
       prNumber: 6,
     })) as { error: string }
     expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('maps mergeStateStatus BEHIND to behind', async () => {
+    mockPrDetail({ ...PR_META, mergeStateStatus: 'BEHIND' })
+    mockGitFailure('not found')
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { mergeStateStatus: string } }
+    expect(result.pr.mergeStateStatus).toBe('behind')
+  })
+
+  it('maps mergeStateStatus DIRTY to dirty', async () => {
+    mockPrDetail({ ...PR_META, mergeStateStatus: 'DIRTY' })
+    mockGitFailure('not found')
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { mergeStateStatus: string } }
+    expect(result.pr.mergeStateStatus).toBe('dirty')
+  })
+
+  it('maps mergeStateStatus CLEAN to clean', async () => {
+    mockPrDetail({ ...PR_META, mergeStateStatus: 'CLEAN' })
+    mockGitFailure('not found')
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { mergeStateStatus: string } }
+    expect(result.pr.mergeStateStatus).toBe('clean')
+  })
+
+  it('maps lintStatus to fail when eslint check has FAILURE conclusion', async () => {
+    mockPrDetail({
+      ...PR_META,
+      statusCheckRollup: [{ name: 'eslint', conclusion: 'FAILURE' }],
+    })
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { lintStatus: string } }
+    expect(result.pr.lintStatus).toBe('fail')
+  })
+
+  it('maps lintStatus to warn when lint check is PENDING', async () => {
+    mockPrDetail({
+      ...PR_META,
+      statusCheckRollup: [{ name: 'lint', conclusion: 'IN_PROGRESS' }],
+    })
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { lintStatus: string } }
+    expect(result.pr.lintStatus).toBe('warn')
+  })
+
+  it('maps lintStatus to pass when lint check has SUCCESS conclusion', async () => {
+    mockPrDetail({
+      ...PR_META,
+      statusCheckRollup: [{ name: 'lint', conclusion: 'SUCCESS' }],
+    })
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { lintStatus: string } }
+    expect(result.pr.lintStatus).toBe('pass')
+  })
+
+  it('maps lintStatus to unknown when lint check is SKIPPED (non-blocking)', async () => {
+    mockPrDetail({
+      ...PR_META,
+      statusCheckRollup: [{ name: 'lint', conclusion: 'SKIPPED' }],
+    })
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { lintStatus: string } }
+    expect(result.pr.lintStatus).toBe('unknown')
+  })
+
+  it('extracts approvals from REST reviews field', async () => {
+    const reviews = [
+      {
+        user: { login: 'bob', avatar_url: 'https://example.com/bob.png' },
+        state: 'APPROVED',
+        submitted_at: '2026-05-01T10:00:00Z',
+      },
+      {
+        user: { login: 'carol', avatar_url: '' },
+        state: 'CHANGES_REQUESTED',
+        submitted_at: '2026-05-01T11:00:00Z',
+      },
+    ]
+    mockPrDetail({ ...PR_META, statusCheckRollup: [] }, PR_FILES_REST, reviews)
+    mockGitFailure('not found')
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { approvals: Array<{ author: string }> } }
+    expect(result.pr.approvals).toHaveLength(1)
+    expect(result.pr.approvals[0].author).toBe('bob')
+  })
+
+  it('skips reviews with no login in mapApprovals', async () => {
+    const reviews = [{ user: {}, state: 'APPROVED', submitted_at: '2026-05-01T10:00:00Z' }]
+    mockPrDetail({ ...PR_META, statusCheckRollup: [] }, PR_FILES_REST, reviews)
+    mockGitFailure('not found')
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { approvals: Array<{ author: string }> } }
+    expect(result.pr.approvals).toHaveLength(0)
+  })
+
+  it('deduplicates approvals keeping the later non-COMMENTED review', async () => {
+    const reviews = [
+      {
+        user: { login: 'bob', avatar_url: '' },
+        state: 'APPROVED',
+        submitted_at: '2026-05-01T10:00:00Z',
+      },
+      {
+        user: { login: 'bob', avatar_url: '' },
+        state: 'COMMENTED',
+        submitted_at: '2026-05-01T11:00:00Z',
+      },
+    ]
+    mockPrDetail({ ...PR_META, statusCheckRollup: [] }, PR_FILES_REST, reviews)
+    mockGitFailure('not found')
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { approvals: Array<{ author: string }> } }
+    // COMMENTED review should not overwrite the APPROVED one
+    expect(result.pr.approvals).toHaveLength(1)
+    expect(result.pr.approvals[0].author).toBe('bob')
   })
 })
 
@@ -1158,5 +1298,51 @@ describe('github:pr-issue-comment-add', () => {
       body: 'hello',
     })) as { error: string }
     expect(result.error).toContain('forbidden')
+  })
+})
+
+describe('github:pr-update-branch', () => {
+  let handlers: Record<string, Handler>
+  beforeEach(() => {
+    mockExecFile.mockReset()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
+    const result = (await handlers['github:pr-update-branch']({
+      prNumber: 6,
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns VALIDATION_ERROR for missing prNumber', async () => {
+    const result = (await handlers['github:pr-update-branch']({
+      repoRoot: '/repo',
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns ok:true on success', async () => {
+    mockGitSuccess('')
+
+    const result = (await handlers['github:pr-update-branch']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { ok: boolean }
+    expect(result.ok).toBe(true)
+    const args: string[] = mockExecFile.mock.calls[0][1]
+    expect(args).toContain('update-branch')
+    expect(args).toContain('6')
+    expect(args).toContain('--rebase=false')
+  })
+
+  it('returns error string when gh fails', async () => {
+    mockGitFailure('merge conflict')
+
+    const result = (await handlers['github:pr-update-branch']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { error: string }
+    expect(result.error).toContain('merge conflict')
   })
 })

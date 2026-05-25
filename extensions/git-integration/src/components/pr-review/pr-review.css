@@ -305,6 +305,9 @@
 .pr-section--blue .pr-section-title {
   color: var(--tm-accent);
 }
+.pr-section--yellow .pr-section-title {
+  color: var(--tm-warning, #d29922);
+}
 
 /* PR rows */
 
@@ -417,6 +420,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.pr-row-approved {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--tm-success);
+  margin-top: 3px;
+  letter-spacing: 0.02em;
 }
 
 .pr-row-progress {
@@ -2233,6 +2245,55 @@
   opacity: 0.8;
 }
 
+.pr-overview-approvals-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 16px;
+  background: rgba(63, 185, 80, 0.06);
+  border-bottom: 1px solid rgba(63, 185, 80, 0.2);
+  flex-shrink: 0;
+}
+
+.pr-overview-approvals-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tm-success);
+  letter-spacing: 0.03em;
+}
+
+.pr-overview-approver {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px 2px 4px;
+  background: rgba(63, 185, 80, 0.1);
+  border: 1px solid rgba(63, 185, 80, 0.25);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--tm-success);
+}
+
+.pr-overview-approver-avatar {
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pr-overview-approver-name {
+  font-weight: 500;
+}
+
+.pr-overview-approvals-label--pending {
+  color: var(--tm-warning, #d29922);
+}
+
+.pr-overview-approver--pending {
+  background: rgba(210, 153, 34, 0.1);
+  border-color: rgba(210, 153, 34, 0.25);
+  color: var(--tm-warning, #d29922);
+}
+
 .pr-overview-body-scroll {
   flex: 1;
   overflow-y: auto;
@@ -2438,6 +2499,44 @@
   overflow-y: auto;
 }
 
+/* Merge state badges */
+
+.pr-merge-state-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+
+.pr-merge-state-badge--behind {
+  background: rgba(210, 153, 34, 0.15);
+  color: #d29922;
+  border: 1px solid rgba(210, 153, 34, 0.35);
+}
+
+.pr-merge-state-badge--dirty {
+  background: rgba(248, 81, 73, 0.12);
+  color: #f85149;
+  border: 1px solid rgba(248, 81, 73, 0.3);
+}
+
+.pr-overview-your-review-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(88, 166, 255, 0.12);
+  color: var(--tm-accent, #58a6ff);
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  letter-spacing: 0.02em;
+}
+
 /* CTA */
 
 .pr-draft-badge {
@@ -2484,6 +2583,36 @@
 .pr-overview-ready-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.pr-overview-update-branch-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid rgba(210, 153, 34, 0.5);
+  border-radius: 6px;
+  color: #d29922;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.pr-overview-update-branch-btn:hover:not(:disabled) {
+  border-color: #d29922;
+  color: #e3b341;
+}
+.pr-overview-update-branch-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pr-update-branch-error {
+  font-size: 11px;
+  color: #f85149;
+  margin: 0;
+  flex: 1;
+  text-align: left;
 }
 
 .pr-overview-start-btn {
@@ -2572,10 +2701,7 @@
 }
 
 .pr-issue-composer {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
+  margin: 8px 0 0;
 }
 
 .pr-issue-composer-textarea {

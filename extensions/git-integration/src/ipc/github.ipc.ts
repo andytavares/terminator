@@ -105,6 +105,18 @@ function normalizeGraphQLNode(node: unknown): Record<string, unknown> {
   type CommitContext = { name?: string; context?: string; conclusion?: string; state?: string }
   type CommitNode = { commit?: { statusCheckRollup?: { contexts?: { nodes?: CommitContext[] } } } }
   type CommitsField = { nodes?: CommitNode[] }
+  type ReviewNode = {
+    author?: { login?: string; avatarUrl?: string }
+    state?: string
+    submittedAt?: string
+  }
+  type LatestReviews = { nodes?: ReviewNode[] }
+  type ReviewRequestNode = {
+    requestedReviewer?: { login?: string; avatarUrl?: string; name?: string }
+  }
+  type ReviewRequests = { nodes?: ReviewRequestNode[] }
+  type AssigneeNode = { login?: string }
+  type Assignees = { nodes?: AssigneeNode[] }
   const commits = obj.commits as CommitsField | undefined
   const contextNodes = commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes ?? []
   const statusCheckRollup = contextNodes.map((ctx) => ({
@@ -112,7 +124,20 @@ function normalizeGraphQLNode(node: unknown): Record<string, unknown> {
     state: ctx.conclusion ?? ctx.state ?? '',
     conclusion: ctx.conclusion ?? ctx.state ?? '',
   }))
-  return { ...obj, statusCheckRollup }
+  const latestReviewNodes = (obj.latestReviews as LatestReviews | undefined)?.nodes ?? []
+  const reviewRequestNodes = (obj.reviewRequests as ReviewRequests | undefined)?.nodes ?? []
+  const requestedReviewers = reviewRequestNodes
+    .map((n) => n.requestedReviewer?.login ?? n.requestedReviewer?.name ?? '')
+    .filter(Boolean)
+  const assigneeNodes = (obj.assignees as Assignees | undefined)?.nodes ?? []
+  const assigneeLogins = assigneeNodes.map((n) => n.login ?? '').filter(Boolean)
+  return {
+    ...obj,
+    statusCheckRollup,
+    latestReviews: { nodes: latestReviewNodes },
+    requestedReviewers,
+    assigneeLogins,
+  }
 }
 
 async function runGit(cwd: string, args: string[]): Promise<string> {
@@ -121,7 +146,7 @@ async function runGit(cwd: string, args: string[]): Promise<string> {
 }
 
 const PR_JSON_FIELDS =
-  'number,title,author,createdAt,headRefName,baseRefName,isDraft,statusCheckRollup,files,additions,deletions'
+  'number,title,author,createdAt,headRefName,baseRefName,isDraft,statusCheckRollup,files,additions,deletions,reviews,assignees,latestReviews'
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
@@ -136,6 +161,19 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
     }
     return { error: msg }
   }
+
+  register('github:current-user', async (payload) => {
+    const schema = z.object({ repoRoot: z.string().min(1) })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repoRoot } = parsed.data
+    try {
+      const raw = await gh(repoRoot, ['api', 'user', '--jq', '.login'])
+      return { login: raw.trim() }
+    } catch (e) {
+      return { error: String(e) }
+    }
+  })
 
   register('github:list-open-prs', async (payload) => {
     const schema = z.object({
@@ -177,7 +215,7 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
       // Paginated load via GraphQL
       const { owner, repo } = await ownerAndName(repoRoot)
       const gqlStates = includeClosedPrs ? '[OPEN,CLOSED,MERGED]' : 'OPEN'
-      const gql = `query($owner:String!,$repo:String!,$cursor:String){repository(owner:$owner,name:$repo){pullRequests(first:20,states:${gqlStates},after:$cursor,orderBy:{field:CREATED_AT,direction:DESC}){pageInfo{endCursor hasNextPage}nodes{number title isDraft additions deletions createdAt headRefName baseRefName changedFiles author{login avatarUrl}commits(last:1){nodes{commit{statusCheckRollup{contexts(first:20){nodes{...on CheckRun{name conclusion status}...on StatusContext{context state}}}}}}}}}}}`
+      const gql = `query($owner:String!,$repo:String!,$cursor:String){repository(owner:$owner,name:$repo){pullRequests(first:20,states:${gqlStates},after:$cursor,orderBy:{field:CREATED_AT,direction:DESC}){pageInfo{endCursor hasNextPage}nodes{number title isDraft additions deletions createdAt headRefName baseRefName changedFiles author{login avatarUrl}assignees(first:10){nodes{login}}latestReviews(first:20){nodes{author{login avatarUrl}state submittedAt}}reviewRequests(first:10){nodes{requestedReviewer{...on User{login avatarUrl}...on Team{name}}}}commits(last:1){nodes{commit{statusCheckRollup{contexts(first:20){nodes{...on CheckRun{name conclusion status}...on StatusContext{context state}}}}}}}}}}}`
       const args = [
         'api',
         'graphql',
@@ -221,19 +259,35 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
     const { repoRoot, prNumber } = parsed.data
     try {
       const { owner, repo } = await ownerAndName(repoRoot)
-      const [metaRaw, filesRaw] = await Promise.all([
+      const [metaRaw, filesRaw, reviewsRaw, reviewersRaw] = await Promise.all([
         gh(repoRoot, [
           'pr',
           'view',
           String(prNumber),
           '--json',
-          'number,title,body,author,createdAt,headRefName,baseRefName,headRefOid,isDraft,statusCheckRollup',
+          'number,title,body,author,createdAt,headRefName,baseRefName,headRefOid,isDraft,mergeStateStatus,statusCheckRollup,assignees',
         ]),
         // Use REST API to get file list with patch content for import-graph grouping
         gh(repoRoot, ['api', '--paginate', `repos/${owner}/${repo}/pulls/${prNumber}/files`]),
+        gh(repoRoot, ['api', `repos/${owner}/${repo}/pulls/${prNumber}/reviews`]).catch(() => '[]'),
+        gh(repoRoot, ['api', `repos/${owner}/${repo}/pulls/${prNumber}/requested_reviewers`]).catch(
+          () => '{"users":[],"teams":[]}'
+        ),
       ])
       const meta = JSON.parse(metaRaw) as Record<string, unknown>
       const filesData = JSON.parse(filesRaw) as unknown[]
+      const reviewsData = JSON.parse(reviewsRaw) as Array<Record<string, unknown>>
+      const reviewersData = JSON.parse(reviewersRaw) as {
+        users?: Array<Record<string, unknown>>
+        teams?: Array<Record<string, unknown>>
+      }
+      const requestedReviewers = [
+        ...(reviewersData.users ?? []).map((u) => String(u.login ?? '')),
+        ...(reviewersData.teams ?? []).map((t) => String(t.slug ?? t.name ?? '')),
+      ].filter(Boolean)
+      const assigneeLogins = ((meta.assignees as Array<Record<string, unknown>> | undefined) ?? [])
+        .map((a) => String(a.login ?? ''))
+        .filter(Boolean)
       const chapters = buildChapters(filesData)
 
       // When statusCheckRollup is null/empty (checks queued but not yet reported),
@@ -274,10 +328,14 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
         baseRefName: String(meta.baseRefName ?? ''),
         headSHA: String(meta.headRefOid ?? ''),
         isDraft: Boolean(meta.isDraft),
+        mergeStateStatus: mapMergeStateStatus(String(meta.mergeStateStatus ?? '')),
         ciStatus: mapCiStatus(rollup),
         lintStatus: mapCheckStatus(rollup, LINT_CHECK_NAMES),
         coverageStatus: mapCheckStatus(rollup, COVERAGE_CHECK_NAMES),
         statusChecks: mapStatusChecks(rollup),
+        approvals: mapApprovals(reviewsData),
+        requestedReviewers,
+        assigneeLogins,
         chapters,
       }
       return { pr }
@@ -293,6 +351,19 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
     const { repoRoot, prNumber } = parsed.data
     try {
       await gh(repoRoot, ['pr', 'ready', String(prNumber)])
+      return { ok: true }
+    } catch (e) {
+      return catchError(e)
+    }
+  })
+
+  register('github:pr-update-branch', async (payload) => {
+    const schema = z.object({ repoRoot: z.string().min(1), prNumber: z.number().int().positive() })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repoRoot, prNumber } = parsed.data
+    try {
+      await gh(repoRoot, ['pr', 'update-branch', String(prNumber), '--rebase=false'], 30_000)
       return { ok: true }
     } catch (e) {
       return catchError(e)
@@ -632,8 +703,13 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     try {
-      const key = `${parsed.data.repoRoot}:${parsed.data.prNumber}`
-      activeReviewStore.delete(key)
+      const { repoRoot, prNumber } = parsed.data
+      activeReviewStore.delete(`${repoRoot}:${prNumber}`)
+      // Also delete all session store entries for this PR so it won't re-appear as in-progress on next load
+      const sessionPrefix = `${repoRoot}:::${prNumber}:::`
+      for (const key of Object.keys(sessionStore.store)) {
+        if (key.startsWith(sessionPrefix)) sessionStore.delete(key)
+      }
       return { ok: true as const }
     } catch (e) {
       return { error: String(e) }
@@ -696,6 +772,14 @@ const COVERAGE_CHECK_NAMES = ['coverage', 'codecov', 'coveralls', 'sonar', 'code
 
 const NON_BLOCKING = new Set(['SKIPPED', 'NEUTRAL', 'CANCELLED', 'STALE'])
 
+function mapMergeStateStatus(raw: string): 'behind' | 'dirty' | 'clean' | 'unknown' {
+  const s = raw.toUpperCase()
+  if (s === 'BEHIND') return 'behind'
+  if (s === 'DIRTY' || s === 'CONFLICTING') return 'dirty'
+  if (s === 'CLEAN' || s === 'HAS_HOOKS' || s === 'UNSTABLE' || s === 'BLOCKED') return 'clean'
+  return 'unknown'
+}
+
 function mapCiStatus(rollup: unknown): 'passing' | 'failing' | 'pending' | 'none' {
   if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'none'
   // Normalise: gh returns `conclusion` on CheckRuns; StatusContext uses `state`
@@ -754,6 +838,32 @@ function mapStatusChecks(rollup: unknown): StatusCheck[] {
       url: s.url ? String(s.url) : undefined,
     }
   })
+}
+
+function mapApprovals(
+  reviews: Array<Record<string, unknown>>
+): Array<{ author: string; authorAvatarUrl: string; submittedAt: string }> {
+  // Only keep the latest APPROVED review per author (later CHANGES_REQUESTED dismiss earlier approvals)
+  const byAuthor = new Map<string, Record<string, unknown>>()
+  for (const r of reviews) {
+    const login = String((r.user as Record<string, unknown>)?.login ?? '')
+    if (!login) continue
+    const state = String(r.state ?? '').toUpperCase()
+    // Track any review per author; we'll filter for APPROVED at the end
+    if (!byAuthor.has(login) || state !== 'COMMENTED') {
+      byAuthor.set(login, r)
+    }
+  }
+  return [...byAuthor.values()]
+    .filter((r) => String(r.state ?? '').toUpperCase() === 'APPROVED')
+    .map((r) => {
+      const user = (r.user as Record<string, unknown>) ?? {}
+      return {
+        author: String(user.login ?? ''),
+        authorAvatarUrl: String(user.avatar_url ?? ''),
+        submittedAt: String(r.submitted_at ?? ''),
+      }
+    })
 }
 
 async function readFileCoverage(repoRoot: string, filePath: string): Promise<number | null> {

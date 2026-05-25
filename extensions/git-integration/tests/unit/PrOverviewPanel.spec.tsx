@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { PrOverviewPanel } from '../../src/components/pr-review/PrOverviewPanel'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
@@ -15,6 +15,7 @@ vi.mock('../../src/api/github', () => ({
   githubAPI: {
     prMarkReady: vi.fn().mockResolvedValue({}),
     prIssueCommentAdd: vi.fn().mockResolvedValue({}),
+    prUpdateBranch: vi.fn().mockResolvedValue({ ok: true }),
   },
 }))
 
@@ -73,10 +74,15 @@ const basePr: PrReviewDetail = {
   headRefName: 'feature/x',
   baseRefName: 'main',
   headSHA: 'abc123',
+  isDraft: false,
+  mergeStateStatus: 'clean',
   ciStatus: 'passing',
   lintStatus: 'pass',
   coverageStatus: 'pass',
   statusChecks: [{ name: 'CI', state: 'pass' }],
+  approvals: [],
+  requestedReviewers: [],
+  assigneeLogins: [],
   chapters: [
     {
       id: 'ch1',
@@ -96,6 +102,7 @@ beforeEach(() => {
   vi.mocked(usePrReviewStore).mockReturnValue({
     viewedFiles: new Set(),
     issueComments: [],
+    currentUserLogin: null,
   } as unknown as ReturnType<typeof usePrReviewStore>)
 })
 
@@ -336,6 +343,40 @@ describe('PrOverviewPanel', () => {
     expect(onPopOut).toHaveBeenCalledOnce()
   })
 
+  it('shows approvals bar when PR has approvals', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{
+          ...basePr,
+          approvals: [
+            { author: 'bob', authorAvatarUrl: '', submittedAt: new Date().toISOString() },
+            { author: 'carol', authorAvatarUrl: '', submittedAt: new Date().toISOString() },
+          ],
+        }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Approved by')).toBeTruthy()
+    expect(screen.getByText('bob')).toBeTruthy()
+    expect(screen.getByText('carol')).toBeTruthy()
+  })
+
+  it('does not show approvals bar when PR has no approvals', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={basePr}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryByText('Approved by')).toBeNull()
+  })
+
   it('does not render pop out button when onPopOut is absent', () => {
     render(
       <PrOverviewPanel
@@ -347,5 +388,243 @@ describe('PrOverviewPanel', () => {
       />
     )
     expect(screen.queryByTitle('Open in focused window')).toBeNull()
+  })
+
+  it('renders write/preview tabs in discussion composer', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={basePr}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Write')).toBeTruthy()
+    expect(screen.getByText('Preview')).toBeTruthy()
+    expect(screen.getByPlaceholderText('Leave a comment…')).toBeTruthy()
+  })
+
+  it('shows preview pane when Preview tab is clicked', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={basePr}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    fireEvent.click(screen.getByText('Preview'))
+    expect(screen.getByText('Nothing to preview.')).toBeTruthy()
+    expect(screen.queryByPlaceholderText('Leave a comment…')).toBeNull()
+  })
+
+  it('shows "behind" badge when mergeStateStatus is behind', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, mergeStateStatus: 'behind' }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText(/Behind main/)).toBeTruthy()
+  })
+
+  it('shows "conflicts" badge when mergeStateStatus is dirty', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, mergeStateStatus: 'dirty' }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('⚠ Conflicts')).toBeTruthy()
+  })
+
+  it('does not show merge state badge when mergeStateStatus is clean', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, mergeStateStatus: 'clean' }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryByText(/Behind/)).toBeNull()
+    expect(screen.queryByText(/Conflicts/)).toBeNull()
+  })
+
+  it('shows update branch button when mergeStateStatus is behind', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, mergeStateStatus: 'behind' }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText(/Update from main/)).toBeTruthy()
+  })
+
+  it('does not show update branch button when mergeStateStatus is clean', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, mergeStateStatus: 'clean' }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryByText(/Update from/)).toBeNull()
+  })
+
+  it('calls prUpdateBranch and onRefresh when update branch button clicked', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    const onRefresh = vi.fn().mockResolvedValue(undefined)
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, mergeStateStatus: 'behind' }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+        onRefresh={onRefresh}
+      />
+    )
+    fireEvent.click(screen.getByText(/Update from main/))
+    await waitFor(() => {
+      expect(githubAPI.prUpdateBranch).toHaveBeenCalledWith('/repo', 42)
+      expect(onRefresh).toHaveBeenCalled()
+    })
+  })
+
+  it('shows error message when prUpdateBranch returns error', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    vi.mocked(githubAPI.prUpdateBranch).mockResolvedValueOnce({ error: 'update failed' })
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, mergeStateStatus: 'behind' }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    fireEvent.click(screen.getByText(/Update from main/))
+    await waitFor(() => {
+      expect(screen.getByText('update failed')).toBeTruthy()
+    })
+  })
+
+  it('shows requested reviewers as pending when no approvals', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, requestedReviewers: ['dave', 'eve'] }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Review requested from')).toBeTruthy()
+    expect(screen.getByText('dave')).toBeTruthy()
+    expect(screen.getByText('eve')).toBeTruthy()
+  })
+
+  it('shows "Awaiting" label for pending reviewers when approvals already exist', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{
+          ...basePr,
+          approvals: [
+            { author: 'bob', authorAvatarUrl: '', submittedAt: new Date().toISOString() },
+          ],
+          requestedReviewers: ['dave'],
+        }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Approved by')).toBeTruthy()
+    expect(screen.getByText('Awaiting')).toBeTruthy()
+    expect(screen.getByText('dave')).toBeTruthy()
+  })
+
+  it('does not show reviewer bar when no approvals and no requested reviewers', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={basePr}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryByText('Approved by')).toBeNull()
+    expect(screen.queryByText('Review requested from')).toBeNull()
+  })
+
+  it('shows "Your review requested" badge when current user is a requested reviewer', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set(),
+      issueComments: [],
+      currentUserLogin: 'alice',
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, requestedReviewers: ['alice', 'bob'] }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Your review requested')).toBeTruthy()
+  })
+
+  it('shows "Your review requested" badge when current user is an assignee', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set(),
+      issueComments: [],
+      currentUserLogin: 'alice',
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, assigneeLogins: ['alice'] }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Your review requested')).toBeTruthy()
+  })
+
+  it('does not show "Your review requested" badge when current user is not a reviewer or assignee', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set(),
+      issueComments: [],
+      currentUserLogin: 'alice',
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, requestedReviewers: ['bob'] }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryByText('Your review requested')).toBeNull()
   })
 })

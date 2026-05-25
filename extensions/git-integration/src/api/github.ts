@@ -4,6 +4,8 @@
 const bridge = () => window.electronAPI.extensionBridge
 
 export const githubAPI = {
+  currentUser: (repoRoot: string) => bridge().invoke('github:current-user', { repoRoot }),
+
   listOpenPrs: (
     repoRoot: string,
     options?: { cursor?: string; search?: string; includeClosedPrs?: boolean }
@@ -14,6 +16,9 @@ export const githubAPI = {
 
   prMarkReady: (repoRoot: string, prNumber: number) =>
     bridge().invoke('github:pr-mark-ready', { repoRoot, prNumber }),
+
+  prUpdateBranch: (repoRoot: string, prNumber: number) =>
+    bridge().invoke('github:pr-update-branch', { repoRoot, prNumber }),
 
   prFileDiff: (repoRoot: string, prNumber: number, path: string) =>
     bridge().invoke('github:pr-file-diff', { repoRoot, prNumber, path }),

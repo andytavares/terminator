@@ -25,6 +25,7 @@ const mockPrIssueCommentsAPI = vi.fn()
 
 vi.mock('../../src/api/github', () => ({
   githubAPI: {
+    currentUser: vi.fn().mockResolvedValue({ login: 'testuser' }),
     listOpenPrs: (...args: unknown[]) => mockListOpenPrsAPI(...args),
     prReviewDetail: (...args: unknown[]) => mockPrReviewDetailAPI(...args),
     fileMetrics: (...args: unknown[]) => mockFileMetricsAPI(...args),

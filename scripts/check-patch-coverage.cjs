@@ -61,17 +61,56 @@ function getStagedSourceFiles() {
 }
 
 function runCoverage() {
+  const os = require('os')
+  const tmpLog = path.join(os.tmpdir(), `vitest-patch-coverage-${process.pid}.log`)
   console.log('Running coverage suite for patch coverage check...')
+
+  // Use tee-style: inherit stdout/stderr for proper v8 coverage temp-file handling,
+  // but also capture output to a log file so we can filter it afterward.
   const result = spawnSync(
-    'npx',
-    ['vitest', 'run', '--coverage', '--coverage.reporter=json', '--coverage.reporter=text'],
+    'sh',
+    [
+      '-c',
+      `npx vitest run --coverage --coverage.reporter=json --coverage.reporter=text 2>&1 | tee ${tmpLog}`,
+    ],
     {
       cwd: path.join(__dirname, '..'),
-      stdio: 'inherit',
+      stdio: 'pipe',
       encoding: 'utf8',
     }
   )
+
+  const combined = fs.existsSync(tmpLog)
+    ? fs.readFileSync(tmpLog, 'utf8')
+    : (result.stdout || '') + (result.stderr || '')
+  try {
+    fs.unlinkSync(tmpLog)
+  } catch {
+    /* ignore */
+  }
+
+  // Always print the coverage table
+  const coverageIdx = combined.indexOf('% Coverage report')
+  if (coverageIdx !== -1) {
+    process.stdout.write('\n' + combined.slice(coverageIdx))
+  }
+
   if (result.status !== 0) {
+    // Extract and show only the failing test sections
+    const lines = combined.split('\n')
+    const failLines = []
+    let capture = false
+    for (const line of lines) {
+      // Start capturing on suite FAIL header or the ⎯ divider blocks
+      if (/^\s+FAIL\s/.test(line) || /^⎯+/.test(line)) capture = true
+      // Stop capturing when we hit the coverage table or summary footer
+      if (line.includes('% Coverage report') || /^\s+Test Files\s/.test(line)) capture = false
+      if (capture) failLines.push(line)
+    }
+    if (failLines.length > 0) {
+      console.error('\n--- Failing tests ---')
+      console.error(failLines.join('\n'))
+    }
     console.error('\n✗ Tests failed — fix failing tests before committing.\n')
     process.exit(1)
   }
