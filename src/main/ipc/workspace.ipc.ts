@@ -11,7 +11,10 @@ import {
   renameProject,
   reorderProjects,
   deleteProject,
+  getProjectById,
 } from '../storage/workspace-store.js'
+import { removeWorktree } from '../git/git-service.js'
+import { emitWorkspaceDelete, emitProjectDelete } from '../extensions/workspace-events.js'
 
 export function registerWorkspaceHandlers(): void {
   ipcMain.handle('workspace:list', () => {
@@ -27,7 +30,9 @@ export function registerWorkspaceHandlers(): void {
   })
 
   ipcMain.handle('workspace:delete', (_event, { id }) => {
-    return deleteWorkspace(id)
+    const result = deleteWorkspace(id)
+    emitWorkspaceDelete(id)
+    return result
   })
 
   ipcMain.handle('workspace:reorder', (_event, payload) => {
@@ -54,7 +59,20 @@ export function registerWorkspaceHandlers(): void {
     return reorderProjects(payload)
   })
 
-  ipcMain.handle('project:delete', (_event, { id }) => {
-    return deleteProject(id)
+  ipcMain.handle('project:delete', async (_event, { id }) => {
+    const project = getProjectById(id)
+    if (project?.isWorktree && project.worktreePath) {
+      const workspace = listWorkspaces().find((w) => w.id === project.workspaceId)
+      if (workspace?.folderPath) {
+        try {
+          await removeWorktree(workspace.folderPath, project.worktreePath)
+        } catch {
+          // proceed with deletion even if worktree removal fails
+        }
+      }
+    }
+    const result = deleteProject(id)
+    emitProjectDelete(id)
+    return result
   })
 }

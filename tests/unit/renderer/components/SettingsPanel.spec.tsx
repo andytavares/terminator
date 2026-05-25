@@ -234,4 +234,339 @@ describe('ExtensionsSection', () => {
       ).toHaveBeenCalledWith('com.test', false)
     )
   })
+
+  it('reloads extension and shows toast', async () => {
+    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    ;(
+      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
+    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    ;(
+      window.electronAPI as unknown as { extension: { reload: ReturnType<typeof vi.fn> } }
+    ).extension.reload.mockResolvedValue({ extension: { ...ext, version: '1.0.1' } })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await waitFor(() => screen.getByText('Reload'))
+    fireEvent.click(screen.getByText('Reload'))
+    await waitFor(() =>
+      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }))
+    )
+  })
+
+  it('shows toast when reload fails', async () => {
+    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    ;(
+      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
+    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    ;(
+      window.electronAPI as unknown as { extension: { reload: ReturnType<typeof vi.fn> } }
+    ).extension.reload.mockResolvedValue({ error: 'RELOAD_FAILED' })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await waitFor(() => screen.getByText('Reload'))
+    fireEvent.click(screen.getByText('Reload'))
+    await waitFor(() =>
+      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
+    )
+  })
+
+  it('uninstalls extension when confirm is accepted', async () => {
+    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    ;(
+      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
+    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true))
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await waitFor(() => screen.getByText('Uninstall'))
+    fireEvent.click(screen.getByText('Uninstall'))
+    await waitFor(() =>
+      expect(
+        (window.electronAPI as unknown as { extension: { uninstall: ReturnType<typeof vi.fn> } })
+          .extension.uninstall
+      ).toHaveBeenCalledWith('com.test')
+    )
+    vi.unstubAllGlobals()
+  })
+
+  it('does not uninstall when confirm is declined', async () => {
+    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    ;(
+      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
+    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(false))
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await waitFor(() => screen.getByText('Uninstall'))
+    fireEvent.click(screen.getByText('Uninstall'))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(
+      (window.electronAPI as unknown as { extension: { uninstall: ReturnType<typeof vi.fn> } })
+        .extension.uninstall
+    ).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
+  it('upgrades extension via Browse + install', async () => {
+    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    const upgraded = { ...ext, version: '2.0.0' }
+    ;(
+      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
+    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    ;(
+      window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } }
+    ).dialog.openDirectory.mockResolvedValue({ filePath: '/path/to/upgrade' })
+    ;(
+      window.electronAPI as unknown as { extension: { uninstall: ReturnType<typeof vi.fn> } }
+    ).extension.uninstall.mockResolvedValue({ ok: true })
+    ;(
+      window.electronAPI as unknown as { extension: { install: ReturnType<typeof vi.fn> } }
+    ).extension.install.mockResolvedValue({ extension: upgraded })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await waitFor(() => screen.getByText('Upgrade'))
+    fireEvent.click(screen.getByText('Upgrade'))
+    await waitFor(() =>
+      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }))
+    )
+  })
+
+  it('shows error toast when upgrade install step fails', async () => {
+    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    ;(
+      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
+    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    ;(
+      window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } }
+    ).dialog.openDirectory.mockResolvedValue({ filePath: '/path/to/upgrade' })
+    ;(
+      window.electronAPI as unknown as { extension: { uninstall: ReturnType<typeof vi.fn> } }
+    ).extension.uninstall.mockResolvedValue({ ok: true })
+    ;(
+      window.electronAPI as unknown as { extension: { install: ReturnType<typeof vi.fn> } }
+    ).extension.install.mockResolvedValue({ error: 'INVALID_MANIFEST' })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await waitFor(() => screen.getByText('Upgrade'))
+    fireEvent.click(screen.getByText('Upgrade'))
+    await waitFor(() =>
+      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
+    )
+  })
+
+  it('shows error toast when upgrade uninstall step fails', async () => {
+    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    ;(
+      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
+    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    ;(
+      window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } }
+    ).dialog.openDirectory.mockResolvedValue({ filePath: '/path/to/upgrade' })
+    ;(
+      window.electronAPI as unknown as { extension: { uninstall: ReturnType<typeof vi.fn> } }
+    ).extension.uninstall.mockResolvedValue({ error: 'UNINSTALL_FAILED' })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await waitFor(() => screen.getByText('Upgrade'))
+    fireEvent.click(screen.getByText('Upgrade'))
+    await waitFor(() =>
+      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
+    )
+  })
+
+  it('skips upgrade when directory dialog is cancelled', async () => {
+    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    ;(
+      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
+    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    ;(
+      window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } }
+    ).dialog.openDirectory.mockResolvedValue({ cancelled: true })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await waitFor(() => screen.getByText('Upgrade'))
+    fireEvent.click(screen.getByText('Upgrade'))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(
+      (window.electronAPI as unknown as { extension: { uninstall: ReturnType<typeof vi.fn> } })
+        .extension.uninstall
+    ).not.toHaveBeenCalled()
+  })
+
+  it('renders ExtensionSettingRow for extension with schema', async () => {
+    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    const extAPI = window.electronAPI as unknown as {
+      extension: {
+        list: ReturnType<typeof vi.fn>
+        getSettingsSchemas: ReturnType<typeof vi.fn>
+      }
+    }
+    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
+    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+      schemas: [
+        {
+          extensionId: 'com.test',
+          label: 'Test Extension',
+          properties: {
+            'com.test.myKey': {
+              type: 'string',
+              label: 'My Setting',
+              description: 'A test setting',
+              default: 'hello',
+            },
+          },
+        },
+      ],
+    })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await waitFor(() => screen.getByTitle('Configure'))
+    fireEvent.click(screen.getByTitle('Configure'))
+    await waitFor(() => expect(screen.getByText('My Setting')).toBeTruthy())
+  })
+
+  it('ExtensionSettingRow calls updateSetting after debounce', async () => {
+    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    const extAPI = window.electronAPI as unknown as {
+      extension: {
+        list: ReturnType<typeof vi.fn>
+        getSettingsSchemas: ReturnType<typeof vi.fn>
+        updateSetting: ReturnType<typeof vi.fn>
+      }
+    }
+    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
+    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+      schemas: [
+        {
+          extensionId: 'com.test',
+          label: 'Test Extension',
+          properties: {
+            'com.test.myKey': {
+              type: 'string',
+              label: 'My Setting',
+              default: 'hello',
+            },
+          },
+        },
+      ],
+    })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await waitFor(() => screen.getByTitle('Configure'))
+    fireEvent.click(screen.getByTitle('Configure'))
+    await waitFor(() => screen.getByDisplayValue('hello'))
+    fireEvent.change(screen.getByDisplayValue('hello'), { target: { value: 'world' } })
+    // Wait for debounce timer (400ms) to fire
+    await waitFor(
+      () => expect(extAPI.extension.updateSetting).toHaveBeenCalledWith('com.test.myKey', 'world'),
+      { timeout: 2000 }
+    )
+  })
+
+  it('ExtensionSettingRow renders boolean select', async () => {
+    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    const extAPI = window.electronAPI as unknown as {
+      extension: {
+        list: ReturnType<typeof vi.fn>
+        getSettingsSchemas: ReturnType<typeof vi.fn>
+      }
+    }
+    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
+    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+      schemas: [
+        {
+          extensionId: 'com.test',
+          label: 'Test Extension',
+          properties: {
+            'com.test.toggle': {
+              type: 'boolean',
+              label: 'Enable Feature',
+              default: true,
+            },
+          },
+        },
+      ],
+    })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await waitFor(() => screen.getByTitle('Configure'))
+    fireEvent.click(screen.getByTitle('Configure'))
+    await waitFor(() => expect(screen.getByText('Enable Feature')).toBeTruthy())
+    // The boolean select shows text 'Enabled'/'Disabled', not values 'true'/'false'
+    expect(screen.getByDisplayValue('Enabled')).toBeTruthy()
+  })
+
+  it('ExtensionSettingRow renders enum select', async () => {
+    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    const extAPI = window.electronAPI as unknown as {
+      extension: {
+        list: ReturnType<typeof vi.fn>
+        getSettingsSchemas: ReturnType<typeof vi.fn>
+      }
+    }
+    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
+    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+      schemas: [
+        {
+          extensionId: 'com.test',
+          label: 'Test Extension',
+          properties: {
+            'com.test.mode': {
+              type: 'enum',
+              label: 'Mode',
+              options: ['fast', 'slow', 'auto'],
+              default: 'auto',
+            },
+          },
+        },
+      ],
+    })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await waitFor(() => screen.getByTitle('Configure'))
+    fireEvent.click(screen.getByTitle('Configure'))
+    await waitFor(() => expect(screen.getByText('Mode')).toBeTruthy())
+    expect(screen.getByText('fast')).toBeTruthy()
+    expect(screen.getByText('slow')).toBeTruthy()
+    expect(screen.getByText('auto')).toBeTruthy()
+  })
+
+  it('toggleSettingsExpand collapses panel when clicked again', async () => {
+    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    const extAPI = window.electronAPI as unknown as {
+      extension: {
+        list: ReturnType<typeof vi.fn>
+        getSettingsSchemas: ReturnType<typeof vi.fn>
+      }
+    }
+    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
+    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+      schemas: [
+        {
+          extensionId: 'com.test',
+          label: 'Test Extension',
+          properties: {
+            'com.test.key': { type: 'string', label: 'Key', default: 'val' },
+          },
+        },
+      ],
+    })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await waitFor(() => screen.getByTitle('Configure'))
+    const gearBtn = screen.getByTitle('Configure')
+    fireEvent.click(gearBtn)
+    await waitFor(() => expect(screen.getByText('Key')).toBeTruthy())
+    fireEvent.click(gearBtn)
+    await waitFor(() => expect(screen.queryByText('Key')).toBeNull())
+  })
+
+  it('switches to global section when Appearance & Terminal is clicked', () => {
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      activeWorkspaceId: 'ws-1',
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    fireEvent.click(screen.getByText('Appearance & Terminal'))
+    expect(screen.getByTestId('global-settings')).toBeTruthy()
+  })
 })

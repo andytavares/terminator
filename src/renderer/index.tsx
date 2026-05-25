@@ -1,7 +1,7 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
-import { PrReviewWindow } from './PrReviewWindow'
+import { ExtensionWindowView } from './ExtensionWindowView'
 import '@fontsource/ibm-plex-sans/400.css'
 import '@fontsource/ibm-plex-sans/500.css'
 import '@fontsource/ibm-plex-sans/600.css'
@@ -21,12 +21,12 @@ function Root(): JSX.Element {
   }, [theme])
 
   React.useEffect(() => {
-    if (view !== 'pr-review') {
+    if (!view || view === 'main') {
       window.electronAPI.terminal.cleanupOrphans().catch(() => {})
     }
   }, [])
 
-  if (view === 'pr-review') return <PrReviewWindow />
+  if (view && view !== 'main') return <ExtensionWindowView view={view} />
   return <App />
 }
 

@@ -72,6 +72,8 @@ export interface HistoryEntry {
     | 'revoked'
     | 'modified'
     | 'stale'
+    | 'skipped'
+    | 'unskipped'
     | 'file_approved'
     | 'file_skipped'
   phase: PhaseId

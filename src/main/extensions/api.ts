@@ -21,7 +21,7 @@ export interface SettingDefinition {
 
 // v1.1.0 types
 
-export type PanelSlot = 'right-sidebar'
+export type PanelSlot = 'right-sidebar' | 'global-tab'
 
 export interface PanelContribution {
   id: string
@@ -82,6 +82,28 @@ export interface CommandContribution {
   category?: string
 }
 
+// v1.2.0 types
+
+export interface GlobalTabContribution {
+  id: string
+  label: string
+  icon?: string
+  component: unknown
+  permanent?: boolean
+}
+
+export interface WorkspaceSnapshot {
+  readonly id: string
+  readonly name: string
+  readonly folderPath: string
+}
+
+export interface ProjectSnapshot {
+  readonly id: string
+  readonly workspaceId: string
+  readonly name: string
+}
+
 export interface ExtensionAPI {
   readonly app: { readonly version: string }
   log: {
@@ -97,6 +119,16 @@ export interface ExtensionAPI {
   sidebar: {
     registerItem(item: SidebarContribution): Disposable
     registerPanel(slot: PanelSlot, panel: PanelContribution): Disposable
+    registerGlobalTab(tab: GlobalTabContribution): Disposable
+  }
+  globalShortcut: {
+    register(accelerator: string, handler: () => void): Disposable
+  }
+  workspace: {
+    list(): WorkspaceSnapshot[]
+    listProjects(workspaceId: string): ProjectSnapshot[]
+    onDelete(handler: (workspaceId: string) => void): Disposable
+    onProjectDelete(handler: (projectId: string) => void): Disposable
   }
   topBar: {
     registerMenuItem(item: TopBarMenuContribution): Disposable
@@ -137,13 +169,29 @@ export interface ExtensionAPI {
     onSessionCreate(handler: (session: Readonly<SessionSnapshot>) => void): Disposable
     onSessionClose(handler: (sessionId: string) => void): Disposable
   }
+  window: {
+    openAuxiliary(view: string, params?: Record<string, string>): void
+  }
 }
 
-import { BrowserWindow, Menu, MenuItem, ipcMain } from 'electron'
+import {
+  BrowserWindow,
+  Menu,
+  MenuItem,
+  ipcMain,
+  globalShortcut as electronGlobalShortcut,
+} from 'electron'
+import { join } from 'path'
+
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
 import { fsWatcherService } from '../fs/fs-watcher.js'
 import { getExtensionSetting } from '../storage/extension-settings-store.js'
 import { makeLogger } from '../logger.js'
+import {
+  listWorkspaces,
+  listProjects as listProjectsFromStore,
+} from '../storage/workspace-store.js'
+import { onWorkspaceDelete, onProjectDelete } from './workspace-events.js'
 
 const RESERVED_SHORTCUTS = new Set([
   'CmdOrCtrl+1',
@@ -170,6 +218,7 @@ interface Registry {
   workspaceSettingsValues: Map<string, unknown>
   sidebarItems: Map<string, SidebarContribution>
   sidebarPanels: Map<string, { slot: PanelSlot; panel: PanelContribution }>
+  globalTabs: Map<string, GlobalTabContribution>
   topBarItems: Map<string, TopBarMenuContribution>
   nativeMenuItems: Map<string, NativeMenuItemContribution>
   contextMenuItems: Map<string, { target: ContextMenuTarget; item: MenuItemContribution }>
@@ -186,6 +235,7 @@ export const globalRegistry: Registry = {
   workspaceSettingsValues: new Map(),
   sidebarItems: new Map(),
   sidebarPanels: new Map(),
+  globalTabs: new Map(),
   topBarItems: new Map(),
   nativeMenuItems: new Map(),
   contextMenuItems: new Map(),
@@ -228,6 +278,9 @@ function rebuildViewMenu(): void {
     // Menu may not exist in test environments; ignore
   }
 }
+
+// Map from view name to open auxiliary BrowserWindow (shared across all extensions)
+const auxiliaryWindows = new Map<string, BrowserWindow>()
 
 export function createExtensionAPI(
   extensionId: string,
@@ -280,6 +333,47 @@ export function createExtensionAPI(
         }
         globalRegistry.sidebarPanels.set(slotKey, { slot, panel })
         return disposable(() => globalRegistry.sidebarPanels.delete(slotKey))
+      },
+      registerGlobalTab(tab: GlobalTabContribution): Disposable {
+        const key = `${extensionId}.globaltab.${tab.id}`
+        if (globalRegistry.globalTabs.has(key)) {
+          throw new Error(
+            `GLOBAL_TAB_ALREADY_REGISTERED: tab "${tab.id}" is already registered for extension "${extensionId}"`
+          )
+        }
+        globalRegistry.globalTabs.set(key, tab)
+        return disposable(() => globalRegistry.globalTabs.delete(key))
+      },
+    },
+    globalShortcut: {
+      register(accelerator: string, handler: () => void): Disposable {
+        const registered = electronGlobalShortcut.register(accelerator, handler)
+        if (!registered) {
+          throw new Error(
+            `ACCELERATOR_TAKEN: "${accelerator}" could not be registered (already in use by OS or another app)`
+          )
+        }
+        return disposable(() => electronGlobalShortcut.unregister(accelerator))
+      },
+    },
+    workspace: {
+      list(): WorkspaceSnapshot[] {
+        return listWorkspaces().map(({ id, name, folderPath }) => ({ id, name, folderPath }))
+      },
+      listProjects(workspaceId: string): ProjectSnapshot[] {
+        return listProjectsFromStore(workspaceId).map(({ id, workspaceId: wsId, name }) => ({
+          id,
+          workspaceId: wsId,
+          name,
+        }))
+      },
+      onDelete(handler: (workspaceId: string) => void): Disposable {
+        const unsub = onWorkspaceDelete(handler)
+        return disposable(unsub)
+      },
+      onProjectDelete(handler: (projectId: string) => void): Disposable {
+        const unsub = onProjectDelete(handler)
+        return disposable(unsub)
       },
     },
     topBar: {
@@ -374,6 +468,35 @@ export function createExtensionAPI(
       onSessionClose(handler: (sessionId: string) => void): Disposable {
         globalRegistry.sessionCloseHandlers.add(handler)
         return disposable(() => globalRegistry.sessionCloseHandlers.delete(handler))
+      },
+    },
+    window: {
+      openAuxiliary(view: string, params?: Record<string, string>): void {
+        const existing = auxiliaryWindows.get(view)
+        if (existing && !existing.isDestroyed()) {
+          existing.focus()
+          return
+        }
+        const win = new BrowserWindow({
+          width: 1400,
+          height: 900,
+          webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+            preload: join(__dirname, '../preload/index.js'),
+          },
+        })
+        auxiliaryWindows.set(view, win)
+        win.on('closed', () => {
+          auxiliaryWindows.delete(view)
+        })
+        const query: Record<string, string> = { view, ...params }
+        const devUrl = process.env['ELECTRON_RENDERER_URL']
+        if (devUrl) {
+          win.loadURL(`${devUrl}?${new URLSearchParams(query).toString()}`)
+        } else {
+          win.loadFile(join(__dirname, '../renderer/index.html'), { query })
+        }
       },
     },
   }

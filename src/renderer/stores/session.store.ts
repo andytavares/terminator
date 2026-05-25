@@ -1,11 +1,17 @@
 import { create } from 'zustand'
-import type { TerminalSession } from '../../shared/types/index'
+import type { TerminalSession, PaneNode, PaneSplitDirection } from '../../shared/types/index'
+import { splitLeaf, removeLeaf, leafIds, updateSplitRatio } from '../utils/pane-tree'
+import { useWorkspaceStore } from './workspace.store'
 
 interface SessionState {
   sessions: Map<string, TerminalSession>
   terminalInstances: Map<string, unknown>
   activeSessionIdByProject: Map<string, string>
   bellCounts: Map<string, number>
+  busySessions: Set<string>
+  terminalCountByProject: Map<string, number>
+  paneLayoutByProject: Map<string, PaneNode>
+  focusedSessionByProject: Map<string, string>
 
   createSession: (
     projectId: string,
@@ -25,6 +31,24 @@ interface SessionState {
   clearBellCount: (sessionId: string) => void
   getBellCountForSession: (sessionId: string) => number
   getBellCountForProject: (projectId: string) => number
+  setSessionBusy: (sessionId: string) => void
+  setSessionIdle: (sessionId: string) => void
+  isSessionBusy: (sessionId: string) => boolean
+  isProjectBusy: (projectId: string) => boolean
+  renameSession: (sessionId: string, title: string) => void
+
+  getPaneLayout: (projectId: string) => PaneNode | null
+  setSplitLayout: (projectId: string, layout: PaneNode | null) => void
+  activateSplit: (
+    projectId: string,
+    focusedId: string,
+    newId: string,
+    direction: PaneSplitDirection
+  ) => void
+  closeSplitLeaf: (projectId: string, sessionId: string) => void
+  setSplitRatio: (projectId: string, splitId: string, ratio: number) => void
+  getFocusedSession: (projectId: string) => string | null
+  setFocusedSession: (projectId: string, sessionId: string) => void
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -32,12 +56,28 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   terminalInstances: new Map(),
   activeSessionIdByProject: new Map(),
   bellCounts: new Map(),
+  busySessions: new Set(),
+  terminalCountByProject: new Map(),
+  paneLayoutByProject: new Map(),
+  focusedSessionByProject: new Map(),
 
   createSession: async (projectId, type, title, cwd, scrollbackLimit) => {
+    let resolvedTitle = title
+    if (!resolvedTitle) {
+      const counts = get().terminalCountByProject
+      const next = (counts.get(projectId) ?? 0) + 1
+      set((s) => {
+        const terminalCountByProject = new Map(s.terminalCountByProject)
+        terminalCountByProject.set(projectId, next)
+        return { terminalCountByProject }
+      })
+      resolvedTitle = `Terminal ${next}`
+    }
+
     const result = await window.electronAPI.terminal.create({
       projectId,
       type,
-      tabTitle: title,
+      tabTitle: resolvedTitle,
       scrollbackLimit,
       cwd,
     })
@@ -47,7 +87,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const session: TerminalSession = {
       id: sessionId,
       projectId,
-      tabTitle: title,
+      tabTitle: resolvedTitle,
       status: 'active',
       type,
       scrollbackLimit,
@@ -64,6 +104,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   closeSession: async (sessionId) => {
+    // Capture projectId before removing the session from the store
+    const projectId = get().sessions.get(sessionId)?.projectId ?? null
     // Dispose xterm instance before removing from store
     const instance = get().terminalInstances.get(sessionId) as { dispose?: () => void } | undefined
     instance?.dispose?.()
@@ -86,8 +128,41 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           else activeMap.delete(session.projectId)
         }
       }
-      return { sessions, terminalInstances, activeSessionIdByProject: activeMap, bellCounts }
+      const busySessions = new Set(s.busySessions)
+      busySessions.delete(sessionId)
+
+      // Remove from any split layout
+      const paneLayoutByProject = new Map(s.paneLayoutByProject)
+      for (const [pid, layout] of paneLayoutByProject) {
+        if (!leafIds(layout).includes(sessionId)) continue
+        const newLayout = removeLeaf(layout, sessionId)
+        if (!newLayout || leafIds(newLayout).length <= 1) paneLayoutByProject.delete(pid)
+        else paneLayoutByProject.set(pid, newLayout)
+      }
+      // Remove stale focused session entry
+      const focusedSessionByProject = new Map(s.focusedSessionByProject)
+      if (session && focusedSessionByProject.get(session.projectId) === sessionId) {
+        focusedSessionByProject.delete(session.projectId)
+      }
+
+      return {
+        sessions,
+        terminalInstances,
+        activeSessionIdByProject: activeMap,
+        bellCounts,
+        busySessions,
+        paneLayoutByProject,
+        focusedSessionByProject,
+      }
     })
+
+    // If this was the last session in the project, delete the project automatically.
+    if (projectId && get().getSessionsForProject(projectId).length === 0) {
+      useWorkspaceStore
+        .getState()
+        .deleteProject(projectId)
+        .catch(() => {})
+    }
   },
 
   getSessionsForProject: (projectId) => {
@@ -149,6 +224,31 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     return total
   },
 
+  setSessionBusy: (sessionId) =>
+    set((s) => {
+      if (s.busySessions.has(sessionId)) return s
+      const busySessions = new Set(s.busySessions)
+      busySessions.add(sessionId)
+      return { busySessions }
+    }),
+
+  setSessionIdle: (sessionId) =>
+    set((s) => {
+      if (!s.busySessions.has(sessionId)) return s
+      const busySessions = new Set(s.busySessions)
+      busySessions.delete(sessionId)
+      return { busySessions }
+    }),
+
+  isSessionBusy: (sessionId) => get().busySessions.has(sessionId),
+
+  isProjectBusy: (projectId) => {
+    const { sessions, busySessions } = get()
+    for (const [id, session] of sessions)
+      if (session.projectId === projectId && busySessions.has(id)) return true
+    return false
+  },
+
   handleProcessExit: (sessionId, _exitCode) => {
     set((s) => {
       const sessions = new Map(s.sessions)
@@ -162,6 +262,88 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         })
       }
       return { sessions }
+    })
+  },
+
+  renameSession: (sessionId, title) => {
+    set((s) => {
+      const sessions = new Map(s.sessions)
+      const session = sessions.get(sessionId)
+      if (!session) return s
+      sessions.set(sessionId, { ...session, tabTitle: title })
+      return { sessions }
+    })
+  },
+
+  getPaneLayout: (projectId) => get().paneLayoutByProject.get(projectId) ?? null,
+
+  setSplitLayout: (projectId, layout) => {
+    set((s) => {
+      const paneLayoutByProject = new Map(s.paneLayoutByProject)
+      if (layout === null) paneLayoutByProject.delete(projectId)
+      else paneLayoutByProject.set(projectId, layout)
+      return { paneLayoutByProject }
+    })
+  },
+
+  activateSplit: (projectId, focusedId, newId, direction) => {
+    set((s) => {
+      const existing = s.paneLayoutByProject.get(projectId)
+      const root: PaneNode = existing ?? { type: 'leaf', sessionId: focusedId }
+      const newLayout = splitLeaf(root, focusedId, newId, direction)
+      const paneLayoutByProject = new Map(s.paneLayoutByProject)
+      paneLayoutByProject.set(projectId, newLayout)
+      const focusedSessionByProject = new Map(s.focusedSessionByProject)
+      focusedSessionByProject.set(projectId, newId)
+      return { paneLayoutByProject, focusedSessionByProject }
+    })
+  },
+
+  closeSplitLeaf: (projectId, sessionId) => {
+    set((s) => {
+      const layout = s.paneLayoutByProject.get(projectId)
+      if (!layout) return s
+      const newLayout = removeLeaf(layout, sessionId)
+      const paneLayoutByProject = new Map(s.paneLayoutByProject)
+      if (!newLayout || leafIds(newLayout).length <= 1) {
+        paneLayoutByProject.delete(projectId)
+        // Activate the surviving leaf so single-pane mode shows it
+        const survivorId = newLayout?.type === 'leaf' ? newLayout.sessionId : null
+        const activeMap = new Map(s.activeSessionIdByProject)
+        if (survivorId) activeMap.set(projectId, survivorId)
+        const focusedSessionByProject = new Map(s.focusedSessionByProject)
+        focusedSessionByProject.delete(projectId)
+        return { paneLayoutByProject, activeSessionIdByProject: activeMap, focusedSessionByProject }
+      }
+      paneLayoutByProject.set(projectId, newLayout)
+      const focusedSessionByProject = new Map(s.focusedSessionByProject)
+      // Move focus to the first remaining leaf if we closed the focused one
+      if (focusedSessionByProject.get(projectId) === sessionId) {
+        const remaining = leafIds(newLayout).filter((id) => id !== sessionId)
+        if (remaining.length > 0) focusedSessionByProject.set(projectId, remaining[0])
+        else focusedSessionByProject.delete(projectId)
+      }
+      return { paneLayoutByProject, focusedSessionByProject }
+    })
+  },
+
+  setSplitRatio: (projectId, splitId, ratio) => {
+    set((s) => {
+      const layout = s.paneLayoutByProject.get(projectId)
+      if (!layout) return s
+      const paneLayoutByProject = new Map(s.paneLayoutByProject)
+      paneLayoutByProject.set(projectId, updateSplitRatio(layout, splitId, ratio))
+      return { paneLayoutByProject }
+    })
+  },
+
+  getFocusedSession: (projectId) => get().focusedSessionByProject.get(projectId) ?? null,
+
+  setFocusedSession: (projectId, sessionId) => {
+    set((s) => {
+      const focusedSessionByProject = new Map(s.focusedSessionByProject)
+      focusedSessionByProject.set(projectId, sessionId)
+      return { focusedSessionByProject }
     })
   },
 }))

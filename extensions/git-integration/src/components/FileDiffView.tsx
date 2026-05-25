@@ -115,11 +115,11 @@ function UnifiedTable({
 
 // ── Split view ────────────────────────────────────────────────────────────────
 
-type SplitRow =
+export type SplitRow =
   | { kind: 'context'; line: DiffLine }
   | { kind: 'change'; oldLine: DiffLine | null; newLine: DiffLine | null }
 
-function buildSplitRows(lines: DiffLine[]): SplitRow[] {
+export function buildSplitRows(lines: DiffLine[]): SplitRow[] {
   const rows: SplitRow[] = []
   let i = 0
   while (i < lines.length) {

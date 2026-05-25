@@ -190,4 +190,27 @@ describe('useSettingsStore', () => {
       expect(resolved.appearance.theme).toBe('dark')
     })
   })
+
+  describe('updateShowMetricsBar', () => {
+    it('calls updateGlobal with showMetricsBar true and updates store', async () => {
+      const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: false, showMetricsBar: true } }
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+      await useSettingsStore.getState().updateShowMetricsBar(true)
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        ui: { showMetricsBar: true },
+      })
+      expect(useSettingsStore.getState().globalSettings?.ui?.showMetricsBar).toBe(true)
+    })
+
+    it('calls updateGlobal with showMetricsBar false', async () => {
+      const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: false, showMetricsBar: false } }
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+      await useSettingsStore.getState().updateShowMetricsBar(false)
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        ui: { showMetricsBar: false },
+      })
+    })
+  })
 })

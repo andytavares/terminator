@@ -1,0 +1,111 @@
+.session-tile {
+  background: var(--bg-surface);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--tile-ws-color, var(--accent));
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease,
+    border-color 0.14s ease;
+  outline: none;
+  user-select: none;
+}
+
+.session-tile:hover,
+.session-tile:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  border-color: rgba(255, 255, 255, 0.15);
+  border-left-color: var(--tile-ws-color, var(--accent));
+}
+
+.session-tile:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.session-tile__thumb {
+  height: 140px;
+  background: #1e1e1e;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.session-tile__preview {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* xterm injects its own elements; clip them cleanly */
+.session-tile__preview .xterm {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+}
+
+.session-tile__preview .xterm-viewport {
+  overflow: hidden !important;
+}
+
+.session-tile__busy {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+}
+
+.session-tile__footer {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-tile__header {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+}
+
+.session-tile__workspace {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--tile-ws-color, var(--accent));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-tile__project {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-tile__tab {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-tile__metrics {
+  display: flex;
+  gap: 10px;
+  font-size: 10px;
+  color: var(--text-secondary, var(--text-muted));
+  font-family: var(--font-mono);
+}

@@ -2,6 +2,7 @@
 // Discovered automatically via Vite glob import in src/renderer/extensions/loader.ts.
 // The core app never imports this file directly.
 
+import React from 'react'
 import 'highlight.js/styles/atom-one-dark.css'
 import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
 import { GitSidebarPanel } from './components/GitSidebarPanel'
@@ -27,6 +28,11 @@ registry.registerProjectTab({
   label: 'Code Reviews',
   component: PrReviewTab,
 })
+
+registry.registerWindowView(
+  'pr-review',
+  PrReviewTab as React.ComponentType<{ repoRoot: string | null }>
+)
 
 // Extension owns its own keyboard shortcuts — the core app has no knowledge of these
 registry.registerKeyboardShortcut({

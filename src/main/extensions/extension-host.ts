@@ -180,7 +180,10 @@ export class ExtensionHost {
   async loadAll(): Promise<void> {
     const extensions = store.get('extensions').filter((e) => e.status === 'enabled')
     for (const record of extensions) {
-      await this.activate(record)
+      const result = await this.activate(record)
+      if ('error' in result) {
+        hostLogger.error(`Extension ${record.id} failed to load: ${result.message}`)
+      }
     }
   }
 

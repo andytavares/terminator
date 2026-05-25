@@ -627,3 +627,46 @@ describe('github:session-set', () => {
     expect(storeData['my-key']).toMatchObject({ prNumber: 42 })
   })
 })
+
+// ─── github:save-active-review ────────────────────────────────────────────────
+
+describe('github:save-active-review', () => {
+  it('returns VALIDATION_ERROR for missing repoRoot', () => {
+    const result = getHandler('github:save-active-review')({ pr: QUEUE_PR }) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('persists the PR snapshot and returns ok', () => {
+    const result = getHandler('github:save-active-review')({
+      repoRoot: '/repo',
+      pr: QUEUE_PR,
+    }) as { ok: boolean }
+    expect(result.ok).toBe(true)
+  })
+})
+
+// ─── github:active-reviews-for-repo ──────────────────────────────────────────
+
+describe('github:active-reviews-for-repo', () => {
+  it('returns VALIDATION_ERROR for missing repoRoot', () => {
+    const result = getHandler('github:active-reviews-for-repo')({}) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns empty array when no active reviews saved', () => {
+    const result = getHandler('github:active-reviews-for-repo')({
+      repoRoot: '/repo',
+    }) as { prs: unknown[] }
+    expect(result.prs).toEqual([])
+  })
+
+  it('returns saved PRs for repo and excludes other repos', () => {
+    getHandler('github:save-active-review')({ repoRoot: '/repo', pr: QUEUE_PR })
+    getHandler('github:save-active-review')({ repoRoot: '/other', pr: { ...QUEUE_PR, number: 99 } })
+    const result = getHandler('github:active-reviews-for-repo')({
+      repoRoot: '/repo',
+    }) as { prs: unknown[] }
+    expect(result.prs).toHaveLength(1)
+    expect((result.prs[0] as { number: number }).number).toBe(42)
+  })
+})

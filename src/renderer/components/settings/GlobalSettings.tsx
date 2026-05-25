@@ -3,8 +3,13 @@ import { useSettingsStore } from '../../stores/settings.store'
 import './SettingsPanel.css'
 
 export function GlobalSettings(): JSX.Element {
-  const { globalSettings, updateGlobalTheme, updateScrollbackLimit, updateWorktreeBaseDir } =
-    useSettingsStore()
+  const {
+    globalSettings,
+    updateGlobalTheme,
+    updateScrollbackLimit,
+    updateWorktreeBaseDir,
+    updateShowMetricsBar,
+  } = useSettingsStore()
 
   if (!globalSettings) return <div>Loading...</div>
 
@@ -61,6 +66,24 @@ export function GlobalSettings(): JSX.Element {
             }
           }}
         />
+      </div>
+
+      <h3 className="settings-section__title" style={{ marginTop: 20 }}>
+        Interface
+      </h3>
+
+      <div className="settings-section__field">
+        <label className="settings-section__label settings-section__label--inline">
+          <input
+            type="checkbox"
+            checked={globalSettings.ui?.showMetricsBar ?? false}
+            onChange={(e) => void updateShowMetricsBar(e.target.checked)}
+          />
+          Show CPU / Memory / Network bar
+        </label>
+        <span className="settings-section__hint">
+          Displays a system metrics bar at the bottom of every screen.
+        </span>
       </div>
 
       <h3 className="settings-section__title" style={{ marginTop: 20 }}>

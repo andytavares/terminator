@@ -142,6 +142,58 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().activeProjectTabId).toBeNull()
     })
   })
+
+  describe('registerWindowView', () => {
+    it('adds view to windowViews map', () => {
+      useExtensionRegistry.getState().registerWindowView('pr-review', NullComponent)
+      expect(useExtensionRegistry.getState().windowViews.has('pr-review')).toBe(true)
+    })
+
+    it('overwrites existing view with same id', () => {
+      const comp2 = null as unknown as ComponentType<{ repoRoot: string | null }>
+      useExtensionRegistry.getState().registerWindowView('pr-review', NullComponent)
+      useExtensionRegistry.getState().registerWindowView('pr-review', comp2)
+      expect(useExtensionRegistry.getState().windowViews.get('pr-review')).toBe(comp2)
+    })
+  })
+
+  describe('registerGlobalTab', () => {
+    it('adds tab to globalTabs map', () => {
+      const tab = { id: 'task-vault', label: 'Tasks', component: NullComponent }
+      useExtensionRegistry.getState().registerGlobalTab(tab)
+      expect(useExtensionRegistry.getState().globalTabs.has('task-vault')).toBe(true)
+    })
+
+    it('returns dispose function that removes the tab', () => {
+      const tab = { id: 'task-vault', label: 'Tasks', component: NullComponent }
+      const dispose = useExtensionRegistry.getState().registerGlobalTab(tab)
+      dispose()
+      expect(useExtensionRegistry.getState().globalTabs.has('task-vault')).toBe(false)
+    })
+
+    it('clears activeGlobalTabId when active tab is disposed', () => {
+      const tab = { id: 'task-vault', label: 'Tasks', component: NullComponent }
+      const dispose = useExtensionRegistry.getState().registerGlobalTab(tab)
+      useExtensionRegistry.setState({ activeGlobalTabId: 'task-vault' })
+      dispose()
+      expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
+    })
+  })
+
+  describe('registerCommand', () => {
+    it('adds command to commands array', () => {
+      const cmd = { id: 'test', label: 'Test', action: () => {} }
+      useExtensionRegistry.getState().registerCommand(cmd)
+      expect(useExtensionRegistry.getState().commands.some((c) => c.id === 'test')).toBe(true)
+    })
+
+    it('returns dispose function that removes the command', () => {
+      const cmd = { id: 'test2', label: 'Test2', action: () => {} }
+      const dispose = useExtensionRegistry.getState().registerCommand(cmd)
+      dispose()
+      expect(useExtensionRegistry.getState().commands.some((c) => c.id === 'test2')).toBe(false)
+    })
+  })
 })
 
 // ─── matchesAccelerator ────────────────────────────────────────────────────────

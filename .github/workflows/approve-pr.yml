@@ -1,0 +1,21 @@
+name: Approve PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to approve
+        required: true
+        type: number
+
+permissions:
+  pull-requests: write
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Approve pull request
+        run: gh pr review ${{ inputs.pr_number }} --approve --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

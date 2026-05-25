@@ -4,6 +4,7 @@ import { useSessionStore } from '../stores/session.store'
 import { useTerminalSession } from './useTerminalSession'
 import { useSettingsStore } from '../stores/settings.store'
 import { useExtensionRegistry, matchesAccelerator } from '../extensions/registry'
+import { useToastStore } from '../stores/toast.store'
 
 interface Options {
   onOpenSettings?: () => void
@@ -23,11 +24,19 @@ export function useKeyboardShortcuts({
     activeProjectId,
     projectsByWorkspaceId,
   } = useWorkspaceStore()
-  const { getActiveSessionForProject, setActiveSessionForProject, getSessionsForProject } =
-    useSessionStore()
-  const { createSession } = useTerminalSession()
+  const {
+    getActiveSessionForProject,
+    setActiveSessionForProject,
+    getSessionsForProject,
+    getPaneLayout,
+    getFocusedSession,
+    closeSplitLeaf,
+    closeSession,
+  } = useSessionStore()
+  const { createSession, splitSession } = useTerminalSession()
   const { resolveSettings } = useSettingsStore()
   const { keyboardShortcuts } = useExtensionRegistry()
+  const { addToast } = useToastStore()
 
   useEffect(() => {
     function cycleWorkspace(delta: number): void {
@@ -147,6 +156,61 @@ export function useKeyboardShortcuts({
         return
       }
 
+      // Cmd+D: split vertically (side by side)
+      if (isMeta && !e.shiftKey && e.key === 'd') {
+        e.preventDefault()
+        if (activeProjectId) {
+          const settings = resolveSettings(activeWorkspaceId)
+          const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
+          const projects = activeWorkspaceId
+            ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? [])
+            : []
+          const activeProject = projects.find((p) => p.id === activeProjectId)
+          const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
+          splitSession(activeProjectId, 'vertical', cwd, settings.terminal.scrollbackLimit).catch(
+            () => addToast({ type: 'error', message: 'Could not create split pane' })
+          )
+        }
+        return
+      }
+
+      // Cmd+Shift+D: split horizontally (top / bottom)
+      if (isMeta && e.shiftKey && e.key === 'd') {
+        e.preventDefault()
+        if (activeProjectId) {
+          const settings = resolveSettings(activeWorkspaceId)
+          const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
+          const projects = activeWorkspaceId
+            ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? [])
+            : []
+          const activeProject = projects.find((p) => p.id === activeProjectId)
+          const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
+          splitSession(activeProjectId, 'horizontal', cwd, settings.terminal.scrollbackLimit).catch(
+            () => addToast({ type: 'error', message: 'Could not create split pane' })
+          )
+        }
+        return
+      }
+
+      // Cmd+W: close focused split pane (or active tab if not in split mode)
+      if (isMeta && e.key === 'w') {
+        e.preventDefault()
+        if (activeProjectId) {
+          const layout = getPaneLayout(activeProjectId)
+          const focusedId = getFocusedSession(activeProjectId)
+          if (layout && focusedId) {
+            closeSplitLeaf(activeProjectId, focusedId)
+            closeSession(focusedId).catch(() =>
+              addToast({ type: 'error', message: 'Could not close terminal' })
+            )
+          } else {
+            const activeId = getActiveSessionForProject(activeProjectId)
+            if (activeId) closeSession(activeId)
+          }
+        }
+        return
+      }
+
       // Cmd+Left: previous tab
       if (isMeta && e.key === 'ArrowLeft') {
         e.preventDefault()
@@ -173,9 +237,15 @@ export function useKeyboardShortcuts({
     resolveSettings,
     projectsByWorkspaceId,
     createSession,
+    splitSession,
     getSessionsForProject,
     getActiveSessionForProject,
     setActiveSessionForProject,
+    getPaneLayout,
+    getFocusedSession,
+    closeSplitLeaf,
+    closeSession,
+    addToast,
     onOpenSettings,
     onToggleLog,
     onOpenCommandPalette,

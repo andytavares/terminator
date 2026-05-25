@@ -11,6 +11,7 @@ interface Props {
   onOpenPr: (pr: ReviewQueuePR) => void
   onRefresh: (options?: { search?: string; includeClosedPrs?: boolean }) => Promise<void>
   onLoadMore: () => Promise<void>
+  onDismissPr: (prNumber: number) => Promise<void>
   includeClosedPrs: boolean
   onToggleClosedPrs: (include: boolean) => Promise<void>
 }
@@ -20,6 +21,7 @@ export function ReviewQueue({
   onOpenPr,
   onRefresh,
   onLoadMore,
+  onDismissPr,
   includeClosedPrs,
   onToggleClosedPrs,
 }: Props) {
@@ -214,7 +216,13 @@ export function ReviewQueue({
           </div>
         ) : (
           <>
-            <PrSection title="In progress" prs={inProgress} accent="blue" onOpen={onOpenPr} />
+            <PrSection
+              title="In progress"
+              prs={inProgress}
+              accent="blue"
+              onOpen={onOpenPr}
+              onDismiss={onDismissPr}
+            />
             {activeFilter === 'in-progress' && inProgress.length === 0 && (
               <div className="pr-queue-empty">
                 No in-progress reviews yet. Open a PR to start reviewing.
@@ -253,18 +261,20 @@ function PrSection({
   prs,
   accent,
   onOpen,
+  onDismiss,
 }: {
   title: string
   prs: ReviewQueuePR[]
   accent: 'red' | 'green' | 'blue' | 'none'
   onOpen: (pr: ReviewQueuePR) => void
+  onDismiss?: (prNumber: number) => Promise<void>
 }) {
   if (prs.length === 0) return null
   return (
     <div className={`pr-section pr-section--${accent}`}>
       <h3 className="pr-section-title">{title}</h3>
       {prs.map((pr) => (
-        <PrRow key={pr.number} pr={pr} onOpen={onOpen} />
+        <PrRow key={pr.number} pr={pr} onOpen={onOpen} onDismiss={onDismiss} />
       ))}
     </div>
   )
@@ -272,7 +282,15 @@ function PrSection({
 
 const SIGNAL_LABELS = ['Tests', 'Coverage', 'CI', 'Lint', 'Churn', 'Blast'] as const
 
-function PrRow({ pr, onOpen }: { pr: ReviewQueuePR; onOpen: (pr: ReviewQueuePR) => void }) {
+function PrRow({
+  pr,
+  onOpen,
+  onDismiss,
+}: {
+  pr: ReviewQueuePR
+  onOpen: (pr: ReviewQueuePR) => void
+  onDismiss?: (prNumber: number) => Promise<void>
+}) {
   const dots = [
     pr.signalDots.tests,
     pr.signalDots.coverage,
@@ -282,6 +300,7 @@ function PrRow({ pr, onOpen }: { pr: ReviewQueuePR; onOpen: (pr: ReviewQueuePR) 
     pr.signalDots.blast,
   ]
 
+  const isSession = pr.sessionStatus === 'paused' || pr.sessionStatus === 'in-progress'
   const actionLabel =
     pr.sessionStatus === 'paused'
       ? 'Resume'
@@ -290,6 +309,7 @@ function PrRow({ pr, onOpen }: { pr: ReviewQueuePR; onOpen: (pr: ReviewQueuePR) 
         : pr.riskLevel === 'high'
           ? 'Review'
           : 'Approve'
+  const actionModifier = isSession ? 'session' : pr.riskLevel
 
   const age = formatAge(pr.openedAt)
 
@@ -299,39 +319,53 @@ function PrRow({ pr, onOpen }: { pr: ReviewQueuePR; onOpen: (pr: ReviewQueuePR) 
       : null
 
   return (
-    <button className={`pr-row pr-row--${pr.riskLevel}`} onClick={() => onOpen(pr)}>
-      <div className="pr-row-left">
-        <span className="pr-row-number">#{pr.number}</span>
-        {pr.isDraft && <span className="pr-row-draft">Draft</span>}
-        <span className="pr-row-title">{pr.title}</span>
-        <span className="pr-row-meta">
-          {pr.author} · {age} · {pr.fileCount} files · +{pr.additions}/−{pr.deletions}
-        </span>
-        {fileProgress !== null && (
-          <div className="pr-row-progress" aria-label={`${fileProgress}% of files reviewed`}>
-            <div className="pr-row-progress-bar" style={{ width: `${fileProgress}%` }} />
+    <div className="pr-row-wrap">
+      <button className={`pr-row pr-row--${pr.riskLevel}`} onClick={() => onOpen(pr)}>
+        <div className="pr-row-left">
+          <div className="pr-row-header">
+            <span className="pr-row-number">#{pr.number}</span>
+            {pr.isDraft && <span className="pr-row-draft">Draft</span>}
           </div>
-        )}
-      </div>
+          <span className="pr-row-title">{pr.title}</span>
+          <span className="pr-row-meta">
+            {pr.author} · {age} · {pr.fileCount} files · +{pr.additions}/−{pr.deletions}
+          </span>
+          {fileProgress !== null && (
+            <div className="pr-row-progress" aria-label={`${fileProgress}% of files reviewed`}>
+              <div className="pr-row-progress-bar" style={{ width: `${fileProgress}%` }} />
+            </div>
+          )}
+        </div>
 
-      <div className="pr-row-signals">
-        {dots.map((level, i) => (
-          <span
-            key={i}
-            className={`pr-signal-dot pr-signal-dot--${level}`}
-            title={SIGNAL_LABELS[i]}
-          />
-        ))}
-      </div>
+        <div className="pr-row-signals">
+          {dots.map((level, i) => (
+            <span
+              key={i}
+              className={`pr-signal-dot pr-signal-dot--${level}`}
+              title={SIGNAL_LABELS[i]}
+            />
+          ))}
+        </div>
 
-      <div className="pr-row-right">
-        <span className="pr-row-time">{pr.estimatedMinutes}m</span>
-        <span className={`pr-risk-chip pr-risk-chip--${pr.riskLevel}`}>
-          {pr.riskLevel === 'high' ? 'HIGH' : pr.riskLevel === 'medium' ? 'MED' : 'LOW'}
-        </span>
-        <span className={`pr-row-action pr-row-action--${pr.riskLevel}`}>{actionLabel}</span>
-      </div>
-    </button>
+        <div className="pr-row-right">
+          <span className="pr-row-time">{pr.estimatedMinutes}m</span>
+          <span className={`pr-risk-chip pr-risk-chip--${pr.riskLevel}`}>
+            {pr.riskLevel === 'high' ? 'HIGH' : pr.riskLevel === 'medium' ? 'MED' : 'LOW'}
+          </span>
+          <span className={`pr-row-action pr-row-action--${actionModifier}`}>{actionLabel}</span>
+        </div>
+      </button>
+      {onDismiss && pr.sessionStatus !== 'not-started' && (
+        <button
+          className="pr-row-dismiss-btn"
+          onClick={() => void onDismiss(pr.number)}
+          title="Dismiss from in-progress"
+          aria-label={`Dismiss PR #${pr.number} from in-progress`}
+        >
+          ×
+        </button>
+      )}
+    </div>
   )
 }
 

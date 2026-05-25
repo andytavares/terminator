@@ -24,7 +24,18 @@ async function buildExtension(name) {
     target: 'node20',
     format: 'cjs',
     outfile,
-    external: ['electron', 'electron-store', 'zod', 'node-pty'],
+    external: [
+      'electron',
+      'electron-store',
+      'zod',
+      'node-pty',
+      'chokidar',
+      'fsevents',
+      'gray-matter',
+      'node-ical',
+      '@modelcontextprotocol/sdk',
+      'better-sqlite3',
+    ],
     logLevel: 'info',
   })
 }
