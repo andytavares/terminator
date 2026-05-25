@@ -61,10 +61,18 @@ function getStagedSourceFiles() {
 }
 
 function runCoverage() {
+  const os = require('os')
+  const tmpLog = path.join(os.tmpdir(), `vitest-patch-coverage-${process.pid}.log`)
   console.log('Running coverage suite for patch coverage check...')
+
+  // Use tee-style: inherit stdout/stderr for proper v8 coverage temp-file handling,
+  // but also capture output to a log file so we can filter it afterward.
   const result = spawnSync(
-    'npx',
-    ['vitest', 'run', '--coverage', '--coverage.reporter=json', '--coverage.reporter=text'],
+    'sh',
+    [
+      '-c',
+      `npx vitest run --coverage --coverage.reporter=json --coverage.reporter=text 2>&1 | tee ${tmpLog}`,
+    ],
     {
       cwd: path.join(__dirname, '..'),
       stdio: 'pipe',
@@ -72,7 +80,14 @@ function runCoverage() {
     }
   )
 
-  const combined = (result.stdout || '') + (result.stderr || '')
+  const combined = fs.existsSync(tmpLog)
+    ? fs.readFileSync(tmpLog, 'utf8')
+    : (result.stdout || '') + (result.stderr || '')
+  try {
+    fs.unlinkSync(tmpLog)
+  } catch {
+    /* ignore */
+  }
 
   // Always print the coverage table
   const coverageIdx = combined.indexOf('% Coverage report')
