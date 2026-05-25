@@ -1,0 +1,20 @@
+extensions/git-integration/src/conflict-demo.ts
+  s_88f0440d226e07::t_bd4695d2164086 19,64
+  s_88f0440d226e07::t_36bdb688c7f247 49-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "b5f61464c72cbd43a88d5c630c16c36f5386d56c",
+  "prompts": {},
+  "sessions": {
+    "s_88f0440d226e07": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c6b96ea5-86d5-4fb2-a177-4335086178fa",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
