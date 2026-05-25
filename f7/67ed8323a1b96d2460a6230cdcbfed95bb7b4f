@@ -1,0 +1,80 @@
+extensions/git-integration/tests/unit/github-ipc.spec.ts
+  s_837276b88ea77e::t_622c6128088720 92
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_837276b88ea77e::t_3b7b799d1e9bd5 424-426,452-454
+  s_837276b88ea77e::t_622c6128088720 12,230,238-265,276-280,289-296,409-423,427-451,510,795-805
+  s_837276b88ea77e::t_571fe4c1fd5fb1 806-807
+  s_837276b88ea77e::t_c1834bed4c78b4 297-301
+extensions/git-integration/tests/unit/PrOverviewPanel.spec.tsx
+  s_837276b88ea77e::t_622c6128088720 10-20,98,108,122,136,151,164,177,191,206,220,234,247,263,267,280,298,311,325,342
+extensions/git-integration/src/components/pr-review/ChapterNav.tsx
+  s_837276b88ea77e::t_622c6128088720 8,11,34-37
+extensions/git-integration/src/api/github.ts
+  s_837276b88ea77e::t_794af45dd0e082 32
+  s_837276b88ea77e::t_622c6128088720 15-17,27-31
+extensions/git-integration/src/components/pr-review/ReviewQueue.tsx
+  s_837276b88ea77e::t_622c6128088720 325-328
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_837276b88ea77e::t_622c6128088720 96,128-138,198
+extensions/git-integration/tests/unit/PrReviewView.spec.tsx
+  s_837276b88ea77e::t_622c6128088720 153-160,164,170-171,240,252-257,262
+extensions/git-integration/src/components/pr-review/FullFileList.tsx
+  s_837276b88ea77e::t_622c6128088720 12,21,68-69,72-92,94-97,100
+extensions/git-integration/src/hooks/usePrReview.ts
+  s_837276b88ea77e::t_196b29fa7ca742 358-359
+  s_837276b88ea77e::t_622c6128088720 12,211-215,339-356
+  s_837276b88ea77e::t_59db998b85853d 357
+extensions/git-integration/src/components/pr-review/PrReviewTab.tsx
+  s_837276b88ea77e::t_622c6128088720 7-12,60,117-118,209,214
+extensions/git-integration/src/components/pr-review/CommentComposer.tsx
+  s_837276b88ea77e::t_622c6128088720 72
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_837276b88ea77e::t_50569df19c1b3f 2559
+  s_837276b88ea77e::t_ff5345d6c4ac90 2613
+  s_837276b88ea77e::t_622c6128088720 382-387,1162-1170,1197-1203,1207-1209,1218-1221,1255-1263,1267-1268,1277-1290,1953-1955,1958-1959,1962,2443-2455,2462-2463,2467-2488,2510-2558,2560-2612
+  s_837276b88ea77e::t_a4a2022b135098 2456
+  s_837276b88ea77e::t_9d70d7ed323f4a 1222
+extensions/git-integration/tests/unit/PrReviewTab.spec.tsx
+  s_837276b88ea77e::t_622c6128088720 26
+extensions/git-integration/src/components/pr-review/StatusChecksBar.tsx
+  s_837276b88ea77e::t_622c6128088720 6,17-18
+extensions/git-integration/src/components/FileDiffView.tsx
+  s_837276b88ea77e::t_622c6128088720 118,122
+extensions/git-integration/src/components/pr-review/PrReviewView.tsx
+  s_837276b88ea77e::t_622c6128088720 57,60-61,183-191,200,221-227,247-248,286-288
+extensions/git-integration/src/github/pr-review-service.ts
+  s_837276b88ea77e::t_622c6128088720 250-251,253-260,263-265,268-276
+extensions/git-integration/src/stores/pr-review.store.ts
+  s_837276b88ea77e::t_622c6128088720 8,41-43,75,145,212,307
+  s_837276b88ea77e::t_bb47b5156e0919 213
+extensions/git-integration/src/components/pr-review/PrOverviewPanel.tsx
+  s_837276b88ea77e::t_aa9062b0d7fe69 345,349-352
+  s_837276b88ea77e::t_0d29c72380ab17 344
+  s_837276b88ea77e::t_622c6128088720 1,3-4,7,10,15,26-55,80-122,127-128,131-139,165,256-299,304-312,321-343,346-348,361-375
+extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx
+  s_837276b88ea77e::t_98acfc7af3d4e8 541
+  s_837276b88ea77e::t_622c6128088720 10-11,60-70,87,153-170,173,188-212,214-219,223-238,240,242-245,247,314,321,334,337,339-362,376,385-388,396,411-414,429-482,485,490,494-521,525-527,532-540,543-577,579-580,595-598,602-631,633,636-637,652-655,659-668
+  s_837276b88ea77e::t_a476571bb46b3b 213
+  s_837276b88ea77e::t_415343645abf15 239
+src/renderer/components/overview/OverviewScreen.tsx
+  s_837276b88ea77e::t_622c6128088720 19
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_837276b88ea77e::t_576ed3cf6d0659 287-289,316-318
+  s_837276b88ea77e::t_622c6128088720 291,319
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "f767ed8323a1b96d2460a6230cdcbfed95bb7b4f",
+  "prompts": {},
+  "sessions": {
+    "s_837276b88ea77e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4838bd3f-b288-4833-902f-2dbdbd272759",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
