@@ -102,6 +102,58 @@ describe('github:pr-review-detail', () => {
     expect(result.pr.ciStatus).toBe('none')
   })
 
+  it('falls back to check-suites when statusCheckRollup is empty and suites are returned', async () => {
+    mockPrDetail(PR_META)
+    mockGitSuccess(JSON.stringify([{ name: 'Buildkite', state: 'queued', conclusion: null }]))
+
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { statusChecks: Array<{ name: string; state: string }> } }
+
+    expect(result.pr.statusChecks).toHaveLength(1)
+    expect(result.pr.statusChecks[0].name).toBe('Buildkite')
+    expect(result.pr.statusChecks[0].state).toBe('pending')
+  })
+
+  it('leaves statusChecks empty when check-suites also returns empty array', async () => {
+    mockPrDetail(PR_META)
+    mockGitSuccess(JSON.stringify([]))
+
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { statusChecks: unknown[] } }
+
+    expect(result.pr.statusChecks).toEqual([])
+  })
+
+  it('skips check-suites fallback when headSHA is empty', async () => {
+    mockPrDetail({ ...PR_META, headRefOid: '' })
+    // No 4th mock needed — the branch is skipped entirely
+
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { statusChecks: unknown[] } }
+
+    expect(result.pr.statusChecks).toEqual([])
+    // Only 3 execFile calls (repo view + pr view + files), not 4
+    expect(mockExecFile).toHaveBeenCalledTimes(3)
+  })
+
+  it('maps isDraft=true onto pr object', async () => {
+    mockPrDetail({ ...PR_META, isDraft: true })
+    mockGitFailure('not found')
+
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { isDraft: boolean } }
+
+    expect(result.pr.isDraft).toBe(true)
+  })
+
   it('maps SUCCESS conclusion to pass state', async () => {
     mockPrDetail({
       ...PR_META,
@@ -943,5 +995,168 @@ describe('github:pr-review-detail — catchError branches', () => {
       prNumber: 6,
     })) as { error: string }
     expect(result.error).toContain('ENOENT')
+  })
+})
+
+describe('github:pr-mark-ready', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR for missing prNumber', async () => {
+    const result = (await handlers['github:pr-mark-ready']({
+      repoRoot: '/repo',
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
+    const result = (await handlers['github:pr-mark-ready']({
+      prNumber: 6,
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns { ok: true } on success', async () => {
+    mockGitSuccess('')
+
+    const result = (await handlers['github:pr-mark-ready']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { ok: boolean }
+    expect(result.ok).toBe(true)
+    const args: string[] = mockExecFile.mock.calls[0][1]
+    expect(args).toContain('ready')
+    expect(args).toContain('6')
+  })
+
+  it('returns error string when gh fails', async () => {
+    mockGitFailure('not in draft state')
+
+    const result = (await handlers['github:pr-mark-ready']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { error: string }
+    expect(result.error).toContain('not in draft state')
+  })
+})
+
+describe('github:pr-issue-comments', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR for missing prNumber', async () => {
+    const result = (await handlers['github:pr-issue-comments']({
+      repoRoot: '/repo',
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
+    const result = (await handlers['github:pr-issue-comments']({
+      prNumber: 6,
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns mapped comments on success', async () => {
+    const raw = [
+      {
+        id: 1,
+        user: { login: 'alice', avatar_url: 'https://example.com/avatar.png' },
+        body: 'Looks good',
+        created_at: '2025-01-01T00:00:00Z',
+        updated_at: '2025-01-01T00:00:00Z',
+      },
+    ]
+    mockGitSuccess(JSON.stringify(raw))
+
+    const result = (await handlers['github:pr-issue-comments']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { comments: Array<{ id: number; author: string; body: string }> }
+
+    expect(result.comments).toHaveLength(1)
+    expect(result.comments[0].id).toBe(1)
+    expect(result.comments[0].author).toBe('alice')
+    expect(result.comments[0].body).toBe('Looks good')
+  })
+
+  it('returns error string when gh fails', async () => {
+    mockGitFailure('network error')
+
+    const result = (await handlers['github:pr-issue-comments']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { error: string }
+    expect(result.error).toContain('network error')
+  })
+})
+
+describe('github:pr-issue-comment-add', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR for missing body', async () => {
+    const result = (await handlers['github:pr-issue-comment-add']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns VALIDATION_ERROR for empty body', async () => {
+    const result = (await handlers['github:pr-issue-comment-add']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      body: '',
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns mapped comment on success', async () => {
+    const raw = {
+      id: 42,
+      user: { login: 'bob', avatar_url: '' },
+      body: 'LGTM!',
+      created_at: '2025-01-02T00:00:00Z',
+      updated_at: '2025-01-02T00:00:00Z',
+    }
+    mockGitSuccess(JSON.stringify(raw))
+
+    const result = (await handlers['github:pr-issue-comment-add']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      body: 'LGTM!',
+    })) as { comment: { id: number; author: string; body: string } }
+
+    expect(result.comment.id).toBe(42)
+    expect(result.comment.author).toBe('bob')
+    expect(result.comment.body).toBe('LGTM!')
+    const args: string[] = mockExecFile.mock.calls[0][1]
+    expect(args).toContain('POST')
+    expect(args).toContain('body=LGTM!')
+  })
+
+  it('returns error string when gh fails', async () => {
+    mockGitFailure('forbidden')
+
+    const result = (await handlers['github:pr-issue-comment-add']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      body: 'hello',
+    })) as { error: string }
+    expect(result.error).toContain('forbidden')
   })
 })
