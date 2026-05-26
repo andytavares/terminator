@@ -1,0 +1,281 @@
+extensions/git-integration/src/ipc/git.ipc.ts
+  s_88f0440d226e07::t_0bb9eafaa314f1 5,142-143
+extensions/git-integration/tests/unit/merge-flow.schema.spec.ts
+  s_88f0440d226e07::t_a6a8c0d2885abc 14
+extensions/git-integration/src/components/merge-flow/ConflictResolver.tsx
+  s_88f0440d226e07::t_f389fadbe3dfb7 43
+  s_88f0440d226e07::t_d94a1602bed99a 70
+  s_88f0440d226e07::t_346ee36aa2b06a 22-25
+  s_88f0440d226e07::t_c5c1656f805f3d 86
+  s_88f0440d226e07::t_58483495288177 40,45-51
+  s_88f0440d226e07::t_2e2f5f8e4d642e 83-85
+  s_88f0440d226e07::t_791794ba5ac45a 155-172,175-178
+  s_88f0440d226e07::t_2d65d6604e157a 121-136
+  s_88f0440d226e07::t_884177d71914df 21
+  s_88f0440d226e07::t_1d09b99680bc15 106-114
+  s_88f0440d226e07::t_4237b949582695 71-72
+  s_88f0440d226e07::t_59642fa4b57419 2-6
+  s_88f0440d226e07::t_1b37391e6b3888 182-191
+  s_88f0440d226e07::t_1d6ae48beecbf9 208-212
+  s_88f0440d226e07::t_ae9f6544ad64f6 215-228
+  s_88f0440d226e07::t_1f4ab260a16813 239-242
+  s_88f0440d226e07::t_c41687299de3ea 198-199
+  s_88f0440d226e07::t_6196e512d4975e 64,89-94
+  s_88f0440d226e07::t_8fbcfcdf6a75b2 174
+  s_88f0440d226e07::t_b61be870a6f9b0 87
+  s_88f0440d226e07::t_9bd8499e3f7508 173
+extensions/git-integration/src/components/merge-flow/ConflictHeader.tsx
+  s_88f0440d226e07::t_4dbb376a1016bf 119-129
+  s_88f0440d226e07::t_23996185a3a2ea 13-24,26
+  s_88f0440d226e07::t_01914def756d53 6-11,34-106
+  s_88f0440d226e07::t_dbf59cf6ed5e80 108-118
+  s_88f0440d226e07::t_b55a0193c0b198 12
+extensions/git-integration/tests/unit/CompletionScreen.spec.tsx
+  s_88f0440d226e07::t_e71767eaf3ffdf 70-126
+extensions/git-integration/src/components/GitFullView.tsx
+  s_88f0440d226e07::t_0bb9eafaa314f1 11,27-37,201-202
+  s_88f0440d226e07::t_5f249aac6f88bb 203-204
+  s_88f0440d226e07::t_705a20f52f49be 216-226
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_88f0440d226e07::t_23f9f8fb03e49f 142
+extensions/git-integration/src/stores/git.store.ts
+  s_88f0440d226e07::t_0bb9eafaa314f1 9,15,23,34
+extensions/git-integration/tests/unit/GitSidebarPanel.spec.tsx
+  s_88f0440d226e07::t_0bb9eafaa314f1 1,27-28,44-81
+extensions/git-integration/src/components/merge-flow/AiSuggestionPanel.tsx
+  s_88f0440d226e07::t_2fe4f404a01e0e 69-71,73-75
+  s_88f0440d226e07::t_c19172b83153d3 4
+extensions/git-integration/tests/unit/MergeFlowView.spec.tsx
+  s_88f0440d226e07::t_9542788c250bcf 134-135,142-146
+  s_88f0440d226e07::t_2829e94f1f5b4e 1
+  s_88f0440d226e07::t_3b371079a012bb 119-131
+  s_88f0440d226e07::t_b4dc71fc1c44ab 136-141,147-148
+.specify/feature.json
+  s_88f0440d226e07::t_0bb9eafaa314f1 2
+extensions/git-integration/src/components/merge-flow/CompletionScreen.tsx
+  s_88f0440d226e07::t_ffb7dd102c00fd 9
+  s_88f0440d226e07::t_7cf36918d0c918 100-102,104-105
+  s_88f0440d226e07::t_3e48de08c9f710 68
+  s_88f0440d226e07::t_c54776c85f5a0f 120
+  s_88f0440d226e07::t_7f339a5756c39f 21,25
+  s_88f0440d226e07::t_3ecbc8405cacf2 5,13-20,22-24,26-67,72-88,118-119,121-240
+extensions/git-integration/tests/unit/ConflictResolver.spec.tsx
+  s_88f0440d226e07::t_5d88c433598675 198
+  s_88f0440d226e07::t_9c0ff776c8d34d 31
+  s_88f0440d226e07::t_5891dd5e6f839e 291
+  s_88f0440d226e07::t_2834db1b0f6dd6 210-212
+  s_88f0440d226e07::t_5539033907d22e 333-392
+  s_88f0440d226e07::t_eb75e1b4ca3872 319
+  s_88f0440d226e07::t_58a1399e3a2c35 130-141
+  s_88f0440d226e07::t_93588ef7324e18 29-30,32-45,47-64,66-70
+  s_88f0440d226e07::t_0f06d7ba644e8b 144-170
+  s_88f0440d226e07::t_8491d53fe83da7 281-285
+extensions/git-integration/src/schemas/merge-flow.schema.ts
+  s_88f0440d226e07::t_edb91dbb38075a 48-49
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_88f0440d226e07::t_b7c376560e0ac2 218
+  s_88f0440d226e07::t_3a9faaab1c8cfd 149
+extensions/git-integration/src/github/pr-review-service.ts
+  s_88f0440d226e07::t_5caae549f64922 732-738
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_88f0440d226e07::t_d6872e9ae9a182 2622-2639
+  s_88f0440d226e07::t_29d93b97c31964 408-419
+extensions/git-integration/src/utils/syntax.ts
+  s_88f0440d226e07::t_88434a2e849666 1-2,12-66,68-71,73-76,78,80-81
+  s_88f0440d226e07::t_55663d21030ea1 3-11
+  s_88f0440d226e07::t_99c69996c6e4a2 67,72,77,79
+extensions/git-integration/src/components/git-integration.css
+  s_88f0440d226e07::t_0a7e3bd54b6e85 970-1002
+docs/ARCHITECTURE.md
+  s_88f0440d226e07::t_0bb9eafaa314f1 314-348
+extensions/git-integration/src/components/GitSidebarPanel.tsx
+  s_88f0440d226e07::t_0bb9eafaa314f1 17,47-55
+  s_88f0440d226e07::t_1a673ac3b58e99 56
+src/main/extensions/extension-host.ts
+  s_88f0440d226e07::t_4166f4d64ddd56 204-212,214-215
+extensions/git-integration/tests/unit/PrOverviewPanel.spec.tsx
+  s_88f0440d226e07::t_e604a197f1b79a 32,35,37-46
+  s_88f0440d226e07::t_348cfc2178c57c 526,537-539
+  s_88f0440d226e07::t_e5aaaf153868b6 134-135,140
+  s_88f0440d226e07::t_e49245c963e293 10-19
+  s_88f0440d226e07::t_285a1a20022a68 489-514,516-525,540-541
+  s_88f0440d226e07::t_a4a8f9d753c1c1 515,527-536
+  s_88f0440d226e07::t_814f6656fcf58a 133
+  s_88f0440d226e07::t_512354ef3308d5 33-34,36,47-52
+  s_88f0440d226e07::t_334a65b36b1580 136-139,141
+extensions/git-integration/tests/unit/merge-flow-api.spec.ts
+  s_d10cdb513aa2bf::t_b5cbcd8b369057 1-137
+extensions/git-integration/tests/unit/ManualEditor.spec.tsx
+  s_88f0440d226e07::t_6d055a87c568f8 174-176,178-180
+  s_88f0440d226e07::t_192cacef335a17 5-43,45-60,62-82,84-146,156,163-170,177
+  s_88f0440d226e07::t_791eba03680824 44
+  s_88f0440d226e07::t_ed0925269811f8 149,157
+extensions/git-integration/src/components/merge-flow/ActionBar.tsx
+  s_88f0440d226e07::t_c5e5b15688b2de 22-56
+extensions/git-integration/src/components/merge-flow/ConflictHub.tsx
+  s_88f0440d226e07::t_69b96806140364 177-186
+  s_88f0440d226e07::t_08814503bbbadf 137
+  s_88f0440d226e07::t_a5af57d0022f37 11-41,43-131,143-154,158-159,161-166,188-190,192-281
+  s_88f0440d226e07::t_7a044a8c41161d 157,160
+  s_88f0440d226e07::t_38365ce335edf1 8
+  s_88f0440d226e07::t_f19101d2263aec 7
+  s_88f0440d226e07::t_2f89febf2c2d8c 191
+  s_88f0440d226e07::t_069be1fdaf5e2f 168-176
+extensions/git-integration/src/components/pr-review/PrOverviewPanel.tsx
+  s_88f0440d226e07::t_364208962e06a5 4-5
+  s_88f0440d226e07::t_b8600e37420102 44,55
+  s_88f0440d226e07::t_def25a63f59d2f 45
+  s_88f0440d226e07::t_ed0e6ecca33c5d 121,126-127,130,138-140,150-151,167-168,172-178
+  s_88f0440d226e07::t_58a404d13716d2 10
+  s_88f0440d226e07::t_9216182d60445b 122-125,128-129,131-137,141-149,152-166,169-171
+  s_88f0440d226e07::t_c96f55bcab33a9 491-493,496,498-499
+  s_88f0440d226e07::t_d3b080e2c773bf 8-9
+  s_88f0440d226e07::t_059fa05712f4ad 494-495,497
+  s_88f0440d226e07::t_9df865307037db 42-43
+extensions/git-integration/src/components/merge-flow/ResultPreviewStrip.tsx
+  s_88f0440d226e07::t_1ebbf3d4174273 2-6,11-13,22-25
+  s_88f0440d226e07::t_2bbda2e1744af7 7-10,16-21
+extensions/git-integration/tests/unit/merge-flow-ipc.spec.ts
+  s_88f0440d226e07::t_d97942a118b055 431-442,445-458,479-495
+  s_d10cdb513aa2bf::t_c1a336be810122 597-777
+  s_88f0440d226e07::t_bd31ac5f8c2b57 565-566,573,589
+  s_88f0440d226e07::t_701aa3233c367e 207-218,223-236
+  s_d10cdb513aa2bf::t_786329412da5e5 459-478,496-515
+  s_d10cdb513aa2bf::t_746f58b27ebf55 545-559
+  s_88f0440d226e07::t_16ba5d8d5b3fed 222
+  s_d10cdb513aa2bf::t_7ceea4629e8825 323-379,381-387,390-404
+  s_88f0440d226e07::t_ad0cfc25d4354d 561-564,567-572,574-588,591-592,594-596
+  s_d10cdb513aa2bf::t_0b8d6d5403ee6e 264-307
+  s_d10cdb513aa2bf::t_6f21818dfd3f90 380,388-389
+extensions/git-integration/src/components/pr-review/ReviewQueue.tsx
+  s_88f0440d226e07::t_d6146aba62cf94 353-357
+src/renderer/App.tsx
+  s_88f0440d226e07::t_66bd80a55805ea 59-64
+extensions/git-integration/tests/unit/syntax.spec.ts
+  s_d10cdb513aa2bf::t_7a728fd2e8d7e8 1-2,8-70,72-118,120-148,150-154
+  s_d10cdb513aa2bf::t_e623c816661afb 3-7,71,119,149
+extensions/git-integration/src/stores/merge-flow.store.ts
+  s_88f0440d226e07::t_dddb7b39c23a9b 135-148
+  s_88f0440d226e07::t_4ccb599b5c4467 192-194
+extensions/git-integration/src/components/merge-flow/ManualEditor.tsx
+  s_88f0440d226e07::t_1d780614213213 91
+  s_88f0440d226e07::t_5701ed1a1a23a6 61
+  s_88f0440d226e07::t_667260e16a0475 13
+  s_88f0440d226e07::t_c153faad37520f 143
+  s_88f0440d226e07::t_4b0f90ef39a13f 106,122,138
+  s_88f0440d226e07::t_36548535a01fd6 1-6,29-40,42-46,48-51,53-60,63-90,92-103,105,118-121,127-134,140,144
+  s_88f0440d226e07::t_ee44aac8326d6b 22-25,62,104,139
+  s_88f0440d226e07::t_40f4e043791cda 107-117
+extensions/git-integration/src/components/merge-flow/MergeFlowView.tsx
+  s_88f0440d226e07::t_f20615a7362af5 51-55
+  s_88f0440d226e07::t_9bc18ee6e92f4a 97
+  s_88f0440d226e07::t_e6830456735310 138
+  s_88f0440d226e07::t_a9591f809e19ce 31-33
+  s_88f0440d226e07::t_60989d38f2b43f 151
+  s_88f0440d226e07::t_1373b3189f5110 44,60
+  s_88f0440d226e07::t_9af75149fa608d 57
+  s_88f0440d226e07::t_b79245d049d0e1 35-40
+  s_88f0440d226e07::t_74fcdd50819edc 72-96,98-104,137,150
+  s_88f0440d226e07::t_fbbdad83bcfdba 118-125
+extensions/git-integration/tests/unit/merge-flow.store.spec.ts
+  s_88f0440d226e07::t_896c38063d8eef 168-194
+extensions/git-integration/tests/unit/KeepBothModal.spec.tsx
+  s_88f0440d226e07::t_1134929804f7a9 39-44
+README.md
+  s_88f0440d226e07::t_0bb9eafaa314f1 14
+specs/002-git-github-integration/contracts/ipc-channels-git.md
+  s_88f0440d226e07::t_0bb9eafaa314f1 367-384
+CLAUDE.md
+  s_88f0440d226e07::t_0bb9eafaa314f1 5
+extensions/git-integration/package.json
+  s_88f0440d226e07::t_08ce19a41187e9 7-9
+extensions/git-integration/src/api/merge-flow.ts
+  s_88f0440d226e07::t_4bf65a3c07b945 61
+  s_88f0440d226e07::t_0ca6b73f75f40f 44
+  s_88f0440d226e07::t_ff5a350b90e504 71-81,83
+  s_88f0440d226e07::t_b1e588890646cc 59-60,62-64
+  s_88f0440d226e07::t_692a69f0b4aea2 35-38
+  s_88f0440d226e07::t_cdd2b90ac9274a 20-28,30
+  s_88f0440d226e07::t_6f06ceece6f8f6 19
+  s_88f0440d226e07::t_4d101e306ddafa 58,65-70
+extensions/git-integration/src/components/merge-flow/ConflictPanel.tsx
+  s_88f0440d226e07::t_8a628cf4c2f982 3
+  s_88f0440d226e07::t_76f32ea488bb4f 2,5-59,61-62,64-71,76-93,98-106,111-138,141-165,167-189,191
+  s_88f0440d226e07::t_a8d4197340e4df 60,63,72-75,94-97,107-110
+  s_88f0440d226e07::t_c63d980d79434d 140,166,190
+extensions/git-integration/src/git/conflict-reader.ts
+  s_88f0440d226e07::t_f47db561eb478a 172-206
+extensions/git-integration/src/components/merge-flow/KeepBothModal.tsx
+  s_88f0440d226e07::t_5c6a6ec9996234 119
+  s_88f0440d226e07::t_04816e494b9fb2 3
+  s_88f0440d226e07::t_4ce50574b0c726 110,129-134,136,140-144,146-147,150-151,154-172,174-175,185,208-215,218-221,237-244,247-250
+  s_88f0440d226e07::t_9b10815c79ab54 2,7-71,73-108,111-118,120-128,137-139,148-149,152-153,181-184,186-207,216-217,222-236,245-246,251-287
+extensions/git-integration/src/components/merge-flow/merge-flow.css
+  s_88f0440d226e07::t_eb0b5c08189ad1 733-734,739,747-748,753,761-762,769
+  s_88f0440d226e07::t_1348462812e558 634-636,643-672,678-732,735-738,740-746,749-752,754-760,763-768,770-773
+  s_88f0440d226e07::t_20a81e4bd2c5eb 1357,1366-1391,1402-1408,1410-1416,1427-1439,1448-1452
+  s_88f0440d226e07::t_914726fea159b0 947,955-1015,1029-1104,1106-1193,1195-1200,1203,1207-1237,1241-1262
+  s_88f0440d226e07::t_6345f9fe1c0ccf 1461-1633,1635-1728,1736,1739-1772,1776-1792
+  s_88f0440d226e07::t_8f17c81368ecaf 1409,1417,1420
+  s_88f0440d226e07::t_ef7d4c451657a3 16-46,65,118-119,146,268,305,327,341,390,407,426,434,452-460,499-500,504,510,514,516,600-630,640-641,675,779-780,792-794,816-824,837-838,858-859,861,871,901-906,925,929,953-954,1105,1194,1201-1202,1204-1206,1238,1272-1346,1364,1396-1401,1425,1442-1445,1634,1732-1735,1737,1773,1801-1812
+  s_88f0440d226e07::t_a9a8288c0ed151 557-591
+  s_88f0440d226e07::t_0d196f159c5fff 1419
+  s_88f0440d226e07::t_5740ae0611ef0f 384-389,392-403,410-425,433,435-445,461-494,503,505-509,511,515,517-518,592-599
+  s_88f0440d226e07::t_a462a4bb7c4c99 519-556
+  s_88f0440d226e07::t_8ffa726ec940e8 1421-1422
+  s_88f0440d226e07::t_65e777734e0952 50-64,66-115,124-144,149-267,269-304,306-326,330-340,343-380
+  s_88f0440d226e07::t_667ba2e03197e6 2-8
+  s_88f0440d226e07::t_de64ee89db0b92 829-833,841-857,860,865-867,872-900,911-921,926-928
+  s_88f0440d226e07::t_3e432eb5baa5be 1418
+  s_88f0440d226e07::t_ed064b842528f7 1016-1028
+  s_88f0440d226e07::t_6f746b23de4d5b 788-790,798-808
+extensions/git-integration/tests/unit/ConflictHub.spec.tsx
+  s_88f0440d226e07::t_b580a060e82f4a 68-71
+  s_88f0440d226e07::t_9d50d078b5b2cc 88
+  s_88f0440d226e07::t_67ec1275aa9f89 54
+  s_88f0440d226e07::t_d8e7c1161a0f74 109-125
+extensions/git-integration/tests/unit/ConflictHeader.spec.tsx
+  s_88f0440d226e07::t_f60c9d8855a20c 198-246
+  s_88f0440d226e07::t_6774617b3751c0 69-194
+extensions/git-integration/src/ipc/merge-flow.ipc.ts
+  s_88f0440d226e07::t_39a5cc0d84b196 384,394-396
+  s_88f0440d226e07::t_6ab560df28aad5 85,103-106,109,120-122,128-129
+  s_88f0440d226e07::t_bbf665843c7995 180-181,186-187,200-204
+  s_88f0440d226e07::t_30a5abe546b511 114,123-127
+  s_88f0440d226e07::t_5ca3affd8b7c60 210,214-224,259,262-265,267-275
+  s_88f0440d226e07::t_e89ba896860697 381-383,385-393,397-403
+  s_88f0440d226e07::t_0c59526cafe73b 276-306
+  s_88f0440d226e07::t_ec39cc89d638cb 99-102,115-119
+  s_88f0440d226e07::t_a7f004d3a2eaa1 140-152,154-157
+  s_88f0440d226e07::t_0562ad095f0c84 86-92,107-108,110-113
+  s_88f0440d226e07::t_5750150476d2a7 333-342
+  s_88f0440d226e07::t_aee8f3f6b8d9ef 211-213,229,256,258,261,266
+  s_88f0440d226e07::t_7d7878c41208d8 182-185,188-199
+  s_88f0440d226e07::t_f0b81b0cbf29ea 225-228,230-243,245-247,249-255,257,260
+extensions/git-integration/tests/unit/AiSuggestionPanel.spec.tsx
+  s_88f0440d226e07::t_ee3e09c896c3ca 94-99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "c3111f79ec868f3dc76c2b0d24b782f4ccd3c2b7",
+  "prompts": {},
+  "sessions": {
+    "s_88f0440d226e07": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c6b96ea5-86d5-4fb2-a177-4335086178fa",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_d10cdb513aa2bf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "021b94aa-a5b0-438e-935d-473e5c7ae94b",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
