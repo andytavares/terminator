@@ -14,7 +14,7 @@ interface Props {
 
 export function GitSidebarPanel({ repoRoot, onClose }: Props): JSX.Element {
   useGitStatus(repoRoot)
-  const { status, setSelectedFile, setDiff } = useGitStore()
+  const { status, setSelectedFile, setDiff, setView } = useGitStore()
   const { setActiveProjectTab } = useExtensionRegistry()
 
   const handleFileSelect = useCallback(
@@ -43,6 +43,16 @@ export function GitSidebarPanel({ repoRoot, onClose }: Props): JSX.Element {
           ×
         </button>
       </div>
+
+      {status?.hasConflicts && (
+        <button
+          className="git-sidebar__resolve-conflicts-btn"
+          onClick={() => setView('merge-flow')}
+          data-testid="resolve-conflicts-btn"
+        >
+          Resolve conflicts →
+        </button>
+      )}
 
       {!status ? (
         <div className="git-sidebar__file-list">

@@ -1,8 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Eye } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
+import { useGitStore } from '../../stores/git.store'
+import { useExtensionRegistry } from '../../../../../src/renderer/extensions/registry'
 import { useLoadIssueComments } from '../../hooks/usePrReview'
 import { githubAPI } from '../../api/github'
+import { mergeFlowAPI } from '../../api/merge-flow'
+import { useToastStore } from '../../../../../src/renderer/stores/toast.store'
+import { useWorkspaceStore } from '../../../../../src/renderer/stores/workspace.store'
 import { StatusChecksBar } from './StatusChecksBar'
 import { RichContent } from './RichContent'
 import type { PrReviewDetail, IssueComment } from '../../schemas/pr-review.schema'
@@ -34,6 +39,10 @@ export function PrOverviewPanel({
   onPopOut,
 }: Props) {
   const { viewedFiles, issueComments, currentUserLogin } = usePrReviewStore()
+  const { setView } = useGitStore()
+  const { setActiveProjectTab } = useExtensionRegistry()
+  const { addToast } = useToastStore()
+  const { activeWorkspaceId, createProject, setActiveProject } = useWorkspaceStore()
   const loadIssueComments = useLoadIssueComments(repoRoot)
   const [commentBody, setCommentBody] = useState('')
   const [commentTab, setCommentTab] = useState<'write' | 'preview'>('write')
@@ -43,6 +52,7 @@ export function PrOverviewPanel({
   const [markingReady, setMarkingReady] = useState(false)
   const [updatingBranch, setUpdatingBranch] = useState(false)
   const [updateBranchError, setUpdateBranchError] = useState<string | null>(null)
+  const [preparingMerge, setPreparingMerge] = useState(false)
   const composerRef = useRef<HTMLTextAreaElement>(null)
 
   const handleRefresh = async () => {
@@ -105,6 +115,64 @@ export function PrOverviewPanel({
       setUpdateBranchError(String(e))
     } finally {
       setUpdatingBranch(false)
+    }
+  }
+
+  const handleResolveConflicts = async () => {
+    if (!activeWorkspaceId) {
+      addToast({ type: 'error', message: 'No active workspace — open a project first.' })
+      return
+    }
+    setPreparingMerge(true)
+    try {
+      // Get a safe path for the new worktree
+      const { path: worktreePath } = await window.electronAPI.git.suggestWorktreePath(
+        repoRoot,
+        pr.headRefName
+      )
+
+      // Create the worktree + run git merge to produce conflict markers
+      const mergeResult = await mergeFlowAPI.preparePrWorktree(
+        repoRoot,
+        worktreePath,
+        pr.headRefName,
+        pr.baseRefName
+      )
+      if ('error' in mergeResult) {
+        addToast({ type: 'error', message: `Could not prepare merge: ${mergeResult.error}` })
+        return
+      }
+      if (!mergeResult.hasConflicts) {
+        addToast({
+          type: 'error',
+          message: 'No conflicts found after merge — the PR may already be clean.',
+        })
+        return
+      }
+
+      // Register the worktree as a project so it shows in the sidebar
+      const shortName = pr.headRefName.split('/').pop() ?? pr.headRefName
+      const projectResult = await createProject({
+        workspaceId: activeWorkspaceId,
+        name: `${shortName} (conflicts)`,
+        worktreePath,
+        gitBranch: pr.headRefName,
+        isWorktree: true,
+      })
+      if ('error' in projectResult) {
+        addToast({
+          type: 'error',
+          message: `Could not add conflict project: ${(projectResult as { error: string }).error}`,
+        })
+        return
+      }
+
+      // Switch to the new project and open the conflict resolver
+      setActiveProject(projectResult.project.id)
+      setView('merge-flow')
+      setActiveProjectTab('git')
+    } finally {
+      setPreparingMerge(false)
     }
   }
 
@@ -418,6 +486,15 @@ export function PrOverviewPanel({
             disabled={updatingBranch}
           >
             {updatingBranch ? 'Updating…' : `↓ Update from ${pr.baseRefName}`}
+          </button>
+        )}
+        {pr.mergeStateStatus === 'dirty' && (
+          <button
+            className="pr-overview-resolve-conflicts-btn"
+            onClick={handleResolveConflicts}
+            disabled={preparingMerge}
+          >
+            {preparingMerge ? 'Preparing merge…' : 'Resolve conflicts →'}
           </button>
         )}
         {pr.isDraft && (

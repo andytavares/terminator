@@ -350,6 +350,11 @@ function PrRow({
           <div className="pr-row-header">
             <span className="pr-row-number">#{pr.number}</span>
             {pr.isDraft && <span className="pr-row-draft">Draft</span>}
+            {pr.mergeStateStatus === 'dirty' && (
+              <span className="pr-row-conflicts" title="This PR has merge conflicts">
+                ⚠ Conflicts
+              </span>
+            )}
           </div>
           <span className="pr-row-title">{pr.title}</span>
           <span className="pr-row-meta">

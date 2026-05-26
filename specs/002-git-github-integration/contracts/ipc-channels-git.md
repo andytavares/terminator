@@ -364,3 +364,21 @@ interface ElectronAPI {
   }
 }
 ```
+
+---
+
+## MergeFlow Conflict Resolver Channels
+
+The following 9 IPC channels are added by the MergeFlow feature (spec 006). Full documentation at `specs/006-mergeflow-conflict-resolver/contracts/ipc-channels.md`.
+
+| Channel                | Direction       | Purpose                                         |
+| ---------------------- | --------------- | ----------------------------------------------- |
+| `git:conflicts-list`   | renderer → main | Build ConflictSession from all conflicted files |
+| `git:conflict-blocks`  | renderer → main | Read conflict blocks for a single file          |
+| `git:resolve-conflict` | renderer → main | Write resolved text to working-tree file        |
+| `git:undo-resolve`     | renderer → main | Restore original conflict markers               |
+| `git:merge-commit`     | renderer → main | Stage resolved files and run merge commit       |
+| `git:merge-ai-suggest` | renderer → main | Request AI resolution suggestion (stub)         |
+| `git:session-restore`  | renderer → main | Restore persisted session from electron-store   |
+| `git:session-persist`  | renderer → main | Persist current session state                   |
+| `git:session-clear`    | renderer → main | Delete persisted session                        |

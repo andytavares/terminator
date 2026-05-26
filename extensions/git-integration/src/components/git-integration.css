@@ -967,6 +967,39 @@
   overflow: hidden;
 }
 
+.git-full-view__conflict-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(224, 92, 92, 0.12);
+  border-bottom: 1px solid rgba(224, 92, 92, 0.3);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.git-full-view__conflict-banner-text {
+  font-size: 12px;
+  color: var(--tm-danger);
+  font-weight: 500;
+}
+
+.git-full-view__conflict-banner-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--tm-danger);
+  background: transparent;
+  color: var(--tm-danger);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.git-full-view__conflict-banner-btn:hover {
+  background: rgba(224, 92, 92, 0.15);
+}
+
 .git-full-view__staging {
   flex: 1;
   min-height: 0;

@@ -7,6 +7,16 @@ import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
 
 vi.mock('../../src/stores/pr-review.store', () => ({ usePrReviewStore: vi.fn() }))
 
+const mockSetView = vi.fn()
+vi.mock('../../src/stores/git.store', () => ({
+  useGitStore: () => ({ setView: mockSetView }),
+}))
+
+const mockSetActiveProjectTab = vi.fn()
+vi.mock('../../../../src/renderer/extensions/registry', () => ({
+  useExtensionRegistry: () => ({ setActiveProjectTab: mockSetActiveProjectTab }),
+}))
+
 vi.mock('../../src/hooks/usePrReview', () => ({
   useLoadIssueComments: vi.fn(() => vi.fn()),
 }))
@@ -17,6 +27,27 @@ vi.mock('../../src/api/github', () => ({
     prIssueCommentAdd: vi.fn().mockResolvedValue({}),
     prUpdateBranch: vi.fn().mockResolvedValue({ ok: true }),
   },
+}))
+
+const mockPreparePrWorktree = vi.fn()
+vi.mock('../../src/api/merge-flow', () => ({
+  mergeFlowAPI: {
+    preparePrWorktree: (...a: unknown[]) => mockPreparePrWorktree(...a),
+  },
+}))
+
+const mockCreateProject = vi.fn()
+const mockSetActiveProject = vi.fn()
+vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
+  useWorkspaceStore: () => ({
+    activeWorkspaceId: 'ws-1',
+    createProject: mockCreateProject,
+    setActiveProject: mockSetActiveProject,
+  }),
+}))
+
+vi.mock('../../../../src/renderer/stores/toast.store', () => ({
+  useToastStore: () => ({ addToast: vi.fn() }),
 }))
 
 vi.mock('../../src/components/pr-review/StatusChecksBar', () => ({
@@ -99,6 +130,15 @@ const basePr: PrReviewDetail = {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks()
+  mockPreparePrWorktree.mockResolvedValue({ hasConflicts: true })
+  mockCreateProject.mockResolvedValue({ project: { id: 'proj-conflict' } })
+  // Stub window.electronAPI.git.suggestWorktreePath
+  ;(window as unknown as Record<string, unknown>).electronAPI = {
+    git: {
+      suggestWorktreePath: vi.fn().mockResolvedValue({ path: '/tmp/worktree/branch' }),
+    },
+  }
   vi.mocked(usePrReviewStore).mockReturnValue({
     viewedFiles: new Set(),
     issueComments: [],
@@ -444,6 +484,59 @@ describe('PrOverviewPanel', () => {
       />
     )
     expect(screen.getByText('⚠ Conflicts')).toBeTruthy()
+  })
+
+  it('shows resolve conflicts button when mergeStateStatus is dirty', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, mergeStateStatus: 'dirty' }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText(/Resolve conflicts/i)).toBeTruthy()
+  })
+
+  it('does not show resolve conflicts button when mergeStateStatus is clean', () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, mergeStateStatus: 'clean' }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryByText(/Resolve conflicts/i)).toBeNull()
+  })
+
+  it('resolve conflicts button creates worktree project then switches to merge-flow view', async () => {
+    render(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={{ ...basePr, mergeStateStatus: 'dirty' }}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    fireEvent.click(screen.getByText(/Resolve conflicts/i))
+    await waitFor(() => {
+      expect(mockPreparePrWorktree).toHaveBeenCalledWith(
+        '/repo',
+        '/tmp/worktree/branch',
+        basePr.headRefName,
+        basePr.baseRefName
+      )
+      expect(mockCreateProject).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceId: 'ws-1', isWorktree: true })
+      )
+      expect(mockSetActiveProject).toHaveBeenCalledWith('proj-conflict')
+      expect(mockSetView).toHaveBeenCalledWith('merge-flow')
+      expect(mockSetActiveProjectTab).toHaveBeenCalledWith('git')
+    })
   })
 
   it('does not show merge state badge when mergeStateStatus is clean', () => {
