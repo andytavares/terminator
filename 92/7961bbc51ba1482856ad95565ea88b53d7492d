@@ -1,0 +1,34 @@
+src/renderer/components/overview/SessionTile.tsx
+  s_d10cdb513aa2bf::t_c4a8f653227bdb 36,39-42
+  s_d10cdb513aa2bf::t_0988f4e4bf6df8 70-77
+src/renderer/components/overview/OverviewScreen.tsx
+  s_d10cdb513aa2bf::t_d3e9f66bc584a8 20
+  s_d10cdb513aa2bf::t_7b7c91be48560d 37,49-51,59
+src/renderer/components/overview/SessionTile.css
+  s_d10cdb513aa2bf::t_24856747ccb728 63-97
+tests/unit/renderer/components/SessionTile.spec.tsx
+  s_d10cdb513aa2bf::t_595efedcce599d 253,269,285,301
+  s_d10cdb513aa2bf::t_cd0eae4600efcd 347-393
+  s_d10cdb513aa2bf::t_e11e29dc86fba7 73,79,83
+tests/unit/renderer/components/OverviewScreen.spec.tsx
+  s_d10cdb513aa2bf::t_d716cb05429463 93
+  s_d10cdb513aa2bf::t_8e3593a0a3aa46 368
+  s_d10cdb513aa2bf::t_0fa83a4adf6d10 139,161,184,209,240,268,301
+  s_d10cdb513aa2bf::t_b0ce2254e197c9 326-354
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "927961bbc51ba1482856ad95565ea88b53d7492d",
+  "prompts": {},
+  "sessions": {
+    "s_d10cdb513aa2bf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "021b94aa-a5b0-438e-935d-473e5c7ae94b",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
