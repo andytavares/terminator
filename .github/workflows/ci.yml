@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   lint:
     name: Lint
@@ -144,106 +147,3 @@ jobs:
 
       - name: Build
         run: npm run build
-
-  release:
-    name: Package & Release
-    needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: macos-14
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.RELEASE_TOKEN }}
-
-      - uses: actions/setup-python@v5
-        id: python
-        with:
-          python-version: '3.11'
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-        env:
-          PYTHON: ${{ steps.python.outputs.python-path }}
-
-      - name: Bump patch version
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          npm version patch --no-git-tag-version
-          git add package.json package-lock.json
-          git commit -m "chore: bump version [skip ci]"
-          git push
-
-      - name: Build
-        run: npm run build
-
-      - name: Patch notarize to log full output before JSON.parse
-        run: |
-          python3 - <<'EOF'
-          import sys
-          path = 'node_modules/@electron/notarize/lib/notarytool.js'
-          with open(path, 'r') as f:
-              content = f.read()
-          needle = 'const parsed = JSON.parse(result.output.trim());'
-          if needle not in content:
-              print('ERROR: needle not found in file. Actual content around JSON.parse:')
-              for i, line in enumerate(content.splitlines()):
-                  if 'JSON.parse' in line or 'result.output' in line:
-                      print(f'  line {i+1}: {repr(line)}')
-              sys.exit(1)
-          patched = content.replace(needle, f'console.error("[notarytool raw output]", result.output); {needle}')
-          with open(path, 'w') as f:
-              f.write(patched)
-          print('patched successfully')
-          EOF
-
-      - name: Package
-        env:
-          CSC_LINK: ${{ secrets.APPLE_CERTIFICATE }}
-          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npm run package
-
-      - name: Get version
-        id: version
-        run: echo "value=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.version.outputs.value }}
-          name: v${{ steps.version.outputs.value }}
-          draft: false
-          prerelease: false
-          files: dist/*.dmg
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  cleanup:
-    name: Delete old releases
-    needs: release
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Delete old GitHub releases (keep last 5)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release list --repo "${{ github.repository }}" --limit 100 --json tagName \
-            --jq '.[5:][].tagName' | \
-          while read -r tag; do
-            echo "Deleting release and tag: $tag"
-            gh release delete "$tag" --repo "${{ github.repository }}" --yes --cleanup-tag
-          done
