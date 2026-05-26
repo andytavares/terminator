@@ -90,6 +90,7 @@ beforeEach(() => {
 
   vi.mocked(useSessionStore).mockReturnValue({
     sessions: new Map(),
+    busySessions: new Set(),
   } as unknown as ReturnType<typeof useSessionStore>)
 
   vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -135,6 +136,7 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['sess-1', session]]),
+      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -156,6 +158,7 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['sess-1', session]]),
+      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -178,6 +181,7 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['sess-1', session]]),
+      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -202,6 +206,7 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['sess-1', session]]),
+      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -232,6 +237,7 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['sess-1', session]]),
+      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -259,6 +265,7 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['sess-1', session]]),
+      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -291,6 +298,7 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['sess-1', session]]),
+      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -315,6 +323,35 @@ describe('OverviewScreen', () => {
     expect(mockSetActiveWorkspace).not.toHaveBeenCalled()
   })
 
+  it('sorts busy sessions to the top before alphabetical ordering', async () => {
+    const ws = makeWorkspace({ id: 'ws-1', name: 'Alpha' })
+    const proj = makeProject({ id: 'p-1', workspaceId: 'ws-1', name: 'Project' })
+    // sess-a comes first alphabetically, sess-z comes last — but sess-z is busy
+    const sessA = makeSession({ id: 's-a', projectId: 'p-1', tabTitle: 'aaa' })
+    const sessZ = makeSession({ id: 's-z', projectId: 'p-1', tabTitle: 'zzz' })
+
+    vi.mocked(useSessionStore).mockReturnValue({
+      sessions: new Map([
+        ['s-a', sessA],
+        ['s-z', sessZ],
+      ]),
+      busySessions: new Set(['s-z']),
+    } as unknown as ReturnType<typeof useSessionStore>)
+
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [ws],
+      projectsByWorkspaceId: new Map([['ws-1', [proj]]]),
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+
+    await act(async () => {
+      render(<OverviewScreen />)
+    })
+
+    const tiles = screen.getAllByRole('button')
+    expect(tiles[0].getAttribute('data-testid')).toBe('tile-s-z')
+    expect(tiles[1].getAttribute('data-testid')).toBe('tile-s-a')
+  })
+
   it('sorts tiles by workspace name, then project name, then tab title', async () => {
     const ws1 = makeWorkspace({ id: 'ws-a', name: 'Alpha' })
     const ws2 = makeWorkspace({ id: 'ws-b', name: 'Beta' })
@@ -328,6 +365,7 @@ describe('OverviewScreen', () => {
         ['s-1', sess1],
         ['s-2', sess2],
       ]),
+      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({

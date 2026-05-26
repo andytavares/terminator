@@ -60,6 +60,41 @@
   right: 6px;
 }
 
+.session-tile__close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition:
+    opacity 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
+  pointer-events: none;
+}
+
+.session-tile:hover .session-tile__close,
+.session-tile:focus-visible .session-tile__close {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.session-tile__close:hover {
+  background: rgba(220, 60, 60, 0.85);
+  color: #fff;
+}
+
 .session-tile__footer {
   padding: 8px 10px;
   display: flex;
