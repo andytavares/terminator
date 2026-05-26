@@ -1,0 +1,135 @@
+name: Fill PR Description
+
+on:
+  pull_request:
+    types: [opened, labeled]
+    branches: [main]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  fill-description:
+    name: Generate description with Claude
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened' || github.event.label.name == 'fill-description'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect diff and commits
+        run: |
+          BASE="${{ github.event.pull_request.base.ref }}"
+          git fetch origin "$BASE"
+
+          # Commits (subject + body)
+          git log "origin/$BASE"..HEAD --format="- %s%n%b" > commits.txt
+
+          # Diff truncated at 80 KB
+          DIFF=$(git diff "origin/$BASE"...HEAD)
+          MAX=81920  # 80 KB
+          if [ ${#DIFF} -gt $MAX ]; then
+            printf '%s\n\n[... diff truncated at 80 KB ...]' "${DIFF:0:$MAX}" > pr.diff
+          else
+            printf '%s' "$DIFF" > pr.diff
+          fi
+
+      - name: Call Anthropic API
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::ANTHROPIC_API_KEY secret is not set — skipping description generation"
+            exit 0
+          fi
+
+          COMMITS=$(cat commits.txt)
+          DIFF=$(cat pr.diff)
+          PR_TITLE="${{ github.event.pull_request.title }}"
+
+          PROMPT="You are writing a GitHub pull request description for an Electron + React TypeScript desktop app (a terminal emulator).
+
+          Fill in ONLY the three sections below using the PR title, commit messages, and diff provided.
+          Be concise and direct. Focus on WHY, not WHAT (the diff already shows what changed).
+          Output raw markdown only — no preamble, no explanation, nothing outside the three sections.
+          If there are no meaningful notes for the reviewer, omit the Notes section entirely.
+
+          ## What
+
+          <!-- one short paragraph: what changed and why — focus on the decision, not the diff -->
+
+          ## How to test
+
+          <!-- numbered steps a reviewer can follow to verify the behaviour -->
+
+          1.
+
+          ## Notes for reviewer
+
+          <!-- trade-offs, gotchas, or context not obvious from the diff — omit if nothing to say -->
+
+          --- PR TITLE ---
+          $PR_TITLE
+
+          --- COMMITS ---
+          $COMMITS
+
+          --- DIFF ---
+          $DIFF"
+
+          RESPONSE=$(curl --silent --fail \
+            https://api.anthropic.com/v1/messages \
+            --header "x-api-key: $ANTHROPIC_API_KEY" \
+            --header "anthropic-version: 2023-06-01" \
+            --header "content-type: application/json" \
+            --data "$(jq -n \
+              --arg model "claude-sonnet-4-6" \
+              --arg prompt "$PROMPT" \
+              '{
+                model: $model,
+                max_tokens: 1024,
+                messages: [{ role: "user", content: $prompt }]
+              }'
+            )")
+
+          echo "$RESPONSE" | jq -r '.content[0].text' > claude_output.txt
+
+      - name: Assemble final body
+        run: |
+          if [ ! -f claude_output.txt ]; then
+            exit 0
+          fi
+
+          cat claude_output.txt > final_body.md
+          cat >> final_body.md << 'EOF'
+
+          ## Checklist
+
+          - [ ] `npm run lint` passes
+          - [ ] `npm run test` passes (coverage ≥ 80%)
+          - [ ] `npm run build:extensions` succeeds
+          - [ ] New IPC channels added to `ipc-channels.md` and `electron.d.ts`
+          - [ ] README / docs updated if user-facing behavior changed
+          - [ ] No `console.log` left in production paths
+          EOF
+
+      - name: Update PR description
+        if: hashFiles('final_body.md') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} \
+            --body "$(cat final_body.md)" \
+            --repo "${{ github.repository }}"
+
+      - name: Remove trigger label
+        if: github.event.action == 'labeled'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} \
+            --remove-label "fill-description" \
+            --repo "${{ github.repository }}"
