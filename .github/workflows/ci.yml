@@ -152,7 +152,6 @@ jobs:
     runs-on: macos-14
     permissions:
       contents: write
-      packages: write
 
     steps:
       - uses: actions/checkout@v4
@@ -168,7 +167,6 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          registry-url: 'https://npm.pkg.github.com'
 
       - name: Install dependencies
         run: npm ci
@@ -230,26 +228,22 @@ jobs:
           files: dist/*.dmg
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish to GitHub Packages
-        run: npm publish --access restricted
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   cleanup:
-    name: Delete old package versions
+    name: Delete old releases
     needs: release
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      packages: write
+      contents: write
 
     steps:
-      - name: Delete old package versions (keep last 5)
-        uses: actions/delete-package-versions@v5
-        with:
-          package-name: 'terminator'
-          package-type: 'npm'
-          min-versions-to-keep: 5
-          delete-only-pre-release-versions: false
-          token: ${{ secrets.GITHUB_TOKEN }}
-          owner: ${{ github.repository_owner }}
+      - name: Delete old GitHub releases (keep last 5)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release list --repo "${{ github.repository }}" --limit 100 --json tagName \
+            --jq '.[5:][].tagName' | \
+          while read -r tag; do
+            echo "Deleting release and tag: $tag"
+            gh release delete "$tag" --repo "${{ github.repository }}" --yes --cleanup-tag
+          done

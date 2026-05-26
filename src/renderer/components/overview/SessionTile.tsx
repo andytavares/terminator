@@ -33,8 +33,13 @@ function SessionTileInner({
   onNavigate,
 }: Props): JSX.Element {
   const previewRef = useRef<HTMLDivElement>(null)
-  const { getTerminalInstance, isSessionBusy } = useSessionStore()
+  const { getTerminalInstance, isSessionBusy, closeSession } = useSessionStore()
   const isBusy = isSessionBusy(session.id)
+
+  function handleClose(e: React.MouseEvent): void {
+    e.stopPropagation()
+    void closeSession(session.id)
+  }
 
   useLayoutEffect(() => {
     const instance = getTerminalInstance(session.id) as TerminalInstance | undefined
@@ -62,6 +67,14 @@ function SessionTileInner({
             <ActivitySpinner />
           </div>
         )}
+        <button
+          className="session-tile__close"
+          onClick={handleClose}
+          aria-label={`Close ${session.tabTitle}`}
+          tabIndex={-1}
+        >
+          ✕
+        </button>
       </div>
 
       <div className="session-tile__footer">

@@ -70,14 +70,17 @@ function makeMetrics(overrides: Partial<ProcessMetrics> = {}): ProcessMetrics {
 
 const mockGetTerminalInstance = vi.fn()
 const mockIsSessionBusy = vi.fn(() => false)
+const mockCloseSession = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
   mockGetTerminalInstance.mockReturnValue(undefined)
   mockIsSessionBusy.mockReturnValue(false)
+  mockCloseSession.mockResolvedValue(undefined)
   vi.mocked(useSessionStore).mockReturnValue({
     getTerminalInstance: mockGetTerminalInstance,
     isSessionBusy: mockIsSessionBusy,
+    closeSession: mockCloseSession,
   } as unknown as ReturnType<typeof useSessionStore>)
 })
 
@@ -247,7 +250,7 @@ describe('SessionTile', () => {
         onNavigate={onNavigate}
       />
     )
-    fireEvent.click(screen.getByRole('button'))
+    fireEvent.click(screen.getByLabelText('Switch to My Project — Terminal'))
     expect(onNavigate).toHaveBeenCalledOnce()
   })
 
@@ -263,7 +266,7 @@ describe('SessionTile', () => {
         onNavigate={onNavigate}
       />
     )
-    fireEvent.keyDown(screen.getByRole('button'), { key: 'Enter' })
+    fireEvent.keyDown(screen.getByLabelText('Switch to My Project — Terminal'), { key: 'Enter' })
     expect(onNavigate).toHaveBeenCalledOnce()
   })
 
@@ -279,7 +282,7 @@ describe('SessionTile', () => {
         onNavigate={onNavigate}
       />
     )
-    fireEvent.keyDown(screen.getByRole('button'), { key: ' ' })
+    fireEvent.keyDown(screen.getByLabelText('Switch to My Project — Terminal'), { key: ' ' })
     expect(onNavigate).toHaveBeenCalledOnce()
   })
 
@@ -295,7 +298,7 @@ describe('SessionTile', () => {
         onNavigate={onNavigate}
       />
     )
-    fireEvent.keyDown(screen.getByRole('button'), { key: 'Tab' })
+    fireEvent.keyDown(screen.getByLabelText('Switch to My Project — Terminal'), { key: 'Tab' })
     expect(onNavigate).not.toHaveBeenCalled()
   })
 
@@ -340,5 +343,52 @@ describe('SessionTile', () => {
       />
     )
     expect(screen.getByText(/512 KB/)).toBeTruthy()
+  })
+
+  it('renders a close button', () => {
+    const { container } = render(
+      <SessionTile
+        session={makeSession()}
+        workspace={makeWorkspace()}
+        project={makeProject()}
+        processMetrics={null}
+        tileIndex={0}
+        onNavigate={vi.fn()}
+      />
+    )
+    expect(container.querySelector('.session-tile__close')).toBeTruthy()
+  })
+
+  it('calls closeSession when close button is clicked', () => {
+    render(
+      <SessionTile
+        session={makeSession({ id: 'sess-42' })}
+        workspace={makeWorkspace()}
+        project={makeProject()}
+        processMetrics={null}
+        tileIndex={0}
+        onNavigate={vi.fn()}
+      />
+    )
+    const closeBtn = screen.getByLabelText('Close Terminal')
+    fireEvent.click(closeBtn)
+    expect(mockCloseSession).toHaveBeenCalledWith('sess-42')
+  })
+
+  it('does not call onNavigate when close button is clicked', () => {
+    const onNavigate = vi.fn()
+    render(
+      <SessionTile
+        session={makeSession()}
+        workspace={makeWorkspace()}
+        project={makeProject()}
+        processMetrics={null}
+        tileIndex={0}
+        onNavigate={onNavigate}
+      />
+    )
+    const closeBtn = screen.getByLabelText('Close Terminal')
+    fireEvent.click(closeBtn)
+    expect(onNavigate).not.toHaveBeenCalled()
   })
 })
