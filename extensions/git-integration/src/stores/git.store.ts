@@ -6,11 +6,13 @@ interface GitStore {
   selectedFile: string | null
   diffCache: Map<string, FileDiff>
   isLoading: boolean
+  view: 'default' | 'merge-flow'
   setStatus(status: GitStatus | null): void
   setSelectedFile(path: string | null): void
   setDiff(path: string, diff: FileDiff): void
   setLoading(loading: boolean): void
   clearDiffCache(): void
+  setView(view: 'default' | 'merge-flow'): void
 }
 
 export const useGitStore = create<GitStore>((set) => ({
@@ -18,6 +20,7 @@ export const useGitStore = create<GitStore>((set) => ({
   selectedFile: null,
   diffCache: new Map(),
   isLoading: false,
+  view: 'default',
   setStatus: (status) => set({ status }),
   setSelectedFile: (selectedFile) => set({ selectedFile }),
   setDiff: (path, diff) =>
@@ -28,4 +31,5 @@ export const useGitStore = create<GitStore>((set) => ({
     }),
   setLoading: (isLoading) => set({ isLoading }),
   clearDiffCache: () => set({ diffCache: new Map() }),
+  setView: (view) => set({ view }),
 }))

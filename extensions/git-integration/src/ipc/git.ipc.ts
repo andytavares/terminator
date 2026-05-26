@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { execFile as execFileCb } from 'child_process'
 import { promisify } from 'util'
 import { getStatus, getDiff, stageFiles, unstageFiles, commitChanges } from '../git/git-service.js'
+import { registerMergeFlowHandlers } from './merge-flow.ipc.js'
 
 const execFile = promisify(execFileCb)
 
@@ -138,4 +139,6 @@ export function registerGitExtensionHandlers(register: RegisterFn): void {
   register('git:pr-create', (_payload) => {
     return { error: 'NOT_IMPLEMENTED' }
   })
+
+  registerMergeFlowHandlers(register)
 }

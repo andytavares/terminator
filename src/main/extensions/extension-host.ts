@@ -201,11 +201,18 @@ export class ExtensionHost {
       const dirPath = join(bundledDir, name)
       const manifestPath = join(dirPath, 'manifest.json')
       if (!existsSync(manifestPath)) continue
-      // Only load if not already registered (avoid duplicates on hot-reload)
-      const alreadyLoaded = this.loaded.has(name)
-      if (!alreadyLoaded) {
-        await this.load(dirPath)
+      // Peek at manifest to get the real extension ID (e.g. "terminator.git-integration")
+      // before checking this.loaded — directory name and ID differ.
+      let extensionId: string | undefined
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const manifest = require(manifestPath) as { id?: string }
+        extensionId = manifest.id
+      } catch {
+        // fall through and let load() report the invalid manifest
       }
+      if (extensionId && this.loaded.has(extensionId)) continue
+      await this.load(dirPath)
     }
   }
 

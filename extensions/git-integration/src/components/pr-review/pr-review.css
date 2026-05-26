@@ -405,6 +405,18 @@
   vertical-align: middle;
 }
 
+.pr-row-conflicts {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(245, 166, 35, 0.15);
+  color: var(--tm-warning);
+  margin-left: 6px;
+  vertical-align: middle;
+  font-weight: 500;
+}
+
 .pr-row-title {
   font-size: 13px;
   font-weight: 500;
@@ -2605,6 +2617,24 @@
 .pr-overview-update-branch-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.pr-overview-resolve-conflicts-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid rgba(248, 81, 73, 0.5);
+  border-radius: 6px;
+  color: #f85149;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.pr-overview-resolve-conflicts-btn:hover {
+  border-color: #f85149;
+  color: #ff7b72;
 }
 
 .pr-update-branch-error {

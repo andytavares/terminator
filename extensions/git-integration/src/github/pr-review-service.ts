@@ -729,6 +729,13 @@ export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
     approvedBy,
     requestedReviewers,
     assigneeLogins,
+    mergeStateStatus: (() => {
+      const s = String(obj.mergeStateStatus ?? '').toUpperCase()
+      if (s === 'BEHIND') return 'behind' as const
+      if (s === 'DIRTY') return 'dirty' as const
+      if (s === 'CLEAN' || s === 'HAS_HOOKS') return 'clean' as const
+      return 'unknown' as const
+    })(),
   }
 }
 

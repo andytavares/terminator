@@ -56,7 +56,12 @@ export function App(): JSX.Element {
   } = useExtensionRegistry()
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
-  const repoRoot = activeWorkspace?.folderPath ?? null
+  const activeProjects = activeWorkspaceId
+    ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? [])
+    : []
+  const activeProject = activeProjects.find((p) => p.id === activeProjectId)
+  // For worktree projects use their own path; otherwise fall back to the workspace folder
+  const repoRoot = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? null
 
   const handleOpenSettings = useCallback(() => setSettingsOpen(true), [])
   const handleToggleLog = useCallback(() => setLogOpen((v) => !v), [])

@@ -8,6 +8,7 @@ import { FileDiffView } from './FileDiffView'
 import { PrDialog } from './PrDialog'
 import type { FileDiff, PullRequest } from '../schemas/git.schema'
 import { gitAPI } from '../api/git'
+import { MergeFlowView } from './merge-flow/MergeFlowView'
 
 interface Props {
   repoRoot: string | null
@@ -23,8 +24,17 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
     -1
   )
 
-  const { status, selectedFile, diffCache, setSelectedFile, setDiff, setLoading, clearDiffCache } =
-    useGitStore()
+  const {
+    status,
+    selectedFile,
+    diffCache,
+    setSelectedFile,
+    setDiff,
+    setLoading,
+    clearDiffCache,
+    view,
+    setView,
+  } = useGitStore()
   const [commitMessage, setCommitMessage] = useState('')
   const [isCommitting, setIsCommitting] = useState(false)
   const [isPushing, setIsPushing] = useState(false)
@@ -188,6 +198,10 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
     return <div className="git-full-view git-full-view--empty">No project selected.</div>
   }
 
+  if (view === 'merge-flow') {
+    return <MergeFlowView repoRoot={repoRoot} onExit={() => setView('default')} />
+  }
+
   return (
     <div className="git-full-view">
       {/* Left: diff / code view */}
@@ -199,6 +213,17 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
 
       {/* Right: changes list + commit */}
       <div className="git-full-view__changes-pane" style={{ width: changesWidth }}>
+        {status?.hasConflicts && (
+          <div className="git-full-view__conflict-banner">
+            <span className="git-full-view__conflict-banner-text">Merge conflicts detected</span>
+            <button
+              className="git-full-view__conflict-banner-btn"
+              onClick={() => setView('merge-flow')}
+            >
+              Resolve conflicts →
+            </button>
+          </div>
+        )}
         <div className="git-full-view__staging">
           <StagingArea
             repoRoot={repoRoot}

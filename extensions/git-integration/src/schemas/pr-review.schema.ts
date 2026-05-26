@@ -139,6 +139,7 @@ export const ReviewQueuePRSchema = z.object({
   assigneeLogins: z.array(z.string()).default([]),
   resumeChapter: z.number().optional(),
   resumeChapterTotal: z.number().optional(),
+  mergeStateStatus: z.enum(['behind', 'dirty', 'clean', 'unknown']).default('unknown'),
 })
 
 // ─── PR issue (conversation) comments ────────────────────────────────────────
