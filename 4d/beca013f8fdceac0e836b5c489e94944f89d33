@@ -1,0 +1,301 @@
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_1ef7c376250e8d::t_7287b0c4027c2a 17,25-26,28,31-36,51-66,110,138-156,161-177,179-191,193-201,203-212,218-221,223-224,232-241
+  s_1ef7c376250e8d::t_c041bf006e986c 157-158
+  s_1ef7c376250e8d::t_a43db3d6751cf1 217
+  s_1ef7c376250e8d::t_ac35f012a46557 27
+src/renderer/stores/notification.store.ts
+  s_e205e21e6721f9::t_204fcb1c9f9157 1-5,7-12,14-29,32-79
+  s_e205e21e6721f9::t_668da954c93f7f 6,13
+  s_e205e21e6721f9::t_4363212aaaaa4c 30-31
+src/main/extensions/api.ts
+  s_e205e21e6721f9::t_383117bf6cba2c 408-423
+  s_e205e21e6721f9::t_001547306e290d 188
+src/main/git/git-service.ts
+  s_1ef7c376250e8d::t_64c639ec89175b 119-122
+src/renderer/components/sidebar/WorkspaceRail.css
+  s_e205e21e6721f9::t_8359bd2cb8f95d 239-241,245-248,258-259,264,275-286
+  s_e205e21e6721f9::t_72fb7af73a161e 242-244,249-257,260-263,265-274
+extensions/task-vault/src/components/CalendarDrawer.tsx
+  s_e205e21e6721f9::t_0eb43b9e4721d5 1,3-56,58-80,82,84-87,89,91-98,100-101,103-125,139,180,195,213-215
+  s_e205e21e6721f9::t_a70ae65253e47b 2,57,126-138,140,142-147,149-152,154-170,172-179,181-194,196-200,202-212
+  s_e205e21e6721f9::t_cfe53b6e482297 102
+extensions/task-vault/tests/notifications/task-scheduler.spec.ts
+  s_e205e21e6721f9::t_c0c966bf572499 90
+  s_e205e21e6721f9::t_994b9866fb0b13 1-89,91-214,216-230,232-295
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_e205e21e6721f9::t_1ac4906351ef04 1015-1062
+src/main/preload.ts
+  s_e205e21e6721f9::t_8e65515147fcc4 171-181
+  s_1ef7c376250e8d::t_639149fa1d935a 72-73
+tests/unit/terminal/notification.ipc.spec.ts
+  s_e205e21e6721f9::t_de2d79a6964043 4,12,17-18
+src/main/notifications/notification-manager.ts
+  s_e205e21e6721f9::t_80c917e6f78f05 1-98
+extensions/task-vault/src/notifications/task-scheduler.ts
+  s_e205e21e6721f9::t_3b432d7a5672ce 64-69,71-95
+  s_e205e21e6721f9::t_5cbf8d7177096b 1-4,15-43,45-52,56-63,70,96-153,156
+  s_e205e21e6721f9::t_c8fbda303a7bb1 44
+  s_e205e21e6721f9::t_261d0eef3bdeff 5-14
+  s_e205e21e6721f9::t_e62bd2eab9b899 154-155
+  s_e205e21e6721f9::t_5f84b650c40f84 53-55
+src/renderer/stores/toast.store.ts
+  s_e205e21e6721f9::t_afddb43a11fbb4 2
+  s_e205e21e6721f9::t_d6e29e76386c17 15,19-20,27,39
+  s_e205e21e6721f9::t_204fec4c2b65b0 33-38,40
+extensions/task-vault/src/schemas/vault.schema.ts
+  s_e205e21e6721f9::t_71eeab7db3108c 252-257,272-282
+  s_e205e21e6721f9::t_74f6174def6a04 270
+  s_e205e21e6721f9::t_1e9cc3fb619045 258-269,271
+  s_e205e21e6721f9::t_325b335201117f 12
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_e205e21e6721f9::t_5a860b614a9998 549
+  s_e205e21e6721f9::t_06de8e3cec8b3b 355,366
+  s_e205e21e6721f9::t_bff3a7defec17f 16
+  s_e205e21e6721f9::t_54989c79187036 5
+  s_e205e21e6721f9::t_73b07a26d0f806 401
+  s_e205e21e6721f9::t_0310725bf1f60f 538
+  s_e205e21e6721f9::t_c16c6e77e5f8d3 525
+  s_e205e21e6721f9::t_0bafc6b30473b4 313-319
+  s_e205e21e6721f9::t_b7aecf2af5eaa7 15
+  s_e205e21e6721f9::t_50e161af9140a8 269
+  s_e205e21e6721f9::t_9d0706402f6d31 300-312
+  s_e205e21e6721f9::t_f7d006efa8f287 347-353,357-359,361
+  s_e205e21e6721f9::t_10167b790fc753 7
+  s_e205e21e6721f9::t_80b743162a3847 262,267
+  s_e205e21e6721f9::t_f52ce4d370e73e 265-266
+  s_e205e21e6721f9::t_28e06a1a28790d 379-400,402-403
+  s_e205e21e6721f9::t_fb705a98a706a0 526
+  s_e205e21e6721f9::t_a350029e980fa5 523-524,527
+src/renderer/components/sidebar/WorkspaceRail.tsx
+  s_e205e21e6721f9::t_06835050fe1382 34,36,43,45
+  s_e205e21e6721f9::t_995f28be881f5b 35,44
+  s_e205e21e6721f9::t_bab0502ea620ab 83
+  s_e205e21e6721f9::t_cc00957e1ae4b0 81-82,84-92
+  s_e205e21e6721f9::t_a8ad32863e408a 2
+extensions/task-vault/src/stores/vault.store.ts
+  s_e205e21e6721f9::t_c022edf6fb314f 109,128-131,133-139
+  s_e205e21e6721f9::t_33df8fe14b7e73 67
+  s_e205e21e6721f9::t_5f63799038080c 68
+  s_e205e21e6721f9::t_c559b1ba89bb75 4
+  s_e205e21e6721f9::t_3bbd65f8ebd17c 104
+  s_e205e21e6721f9::t_87d1fe9ed9d5e8 37,39
+  s_e205e21e6721f9::t_70e0a644b8b74c 103,105-107
+  s_e205e21e6721f9::t_39659fa70ef978 36,49-50
+tests/unit/renderer/components/NotificationPanel.spec.tsx
+  s_e205e21e6721f9::t_f51ecca50dcdcd 11-15
+  s_e205e21e6721f9::t_a3fafa0efddcda 1,4-5,7-10,16,18-20,22-26,28-39,44-64,66-71,73-99,101,103-110,113-119,121-132,134-138,192
+  s_e205e21e6721f9::t_d4a903ed1a07c2 139-191
+  s_e205e21e6721f9::t_27aeb629ab369d 2-3,6,17,21,27,40-43,65,72,100,102,111-112,120,133
+src/renderer/components/NotificationPanel.tsx
+  s_e205e21e6721f9::t_1474fac35efc39 54
+  s_e205e21e6721f9::t_b4d74f75978f7e 4,93-106,108-112
+  s_e205e21e6721f9::t_615d8ad558c4a6 78
+  s_e205e21e6721f9::t_8279bbc529d677 29-35,38-44,50-51,58-61
+  s_e205e21e6721f9::t_b631000166d855 116-119
+  s_e205e21e6721f9::t_6dbe7ac488492e 164
+  s_e205e21e6721f9::t_a42bb5d8c170cd 2,7-18,62,107,159
+  s_e205e21e6721f9::t_203236598d1e24 1,3,5-6,19-28,36-37,45-49,52-53,55-57,63-64,66-77,79-92,113-115,120-158,160-162,166-171
+extensions/task-vault/tests/components/CalendarDrawer.spec.tsx
+  s_e205e21e6721f9::t_501126ee31e58c 1-44,46-47,50-52,54-76,78-87,89-121,123-126,136,138-139
+  s_e205e21e6721f9::t_8bd34245ef0e8d 45,48-49,53,88,122,127-135,137
+tests/unit/renderer/stores/toast.store.spec.ts
+  s_e205e21e6721f9::t_d5f292bbccab15 2-8,10,15
+  s_e205e21e6721f9::t_880155170387e4 77-85
+src/renderer/components/NotificationPanel.css
+  s_e205e21e6721f9::t_de539af1036f7d 18-19,21
+  s_e205e21e6721f9::t_eb84385da4cb86 128-131
+  s_e205e21e6721f9::t_e156696e018900 11,20,22-24
+  s_e205e21e6721f9::t_ade70169f7b93d 1-10,13-17,25-101,104-127,133,136-232
+  s_e205e21e6721f9::t_f0c8c52320cb47 132,134
+  s_e205e21e6721f9::t_88d7fea477e8e0 12
+  s_e205e21e6721f9::t_47e4d4d5cc2c3b 102-103
+  s_e205e21e6721f9::t_e9deb7a3c92e6b 135
+extensions/task-vault/src/components/VaultSidebar.tsx
+  s_e205e21e6721f9::t_85d2df4afad287 18
+  s_e205e21e6721f9::t_9c8bd8a662a30b 2-8,10
+src/renderer/App.tsx
+  s_e205e21e6721f9::t_39153e075c1672 18
+  s_e205e21e6721f9::t_a3d6d4638658fb 192,199
+  s_e205e21e6721f9::t_e69d1c6de1c67a 19
+  s_e205e21e6721f9::t_d0c91d8fe84efb 46-49,51
+  s_e205e21e6721f9::t_70811d3265b667 321,323
+  s_e205e21e6721f9::t_305c89738080ca 322
+  s_e205e21e6721f9::t_82ca8129ea00b3 403
+  s_e205e21e6721f9::t_c6d6cdea9b1d2b 190-191,193-198,200-201
+  s_e205e21e6721f9::t_b5ed457cab1511 52
+  s_e205e21e6721f9::t_2f347fa03947c6 202-208
+tests/unit/renderer/App.spec.tsx
+  s_e205e21e6721f9::t_71ea977bdced8f 190-193
+  s_e205e21e6721f9::t_19b11f818ad7ab 394-395,397
+  s_e205e21e6721f9::t_8496d2daae3456 185-189
+  s_e205e21e6721f9::t_e7a3c58a24b508 446-447,449
+tests/integration/ipc/git.ipc.spec.ts
+  s_1ef7c376250e8d::t_48d27422dc2ee3 14
+  s_1ef7c376250e8d::t_98d5c0ab42a5a9 133-155
+extensions/task-vault/src/components/CalendarView.tsx
+  s_e205e21e6721f9::t_ab390a55b5ef0a 1-67,69,71-74,76,78-113,115-124,126-136,138-163
+extensions/task-vault/src/vault/types.ts
+  s_e205e21e6721f9::t_aa33e96babedd9 111-112
+  s_e205e21e6721f9::t_2a71c44bac4aa9 1-8
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_e205e21e6721f9::t_6b39bcfc3890fc 23-25
+  s_e205e21e6721f9::t_c758dc55e41701 28
+  s_e205e21e6721f9::t_6b0468b14ae4da 1108-1126
+  s_e205e21e6721f9::t_97eac3fdb3c7ec 54-62,75-76
+  s_e205e21e6721f9::t_bd8ad871477b7e 832-873
+  s_e205e21e6721f9::t_2c05830e59b5ff 1127-1145,1147-1189
+  s_e205e21e6721f9::t_2a10da0cca20fd 1146
+  s_e205e21e6721f9::t_6e7b68e7df23f5 42-45,47
+  s_e205e21e6721f9::t_d7dbd332eaadef 815
+  s_e205e21e6721f9::t_c0b68e779870e7 1190-1210
+src/renderer/components/sidebar/Dialog.css
+  s_1ef7c376250e8d::t_ffa9fc3861a4b1 192-228
+extensions/task-vault/src/ipc/kanban.ipc.ts
+  s_e205e21e6721f9::t_35a5a11fd8c04a 38-44,46
+  s_e205e21e6721f9::t_05f43e3abc2487 56
+src/main/ipc/notification.ipc.ts
+  s_e205e21e6721f9::t_6d366f848de95a 2-9,21-36
+tests/unit/renderer/stores/notification.store.spec.ts
+  s_e205e21e6721f9::t_0fb686dc9a6d63 1-160
+tests/unit/extensions/api.spec.ts
+  s_e205e21e6721f9::t_699b93fe8f12b1 11-14
+  s_e205e21e6721f9::t_4fba38fae1d055 279-306,308-310,312-328,330-386
+  s_e205e21e6721f9::t_7bc659416f1ad5 4
+  s_e205e21e6721f9::t_952f42e6063240 329
+  s_e205e21e6721f9::t_b712c41eb8cf4d 307
+src/renderer/components/sidebar/CreateProjectDialog.tsx
+  s_1ef7c376250e8d::t_9119c64a4529ba 233-243
+  s_1ef7c376250e8d::t_633ef749670f4e 8-9,18,23,51-52,57,69,71-75,77-79,87,89-121,130,153,155-156,181-204,208,212,218-229,246,252,266-268
+  s_1ef7c376250e8d::t_906d82bda84d2b 5
+  s_1ef7c376250e8d::t_a6077127467513 210-211,213-214
+src/renderer/electron.d.ts
+  s_e205e21e6721f9::t_d7b50626903269 13-22
+  s_1ef7c376250e8d::t_ac365244fad94a 54
+  s_e205e21e6721f9::t_bd7abd4be13524 152-157
+src/main/index.ts
+  s_1ef7c376250e8d::t_de0aa217657e9f 44-57
+  s_1ef7c376250e8d::t_63aae41ca01b9e 144
+  s_1ef7c376250e8d::t_dfb8b5def9bc56 134-138
+  s_1ef7c376250e8d::t_76a21cfaee328a 17-22
+src/renderer/components/sidebar/BranchSelect.tsx
+  s_1ef7c376250e8d::t_e1e007f1b02360 1-104
+package.json
+  s_e205e21e6721f9::t_94149a07e7ab34 51
+src/renderer/extensions/registry.ts
+  s_e205e21e6721f9::t_0048a93deeca75 87
+  s_e205e21e6721f9::t_487756aea7c953 174-189
+  s_e205e21e6721f9::t_eb2bc22fa807aa 52,63-64
+src/main/ipc/git.ipc.ts
+  s_1ef7c376250e8d::t_0e5589d71826d1 9
+  s_1ef7c376250e8d::t_5c4593991168dd 66-73
+tests/unit/notifications/notification-manager.spec.ts
+  s_e205e21e6721f9::t_cc042ef85c4e78 1-38,40-127
+extensions/task-vault/src/components/SomedayView.tsx
+  s_e205e21e6721f9::t_f7f47ec75e2485 1-191
+extensions/task-vault/src/components/InboxView.tsx
+  s_e205e21e6721f9::t_06c8fb1e66f954 179-180
+src/renderer/components/sidebar/BranchSelect.css
+  s_1ef7c376250e8d::t_ee6d5ff55c55a2 1-142
+extensions/task-vault/src/components/task-vault.css
+  s_e205e21e6721f9::t_24fda07b29ec49 6204-6212,6214,6218,6224-6225
+  s_e205e21e6721f9::t_d397672af410e9 3537-3539
+  s_e205e21e6721f9::t_9e3beee2ca0146 6254-6388
+  s_e205e21e6721f9::t_85302c55fe6855 6390,6392,6394,6406
+  s_e205e21e6721f9::t_91248573a7ae21 6147-6159,6163-6164,6166,6168-6178,6181-6203,6213,6215-6217,6219-6223
+  s_e205e21e6721f9::t_efe6b5032480f2 6389,6391,6393,6395-6405,6407-6585
+  s_e205e21e6721f9::t_62e1506f6367a4 6103
+  s_e205e21e6721f9::t_1d9b6591a95af8 3156-3163
+  s_e205e21e6721f9::t_0d152b7b1853f2 3536,3540-3542
+  s_e205e21e6721f9::t_fc8469415d0cef 6018,6025-6102,6104-6146,6160-6162,6165,6167,6179-6180,6226-6253
+  s_e205e21e6721f9::t_1f8b70948426ee 6019-6024
+  s_e205e21e6721f9::t_42fb0f58f46afb 3513-3515,3521-3535,3543-3546,3548-3550,3558-3566
+README.md
+  s_e205e21e6721f9::t_e206283e49b286 20
+  s_e205e21e6721f9::t_cb85f6342986d3 32
+extensions/task-vault/src/index.ts
+  s_e205e21e6721f9::t_f9516ac865b96d 86-87
+  s_e205e21e6721f9::t_3880343ac30ddd 54-60
+  s_e205e21e6721f9::t_e76a44cbf0f71c 88
+  s_e205e21e6721f9::t_3303f519da84f0 11
+extensions/task-vault/src/components/WeeklyReviewStep6Reflect.tsx
+  s_e205e21e6721f9::t_e7727e35b4cc43 15-16
+tests/unit/renderer/components/BranchSelect.spec.tsx
+  s_e205e21e6721f9::t_70667475cde49a 2
+  s_1ef7c376250e8d::t_822705cdcd49d5 1,3-138
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_e205e21e6721f9::t_bbd5da2b545f5f 941-944,949
+  s_e205e21e6721f9::t_5bf13f978d7ef6 934-940,945-948,950-954,959-965,967-968,970-974,976-997,999-1005,1007-1011,1013-1046,1048-1052,1054-1057,1072-1074
+  s_e205e21e6721f9::t_bf87216e8d3b00 1071
+  s_e205e21e6721f9::t_b8f285e1d56392 907-922,924-928,930-933
+  s_e205e21e6721f9::t_b412ea81c3d3b8 956-957
+docs/EXTENSION-DEVELOPMENT.md
+  s_e205e21e6721f9::t_281c3f1cb481f1 669,675-683,685-691
+extensions/task-vault/src/components/DailyLog.tsx
+  s_e205e21e6721f9::t_9578c19366489b 19
+  s_e205e21e6721f9::t_b8d7538d7cdcce 805
+  s_e205e21e6721f9::t_cbda7b9600b637 1137
+  s_e205e21e6721f9::t_3cf7840e23e806 800-801,803-804,926
+  s_e205e21e6721f9::t_fb0bcfbd627216 40
+  s_e205e21e6721f9::t_9a824140b1088a 60-61
+  s_e205e21e6721f9::t_a73d97990db352 1131-1132,1134-1136,1138-1140
+  s_e205e21e6721f9::t_d4625b410104c4 619-630,634-637,643-645,664
+  s_e205e21e6721f9::t_72b0dbc471058f 8
+  s_e205e21e6721f9::t_ec82276520fbb3 1093
+  s_e205e21e6721f9::t_9ca0bc8b86fa3b 523,537
+  s_e205e21e6721f9::t_f136782b487049 992
+  s_e205e21e6721f9::t_a138b5df465c0c 1133
+  s_e205e21e6721f9::t_759be0d50128e3 667-680
+  s_e205e21e6721f9::t_f0c8072732aedb 611-613,615
+  s_e205e21e6721f9::t_7a0c4b81881057 1,17-18
+  s_e205e21e6721f9::t_e997aafca2df06 793,797,799
+  s_e205e21e6721f9::t_7cadeafa3f606c 979-980,996-997,1011,1015-1018,1026-1065,1069-1081,1083-1090,1092,1101-1104,1171,1176-1180
+  s_e205e21e6721f9::t_0917943b3bd7d7 341-345,353-354,358,366,369,372,376,379-449,460,464-465,489,491-492,500
+  s_e205e21e6721f9::t_2ba4322810c6ee 990-991,993
+  s_e205e21e6721f9::t_4edd97e94286c8 38-39,41
+  s_e205e21e6721f9::t_23bd5185a42b28 638-640,642
+  s_e205e21e6721f9::t_2feb00acb1fbff 159
+  s_e205e21e6721f9::t_992682b8a8bf51 608
+  s_e205e21e6721f9::t_99da99c9f1887d 367-368,370-371,373-375,377-378
+  s_e205e21e6721f9::t_bdec9bced14d23 143-149
+  s_e205e21e6721f9::t_b565f6918cc037 175-177,179
+  s_e205e21e6721f9::t_717f5e65de4dbd 646-661
+  s_e205e21e6721f9::t_27f66620ca38a5 752
+  s_e205e21e6721f9::t_8d7c3c9107fc5c 1066-1068,1091,1094-1097,1099-1100
+  s_e205e21e6721f9::t_5a00915523f6a1 346-352,355-357,359-363,458-459
+  s_e205e21e6721f9::t_d4759682e2039c 26
+  s_e205e21e6721f9::t_8ce145ebe2cd9a 6
+  s_e205e21e6721f9::t_7ff2efd8272297 364-365,450-457,461-463,466-488,490,493-499,501-509,517-522,531-536
+  s_e205e21e6721f9::t_d6341f5bb7c1e6 545
+  s_e205e21e6721f9::t_a865433e85558c 549
+  s_e205e21e6721f9::t_5c6101874aebd7 827-829,863,867
+  s_e205e21e6721f9::t_df20b22010938a 1108-1130
+  s_e205e21e6721f9::t_b4f1b19e57facf 546-548
+  s_e205e21e6721f9::t_e695281bfcc239 27
+tests/integration/ipc/notification.ipc.spec.ts
+  s_e205e21e6721f9::t_33bcb4e481747c 1-12,19-107
+  s_e205e21e6721f9::t_0e5b254705c16b 13-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "4dbeca013f8fdceac0e836b5c489e94944f89d33",
+  "prompts": {},
+  "sessions": {
+    "s_1ef7c376250e8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f25a8d26-c65d-4789-8656-7301a1e8d69e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_e205e21e6721f9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f21babc0-3d2a-4e2e-88ec-f495ec91a1ad",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
