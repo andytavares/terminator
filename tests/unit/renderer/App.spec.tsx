@@ -182,6 +182,15 @@ beforeEach(() => {
       onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe),
     },
     extensionEvents: null,
+    notifications: {
+      list: vi.fn().mockResolvedValue([]),
+      dismiss: vi.fn().mockResolvedValue({ ok: true }),
+      onPush: vi.fn().mockReturnValue(mockUnsubscribe),
+    },
+    extensionBridge: {
+      on: vi.fn().mockReturnValue(mockUnsubscribe),
+      invoke: vi.fn().mockResolvedValue({}),
+    },
   }
   setupMocks()
 })
@@ -382,6 +391,10 @@ describe('App', () => {
         onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
         onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
       },
+      extensionBridge: {
+        on: vi.fn().mockReturnValue(mockUnsubscribe),
+        invoke: vi.fn().mockResolvedValue({}),
+      },
     }
     render(<App />)
     openSettingsCallback?.()
@@ -401,6 +414,10 @@ describe('App', () => {
         },
         onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
         onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
+      },
+      extensionBridge: {
+        on: vi.fn().mockReturnValue(mockUnsubscribe),
+        invoke: vi.fn().mockResolvedValue({}),
       },
     }
     render(<App />)
@@ -425,6 +442,10 @@ describe('App', () => {
           return vi.fn()
         },
         onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
+      },
+      extensionBridge: {
+        on: vi.fn().mockReturnValue(mockUnsubscribe),
+        invoke: vi.fn().mockResolvedValue({}),
       },
     }
     render(<App />)
@@ -496,6 +517,10 @@ describe('App', () => {
           cb('git')
           return vi.fn()
         },
+      },
+      extensionBridge: {
+        on: vi.fn().mockReturnValue(mockUnsubscribe),
+        invoke: vi.fn().mockResolvedValue({}),
       },
     }
     render(<App />)

@@ -49,6 +49,7 @@ interface ExtensionRegistry {
   commands: CommandRegistration[]
   openPanels: Set<string>
   activeProjectTabId: string | null
+  pendingNavigations: Map<string, unknown>
 
   registerSidebarPanel(panel: SidebarPanelRegistration): () => void
   registerProjectTab(tab: ProjectTabRegistration): () => void
@@ -59,6 +60,8 @@ interface ExtensionRegistry {
   togglePanel(panelId: string): void
   setActiveProjectTab(tabId: string | null): void
   setActiveGlobalTab(tabId: string | null): void
+  setActiveGlobalTabWithNavigation(tabId: string, navigationData: unknown): void
+  clearPendingNavigation(extensionId: string): void
 }
 
 export type ExtensionRendererAPI = Pick<
@@ -81,6 +84,7 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
   commands: [],
   openPanels: new Set(),
   activeProjectTabId: null,
+  pendingNavigations: new Map(),
 
   registerSidebarPanel(panel) {
     set((s) => {
@@ -166,6 +170,22 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
 
   setActiveGlobalTab(tabId) {
     set({ activeGlobalTabId: tabId, ...(tabId !== null ? { activeProjectTabId: null } : {}) })
+  },
+
+  setActiveGlobalTabWithNavigation(tabId, navigationData) {
+    set((s) => {
+      const pendingNavigations = new Map(s.pendingNavigations)
+      pendingNavigations.set(tabId, navigationData)
+      return { activeGlobalTabId: tabId, activeProjectTabId: null, pendingNavigations }
+    })
+  },
+
+  clearPendingNavigation(extensionId) {
+    set((s) => {
+      const pendingNavigations = new Map(s.pendingNavigations)
+      pendingNavigations.delete(extensionId)
+      return { pendingNavigations }
+    })
   },
 }))
 

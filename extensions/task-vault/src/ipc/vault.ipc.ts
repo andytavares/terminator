@@ -20,8 +20,12 @@ import {
   ListArchiveRequestSchema,
   GetTaskDetailRequestSchema,
   SaveTaskDetailRequestSchema,
+  BlockTaskRequestSchema,
+  UnblockTaskRequestSchema,
+  ReorderTasksRequestSchema,
 } from '../schemas/vault.schema'
 import type { IndexedTask, IndexedProject, TaskStatus, ProjectStatus } from '../vault/types'
+import { triggerSchedulerTick } from '../notifications/task-scheduler.js'
 
 // vaultPath is kept so ICS handler can still use it (unchanged)
 let vaultPath = ''
@@ -35,15 +39,27 @@ export function getVaultPath(): string {
   return vaultPath
 }
 
+function localDate(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function today(): string {
-  return new Date().toISOString().slice(0, 10)
+  return localDate()
 }
 
 function rowToTask(row: Record<string, unknown>): IndexedTask {
   const source = row.source as string
   const sourceRef = row.source_ref as string | null
-  // Build a virtual filePath for display purposes (archive view)
   const filePath = sourceRef ? `${source}/${sourceRef}` : source
+  let blockedReason: string | undefined
+  let blockedCheckInterval: string | undefined
+  try {
+    const meta = JSON.parse((row.metadata as string) || '{}') as Record<string, string>
+    blockedReason = meta.blocked_reason || undefined
+    blockedCheckInterval = meta.blocked_check_interval || undefined
+  } catch {
+    // ignore malformed metadata
+  }
   return {
     id: row.id as string,
     filePath,
@@ -56,6 +72,8 @@ function rowToTask(row: Record<string, unknown>): IndexedTask {
     dueDate: (row.due_date as string) || undefined,
     terminatorLinks: JSON.parse((row.terminator_links as string) || '[]'),
     subtasks: [],
+    blockedReason,
+    blockedCheckInterval,
   }
 }
 
@@ -794,7 +812,7 @@ export function registerVaultIpcHandlers(): () => void {
     const days = parsed.success ? (parsed.data.days ?? 30) : 30
     try {
       const db = getDb()
-      const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+      const cutoff = localDate(new Date(Date.now() - days * 86400000))
       const taskRows = db
         .prepare(
           `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
@@ -806,6 +824,48 @@ export function registerVaultIpcHandlers(): () => void {
         .all() as Record<string, unknown>[]
       const projects = projectRows.map(rowToProject)
       return { tasks: taskRows.map(rowToTask), projects }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  // ── vault:list-someday ───────────────────────────────────────────────────────
+
+  handle('task-vault:vault:list-someday', async () => {
+    try {
+      const db = getDb()
+      const taskRows = db
+        .prepare(
+          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+           WHERE t.source='someday' AND t.status='open' AND t.parent_id IS NULL
+           ORDER BY t.created_at ASC`
+        )
+        .all() as Record<string, unknown>[]
+      const projectRows = db
+        .prepare(`SELECT * FROM projects WHERE status='someday' ORDER BY name ASC`)
+        .all() as Record<string, unknown>[]
+      return { tasks: taskRows.map(rowToTask), projects: projectRows.map(rowToProject) }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  // ── vault:someday-to-today ───────────────────────────────────────────────────
+
+  handle('task-vault:vault:someday-to-today', async (_event, payload) => {
+    const { taskId } = payload as { taskId: string }
+    if (!taskId) return { error: 'VALIDATION_ERROR' }
+    try {
+      const db = getDb()
+      const todayDate = today()
+      const now = new Date().toISOString()
+      db.prepare(
+        `UPDATE tasks SET source='daily', source_ref=?, status='open', updated_at=? WHERE id=?`
+      ).run(todayDate, now, taskId)
+      db.prepare(
+        `UPDATE tasks SET source='daily', source_ref=?, updated_at=? WHERE parent_id=?`
+      ).run(todayDate, now, taskId)
+      return { success: true }
     } catch (err) {
       return { error: String(err) }
     }
@@ -1043,6 +1103,109 @@ export function registerVaultIpcHandlers(): () => void {
     } catch (err) {
       return { error: String(err) }
     }
+  })
+
+  // ── vault:reopen-task ────────────────────────────────────────────────────────
+  // Sets status back to 'open' in-place (does not move source to inbox).
+  // Used by the daily-log view where the task must stay in the current file.
+
+  handle('task-vault:vault:reopen-task', async (_event, payload) => {
+    const parsed = RestoreTaskRequestSchema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { taskId } = parsed.data
+    const db = getDb()
+    const now = new Date().toISOString()
+    const changes = db
+      .prepare(
+        `UPDATE tasks SET status='open', completed_date=NULL, migrated_to=NULL, updated_at=? WHERE id=?`
+      )
+      .run(now, taskId)
+    if (changes.changes === 0) return { error: 'STALE_ID' }
+    return { success: true }
+  })
+
+  // ── vault:block-task ──────────────────────────────────────────────────────────
+
+  handle('task-vault:vault:block-task', async (_event, payload) => {
+    const parsed = BlockTaskRequestSchema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR: ' + parsed.error.message }
+    const { taskId, reason, checkInterval } = parsed.data
+    const db = getDb()
+    const now = new Date().toISOString()
+    const row = db.prepare(`SELECT metadata FROM tasks WHERE id=?`).get(taskId) as
+      | { metadata: string }
+      | undefined
+    if (!row) return { error: 'STALE_ID' }
+    const meta = JSON.parse(row.metadata || '{}') as Record<string, string>
+    meta.blocked_reason = reason
+    meta.blocked_check_interval = checkInterval
+    const changes = db
+      .prepare(`UPDATE tasks SET status='blocked', metadata=?, updated_at=? WHERE id=?`)
+      .run(JSON.stringify(meta), now, taskId)
+    if (changes.changes === 0) return { error: 'STALE_ID' }
+    triggerSchedulerTick()
+    return { success: true }
+  })
+
+  // ── vault:unblock-task ────────────────────────────────────────────────────────
+
+  handle('task-vault:vault:unblock-task', async (_event, payload) => {
+    const parsed = UnblockTaskRequestSchema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { taskId } = parsed.data
+    const db = getDb()
+    const now = new Date().toISOString()
+    const row = db.prepare(`SELECT metadata FROM tasks WHERE id=?`).get(taskId) as
+      | { metadata: string }
+      | undefined
+    if (!row) return { error: 'STALE_ID' }
+    const meta = JSON.parse(row.metadata || '{}') as Record<string, string>
+    delete meta.blocked_reason
+    delete meta.blocked_check_interval
+    const changes = db
+      .prepare(`UPDATE tasks SET status='open', metadata=?, updated_at=? WHERE id=?`)
+      .run(JSON.stringify(meta), now, taskId)
+    if (changes.changes === 0) return { error: 'STALE_ID' }
+    return { success: true }
+  })
+
+  // ── vault:reorder-tasks ───────────────────────────────────────────────────────
+
+  handle('task-vault:vault:reorder-tasks', async (_event, payload) => {
+    const parsed = ReorderTasksRequestSchema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { orderedIds } = parsed.data
+    const db = getDb()
+    const now = new Date().toISOString()
+    const stmt = db.prepare(`UPDATE tasks SET sort_order=?, updated_at=? WHERE id=?`)
+    const updateMany = db.transaction((ids: string[]) => {
+      for (let i = 0; i < ids.length; i++) {
+        stmt.run(i, now, ids[i])
+      }
+    })
+    updateMany(orderedIds)
+    return { success: true }
+  })
+
+  // ── vault:get-calendar-month ──────────────────────────────────────────────────
+
+  handle('task-vault:vault:get-calendar-month', async (_event, payload) => {
+    const { year, month } = payload as { year: number; month: number }
+    const db = getDb()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const startDate = `${year}-${pad(month)}-01`
+    const endDate = `${year}-${pad(month)}-31`
+    type DayRow = { date: string; status: string; count: number }
+    const rows = db
+      .prepare(
+        `SELECT source_ref AS date, status, COUNT(*) AS count
+         FROM tasks
+         WHERE source='daily' AND source_ref >= ? AND source_ref <= ?
+           AND parent_id IS NULL
+         GROUP BY source_ref, status`
+      )
+      .all(startDate, endDate) as DayRow[]
+    return { days: rows }
   })
 
   return () => {

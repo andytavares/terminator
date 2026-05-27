@@ -11,6 +11,7 @@ vi.mock('../../../src/main/git/git-service', () => ({
   getCurrentBranch: vi.fn(),
   listBranches: vi.fn(),
   checkoutBranch: vi.fn(),
+  createBranch: vi.fn(),
   suggestWorktreePath: vi.fn(),
   createWorktree: vi.fn(),
   removeWorktree: vi.fn(),
@@ -127,6 +128,29 @@ describe('core git IPC handlers', () => {
       error: string
     }
     expect(result.error).toContain('conflict')
+  })
+
+  it('git:create-branch returns VALIDATION_ERROR for missing branch', async () => {
+    const handler = getHandler('git:create-branch')
+    const result = await handler({}, { path: '/tmp/repo' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+
+  it('git:create-branch returns success', async () => {
+    vi.mocked(gitService.createBranch).mockResolvedValue(undefined)
+    const handler = getHandler('git:create-branch')
+    const result = await handler({}, { path: '/tmp/repo', branch: 'feature/new' })
+    expect(result).toMatchObject({ success: true })
+    expect(gitService.createBranch).toHaveBeenCalledWith('/tmp/repo', 'feature/new')
+  })
+
+  it('git:create-branch returns error string on failure', async () => {
+    vi.mocked(gitService.createBranch).mockRejectedValue(new Error('branch already exists'))
+    const handler = getHandler('git:create-branch')
+    const result = (await handler({}, { path: '/tmp/repo', branch: 'feature/new' })) as {
+      error: string
+    }
+    expect(result.error).toContain('branch already exists')
   })
 
   it('git:suggest-worktree-path returns empty path for invalid payload', async () => {

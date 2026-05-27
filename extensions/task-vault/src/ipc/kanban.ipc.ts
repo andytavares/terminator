@@ -35,7 +35,15 @@ function writeConfig(config: KanbanConfig): void {
 
 const MoveTaskSchema = z.object({
   taskId: z.string().min(1),
-  toStatus: z.enum(['open', 'done', 'migrated', 'cancelled', 'in-progress', 'in-review']),
+  toStatus: z.enum([
+    'open',
+    'done',
+    'migrated',
+    'cancelled',
+    'in-progress',
+    'in-review',
+    'blocked',
+  ]),
 })
 
 const SaveConfigSchema = z.object({
@@ -45,7 +53,7 @@ const SaveConfigSchema = z.object({
       id: z.string().min(1),
       label: z.string().min(1),
       taskStatuses: z.array(
-        z.enum(['open', 'done', 'migrated', 'cancelled', 'in-progress', 'in-review'])
+        z.enum(['open', 'done', 'migrated', 'cancelled', 'in-progress', 'in-review', 'blocked'])
       ),
     })
   ),

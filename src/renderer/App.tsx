@@ -15,6 +15,8 @@ import { useTerminalSession } from './hooks/useTerminalSession'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { installLogInterceptor } from './stores/log.store'
 import { useToastStore } from './stores/toast.store'
+import { useNotificationStore } from './stores/notification.store'
+import { NotificationPanel } from './components/NotificationPanel'
 import { useExtensionRegistry } from './extensions/registry'
 import type { CommandRegistration } from './extensions/registry'
 import { EmptyState } from './components/EmptyState'
@@ -41,6 +43,13 @@ export function App(): JSX.Element {
   const { system, enableGlobalMetrics, disableGlobalMetrics } = useMetricsStore()
   const { handleProcessExit, getSessionsForProject } = useSessionStore()
   const { addToast } = useToastStore()
+  const {
+    addNotification,
+    unreadCount,
+    panelOpen: notificationPanelOpen,
+    togglePanel: toggleNotificationPanel,
+  } = useNotificationStore()
+
   const { createSession } = useTerminalSession()
   const {
     sidebarPanels,
@@ -178,6 +187,25 @@ export function App(): JSX.Element {
     return unsub
   }, [handleProcessExit])
 
+  // Hydrate notification store from main process on mount
+  useEffect(() => {
+    void window.electronAPI.notifications?.list().then((notifications) => {
+      for (const n of notifications) addNotification(n)
+    })
+  }, [addNotification])
+
+  // Subscribe to push notifications from extensions
+  useEffect(() => {
+    return window.electronAPI.notifications?.onPush((n) => addNotification(n))
+  }, [addNotification])
+
+  // Global handler for extension navigation events — works even when the target tab is unmounted
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on('task-vault:navigate-task', (taskId) => {
+      useExtensionRegistry.getState().setActiveGlobalTabWithNavigation('task-vault', taskId)
+    })
+  }, [])
+
   // Auto-open a terminal whenever the Terminal tab is active and has no sessions.
   // Covers: first project selection, switching back from an extension tab, all sessions closed.
   useEffect(() => {
@@ -290,6 +318,9 @@ export function App(): JSX.Element {
             globalTabs={Array.from(globalTabs.values())}
             activeGlobalTabId={activeGlobalTabId}
             onSelectGlobalTab={(id) => setActiveGlobalTab(id === activeGlobalTabId ? null : id)}
+            unreadNotifications={unreadCount}
+            notificationPanelOpen={notificationPanelOpen}
+            onBellClick={toggleNotificationPanel}
           />
 
           {activeGlobalTabId && globalTabs.has(activeGlobalTabId) ? (
@@ -369,6 +400,7 @@ export function App(): JSX.Element {
             </>
           )}
 
+          <NotificationPanel />
           {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
           {logOpen && <LogWindow onClose={() => setLogOpen(false)} />}
           {paletteOpen && (

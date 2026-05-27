@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Settings, Download, Upload, Kanban, List, ChevronDown } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import './task-vault.css'
+import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { useVaultStore } from '../stores/vault.store'
+import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { VaultSidebar } from './VaultSidebar'
 import { DailyLog } from './DailyLog'
 import { ProjectsBrowser } from './ProjectsBrowser'
@@ -10,6 +12,8 @@ import { WeeklyReview } from './WeeklyReview'
 import { InboxView } from './InboxView'
 import { AreasView } from './AreasView'
 import { ArchiveView } from './ArchiveView'
+import { SomedayView } from './SomedayView'
+import { CalendarDrawer } from './CalendarDrawer'
 import { SmartTaskInput } from './SmartTaskInput'
 import { KanbanBoard } from './KanbanBoard'
 import { TaskDetailPanel } from './TaskDetailPanel'
@@ -108,7 +112,10 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `task-vault-export-${new Date().toISOString().slice(0, 10)}.json`
+      a.download = `task-vault-export-${(() => {
+        const d = new Date()
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      })()}.json`
       a.click()
       URL.revokeObjectURL(url)
       setStatus('Exported successfully.')
@@ -252,9 +259,14 @@ export function TaskVaultView(): React.JSX.Element {
     isLoading,
     error,
     loadToday,
+    loadDate,
     refreshInboxCount,
     rolledOverTaskIds,
+    pendingTaskId,
+    clearPendingTask,
+    viewingDate,
   } = useVaultStore()
+  const { addToast } = useToastStore()
   const [showDataTools, setShowDataTools] = useState(false)
   const [availableContexts, setAvailableContexts] = useState<string[]>([])
   const [contextMenuOpen, setContextMenuOpen] = useState(false)
@@ -285,6 +297,26 @@ export function TaskVaultView(): React.JSX.Element {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Consume navigation intent dispatched from App.tsx (works even when this tab was unmounted)
+  const pendingNavigation = useExtensionRegistry((s) => s.pendingNavigations.get('task-vault'))
+  const clearPendingNavigation = useExtensionRegistry((s) => s.clearPendingNavigation)
+
+  useEffect(() => {
+    if (!pendingNavigation) return
+    clearPendingNavigation('task-vault')
+    useVaultStore.getState().navigateToTask(pendingNavigation as string)
+  }, [pendingNavigation, clearPendingNavigation])
+
+  useEffect(() => {
+    if (!pendingTaskId || !todayLog) return
+    const task = todayLog.tasks.find((t) => t.id === pendingTaskId)
+    if (task) {
+      setSelectedTaskId(pendingTaskId)
+      setSelectedTaskText(task.text)
+    }
+    clearPendingTask()
+  }, [pendingTaskId, todayLog, clearPendingTask])
+
   useEffect(() => {
     loadToday()
     refreshInboxCount()
@@ -312,17 +344,61 @@ export function TaskVaultView(): React.JSX.Element {
     }
   }, [])
 
+  function makeTaskNavHandler(taskId: string): () => void {
+    return () => {
+      useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
+      useVaultStore.getState().navigateToTask(taskId)
+    }
+  }
+
   async function handleComplete(taskId: string) {
+    const taskText = (todayLog?.tasks ?? []).find((t) => t.id === taskId)?.text ?? ''
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', { taskId })
+    addToast({
+      type: 'success',
+      message: taskText ? `Completed: ${taskText}` : 'Task completed',
+      onClick: makeTaskNavHandler(taskId),
+    })
     await loadToday()
   }
 
   async function handleMigrate(taskId: string, targetDate: string) {
+    const taskText = (todayLog?.tasks ?? []).find((t) => t.id === taskId)?.text ?? ''
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:migrate-task', {
       taskId,
       targetDate,
     })
+    addToast({
+      type: 'info',
+      message: taskText ? `Migrated: ${taskText}` : 'Task migrated',
+      onClick: makeTaskNavHandler(taskId),
+    })
     await loadToday()
+  }
+
+  // Day navigation helpers
+  const todayStr = (() => {
+    const d = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  })()
+  const currentDate = viewingDate ?? todayStr
+  const isToday = viewingDate === null || viewingDate === todayStr
+
+  function goToPrevDay() {
+    const d = new Date(currentDate + 'T12:00:00')
+    d.setDate(d.getDate() - 1)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const prev = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    void loadDate(prev)
+  }
+
+  function goToNextDay() {
+    const d = new Date(currentDate + 'T12:00:00')
+    d.setDate(d.getDate() + 1)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const next = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    void loadDate(next)
   }
 
   function handleSelectTask(taskId: string | null) {
@@ -444,7 +520,11 @@ export function TaskVaultView(): React.JSX.Element {
                   onSelectTask={handleSelectTask}
                   onTaskComplete={handleComplete}
                   onTaskMigrate={handleMigrate}
-                  onRefresh={loadToday}
+                  onRefresh={isToday ? loadToday : () => loadDate(currentDate)}
+                  onPrevDay={goToPrevDay}
+                  onNextDay={goToNextDay}
+                  onGoToToday={loadToday}
+                  isToday={isToday}
                 />
               )}
               {activeView === 'daily' && !isLoading && !error && !todayLog && (
@@ -455,6 +535,7 @@ export function TaskVaultView(): React.JSX.Element {
               {activeView === 'inbox' && <InboxView />}
               {activeView === 'projects' && <ProjectsBrowser />}
               {activeView === 'areas' && <AreasView />}
+              {activeView === 'someday' && <SomedayView />}
               {activeView === 'archive' && <ArchiveView />}
               {activeView === 'review' && <WeeklyReview />}
             </div>
@@ -465,6 +546,7 @@ export function TaskVaultView(): React.JSX.Element {
                 onClose={() => handleSelectTask(null)}
               />
             )}
+            {activeView === 'daily' && <CalendarDrawer />}
           </div>
         )}
       </div>

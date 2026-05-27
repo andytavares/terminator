@@ -8,6 +8,7 @@ import { registerLinksIpcHandlers, setVaultPath as setLinksVaultPath } from './i
 import { registerKanbanIpcHandlers, setVaultPath as setKanbanVaultPath } from './ipc/kanban.ipc.js'
 import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
 import { initDb, closeDb } from './vault/db.js'
+import { startTaskScheduler, setSchedulerTick } from './notifications/task-scheduler.js'
 
 const disposables: Disposable[] = []
 
@@ -50,6 +51,13 @@ export async function activate(api: ExtensionAPI): Promise<void> {
             'Comma-separated list of contexts shown in the + picker (e.g. home,work,computer,phone,errands)',
           default: 'home,work,computer,phone,errands',
         },
+        'terminator.task-vault.dueDateAlertTime': {
+          type: 'string',
+          label: 'Due Date Alert Time',
+          description:
+            'Time of day to send due-date notifications (24-hour HH:MM format, e.g. 09:00)',
+          default: '09:00',
+        },
       },
     })
   )
@@ -75,6 +83,9 @@ export async function activate(api: ExtensionAPI): Promise<void> {
 
     try {
       initDb(vaultPath)
+      const scheduler = startTaskScheduler(api)
+      disposables.push({ dispose: scheduler.dispose })
+      setSchedulerTick(scheduler.tick)
     } catch (err) {
       console.error('[task-vault] Failed to initialize SQLite DB:', err)
     }

@@ -236,6 +236,54 @@
   transform: rotate(90deg);
 }
 
+/* ── Bell button ──────────────────────────────────────────────── */
+.ws-rail__bell {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  background: var(--bg-card, rgba(255, 255, 255, 0.05));
+  border: 1.5px solid transparent;
+  color: var(--text-secondary);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.ws-rail__bell:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  background: var(--bg-card-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text-primary);
+}
+
+.ws-rail__bell--active {
+  background: var(--accent-muted, rgba(124, 106, 247, 0.2));
+  border-color: var(--accent, #7c6af7);
+  color: var(--accent, #7c6af7);
+  box-shadow:
+    0 0 0 2px var(--accent, #7c6af7),
+    0 4px 20px rgba(0, 0, 0, 0.5);
+  transform: translateY(-1px);
+}
+
+.ws-rail__bell .alert-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 14px;
+  height: 14px;
+  font-size: 9px;
+  padding: 0 3px;
+}
+
 .ws-tile__indicators {
   position: absolute;
   top: -4px;

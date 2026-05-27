@@ -904,6 +904,157 @@ describe('task-vault:vault:save-task-detail', () => {
   })
 })
 
+// ── reopen-task ───────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:reopen-task', () => {
+  it('sets status to open without changing source', async () => {
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:reopen-task')
+    const result = await handler({}, { taskId: 'task-1' })
+    expect(result).toMatchObject({ success: true })
+    const sql = mockPrepare.mock.calls.at(-1)?.[0] as string
+    expect(sql).toContain("status='open'")
+    expect(sql).not.toContain('source')
+  })
+
+  it('returns STALE_ID when update changes 0 rows', async () => {
+    mockRun.mockReturnValue({ changes: 0 })
+    const handler = getHandler('task-vault:vault:reopen-task')
+    const result = (await handler({}, { taskId: 'task-1' })) as { error: string }
+    expect(result.error).toBe('STALE_ID')
+  })
+
+  it('returns validation error for missing taskId', async () => {
+    const handler = getHandler('task-vault:vault:reopen-task')
+    const result = (await handler({}, {})) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+})
+
+// ── block-task ────────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:block-task', () => {
+  it('sets status to blocked and stores reason + checkInterval in metadata', async () => {
+    mockGet.mockReturnValue({ metadata: '{}' })
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:block-task')
+    const result = await handler(
+      {},
+      { taskId: 'task-1', reason: 'Waiting on design', checkInterval: '1-day' }
+    )
+    expect(result).toMatchObject({ success: true })
+    const runArgs = mockRun.mock.calls[0]
+    const savedMeta = JSON.parse(runArgs[0] as string) as Record<string, string>
+    expect(savedMeta.blocked_reason).toBe('Waiting on design')
+    expect(savedMeta.blocked_check_interval).toBe('1-day')
+  })
+
+  it('returns STALE_ID when task not found', async () => {
+    mockGet.mockReturnValue(undefined)
+    const handler = getHandler('task-vault:vault:block-task')
+    const result = (await handler(
+      {},
+      { taskId: 'missing', reason: 'X', checkInterval: '2-hour' }
+    )) as { error: string }
+    expect(result.error).toBe('STALE_ID')
+  })
+
+  it('returns STALE_ID when update changes 0 rows', async () => {
+    mockGet.mockReturnValue({ metadata: '{}' })
+    mockRun.mockReturnValue({ changes: 0 })
+    const handler = getHandler('task-vault:vault:block-task')
+    const result = (await handler(
+      {},
+      { taskId: 'task-1', reason: 'X', checkInterval: '1-week' }
+    )) as { error: string }
+    expect(result.error).toBe('STALE_ID')
+  })
+
+  it('returns validation error for invalid payload', async () => {
+    const handler = getHandler('task-vault:vault:block-task')
+    const result = (await handler({}, { taskId: 'task-1' })) as { error: string }
+    expect(result.error).toMatch(/VALIDATION_ERROR/)
+  })
+})
+
+// ── unblock-task ──────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:unblock-task', () => {
+  it('sets status to open and clears blocked metadata', async () => {
+    mockGet.mockReturnValue({ metadata: '{"blocked_reason":"X","blocked_check_interval":"1-day"}' })
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:unblock-task')
+    const result = await handler({}, { taskId: 'task-1' })
+    expect(result).toMatchObject({ success: true })
+    const runArgs = mockRun.mock.calls[0]
+    const savedMeta = JSON.parse(runArgs[0] as string) as Record<string, string>
+    expect(savedMeta.blocked_reason).toBeUndefined()
+    expect(savedMeta.blocked_check_interval).toBeUndefined()
+  })
+
+  it('returns STALE_ID when task not found', async () => {
+    mockGet.mockReturnValue(undefined)
+    const handler = getHandler('task-vault:vault:unblock-task')
+    const result = (await handler({}, { taskId: 'missing' })) as { error: string }
+    expect(result.error).toBe('STALE_ID')
+  })
+
+  it('returns STALE_ID when update changes 0 rows', async () => {
+    mockGet.mockReturnValue({ metadata: '{}' })
+    mockRun.mockReturnValue({ changes: 0 })
+    const handler = getHandler('task-vault:vault:unblock-task')
+    const result = (await handler({}, { taskId: 'task-1' })) as { error: string }
+    expect(result.error).toBe('STALE_ID')
+  })
+
+  it('returns validation error for missing taskId', async () => {
+    const handler = getHandler('task-vault:vault:unblock-task')
+    const result = (await handler({}, {})) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+})
+
+// ── reorder-tasks ─────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:reorder-tasks', () => {
+  it('updates sort_order for each task id in order', async () => {
+    const transactionFn = vi.fn((fn: (ids: string[]) => void) => fn)
+    mockPrepare.mockImplementation((sql: string) => {
+      if (sql.includes('sort_order')) {
+        return {
+          run: mockRun,
+          get: mockGet,
+          all: mockAll,
+        }
+      }
+      return { run: mockRun, get: mockGet, all: mockAll, transaction: transactionFn }
+    })
+    // db.transaction returns a callable that executes the inner fn
+    const mockDb = {
+      prepare: vi.fn().mockReturnValue({ run: mockRun }),
+      transaction: vi.fn((fn: (ids: string[]) => void) => fn),
+    }
+    const { getDb: origGetDb } = await import('../../src/vault/db')
+    vi.mocked(origGetDb).mockReturnValueOnce(mockDb as unknown as ReturnType<typeof origGetDb>)
+
+    const handler = getHandler('task-vault:vault:reorder-tasks')
+    const result = await handler({}, { orderedIds: ['id-1', 'id-2', 'id-3'] })
+    expect(result).toMatchObject({ success: true })
+  })
+
+  it('returns validation error for empty orderedIds', async () => {
+    const handler = getHandler('task-vault:vault:reorder-tasks')
+    const result = (await handler({}, { orderedIds: [] })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns validation error for missing payload', async () => {
+    const handler = getHandler('task-vault:vault:reorder-tasks')
+    const result = (await handler({}, {})) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+})
+
 // ── registerVaultIpcHandlers dispose ──────────────────────────────────────────
 
 describe('registerVaultIpcHandlers dispose', () => {
@@ -917,5 +1068,9 @@ describe('registerVaultIpcHandlers dispose', () => {
     expect(removedChannels).toContain('task-vault:vault:add-task')
     expect(removedChannels).toContain('task-vault:vault:get-task-detail')
     expect(removedChannels).toContain('task-vault:vault:save-task-detail')
+    expect(removedChannels).toContain('task-vault:vault:reopen-task')
+    expect(removedChannels).toContain('task-vault:vault:block-task')
+    expect(removedChannels).toContain('task-vault:vault:unblock-task')
+    expect(removedChannels).toContain('task-vault:vault:reorder-tasks')
   })
 })

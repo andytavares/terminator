@@ -176,7 +176,8 @@ function InboxItem({
   }
 
   async function handleMoveToToday() {
-    const today = new Date().toISOString().slice(0, 10)
+    const d = new Date()
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:process-inbox-item', {
       taskId: item.id,
       action: 'file',

@@ -12,7 +12,8 @@ export function WeeklyReviewStep6Reflect({ onComplete }: Props): React.JSX.Eleme
 
   async function finishReview() {
     setSaving(true)
-    const today = new Date().toISOString().slice(0, 10)
+    const d = new Date()
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     const note = `weekly review completed ${today}: worked: ${worked || '—'} | didn't: ${didnt || '—'} | try: ${tryNext || '—'}`
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:add-task', {
       text: note,

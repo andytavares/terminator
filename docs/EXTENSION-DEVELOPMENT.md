@@ -666,11 +666,29 @@ disposables.push(disposable)
 
 ### `api.notifications.showToast(type, message)`
 
-Shows a toast notification from the main process. `type` is `'info' | 'success' | 'warning' | 'error'`.
+Shows an ephemeral toast notification and also records it in the persistent notification center. `type` is `'info' | 'success' | 'warning' | 'error'`.
 
 ```typescript
 api.notifications.showToast('info', 'Weekly review is ready')
 ```
+
+### `api.notifications.createNotification(opts): Disposable`
+
+Creates a persistent notification in the notification center (without an ephemeral toast). Supports optional action buttons with callbacks that run in the main process.
+
+```typescript
+const notif = api.notifications.createNotification({
+  type: 'info',
+  title: 'Build complete',
+  message: '3 files changed',
+  actions: [{ id: 'open', label: 'Open log', handler: () => openLogWindow() }],
+})
+
+// Remove the notification when the extension is torn down:
+notif.dispose()
+```
+
+Returns a `Disposable` — calling `.dispose()` dismisses the notification.
 
 ### Renderer-side: `registry.registerKeyboardShortcut(shortcut)`
 

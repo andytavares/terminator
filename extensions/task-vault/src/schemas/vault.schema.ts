@@ -9,6 +9,7 @@ const TaskStatusSchema = z.enum([
   'cancelled',
   'in-progress',
   'in-review',
+  'blocked',
 ])
 const ProjectStatusSchema = z.enum(['active', 'someday', 'done', 'archived'])
 const DateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -247,4 +248,35 @@ export const SaveTaskDetailRequestSchema = z.object({
   description: z.string(),
   acceptanceCriteria: z.string(),
   devHints: z.string(),
+})
+
+// ── vault:block-task ──────────────────────────────────────────────────────────
+
+export const BlockTaskRequestSchema = z.object({
+  taskId: TaskIdSchema,
+  reason: z.string().min(1),
+  checkInterval: z.union([
+    z.enum([
+      '30-min',
+      '1-hour',
+      '2-hour',
+      '4-hour',
+      '1-day',
+      '2-day',
+      '1-week',
+      '2-weeks',
+      '1-month',
+    ]),
+    z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/), // custom: local datetime (YYYY-MM-DDTHH:MM)
+  ]),
+})
+
+// ── vault:unblock-task ────────────────────────────────────────────────────────
+
+export const UnblockTaskRequestSchema = z.object({ taskId: TaskIdSchema })
+
+// ── vault:reorder-tasks ───────────────────────────────────────────────────────
+
+export const ReorderTasksRequestSchema = z.object({
+  orderedIds: z.array(z.string().min(1)).min(1),
 })

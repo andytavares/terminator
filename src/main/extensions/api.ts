@@ -185,6 +185,7 @@ import { join } from 'path'
 
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
 import { fsWatcherService } from '../fs/fs-watcher.js'
+import { notificationManager } from '../notifications/notification-manager.js'
 import { getExtensionSetting } from '../storage/extension-settings-store.js'
 import { makeLogger } from '../logger.js'
 import {
@@ -404,6 +405,22 @@ export function createExtensionAPI(
         for (const win of BrowserWindow.getAllWindows()) {
           win.webContents.send('extension:toast', { type, message })
         }
+        notificationManager.create({ type, title: message, source: extensionId })
+      },
+      createNotification(opts: {
+        type: ToastType
+        title: string
+        message?: string
+        actions?: Array<{ id: string; label: string; handler: () => void }>
+      }): Disposable {
+        const id = notificationManager.create({
+          type: opts.type,
+          title: opts.title,
+          message: opts.message,
+          source: extensionId,
+          actions: opts.actions,
+        })
+        return disposable(() => notificationManager.dismiss(id))
       },
     },
     nativeMenu: {
