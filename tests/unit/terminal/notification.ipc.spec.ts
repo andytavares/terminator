@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockOn = vi.fn()
+const mockHandle = vi.fn()
 const mockIsSupported = vi.fn().mockReturnValue(true)
 const mockNotificationShow = vi.fn()
 const MockNotification = vi.fn().mockImplementation(() => ({ show: mockNotificationShow }))
@@ -8,9 +9,13 @@ Object.assign(MockNotification, { isSupported: mockIsSupported })
 
 const mockDockBounce = vi.fn()
 vi.mock('electron', () => ({
-  ipcMain: { on: mockOn },
+  ipcMain: { on: mockOn, handle: mockHandle },
   Notification: MockNotification,
   app: { dock: { bounce: mockDockBounce } },
+}))
+
+vi.mock('../../../src/main/notifications/notification-manager', () => ({
+  notificationManager: { list: vi.fn(), dismiss: vi.fn(), triggerAction: vi.fn() },
 }))
 
 describe('registerNotificationHandlers', () => {

@@ -1,4 +1,11 @@
-export type TaskStatus = 'open' | 'done' | 'migrated' | 'cancelled' | 'in-progress' | 'in-review'
+export type TaskStatus =
+  | 'open'
+  | 'done'
+  | 'migrated'
+  | 'cancelled'
+  | 'in-progress'
+  | 'in-review'
+  | 'blocked'
 
 export interface KanbanLane {
   id: string
@@ -101,6 +108,8 @@ export interface IndexedTask {
   dueDate?: string
   terminatorLinks: string[]
   subtasks?: IndexedTask[]
+  blockedReason?: string
+  blockedCheckInterval?: string
 }
 
 export interface IndexedProject {
@@ -114,15 +123,6 @@ export interface IndexedProject {
   nextActionCount: number
   lastModified: string
   terminatorLinks: string[]
-}
-
-export interface VaultIndex {
-  version: number
-  builtAt: string
-  vaultPath: string
-  tasks: IndexedTask[]
-  projects: IndexedProject[]
-  inboxCount: number
 }
 
 export interface TerminatorLink {

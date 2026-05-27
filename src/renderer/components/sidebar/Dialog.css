@@ -189,6 +189,43 @@
   height: 14px;
 }
 
+/* ── Segmented control ───────────────────────────────────────── */
+.dialog__segment {
+  display: flex;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.dialog__segment-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  border-right: 1px solid var(--border-strong);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-family: var(--font-ui);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.dialog__segment-btn:last-child {
+  border-right: none;
+}
+
+.dialog__segment-btn:hover:not(.dialog__segment-btn--active) {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.dialog__segment-btn--active {
+  background: var(--accent);
+  color: white;
+}
+
 /* ── Hint text ───────────────────────────────────────────────── */
 .dialog__hint {
   display: block;

@@ -69,6 +69,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     listBranches: (path: string) => ipcRenderer.invoke('git:list-branches', { path }),
     checkout: (path: string, branch: string) =>
       ipcRenderer.invoke('git:checkout', { path, branch }),
+    createBranch: (path: string, branch: string) =>
+      ipcRenderer.invoke('git:create-branch', { path, branch }),
     suggestWorktreePath: (repoRoot: string, branch: string, baseDir?: string) =>
       ipcRenderer.invoke('git:suggest-worktree-path', { repoRoot, branch, baseDir }),
     createWorktree: (payload: unknown) => ipcRenderer.invoke('git:create-worktree', payload),
@@ -165,6 +167,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   notification: {
     show: (title: string, body: string) => ipcRenderer.send('notification:show', { title, body }),
+  },
+  notifications: {
+    list: () => ipcRenderer.invoke('notifications:list'),
+    dismiss: (id: string) => ipcRenderer.invoke('notifications:dismiss', { id }),
+    triggerAction: (notifId: string, actionId: string) =>
+      ipcRenderer.invoke('notifications:trigger-action', { notifId, actionId }),
+    onPush: (handler: (n: unknown) => void) => {
+      const listener = (_: Electron.IpcRendererEvent, n: unknown) => handler(n)
+      ipcRenderer.on('notifications:push', listener)
+      return () => ipcRenderer.removeListener('notifications:push', listener)
+    },
   },
   metrics: {
     getSystem: () => ipcRenderer.invoke('metrics:system'),

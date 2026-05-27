@@ -1007,8 +1007,56 @@ Calls `ptyManager.getPid(sessionId)` for each ID; sessions without a live PTY ar
 
 ### Channel Summary
 
-| Channel             | Direction       | Summary                                           |
-| ------------------- | --------------- | ------------------------------------------------- |
-| `metrics:system`    | renderer → main | CPU%, memory used/total, network in/out bytes/sec |
-| `metrics:processes` | renderer → main | Per-PID CPU% and RSS bytes from `ps`              |
-| `metrics:pids`      | renderer → main | Resolve session UUIDs to live PTY PIDs            |
+| Channel                        | Direction       | Summary                                           |
+| ------------------------------ | --------------- | ------------------------------------------------- |
+| `metrics:system`               | renderer → main | CPU%, memory used/total, network in/out bytes/sec |
+| `metrics:processes`            | renderer → main | Per-PID CPU% and RSS bytes from `ps`              |
+| `metrics:pids`                 | renderer → main | Resolve session UUIDs to live PTY PIDs            |
+| `notifications:list`           | renderer → main | List all in-memory notifications                  |
+| `notifications:dismiss`        | renderer → main | Remove a notification by ID                       |
+| `notifications:trigger-action` | renderer → main | Invoke a stored action callback by ID             |
+| `notifications:push`           | main → renderer | Push a new notification to all windows            |
+
+---
+
+### `notifications:list`
+
+Returns all current in-memory notification records (without callbacks).
+
+**Direction**: renderer → main (invoke/handle)
+
+**Response**: `SerializedNotification[]`
+
+---
+
+### `notifications:dismiss`
+
+Removes a notification from the manager.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ id: string }`
+
+**Response**: `{ ok: true } | { error: string }`
+
+---
+
+### `notifications:trigger-action`
+
+Invokes the callback stored for a notification action.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ notifId: string; actionId: string }`
+
+**Response**: `{ ok: true } | { error: 'UNKNOWN_NOTIFICATION' | 'UNKNOWN_ACTION' | string }`
+
+---
+
+### `notifications:push`
+
+Sent from main to all renderer windows when a new notification is created via `notificationManager.create()`.
+
+**Direction**: main → renderer (webContents.send)
+
+**Payload**: `SerializedNotification`

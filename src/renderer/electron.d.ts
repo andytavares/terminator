@@ -10,6 +10,16 @@ import type {
   ProcessMetrics,
 } from '../shared/types/index'
 
+export interface SerializedNotification {
+  id: string
+  type: 'info' | 'success' | 'warning' | 'error'
+  title: string
+  message?: string
+  timestamp: number
+  source?: string
+  actions?: Array<{ id: string; label: string }>
+}
+
 interface ElectronAPI {
   terminal: {
     create(payload: unknown): Promise<{ sessionId: string } | { error: string }>
@@ -41,6 +51,7 @@ interface ElectronAPI {
     currentBranch(path: string): Promise<{ branch: string } | { error: string }>
     listBranches(path: string): Promise<{ branches: Branch[] }>
     checkout(path: string, branch: string): Promise<{ success: true } | { error: string }>
+    createBranch(path: string, branch: string): Promise<{ success: true } | { error: string }>
     suggestWorktreePath(
       repoRoot: string,
       branch: string,
@@ -137,6 +148,12 @@ interface ElectronAPI {
   }
   notification: {
     show(title: string, body: string): void
+  }
+  notifications: {
+    list(): Promise<SerializedNotification[]>
+    dismiss(id: string): Promise<{ ok: true } | { error: string }>
+    triggerAction(notifId: string, actionId: string): Promise<{ ok: true } | { error: string }>
+    onPush(handler: (n: SerializedNotification) => void): () => void
   }
   metrics: {
     getSystem(): Promise<{ data: SystemMetrics } | { error: string }>

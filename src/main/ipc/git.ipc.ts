@@ -6,6 +6,7 @@ import {
   getCurrentBranch,
   listBranches,
   checkoutBranch,
+  createBranch,
   suggestWorktreePath,
   createWorktree,
   removeWorktree,
@@ -56,6 +57,18 @@ export function registerGitHandlers(): void {
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     try {
       await checkoutBranch(parsed.data.path, parsed.data.branch)
+      return { success: true }
+    } catch (e) {
+      return { error: String(e) }
+    }
+  })
+
+  ipcMain.handle('git:create-branch', async (_event, payload) => {
+    const schema = z.object({ path: z.string().min(1), branch: z.string().min(1) })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    try {
+      await createBranch(parsed.data.path, parsed.data.branch)
       return { success: true }
     } catch (e) {
       return { error: String(e) }

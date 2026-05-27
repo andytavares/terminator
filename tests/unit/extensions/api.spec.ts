@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockSend = vi.fn()
-const mockWindow = { webContents: { send: mockSend } }
+const mockWindow = { webContents: { send: mockSend }, isDestroyed: vi.fn(() => false) }
 
 // Mock electron before importing api.ts
 vi.mock('electron', () => ({
   BrowserWindow: {
     getAllWindows: vi.fn(() => [mockWindow]),
+  },
+  ipcMain: {
+    handle: vi.fn(),
+    removeHandler: vi.fn(),
   },
   Menu: {
     getApplicationMenu: vi.fn(() => null),
@@ -270,5 +274,113 @@ describe('api.settings workspace precedence', () => {
 
     const val = api.settings.get<boolean>('com.test.enabled')
     expect(val).toBe(false)
+  })
+})
+
+describe('api.notifications.createNotification', () => {
+  it('returns a disposable that can dismiss the notification', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const disposable = api.notifications.createNotification({
+      type: 'info',
+      title: 'Test notif',
+    })
+    expect(disposable).toHaveProperty('dispose')
+    expect(() => disposable.dispose()).not.toThrow()
+  })
+
+  it('creates notification with actions', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const disposable = api.notifications.createNotification({
+      type: 'warning',
+      title: 'With actions',
+      message: 'Please review',
+      actions: [{ id: 'go', label: 'Go', handler: vi.fn() }],
+    })
+    expect(disposable).toHaveProperty('dispose')
+    disposable.dispose()
+  })
+})
+
+describe('api.contextMenu.registerItem', () => {
+  it('registers item and returns disposable', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const onClick = vi.fn<[string], void>()
+    const disposable = api.contextMenu.registerItem('workspace', {
+      id: 'ctx-item',
+      label: 'Open',
+      onClick,
+    })
+    expect(disposable).toHaveProperty('dispose')
+    disposable.dispose()
+  })
+})
+
+describe('api.keyboard.register', () => {
+  it('registers a shortcut and returns disposable', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const handler = vi.fn()
+    const disposable = api.keyboard.register('Ctrl+Shift+Z', handler)
+    expect(disposable).toHaveProperty('dispose')
+    disposable.dispose()
+  })
+
+  it('throws when accelerator is reserved', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    expect(() => api.keyboard.register('CmdOrCtrl+T', vi.fn())).toThrow('reserved')
+  })
+})
+
+describe('api.commands.register', () => {
+  it('registers command and returns disposable', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const handler = vi.fn()
+    const disposable = api.commands.register({ id: 'my-command', label: 'My Command' }, handler)
+    expect(disposable).toHaveProperty('dispose')
+    disposable.dispose()
+  })
+})
+
+describe('api.ipc.registerHandler', () => {
+  it('registers an IPC handler and returns disposable', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const handler = vi.fn().mockResolvedValue({ ok: true })
+    const disposable = api.ipc.registerHandler('test.ext:my-channel', handler)
+    expect(disposable).toHaveProperty('dispose')
+    disposable.dispose()
+  })
+})
+
+describe('api.topBar.registerMenuItem', () => {
+  it('registers a top bar item and returns disposable', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const disposable = api.topBar.registerMenuItem({
+      id: 'tb-item',
+      label: 'My Item',
+      onClick: vi.fn(),
+    })
+    expect(globalRegistry.topBarItems.has('test.ext.topbar.tb-item')).toBe(true)
+    disposable.dispose()
+    expect(globalRegistry.topBarItems.has('test.ext.topbar.tb-item')).toBe(false)
+  })
+})
+
+describe('api.sidebar.registerGlobalTab', () => {
+  it('registers a global tab and returns disposable', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const disposable = api.sidebar.registerGlobalTab({
+      id: 'my-tab',
+      label: 'My Tab',
+      component: {} as unknown,
+    })
+    expect(disposable).toHaveProperty('dispose')
+    disposable.dispose()
+  })
+
+  it('throws GLOBAL_TAB_ALREADY_REGISTERED when same tab registered twice', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    api.sidebar.registerGlobalTab({ id: 'dup-tab', label: 'Dup', component: {} as unknown })
+    expect(() =>
+      api.sidebar.registerGlobalTab({ id: 'dup-tab', label: 'Dup 2', component: {} as unknown })
+    ).toThrow('GLOBAL_TAB_ALREADY_REGISTERED')
   })
 })

@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react'
+import { Bell } from 'lucide-react'
 import type { Workspace } from '../../../shared/types/index'
 import type { GlobalTabRegistration } from '../../extensions/registry'
 import { useWorkspaceStore } from '../../stores/workspace.store'
@@ -30,12 +31,18 @@ interface WorkspaceRailProps {
   globalTabs?: GlobalTabRegistration[]
   activeGlobalTabId?: string | null
   onSelectGlobalTab?: (id: string) => void
+  unreadNotifications?: number
+  notificationPanelOpen?: boolean
+  onBellClick?: () => void
 }
 
 export function WorkspaceRail({
   globalTabs = [],
   activeGlobalTabId = null,
   onSelectGlobalTab,
+  unreadNotifications = 0,
+  notificationPanelOpen = false,
+  onBellClick,
 }: WorkspaceRailProps): JSX.Element {
   const [createOpen, setCreateOpen] = useState(false)
   const { workspaces, reorderWorkspaces } = useWorkspaceStore()
@@ -71,6 +78,18 @@ export function WorkspaceRail({
 
   return (
     <aside className="ws-rail">
+      {onBellClick && (
+        <button
+          className={`ws-rail__bell${notificationPanelOpen ? ' ws-rail__bell--active' : ''}`}
+          onClick={onBellClick}
+          title="Notifications"
+          aria-label={`Notifications${unreadNotifications > 0 ? ` (${unreadNotifications} unread)` : ''}`}
+        >
+          <Bell size={16} />
+          <AlertBadge count={unreadNotifications} className="alert-badge--tab" />
+        </button>
+      )}
+
       {pinnedTab && (
         <>
           <button

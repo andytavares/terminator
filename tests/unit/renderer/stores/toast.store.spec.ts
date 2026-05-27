@@ -1,9 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+// Mock window.electronAPI so the notification store's dismiss calls don't throw
+Object.defineProperty(globalThis, 'window', {
+  value: { electronAPI: { notifications: { dismiss: vi.fn().mockResolvedValue({ ok: true }) } } },
+  writable: true,
+})
+
 import { useToastStore } from '../../../../src/renderer/stores/toast.store'
+import { useNotificationStore } from '../../../../src/renderer/stores/notification.store'
 
 // Reset store state between tests
 function resetStore() {
   useToastStore.setState({ toasts: [] })
+  useNotificationStore.setState({ notifications: [], panelOpen: false, unreadCount: 0 })
 }
 
 describe('useToastStore', () => {
@@ -64,6 +73,15 @@ describe('useToastStore', () => {
       const { toasts } = useToastStore.getState()
       expect(toasts).toHaveLength(1)
       expect(toasts[0].message).toBe('B')
+    })
+
+    it('also adds to the notification store', () => {
+      useToastStore.getState().addToast({ type: 'success', message: 'Saved' })
+      const { notifications } = useNotificationStore.getState()
+      expect(notifications).toHaveLength(1)
+      expect(notifications[0].title).toBe('Saved')
+      expect(notifications[0].type).toBe('success')
+      expect(notifications[0].source).toBe('core')
     })
   })
 

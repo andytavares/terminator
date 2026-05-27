@@ -116,6 +116,10 @@ export async function checkoutBranch(dirPath: string, branch: string): Promise<v
   await git(['checkout', branch], dirPath)
 }
 
+export async function createBranch(dirPath: string, branch: string): Promise<void> {
+  await git(['checkout', '-b', branch], dirPath)
+}
+
 export async function listWorktrees(dirPath: string): Promise<WorktreeInfo[]> {
   const output = await git(['worktree', 'list', '--porcelain'], dirPath)
   const worktrees: WorktreeInfo[] = []

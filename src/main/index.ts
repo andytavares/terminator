@@ -14,6 +14,12 @@ import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
 import { logger } from './logger.js'
 
+declare module 'electron' {
+  interface App {
+    isQuitting?: boolean
+  }
+}
+
 let mainWindow: BrowserWindow | null = null
 const ptyManager = new PtyManager()
 const extensionHost = new ExtensionHost()
@@ -35,9 +41,20 @@ function createWindow(): void {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
-  mainWindow.on('closed', () => {
-    mainWindow = null
-  })
+  // On macOS, hide instead of destroy so PTY sessions and renderer state survive.
+  // Full quit (Cmd+Q / right-click Quit) still goes through before-quit → killAll().
+  if (process.platform === 'darwin') {
+    mainWindow.on('close', (event) => {
+      if (!app.isQuitting) {
+        event.preventDefault()
+        mainWindow?.hide()
+      }
+    })
+  } else {
+    mainWindow.on('closed', () => {
+      mainWindow = null
+    })
+  }
 }
 
 function setupMenu(): void {
@@ -114,12 +131,17 @@ app.whenReady().then(async () => {
   createWindow()
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (mainWindow) {
+      mainWindow.show()
+    } else {
+      createWindow()
+    }
   })
 })
 
 app.on('before-quit', async (event) => {
   event.preventDefault()
+  app.isQuitting = true
   await ptyManager.killAll()
   app.exit(0)
 })
