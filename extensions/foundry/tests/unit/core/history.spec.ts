@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { tmpdir } from 'node:os'
-import { appendHistoryEntry, readHistory } from '../../../src/core/history.js'
+import { appendHistoryEntry, readHistory, deleteHistoryEntry } from '../../../src/core/history.js'
 import type { HistoryEntry } from '../../../src/types/foundry.types.js'
 
 function makeEntry(overrides: Partial<HistoryEntry> = {}): HistoryEntry {
@@ -111,7 +111,7 @@ describe('readHistory()', () => {
     expect(page3.hasMore).toBe(false)
   })
 
-  it('gracefully skips malformed lines', async () => {
+  it('gracefully skips malformed lines while preserving valid entries', async () => {
     const foundryDir = path.join(dir, '.foundry')
     await fs.mkdir(foundryDir, { recursive: true })
     await fs.writeFile(
@@ -122,5 +122,55 @@ describe('readHistory()', () => {
     expect(entries).toHaveLength(1)
     expect(entries[0].runId).toBe('ok')
     expect(total).toBe(1)
+  })
+})
+
+describe('deleteHistoryEntry()', () => {
+  let dir: string
+  let cleanup: () => Promise<void>
+
+  beforeEach(async () => {
+    ;({ dir, cleanup } = await makeTmp())
+  })
+  afterEach(async () => cleanup())
+
+  it('returns ok when file does not exist', async () => {
+    const result = await deleteHistoryEntry(dir, 'no-such-run')
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('removes the matching entry and leaves others intact', async () => {
+    await appendHistoryEntry(dir, makeEntry({ runId: 'keep-1' }))
+    await appendHistoryEntry(dir, makeEntry({ runId: 'delete-me' }))
+    await appendHistoryEntry(dir, makeEntry({ runId: 'keep-2' }))
+
+    const result = await deleteHistoryEntry(dir, 'delete-me')
+    expect(result).toEqual({ ok: true })
+
+    const { entries, total } = await readHistory(dir, 0, 10)
+    expect(total).toBe(2)
+    expect(entries.map((e) => e.runId)).not.toContain('delete-me')
+    expect(entries.map((e) => e.runId)).toContain('keep-1')
+    expect(entries.map((e) => e.runId)).toContain('keep-2')
+  })
+
+  it('returns ok silently when runId not found in file', async () => {
+    await appendHistoryEntry(dir, makeEntry({ runId: 'existing' }))
+    const result = await deleteHistoryEntry(dir, 'not-in-file')
+    expect(result).toEqual({ ok: true })
+    const { total } = await readHistory(dir, 0, 10)
+    expect(total).toBe(1)
+  })
+
+  it('preserves malformed lines when deleting', async () => {
+    const foundryDir = path.join(dir, '.foundry')
+    await fs.mkdir(foundryDir, { recursive: true })
+    await fs.writeFile(
+      path.join(foundryDir, 'history.jsonl'),
+      'not-json\n' + JSON.stringify(makeEntry({ runId: 'target' })) + '\n'
+    )
+    await deleteHistoryEntry(dir, 'target')
+    const raw = await fs.readFile(path.join(foundryDir, 'history.jsonl'), 'utf-8')
+    expect(raw).toContain('not-json')
   })
 })

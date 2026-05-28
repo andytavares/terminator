@@ -12,6 +12,9 @@ export interface StoredProvider {
   keychainKey?: string
   endpoint?: string
   supportsStreaming?: boolean
+  // Rate-limit / retry controls
+  maxRetries?: number // how many times to retry on 429 (default: 4)
+  requestDelayMs?: number // fixed delay between requests in ms (default: 0)
   [key: string]: unknown
 }
 

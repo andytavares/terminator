@@ -6,10 +6,13 @@ export class OllamaAdapter implements ProviderAdapter {
   constructor(
     private readonly providerId: string,
     private readonly model: string,
-    private readonly endpoint: string
+    private readonly endpoint: string,
+    private readonly maxRetries: number = 2,
+    private readonly requestDelayMs: number = 0
   ) {}
 
   async *run(request: RunRequest): AsyncIterable<RunEvent> {
+    if (this.requestDelayMs > 0) await new Promise((r) => setTimeout(r, this.requestDelayMs))
     const url = `${this.endpoint.replace(/\/$/, '')}/api/generate`
     const prompt = request.agentsMdContent
       ? `${request.agentsMdContent}\n\n${request.prompt}`

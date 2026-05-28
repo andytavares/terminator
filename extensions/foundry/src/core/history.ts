@@ -44,3 +44,35 @@ export async function readHistory(
   const page = all.slice(offset, offset + limit)
   return { entries: page, total, hasMore: offset + limit < total }
 }
+
+export async function deleteHistoryEntry(
+  workspaceRoot: string,
+  runId: string
+): Promise<{ ok: true } | { error: string }> {
+  const filePath = HISTORY_PATH(workspaceRoot)
+  let raw: string
+  try {
+    raw = await fs.readFile(filePath, 'utf-8')
+  } catch {
+    return { ok: true } // file doesn't exist — nothing to delete
+  }
+  const filtered = raw
+    .split('\n')
+    .filter((line) => {
+      const trimmed = line.trim()
+      if (!trimmed) return false
+      try {
+        const entry = JSON.parse(trimmed) as { runId?: string }
+        return entry.runId !== runId
+      } catch {
+        return true // keep malformed lines
+      }
+    })
+    .join('\n')
+  try {
+    await fs.writeFile(filePath, filtered ? filtered + '\n' : '', 'utf-8')
+    return { ok: true }
+  } catch (err) {
+    return { error: String(err) }
+  }
+}

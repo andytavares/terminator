@@ -75,6 +75,18 @@ export async function mergeWorktreeBranch(
   }
 }
 
+async function symlinkIfAbsent(src: string, dest: string): Promise<void> {
+  try {
+    await fs.access(dest)
+  } catch {
+    try {
+      await fs.symlink(src, dest)
+    } catch {
+      /* src may not exist */
+    }
+  }
+}
+
 export async function createWorktree(
   workspaceRoot: string,
   runId: string
@@ -82,10 +94,29 @@ export async function createWorktree(
   try {
     const branch = `foundry/run-${runId.slice(0, 8)}`
     const worktreePath = path.join(os.tmpdir(), `foundry-run-${runId.slice(0, 8)}`)
-    // Create worktree on a new branch from HEAD
     await execAsync('git', ['worktree', 'add', '-b', branch, worktreePath, 'HEAD'], {
       cwd: workspaceRoot,
     })
+    // Symlink node_modules so npm scripts (lint, test, format) work without reinstalling
+    await symlinkIfAbsent(
+      path.join(workspaceRoot, 'node_modules'),
+      path.join(worktreePath, 'node_modules')
+    )
+    // Symlink extension-level node_modules (npm workspace packages)
+    try {
+      const extEntries = await fs.readdir(path.join(workspaceRoot, 'extensions'), {
+        withFileTypes: true,
+      })
+      for (const entry of extEntries) {
+        if (!entry.isDirectory()) continue
+        await symlinkIfAbsent(
+          path.join(workspaceRoot, 'extensions', entry.name, 'node_modules'),
+          path.join(worktreePath, 'extensions', entry.name, 'node_modules')
+        )
+      }
+    } catch {
+      /* extensions dir may not exist in all projects */
+    }
     return { worktreePath, branch }
   } catch (err) {
     return { error: String(err) }

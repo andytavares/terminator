@@ -8,7 +8,9 @@ export class OpenAIAdapter implements ProviderAdapter {
   constructor(
     private readonly providerId: string,
     private readonly model: string,
-    private readonly keychainKey: string
+    private readonly keychainKey: string,
+    private readonly maxRetries: number = 3,
+    private readonly requestDelayMs: number = 0
   ) {}
 
   async *run(request: RunRequest): AsyncIterable<RunEvent> {
@@ -18,7 +20,8 @@ export class OpenAIAdapter implements ProviderAdapter {
       return
     }
 
-    const client = new OpenAI({ apiKey })
+    if (this.requestDelayMs > 0) await new Promise((r) => setTimeout(r, this.requestDelayMs))
+    const client = new OpenAI({ apiKey, maxRetries: this.maxRetries })
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       {
         role: 'system',

@@ -8,7 +8,9 @@ export class GeminiAdapter implements ProviderAdapter {
   constructor(
     private readonly providerId: string,
     private readonly model: string,
-    private readonly keychainKey: string
+    private readonly keychainKey: string,
+    private readonly maxRetries: number = 3,
+    private readonly requestDelayMs: number = 0
   ) {}
 
   async *run(request: RunRequest): AsyncIterable<RunEvent> {
@@ -18,6 +20,25 @@ export class GeminiAdapter implements ProviderAdapter {
       return
     }
 
+    if (this.requestDelayMs > 0) await new Promise((r) => setTimeout(r, this.requestDelayMs))
+
+    // Gemini SDK has no built-in retry — implement simple exponential backoff for 429s
+    let attempt = 0
+    while (true) {
+      try {
+        yield* this._stream(request, apiKey)
+        return
+      } catch (err) {
+        const is429 = String(err).includes('429') || String(err).includes('RESOURCE_EXHAUSTED')
+        if (!is429 || attempt >= this.maxRetries) throw err
+        const delay = Math.min(1000 * 2 ** attempt + Math.random() * 500, 30_000)
+        await new Promise((r) => setTimeout(r, delay))
+        attempt++
+      }
+    }
+  }
+
+  async *_stream(request: RunRequest, apiKey: string): AsyncIterable<RunEvent> {
     try {
       const genAI = new GoogleGenerativeAI(apiKey)
       const model = genAI.getGenerativeModel({ model: request.model || this.model })

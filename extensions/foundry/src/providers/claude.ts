@@ -161,7 +161,9 @@ export class ClaudeAdapter implements ProviderAdapter {
   constructor(
     private readonly providerId: string,
     private readonly model: string,
-    private readonly keychainKey: string
+    private readonly keychainKey: string,
+    private readonly maxRetries: number = 4,
+    private readonly requestDelayMs: number = 0
   ) {}
 
   async *run(request: RunRequest): AsyncIterable<RunEvent> {
@@ -171,7 +173,9 @@ export class ClaudeAdapter implements ProviderAdapter {
       return
     }
 
-    const client = new Anthropic({ apiKey })
+    if (this.requestDelayMs > 0) await new Promise((r) => setTimeout(r, this.requestDelayMs))
+    // maxRetries: SDK automatically retries 429 / 529 with exponential backoff
+    const client = new Anthropic({ apiKey, maxRetries: this.maxRetries, timeout: 120_000 })
 
     const systemPrompt = [
       "You are an expert software engineer working inside a developer's codebase.",

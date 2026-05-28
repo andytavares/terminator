@@ -15,6 +15,13 @@ vi.mock('node:child_process', () => ({
   execFile: vi.fn(),
 }))
 
+// Mock fs/promises for removeWorktree fallback tests
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return { ...actual, rm: vi.fn().mockResolvedValue(undefined) }
+})
+import * as fsp from 'node:fs/promises'
+
 import * as cp from 'node:child_process'
 const mockExecFile = cp.execFile as ReturnType<typeof vi.fn>
 
@@ -71,6 +78,12 @@ describe('stashChanges()', () => {
     const result = await stashChanges('/workspace')
     expect(result).toEqual({ ok: true })
   })
+
+  it('returns error on git failure', async () => {
+    mockExec('', '', new Error('nothing to stash'))
+    const result = await stashChanges('/workspace')
+    expect(result).toHaveProperty('error')
+  })
 })
 
 describe('revertFiles()', () => {
@@ -118,6 +131,32 @@ describe('getDiffForFile()', () => {
     const result = await getDiffForFile('/workspace', 'src/unchanged.ts')
     expect(result).toEqual({ unifiedDiff: '', linesAdded: 0, linesRemoved: 0 })
   })
+
+  it('handles relative file path (not absolute)', async () => {
+    const diff = `--- a/src/rel.ts\n+++ b/src/rel.ts\n@@ -1 +1 @@\n-old\n+new\n`
+    mockExec(diff)
+    // relative path — skips the absolute-path slice branch
+    const result = await getDiffForFile('/workspace', 'src/rel.ts')
+    if ('error' in result) throw new Error('unexpected error')
+    expect(result.unifiedDiff).toContain('+new')
+    expect(result.linesAdded).toBe(1)
+    expect(result.linesRemoved).toBe(1)
+  })
+
+  it('strips workspaceRoot prefix from absolute path', async () => {
+    const diff = `--- a/src/abs.ts\n+++ b/src/abs.ts\n@@ -1 +1 @@\n-x\n+y\n`
+    mockExec(diff)
+    // absolute path that starts with workspaceRoot — triggers the slice branch
+    const result = await getDiffForFile('/workspace', '/workspace/src/abs.ts')
+    if ('error' in result) throw new Error('unexpected error')
+    expect(result.unifiedDiff).toContain('+y')
+  })
+
+  it('returns error when git diff fails', async () => {
+    mockExec('', 'fatal error', new Error('exit 128'))
+    const result = await getDiffForFile('/workspace', 'src/foo.ts')
+    expect(result).toHaveProperty('error')
+  })
 })
 
 describe('createWorktree()', () => {
@@ -145,6 +184,13 @@ describe('removeWorktree()', () => {
 
   it('returns error but does not throw on git failure', async () => {
     mockExec('', '', new Error('no such worktree'))
+    const result = await removeWorktree('/workspace', '/tmp/wt', 'foundry/run-abc12345')
+    expect(result).toHaveProperty('error')
+  })
+
+  it('returns error even when fallback fs.rm also fails', async () => {
+    mockExec('', '', new Error('no such worktree'))
+    vi.mocked(fsp.rm).mockRejectedValueOnce(new Error('rm failed'))
     const result = await removeWorktree('/workspace', '/tmp/wt', 'foundry/run-abc12345')
     expect(result).toHaveProperty('error')
   })

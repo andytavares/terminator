@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import './foundry.css'
 import type { Run, FileChange, RunLogEntry, RunLogKind, SensorResult } from '../types/foundry.types'
+import { CopilotView } from './CopilotView'
+import { OrchestrationView } from './OrchestrationView'
 
 interface Props {
   repoRoot: string | null
@@ -225,6 +227,7 @@ export function RunConsole({ repoRoot }: Props) {
   const [loadingDiff, setLoadingDiff] = useState(false)
   const [gateNote, setGateNote] = useState('')
   const [decidingWith, setDecidingWith] = useState<string | null>(null)
+  const [runningChecks, setRunningChecks] = useState(false)
   const logEndRef = useRef<HTMLDivElement | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -355,6 +358,45 @@ export function RunConsole({ repoRoot }: Props) {
       </div>
     )
 
+  // Route to mode-specific views
+  if (run.mode === 'co-pilot') {
+    return (
+      <div
+        className="fnd-panel"
+        style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}
+      >
+        <div className="fnd-header">
+          <span className="fnd-badge fnd-badge--running" style={{ marginRight: 8, fontSize: 10 }}>
+            co-pilot
+          </span>
+          <span
+            className="fnd-title"
+            style={{ textTransform: 'none', fontSize: 12, letterSpacing: 0 }}
+          >
+            {workspaceRoot.split('/').pop()} — co-pilot session
+          </span>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--tm-text-muted)' }}>
+            {run.providerId} · {run.model}
+          </span>
+        </div>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <CopilotView run={run} workspaceRoot={workspaceRoot} />
+        </div>
+      </div>
+    )
+  }
+
+  if (run.mode === 'orchestrate') {
+    return (
+      <div
+        className="fnd-panel"
+        style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}
+      >
+        <OrchestrationView run={run} workspaceRoot={workspaceRoot} onAbort={() => void loadRun()} />
+      </div>
+    )
+  }
+
   const dotClass = STATUS_DOT[run.status] ?? 'fnd-dot--amber'
   const label = STATUS_LABEL[run.status] ?? run.status
   const runName = run.specPath
@@ -362,6 +404,7 @@ export function RunConsole({ repoRoot }: Props) {
     : (run.prompt ?? '').slice(0, 40) || run.id
   const isTerminal = run.status === 'done' || run.status === 'rejected' || run.status === 'aborted'
   const isGate = run.status === 'gate'
+  const isPausedError = run.status === 'paused-error'
 
   return (
     <div className="fnd-panel" style={{ height: '100vh' }}>
@@ -378,15 +421,30 @@ export function RunConsole({ repoRoot }: Props) {
           )}
           {runName}
         </span>
-        {!isTerminal && (
-          <button
-            className="fnd-btn fnd-btn--secondary fnd-btn--sm"
-            onClick={() => void abort()}
-            disabled={decidingWith === 'abort'}
-          >
-            {decidingWith === 'abort' ? 'Aborting…' : 'Abort'}
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 6 }}>
+          {isPausedError && (
+            <button
+              className="fnd-btn fnd-btn--primary fnd-btn--sm"
+              onClick={() =>
+                void invoke('foundry:run-retry', { runId, workspaceRoot }).then(
+                  () => void loadRun()
+                )
+              }
+              disabled={decidingWith !== null}
+            >
+              ↺ Retry
+            </button>
+          )}
+          {!isTerminal && (
+            <button
+              className="fnd-btn fnd-btn--secondary fnd-btn--sm"
+              onClick={() => void abort()}
+              disabled={decidingWith === 'abort'}
+            >
+              {decidingWith === 'abort' ? 'Aborting…' : 'Abort'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Status + metadata strip ── */}
@@ -505,9 +563,34 @@ export function RunConsole({ repoRoot }: Props) {
             )}
           </div>
 
-          {/* Sensor results */}
+          {/* Sensor results + re-run button */}
           {run.sensorResults && run.sensorResults.length > 0 && (
             <div style={{ flexShrink: 0, borderTop: '1px solid var(--tm-border)' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '4px 10px 2px',
+                }}
+              >
+                <span className="fnd-section-label" style={{ padding: 0 }}>
+                  Sensor results
+                </span>
+                <button
+                  className="fnd-btn fnd-btn--secondary fnd-btn--sm"
+                  style={{ fontSize: 10 }}
+                  disabled={runningChecks}
+                  onClick={() => {
+                    setRunningChecks(true)
+                    void invoke('foundry:run-sensors', { runId, workspaceRoot })
+                      .then(() => void loadRun())
+                      .finally(() => setRunningChecks(false))
+                  }}
+                >
+                  {runningChecks ? 'Running…' : '↺ Re-run checks'}
+                </button>
+              </div>
               {run.sensorResults.map((r, i) => (
                 <SensorRow key={i} r={r} />
               ))}

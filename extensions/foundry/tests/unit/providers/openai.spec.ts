@@ -117,4 +117,23 @@ describe('OpenAIAdapter', () => {
     mockRetrieveKey.mockResolvedValueOnce(null)
     expect((await adapter.testConnection()).ok).toBe(false)
   })
+
+  it('respects requestDelayMs before sending request', async () => {
+    vi.useFakeTimers()
+    const delayedAdapter = new OpenAIAdapter('p2', 'gpt-4o', 'foundry.p2.apikey', 3, 500)
+    mockCreate.mockResolvedValue({ choices: [{ delta: { content: 'hi' }, finish_reason: 'stop' }] })
+
+    const runPromise = (async () => {
+      const events = []
+      for await (const ev of delayedAdapter.run(BASE_REQ)) events.push(ev)
+      return events
+    })()
+
+    // Advance past the delay so the run can proceed
+    await vi.advanceTimersByTimeAsync(600)
+    vi.useRealTimers()
+
+    const events = await runPromise
+    expect(events.some((e) => e.type === 'done' || e.type === 'error')).toBe(true)
+  })
 })

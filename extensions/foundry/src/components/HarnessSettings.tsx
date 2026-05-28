@@ -475,6 +475,8 @@ interface ProviderConfig {
   endpoint?: string
   keychainKey?: string
   supportsStreaming: boolean
+  maxRetries?: number
+  requestDelayMs?: number
 }
 
 type ProviderType = 'claude' | 'openai' | 'gemini' | 'ollama'
@@ -520,6 +522,81 @@ const MODELS: Record<ProviderType, string[]> = {
   ollama: ['llama3', 'mistral', 'codellama', 'phi3'],
 }
 
+function RateLimitPanel({
+  provider,
+  onSave,
+  saving,
+}: {
+  provider: ProviderConfig
+  onSave: (maxRetries: number, requestDelayMs: number) => void
+  saving: boolean
+}) {
+  const [retries, setRetries] = useState(provider.maxRetries ?? 4)
+  const [delay, setDelay] = useState(provider.requestDelayMs ?? 0)
+
+  return (
+    <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--tm-border)' }}>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: 'var(--tm-text-secondary)',
+          marginBottom: 10,
+        }}
+      >
+        Rate limit &amp; retry settings
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
+        <div>
+          <div className="fnd-section-label" style={{ marginBottom: 5, fontSize: 10 }}>
+            Max retries on 429
+          </div>
+          <input
+            type="number"
+            className="fnd-sensor-cmd-input"
+            style={{ width: '100%', boxSizing: 'border-box' }}
+            min={0}
+            max={10}
+            value={retries}
+            onChange={(e) => setRetries(Math.max(0, Math.min(10, parseInt(e.target.value) || 0)))}
+          />
+          <div style={{ fontSize: 10, color: 'var(--tm-text-muted)', marginTop: 4 }}>
+            SDK retries with exponential backoff. 0 = no retries. Default:{' '}
+            {provider.type === 'claude' ? 4 : 3}.
+          </div>
+        </div>
+        <div>
+          <div className="fnd-section-label" style={{ marginBottom: 5, fontSize: 10 }}>
+            Request delay (ms)
+          </div>
+          <input
+            type="number"
+            className="fnd-sensor-cmd-input"
+            style={{ width: '100%', boxSizing: 'border-box' }}
+            min={0}
+            max={60000}
+            step={500}
+            value={delay}
+            onChange={(e) => setDelay(Math.max(0, parseInt(e.target.value) || 0))}
+          />
+          <div style={{ fontSize: 10, color: 'var(--tm-text-muted)', marginTop: 4 }}>
+            Fixed pause before each request. 1000 = ~60 rpm. 0 = no throttle.
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+        <button
+          className="fnd-btn fnd-btn--primary fnd-btn--sm"
+          onClick={() => onSave(retries, delay)}
+          disabled={saving}
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function ProvidersPanel({ repoRoot }: { repoRoot: string }) {
   const [providers, setProviders] = useState<ProviderConfig[]>([])
   const [adding, setAdding] = useState<ProviderType | null>(null)
@@ -528,6 +605,8 @@ function ProvidersPanel({ repoRoot }: { repoRoot: string }) {
     {}
   )
   const [loaded, setLoaded] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [saving, setSaving] = useState<string | null>(null)
 
   useEffect(() => {
     void loadProviders()
@@ -560,6 +639,22 @@ function ProvidersPanel({ repoRoot }: { repoRoot: string }) {
       setTestResult((prev) => ({ ...prev, [p.id]: { ok: false, latencyMs: 0 } }))
     } finally {
       setTesting(null)
+    }
+  }
+
+  async function saveRateLimits(p: ProviderConfig, maxRetries: number, requestDelayMs: number) {
+    setSaving(p.id)
+    try {
+      await invoke('foundry:provider-save', {
+        provider: { ...p, maxRetries, requestDelayMs },
+        workspaceRoot: repoRoot,
+      })
+      setProviders((prev) =>
+        prev.map((x) => (x.id === p.id ? { ...x, maxRetries, requestDelayMs } : x))
+      )
+      setExpandedId(null)
+    } finally {
+      setSaving(null)
     }
   }
 
@@ -634,13 +729,43 @@ function ProvidersPanel({ repoRoot }: { repoRoot: string }) {
                 ×
               </button>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--tm-text-muted)', display: 'flex', gap: 12 }}>
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--tm-text-muted)',
+                display: 'flex',
+                gap: 12,
+                alignItems: 'center',
+              }}
+            >
               <span>{p.model}</span>
               {p.endpoint && <span>{p.endpoint}</span>}
               {p.keychainKey && (
                 <span style={{ color: 'var(--tm-success)' }}>key stored in keychain ✓</span>
               )}
+              <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+                {p.requestDelayMs ? (
+                  <span style={{ color: 'var(--tm-warning)' }}>⏱ {p.requestDelayMs}ms delay</span>
+                ) : null}
+                {p.maxRetries !== undefined && p.maxRetries !== 4 ? (
+                  <span>{p.maxRetries} retries</span>
+                ) : null}
+                <button
+                  className="fnd-btn fnd-btn--secondary fnd-btn--sm"
+                  style={{ fontSize: 10 }}
+                  onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
+                >
+                  {expandedId === p.id ? '▲ Rate limits' : '▼ Rate limits'}
+                </button>
+              </span>
             </div>
+            {expandedId === p.id && (
+              <RateLimitPanel
+                provider={p}
+                onSave={(retries, delay) => void saveRateLimits(p, retries, delay)}
+                saving={saving === p.id}
+              />
+            )}
           </div>
         )
       })}
