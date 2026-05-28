@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { DailyLog, IndexedTask } from '../vault/types'
+import type { DailyLog, IndexedTask, KanbanLane } from '../vault/types'
 
 export type VaultView = 'daily' | 'inbox' | 'projects' | 'areas' | 'archive' | 'review'
 export type ViewMode = 'list' | 'kanban'
@@ -25,6 +25,10 @@ interface VaultStore {
   inboxCount: number
   somedayTasks: IndexedTask[]
   loadSomeday: () => Promise<void>
+  calendarRefreshKey: number
+  tickCalendar: () => void
+  kanbanLanes: KanbanLane[]
+  setKanbanLanes: (lanes: KanbanLane[]) => void
   activeView: VaultView
   viewMode: ViewMode
   selectedContexts: string[]
@@ -48,7 +52,7 @@ interface VaultStore {
   setShowCaptureModal: (show: boolean) => void
   navToArea: (name: string) => void
   navToProject: (name: string) => void
-  navigateToTask: (taskId: string) => void
+  navigateToTask: (taskId: string, date?: string) => void
   clearPendingTask: () => void
 }
 
@@ -57,6 +61,10 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   todayLog: null,
   inboxCount: 0,
   somedayTasks: [],
+  calendarRefreshKey: 0,
+  tickCalendar: () => set((s) => ({ calendarRefreshKey: s.calendarRefreshKey + 1 })),
+  kanbanLanes: [],
+  setKanbanLanes: (lanes: KanbanLane[]) => set({ kanbanLanes: lanes }),
   activeView: 'daily',
   viewMode: (localStorage.getItem(KANBAN_MODE_KEY) as ViewMode | null) ?? 'list',
   selectedContexts: loadSelectedContexts(),
@@ -103,8 +111,8 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   navToProject: (name: string) =>
     set({ activeView: 'projects', selectedProjectName: name, selectedAreaName: null }),
 
-  navigateToTask: (taskId: string) =>
-    set({ activeView: 'daily', pendingTaskId: taskId, viewingDate: null }),
+  navigateToTask: (taskId: string, date?: string) =>
+    set({ activeView: 'daily', pendingTaskId: taskId, viewingDate: date ?? null }),
 
   clearPendingTask: () => set({ pendingTaskId: null }),
 
@@ -117,12 +125,13 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
         return
       }
       const res = result as DailyLog & { rolledOver?: number; rolledOverIds?: string[] }
-      set({
+      set((s) => ({
         todayLog: res,
         isLoading: false,
         lastRolledOver: res.rolledOver ?? 0,
         rolledOverTaskIds: res.rolledOverIds ?? [],
-      })
+        calendarRefreshKey: s.calendarRefreshKey + 1,
+      }))
     } catch (err) {
       set({ error: String(err), isLoading: false })
     }
@@ -139,7 +148,12 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
         return
       }
       const res = result as DailyLog
-      set({ todayLog: res, isLoading: false, rolledOverTaskIds: [] })
+      set((s) => ({
+        todayLog: res,
+        isLoading: false,
+        rolledOverTaskIds: [],
+        calendarRefreshKey: s.calendarRefreshKey + 1,
+      }))
     } catch (err) {
       set({ error: String(err), isLoading: false })
     }

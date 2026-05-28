@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   MinusCircle,
   ArrowRightCircle,
-  Timer,
   ChevronDown,
   ChevronRight,
   OctagonAlert,
@@ -63,7 +62,7 @@ function StatusIcon({
     case 'migrated':
       return <ArrowRightCircle size={size} className="task-status task-status--migrated" />
     case 'in-progress':
-      return <Timer size={size} className="task-status task-status--in-progress" />
+      return <Circle size={size} className="task-status task-status--in-progress" />
     case 'blocked':
       return <OctagonAlert size={size} className="task-status task-status--blocked" />
     default:
@@ -113,9 +112,7 @@ function SessionPicker({
   if (activeSessions.length === 0) {
     return (
       <span className="daily-log__link-picker">
-        <span style={{ fontSize: 12, color: 'var(--tm-text-muted)' }}>
-          No active terminal sessions.
-        </span>
+        <span className="tv-text-muted-sm">No active terminal sessions.</span>
         <button className="tv-btn tv-btn--icon" onClick={onClose}>
           <X size={14} />
         </button>
@@ -233,7 +230,7 @@ function SubtaskRow({
         </span>
       ) : (
         <span
-          className={`daily-log__subtask-text${subtask.status === 'done' ? ' daily-log__task-text--strikethrough' : ''}`}
+          className={`daily-log__subtask-text${subtask.status === 'done' || subtask.status === 'migrated' ? ' daily-log__task-text--strikethrough' : ''}`}
           onDoubleClick={isOpen ? () => setEditing(true) : undefined}
         >
           {subtask.text}
@@ -524,6 +521,14 @@ const RECURRENCE_INTERVALS: { value: string; label: string }[] = [
   { value: 'biweekly', label: 'Every 2 weeks' },
   { value: 'monthly', label: 'Monthly' },
 ]
+
+function format12h(hhmm: string): string {
+  const [hStr = '0', mStr = '00'] = hhmm.split(':')
+  const h = parseInt(hStr, 10)
+  const ampm = h < 12 ? 'AM' : 'PM'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${h12}:${mStr} ${ampm}`
+}
 
 function formatRecurrence(interval: string, days?: number[]): string {
   const label = RECURRENCE_INTERVALS.find((r) => r.value === interval)?.label ?? interval
@@ -1013,10 +1018,9 @@ function TaskRow({
             {task.recurrenceInterval && (
               <span
                 className="daily-log__recurrence-badge"
-                title={`Repeats: ${formatRecurrence(task.recurrenceInterval, task.recurrenceDays)}${task.recurrenceTime ? ` at ${task.recurrenceTime}` : ''}`}
+                title={`Repeats: ${formatRecurrence(task.recurrenceInterval, task.recurrenceDays)}${task.recurrenceTime ? ` at ${format12h(task.recurrenceTime)}` : ''}`}
               >
                 <Repeat size={11} />
-                {formatRecurrence(task.recurrenceInterval, task.recurrenceDays)}
               </span>
             )}
           </span>

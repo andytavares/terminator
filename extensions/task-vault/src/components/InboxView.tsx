@@ -98,7 +98,7 @@ export function InboxView(): React.JSX.Element {
           <div className="inbox-view__processor-header">
             <span>Processing inbox (GTD clarify)…</span>
             <button
-              className="inbox-view__back-btn"
+              className="tv-btn tv-btn--ghost tv-btn--xs"
               onClick={() => {
                 setProcessing(false)
                 void load()

@@ -103,7 +103,10 @@ describe('fs IPC handlers', () => {
     it('registers a watcher handler that sends fs:changed events to the window', () => {
       const handlerCapture = vi.mocked(fsWatcherService.addHandler).mock.calls[0][0]
       const mockSend = vi.fn()
-      mockGetMainWindow.mockReturnValueOnce({ webContents: { send: mockSend } })
+      mockGetMainWindow.mockReturnValueOnce({
+        webContents: { send: mockSend },
+        isDestroyed: vi.fn().mockReturnValue(false),
+      })
       const event = { type: 'change', path: '/my/file.ts' }
       handlerCapture(event as Parameters<typeof handlerCapture>[0])
       expect(mockSend).toHaveBeenCalledWith('fs:changed', event)

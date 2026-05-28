@@ -127,6 +127,7 @@ const defaultExtensionRegistry = {
   setActiveGlobalTab: vi.fn(),
   keyboardShortcuts: [],
   commands: [],
+  overlays: [],
 }
 
 function setupMocks(
@@ -356,6 +357,16 @@ describe('App', () => {
     await waitFor(() => screen.getByText('Close Palette'))
     fireEvent.click(screen.getByText('Close Palette'))
     await waitFor(() => expect(screen.queryByTestId('command-palette')).toBeNull())
+  })
+
+  it('renders overlay components from extension registry', () => {
+    const MockOverlay = () => <div data-testid="mock-overlay">Overlay</div>
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      overlays: [MockOverlay],
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    render(<App />)
+    expect(screen.getByTestId('mock-overlay')).toBeTruthy()
   })
 
   it('renders extension sidebar panels when openPanels is non-empty', async () => {

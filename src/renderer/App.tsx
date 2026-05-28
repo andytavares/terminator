@@ -62,6 +62,7 @@ export function App(): JSX.Element {
     setActiveProjectTab,
     setActiveGlobalTab,
     commands: extensionCommands,
+    overlays,
   } = useExtensionRegistry()
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
@@ -75,6 +76,10 @@ export function App(): JSX.Element {
   const handleOpenSettings = useCallback(() => setSettingsOpen(true), [])
   const handleToggleLog = useCallback(() => setLogOpen((v) => !v), [])
   const handleOpenCommandPalette = useCallback(() => setPaletteOpen(true), [])
+  const handleToggleOverview = useCallback(() => {
+    const { activeGlobalTabId: curr, setActiveGlobalTab: setTab } = useExtensionRegistry.getState()
+    setTab(curr === 'core.overview' ? null : 'core.overview')
+  }, [])
 
   const handleNewTab = useCallback(() => {
     if (!activeProjectId) return
@@ -95,6 +100,7 @@ export function App(): JSX.Element {
     onOpenSettings: handleOpenSettings,
     onToggleLog: handleToggleLog,
     onOpenCommandPalette: handleOpenCommandPalette,
+    onToggleOverview: handleToggleOverview,
   })
 
   const builtinCommands = useCallback((): CommandRegistration[] => {
@@ -122,7 +128,7 @@ export function App(): JSX.Element {
       {
         id: 'core.toggle-overview',
         label: 'Toggle Overview',
-        shortcut: '⌘⇧O',
+        shortcut: '⌘⇧I',
         category: 'App',
         action: () => {
           const { activeGlobalTabId, setActiveGlobalTab } = useExtensionRegistry.getState()
@@ -201,8 +207,8 @@ export function App(): JSX.Element {
 
   // Global handler for extension navigation events — works even when the target tab is unmounted
   useEffect(() => {
-    return window.electronAPI.extensionBridge.on('task-vault:navigate-task', (taskId) => {
-      useExtensionRegistry.getState().setActiveGlobalTabWithNavigation('task-vault', taskId)
+    return window.electronAPI.extensionBridge.on('task-vault:navigate-task', (payload) => {
+      useExtensionRegistry.getState().setActiveGlobalTabWithNavigation('task-vault', payload)
     })
   }, [])
 
@@ -407,6 +413,9 @@ export function App(): JSX.Element {
             <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />
           )}
           <ToastContainer />
+          {overlays.map((Overlay, i) => (
+            <Overlay key={i} />
+          ))}
         </div>
         {showMetricsBar && (
           <div className="app-global-metrics">

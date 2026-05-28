@@ -291,6 +291,7 @@ function AreaDetail({
   onRefresh: () => Promise<void>
   onNavToProject: (name: string) => void
 }): React.JSX.Element {
+  const tickCalendar = useVaultStore((s) => s.tickCalendar)
   const [tasks, setTasks] = useState<IndexedTask[]>(area.tasks)
   const [newTaskText, setNewTaskText] = useState('')
   const [adding, setAdding] = useState(false)
@@ -306,6 +307,7 @@ function AreaDetail({
       if (updated) setTasks(updated.tasks)
     }
     await onRefresh()
+    tickCalendar()
   }
 
   async function handleAddTask() {
@@ -380,15 +382,13 @@ function AreaDetail({
   return (
     <div className="area-detail">
       <div className="area-detail__header">
-        <button className="area-detail__back-btn" onClick={onBack}>
+        <button className="tv-btn tv-btn--ghost tv-btn--xs" onClick={onBack}>
           ← Areas
         </button>
         <h2>
           {area.name}
           {area.status === 'archived' && (
-            <span className="projects-browser__archived-badge" style={{ marginLeft: 8 }}>
-              archived
-            </span>
+            <span className="projects-browser__archived-badge tv-ml-2">archived</span>
           )}
         </h2>
         {area.status !== 'archived' ? (

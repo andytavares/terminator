@@ -176,4 +176,47 @@ describe('terminal IPC handlers', () => {
       expect(mockPty.write).toHaveBeenCalledWith('ls -la\n')
     })
   })
+
+  describe('terminal:resize', () => {
+    it('resizes the PTY for the given session', async () => {
+      const createResult = (await handlerMap['terminal:create'](
+        {},
+        {
+          projectId: '550e8400-e29b-41d4-a716-446655440004',
+          type: 'human',
+          tabTitle: 'Shell',
+          cwd: '/tmp',
+        }
+      )) as { sessionId: string }
+
+      onMap['terminal:resize']({}, { sessionId: createResult.sessionId, cols: 120, rows: 40 })
+
+      expect(mockPty.resize).toHaveBeenCalledWith(120, 40)
+    })
+  })
+
+  describe('terminal:close-all', () => {
+    it('kills all sessions and returns terminatedCount', async () => {
+      await handlerMap['terminal:create'](
+        {},
+        {
+          projectId: '550e8400-e29b-41d4-a716-446655440005',
+          type: 'human',
+          tabTitle: 'Shell',
+          cwd: '/tmp',
+        }
+      )
+
+      const result = await handlerMap['terminal:close-all']({}, undefined)
+      expect(result).toMatchObject({ terminatedCount: expect.any(Number) })
+      expect(mockPty.kill).toHaveBeenCalled()
+    })
+  })
+
+  describe('terminal:cleanup-orphans', () => {
+    it('returns a cleanedCount result', async () => {
+      const result = await handlerMap['terminal:cleanup-orphans']({}, undefined)
+      expect(result).toMatchObject({ cleanedCount: expect.any(Number) })
+    })
+  })
 })

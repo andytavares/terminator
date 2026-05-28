@@ -159,7 +159,7 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
   if (activeSessions.length === 0)
     return (
       <span className="projects-browser__link-picker">
-        <span style={{ fontSize: 11, color: 'var(--tm-text-muted)' }}>No active sessions</span>
+        <span className="tv-text-muted-sm">No active sessions</span>
         <button className="tv-btn tv-btn--icon" onClick={() => setLinking(false)}>
           <X size={14} />
         </button>
@@ -290,6 +290,7 @@ function CreateProjectForm({ onCreated, onCancel }: CreateProjectFormProps): Rea
 }
 
 function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.Element {
+  const tickCalendar = useVaultStore((s) => s.tickCalendar)
   const [tasks, setTasks] = useState<IndexedTask[]>([])
   const [expanded, setExpanded] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -317,22 +318,26 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
   async function handleComplete(taskId: string) {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', { taskId })
     await load()
+    tickCalendar()
   }
 
   async function handleCancel(taskId: string) {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:cancel-task', { taskId })
     await load()
+    tickCalendar()
   }
 
   async function handleRestore(taskId: string) {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:restore-task', { taskId })
     await load()
+    tickCalendar()
   }
 
   async function handleDelete(taskId: string, text: string) {
     if (!confirm(`Delete task: "${text}"?`)) return
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-task', { taskId })
     await load()
+    tickCalendar()
   }
 
   async function handleSaveEdit(taskId: string) {
@@ -343,6 +348,7 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
     })
     setEditingId(null)
     await load()
+    tickCalendar()
   }
 
   function startEdit(t: IndexedTask) {
@@ -371,6 +377,7 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
       })
       setAddingText('')
       await load()
+      tickCalendar()
     } finally {
       setAdding(false)
     }
@@ -378,7 +385,10 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
 
   if (!expanded) {
     return (
-      <button className="projects-browser__tasks-toggle" onClick={toggle}>
+      <button
+        className="tv-btn tv-btn--ghost tv-btn--xs projects-browser__tasks-toggle"
+        onClick={toggle}
+      >
         {loaded
           ? `${tasks.length} task${tasks.length !== 1 ? 's' : ''} tagged @${projectName}`
           : `Show tasks tagged @${projectName}`}

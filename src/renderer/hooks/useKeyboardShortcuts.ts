@@ -10,12 +10,14 @@ interface Options {
   onOpenSettings?: () => void
   onToggleLog?: () => void
   onOpenCommandPalette?: () => void
+  onToggleOverview?: () => void
 }
 
 export function useKeyboardShortcuts({
   onOpenSettings,
   onToggleLog,
   onOpenCommandPalette,
+  onToggleOverview,
 }: Options = {}): void {
   const {
     workspaces,
@@ -81,6 +83,13 @@ export function useKeyboardShortcuts({
       if (isMeta && e.shiftKey && e.key === 'l') {
         e.preventDefault()
         onToggleLog?.()
+        return
+      }
+
+      // Cmd+Shift+I: toggle overview tab
+      if (isMeta && e.shiftKey && e.key === 'i') {
+        e.preventDefault()
+        onToggleOverview?.()
         return
       }
 
@@ -251,5 +260,6 @@ export function useKeyboardShortcuts({
     onOpenSettings,
     onToggleLog,
     onOpenCommandPalette,
+    onToggleOverview,
   ])
 }

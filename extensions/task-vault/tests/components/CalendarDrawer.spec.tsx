@@ -9,9 +9,19 @@ const mockLoadToday = vi.fn()
 
 vi.mock('../../src/stores/vault.store', () => ({
   useVaultStore: (
-    sel?: (s: { loadDate: typeof mockLoadDate; loadToday: typeof mockLoadToday }) => unknown
+    sel?: (s: {
+      loadDate: typeof mockLoadDate
+      loadToday: typeof mockLoadToday
+      calendarRefreshKey: number
+      kanbanLanes: []
+    }) => unknown
   ) => {
-    const store = { loadDate: mockLoadDate, loadToday: mockLoadToday }
+    const store = {
+      loadDate: mockLoadDate,
+      loadToday: mockLoadToday,
+      calendarRefreshKey: 0,
+      kanbanLanes: [],
+    }
     if (sel) return sel(store)
     return store
   },

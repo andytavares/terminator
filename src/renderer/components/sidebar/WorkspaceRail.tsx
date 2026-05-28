@@ -128,9 +128,10 @@ export function WorkspaceRail({
           key={tab.id}
           className={`ws-rail__global-tab${activeGlobalTabId === tab.id ? ' ws-rail__global-tab--active' : ''}`}
           onClick={() => onSelectGlobalTab?.(tab.id)}
-          title={tab.label}
+          title={`${tab.label}${tab.badge ? ` (${tab.badge})` : ''}`}
         >
           {tab.icon ?? tab.label[0]}
+          <AlertBadge count={tab.badge ?? 0} className="alert-badge--tab-corner" />
         </button>
       ))}
 

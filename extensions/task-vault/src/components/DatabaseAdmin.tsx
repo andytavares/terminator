@@ -268,7 +268,11 @@ export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Elemen
                 {result.rows.length} row{result.rows.length !== 1 ? 's' : ''}{' '}
                 {result.elapsed != null && `· ${result.elapsed}ms`}
                 {canDeleteRows && (
-                  <span className="db-admin__result-hint"> · click 🗑 to delete a row</span>
+                  <span className="db-admin__result-hint">
+                    {' · click '}
+                    <Trash2 size={10} style={{ display: 'inline', verticalAlign: 'middle' }} />
+                    {' to delete a row'}
+                  </span>
                 )}
               </div>
               <div className="db-admin__table-wrap">

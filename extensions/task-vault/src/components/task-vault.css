@@ -1,4 +1,66 @@
+/* ── Task Vault Design Tokens ────────────────────────────────────── */
+:root {
+  /* Spacing scale (4px grid) */
+  --tv-space-1: 4px;
+  --tv-space-2: 8px;
+  --tv-space-3: 12px;
+  --tv-space-4: 16px;
+  --tv-space-5: 20px;
+  --tv-space-6: 24px;
+  --tv-space-8: 32px;
+
+  /* Border radius scale */
+  --tv-radius-xs: 4px;
+  --tv-radius-sm: 6px;
+  --tv-radius-md: 8px;
+  --tv-radius-lg: 10px;
+  --tv-radius-pill: 20px;
+
+  /* Button heights */
+  --tv-btn-h-xs: 22px;
+  --tv-btn-h-sm: 26px;
+  --tv-btn-h-md: 30px;
+  --tv-btn-h-lg: 36px;
+
+  /* Typography scale */
+  --tv-text-xs: 10px;
+  --tv-text-sm: 11px;
+  --tv-text-base: 13px;
+  --tv-text-md: 14px;
+  --tv-text-lg: 16px;
+  --tv-text-xl: 18px;
+  --tv-text-2xl: 20px;
+
+  /* Semantic color palette — consistent across all views */
+  --tv-color-danger: var(--tv-color-danger);
+  --tv-color-warning: var(--tm-warning, #f59e0b);
+  --tv-color-success: var(--tm-success, #4ade80);
+  --tv-color-danger-bg: rgba(224, 82, 96, 0.1);
+  --tv-color-danger-border: rgba(224, 82, 96, 0.35);
+  --tv-color-warning-bg: rgba(245, 158, 11, 0.12);
+  --tv-color-warning-border: rgba(245, 158, 11, 0.35);
+  --tv-color-success-bg: rgba(74, 222, 128, 0.12);
+  --tv-color-success-border: rgba(74, 222, 128, 0.3);
+
+  /* Status colors — always explicit, never rely on inheritance */
+  --tv-status-open: var(--tm-text-secondary, rgba(255, 255, 255, 0.65));
+  --tv-status-in-progress: #f59e0b;
+  --tv-status-in-review: #a78bfa;
+  --tv-status-blocked: var(--tv-color-warning);
+  --tv-status-done: var(--tv-color-success);
+  --tv-status-migrated: var(--tm-text-muted, rgba(255, 255, 255, 0.4));
+  --tv-status-cancelled: var(--tm-text-muted, rgba(255, 255, 255, 0.35));
+}
+
 /* ── Task Vault Extension Styles ───────────────────────────────── */
+
+/* Force dark color-scheme on all native date/time pickers so the calendar/clock
+   icon renders light-on-dark instead of the OS default black-on-white. */
+.task-vault-view input[type='date'],
+.task-vault-view input[type='time'],
+.task-vault-view input[type='datetime-local'] {
+  color-scheme: dark;
+}
 
 /* Layout */
 .task-vault-view {
@@ -33,7 +95,7 @@
   background: rgba(224, 92, 92, 0.12);
   border: 1px solid rgba(224, 92, 92, 0.3);
   border-radius: var(--tm-radius-sm, 6px);
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
 }
 
 /* ── Vault Sidebar ─────────────────────────────────────────────── */
@@ -125,14 +187,14 @@
 .daily-log__task {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--tm-border);
-  min-height: 32px;
+  gap: var(--tv-space-2);
+  padding: var(--tv-space-2) var(--tv-space-3);
+  border-radius: var(--tv-radius-sm);
+  min-height: 34px;
 }
 
 .daily-log__task:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .daily-log__task--done {
@@ -140,11 +202,14 @@
 }
 
 .daily-log__task-marker {
-  font-family: var(--font-mono, monospace);
-  font-size: 12px;
-  color: var(--tm-text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  width: 28px;
+  color: var(--tv-status-open);
+  width: 22px;
+  height: 22px;
+  line-height: 0;
 }
 
 .daily-log__task-text {
@@ -183,7 +248,7 @@
 
 .daily-log__complete-btn:hover {
   background: var(--tm-success, #4ade80);
-  color: #000;
+  color: #1a3322;
   border-color: var(--tm-success, #4ade80);
 }
 
@@ -232,6 +297,7 @@
   font-size: 12px;
   padding: 3px 8px;
   outline: none;
+  color-scheme: dark;
 }
 
 .daily-log__link-picker input:focus,
@@ -304,9 +370,9 @@
 .projects-browser__card {
   background: var(--tm-bg-card);
   border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-md, 10px);
-  padding: 14px 16px;
-  margin-bottom: 12px;
+  border-radius: var(--tv-radius-md);
+  padding: var(--tv-space-3) var(--tv-space-4);
+  margin-bottom: var(--tv-space-3);
   transition: background 0.1s;
 }
 
@@ -321,9 +387,9 @@
 .projects-browser__card-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--tv-space-2);
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: var(--tv-space-2);
 }
 
 .projects-browser__name {
@@ -341,7 +407,7 @@
 
 .projects-browser__deadline {
   font-size: 11px;
-  color: var(--tm-warning, #facc15);
+  color: var(--tv-color-warning);
   margin-left: auto;
 }
 
@@ -419,7 +485,7 @@
 
 .projects-browser__stale-badge {
   font-size: 11px;
-  color: var(--tm-warning, #facc15);
+  color: var(--tv-color-warning);
   background: rgba(250, 204, 21, 0.12);
   border: 1px solid rgba(250, 204, 21, 0.25);
   border-radius: 10px;
@@ -453,7 +519,7 @@
 
 .projects-browser__action-btn--danger:hover {
   background: rgba(224, 92, 92, 0.15);
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
   border-color: rgba(224, 92, 92, 0.4);
 }
 
@@ -481,7 +547,7 @@
 }
 
 .weekly-review--error {
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
 }
 
 .weekly-review__header {
@@ -624,7 +690,7 @@
 
 .wr-step__stale-badge {
   font-size: 10px;
-  color: var(--tm-warning, #facc15);
+  color: var(--tv-color-warning);
   background: rgba(250, 204, 21, 0.12);
   border: 1px solid rgba(250, 204, 21, 0.25);
   border-radius: 10px;
@@ -756,7 +822,7 @@
 .wr-step__warning {
   background: rgba(250, 204, 21, 0.08);
   border: 1px solid rgba(250, 204, 21, 0.25);
-  color: var(--tm-warning, #facc15);
+  color: var(--tv-color-warning);
 }
 
 .wr-step__meta {
@@ -1034,7 +1100,7 @@
 }
 
 .linked-vault-panel__status--in-progress {
-  background: var(--tm-warning, #facc15);
+  background: var(--tv-color-warning);
 }
 
 .linked-vault-panel__status--migrated,
@@ -1064,7 +1130,7 @@
 
 .linked-vault-panel__remove:hover {
   opacity: 1;
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
 }
 
 /* ── Quick Capture Overlay ─────────────────────────────────────── */
@@ -1124,7 +1190,7 @@
 
 .quick-capture__badge--area {
   background: rgba(250, 204, 21, 0.12);
-  color: var(--tm-warning, #facc15);
+  color: var(--tv-color-warning);
 }
 
 .quick-capture__hint {
@@ -1164,12 +1230,27 @@
 
 .daily-log__tag--area {
   background: rgba(250, 204, 21, 0.1);
-  color: var(--tm-warning, #facc15);
+  color: var(--tv-color-warning);
 }
 
 .daily-log__tag--due {
   background: rgba(224, 92, 92, 0.1);
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
+}
+
+.daily-log__recurrence-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--tv-radius-xs);
+  background: var(--tm-accent-dim, rgba(99, 102, 241, 0.12));
+  color: var(--tm-accent, #6366f1);
+  margin-left: var(--tv-space-1);
+  vertical-align: middle;
+  cursor: default;
+  flex-shrink: 0;
 }
 
 .daily-log__edit-btn,
@@ -1201,13 +1282,13 @@
 .daily-log__cancel-task-btn:hover,
 .daily-log__delete-btn:hover {
   background: rgba(224, 92, 92, 0.15);
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
   border-color: rgba(224, 92, 92, 0.4);
 }
 
 .daily-log__save-btn:hover {
   background: var(--tm-success, #4ade80);
-  color: #000;
+  color: #1a3322;
   border-color: var(--tm-success, #4ade80);
 }
 
@@ -1306,7 +1387,7 @@
 }
 
 .inbox-view__error {
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
 }
 
 .inbox-view__capture {
@@ -1418,11 +1499,11 @@
 .inbox-item {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: var(--tv-space-2);
+  padding: var(--tv-space-3) var(--tv-space-4);
   background: var(--tm-bg-card);
   border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-sm, 6px);
+  border-radius: var(--tv-radius-md);
   transition: background 0.1s;
 }
 
@@ -1433,7 +1514,7 @@
 .inbox-item__row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--tv-space-2);
   width: 100%;
 }
 
@@ -1453,7 +1534,7 @@
 }
 
 .inbox-item__btn--delete:hover {
-  color: var(--tm-danger, #e05c5c) !important;
+  color: var(--tv-color-danger) !important;
   border-color: rgba(224, 92, 92, 0.4) !important;
   background: rgba(224, 92, 92, 0.1) !important;
 }
@@ -1492,7 +1573,7 @@
 
 .inbox-item__btn--delete:hover {
   background: rgba(224, 92, 92, 0.15);
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
   border-color: rgba(224, 92, 92, 0.4);
 }
 
@@ -1787,7 +1868,7 @@
   background: rgba(224, 92, 92, 0.1);
   border: 1px solid rgba(224, 92, 92, 0.3);
   border-radius: var(--tm-radius-xs, 4px);
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
   font-size: 12px;
   padding: 8px 12px;
   margin-bottom: 12px;
@@ -1816,6 +1897,7 @@
   font-size: 13px;
   padding: 8px 12px;
   outline: none;
+  color-scheme: dark;
 }
 
 .create-project-form__field input:focus {
@@ -1952,7 +2034,7 @@
 }
 
 .areas-view__error {
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
 }
 .areas-view__empty p {
   margin: 4px 0;
@@ -2024,8 +2106,8 @@
 .areas-view__card {
   background: var(--tm-bg-card);
   border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-md, 10px);
-  padding: 16px;
+  border-radius: var(--tv-radius-md);
+  padding: var(--tv-space-3) var(--tv-space-4);
   cursor: pointer;
   transition:
     background 0.1s,
@@ -2038,16 +2120,16 @@
 }
 
 .areas-view__card-name {
-  font-size: 15px;
+  font-size: var(--tv-text-md);
   font-weight: 600;
-  margin-bottom: 10px;
+  margin-bottom: var(--tv-space-2);
   color: var(--tm-text-primary);
 }
 
 .areas-view__card-stats {
   display: flex;
-  gap: 10px;
-  font-size: 11px;
+  gap: var(--tv-space-2);
+  font-size: var(--tv-text-sm);
 }
 
 .areas-view__open-count {
@@ -2225,7 +2307,7 @@
 }
 
 .archive-view__error {
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
 }
 
 .archive-view__window-picker {
@@ -2310,10 +2392,15 @@
 .archive-task {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border-bottom: 1px solid var(--tm-border);
-  font-size: 13px;
+  gap: var(--tv-space-2);
+  padding: var(--tv-space-2) var(--tv-space-3);
+  border-radius: var(--tv-radius-sm);
+  font-size: var(--tv-text-base);
+  transition: background 120ms ease-out;
+}
+
+.archive-task:hover {
+  background: var(--tm-bg-surface, rgba(255, 255, 255, 0.04));
 }
 
 .archive-task__icon {
@@ -2405,7 +2492,7 @@
   background: none;
   border: 1px solid rgba(224, 92, 92, 0.3);
   border-radius: var(--tm-radius-sm, 6px);
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
   font-size: 12px;
   padding: 5px 12px;
   cursor: pointer;
@@ -2446,7 +2533,7 @@
 
 .archive-task__delete-btn:hover {
   background: rgba(224, 92, 92, 0.15);
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
   border-color: rgba(224, 92, 92, 0.4);
 }
 
@@ -2469,7 +2556,7 @@
 
 .area-detail__delete-btn--danger {
   border-color: rgba(224, 92, 92, 0.3);
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
 }
 
 .area-detail__delete-btn--danger:hover {
@@ -2477,7 +2564,7 @@
 }
 
 .areas-view__card-delete--danger:hover {
-  color: var(--tm-danger, #e05c5c) !important;
+  color: var(--tv-color-danger) !important;
 }
 
 .area-detail__task-edit {
@@ -2522,14 +2609,14 @@
 
 .areas-view__card-delete:hover {
   opacity: 1 !important;
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
 }
 
 .areas-view__create-error {
   background: rgba(224, 92, 92, 0.1);
   border: 1px solid rgba(224, 92, 92, 0.3);
   border-radius: var(--tm-radius-xs, 4px);
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
   font-size: 12px;
   padding: 6px 10px;
   margin-bottom: 8px;
@@ -2840,6 +2927,7 @@
   outline: none;
   width: 100%;
   box-sizing: border-box;
+  color-scheme: dark;
 }
 
 .smart-input__date-input:focus {
@@ -3124,24 +3212,34 @@
 .tv-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 4px;
+  justify-content: center;
+  gap: var(--tv-space-1);
+  height: var(--tv-btn-h-sm);
+  padding: 0 var(--tv-space-2);
+  border-radius: var(--tv-radius-xs);
   border: 1px solid transparent;
-  font-size: 12px;
+  font-size: var(--tv-text-base);
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
-  transition:
-    background 80ms,
-    color 80ms,
-    border-color 80ms;
   white-space: nowrap;
-  line-height: 1.4;
+  line-height: 1;
+  flex-shrink: 0;
 }
 .tv-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.tv-btn--xs {
+  height: var(--tv-btn-h-xs);
+  padding: 0 6px;
+  font-size: var(--tv-text-sm);
+}
+.tv-btn--lg {
+  height: var(--tv-btn-h-lg);
+  padding: 0 var(--tv-space-4);
+  font-size: var(--tv-text-md);
 }
 
 .tv-btn--primary {
@@ -3164,19 +3262,20 @@
 
 .tv-btn--danger {
   background: transparent;
-  color: var(--tm-danger, #e05260);
-  border-color: var(--tm-danger, #e05260);
+  color: var(--tv-color-danger);
+  border-color: var(--tv-color-danger);
 }
 .tv-btn--danger:hover:not(:disabled) {
-  background: var(--tm-danger, #e05260);
-  color: #fff;
+  background: var(--tv-color-danger-bg);
+  color: var(--tv-color-danger);
+  border-color: var(--tv-color-danger);
 }
 
 .tv-btn--ghost {
   background: transparent;
   color: var(--tm-text-muted);
   border: none;
-  padding: 3px 7px;
+  padding: 0 var(--tv-space-2);
 }
 .tv-btn--ghost:hover:not(:disabled) {
   background: var(--tm-surface-2, rgba(255, 255, 255, 0.06));
@@ -3197,36 +3296,39 @@
 .tv-btn--icon {
   background: transparent;
   border: none;
-  padding: 3px 6px;
+  height: var(--tv-btn-h-xs);
+  width: var(--tv-btn-h-xs);
+  padding: 0;
   color: var(--tm-text-muted);
   line-height: 1;
-  border-radius: 3px;
+  border-radius: var(--tv-radius-xs);
 }
 .tv-btn--icon:hover:not(:disabled) {
-  color: var(--tm-text);
+  color: var(--tm-text-primary);
   background: var(--tm-surface-2, rgba(255, 255, 255, 0.06));
 }
 
-/* Uniform action button size for task rows */
+/* Task row action icons — visible by default */
 .tv-btn--action-icon {
-  height: 28px;
-  min-width: 28px;
-  padding: 0 8px;
-  justify-content: center;
+  height: var(--tv-btn-h-sm);
+  min-width: var(--tv-btn-h-sm);
+  padding: 0 var(--tv-space-2);
+  color: var(--tm-text-primary);
+  border-color: var(--tm-border-strong, rgba(255, 255, 255, 0.3));
 }
 
 /* ═══════════════════════════════════════════════════════════════════
    VISUAL REFINEMENTS — refined dark productivity aesthetic
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ── Global transition upgrade ───────────────────────────────────── */
+/* ── Global transition ───────────────────────────────────────────── */
 .tv-btn {
   transition:
-    background 150ms ease-out,
-    color 150ms ease-out,
-    border-color 150ms ease-out,
-    box-shadow 150ms ease-out,
-    filter 150ms ease-out,
+    background 120ms ease-out,
+    color 120ms ease-out,
+    border-color 120ms ease-out,
+    box-shadow 120ms ease-out,
+    filter 120ms ease-out,
     transform 80ms ease-out;
 }
 
@@ -3278,14 +3380,11 @@
 
 /* Task row hover with action reveal */
 .daily-log__task {
-  border-radius: 5px;
-  padding-left: 4px;
-  padding-right: 4px;
   transition: background 120ms ease-out;
 }
 
 .daily-log__task:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--tm-bg-surface, rgba(255, 255, 255, 0.05));
 }
 
 .daily-log__task-actions {
@@ -3307,67 +3406,71 @@
   opacity: 1;
 }
 
-/* ── Project cards: hover elevation ──────────────────────────────── */
-.projects-browser__card {
-  transition:
-    background 150ms ease-out,
-    border-color 150ms ease-out,
-    box-shadow 200ms ease-out,
-    transform 150ms ease-out;
-}
-
-.projects-browser__card:hover {
-  background: var(--tm-bg-card-hover);
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.3),
-    0 1px 3px rgba(0, 0, 0, 0.2);
-  transform: translateY(-1px);
-  border-color: var(--tm-border-strong);
-}
-
-.projects-browser__name {
-  font-size: 14px;
-  letter-spacing: -0.01em;
-}
-
-/* ── Inbox items: elevation on hover ─────────────────────────────── */
-.inbox-item {
-  transition:
-    background 150ms ease-out,
-    border-color 150ms ease-out,
-    box-shadow 200ms ease-out;
-}
-
+/* ── Unified card hover ───────────────────────────────────────────── */
+.projects-browser__card,
+.areas-view__card,
+.projects-browser__card:hover,
+.areas-view__card:hover,
 .inbox-item:hover {
   background: var(--tm-bg-card-hover);
   border-color: var(--tm-border-strong);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-/* ── Area cards: elevation on hover ──────────────────────────────── */
-.areas-view__card {
-  transition:
-    background 150ms ease-out,
-    border-color 150ms ease-out,
-    box-shadow 200ms ease-out,
-    transform 150ms ease-out;
-}
-
-.areas-view__card:hover {
-  background: var(--tm-bg-card-hover);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.25),
+    0 1px 3px rgba(0, 0, 0, 0.15);
   transform: translateY(-1px);
-  border-color: var(--tm-border-strong);
 }
 
-/* ── Page headers: consistent typographic treatment ─────────────── */
+.projects-browser__name {
+  font-size: var(--tv-text-md);
+  letter-spacing: -0.01em;
+}
+
+/* ── Page header typography — unified ────────────────────────────── */
 .inbox-view__header h2,
 .projects-browser__header h2,
 .projects-browser h2,
 .areas-view__header h2,
 .archive-view__header h2,
 .area-detail__header h2 {
+  font-size: var(--tv-text-xl);
+  font-weight: 600;
   letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--tm-text-primary);
+}
+
+/* Section sub-headers */
+.daily-log__section-header h3,
+.archive-view__section-title,
+.projects-browser__section-title {
+  font-size: var(--tv-text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--tm-text-muted);
+}
+
+/* View header containers — consistent gap and spacing */
+.inbox-view__header,
+.projects-browser__header,
+.areas-view__header,
+.archive-view__header,
+.area-detail__header {
+  display: flex;
+  align-items: center;
+  gap: var(--tv-space-3);
+  margin-bottom: var(--tv-space-5);
+  flex-wrap: wrap;
+}
+
+/* ── Utility classes ─────────────────────────────────────────────── */
+.tv-text-muted-sm {
+  font-size: var(--tv-text-sm);
+  color: var(--tm-text-muted);
+}
+
+.tv-ml-2 {
+  margin-left: var(--tv-space-2);
 }
 
 /* ── Tags: consistent presence ───────────────────────────────────── */
@@ -3500,23 +3603,25 @@
 }
 
 .task-status--open {
-  opacity: 0.25;
+  color: var(--tv-status-open);
 }
-
-.task-status--done {
-  opacity: 0.6;
-}
-
-.task-status--cancelled {
-  opacity: 0.3;
-}
-
-.task-status--migrated {
-  opacity: 0.4;
-}
-
 .task-status--in-progress {
-  opacity: 0.8;
+  color: var(--tv-status-in-progress);
+}
+.task-status--in-review {
+  color: var(--tv-status-in-review);
+}
+.task-status--done {
+  color: var(--tv-status-done);
+}
+.task-status--blocked {
+  color: var(--tv-status-blocked);
+}
+.task-status--migrated {
+  color: var(--tv-status-migrated);
+}
+.task-status--cancelled {
+  color: var(--tv-status-cancelled);
 }
 
 /* ── Clickable task checkbox ──────────────────────────────────────── */
@@ -3531,6 +3636,7 @@
   cursor: pointer;
   border-radius: 50%;
   flex-shrink: 0;
+  color: var(--tv-status-open);
   transition:
     background 120ms ease-out,
     transform 100ms ease-out;
@@ -3545,20 +3651,10 @@
 }
 
 .daily-log__task-checkbox:hover .task-status--open {
-  opacity: 0.7;
+  color: var(--tm-text-primary, #fff);
 }
 
 /* Non-clickable status marker (done/cancelled/migrated) */
-.daily-log__task-marker {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  line-height: 0;
-}
-
 /* ── Human-readable date header ──────────────────────────────────── */
 .daily-log__date {
   display: flex;
@@ -3678,7 +3774,7 @@
 /* ── Danger hover variant for destructive buttons ────────────────── */
 .tv-btn--danger-hover:hover:not(:disabled) {
   background: rgba(224, 92, 92, 0.12);
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
   border-color: rgba(224, 92, 92, 0.35);
 }
 
@@ -3827,17 +3923,9 @@ h2.daily-log__date {
   color: var(--tm-text-primary);
 }
 
-/* Inbox item: refine action reveal */
-.inbox-item {
-  border-radius: 8px;
-  padding: 9px 12px;
-  gap: 8px;
-}
-
 .inbox-item__text {
-  font-size: 13px;
+  font-size: var(--tv-text-base);
   line-height: 1.5;
-  padding-top: 1px;
 }
 
 .inbox-item__actions {
@@ -3990,8 +4078,8 @@ h2.daily-log__date {
 
 /* Stats row: better visual grouping */
 .projects-browser__stats {
-  gap: 14px;
-  margin-top: 4px;
+  gap: var(--tv-space-4);
+  margin-top: var(--tv-space-1);
 }
 
 /* Stale badge: same sizing as other badges */
@@ -4044,16 +4132,18 @@ h2.daily-log__date {
 /* Grid cards: stronger presence */
 .areas-view__grid {
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
+  gap: var(--tv-space-3);
 }
 
 .areas-view__card {
-  border-radius: 10px;
-  padding: 16px 16px 14px;
+  border-radius: var(--tv-radius-md);
+  padding: var(--tv-space-3) var(--tv-space-4);
   min-height: 90px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--tv-space-2);
+  position: relative;
+  overflow: hidden;
 }
 
 /* Top accent stripe per card */
@@ -4064,7 +4154,7 @@ h2.daily-log__date {
   left: 0;
   right: 0;
   height: 3px;
-  border-radius: 10px 10px 0 0;
+  border-radius: var(--tv-radius-md) var(--tv-radius-md) 0 0;
   background: color-mix(in srgb, var(--tm-accent) 30%, transparent);
   opacity: 0;
   transition: opacity 200ms;
@@ -4075,7 +4165,7 @@ h2.daily-log__date {
 }
 
 .areas-view__card-name {
-  font-size: 14px;
+  font-size: var(--tv-text-md);
   font-weight: 700;
   letter-spacing: -0.015em;
   margin-bottom: 0;
@@ -4083,12 +4173,12 @@ h2.daily-log__date {
 }
 
 .areas-view__card-stats {
-  gap: 8px;
+  gap: var(--tv-space-2);
   flex-direction: column;
 }
 
 .areas-view__open-count {
-  font-size: 22px;
+  font-size: var(--tv-text-2xl);
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1;
@@ -4097,7 +4187,7 @@ h2.daily-log__date {
 }
 
 .areas-view__total-count {
-  font-size: 11px;
+  font-size: var(--tv-text-sm);
   color: var(--tm-text-muted);
   letter-spacing: 0.01em;
 }
@@ -5152,8 +5242,8 @@ h2.daily-log__date {
 }
 
 .tv-kanban__tag--due {
-  background: color-mix(in srgb, var(--tm-warning, #e6994a) 15%, transparent);
-  color: var(--tm-warning, #e6994a);
+  background: color-mix(in srgb, var(--tv-color-warning) 15%, transparent);
+  color: var(--tv-color-warning);
 }
 
 /* ── Kanban Lane Editor ───────────────────────────────────────────────────────── */
@@ -5261,6 +5351,23 @@ h2.daily-log__date {
 .tv-lane-editor__status-chip--used {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+.tv-lane-editor__color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tv-lane-editor__color-input {
+  width: 28px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--tm-border);
+  border-radius: 3px;
+  cursor: pointer;
+  background: none;
 }
 
 .tv-lane-editor__add-row {
@@ -5803,10 +5910,10 @@ h2.daily-log__date {
   padding: 0;
   background: none;
   border: none;
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tm-text-secondary);
   cursor: pointer;
   border-radius: 3px;
-  opacity: 0.7;
+  opacity: 0.5;
   transition:
     opacity 0.1s,
     background 0.1s;
@@ -5814,7 +5921,7 @@ h2.daily-log__date {
 
 .db-admin__stat-clear:hover {
   opacity: 1;
-  background: rgba(224, 92, 92, 0.12);
+  background: var(--tm-bg-elevated);
 }
 
 .db-admin__stat-chip {
@@ -5857,14 +5964,14 @@ h2.daily-log__date {
 }
 
 .tv-btn--danger-ghost {
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
   border-color: transparent;
   background: transparent;
 }
 
 .tv-btn--danger-ghost:hover {
   background: rgba(224, 92, 92, 0.1);
-  border-color: var(--tm-danger, #e05c5c);
+  border-color: var(--tv-color-danger);
 }
 
 .db-admin__editor-section {
@@ -5916,7 +6023,7 @@ h2.daily-log__date {
 
 .db-admin__error {
   font-size: 11px;
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
   background: rgba(224, 92, 92, 0.08);
   border: 1px solid rgba(224, 92, 92, 0.25);
   border-radius: 4px;
@@ -5985,10 +6092,10 @@ h2.daily-log__date {
   padding: 0;
   background: none;
   border: none;
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tm-text-secondary);
   cursor: pointer;
   border-radius: 3px;
-  opacity: 0.7;
+  opacity: 0.5;
   transition:
     opacity 0.1s,
     background 0.1s;
@@ -6000,7 +6107,7 @@ h2.daily-log__date {
 
 .db-admin__row-delete:hover {
   opacity: 1;
-  background: rgba(224, 92, 92, 0.12);
+  background: var(--tm-bg-elevated);
 }
 
 .db-admin__result-hint {
@@ -6033,7 +6140,7 @@ h2.daily-log__date {
 .db-admin__confirm-title {
   font-size: 13px;
   font-weight: 600;
-  color: var(--tm-danger, #e05c5c);
+  color: var(--tv-color-danger);
   margin: 0;
 }
 
@@ -6054,26 +6161,13 @@ h2.daily-log__date {
   justify-content: flex-end;
 }
 
-.tv-btn--danger {
-  background: var(--tm-danger, #e05c5c);
-  color: #fff;
-  border-color: var(--tm-danger, #e05c5c);
-}
-
-.tv-btn--danger:hover {
-  opacity: 0.85;
-}
-
 /* ── Inline first-subtask add row ────────────────────────────────── */
 .daily-log__subtask-add-row--inline {
   padding-left: 28px;
   padding-bottom: 4px;
 }
 
-/* ── Blocked task status ─────────────────────────────────────────── */
-.task-status--blocked {
-  opacity: 0.8;
-}
+/* task-status--blocked covered by token block above */
 
 .daily-log__task--blocked {
   border-left: 2px solid var(--tm-border-strong);
@@ -6084,7 +6178,7 @@ h2.daily-log__date {
   display: inline-block;
   margin-left: 8px;
   font-size: 11px;
-  color: var(--tm-warning, #f97316);
+  color: var(--tv-color-warning);
   opacity: 0.85;
   font-style: italic;
   max-width: 220px;
@@ -6367,33 +6461,103 @@ h2.daily-log__date {
   flex: 0 0 auto;
 }
 
+/* ── Recurrence modal layout rows ────────────────────────────────── */
+.recurrence-modal__interval-row,
+.recurrence-modal__days-row,
+.recurrence-modal__end-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tv-space-1);
+  margin-top: var(--tv-space-1);
+}
+
+.recurrence-modal__day-btn {
+  background: var(--tm-bg-base);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tv-radius-xs);
+  color: var(--tm-text-secondary);
+  font-size: var(--tv-text-sm);
+  font-family: inherit;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+  min-width: 36px;
+  text-align: center;
+}
+
+.recurrence-modal__day-btn:hover {
+  background: var(--tm-bg-hover, rgba(255, 255, 255, 0.06));
+  color: var(--tm-text-primary);
+  border-color: var(--tm-border-strong);
+}
+
+.recurrence-modal__day-btn--active {
+  background: var(--tm-accent-muted, rgba(99, 102, 241, 0.18));
+  border-color: var(--tm-accent, #6366f1);
+  color: var(--tm-accent, #6366f1);
+}
+
+.recurrence-modal__count-row {
+  display: flex;
+  align-items: center;
+  gap: var(--tv-space-2);
+  margin-top: var(--tv-space-1);
+}
+
+.recurrence-modal__count-input {
+  background: var(--tm-bg-base);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tv-radius-xs);
+  color: var(--tm-text-primary);
+  font-size: var(--tv-text-base);
+  font-family: inherit;
+  padding: 4px 8px;
+  outline: none;
+  width: 64px;
+  text-align: center;
+}
+
+.recurrence-modal__count-input:focus {
+  border-color: var(--tm-accent);
+}
+
+.recurrence-modal__count-label {
+  font-size: var(--tv-text-base);
+  color: var(--tm-text-secondary);
+}
+
 .daily-log__block-modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
 
-/* ── Warning button variant ──────────────────────────────────────── */
+/* ── Warning / success button variants ──────────────────────────── */
 .tv-btn--warning {
-  background: var(--tm-warning, #f97316);
-  color: #fff;
-  border-color: var(--tm-warning, #f97316);
+  background: transparent;
+  color: var(--tv-color-warning);
+  border-color: var(--tv-color-warning);
 }
 
-.tv-btn--warning:hover {
-  opacity: 0.85;
+.tv-btn--warning:hover:not(:disabled) {
+  background: var(--tv-color-warning-bg);
+  color: var(--tv-color-warning);
+  border-color: var(--tv-color-warning);
 }
 
 .tv-btn--warning-hover:hover {
-  background: rgba(249, 115, 22, 0.15);
-  color: var(--tm-warning, #f97316);
-  border-color: var(--tm-warning, #f97316);
+  background: var(--tv-color-warning-bg);
+  color: var(--tv-color-warning);
+  border-color: var(--tv-color-warning-border);
 }
 
 .tv-btn--success-hover:hover {
-  background: rgba(74, 222, 128, 0.15);
-  color: var(--tm-success, #4ade80);
-  border-color: var(--tm-success, #4ade80);
+  background: var(--tv-color-success-bg);
+  color: var(--tv-color-success);
+  border-color: var(--tv-color-success-border);
 }
 
 /* ── Calendar View ───────────────────────────────────────────────── */
@@ -6500,7 +6664,7 @@ h2.daily-log__date {
   background: #f59e0b;
 }
 .cal-dot--blocked {
-  background: var(--tm-warning, #f97316);
+  background: var(--tv-color-warning);
 }
 .cal-dot--done {
   background: var(--tm-success, #4ade80);
@@ -6509,9 +6673,24 @@ h2.daily-log__date {
   background: var(--tm-text-muted);
   opacity: 0.5;
 }
+.cal-dot--review {
+  background: #a78bfa;
+}
 .cal-dot--cancelled {
   background: var(--tm-text-muted);
   opacity: 0.35;
+}
+
+.task-status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 5px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
 }
 
 .cal-view__legend {
@@ -6682,7 +6861,7 @@ h2.daily-log__date {
 
 .cal-drawer__day-task {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
   padding: 4px 0;
 }
@@ -6692,7 +6871,6 @@ h2.daily-log__date {
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  margin-top: 3px;
   background: var(--tm-text-muted);
 }
 
@@ -6703,10 +6881,13 @@ h2.daily-log__date {
   background: #f59e0b;
 }
 .cal-drawer__day-task--blocked .cal-drawer__day-task-dot {
-  background: var(--tm-warning, #f97316);
+  background: var(--tv-color-warning);
 }
 .cal-drawer__day-task--done .cal-drawer__day-task-dot {
   background: var(--tm-success, #4ade80);
+}
+.cal-drawer__day-task--in-review .cal-drawer__day-task-dot {
+  background: #a78bfa;
 }
 .cal-drawer__day-task--migrated .cal-drawer__day-task-dot,
 .cal-drawer__day-task--cancelled .cal-drawer__day-task-dot {

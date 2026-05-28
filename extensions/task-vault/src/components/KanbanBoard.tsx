@@ -209,6 +209,9 @@ export function KanbanBoard({ onConfigChange }: KanbanBoardProps) {
   const draggingTaskId = useRef<string | null>(null)
 
   const selectedContexts = useVaultStore((s) => s.selectedContexts)
+  const setKanbanLanes = useVaultStore((s) => s.setKanbanLanes)
+  const loadToday = useVaultStore((s) => s.loadToday)
+  const tickCalendar = useVaultStore((s) => s.tickCalendar)
 
   const visibleTasks = useMemo(() => {
     if (selectedContexts.length === 0) return tasks
@@ -219,7 +222,9 @@ export function KanbanBoard({ onConfigChange }: KanbanBoardProps) {
     try {
       const result = await window.electronAPI.extensionBridge.invoke('task-vault:kanban:get-config')
       if (result && typeof result === 'object' && !('error' in result)) {
-        setConfig(result as KanbanConfig)
+        const cfg = result as KanbanConfig
+        setConfig(cfg)
+        setKanbanLanes(cfg.lanes)
       }
     } catch {
       // fallback to default
@@ -258,10 +263,11 @@ export function KanbanBoard({ onConfigChange }: KanbanBoardProps) {
   const saveConfig = useCallback(
     async (newConfig: KanbanConfig) => {
       setConfig(newConfig)
+      setKanbanLanes(newConfig.lanes)
       onConfigChange?.(newConfig)
       await window.electronAPI.extensionBridge.invoke('task-vault:kanban:save-config', newConfig)
     },
-    [onConfigChange]
+    [onConfigChange, setKanbanLanes]
   )
 
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
@@ -309,7 +315,8 @@ export function KanbanBoard({ onConfigChange }: KanbanBoardProps) {
       taskId,
       toStatus,
     })
-    await loadTasks()
+    await Promise.all([loadTasks(), loadToday()])
+    tickCalendar()
   }
 
   const swimlanes = groupBySwimlane(visibleTasks, config.swimlaneGrouping)

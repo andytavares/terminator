@@ -11,6 +11,7 @@ export interface KanbanLane {
   id: string
   label: string
   taskStatuses: TaskStatus[]
+  dotColor?: string
 }
 
 export type SwimlaneGrouping = 'none' | 'project' | 'area'

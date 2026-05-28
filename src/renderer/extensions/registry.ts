@@ -7,6 +7,7 @@ export interface GlobalTabRegistration {
   icon?: string
   component: ComponentType<Record<string, never>>
   permanent?: boolean
+  badge?: number
 }
 
 export interface SidebarPanelRegistration {
@@ -47,6 +48,7 @@ interface ExtensionRegistry {
   activeGlobalTabId: string | null
   keyboardShortcuts: KeyboardShortcutRegistration[]
   commands: CommandRegistration[]
+  overlays: ComponentType[]
   openPanels: Set<string>
   activeProjectTabId: string | null
   pendingNavigations: Map<string, unknown>
@@ -55,8 +57,11 @@ interface ExtensionRegistry {
   registerProjectTab(tab: ProjectTabRegistration): () => void
   registerGlobalTab(tab: GlobalTabRegistration): () => void
   registerWindowView(id: string, component: ComponentType<{ repoRoot: string | null }>): void
+  registerOverlay(component: ComponentType): () => void
   registerKeyboardShortcut(shortcut: KeyboardShortcutRegistration): () => void
   registerCommand(command: CommandRegistration): () => void
+  updateCommand(id: string, patch: Partial<Omit<CommandRegistration, 'id' | 'action'>>): void
+  updateGlobalTab(id: string, patch: Partial<Omit<GlobalTabRegistration, 'id' | 'component'>>): void
   togglePanel(panelId: string): void
   setActiveProjectTab(tabId: string | null): void
   setActiveGlobalTab(tabId: string | null): void
@@ -70,8 +75,10 @@ export type ExtensionRendererAPI = Pick<
   | 'registerSidebarPanel'
   | 'registerProjectTab'
   | 'registerWindowView'
+  | 'registerOverlay'
   | 'registerKeyboardShortcut'
   | 'registerCommand'
+  | 'updateGlobalTab'
 >
 
 export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
@@ -82,6 +89,7 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
   activeGlobalTabId: null,
   keyboardShortcuts: [],
   commands: [],
+  overlays: [],
   openPanels: new Set(),
   activeProjectTabId: null,
   pendingNavigations: new Map(),
@@ -150,9 +158,29 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
       set((s) => ({ keyboardShortcuts: s.keyboardShortcuts.filter((sc) => sc !== shortcut) }))
   },
 
+  registerOverlay(component) {
+    set((s) => ({ overlays: [...s.overlays, component] }))
+    return () => set((s) => ({ overlays: s.overlays.filter((c) => c !== component) }))
+  },
+
   registerCommand(command) {
     set((s) => ({ commands: [...s.commands, command] }))
     return () => set((s) => ({ commands: s.commands.filter((c) => c !== command) }))
+  },
+
+  updateCommand(id, patch) {
+    set((s) => ({
+      commands: s.commands.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    }))
+  },
+
+  updateGlobalTab(id, patch) {
+    set((s) => {
+      const tabs = new Map(s.globalTabs)
+      const existing = tabs.get(id)
+      if (existing) tabs.set(id, { ...existing, ...patch })
+      return { globalTabs: tabs }
+    })
   },
 
   togglePanel(panelId) {
@@ -203,7 +231,9 @@ function parseAccelerator(accelerator: string): ParsedAccelerator {
   const parts = accelerator.split('+')
   const key = parts[parts.length - 1].toLowerCase()
   return {
-    metaOrCtrl: parts.some((p) => p === 'CmdOrCtrl' || p === 'Cmd' || p === 'Ctrl'),
+    metaOrCtrl: parts.some(
+      (p) => p === 'CmdOrCtrl' || p === 'CommandOrControl' || p === 'Cmd' || p === 'Ctrl'
+    ),
     shift: parts.some((p) => p === 'Shift'),
     alt: parts.some((p) => p === 'Alt' || p === 'Option'),
     key,

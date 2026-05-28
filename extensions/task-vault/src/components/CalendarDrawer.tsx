@@ -1,22 +1,31 @@
 import React, { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react'
 import { useVaultStore } from '../stores/vault.store'
-import type { Task } from '../vault/types'
+import type { KanbanLane, Task } from '../vault/types'
 
 type DayData = { date: string; status: string; count: number }
 type DayMap = Map<string, DayData[]>
 
-const STATUS_DOT_CLASS: Record<string, string> = {
+export const STATUS_DOT_CLASS: Record<string, string> = {
   open: 'cal-dot--open',
   'in-progress': 'cal-dot--progress',
-  'in-review': 'cal-dot--progress',
+  'in-review': 'cal-dot--review',
   blocked: 'cal-dot--blocked',
   done: 'cal-dot--done',
   migrated: 'cal-dot--migrated',
   cancelled: 'cal-dot--cancelled',
 }
 
-const DOT_ORDER = ['open', 'in-progress', 'blocked', 'done', 'migrated', 'cancelled']
+const DOT_ORDER = ['open', 'in-progress', 'in-review', 'blocked', 'done', 'migrated', 'cancelled']
+
+export function statusDotStyle(
+  status: string,
+  lanes: KanbanLane[]
+): { className: string; style?: React.CSSProperties } {
+  const lane = lanes.find((l) => l.dotColor && l.taskStatuses.includes(status as never))
+  if (lane?.dotColor) return { className: 'cal-dot', style: { background: lane.dotColor } }
+  return { className: `cal-dot ${STATUS_DOT_CLASS[status] ?? 'cal-dot--open'}` }
+}
 const WEEKDAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 const MONTH_NAMES = [
   'January',
@@ -41,7 +50,7 @@ function getTodayStr(): string {
 }
 
 export function CalendarDrawer(): React.JSX.Element {
-  const { loadDate, loadToday } = useVaultStore()
+  const { loadDate, loadToday, calendarRefreshKey, kanbanLanes } = useVaultStore()
   const todayStr = getTodayStr()
   const today = new Date()
 
@@ -54,7 +63,7 @@ export function CalendarDrawer(): React.JSX.Element {
 
   useEffect(() => {
     void loadMonth()
-  }, [year, month])
+  }, [year, month, calendarRefreshKey])
 
   async function loadMonth() {
     try {
@@ -168,9 +177,10 @@ export function CalendarDrawer(): React.JSX.Element {
                 <span className="cal-drawer__day-num">{parseInt(dateStr.slice(8))}</span>
                 {hasTasks && (
                   <span className="cal-drawer__dots">
-                    {dots.slice(0, 3).map((s) => (
-                      <span key={s} className={`cal-dot ${STATUS_DOT_CLASS[s] ?? ''}`} />
-                    ))}
+                    {dots.slice(0, 3).map((s) => {
+                      const { className, style } = statusDotStyle(s, kanbanLanes)
+                      return <span key={s} className={className} style={style} />
+                    })}
                   </span>
                 )}
               </button>

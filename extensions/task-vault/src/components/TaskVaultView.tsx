@@ -18,7 +18,7 @@ import { KanbanBoard } from './KanbanBoard'
 import { TaskDetailPanel } from './TaskDetailPanel'
 import { DatabaseAdmin } from './DatabaseAdmin'
 
-function CaptureModal(): React.JSX.Element | null {
+export function CaptureModal(): React.JSX.Element | null {
   const { showCaptureModal, setShowCaptureModal, refreshInboxCount } = useVaultStore()
   const [text, setText] = useState('')
   const [capturing, setCapturing] = useState(false)
@@ -266,6 +266,8 @@ export function TaskVaultView(): React.JSX.Element {
     viewingDate,
     somedayTasks,
     loadSomeday,
+    setKanbanLanes,
+    tickCalendar,
   } = useVaultStore()
   const { addToast } = useToastStore()
   const [showDataTools, setShowDataTools] = useState(false)
@@ -276,6 +278,18 @@ export function TaskVaultView(): React.JSX.Element {
   const [selectedTaskText, setSelectedTaskText] = useState<string>('')
 
   const loadSomedayTasks = loadSomeday
+
+  const loadKanbanConfig = useCallback(async () => {
+    try {
+      const result = await window.electronAPI.extensionBridge.invoke('task-vault:kanban:get-config')
+      if (result && typeof result === 'object' && !('error' in result)) {
+        const cfg = result as { lanes: import('../vault/types').KanbanLane[] }
+        setKanbanLanes(cfg.lanes)
+      }
+    } catch {
+      // non-critical
+    }
+  }, [setKanbanLanes])
 
   const loadContexts = useCallback(async () => {
     try {
@@ -307,7 +321,12 @@ export function TaskVaultView(): React.JSX.Element {
   useEffect(() => {
     if (!pendingNavigation) return
     clearPendingNavigation('task-vault')
-    useVaultStore.getState().navigateToTask(pendingNavigation as string)
+    const payload = pendingNavigation as { taskId: string; date?: string } | string
+    const taskId = typeof payload === 'string' ? payload : payload.taskId
+    const date = typeof payload === 'object' && payload.date ? payload.date : undefined
+    const store = useVaultStore.getState()
+    store.navigateToTask(taskId, date)
+    if (date) void store.loadDate(date)
   }, [pendingNavigation, clearPendingNavigation])
 
   useEffect(() => {
@@ -325,11 +344,14 @@ export function TaskVaultView(): React.JSX.Element {
     refreshInboxCount()
     void loadContexts()
     void loadSomedayTasks()
+    void loadKanbanConfig()
 
     const unsubIndexUpdated = window.electronAPI.extensionBridge.on(
       'task-vault:push:index-updated',
       () => {
-        loadToday()
+        const vd = useVaultStore.getState().viewingDate
+        if (vd) void loadDate(vd)
+        else loadToday()
         refreshInboxCount()
         void loadContexts()
         void loadSomedayTasks()
@@ -339,13 +361,23 @@ export function TaskVaultView(): React.JSX.Element {
     const unsubExternal = window.electronAPI.extensionBridge.on(
       'task-vault:push:file-changed-externally',
       () => {
-        loadToday()
+        const vd = useVaultStore.getState().viewingDate
+        if (vd) void loadDate(vd)
+        else loadToday()
+      }
+    )
+
+    const unsubRecurrenceSpawned = window.electronAPI.extensionBridge.on(
+      'task-vault:recurrence-spawned',
+      () => {
+        tickCalendar()
       }
     )
 
     return () => {
       unsubIndexUpdated()
       unsubExternal()
+      unsubRecurrenceSpawned()
     }
   }, [])
 
@@ -364,7 +396,8 @@ export function TaskVaultView(): React.JSX.Element {
       message: taskText ? `Completed: ${taskText}` : 'Task completed',
       onClick: makeTaskNavHandler(taskId),
     })
-    await loadToday()
+    if (viewingDate) await loadDate(viewingDate)
+    else await loadToday()
   }
 
   async function handlePickUpToday(taskId: string) {
@@ -389,7 +422,8 @@ export function TaskVaultView(): React.JSX.Element {
       message: taskText ? `Migrated: ${taskText}` : 'Task migrated',
       onClick: makeTaskNavHandler(taskId),
     })
-    await loadToday()
+    if (viewingDate) await loadDate(viewingDate)
+    else await loadToday()
   }
 
   // Day navigation helpers
@@ -437,7 +471,6 @@ export function TaskVaultView(): React.JSX.Element {
 
   return (
     <div className="task-vault-view">
-      <CaptureModal />
       {showDataTools && <DataToolsModal onClose={() => setShowDataTools(false)} />}
       <VaultSidebar />
       <div className="task-vault-view__content">

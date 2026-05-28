@@ -2,6 +2,7 @@ import * as path from 'node:path'
 import { ipcMain } from 'electron'
 import { getDb, randomUUID } from '../vault/db'
 import { extractTags, toDisplayName } from '../vault/tags'
+import { localDate as _localDate } from '../vault/recurrence'
 import {
   CaptureRequestSchema,
   GetDailyRequestSchema,
@@ -42,43 +43,10 @@ export function getVaultPath(): string {
   return vaultPath
 }
 
-function localDate(d: Date = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+const localDate = _localDate
 
 function today(): string {
   return localDate()
-}
-
-function computeNextDueDate(fromDate: string, interval: string, days: number[]): string {
-  // Use noon to avoid DST edge cases
-  const d = new Date(`${fromDate}T12:00:00`)
-  if (interval === 'daily') {
-    d.setDate(d.getDate() + 1)
-  } else if (interval === 'biweekly') {
-    d.setDate(d.getDate() + 14)
-  } else if (interval === 'monthly') {
-    d.setMonth(d.getMonth() + 1)
-  } else if (interval === 'weekly') {
-    if (days.length === 0) {
-      d.setDate(d.getDate() + 7)
-    } else {
-      const todayDow = d.getDay()
-      const sortedDays = [...days].sort((a, b) => a - b)
-      let found = false
-      for (const day of sortedDays) {
-        if (day > todayDow) {
-          d.setDate(d.getDate() + (day - todayDow))
-          found = true
-          break
-        }
-      }
-      if (!found) {
-        d.setDate(d.getDate() + (7 - todayDow + sortedDays[0]))
-      }
-    }
-  }
-  return localDate(d)
 }
 
 function rowToTask(row: Record<string, unknown>): IndexedTask {
@@ -451,88 +419,10 @@ export function registerVaultIpcHandlers(): () => void {
     const now = new Date().toISOString()
     const todayStr = today()
 
-    const task = db
-      .prepare(`SELECT id, text, project_id, context, area_id, metadata FROM tasks WHERE id=?`)
-      .get(taskId) as
-      | {
-          id: string
-          text: string
-          project_id: string | null
-          context: string | null
-          area_id: string | null
-          metadata: string
-        }
-      | undefined
-
     const changes = db
       .prepare(`UPDATE tasks SET status='done', completed_date=?, updated_at=? WHERE id=?`)
       .run(todayStr, now, taskId)
     if (changes.changes === 0) return { error: 'STALE_ID' }
-
-    // Spawn next occurrence for recurring tasks
-    if (task) {
-      let meta: Record<string, unknown> = {}
-      try {
-        meta = JSON.parse(task.metadata || '{}') as Record<string, unknown>
-      } catch {
-        // ignore
-      }
-      const recurrenceInterval = meta.recurrence_interval as string | undefined
-      if (recurrenceInterval) {
-        let recurrenceDays: number[] = []
-        try {
-          recurrenceDays = JSON.parse(meta.recurrence_days as string) as number[]
-        } catch {
-          // ignore
-        }
-        const nextDue = computeNextDueDate(todayStr, recurrenceInterval, recurrenceDays)
-        const endType = (meta.recurrence_end_type as string) || 'none'
-        const completedCount = (meta.recurrence_completed_count as number) || 0
-
-        // Check end conditions before spawning
-        let shouldSpawn = true
-        if (endType === 'on_date') {
-          const endDate = meta.recurrence_end_date as string | undefined
-          if (endDate && nextDue > endDate) shouldSpawn = false
-        } else if (endType === 'after_count') {
-          const endCount = meta.recurrence_end_count as number | undefined
-          if (endCount != null && completedCount + 1 >= endCount) shouldSpawn = false
-        }
-
-        if (!shouldSpawn) {
-          return { success: true, recurrenceEnded: true }
-        }
-
-        const newId = randomUUID()
-        const nextMeta: Record<string, unknown> = {
-          recurrence_interval: recurrenceInterval,
-          recurrence_days: meta.recurrence_days,
-          recurrence_time: meta.recurrence_time,
-          recurrence_end_type: endType !== 'none' ? endType : undefined,
-          recurrence_end_date: meta.recurrence_end_date,
-          recurrence_end_count: meta.recurrence_end_count,
-          recurrence_completed_count: completedCount + 1,
-        }
-        db.prepare(
-          `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,metadata,created_at,updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
-        ).run(
-          newId,
-          task.text,
-          'open',
-          task.project_id ?? null,
-          task.context ?? null,
-          task.area_id ?? null,
-          nextDue,
-          'daily',
-          nextDue,
-          JSON.stringify(nextMeta),
-          now,
-          now
-        )
-        return { success: true, nextTaskId: newId, nextDueDate: nextDue }
-      }
-    }
 
     return { success: true }
   })
@@ -549,13 +439,13 @@ export function registerVaultIpcHandlers(): () => void {
       .get(taskId) as Record<string, unknown> | undefined
     if (!task) return { error: 'STALE_ID' }
     const now = new Date().toISOString()
-    db.prepare(`UPDATE tasks SET status='migrated', migrated_to=?, updated_at=? WHERE id=?`).run(
-      targetDate,
-      now,
-      taskId
-    )
-    // Create new task on target date, preserving ID-based links
     const newId = randomUUID()
+    const existingMeta = JSON.parse((task.metadata as string) || '{}') as Record<string, unknown>
+    existingMeta.migration_twin_id = newId
+    db.prepare(
+      `UPDATE tasks SET status='migrated', migrated_to=?, metadata=?, updated_at=? WHERE id=?`
+    ).run(targetDate, JSON.stringify(existingMeta), now, taskId)
+    // Create new parent task on target date
     db.prepare(
       `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,created_at,updated_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?)`
@@ -572,6 +462,35 @@ export function registerVaultIpcHandlers(): () => void {
       now,
       now
     )
+    // Migrate subtasks: create twins under the new parent, mark originals as migrated
+    type SubRow = { id: string; text: string; sort_order: number | null; metadata: string }
+    const subtasks = db
+      .prepare(
+        `SELECT id, text, sort_order, metadata FROM tasks WHERE parent_id=? ORDER BY sort_order, created_at`
+      )
+      .all(taskId) as SubRow[]
+    for (const sub of subtasks) {
+      const subTwinId = randomUUID()
+      const subMeta = JSON.parse(sub.metadata || '{}') as Record<string, unknown>
+      subMeta.migration_twin_id = subTwinId
+      db.prepare(
+        `UPDATE tasks SET status='migrated', migrated_to=?, metadata=?, updated_at=? WHERE id=?`
+      ).run(targetDate, JSON.stringify(subMeta), now, sub.id)
+      db.prepare(
+        `INSERT INTO tasks (id,text,status,parent_id,sort_order,source,source_ref,created_at,updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?)`
+      ).run(
+        subTwinId,
+        sub.text,
+        'open',
+        newId,
+        sub.sort_order ?? null,
+        'daily',
+        targetDate,
+        now,
+        now
+      )
+    }
     return { newTaskId: newId }
   })
 
@@ -792,12 +711,28 @@ export function registerVaultIpcHandlers(): () => void {
     const { taskId } = parsed.data
     const db = getDb()
     const now = new Date().toISOString()
+    const existing = db.prepare(`SELECT metadata FROM tasks WHERE id=?`).get(taskId) as
+      | { metadata: string }
+      | undefined
+    if (!existing) return { error: 'STALE_ID' }
+    const meta = JSON.parse(existing.metadata || '{}') as Record<string, unknown>
+    const twinId = meta.migration_twin_id as string | undefined
+    if (twinId) {
+      // Delete all subtasks of the twin, then the twin itself
+      db.prepare(`DELETE FROM tasks WHERE parent_id=?`).run(twinId)
+      db.prepare(`DELETE FROM tasks WHERE id=?`).run(twinId)
+      delete meta.migration_twin_id
+    }
+    // Restore original subtasks that were migrated alongside this task
+    db.prepare(
+      `UPDATE tasks SET status='open', migrated_to=NULL, metadata=json_remove(metadata, '$.migration_twin_id'), updated_at=? WHERE parent_id=? AND status='migrated'`
+    ).run(now, taskId)
     // Always move back to inbox so the task is findable regardless of original source
     const changes = db
       .prepare(
-        `UPDATE tasks SET status='open', source='inbox', source_ref=NULL, completed_date=NULL, migrated_to=NULL, updated_at=? WHERE id=?`
+        `UPDATE tasks SET status='open', source='inbox', source_ref=NULL, completed_date=NULL, migrated_to=NULL, metadata=?, updated_at=? WHERE id=?`
       )
-      .run(now, taskId)
+      .run(JSON.stringify(meta), now, taskId)
     if (changes.changes === 0) return { error: 'STALE_ID' }
     return { success: true }
   })
@@ -1340,11 +1275,27 @@ export function registerVaultIpcHandlers(): () => void {
     const { taskId } = parsed.data
     const db = getDb()
     const now = new Date().toISOString()
+    const existing = db.prepare(`SELECT metadata FROM tasks WHERE id=?`).get(taskId) as
+      | { metadata: string }
+      | undefined
+    if (!existing) return { error: 'STALE_ID' }
+    const meta = JSON.parse(existing.metadata || '{}') as Record<string, unknown>
+    const twinId = meta.migration_twin_id as string | undefined
+    if (twinId) {
+      // Delete all subtasks of the twin, then the twin itself
+      db.prepare(`DELETE FROM tasks WHERE parent_id=?`).run(twinId)
+      db.prepare(`DELETE FROM tasks WHERE id=?`).run(twinId)
+      delete meta.migration_twin_id
+    }
+    // Restore original subtasks that were migrated alongside this task
+    db.prepare(
+      `UPDATE tasks SET status='open', migrated_to=NULL, metadata=json_remove(metadata, '$.migration_twin_id'), updated_at=? WHERE parent_id=? AND status='migrated'`
+    ).run(now, taskId)
     const changes = db
       .prepare(
-        `UPDATE tasks SET status='open', completed_date=NULL, migrated_to=NULL, updated_at=? WHERE id=?`
+        `UPDATE tasks SET status='open', completed_date=NULL, migrated_to=NULL, metadata=?, updated_at=? WHERE id=?`
       )
-      .run(now, taskId)
+      .run(JSON.stringify(meta), now, taskId)
     if (changes.changes === 0) return { error: 'STALE_ID' }
     return { success: true }
   })
@@ -1401,8 +1352,10 @@ export function registerVaultIpcHandlers(): () => void {
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, interval, days, time, endType, endDate, endCount } = parsed.data
     const db = getDb()
-    const task = db.prepare(`SELECT metadata FROM tasks WHERE id=?`).get(taskId) as
-      | { metadata: string }
+    const task = db
+      .prepare(`SELECT metadata, due_date, source_ref FROM tasks WHERE id=?`)
+      .get(taskId) as
+      | { metadata: string; due_date: string | null; source_ref: string | null }
       | undefined
     if (!task) return { error: 'STALE_ID' }
     let meta: Record<string, unknown> = {}
@@ -1420,8 +1373,12 @@ export function registerVaultIpcHandlers(): () => void {
     // Reset completion count when recurrence is (re)configured
     meta.recurrence_completed_count = 0
     const now = new Date().toISOString()
-    db.prepare(`UPDATE tasks SET metadata=?, updated_at=? WHERE id=?`).run(
+    // Ensure due_date is set so the scheduler can find this task.
+    // Daily log tasks have no due_date by default — use source_ref (the log date) as fallback.
+    const effectiveDueDate = task.due_date ?? task.source_ref ?? today()
+    db.prepare(`UPDATE tasks SET metadata=?, due_date=?, updated_at=? WHERE id=?`).run(
       JSON.stringify(meta),
+      effectiveDueDate,
       now,
       taskId
     )
