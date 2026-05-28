@@ -1,0 +1,48 @@
+extensions/speckit-pilot/src/components/SpecKitPilotView.tsx
+  s_ea080172b4091c::t_d07d634aee84e1 1055-1066
+  s_ea080172b4091c::t_80fa996f89c5e9 746-753
+src/renderer/electron.d.ts
+  s_ea080172b4091c::t_85e28a9afeb475 78
+extensions/task-vault/src/components/InboxView.tsx
+  s_ea080172b4091c::t_ed1e401f6e6871 25-28
+src/main/extensions/api.ts
+  s_ea080172b4091c::t_465cef9caf8f03 146-151
+src/main/ipc/shell.ipc.ts
+  s_ea080172b4091c::t_e4864ba3ea718d 27-37
+extensions/task-vault/src/notifications/task-scheduler.ts
+  s_ea080172b4091c::t_f7b944e88c8580 4,46,48-49,51,70-100,126,136-141,159,170-178,241,243,287-291,303,313-316
+tests/integration/ipc/shell.ipc.spec.ts
+  s_ea080172b4091c::t_19eb46026d9a6d 8,13-15
+  s_ea080172b4091c::t_4f5835374d9f4c 159,162-195
+  s_ea080172b4091c::t_31a159e8578f5b 207-208,220-229
+  s_ea080172b4091c::t_e056022dd120d0 4-7
+extensions/task-vault/tests/notifications/task-scheduler.spec.ts
+  s_ea080172b4091c::t_33ae7ac3895800 14-29,40-42,70-71,128,156-158,201-203,217,223,229,235-266,268-292,295,300,304-318,321-322,325,330-336,455-457
+  s_ea080172b4091c::t_7cc96faa3ae5d8 293-294,296-299,301-303,319-320,323-324,326-329
+extensions/task-vault/src/components/TaskDetailPanel.tsx
+  s_ea080172b4091c::t_8d58639257590c 134-143
+extensions/task-vault/src/components/KanbanBoard.tsx
+  s_ea080172b4091c::t_b1cc5ca8c8b3c5 115-122
+extensions/task-vault/src/renderer.tsx
+  s_ea080172b4091c::t_dde51f6b589f7d 110-113,116
+  s_ea080172b4091c::t_29e5b19de9b0ec 96-97,102-104
+  s_ea080172b4091c::t_f4cd4abf366015 114-115
+src/main/preload.ts
+  s_ea080172b4091c::t_5332a84a388df3 117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ee496b83fbe8e487801e8a87344dba6438185775",
+  "prompts": {},
+  "sessions": {
+    "s_ea080172b4091c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f722fcbd-06a9-4316-8547-d85447dd1579",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
