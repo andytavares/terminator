@@ -1,0 +1,922 @@
+import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
+import { BrowserWindow } from 'electron'
+import * as fs from 'node:fs/promises'
+import * as path from 'node:path'
+
+import { readHarness, writeHarness } from './core/harness.js'
+import { appendHistoryEntry, readHistory } from './core/history.js'
+import {
+  getStatus,
+  createCheckpoint,
+  stashChanges,
+  revertFiles,
+  getDiffForFile,
+  createWorktree,
+  removeWorktree,
+  mergeWorktreeBranch,
+} from './core/git.js'
+import { runSensor, runAllSensors } from './core/sensors.js'
+import { isAvailable as keychainAvailable, storeKey, deleteKey } from './core/keychain.js'
+import { validateDag } from './core/dag.js'
+import {
+  healthEvents,
+  trackSensorResult,
+  trackGateDecision,
+  setHealthChangedCallback,
+  resetHealthState,
+} from './core/health.js'
+export { trackSensorResult, trackGateDecision }
+import type { Run, RunLogEntry, RunLogKind, Harness } from './types/foundry.types.js'
+import { ClaudeAdapter } from './providers/claude.js'
+import { OpenAIAdapter } from './providers/openai.js'
+import { GeminiAdapter } from './providers/gemini.js'
+import { OllamaAdapter } from './providers/ollama.js'
+import type { ProviderAdapter } from './providers/adapter.js'
+import { readProviders, writeProviders } from './core/providers.js'
+import type { StoredProvider } from './core/providers.js'
+
+const disposables: Disposable[] = []
+
+// In-memory active run registry: workspaceRoot → Run
+const activeRuns = new Map<string, Run>()
+
+// Per-run log buffer: runId → entries (capped at 2000 to avoid unbounded growth)
+const runLogs = new Map<string, RunLogEntry[]>()
+const RUN_LOG_CAP = 2000
+
+function appendLog(runId: string, kind: RunLogKind, message: string) {
+  let entries = runLogs.get(runId)
+  if (!entries) {
+    entries = []
+    runLogs.set(runId, entries)
+  }
+  if (entries.length >= RUN_LOG_CAP) entries.shift()
+  const entry: RunLogEntry = { ts: new Date().toISOString(), kind, message }
+  entries.push(entry)
+  broadcast('foundry:run-log', { runId, entry })
+}
+
+function broadcast(channel: string, payload: unknown) {
+  try {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send(channel, payload)
+    }
+  } catch {
+    // BrowserWindow unavailable outside Electron runtime
+  }
+}
+
+function reg(
+  api: ExtensionAPI,
+  channel: string,
+  handler: (payload: unknown) => Promise<unknown> | unknown
+) {
+  disposables.push(api.ipc.registerHandler(channel, handler))
+}
+
+// ─── Provider adapter factory ───────────────────────────────────────────────
+
+function buildAdapter(provider: StoredProvider, _workspaceRoot: string): ProviderAdapter | null {
+  switch (provider.type) {
+    case 'claude':
+      if (!provider.keychainKey) return null
+      return new ClaudeAdapter(provider.id, provider.model, provider.keychainKey)
+    case 'openai':
+      if (!provider.keychainKey) return null
+      return new OpenAIAdapter(provider.id, provider.model, provider.keychainKey)
+    case 'gemini':
+      if (!provider.keychainKey) return null
+      return new GeminiAdapter(provider.id, provider.model, provider.keychainKey)
+    case 'ollama':
+      return new OllamaAdapter(
+        provider.id,
+        provider.model,
+        provider.endpoint ?? 'http://localhost:11434'
+      )
+    default:
+      return null
+  }
+}
+
+// ─── Run execution loop ──────────────────────────────────────────────────────
+
+async function executeRun(run: Run, harness: Harness): Promise<void> {
+  const workspaceRoot = run.workspaceRoot
+  const providers = await readProviders(workspaceRoot)
+  const provider = providers.find((p) => p.id === run.providerId)
+
+  if (!provider) {
+    run.status = 'paused-error'
+    appendLog(
+      run.id,
+      'error',
+      `Provider "${run.providerId}" not found. Add it in Harness Settings.`
+    )
+    broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
+    return
+  }
+
+  const adapter = buildAdapter(provider, workspaceRoot)
+  if (!adapter) {
+    run.status = 'paused-error'
+    appendLog(
+      run.id,
+      'error',
+      `Cannot build adapter for provider "${provider.id}" — check that an API key is saved.`
+    )
+    broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
+    return
+  }
+
+  // Create an isolated git worktree so the run doesn't pollute the working tree
+  const worktreeResult = await createWorktree(workspaceRoot, run.id)
+  if ('error' in worktreeResult) {
+    appendLog(
+      run.id,
+      'error',
+      `Could not create worktree: ${worktreeResult.error} — running in main workspace instead`
+    )
+  } else {
+    run.worktreePath = worktreeResult.worktreePath
+    run.worktreeBranch = worktreeResult.branch
+    appendLog(
+      run.id,
+      'system',
+      `Isolated worktree: ${worktreeResult.worktreePath} (branch: ${worktreeResult.branch})`
+    )
+  }
+
+  // The agent operates in the worktree (or workspace if worktree failed)
+  const runRoot = run.worktreePath ?? workspaceRoot
+
+  // Read AGENTS.md for system context
+  let agentsMdContent = ''
+  try {
+    agentsMdContent = await fs.readFile(path.join(runRoot, harness.agentsMdPath), 'utf-8')
+    appendLog(run.id, 'system', `Loaded ${harness.agentsMdPath} (${agentsMdContent.length} chars)`)
+  } catch {
+    appendLog(
+      run.id,
+      'system',
+      `No ${harness.agentsMdPath} found — running without feedforward context`
+    )
+  }
+
+  appendLog(run.id, 'system', `Calling ${provider.type} (${run.model})…`)
+
+  let tokenBuffer = ''
+  let tokenCountIn = 0
+  let tokenCountOut = 0
+
+  try {
+    const request = {
+      mode: run.mode,
+      providerId: run.providerId,
+      model: run.model,
+      prompt: run.prompt ?? '',
+      workspaceRoot: runRoot,
+      agentsMdContent,
+      iterationLimit: run.iterationLimit,
+    }
+
+    for await (const event of adapter.run(request)) {
+      // Bail if run was aborted/dismissed while streaming
+      if (activeRuns.get(workspaceRoot)?.id !== run.id) return
+
+      if (event.type === 'token') {
+        // Tokens from the adapter are already line-granular — log each directly
+        if (event.token.trim()) appendLog(run.id, 'agent', event.token)
+        tokenBuffer += event.token
+      } else if (event.type === 'file-changed') {
+        // Adapter executed a tool that wrote a file — track the change
+        const existing = run.fileChanges.find((c) => c.filePath === event.filePath)
+        if (!existing) {
+          run.fileChanges.push(event.change)
+        } else {
+          existing.linesAdded += event.change.linesAdded
+          existing.linesRemoved += event.change.linesRemoved
+        }
+        appendLog(
+          run.id,
+          'file',
+          `${event.change.status === 'new' ? '+' : '~'} ${event.filePath.replace(workspaceRoot + '/', '')}`
+        )
+        broadcast('foundry:run-event', {
+          runId: run.id,
+          event: { type: 'file-changed', filePath: event.filePath },
+        })
+      } else if (event.type === 'done') {
+        if (tokenBuffer.trim()) {
+          appendLog(run.id, 'agent', tokenBuffer)
+          tokenBuffer = ''
+        }
+        tokenCountIn = event.tokenCountIn
+        tokenCountOut = event.tokenCountOut
+        appendLog(
+          run.id,
+          'system',
+          `Agent finished — ${tokenCountIn} in / ${tokenCountOut} out tokens`
+        )
+      } else if (event.type === 'error') {
+        appendLog(run.id, 'error', `Provider error: ${event.message}`)
+        run.status = 'paused-error'
+        broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
+        return
+      }
+    }
+
+    // Flush any remaining buffer
+    if (tokenBuffer.trim()) appendLog(run.id, 'agent', tokenBuffer)
+
+    // Run sensors before opening gate
+    if (harness.sensors.length > 0) {
+      appendLog(run.id, 'system', `Running ${harness.sensors.length} sensor(s)…`)
+      const sensorResults = await runAllSensors(harness.sensors, runRoot)
+      run.sensorResults = sensorResults
+      for (const r of sensorResults) {
+        const icon = r.pass ? '✓' : '✗'
+        appendLog(run.id, 'sensor', `${icon} ${r.sensorName} (${r.durationMs}ms)`)
+        if (!r.pass && r.stdoutExcerpt)
+          appendLog(run.id, 'sensor', `  ${r.stdoutExcerpt.slice(0, 200)}`)
+        trackSensorResult(r.sensorName, r.pass, workspaceRoot)
+      }
+
+      const allPassed = sensorResults.every((r) => r.pass)
+      if (harness.gateDefaults.sensorsMustPassBeforeGate && !allPassed) {
+        appendLog(
+          run.id,
+          'error',
+          'Sensors failed — gate blocked. Fix issues or disable "sensors must pass" in settings.'
+        )
+        run.status = 'paused-error'
+        broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
+        return
+      }
+    }
+
+    if (harness.gateDefaults.requireGateAfterEachIteration) {
+      appendLog(
+        run.id,
+        'system',
+        `Gate open — awaiting your review (iteration ${run.currentIteration}/${run.iterationLimit})`
+      )
+      run.status = 'gate'
+      broadcast('foundry:run-status-changed', { runId: run.id, status: 'gate' })
+    } else {
+      // Auto-approve: merge worktree changes back and clean up
+      if (run.worktreePath && run.worktreeBranch) {
+        appendLog(run.id, 'system', 'Merging changes back to workspace…')
+        const mergeResult = await mergeWorktreeBranch(workspaceRoot, run.worktreeBranch)
+        if ('error' in mergeResult) {
+          appendLog(
+            run.id,
+            'system',
+            `Merge note: ${mergeResult.error} — changes remain on branch ${run.worktreeBranch}`
+          )
+        }
+        void removeWorktree(workspaceRoot, run.worktreePath, run.worktreeBranch)
+      }
+      appendLog(run.id, 'ok', 'Run complete (auto-approved — no gate required)')
+      run.status = 'done'
+      run.completedAt = new Date().toISOString()
+      activeRuns.delete(workspaceRoot)
+      runLogs.delete(run.id)
+      await appendHistoryEntry(workspaceRoot, {
+        runId: run.id,
+        mode: run.mode,
+        providerId: run.providerId,
+        providerLabel: provider.id,
+        model: run.model,
+        specPath: run.specPath,
+        promptSummary: (run.prompt ?? '').slice(0, 200),
+        status: 'done',
+        tokenCountIn,
+        tokenCountOut,
+        sensorSummary: '0/0',
+        gateDecisions: [],
+        filesChangedCount: run.fileChanges.length,
+        durationMs: Date.now() - new Date(run.createdAt).getTime(),
+        createdAt: run.createdAt,
+        completedAt: run.completedAt!,
+      })
+      broadcast('foundry:run-status-changed', { runId: run.id, status: 'done' })
+    }
+  } catch (err) {
+    appendLog(run.id, 'error', `Unexpected error: ${String(err)}`)
+    run.status = 'paused-error'
+    broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
+  }
+}
+
+export function activate(api: ExtensionAPI): void {
+  // Wire health broadcast callback
+  setHealthChangedCallback(() => {
+    broadcast('foundry:health-changed', { events: healthEvents })
+  })
+
+  // ─── Harness ───────────────────────────────────────────────────────────────
+  reg(api, 'foundry:harness-read', async (payload: unknown) => {
+    const { workspaceRoot } = payload as { workspaceRoot: string }
+    if (!workspaceRoot) return { error: 'workspaceRoot required' }
+    return readHarness(workspaceRoot)
+  })
+
+  reg(api, 'foundry:harness-write', async (payload: unknown) => {
+    const { workspaceRoot, harness } = payload as {
+      workspaceRoot: string
+      harness: Parameters<typeof writeHarness>[1]
+    }
+    if (!workspaceRoot || !harness) return { error: 'workspaceRoot and harness required' }
+    return writeHarness(workspaceRoot, harness)
+  })
+
+  reg(api, 'foundry:agents-md-read', async (payload: unknown) => {
+    const { workspaceRoot } = payload as { workspaceRoot: string }
+    if (!workspaceRoot) return { error: 'workspaceRoot required' }
+    try {
+      const content = await fs.readFile(path.join(workspaceRoot, 'AGENTS.md'), 'utf-8')
+      return { content }
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { notFound: true }
+      return { error: String(err) }
+    }
+  })
+
+  reg(api, 'foundry:agents-md-write', async (payload: unknown) => {
+    const { workspaceRoot, content } = payload as { workspaceRoot: string; content: string }
+    if (!workspaceRoot || content === undefined)
+      return { error: 'workspaceRoot and content required' }
+    try {
+      await fs.writeFile(path.join(workspaceRoot, 'AGENTS.md'), content, 'utf-8')
+      return { ok: true }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  reg(api, 'foundry:agents-md-scan', async (payload: unknown) => {
+    const { workspaceRoot } = payload as { workspaceRoot: string }
+    if (!workspaceRoot) return { error: 'workspaceRoot required' }
+    try {
+      const content = await fs.readFile(path.join(workspaceRoot, 'AGENTS.md'), 'utf-8')
+      const staleRefs: Array<{ line: number; ref: string }> = []
+      const lines = content.split('\n')
+      for (let i = 0; i < lines.length; i++) {
+        const matches = lines[i].matchAll(
+          /`([^`]+\.[a-zA-Z]+[^`]*)`|(?:^|\s)((?:\.\.?\/|src\/|docs\/)\S+\.\w+)/g
+        )
+        for (const m of matches) {
+          const ref = (m[1] || m[2]).trim()
+          if (!ref) continue
+          const absPath = path.isAbsolute(ref) ? ref : path.join(workspaceRoot, ref)
+          try {
+            await fs.access(absPath)
+          } catch {
+            staleRefs.push({ line: i + 1, ref })
+          }
+        }
+      }
+      return { staleRefs }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  // ─── Provider ──────────────────────────────────────────────────────────────
+
+  reg(api, 'foundry:provider-list', async (payload: unknown) => {
+    const { workspaceRoot } = payload as { workspaceRoot: string }
+    if (!workspaceRoot) return { providers: [] }
+    const providers = await readProviders(workspaceRoot)
+    return { providers }
+  })
+
+  reg(api, 'foundry:provider-save', async (payload: unknown) => {
+    const { provider, apiKey, workspaceRoot } = payload as {
+      provider: StoredProvider
+      apiKey?: string
+      workspaceRoot: string
+    }
+    if (!workspaceRoot) return { error: 'workspaceRoot required' }
+    if (!keychainAvailable() && apiKey) {
+      return { error: 'OS encryption unavailable — cannot store API key securely' }
+    }
+    if (apiKey && provider.keychainKey) {
+      await storeKey(provider.keychainKey, apiKey)
+    }
+    const providers = await readProviders(workspaceRoot)
+    const idx = providers.findIndex((p) => p.id === provider.id)
+    if (idx >= 0) providers[idx] = provider
+    else providers.push(provider)
+    await writeProviders(workspaceRoot, providers)
+    return { provider }
+  })
+
+  reg(api, 'foundry:provider-delete', async (payload: unknown) => {
+    const { providerId, workspaceRoot } = payload as { providerId: string; workspaceRoot: string }
+    if (!workspaceRoot) return { error: 'workspaceRoot required' }
+    const providers = await readProviders(workspaceRoot)
+    const idx = providers.findIndex((p) => p.id === providerId)
+    if (idx >= 0) {
+      const p = providers[idx]
+      if (p.keychainKey) await deleteKey(p.keychainKey)
+      providers.splice(idx, 1)
+      await writeProviders(workspaceRoot, providers)
+    }
+    return { ok: true }
+  })
+
+  reg(api, 'foundry:provider-test', async (payload: unknown) => {
+    const { providerId, workspaceRoot } = payload as { providerId: string; workspaceRoot: string }
+    if (!workspaceRoot) return { error: 'workspaceRoot required' }
+    const providers = await readProviders(workspaceRoot)
+    const provider = providers.find((p) => p.id === providerId)
+    if (!provider) return { error: 'Provider not found' }
+    const adapter = buildAdapter(provider, workspaceRoot)
+    if (!adapter) return { error: 'Cannot build adapter — check API key is saved' }
+    return adapter.testConnection()
+  })
+
+  // ─── Sensor ────────────────────────────────────────────────────────────────
+  reg(api, 'foundry:sensor-run', async (payload: unknown) => {
+    const { sensorName, command, workspaceRoot } = payload as {
+      sensorName: string
+      command: string
+      workspaceRoot: string
+    }
+    if (!sensorName || !command || !workspaceRoot)
+      return { error: 'sensorName, command, workspaceRoot required' }
+    const result = await runSensor({ name: sensorName, command }, workspaceRoot)
+    return { result }
+  })
+
+  reg(api, 'foundry:sensors-run-all', async (payload: unknown) => {
+    const { workspaceRoot } = payload as { workspaceRoot: string }
+    if (!workspaceRoot) return { error: 'workspaceRoot required' }
+    const harnessResult = await readHarness(workspaceRoot)
+    if ('error' in harnessResult || 'notFound' in harnessResult) return { results: [] }
+    const results = await runAllSensors(harnessResult.harness.sensors, workspaceRoot)
+    for (const r of results) trackSensorResult(r.sensorName, r.pass, workspaceRoot)
+    return { results }
+  })
+
+  // ─── Git ───────────────────────────────────────────────────────────────────
+  reg(api, 'foundry:git-status', async (payload: unknown) => {
+    const { workspaceRoot } = payload as { workspaceRoot: string }
+    return getStatus(workspaceRoot)
+  })
+
+  reg(api, 'foundry:git-checkpoint', async (payload: unknown) => {
+    const { workspaceRoot, runId } = payload as { workspaceRoot: string; runId: string }
+    return createCheckpoint(workspaceRoot, runId)
+  })
+
+  reg(api, 'foundry:git-stash', async (payload: unknown) => {
+    const { workspaceRoot } = payload as { workspaceRoot: string }
+    return stashChanges(workspaceRoot)
+  })
+
+  reg(api, 'foundry:git-revert-files', async (payload: unknown) => {
+    const { workspaceRoot, filePaths } = payload as { workspaceRoot: string; filePaths: string[] }
+    return revertFiles(workspaceRoot, filePaths ?? [])
+  })
+
+  reg(api, 'foundry:git-diff-file', async (payload: unknown) => {
+    const { workspaceRoot, filePath } = payload as { workspaceRoot: string; filePath: string }
+    const run = activeRuns.get(workspaceRoot)
+    // If filePath is inside the worktree, use the worktree as the git root
+    const worktreePath = run?.worktreePath
+    const diffRoot =
+      worktreePath && filePath.startsWith(worktreePath) ? worktreePath : workspaceRoot
+    return getDiffForFile(diffRoot, filePath)
+  })
+
+  // ─── Run ───────────────────────────────────────────────────────────────────
+  reg(api, 'foundry:run-create', async (payload: unknown) => {
+    const { workspaceRoot, mode, providerId, model, specPath, prompt, iterationLimit } =
+      payload as {
+        workspaceRoot: string
+        mode: string
+        providerId: string
+        model: string
+        specPath?: string
+        prompt?: string
+        iterationLimit?: number
+      }
+    if (!workspaceRoot || !mode || !providerId || !model)
+      return { error: 'workspaceRoot, mode, providerId, model required' }
+
+    const existing = activeRuns.get(workspaceRoot)
+    if (existing && (existing.status === 'running' || existing.status === 'gate')) {
+      return { error: 'A run is already active in this workspace' }
+    }
+
+    const harnessResult = await readHarness(workspaceRoot)
+    if ('error' in harnessResult) return { error: `Cannot read harness: ${harnessResult.error}` }
+    if ('notFound' in harnessResult) return { error: 'Harness not configured. Run setup first.' }
+
+    const run: Run = {
+      id: crypto.randomUUID(),
+      mode: mode as Run['mode'],
+      providerId,
+      model,
+      specPath,
+      prompt,
+      status: 'running',
+      createdAt: new Date().toISOString(),
+      workspaceRoot,
+      currentIteration: 1,
+      iterationLimit: iterationLimit ?? harnessResult.harness.iterationLimit,
+      iterations: [],
+      fileChanges: [],
+    }
+
+    activeRuns.set(workspaceRoot, run)
+    appendLog(run.id, 'system', `Run started — mode: ${run.mode}, model: ${run.model}`)
+    if (run.checkpointCommit) appendLog(run.id, 'system', `Git checkpoint: ${run.checkpointCommit}`)
+    if (run.specPath) appendLog(run.id, 'system', `Spec: ${run.specPath}`)
+    broadcast('foundry:run-status-changed', { runId: run.id, status: 'running' })
+
+    // Fire-and-forget: execute the run asynchronously so we return immediately
+    void executeRun(run, harnessResult.harness)
+
+    return { run }
+  })
+
+  reg(api, 'foundry:run-gate-decide', async (payload: unknown) => {
+    const { runId, workspaceRoot, decision, note } = payload as {
+      runId: string
+      workspaceRoot: string
+      decision: string
+      note?: string
+    }
+    const run = activeRuns.get(workspaceRoot)
+    if (!run || run.id !== runId) return { error: 'Run not found' }
+
+    if (decision === 'reject') {
+      appendLog(
+        run.id,
+        'system',
+        `Gate decision: reject — reverting ${run.fileChanges.length} file(s)`
+      )
+      const filePaths = run.fileChanges.map((c) => c.filePath)
+      if (filePaths.length > 0) await revertFiles(workspaceRoot, filePaths)
+      run.status = 'rejected'
+      run.completedAt = new Date().toISOString()
+      activeRuns.delete(workspaceRoot)
+      runLogs.delete(run.id)
+      trackGateDecision(run.specPath ?? '', run.currentIteration, 'reject', workspaceRoot)
+      await appendHistoryEntry(workspaceRoot, {
+        runId: run.id,
+        mode: run.mode,
+        providerId: run.providerId,
+        providerLabel: run.providerId,
+        model: run.model,
+        specPath: run.specPath,
+        promptSummary: (run.prompt ?? '').slice(0, 200),
+        status: 'rejected',
+        tokenCountIn: 0,
+        tokenCountOut: 0,
+        sensorSummary: '0/0',
+        gateDecisions: [
+          {
+            iterationNumber: run.currentIteration,
+            decision: 'reject',
+            decidedAt: new Date().toISOString(),
+          },
+        ],
+        filesChangedCount: run.fileChanges.length,
+        durationMs: 0,
+        createdAt: run.createdAt,
+        completedAt: run.completedAt,
+      })
+      broadcast('foundry:run-status-changed', { runId: run.id, status: 'rejected' })
+      return { run }
+    }
+
+    if (decision === 'approve') {
+      appendLog(run.id, 'ok', 'Gate approved — merging changes to workspace…')
+      if (run.worktreePath && run.worktreeBranch) {
+        const mergeResult = await mergeWorktreeBranch(workspaceRoot, run.worktreeBranch)
+        if ('error' in mergeResult) {
+          appendLog(
+            run.id,
+            'system',
+            `Merge note: ${mergeResult.error} — changes remain on branch ${run.worktreeBranch}`
+          )
+        } else {
+          appendLog(run.id, 'ok', 'Changes merged into workspace')
+        }
+        void removeWorktree(workspaceRoot, run.worktreePath, run.worktreeBranch)
+      }
+      run.status = 'done'
+      run.completedAt = new Date().toISOString()
+      activeRuns.delete(workspaceRoot)
+      runLogs.delete(run.id)
+      trackGateDecision(run.specPath ?? '', run.currentIteration, 'approve', workspaceRoot)
+      await appendHistoryEntry(workspaceRoot, {
+        runId: run.id,
+        mode: run.mode,
+        providerId: run.providerId,
+        providerLabel: run.providerId,
+        model: run.model,
+        specPath: run.specPath,
+        promptSummary: (run.prompt ?? '').slice(0, 200),
+        status: 'done',
+        tokenCountIn: 0,
+        tokenCountOut: 0,
+        sensorSummary: '0/0',
+        gateDecisions: [
+          {
+            iterationNumber: run.currentIteration,
+            decision: 'approve',
+            decidedAt: new Date().toISOString(),
+          },
+        ],
+        filesChangedCount: run.fileChanges.length,
+        durationMs: 0,
+        createdAt: run.createdAt,
+        completedAt: run.completedAt,
+      })
+      broadcast('foundry:run-status-changed', { runId: run.id, status: 'done' })
+      return { run }
+    }
+
+    if (decision === 'request-changes') {
+      appendLog(
+        run.id,
+        'system',
+        `Gate: request-changes — starting iteration ${run.currentIteration + 1}${note ? ` — feedback: ${note}` : ''}`
+      )
+      run.currentIteration++
+      run.status = 'running'
+      run.fileChanges = []
+      if (note) run.prompt = `[FEEDBACK]: ${note}\n\n${run.prompt ?? ''}`
+      broadcast('foundry:run-status-changed', { runId: run.id, status: 'running' })
+      // Re-read harness and re-execute the next iteration
+      const harnessResult = await readHarness(workspaceRoot)
+      if (!('error' in harnessResult) && !('notFound' in harnessResult)) {
+        void executeRun(run, harnessResult.harness)
+      }
+      return { run }
+    }
+
+    return { error: `Unknown decision: ${decision}` }
+  })
+
+  reg(api, 'foundry:run-abort', async (payload: unknown) => {
+    const { runId, workspaceRoot } = payload as { runId: string; workspaceRoot: string }
+    const run = activeRuns.get(workspaceRoot)
+    if (!run || run.id !== runId) return { error: 'Run not found' }
+    appendLog(run.id, 'system', 'Run aborted — discarding worktree')
+    if (run.worktreePath && run.worktreeBranch) {
+      // Worktree is isolated — just remove it; main workspace is untouched
+      void removeWorktree(workspaceRoot, run.worktreePath, run.worktreeBranch)
+    } else {
+      // Fallback: revert files in the main workspace
+      const filePaths = run.fileChanges.map((c) => c.filePath)
+      if (filePaths.length > 0) await revertFiles(workspaceRoot, filePaths)
+    }
+    run.status = 'aborted'
+    run.completedAt = new Date().toISOString()
+    activeRuns.delete(workspaceRoot)
+    runLogs.delete(run.id)
+    await appendHistoryEntry(workspaceRoot, {
+      runId: run.id,
+      mode: run.mode,
+      providerId: run.providerId,
+      providerLabel: run.providerId,
+      model: run.model,
+      specPath: run.specPath,
+      promptSummary: (run.prompt ?? '').slice(0, 200),
+      status: 'aborted',
+      tokenCountIn: 0,
+      tokenCountOut: 0,
+      sensorSummary: '0/0',
+      gateDecisions: [],
+      filesChangedCount: run.fileChanges.length,
+      durationMs: 0,
+      createdAt: run.createdAt,
+      completedAt: run.completedAt,
+    })
+    broadcast('foundry:run-status-changed', { runId: run.id, status: 'aborted' })
+    return { ok: true }
+  })
+
+  reg(api, 'foundry:run-dismiss', async (payload: unknown) => {
+    const { runId, workspaceRoot } = payload as { runId: string; workspaceRoot: string }
+    const run = activeRuns.get(workspaceRoot)
+    if (!run || run.id !== runId) return { error: 'Run not found' }
+    const finalStatus = run.status === 'done' || run.status === 'rejected' ? run.status : 'aborted'
+    run.status = finalStatus
+    run.completedAt = run.completedAt ?? new Date().toISOString()
+    activeRuns.delete(workspaceRoot)
+    await appendHistoryEntry(workspaceRoot, {
+      runId: run.id,
+      mode: run.mode,
+      providerId: run.providerId,
+      providerLabel: run.providerId,
+      model: run.model,
+      specPath: run.specPath,
+      promptSummary: (run.prompt ?? '').slice(0, 200),
+      status: finalStatus,
+      tokenCountIn: 0,
+      tokenCountOut: 0,
+      sensorSummary: '0/0',
+      gateDecisions: [],
+      filesChangedCount: run.fileChanges.length,
+      durationMs: 0,
+      createdAt: run.createdAt,
+      completedAt: run.completedAt,
+    })
+    runLogs.delete(run.id)
+    broadcast('foundry:run-status-changed', { runId: run.id, status: finalStatus })
+    return { ok: true }
+  })
+
+  reg(api, 'foundry:run-logs', (payload: unknown) => {
+    const { runId } = payload as { runId: string }
+    const entries = runLogs.get(runId) ?? []
+    return { entries }
+  })
+
+  reg(api, 'foundry:run-switch-provider', async (payload: unknown) => {
+    const { runId, workspaceRoot, providerId, model } = payload as {
+      runId: string
+      workspaceRoot: string
+      providerId: string
+      model: string
+    }
+    const run = activeRuns.get(workspaceRoot)
+    if (!run || run.id !== runId) return { error: 'Run not found' }
+    run.providerId = providerId
+    run.model = model
+    run.status = 'running'
+    broadcast('foundry:run-status-changed', { runId: run.id, status: 'running' })
+    return { run }
+  })
+
+  reg(api, 'foundry:run-list', async (payload: unknown) => {
+    const { workspaceRoot } = payload as { workspaceRoot: string }
+    const active = activeRuns.get(workspaceRoot)
+    return { runs: active ? [active] : [] }
+  })
+
+  // ─── File picker / reader (renderer can't use dialog directly) ────────────
+  reg(api, 'foundry:open-file', async (payload: unknown) => {
+    const { filters, multiSelect } = (payload ?? {}) as {
+      filters?: Array<{ name: string; extensions: string[] }>
+      multiSelect?: boolean
+    }
+    try {
+      const { dialog, BrowserWindow: BW } = await import('electron')
+      const win = BW.getFocusedWindow()
+      const result = await dialog.showOpenDialog(win, {
+        properties: multiSelect ? ['openFile', 'multiSelections'] : ['openFile'],
+        filters: filters ?? [{ name: 'All files', extensions: ['*'] }],
+      })
+      if (result.canceled || result.filePaths.length === 0) return { cancelled: true }
+      return multiSelect ? { filePaths: result.filePaths } : { filePath: result.filePaths[0] }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  reg(api, 'foundry:read-file', async (payload: unknown) => {
+    const { filePath } = payload as { filePath: string }
+    if (!filePath) return { error: 'filePath required' }
+    try {
+      const content = await fs.readFile(filePath, 'utf-8')
+      return { content, filePath }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  // ─── Orchestrate ───────────────────────────────────────────────────────────
+  reg(api, 'foundry:orchestrate-plan', async () => {
+    return { error: 'not implemented' }
+  })
+
+  reg(api, 'foundry:dag-validate', (payload: unknown) => {
+    const { subAgents } = payload as { subAgents: Parameters<typeof validateDag>[0] }
+    if (!subAgents) return { valid: false, cycleNodes: [] }
+    return validateDag(subAgents)
+  })
+
+  // ─── Co-pilot ──────────────────────────────────────────────────────────────
+  reg(api, 'foundry:copilot-send', async () => ({ error: 'not implemented' }))
+
+  reg(api, 'foundry:copilot-revert-file', async (payload: unknown) => {
+    const { workspaceRoot, filePath } = payload as { workspaceRoot: string; filePath: string }
+    return revertFiles(workspaceRoot, [filePath])
+  })
+
+  reg(api, 'foundry:copilot-accept-all', async () => ({ ok: true }))
+
+  reg(api, 'foundry:copilot-abort', async (payload: unknown) => {
+    const { workspaceRoot, filesModifiedThisTurn } = payload as {
+      workspaceRoot: string
+      filesModifiedThisTurn: string[]
+    }
+    if (filesModifiedThisTurn?.length) {
+      await revertFiles(workspaceRoot, filesModifiedThisTurn)
+    }
+    return { ok: true }
+  })
+
+  // ─── History ───────────────────────────────────────────────────────────────
+  reg(api, 'foundry:history-load', async (payload: unknown) => {
+    const {
+      workspaceRoot,
+      offset = 0,
+      limit = 200,
+    } = payload as { workspaceRoot: string; offset?: number; limit?: number }
+    if (!workspaceRoot) return { error: 'workspaceRoot required' }
+    return readHistory(workspaceRoot, offset, limit)
+  })
+
+  reg(api, 'foundry:open-run-console', (payload: unknown) => {
+    const { runId, workspaceRoot } = payload as { runId: string; workspaceRoot?: string }
+    if (!runId) return { error: 'runId required' }
+    api.window.openAuxiliary('foundry-run', { runId, repoRoot: workspaceRoot ?? '' })
+    return { ok: true }
+  })
+
+  reg(api, 'foundry:history-compare', async (payload: unknown) => {
+    const { workspaceRoot, runIdA, runIdB } = payload as {
+      workspaceRoot: string
+      runIdA: string
+      runIdB: string
+    }
+    const { entries } = await readHistory(workspaceRoot, 0, 10000)
+    const runA = entries.find((e) => e.runId === runIdA)
+    const runB = entries.find((e) => e.runId === runIdB)
+    if (!runA) return { error: `Run ${runIdA} not found` }
+    if (!runB) return { error: `Run ${runIdB} not found` }
+    return { runA, runB }
+  })
+
+  // ─── File system watch for active run file-change detection ───────────────
+  disposables.push(
+    api.fs.watch((event) => {
+      // Bail immediately when no runs are active — this fires on every file change
+      // in the project (including Vite HMR artifacts) so must be extremely cheap.
+      if (activeRuns.size === 0 || !event.filename) return
+      for (const [workspaceRoot, run] of activeRuns) {
+        if (run.status !== 'running') continue
+        if (!event.projectRoot.startsWith(workspaceRoot)) continue
+        const filePath = path.join(event.projectRoot, event.filename)
+        const existing = run.fileChanges.find((c) => c.filePath === filePath)
+        if (!existing) {
+          run.fileChanges.push({
+            filePath,
+            status: 'modified',
+            linesAdded: 0,
+            linesRemoved: 0,
+            unifiedDiff: '',
+          })
+          appendLog(run.id, 'file', `~ ${filePath.replace(workspaceRoot, '').replace(/^\//, '')}`)
+        }
+        broadcast('foundry:run-event', { runId: run.id, event: { type: 'file-changed', filePath } })
+      }
+    })
+  )
+
+  // ─── Terminal session close → reset co-pilot ──────────────────────────────
+  if (api.terminal?.onSessionClose) {
+    disposables.push(
+      api.terminal.onSessionClose(() => {
+        broadcast('foundry:copilot-reset', {})
+      })
+    )
+  }
+
+  // ─── Settings ──────────────────────────────────────────────────────────────
+  disposables.push(
+    api.settings.register({
+      label: 'Foundry',
+      properties: {
+        'terminator.foundry.enabled': {
+          type: 'boolean',
+          label: 'Enable Foundry',
+          default: true,
+          workspaceScoped: false,
+        },
+        'terminator.foundry.defaultProviderId': {
+          type: 'string',
+          label: 'Default Provider ID',
+          default: '',
+          workspaceScoped: false,
+        },
+      },
+    })
+  )
+}
+
+export function deactivate(): void {
+  disposables.forEach((d) => d.dispose())
+  disposables.length = 0
+  activeRuns.clear()
+  resetHealthState()
+}
