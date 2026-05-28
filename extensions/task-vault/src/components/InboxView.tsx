@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { Trash2, Pencil, X } from 'lucide-react'
+import { Trash2, X, CalendarDays, Sunset } from 'lucide-react'
 import type { IndexedTask } from '../vault/types'
 import { InboxProcessor } from './InboxProcessor'
 import { SmartTaskInput } from './SmartTaskInput'
-import { FileToPicker } from './FileToPicker'
 import { useVaultStore } from '../stores/vault.store'
 
 export function InboxView(): React.JSX.Element {
@@ -13,7 +12,7 @@ export function InboxView(): React.JSX.Element {
   const [newTaskText, setNewTaskText] = useState('')
   const [adding, setAdding] = useState(false)
   const [processing, setProcessing] = useState(false)
-  const { refreshInboxCount } = useVaultStore()
+  const { refreshInboxCount, loadToday, setView, loadSomeday } = useVaultStore()
 
   async function load() {
     setIsLoading(true)
@@ -52,8 +51,10 @@ export function InboxView(): React.JSX.Element {
   }
 
   async function handleDone() {
-    await load()
     await refreshInboxCount()
+    await loadSomeday()
+    await loadToday()
+    setView('daily')
   }
 
   if (isLoading) return <div className="inbox-view__loading">Loading inbox…</div>
@@ -96,7 +97,13 @@ export function InboxView(): React.JSX.Element {
         <div className="inbox-view__processor">
           <div className="inbox-view__processor-header">
             <span>Processing inbox (GTD clarify)…</span>
-            <button className="inbox-view__back-btn" onClick={() => setProcessing(false)}>
+            <button
+              className="tv-btn tv-btn--ghost tv-btn--xs"
+              onClick={() => {
+                setProcessing(false)
+                void load()
+              }}
+            >
               ← Back to list
             </button>
           </div>
@@ -105,7 +112,13 @@ export function InboxView(): React.JSX.Element {
       ) : (
         <>
           <div className="inbox-view__actions-bar">
-            <button className="inbox-view__process-btn" onClick={() => setProcessing(true)}>
+            <button
+              className="inbox-view__process-btn"
+              onClick={async () => {
+                await load()
+                setProcessing(true)
+              }}
+            >
               Process inbox (GTD clarify)
             </button>
           </div>
@@ -129,8 +142,7 @@ function InboxItem({
 }): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState('')
-  const [showFilePicker, setShowFilePicker] = useState(false)
-  const { refreshInboxCount, loadToday } = useVaultStore()
+  const { refreshInboxCount, loadSomeday, loadToday } = useVaultStore()
 
   function rawText() {
     const parts = [item.text]
@@ -139,12 +151,6 @@ function InboxItem({
     if (item.area) parts.push(`#${item.area.replace(/ /g, '-')}`)
     if (item.dueDate) parts.push(`due:${item.dueDate}`)
     return parts.join(' ')
-  }
-
-  function fileToPrefilledQuery() {
-    if (item.project) return item.project
-    if (item.area) return item.area
-    return ''
   }
 
   async function saveEdit() {
@@ -173,6 +179,7 @@ function InboxItem({
     })
     await onRefresh()
     await refreshInboxCount()
+    await loadSomeday()
   }
 
   async function handleMoveToToday() {
@@ -182,18 +189,6 @@ function InboxItem({
       taskId: item.id,
       action: 'file',
       destination: `daily/${today}.md`,
-    })
-    await onRefresh()
-    await refreshInboxCount()
-    await loadToday()
-  }
-
-  async function handleFileTo(filePath: string) {
-    setShowFilePicker(false)
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:process-inbox-item', {
-      taskId: item.id,
-      action: 'file',
-      destination: filePath,
     })
     await onRefresh()
     await refreshInboxCount()
@@ -214,74 +209,56 @@ function InboxItem({
           <button className="tv-btn tv-btn--primary" onClick={saveEdit}>
             Save
           </button>
-          <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)}>
-            <X size={14} />
+          <button className="tv-btn tv-btn--outline" onClick={() => setEditing(false)}>
+            <X size={13} />
           </button>
         </div>
       ) : (
-        <span
-          className="inbox-item__text"
-          onDoubleClick={() => {
-            setEditText(rawText())
-            setEditing(true)
-          }}
-          title="Double-click to edit"
-        >
-          {item.text}
-          {item.project && (
-            <span className="daily-log__tag daily-log__tag--project">@{item.project}</span>
-          )}
-          {item.context && (
-            <span className="daily-log__tag daily-log__tag--context">+{item.context}</span>
-          )}
-          {item.area && <span className="daily-log__tag daily-log__tag--area">#{item.area}</span>}
-          {item.dueDate && (
-            <span className="daily-log__tag daily-log__tag--due">due:{item.dueDate}</span>
-          )}
-        </span>
-      )}
-
-      {!editing && (
-        <div className="inbox-item__actions">
-          <button
-            className="inbox-item__promote-btn"
-            onClick={handleMoveToToday}
-            title="Move to Today's log"
-          >
-            → Today
-          </button>
-          <button
-            className="inbox-item__promote-btn"
-            onClick={() => setShowFilePicker((v) => !v)}
-            title="File to project or area"
-          >
-            → File to…
-          </button>
-          <button className="inbox-item__btn" onClick={handleSomeday} title="Move to Someday">
-            Someday
-          </button>
-          <button
-            className="inbox-item__btn"
-            onClick={() => {
+        <div className="inbox-item__row">
+          <span
+            className="inbox-item__text"
+            onDoubleClick={() => {
               setEditText(rawText())
               setEditing(true)
             }}
-            title="Edit"
+            title="Double-click to edit"
           >
-            <Pencil size={14} />
-          </button>
-          <button className="inbox-item__btn--delete" onClick={handleDelete} title="Delete">
-            <Trash2 size={14} />
-          </button>
+            {item.text}
+            {item.project && (
+              <span className="daily-log__tag daily-log__tag--project">@{item.project}</span>
+            )}
+            {item.context && (
+              <span className="daily-log__tag daily-log__tag--context">+{item.context}</span>
+            )}
+            {item.area && <span className="daily-log__tag daily-log__tag--area">#{item.area}</span>}
+            {item.dueDate && (
+              <span className="daily-log__tag daily-log__tag--due">due:{item.dueDate}</span>
+            )}
+          </span>
+          <div className="inbox-item__actions">
+            <button
+              className="tv-btn tv-btn--outline tv-btn--action-icon"
+              onClick={handleMoveToToday}
+              title="Move to Today's log"
+            >
+              <CalendarDays size={13} />
+            </button>
+            <button
+              className="tv-btn tv-btn--outline tv-btn--action-icon"
+              onClick={handleSomeday}
+              title="Move to backlog"
+            >
+              <Sunset size={13} />
+            </button>
+            <button
+              className="tv-btn tv-btn--outline tv-btn--action-icon inbox-item__btn--delete"
+              onClick={handleDelete}
+              title="Delete"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
         </div>
-      )}
-
-      {showFilePicker && (
-        <FileToPicker
-          prefilledQuery={fileToPrefilledQuery()}
-          onSelect={handleFileTo}
-          onClose={() => setShowFilePicker(false)}
-        />
       )}
     </div>
   )

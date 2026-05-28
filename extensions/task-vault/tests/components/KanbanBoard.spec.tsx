@@ -9,9 +9,22 @@ const mockOn = vi.fn(() => vi.fn())
 let mockSelectedContexts: string[] = []
 
 vi.mock('../../src/stores/vault.store', () => ({
-  useVaultStore: (sel?: (s: { selectedContexts: string[] }) => unknown) => {
-    if (sel) return sel({ selectedContexts: mockSelectedContexts })
-    return { selectedContexts: mockSelectedContexts }
+  useVaultStore: (
+    sel?: (s: {
+      selectedContexts: string[]
+      setKanbanLanes: () => void
+      loadToday: () => Promise<void>
+      tickCalendar: () => void
+    }) => unknown
+  ) => {
+    const store = {
+      selectedContexts: mockSelectedContexts,
+      setKanbanLanes: vi.fn(),
+      loadToday: vi.fn().mockResolvedValue(undefined),
+      tickCalendar: vi.fn(),
+    }
+    if (sel) return sel(store)
+    return store
   },
 }))
 

@@ -116,6 +116,17 @@ describe('task-vault:vault:complete-task', () => {
     const result = await handler({}, {})
     expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
   })
+
+  it('does not spawn next occurrence on completion (spawning is now time-based)', async () => {
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:complete-task')
+    const result = (await handler({}, { taskId: 'task-1' })) as {
+      success: boolean
+      nextTaskId?: string
+    }
+    expect(result).toEqual({ success: true })
+    expect(result.nextTaskId).toBeUndefined()
+  })
 })
 
 // ── delete-task ───────────────────────────────────────────────────────────────
@@ -181,17 +192,42 @@ describe('task-vault:vault:cancel-task', () => {
 
 describe('task-vault:vault:restore-task', () => {
   it('returns { success: true } when row updated', async () => {
+    mockGet.mockReturnValue({ metadata: '{}' })
     mockRun.mockReturnValue({ changes: 1 })
     const handler = getHandler('task-vault:vault:restore-task')
     const result = await handler({}, { taskId: 'task-1' })
     expect(result).toEqual({ success: true })
   })
 
-  it('returns { error: STALE_ID } when no row matched', async () => {
-    mockRun.mockReturnValue({ changes: 0 })
+  it('returns { error: STALE_ID } when task row not found', async () => {
+    mockGet.mockReturnValue(undefined)
     const handler = getHandler('task-vault:vault:restore-task')
     const result = await handler({}, { taskId: 'gone' })
     expect(result).toEqual({ error: 'STALE_ID' })
+  })
+
+  it('deletes twin and its subtasks when migration_twin_id present', async () => {
+    mockGet.mockReturnValue({ metadata: '{"migration_twin_id":"twin-xyz"}' })
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:restore-task')
+    await handler({}, { taskId: 'task-1' })
+    const allRunArgs = mockRun.mock.calls.flat()
+    expect(allRunArgs).toContain('twin-xyz')
+    const deleteSqls = mockPrepare.mock.calls
+      .filter(([sql]: [string]) => sql.startsWith('DELETE FROM tasks'))
+      .map(([sql]: [string]) => sql)
+    expect(deleteSqls.length).toBeGreaterThanOrEqual(2) // subtasks + twin
+  })
+
+  it('restores migrated subtasks when reopening parent', async () => {
+    mockGet.mockReturnValue({ metadata: '{}' })
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:restore-task')
+    await handler({}, { taskId: 'task-1' })
+    const updateSubSql = mockPrepare.mock.calls.find(
+      ([sql]: [string]) => sql.includes('parent_id=?') && sql.includes("status='open'")
+    )?.[0] as string | undefined
+    expect(updateSubSql).toBeDefined()
   })
 })
 
@@ -282,24 +318,21 @@ describe('task-vault:vault:create-area', () => {
 // ── get-today ─────────────────────────────────────────────────────────────────
 
 describe('task-vault:vault:get-today', () => {
-  it('returns date, tasks, events, notes when db empty', async () => {
+  it('returns date and tasks when db empty', async () => {
     mockAll.mockReturnValue([])
     const handler = getHandler('task-vault:vault:get-today')
     const result = (await handler({}, undefined)) as Record<string, unknown>
-    expect(result).toMatchObject({ tasks: [], events: [], notes: [] })
+    expect(result).toMatchObject({ tasks: [] })
     expect(typeof result.date).toBe('string')
     expect(result.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
   it('maps task rows and sets exists=true when tasks present', async () => {
     const row = makeTaskRow({ source: 'daily', source_ref: '2026-05-20' })
-    // rollover stale tasks → [], tasks query → [row], subtasks query → [], events → [], notes → []
     mockAll
       .mockReturnValueOnce([]) // rollover: no stale tasks
       .mockReturnValueOnce([row]) // main task fetch
       .mockReturnValueOnce([]) // subtasks
-      .mockReturnValueOnce([]) // events
-      .mockReturnValueOnce([]) // notes
     const handler = getHandler('task-vault:vault:get-today')
     const result = (await handler({}, undefined)) as Record<string, unknown>
     expect(result).toMatchObject({ exists: true })
@@ -308,13 +341,10 @@ describe('task-vault:vault:get-today', () => {
 
   it('rolls over stale open tasks from past daily logs', async () => {
     const staleRow = makeTaskRow({ source: 'daily', source_ref: '2026-05-01', status: 'open' })
-    // rollover query returns stale task → triggers insert + migrate statements
     mockAll
       .mockReturnValueOnce([staleRow]) // rollover: one stale task found
       .mockReturnValueOnce([]) // main task fetch (after rollover inserts)
       .mockReturnValueOnce([]) // subtasks
-      .mockReturnValueOnce([]) // events
-      .mockReturnValueOnce([]) // notes
     const handler = getHandler('task-vault:vault:get-today')
     const result = (await handler({}, undefined)) as Record<string, unknown>
     expect(result.rolledOver).toBe(1)
@@ -386,21 +416,30 @@ describe('task-vault:vault:list-areas', () => {
 
 describe('task-vault:vault:update-project-status', () => {
   it('returns { success: true } when project updated by name', async () => {
-    mockRun.mockReturnValue({ changes: 1 })
+    mockGet.mockReturnValue({ id: 'proj-1' })
     const handler = getHandler('task-vault:vault:update-project-status')
-    const result = await handler({}, { projectFilePath: 'MyProject', status: 'archived' })
+    const result = await handler({}, { projectFilePath: 'MyProject', status: 'active' })
     expect(result).toEqual({ success: true })
   })
 
   it('falls back to id lookup and returns { success: true }', async () => {
-    mockRun.mockReturnValueOnce({ changes: 0 }).mockReturnValueOnce({ changes: 1 })
+    mockGet.mockReturnValueOnce(undefined).mockReturnValueOnce({ id: 'proj-id' })
     const handler = getHandler('task-vault:vault:update-project-status')
     const result = await handler({}, { projectFilePath: 'proj-id', status: 'active' })
     expect(result).toEqual({ success: true })
   })
 
+  it('cancels open tasks when archiving', async () => {
+    mockGet.mockReturnValue({ id: 'proj-1' })
+    const handler = getHandler('task-vault:vault:update-project-status')
+    const result = await handler({}, { projectFilePath: 'MyProject', status: 'archived' })
+    expect(result).toEqual({ success: true })
+    // cascade UPDATE + project UPDATE
+    expect(mockRun).toHaveBeenCalledTimes(2)
+  })
+
   it('returns { error: NOT_FOUND } when both lookups fail', async () => {
-    mockRun.mockReturnValue({ changes: 0 })
+    mockGet.mockReturnValue(undefined)
     const handler = getHandler('task-vault:vault:update-project-status')
     const result = await handler({}, { projectFilePath: 'ghost', status: 'archived' })
     expect(result).toEqual({ error: 'NOT_FOUND' })
@@ -502,14 +541,56 @@ describe('task-vault:projects:get-tasks', () => {
   })
 })
 
+// ── archive-area ──────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:archive-area', () => {
+  it('archives area and cascades to projects and tasks', async () => {
+    mockGet.mockReturnValue({ id: 'area-1' })
+    mockAll.mockReturnValue([{ id: 'proj-1' }]) // one project
+    const handler = getHandler('task-vault:vault:archive-area')
+    const result = await handler({}, { areaName: 'Work' })
+    expect(result).toMatchObject({ success: true })
+    // tasks cascade UPDATE + direct area tasks UPDATE + projects UPDATE + area UPDATE
+    expect(mockRun).toHaveBeenCalledTimes(4)
+  })
+
+  it('returns NOT_FOUND when area does not exist', async () => {
+    mockGet.mockReturnValue(undefined)
+    const handler = getHandler('task-vault:vault:archive-area')
+    const result = await handler({}, { areaName: 'Ghost' })
+    expect(result).toMatchObject({ error: 'NOT_FOUND' })
+  })
+
+  it('returns VALIDATION_ERROR for missing areaName', async () => {
+    const handler = getHandler('task-vault:vault:archive-area')
+    const result = await handler({}, {})
+    expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
+  })
+})
+
 // ── delete-area ───────────────────────────────────────────────────────────────
 
 describe('task-vault:vault:delete-area', () => {
-  it('deletes area (FK ON DELETE SET NULL handles task untag)', async () => {
+  it('deletes archived area and cascades', async () => {
+    mockGet.mockReturnValue({ id: 'area-1', status: 'archived' })
+    mockAll.mockReturnValue([]) // no projects
     const handler = getHandler('task-vault:vault:delete-area')
     const result = await handler({}, { areaFilePath: 'areas/Work.md' })
     expect(result).toMatchObject({ success: true })
-    expect(mockRun).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns MUST_ARCHIVE_FIRST when area is not archived', async () => {
+    mockGet.mockReturnValue({ id: 'area-1', status: 'active' })
+    const handler = getHandler('task-vault:vault:delete-area')
+    const result = await handler({}, { areaFilePath: 'areas/Work.md' })
+    expect(result).toMatchObject({ error: 'MUST_ARCHIVE_FIRST' })
+  })
+
+  it('returns NOT_FOUND when area does not exist', async () => {
+    mockGet.mockReturnValue(undefined)
+    const handler = getHandler('task-vault:vault:delete-area')
+    const result = await handler({}, { areaFilePath: 'areas/Ghost.md' })
+    expect(result).toMatchObject({ error: 'NOT_FOUND' })
   })
 
   it('returns VALIDATION_ERROR for missing areaFilePath', async () => {
@@ -527,8 +608,6 @@ describe('task-vault:vault:get-daily', () => {
     mockAll
       .mockReturnValueOnce([row]) // tasks
       .mockReturnValueOnce([]) // subtasks
-      .mockReturnValueOnce([]) // events
-      .mockReturnValueOnce([]) // notes
     const handler = getHandler('task-vault:vault:get-daily')
     const result = (await handler({}, { date: '2026-05-20' })) as Record<string, unknown>
     expect(result.date).toBe('2026-05-20')
@@ -557,6 +636,7 @@ describe('task-vault:vault:migrate-task', () => {
   it('migrates task to target date and returns newTaskId', async () => {
     const row = makeTaskRow()
     mockGet.mockReturnValue(row)
+    mockAll.mockReturnValue([]) // no subtasks
     const handler = getHandler('task-vault:vault:migrate-task')
     const result = (await handler({}, { taskId: 'task-1', targetDate: '2026-05-21' })) as {
       newTaskId: string
@@ -575,6 +655,30 @@ describe('task-vault:vault:migrate-task', () => {
     const handler = getHandler('task-vault:vault:migrate-task')
     const result = await handler({}, { targetDate: '2026-05-21' })
     expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
+  })
+
+  it('migrates subtasks: marks originals migrated and creates twins under new parent', async () => {
+    const row = makeTaskRow()
+    mockGet.mockReturnValue(row)
+    const sub1 = { id: 'sub-1', text: 'Subtask one', sort_order: 0, metadata: '{}' }
+    const sub2 = { id: 'sub-2', text: 'Subtask two', sort_order: 1, metadata: '{}' }
+    mockAll.mockReturnValueOnce([sub1, sub2])
+    const handler = getHandler('task-vault:vault:migrate-task')
+    await handler({}, { taskId: 'task-1', targetDate: '2026-05-21' })
+    // Should have UPDATEd both subtasks to migrated status
+    const updateCalls = mockPrepare.mock.calls.filter(
+      ([sql]: [string]) => sql.includes("status='migrated'") && sql.includes('WHERE id=?')
+    )
+    expect(updateCalls.length).toBeGreaterThanOrEqual(3) // parent + 2 subtasks
+    // Both subtask IDs should appear in run() calls
+    const allRunArgs = mockRun.mock.calls.flat()
+    expect(allRunArgs).toContain('sub-1')
+    expect(allRunArgs).toContain('sub-2')
+    // Twin INSERT calls: one for parent, one per subtask
+    const insertCalls = mockPrepare.mock.calls.filter(([sql]: [string]) =>
+      sql.startsWith('INSERT INTO tasks')
+    )
+    expect(insertCalls).toHaveLength(3) // parent twin + 2 subtask twins
   })
 })
 
@@ -700,23 +804,17 @@ describe('task-vault:vault:export-json', () => {
       .mockReturnValueOnce([taskRow]) // tasks
       .mockReturnValueOnce([projRow]) // projects
       .mockReturnValueOnce([areaRow]) // areas
-      .mockReturnValueOnce([]) // events
-      .mockReturnValueOnce([]) // notes
     const handler = getHandler('task-vault:vault:export-json')
     const result = (await handler({}, undefined)) as {
       tasks: unknown[]
       projects: unknown[]
       areas: unknown[]
-      events: unknown[]
-      notes: unknown[]
       exportedAt: string
       version: number
     }
     expect(result.tasks).toHaveLength(1)
     expect(result.projects).toHaveLength(1)
     expect(result.areas).toHaveLength(1)
-    expect(result.events).toHaveLength(0)
-    expect(result.notes).toHaveLength(0)
     expect(result.version).toBe(1)
     expect(typeof result.exportedAt).toBe('string')
   })
@@ -751,13 +849,11 @@ describe('task-vault:vault:import-json', () => {
       ],
       projects: [{ id: 'p1', name: 'Project', status: 'active', created_at: now, updated_at: now }],
       areas: [{ id: 'a1', name: 'Work', created_at: now }],
-      events: [{ id: 'e1', date: '2026-05-22', text: 'Meeting', created_at: now }],
-      notes: [{ id: 'n1', date: '2026-05-22', text: 'Note text', created_at: now }],
     }
     const handler = getHandler('task-vault:vault:import-json')
     const result = (await handler({}, importData)) as { success: boolean; imported: number }
     expect(result.success).toBe(true)
-    expect(result.imported).toBe(5)
+    expect(result.imported).toBe(3)
   })
 
   it('imports tasks only when other arrays absent', async () => {
@@ -908,6 +1004,7 @@ describe('task-vault:vault:save-task-detail', () => {
 
 describe('task-vault:vault:reopen-task', () => {
   it('sets status to open without changing source', async () => {
+    mockGet.mockReturnValue({ metadata: '{}' })
     mockRun.mockReturnValue({ changes: 1 })
     const handler = getHandler('task-vault:vault:reopen-task')
     const result = await handler({}, { taskId: 'task-1' })
@@ -917,7 +1014,42 @@ describe('task-vault:vault:reopen-task', () => {
     expect(sql).not.toContain('source')
   })
 
+  it('deletes migration twin and its subtasks when migration_twin_id is present', async () => {
+    mockGet.mockReturnValue({ metadata: '{"migration_twin_id":"twin-abc"}' })
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:reopen-task')
+    const result = await handler({}, { taskId: 'task-1' })
+    expect(result).toMatchObject({ success: true })
+    // Two DELETE statements: subtasks of twin, then twin itself
+    const deleteSqls = mockPrepare.mock.calls
+      .filter(([sql]: [string]) => sql.startsWith('DELETE FROM tasks'))
+      .map(([sql]: [string]) => sql)
+    expect(deleteSqls.length).toBeGreaterThanOrEqual(2)
+    // The twin ID should appear in run() calls
+    const allRunArgs = mockRun.mock.calls.flat()
+    expect(allRunArgs).toContain('twin-abc')
+  })
+
+  it('restores migrated subtasks of the original task', async () => {
+    mockGet.mockReturnValue({ metadata: '{}' })
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:reopen-task')
+    await handler({}, { taskId: 'task-1' })
+    const updateSubSql = mockPrepare.mock.calls.find(
+      ([sql]: [string]) => sql.includes('parent_id=?') && sql.includes("status='open'")
+    )?.[0] as string | undefined
+    expect(updateSubSql).toBeDefined()
+  })
+
+  it('returns STALE_ID when task row not found', async () => {
+    mockGet.mockReturnValue(undefined)
+    const handler = getHandler('task-vault:vault:reopen-task')
+    const result = (await handler({}, { taskId: 'task-1' })) as { error: string }
+    expect(result.error).toBe('STALE_ID')
+  })
+
   it('returns STALE_ID when update changes 0 rows', async () => {
+    mockGet.mockReturnValue({ metadata: '{}' })
     mockRun.mockReturnValue({ changes: 0 })
     const handler = getHandler('task-vault:vault:reopen-task')
     const result = (await handler({}, { taskId: 'task-1' })) as { error: string }
@@ -1057,6 +1189,126 @@ describe('task-vault:vault:reorder-tasks', () => {
 
 // ── registerVaultIpcHandlers dispose ──────────────────────────────────────────
 
+// ── set-recurrence ────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:set-recurrence', () => {
+  const baseTask = { metadata: '{}', due_date: null, source_ref: null }
+
+  it('writes recurrence fields to metadata and returns { success: true }', async () => {
+    mockGet.mockReturnValue(baseTask)
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:set-recurrence')
+    const result = await handler({}, { taskId: 'task-1', interval: 'daily', time: '08:00' })
+    expect(result).toEqual({ success: true })
+    const storedMeta = JSON.parse(mockRun.mock.calls[0][0] as string) as Record<string, unknown>
+    expect(storedMeta.recurrence_interval).toBe('daily')
+    expect(storedMeta.recurrence_time).toBe('08:00')
+  })
+
+  it('stores recurrence_days for weekly interval', async () => {
+    mockGet.mockReturnValue(baseTask)
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:set-recurrence')
+    await handler({}, { taskId: 'task-1', interval: 'weekly', days: [1, 3, 5] })
+    const storedMeta = JSON.parse(mockRun.mock.calls[0][0] as string) as Record<string, unknown>
+    expect(storedMeta.recurrence_interval).toBe('weekly')
+    expect(JSON.parse(storedMeta.recurrence_days as string)).toEqual([1, 3, 5])
+  })
+
+  it('stores on_date end condition', async () => {
+    mockGet.mockReturnValue(baseTask)
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:set-recurrence')
+    await handler(
+      {},
+      { taskId: 'task-1', interval: 'daily', endType: 'on_date', endDate: '2026-12-31' }
+    )
+    const storedMeta = JSON.parse(mockRun.mock.calls[0][0] as string) as Record<string, unknown>
+    expect(storedMeta.recurrence_end_type).toBe('on_date')
+    expect(storedMeta.recurrence_end_date).toBe('2026-12-31')
+    expect(storedMeta.recurrence_completed_count).toBe(0)
+  })
+
+  it('stores after_count end condition', async () => {
+    mockGet.mockReturnValue(baseTask)
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:set-recurrence')
+    await handler(
+      {},
+      { taskId: 'task-1', interval: 'weekly', days: [1], endType: 'after_count', endCount: 5 }
+    )
+    const storedMeta = JSON.parse(mockRun.mock.calls[0][0] as string) as Record<string, unknown>
+    expect(storedMeta.recurrence_end_type).toBe('after_count')
+    expect(storedMeta.recurrence_end_count).toBe(5)
+    expect(storedMeta.recurrence_completed_count).toBe(0)
+  })
+
+  it('backfills due_date from source_ref when task has no due_date', async () => {
+    mockGet.mockReturnValue({ metadata: '{}', due_date: null, source_ref: '2026-05-27' })
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:set-recurrence')
+    await handler({}, { taskId: 'task-1', interval: 'daily' })
+    // Second run arg is the effective due_date passed to UPDATE
+    expect(mockRun.mock.calls[0][1]).toBe('2026-05-27')
+  })
+
+  it('preserves existing due_date when already set', async () => {
+    mockGet.mockReturnValue({ metadata: '{}', due_date: '2026-06-01', source_ref: '2026-05-27' })
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:set-recurrence')
+    await handler({}, { taskId: 'task-1', interval: 'daily' })
+    expect(mockRun.mock.calls[0][1]).toBe('2026-06-01')
+  })
+
+  it('returns STALE_ID when task not found', async () => {
+    mockGet.mockReturnValue(undefined)
+    const handler = getHandler('task-vault:vault:set-recurrence')
+    const result = await handler({}, { taskId: 'missing', interval: 'daily' })
+    expect(result).toEqual({ error: 'STALE_ID' })
+  })
+
+  it('returns VALIDATION_ERROR for invalid interval', async () => {
+    const handler = getHandler('task-vault:vault:set-recurrence')
+    const result = await handler({}, { taskId: 'task-1', interval: 'hourly' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+})
+
+// ── clear-recurrence ──────────────────────────────────────────────────────────
+
+describe('task-vault:vault:clear-recurrence', () => {
+  it('removes all recurrence fields from metadata and returns { success: true }', async () => {
+    mockGet.mockReturnValue({
+      metadata: JSON.stringify({
+        recurrence_interval: 'daily',
+        recurrence_time: '09:00',
+        recurrence_end_type: 'after_count',
+        recurrence_end_count: 5,
+        recurrence_completed_count: 2,
+        other_key: 'keep',
+      }),
+    })
+    mockRun.mockReturnValue({ changes: 1 })
+    const handler = getHandler('task-vault:vault:clear-recurrence')
+    const result = await handler({}, { taskId: 'task-1' })
+    expect(result).toEqual({ success: true })
+    const storedMeta = JSON.parse(mockRun.mock.calls[0][0] as string) as Record<string, unknown>
+    expect(storedMeta.recurrence_interval).toBeUndefined()
+    expect(storedMeta.recurrence_time).toBeUndefined()
+    expect(storedMeta.recurrence_end_type).toBeUndefined()
+    expect(storedMeta.recurrence_end_count).toBeUndefined()
+    expect(storedMeta.recurrence_completed_count).toBeUndefined()
+    expect(storedMeta.other_key).toBe('keep')
+  })
+
+  it('returns STALE_ID when task not found', async () => {
+    mockGet.mockReturnValue(undefined)
+    const handler = getHandler('task-vault:vault:clear-recurrence')
+    const result = await handler({}, { taskId: 'missing' })
+    expect(result).toEqual({ error: 'STALE_ID' })
+  })
+})
+
 describe('registerVaultIpcHandlers dispose', () => {
   it('calls ipcMain.removeHandler for all registered channels', () => {
     const dispose = registerVaultIpcHandlers()
@@ -1072,5 +1324,7 @@ describe('registerVaultIpcHandlers dispose', () => {
     expect(removedChannels).toContain('task-vault:vault:block-task')
     expect(removedChannels).toContain('task-vault:vault:unblock-task')
     expect(removedChannels).toContain('task-vault:vault:reorder-tasks')
+    expect(removedChannels).toContain('task-vault:vault:set-recurrence')
+    expect(removedChannels).toContain('task-vault:vault:clear-recurrence')
   })
 })

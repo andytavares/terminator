@@ -9,7 +9,8 @@ const ReadFileSchema = z.object({ filePath: z.string().min(1) })
 
 export function registerFsHandlers(getMainWindow: () => BrowserWindow | null): void {
   fsWatcherService.addHandler((event) => {
-    getMainWindow()?.webContents.send('fs:changed', event)
+    const win = getMainWindow()
+    if (win && !win.isDestroyed()) win.webContents.send('fs:changed', event)
   })
 
   ipcMain.handle('fs:watch-start', (_event, payload) => {

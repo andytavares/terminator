@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron'
-import { getDb } from '../vault/db.js'
+import { getDb, randomUUID } from '../vault/db.js'
+import { computeNextDueDate } from '../vault/recurrence.js'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 
 let _tick: (() => void) | null = null
@@ -45,6 +46,7 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
   const notifiedDueIds = new Set<string>()
   const lastNotifiedBlocked = new Map<string, number>()
   let lastDay = new Date().toDateString()
+  let isStartup = true
 
   function tick(): void {
     try {
@@ -62,37 +64,136 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
       }
 
       // ── Due tasks (gated by configured alert time) ───────────────
-      const alertTimeSetting =
+      const globalAlertTimeSetting =
         api.settings.get<string>('terminator.task-vault.dueDateAlertTime') ?? '09:00'
-      const [alertHourStr = '9', alertMinStr = '0'] = alertTimeSetting.split(':')
-      const alertTotalMinutes = parseInt(alertHourStr) * 60 + parseInt(alertMinStr)
+      const [globalAlertHourStr = '9', globalAlertMinStr = '0'] = globalAlertTimeSetting.split(':')
+      const globalAlertTotalMinutes =
+        parseInt(globalAlertHourStr) * 60 + parseInt(globalAlertMinStr)
       const currentTotalMinutes = nowDate.getHours() * 60 + nowDate.getMinutes()
 
-      if (currentTotalMinutes >= alertTotalMinutes) {
-        type DueRow = { id: string; text: string }
-        const dueTasks = db
-          .prepare(
-            `SELECT id, text FROM tasks
-             WHERE status='open' AND due_date IS NOT NULL AND due_date <= ? AND parent_id IS NULL`
-          )
-          .all(today) as DueRow[]
+      type DueRow = {
+        id: string
+        text: string
+        due_date: string
+        project_id: string | null
+        context: string | null
+        area_id: string | null
+        metadata: string
+      }
+      const dueTasks = db
+        .prepare(
+          `SELECT id, text, due_date, project_id, context, area_id, metadata FROM tasks
+           WHERE status='open' AND due_date IS NOT NULL AND due_date <= ? AND parent_id IS NULL`
+        )
+        .all(today) as DueRow[]
 
-        for (const task of dueTasks) {
-          if (notifiedDueIds.has(task.id)) continue
-          notifiedDueIds.add(task.id)
-          const taskId = task.id
-          api.notifications.createNotification({
-            type: 'warning',
-            title: `Due today: ${task.text}`,
-            actions: [
-              {
-                id: 'open',
-                label: 'Open Vault',
-                handler: () => broadcast('task-vault:navigate-task', taskId),
-              },
-            ],
-          })
+      for (const task of dueTasks) {
+        if (notifiedDueIds.has(task.id)) continue
+
+        let meta: Record<string, unknown> = {}
+        try {
+          meta = JSON.parse(task.metadata || '{}') as Record<string, unknown>
+        } catch {
+          // ignore malformed metadata
         }
+
+        const isOverdue = task.due_date < today
+
+        // Use per-task recurrence_time if set, otherwise fall back to global alert time
+        let taskAlertMinutes = globalAlertTotalMinutes
+        const recurrenceTime = meta.recurrence_time as string | undefined
+        if (recurrenceTime) {
+          const [h = '9', m = '0'] = recurrenceTime.split(':')
+          taskAlertMinutes = parseInt(h) * 60 + parseInt(m)
+        }
+
+        // On startup: fire for all due tasks regardless of alert time.
+        // On regular ticks: past-due tasks always fire; today's tasks respect the alert time.
+        if (!isStartup && !isOverdue && currentTotalMinutes < taskAlertMinutes) continue
+
+        notifiedDueIds.add(task.id)
+        const taskId = task.id
+        const taskDate = task.due_date
+        api.notifications.createNotification({
+          type: isOverdue ? 'error' : 'warning',
+          title: isOverdue ? `Overdue: ${task.text}` : `Due today: ${task.text}`,
+          actions: [
+            {
+              id: 'open',
+              label: 'Open Vault',
+              handler: () => broadcast('task-vault:navigate-task', { taskId, date: taskDate }),
+            },
+          ],
+        })
+
+        // ── Spawn next occurrence for recurring tasks at notify time ──
+        const recurrenceInterval = meta.recurrence_interval as string | undefined
+        if (!recurrenceInterval) continue
+
+        // Use recurrence_next_spawned to prevent double-spawn across restarts
+        const alreadySpawnedFor = meta.recurrence_next_spawned as string | undefined
+
+        let recurrenceDays: number[] = []
+        try {
+          if (meta.recurrence_days != null)
+            recurrenceDays = JSON.parse(meta.recurrence_days as string) as number[]
+        } catch {
+          // ignore
+        }
+
+        const nextDue = computeNextDueDate(task.due_date, recurrenceInterval, recurrenceDays)
+        if (alreadySpawnedFor === nextDue) continue // already spawned this occurrence
+
+        // Check end conditions
+        const endType = (meta.recurrence_end_type as string) || 'none'
+        const spawnCount = (meta.recurrence_completed_count as number) || 0
+        let shouldSpawn = true
+        if (endType === 'on_date') {
+          const endDate = meta.recurrence_end_date as string | undefined
+          if (endDate && nextDue > endDate) shouldSpawn = false
+        } else if (endType === 'after_count') {
+          const endCount = meta.recurrence_end_count as number | undefined
+          if (endCount != null && spawnCount + 1 >= endCount) shouldSpawn = false
+        }
+
+        if (!shouldSpawn) continue
+
+        const newId = randomUUID()
+        const nowIso = new Date().toISOString()
+        const nextMeta: Record<string, unknown> = {
+          recurrence_interval: recurrenceInterval,
+          recurrence_days: meta.recurrence_days,
+          recurrence_time: meta.recurrence_time,
+          recurrence_end_type: endType !== 'none' ? endType : undefined,
+          recurrence_end_date: meta.recurrence_end_date,
+          recurrence_end_count: meta.recurrence_end_count,
+          recurrence_completed_count: spawnCount + 1,
+        }
+        db.prepare(
+          `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,metadata,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+        ).run(
+          newId,
+          task.text,
+          'open',
+          task.project_id ?? null,
+          task.context ?? null,
+          task.area_id ?? null,
+          nextDue,
+          'daily',
+          nextDue,
+          JSON.stringify(nextMeta),
+          nowIso,
+          nowIso
+        )
+        // Mark the current task so we don't spawn again on the next tick / after restart
+        const updatedMeta = { ...meta, recurrence_next_spawned: nextDue }
+        db.prepare(`UPDATE tasks SET metadata=?, updated_at=? WHERE id=?`).run(
+          JSON.stringify(updatedMeta),
+          nowIso,
+          task.id
+        )
+        broadcast('task-vault:recurrence-spawned', { taskId: task.id, nextTaskId: newId, nextDue })
       }
 
       // ── Blocked tasks with check interval ────────────────────────
@@ -151,6 +252,7 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
   }
 
   tick()
+  isStartup = false
   const intervalId = setInterval(tick, 15_000)
   return { dispose: () => clearInterval(intervalId), tick }
 }

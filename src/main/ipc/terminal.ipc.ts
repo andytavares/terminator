@@ -48,10 +48,13 @@ export function registerTerminalHandlers(
       defaultShell,
       type,
       (data) => {
-        getWindow()?.webContents.send('terminal:output', { sessionId, data })
+        const win = getWindow()
+        if (win && !win.isDestroyed()) win.webContents.send('terminal:output', { sessionId, data })
       },
       (exitCode) => {
-        getWindow()?.webContents.send('terminal:process-exit', { sessionId, exitCode })
+        const win = getWindow()
+        if (win && !win.isDestroyed())
+          win.webContents.send('terminal:process-exit', { sessionId, exitCode })
       }
     )
 

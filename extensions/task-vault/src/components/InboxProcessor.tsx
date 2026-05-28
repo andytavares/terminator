@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import type { IndexedTask } from '../vault/types'
 import { FileToPicker } from './FileToPicker'
+import { useVaultStore } from '../stores/vault.store'
 
 type InboxStep = 'actionable' | 'two-minute' | 'destination'
 
@@ -13,6 +14,7 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
   const [currentIdx, setCurrentIdx] = useState(0)
   const [step, setStep] = useState<InboxStep>('actionable')
   const [isProcessing, setIsProcessing] = useState(false)
+  const { refreshInboxCount } = useVaultStore()
 
   const current = items[currentIdx]
 
@@ -24,7 +26,6 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
         'task-vault:vault:process-inbox-item',
         { taskId: current.id, action, destination: dest, newProjectName }
       )
-      // STALE_ID means the item was already processed — still advance
       if (result && typeof result === 'object' && 'error' in result) {
         const err = (result as { error: string }).error
         if (err !== 'STALE_ID') {
@@ -32,9 +33,22 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
           return
         }
       }
+      await refreshInboxCount()
       advanceToNext()
     } catch {
       setIsProcessing(false)
+    }
+  }
+
+  async function handleFileNew(kind: 'project' | 'area', name: string) {
+    if (kind === 'area') {
+      await window.electronAPI.extensionBridge
+        .invoke('task-vault:vault:create-area', { name })
+        .catch(() => {})
+      // Use the path format resolveSource expects: areas/<name>.md
+      await processItem('file', `areas/${name}.md`)
+    } else {
+      await processItem('file', undefined, name)
     }
   }
 
@@ -59,6 +73,12 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
       </div>
       <div className="inbox-processor__item">
         <p className="inbox-processor__text">{current.text}</p>
+        {current.project && (
+          <span className="daily-log__tag daily-log__tag--project">@{current.project}</span>
+        )}
+        {current.area && (
+          <span className="daily-log__tag daily-log__tag--area">#{current.area}</span>
+        )}
       </div>
 
       {step === 'actionable' && (
@@ -68,11 +88,14 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
             <button className="tv-btn tv-btn--primary" onClick={() => setStep('two-minute')}>
               Yes
             </button>
-            <button className="tv-btn tv-btn--danger" onClick={() => processItem('trash')}>
-              No — trash it
+            <button className="tv-btn tv-btn--danger" onClick={() => void processItem('trash')}>
+              Trash it
             </button>
-            <button className="tv-btn tv-btn--secondary" onClick={() => processItem('someday')}>
-              Incubate (someday)
+            <button
+              className="tv-btn tv-btn--secondary"
+              onClick={() => void processItem('someday')}
+            >
+              Incubate — Backlog
             </button>
           </div>
         </div>
@@ -82,11 +105,11 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
         <div className="inbox-processor__step">
           <p className="inbox-processor__question">Can it be done in &lt;2 minutes?</p>
           <div className="inbox-processor__actions">
-            <button className="tv-btn tv-btn--primary" onClick={() => processItem('do-now')}>
-              Do now
+            <button className="tv-btn tv-btn--primary" onClick={() => void processItem('do-now')}>
+              Do now — Today
             </button>
             <button className="tv-btn tv-btn--secondary" onClick={() => setStep('destination')}>
-              No — file it
+              No — File it
             </button>
           </div>
         </div>
@@ -97,14 +120,18 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
           <p className="inbox-processor__question">Where does it belong?</p>
           <FileToPicker
             prefilledQuery={current.project ?? current.area ?? ''}
-            onSelect={(filePath) => processItem('file', filePath)}
-            onClose={() => setStep('actionable')}
+            onSelect={(filePath) => void processItem('file', filePath)}
+            onSelectNew={(kind, name) => void handleFileNew(kind, name)}
+            onClose={() => setStep('two-minute')}
           />
-          <div className="inbox-processor__actions">
-            <button className="tv-btn tv-btn--secondary" onClick={() => processItem('someday')}>
-              Move to Someday
+          <div className="inbox-processor__actions" style={{ marginTop: 10 }}>
+            <button
+              className="tv-btn tv-btn--secondary"
+              onClick={() => void processItem('someday')}
+            >
+              Backlog
             </button>
-            <button className="tv-btn tv-btn--secondary" onClick={() => setStep('actionable')}>
+            <button className="tv-btn tv-btn--secondary" onClick={() => setStep('two-minute')}>
               Back
             </button>
           </div>

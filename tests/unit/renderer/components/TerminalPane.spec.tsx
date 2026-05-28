@@ -133,45 +133,69 @@ describe('TerminalPane', () => {
     expect(mockFocus).toHaveBeenCalled()
   })
 
-  it('writes dropped file paths to the active terminal session', () => {
+  it('pastes dropped file paths into the active terminal session', () => {
+    const mockPaste = vi.fn()
     mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
     mockGetActive.mockReturnValue('ses-1')
+    mockGetInstance.mockReturnValue({
+      terminal: { paste: mockPaste, focus: vi.fn(), scrollToBottom: vi.fn() },
+      mount: vi.fn(),
+      unmount: vi.fn(),
+    })
     const { container } = render(<TerminalPane projectId="proj-1" />)
     const pane = container.querySelector('.terminal-pane')!
     const file = Object.assign(new File([], 'report.pdf'), { path: '/Users/me/report.pdf' })
     fireEvent.drop(pane, { dataTransfer: { files: [file], types: ['Files'] } })
-    expect(mockTerminalInput).toHaveBeenCalledWith('ses-1', '/Users/me/report.pdf')
+    expect(mockPaste).toHaveBeenCalledWith('/Users/me/report.pdf')
   })
 
   it('quotes paths with spaces when dropping files', () => {
+    const mockPaste = vi.fn()
     mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
     mockGetActive.mockReturnValue('ses-1')
+    mockGetInstance.mockReturnValue({
+      terminal: { paste: mockPaste, focus: vi.fn(), scrollToBottom: vi.fn() },
+      mount: vi.fn(),
+      unmount: vi.fn(),
+    })
     const { container } = render(<TerminalPane projectId="proj-1" />)
     const pane = container.querySelector('.terminal-pane')!
     const file = Object.assign(new File([], 'my file.png'), { path: '/Users/me/my file.png' })
     fireEvent.drop(pane, { dataTransfer: { files: [file], types: ['Files'] } })
-    expect(mockTerminalInput).toHaveBeenCalledWith('ses-1', "'/Users/me/my file.png'")
+    expect(mockPaste).toHaveBeenCalledWith("'/Users/me/my file.png'")
   })
 
   it('joins multiple dropped files with spaces', () => {
+    const mockPaste = vi.fn()
     mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
     mockGetActive.mockReturnValue('ses-1')
+    mockGetInstance.mockReturnValue({
+      terminal: { paste: mockPaste, focus: vi.fn(), scrollToBottom: vi.fn() },
+      mount: vi.fn(),
+      unmount: vi.fn(),
+    })
     const { container } = render(<TerminalPane projectId="proj-1" />)
     const pane = container.querySelector('.terminal-pane')!
     const f1 = Object.assign(new File([], 'a.txt'), { path: '/a.txt' })
     const f2 = Object.assign(new File([], 'b.txt'), { path: '/b.txt' })
     fireEvent.drop(pane, { dataTransfer: { files: [f1, f2], types: ['Files'] } })
-    expect(mockTerminalInput).toHaveBeenCalledWith('ses-1', '/a.txt /b.txt')
+    expect(mockPaste).toHaveBeenCalledWith('/a.txt /b.txt')
   })
 
-  it('does not call input when no active session on drop', () => {
+  it('does not call paste when no active session on drop', () => {
+    const mockPaste = vi.fn()
     mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
     mockGetActive.mockReturnValue(null)
+    mockGetInstance.mockReturnValue({
+      terminal: { paste: mockPaste, focus: vi.fn(), scrollToBottom: vi.fn() },
+      mount: vi.fn(),
+      unmount: vi.fn(),
+    })
     const { container } = render(<TerminalPane projectId="proj-1" />)
     const pane = container.querySelector('.terminal-pane')!
     const file = Object.assign(new File([], 'x.txt'), { path: '/x.txt' })
     fireEvent.drop(pane, { dataTransfer: { files: [file], types: ['Files'] } })
-    expect(mockTerminalInput).not.toHaveBeenCalled()
+    expect(mockPaste).not.toHaveBeenCalled()
   })
 
   it('handleDragOver prevents default when Files type is included', () => {

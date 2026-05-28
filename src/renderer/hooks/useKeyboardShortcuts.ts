@@ -10,12 +10,14 @@ interface Options {
   onOpenSettings?: () => void
   onToggleLog?: () => void
   onOpenCommandPalette?: () => void
+  onToggleOverview?: () => void
 }
 
 export function useKeyboardShortcuts({
   onOpenSettings,
   onToggleLog,
   onOpenCommandPalette,
+  onToggleOverview,
 }: Options = {}): void {
   const {
     workspaces,
@@ -57,6 +59,12 @@ export function useKeyboardShortcuts({
 
     function handleKeyDown(e: KeyboardEvent): void {
       const isMeta = e.metaKey || e.ctrlKey
+      const inXterm = e.target instanceof HTMLElement && !!e.target.closest('.xterm')
+      const inTextField =
+        !inXterm &&
+        (e.target instanceof HTMLInputElement ||
+          e.target instanceof HTMLTextAreaElement ||
+          (e.target instanceof HTMLElement && e.target.isContentEditable))
 
       if (isMeta && e.key === ',') {
         e.preventDefault()
@@ -78,11 +86,14 @@ export function useKeyboardShortcuts({
         return
       }
 
+      // Cmd+Shift+I: toggle overview tab
+      if (isMeta && e.shiftKey && e.key === 'i') {
+        e.preventDefault()
+        onToggleOverview?.()
+        return
+      }
+
       // Extension-registered keyboard shortcuts — skip bare-key shortcuts when focus is in a text field
-      const inTextField =
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        (e.target instanceof HTMLElement && e.target.isContentEditable)
       for (const shortcut of keyboardShortcuts) {
         if (matchesAccelerator(e, shortcut.accelerator)) {
           // Bare-key shortcuts (no Cmd/Ctrl/Alt/Shift) must not fire while typing
@@ -122,8 +133,8 @@ export function useKeyboardShortcuts({
         return
       }
 
-      // Cmd+K: clear terminal screen
-      if (isMeta && e.key === 'k') {
+      // Cmd+K: clear terminal screen (skip if typing — Cmd+K kills to line start in text fields)
+      if (isMeta && e.key === 'k' && !inTextField) {
         e.preventDefault()
         if (activeProjectId) {
           const activeSessionId = getActiveSessionForProject(activeProjectId)
@@ -211,15 +222,15 @@ export function useKeyboardShortcuts({
         return
       }
 
-      // Cmd+Left: previous tab
-      if (isMeta && e.key === 'ArrowLeft') {
+      // Cmd+Left: previous tab (skip if typing — Cmd+Left/Right navigates within text)
+      if (isMeta && e.key === 'ArrowLeft' && !inTextField) {
         e.preventDefault()
         if (activeProjectId) cycleTab(activeProjectId, -1)
         return
       }
 
-      // Cmd+Right: next tab
-      if (isMeta && e.key === 'ArrowRight') {
+      // Cmd+Right: next tab (skip if typing)
+      if (isMeta && e.key === 'ArrowRight' && !inTextField) {
         e.preventDefault()
         if (activeProjectId) cycleTab(activeProjectId, 1)
         return
@@ -249,5 +260,6 @@ export function useKeyboardShortcuts({
     onOpenSettings,
     onToggleLog,
     onOpenCommandPalette,
+    onToggleOverview,
   ])
 }

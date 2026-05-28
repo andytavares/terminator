@@ -1,3 +1,7 @@
+export function toDisplayName(slug: string): string {
+  return slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 const TAG_PROJECT = /@(\S+)/g
 const TAG_CONTEXT = /\+(\S+)/g
 const TAG_AREA = /#(\S+)/g
@@ -30,20 +34,20 @@ export function extractTags(raw: string): ExtractedTags {
     terminatorLinks.push(tlMatch[1].toLowerCase())
   }
 
-  // Extract @project (first occurrence) — underscores represent spaces in multi-word names
+  // Extract @project (first occurrence)
   TAG_PROJECT.lastIndex = 0
   const projMatch = TAG_PROJECT.exec(raw)
-  if (projMatch) project = projMatch[1].replace(/-/g, ' ')
+  if (projMatch) project = toDisplayName(projMatch[1])
 
   // Extract +context (first occurrence)
   TAG_CONTEXT.lastIndex = 0
   const ctxMatch = TAG_CONTEXT.exec(raw)
-  if (ctxMatch) context = ctxMatch[1].replace(/-/g, ' ')
+  if (ctxMatch) context = toDisplayName(ctxMatch[1])
 
   // Extract #area (first occurrence)
   TAG_AREA.lastIndex = 0
   const areaMatch = TAG_AREA.exec(raw)
-  if (areaMatch) area = areaMatch[1].replace(/-/g, ' ')
+  if (areaMatch) area = toDisplayName(areaMatch[1])
 
   // Extract key:value metadata (including due:)
   TAG_META.lastIndex = 0

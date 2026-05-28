@@ -12,9 +12,14 @@ function resetStore() {
   useExtensionRegistry.setState({
     sidebarPanels: new Map(),
     projectTabs: new Map(),
+    globalTabs: new Map(),
     keyboardShortcuts: [],
+    commands: [],
+    overlays: [],
     openPanels: new Set(),
     activeProjectTabId: null,
+    activeGlobalTabId: null,
+    pendingNavigations: new Map(),
   })
 }
 
@@ -194,6 +199,76 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().commands.some((c) => c.id === 'test2')).toBe(false)
     })
   })
+
+  describe('updateCommand', () => {
+    it('updates label and shortcut of an existing command', () => {
+      const cmd = { id: 'upd', label: 'Old', action: () => {} }
+      useExtensionRegistry.getState().registerCommand(cmd)
+      useExtensionRegistry.getState().updateCommand('upd', { label: 'New', shortcut: '⌘K' })
+      const updated = useExtensionRegistry.getState().commands.find((c) => c.id === 'upd')
+      expect(updated?.label).toBe('New')
+      expect(updated?.shortcut).toBe('⌘K')
+    })
+
+    it('does nothing when command id does not exist', () => {
+      useExtensionRegistry.getState().updateCommand('nonexistent', { label: 'X' })
+      expect(useExtensionRegistry.getState().commands).toHaveLength(0)
+    })
+  })
+
+  describe('updateGlobalTab', () => {
+    it('updates badge on an existing global tab', () => {
+      const tab = { id: 'tv', label: 'Task Vault', component: NullComponent }
+      useExtensionRegistry.getState().registerGlobalTab(tab)
+      useExtensionRegistry.getState().updateGlobalTab('tv', { badge: 5 })
+      expect(useExtensionRegistry.getState().globalTabs.get('tv')?.badge).toBe(5)
+    })
+
+    it('does nothing when tab id does not exist', () => {
+      useExtensionRegistry.getState().updateGlobalTab('missing', { badge: 3 })
+      expect(useExtensionRegistry.getState().globalTabs.size).toBe(0)
+    })
+  })
+
+  describe('registerOverlay', () => {
+    it('adds component to overlays array', () => {
+      useExtensionRegistry.getState().registerOverlay(NullComponent)
+      expect(useExtensionRegistry.getState().overlays).toHaveLength(1)
+    })
+
+    it('returns dispose function that removes the overlay', () => {
+      const dispose = useExtensionRegistry.getState().registerOverlay(NullComponent)
+      dispose()
+      expect(useExtensionRegistry.getState().overlays).toHaveLength(0)
+    })
+  })
+
+  describe('setActiveGlobalTabWithNavigation', () => {
+    it('sets activeGlobalTabId and stores navigation data', () => {
+      useExtensionRegistry
+        .getState()
+        .setActiveGlobalTabWithNavigation('task-vault', { taskId: '123' })
+      const state = useExtensionRegistry.getState()
+      expect(state.activeGlobalTabId).toBe('task-vault')
+      expect(state.activeProjectTabId).toBeNull()
+      expect(state.pendingNavigations.get('task-vault')).toEqual({ taskId: '123' })
+    })
+  })
+
+  describe('clearPendingNavigation', () => {
+    it('removes pending navigation for the given extension', () => {
+      useExtensionRegistry
+        .getState()
+        .setActiveGlobalTabWithNavigation('task-vault', { taskId: '123' })
+      useExtensionRegistry.getState().clearPendingNavigation('task-vault')
+      expect(useExtensionRegistry.getState().pendingNavigations.has('task-vault')).toBe(false)
+    })
+
+    it('does nothing when no pending navigation exists for the extension', () => {
+      useExtensionRegistry.getState().clearPendingNavigation('nonexistent')
+      expect(useExtensionRegistry.getState().pendingNavigations.size).toBe(0)
+    })
+  })
 })
 
 // ─── matchesAccelerator ────────────────────────────────────────────────────────
@@ -248,5 +323,15 @@ describe('matchesAccelerator', () => {
   it('is case-insensitive for key comparison', () => {
     const event = makeEvent({ key: 'G', ctrlKey: true, shiftKey: true })
     expect(matchesAccelerator(event, 'CmdOrCtrl+Shift+G')).toBe(true)
+  })
+
+  it('matches CommandOrControl+Shift+T format (Electron full name)', () => {
+    const event = makeEvent({ key: 'T', metaKey: true, shiftKey: true })
+    expect(matchesAccelerator(event, 'CommandOrControl+Shift+T')).toBe(true)
+  })
+
+  it('does not match CommandOrControl+Shift+T when shift is not held', () => {
+    const event = makeEvent({ key: 't', metaKey: true })
+    expect(matchesAccelerator(event, 'CommandOrControl+Shift+T')).toBe(false)
   })
 })

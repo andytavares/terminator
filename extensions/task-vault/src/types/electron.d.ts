@@ -21,8 +21,6 @@ export type TaskVaultGetTodayResponse =
   | {
       date: string
       tasks: IndexedTask[]
-      events: Array<{ time?: string; text: string }>
-      notes: Array<{ text: string }>
       exists: boolean
     }
   | { error: string }

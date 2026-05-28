@@ -15,20 +15,20 @@ describe('extractTags', () => {
 
   it('extracts @project tag and removes it from text', () => {
     const result = extractTags('Fix bug @my-project')
-    expect(result.project).toBe('my project')
+    expect(result.project).toBe('My Project')
     expect(result.text).not.toContain('@my-project')
     expect(result.text.trim()).toBe('Fix bug')
   })
 
   it('extracts +context tag and removes it from text', () => {
     const result = extractTags('Call client +phone')
-    expect(result.context).toBe('phone')
+    expect(result.context).toBe('Phone')
     expect(result.text).not.toContain('+phone')
   })
 
   it('extracts #area tag and removes it from text', () => {
     const result = extractTags('Write report #work')
-    expect(result.area).toBe('work')
+    expect(result.area).toBe('Work')
     expect(result.text).not.toContain('#work')
   })
 
@@ -75,9 +75,9 @@ describe('extractTags', () => {
     const uuid = '550e8400-e29b-41d4-a716-446655440000'
     const raw = `Review report @my-project +office #work due:2026-07-01 priority:low terminator:${uuid}`
     const result = extractTags(raw)
-    expect(result.project).toBe('my project')
-    expect(result.context).toBe('office')
-    expect(result.area).toBe('work')
+    expect(result.project).toBe('My Project')
+    expect(result.context).toBe('Office')
+    expect(result.area).toBe('Work')
     expect(result.dueDate).toBe('2026-07-01')
     expect(result.metadata['priority']).toBe('low')
     expect(result.terminatorLinks).toContain(uuid)
@@ -86,19 +86,18 @@ describe('extractTags', () => {
 
   it('only takes first @project occurrence', () => {
     const result = extractTags('Task @proj-one @proj-two')
-    expect(result.project).toBe('proj one')
-    // Only first match is used
-    expect(result.project).not.toBe('proj two')
+    expect(result.project).toBe('Proj One')
+    expect(result.project).not.toBe('Proj Two')
   })
 
   it('only takes first +context occurrence', () => {
     const result = extractTags('Task +ctx-a +ctx-b')
-    expect(result.context).toBe('ctx a')
+    expect(result.context).toBe('Ctx A')
   })
 
   it('only takes first #area occurrence', () => {
     const result = extractTags('Task #area-one #area-two')
-    expect(result.area).toBe('area one')
+    expect(result.area).toBe('Area One')
   })
 
   it('handles raw text with no tags, returns clean text', () => {

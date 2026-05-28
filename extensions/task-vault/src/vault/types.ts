@@ -11,6 +11,7 @@ export interface KanbanLane {
   id: string
   label: string
   taskStatuses: TaskStatus[]
+  dotColor?: string
 }
 
 export type SwimlaneGrouping = 'none' | 'project' | 'area'
@@ -50,21 +51,10 @@ export interface Task {
   subtasks?: Task[]
 }
 
-export interface Event {
-  time?: string
-  text: string
-}
-
-export interface Note {
-  text: string
-}
-
 export interface DailyLog {
   date: string
   filePath: string
   tasks: Task[]
-  events: Event[]
-  notes: Note[]
   exists: boolean
 }
 
@@ -110,6 +100,13 @@ export interface IndexedTask {
   subtasks?: IndexedTask[]
   blockedReason?: string
   blockedCheckInterval?: string
+  recurrenceInterval?: string
+  recurrenceDays?: number[]
+  recurrenceTime?: string
+  recurrenceEndType?: 'none' | 'on_date' | 'after_count'
+  recurrenceEndDate?: string
+  recurrenceEndCount?: number
+  recurrenceCompletedCount?: number
 }
 
 export interface IndexedProject {

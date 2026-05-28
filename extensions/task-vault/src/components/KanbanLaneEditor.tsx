@@ -64,6 +64,10 @@ export function KanbanLaneEditor({ lanes, onSave, onClose }: KanbanLaneEditorPro
     setDraft((prev) => prev.filter((_, i) => i !== index))
   }
 
+  function updateDotColor(index: number, dotColor: string | undefined) {
+    setDraft((prev) => prev.map((l, i) => (i === index ? { ...l, dotColor } : l)))
+  }
+
   function addLane() {
     const label = newLabel.trim()
     if (!label) return
@@ -158,6 +162,25 @@ export function KanbanLaneEditor({ lanes, onSave, onClose }: KanbanLaneEditorPro
                       </label>
                     )
                   })}
+                </div>
+                <div className="tv-lane-editor__color-row">
+                  <span className="tv-lane-editor__statuses-label">Dot color:</span>
+                  <input
+                    type="color"
+                    className="tv-lane-editor__color-input"
+                    value={lane.dotColor ?? '#6366f1'}
+                    onChange={(e) => updateDotColor(i, e.target.value)}
+                    title="Calendar dot color"
+                  />
+                  {lane.dotColor && (
+                    <button
+                      className="tv-btn tv-btn--ghost tv-btn--xs"
+                      onClick={() => updateDotColor(i, undefined)}
+                      title="Reset to default"
+                    >
+                      Reset
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

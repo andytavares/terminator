@@ -1,3 +1,4 @@
+import { BrowserWindow } from 'electron'
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import { registerVaultIpcHandlers, setVaultPath } from './ipc/vault.ipc.js'
 import {
@@ -28,7 +29,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
           type: 'string',
           label: 'Capture Hotkey',
           description: 'Global shortcut to open the quick capture overlay',
-          default: 'CommandOrControl+Shift+Space',
+          default: 'CommandOrControl+Shift+T',
         },
         'terminator.task-vault.staleThresholdDays': {
           type: 'number',
@@ -133,7 +134,11 @@ function scheduleWeeklyReviewNudge(api: ExtensionAPI, reviewDay: number): void {
 }
 
 function openCaptureOverlay(_api: ExtensionAPI): void {
-  // Implemented in renderer; main-side just signals renderer
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.isDestroyed()) continue
+    win.show()
+    win.webContents.send('task-vault:push:open-capture')
+  }
 }
 
 export async function deactivate(): Promise<void> {

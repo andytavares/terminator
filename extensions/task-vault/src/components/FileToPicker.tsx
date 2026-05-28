@@ -8,23 +8,26 @@ interface AreaData {
 }
 
 interface DestOption {
-  kind: 'project' | 'area'
+  kind: 'project' | 'area' | 'create-project' | 'create-area'
   label: string
   sublabel?: string
   filePath: string
+  createName?: string
 }
 
 export function FileToPicker({
   prefilledQuery,
   onSelect,
+  onSelectNew,
   onClose,
 }: {
   prefilledQuery: string
   onSelect: (filePath: string) => void
+  onSelectNew?: (kind: 'project' | 'area', name: string) => void
   onClose: () => void
 }): React.JSX.Element {
   const [query, setQuery] = useState(prefilledQuery)
-  const [options, setOptions] = useState<DestOption[]>([])
+  const [baseOptions, setBaseOptions] = useState<DestOption[]>([])
   const [loading, setLoading] = useState(true)
   const [highlighted, setHighlighted] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -45,16 +48,16 @@ export function FileToPicker({
               kind: 'project',
               label: p.name,
               sublabel: p.area ? `#${p.area}` : undefined,
-              filePath: p.filePath,
+              filePath: `projects/${p.name}.md`,
             })
           }
         }
         if (areaResult && typeof areaResult === 'object' && 'areas' in areaResult) {
           for (const a of (areaResult as { areas: AreaData[] }).areas) {
-            opts.push({ kind: 'area', label: a.name, filePath: a.filePath })
+            opts.push({ kind: 'area', label: a.name, filePath: `areas/${a.name}.md` })
           }
         }
-        setOptions(opts)
+        setBaseOptions(opts)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -64,10 +67,41 @@ export function FileToPicker({
     setHighlighted(0)
   }, [query])
 
-  const q = query.toLowerCase().replace(/^[@#]/, '')
-  const filtered = options.filter(
+  const q = query.trim().toLowerCase().replace(/^[@#]/, '')
+  const filtered: DestOption[] = baseOptions.filter(
     (o) => !q || o.label.toLowerCase().includes(q) || (o.sublabel ?? '').toLowerCase().includes(q)
   )
+
+  if (onSelectNew && q.length > 0) {
+    const exactProject = baseOptions.some(
+      (o) => o.kind === 'project' && o.label.toLowerCase() === q
+    )
+    const exactArea = baseOptions.some((o) => o.kind === 'area' && o.label.toLowerCase() === q)
+    if (!exactProject) {
+      filtered.push({
+        kind: 'create-project',
+        label: `Create project "${query.trim()}"`,
+        filePath: '',
+        createName: query.trim(),
+      })
+    }
+    if (!exactArea) {
+      filtered.push({
+        kind: 'create-area',
+        label: `Create area "${query.trim()}"`,
+        filePath: '',
+        createName: query.trim(),
+      })
+    }
+  }
+
+  function select(opt: DestOption) {
+    if (opt.kind === 'create-project' || opt.kind === 'create-area') {
+      onSelectNew?.(opt.kind === 'create-project' ? 'project' : 'area', opt.createName!)
+    } else {
+      onSelect(opt.filePath)
+    }
+  }
 
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown') {
@@ -78,7 +112,7 @@ export function FileToPicker({
       setHighlighted((h) => Math.max(h - 1, 0))
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      if (filtered[highlighted]) onSelect(filtered[highlighted].filePath)
+      if (filtered[highlighted]) select(filtered[highlighted])
     } else if (e.key === 'Escape') {
       onClose()
     }
@@ -91,7 +125,7 @@ export function FileToPicker({
           ref={inputRef}
           className="file-to-picker__search"
           type="text"
-          placeholder="Search projects & areas…"
+          placeholder="Search or create project / area…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
@@ -103,21 +137,39 @@ export function FileToPicker({
       {loading ? (
         <div className="file-to-picker__loading">Loading…</div>
       ) : filtered.length === 0 ? (
-        <div className="file-to-picker__empty">No matches.</div>
+        <div className="file-to-picker__empty">Type to search or create…</div>
       ) : (
         <ul className="file-to-picker__list">
           {filtered.map((opt, i) => (
             <li
-              key={opt.filePath}
-              className={`file-to-picker__option${i === highlighted ? ' file-to-picker__option--highlighted' : ''}`}
+              key={
+                opt.kind === 'create-project' || opt.kind === 'create-area'
+                  ? `${opt.kind}-${opt.createName}`
+                  : opt.filePath
+              }
+              className={[
+                'file-to-picker__option',
+                i === highlighted ? 'file-to-picker__option--highlighted' : '',
+                opt.kind === 'create-project' || opt.kind === 'create-area'
+                  ? 'file-to-picker__option--create'
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
               onMouseDown={(e) => {
                 e.preventDefault()
-                onSelect(opt.filePath)
+                select(opt)
               }}
               onMouseEnter={() => setHighlighted(i)}
             >
-              <span className={`file-to-picker__kind file-to-picker__kind--${opt.kind}`}>
-                {opt.kind === 'project' ? '@' : '#'}
+              <span
+                className={`file-to-picker__kind file-to-picker__kind--${opt.kind === 'create-project' ? 'project' : opt.kind === 'create-area' ? 'area' : opt.kind}`}
+              >
+                {opt.kind === 'project' || opt.kind === 'create-project'
+                  ? '@'
+                  : opt.kind === 'area' || opt.kind === 'create-area'
+                    ? '#'
+                    : ''}
               </span>
               <span className="file-to-picker__label">{opt.label}</span>
               {opt.sublabel && <span className="file-to-picker__sublabel">{opt.sublabel}</span>}

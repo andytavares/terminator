@@ -44,6 +44,7 @@ vi.mock('xterm', () => {
     open: vi.fn(),
     focus: vi.fn(),
     write: vi.fn(),
+    paste: vi.fn(),
     dispose: vi.fn(),
     scrollToBottom: vi.fn(),
     buffer: makeMockBuffer(24, 80),
@@ -110,13 +111,13 @@ describe('TerminalInstance', () => {
     expect(() => new TerminalInstance('ses-1', 1000)).not.toThrow()
   })
 
-  it('sends \\n when Cmd+Enter is pressed via custom key handler', () => {
+  it('pastes \\n when Cmd+Enter is pressed via custom key handler', () => {
     new TerminalInstance('ses-1', 1000)
     const instance = vi.mocked(Terminal).mock.results[0].value
     const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
     const result = handler({ metaKey: true, ctrlKey: false, key: 'Enter', type: 'keydown' })
     expect(result).toBe(false)
-    expect(mockInput).toHaveBeenCalledWith('ses-1', '\n')
+    expect(instance.paste).toHaveBeenCalledWith('\n')
   })
 
   it('does not intercept non-Cmd+Enter keys', () => {

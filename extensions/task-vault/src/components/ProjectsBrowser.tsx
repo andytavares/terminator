@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Zap, Pencil, Check, X, Trash2 } from 'lucide-react'
+import { Zap, Pencil, Check, X, Trash2, Archive } from 'lucide-react'
 import type { IndexedProject, IndexedTask } from '../vault/types'
 import { useVaultStore } from '../stores/vault.store'
+import { SmartTaskInput } from './SmartTaskInput'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 
@@ -158,7 +159,7 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
   if (activeSessions.length === 0)
     return (
       <span className="projects-browser__link-picker">
-        <span style={{ fontSize: 11, color: 'var(--tm-text-muted)' }}>No active sessions</span>
+        <span className="tv-text-muted-sm">No active sessions</span>
         <button className="tv-btn tv-btn--icon" onClick={() => setLinking(false)}>
           <X size={14} />
         </button>
@@ -289,6 +290,7 @@ function CreateProjectForm({ onCreated, onCancel }: CreateProjectFormProps): Rea
 }
 
 function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.Element {
+  const tickCalendar = useVaultStore((s) => s.tickCalendar)
   const [tasks, setTasks] = useState<IndexedTask[]>([])
   const [expanded, setExpanded] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -316,22 +318,26 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
   async function handleComplete(taskId: string) {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', { taskId })
     await load()
+    tickCalendar()
   }
 
   async function handleCancel(taskId: string) {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:cancel-task', { taskId })
     await load()
+    tickCalendar()
   }
 
   async function handleRestore(taskId: string) {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:restore-task', { taskId })
     await load()
+    tickCalendar()
   }
 
   async function handleDelete(taskId: string, text: string) {
     if (!confirm(`Delete task: "${text}"?`)) return
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-task', { taskId })
     await load()
+    tickCalendar()
   }
 
   async function handleSaveEdit(taskId: string) {
@@ -342,6 +348,7 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
     })
     setEditingId(null)
     await load()
+    tickCalendar()
   }
 
   function startEdit(t: IndexedTask) {
@@ -358,12 +365,19 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
     if (!addingText.trim()) return
     setAdding(true)
     try {
+      const slug = projectName.replace(/ /g, '-')
+      const text = addingText.trim()
+      // Only append the tag if the text doesn't already reference this project
+      const taggedText = text.toLowerCase().includes(`@${slug.toLowerCase()}`)
+        ? text
+        : `${text} @${slug}`
       await window.electronAPI.extensionBridge.invoke('task-vault:vault:add-task', {
         filePath: `projects/${projectName}.md`,
-        text: addingText.trim() + ` @${projectName}`,
+        text: taggedText,
       })
       setAddingText('')
       await load()
+      tickCalendar()
     } finally {
       setAdding(false)
     }
@@ -371,7 +385,10 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
 
   if (!expanded) {
     return (
-      <button className="projects-browser__tasks-toggle" onClick={toggle}>
+      <button
+        className="tv-btn tv-btn--ghost tv-btn--xs projects-browser__tasks-toggle"
+        onClick={toggle}
+      >
         {loaded
           ? `${tasks.length} task${tasks.length !== 1 ? 's' : ''} tagged @${projectName}`
           : `Show tasks tagged @${projectName}`}
@@ -403,14 +420,10 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
       </div>
 
       <div className="projects-browser__add-task-row">
-        <input
-          type="text"
-          className="projects-browser__add-task-input"
+        <SmartTaskInput
           value={addingText}
-          onChange={(e) => setAddingText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void handleAddTask()
-          }}
+          onChange={setAddingText}
+          onSubmit={() => void handleAddTask()}
           placeholder={`Add task to @${projectName}…`}
           disabled={adding}
         />
@@ -439,14 +452,11 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
           </button>
           {editingId === t.id ? (
             <span className="projects-browser__task-edit">
-              <input
-                type="text"
+              <SmartTaskInput
                 value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleSaveEdit(t.id)
-                  if (e.key === 'Escape') setEditingId(null)
-                }}
+                onChange={setEditText}
+                onSubmit={() => void handleSaveEdit(t.id)}
+                onCancel={() => setEditingId(null)}
                 autoFocus
               />
               <button className="tv-btn tv-btn--primary" onClick={() => void handleSaveEdit(t.id)}>
@@ -569,15 +579,15 @@ function ProjectAreaBadge({
     return (
       <span className="projects-browser__area-edit">
         <AreaCombobox value={areaValue} onChange={setAreaValue} existingAreas={existingAreas} />
-        <button className="tv-btn tv-btn--primary" onClick={save} title="Save area">
-          <Check size={14} />
-        </button>
         <button
-          className="tv-btn tv-btn--secondary"
-          onClick={() => setEditing(false)}
-          title="Cancel"
+          className="tv-btn tv-btn--icon tv-btn--accent-active"
+          onClick={() => void save()}
+          title="Save area"
         >
-          <X size={14} />
+          <Check size={13} />
+        </button>
+        <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)} title="Cancel">
+          <X size={13} />
         </button>
       </span>
     )
@@ -594,7 +604,11 @@ function ProjectAreaBadge({
         >
           #{project.area}
         </span>
-        <button className="projects-browser__area-edit-btn" onClick={openEdit} title="Change area">
+        <button
+          className="projects-browser__area-edit-btn"
+          onClick={() => void openEdit()}
+          title="Change area"
+        >
           <Pencil size={14} />
         </button>
       </span>
@@ -602,7 +616,11 @@ function ProjectAreaBadge({
   }
 
   return (
-    <button className="projects-browser__area-assign-btn" onClick={openEdit} title="Assign to area">
+    <button
+      className="projects-browser__area-assign-btn"
+      onClick={() => void openEdit()}
+      title="Assign to area"
+    >
       + area
     </button>
   )
@@ -611,13 +629,13 @@ function ProjectAreaBadge({
 export function ProjectsBrowser(): React.JSX.Element {
   const [projects, setProjects] = useState<IndexedProject[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<'active' | 'someday' | 'all'>('active')
+  const [statusFilter, setStatusFilter] = useState<'active' | 'archived' | 'all'>('active')
   const [showCreateForm, setShowCreateForm] = useState(false)
   const { selectedProjectName } = useVaultStore()
 
   async function load() {
     setIsLoading(true)
-    const status = statusFilter === 'all' ? ['active', 'someday'] : [statusFilter]
+    const status = statusFilter === 'all' ? ['active', 'someday', 'archived'] : [statusFilter]
     const result = await window.electronAPI.extensionBridge.invoke('task-vault:projects:list', {
       status,
     })
@@ -654,7 +672,7 @@ export function ProjectsBrowser(): React.JSX.Element {
       <div className="projects-browser__header">
         <h2>Projects</h2>
         <div className="projects-browser__filter">
-          {(['active', 'someday', 'all'] as const).map((f) => (
+          {(['active', 'archived', 'all'] as const).map((f) => (
             <button
               key={f}
               className={`projects-browser__filter-btn${statusFilter === f ? ' projects-browser__filter-btn--active' : ''}`}
@@ -692,6 +710,9 @@ export function ProjectsBrowser(): React.JSX.Element {
         >
           <div className="projects-browser__card-header">
             <span className="projects-browser__name">{project.name}</span>
+            {project.status === 'archived' && (
+              <span className="projects-browser__archived-badge">archived</span>
+            )}
             {project.status === 'someday' && (
               <span className="projects-browser__someday-badge">someday</span>
             )}
@@ -707,50 +728,39 @@ export function ProjectsBrowser(): React.JSX.Element {
             <LinkToTerminator filePath={project.filePath} />
           </div>
           <ProjectTaskList projectName={project.name} />
-          {project.isStale && (
+          {project.isStale && project.status === 'active' && (
             <div className="projects-browser__stale-info">
               <span className="projects-browser__stale-badge">
                 {project.nextActionCount === 0 ? 'no next action' : 'inactive'}
               </span>
-              <div className="projects-browser__stale-actions">
-                <button
-                  className="projects-browser__action-btn"
-                  onClick={() => handleUpdateStatus(project.filePath, 'someday')}
-                >
-                  Move to Someday
-                </button>
-                <button
-                  className="projects-browser__action-btn projects-browser__action-btn--danger"
-                  onClick={() => handleUpdateStatus(project.filePath, 'archived')}
-                >
-                  Archive
-                </button>
-              </div>
             </div>
           )}
           {project.status === 'someday' && (
             <div className="projects-browser__stale-actions">
               <button
                 className="projects-browser__action-btn"
-                onClick={() => handleUpdateStatus(project.filePath, 'active')}
+                onClick={() => void handleUpdateStatus(project.filePath, 'active')}
               >
                 Promote to active
-              </button>
-              <button
-                className="projects-browser__action-btn projects-browser__action-btn--danger"
-                onClick={() => handleUpdateStatus(project.filePath, 'archived')}
-              >
-                Archive
               </button>
             </div>
           )}
           <div className="projects-browser__footer">
-            <button
-              className="projects-browser__action-btn projects-browser__action-btn--danger"
-              onClick={() => handleDelete(project.filePath, project.name)}
-            >
-              Delete project
-            </button>
+            {project.status !== 'archived' ? (
+              <button
+                className="projects-browser__action-btn projects-browser__action-btn--danger"
+                onClick={() => void handleUpdateStatus(project.filePath, 'archived')}
+              >
+                <Archive size={12} /> Archive project
+              </button>
+            ) : (
+              <button
+                className="projects-browser__action-btn projects-browser__action-btn--danger"
+                onClick={() => void handleDelete(project.filePath, project.name)}
+              >
+                <Trash2 size={12} /> Delete project
+              </button>
+            )}
           </div>
         </div>
       ))}

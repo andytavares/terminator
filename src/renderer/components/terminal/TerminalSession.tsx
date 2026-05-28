@@ -76,8 +76,11 @@ export class TerminalInstance {
     this.element.style.cssText = 'width:100%;height:100%;'
 
     this.terminal.attachCustomKeyEventHandler((e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && e.type === 'keydown') {
-        window.electronAPI.terminal.input(sessionId, '\n')
+      if (e.metaKey && e.key === 'Enter' && e.type === 'keydown') {
+        // terminal.paste() respects bracketed paste mode automatically:
+        // if the running program has enabled it, wraps in \x1b[200~...\x1b[201~
+        // if not, sends the newline raw — correct either way
+        this.terminal.paste('\n')
         return false
       }
       return true
