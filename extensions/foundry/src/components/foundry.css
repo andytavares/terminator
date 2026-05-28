@@ -1,0 +1,760 @@
+/* Foundry extension — uses only --tm-* tokens from the published extension contract */
+
+.fnd-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--tm-bg-surface);
+  color: var(--tm-text-primary);
+  font-size: 13px;
+}
+
+/* ── Header ── */
+.fnd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--tm-border);
+  flex-shrink: 0;
+}
+
+.fnd-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tm-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Status bar ── */
+.fnd-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+  flex-shrink: 0;
+}
+
+.fnd-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.fnd-dot--green {
+  background: var(--tm-success);
+}
+.fnd-dot--amber {
+  background: var(--tm-warning);
+}
+.fnd-dot--red {
+  background: var(--tm-danger);
+}
+
+/* ── Body ── */
+.fnd-body {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 6px;
+}
+
+.fnd-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tm-text-muted);
+  padding: 4px 6px 6px;
+}
+
+/* ── Empty states ── */
+.fnd-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ── Setup banner ── */
+.fnd-setup-banner {
+  margin: 16px 12px;
+  padding: 20px 16px;
+  border: 1px dashed var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  text-align: center;
+}
+
+.fnd-setup-banner p {
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+/* ── Run cards ── */
+.fnd-run-card {
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-xs);
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  background: var(--tm-bg-card);
+}
+
+.fnd-run-card:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+.fnd-run-card--gate {
+  border-color: rgba(250, 204, 21, 0.3);
+}
+
+.fnd-run-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.fnd-run-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tm-text-primary);
+}
+
+.fnd-run-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+/* ── Badges ── */
+.fnd-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fnd-badge--running {
+  background: rgba(92, 107, 192, 0.15);
+  color: var(--tm-accent);
+  border: 1px solid rgba(92, 107, 192, 0.3);
+}
+
+.fnd-badge--gate {
+  background: rgba(250, 204, 21, 0.12);
+  color: var(--tm-warning);
+  border: 1px solid rgba(250, 204, 21, 0.25);
+}
+
+.fnd-badge--done {
+  background: rgba(74, 222, 128, 0.1);
+  color: var(--tm-success);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+}
+
+.fnd-badge--aborted {
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-muted);
+  border: 1px solid var(--tm-border);
+}
+
+.fnd-badge--rejected {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--tm-danger);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.fnd-badge--paused-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--tm-danger);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* ── Run history row hover ── */
+.fnd-run-row:hover {
+  background: var(--tm-bg-card);
+}
+
+/* ── Mode chips (history table) ── */
+.fnd-mode-chip {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fnd-mc-stc {
+  background: rgba(92, 107, 192, 0.15);
+  color: var(--tm-accent);
+  border: 1px solid rgba(92, 107, 192, 0.3);
+}
+
+.fnd-mc-orc {
+  background: rgba(45, 212, 191, 0.12);
+  color: var(--tm-teal, #2dd4bf);
+  border: 1px solid rgba(45, 212, 191, 0.25);
+}
+
+.fnd-mc-cp {
+  background: rgba(96, 165, 250, 0.12);
+  color: var(--tm-blue, #60a5fa);
+  border: 1px solid rgba(96, 165, 250, 0.25);
+}
+
+/* ── Co-pilot file mention chip ── */
+.fnd-file-mention {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: rgba(45, 212, 191, 0.12);
+  color: var(--tm-teal, #2dd4bf);
+  border: 1px solid rgba(45, 212, 191, 0.2);
+  font-family: var(--tm-font-mono);
+  font-size: 0.9em;
+}
+
+/* ── Cursor blink animation ── */
+@keyframes fnd-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ── Buttons ── */
+.fnd-btn {
+  padding: 5px 12px;
+  border-radius: var(--tm-radius-xs);
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-weight: 500;
+}
+
+.fnd-btn--primary {
+  background: var(--tm-accent);
+  color: #fff;
+  border-color: var(--tm-accent);
+}
+
+.fnd-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.fnd-btn--secondary {
+  background: transparent;
+  color: var(--tm-text-secondary);
+  border-color: var(--tm-border);
+}
+
+.fnd-btn--secondary:hover:not(:disabled) {
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-text-primary);
+}
+
+.fnd-btn--danger {
+  background: transparent;
+  color: var(--tm-danger);
+  border-color: rgba(224, 92, 92, 0.35);
+}
+
+.fnd-btn--danger:hover:not(:disabled) {
+  background: rgba(224, 92, 92, 0.08);
+}
+
+.fnd-btn--sm {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.fnd-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── New run dashed button ── */
+.fnd-new-run-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px;
+  padding: 8px;
+  width: calc(100% - 16px);
+  border: 1px dashed var(--tm-border-strong);
+  border-radius: var(--tm-radius-xs);
+  background: none;
+  color: var(--tm-text-muted);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.fnd-new-run-btn:hover {
+  border-color: var(--tm-accent);
+  color: var(--tm-accent);
+}
+
+/* ── Wizard ── */
+.fnd-wizard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.fnd-wizard-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--tm-border);
+  flex-shrink: 0;
+}
+
+.fnd-wizard-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tm-text-primary);
+}
+
+.fnd-wizard-close {
+  background: none;
+  border: none;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 4px;
+  border-radius: var(--tm-radius-xs);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.fnd-wizard-close:hover {
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-text-primary);
+}
+
+.fnd-step-bar {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--tm-border);
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.fnd-step {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+}
+
+.fnd-step--done {
+  color: var(--tm-success);
+}
+.fnd-step--active {
+  color: var(--tm-accent);
+}
+.fnd-step--idle {
+  color: var(--tm-text-muted);
+}
+
+.fnd-step-num {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.fnd-step-line {
+  flex: 1;
+  height: 1px;
+  background: var(--tm-border);
+  margin: 0 6px;
+  min-width: 16px;
+}
+
+.fnd-wizard-body {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+}
+
+.fnd-wizard-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-top: 1px solid var(--tm-border);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.fnd-wizard-footer-hint {
+  font-size: 10px;
+  color: var(--tm-text-muted);
+  flex: 1;
+}
+
+.fnd-wizard-footer-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── Template cards ── */
+.fnd-template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 14px;
+}
+
+.fnd-template-card {
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  padding: 12px;
+  cursor: pointer;
+  background: var(--tm-bg-card);
+}
+
+.fnd-template-card:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+.fnd-template-card--selected {
+  border-color: var(--tm-accent);
+  background: var(--tm-accent-dim);
+}
+
+.fnd-template-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tm-text-primary);
+  margin-bottom: 4px;
+}
+
+.fnd-template-card--selected .fnd-template-name {
+  color: var(--tm-accent);
+}
+
+.fnd-template-desc {
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+  line-height: 1.4;
+}
+
+/* ── Agents.md editor ── */
+.fnd-editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--tm-border);
+  flex-shrink: 0;
+}
+
+.fnd-editor-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--tm-text-muted);
+  flex: 1;
+}
+
+.fnd-editor-select {
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-xs);
+  color: var(--tm-text-primary);
+  font-size: 11px;
+  padding: 3px 6px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.fnd-editor-select:focus {
+  outline: none;
+  border-color: var(--tm-accent);
+}
+
+.fnd-editor-textarea {
+  flex: 1;
+  resize: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--tm-text-secondary);
+  font-family: var(--tm-font-mono);
+}
+
+/* ── Sensors ── */
+.fnd-sensor-card {
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-xs);
+  padding: 10px;
+  margin-bottom: 8px;
+  background: var(--tm-bg-card);
+}
+
+.fnd-sensor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.fnd-sensor-name-input,
+.fnd-sensor-cmd-input {
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-xs);
+  color: var(--tm-text-primary);
+  font-size: 12px;
+  padding: 4px 8px;
+  font-family: var(--tm-font-mono);
+}
+
+.fnd-sensor-name-input {
+  flex: 0 0 80px;
+}
+.fnd-sensor-cmd-input {
+  flex: 1;
+}
+
+.fnd-sensor-name-input:focus,
+.fnd-sensor-cmd-input:focus {
+  outline: none;
+  border-color: var(--tm-accent);
+}
+
+.fnd-sensor-status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.fnd-sensor-status--unchecked {
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-muted);
+  border: 1px solid var(--tm-border);
+}
+.fnd-sensor-status--checking {
+  background: var(--tm-accent-dim);
+  color: var(--tm-accent);
+  border: 1px solid rgba(92, 107, 192, 0.3);
+}
+.fnd-sensor-status--pass {
+  background: rgba(74, 222, 128, 0.1);
+  color: var(--tm-success);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+}
+.fnd-sensor-status--fail {
+  background: rgba(224, 92, 92, 0.08);
+  color: var(--tm-danger);
+  border: 1px solid rgba(224, 92, 92, 0.25);
+}
+
+.fnd-add-sensor-btn {
+  width: 100%;
+  border: 1px dashed var(--tm-border-strong);
+  border-radius: var(--tm-radius-xs);
+  padding: 7px 10px;
+  font-size: 12px;
+  color: var(--tm-text-muted);
+  cursor: pointer;
+  background: none;
+  font-family: inherit;
+  text-align: center;
+}
+
+.fnd-add-sensor-btn:hover {
+  border-color: var(--tm-accent);
+  color: var(--tm-accent);
+}
+
+/* ── Provider list ── */
+.fnd-provider-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-xs);
+  margin-bottom: 6px;
+  background: var(--tm-bg-card);
+  cursor: pointer;
+}
+
+.fnd-provider-option:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+.fnd-provider-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--tm-text-primary);
+}
+
+.fnd-provider-note {
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.fnd-radio {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-input);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fnd-radio--checked {
+  border-color: var(--tm-accent);
+  background: var(--tm-accent-dim);
+}
+
+.fnd-radio-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tm-accent);
+}
+
+/* ── Done state ── */
+.fnd-done {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  gap: 8px;
+}
+
+.fnd-done-icon {
+  font-size: 28px;
+  color: var(--tm-success);
+  margin-bottom: 4px;
+}
+
+.fnd-done-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tm-text-primary);
+}
+
+.fnd-done-sub {
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+/* ── Error bar ── */
+.fnd-error-bar {
+  padding: 6px 12px;
+  background: rgba(224, 92, 92, 0.08);
+  color: var(--tm-danger);
+  font-size: 11px;
+  border-top: 1px solid rgba(224, 92, 92, 0.2);
+}
+
+/* ── Hint text ── */
+.fnd-hint {
+  font-size: 11px;
+  color: var(--tm-text-muted);
+  line-height: 1.5;
+  margin-top: 10px;
+}
+
+/* ── Run console log ── */
+.fnd-log {
+  flex: 1;
+  overflow: auto;
+  font-family: 'IBM Plex Mono', 'Menlo', 'Consolas', monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+  padding: 8px 12px;
+  background: var(--tm-bg-surface);
+}
+
+.fnd-log-line {
+  display: flex;
+  gap: 8px;
+  padding: 1px 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.fnd-log-ts {
+  color: var(--tm-text-muted);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.fnd-log-msg {
+  flex: 1;
+}
+
+.fnd-log-line--system .fnd-log-msg {
+  color: var(--tm-text-secondary);
+}
+.fnd-log-line--agent .fnd-log-msg {
+  color: var(--tm-text-primary);
+}
+.fnd-log-line--file .fnd-log-msg {
+  color: var(--tm-warning);
+}
+.fnd-log-line--sensor .fnd-log-msg {
+  color: var(--tm-accent);
+}
+.fnd-log-line--ok .fnd-log-msg {
+  color: var(--tm-success);
+}
+.fnd-log-line--error .fnd-log-msg {
+  color: var(--tm-danger);
+}

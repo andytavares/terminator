@@ -1,0 +1,2786 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Foundry — Screen Renderings</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg: #080809;
+        --surface: #0d0d0f;
+        --surface2: #0f0f12;
+        --surface3: #0a0a0c;
+        --border: #1e1e22;
+        --border2: #2a2a2e;
+        --text-primary: #c9c9cc;
+        --text-secondary: #8b8b90;
+        --text-muted: #6a6a70;
+        --text-dim: #4a4a50;
+        --text-faint: #3a3a3e;
+        --text-ghost: #2a2a2e;
+        --accent: #a78bfa;
+        --accent-bg: #a78bfa22;
+        --accent-border: #a78bfa55;
+        --green: #22c55e;
+        --green-bg: #22c55e22;
+        --green-border: #22c55e55;
+        --amber: #f59e0b;
+        --amber-bg: #f59e0b22;
+        --amber-border: #f59e0b55;
+        --red: #ef4444;
+        --red-bg: #ef444408;
+        --red-border: #ef444422;
+        --teal: #34d399;
+        --teal-bg: #34d39922;
+        --blue: #60a5fa;
+        --blue-bg: #60a5fa22;
+        --mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      }
+      body {
+        background: #050506;
+        color: var(--text-primary);
+        font-family: var(--mono);
+        font-size: 12px;
+        padding: 32px 24px;
+        line-height: 1.5;
+      }
+      .page-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--accent);
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .page-subtitle {
+        font-size: 11px;
+        color: var(--text-dim);
+        margin-bottom: 40px;
+      }
+      .screen-section {
+        margin-bottom: 52px;
+      }
+      .screen-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-dim);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .screen-label::after {
+        content: '';
+        flex: 1;
+        height: 0.5px;
+        background: var(--border);
+      }
+
+      /* ─── shared component atoms ─── */
+      .term {
+        background: var(--surface);
+        border-radius: 10px;
+        border: 0.5px solid var(--border2);
+        overflow: hidden;
+      }
+      .status-badge {
+        font-size: 9px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+      }
+      .s-running {
+        background: var(--accent-bg);
+        color: var(--accent);
+      }
+      .s-gate {
+        background: var(--amber-bg);
+        color: var(--amber);
+      }
+      .s-done {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .s-aborted {
+        background: #4a4a5022;
+        color: var(--text-dim);
+      }
+      .s-wait {
+        background: var(--border);
+        color: var(--text-faint);
+      }
+      .btn {
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-size: 10px;
+        cursor: pointer;
+        font-family: var(--mono);
+        border: 0.5px solid var(--border2);
+        background: #1a1a1e;
+        color: var(--text-secondary);
+      }
+      .btn-accent {
+        background: var(--accent-bg);
+        border-color: var(--accent-border);
+        color: var(--accent);
+      }
+      .btn-green {
+        background: var(--green-bg);
+        border-color: var(--green-border);
+        color: var(--green);
+      }
+      .btn-amber {
+        background: var(--amber-bg);
+        border-color: var(--amber-border);
+        color: var(--amber);
+      }
+      .btn-red {
+        background: var(--red-bg);
+        border-color: var(--red-border);
+        color: var(--red);
+      }
+      .field-label {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-dim);
+        margin-bottom: 4px;
+      }
+      .field-input {
+        background: var(--surface3);
+        border: 0.5px solid var(--border);
+        border-radius: 4px;
+        padding: 5px 8px;
+        font-size: 10px;
+        color: var(--text-primary);
+        font-family: var(--mono);
+        width: 100%;
+      }
+      .section-head {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--text-faint);
+        padding: 2px 3px 6px;
+      }
+      .panel-title {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--text-dim);
+      }
+      .diff-add {
+        color: var(--green);
+      }
+      .diff-del {
+        color: var(--red);
+      }
+      .diff-ctx {
+        color: var(--text-ghost);
+      }
+      .diff-hunk {
+        color: var(--text-faint);
+        margin: 3px 0;
+      }
+      .toggle {
+        width: 28px;
+        height: 15px;
+        border-radius: 8px;
+        background: #1e1e22;
+        border: 0.5px solid var(--border2);
+        position: relative;
+        cursor: pointer;
+        flex-shrink: 0;
+        display: inline-block;
+      }
+      .toggle.on {
+        background: var(--accent-bg);
+        border-color: var(--accent-border);
+      }
+      .toggle::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #3a3a3e;
+      }
+      .toggle.on::after {
+        left: 15px;
+        background: var(--accent);
+      }
+
+      /* ─── rail ─── */
+      .rail {
+        width: 44px;
+        background: #0a0a0c;
+        border-right: 0.5px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 8px 0;
+        gap: 2px;
+        flex-shrink: 0;
+      }
+      .rail-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: var(--text-dim);
+        font-size: 16px;
+      }
+      .rail-icon.active {
+        background: #1a1a1e;
+        color: var(--accent);
+      }
+      .rail-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--accent);
+        margin-top: auto;
+        margin-bottom: 8px;
+      }
+
+      /* ─── sidebar ─── */
+      .sidebar {
+        width: 192px;
+        background: var(--surface2);
+        border-right: 0.5px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+      }
+      .sidebar-header {
+        padding: 8px 10px;
+        border-bottom: 0.5px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .sidebar-title {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+      }
+      .ws-item {
+        padding: 5px 10px;
+        font-size: 12px;
+        color: var(--text-muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .ws-item.active {
+        color: var(--text-primary);
+        background: #1a1a1e;
+      }
+      .ws-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .proj {
+        padding: 3px 10px 3px 26px;
+        font-size: 11px;
+        color: var(--text-faint);
+        cursor: pointer;
+      }
+      .proj.active {
+        color: var(--accent);
+      }
+
+      /* ─── main content ─── */
+      .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .tabbar {
+        height: 34px;
+        background: #0a0a0c;
+        border-bottom: 0.5px solid var(--border);
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
+        gap: 2px;
+      }
+      .tab {
+        height: 26px;
+        padding: 0 12px;
+        border-radius: 4px;
+        font-size: 11px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        color: var(--text-muted);
+        white-space: nowrap;
+      }
+      .tab.active {
+        background: #1a1a1e;
+        color: var(--text-primary);
+      }
+      .tab-badge {
+        background: var(--accent-bg);
+        color: var(--accent);
+        font-size: 9px;
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+      .content {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+      }
+      .terminal-area {
+        flex: 1;
+        padding: 12px;
+        font-size: 11px;
+        line-height: 1.6;
+        color: var(--text-secondary);
+        min-width: 0;
+      }
+      .term-prompt {
+        color: var(--accent);
+      }
+      .term-cmd {
+        color: var(--text-primary);
+      }
+
+      /* ─── right panel / run panel ─── */
+      .right-panel {
+        width: 268px;
+        border-left: 0.5px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        background: var(--surface);
+        flex-shrink: 0;
+      }
+      .panel-header {
+        padding: 8px 10px;
+        border-bottom: 0.5px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .harness-bar {
+        padding: 6px 10px;
+        border-bottom: 0.5px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10px;
+      }
+      .run-list {
+        flex: 1;
+        overflow: auto;
+        padding: 6px;
+      }
+      .run-card {
+        border: 0.5px solid var(--border);
+        border-radius: 5px;
+        padding: 8px 9px;
+        margin-bottom: 5px;
+        cursor: pointer;
+        background: var(--surface3);
+      }
+      .run-card:hover {
+        background: #131316;
+        border-color: var(--border2);
+      }
+      .run-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 4px;
+      }
+      .run-name {
+        font-size: 11px;
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      .run-meta {
+        font-size: 10px;
+        color: var(--text-faint);
+        display: flex;
+        gap: 8px;
+      }
+      .run-bar {
+        height: 3px;
+        background: #1a1a1e;
+        border-radius: 2px;
+        margin-top: 6px;
+        overflow: hidden;
+      }
+      .run-bar-fill {
+        height: 3px;
+        background: var(--accent);
+        border-radius: 2px;
+      }
+      .new-run-btn {
+        margin: 8px;
+        padding: 7px;
+        border-radius: 5px;
+        background: none;
+        border: 0.5px dashed var(--border2);
+        color: var(--text-faint);
+        font-size: 11px;
+        cursor: pointer;
+        font-family: var(--mono);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+      }
+      .new-run-btn:hover {
+        border-color: var(--accent-border);
+        color: var(--accent);
+      }
+
+      /* ─── wizard ─── */
+      .wizard-header {
+        padding: 10px 14px;
+        border-bottom: 0.5px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .wiz-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .steps {
+        padding: 10px 14px 0;
+        display: flex;
+        align-items: center;
+        gap: 0;
+      }
+      .step {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 10px;
+        color: var(--text-faint);
+      }
+      .step.active {
+        color: var(--accent);
+      }
+      .step.done {
+        color: var(--green);
+      }
+      .step-num {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 0.5px solid currentColor;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 9px;
+        flex-shrink: 0;
+      }
+      .step-line {
+        flex: 1;
+        height: 0.5px;
+        background: var(--border);
+        margin: 0 6px;
+        min-width: 20px;
+      }
+      .wizard-body {
+        padding: 14px;
+      }
+      .mode-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .mode-card {
+        border: 0.5px solid var(--border);
+        border-radius: 6px;
+        padding: 11px 10px;
+        cursor: pointer;
+        background: var(--surface3);
+      }
+      .mode-card.selected {
+        border-color: var(--accent-border);
+        background: #a78bfa0a;
+      }
+      .mode-icon {
+        font-size: 18px;
+        color: var(--text-dim);
+        margin-bottom: 7px;
+      }
+      .mode-card.selected .mode-icon {
+        color: var(--accent);
+      }
+      .mode-name {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 3px;
+      }
+      .mode-card.selected .mode-name {
+        color: var(--accent);
+      }
+      .mode-desc {
+        font-size: 9px;
+        color: var(--text-dim);
+        line-height: 1.5;
+      }
+      .provider-row {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 14px;
+      }
+      .provider-pill {
+        padding: 4px 10px;
+        border-radius: 4px;
+        border: 0.5px solid var(--border);
+        background: var(--surface3);
+        font-size: 10px;
+        color: var(--text-muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .provider-pill.active {
+        border-color: var(--accent-border);
+        background: var(--accent-bg);
+        color: var(--accent);
+      }
+      .context-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 8px;
+        border: 0.5px solid var(--border);
+        border-radius: 4px;
+        background: var(--surface3);
+        margin-top: 4px;
+      }
+      .ctx-file {
+        flex: 1;
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+      .ctx-badge {
+        font-size: 9px;
+        padding: 1px 5px;
+        border-radius: 3px;
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .wizard-footer {
+        padding: 10px 14px;
+        border-top: 0.5px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      /* ─── run console ─── */
+      .run-header {
+        padding: 8px 12px;
+        border-bottom: 0.5px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .run-body {
+        display: flex;
+      }
+      .console-pane {
+        flex: 1;
+        border-right: 0.5px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .console-toolbar {
+        padding: 5px 10px;
+        border-bottom: 0.5px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .console-output {
+        flex: 1;
+        overflow: auto;
+        padding: 10px;
+      }
+      .c-system {
+        color: var(--text-dim);
+      }
+      .c-agent {
+        color: var(--accent);
+      }
+      .c-file {
+        color: var(--teal);
+      }
+      .c-sensor {
+        color: var(--amber);
+      }
+      .c-ok {
+        color: var(--green);
+      }
+      .c-line {
+        font-size: 10px;
+        line-height: 1.7;
+        white-space: pre;
+      }
+      .c-sep {
+        color: var(--text-faint);
+      }
+      .diff-pane {
+        display: flex;
+        flex-direction: column;
+      }
+      .diff-header {
+        padding: 6px 10px;
+        border-bottom: 0.5px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .file-list {
+        border-bottom: 0.5px solid var(--border);
+      }
+      .file-row {
+        padding: 4px 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+      .file-row.active {
+        background: #1a1a1e;
+        color: var(--text-primary);
+      }
+      .file-status {
+        width: 14px;
+        height: 14px;
+        border-radius: 2px;
+        font-size: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .fs-new {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .fs-mod {
+        background: var(--amber-bg);
+        color: var(--amber);
+      }
+      .diff-view {
+        flex: 1;
+        overflow: auto;
+        padding: 8px 10px;
+        font-size: 10px;
+        line-height: 1.6;
+      }
+      .gate-footer {
+        border-top: 0.5px solid var(--border);
+        padding: 8px 10px;
+      }
+      .sensor-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 6px;
+        font-size: 10px;
+      }
+      .sensor-label {
+        flex: 1;
+        color: var(--text-dim);
+      }
+      .sensor-ok {
+        color: var(--green);
+        font-size: 9px;
+      }
+      .gate-actions {
+        display: flex;
+        gap: 5px;
+      }
+      .ga-btn {
+        flex: 1;
+        padding: 5px 4px;
+        border-radius: 4px;
+        font-size: 10px;
+        cursor: pointer;
+        font-family: var(--mono);
+        border: 0.5px solid var(--border2);
+        background: #1a1a1e;
+        color: var(--text-secondary);
+        text-align: center;
+      }
+
+      /* ─── orchestrate ─── */
+      .dag-pane {
+        flex: 1;
+        border-right: 0.5px solid var(--border);
+        position: relative;
+        overflow: hidden;
+        background: #080809;
+      }
+      .agent-list {
+        display: flex;
+        flex-direction: column;
+      }
+      .ai-item {
+        padding: 7px 10px;
+        border-bottom: 0.5px solid #0f0f12;
+        cursor: pointer;
+      }
+      .ai-item:hover {
+        background: #0f0f12;
+      }
+      .ai-item.selected {
+        background: #131316;
+        border-left: 2px solid var(--accent);
+        padding-left: 8px;
+      }
+      .ai-top {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 3px;
+      }
+      .ai-num {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        font-size: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-weight: 600;
+      }
+      .ai-name {
+        font-size: 11px;
+        color: var(--text-primary);
+        flex: 1;
+      }
+      .ai-meta {
+        font-size: 9px;
+        color: var(--text-faint);
+        display: flex;
+        gap: 8px;
+      }
+
+      /* ─── co-pilot ─── */
+      .chat-pane {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        border-right: 0.5px solid var(--border);
+        min-width: 0;
+      }
+      .chat-msgs {
+        flex: 1;
+        overflow: auto;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .msg {
+        max-width: 92%;
+      }
+      .msg-user {
+        align-self: flex-end;
+      }
+      .msg-agent {
+        align-self: flex-start;
+      }
+      .msg-user .msg-bubble {
+        background: var(--accent-bg);
+        border: 0.5px solid #a78bfa33;
+        color: var(--text-primary);
+        border-radius: 6px 6px 2px 6px;
+        padding: 7px 10px;
+        font-size: 10px;
+        line-height: 1.6;
+      }
+      .msg-agent .msg-bubble {
+        background: #131316;
+        border: 0.5px solid var(--border);
+        color: var(--text-secondary);
+        border-radius: 2px 6px 6px 6px;
+        padding: 7px 10px;
+        font-size: 10px;
+        line-height: 1.6;
+      }
+      .msg-meta {
+        font-size: 9px;
+        color: var(--text-faint);
+        margin: 2px 4px;
+      }
+      .msg-user .msg-meta {
+        text-align: right;
+      }
+      .file-mention {
+        display: inline-block;
+        background: #34d39914;
+        color: var(--teal);
+        padding: 0 4px;
+        border-radius: 2px;
+        font-size: 9px;
+      }
+      .chat-input-row {
+        padding: 8px 10px;
+        border-top: 0.5px solid var(--border);
+        display: flex;
+        gap: 6px;
+        align-items: flex-end;
+      }
+      .chat-input {
+        flex: 1;
+        background: var(--surface3);
+        border: 0.5px solid var(--border2);
+        border-radius: 5px;
+        padding: 6px 8px;
+        font-size: 10px;
+        color: var(--text-primary);
+        font-family: var(--mono);
+        resize: none;
+        height: 44px;
+        line-height: 1.5;
+      }
+
+      /* ─── settings ─── */
+      .settings-body {
+        display: flex;
+      }
+      .settings-nav {
+        background: var(--surface3);
+        border-right: 0.5px solid var(--border);
+        padding: 8px 0;
+        flex-shrink: 0;
+      }
+      .nav-group {
+        padding: 3px 0;
+      }
+      .nav-label {
+        padding: 3px 12px;
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--text-faint);
+      }
+      .nav-item {
+        padding: 5px 12px;
+        font-size: 11px;
+        color: var(--text-muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+      .nav-item.active {
+        color: var(--accent);
+        background: #1a1a1e;
+      }
+      .nav-badge {
+        font-size: 8px;
+        padding: 1px 4px;
+        border-radius: 2px;
+        background: var(--amber-bg);
+        color: var(--amber);
+        margin-left: auto;
+      }
+      .settings-content {
+        flex: 1;
+        overflow: auto;
+        padding: 14px;
+      }
+      .section-title {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 0.5px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .sensor-card {
+        border: 0.5px solid var(--border);
+        border-radius: 5px;
+        padding: 9px 10px;
+        margin-bottom: 7px;
+        background: var(--surface3);
+      }
+      .sc-top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 5px;
+      }
+      .sc-name {
+        font-size: 11px;
+        color: var(--text-primary);
+        flex: 1;
+      }
+      .sc-cmd {
+        font-size: 10px;
+        color: var(--text-dim);
+        font-family: var(--mono);
+        background: var(--surface);
+        padding: 3px 7px;
+        border-radius: 3px;
+        margin-bottom: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .ss-ok {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .ss-err {
+        background: var(--red-bg);
+        color: var(--red);
+        border-color: var(--red-border) !important;
+      }
+      .gate-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 0;
+        border-bottom: 0.5px solid #0f0f12;
+      }
+      .gate-name {
+        font-size: 10px;
+        color: var(--text-secondary);
+        flex: 1;
+      }
+      .add-sensor {
+        border: 0.5px dashed var(--border2);
+        border-radius: 5px;
+        padding: 7px 10px;
+        font-size: 10px;
+        color: var(--text-faint);
+        cursor: pointer;
+        text-align: center;
+        margin-bottom: 7px;
+      }
+
+      /* ─── history ─── */
+      .hist-header {
+        padding: 8px 14px;
+        border-bottom: 0.5px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .filter-pill {
+        padding: 3px 9px;
+        border-radius: 3px;
+        border: 0.5px solid var(--border);
+        background: var(--surface3);
+        font-size: 9px;
+        color: var(--text-dim);
+        cursor: pointer;
+      }
+      .filter-pill.active {
+        border-color: var(--accent-border);
+        background: var(--accent-bg);
+        color: var(--accent);
+      }
+      .hist-body {
+        display: flex;
+      }
+      .table-pane {
+        flex: 1;
+        overflow: auto;
+        border-right: 0.5px solid var(--border);
+        min-width: 0;
+      }
+      .tbl-header {
+        display: grid;
+        grid-template-columns: 1fr 72px 80px 60px 56px 56px;
+        padding: 5px 12px;
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-faint);
+        border-bottom: 0.5px solid var(--border);
+      }
+      .tbl-row {
+        display: grid;
+        grid-template-columns: 1fr 72px 80px 60px 56px 56px;
+        padding: 6px 12px;
+        border-bottom: 0.5px solid #0f0f12;
+        cursor: pointer;
+        font-size: 10px;
+        color: var(--text-muted);
+        align-items: center;
+      }
+      .tbl-row:hover {
+        background: #0f0f12;
+      }
+      .tbl-row.selected {
+        background: #131316;
+        border-left: 2px solid var(--accent);
+        padding-left: 10px;
+      }
+      .tbl-name {
+        color: var(--text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding-right: 6px;
+      }
+      .tbl-row.selected .tbl-name {
+        color: var(--text-primary);
+      }
+      .mode-chip {
+        display: inline-block;
+        font-size: 8px;
+        padding: 1px 5px;
+        border-radius: 2px;
+      }
+      .mc-stc {
+        background: var(--accent-bg);
+        color: var(--accent);
+      }
+      .mc-orc {
+        background: var(--teal-bg);
+        color: var(--teal);
+      }
+      .mc-cp {
+        background: var(--blue-bg);
+        color: var(--blue);
+      }
+      .detail-pane {
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .detail-section {
+        padding: 8px 10px;
+        border-bottom: 0.5px solid #0f0f12;
+      }
+      .ds-label {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-faint);
+        margin-bottom: 5px;
+      }
+      .ds-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        margin-bottom: 3px;
+      }
+      .ds-key {
+        color: var(--text-dim);
+      }
+      .ds-val {
+        color: var(--text-secondary);
+      }
+      .gt-entry {
+        display: flex;
+        gap: 7px;
+        margin-bottom: 8px;
+        font-size: 10px;
+        position: relative;
+      }
+      .gt-entry::before {
+        content: '';
+        position: absolute;
+        left: 6px;
+        top: 18px;
+        bottom: -10px;
+        width: 0.5px;
+        background: var(--border);
+      }
+      .gt-entry:last-child::before {
+        display: none;
+      }
+      .gt-dot {
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 7px;
+        margin-top: 1px;
+      }
+
+      /* ─── harness setup wizard ─── */
+      .editor-pane {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        border-right: 0.5px solid var(--border);
+        min-width: 0;
+      }
+      .editor-toolbar {
+        padding: 5px 10px;
+        border-bottom: 0.5px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .editor {
+        flex: 1;
+        overflow: auto;
+        padding: 10px 12px;
+        font-size: 10px;
+        line-height: 1.7;
+        color: var(--text-secondary);
+      }
+      .e-comment {
+        color: var(--text-faint);
+      }
+      .e-heading {
+        color: var(--accent);
+      }
+      .e-code {
+        color: var(--teal);
+        background: #34d39908;
+        padding: 0 3px;
+        border-radius: 2px;
+      }
+      .rp-section {
+        padding: 10px;
+        border-bottom: 0.5px solid var(--border);
+      }
+      .rp-title {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-dim);
+        margin-bottom: 8px;
+      }
+      .sensor-input-row {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        margin-bottom: 7px;
+      }
+      .sensor-inp {
+        background: var(--surface3);
+        border: 0.5px solid var(--border);
+        border-radius: 3px;
+        padding: 3px 7px;
+        font-size: 9px;
+        color: var(--text-secondary);
+        font-family: var(--mono);
+        width: 100%;
+      }
+      .prov-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        border: 0.5px solid var(--border);
+        border-radius: 4px;
+        margin-bottom: 5px;
+        background: var(--surface3);
+        cursor: pointer;
+      }
+      .prov-name {
+        font-size: 10px;
+        color: var(--text-secondary);
+        flex: 1;
+      }
+      .prov-radio {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 0.5px solid var(--border2);
+        background: #1e1e22;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .prov-radio.checked {
+        border-color: var(--accent);
+        background: var(--accent-bg);
+      }
+      .prov-radio.checked::after {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-title"><i class="ti ti-flame"></i> Foundry — Screen Renderings</div>
+    <div class="page-subtitle">spec 007-foundry-agent-harness · 8 screens · 2026-05-28</div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     SCREEN 1 — Sidebar panel / active runs
+     ═══════════════════════════════════════════════════════════ -->
+    <div class="screen-section">
+      <div class="screen-label">
+        <i class="ti ti-layout-sidebar-right"></i> Screen 1 — Foundry sidebar panel (active runs
+        view)
+      </div>
+      <div class="term" style="display: flex; height: 520px">
+        <div class="rail">
+          <div class="rail-icon"><i class="ti ti-terminal-2"></i></div>
+          <div class="rail-icon"><i class="ti ti-git-branch"></i></div>
+          <div class="rail-icon active"><i class="ti ti-flame"></i></div>
+          <div class="rail-icon" style="margin-top: 4px"><i class="ti ti-checklist"></i></div>
+          <div class="rail-dot"></div>
+          <div class="rail-icon" style="margin-top: 0"><i class="ti ti-bell"></i></div>
+        </div>
+        <div class="sidebar">
+          <div class="sidebar-header"><span class="sidebar-title">Workspaces</span></div>
+          <div style="padding: 4px 0; flex: 1">
+            <div class="ws-item active">
+              <div class="ws-dot" style="background: #a78bfa"></div>
+              terminator
+            </div>
+            <div class="proj active"><i class="ti ti-folder" style="font-size: 10px"></i> core</div>
+            <div class="proj"><i class="ti ti-folder" style="font-size: 10px"></i> extensions</div>
+            <div class="ws-item" style="margin-top: 4px">
+              <div class="ws-dot" style="background: #34d399"></div>
+              api-gateway
+            </div>
+            <div class="ws-item">
+              <div class="ws-dot" style="background: #60a5fa"></div>
+              infra
+            </div>
+          </div>
+        </div>
+        <div class="main">
+          <div class="tabbar">
+            <div class="tab active">
+              <i class="ti ti-terminal-2" style="font-size: 12px"></i> terminal
+            </div>
+            <div class="tab"><i class="ti ti-code-dots" style="font-size: 12px"></i> pr-review</div>
+            <div class="tab">
+              <i class="ti ti-flame" style="font-size: 12px"></i> foundry
+              <span class="tab-badge">1 gate</span>
+            </div>
+            <div class="tab" style="margin-left: auto; color: #3a3a3e">
+              <i class="ti ti-plus" style="font-size: 12px"></i>
+            </div>
+          </div>
+          <div class="content">
+            <div class="terminal-area">
+              <div style="color: #4a4a50">Last login: Thu May 28 09:14:22 on ttys003</div>
+              <div style="margin-top: 6px">
+                <span class="term-prompt">~/repos/terminator core ❯</span>
+                <span class="term-cmd">npm run lint</span>
+              </div>
+              <div style="color: #5a5a5e">&gt; eslint src --ext .ts,.tsx</div>
+              <div style="color: #22c55e">✓ 0 problems found</div>
+              <div style="margin-top: 6px">
+                <span class="term-prompt">~/repos/terminator core ❯</span>
+                <span class="term-cmd">npm test</span>
+              </div>
+              <div style="color: #5a5a5e">PASS tests/unit/schemas/workspace.schema.spec.ts</div>
+              <div style="color: #22c55e">Test suites: 2 passed, 2 total</div>
+              <div style="margin-top: 6px">
+                <span class="term-prompt">~/repos/terminator core ❯</span>
+                <span
+                  style="
+                    display: inline-block;
+                    width: 7px;
+                    height: 12px;
+                    background: var(--accent);
+                    border-radius: 1px;
+                    vertical-align: middle;
+                  "
+                ></span>
+              </div>
+            </div>
+            <div class="right-panel">
+              <div class="panel-header">
+                <span class="panel-title" style="color: var(--accent)"
+                  ><i class="ti ti-flame" style="font-size: 13px"></i> Foundry</span
+                >
+                <div style="display: flex; gap: 6px">
+                  <button class="btn btn-accent">
+                    <i class="ti ti-player-play" style="font-size: 10px"></i> run
+                  </button>
+                  <button class="btn">
+                    <i class="ti ti-settings" style="font-size: 10px"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="harness-bar">
+                <div
+                  style="
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 50%;
+                    background: var(--green);
+                    flex-shrink: 0;
+                  "
+                ></div>
+                <span style="color: var(--text-dim)">Harness ready —</span>
+                <span style="color: #6ee7b7">3 sensors active</span>
+              </div>
+              <div class="run-list">
+                <div class="section-head">Active runs</div>
+                <div class="run-card" style="border-color: var(--amber-border)">
+                  <div class="run-top">
+                    <span class="run-name">auth-middleware spec</span>
+                    <span class="status-badge s-gate"
+                      ><i class="ti ti-flag" style="font-size: 9px"></i> gate</span
+                    >
+                  </div>
+                  <div class="run-meta">
+                    <span><i class="ti ti-sparkles" style="font-size: 9px"></i> claude sonnet</span>
+                    <span><i class="ti ti-coins" style="font-size: 9px"></i> 4.2k</span>
+                    <span><i class="ti ti-clock" style="font-size: 9px"></i> 2m ago</span>
+                  </div>
+                  <div class="run-bar">
+                    <div class="run-bar-fill" style="width: 66%; background: var(--amber)"></div>
+                  </div>
+                </div>
+                <div class="run-card">
+                  <div class="run-top">
+                    <span class="run-name">openapi docs agent</span>
+                    <span class="status-badge s-running">running</span>
+                  </div>
+                  <div class="run-meta">
+                    <span><i class="ti ti-sparkles" style="font-size: 9px"></i> gpt-4o</span>
+                    <span><i class="ti ti-coins" style="font-size: 9px"></i> 1.8k</span>
+                    <span><i class="ti ti-clock" style="font-size: 9px"></i> just now</span>
+                  </div>
+                  <div class="run-bar"><div class="run-bar-fill" style="width: 28%"></div></div>
+                </div>
+                <div class="section-head" style="padding-top: 8px">Recent</div>
+                <div class="run-card">
+                  <div class="run-top">
+                    <span class="run-name">rate-limiter refactor</span>
+                    <span class="status-badge s-done">done</span>
+                  </div>
+                  <div class="run-meta">
+                    <span><i class="ti ti-sparkles" style="font-size: 9px"></i> claude sonnet</span>
+                    <span><i class="ti ti-coins" style="font-size: 9px"></i> 9.1k</span>
+                    <span><i class="ti ti-clock" style="font-size: 9px"></i> 1h ago</span>
+                  </div>
+                </div>
+              </div>
+              <button class="new-run-btn"><i class="ti ti-plus"></i> new run</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     SCREEN 2 — New run wizard (configure step)
+     ═══════════════════════════════════════════════════════════ -->
+    <div class="screen-section">
+      <div class="screen-label">
+        <i class="ti ti-wand"></i> Screen 2 — New run wizard (configure step)
+      </div>
+      <div class="term">
+        <div class="wizard-header">
+          <div class="wiz-title">
+            <i class="ti ti-flame" style="font-size: 14px; color: var(--accent)"></i> new foundry
+            run
+          </div>
+          <button class="btn" style="padding: 3px 8px">
+            <i class="ti ti-x" style="font-size: 12px"></i>
+          </button>
+        </div>
+        <div class="steps">
+          <div class="step done">
+            <div class="step-num"><i class="ti ti-check" style="font-size: 8px"></i></div>
+            <span>mode</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="step active">
+            <div class="step-num">2</div>
+            <span>configure</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <span>review &amp; launch</span>
+          </div>
+        </div>
+        <div class="wizard-body">
+          <div class="field-label" style="margin-bottom: 10px">Run mode</div>
+          <div class="mode-grid">
+            <div class="mode-card selected">
+              <div class="mode-icon"><i class="ti ti-file-code"></i></div>
+              <div class="mode-name">Spec-to-code</div>
+              <div class="mode-desc">Spec drives code generation with approval gates</div>
+            </div>
+            <div class="mode-card">
+              <div class="mode-icon"><i class="ti ti-topology-star-3"></i></div>
+              <div class="mode-name">Orchestrate</div>
+              <div class="mode-desc">Decompose task across multiple sub-agents</div>
+            </div>
+            <div class="mode-card">
+              <div class="mode-icon"><i class="ti ti-messages"></i></div>
+              <div class="mode-name">Co-pilot</div>
+              <div class="mode-desc">Continuous back-and-forth, no hard gates</div>
+            </div>
+          </div>
+          <div class="field-label">Provider</div>
+          <div class="provider-row">
+            <div class="provider-pill active">
+              <i class="ti ti-sparkles" style="font-size: 10px"></i> Claude
+            </div>
+            <div class="provider-pill">
+              <i class="ti ti-sparkles" style="font-size: 10px"></i> OpenAI
+            </div>
+            <div class="provider-pill">
+              <i class="ti ti-sparkles" style="font-size: 10px"></i> Gemini
+            </div>
+            <div class="provider-pill">
+              <i class="ti ti-server" style="font-size: 10px"></i> Ollama
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; margin-bottom: 10px">
+            <div style="flex: 1">
+              <div class="field-label">Model</div>
+              <select class="field-input" style="cursor: pointer; appearance: none">
+                <option>claude-sonnet-4-6</option>
+                <option>claude-opus-4-6</option>
+                <option>claude-haiku-4-5</option>
+              </select>
+            </div>
+            <div style="flex: 1">
+              <div class="field-label">Max iterations</div>
+              <input class="field-input" type="number" value="3" />
+            </div>
+          </div>
+          <div class="field-label">Spec file</div>
+          <input
+            class="field-input"
+            type="text"
+            value="specs/007-foundry/spec.md"
+            style="margin-bottom: 10px"
+          />
+          <div class="field-label">Context (auto-detected)</div>
+          <div class="context-row">
+            <i class="ti ti-file-text" style="font-size: 11px; color: var(--text-dim)"></i>
+            <span class="ctx-file">AGENTS.md</span>
+            <span class="ctx-badge">feedforward</span>
+          </div>
+          <div class="context-row">
+            <i class="ti ti-shield-check" style="font-size: 11px; color: var(--text-dim)"></i>
+            <span class="ctx-file">.foundry/harness.json — 3 sensors</span>
+            <span class="ctx-badge">sensors</span>
+          </div>
+        </div>
+        <div class="wizard-footer">
+          <span style="font-size: 9px; color: var(--text-faint)"
+            >⌘⇧R to launch from command palette</span
+          >
+          <div style="display: flex; gap: 6px">
+            <button class="btn">back</button>
+            <button class="btn btn-accent">
+              next <i class="ti ti-arrow-right" style="font-size: 10px"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     SCREEN 3 — Run console + gate review
+     ═══════════════════════════════════════════════════════════ -->
+    <div class="screen-section">
+      <div class="screen-label">
+        <i class="ti ti-terminal"></i> Screen 3 — Run console with gate review (spec-to-code,
+        iteration 1)
+      </div>
+      <div class="term">
+        <div class="run-header">
+          <span class="status-badge s-gate"
+            ><i class="ti ti-flag" style="font-size: 9px"></i> gate — iter 1/3</span
+          >
+          <div style="flex: 1; font-size: 11px; font-weight: 500; color: var(--text-primary)">
+            auth-middleware spec → spec-to-code
+          </div>
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              font-size: 10px;
+              color: var(--text-dim);
+            "
+          >
+            <span><i class="ti ti-sparkles" style="font-size: 10px"></i> claude sonnet-4-6</span>
+            <span><i class="ti ti-coins" style="font-size: 10px"></i> 4,218 tok</span>
+            <span><i class="ti ti-clock" style="font-size: 10px"></i> 1m 42s</span>
+          </div>
+        </div>
+        <div class="run-body">
+          <div class="console-pane" style="height: 420px">
+            <div class="console-toolbar">
+              <span
+                style="
+                  font-size: 9px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.08em;
+                  color: var(--text-faint);
+                  flex: 1;
+                "
+                >agent output</span
+              >
+              <button class="btn" style="font-size: 9px; padding: 2px 8px">copy</button>
+              <button class="btn btn-red" style="font-size: 9px; padding: 2px 8px">
+                <i class="ti ti-player-stop" style="font-size: 9px"></i> abort
+              </button>
+            </div>
+            <div
+              class="console-output"
+              style="height: calc(100% - 28px); overflow: auto; padding: 10px"
+            >
+              <div class="c-line c-system">▶ foundry: run started — git checkpoint abc123f</div>
+              <div class="c-line c-system">▶ foundry: dispatch to claude-sonnet-4-6</div>
+              <div class="c-line c-sep" style="margin-top: 4px">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+              <div class="c-line c-agent" style="margin-top: 4px">
+                ✦ I'll implement the authentication middleware based on the spec.
+              </div>
+              <div class="c-line c-agent">Starting with the token validation layer...</div>
+              <div class="c-line c-file" style="margin-top: 4px">
+                ✎ src/middleware/auth.middleware.ts (new)
+              </div>
+              <div class="c-line c-file">✎ src/middleware/auth.middleware.spec.ts (new)</div>
+              <div class="c-line c-file">✎ src/types/auth.types.ts (modified)</div>
+              <div class="c-line c-agent" style="margin-top: 4px">
+                Implementation complete. Added JWT validation,
+              </div>
+              <div class="c-line c-agent">refresh token rotation, and rate limiting.</div>
+              <div class="c-line c-sep" style="margin-top: 4px">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+              <div class="c-line c-system" style="margin-top: 4px">
+                ▶ foundry: running feedback sensors…
+              </div>
+              <div class="c-line c-sensor">
+                ⚡ lint: eslint src — <span class="c-ok">✓ 0 errors</span>
+              </div>
+              <div class="c-line c-sensor">
+                ⚡ test: npm test — <span class="c-ok">✓ 14 passed</span>
+              </div>
+              <div class="c-line c-sensor">
+                ⚡ build: tsc — <span class="c-ok">✓ compiled</span>
+              </div>
+              <div class="c-line c-system" style="margin-top: 4px">
+                ▶ foundry: gate open — awaiting review
+              </div>
+              <div class="c-line" style="color: var(--amber); margin-top: 2px">
+                ⊙ review 3 files and sensor results →
+              </div>
+            </div>
+          </div>
+          <div class="diff-pane" style="width: 300px">
+            <div class="diff-header">
+              <span class="panel-title">Changed files</span>
+              <span style="font-size: 9px; color: var(--text-faint)">3 files</span>
+            </div>
+            <div class="file-list">
+              <div class="file-row active">
+                <div class="file-status fs-new">+</div>
+                <span style="flex: 1">auth.middleware.ts</span>
+                <span style="font-size: 9px; color: var(--green)">+94</span>
+              </div>
+              <div class="file-row">
+                <div class="file-status fs-new">+</div>
+                <span style="flex: 1">auth.middleware.spec.ts</span>
+                <span style="font-size: 9px; color: var(--green)">+67</span>
+              </div>
+              <div class="file-row">
+                <div class="file-status fs-mod">~</div>
+                <span style="flex: 1">auth.types.ts</span>
+                <span style="font-size: 9px; color: var(--amber)">±12</span>
+              </div>
+            </div>
+            <div class="diff-view" style="height: 220px; overflow: auto">
+              <div class="diff-hunk">@@ -0,0 +1,22 @@</div>
+              <div class="diff-add">
+                + import { Request, Response, NextFunction } from 'express'
+              </div>
+              <div class="diff-add">+ import { verifyToken } from '../lib/jwt'</div>
+              <div class="diff-add">+ import { RateLimiter } from '../lib/rate-limit'</div>
+              <div class="diff-add">+</div>
+              <div class="diff-add">+ export async function authMiddleware(</div>
+              <div class="diff-add">+ req: Request,</div>
+              <div class="diff-add">+ res: Response,</div>
+              <div class="diff-add">+ next: NextFunction</div>
+              <div class="diff-add">+ ): Promise&lt;void&gt; {</div>
+              <div class="diff-add">+ const token = req.headers.authorization?.split(' ')[1]</div>
+              <div class="diff-ctx">...</div>
+            </div>
+            <div class="gate-footer">
+              <div class="sensor-row">
+                <span class="sensor-label"
+                  ><i class="ti ti-shield-check" style="font-size: 9px"></i> lint</span
+                ><span class="sensor-ok"
+                  ><i class="ti ti-check" style="font-size: 9px"></i> 0 errors</span
+                >
+              </div>
+              <div class="sensor-row">
+                <span class="sensor-label"
+                  ><i class="ti ti-test-pipe" style="font-size: 9px"></i> test</span
+                ><span class="sensor-ok"
+                  ><i class="ti ti-check" style="font-size: 9px"></i> 14/14 pass</span
+                >
+              </div>
+              <div class="sensor-row" style="margin-bottom: 8px">
+                <span class="sensor-label"
+                  ><i class="ti ti-hammer" style="font-size: 9px"></i> build</span
+                ><span class="sensor-ok"
+                  ><i class="ti ti-check" style="font-size: 9px"></i> compiled</span
+                >
+              </div>
+              <div class="gate-actions">
+                <button
+                  class="ga-btn"
+                  style="
+                    background: var(--green-bg);
+                    border-color: var(--green-border);
+                    color: var(--green);
+                  "
+                >
+                  <i class="ti ti-check" style="font-size: 10px"></i> approve
+                </button>
+                <button
+                  class="ga-btn"
+                  style="
+                    background: var(--amber-bg);
+                    border-color: var(--amber-border);
+                    color: var(--amber);
+                  "
+                >
+                  <i class="ti ti-pencil" style="font-size: 10px"></i> changes
+                </button>
+                <button
+                  class="ga-btn"
+                  style="
+                    background: var(--red-bg);
+                    border-color: var(--red-border);
+                    color: var(--red);
+                  "
+                >
+                  <i class="ti ti-x" style="font-size: 10px"></i> reject
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     SCREEN 4 — Multi-agent orchestration DAG
+     ═══════════════════════════════════════════════════════════ -->
+    <div class="screen-section">
+      <div class="screen-label">
+        <i class="ti ti-topology-star-3"></i> Screen 4 — Multi-agent orchestration view (DAG)
+      </div>
+      <div class="term">
+        <div class="run-header">
+          <span class="status-badge s-running"
+            ><i class="ti ti-topology-star-3" style="font-size: 9px"></i> orchestrate</span
+          >
+          <div style="flex: 1; font-size: 11px; font-weight: 500; color: var(--text-primary)">
+            Build REST API with tests, OpenAPI docs, and review
+          </div>
+          <span style="font-size: 10px; color: var(--text-dim)"
+            ><i class="ti ti-sparkles" style="font-size: 10px"></i> claude sonnet</span
+          >
+          <span style="font-size: 10px; color: var(--text-dim); margin-left: 10px"
+            ><i class="ti ti-clock" style="font-size: 10px"></i> 4m 11s</span
+          >
+        </div>
+        <div style="display: flex; height: 420px">
+          <div class="dag-pane">
+            <svg
+              width="100%"
+              height="100%"
+              viewBox="0 0 440 420"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <defs>
+                <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                  <path d="M0,0 L0,6 L6,3 Z" fill="#2a2a2e" />
+                </marker>
+                <marker
+                  id="arr-done"
+                  markerWidth="6"
+                  markerHeight="6"
+                  refX="5"
+                  refY="3"
+                  orient="auto"
+                >
+                  <path d="M0,0 L0,6 L6,3 Z" fill="#22c55e44" />
+                </marker>
+                <marker
+                  id="arr-run"
+                  markerWidth="6"
+                  markerHeight="6"
+                  refX="5"
+                  refY="3"
+                  orient="auto"
+                >
+                  <path d="M0,0 L0,6 L6,3 Z" fill="#a78bfa44" />
+                </marker>
+              </defs>
+              <line
+                x1="220"
+                y1="88"
+                x2="140"
+                y2="160"
+                stroke="#22c55e44"
+                stroke-width="1"
+                marker-end="url(#arr-done)"
+              />
+              <line
+                x1="220"
+                y1="88"
+                x2="300"
+                y2="160"
+                stroke="#22c55e44"
+                stroke-width="1"
+                marker-end="url(#arr-done)"
+              />
+              <line
+                x1="140"
+                y1="212"
+                x2="220"
+                y2="290"
+                stroke="#a78bfa44"
+                stroke-width="1"
+                stroke-dasharray="4,3"
+                marker-end="url(#arr-run)"
+              />
+              <line
+                x1="300"
+                y1="212"
+                x2="220"
+                y2="290"
+                stroke="#a78bfa44"
+                stroke-width="1"
+                stroke-dasharray="4,3"
+                marker-end="url(#arr-run)"
+              />
+              <line
+                x1="220"
+                y1="342"
+                x2="220"
+                y2="390"
+                stroke="#2a2a2e"
+                stroke-width="1"
+                marker-end="url(#arr)"
+              />
+              <g transform="translate(220,56)">
+                <rect
+                  x="-60"
+                  y="-28"
+                  width="120"
+                  height="36"
+                  rx="5"
+                  fill="#22c55e0f"
+                  stroke="#22c55e55"
+                  stroke-width="0.5"
+                />
+                <text
+                  x="0"
+                  y="-8"
+                  text-anchor="middle"
+                  fill="#22c55e"
+                  font-size="10"
+                  font-family="'SF Mono',monospace"
+                  font-weight="500"
+                >
+                  ① schema agent
+                </text>
+                <text
+                  x="0"
+                  y="6"
+                  text-anchor="middle"
+                  fill="#22c55e99"
+                  font-size="8"
+                  font-family="'SF Mono',monospace"
+                >
+                  done ✓
+                </text>
+              </g>
+              <g transform="translate(120,186)">
+                <rect
+                  x="-58"
+                  y="-28"
+                  width="116"
+                  height="36"
+                  rx="5"
+                  fill="#a78bfa0f"
+                  stroke="#a78bfa55"
+                  stroke-width="0.5"
+                />
+                <text
+                  x="0"
+                  y="-8"
+                  text-anchor="middle"
+                  fill="#a78bfa"
+                  font-size="10"
+                  font-family="'SF Mono',monospace"
+                  font-weight="500"
+                >
+                  ② impl agent
+                </text>
+                <text
+                  x="0"
+                  y="6"
+                  text-anchor="middle"
+                  fill="#a78bfaaa"
+                  font-size="8"
+                  font-family="'SF Mono',monospace"
+                >
+                  running…
+                </text>
+              </g>
+              <g transform="translate(320,186)">
+                <rect
+                  x="-58"
+                  y="-28"
+                  width="116"
+                  height="36"
+                  rx="5"
+                  fill="#a78bfa0f"
+                  stroke="#a78bfa55"
+                  stroke-width="0.5"
+                />
+                <text
+                  x="0"
+                  y="-8"
+                  text-anchor="middle"
+                  fill="#a78bfa"
+                  font-size="10"
+                  font-family="'SF Mono',monospace"
+                  font-weight="500"
+                >
+                  ③ test agent
+                </text>
+                <text
+                  x="0"
+                  y="6"
+                  text-anchor="middle"
+                  fill="#a78bfaaa"
+                  font-size="8"
+                  font-family="'SF Mono',monospace"
+                >
+                  running…
+                </text>
+              </g>
+              <g transform="translate(220,316)">
+                <rect
+                  x="-62"
+                  y="-28"
+                  width="124"
+                  height="36"
+                  rx="5"
+                  fill="#1e1e22"
+                  stroke="#2a2a2e"
+                  stroke-width="0.5"
+                />
+                <text
+                  x="0"
+                  y="-8"
+                  text-anchor="middle"
+                  fill="#4a4a50"
+                  font-size="10"
+                  font-family="'SF Mono',monospace"
+                  font-weight="500"
+                >
+                  ④ docs agent
+                </text>
+                <text
+                  x="0"
+                  y="6"
+                  text-anchor="middle"
+                  fill="#3a3a3e"
+                  font-size="8"
+                  font-family="'SF Mono',monospace"
+                >
+                  waiting on ② ③
+                </text>
+              </g>
+              <g transform="translate(220,400)">
+                <rect
+                  x="-60"
+                  y="-16"
+                  width="120"
+                  height="26"
+                  rx="5"
+                  fill="#0d0d0f"
+                  stroke="#1e1e22"
+                  stroke-width="0.5"
+                  stroke-dasharray="3,2"
+                />
+                <text
+                  x="0"
+                  y="2"
+                  text-anchor="middle"
+                  fill="#2a2a2e"
+                  font-size="9"
+                  font-family="'SF Mono',monospace"
+                >
+                  ⑤ review agent
+                </text>
+              </g>
+            </svg>
+            <div style="position: absolute; bottom: 8px; left: 8px; display: flex; gap: 8px">
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 4px;
+                  font-size: 9px;
+                  color: var(--text-faint);
+                "
+              >
+                <div
+                  style="width: 8px; height: 8px; border-radius: 50%; background: var(--green)"
+                ></div>
+                done
+              </div>
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 4px;
+                  font-size: 9px;
+                  color: var(--text-faint);
+                "
+              >
+                <div
+                  style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent)"
+                ></div>
+                running
+              </div>
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 4px;
+                  font-size: 9px;
+                  color: var(--text-faint);
+                "
+              >
+                <div
+                  style="width: 8px; height: 8px; border-radius: 50%; background: var(--border2)"
+                ></div>
+                waiting
+              </div>
+            </div>
+          </div>
+          <div style="width: 248px; display: flex; flex-direction: column">
+            <div
+              style="
+                padding: 6px 10px;
+                border-bottom: 0.5px solid var(--border);
+                font-size: 9px;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: var(--text-faint);
+              "
+            >
+              sub-agents
+            </div>
+            <div class="ai-item">
+              <div class="ai-top">
+                <div class="ai-num" style="background: var(--green-bg); color: var(--green)">1</div>
+                <span class="ai-name">schema agent</span
+                ><span class="status-badge s-done">done</span>
+              </div>
+              <div class="ai-meta">
+                <span>claude sonnet</span><span>1.2k tok</span><span>45s</span>
+              </div>
+            </div>
+            <div class="ai-item selected">
+              <div class="ai-top">
+                <div class="ai-num" style="background: var(--accent-bg); color: var(--accent)">
+                  2
+                </div>
+                <span class="ai-name">impl agent</span
+                ><span class="status-badge s-running">running</span>
+              </div>
+              <div class="ai-meta">
+                <span>claude sonnet</span><span>2.1k tok</span><span>2m 20s</span>
+              </div>
+            </div>
+            <div class="ai-item">
+              <div class="ai-top">
+                <div class="ai-num" style="background: var(--accent-bg); color: var(--accent)">
+                  3
+                </div>
+                <span class="ai-name">test agent</span
+                ><span class="status-badge s-running">running</span>
+              </div>
+              <div class="ai-meta">
+                <span>claude sonnet</span><span>0.9k tok</span><span>1m 04s</span>
+              </div>
+            </div>
+            <div class="ai-item">
+              <div class="ai-top">
+                <div class="ai-num" style="background: var(--border); color: var(--text-faint)">
+                  4
+                </div>
+                <span class="ai-name" style="color: var(--text-dim)">docs agent</span
+                ><span class="status-badge s-wait">waiting</span>
+              </div>
+              <div class="ai-meta"><span>needs ② ③</span></div>
+            </div>
+            <div class="ai-item">
+              <div class="ai-top">
+                <div
+                  class="ai-num"
+                  style="
+                    background: var(--surface);
+                    color: var(--text-faint);
+                    border: 0.5px dashed var(--border);
+                  "
+                >
+                  5
+                </div>
+                <span class="ai-name" style="color: var(--text-faint)">review agent</span
+                ><span class="status-badge s-wait" style="opacity: 0.4">locked</span>
+              </div>
+              <div class="ai-meta"><span>needs ①②③④</span></div>
+            </div>
+            <div style="padding: 8px 10px; border-top: 0.5px solid var(--border); margin-top: auto">
+              <div
+                style="
+                  font-size: 9px;
+                  color: var(--text-faint);
+                  margin-bottom: 6px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.08em;
+                "
+              >
+                progress
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px">
+                <div
+                  style="
+                    flex: 1;
+                    height: 3px;
+                    background: #1a1a1e;
+                    border-radius: 2px;
+                    overflow: hidden;
+                  "
+                >
+                  <div
+                    style="width: 30%; height: 3px; background: var(--accent); border-radius: 2px"
+                  ></div>
+                </div>
+                <span style="font-size: 9px; color: var(--text-dim)">1/5 done</span>
+              </div>
+              <div style="display: flex; gap: 5px; margin-top: 8px">
+                <button class="btn btn-red" style="flex: 1; padding: 4px; font-size: 9px">
+                  <i class="ti ti-player-stop" style="font-size: 9px"></i> abort all
+                </button>
+                <button class="btn" style="flex: 2; padding: 4px; font-size: 9px">
+                  <i class="ti ti-list-details" style="font-size: 9px"></i> full log
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     SCREEN 5 — Co-pilot mode
+     ═══════════════════════════════════════════════════════════ -->
+    <div class="screen-section">
+      <div class="screen-label">
+        <i class="ti ti-messages"></i> Screen 5 — Co-pilot mode (live diff panel, no gates)
+      </div>
+      <div class="term">
+        <div class="run-header">
+          <span class="status-badge" style="background: var(--teal-bg); color: var(--teal)"
+            ><i class="ti ti-messages" style="font-size: 9px"></i> co-pilot</span
+          >
+          <div style="flex: 1; font-size: 11px; color: var(--text-primary)">
+            extensions / core — co-pilot session
+          </div>
+          <div
+            style="
+              font-size: 10px;
+              color: var(--text-dim);
+              display: flex;
+              align-items: center;
+              gap: 4px;
+            "
+          >
+            <i class="ti ti-sparkles" style="font-size: 10px"></i> claude sonnet-4-6
+          </div>
+        </div>
+        <div style="display: flex; height: 440px">
+          <div class="chat-pane">
+            <div class="chat-msgs">
+              <div class="msg msg-user">
+                <div class="msg-bubble">
+                  Add proper error handling to the auth middleware. Use our existing AppError class
+                  and make sure every error has an appropriate HTTP status code.
+                </div>
+                <div class="msg-meta">you · just now</div>
+              </div>
+              <div class="msg msg-agent">
+                <div class="msg-bubble">
+                  I'll add structured error handling using your
+                  <span class="file-mention">AppError</span> class. Looking at the existing pattern
+                  in <span class="file-mention">src/lib/errors.ts</span>...<br /><br />I've updated
+                  <span class="file-mention">auth.middleware.ts</span> to wrap all token errors in
+                  <span class="file-mention">AppError</span> with 401/403 codes, and added a missing
+                  import. Also updated the test file to cover the new error paths.<br /><br />3
+                  files changed — diff is on the right.
+                </div>
+                <div class="msg-meta">foundry · just now</div>
+              </div>
+            </div>
+            <div class="chat-input-row">
+              <textarea class="chat-input" placeholder="ask or instruct…">
+What about the refresh token rotation edge case?</textarea
+              >
+              <button class="btn btn-accent" style="padding: 6px 12px; white-space: nowrap">
+                <i class="ti ti-send" style="font-size: 10px"></i> send
+              </button>
+            </div>
+          </div>
+          <div style="width: 268px; display: flex; flex-direction: column">
+            <div class="diff-header">
+              <span class="panel-title">live diff — 2 files</span>
+              <div style="display: flex; gap: 4px">
+                <button class="btn btn-green" style="font-size: 9px; padding: 2px 7px">
+                  accept all
+                </button>
+                <button class="btn btn-red" style="font-size: 9px; padding: 2px 7px">abort</button>
+              </div>
+            </div>
+            <div style="display: flex; border-bottom: 0.5px solid var(--border); padding: 0 8px">
+              <div
+                style="
+                  padding: 5px 8px;
+                  font-size: 10px;
+                  color: var(--text-primary);
+                  border-bottom: 1.5px solid var(--accent);
+                  cursor: pointer;
+                "
+              >
+                auth.middleware.ts
+              </div>
+              <div
+                style="padding: 5px 8px; font-size: 10px; color: var(--text-dim); cursor: pointer"
+              >
+                auth.middleware.spec.ts
+              </div>
+            </div>
+            <div class="diff-view" style="flex: 1; overflow: auto">
+              <div class="diff-hunk">@@ -12,8 +12,18 @@</div>
+              <div class="diff-ctx">const token = req.headers.authorization?.split(' ')[1]</div>
+              <div class="diff-ctx">if (!token) {</div>
+              <div class="diff-del">- res.status(401).json({ error: 'No token' })</div>
+              <div class="diff-del">- return</div>
+              <div class="diff-add">
+                + throw new AppError('No authorization token', 401, 'MISSING_TOKEN')
+              </div>
+              <div class="diff-ctx">}</div>
+              <div class="diff-hunk">@@ -22,6 +32,9 @@</div>
+              <div class="diff-ctx">} catch (err) {</div>
+              <div class="diff-del">- res.status(403).json({ error: 'Invalid token' })</div>
+              <div class="diff-add">+ if (err instanceof TokenExpiredError) {</div>
+              <div class="diff-add">
+                + throw new AppError('Token expired', 401, 'TOKEN_EXPIRED')
+              </div>
+              <div class="diff-add">+ }</div>
+              <div class="diff-add">
+                + throw new AppError('Invalid token', 403, 'INVALID_TOKEN')
+              </div>
+              <div class="diff-ctx">}</div>
+            </div>
+            <div
+              style="
+                padding: 6px 10px;
+                border-top: 0.5px solid var(--border);
+                font-size: 9px;
+                color: var(--text-faint);
+                display: flex;
+                gap: 10px;
+                align-items: center;
+              "
+            >
+              <span style="color: var(--green)">+9 added</span>
+              <span style="color: var(--red)">-3 removed</span>
+              <span>auth.middleware.ts</span>
+              <button
+                class="btn btn-red"
+                style="margin-left: auto; font-size: 9px; padding: 1px 6px"
+              >
+                revert
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     SCREEN 6 — Harness config / settings
+     ═══════════════════════════════════════════════════════════ -->
+    <div class="screen-section">
+      <div class="screen-label">
+        <i class="ti ti-settings"></i> Screen 6 — Harness configuration (sensors + gate defaults)
+      </div>
+      <div class="term">
+        <div
+          style="
+            padding: 9px 14px;
+            border-bottom: 0.5px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          "
+        >
+          <i class="ti ti-flame" style="font-size: 13px; color: var(--accent)"></i>
+          <div style="flex: 1; font-size: 11px; font-weight: 600; color: var(--text-primary)">
+            Foundry — harness settings
+          </div>
+          <button class="btn" style="padding: 3px 8px">
+            <i class="ti ti-x" style="font-size: 12px"></i>
+          </button>
+        </div>
+        <div class="settings-body" style="height: 460px">
+          <div class="settings-nav" style="width: 160px">
+            <div class="nav-group">
+              <div class="nav-label">Harness</div>
+              <div class="nav-item active">
+                <i class="ti ti-shield-bolt" style="font-size: 12px"></i> Sensors
+                <span class="nav-badge">1 err</span>
+              </div>
+              <div class="nav-item">
+                <i class="ti ti-file-text" style="font-size: 12px"></i> AGENTS.md
+              </div>
+              <div class="nav-item"><i class="ti ti-flag-2" style="font-size: 12px"></i> Gates</div>
+            </div>
+            <div class="nav-group" style="margin-top: 6px">
+              <div class="nav-label">Providers</div>
+              <div class="nav-item">
+                <i class="ti ti-sparkles" style="font-size: 12px"></i> Claude
+              </div>
+              <div class="nav-item">
+                <i class="ti ti-sparkles" style="font-size: 12px"></i> OpenAI
+              </div>
+              <div class="nav-item">
+                <i class="ti ti-server" style="font-size: 12px"></i> Ollama
+              </div>
+              <div class="nav-item" style="color: var(--text-faint)">
+                <i class="ti ti-plus" style="font-size: 12px"></i> add provider
+              </div>
+            </div>
+            <div class="nav-group" style="margin-top: 6px">
+              <div class="nav-label">Other</div>
+              <div class="nav-item">
+                <i class="ti ti-history" style="font-size: 12px"></i> Run history
+              </div>
+            </div>
+          </div>
+          <div class="settings-content">
+            <div class="section-title">
+              <i class="ti ti-shield-bolt" style="font-size: 12px; color: var(--accent)"></i>
+              Feedback sensors
+            </div>
+            <div class="sensor-card">
+              <div class="sc-top">
+                <span class="sc-name">lint</span
+                ><span class="status-badge ss-ok"
+                  ><i class="ti ti-check" style="font-size: 8px"></i> passing</span
+                ><button class="btn" style="font-size: 9px; padding: 2px 8px">edit</button
+                ><button class="btn" style="font-size: 9px; padding: 2px 8px">
+                  <i class="ti ti-player-play" style="font-size: 8px"></i> run
+                </button>
+              </div>
+              <div class="sc-cmd">
+                <span>eslint src --ext .ts,.tsx</span
+                ><span style="color: var(--text-faint)">0.3s</span>
+              </div>
+            </div>
+            <div class="sensor-card" style="border-color: var(--red-border)">
+              <div class="sc-top">
+                <span class="sc-name">test</span
+                ><span class="status-badge ss-err"
+                  ><i class="ti ti-x" style="font-size: 8px"></i> failing</span
+                ><button class="btn" style="font-size: 9px; padding: 2px 8px">edit</button
+                ><button class="btn" style="font-size: 9px; padding: 2px 8px">
+                  <i class="ti ti-player-play" style="font-size: 8px"></i> run
+                </button>
+              </div>
+              <div class="sc-cmd" style="color: var(--red)">
+                <span>npm test</span><span style="color: var(--text-faint)">exit 1</span>
+              </div>
+              <div style="font-size: 9px; color: var(--red); margin-top: 3px">
+                <i class="ti ti-alert-triangle" style="font-size: 9px"></i> 3 consecutive failures —
+                check test command
+              </div>
+            </div>
+            <div class="sensor-card">
+              <div class="sc-top">
+                <span class="sc-name">build</span
+                ><span class="status-badge ss-ok"
+                  ><i class="ti ti-check" style="font-size: 8px"></i> passing</span
+                ><button class="btn" style="font-size: 9px; padding: 2px 8px">edit</button
+                ><button class="btn" style="font-size: 9px; padding: 2px 8px">
+                  <i class="ti ti-player-play" style="font-size: 8px"></i> run
+                </button>
+              </div>
+              <div class="sc-cmd">
+                <span>tsc --noEmit</span><span style="color: var(--text-faint)">1.1s</span>
+              </div>
+            </div>
+            <div class="add-sensor">
+              <i class="ti ti-plus" style="font-size: 10px"></i> add sensor
+            </div>
+            <div class="section-title" style="margin-top: 4px">
+              <i class="ti ti-flag-2" style="font-size: 12px; color: var(--accent)"></i> Gate
+              defaults
+            </div>
+            <div class="gate-row">
+              <span class="gate-name">require gate after each iteration</span>
+              <div class="toggle on"></div>
+            </div>
+            <div class="gate-row">
+              <span class="gate-name">sensors must pass before gate opens</span>
+              <div class="toggle on"></div>
+            </div>
+            <div class="gate-row">
+              <span class="gate-name">auto-checkpoint commit before run</span>
+              <div class="toggle on"></div>
+            </div>
+            <div class="gate-row" style="border: none">
+              <span class="gate-name">require clean working tree</span>
+              <div class="toggle on"></div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px">
+              <span style="font-size: 10px; color: var(--text-secondary); flex: 1"
+                >max iterations per run</span
+              >
+              <input
+                class="field-input"
+                type="number"
+                value="3"
+                style="width: 50px; text-align: center"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     SCREEN 7 — Run history
+     ═══════════════════════════════════════════════════════════ -->
+    <div class="screen-section">
+      <div class="screen-label">
+        <i class="ti ti-history"></i> Screen 7 — Run history (global tab, with gate timeline detail)
+      </div>
+      <div class="term">
+        <div class="hist-header">
+          <div
+            style="
+              flex: 1;
+              font-size: 11px;
+              font-weight: 600;
+              color: var(--text-primary);
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            "
+          >
+            <i class="ti ti-history" style="font-size: 13px; color: var(--accent)"></i> Run history
+          </div>
+          <div style="display: flex; gap: 6px">
+            <div class="filter-pill active">all</div>
+            <div class="filter-pill">spec-to-code</div>
+            <div class="filter-pill">orchestrate</div>
+            <div class="filter-pill">co-pilot</div>
+            <div class="filter-pill">failed</div>
+          </div>
+          <input class="field-input" style="width: 140px" placeholder="search runs…" />
+        </div>
+        <div class="hist-body" style="height: 450px">
+          <div class="table-pane">
+            <div class="tbl-header">
+              <span>run / spec</span><span>mode</span><span>model</span><span>tokens</span
+              ><span>time</span><span>status</span>
+            </div>
+            <div class="tbl-row selected">
+              <span class="tbl-name">auth-middleware spec</span
+              ><span><span class="mode-chip mc-stc">spec→code</span></span
+              ><span style="font-size: 9px">sonnet-4-6</span><span>4.2k</span><span>1m 42s</span
+              ><span><span class="status-badge s-done">done</span></span>
+            </div>
+            <div class="tbl-row">
+              <span class="tbl-name">rate-limiter refactor</span
+              ><span><span class="mode-chip mc-stc">spec→code</span></span
+              ><span style="font-size: 9px">sonnet-4-6</span><span>9.1k</span><span>4m 08s</span
+              ><span><span class="status-badge s-done">done</span></span>
+            </div>
+            <div class="tbl-row">
+              <span class="tbl-name">REST API orchestration</span
+              ><span><span class="mode-chip mc-orc">orchestrate</span></span
+              ><span style="font-size: 9px">sonnet-4-6</span><span>22.4k</span><span>11m 22s</span
+              ><span><span class="status-badge s-done">done</span></span>
+            </div>
+            <div class="tbl-row">
+              <span class="tbl-name">session store migration</span
+              ><span><span class="mode-chip mc-stc">spec→code</span></span
+              ><span style="font-size: 9px">gpt-4o</span><span>6.8k</span><span>3m 14s</span
+              ><span
+                ><span
+                  class="status-badge s-aborted"
+                  style="background: var(--red-bg); color: var(--red)"
+                  >rejected</span
+                ></span
+              >
+            </div>
+            <div class="tbl-row">
+              <span class="tbl-name">error handling co-pilot</span
+              ><span><span class="mode-chip mc-cp">co-pilot</span></span
+              ><span style="font-size: 9px">sonnet-4-6</span><span>2.1k</span><span>12m</span
+              ><span><span class="status-badge s-done">done</span></span>
+            </div>
+            <div class="tbl-row">
+              <span class="tbl-name">logging refactor</span
+              ><span><span class="mode-chip mc-stc">spec→code</span></span
+              ><span style="font-size: 9px">ollama/llama3</span><span>11.2k</span><span>8m 50s</span
+              ><span><span class="status-badge s-aborted">aborted</span></span>
+            </div>
+          </div>
+          <div class="detail-pane" style="width: 240px">
+            <div
+              style="
+                padding: 8px 10px;
+                border-bottom: 0.5px solid var(--border);
+                font-size: 10px;
+                font-weight: 500;
+                color: var(--text-primary);
+              "
+            >
+              auth-middleware spec
+            </div>
+            <div class="detail-section">
+              <div class="ds-label">Run details</div>
+              <div class="ds-row">
+                <span class="ds-key">mode</span><span class="ds-val">spec-to-code</span>
+              </div>
+              <div class="ds-row">
+                <span class="ds-key">provider</span><span class="ds-val">claude / sonnet-4-6</span>
+              </div>
+              <div class="ds-row">
+                <span class="ds-key">tokens</span><span class="ds-val">4,218 in · 892 out</span>
+              </div>
+              <div class="ds-row">
+                <span class="ds-key">iterations</span><span class="ds-val">1 / 3</span>
+              </div>
+              <div class="ds-row">
+                <span class="ds-key">sensors</span
+                ><span class="ds-val" style="color: var(--green)">3/3 pass</span>
+              </div>
+              <div class="ds-row">
+                <span class="ds-key">files</span><span class="ds-val">3 changed</span>
+              </div>
+              <div class="ds-row">
+                <span class="ds-key">date</span><span class="ds-val">today 09:41</span>
+              </div>
+            </div>
+            <div style="padding: 8px 10px">
+              <div class="ds-label">Gate timeline</div>
+              <div class="gt-entry">
+                <div
+                  class="gt-dot"
+                  style="
+                    background: var(--green-bg);
+                    border: 0.5px solid var(--green-border);
+                    color: var(--green);
+                  "
+                >
+                  <i class="ti ti-check" style="font-size: 7px"></i>
+                </div>
+                <div>
+                  <div style="font-size: 10px; color: var(--text-secondary)">gate 1 — approved</div>
+                  <div style="font-size: 9px; color: var(--text-dim)">
+                    looked good, all sensors green
+                  </div>
+                  <div style="font-size: 9px; color: var(--text-faint)">09:43 · atavares</div>
+                </div>
+              </div>
+              <div class="gt-entry" style="opacity: 0.4">
+                <div
+                  class="gt-dot"
+                  style="background: #1a1a1e; border: 0.5px solid var(--border2)"
+                ></div>
+                <div>
+                  <div style="font-size: 10px; color: var(--text-faint)">run completed</div>
+                  <div style="font-size: 9px; color: var(--text-faint)">09:43</div>
+                </div>
+              </div>
+            </div>
+            <div
+              style="
+                padding: 8px 10px;
+                margin-top: auto;
+                border-top: 0.5px solid var(--border);
+                display: flex;
+                gap: 5px;
+              "
+            >
+              <button class="btn" style="flex: 1; font-size: 9px; padding: 4px">
+                <i class="ti ti-file-text" style="font-size: 9px"></i> view spec
+              </button>
+              <button class="btn btn-accent" style="flex: 1; font-size: 9px; padding: 4px">
+                <i class="ti ti-player-play" style="font-size: 9px"></i> re-run
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     SCREEN 8 — First-run setup wizard
+     ═══════════════════════════════════════════════════════════ -->
+    <div class="screen-section">
+      <div class="screen-label">
+        <i class="ti ti-wand"></i> Screen 8 — First-run harness setup wizard (AGENTS.md + sensors +
+        provider)
+      </div>
+      <div class="term">
+        <div
+          style="
+            padding: 9px 14px;
+            border-bottom: 0.5px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          "
+        >
+          <i class="ti ti-flame" style="font-size: 13px; color: var(--accent)"></i>
+          <div style="flex: 1; font-size: 11px; font-weight: 600; color: var(--text-primary)">
+            Set up your harness
+          </div>
+        </div>
+        <div class="steps" style="padding: 10px 14px; border-bottom: 0.5px solid var(--border)">
+          <div class="step done">
+            <div class="step-num"><i class="ti ti-check" style="font-size: 7px"></i></div>
+            <span>template</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="step active">
+            <div class="step-num">2</div>
+            <span>agents.md</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <span>sensors</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <span>provider</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="step">
+            <div class="step-num">5</div>
+            <span>done</span>
+          </div>
+        </div>
+        <div style="display: flex; height: 440px">
+          <div class="editor-pane">
+            <div class="editor-toolbar">
+              <span
+                style="
+                  font-size: 9px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.08em;
+                  color: var(--text-faint);
+                  flex: 1;
+                "
+                >AGENTS.md — TypeScript/Node template</span
+              >
+              <select
+                class="field-input"
+                style="width: auto; padding: 2px 6px; font-size: 9px; cursor: pointer"
+              >
+                <option>TypeScript / Node</option>
+                <option>General</option>
+                <option>Python</option>
+                <option>Blank</option>
+              </select>
+            </div>
+            <div class="editor">
+              <div class="e-comment"># AGENTS.md — generated by Foundry · edit freely</div>
+              <div style="margin-top: 8px"><span class="e-heading"># Project overview</span></div>
+              <div>TypeScript Electron application. Extension-first terminal emulator.</div>
+              <div style="margin-top: 8px">
+                <span class="e-heading"># How to build &amp; test</span>
+              </div>
+              <div><span class="e-code">npm run build</span> — compiles main + renderer</div>
+              <div><span class="e-code">npm test</span> — runs vitest unit suite</div>
+              <div><span class="e-code">npm run lint</span> — eslint src/</div>
+              <div style="margin-top: 8px">
+                <span class="e-heading"># Architecture conventions</span>
+              </div>
+              <div>- All IPC channels defined in <span class="e-code">src/main/ipc/</span></div>
+              <div>
+                - Extensions use <span class="e-code">ExtensionAPI</span> only — no internal imports
+              </div>
+              <div>- React components are functional, no class components</div>
+              <div style="margin-top: 8px"><span class="e-heading"># Critical rules</span></div>
+              <div>
+                - Never modify <span class="e-code">src/main/extensions/api.ts</span> without ADR
+              </div>
+              <div>- Tests must accompany every new public function</div>
+              <div class="e-comment" style="margin-top: 4px">
+                # add project-specific rules below…
+              </div>
+            </div>
+          </div>
+          <div style="width: 240px; display: flex; flex-direction: column">
+            <div class="rp-section">
+              <div class="rp-title">Feedback sensors</div>
+              <div class="sensor-input-row">
+                <div
+                  style="
+                    font-size: 9px;
+                    color: var(--text-dim);
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                  "
+                >
+                  lint <span class="status-badge ss-ok" style="font-size: 8px">✓ ok</span>
+                </div>
+                <input class="sensor-inp" value="eslint src --ext .ts,.tsx" />
+              </div>
+              <div class="sensor-input-row">
+                <div
+                  style="
+                    font-size: 9px;
+                    color: var(--text-dim);
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                  "
+                >
+                  test <span class="status-badge ss-ok" style="font-size: 8px">✓ ok</span>
+                </div>
+                <input class="sensor-inp" value="npm test" />
+              </div>
+              <div class="sensor-input-row">
+                <div
+                  style="
+                    font-size: 9px;
+                    color: var(--text-dim);
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                  "
+                >
+                  build
+                  <span
+                    style="
+                      font-size: 8px;
+                      padding: 1px 5px;
+                      border-radius: 3px;
+                      background: var(--border);
+                      color: var(--text-faint);
+                    "
+                    >not checked</span
+                  >
+                </div>
+                <input class="sensor-inp" placeholder="optional — e.g. npm run build" />
+              </div>
+            </div>
+            <div style="padding: 10px">
+              <div class="rp-title">Default provider</div>
+              <div class="prov-row">
+                <i class="ti ti-sparkles" style="font-size: 11px; color: var(--accent)"></i
+                ><span class="prov-name">Claude (Anthropic)</span>
+                <div class="prov-radio checked"></div>
+              </div>
+              <div class="prov-row">
+                <i class="ti ti-sparkles" style="font-size: 11px; color: var(--text-dim)"></i
+                ><span class="prov-name">OpenAI</span>
+                <div class="prov-radio"></div>
+              </div>
+              <div class="prov-row">
+                <i class="ti ti-server" style="font-size: 11px; color: var(--text-dim)"></i
+                ><span class="prov-name">Ollama (local)</span>
+                <div class="prov-radio"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="wizard-footer">
+          <span style="font-size: 9px; color: var(--text-faint)"
+            >AGENTS.md will be written to workspace root</span
+          >
+          <div style="display: flex; gap: 6px">
+            <button class="btn">back</button>
+            <button class="btn btn-accent">
+              next <i class="ti ti-arrow-right" style="font-size: 10px"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

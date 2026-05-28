@@ -30,8 +30,11 @@ const COVERAGE_EXCLUDED_PATTERNS = [
   /extensions\/[^/]+\/src\/vault\/db\.ts$/,
   /extensions\/[^/]+\/src\/vault\/writer\.ts$/,
   /extensions\/[^/]+\/src\/schemas\/project\.schema\.ts$/,
+  /extensions\/[^/]+\/src\/types\//, // pure TypeScript type declarations — no executable code
+  /extensions\/[^/]+\/src\/providers\/adapter\.ts$/, // interface-only adapter contract
   /src\/shared\/types\//,
   /\.d\.ts$/,
+  /vitest\.config\.ts$/, // test runner config, not application code
 ]
 
 function isCoverageExcluded(filePath) {

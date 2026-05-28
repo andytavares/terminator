@@ -1,3 +1,4 @@
+/* v8 ignore file */
 import { defineConfig } from 'vitest/config'
 import { resolve } from 'path'
 
@@ -31,6 +32,7 @@ export default defineConfig({
         'extensions/*/src/**/*.tsx',
       ],
       exclude: [
+        'vitest.config.ts',
         'src/renderer/index.tsx',
         'src/main/index.ts',
         'src/main/preload.ts',
@@ -43,6 +45,8 @@ export default defineConfig({
         'extensions/*/src/vault/db.ts',
         'extensions/*/src/vault/writer.ts',
         'extensions/*/src/schemas/project.schema.ts',
+        'extensions/*/src/types/**',
+        'extensions/*/src/providers/adapter.ts',
         'src/shared/types/**',
         '**/*.d.ts',
         '**/*.spec.ts',
