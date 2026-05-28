@@ -137,9 +137,10 @@ export const RestoreTaskRequestSchema = z.object({ taskId: TaskIdSchema })
 
 export const CreateAreaRequestSchema = z.object({ name: z.string().min(1) })
 
-// ── vault:delete-area ────────────────────────────────────────────────────────
+// ── vault:delete-area / vault:archive-area ───────────────────────────────────
 
 export const DeleteAreaRequestSchema = z.object({ areaFilePath: z.string().min(1) })
+export const ArchiveAreaRequestSchema = z.object({ areaName: z.string().min(1) })
 
 // ── vault:list-archive ───────────────────────────────────────────────────────
 
@@ -280,3 +281,24 @@ export const UnblockTaskRequestSchema = z.object({ taskId: TaskIdSchema })
 export const ReorderTasksRequestSchema = z.object({
   orderedIds: z.array(z.string().min(1)).min(1),
 })
+
+// ── vault:set-recurrence ──────────────────────────────────────────────────────
+
+export const RecurrenceIntervalSchema = z.enum(['daily', 'weekly', 'biweekly', 'monthly'])
+
+export const SetRecurrenceRequestSchema = z.object({
+  taskId: TaskIdSchema,
+  interval: RecurrenceIntervalSchema,
+  days: z.array(z.number().int().min(0).max(6)).optional(), // weekdays 0=Sun..6=Sat (weekly only)
+  time: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .optional(),
+  endType: z.enum(['none', 'on_date', 'after_count']).optional(),
+  endDate: DateSchema.optional(),
+  endCount: z.number().int().min(1).optional(),
+})
+
+// ── vault:clear-recurrence ────────────────────────────────────────────────────
+
+export const ClearRecurrenceRequestSchema = z.object({ taskId: TaskIdSchema })

@@ -40,12 +40,14 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>): void {
     e.preventDefault()
+    const instance = getTerminalInstance(sessionId)
+    if (!instance) return
     const paths = Array.from(e.dataTransfer.files)
       .map((f) => (f as unknown as { path: string }).path)
       .filter(Boolean)
       .map((p) => (/\s/.test(p) ? `'${p.replace(/'/g, "'\\''")}'` : p))
       .join(' ')
-    if (paths) window.electronAPI.terminal.input(sessionId, paths)
+    if (paths) instance.terminal.paste(paths)
   }
 
   return (

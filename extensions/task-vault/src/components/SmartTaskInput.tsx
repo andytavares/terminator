@@ -21,6 +21,7 @@ interface ActiveTrigger {
 interface DropdownOption {
   label: string
   value: string
+  isCreate?: boolean
 }
 
 // Detect which trigger is active given the text and cursor position
@@ -135,10 +136,24 @@ export function SmartTaskInput({
       const q = trigger.query.toLowerCase()
       const qNorm = q.replace(/-/g, ' ')
       switch (trigger.type) {
-        case 'project':
-          return optionCache.projects.filter((o) => o.label.toLowerCase().includes(qNorm))
-        case 'area':
-          return optionCache.areas.filter((o) => o.label.toLowerCase().includes(qNorm))
+        case 'project': {
+          const matches = optionCache.projects.filter((o) => o.label.toLowerCase().includes(qNorm))
+          const exactMatch = optionCache.projects.some((o) => o.label.toLowerCase() === qNorm)
+          const createOpt: DropdownOption[] =
+            q.length > 0 && !exactMatch
+              ? [{ label: trigger.query, value: trigger.query, isCreate: true }]
+              : []
+          return [...matches, ...createOpt]
+        }
+        case 'area': {
+          const matches = optionCache.areas.filter((o) => o.label.toLowerCase().includes(qNorm))
+          const exactMatch = optionCache.areas.some((o) => o.label.toLowerCase() === qNorm)
+          const createOpt: DropdownOption[] =
+            q.length > 0 && !exactMatch
+              ? [{ label: trigger.query, value: trigger.query, isCreate: true }]
+              : []
+          return [...matches, ...createOpt]
+        }
         case 'context':
           return optionCache.contexts.filter((o) => o.label.toLowerCase().includes(qNorm))
         default:
@@ -165,8 +180,24 @@ export function SmartTaskInput({
     }
   }
 
-  function handleSelect(option: DropdownOption) {
+  async function handleSelect(option: DropdownOption) {
     if (!active) return
+
+    if (option.isCreate) {
+      const name = option.value
+      try {
+        if (active.type === 'project') {
+          await window.electronAPI.extensionBridge.invoke('task-vault:projects:create', { name })
+          optionCache.projects.push({ label: name, value: name })
+        } else if (active.type === 'area') {
+          await window.electronAPI.extensionBridge.invoke('task-vault:vault:create-area', { name })
+          optionCache.areas.push({ label: name, value: name })
+        }
+      } catch {
+        // insert the tag even if creation fails
+      }
+    }
+
     const before = value.slice(0, active.triggerStart)
     const after = value.slice(active.triggerStart + active.triggerChar.length + active.query.length)
     const slug = option.value.replace(/ /g, '-')
@@ -188,6 +219,24 @@ export function SmartTaskInput({
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    // Convert spaces to hyphens while inside a @/#/+ trigger
+    if (active && active.type !== 'date' && e.key === ' ') {
+      e.preventDefault()
+      const input = inputRef.current!
+      const cursor = input.selectionStart ?? value.length
+      const newVal = value.slice(0, cursor) + '-' + value.slice(cursor)
+      const newCursor = cursor + 1
+      onChange(newVal)
+      const trigger = detectTrigger(newVal, newCursor)
+      setActive(trigger)
+      setSelectedIdx(0)
+      if (trigger && trigger.type !== 'date') {
+        setOptions(getOptionsForTrigger(trigger))
+      }
+      requestAnimationFrame(() => input.setSelectionRange(newCursor, newCursor))
+      return
+    }
+
     if (active && active.type !== 'date' && options.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -201,7 +250,7 @@ export function SmartTaskInput({
       }
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault()
-        handleSelect(options[selectedIdx])
+        void handleSelect(options[selectedIdx])
         return
       }
       if (e.key === 'Escape') {
@@ -219,8 +268,9 @@ export function SmartTaskInput({
       return
     }
 
-    if (e.key === 'Enter' && !active) {
+    if (e.key === 'Enter') {
       e.preventDefault()
+      setActive(null)
       onSubmit()
     }
   }
@@ -294,13 +344,23 @@ export function SmartTaskInput({
               ) : (
                 options.map((opt, i) => (
                   <button
-                    key={opt.value}
-                    className={`smart-input__option${i === selectedIdx ? ' smart-input__option--selected' : ''}`}
-                    onClick={() => handleSelect(opt)}
+                    key={opt.isCreate ? `__create__${opt.value}` : opt.value}
+                    className={`smart-input__option${i === selectedIdx ? ' smart-input__option--selected' : ''}${opt.isCreate ? ' smart-input__option--create' : ''}`}
+                    onClick={() => void handleSelect(opt)}
                     onMouseEnter={() => setSelectedIdx(i)}
                   >
-                    <span className="smart-input__option-trigger">{active?.triggerChar}</span>
-                    {opt.label}
+                    {opt.isCreate ? (
+                      <>
+                        <span className="smart-input__option-create-icon">+</span>
+                        Create "{active?.triggerChar}
+                        {opt.label}"
+                      </>
+                    ) : (
+                      <>
+                        <span className="smart-input__option-trigger">{active?.triggerChar}</span>
+                        {opt.label}
+                      </>
+                    )}
                   </button>
                 ))
               )}

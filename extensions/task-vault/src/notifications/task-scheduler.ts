@@ -62,37 +62,51 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
       }
 
       // ── Due tasks (gated by configured alert time) ───────────────
-      const alertTimeSetting =
+      const globalAlertTimeSetting =
         api.settings.get<string>('terminator.task-vault.dueDateAlertTime') ?? '09:00'
-      const [alertHourStr = '9', alertMinStr = '0'] = alertTimeSetting.split(':')
-      const alertTotalMinutes = parseInt(alertHourStr) * 60 + parseInt(alertMinStr)
+      const [globalAlertHourStr = '9', globalAlertMinStr = '0'] = globalAlertTimeSetting.split(':')
+      const globalAlertTotalMinutes =
+        parseInt(globalAlertHourStr) * 60 + parseInt(globalAlertMinStr)
       const currentTotalMinutes = nowDate.getHours() * 60 + nowDate.getMinutes()
 
-      if (currentTotalMinutes >= alertTotalMinutes) {
-        type DueRow = { id: string; text: string }
-        const dueTasks = db
-          .prepare(
-            `SELECT id, text FROM tasks
-             WHERE status='open' AND due_date IS NOT NULL AND due_date <= ? AND parent_id IS NULL`
-          )
-          .all(today) as DueRow[]
+      type DueRow = { id: string; text: string; metadata: string }
+      const dueTasks = db
+        .prepare(
+          `SELECT id, text, metadata FROM tasks
+           WHERE status='open' AND due_date IS NOT NULL AND due_date <= ? AND parent_id IS NULL`
+        )
+        .all(today) as DueRow[]
 
-        for (const task of dueTasks) {
-          if (notifiedDueIds.has(task.id)) continue
-          notifiedDueIds.add(task.id)
-          const taskId = task.id
-          api.notifications.createNotification({
-            type: 'warning',
-            title: `Due today: ${task.text}`,
-            actions: [
-              {
-                id: 'open',
-                label: 'Open Vault',
-                handler: () => broadcast('task-vault:navigate-task', taskId),
-              },
-            ],
-          })
+      for (const task of dueTasks) {
+        if (notifiedDueIds.has(task.id)) continue
+
+        // Use per-task recurrence_time if set, otherwise fall back to global alert time
+        let taskAlertMinutes = globalAlertTotalMinutes
+        try {
+          const meta = JSON.parse(task.metadata || '{}') as Record<string, string>
+          if (meta.recurrence_time) {
+            const [h = '9', m = '0'] = meta.recurrence_time.split(':')
+            taskAlertMinutes = parseInt(h) * 60 + parseInt(m)
+          }
+        } catch {
+          // ignore malformed metadata
         }
+
+        if (currentTotalMinutes < taskAlertMinutes) continue
+
+        notifiedDueIds.add(task.id)
+        const taskId = task.id
+        api.notifications.createNotification({
+          type: 'warning',
+          title: `Due today: ${task.text}`,
+          actions: [
+            {
+              id: 'open',
+              label: 'Open Vault',
+              handler: () => broadcast('task-vault:navigate-task', taskId),
+            },
+          ],
+        })
       }
 
       // ── Blocked tasks with check interval ────────────────────────

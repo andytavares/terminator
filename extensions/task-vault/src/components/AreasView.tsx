@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Trash2, Pencil, Check, X } from 'lucide-react'
+import { Trash2, Pencil, Check, X, Archive } from 'lucide-react'
 import type { IndexedTask } from '../vault/types'
 import { SmartTaskInput, invalidateSmartInputCache } from './SmartTaskInput'
 import { useVaultStore } from '../stores/vault.store'
@@ -17,6 +17,7 @@ interface AreaProject {
 interface AreaData {
   filePath: string
   name: string
+  status: string
   taskCount: number
   openTaskCount: number
   tasks: IndexedTask[]
@@ -28,6 +29,7 @@ export function AreasView(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedArea, setSelectedArea] = useState<AreaData | null>(null)
+  const [statusFilter, setStatusFilter] = useState<'active' | 'archived'>('active')
   const { navToProject, selectedAreaName } = useVaultStore()
   const [creatingArea, setCreatingArea] = useState(false)
   const [newAreaName, setNewAreaName] = useState('')
@@ -38,7 +40,10 @@ export function AreasView(): React.JSX.Element {
     setIsLoading(true)
     setError(null)
     try {
-      const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:list-areas')
+      const result = await window.electronAPI.extensionBridge.invoke(
+        'task-vault:vault:list-areas',
+        { status: statusFilter }
+      )
       if (result && typeof result === 'object' && 'areas' in result) {
         setAreas((result as { areas: AreaData[] }).areas)
       } else if (result && typeof result === 'object' && 'error' in result) {
@@ -53,7 +58,7 @@ export function AreasView(): React.JSX.Element {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [statusFilter])
 
   useEffect(() => {
     if (selectedAreaName && areas.length > 0) {
@@ -85,14 +90,30 @@ export function AreasView(): React.JSX.Element {
     }
   }
 
-  async function handleDeleteArea(filePath: string, name: string) {
-    if (!confirm(`Delete area "${name}"? This will delete the area file and all its tasks.`)) return
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-area', {
-      areaFilePath: filePath,
+  async function handleArchiveArea(name: string) {
+    if (
+      !confirm(
+        `Archive area "${name}"? This will archive the area, all its projects, and cancel all open tasks.`
+      )
+    )
+      return
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:archive-area', {
+      areaName: name,
     })
     invalidateSmartInputCache()
     await load()
-    if (selectedArea?.filePath === filePath) setSelectedArea(null)
+    if (selectedArea?.name === name) setSelectedArea(null)
+  }
+
+  async function handleDeleteArea(name: string) {
+    if (!confirm(`Permanently delete area "${name}" and all its data? This cannot be undone.`))
+      return
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-area', {
+      areaFilePath: name,
+    })
+    invalidateSmartInputCache()
+    await load()
+    if (selectedArea?.name === name) setSelectedArea(null)
   }
 
   if (isLoading) return <div className="areas-view__loading">Loading areas…</div>
@@ -104,9 +125,10 @@ export function AreasView(): React.JSX.Element {
         area={selectedArea}
         onBack={() => {
           setSelectedArea(null)
-          load()
+          void load()
         }}
-        onDelete={() => handleDeleteArea(selectedArea.filePath, selectedArea.name)}
+        onArchive={() => void handleArchiveArea(selectedArea.name)}
+        onDelete={() => void handleDeleteArea(selectedArea.name)}
         onRefresh={async () => {
           await load()
         }}
@@ -119,9 +141,22 @@ export function AreasView(): React.JSX.Element {
     <div className="areas-view">
       <div className="areas-view__header">
         <h2>Areas</h2>
-        <button className="areas-view__create-btn" onClick={() => setCreatingArea(true)}>
-          + New area
-        </button>
+        <div className="projects-browser__filter">
+          {(['active', 'archived'] as const).map((f) => (
+            <button
+              key={f}
+              className={`projects-browser__filter-btn${statusFilter === f ? ' projects-browser__filter-btn--active' : ''}`}
+              onClick={() => setStatusFilter(f)}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+        {statusFilter === 'active' && (
+          <button className="areas-view__create-btn" onClick={() => setCreatingArea(true)}>
+            + New area
+          </button>
+        )}
       </div>
 
       {creatingArea && (
@@ -210,16 +245,29 @@ export function AreasView(): React.JSX.Element {
                   </div>
                 )}
               </div>
-              <button
-                className="areas-view__card-delete"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleDeleteArea(area.filePath, area.name)
-                }}
-                title="Delete area"
-              >
-                <Trash2 size={14} />
-              </button>
+              {area.status !== 'archived' ? (
+                <button
+                  className="areas-view__card-delete"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void handleArchiveArea(area.name)
+                  }}
+                  title="Archive area"
+                >
+                  <Archive size={14} />
+                </button>
+              ) : (
+                <button
+                  className="areas-view__card-delete areas-view__card-delete--danger"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void handleDeleteArea(area.name)
+                  }}
+                  title="Delete area permanently"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -231,12 +279,14 @@ export function AreasView(): React.JSX.Element {
 function AreaDetail({
   area,
   onBack,
+  onArchive,
   onDelete,
   onRefresh,
   onNavToProject,
 }: {
   area: AreaData
   onBack: () => void
+  onArchive: () => void
   onDelete: () => void
   onRefresh: () => Promise<void>
   onNavToProject: (name: string) => void
@@ -262,9 +312,14 @@ function AreaDetail({
     if (!newTaskText.trim()) return
     setAdding(true)
     try {
+      const slug = area.name.replace(/ /g, '-')
+      const text = newTaskText.trim()
+      const taggedText = text.toLowerCase().includes(`#${slug.toLowerCase()}`)
+        ? text
+        : `${text} #${slug}`
       await window.electronAPI.extensionBridge.invoke('task-vault:vault:add-task', {
-        filePath: area.filePath,
-        text: newTaskText.trim(),
+        filePath: `areas/${area.name}.md`,
+        text: taggedText,
       })
       setNewTaskText('')
       await reloadTasks()
@@ -328,10 +383,27 @@ function AreaDetail({
         <button className="area-detail__back-btn" onClick={onBack}>
           ← Areas
         </button>
-        <h2>{area.name}</h2>
-        <button className="area-detail__delete-btn" onClick={onDelete} title="Delete area">
-          Delete area
-        </button>
+        <h2>
+          {area.name}
+          {area.status === 'archived' && (
+            <span className="projects-browser__archived-badge" style={{ marginLeft: 8 }}>
+              archived
+            </span>
+          )}
+        </h2>
+        {area.status !== 'archived' ? (
+          <button className="area-detail__delete-btn" onClick={onArchive} title="Archive area">
+            Archive area
+          </button>
+        ) : (
+          <button
+            className="area-detail__delete-btn area-detail__delete-btn--danger"
+            onClick={onDelete}
+            title="Delete area permanently"
+          >
+            Delete area
+          </button>
+        )}
       </div>
 
       <div className="area-detail__add-row">

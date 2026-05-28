@@ -23,6 +23,7 @@ function makeInstance() {
     terminal: {
       focus: vi.fn(),
       scrollToBottom: vi.fn(),
+      paste: vi.fn(),
     },
   }
 }
@@ -93,22 +94,26 @@ describe('LeafPane', () => {
     expect(() => fireEvent.click(container.querySelector('.leaf-pane')!)).not.toThrow()
   })
 
-  it('sends file paths to terminal on drop', () => {
+  it('pastes file paths into terminal on drop', () => {
+    const instance = makeInstance()
+    mockGetTerminalInstance.mockReturnValue(instance)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     const file = Object.assign(new File([], 'report.pdf'), { path: '/Users/me/report.pdf' })
     fireEvent.drop(container.querySelector('.leaf-pane')!, {
       dataTransfer: { files: [file], types: ['Files'] },
     })
-    expect(mockTerminalInput).toHaveBeenCalledWith('sess-1', '/Users/me/report.pdf')
+    expect(instance.terminal.paste).toHaveBeenCalledWith('/Users/me/report.pdf')
   })
 
   it('quotes paths with spaces on drop', () => {
+    const instance = makeInstance()
+    mockGetTerminalInstance.mockReturnValue(instance)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     const file = Object.assign(new File([], 'my file.txt'), { path: '/my file.txt' })
     fireEvent.drop(container.querySelector('.leaf-pane')!, {
       dataTransfer: { files: [file], types: ['Files'] },
     })
-    expect(mockTerminalInput).toHaveBeenCalledWith('sess-1', "'/my file.txt'")
+    expect(instance.terminal.paste).toHaveBeenCalledWith("'/my file.txt'")
   })
 
   it('prevents default on dragover when files are dragged', () => {

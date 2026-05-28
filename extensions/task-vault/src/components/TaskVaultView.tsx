@@ -12,7 +12,6 @@ import { WeeklyReview } from './WeeklyReview'
 import { InboxView } from './InboxView'
 import { AreasView } from './AreasView'
 import { ArchiveView } from './ArchiveView'
-import { SomedayView } from './SomedayView'
 import { CalendarDrawer } from './CalendarDrawer'
 import { SmartTaskInput } from './SmartTaskInput'
 import { KanbanBoard } from './KanbanBoard'
@@ -265,6 +264,8 @@ export function TaskVaultView(): React.JSX.Element {
     pendingTaskId,
     clearPendingTask,
     viewingDate,
+    somedayTasks,
+    loadSomeday,
   } = useVaultStore()
   const { addToast } = useToastStore()
   const [showDataTools, setShowDataTools] = useState(false)
@@ -273,6 +274,8 @@ export function TaskVaultView(): React.JSX.Element {
   const contextMenuRef = useRef<HTMLDivElement>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [selectedTaskText, setSelectedTaskText] = useState<string>('')
+
+  const loadSomedayTasks = loadSomeday
 
   const loadContexts = useCallback(async () => {
     try {
@@ -321,6 +324,7 @@ export function TaskVaultView(): React.JSX.Element {
     loadToday()
     refreshInboxCount()
     void loadContexts()
+    void loadSomedayTasks()
 
     const unsubIndexUpdated = window.electronAPI.extensionBridge.on(
       'task-vault:push:index-updated',
@@ -328,6 +332,7 @@ export function TaskVaultView(): React.JSX.Element {
         loadToday()
         refreshInboxCount()
         void loadContexts()
+        void loadSomedayTasks()
       }
     )
 
@@ -360,6 +365,17 @@ export function TaskVaultView(): React.JSX.Element {
       onClick: makeTaskNavHandler(taskId),
     })
     await loadToday()
+  }
+
+  async function handlePickUpToday(taskId: string) {
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:someday-to-today', { taskId })
+    await loadToday()
+    await loadSomedayTasks()
+  }
+
+  async function handleDeleteBacklogTask(taskId: string) {
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-task', { taskId })
+    await loadSomedayTasks()
   }
 
   async function handleMigrate(taskId: string, targetDate: string) {
@@ -413,7 +429,7 @@ export function TaskVaultView(): React.JSX.Element {
       setSelectedTaskText('')
       return
     }
-    const allTasks = todayLog?.tasks ?? []
+    const allTasks = [...(todayLog?.tasks ?? []), ...somedayTasks]
     const task = allTasks.find((t) => t.id === taskId)
     setSelectedTaskId(taskId)
     setSelectedTaskText(task?.text ?? '')
@@ -501,9 +517,7 @@ export function TaskVaultView(): React.JSX.Element {
         {viewMode === 'kanban' && activeView !== 'review' ? (
           <KanbanBoard />
         ) : (
-          <div
-            className={`task-vault-view__main${selectedTaskId && activeView === 'daily' ? ' task-vault-view__main--split' : ''}`}
-          >
+          <div className="task-vault-view__main">
             <div className="task-vault-view__list">
               {activeView === 'daily' && isLoading && (
                 <div className="task-vault-view__loading">Loading…</div>
@@ -520,11 +534,22 @@ export function TaskVaultView(): React.JSX.Element {
                   onSelectTask={handleSelectTask}
                   onTaskComplete={handleComplete}
                   onTaskMigrate={handleMigrate}
-                  onRefresh={isToday ? loadToday : () => loadDate(currentDate)}
+                  onRefresh={
+                    isToday
+                      ? async () => {
+                          await loadToday()
+                          await loadSomedayTasks()
+                        }
+                      : () => loadDate(currentDate)
+                  }
                   onPrevDay={goToPrevDay}
                   onNextDay={goToNextDay}
                   onGoToToday={loadToday}
                   isToday={isToday}
+                  somedayTasks={isToday ? somedayTasks : []}
+                  onPickUpToday={handlePickUpToday}
+                  onDeleteBacklogTask={handleDeleteBacklogTask}
+                  onRefreshBacklog={loadSomedayTasks}
                 />
               )}
               {activeView === 'daily' && !isLoading && !error && !todayLog && (
@@ -535,16 +560,18 @@ export function TaskVaultView(): React.JSX.Element {
               {activeView === 'inbox' && <InboxView />}
               {activeView === 'projects' && <ProjectsBrowser />}
               {activeView === 'areas' && <AreasView />}
-              {activeView === 'someday' && <SomedayView />}
               {activeView === 'archive' && <ArchiveView />}
               {activeView === 'review' && <WeeklyReview />}
             </div>
             {selectedTaskId && activeView === 'daily' && (
-              <TaskDetailPanel
-                taskId={selectedTaskId}
-                taskText={selectedTaskText}
-                onClose={() => handleSelectTask(null)}
-              />
+              <>
+                <div className="tv-detail-panel__backdrop" onClick={() => handleSelectTask(null)} />
+                <TaskDetailPanel
+                  taskId={selectedTaskId}
+                  taskText={selectedTaskText}
+                  onClose={() => handleSelectTask(null)}
+                />
+              </>
             )}
             {activeView === 'daily' && <CalendarDrawer />}
           </div>

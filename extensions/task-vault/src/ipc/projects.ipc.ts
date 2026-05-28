@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron'
 import { getDb, randomUUID } from '../vault/db'
+import { toDisplayName } from '../vault/tags'
 import {
   ListProjectsRequestSchema,
   UpdateProjectStatusRequestSchema,
@@ -150,13 +151,15 @@ export function registerProjectsIpcHandlers(): () => void {
     const parsed = CreateProjectRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { name, area, deadline, outcome } = parsed.data
+    const displayName = toDisplayName(name.trim())
+    const displayArea = area ? toDisplayName(area.trim()) : undefined
     const db = getDb()
-    const existing = db.prepare(`SELECT id FROM projects WHERE name=?`).get(name)
+    const existing = db.prepare(`SELECT id FROM projects WHERE name=?`).get(displayName)
     if (existing) return { error: 'PROJECT_EXISTS' }
     const now = new Date().toISOString()
     let areaId: string | null = null
-    if (area) {
-      const existingArea = db.prepare(`SELECT id FROM areas WHERE name=?`).get(area) as
+    if (displayArea) {
+      const existingArea = db.prepare(`SELECT id FROM areas WHERE name=?`).get(displayArea) as
         | { id: string }
         | undefined
       if (existingArea) {
@@ -165,7 +168,7 @@ export function registerProjectsIpcHandlers(): () => void {
         areaId = randomUUID()
         db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
           areaId,
-          area,
+          displayArea,
           now
         )
       }
@@ -173,8 +176,8 @@ export function registerProjectsIpcHandlers(): () => void {
     db.prepare(
       `INSERT INTO projects (id,name,status,area_id,deadline,outcome,created_at,updated_at)
        VALUES (?,?,?,?,?,?,?,?)`
-    ).run(randomUUID(), name, 'active', areaId, deadline ?? null, outcome ?? null, now, now)
-    return { success: true, filePath: name }
+    ).run(randomUUID(), displayName, 'active', areaId, deadline ?? null, outcome ?? null, now, now)
+    return { success: true, filePath: displayName }
   })
 
   // ── projects:delete ──────────────────────────────────────────────────────────
@@ -182,11 +185,27 @@ export function registerProjectsIpcHandlers(): () => void {
   handle('task-vault:projects:delete', async (_event, payload) => {
     const parsed = DeleteProjectRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    // projectFilePath is now the project name
     const { projectFilePath: projectName } = parsed.data
     const db = getDb()
-    // FK ON DELETE SET NULL handles tasks.project_id automatically
-    db.prepare(`DELETE FROM projects WHERE name=?`).run(projectName)
+
+    const proj = db.prepare(`SELECT id, status FROM projects WHERE name=?`).get(projectName) as
+      | { id: string; status: string }
+      | undefined
+    if (!proj) return { error: 'NOT_FOUND' }
+    if (proj.status !== 'archived') return { error: 'MUST_ARCHIVE_FIRST' }
+
+    // Delete all tasks (subtasks cascade via parent_id FK)
+    db.prepare(
+      `WITH RECURSIVE subtree(id) AS (
+         SELECT id FROM tasks WHERE project_id=? AND parent_id IS NULL
+         UNION ALL
+         SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
+       )
+       DELETE FROM tasks WHERE id IN (SELECT id FROM subtree)`
+    ).run(proj.id)
+    // Also catch any orphaned tasks remaining
+    db.prepare(`DELETE FROM tasks WHERE project_id=?`).run(proj.id)
+    db.prepare(`DELETE FROM projects WHERE id=?`).run(proj.id)
     return { success: true }
   })
 
@@ -198,15 +217,31 @@ export function registerProjectsIpcHandlers(): () => void {
     const { projectFilePath: projectName, status } = parsed.data
     const db = getDb()
     const now = new Date().toISOString()
-    let changes = db
-      .prepare(`UPDATE projects SET status=?, updated_at=? WHERE name=?`)
-      .run(status, now, projectName)
-    if (changes.changes === 0) {
-      changes = db
-        .prepare(`UPDATE projects SET status=?, updated_at=? WHERE id=?`)
-        .run(status, now, projectName)
+
+    let proj = db.prepare(`SELECT id FROM projects WHERE name=?`).get(projectName) as
+      | { id: string }
+      | undefined
+    if (!proj) {
+      proj = db.prepare(`SELECT id FROM projects WHERE id=?`).get(projectName) as
+        | { id: string }
+        | undefined
     }
-    if (changes.changes === 0) return { error: 'NOT_FOUND' }
+    if (!proj) return { error: 'NOT_FOUND' }
+
+    if (status === 'archived') {
+      db.prepare(
+        `WITH RECURSIVE subtree(id) AS (
+           SELECT id FROM tasks WHERE project_id=? AND parent_id IS NULL
+           UNION ALL
+           SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
+         )
+         UPDATE tasks SET status='cancelled', updated_at=?
+         WHERE id IN (SELECT id FROM subtree)
+           AND status IN ('open','in-progress','in-review','blocked')`
+      ).run(proj.id, now)
+    }
+
+    db.prepare(`UPDATE projects SET status=?, updated_at=? WHERE id=?`).run(status, now, proj.id)
     return { success: true }
   })
 

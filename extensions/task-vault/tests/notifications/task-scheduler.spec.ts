@@ -293,3 +293,63 @@ describe('broadcast via action handler', () => {
     expect(mockSend).toHaveBeenCalledWith('task-vault:navigate-task', 't-action')
   })
 })
+
+// ── per-task recurrence_time ──────────────────────────────────────────────────
+
+describe('startTaskScheduler — per-task recurrence_time', () => {
+  function dueTaskRow(overrides: Record<string, unknown> = {}) {
+    return { id: 'r1', text: 'Recurring task', metadata: '{}', ...overrides }
+  }
+
+  it('fires notification when current time >= task recurrence_time', () => {
+    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+
+    const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
+    const createNotification = vi.spyOn(api.notifications, 'createNotification')
+
+    const row = dueTaskRow({
+      metadata: JSON.stringify({ recurrence_interval: 'daily', recurrence_time: '10:00' }),
+    })
+    mockAll.mockReturnValueOnce([row]).mockReturnValue([])
+
+    const { dispose } = startTaskScheduler(api)
+    dispose()
+
+    expect(createNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'warning', title: expect.stringContaining('Recurring task') })
+    )
+  })
+
+  it('suppresses notification when current time < task recurrence_time', () => {
+    vi.setSystemTime(new Date('2026-05-26T08:00:00'))
+
+    const api = makeApi({ settings: { get: vi.fn(() => '07:00') } }) // global alert is past
+    const createNotification = vi.spyOn(api.notifications, 'createNotification')
+
+    // Task has per-task time of 09:00 — current time 08:00 should suppress
+    const row = dueTaskRow({
+      metadata: JSON.stringify({ recurrence_interval: 'daily', recurrence_time: '09:00' }),
+    })
+    mockAll.mockReturnValueOnce([row]).mockReturnValue([])
+
+    const { dispose } = startTaskScheduler(api)
+    dispose()
+
+    expect(createNotification).not.toHaveBeenCalled()
+  })
+
+  it('falls back to global alert time when task has no recurrence_time', () => {
+    vi.setSystemTime(new Date('2026-05-26T09:30:00'))
+
+    const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
+    const createNotification = vi.spyOn(api.notifications, 'createNotification')
+
+    const row = dueTaskRow({ metadata: '{}' })
+    mockAll.mockReturnValueOnce([row]).mockReturnValue([])
+
+    const { dispose } = startTaskScheduler(api)
+    dispose()
+
+    expect(createNotification).toHaveBeenCalled()
+  })
+})

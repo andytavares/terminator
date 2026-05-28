@@ -17,6 +17,9 @@ import {
   OctagonAlert,
   GripVertical,
   CornerUpLeft,
+  Repeat,
+  CalendarCheck,
+  Sunset,
 } from 'lucide-react'
 import type { DailyLog as DailyLogData, IndexedTask } from '../vault/types'
 import { SmartTaskInput } from './SmartTaskInput'
@@ -39,6 +42,10 @@ interface DailyLogProps {
   onNextDay?: () => void
   onGoToToday?: () => void
   isToday?: boolean
+  somedayTasks?: IndexedTask[]
+  onPickUpToday?: (taskId: string) => Promise<void>
+  onDeleteBacklogTask?: (taskId: string) => Promise<void>
+  onRefreshBacklog?: () => Promise<void>
 }
 
 function StatusIcon({
@@ -210,14 +217,11 @@ function SubtaskRow({
 
       {editing ? (
         <span className="daily-log__subtask-edit">
-          <input
-            type="text"
+          <SmartTaskInput
             value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void saveEdit()
-              if (e.key === 'Escape') setEditing(false)
-            }}
+            onChange={setEditText}
+            onSubmit={() => void saveEdit()}
+            onCancel={() => setEditing(false)}
             autoFocus
           />
           <button className="tv-btn tv-btn--primary" onClick={() => void saveEdit()}>
@@ -303,19 +307,16 @@ function GhostAddSubtaskRow({
 
   return (
     <div className="daily-log__subtask-add-row">
-      <input
-        type="text"
-        className="daily-log__subtask-input"
-        placeholder="Subtask…"
+      <SmartTaskInput
         value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') void handleAdd()
-          if (e.key === 'Escape') {
-            setText('')
-            setActive(false)
-          }
+        onChange={setText}
+        onSubmit={() => void handleAdd()}
+        onCancel={() => {
+          setText('')
+          setActive(false)
         }}
+        placeholder="Subtask…"
+        disabled={saving}
         autoFocus
       />
       <button
@@ -507,6 +508,199 @@ function BlockModal({
   )
 }
 
+const WEEKDAY_LABELS: { value: number; short: string }[] = [
+  { value: 1, short: 'Mon' },
+  { value: 2, short: 'Tue' },
+  { value: 3, short: 'Wed' },
+  { value: 4, short: 'Thu' },
+  { value: 5, short: 'Fri' },
+  { value: 6, short: 'Sat' },
+  { value: 0, short: 'Sun' },
+]
+
+const RECURRENCE_INTERVALS: { value: string; label: string }[] = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Every 2 weeks' },
+  { value: 'monthly', label: 'Monthly' },
+]
+
+function formatRecurrence(interval: string, days?: number[]): string {
+  const label = RECURRENCE_INTERVALS.find((r) => r.value === interval)?.label ?? interval
+  if (interval === 'weekly' && days && days.length > 0) {
+    const dayLabels = days
+      .slice()
+      .sort((a, b) => {
+        // Sort Mon-Sun order
+        const order = [1, 2, 3, 4, 5, 6, 0]
+        return order.indexOf(a) - order.indexOf(b)
+      })
+      .map((d) => WEEKDAY_LABELS.find((w) => w.value === d)?.short ?? d)
+      .join(', ')
+    return `${label} · ${dayLabels}`
+  }
+  return label
+}
+
+type EndType = 'none' | 'on_date' | 'after_count'
+
+function RecurrenceModal({
+  existing,
+  onConfirm,
+  onClear,
+  onClose,
+}: {
+  existing?: {
+    interval: string
+    days?: number[]
+    time?: string
+    endType?: EndType
+    endDate?: string
+    endCount?: number
+  }
+  onConfirm: (
+    interval: string,
+    days: number[],
+    time: string,
+    endType: EndType,
+    endDate: string,
+    endCount: number
+  ) => void
+  onClear: () => void
+  onClose: () => void
+}): React.JSX.Element {
+  const [interval, setInterval] = useState(existing?.interval ?? 'weekly')
+  const [days, setDays] = useState<number[]>(existing?.days ?? [1, 3, 5])
+  const [time, setTime] = useState(existing?.time ?? '09:00')
+  const [endType, setEndType] = useState<EndType>(existing?.endType ?? 'none')
+  const [endDate, setEndDate] = useState(existing?.endDate ?? '')
+  const [endCount, setEndCount] = useState(existing?.endCount ?? 10)
+
+  function toggleDay(d: number) {
+    setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]))
+  }
+
+  function handleSubmit() {
+    onConfirm(interval, interval === 'weekly' ? days : [], time, endType, endDate, endCount)
+  }
+
+  const canSubmit =
+    (interval !== 'weekly' || days.length > 0) && (endType !== 'on_date' || endDate.length > 0)
+
+  return (
+    <div className="daily-log__block-modal-backdrop" onClick={onClose}>
+      <div className="daily-log__block-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="daily-log__block-modal-header">
+          <Repeat size={15} />
+          <span>{existing ? 'Edit Recurrence' : 'Set Recurrence'}</span>
+          <button className="tv-btn tv-btn--icon" onClick={onClose}>
+            <X size={14} />
+          </button>
+        </div>
+
+        <div className="daily-log__block-modal-label">
+          Repeats
+          <div className="recurrence-modal__interval-row">
+            {RECURRENCE_INTERVALS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                className={`interval-picker__btn${interval === value ? ' interval-picker__btn--active' : ''}`}
+                onClick={() => setInterval(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {interval === 'weekly' && (
+          <div className="daily-log__block-modal-label">
+            On days
+            <div className="recurrence-modal__days-row">
+              {WEEKDAY_LABELS.map(({ value, short }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`recurrence-modal__day-btn${days.includes(value) ? ' recurrence-modal__day-btn--active' : ''}`}
+                  onClick={() => toggleDay(value)}
+                >
+                  {short}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="daily-log__block-modal-label">
+          Notify at
+          <input
+            type="time"
+            className="interval-picker__time-input"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+          />
+        </div>
+
+        <div className="daily-log__block-modal-label">
+          Ends
+          <div className="recurrence-modal__end-row">
+            {(['none', 'on_date', 'after_count'] as EndType[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={`interval-picker__btn${endType === t ? ' interval-picker__btn--active' : ''}`}
+                onClick={() => setEndType(t)}
+              >
+                {t === 'none' ? 'Never' : t === 'on_date' ? 'On date' : 'After'}
+              </button>
+            ))}
+          </div>
+          {endType === 'on_date' && (
+            <input
+              type="date"
+              className="interval-picker__date-input"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+          )}
+          {endType === 'after_count' && (
+            <div className="recurrence-modal__count-row">
+              <input
+                type="number"
+                className="recurrence-modal__count-input"
+                min={1}
+                max={999}
+                value={endCount}
+                onChange={(e) => setEndCount(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+              <span className="recurrence-modal__count-label">completions</span>
+            </div>
+          )}
+        </div>
+
+        <div className="daily-log__block-modal-actions">
+          {existing && (
+            <button
+              className="tv-btn tv-btn--ghost tv-btn--danger-text"
+              onClick={onClear}
+              style={{ marginRight: 'auto' }}
+            >
+              Remove
+            </button>
+          )}
+          <button className="tv-btn tv-btn--ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="tv-btn tv-btn--primary" onClick={handleSubmit} disabled={!canSubmit}>
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function TaskRow({
   task,
   isSelected,
@@ -543,14 +737,22 @@ function TaskRow({
   const [linking, setLinking] = useState(false)
   const [linked, setLinked] = useState(task.terminatorLinks.length > 0)
   const [blockModalOpen, setBlockModalOpen] = useState(false)
+  const [recurrenceModalOpen, setRecurrenceModalOpen] = useState(false)
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [subtaskText, setSubtaskText] = useState('')
   const [savingSubtask, setSavingSubtask] = useState(false)
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { addToast } = useToastStore()
 
   useEffect(() => {
     setLinked(task.terminatorLinks.length > 0)
   }, [task.terminatorLinks])
+
+  useEffect(() => {
+    return () => {
+      if (clickTimer.current) clearTimeout(clickTimer.current)
+    }
+  }, [])
 
   function rawText(): string {
     const parts = [task.text]
@@ -643,6 +845,57 @@ function TaskRow({
     await onRefresh()
   }
 
+  async function handleSetRecurrence(
+    interval: string,
+    days: number[],
+    time: string,
+    endType: 'none' | 'on_date' | 'after_count',
+    endDate: string,
+    endCount: number
+  ) {
+    setRecurrenceModalOpen(false)
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:set-recurrence', {
+      taskId: task.id,
+      interval,
+      days: days.length > 0 ? days : undefined,
+      time: time || undefined,
+      endType,
+      endDate: endType === 'on_date' ? endDate : undefined,
+      endCount: endType === 'after_count' ? endCount : undefined,
+    })
+    addToast({
+      type: 'success',
+      message: `Recurrence set: ${formatRecurrence(interval, days)}`,
+      onClick: makeTaskNavHandler(task.id),
+    })
+    await onRefresh()
+  }
+
+  async function handleSendToBacklog() {
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:process-inbox-item', {
+      taskId: task.id,
+      action: 'someday',
+    })
+    addToast({ type: 'info', message: `Moved to backlog: ${task.text}` })
+    await onRefresh()
+  }
+
+  async function handleClearRecurrence() {
+    setRecurrenceModalOpen(false)
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:clear-recurrence', {
+      taskId: task.id,
+    })
+    addToast({ type: 'info', message: `Recurrence removed: ${task.text}` })
+    await onRefresh()
+  }
+
+  async function handleDelete() {
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-task', {
+      taskId: task.id,
+    })
+    await onRefresh()
+  }
+
   async function handleAddFirstSubtask() {
     if (!subtaskText.trim()) return
     setSavingSubtask(true)
@@ -659,7 +912,7 @@ function TaskRow({
     }
   }
 
-  const isOpen = task.status === 'open'
+  const isOpen = task.status === 'open' || task.status === 'in-progress'
   const isDone = task.status === 'done'
   const isBlocked = task.status === 'blocked'
 
@@ -711,8 +964,22 @@ function TaskRow({
         ) : (
           <span
             className={`daily-log__task-text${isDone || task.status === 'migrated' ? ' daily-log__task-text--strikethrough' : task.status === 'cancelled' ? ' daily-log__task-text--cancelled' : ''}`}
-            onDoubleClick={isOpen || isBlocked ? startEdit : undefined}
-            onClick={onSelect}
+            onClick={() => {
+              if (!(isOpen || isBlocked)) {
+                onSelect?.()
+                return
+              }
+              if (clickTimer.current) {
+                clearTimeout(clickTimer.current)
+                clickTimer.current = null
+                startEdit()
+              } else {
+                clickTimer.current = setTimeout(() => {
+                  clickTimer.current = null
+                  onSelect?.()
+                }, 220)
+              }
+            }}
             title={
               isOpen || isBlocked
                 ? 'Click to open detail · Double-click to edit'
@@ -743,6 +1010,15 @@ function TaskRow({
                 ⊘ {task.blockedReason}
               </span>
             )}
+            {task.recurrenceInterval && (
+              <span
+                className="daily-log__recurrence-badge"
+                title={`Repeats: ${formatRecurrence(task.recurrenceInterval, task.recurrenceDays)}${task.recurrenceTime ? ` at ${task.recurrenceTime}` : ''}`}
+              >
+                <Repeat size={11} />
+                {formatRecurrence(task.recurrenceInterval, task.recurrenceDays)}
+              </span>
+            )}
           </span>
         )}
 
@@ -754,6 +1030,13 @@ function TaskRow({
               title="Migrate to another day"
             >
               <ArrowRight size={13} />
+            </button>
+            <button
+              className="tv-btn tv-btn--outline tv-btn--action-icon"
+              onClick={() => void handleSendToBacklog()}
+              title="Send to backlog"
+            >
+              <Sunset size={13} />
             </button>
             {linked || task.terminatorLinks.length > 0 ? (
               <button
@@ -783,6 +1066,17 @@ function TaskRow({
                 <ListPlus size={13} />
               </button>
             )}
+            <button
+              className={`tv-btn tv-btn--outline tv-btn--action-icon${task.recurrenceInterval ? ' tv-btn--accent-active' : ''}`}
+              onClick={() => setRecurrenceModalOpen(true)}
+              title={
+                task.recurrenceInterval
+                  ? `Recurrence: ${formatRecurrence(task.recurrenceInterval, task.recurrenceDays)}`
+                  : 'Set recurrence'
+              }
+            >
+              <Repeat size={13} />
+            </button>
             <button
               className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--warning-hover"
               onClick={() => setBlockModalOpen(true)}
@@ -884,19 +1178,16 @@ function TaskRow({
       </div>
       {addingSubtask && (
         <div className="daily-log__subtask-add-row daily-log__subtask-add-row--inline">
-          <input
-            type="text"
-            className="daily-log__subtask-input"
-            placeholder="Subtask…"
+          <SmartTaskInput
             value={subtaskText}
-            onChange={(e) => setSubtaskText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void handleAddFirstSubtask()
-              if (e.key === 'Escape') {
-                setSubtaskText('')
-                setAddingSubtask(false)
-              }
+            onChange={setSubtaskText}
+            onSubmit={() => void handleAddFirstSubtask()}
+            onCancel={() => {
+              setSubtaskText('')
+              setAddingSubtask(false)
             }}
+            placeholder="Subtask…"
+            disabled={savingSubtask}
             autoFocus
           />
           <button
@@ -921,6 +1212,27 @@ function TaskRow({
         <BlockModal
           onConfirm={(reason, checkInterval) => void handleBlock(reason, checkInterval)}
           onClose={() => setBlockModalOpen(false)}
+        />
+      )}
+      {recurrenceModalOpen && (
+        <RecurrenceModal
+          existing={
+            task.recurrenceInterval
+              ? {
+                  interval: task.recurrenceInterval,
+                  days: task.recurrenceDays,
+                  time: task.recurrenceTime,
+                  endType: task.recurrenceEndType,
+                  endDate: task.recurrenceEndDate,
+                  endCount: task.recurrenceEndCount,
+                }
+              : undefined
+          }
+          onConfirm={(interval, days, time, endType, endDate, endCount) =>
+            void handleSetRecurrence(interval, days, time, endType, endDate, endCount)
+          }
+          onClear={() => void handleClearRecurrence()}
+          onClose={() => setRecurrenceModalOpen(false)}
         />
       )}
     </>
@@ -976,6 +1288,118 @@ function AddTaskRow({ onAdd }: { onAdd: (text: string) => Promise<void> }): Reac
   )
 }
 
+function BacklogTaskRow({
+  task,
+  onPickUpToday,
+  onDelete,
+  onRefreshBacklog,
+  onSelect,
+}: {
+  task: IndexedTask
+  onPickUpToday?: (taskId: string) => Promise<void>
+  onDelete?: (taskId: string) => Promise<void>
+  onRefreshBacklog?: () => Promise<void>
+  onSelect?: (taskId: string) => void
+}): React.JSX.Element {
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState(task.text)
+
+  function rawText(): string {
+    const parts = [task.text]
+    if (task.project) parts.push(`@${task.project.replace(/ /g, '-')}`)
+    if (task.context) parts.push(`+${task.context.replace(/ /g, '-')}`)
+    if (task.area) parts.push(`#${task.area.replace(/ /g, '-')}`)
+    if (task.dueDate) parts.push(`due:${task.dueDate}`)
+    return parts.join(' ')
+  }
+
+  async function saveEdit() {
+    if (!editText.trim()) {
+      setEditing(false)
+      setEditText(task.text)
+      return
+    }
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:edit-task', {
+      taskId: task.id,
+      text: editText.trim(),
+    })
+    setEditing(false)
+    await onRefreshBacklog?.()
+  }
+
+  return (
+    <div className="daily-log__backlog-task">
+      <span className="daily-log__backlog-spacer" />
+      {editing ? (
+        <span className="daily-log__task-edit">
+          <SmartTaskInput
+            value={editText}
+            onChange={setEditText}
+            onSubmit={saveEdit}
+            onCancel={() => {
+              setEditing(false)
+            }}
+            autoFocus
+          />
+          <button className="tv-btn tv-btn--primary" onClick={() => void saveEdit()}>
+            Save
+          </button>
+          <button
+            className="tv-btn tv-btn--icon"
+            onClick={() => {
+              setEditing(false)
+            }}
+          >
+            <X size={14} />
+          </button>
+        </span>
+      ) : (
+        <span
+          className="daily-log__backlog-task-text"
+          onClick={onSelect ? () => onSelect(task.id) : undefined}
+          onDoubleClick={() => {
+            setEditText(rawText())
+            setEditing(true)
+          }}
+          style={{ cursor: onSelect ? 'pointer' : undefined }}
+          title="Click to open detail · Double-click to edit"
+        >
+          {task.text}
+          {task.project && (
+            <span className="daily-log__tag daily-log__tag--project">@{task.project}</span>
+          )}
+          {task.area && <span className="daily-log__tag daily-log__tag--area">#{task.area}</span>}
+          {task.context && (
+            <span className="daily-log__tag daily-log__tag--context">+{task.context}</span>
+          )}
+        </span>
+      )}
+      {!editing && (
+        <span className="daily-log__backlog-actions">
+          {onPickUpToday && (
+            <button
+              className="daily-log__backlog-btn"
+              onClick={() => void onPickUpToday(task.id)}
+              title="Pick up today"
+            >
+              <CalendarCheck size={13} />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              className="daily-log__backlog-btn"
+              onClick={() => void onDelete(task.id)}
+              title="Delete"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
+        </span>
+      )}
+    </div>
+  )
+}
+
 const TERMINAL_STATUSES = new Set<string>(['done', 'migrated', 'cancelled'])
 
 export function DailyLog({
@@ -991,7 +1415,12 @@ export function DailyLog({
   onNextDay,
   onGoToToday,
   isToday = false,
+  somedayTasks = [],
+  onPickUpToday,
+  onDeleteBacklogTask,
+  onRefreshBacklog,
 }: DailyLogProps): React.JSX.Element {
+  const [backlogExpanded, setBacklogExpanded] = useState(true)
   const [rolloverExpanded, setRolloverExpanded] = useState(true)
   const draggingId = useRef<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -1120,14 +1549,6 @@ export function DailyLog({
           </span>
           <span className="daily-log__date-detail">{detail}</span>
         </div>
-        <button
-          className="tv-btn tv-btn--icon daily-log__date-nav"
-          onClick={onNextDay}
-          disabled={!onNextDay}
-          title="Next day"
-        >
-          <ChevronRight size={16} />
-        </button>
         {!isToday && onGoToToday && (
           <button
             className="tv-btn tv-btn--xs tv-btn--secondary daily-log__back-to-today"
@@ -1138,6 +1559,14 @@ export function DailyLog({
             Today
           </button>
         )}
+        <button
+          className="tv-btn tv-btn--icon daily-log__date-nav"
+          onClick={onNextDay}
+          disabled={!onNextDay}
+          title="Next day"
+        >
+          <ChevronRight size={16} />
+        </button>
       </div>
 
       <section className="daily-log__tasks">
@@ -1179,30 +1608,33 @@ export function DailyLog({
         )}
         {terminalTodayTasks.map((task) => renderTaskWithSubtasks(task))}
         <AddTaskRow onAdd={handleAddTask} />
+        {isToday && somedayTasks.length > 0 && (
+          <>
+            <div className="daily-log__backlog-divider" />
+            <button
+              className="daily-log__backlog-header"
+              onClick={() => setBacklogExpanded((v) => !v)}
+            >
+              <span className="daily-log__backlog-label">Backlog ({somedayTasks.length})</span>
+              {backlogExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </button>
+            {backlogExpanded && (
+              <div className="daily-log__backlog-list">
+                {somedayTasks.map((task) => (
+                  <BacklogTaskRow
+                    key={task.id}
+                    task={task}
+                    onPickUpToday={onPickUpToday}
+                    onDelete={onDeleteBacklogTask}
+                    onRefreshBacklog={onRefreshBacklog}
+                    onSelect={onSelectTask}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </section>
-
-      {log.events.length > 0 && (
-        <section className="daily-log__events">
-          <h3>Events</h3>
-          {log.events.map((event, i) => (
-            <div key={i} className="daily-log__event">
-              {event.time && <span className="daily-log__event-time">{event.time}</span>}
-              <span>{event.text}</span>
-            </div>
-          ))}
-        </section>
-      )}
-
-      {log.notes.length > 0 && (
-        <section className="daily-log__notes">
-          <h3>Notes</h3>
-          {log.notes.map((note, i) => (
-            <div key={i} className="daily-log__note">
-              * {note.text}
-            </div>
-          ))}
-        </section>
-      )}
 
       {!log.exists && (
         <p className="daily-log__new-file">No log for today yet. Add a task to get started.</p>

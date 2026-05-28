@@ -1,7 +1,7 @@
 import { create } from 'zustand'
-import type { DailyLog } from '../vault/types'
+import type { DailyLog, IndexedTask } from '../vault/types'
 
-export type VaultView = 'daily' | 'inbox' | 'projects' | 'areas' | 'someday' | 'archive' | 'review'
+export type VaultView = 'daily' | 'inbox' | 'projects' | 'areas' | 'archive' | 'review'
 export type ViewMode = 'list' | 'kanban'
 
 const KANBAN_MODE_KEY = 'task-vault.kanbanMode'
@@ -23,6 +23,8 @@ interface VaultStore {
   vaultPath: string
   todayLog: DailyLog | null
   inboxCount: number
+  somedayTasks: IndexedTask[]
+  loadSomeday: () => Promise<void>
   activeView: VaultView
   viewMode: ViewMode
   selectedContexts: string[]
@@ -54,6 +56,7 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   vaultPath: '',
   todayLog: null,
   inboxCount: 0,
+  somedayTasks: [],
   activeView: 'daily',
   viewMode: (localStorage.getItem(KANBAN_MODE_KEY) as ViewMode | null) ?? 'list',
   selectedContexts: loadSelectedContexts(),
@@ -148,6 +151,19 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       if (result && typeof result === 'object' && 'tasks' in result) {
         const { tasks } = result as { tasks: { status: string }[] }
         set({ inboxCount: tasks.length })
+      }
+    } catch {
+      // non-critical
+    }
+  },
+
+  loadSomeday: async () => {
+    try {
+      const result = await window.electronAPI.extensionBridge.invoke(
+        'task-vault:vault:list-someday'
+      )
+      if (result && typeof result === 'object' && 'tasks' in result) {
+        set({ somedayTasks: (result as { tasks: IndexedTask[] }).tasks })
       }
     } catch {
       // non-critical

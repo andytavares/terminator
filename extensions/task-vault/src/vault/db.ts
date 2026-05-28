@@ -57,6 +57,13 @@ function applyMigrations(db: Database.Database): void {
       `UPDATE projects SET area_id = (SELECT id FROM areas WHERE name = projects.area) WHERE area IS NOT NULL`
     )
   }
+  if (!hasColumn(db, 'areas', 'status')) {
+    db.exec(`ALTER TABLE areas ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`)
+  }
+  // Drop legacy tables no longer used by the app
+  db.exec(`DROP TABLE IF EXISTS events`)
+  db.exec(`DROP TABLE IF EXISTS notes`)
+
   // Always ensure indexes exist (CREATE INDEX IF NOT EXISTS is idempotent)
   db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id)`)
   db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_area_id ON tasks(area_id)`)
@@ -110,21 +117,5 @@ function applySchema(db: Database.Database): void {
       created_at TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS events (
-      id         TEXT PRIMARY KEY,
-      date       TEXT NOT NULL,
-      time       TEXT,
-      text       TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_events_date ON events(date);
-
-    CREATE TABLE IF NOT EXISTS notes (
-      id         TEXT PRIMARY KEY,
-      date       TEXT NOT NULL,
-      text       TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_notes_date ON notes(date);
   `)
 }

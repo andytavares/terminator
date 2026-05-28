@@ -1,13 +1,5 @@
 import React from 'react'
-import {
-  CalendarDays,
-  Inbox,
-  FolderOpen,
-  Layers,
-  Sunset,
-  Archive,
-  ClipboardList,
-} from 'lucide-react'
+import { CalendarDays, Inbox, FolderOpen, Layers, Archive, ClipboardList } from 'lucide-react'
 import { useVaultStore, type VaultView } from '../stores/vault.store'
 
 const NAV_ITEMS: Array<{ view: VaultView; label: string; icon: React.ReactNode }> = [
@@ -15,7 +7,6 @@ const NAV_ITEMS: Array<{ view: VaultView; label: string; icon: React.ReactNode }
   { view: 'inbox', label: 'Inbox', icon: <Inbox size={15} /> },
   { view: 'projects', label: 'Projects', icon: <FolderOpen size={15} /> },
   { view: 'areas', label: 'Areas', icon: <Layers size={15} /> },
-  { view: 'someday', label: 'Someday', icon: <Sunset size={15} /> },
   { view: 'archive', label: 'Archive', icon: <Archive size={15} /> },
   { view: 'review', label: 'Weekly Review', icon: <ClipboardList size={15} /> },
 ]

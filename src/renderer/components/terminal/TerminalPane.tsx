@@ -116,12 +116,14 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
   function handleDrop(e: React.DragEvent<HTMLDivElement>): void {
     e.preventDefault()
     if (!activeSessionId) return
+    const instance = getTerminalInstance(activeSessionId)
+    if (!instance) return
     const paths = Array.from(e.dataTransfer.files)
       .map((f) => (f as unknown as { path: string }).path)
       .filter(Boolean)
       .map((p) => (/\s/.test(p) ? `'${p.replace(/'/g, "'\\''")}'` : p))
       .join(' ')
-    if (paths) window.electronAPI.terminal.input(activeSessionId, paths)
+    if (paths) instance.terminal.paste(paths)
   }
 
   return (

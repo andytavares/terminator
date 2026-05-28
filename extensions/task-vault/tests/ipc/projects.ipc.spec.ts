@@ -230,14 +230,14 @@ describe('task-vault:projects:update-status IPC handler', () => {
   })
 
   it('returns success when project is updated', async () => {
-    mockRun.mockReturnValue({ changes: 1 })
+    mockGet.mockReturnValue({ id: 'proj-1' })
     const handler = getHandler('task-vault:projects:update-status')
     const result = await handler({}, { projectFilePath: 'Alpha', status: 'done' })
     expect(result).toMatchObject({ success: true })
   })
 
   it('returns NOT_FOUND when project does not exist', async () => {
-    mockRun.mockReturnValue({ changes: 0 })
+    mockGet.mockReturnValue(undefined)
     const handler = getHandler('task-vault:projects:update-status')
     const result = await handler({}, { projectFilePath: 'nonexistent', status: 'done' })
     expect(result).toMatchObject({ error: 'NOT_FOUND' })
@@ -283,11 +283,25 @@ describe('task-vault:projects:create IPC handler', () => {
 })
 
 describe('task-vault:projects:delete IPC handler', () => {
-  it('deletes project (FK ON DELETE SET NULL handles task orphaning)', async () => {
+  it('deletes archived project and its tasks', async () => {
+    mockGet.mockReturnValue({ id: 'proj-1', status: 'archived' })
     const handler = getHandler('task-vault:projects:delete')
     const result = await handler({}, { projectFilePath: 'Alpha' })
     expect(result).toMatchObject({ success: true })
-    expect(mockRun).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns MUST_ARCHIVE_FIRST for non-archived project', async () => {
+    mockGet.mockReturnValue({ id: 'proj-1', status: 'active' })
+    const handler = getHandler('task-vault:projects:delete')
+    const result = await handler({}, { projectFilePath: 'Alpha' })
+    expect(result).toMatchObject({ error: 'MUST_ARCHIVE_FIRST' })
+  })
+
+  it('returns NOT_FOUND when project does not exist', async () => {
+    mockGet.mockReturnValue(undefined)
+    const handler = getHandler('task-vault:projects:delete')
+    const result = await handler({}, { projectFilePath: 'Ghost' })
+    expect(result).toMatchObject({ error: 'NOT_FOUND' })
   })
 
   it('returns VALIDATION_ERROR for missing projectFilePath', async () => {
