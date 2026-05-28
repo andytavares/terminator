@@ -93,16 +93,27 @@ void (async () => {
   }
 })()
 
-// Inbox badge — keep the task-vault rail icon count in sync
+// Inbox badge — keep the task-vault rail icon count in sync.
+// Updates both the store (inboxCount) and the registry badge so all sources stay consistent.
 async function refreshInboxBadge(): Promise<void> {
   try {
     const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:get-inbox')
     const items = (result as { tasks?: unknown[] } | null)?.tasks ?? []
-    registry.updateGlobalTab('task-vault', { badge: items.length > 0 ? items.length : undefined })
+    const count = items.length
+    // Updating the store triggers the subscribe() below, which updates the registry badge.
+    useVaultStore.setState({ inboxCount: count })
   } catch {
     // Vault not configured — no badge
   }
 }
+
+// Sync badge whenever inboxCount changes in the store (e.g. after quick-add via CaptureModal)
+useVaultStore.subscribe((state, prevState) => {
+  if (state.inboxCount !== prevState.inboxCount) {
+    const count = state.inboxCount
+    registry.updateGlobalTab('task-vault', { badge: count > 0 ? count : undefined })
+  }
+})
 
 void refreshInboxBadge()
 window.electronAPI.extensionBridge.on('task-vault:push:index-updated', () => {

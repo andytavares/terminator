@@ -131,7 +131,16 @@ function SectionEditor({ label, value, placeholder, onSave }: SectionEditorProps
       ) : (
         <div
           className={`tv-detail__preview${!value.trim() ? ' tv-detail__preview--empty' : ''}`}
-          onClick={() => setEditing(true)}
+          onClick={(e) => {
+            const anchor = (e.target as HTMLElement).closest('a')
+            if (anchor?.href) {
+              e.preventDefault()
+              e.stopPropagation()
+              window.electronAPI.shell.openExternal(anchor.href).catch(() => {})
+              return
+            }
+            setEditing(true)
+          }}
           title="Click to edit"
         >
           {value.trim() ? (

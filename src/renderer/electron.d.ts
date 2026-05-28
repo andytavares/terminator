@@ -75,6 +75,7 @@ interface ElectronAPI {
       { exitCode: number; stdout: string; stderr: string; timedOut: boolean } | { error: string }
     >
     openPath(filePath: string): Promise<{ ok: true } | { error: string }>
+    openExternal(url: string): Promise<{ ok: true } | { error: string }>
   }
   fs: {
     watchStart(projectRoot: string): Promise<{ ok: true } | { error: string }>

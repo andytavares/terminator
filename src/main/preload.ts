@@ -114,6 +114,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   shell: {
     exec: (options: unknown) => ipcRenderer.invoke('shell:exec', options),
     openPath: (filePath: string) => ipcRenderer.invoke('shell:open-path', { filePath }),
+    openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', { url }),
   },
   fs: {
     watchStart: (projectRoot: string) => ipcRenderer.invoke('fs:watch-start', { projectRoot }),

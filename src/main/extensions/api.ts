@@ -143,6 +143,12 @@ export interface ExtensionAPI {
   }
   notifications: {
     showToast(type: ToastType, message: string): void
+    createNotification(opts: {
+      type: ToastType
+      title: string
+      message?: string
+      actions?: Array<{ id: string; label: string; handler: () => void }>
+    }): Disposable
   }
   nativeMenu: {
     addViewMenuItem(item: NativeMenuItemContribution): Disposable
@@ -405,7 +411,6 @@ export function createExtensionAPI(
         for (const win of BrowserWindow.getAllWindows()) {
           if (!win.isDestroyed()) win.webContents.send('extension:toast', { type, message })
         }
-        notificationManager.create({ type, title: message, source: extensionId })
       },
       createNotification(opts: {
         type: ToastType
