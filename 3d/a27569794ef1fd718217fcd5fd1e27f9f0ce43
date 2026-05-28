@@ -1,0 +1,112 @@
+extensions/foundry/src/components/FoundryPanel.tsx
+  s_ad5d88db947deb::t_d2859d4d0b91fb 6
+  s_ad5d88db947deb::t_52490cf2623188 114,116,130,164-165
+extensions/foundry/src/components/HarnessSettings.tsx
+  s_ad5d88db947deb::t_f7b01132a22a7b 645-648,650-652,654-660
+  s_ad5d88db947deb::t_b5c14bd65baeb6 649
+  s_ad5d88db947deb::t_feecd9d332d31e 732-737,739-740,746,748,751,753-760,762-768
+  s_ad5d88db947deb::t_bd092a0b4f4204 525-543,545-563,566-599
+  s_ad5d88db947deb::t_272bea50986380 608-609
+  s_ad5d88db947deb::t_82484b1540f1ca 478-479
+extensions/foundry/tests/unit/core/history.spec.ts
+  s_ad5d88db947deb::t_1192cb82aaae1c 114
+  s_ad5d88db947deb::t_d24304a1962be0 127-176
+  s_ad5d88db947deb::t_14194452d22801 5
+extensions/foundry/src/core/git.ts
+  s_45188afb3ce87b::t_3f575ae9adf893 78-89,100-107,109-119
+extensions/foundry/src/components/CopilotView.tsx
+  s_ad5d88db947deb::t_302a92a24fdc61 1-61,63-67,69,72,74-83,85-98,100-161,163-196,198-212,215-225,227-234,236-253,256-297,299-316,318-327,329-336,338-376,378-392,394-435,437-446,448-471
+extensions/foundry/src/providers/gemini.ts
+  s_ad5d88db947deb::t_74dafa0748b775 11-13,23-41
+extensions/foundry/src/index.ts
+  s_ad5d88db947deb::t_5daf2e03481506 878,887
+  s_ad5d88db947deb::t_d0f95aee6c4184 7
+  s_ad5d88db947deb::t_7c3468d1525273 47-49,62-78
+  s_ad5d88db947deb::t_2100e9426a9d9e 1112-1115,1120-1122,1125
+  s_ad5d88db947deb::t_0fb80cf165ad92 132-151,261-356,358-369,371-374,376-377,384,386-390,392-393,395-448
+  s_45188afb3ce87b::t_24740b5ec5d99d 825-844
+  s_ad5d88db947deb::t_c0512ed426b7ea 1138-1143
+  s_45188afb3ce87b::t_39a70f285a9916 1144-1162
+  s_ad5d88db947deb::t_647abd93571684 1118
+  s_ad5d88db947deb::t_fc05afa294226b 81-85
+  s_ad5d88db947deb::t_000cd8091f2804 357,370,378-383,385,391,394
+  s_ad5d88db947deb::t_248c9cd22c1aa6 20
+  s_ad5d88db947deb::t_278e792ce0e86e 152-164,166-185,187-194,196-204,207,215-223,225-255,257-260
+  s_ad5d88db947deb::t_f8d78a5bc13330 984,1032,1093
+  s_ad5d88db947deb::t_c069044f8ca74a 1182-1223
+  s_ad5d88db947deb::t_38e6f61d210bbb 1103-1111,1116-1117,1119,1126-1128
+  s_ad5d88db947deb::t_2fb3e6e1b77745 107-108,112,115,118,123-125
+  s_ad5d88db947deb::t_10dce514cc7b80 917-928
+  s_ad5d88db947deb::t_181f6a237fc09f 1123-1124
+  s_ad5d88db947deb::t_5f1910d13269d6 513-526
+extensions/foundry/tests/unit/core/git.spec.ts
+  s_ad5d88db947deb::t_34fb499f328242 18-24
+  s_ad5d88db947deb::t_5547459751d73f 190-196
+  s_ad5d88db947deb::t_99152f3f92dfb8 81-86
+  s_ad5d88db947deb::t_92ee1e10c009a8 134-145,155-159
+  s_ad5d88db947deb::t_23a39dc0aec67e 146-154
+extensions/foundry/src/components/foundry.css
+  s_ad5d88db947deb::t_02800db031f950 180-191
+  s_ad5d88db947deb::t_0cc048625b70fb 192-196
+  s_ad5d88db947deb::t_a1f5c0b0e1164c 197-247
+extensions/foundry/src/core/providers.ts
+  s_ad5d88db947deb::t_86d06c31b0c6e6 15-17
+extensions/foundry/src/components/NewRunDialog.tsx
+  s_ad5d88db947deb::t_8a0a75b96c3882 428
+  s_ad5d88db947deb::t_56f70c23503581 4,295-300,321-341,345,351,354,365-384,402-408,420-422,424-427,429-431,436,442,447-450,455,457,464-480,482-500,502-504,506-511,524-539,542,548,554,560-561,563-564,592-593,604,612,616,623,626-640,642-649,651-653,655,669-678,680-687,689-691,693-695,709-713,719-721,731
+  s_ad5d88db947deb::t_0ff66f604c4823 346
+  s_ad5d88db947deb::t_451fe2a2020719 6-42,44-53,55-65,67-78,80-127,129-135,138,140-154,156-157,159-171,173-174,176-206,208-239,242,244,246-252,254-256,258-263,265-276,278-285
+  s_ad5d88db947deb::t_7930cf88e4f412 565-575,577-579,585,589,594-598
+  s_ad5d88db947deb::t_6e8b5b834b06ff 409-410
+  s_ad5d88db947deb::t_6fc8a3f0729a3c 1
+extensions/foundry/src/providers/claude.ts
+  s_45188afb3ce87b::t_68fb624b347afe 177
+  s_ad5d88db947deb::t_3781b27754350d 176,178
+  s_ad5d88db947deb::t_5b93c19afb3123 164-166
+extensions/foundry/src/providers/openai.ts
+  s_ad5d88db947deb::t_18bb7a87a78333 11-13,23-24
+extensions/foundry/src/core/history.ts
+  s_ad5d88db947deb::t_3dbf51aba633cc 47-78
+extensions/foundry/src/providers/ollama.ts
+  s_ad5d88db947deb::t_209f46fcc02b4d 9-11,15
+extensions/foundry/tests/unit/providers/openai.spec.ts
+  s_ad5d88db947deb::t_b0d2e83cabbb8d 120-138
+extensions/foundry/src/components/RunConsole.tsx
+  s_45188afb3ce87b::t_44d3bfdca93114 230
+  s_ad5d88db947deb::t_66f20124310cc4 361-399
+  s_45188afb3ce87b::t_20cfd55384197d 407
+  s_45188afb3ce87b::t_68d03726b9bb9b 424-447
+  s_45188afb3ce87b::t_609ffb7f9b1d60 566,569-573,575-593
+  s_ad5d88db947deb::t_b83c42b04452e9 4-5
+extensions/foundry/src/components/HistoryView.tsx
+  s_ad5d88db947deb::t_e2f2e15c052b0b 1-2,4-6,8-15,26,28-30,32-34,37-44,46,58-59,72-73,89,92-96,99-101,103-106,127-134,155,164-165,167-172,185-189,191-196,198-203,230,318,333,345-346,348-352
+  s_ad5d88db947deb::t_124be0fb37d849 3,7,16-25,27,31,35-36,45,47-57,60-71,74-88,90-91,97-98,107-118,120-125,135-154,156-163,166,173-181,183-184,190,197,204,215-222,224-229,231-243,245-264,266-280,282-285,301-309,319-325,327-332,334-344,347
+  s_ad5d88db947deb::t_df598ae89791a0 205-211,213-214,265
+extensions/foundry/src/components/OrchestrationView.tsx
+  s_ad5d88db947deb::t_06dcbc374000f8 2,4-32,42-71,81-82,88-89,96-101,111-113,115-116,119,121-131,135-139,150-162,168-179,181,200-202,211,225-231,254-255,386-391,408-409,414-429,431-442,444-448,450-452,456-461,463-472,474-478,480-482,501-508,510,515-534,536-547,549-554,561-576,582-590,592-599,601-608,610-615,621-626
+  s_ad5d88db947deb::t_ceeb46ee9f7174 1,3,33-41,72-80,83-87,90-95,102-110,114,117-118,120,132-134,140-149,163-167,180,182-199,203-210,212-224,232-237,239-249,251-253,256-282,284-305,307-317,319-337,339-351,353-363,365-385,392-407,410-413,449,453-455,479,483-489,491-496,498-500,509,511-514,577-581,616-620
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3da27569794ef1fd718217fcd5fd1e27f9f0ce43",
+  "prompts": {},
+  "sessions": {
+    "s_45188afb3ce87b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "68c2484b-ee00-4e93-94a7-309e486a3661",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_ad5d88db947deb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0a4319a-c989-428f-bf8e-12290d0f5fa6",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
