@@ -234,6 +234,39 @@
   font-size: 0.9em;
 }
 
+/* ── Tool call block (co-pilot + run console) ── */
+.fnd-tool-call {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 3px 0;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(92, 107, 192, 0.08);
+  border-left: 2px solid rgba(92, 107, 192, 0.35);
+  font-family: var(--tm-font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.fnd-tool-call__arrow {
+  color: var(--tm-accent);
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.fnd-tool-call__name {
+  color: var(--tm-accent);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.fnd-tool-call__args {
+  color: var(--tm-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
 /* ── Cursor blink animation ── */
 @keyframes fnd-blink {
   0%,

@@ -273,6 +273,7 @@ export function CopilotView({ run, workspaceRoot }: Props) {
   }
 
   async function abort() {
+    // Server tracks turn files — just pass runId+workspaceRoot
     await invoke('foundry:copilot-abort', { runId: run.id, workspaceRoot })
     setFiles([])
   }
@@ -289,19 +290,57 @@ export function CopilotView({ run, workspaceRoot }: Props) {
     }
   }
 
+  function renderProseLine(line: string, key: number) {
+    // Highlight `backtick` spans and bare file paths (word.ext) as chips
+    // Use a conservative pattern that won't match JSON values or URL fragments
+    const parts = line.split(/(`[^`]+`)/)
+    return (
+      <div key={key} style={{ minHeight: '1.4em' }}>
+        {parts.map((part, i) => {
+          if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+            return (
+              <span key={i} className="fnd-file-mention">
+                {part.slice(1, -1)}
+              </span>
+            )
+          }
+          // Within plain text, highlight bare file paths like src/foo/bar.ts
+          const subParts = part.split(/((?:[\w./]+\/)?[\w-]+\.\w{1,6}(?=\s|$|[,)]|\s))/g)
+          return subParts.map((sub, j) => {
+            if (/^(?:[\w./]+\/)?[\w-]+\.\w{1,6}$/.test(sub) && !sub.includes('://')) {
+              return (
+                <span key={`${i}-${j}`} className="fnd-file-mention">
+                  {sub}
+                </span>
+              )
+            }
+            return <span key={`${i}-${j}`}>{sub}</span>
+          })
+        })}
+      </div>
+    )
+  }
+
   function renderContent(content: string) {
-    // Render file paths as teal inline chips
-    const parts = content.split(/(`[^`]+`|\b\S+\.\w{1,6}\b)/)
-    return parts.map((part, i) => {
-      if (/^\S+\.\w{1,6}$/.test(part) || (part.startsWith('`') && part.endsWith('`'))) {
-        const name = part.replace(/`/g, '')
+    const lines = content.split('\n')
+    return lines.map((line, i) => {
+      // Tool call line: "→ toolName({...})"
+      if (line.startsWith('→ ')) {
+        const body = line.slice(2)
+        const parenIdx = body.indexOf('(')
+        const name = parenIdx >= 0 ? body.slice(0, parenIdx) : body
+        const args = parenIdx >= 0 ? body.slice(parenIdx) : ''
         return (
-          <span key={i} className="fnd-file-mention">
-            {name}
-          </span>
+          <div key={i} className="fnd-tool-call">
+            <span className="fnd-tool-call__arrow">→</span>
+            <span className="fnd-tool-call__name">{name}</span>
+            {args && <span className="fnd-tool-call__args">{args}</span>}
+          </div>
         )
       }
-      return <span key={i}>{part}</span>
+      // Empty line → spacer
+      if (!line.trim()) return <div key={i} style={{ height: 6 }} />
+      return renderProseLine(line, i)
     })
   }
 

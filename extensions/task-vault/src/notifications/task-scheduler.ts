@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { getDb, randomUUID } from '../vault/db.js'
 import { computeNextDueDate } from '../vault/recurrence.js'
-import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
+import type { ExtensionAPI, Disposable } from '../../../../src/main/extensions/api.js'
 
 let _tick: (() => void) | null = null
 
@@ -43,8 +43,12 @@ function broadcast(channel: string, data: unknown): void {
 }
 
 export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; tick: () => void } {
+  // In-memory dedup set (fast path within a session)
   const notifiedDueIds = new Set<string>()
+  // Notification disposables so we can auto-dismiss when tasks resolve
+  const dueTaskNotifs = new Map<string, Disposable>()
   const lastNotifiedBlocked = new Map<string, number>()
+  const blockedTaskNotifs = new Map<string, Disposable>()
   let lastDay = new Date().toDateString()
   let isStartup = true
 
@@ -61,6 +65,37 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
       if (currentDay !== lastDay) {
         notifiedDueIds.clear()
         lastDay = currentDay
+      }
+
+      // ── Auto-dismiss due notifications for tasks no longer open ──────────────
+      if (dueTaskNotifs.size > 0) {
+        const trackedIds = Array.from(dueTaskNotifs.keys())
+        const placeholders = trackedIds.map(() => '?').join(',')
+        type StatusRow = { id: string }
+        const resolved = db
+          .prepare(
+            `SELECT id FROM tasks WHERE id IN (${placeholders}) AND status IN ('done','cancelled','migrated')`
+          )
+          .all(...trackedIds) as StatusRow[]
+        for (const row of resolved) {
+          dueTaskNotifs.get(row.id)?.dispose()
+          dueTaskNotifs.delete(row.id)
+          notifiedDueIds.delete(row.id)
+        }
+      }
+
+      // ── Auto-dismiss blocked notifications for tasks no longer blocked ───────
+      if (blockedTaskNotifs.size > 0) {
+        const trackedIds = Array.from(blockedTaskNotifs.keys())
+        const placeholders = trackedIds.map(() => '?').join(',')
+        type StatusRow = { id: string }
+        const resolved = db
+          .prepare(`SELECT id FROM tasks WHERE id IN (${placeholders}) AND status != 'blocked'`)
+          .all(...trackedIds) as StatusRow[]
+        for (const row of resolved) {
+          blockedTaskNotifs.get(row.id)?.dispose()
+          blockedTaskNotifs.delete(row.id)
+        }
       }
 
       // ── Due tasks (gated by configured alert time) ───────────────
@@ -88,6 +123,7 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
         .all(today) as DueRow[]
 
       for (const task of dueTasks) {
+        // Fast in-session dedup
         if (notifiedDueIds.has(task.id)) continue
 
         let meta: Record<string, unknown> = {}
@@ -95,6 +131,12 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
           meta = JSON.parse(task.metadata || '{}') as Record<string, unknown>
         } catch {
           // ignore malformed metadata
+        }
+
+        // Persistent cross-restart dedup: skip if already notified today
+        if (meta.notification_notified_date === today) {
+          notifiedDueIds.add(task.id)
+          continue
         }
 
         const isOverdue = task.due_date < today
@@ -114,7 +156,7 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
         notifiedDueIds.add(task.id)
         const taskId = task.id
         const taskDate = task.due_date
-        api.notifications.createNotification({
+        const notif = api.notifications.createNotification({
           type: isOverdue ? 'error' : 'warning',
           title: isOverdue ? `Overdue: ${task.text}` : `Due today: ${task.text}`,
           actions: [
@@ -125,6 +167,15 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
             },
           ],
         })
+        dueTaskNotifs.set(task.id, notif)
+
+        // Persist dedup date to task metadata so restarts don't re-notify
+        const updatedMeta = { ...meta, notification_notified_date: today }
+        db.prepare(`UPDATE tasks SET metadata=?, updated_at=? WHERE id=?`).run(
+          JSON.stringify(updatedMeta),
+          new Date().toISOString(),
+          task.id
+        )
 
         // ── Spawn next occurrence for recurring tasks at notify time ──
         const recurrenceInterval = meta.recurrence_interval as string | undefined
@@ -187,9 +238,9 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
           nowIso
         )
         // Mark the current task so we don't spawn again on the next tick / after restart
-        const updatedMeta = { ...meta, recurrence_next_spawned: nextDue }
+        const spawnedMeta = { ...updatedMeta, recurrence_next_spawned: nextDue }
         db.prepare(`UPDATE tasks SET metadata=?, updated_at=? WHERE id=?`).run(
-          JSON.stringify(updatedMeta),
+          JSON.stringify(spawnedMeta),
           nowIso,
           task.id
         )
@@ -233,7 +284,11 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
 
         lastNotifiedBlocked.set(task.id, now)
         const taskId = task.id
-        api.notifications.createNotification({
+
+        // Dismiss any existing notification for this blocked task before creating a new one
+        blockedTaskNotifs.get(task.id)?.dispose()
+
+        const notif = api.notifications.createNotification({
           type: 'info',
           title: `Check in: ${task.text}`,
           message: meta.blocked_reason ?? undefined,
@@ -245,6 +300,7 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
             },
           ],
         })
+        blockedTaskNotifs.set(task.id, notif)
       }
     } catch {
       // DB may not be initialized yet — retry next tick
@@ -254,5 +310,8 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
   tick()
   isStartup = false
   const intervalId = setInterval(tick, 15_000)
-  return { dispose: () => clearInterval(intervalId), tick }
+  return {
+    dispose: () => clearInterval(intervalId),
+    tick,
+  }
 }

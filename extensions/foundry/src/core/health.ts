@@ -13,7 +13,11 @@ export function setHealthChangedCallback(cb: () => void) {
   onHealthChanged = cb
 }
 
-export function trackSensorResult(sensorName: string, pass: boolean): void {
+export function trackSensorResult(
+  sensorName: string,
+  pass: boolean,
+  _workspaceRoot?: string
+): void {
   if (pass) {
     sensorFailureCount.delete(sensorName)
     const idx = healthEvents.findIndex(
@@ -49,7 +53,8 @@ export function trackSensorResult(sensorName: string, pass: boolean): void {
 export function trackGateDecision(
   specPath: string,
   gateIndex: number,
-  decision: 'approve' | 'request-changes' | 'reject'
+  decision: 'approve' | 'request-changes' | 'reject',
+  _workspaceRoot?: string
 ): void {
   const key = `${specPath}:${gateIndex}`
   if (decision !== 'reject') {
@@ -73,6 +78,47 @@ export function trackGateDecision(
         lastOccurredAt: new Date().toISOString(),
       })
     }
+    onHealthChanged?.()
+  }
+}
+
+export function trackStaleRefs(staleRefs: Array<{ line: number; ref: string }>): void {
+  // Remove any existing stale-reference event
+  const idx = healthEvents.findIndex((e) => e.kind === 'stale-reference')
+  if (staleRefs.length === 0) {
+    if (idx >= 0) {
+      healthEvents.splice(idx, 1)
+      onHealthChanged?.()
+    }
+    return
+  }
+  const first = staleRefs[0]
+  if (idx >= 0) {
+    healthEvents[idx].agentsMdLine = first.line
+    healthEvents[idx].agentsMdRef = first.ref
+    healthEvents[idx].consecutiveCount = staleRefs.length
+    healthEvents[idx].lastOccurredAt = new Date().toISOString()
+  } else {
+    healthEvents.push({
+      kind: 'stale-reference',
+      agentsMdLine: first.line,
+      agentsMdRef: first.ref,
+      consecutiveCount: staleRefs.length,
+      lastOccurredAt: new Date().toISOString(),
+    })
+  }
+  onHealthChanged?.()
+}
+
+export function resolveHealthEvent(kind: HarnessHealthEvent['kind'], key?: string): void {
+  const idx = healthEvents.findIndex((e) => {
+    if (e.kind !== kind) return false
+    if (kind === 'sensor-failure') return !key || e.sensorName === key
+    if (kind === 'feedforward-gap') return !key || e.specPath === key
+    return true
+  })
+  if (idx >= 0) {
+    healthEvents.splice(idx, 1)
     onHealthChanged?.()
   }
 }

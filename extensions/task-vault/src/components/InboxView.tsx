@@ -22,7 +22,10 @@ export function InboxView(): React.JSX.Element {
       if (result && typeof result === 'object' && 'error' in result) {
         setError((result as { error: string }).error)
       } else if (result && typeof result === 'object' && 'tasks' in result) {
-        setItems((result as { tasks: IndexedTask[] }).tasks)
+        const tasks = (result as { tasks: IndexedTask[] }).tasks
+        setItems(tasks)
+        // Keep the store's inboxCount in sync so the sidebar badge is always accurate
+        useVaultStore.setState({ inboxCount: tasks.length })
       }
     } catch (err) {
       setError(String(err))

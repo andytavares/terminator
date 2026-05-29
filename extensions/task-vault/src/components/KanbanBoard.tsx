@@ -112,7 +112,14 @@ function LaneColumn({
                 didDragRef.current = false
               }, 0)
             }}
-            onClick={() => {
+            onClick={(e) => {
+              const anchor = (e.target as HTMLElement).closest('a')
+              if (anchor?.href) {
+                e.preventDefault()
+                e.stopPropagation()
+                window.electronAPI.shell.openExternal(anchor.href).catch(() => {})
+                return
+              }
               if (!didDragRef.current) onSelect(task)
             }}
           >

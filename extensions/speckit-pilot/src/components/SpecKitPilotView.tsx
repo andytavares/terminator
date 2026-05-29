@@ -743,6 +743,14 @@ export function SpecKitPilotView({ repoRoot }: Props): JSX.Element {
                           <div
                             className="sk-md sk-artifact-preview__body"
                             dangerouslySetInnerHTML={{ __html: renderMarkdown(fileContent) }}
+                            onClick={(e) => {
+                              const anchor = (e.target as HTMLElement).closest('a')
+                              if (anchor?.href) {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                window.electronAPI.shell.openExternal(anchor.href).catch(() => {})
+                              }
+                            }}
                           />
                         </div>
                       )}
@@ -1044,7 +1052,18 @@ function FileViewer({
             spellCheck={false}
           />
         ) : (
-          <div className="sk-md" dangerouslySetInnerHTML={{ __html: html }} />
+          <div
+            className="sk-md"
+            dangerouslySetInnerHTML={{ __html: html }}
+            onClick={(e) => {
+              const anchor = (e.target as HTMLElement).closest('a')
+              if (anchor?.href) {
+                e.preventDefault()
+                e.stopPropagation()
+                window.electronAPI.shell.openExternal(anchor.href).catch(() => {})
+              }
+            }}
+          />
         )}
       </div>
 

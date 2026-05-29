@@ -1,9 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ipcMain } from 'electron'
 
+const { mockOpenPath, mockOpenExternal } = vi.hoisted(() => ({
+  mockOpenPath: vi.fn(),
+  mockOpenExternal: vi.fn(),
+}))
+
 vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn(),
+  },
+  shell: {
+    openPath: mockOpenPath,
+    openExternal: mockOpenExternal,
   },
 }))
 
@@ -147,36 +156,76 @@ describe('shell:exec IPC handler', () => {
   })
 })
 
-describe('shell:open-path IPC handler', () => {
+describe('shell:open-external IPC handler', () => {
   let handler: (event: unknown, payload: unknown) => Promise<unknown>
 
-  const mockOpenPath = vi.fn()
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockOpenExternal.mockResolvedValue(undefined)
+
+    registerShellHandlers()
+
+    const calls = vi.mocked(ipcMain.handle).mock.calls
+    const call = calls.find(([channel]) => channel === 'shell:open-external')
+    expect(call).toBeDefined()
+    handler = call![1] as typeof handler
+  })
+
+  it('returns VALIDATION_ERROR for a non-URL string', async () => {
+    const result = (await handler({}, { url: 'not-a-url' })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns VALIDATION_ERROR for missing url field', async () => {
+    const result = (await handler({}, {})) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns ok:true when openExternal succeeds', async () => {
+    const result = await handler({}, { url: 'https://example.com' })
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('returns error string when openExternal throws', async () => {
+    mockOpenExternal.mockRejectedValue(new Error('launch failed'))
+    const result = (await handler({}, { url: 'https://example.com' })) as { error: string }
+    expect(result.error).toContain('launch failed')
+  })
+})
+
+describe('shell:open-path IPC handler', () => {
+  let handler: (event: unknown, payload: unknown) => Promise<unknown>
 
   beforeEach(() => {
     vi.clearAllMocks()
     mockOpenPath.mockResolvedValue('')
 
-    vi.doMock('electron', () => ({
-      ipcMain: { handle: vi.fn() },
-      shell: { openPath: mockOpenPath },
-    }))
-
     registerShellHandlers()
 
     const calls = vi.mocked(ipcMain.handle).mock.calls
     const call = calls.find(([channel]) => channel === 'shell:open-path')
-    if (call) handler = call[1] as typeof handler
+    expect(call).toBeDefined()
+    handler = call![1] as typeof handler
   })
 
   it('returns VALIDATION_ERROR for empty filePath', async () => {
-    if (!handler) return
     const result = (await handler({}, { filePath: '' })) as { error: string }
     expect(result.error).toBe('VALIDATION_ERROR')
   })
 
   it('returns VALIDATION_ERROR for missing filePath', async () => {
-    if (!handler) return
     const result = (await handler({}, {})) as { error: string }
     expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns ok:true when openPath succeeds', async () => {
+    const result = await handler({}, { filePath: '/some/file.txt' })
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('returns error when openPath returns a non-empty error message', async () => {
+    mockOpenPath.mockResolvedValue('No application found')
+    const result = (await handler({}, { filePath: '/some/file.txt' })) as { error: string }
+    expect(result.error).toBe('No application found')
   })
 })

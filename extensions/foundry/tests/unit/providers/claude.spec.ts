@@ -36,11 +36,12 @@ function makeResponse(
 }
 
 const mockCreate = vi.fn()
+const mockModelsList = vi.fn(async () => ({ data: [{ id: 'claude-sonnet' }] }))
 
 vi.mock('@anthropic-ai/sdk', () => ({
   default: class MockAnthropic {
     messages = { create: mockCreate }
-    models = { list: vi.fn(async () => ({ data: [{ id: 'claude-sonnet' }] })) }
+    models = { list: mockModelsList }
   },
 }))
 
@@ -289,5 +290,38 @@ describe('ClaudeAdapter', () => {
     mockRetrieveKey.mockResolvedValueOnce(null)
     const result = await adapter.testConnection()
     expect(result.ok).toBe(false)
+  })
+
+  it('testConnection() returns ok=false when models.list throws', async () => {
+    mockModelsList.mockRejectedValueOnce(new Error('Network error'))
+    const result = await adapter.testConnection()
+    expect(result.ok).toBe(false)
+    expect(result.latencyMs).toBeGreaterThanOrEqual(0)
+  })
+
+  it('run() omits agentsMdContent from system prompt when empty', async () => {
+    let capturedSystem = ''
+    mockCreate.mockImplementation(async (opts: { system: string }) => {
+      capturedSystem = opts?.system ?? ''
+      return makeResponse([{ type: 'text', text: 'ok' }])
+    })
+    for await (const _ of adapter.run({ ...BASE_REQUEST, agentsMdContent: '' })) {
+      /* drain */
+    }
+    expect(capturedSystem).not.toContain('Follow these project-specific guidelines')
+  })
+
+  it('respects requestDelayMs before first API call', async () => {
+    vi.useFakeTimers()
+    const delayedAdapter = new ClaudeAdapter('p', 'claude-sonnet-4-6', 'key', 0, 200)
+    mockCreate.mockResolvedValue(makeResponse([{ type: 'text', text: 'hi' }]))
+    const runPromise = (async () => {
+      for await (const _ of delayedAdapter.run(BASE_REQUEST)) {
+        /* drain */
+      }
+    })()
+    await vi.advanceTimersByTimeAsync(300)
+    vi.useRealTimers()
+    await runPromise
   })
 })

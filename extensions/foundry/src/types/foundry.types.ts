@@ -136,6 +136,11 @@ export interface Run {
   sensorResults?: SensorResult[]
   worktreePath?: string
   worktreeBranch?: string
+  /** Accumulated token counts across all iterations — written to history at completion */
+  tokenCountIn?: number
+  tokenCountOut?: number
+  /** Terminator project.id created for this run's worktree — used for cleanup on completion */
+  terminalProjectId?: string
 }
 
 // ─── History ────────────────────────────────────────────────────────────────

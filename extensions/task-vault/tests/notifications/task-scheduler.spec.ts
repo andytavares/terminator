@@ -11,7 +11,22 @@ vi.mock('electron', () => ({
 
 const mockRun = vi.fn().mockReturnValue({ changes: 1 })
 const mockAll = vi.fn(() => [])
-const mockPrepare = vi.fn(() => ({ all: mockAll, run: mockRun }))
+// Auto-dismiss queries always return [] by default (no resolved tasks)
+const mockAutoDismissAll = vi.fn(() => [])
+
+/**
+ * SQL-aware prepare mock: routes auto-dismiss SELECT queries to a separate mock
+ * so they don't interfere with the due/blocked task query expectations.
+ */
+const mockPrepare = vi.fn((sql: string) => {
+  if (
+    (sql as string).includes("AND status IN ('done','cancelled','migrated')") ||
+    (sql as string).includes("AND status != 'blocked'")
+  ) {
+    return { all: mockAutoDismissAll, run: mockRun }
+  }
+  return { all: mockAll, run: mockRun }
+})
 const mockDb = { prepare: mockPrepare }
 
 vi.mock('../../src/vault/db.js', () => ({
@@ -22,7 +37,9 @@ vi.mock('../../src/vault/db.js', () => ({
 function makeApi(overrides: Record<string, unknown> = {}) {
   return {
     settings: { get: vi.fn((_key: string) => undefined) },
-    notifications: { createNotification: vi.fn() },
+    notifications: {
+      createNotification: vi.fn(() => ({ dispose: vi.fn() })),
+    },
     ...overrides,
   } as unknown as import('../../../../src/main/extensions/api.js').ExtensionAPI
 }
@@ -50,6 +67,8 @@ function blockedRow(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks()
   mockAll.mockReturnValue([])
+  mockAutoDismissAll.mockReturnValue([])
+  mockRun.mockReturnValue({ changes: 1 })
   vi.useFakeTimers()
 })
 
@@ -106,7 +125,7 @@ describe('startTaskScheduler — due tasks', () => {
     mockAll.mockImplementation((date: string) => {
       // First call = due tasks query, second = blocked tasks query
       if (typeof date === 'string' && date.startsWith('2026')) {
-        return [{ id: 't1', text: 'Finish report', due_date: '2026-05-26' }]
+        return [{ id: 't1', text: 'Finish report', due_date: '2026-05-26', metadata: '{}' }]
       }
       return []
     })
@@ -134,7 +153,9 @@ describe('startTaskScheduler — due tasks', () => {
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
     mockAll
-      .mockReturnValueOnce([{ id: 't1', text: 'Early task', due_date: '2026-05-26' }])
+      .mockReturnValueOnce([
+        { id: 't1', text: 'Early task', due_date: '2026-05-26', metadata: '{}' },
+      ])
       .mockReturnValue([])
 
     const { dispose } = startTaskScheduler(api)
@@ -157,7 +178,7 @@ describe('startTaskScheduler — due tasks', () => {
     mockAll
       .mockReturnValueOnce([]) // startup: due tasks empty
       .mockReturnValueOnce([]) // startup: blocked tasks empty
-      .mockReturnValueOnce([{ id: 't2', text: 'New task', due_date: '2026-05-26' }]) // 2nd tick: due
+      .mockReturnValueOnce([{ id: 't2', text: 'New task', due_date: '2026-05-26', metadata: '{}' }]) // 2nd tick: due
       .mockReturnValue([])
 
     const { tick, dispose } = startTaskScheduler(api)
@@ -177,7 +198,9 @@ describe('startTaskScheduler — due tasks', () => {
 
     // due_date is yesterday — overdue regardless of time
     mockAll
-      .mockReturnValueOnce([{ id: 'od1', text: 'Overdue task', due_date: '2026-05-25' }])
+      .mockReturnValueOnce([
+        { id: 'od1', text: 'Overdue task', due_date: '2026-05-25', metadata: '{}' },
+      ])
       .mockReturnValue([])
 
     const { dispose } = startTaskScheduler(api)
@@ -191,23 +214,125 @@ describe('startTaskScheduler — due tasks', () => {
     )
   })
 
-  it('deduplicates due task notifications within the same day', () => {
+  it('deduplicates due task notifications within the same day (in-memory)', () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn((_k: string) => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    mockAll.mockImplementation(() => [{ id: 'dup', text: 'Dup task' }])
+    mockAll.mockImplementation(() => [{ id: 'dup', text: 'Dup task', metadata: '{}' }])
 
     const { tick, dispose } = startTaskScheduler(api)
     tick() // second call
     dispose()
 
-    // Should only fire once despite two ticks
+    // Should only fire once despite two ticks (in-memory dedup set)
     const warningCalls = createNotification.mock.calls.filter(
       (c) => (c[0] as { type: string }).type === 'warning'
     )
     expect(warningCalls).toHaveLength(1)
+  })
+
+  it('skips notification for tasks already notified today (cross-restart dedup via metadata)', () => {
+    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+
+    const api = makeApi({ settings: { get: vi.fn((_k: string) => '09:00') } })
+    const createNotification = vi.spyOn(api.notifications, 'createNotification')
+
+    // Task already has notification_notified_date = today in its metadata
+    mockAll
+      .mockReturnValueOnce([
+        {
+          id: 'already',
+          text: 'Already notified',
+          due_date: '2026-05-26',
+          metadata: JSON.stringify({ notification_notified_date: '2026-05-26' }),
+        },
+      ])
+      .mockReturnValue([])
+
+    const { dispose } = startTaskScheduler(api)
+    dispose()
+
+    expect(createNotification).not.toHaveBeenCalled()
+  })
+
+  it('persists notification_notified_date to task metadata when notification fires', () => {
+    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+
+    const api = makeApi({ settings: { get: vi.fn((_k: string) => '09:00') } })
+
+    mockAll
+      .mockReturnValueOnce([
+        { id: 'persist', text: 'Persist me', due_date: '2026-05-26', metadata: '{}' },
+      ])
+      .mockReturnValue([])
+
+    const { dispose } = startTaskScheduler(api)
+    dispose()
+
+    // UPDATE tasks SET metadata=? should have been called with today's date embedded
+    const updateCalls = mockRun.mock.calls.filter((args) => {
+      const metaArg = args[0] as string
+      return typeof metaArg === 'string' && metaArg.includes('notification_notified_date')
+    })
+    expect(updateCalls.length).toBeGreaterThan(0)
+    const storedMeta = JSON.parse(updateCalls[0][0] as string) as Record<string, string>
+    expect(storedMeta.notification_notified_date).toBe('2026-05-26')
+  })
+})
+
+describe('startTaskScheduler — auto-dismiss', () => {
+  it('dismisses due notification when task transitions to done', () => {
+    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+
+    const api = makeApi({ settings: { get: vi.fn((_k: string) => '09:00') } })
+    const disposeMock = vi.fn()
+    vi.spyOn(api.notifications, 'createNotification').mockReturnValue({ dispose: disposeMock })
+
+    // Startup tick: due task fires notification → dueTaskNotifs has 'done-task'
+    // Second tick: auto-dismiss due runs (map non-empty) and finds task resolved
+    mockAll
+      .mockReturnValueOnce([
+        { id: 'done-task', text: 'Will be done', due_date: '2026-05-26', metadata: '{}' },
+      ])
+      .mockReturnValue([]) // blocked tasks (startup) + all subsequent
+
+    // Startup auto-dismiss is always skipped (maps empty at that point).
+    // First mockAutoDismissAll call = second tick's auto-dismiss due query.
+    mockAutoDismissAll.mockReturnValueOnce([{ id: 'done-task' }])
+
+    const { tick, dispose } = startTaskScheduler(api)
+    tick() // second tick — auto-dismiss fires
+    dispose()
+
+    expect(disposeMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('dismisses blocked notification when task becomes unblocked', () => {
+    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+
+    const api = makeApi({ settings: { get: vi.fn((_k: string) => '09:00') } })
+    const disposeMock = vi.fn()
+    vi.spyOn(api.notifications, 'createNotification').mockReturnValue({ dispose: disposeMock })
+
+    // Startup: no due tasks, one blocked task → notification created → blockedTaskNotifs has 'b1'
+    // Second tick: auto-dismiss blocked runs and finds task is now unblocked
+    mockAll
+      .mockReturnValueOnce([]) // startup due tasks
+      .mockReturnValueOnce([blockedRow()]) // startup blocked tasks → notification fires
+      .mockReturnValue([]) // all subsequent queries
+
+    // Startup auto-dismiss is skipped (maps empty). Second tick runs auto-dismiss blocked.
+    // dueTaskNotifs is empty on second tick so auto-dismiss due is skipped too.
+    // First mockAutoDismissAll call = second tick's auto-dismiss blocked query.
+    mockAutoDismissAll.mockReturnValueOnce([{ id: 'b1' }])
+
+    const { tick, dispose } = startTaskScheduler(api)
+    tick()
+    dispose()
+
+    expect(disposeMock).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -218,12 +343,6 @@ describe('startTaskScheduler — blocked tasks', () => {
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    mockAll.mockImplementation((...args: unknown[]) => {
-      // Due tasks query returns nothing; blocked tasks query returns a row
-      if (args.length > 0) return [] // due tasks (takes today as param)
-      return [blockedRow()] // blocked tasks (no param)
-    })
-    // Simpler: just return blocked row on second call
     mockAll.mockReturnValueOnce([]).mockReturnValue([blockedRow()])
 
     const { dispose } = startTaskScheduler(api)
@@ -333,7 +452,9 @@ describe('broadcast via action handler', () => {
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    mockAll.mockReturnValueOnce([{ id: 't-action', text: 'Action task' }]).mockReturnValue([])
+    mockAll
+      .mockReturnValueOnce([{ id: 't-action', text: 'Action task', metadata: '{}' }])
+      .mockReturnValue([])
 
     const { dispose } = startTaskScheduler(api)
     dispose()

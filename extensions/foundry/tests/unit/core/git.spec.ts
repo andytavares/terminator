@@ -15,10 +15,23 @@ vi.mock('node:child_process', () => ({
   execFile: vi.fn(),
 }))
 
-// Mock fs/promises for removeWorktree fallback tests
+// Mock fs/promises — stub all methods used by createWorktree and removeWorktree
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
-  return { ...actual, rm: vi.fn().mockResolvedValue(undefined) }
+  return {
+    ...actual,
+    rm: vi.fn().mockResolvedValue(undefined),
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    // access: resolves by default (dir/file exists); individual tests can override
+    access: vi.fn().mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })),
+    readFile: vi.fn().mockResolvedValue(''),
+    appendFile: vi.fn().mockResolvedValue(undefined),
+    readdir: vi.fn().mockResolvedValue([]),
+    symlink: vi.fn().mockResolvedValue(undefined),
+    rename: vi.fn().mockResolvedValue(undefined),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    unlink: vi.fn().mockResolvedValue(undefined),
+  }
 })
 import * as fsp from 'node:fs/promises'
 
@@ -160,17 +173,36 @@ describe('getDiffForFile()', () => {
 })
 
 describe('createWorktree()', () => {
-  it('returns worktreePath and branch on success', async () => {
+  it('returns worktreePath inside .worktrees/ and branch with label', async () => {
     mockExec('')
-    const result = await createWorktree('/workspace', 'abc12345-1234-1234-1234-123456789abc')
+    const result = await createWorktree(
+      '/workspace',
+      'abc12345-1234-1234-1234-123456789abc',
+      'add-auth-middleware'
+    )
     expect(result).toHaveProperty('worktreePath')
     expect(result).toHaveProperty('branch')
+    expect(result).toHaveProperty('label')
+    if ('branch' in result) {
+      expect(result.branch).toBe('foundry/add-auth-middleware')
+      expect(result.worktreePath).toContain('.worktrees')
+      expect(result.label).toBe('add-auth-middleware')
+    }
+  })
+
+  it('falls back to run-XXXX slug when no label provided', async () => {
+    mockExec('')
+    const result = await createWorktree('/workspace', 'abc12345-1234-1234-1234-123456789abc')
     if ('branch' in result) expect(result.branch).toMatch(/^foundry\/run-/)
   })
 
   it('returns error on git failure', async () => {
     mockExec('', '', new Error('not a git repo'))
-    const result = await createWorktree('/workspace', 'abc12345-1234-1234-1234-123456789abc')
+    const result = await createWorktree(
+      '/workspace',
+      'abc12345-1234-1234-1234-123456789abc',
+      'test-label'
+    )
     expect(result).toHaveProperty('error')
   })
 })

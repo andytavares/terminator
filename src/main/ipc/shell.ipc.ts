@@ -24,6 +24,17 @@ export function registerShellHandlers(): void {
     return errorMsg ? { error: errorMsg } : { ok: true as const }
   })
 
+  ipcMain.handle('shell:open-external', async (_event, payload) => {
+    const parsed = z.object({ url: z.string().url() }).safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    try {
+      await shell.openExternal(parsed.data.url)
+      return { ok: true as const }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
   ipcMain.handle('shell:exec', async (_event, payload) => {
     const parsed = ShellExecPayloadSchema.safeParse(payload)
     if (!parsed.success) {

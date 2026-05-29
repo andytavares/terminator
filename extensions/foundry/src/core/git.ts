@@ -2,7 +2,6 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import * as path from 'node:path'
 import * as fs from 'node:fs/promises'
-import * as os from 'node:os'
 
 const execAsync = promisify(execFile)
 
@@ -87,16 +86,60 @@ async function symlinkIfAbsent(src: string, dest: string): Promise<void> {
   }
 }
 
+async function ensureGitignoreEntry(workspaceRoot: string, entry: string): Promise<void> {
+  const gitignorePath = path.join(workspaceRoot, '.gitignore')
+  try {
+    const existing = await fs.readFile(gitignorePath, 'utf-8').catch(() => '')
+    const lines = existing.split('\n')
+    if (!lines.some((l) => l.trim() === entry)) {
+      const suffix = existing.endsWith('\n') || existing === '' ? '' : '\n'
+      await fs.appendFile(gitignorePath, `${suffix}${entry}\n`, 'utf-8')
+    }
+  } catch {
+    // non-fatal if .gitignore is unwritable
+  }
+}
+
+async function resolveUniqueWorktreePath(base: string): Promise<string> {
+  try {
+    await fs.access(base)
+    // Exists — find the next available suffix
+    for (let i = 2; i <= 99; i++) {
+      const candidate = `${base}-${i}`
+      try {
+        await fs.access(candidate)
+      } catch {
+        return candidate
+      }
+    }
+    return `${base}-${Date.now()}`
+  } catch {
+    return base
+  }
+}
+
 export async function createWorktree(
   workspaceRoot: string,
-  runId: string
-): Promise<{ worktreePath: string; branch: string } | { error: string }> {
+  runId: string,
+  label?: string
+): Promise<{ worktreePath: string; branch: string; label: string } | { error: string }> {
   try {
-    const branch = `foundry/run-${runId.slice(0, 8)}`
-    const worktreePath = path.join(os.tmpdir(), `foundry-run-${runId.slice(0, 8)}`)
+    const slug = label?.trim() || `run-${runId.slice(0, 8)}`
+    const worktreesDir = path.join(workspaceRoot, '.worktrees')
+    await fs.mkdir(worktreesDir, { recursive: true })
+
+    // Ensure .worktrees/ is gitignored so it doesn't pollute `git status`
+    await ensureGitignoreEntry(workspaceRoot, '.worktrees/')
+
+    const basePath = path.join(worktreesDir, slug)
+    const worktreePath = await resolveUniqueWorktreePath(basePath)
+    const resolvedSlug = path.basename(worktreePath)
+    const branch = `foundry/${resolvedSlug}`
+
     await execAsync('git', ['worktree', 'add', '-b', branch, worktreePath, 'HEAD'], {
       cwd: workspaceRoot,
     })
+
     // Symlink node_modules so npm scripts (lint, test, format) work without reinstalling
     await symlinkIfAbsent(
       path.join(workspaceRoot, 'node_modules'),
@@ -117,7 +160,8 @@ export async function createWorktree(
     } catch {
       /* extensions dir may not exist in all projects */
     }
-    return { worktreePath, branch }
+
+    return { worktreePath, branch, label: resolvedSlug }
   } catch (err) {
     return { error: String(err) }
   }
