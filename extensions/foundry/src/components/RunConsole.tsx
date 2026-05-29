@@ -51,6 +51,25 @@ function LogLine({ entry }: { entry: RunLogEntry }) {
     minute: '2-digit',
     second: '2-digit',
   })
+
+  // Tool call lines (agent kind, starting with →) get a distinct block style
+  if (entry.kind === 'agent' && entry.message.startsWith('→ ')) {
+    const body = entry.message.slice(2)
+    const parenIdx = body.indexOf('(')
+    const name = parenIdx >= 0 ? body.slice(0, parenIdx) : body
+    const args = parenIdx >= 0 ? body.slice(parenIdx) : ''
+    return (
+      <div style={{ display: 'flex', gap: 8, padding: '1px 0', alignItems: 'baseline' }}>
+        <span className="fnd-log-ts">{time}</span>
+        <div className="fnd-tool-call" style={{ flex: 1, margin: 0 }}>
+          <span className="fnd-tool-call__arrow">→</span>
+          <span className="fnd-tool-call__name">{name}</span>
+          {args && <span className="fnd-tool-call__args">{args}</span>}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={`fnd-log-line fnd-log-line--${entry.kind}`}>
       <span className="fnd-log-ts">{time}</span>
@@ -488,14 +507,29 @@ export function RunConsole({ repoRoot }: Props) {
           }}
         >
           <div
-            className="fnd-section-label"
             style={{
-              padding: '6px 12px',
+              padding: '4px 12px',
               borderBottom: '1px solid var(--tm-border)',
               flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
             }}
           >
-            Agent output
+            <span className="fnd-section-label" style={{ padding: 0 }}>
+              Agent output
+            </span>
+            <button
+              className="fnd-btn fnd-btn--secondary fnd-btn--sm"
+              style={{ fontSize: 10 }}
+              title="Copy log to clipboard"
+              onClick={() => {
+                const text = logs.map((e) => `[${e.ts}] ${e.kind}: ${e.message}`).join('\n')
+                void navigator.clipboard.writeText(text)
+              }}
+            >
+              ⎘ Copy
+            </button>
           </div>
           <div className="fnd-log" style={{ flex: 1 }}>
             {logs.length === 0 ? (

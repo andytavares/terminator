@@ -1,10 +1,10 @@
 import { create } from 'zustand'
-import type { ComponentType } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 
 export interface GlobalTabRegistration {
   id: string
   label: string
-  icon?: string
+  icon?: ReactNode
   component: ComponentType<Record<string, never>>
   permanent?: boolean
   badge?: number

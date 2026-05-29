@@ -22,11 +22,19 @@ import {
   healthEvents,
   trackSensorResult,
   trackGateDecision,
+  trackStaleRefs,
+  resolveHealthEvent,
   setHealthChangedCallback,
   resetHealthState,
 } from './core/health.js'
 export { trackSensorResult, trackGateDecision }
-import type { Run, RunLogEntry, RunLogKind, Harness } from './types/foundry.types.js'
+import type {
+  Run,
+  RunLogEntry,
+  RunLogKind,
+  Harness,
+  HarnessHealthEvent,
+} from './types/foundry.types.js'
 import { ClaudeAdapter } from './providers/claude.js'
 import { OpenAIAdapter } from './providers/openai.js'
 import { GeminiAdapter } from './providers/gemini.js'
@@ -40,12 +48,60 @@ const disposables: Disposable[] = []
 // In-memory active run registry: workspaceRoot → Run
 const activeRuns = new Map<string, Run>()
 
+// ─── Session persistence ──────────────────────────────────────────────────────
+// Persists the active run + its logs so they survive app restarts.
+
+async function saveSession(workspaceRoot: string, run: Run): Promise<void> {
+  try {
+    const dir = path.join(workspaceRoot, '.foundry')
+    await fs.mkdir(dir, { recursive: true })
+    const session = {
+      run,
+      logs: runLogs.get(run.id) ?? [],
+    }
+    const tmp = path.join(dir, 'session.json.tmp')
+    await fs.writeFile(tmp, JSON.stringify(session), 'utf-8')
+    await fs.rename(tmp, path.join(dir, 'session.json'))
+  } catch {
+    // non-fatal — session just won't persist
+  }
+}
+
+async function loadSession(
+  workspaceRoot: string
+): Promise<{ run: Run; logs: RunLogEntry[] } | null> {
+  try {
+    const raw = await fs.readFile(path.join(workspaceRoot, '.foundry', 'session.json'), 'utf-8')
+    return JSON.parse(raw) as { run: Run; logs: RunLogEntry[] }
+  } catch {
+    return null
+  }
+}
+
+async function clearSession(workspaceRoot: string): Promise<void> {
+  try {
+    await fs.unlink(path.join(workspaceRoot, '.foundry', 'session.json'))
+  } catch {
+    // file may not exist
+  }
+}
+
 // Per-run log buffer: runId → entries (capped at 2000 to avoid unbounded growth)
 const runLogs = new Map<string, RunLogEntry[]>()
 const RUN_LOG_CAP = 2000
 
 // Per-sub-agent log buffer: runId → agentId → entries
 const subAgentLogs = new Map<string, Map<string, RunLogEntry[]>>()
+
+// Co-pilot conversation history: runId → messages
+interface CopilotConvMsg {
+  role: 'user' | 'assistant'
+  content: string
+}
+const copilotHistory = new Map<string, CopilotConvMsg[]>()
+
+// Co-pilot per-turn file tracking: runId → filePaths modified in current turn
+const copilotTurnFiles = new Map<string, string[]>()
 
 function appendLog(runId: string, kind: RunLogKind, message: string) {
   let entries = runLogs.get(runId)
@@ -81,6 +137,23 @@ function appendSubAgentLog(runId: string, agentId: string, kind: RunLogKind, mes
 function runDurationMs(run: Run): number {
   const end = run.completedAt ? new Date(run.completedAt).getTime() : Date.now()
   return Math.max(0, end - new Date(run.createdAt).getTime())
+}
+
+function broadcastAndSave(run: Run) {
+  broadcast('foundry:run-status-changed', { runId: run.id, status: run.status })
+  void saveSession(run.workspaceRoot, run)
+}
+
+function cleanupWorktree(run: Run, workspaceRoot: string): void {
+  if (!run.worktreePath || !run.worktreeBranch) return
+  const { worktreePath, worktreeBranch } = run
+  void removeWorktree(workspaceRoot, worktreePath, worktreeBranch)
+  broadcast('foundry:worktree-removed', {
+    runId: run.id,
+    workspaceRoot,
+    worktreePath,
+    terminalProjectId: run.terminalProjectId,
+  })
 }
 
 function broadcast(channel: string, payload: unknown) {
@@ -140,6 +213,45 @@ Rules: max 6 agents, short role names (2–3 words), no cycles.
 
 Task: `
 
+type PlanAgent = { id: string; role: string; task: string; dependsOn: string[] }
+
+async function planOrchestration(
+  taskDescription: string,
+  adapter: import('./providers/adapter.js').ProviderAdapter,
+  workspaceRoot: string
+): Promise<{ agents: PlanAgent[] } | { error: string }> {
+  let planBuffer = ''
+  try {
+    for await (const event of adapter.run({
+      mode: 'spec-to-code',
+      providerId: '',
+      model: '',
+      prompt: PLAN_PROMPT + taskDescription,
+      workspaceRoot,
+      agentsMdContent: '',
+      iterationLimit: 1,
+    })) {
+      if (event.type === 'token') planBuffer += event.token
+      if (event.type === 'error') return { error: `Planning failed: ${event.message}` }
+    }
+  } catch (err) {
+    return { error: `Planning error: ${String(err)}` }
+  }
+
+  const jsonMatch = planBuffer.match(/```json\s*([\s\S]*?)```/) ?? planBuffer.match(/(\{[\s\S]*\})/)
+  let rawJson = jsonMatch ? (jsonMatch[1] ?? jsonMatch[0]) : planBuffer.trim()
+  rawJson = rawJson.replace(/```[\s\S]*$/, '').trim()
+
+  try {
+    const parsed = JSON.parse(rawJson) as { agents?: PlanAgent[] }
+    const agents = parsed.agents ?? []
+    if (agents.length === 0) return { error: 'Orchestration plan returned 0 agents.' }
+    return { agents }
+  } catch {
+    return { error: `Could not parse orchestration plan. Raw response: ${rawJson.slice(0, 300)}` }
+  }
+}
+
 async function executeOrchestrate(
   run: Run,
   harness: Harness,
@@ -156,7 +268,7 @@ async function executeOrchestrate(
       'system',
       `Using manual flow: ${run.subAgents.length} agents — ${run.subAgents.map((a) => a.role).join(', ')}`
     )
-    broadcast('foundry:run-status-changed', { runId: run.id, status: 'running' })
+    broadcastAndSave(run)
     // Jump straight to execution using stored parsedAgents-like data
     const manualAgents = run.subAgents.map((a) => ({
       id: a.agentId,
@@ -173,7 +285,7 @@ async function executeOrchestrate(
           const agentData = manualAgents.find((a) => a.id === agentId)
           if (!subAgent || !agentData) return
           subAgent.status = 'running'
-          broadcast('foundry:run-status-changed', { runId: run.id, status: 'running' })
+          broadcastAndSave(run)
           appendSubAgentLog(run.id, agentId, 'system', `${subAgent.role} — starting`)
           try {
             for await (const event of adapter.run({
@@ -213,7 +325,7 @@ async function executeOrchestrate(
             subAgent.status = 'rejected'
             appendSubAgentLog(run.id, agentId, 'error', String(err))
           }
-          broadcast('foundry:run-status-changed', { runId: run.id, status: 'running' })
+          broadcastAndSave(run)
         })
       )
     }
@@ -234,7 +346,7 @@ async function executeOrchestrate(
       anyRejected ? 'error' : 'ok',
       anyRejected ? 'Flow completed with errors' : 'Flow complete'
     )
-    broadcast('foundry:run-status-changed', { runId: run.id, status: run.status })
+    broadcastAndSave(run)
     await appendHistoryEntry(workspaceRoot, {
       runId: run.id,
       mode: 'orchestrate',
@@ -260,61 +372,14 @@ async function executeOrchestrate(
 
   appendLog(run.id, 'system', `Planning sub-agents for: ${(run.prompt ?? '').slice(0, 80)}…`)
 
-  // Phase 1: collect the full response to parse JSON plan
-  let planBuffer = ''
-  try {
-    for await (const event of adapter.run({
-      mode: 'spec-to-code',
-      providerId: run.providerId,
-      model: run.model,
-      prompt: PLAN_PROMPT + (run.prompt ?? ''),
-      workspaceRoot: runRoot,
-      agentsMdContent: '',
-      iterationLimit: 1,
-    })) {
-      if (activeRuns.get(workspaceRoot)?.id !== run.id) return
-      if (event.type === 'token') planBuffer += event.token
-      if (event.type === 'error') {
-        appendLog(run.id, 'error', `Planning failed: ${event.message}`)
-        run.status = 'paused-error'
-        broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
-        return
-      }
-    }
-  } catch (err) {
-    appendLog(run.id, 'error', `Planning error: ${String(err)}`)
+  const planResult = await planOrchestration(run.prompt ?? '', adapter, runRoot)
+  if ('error' in planResult) {
+    appendLog(run.id, 'error', planResult.error)
     run.status = 'paused-error'
-    broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
+    broadcastAndSave(run)
     return
   }
-
-  // Extract JSON from the response (may be wrapped in ```json ... ```)
-  const jsonMatch = planBuffer.match(/```json\s*([\s\S]*?)```/) ?? planBuffer.match(/(\{[\s\S]*\})/)
-  let rawJson = jsonMatch ? (jsonMatch[1] ?? jsonMatch[0]) : planBuffer.trim()
-  // strip trailing ``` if present without opening fence
-  rawJson = rawJson.replace(/```[\s\S]*$/, '').trim()
-
-  let parsedAgents: Array<{ id: string; role: string; task: string; dependsOn: string[] }> = []
-  try {
-    const parsed = JSON.parse(rawJson) as { agents?: typeof parsedAgents }
-    parsedAgents = parsed.agents ?? []
-  } catch {
-    appendLog(
-      run.id,
-      'error',
-      `Could not parse orchestration plan. Raw response: ${rawJson.slice(0, 300)}`
-    )
-    run.status = 'paused-error'
-    broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
-    return
-  }
-
-  if (parsedAgents.length === 0) {
-    appendLog(run.id, 'error', 'Orchestration plan returned 0 agents.')
-    run.status = 'paused-error'
-    broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
-    return
-  }
+  const parsedAgents = planResult.agents
 
   // Map to SubAgent type and attach to run
   run.subAgents = parsedAgents.map((a) => ({
@@ -330,7 +395,7 @@ async function executeOrchestrate(
     'system',
     `Plan: ${run.subAgents.length} agents — ${run.subAgents.map((a) => a.role).join(', ')}`
   )
-  broadcast('foundry:run-status-changed', { runId: run.id, status: 'running' })
+  broadcastAndSave(run)
 
   // Phase 2: execute in topological tiers
   const tiers = topoSort(run.subAgents)
@@ -349,7 +414,7 @@ async function executeOrchestrate(
         const subAgent = run.subAgents!.find((a) => a.agentId === agentId)
         if (!subAgent) return
         subAgent.status = 'running'
-        broadcast('foundry:run-status-changed', { runId: run.id, status: 'running' })
+        broadcastAndSave(run)
 
         const agentData = parsedAgents.find((a) => a.id === agentId)
         const agentTask = agentData?.task ?? subAgent.role
@@ -393,7 +458,7 @@ async function executeOrchestrate(
           subAgent.status = 'rejected'
           appendSubAgentLog(run.id, agentId, 'error', `failed: ${String(err)}`)
         }
-        broadcast('foundry:run-status-changed', { runId: run.id, status: 'running' })
+        broadcastAndSave(run)
       })
     )
   }
@@ -420,7 +485,7 @@ async function executeOrchestrate(
       ? 'Orchestration completed with errors'
       : `Orchestration complete — ${run.subAgents.length} agents done`
   )
-  broadcast('foundry:run-status-changed', { runId: run.id, status: run.status })
+  broadcastAndSave(run)
 
   await appendHistoryEntry(workspaceRoot, {
     runId: run.id,
@@ -448,6 +513,44 @@ async function executeOrchestrate(
 
 // ─── Run execution loop ──────────────────────────────────────────────────────
 
+const SLUG_STOP = new Set([
+  'a',
+  'an',
+  'the',
+  'and',
+  'or',
+  'but',
+  'in',
+  'on',
+  'at',
+  'to',
+  'for',
+  'of',
+  'with',
+  'by',
+  'from',
+  'is',
+  'it',
+  'as',
+  'be',
+  'do',
+  'if',
+])
+
+function slugifyPrompt(text: string): string {
+  return (
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 1 && !SLUG_STOP.has(w))
+      .slice(0, 5)
+      .join('-')
+      .replace(/-+/g, '-')
+      .slice(0, 50) || 'run'
+  )
+}
+
 async function executeRun(run: Run, harness: Harness): Promise<void> {
   const workspaceRoot = run.workspaceRoot
   const providers = await readProviders(workspaceRoot)
@@ -460,7 +563,7 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
       'error',
       `Provider "${run.providerId}" not found. Add it in Harness Settings.`
     )
-    broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
+    broadcastAndSave(run)
     return
   }
 
@@ -472,12 +575,22 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
       'error',
       `Cannot build adapter for provider "${provider.id}" — check that an API key is saved.`
     )
-    broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
+    broadcastAndSave(run)
     return
   }
 
+  // Derive a human-readable label from the spec filename or prompt text
+  const worktreeLabel = slugifyPrompt(
+    run.specPath
+      ?.split('/')
+      .pop()
+      ?.replace(/\.\w+$/, '') ??
+      run.prompt ??
+      ''
+  )
+
   // Create an isolated git worktree so the run doesn't pollute the working tree
-  const worktreeResult = await createWorktree(workspaceRoot, run.id)
+  const worktreeResult = await createWorktree(workspaceRoot, run.id, worktreeLabel)
   if ('error' in worktreeResult) {
     appendLog(
       run.id,
@@ -490,8 +603,15 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
     appendLog(
       run.id,
       'system',
-      `Isolated worktree: ${worktreeResult.worktreePath} (branch: ${worktreeResult.branch})`
+      `Worktree: .worktrees/${worktreeResult.label}  (branch: ${worktreeResult.branch})`
     )
+    broadcast('foundry:worktree-created', {
+      runId: run.id,
+      workspaceRoot,
+      worktreePath: worktreeResult.worktreePath,
+      branch: worktreeResult.branch,
+      label: worktreeResult.label,
+    })
   }
 
   // The agent operates in the worktree (or workspace if worktree failed)
@@ -574,6 +694,9 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
         }
         tokenCountIn = event.tokenCountIn
         tokenCountOut = event.tokenCountOut
+        // Accumulate on run object so gate-decision history entries can read them
+        run.tokenCountIn = (run.tokenCountIn ?? 0) + tokenCountIn
+        run.tokenCountOut = (run.tokenCountOut ?? 0) + tokenCountOut
         appendLog(
           run.id,
           'system',
@@ -582,7 +705,7 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
       } else if (event.type === 'error') {
         appendLog(run.id, 'error', `Provider error: ${event.message}`)
         run.status = 'paused-error'
-        broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
+        broadcastAndSave(run)
         return
       }
     }
@@ -611,7 +734,7 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
           'Sensors failed — gate blocked. Fix issues or disable "sensors must pass" in settings.'
         )
         run.status = 'paused-error'
-        broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
+        broadcastAndSave(run)
         return
       }
     }
@@ -623,7 +746,7 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
         `Gate open — awaiting your review (iteration ${run.currentIteration}/${run.iterationLimit})`
       )
       run.status = 'gate'
-      broadcast('foundry:run-status-changed', { runId: run.id, status: 'gate' })
+      broadcastAndSave(run)
     } else {
       // Auto-approve: merge worktree changes back and clean up
       if (run.worktreePath && run.worktreeBranch) {
@@ -636,13 +759,18 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
             `Merge note: ${mergeResult.error} — changes remain on branch ${run.worktreeBranch}`
           )
         }
-        void removeWorktree(workspaceRoot, run.worktreePath, run.worktreeBranch)
+        cleanupWorktree(run, workspaceRoot)
       }
       appendLog(run.id, 'ok', 'Run complete (auto-approved — no gate required)')
       run.status = 'done'
       run.completedAt = new Date().toISOString()
       activeRuns.delete(workspaceRoot)
-      runLogs.delete(run.id)
+      void clearSession(workspaceRoot)
+      // Do NOT delete runLogs here — RunConsole needs to read them after completion
+      const sensorSummaryAuto =
+        run.sensorResults && run.sensorResults.length > 0
+          ? `${run.sensorResults.filter((r) => r.pass).length}/${run.sensorResults.length}`
+          : '0/0'
       await appendHistoryEntry(workspaceRoot, {
         runId: run.id,
         mode: run.mode,
@@ -652,21 +780,21 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
         specPath: run.specPath,
         promptSummary: (run.prompt ?? '').slice(0, 200),
         status: 'done',
-        tokenCountIn,
-        tokenCountOut,
-        sensorSummary: '0/0',
+        tokenCountIn: run.tokenCountIn ?? tokenCountIn,
+        tokenCountOut: run.tokenCountOut ?? tokenCountOut,
+        sensorSummary: sensorSummaryAuto,
         gateDecisions: [],
         filesChangedCount: run.fileChanges.length,
         durationMs: Date.now() - new Date(run.createdAt).getTime(),
         createdAt: run.createdAt,
         completedAt: run.completedAt!,
       })
-      broadcast('foundry:run-status-changed', { runId: run.id, status: 'done' })
+      broadcastAndSave(run)
     }
   } catch (err) {
     appendLog(run.id, 'error', `Unexpected error: ${String(err)}`)
     run.status = 'paused-error'
-    broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
+    broadcastAndSave(run)
   }
 }
 
@@ -738,10 +866,22 @@ export function activate(api: ExtensionAPI): void {
           }
         }
       }
+      // Emit stale-reference health event so FoundryPanel can display an alert
+      trackStaleRefs(staleRefs)
       return { staleRefs }
     } catch (err) {
+      // AGENTS.md doesn't exist — clear any stale-reference alert
+      trackStaleRefs([])
       return { error: String(err) }
     }
+  })
+
+  // IPC to resolve (dismiss) a specific health event from the UI
+  reg(api, 'foundry:health-resolve', (payload: unknown) => {
+    const { kind, key } = payload as { kind: HarnessHealthEvent['kind']; key?: string }
+    if (!kind) return { error: 'kind required' }
+    resolveHealthEvent(kind, key)
+    return { ok: true }
   })
 
   // ─── Provider ──────────────────────────────────────────────────────────────
@@ -838,7 +978,7 @@ export function activate(api: ExtensionAPI): void {
       appendLog(run.id, 'sensor', `${r.pass ? '✓' : '✗'} ${r.sensorName} (${r.durationMs}ms)`)
       trackSensorResult(r.sensorName, r.pass, workspaceRoot)
     }
-    broadcast('foundry:run-status-changed', { runId: run.id, status: run.status })
+    broadcastAndSave(run)
     return { results }
   })
 
@@ -930,7 +1070,7 @@ export function activate(api: ExtensionAPI): void {
     appendLog(run.id, 'system', `Run started — mode: ${run.mode}, model: ${run.model}`)
     if (run.checkpointCommit) appendLog(run.id, 'system', `Git checkpoint: ${run.checkpointCommit}`)
     if (run.specPath) appendLog(run.id, 'system', `Spec: ${run.specPath}`)
-    broadcast('foundry:run-status-changed', { runId: run.id, status: 'running' })
+    broadcastAndSave(run)
 
     // Fire-and-forget: execute the run asynchronously so we return immediately
     void executeRun(run, harnessResult.harness)
@@ -959,8 +1099,13 @@ export function activate(api: ExtensionAPI): void {
       run.status = 'rejected'
       run.completedAt = new Date().toISOString()
       activeRuns.delete(workspaceRoot)
-      runLogs.delete(run.id)
+      void clearSession(workspaceRoot)
+      // Do NOT delete runLogs — RunConsole needs them after completion
       trackGateDecision(run.specPath ?? '', run.currentIteration, 'reject', workspaceRoot)
+      const sensorSummaryReject =
+        run.sensorResults && run.sensorResults.length > 0
+          ? `${run.sensorResults.filter((r) => r.pass).length}/${run.sensorResults.length}`
+          : '0/0'
       await appendHistoryEntry(workspaceRoot, {
         runId: run.id,
         mode: run.mode,
@@ -970,13 +1115,14 @@ export function activate(api: ExtensionAPI): void {
         specPath: run.specPath,
         promptSummary: (run.prompt ?? '').slice(0, 200),
         status: 'rejected',
-        tokenCountIn: 0,
-        tokenCountOut: 0,
-        sensorSummary: '0/0',
+        tokenCountIn: run.tokenCountIn ?? 0,
+        tokenCountOut: run.tokenCountOut ?? 0,
+        sensorSummary: sensorSummaryReject,
         gateDecisions: [
           {
             iterationNumber: run.currentIteration,
             decision: 'reject',
+            note,
             decidedAt: new Date().toISOString(),
           },
         ],
@@ -985,7 +1131,7 @@ export function activate(api: ExtensionAPI): void {
         createdAt: run.createdAt,
         completedAt: run.completedAt,
       })
-      broadcast('foundry:run-status-changed', { runId: run.id, status: 'rejected' })
+      broadcastAndSave(run)
       return { run }
     }
 
@@ -1002,13 +1148,18 @@ export function activate(api: ExtensionAPI): void {
         } else {
           appendLog(run.id, 'ok', 'Changes merged into workspace')
         }
-        void removeWorktree(workspaceRoot, run.worktreePath, run.worktreeBranch)
+        cleanupWorktree(run, workspaceRoot)
       }
       run.status = 'done'
       run.completedAt = new Date().toISOString()
       activeRuns.delete(workspaceRoot)
-      runLogs.delete(run.id)
+      void clearSession(workspaceRoot)
+      // Do NOT delete runLogs — RunConsole needs them after completion
       trackGateDecision(run.specPath ?? '', run.currentIteration, 'approve', workspaceRoot)
+      const sensorSummaryApprove =
+        run.sensorResults && run.sensorResults.length > 0
+          ? `${run.sensorResults.filter((r) => r.pass).length}/${run.sensorResults.length}`
+          : '0/0'
       await appendHistoryEntry(workspaceRoot, {
         runId: run.id,
         mode: run.mode,
@@ -1018,13 +1169,14 @@ export function activate(api: ExtensionAPI): void {
         specPath: run.specPath,
         promptSummary: (run.prompt ?? '').slice(0, 200),
         status: 'done',
-        tokenCountIn: 0,
-        tokenCountOut: 0,
-        sensorSummary: '0/0',
+        tokenCountIn: run.tokenCountIn ?? 0,
+        tokenCountOut: run.tokenCountOut ?? 0,
+        sensorSummary: sensorSummaryApprove,
         gateDecisions: [
           {
             iterationNumber: run.currentIteration,
             decision: 'approve',
+            note,
             decidedAt: new Date().toISOString(),
           },
         ],
@@ -1033,7 +1185,7 @@ export function activate(api: ExtensionAPI): void {
         createdAt: run.createdAt,
         completedAt: run.completedAt,
       })
-      broadcast('foundry:run-status-changed', { runId: run.id, status: 'done' })
+      broadcastAndSave(run)
       return { run }
     }
 
@@ -1043,11 +1195,22 @@ export function activate(api: ExtensionAPI): void {
         'system',
         `Gate: request-changes — starting iteration ${run.currentIteration + 1}${note ? ` — feedback: ${note}` : ''}`
       )
+      // Revert previous iteration's files in the worktree so the next iteration starts clean
+      const runRoot = run.worktreePath ?? workspaceRoot
+      const prevFilePaths = run.fileChanges.map((c) => c.filePath)
+      if (prevFilePaths.length > 0) {
+        appendLog(
+          run.id,
+          'system',
+          `Reverting ${prevFilePaths.length} file(s) before next iteration…`
+        )
+        await revertFiles(runRoot, prevFilePaths)
+      }
       run.currentIteration++
       run.status = 'running'
       run.fileChanges = []
       if (note) run.prompt = `[FEEDBACK]: ${note}\n\n${run.prompt ?? ''}`
-      broadcast('foundry:run-status-changed', { runId: run.id, status: 'running' })
+      broadcastAndSave(run)
       // Re-read harness and re-execute the next iteration
       const harnessResult = await readHarness(workspaceRoot)
       if (!('error' in harnessResult) && !('notFound' in harnessResult)) {
@@ -1066,7 +1229,7 @@ export function activate(api: ExtensionAPI): void {
     appendLog(run.id, 'system', 'Run aborted — discarding worktree')
     if (run.worktreePath && run.worktreeBranch) {
       // Worktree is isolated — just remove it; main workspace is untouched
-      void removeWorktree(workspaceRoot, run.worktreePath, run.worktreeBranch)
+      cleanupWorktree(run, workspaceRoot)
     } else {
       // Fallback: revert files in the main workspace
       const filePaths = run.fileChanges.map((c) => c.filePath)
@@ -1075,7 +1238,7 @@ export function activate(api: ExtensionAPI): void {
     run.status = 'aborted'
     run.completedAt = new Date().toISOString()
     activeRuns.delete(workspaceRoot)
-    runLogs.delete(run.id)
+    // Do NOT delete runLogs — RunConsole needs them after completion
     await appendHistoryEntry(workspaceRoot, {
       runId: run.id,
       mode: run.mode,
@@ -1085,8 +1248,8 @@ export function activate(api: ExtensionAPI): void {
       specPath: run.specPath,
       promptSummary: (run.prompt ?? '').slice(0, 200),
       status: 'aborted',
-      tokenCountIn: 0,
-      tokenCountOut: 0,
+      tokenCountIn: run.tokenCountIn ?? 0,
+      tokenCountOut: run.tokenCountOut ?? 0,
       sensorSummary: '0/0',
       gateDecisions: [],
       filesChangedCount: run.fileChanges.length,
@@ -1094,7 +1257,7 @@ export function activate(api: ExtensionAPI): void {
       createdAt: run.createdAt,
       completedAt: run.completedAt,
     })
-    broadcast('foundry:run-status-changed', { runId: run.id, status: 'aborted' })
+    broadcastAndSave(run)
     return { ok: true }
   })
 
@@ -1110,19 +1273,19 @@ export function activate(api: ExtensionAPI): void {
       activeRun.status = finalStatus
       activeRun.completedAt = activeRun.completedAt ?? new Date().toISOString()
       // Clean up associated git worktree if one was created
-      if (activeRun.worktreePath && activeRun.worktreeBranch) {
-        void removeWorktree(workspaceRoot, activeRun.worktreePath, activeRun.worktreeBranch)
-      }
+      cleanupWorktree(activeRun, workspaceRoot)
       activeRuns.delete(workspaceRoot)
       runLogs.delete(runId)
       subAgentLogs.delete(runId)
+      void clearSession(workspaceRoot)
       broadcast('foundry:run-status-changed', { runId, status: finalStatus })
     } else {
-      // Historical run — try to clean up any orphaned worktree for this runId
-      const branch = `foundry/run-${runId.slice(0, 8)}`
-      const { tmpdir } = await import('node:os')
-      const worktreePath = path.join(tmpdir(), `foundry-run-${runId.slice(0, 8)}`)
-      void removeWorktree(workspaceRoot, worktreePath, branch)
+      // Historical run — the session file may have a worktreePath; try cleaning it up
+      const session = await loadSession(workspaceRoot).catch(() => null)
+      if (session?.run.id === runId && session.run.worktreePath && session.run.worktreeBranch) {
+        cleanupWorktree(session.run, workspaceRoot)
+      }
+      void clearSession(workspaceRoot)
     }
     // Remove from history file regardless (works for both active and historical runs)
     await deleteHistoryEntry(workspaceRoot, runId)
@@ -1148,12 +1311,12 @@ export function activate(api: ExtensionAPI): void {
     if (run.status !== 'paused-error') return { error: 'Run is not in a retryable state' }
     run.status = 'running'
     appendLog(run.id, 'system', 'Retrying run…')
-    broadcast('foundry:run-status-changed', { runId: run.id, status: 'running' })
+    broadcastAndSave(run)
     const harnessResult = await readHarness(workspaceRoot)
     if ('error' in harnessResult || 'notFound' in harnessResult) {
       run.status = 'paused-error'
       appendLog(run.id, 'error', 'Cannot read harness — cannot retry')
-      broadcast('foundry:run-status-changed', { runId: run.id, status: 'paused-error' })
+      broadcastAndSave(run)
       return { error: 'Cannot read harness' }
     }
     void executeRun(run, harnessResult.harness)
@@ -1169,15 +1332,65 @@ export function activate(api: ExtensionAPI): void {
     }
     const run = activeRuns.get(workspaceRoot)
     if (!run || run.id !== runId) return { error: 'Run not found' }
+    if (run.status !== 'paused-error')
+      return { error: 'Can only switch provider on a paused-error run' }
     run.providerId = providerId
     run.model = model
     run.status = 'running'
-    broadcast('foundry:run-status-changed', { runId: run.id, status: 'running' })
+    appendLog(run.id, 'system', `Switched provider to ${providerId} (${model}) — retrying…`)
+    broadcastAndSave(run)
+    const harnessResultSP = await readHarness(workspaceRoot)
+    if (!('error' in harnessResultSP) && !('notFound' in harnessResultSP)) {
+      void executeRun(run, harnessResultSP.harness)
+    }
     return { run }
+  })
+
+  // Store the Terminator project ID created by the renderer for this worktree
+  reg(api, 'foundry:set-project-id', (payload: unknown) => {
+    const { runId, workspaceRoot, projectId } = payload as {
+      runId: string
+      workspaceRoot: string
+      projectId: string
+    }
+    const run = activeRuns.get(workspaceRoot)
+    if (run?.id === runId) {
+      run.terminalProjectId = projectId
+      void saveSession(workspaceRoot, run)
+    }
+    return { ok: true }
   })
 
   reg(api, 'foundry:run-list', async (payload: unknown) => {
     const { workspaceRoot } = payload as { workspaceRoot: string }
+
+    // Restore a persisted session if the app restarted with an active run in progress
+    if (!activeRuns.has(workspaceRoot)) {
+      const session = await loadSession(workspaceRoot)
+      if (session) {
+        const { run, logs } = session
+        const isResumable = run.status === 'gate' || run.status === 'paused-error'
+        const wasRunning = run.status === 'running'
+        if (isResumable || wasRunning) {
+          if (wasRunning) {
+            run.status = 'paused-error'
+            logs.push({
+              ts: new Date().toISOString(),
+              kind: 'system',
+              message: 'App restarted — run paused. Use ↺ Retry to resume.',
+            })
+          }
+          activeRuns.set(workspaceRoot, run)
+          runLogs.set(run.id, logs)
+          // Re-save with the potentially updated status
+          void saveSession(workspaceRoot, run)
+        } else {
+          // Terminal status persisted — clean it up
+          void clearSession(workspaceRoot)
+        }
+      }
+    }
+
     const active = activeRuns.get(workspaceRoot)
     // Read recent completed runs from history so they persist across restarts
     let historicalRuns: Array<{
@@ -1255,8 +1468,20 @@ export function activate(api: ExtensionAPI): void {
   })
 
   // ─── Orchestrate ───────────────────────────────────────────────────────────
-  reg(api, 'foundry:orchestrate-plan', async () => {
-    return { error: 'not implemented' }
+  reg(api, 'foundry:orchestrate-plan', async (payload: unknown) => {
+    const { workspaceRoot, taskDescription, providerId } = payload as {
+      workspaceRoot: string
+      taskDescription: string
+      providerId: string
+    }
+    if (!workspaceRoot || !taskDescription || !providerId)
+      return { error: 'workspaceRoot, taskDescription, providerId required' }
+    const providers = await readProviders(workspaceRoot)
+    const provider = providers.find((p) => p.id === providerId)
+    if (!provider) return { error: `Provider "${providerId}" not found` }
+    const adapter = buildAdapter(provider, workspaceRoot)
+    if (!adapter) return { error: 'Cannot build adapter — check that an API key is saved.' }
+    return planOrchestration(taskDescription, adapter, workspaceRoot)
   })
 
   reg(api, 'foundry:dag-validate', (payload: unknown) => {
@@ -1266,22 +1491,154 @@ export function activate(api: ExtensionAPI): void {
   })
 
   // ─── Co-pilot ──────────────────────────────────────────────────────────────
-  reg(api, 'foundry:copilot-send', async () => ({ error: 'not implemented' }))
+  reg(api, 'foundry:copilot-send', async (payload: unknown) => {
+    const { runId, workspaceRoot, message } = payload as {
+      runId: string
+      workspaceRoot: string
+      message: string
+    }
+    if (!runId || !workspaceRoot || !message)
+      return { error: 'runId, workspaceRoot, message required' }
+
+    const run = activeRuns.get(workspaceRoot)
+    if (!run || run.id !== runId) return { error: 'Run not found' }
+
+    const providers = await readProviders(workspaceRoot)
+    const provider = providers.find((p) => p.id === run.providerId)
+    if (!provider) return { error: `Provider "${run.providerId}" not found` }
+    if (!provider.supportsStreaming) {
+      return {
+        error:
+          'Co-pilot requires a streaming-capable provider (Claude, OpenAI, or Gemini). Ollama is not supported.',
+      }
+    }
+
+    const adapter = buildAdapter(provider, workspaceRoot)
+    if (!adapter) return { error: 'Cannot build adapter — check that an API key is saved.' }
+
+    // Load AGENTS.md for system context
+    let agentsMdContent = ''
+    try {
+      const harnessResult = await readHarness(workspaceRoot)
+      if (!('error' in harnessResult) && !('notFound' in harnessResult)) {
+        agentsMdContent = await fs
+          .readFile(path.join(workspaceRoot, harnessResult.harness.agentsMdPath), 'utf-8')
+          .catch(() => '')
+      }
+    } catch {
+      // no harness — proceed without feedforward context
+    }
+
+    // Build conversation history for this run
+    const history = copilotHistory.get(runId) ?? []
+    history.push({ role: 'user', content: message })
+    copilotHistory.set(runId, history)
+
+    // Reset per-turn file tracking
+    copilotTurnFiles.set(runId, [])
+
+    // Stream asynchronously — return immediately so UI is not blocked waiting
+    void (async () => {
+      try {
+        const conversationHistory = history.slice(0, -1).map((m) => ({
+          id: crypto.randomUUID(),
+          role: m.role === 'user' ? ('user' as const) : ('agent' as const),
+          content: m.content,
+          timestamp: new Date().toISOString(),
+        }))
+
+        let assistantText = ''
+        for await (const event of adapter.run({
+          mode: 'co-pilot',
+          providerId: run.providerId,
+          model: run.model,
+          prompt: message,
+          workspaceRoot,
+          agentsMdContent,
+          iterationLimit: 1,
+          conversationHistory,
+        })) {
+          if (event.type === 'token') {
+            assistantText += event.token
+            broadcast('foundry:copilot-event', { runId, event })
+          } else if (event.type === 'file-changed') {
+            const turnFiles = copilotTurnFiles.get(runId) ?? []
+            if (!turnFiles.includes(event.filePath)) {
+              turnFiles.push(event.filePath)
+              copilotTurnFiles.set(runId, turnFiles)
+            }
+            const existing = run.fileChanges.find((c) => c.filePath === event.filePath)
+            if (!existing) {
+              run.fileChanges.push(event.change)
+            } else {
+              existing.linesAdded += event.change.linesAdded
+              existing.linesRemoved += event.change.linesRemoved
+            }
+            broadcast('foundry:copilot-event', { runId, event })
+          } else if (event.type === 'done') {
+            if (assistantText.trim()) {
+              history.push({ role: 'assistant', content: assistantText })
+              copilotHistory.set(runId, history)
+            }
+            broadcast('foundry:copilot-event', { runId, event })
+          } else if (event.type === 'error') {
+            broadcast('foundry:copilot-event', { runId, event })
+          }
+        }
+      } catch (err) {
+        broadcast('foundry:copilot-event', {
+          runId,
+          event: { type: 'error', message: String(err) },
+        })
+      }
+    })()
+
+    return { ok: true }
+  })
 
   reg(api, 'foundry:copilot-revert-file', async (payload: unknown) => {
-    const { workspaceRoot, filePath } = payload as { workspaceRoot: string; filePath: string }
+    const { runId, workspaceRoot, filePath } = payload as {
+      runId: string
+      workspaceRoot: string
+      filePath: string
+    }
+    // Remove from run's fileChanges tracking
+    const run = activeRuns.get(workspaceRoot)
+    if (run && run.id === runId) {
+      run.fileChanges = run.fileChanges.filter((c) => c.filePath !== filePath)
+    }
+    // Remove from turn tracking too
+    if (runId) {
+      const turnFiles = copilotTurnFiles.get(runId) ?? []
+      copilotTurnFiles.set(
+        runId,
+        turnFiles.filter((f) => f !== filePath)
+      )
+    }
     return revertFiles(workspaceRoot, [filePath])
   })
 
-  reg(api, 'foundry:copilot-accept-all', async () => ({ ok: true }))
+  reg(api, 'foundry:copilot-accept-all', async (payload: unknown) => {
+    const { runId, workspaceRoot } = (payload ?? {}) as { runId?: string; workspaceRoot?: string }
+    // Clear turn-level file tracking (files stay on disk — acceptance means we keep them)
+    if (runId) copilotTurnFiles.set(runId, [])
+    const run = runId && workspaceRoot ? activeRuns.get(workspaceRoot) : null
+    if (run && run.id === runId) run.fileChanges = []
+    return { ok: true }
+  })
 
   reg(api, 'foundry:copilot-abort', async (payload: unknown) => {
-    const { workspaceRoot, filesModifiedThisTurn } = payload as {
-      workspaceRoot: string
-      filesModifiedThisTurn: string[]
+    const { runId, workspaceRoot } = payload as { runId: string; workspaceRoot: string }
+    // Use server-tracked turn files (not client-provided) to avoid BUG-7
+    const turnFiles = runId ? (copilotTurnFiles.get(runId) ?? []) : []
+    if (turnFiles.length > 0) {
+      await revertFiles(workspaceRoot, turnFiles)
     }
-    if (filesModifiedThisTurn?.length) {
-      await revertFiles(workspaceRoot, filesModifiedThisTurn)
+    if (runId) copilotTurnFiles.set(runId, [])
+    const run = workspaceRoot ? activeRuns.get(workspaceRoot) : null
+    if (run && run.id === runId) {
+      // Remove turn-modified files from run.fileChanges
+      run.fileChanges = run.fileChanges.filter((c) => !turnFiles.includes(c.filePath))
     }
     return { ok: true }
   })
@@ -1379,5 +1736,7 @@ export function deactivate(): void {
   disposables.forEach((d) => d.dispose())
   disposables.length = 0
   activeRuns.clear()
+  copilotHistory.clear()
+  copilotTurnFiles.clear()
   resetHealthState()
 }

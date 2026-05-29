@@ -298,10 +298,19 @@ interface DetectedContext {
   sensorCount: number
 }
 
+interface RerunConfig {
+  providerId?: string
+  model?: string
+  mode?: string
+  specPath?: string
+  prompt?: string
+}
+
 interface Props {
   repoRoot: string
   onClose: () => void
   onLaunched: () => void
+  rerunConfig?: RerunConfig
 }
 
 function invoke(channel: string, payload: unknown) {
@@ -339,15 +348,15 @@ const MODE_CARDS: { id: RunMode; icon: string; label: string; desc: string }[] =
   },
 ]
 
-export function NewRunDialog({ repoRoot, onClose, onLaunched }: Props) {
-  const [mode, setMode] = useState<RunMode>('spec-to-code')
-  const [specPath, setSpecPath] = useState('')
-  const [taskDesc, setTaskDesc] = useState('')
+export function NewRunDialog({ repoRoot, onClose, onLaunched, rerunConfig }: Props) {
+  const [mode, setMode] = useState<RunMode>((rerunConfig?.mode as RunMode) ?? 'spec-to-code')
+  const [specPath, setSpecPath] = useState(rerunConfig?.specPath ?? '')
+  const [taskDesc, setTaskDesc] = useState(rerunConfig?.prompt ?? '')
   const [dagAgents, setDagAgents] = useState<DagAgent[]>([])
-  const [prompt, setPrompt] = useState('')
+  const [prompt, setPrompt] = useState(rerunConfig?.prompt ?? '')
   const [providers, setProviders] = useState<SavedProvider[]>([])
-  const [providerId, setProviderId] = useState('')
-  const [model, setModel] = useState('')
+  const [providerId, setProviderId] = useState(rerunConfig?.providerId ?? '')
+  const [model, setModel] = useState(rerunConfig?.model ?? '')
   const [maxIterations, setMaxIterations] = useState(3)
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)

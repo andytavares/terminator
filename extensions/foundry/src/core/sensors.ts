@@ -9,8 +9,8 @@ function lastNLines(text: string, n: number): string {
 export function runSensor(sensor: Sensor, workspaceRoot: string): Promise<SensorResult> {
   return new Promise((resolve) => {
     const start = Date.now()
-    const [cmd, ...args] = sensor.command.split(/\s+/)
-    const proc = spawn(cmd, args, { cwd: workspaceRoot, shell: true })
+    // Pass the command as a single string with shell:true so quoting and env vars work correctly
+    const proc = spawn(sensor.command, [], { cwd: workspaceRoot, shell: true })
 
     let stdout = ''
     let stderr = ''
