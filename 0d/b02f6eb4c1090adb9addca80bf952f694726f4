@@ -1,0 +1,135 @@
+extensions/foundry/src/components/HistoryView.tsx
+  s_adebbf7ac85315::t_8020fb83899f25 45-50,60-62,67,77-79,84,97-99,107-148,150-196,198-220,222-243,245-254,256-301,310,364,375-390,434-437,440-445,448-461,464-495,497-501,503-511,513,515-561,563-566,569-570,572,575-576,578-588
+extensions/foundry/src/renderer.tsx
+  s_adebbf7ac85315::t_20baec588a83c6 3
+  s_adebbf7ac85315::t_893c3679253f42 36
+  s_adebbf7ac85315::t_4bd87a0b5393ac 2,7,18,21-28,30-35,37-39,49-58,77-107
+extensions/foundry/src/components/NewRunDialog.tsx
+  s_adebbf7ac85315::t_862e005bafdd28 351-354,356,358-359
+  s_adebbf7ac85315::t_fbe4428e42d75a 301-308,313
+extensions/foundry/tests/unit/providers/gemini.spec.ts
+  s_adebbf7ac85315::t_1db1e0f6d10ebd 130-159
+  s_adebbf7ac85315::t_7d02d2c80949a0 160-171,173-176
+  s_adebbf7ac85315::t_bbe149440e0602 187-194
+  s_adebbf7ac85315::t_9ea86500a7f95c 3-7,11,19-23,40-46,56,61,64-65,67,69-71,75,121
+  s_adebbf7ac85315::t_f72c5b34a83fd5 92,97-105,107-116
+  s_adebbf7ac85315::t_cbe0caa4603a0b 90-91,93-96,106,117-119
+extensions/foundry/src/providers/openai.ts
+  s_adebbf7ac85315::t_fbf652ddb209a3 4,26-40,42,50-52,54-74,76-102,104-106,108-109
+src/renderer/extensions/registry.ts
+  s_adebbf7ac85315::t_f3df16c19a9e8a 2,7
+extensions/foundry/src/index.ts
+  s_adebbf7ac85315::t_173b8a8f1b482c 25-26
+  s_adebbf7ac85315::t_ae8decec954134 1366-1379,1381-1393
+  s_adebbf7ac85315::t_5c1c8098a85e3f 375-377,382
+  s_adebbf7ac85315::t_3a96fc5b1f4a9b 1276
+  s_adebbf7ac85315::t_ebf2d8243f11ab 697-699
+  s_adebbf7ac85315::t_ea56f82ac4a89e 96-105
+  s_adebbf7ac85315::t_ea33fa52806b5b 1280,1288
+  s_adebbf7ac85315::t_2ccb4cf245c048 1600-1617,1621-1628,1631-1635,1637-1641
+  s_adebbf7ac85315::t_3d48356840e75b 51-88
+  s_adebbf7ac85315::t_28c0284dc61f43 582-591,593,606,608-614
+  s_adebbf7ac85315::t_798e63bebad742 1349-1363
+  s_adebbf7ac85315::t_88eb79983a9ce7 147-158
+  s_adebbf7ac85315::t_433a7a499a0d59 1241,1251-1252
+  s_adebbf7ac85315::t_cd2044cbf72672 31-35,37
+  s_adebbf7ac85315::t_0ee7cdbe224199 349,488,981
+  s_adebbf7ac85315::t_d42dd4be30d467 1335-1336,1340,1342-1345
+  s_adebbf7ac85315::t_f835650668becf 1471-1484
+  s_adebbf7ac85315::t_46e9feaf08760c 516-553
+  s_adebbf7ac85315::t_b5e1f93f0943bf 869-870,873-874,879-884
+  s_adebbf7ac85315::t_95c2dc817fcdd9 1494-1511,1513-1597
+  s_adebbf7ac85315::t_8f030227a3cbc1 1283-1287
+  s_adebbf7ac85315::t_ccfbb8b0a35785 143
+  s_adebbf7ac85315::t_5bc088ad04bc0d 1739-1740
+  s_adebbf7ac85315::t_c59a0610a8b012 1198-1208
+  s_adebbf7ac85315::t_80a244ed89956f 142,144-146
+  s_adebbf7ac85315::t_916bb217a67492 216-254
+  s_adebbf7ac85315::t_d3e87e1aea68b6 1157,1159-1162,1172-1174,1179
+  s_adebbf7ac85315::t_2cb31e7f77c41a 1103,1105-1108,1118-1120,1125
+  s_adebbf7ac85315::t_eaac740e1dc75b 769-773,783-785
+  s_adebbf7ac85315::t_9a3916d1b5b99f 768,1102,1156
+  s_adebbf7ac85315::t_741fd7570d45d9 762,1151,1232
+  s_adebbf7ac85315::t_927a39c354d1d5 271,288,328,379,398,417,461,566,578,708,737,749,792,797,1073,1134,1188,1213,1260,1314,1319,1341
+extensions/foundry/src/components/CopilotView.tsx
+  s_adebbf7ac85315::t_42fe7d6eebecaf 276
+  s_adebbf7ac85315::t_41942622c06e93 293-307,309,312-323,325-332,334-338,341-343
+  s_adebbf7ac85315::t_2067317dee2cd4 308,310
+extensions/foundry/src/components/foundry.css
+  s_adebbf7ac85315::t_90dad548457d67 237-269
+extensions/foundry/src/types/foundry.types.ts
+  s_adebbf7ac85315::t_728f976f2c7d1d 142-143
+  s_adebbf7ac85315::t_8b4293dd120a56 139-141
+extensions/foundry/src/components/FoundryPanel.tsx
+  s_adebbf7ac85315::t_d40bea159db0ca 145-155
+  s_adebbf7ac85315::t_919f02c7cee55d 135-144
+  s_adebbf7ac85315::t_5652b29498a1d2 92-99,106
+  s_adebbf7ac85315::t_d4304053c9c31c 7,21-91,105,120-121,209-217,223-227,339-345,347-351,353-357
+  s_adebbf7ac85315::t_82855e5c40606f 156-208
+  s_adebbf7ac85315::t_97dd520981a78f 281,283-285,287-289
+extensions/foundry/tests/unit/core/git.spec.ts
+  s_adebbf7ac85315::t_5c4592c107db2d 18,21-34
+  s_adebbf7ac85315::t_1879aab44de65c 176,178-182,185-195,201-205
+extensions/foundry/src/providers/tools.ts
+  s_adebbf7ac85315::t_71f119b5c46d64 1-113,115-167,169-271
+extensions/foundry/src/providers/claude.ts
+  s_adebbf7ac85315::t_a12ec6bb060519 4
+  s_adebbf7ac85315::t_5efd5a16a78d4b 81-85
+  s_adebbf7ac85315::t_b5ecfa413aa02e 53
+extensions/foundry/src/core/git.ts
+  s_adebbf7ac85315::t_e6608b7f5a5154 89-120,123-125,127-138,142,163-164
+extensions/foundry/tests/unit/state/health.spec.ts
+  s_adebbf7ac85315::t_c4da9ecdf40519 5-6
+  s_adebbf7ac85315::t_34c24adb3e0f1d 93-174
+extensions/foundry/tests/unit/providers/tools.spec.ts
+  s_adebbf7ac85315::t_1500a2a6c4ac12 1-124
+extensions/foundry/tests/unit/providers/claude.spec.ts
+  s_adebbf7ac85315::t_842022c68aa548 39,44
+  s_adebbf7ac85315::t_d11548a4332323 313-326
+  s_adebbf7ac85315::t_893d87e09c7406 302-306,308-311
+  s_adebbf7ac85315::t_ad7e7f954e13eb 307
+  s_adebbf7ac85315::t_c29aba97a2a8d0 294,312
+  s_adebbf7ac85315::t_c2ed3433f8764d 295-301
+extensions/foundry/src/components/RunConsole.tsx
+  s_adebbf7ac85315::t_121fa8eb955c10 511,514-516,519-532
+  s_adebbf7ac85315::t_c43650ad51b443 54-72
+extensions/foundry/tests/unit/providers/openai.spec.ts
+  s_adebbf7ac85315::t_b709e626f6717b 109-126
+  s_adebbf7ac85315::t_9ec8118441e657 16-21,38-42,52,57,60-61,66-67,76,82,179
+  s_adebbf7ac85315::t_e3b80e6bee6b9f 71-75,81
+  s_adebbf7ac85315::t_197670300104eb 127-138,143-175
+extensions/foundry/src/core/sensors.ts
+  s_adebbf7ac85315::t_dd1cc0b62ace1b 12-13
+extensions/foundry/src/core/health.ts
+  s_adebbf7ac85315::t_d6d0cae52099dd 56-57
+  s_adebbf7ac85315::t_53c156323a9713 85-125
+  s_adebbf7ac85315::t_0d30d6322bc8e1 16-20
+specs/007-foundry-agent-harness/tasks.md
+  s_adebbf7ac85315::t_223fe2db643679 95,99,150,153,199,219
+  s_adebbf7ac85315::t_6c1093bf0db3eb 217,239
+extensions/foundry/src/providers/gemini.ts
+  s_adebbf7ac85315::t_4d4fea07460aeb 71
+  s_adebbf7ac85315::t_d7f2d366358784 4,29,45-70,72-80,82-101,104-108,110
+  s_adebbf7ac85315::t_74ad270c41391e 33-36,44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0db02f6eb4c1090adb9addca80bf952f694726f4",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_adebbf7ac85315": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e1190152-9792-4c00-962a-6013d5d55bc2",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
