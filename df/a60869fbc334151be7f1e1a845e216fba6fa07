@@ -1,0 +1,54 @@
+src/main/preload.ts
+  s_d430a15b41c0d2::t_409fdc9489d49e 160-164
+extensions/git-integration/package.json
+  s_d430a15b41c0d2::t_1f6ac3ff17663f 11
+src/renderer/App.tsx
+  s_d430a15b41c0d2::t_7811fa1eb860b3 282
+  s_d430a15b41c0d2::t_2968e44875c268 81-82
+  s_d430a15b41c0d2::t_409fdc9489d49e 45,273-281
+  s_d430a15b41c0d2::t_c97937634b8f24 106,160
+README.md
+  s_d430a15b41c0d2::t_9d61dde63132f2 24
+src/renderer/components/terminal/TerminalSession.tsx
+  s_d430a15b41c0d2::t_00eb8a7ae8c147 79-84
+extensions/foundry/CLAUDE.md
+  s_d430a15b41c0d2::t_a2ea70d42bf7d5 61
+src/renderer/extensions/registry.ts
+  s_d430a15b41c0d2::t_b6ce664c24d790 94
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_d430a15b41c0d2::t_94b8c6db47b6bb 723,737-751
+  s_d430a15b41c0d2::t_7be3ef0616a6a2 853
+extensions/foundry/package.json
+  s_d430a15b41c0d2::t_2d68792fb3b1d3 8
+src/main/ipc/metrics.ipc.ts
+  s_d430a15b41c0d2::t_7fc773504bd2a8 93-98
+  s_d430a15b41c0d2::t_2094b4283c9bcf 78
+  s_d430a15b41c0d2::t_409fdc9489d49e 36-37,109-110
+src/renderer/hooks/useTerminalSession.ts
+  s_d430a15b41c0d2::t_4c9f8d13750b2c 77
+  s_d430a15b41c0d2::t_7923381d311f3b 43
+  s_d430a15b41c0d2::t_409fdc9489d49e 4,38-42,44-47,72-76,78-81
+src/renderer/electron.d.ts
+  s_d430a15b41c0d2::t_409fdc9489d49e 149
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_d430a15b41c0d2::t_e9a1e1f4b0a1b1 131
+  s_d430a15b41c0d2::t_cab7e81314c9c4 132-139,141-154,156-160
+docs/ARCHITECTURE.md
+  s_d430a15b41c0d2::t_6fb4faac73c53b 238,240-247,251-258
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "dfa60869fbc334151be7f1e1a845e216fba6fa07",
+  "prompts": {},
+  "sessions": {
+    "s_d430a15b41c0d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "81986222-9dec-4c61-8e69-22d7bf995c32",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
