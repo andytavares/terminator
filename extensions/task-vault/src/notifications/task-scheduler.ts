@@ -1,6 +1,5 @@
 import { BrowserWindow } from 'electron'
-import { getDb, randomUUID } from '../vault/db.js'
-import { computeNextDueDate } from '../vault/recurrence.js'
+import { getDb } from '../vault/db.js'
 import type { ExtensionAPI, Disposable } from '../../../../src/main/extensions/api.js'
 
 let _tick: (() => void) | null = null
@@ -36,7 +35,7 @@ function getTargetTimestamp(value: string, blockedAt: number): number {
   return isNaN(ts) ? Infinity : ts
 }
 
-function broadcast(channel: string, data: unknown): void {
+export function broadcast(channel: string, data: unknown): void {
   BrowserWindow.getAllWindows().forEach((win) => {
     if (!win.isDestroyed()) win.webContents.send(channel, data)
   })
@@ -113,39 +112,27 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
         project_id: string | null
         context: string | null
         area_id: string | null
+        recurrence_notify_at: string | null
         metadata: string
       }
       const dueTasks = db
         .prepare(
-          `SELECT id, text, due_date, project_id, context, area_id, metadata FROM tasks
+          `SELECT id, text, due_date, project_id, context, area_id,
+                  recurrence_notify_at, metadata FROM tasks
            WHERE status='open' AND due_date IS NOT NULL AND due_date <= ? AND parent_id IS NULL`
         )
         .all(today) as DueRow[]
 
       for (const task of dueTasks) {
-        // Fast in-session dedup
+        // In-session dedup (resets on restart — intentional; startup fires notifications once)
         if (notifiedDueIds.has(task.id)) continue
-
-        let meta: Record<string, unknown> = {}
-        try {
-          meta = JSON.parse(task.metadata || '{}') as Record<string, unknown>
-        } catch {
-          // ignore malformed metadata
-        }
-
-        // Persistent cross-restart dedup: skip if already notified today
-        if (meta.notification_notified_date === today) {
-          notifiedDueIds.add(task.id)
-          continue
-        }
 
         const isOverdue = task.due_date < today
 
-        // Use per-task recurrence_time if set, otherwise fall back to global alert time
+        // Use per-task recurrence_notify_at column if set, otherwise fall back to global alert time
         let taskAlertMinutes = globalAlertTotalMinutes
-        const recurrenceTime = meta.recurrence_time as string | undefined
-        if (recurrenceTime) {
-          const [h = '9', m = '0'] = recurrenceTime.split(':')
+        if (task.recurrence_notify_at) {
+          const [h = '9', m = '0'] = task.recurrence_notify_at.split(':')
           taskAlertMinutes = parseInt(h) * 60 + parseInt(m)
         }
 
@@ -168,83 +155,6 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
           ],
         })
         dueTaskNotifs.set(task.id, notif)
-
-        // Persist dedup date to task metadata so restarts don't re-notify
-        const updatedMeta = { ...meta, notification_notified_date: today }
-        db.prepare(`UPDATE tasks SET metadata=?, updated_at=? WHERE id=?`).run(
-          JSON.stringify(updatedMeta),
-          new Date().toISOString(),
-          task.id
-        )
-
-        // ── Spawn next occurrence for recurring tasks at notify time ──
-        const recurrenceInterval = meta.recurrence_interval as string | undefined
-        if (!recurrenceInterval) continue
-
-        // Use recurrence_next_spawned to prevent double-spawn across restarts
-        const alreadySpawnedFor = meta.recurrence_next_spawned as string | undefined
-
-        let recurrenceDays: number[] = []
-        try {
-          if (meta.recurrence_days != null)
-            recurrenceDays = JSON.parse(meta.recurrence_days as string) as number[]
-        } catch {
-          // ignore
-        }
-
-        const nextDue = computeNextDueDate(task.due_date, recurrenceInterval, recurrenceDays)
-        if (alreadySpawnedFor === nextDue) continue // already spawned this occurrence
-
-        // Check end conditions
-        const endType = (meta.recurrence_end_type as string) || 'none'
-        const spawnCount = (meta.recurrence_completed_count as number) || 0
-        let shouldSpawn = true
-        if (endType === 'on_date') {
-          const endDate = meta.recurrence_end_date as string | undefined
-          if (endDate && nextDue > endDate) shouldSpawn = false
-        } else if (endType === 'after_count') {
-          const endCount = meta.recurrence_end_count as number | undefined
-          if (endCount != null && spawnCount + 1 >= endCount) shouldSpawn = false
-        }
-
-        if (!shouldSpawn) continue
-
-        const newId = randomUUID()
-        const nowIso = new Date().toISOString()
-        const nextMeta: Record<string, unknown> = {
-          recurrence_interval: recurrenceInterval,
-          recurrence_days: meta.recurrence_days,
-          recurrence_time: meta.recurrence_time,
-          recurrence_end_type: endType !== 'none' ? endType : undefined,
-          recurrence_end_date: meta.recurrence_end_date,
-          recurrence_end_count: meta.recurrence_end_count,
-          recurrence_completed_count: spawnCount + 1,
-        }
-        db.prepare(
-          `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,metadata,created_at,updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
-        ).run(
-          newId,
-          task.text,
-          'open',
-          task.project_id ?? null,
-          task.context ?? null,
-          task.area_id ?? null,
-          nextDue,
-          'daily',
-          nextDue,
-          JSON.stringify(nextMeta),
-          nowIso,
-          nowIso
-        )
-        // Mark the current task so we don't spawn again on the next tick / after restart
-        const spawnedMeta = { ...updatedMeta, recurrence_next_spawned: nextDue }
-        db.prepare(`UPDATE tasks SET metadata=?, updated_at=? WHERE id=?`).run(
-          JSON.stringify(spawnedMeta),
-          nowIso,
-          task.id
-        )
-        broadcast('task-vault:recurrence-spawned', { taskId: task.id, nextTaskId: newId, nextDue })
       }
 
       // ── Blocked tasks with check interval ────────────────────────

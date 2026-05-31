@@ -16,8 +16,23 @@ const { mockRun, mockGet, mockAll, mockPrepare } = vi.hoisted(() => {
   return { mockRun, mockGet, mockAll, mockPrepare }
 })
 vi.mock('../../src/vault/db', () => ({
-  getDb: vi.fn(() => ({ prepare: mockPrepare })),
+  getDb: vi.fn(() => ({
+    prepare: mockPrepare,
+    transaction: vi.fn((fn: () => unknown) => fn),
+  })),
   randomUUID: vi.fn(() => 'test-uuid'),
+}))
+
+// Mock ensureNextOccurrence so IPC tests don't exercise the spawn engine
+vi.mock('../../src/vault/ensure-next-occurrence', () => ({
+  ensureNextOccurrence: vi.fn(() => null),
+  backfillRecurringTasks: vi.fn(),
+}))
+
+// Mock broadcast so set-recurrence/clear-recurrence don't need BrowserWindow
+vi.mock('../../src/notifications/task-scheduler.js', () => ({
+  triggerSchedulerTick: vi.fn(),
+  broadcast: vi.fn(),
 }))
 
 import { registerVaultIpcHandlers, setVaultPath, getVaultPath } from '../../src/ipc/vault.ipc'
@@ -1218,28 +1233,31 @@ describe('task-vault:vault:reorder-tasks', () => {
 describe('task-vault:vault:set-recurrence', () => {
   const baseTask = { metadata: '{}', due_date: null, source_ref: null }
 
-  it('writes recurrence fields to metadata and returns { success: true }', async () => {
+  it('writes recurrence_rule column and returns { success: true }', async () => {
     mockGet.mockReturnValue(baseTask)
     mockRun.mockReturnValue({ changes: 1 })
     const handler = getHandler('task-vault:vault:set-recurrence')
     const result = await handler({}, { taskId: 'task-1', interval: 'daily', time: '08:00' })
     expect(result).toEqual({ success: true })
-    const storedMeta = JSON.parse(mockRun.mock.calls[0][0] as string) as Record<string, unknown>
-    expect(storedMeta.recurrence_interval).toBe('daily')
-    expect(storedMeta.recurrence_time).toBe('08:00')
+    // UPDATE args: recurrenceRule, notifyAt, effectiveDueDate, metadataJson, now, taskId
+    const updateCall = mockRun.mock.calls.find((args) => args[0] === 'daily')
+    expect(updateCall).toBeTruthy()
+    expect(updateCall![1]).toBe('08:00') // recurrence_notify_at
   })
 
-  it('stores recurrence_days for weekly interval', async () => {
+  it('stores weekly:1,3,5 rule for weekly interval with days', async () => {
     mockGet.mockReturnValue(baseTask)
     mockRun.mockReturnValue({ changes: 1 })
     const handler = getHandler('task-vault:vault:set-recurrence')
     await handler({}, { taskId: 'task-1', interval: 'weekly', days: [1, 3, 5] })
-    const storedMeta = JSON.parse(mockRun.mock.calls[0][0] as string) as Record<string, unknown>
-    expect(storedMeta.recurrence_interval).toBe('weekly')
-    expect(JSON.parse(storedMeta.recurrence_days as string)).toEqual([1, 3, 5])
+    const updateCall = mockRun.mock.calls.find(
+      (args) => typeof args[0] === 'string' && (args[0] as string).startsWith('weekly:')
+    )
+    expect(updateCall).toBeTruthy()
+    expect(updateCall![0]).toBe('weekly:1,3,5')
   })
 
-  it('stores on_date end condition', async () => {
+  it('stores on_date end condition in metadata', async () => {
     mockGet.mockReturnValue(baseTask)
     mockRun.mockReturnValue({ changes: 1 })
     const handler = getHandler('task-vault:vault:set-recurrence')
@@ -1247,13 +1265,15 @@ describe('task-vault:vault:set-recurrence', () => {
       {},
       { taskId: 'task-1', interval: 'daily', endType: 'on_date', endDate: '2026-12-31' }
     )
-    const storedMeta = JSON.parse(mockRun.mock.calls[0][0] as string) as Record<string, unknown>
+    // The metadata JSON is the 4th arg of the UPDATE run call (index 3)
+    const updateCall = mockRun.mock.calls.find((args) => args[0] === 'daily')
+    const storedMeta = JSON.parse(updateCall![3] as string) as Record<string, unknown>
     expect(storedMeta.recurrence_end_type).toBe('on_date')
     expect(storedMeta.recurrence_end_date).toBe('2026-12-31')
     expect(storedMeta.recurrence_completed_count).toBe(0)
   })
 
-  it('stores after_count end condition', async () => {
+  it('stores after_count end condition in metadata', async () => {
     mockGet.mockReturnValue(baseTask)
     mockRun.mockReturnValue({ changes: 1 })
     const handler = getHandler('task-vault:vault:set-recurrence')
@@ -1261,7 +1281,10 @@ describe('task-vault:vault:set-recurrence', () => {
       {},
       { taskId: 'task-1', interval: 'weekly', days: [1], endType: 'after_count', endCount: 5 }
     )
-    const storedMeta = JSON.parse(mockRun.mock.calls[0][0] as string) as Record<string, unknown>
+    const updateCall = mockRun.mock.calls.find(
+      (args) => typeof args[0] === 'string' && (args[0] as string).startsWith('weekly:')
+    )
+    const storedMeta = JSON.parse(updateCall![3] as string) as Record<string, unknown>
     expect(storedMeta.recurrence_end_type).toBe('after_count')
     expect(storedMeta.recurrence_end_count).toBe(5)
     expect(storedMeta.recurrence_completed_count).toBe(0)
@@ -1272,8 +1295,9 @@ describe('task-vault:vault:set-recurrence', () => {
     mockRun.mockReturnValue({ changes: 1 })
     const handler = getHandler('task-vault:vault:set-recurrence')
     await handler({}, { taskId: 'task-1', interval: 'daily' })
-    // Second run arg is the effective due_date passed to UPDATE
-    expect(mockRun.mock.calls[0][1]).toBe('2026-05-27')
+    // UPDATE args: rule, notifyAt, effectiveDueDate, meta, now, taskId
+    const updateCall = mockRun.mock.calls.find((args) => args[0] === 'daily')
+    expect(updateCall![2]).toBe('2026-05-27') // effectiveDueDate is index 2
   })
 
   it('preserves existing due_date when already set', async () => {
@@ -1281,7 +1305,8 @@ describe('task-vault:vault:set-recurrence', () => {
     mockRun.mockReturnValue({ changes: 1 })
     const handler = getHandler('task-vault:vault:set-recurrence')
     await handler({}, { taskId: 'task-1', interval: 'daily' })
-    expect(mockRun.mock.calls[0][1]).toBe('2026-06-01')
+    const updateCall = mockRun.mock.calls.find((args) => args[0] === 'daily')
+    expect(updateCall![2]).toBe('2026-06-01')
   })
 
   it('returns STALE_ID when task not found', async () => {
@@ -1301,7 +1326,7 @@ describe('task-vault:vault:set-recurrence', () => {
 // ── clear-recurrence ──────────────────────────────────────────────────────────
 
 describe('task-vault:vault:clear-recurrence', () => {
-  it('removes all recurrence fields from metadata and returns { success: true }', async () => {
+  it('nulls recurrence_rule column and clears metadata keys, returns { success: true }', async () => {
     mockGet.mockReturnValue({
       metadata: JSON.stringify({
         recurrence_interval: 'daily',
@@ -1316,7 +1341,12 @@ describe('task-vault:vault:clear-recurrence', () => {
     const handler = getHandler('task-vault:vault:clear-recurrence')
     const result = await handler({}, { taskId: 'task-1' })
     expect(result).toEqual({ success: true })
-    const storedMeta = JSON.parse(mockRun.mock.calls[0][0] as string) as Record<string, unknown>
+    // The UPDATE call passes metadata JSON then taskId; metadata is the first arg
+    const updateCall = mockRun.mock.calls.find(
+      (args) => typeof args[0] === 'string' && (args[0] as string).startsWith('{')
+    )
+    expect(updateCall).toBeTruthy()
+    const storedMeta = JSON.parse(updateCall![0] as string) as Record<string, unknown>
     expect(storedMeta.recurrence_interval).toBeUndefined()
     expect(storedMeta.recurrence_time).toBeUndefined()
     expect(storedMeta.recurrence_end_type).toBeUndefined()

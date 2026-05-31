@@ -321,6 +321,32 @@ The task-vault extension (`extensions/task-vault/`) implements a GTD+BuJo+PARA p
 - Registers tools: capture, today, add_task, complete_task, migrate_task, query, list_projects, weekly_review.
 - Auto-execute gate: reads per-tool toggle from `.todo/settings.json`; returns a suggestion without writing if disabled; `confirmed: true` bypasses.
 
+### Recurring Task Engine
+
+Recurrence state lives in three first-class SQL columns on the `tasks` table (not in the metadata blob):
+
+| Column                   | Format                                                               | Purpose                                                         |
+| ------------------------ | -------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `recurrence_rule`        | `'daily'` \| `'weekly:1,3'` \| `'biweekly'` \| `'monthly'` \| `NULL` | The recurrence interval; weekly days encoded in the rule string |
+| `recurrence_template_id` | UUID FK → `tasks(id)`                                                | Links every spawned instance back to its origin (template) task |
+| `recurrence_notify_at`   | `'HH:MM'` \| `NULL`                                                  | Per-task notification time override                             |
+
+End conditions (`recurrence_end_type`, `recurrence_end_date`, `recurrence_end_count`, `recurrence_completed_count`) remain in the `metadata` JSON blob because they are configuration, not runtime state.
+
+**Core invariant:** for every recurring task, exactly one `status='open'` future instance exists in the database. This invariant is enforced by `ensureNextOccurrence(db, taskId)` — a single idempotent function in `src/vault/ensure-next-occurrence.ts`.
+
+**Trigger points** (the only places that create new occurrence rows):
+
+1. `initDb` — startup gap-fill via `backfillRecurringTasks`. Handles days the app was closed.
+2. `task-vault:vault:complete-task` IPC handler — completes the current task and calls `ensureNextOccurrence` in the same SQLite transaction.
+3. `task-vault:vault:set-recurrence` IPC handler — sets the rule and immediately materialises the first future instance.
+
+**The notification scheduler (`task-scheduler.ts`) is notification-only.** It reads the `recurrence_notify_at` column to determine per-task alert times but never inserts task rows.
+
+**Strict recurrence mode:** next `due_date` is always `previous_due_date + interval`, regardless of completion date (e.g., a weekly Monday task completed on Wednesday still recurs next Monday).
+
+A `UNIQUE INDEX` on `(recurrence_template_id, due_date)` enforces the invariant at the database level, preventing duplicate instances even under concurrent writes.
+
 ### Task ID Format
 
 Tasks are identified as `filepath:lineNumber` (ADR-014). IDs are session-scoped and rebuilt after every write. STALE_ID is returned when a task has moved to a different line.

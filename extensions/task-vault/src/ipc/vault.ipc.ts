@@ -3,6 +3,7 @@ import { ipcMain } from 'electron'
 import { getDb, randomUUID } from '../vault/db'
 import { extractTags, toDisplayName } from '../vault/tags'
 import { localDate as _localDate } from '../vault/recurrence'
+import { ensureNextOccurrence } from '../vault/ensure-next-occurrence'
 import {
   CaptureRequestSchema,
   GetDailyRequestSchema,
@@ -29,7 +30,7 @@ import {
   ArchiveAreaRequestSchema,
 } from '../schemas/vault.schema'
 import type { IndexedTask, IndexedProject, TaskStatus, ProjectStatus } from '../vault/types'
-import { triggerSchedulerTick } from '../notifications/task-scheduler.js'
+import { triggerSchedulerTick, broadcast } from '../notifications/task-scheduler.js'
 
 // vaultPath is kept so ICS handler can still use it (unchanged)
 let vaultPath = ''
@@ -55,28 +56,14 @@ function rowToTask(row: Record<string, unknown>): IndexedTask {
   const filePath = sourceRef ? `${source}/${sourceRef}` : source
   let blockedReason: string | undefined
   let blockedCheckInterval: string | undefined
-  try {
-    const meta = JSON.parse((row.metadata as string) || '{}') as Record<string, string>
-    blockedReason = meta.blocked_reason || undefined
-    blockedCheckInterval = meta.blocked_check_interval || undefined
-  } catch {
-    // ignore malformed metadata
-  }
-  let recurrenceInterval: string | undefined
-  let recurrenceDays: number[] | undefined
-  let recurrenceTime: string | undefined
   let recurrenceEndType: 'none' | 'on_date' | 'after_count' | undefined
   let recurrenceEndDate: string | undefined
   let recurrenceEndCount: number | undefined
   let recurrenceCompletedCount: number | undefined
   try {
     const meta = JSON.parse((row.metadata as string) || '{}') as Record<string, unknown>
-    recurrenceInterval = (meta.recurrence_interval as string) || undefined
-    recurrenceDays =
-      meta.recurrence_days != null
-        ? (JSON.parse(meta.recurrence_days as string) as number[])
-        : undefined
-    recurrenceTime = (meta.recurrence_time as string) || undefined
+    blockedReason = (meta.blocked_reason as string) || undefined
+    blockedCheckInterval = (meta.blocked_check_interval as string) || undefined
     recurrenceEndType =
       (meta.recurrence_end_type as 'none' | 'on_date' | 'after_count') || undefined
     recurrenceEndDate = (meta.recurrence_end_date as string) || undefined
@@ -89,6 +76,12 @@ function rowToTask(row: Record<string, unknown>): IndexedTask {
   } catch {
     // ignore malformed metadata
   }
+
+  // Parse recurrence fields from first-class columns
+  const recurrenceRule = (row.recurrence_rule as string) || undefined
+  const recurrenceTemplateId = (row.recurrence_template_id as string) || undefined
+  const recurrenceNotifyAt = (row.recurrence_notify_at as string) || undefined
+
   return {
     id: row.id as string,
     filePath,
@@ -103,9 +96,9 @@ function rowToTask(row: Record<string, unknown>): IndexedTask {
     subtasks: [],
     blockedReason,
     blockedCheckInterval,
-    recurrenceInterval,
-    recurrenceDays,
-    recurrenceTime,
+    recurrenceRule,
+    recurrenceTemplateId,
+    recurrenceNotifyAt,
     recurrenceEndType,
     recurrenceEndDate,
     recurrenceEndCount,
@@ -150,7 +143,8 @@ const TASK_COLS = `
   t.due_date, t.completed_date, t.migrated_to,
   t.terminator_links, t.source, t.source_ref, t.parent_id,
   t.sort_order, t.metadata, t.created_at, t.updated_at,
-  t.project_id, t.area_id
+  t.project_id, t.area_id,
+  t.recurrence_rule, t.recurrence_template_id, t.recurrence_notify_at
 `
 const TASK_JOINS = `LEFT JOIN projects p ON t.project_id = p.id LEFT JOIN areas a ON t.area_id = a.id`
 
@@ -265,7 +259,7 @@ export function registerVaultIpcHandlers(): () => void {
            FROM tasks t ${TASK_JOINS}
            WHERE t.source='daily' AND t.source_ref < ? AND t.source_ref IS NOT NULL
              AND t.status IN ('open','in-progress','blocked') AND t.parent_id IS NULL
-             AND json_extract(t.metadata, '$.recurrence_interval') IS NULL`
+             AND t.recurrence_rule IS NULL`
         )
         .all(date) as Record<string, unknown>[]
 
@@ -420,12 +414,32 @@ export function registerVaultIpcHandlers(): () => void {
     const now = new Date().toISOString()
     const todayStr = today()
 
-    const changes = db
-      .prepare(`UPDATE tasks SET status='done', completed_date=?, updated_at=? WHERE id=?`)
-      .run(todayStr, now, taskId)
-    if (changes.changes === 0) return { error: 'STALE_ID' }
+    try {
+      let nextTaskId: string | null = null
+      const completeAndSpawn = db.transaction(() => {
+        const changes = db
+          .prepare(`UPDATE tasks SET status='done', completed_date=?, updated_at=? WHERE id=?`)
+          .run(todayStr, now, taskId)
+        if (changes.changes === 0) throw new Error('STALE_ID')
+        nextTaskId = ensureNextOccurrence(db, taskId)
+      })
+      completeAndSpawn()
 
-    return { success: true }
+      if (nextTaskId) {
+        const nextDue = (
+          db.prepare(`SELECT due_date FROM tasks WHERE id=?`).get(nextTaskId) as
+            | { due_date: string }
+            | undefined
+        )?.due_date
+        broadcast('task-vault:recurrence-spawned', { taskId, nextTaskId, nextDue })
+      }
+
+      return { success: true }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg === 'STALE_ID') return { error: 'STALE_ID' }
+      return { error: msg }
+    }
   })
 
   // ── vault:migrate-task ───────────────────────────────────────────────────────
@@ -1359,31 +1373,60 @@ export function registerVaultIpcHandlers(): () => void {
       | { metadata: string; due_date: string | null; source_ref: string | null }
       | undefined
     if (!task) return { error: 'STALE_ID' }
+
+    // Build recurrence_rule column value from interval + days
+    let recurrenceRule = interval
+    if (interval === 'weekly' && days != null && days.length > 0) {
+      recurrenceRule = `weekly:${[...days].sort((a, b) => a - b).join(',')}`
+    }
+
+    // Build end-condition metadata (configuration keys remain in metadata)
     let meta: Record<string, unknown> = {}
     try {
       meta = JSON.parse(task.metadata || '{}') as Record<string, unknown>
     } catch {
       // ignore
     }
-    meta.recurrence_interval = interval
-    meta.recurrence_days = days != null ? JSON.stringify(days) : undefined
-    meta.recurrence_time = time ?? undefined
     meta.recurrence_end_type = endType ?? 'none'
     meta.recurrence_end_date = endType === 'on_date' ? endDate : undefined
     meta.recurrence_end_count = endType === 'after_count' ? endCount : undefined
     // Reset completion count when recurrence is (re)configured
     meta.recurrence_completed_count = 0
+    // Remove stale metadata-based recurrence keys
+    delete meta.recurrence_interval
+    delete meta.recurrence_days
+    delete meta.recurrence_time
+    delete meta.recurrence_next_spawned
+    delete meta.notification_notified_date
+
     const now = new Date().toISOString()
-    // Ensure due_date is set so the scheduler can find this task.
-    // Daily log tasks have no due_date by default — use source_ref (the log date) as fallback.
+    // Ensure due_date is set. Daily log tasks have no due_date by default.
     const effectiveDueDate = task.due_date ?? task.source_ref ?? today()
-    db.prepare(`UPDATE tasks SET metadata=?, due_date=?, updated_at=? WHERE id=?`).run(
-      JSON.stringify(meta),
-      effectiveDueDate,
-      now,
-      taskId
-    )
-    return { success: true }
+
+    try {
+      let nextTaskId: string | null = null
+      const setAndSpawn = db.transaction(() => {
+        // Delete any stale future open instances before resetting the rule
+        db.prepare(
+          `DELETE FROM tasks WHERE recurrence_template_id=? AND status='open' AND due_date > ?`
+        ).run(taskId, today())
+
+        db.prepare(
+          `UPDATE tasks SET recurrence_rule=?, recurrence_notify_at=?, due_date=?, metadata=?, updated_at=? WHERE id=?`
+        ).run(recurrenceRule, time ?? null, effectiveDueDate, JSON.stringify(meta), now, taskId)
+
+        nextTaskId = ensureNextOccurrence(db, taskId)
+      })
+      setAndSpawn()
+
+      if (nextTaskId) {
+        broadcast('task-vault:recurrence-spawned', { taskId, nextTaskId })
+      }
+      return { success: true }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return { error: msg }
+    }
   })
 
   // ── vault:clear-recurrence ────────────────────────────────────────────────────
@@ -1403,6 +1446,7 @@ export function registerVaultIpcHandlers(): () => void {
     } catch {
       // ignore
     }
+    // Remove all recurrence-related keys from metadata
     delete meta.recurrence_interval
     delete meta.recurrence_days
     delete meta.recurrence_time
@@ -1410,12 +1454,17 @@ export function registerVaultIpcHandlers(): () => void {
     delete meta.recurrence_end_date
     delete meta.recurrence_end_count
     delete meta.recurrence_completed_count
+    delete meta.recurrence_next_spawned
+    delete meta.notification_notified_date
     const now = new Date().toISOString()
-    db.prepare(`UPDATE tasks SET metadata=?, updated_at=? WHERE id=?`).run(
-      JSON.stringify(meta),
-      now,
-      taskId
-    )
+    const clearTx = db.transaction(() => {
+      // Delete all future open instances
+      db.prepare(`DELETE FROM tasks WHERE recurrence_template_id=? AND status='open'`).run(taskId)
+      db.prepare(
+        `UPDATE tasks SET recurrence_rule=NULL, recurrence_notify_at=NULL, metadata=?, updated_at=? WHERE id=?`
+      ).run(JSON.stringify(meta), now, taskId)
+    })
+    clearTx()
     return { success: true }
   })
 
