@@ -82,6 +82,10 @@ export class TerminalInstance {
       // Note: Shift+Enter is intercepted unconditionally — programs that handle it
       // natively (e.g. IPython) will not receive the raw key event.
       if ((e.metaKey || e.shiftKey) && e.key === 'Enter' && e.type === 'keydown') {
+        // Must call preventDefault() ourselves — xterm does NOT call it when the custom
+        // handler returns false. Without this, the browser fires a subsequent `input` event
+        // on xterm's textarea, which xterm forwards to the PTY as \r (submitting the line).
+        e.preventDefault()
         this.terminal.paste('\n')
         return false
       }
