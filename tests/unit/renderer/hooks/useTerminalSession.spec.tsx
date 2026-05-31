@@ -389,8 +389,11 @@ describe('useTerminalSession', () => {
       capturedBellCallback?.()
 
       expect(
-        (globalThis as unknown as { electronAPI: { notification: { show: ReturnType<typeof vi.fn> } } })
-          .electronAPI.notification.show
+        (
+          globalThis as unknown as {
+            electronAPI: { notification: { show: ReturnType<typeof vi.fn> } }
+          }
+        ).electronAPI.notification.show
       ).toHaveBeenCalledWith('Terminator', 'Terminal needs attention')
     })
 
