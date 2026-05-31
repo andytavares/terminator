@@ -66,7 +66,7 @@ All renderer-to-main communication goes through `window.electronAPI`, exposed by
 | `git:*`       | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create                                                                     |
 | `github:*`    | renderer → main  | PR review queue, diff, file metrics, inline comments, submit, session persistence, active-review tracking, prune closed/merged |
 | `shell:exec`  | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)                                                                            |
-| `fs:*`        | renderer ↔ main | File watch start/stop; `fs:changed` push events                                                                                |
+| `fs:*`        | renderer ↔ main | File watch start/stop; `fs:read-file`; `fs:changed` push events                                                                |
 
 Full channel specifications: [`specs/001-extension-first-terminal/contracts/ipc-channels.md`](../specs/001-extension-first-terminal/contracts/ipc-channels.md),
 [`specs/002-git-github-integration/contracts/ipc-channels-git.md`](../specs/002-git-github-integration/contracts/ipc-channels-git.md),
@@ -189,16 +189,23 @@ ExtensionHost.load(directoryPath)
       │           api.shell.exec()                  → shell-executor.ts (sandboxed, v1.1.0)
       │           api.notifications.showToast()     → BrowserWindow.webContents.send (v1.1.0)
       │           api.fs.watch()                    → FsWatcherService handlers (v1.1.0)
+      │           api.ipc.registerHandler()         → ipcMain.handle() (v1.1.0)
+      │           api.commands.register()           → globalRegistry.commandContributions / commandHandlers (v1.1.0)
       │           api.contextMenu.registerItem()    → globalRegistry.contextMenuItems
       │           api.keyboard.register()           → globalRegistry.keyboardHandlers (throws on reserved)
       │           api.terminal.onSessionCreate()    → globalRegistry.sessionCreateHandlers
+      │           api.sidebar.registerGlobalTab()   → globalRegistry.globalTabs (v1.2.0)
+      │           api.globalShortcut.register()     → electron globalShortcut (v1.2.0)
+      │           api.workspace.list()              → workspace-store.listWorkspaces() (v1.2.0)
+      │           api.window.openAuxiliary()        → BrowserWindow factory (v1.2.0)
+      │           api.notifications.createNotification() → notificationManager (v1.2.0)
       │
       └─ errors in activate() set status: 'error', app stays stable (FR-028)
 ```
 
 ### Extension build pipeline
 
-Extension main-process TypeScript (`extensions/*/src/index.ts` and its imports) is compiled to a CommonJS bundle (`extensions/*/src/index.js`) by `scripts/build-extensions.js` using esbuild. The compiled bundle is gitignored and must never be committed. `npm run dev` and `npm run build` both invoke this step automatically via the `build:extensions` script. Renderer-side extension code (`renderer.tsx` and React components) is bundled by electron-vite through the main renderer build.
+Extension main-process TypeScript (`extensions/*/src/index.ts` and its imports) is compiled to a CommonJS bundle (`extensions/*/src/index.js`) by `scripts/build-extensions.cjs` using esbuild. The compiled bundle is gitignored and must never be committed. `npm run dev` and `npm run build` both invoke this step automatically via the `build:extensions` script. Renderer-side extension code (`renderer.tsx` and React components) is bundled by electron-vite through the main renderer build.
 
 Extension authors must keep main-process entry points free of React/DOM imports — those belong in `renderer.tsx`.
 

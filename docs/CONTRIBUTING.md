@@ -53,11 +53,12 @@ npm run build:extensions   # compile all extensions
 ### Lint and format
 
 ```bash
-npm run lint       # ESLint + TypeScript type check (zero errors required)
+npm run lint       # ESLint (zero errors required)
+npm run typecheck  # TypeScript type check (no emit — zero errors required)
 npm run format     # Prettier (auto-fixes)
 ```
 
-Lint must pass with **0 errors** before opening a PR. Warnings are acceptable but should not accumulate.
+Both `lint` and `typecheck` must pass with **0 errors** before opening a PR. Warnings are acceptable but should not accumulate.
 
 ---
 
@@ -102,7 +103,7 @@ Test location by type:
 | Change                              | Documentation to update                                                                             |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------- |
 | New feature or user-facing behavior | `README.md` features list and/or `docs/ARCHITECTURE.md`                                             |
-| New IPC channel                     | `specs/001-extension-first-terminal/contracts/ipc-channels.md`                                      |
+| New IPC channel                     | `specs/001-extension-first-terminal/contracts/ipc-channels.md` (master contract) and `src/renderer/electron.d.ts` |
 | Change to extension API             | `specs/001-extension-first-terminal/contracts/extension-api.md` and `docs/EXTENSION-DEVELOPMENT.md` |
 | New npm script                      | `README.md` scripts table and `specs/.../quickstart.md`                                             |
 | Architectural decision              | New ADR in `docs/adr/`                                                                              |
@@ -175,4 +176,3 @@ Before opening a PR, verify:
 - [ ] Documentation updated for every changed behavior (see table above)
 - [ ] New IPC channels documented in `ipc-channels.md` and typed in `electron.d.ts`
 - [ ] ADR written if a significant architectural decision was made
-- [ ] New IPC channels documented in contracts file

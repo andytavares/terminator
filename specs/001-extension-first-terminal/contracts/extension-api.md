@@ -1,10 +1,20 @@
 # Contract: Extension API
 
-**Version**: 1.0.0  
-**Date**: 2026-05-05  
+**Version**: 1.2.0  
+**Date**: 2026-05-31  
 **Branch**: `001-extension-first-terminal`
 
 This is the public API surface exposed to all Terminator extensions. Extensions receive an `ExtensionAPI` object as the sole argument to their `activate()` function. They MUST NOT import from `src/main/` or any internal module directly.
+
+---
+
+## Version History
+
+| Version | Changes |
+| ------- | ------- |
+| 1.0.0 | Initial release: `app`, `log`, `settings`, `sidebar.registerItem`, `contextMenu`, `keyboard`, `terminal` |
+| 1.1.0 | Added: `sidebar.registerPanel`, `topBar`, `shell`, `notifications.showToast`, `nativeMenu`, `fs`, `ipc`, `commands` |
+| 1.2.0 | Added: `sidebar.registerGlobalTab`, `globalShortcut`, `workspace`, `window`, `notifications.createNotification` |
 
 ---
 
@@ -75,6 +85,18 @@ interface ExtensionAPI {
      * Returns a Disposable; disposing removes the item.
      */
     registerItem(item: SidebarContribution): Disposable
+
+    /**
+     * _(v1.1.0)_ Register a panel into a named slot (e.g. 'right-sidebar').
+     * Returns a Disposable; disposing removes the panel.
+     */
+    registerPanel(slot: PanelSlot, panel: PanelContribution): Disposable
+
+    /**
+     * _(v1.2.0)_ Register a tab in the global tab bar (persistent across project switches).
+     * Returns a Disposable; disposing removes the tab.
+     */
+    registerGlobalTab(tab: GlobalTabContribution): Disposable
   }
 
   /**
@@ -89,7 +111,7 @@ interface ExtensionAPI {
   }
 
   /**
-   * Keyboard shortcut registration point.
+   * Keyboard shortcut registration point (local, app-focus-dependent).
    */
   keyboard: {
     /**
@@ -98,6 +120,14 @@ interface ExtensionAPI {
      * Registration throws synchronously if the accelerator conflicts with a reserved core shortcut.
      * Returns a Disposable; disposing removes the shortcut binding.
      */
+    register(accelerator: string, handler: () => void): Disposable
+  }
+
+  /**
+   * _(v1.2.0)_ System-level (global) keyboard shortcut registration.
+   * Fires even when the app is not focused. Use sparingly.
+   */
+  globalShortcut: {
     register(accelerator: string, handler: () => void): Disposable
   }
 
@@ -116,6 +146,93 @@ interface ExtensionAPI {
      * Handler receives the closed session's ID.
      */
     onSessionClose(handler: (sessionId: string) => void): Disposable
+  }
+
+  /**
+   * _(v1.1.0)_ Project-view top-bar menu items.
+   */
+  topBar: {
+    registerMenuItem(item: TopBarMenuContribution): Disposable
+  }
+
+  /**
+   * _(v1.1.0)_ Sandboxed shell execution (git and gh only).
+   */
+  shell: {
+    exec(options: {
+      command: 'git' | 'gh'
+      args: string[]
+      cwd: string
+      timeoutMs?: number
+    }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut: boolean }>
+  }
+
+  /**
+   * _(v1.1.0)_ Toast and notification creation.
+   */
+  notifications: {
+    /** Show a transient toast (auto-dismisses). */
+    showToast(type: ToastType, message: string): void
+
+    /**
+     * _(v1.2.0)_ Create a persistent notification with optional action buttons.
+     * Returns a Disposable; disposing dismisses the notification.
+     */
+    createNotification(opts: {
+      type: ToastType
+      title: string
+      message?: string
+      actions?: Array<{ id: string; label: string; handler: () => void }>
+    }): Disposable
+  }
+
+  /**
+   * _(v1.1.0)_ Native application menu contribution (View menu).
+   */
+  nativeMenu: {
+    addViewMenuItem(item: NativeMenuItemContribution): Disposable
+  }
+
+  /**
+   * _(v1.1.0)_ File-system change event subscription.
+   */
+  fs: {
+    /** Subscribe to fs:changed push events from watched directories. */
+    watch(handler: (event: FsChangeEvent) => void): Disposable
+  }
+
+  /**
+   * _(v1.1.0)_ Custom IPC channel registration.
+   */
+  ipc: {
+    registerHandler(
+      channel: string,
+      handler: (payload: unknown) => Promise<unknown> | unknown
+    ): Disposable
+  }
+
+  /**
+   * _(v1.1.0)_ Command palette contribution.
+   */
+  commands: {
+    register(command: CommandContribution, handler: () => void): Disposable
+  }
+
+  /**
+   * _(v1.2.0)_ Workspace and project read access + event subscriptions.
+   */
+  workspace: {
+    list(): WorkspaceSnapshot[]
+    listProjects(workspaceId: string): ProjectSnapshot[]
+    onDelete(handler: (workspaceId: string) => void): Disposable
+    onProjectDelete(handler: (projectId: string) => void): Disposable
+  }
+
+  /**
+   * _(v1.2.0)_ Auxiliary window management.
+   */
+  window: {
+    openAuxiliary(view: string, params?: Record<string, string>): void
   }
 }
 ```
@@ -152,6 +269,8 @@ interface SettingDefinition {
   /** For type 'number' only */
   min?: number
   max?: number
+  workspaceScoped?: boolean
+  secret?: boolean
 }
 
 /**
@@ -165,6 +284,39 @@ interface SidebarContribution {
   /** Click handler */
   onClick(): void
 }
+
+// v1.1.0 types
+
+type PanelSlot = 'right-sidebar' | 'global-tab'
+
+interface PanelContribution {
+  id: string
+  title: string
+  component: unknown // React.ComponentType — typed as unknown to avoid renderer dependency
+  defaultVisible?: boolean
+}
+
+interface TopBarMenuContribution {
+  id: string
+  label: string
+  onClick(): void
+  tooltip?: string
+}
+
+interface NativeMenuItemContribution {
+  id: string
+  label: string
+  onClick(): void
+  accelerator?: string
+}
+
+interface FsChangeEvent {
+  projectRoot: string
+  eventType: 'change' | 'rename'
+  filename: string | null
+}
+
+type ToastType = 'info' | 'success' | 'warning' | 'error'
 
 /**
  * Available context menu targets.
@@ -191,6 +343,36 @@ interface SessionSnapshot {
   readonly tabTitle: string
   readonly type: 'human' | 'agent'
 }
+
+interface CommandContribution {
+  id: string
+  label: string
+  description?: string
+  shortcut?: string
+  category?: string
+}
+
+// v1.2.0 types
+
+interface GlobalTabContribution {
+  id: string
+  label: string
+  icon?: string
+  component: unknown
+  permanent?: boolean
+}
+
+interface WorkspaceSnapshot {
+  readonly id: string
+  readonly name: string
+  readonly folderPath: string
+}
+
+interface ProjectSnapshot {
+  readonly id: string
+  readonly workspaceId: string
+  readonly name: string
+}
 ```
 
 ---
@@ -212,4 +394,4 @@ interface SessionSnapshot {
 
 4. **Settings key namespacing**: Extension setting keys must be prefixed with the extension ID to avoid collisions (enforced by the host at registration time).
 
-5. **API versioning**: The `ExtensionAPI` interface is versioned starting at `1.0.0`. Breaking changes require a MAJOR version bump and a new ADR.
+5. **API versioning**: The `ExtensionAPI` interface follows semantic versioning. Breaking changes require a MAJOR version bump and a new ADR. The current version is `1.2.0` (see ADR-012).
