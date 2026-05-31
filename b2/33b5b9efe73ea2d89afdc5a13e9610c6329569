@@ -1,0 +1,61 @@
+docs/ARCHITECTURE.md
+  s_ad5148b6f4058b::t_6ea83fe31353e6 69
+  s_ad5148b6f4058b::t_0667eabfe752cf 193
+  s_ad5148b6f4058b::t_e51a6f7a7b4b80 192,197-201
+  s_ad5148b6f4058b::t_59e8e634180fbd 208
+extensions/foundry/README.md
+  s_ad5148b6f4058b::t_87970d21429878 1-25
+tests/unit/extensions/extension-host.spec.ts
+  s_ad5148b6f4058b::t_ed1d0fc66fff03 90
+specs/001-extension-first-terminal/tasks.md
+  s_ad5148b6f4058b::t_de97e84b066230 228
+README.md
+  s_ad5148b6f4058b::t_86a50959ae0666 95-96,98-99
+  s_ad5148b6f4058b::t_be5f3c0f803555 143-145
+  s_ad5148b6f4058b::t_b87a08673cc540 176-177,179-189,191-196
+  s_ad5148b6f4058b::t_81c671aff48738 211-226
+  s_ad5148b6f4058b::t_0679f6c35bca7c 33
+  s_ad5148b6f4058b::t_43313fe5e35d83 124-125
+  s_ad5148b6f4058b::t_09754476148dcb 205
+tests/fixtures/sample-extension/manifest.json
+  s_ad5148b6f4058b::t_0738629524f10f 1-8
+specs/001-extension-first-terminal/quickstart.md
+  s_ad5148b6f4058b::t_96781c49b1af3c 95-112
+  s_ad5148b6f4058b::t_3ba73f9ee317ee 120-130
+  s_ad5148b6f4058b::t_a4e960cce8cfcd 89
+specs/001-extension-first-terminal/contracts/extension-api.md
+  s_ad5148b6f4058b::t_6a7e245458c14f 3-4,11-20,88-99,114,126-133,150-236,272-273,288-320,346-375,397
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_ad5148b6f4058b::t_235f1c2baff5f4 703-714
+  s_ad5148b6f4058b::t_c569acdedca5cc 829-876
+  s_ad5148b6f4058b::t_5858944214eb4a 247-268
+  s_ad5148b6f4058b::t_6a018de97a4692 334-379
+docs/CONTRIBUTING.md
+  s_ad5148b6f4058b::t_08f4d163c6c5f6 106
+  s_ad5148b6f4058b::t_17f3e9823d6a9c 56-57,61
+scripts/create-extension.cjs
+  s_ad5148b6f4058b::t_05260da0b98d0e 171-210
+  s_ad5148b6f4058b::t_420099c7b3b28f 65
+  s_ad5148b6f4058b::t_ce0a7746bc6873 313
+docs/EXTENSION-DEVELOPMENT.md
+  s_ad5148b6f4058b::t_dea50e90a8715f 541
+  s_ad5148b6f4058b::t_b0200551d3ce27 667,669,672-694,697-699
+specs/001-extension-first-terminal/data-model.md
+  s_ad5148b6f4058b::t_8f472660e01e92 117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b233b5b9efe73ea2d89afdc5a13e9610c6329569",
+  "prompts": {},
+  "sessions": {
+    "s_ad5148b6f4058b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9db0ea5b-b452-4183-8bb1-141e7e1c55ee",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
