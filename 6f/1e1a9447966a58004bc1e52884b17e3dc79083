@@ -1,0 +1,27 @@
+.forge/003-task-vault-recurring-engine-rewrite/spec.md
+  s_ad5148b6f4058b::t_2c5c5b0f8d89ed 1-34,36-83
+.forge/003-task-vault-recurring-engine-rewrite/clarifications.md
+  s_ad5148b6f4058b::t_815d5c14ef5d7f 1-21
+.forge/002-codebase-simplification-dedup/spec.md
+  s_ad5148b6f4058b::t_a841e07387153b 1-45
+.forge/003-task-vault-recurring-engine-rewrite/tasks.md
+  s_ad5148b6f4058b::t_9d2481b8f9b50f 1-194
+.forge/002-codebase-simplification-dedup/tasks.md
+  s_ad5148b6f4058b::t_bc57db7d84f02c 1-147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "6f1e1a9447966a58004bc1e52884b17e3dc79083",
+  "prompts": {},
+  "sessions": {
+    "s_ad5148b6f4058b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9db0ea5b-b452-4183-8bb1-141e7e1c55ee",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
