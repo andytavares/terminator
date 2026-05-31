@@ -1,0 +1,119 @@
+.forge-backups/20260531-183202/.claude/commands/forge.stats.md
+  ai_agent 1-12
+.forge-backups/20260531-183202/.claude/agents/test-author.md
+  ai_agent 1-22
+.forge-backups/20260531-183202/.claude/settings.json
+  ai_agent 1-79
+.forge-backups/20260531-183202/.claude/hooks/speckit-context-inject.sh
+  ai_agent 1-43
+.forge-backups/20260531-183202/.claude/skills/build-audit/SKILL.md
+  ai_agent 1-67
+.forge-backups/20260531-183202/.mcp.json
+  ai_agent 1-14
+.forge-backups/20260531-183202/.claude/skills/find-reuse/references/reuse-anti-patterns.md
+  ai_agent 1-11
+.forge-backups/20260531-183202/.claude/skills/repo-conventions/SKILL.md
+  ai_agent 1-22
+.forge-backups/20260531-183202/.claude/skills/canonical-research/SKILL.md
+  ai_agent 1-30
+.forge-backups/20260531-183202/.claude/skills/tdd-workflow/references/bdd-spec-style.md
+  ai_agent 1-15
+.forge-backups/20260531-183202/.claude/skills/code-review/references/review-rubric.md
+  ai_agent 1-11
+.forge-backups/20260531-183202/.claude/skills/build-audit/references/diagnostic-checklist.md
+  ai_agent 1-26
+.forge-backups/20260531-183202/.claude/skills/canonical-research/references/citation-format.md
+  ai_agent 1-15
+.forge-backups/20260531-183202/scripts/detect-stack.sh
+  ai_agent 1-94
+.forge-backups/20260531-183202/.claude/commands/forge.audit.md
+  ai_agent 1-9
+.forge-backups/20260531-183202/.claude/skills/ast-search/references/pattern-syntax.md
+  ai_agent 1-131
+.forge-backups/20260531-183202/.claude/commands/forge.find-reuse.md
+  ai_agent 1-7
+.forge-backups/20260531-183202/.claude/skills/pattern-survey/references/pattern-cluster-shapes.md
+  ai_agent 1-11
+.forge-backups/20260531-183202/.claude/skills/doc-sync/references/doc-index-schema.md
+  ai_agent 1-20
+.forge-backups/20260531-183202/.claude/agents/build-detective.md
+  ai_agent 1-25
+.forge-backups/20260531-183202/.claude/skills/code-review/SKILL.md
+  ai_agent 1-19
+.forge-backups/20260531-183202/.claude/commands/forge.survey.md
+  ai_agent 1-9
+.forge-backups/20260531-183202/.claude/commands/forge.detect-stack.md
+  ai_agent 1-5
+.forge-backups/20260531-183202/.claude/commands/forge.constitution.md
+  ai_agent 1-25
+.forge-backups/20260531-183202/.claude/skills/tdd-workflow/references/test-naming.md
+  ai_agent 1-11
+.forge-backups/20260531-183202/.claude/skills/find-reuse/SKILL.md
+  ai_agent 1-43
+.forge-backups/20260531-183202/.claude/commands/forge.ast-search.md
+  ai_agent 1-7
+.forge-backups/20260531-183202/.claude/commands/forge.context.md
+  ai_agent 1-31
+.forge-backups/20260531-183202/.claude/skills/pattern-survey/SKILL.md
+  ai_agent 1-63
+.forge-backups/20260531-183202/.claude/commands/forge.tdd.md
+  ai_agent 1-12
+.forge-backups/20260531-183202/.claude/agents/code-reviewer.md
+  ai_agent 1-24
+.forge-backups/20260531-183202/.claude/commands/forge.research.md
+  ai_agent 1-25
+.forge-backups/20260531-183202/.claude/skills/codebase-stats/SKILL.md
+  ai_agent 1-55
+.forge-backups/20260531-183202/.claude/commands/forge.docs-sync.md
+  ai_agent 1-12
+.forge-backups/20260531-183202/.claude-plugin/plugin.json
+  ai_agent 1-7
+.forge-backups/20260531-183202/.claude/agents/codebase-oracle.md
+  ai_agent 1-81
+.forge-backups/20260531-183202/.claude/agents/doc-keeper.md
+  ai_agent 1-24
+.forge-backups/20260531-183202/.claude/hooks/post-compact.sh
+  ai_agent 1-23
+.forge-backups/20260531-183202/.claude/hooks/pre-edit-guard.sh
+  ai_agent 1-72
+.forge-backups/20260531-183202/.claude/agents/researcher.md
+  ai_agent 1-22
+.forge-backups/20260531-183202/.claude/hooks/prompt-augment.sh
+  ai_agent 1-20
+.forge-backups/20260531-183202/.claude/hooks/session-start.sh
+  ai_agent 1-49
+.forge-backups/20260531-183202/.claude/skills/project-constitution/SKILL.md
+  ai_agent 1-68
+.forge-backups/20260531-183202/.claude/skills/tdd-workflow/SKILL.md
+  ai_agent 1-27
+.forge-backups/20260531-183202/.claude/hooks/post-edit-doc-mark.sh
+  ai_agent 1-24
+.forge-backups/20260531-183202/.claude/skills/research-topic/references/research-doc-schema.md
+  ai_agent 1-83
+.forge-manifest.json
+  ai_agent 3,6
+.forge-backups/20260531-183202/.claude/skills/repo-conventions/references/file-layout-patterns.md
+  ai_agent 1-9
+.forge-backups/20260531-183202/.claude/skills/ast-search/SKILL.md
+  ai_agent 1-63
+.forge-backups/20260531-183202/.claude/skills/doc-sync/SKILL.md
+  ai_agent 1-24
+.forge-backups/20260531-183202/.claude/commands/forge.ask.md
+  ai_agent 1-9
+.forge-backups/20260531-183202/.claude/commands/forge.review.md
+  ai_agent 1-11
+.forge-backups/20260531-183202/scripts/forge.sh
+  ai_agent 1-531
+.forge-backups/20260531-183202/.claude/skills/codebase-stats/references/scc-flags.md
+  ai_agent 1-10
+.forge-backups/20260531-183202/.claude/hooks/post-edit-format.sh
+  ai_agent 1-17
+.forge-backups/20260531-183202/.claude/skills/research-topic/SKILL.md
+  ai_agent 1-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "728619a3c10fde149d1d838bb0e1af0374b534a5",
+  "prompts": {}
+}
