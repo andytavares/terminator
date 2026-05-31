@@ -1,4 +1,95 @@
 {
   "version": 1,
-  "entries": []
+  "entries": [
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "title": "Terminator Architecture",
+      "summary": "Process model, IPC contract, data model, terminal session lifecycle, extension system, state management, CSS token strategy, Task Vault architecture, and MergeFlow subsystem.",
+      "owners": [],
+      "referenced_code_paths": [
+        "src/main/preload.ts",
+        "src/main/extensions/api.ts",
+        "src/renderer/stores/workspace.store.ts",
+        "src/renderer/stores/session.store.ts",
+        "src/renderer/stores/settings.store.ts",
+        "src/renderer/stores/metrics.store.ts",
+        "extensions/task-vault/src/vault/db.ts",
+        "extensions/task-vault/src/vault/recurrence.ts",
+        "extensions/task-vault/src/vault/ensure-next-occurrence.ts",
+        "extensions/task-vault/src/ipc/vault.ipc.ts",
+        "extensions/task-vault/src/notifications/task-scheduler.ts",
+        "extensions/task-vault/src/vault/types.ts"
+      ],
+      "last_verified_commit": "148e9f1",
+      "staleness_score": 0
+    },
+    {
+      "path": "README.md",
+      "title": "Terminator README",
+      "summary": "Feature list, tech stack, prerequisites, quick start, npm scripts, keyboard shortcuts.",
+      "owners": [],
+      "referenced_code_paths": [
+        "src/renderer/App.tsx",
+        "src/renderer/hooks/useKeyboardShortcuts.ts",
+        "src/main/shared/reserved-shortcuts.ts",
+        "extensions/task-vault/src/vault/types.ts",
+        "extensions/git-integration/src/index.ts"
+      ],
+      "last_verified_commit": "148e9f1",
+      "staleness_score": 0
+    },
+    {
+      "path": "extensions/task-vault/README.md",
+      "title": "Task Vault Extension README",
+      "summary": "Feature list, MCP server setup, available tools, auto-execute toggles, task ID format.",
+      "owners": [],
+      "referenced_code_paths": [
+        "extensions/task-vault/src/mcp/server.ts",
+        "extensions/task-vault/src/vault/types.ts",
+        "extensions/task-vault/src/ipc/vault.ipc.ts"
+      ],
+      "last_verified_commit": "148e9f1",
+      "staleness_score": 0
+    },
+    {
+      "path": "specs/001-extension-first-terminal/contracts/extension-api.md",
+      "title": "Extension API Contract",
+      "summary": "Full surface of ExtensionAPI passed to activate(api) — all namespaces, method signatures, and version annotations.",
+      "owners": [],
+      "referenced_code_paths": ["src/main/extensions/api.ts"],
+      "last_verified_commit": "148e9f1",
+      "staleness_score": 0
+    },
+    {
+      "path": "specs/001-extension-first-terminal/contracts/ipc-channels.md",
+      "title": "IPC Channels Contract (core)",
+      "summary": "Core IPC channel specifications: terminal:*, workspace:*, project:*, settings:*, dialog:*, extension:*, fs:*, notification.*.",
+      "owners": [],
+      "referenced_code_paths": ["src/main/preload.ts", "src/renderer/electron.d.ts"],
+      "last_verified_commit": "148e9f1",
+      "staleness_score": 0
+    },
+    {
+      "path": "docs/EXTENSION-DEVELOPMENT.md",
+      "title": "Extension Development Guide",
+      "summary": "How to build, test, and publish extensions. Extension API reference, CSS token contract, manifest schema.",
+      "owners": [],
+      "referenced_code_paths": [
+        "src/main/extensions/api.ts",
+        "src/renderer/styles.css",
+        "scripts/create-extension.cjs"
+      ],
+      "last_verified_commit": "148e9f1",
+      "staleness_score": 0
+    },
+    {
+      "path": "docs/CONTRIBUTING.md",
+      "title": "Contributing Guide",
+      "summary": "Development workflow, npm scripts, test coverage requirements, PR checklist.",
+      "owners": [],
+      "referenced_code_paths": ["package.json"],
+      "last_verified_commit": "148e9f1",
+      "staleness_score": 0
+    }
+  ]
 }

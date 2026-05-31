@@ -1,6 +1,6 @@
 # Architecture: Terminator
 
-**Version**: 0.1.0 | **Updated**: 2026-05-22
+**Version**: 0.1.0 | **Updated**: 2026-05-31
 
 ---
 
