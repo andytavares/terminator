@@ -1,9 +1,9 @@
 {
   "forge_version": "0.4.0",
-  "installed_from_commit": "6bf8ed1",
+  "installed_from_commit": "58716e9",
   "source_path": "/Users/atavares/Desktop/claude-harness",
   "last_action": "update",
-  "installed_at": "2026-05-31T22:20:32Z",
+  "installed_at": "2026-05-31T22:32:04Z",
   "managed_files": [
     ".claude/agents/build-detective.md",
     ".claude/agents/code-reviewer.md",
