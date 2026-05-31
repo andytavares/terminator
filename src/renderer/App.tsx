@@ -41,7 +41,8 @@ export function App(): JSX.Element {
   } = useWorkspaceStore()
   const { loadSettings, globalSettings, markWelcomeSeen, resolveSettings } = useSettingsStore()
   const { system, enableGlobalMetrics, disableGlobalMetrics } = useMetricsStore()
-  const { handleProcessExit, getSessionsForProject } = useSessionStore()
+  const { handleProcessExit, getSessionsForProject, closeSession, activeSessionIdByProject } =
+    useSessionStore()
   const { addToast } = useToastStore()
   const {
     addNotification,
@@ -77,9 +78,8 @@ export function App(): JSX.Element {
   const handleToggleLog = useCallback(() => setLogOpen((v) => !v), [])
   const handleOpenCommandPalette = useCallback(() => setPaletteOpen(true), [])
   const handleToggleOverview = useCallback(() => {
-    const { activeGlobalTabId: curr, setActiveGlobalTab: setTab } = useExtensionRegistry.getState()
-    setTab(curr === 'core.overview' ? null : 'core.overview')
-  }, [])
+    setActiveGlobalTab(activeGlobalTabId === 'core.overview' ? null : 'core.overview')
+  }, [activeGlobalTabId, setActiveGlobalTab])
 
   const handleNewTab = useCallback(() => {
     if (!activeProjectId) return
@@ -103,7 +103,7 @@ export function App(): JSX.Element {
     onToggleOverview: handleToggleOverview,
   })
 
-  const builtinCommands = useCallback((): CommandRegistration[] => {
+  function builtinCommands(): CommandRegistration[] {
     const cmds: CommandRegistration[] = [
       {
         id: 'core.open-settings',
@@ -131,7 +131,6 @@ export function App(): JSX.Element {
         shortcut: '⌘⇧I',
         category: 'App',
         action: () => {
-          const { activeGlobalTabId, setActiveGlobalTab } = useExtensionRegistry.getState()
           setActiveGlobalTab(activeGlobalTabId === 'core.overview' ? null : 'core.overview')
         },
       },
@@ -158,8 +157,7 @@ export function App(): JSX.Element {
     })
 
     return cmds
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProjectId, workspaces, handleNewTab, setActiveWorkspace])
+  }
 
   const paletteCommands = [...builtinCommands(), ...extensionCommands]
 
@@ -271,6 +269,16 @@ export function App(): JSX.Element {
       setActiveProjectTab(tabId)
     })
   }, [setActiveProjectTab])
+
+  useEffect(() => {
+    if (!window.electronAPI.extensionEvents?.onMenuCloseTab) return
+    return window.electronAPI.extensionEvents.onMenuCloseTab(() => {
+      const sessionId = activeSessionIdByProject.get(activeProjectId ?? '')
+      if (activeProjectId && sessionId) {
+        void closeSession(sessionId)
+      }
+    })
+  }, [activeProjectId, activeSessionIdByProject, closeSession])
 
   // Keep a ref so the effect always sees the latest openPanels without re-running on every change
   const openPanelsRef = useRef(openPanels)

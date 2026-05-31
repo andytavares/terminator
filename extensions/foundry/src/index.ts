@@ -455,7 +455,6 @@ async function executeOrchestrate(
     run.status = 'gate'
     broadcastAndSave(run)
     return
-    return
   }
 
   appendLog(run.id, 'system', `Planning sub-agents for: ${(run.prompt ?? '').slice(0, 80)}…`)

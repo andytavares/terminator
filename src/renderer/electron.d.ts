@@ -146,6 +146,7 @@ interface ElectronAPI {
     onSelectProjectTab(handler: (tabId: string) => void): () => void
     onMenuOpenSettings(handler: () => void): () => void
     onMenuToggleSidebar(handler: () => void): () => void
+    onMenuCloseTab(handler: () => void): () => void
   }
   notification: {
     show(title: string, body: string): void

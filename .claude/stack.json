@@ -1,0 +1,19 @@
+{
+  "languages": ["javascript", "typescript"],
+  "build": {
+    "commands": ["npm run build"]
+  },
+  "test": {
+    "commands": ["npm test"],
+    "command": "npm test"
+  },
+  "lint": {
+    "commands": ["npm run lint"],
+    "command": "npm run lint"
+  },
+  "format": {
+    "commands": ["npm run format"]
+  },
+  "detected_at_commit": "9be72af",
+  "detected_at": "2026-05-31T03:14:27Z"
+}

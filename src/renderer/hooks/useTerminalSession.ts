@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { useSessionStore } from '../stores/session.store'
 import { useWorkspaceStore } from '../stores/workspace.store'
+import { useNotificationStore } from '../stores/notification.store'
 import { TerminalInstance } from '../components/terminal/TerminalSession'
 import type { PaneSplitDirection } from '../../../shared/types/index'
 
@@ -34,7 +35,16 @@ export function useTerminalSession() {
         if (isActiveSession && isActiveProject) return
         incrementBellCount(sessionId)
         const tabTitle = useSessionStore.getState().sessions.get(sessionId)?.tabTitle ?? 'Terminal'
-        window.electronAPI.notification.show('Terminator', `${tabTitle} needs attention`)
+        const title = 'Terminator'
+        const body = `${tabTitle} needs attention`
+        window.electronAPI.notification.show(title, body)
+        useNotificationStore.getState().addNotification({
+          id: `bell-${sessionId}-${Date.now()}`,
+          type: 'info',
+          title,
+          message: body,
+          timestamp: Date.now(),
+        })
       })
       // Store the instance first, then activate — TerminalPane's effect fires after
       // both updates land so getTerminalInstance() is guaranteed to return the instance.
@@ -59,7 +69,16 @@ export function useTerminalSession() {
       const instance = new TerminalInstance(sessionId, scrollbackLimit, () => {
         incrementBellCount(sessionId)
         const tabTitle = useSessionStore.getState().sessions.get(sessionId)?.tabTitle ?? 'Terminal'
-        window.electronAPI.notification.show('Terminator', `${tabTitle} needs attention`)
+        const title = 'Terminator'
+        const body = `${tabTitle} needs attention`
+        window.electronAPI.notification.show(title, body)
+        useNotificationStore.getState().addNotification({
+          id: `bell-${sessionId}-${Date.now()}`,
+          type: 'info',
+          title,
+          message: body,
+          timestamp: Date.now(),
+        })
       })
       setTerminalInstance(sessionId, instance)
       activateSplit(projectId, focusedId, sessionId, direction)

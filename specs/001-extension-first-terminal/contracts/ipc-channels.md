@@ -720,9 +720,7 @@ All invoke/handle channels return a discriminated union of success and error sha
 
 ---
 
-## Extension-contributed channels (git-integration)
-
-These channels are registered by the git-integration extension at runtime.
+## Shell Channels
 
 ### `shell:open-path`
 
@@ -733,6 +731,24 @@ Opens a file or directory in the OS default application.
 **Request**: `{ filePath: string }`
 
 **Response**: `{ ok: true } | { error: string }`
+
+---
+
+### `shell:open-external`
+
+Opens a URL in the system default browser. The URL must be a valid absolute URL.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ url: string }`
+
+**Response**: `{ ok: true } | { error: string }`
+
+---
+
+## Extension-contributed channels (git-integration)
+
+These channels are registered by the git-integration extension at runtime.
 
 ---
 
@@ -829,11 +845,12 @@ Used on queue load to prevent closed/merged PRs from appearing as in-progress or
 
 These channels are sent from the main process menu to the renderer via `webContents.send`.
 
-| Channel                      | Payload | Effect                                           |
-| ---------------------------- | ------- | ------------------------------------------------ |
-| `menu:open-settings`         | none    | Opens the Settings panel                         |
-| `menu:toggle-sidebar`        | none    | Toggles the Projects Panel sidebar               |
-| `menu:open-pr-review-window` | none    | Triggers `window:open-pr-review` for active repo |
+| Channel                      | Payload | Effect                                               |
+| ---------------------------- | ------- | ---------------------------------------------------- |
+| `menu:open-settings`         | none    | Opens the Settings panel                             |
+| `menu:toggle-sidebar`        | none    | Toggles the Projects Panel sidebar                   |
+| `menu:open-pr-review-window` | none    | Triggers `window:open-pr-review` for active repo     |
+| `menu:close-tab`             | none    | Closes the active terminal tab in the active project |
 
 ---
 

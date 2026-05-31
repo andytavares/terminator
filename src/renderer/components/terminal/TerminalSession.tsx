@@ -76,10 +76,16 @@ export class TerminalInstance {
     this.element.style.cssText = 'width:100%;height:100%;'
 
     this.terminal.attachCustomKeyEventHandler((e) => {
-      if (e.metaKey && e.key === 'Enter' && e.type === 'keydown') {
-        // terminal.paste() respects bracketed paste mode automatically:
-        // if the running program has enabled it, wraps in \x1b[200~...\x1b[201~
-        // if not, sends the newline raw — correct either way
+      // Cmd+Enter / Shift+Enter — send a literal newline to the running program.
+      // terminal.paste() wraps in bracketed-paste sequences when the program has enabled
+      // that mode (e.g. claude CLI), so the program receives a newline without executing.
+      // Note: Shift+Enter is intercepted unconditionally — programs that handle it
+      // natively (e.g. IPython) will not receive the raw key event.
+      if ((e.metaKey || e.shiftKey) && e.key === 'Enter' && e.type === 'keydown') {
+        // Must call preventDefault() ourselves — xterm does NOT call it when the custom
+        // handler returns false. Without this, the browser fires a subsequent `input` event
+        // on xterm's textarea, which xterm forwards to the PTY as \r (submitting the line).
+        e.preventDefault()
         this.terminal.paste('\n')
         return false
       }
