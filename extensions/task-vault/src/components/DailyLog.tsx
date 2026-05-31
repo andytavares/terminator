@@ -530,21 +530,26 @@ function format12h(hhmm: string): string {
   return `${h12}:${mStr} ${ampm}`
 }
 
-function formatRecurrence(interval: string, days?: number[]): string {
-  const label = RECURRENCE_INTERVALS.find((r) => r.value === interval)?.label ?? interval
-  if (interval === 'weekly' && days && days.length > 0) {
-    const dayLabels = days
+/** Format a recurrence_rule column value (e.g. 'weekly:1,3') for display. */
+function formatRecurrenceRule(rule: string): string {
+  if (rule.startsWith('weekly:')) {
+    const dayNums = rule
+      .slice('weekly:'.length)
+      .split(',')
+      .map((s) => parseInt(s, 10))
+      .filter((n) => !isNaN(n))
+    const weeklyLabel = RECURRENCE_INTERVALS.find((r) => r.value === 'weekly')?.label ?? 'Weekly'
+    const dayLabels = dayNums
       .slice()
       .sort((a, b) => {
-        // Sort Mon-Sun order
         const order = [1, 2, 3, 4, 5, 6, 0]
         return order.indexOf(a) - order.indexOf(b)
       })
       .map((d) => WEEKDAY_LABELS.find((w) => w.value === d)?.short ?? d)
       .join(', ')
-    return `${label} · ${dayLabels}`
+    return dayLabels ? `${weeklyLabel} · ${dayLabels}` : weeklyLabel
   }
-  return label
+  return RECURRENCE_INTERVALS.find((r) => r.value === rule)?.label ?? rule
 }
 
 type EndType = 'none' | 'on_date' | 'after_count'
@@ -870,7 +875,7 @@ function TaskRow({
     })
     addToast({
       type: 'success',
-      message: `Recurrence set: ${formatRecurrence(interval, days)}`,
+      message: `Recurrence set: ${formatRecurrenceRule(days && days.length > 0 ? `weekly:${days.sort((a, b) => a - b).join(',')}` : interval)}`,
       onClick: makeTaskNavHandler(task.id),
     })
     await onRefresh()
@@ -1015,10 +1020,10 @@ function TaskRow({
                 ⊘ {task.blockedReason}
               </span>
             )}
-            {task.recurrenceInterval && (
+            {task.recurrenceRule && (
               <span
                 className="daily-log__recurrence-badge"
-                title={`Repeats: ${formatRecurrence(task.recurrenceInterval, task.recurrenceDays)}${task.recurrenceTime ? ` at ${format12h(task.recurrenceTime)}` : ''}`}
+                title={`Repeats: ${formatRecurrenceRule(task.recurrenceRule)}${task.recurrenceNotifyAt ? ` at ${format12h(task.recurrenceNotifyAt)}` : ''}`}
               >
                 <Repeat size={11} />
               </span>
@@ -1071,11 +1076,11 @@ function TaskRow({
               </button>
             )}
             <button
-              className={`tv-btn tv-btn--outline tv-btn--action-icon${task.recurrenceInterval ? ' tv-btn--accent-active' : ''}`}
+              className={`tv-btn tv-btn--outline tv-btn--action-icon${task.recurrenceRule ? ' tv-btn--accent-active' : ''}`}
               onClick={() => setRecurrenceModalOpen(true)}
               title={
-                task.recurrenceInterval
-                  ? `Recurrence: ${formatRecurrence(task.recurrenceInterval, task.recurrenceDays)}`
+                task.recurrenceRule
+                  ? `Recurrence: ${formatRecurrenceRule(task.recurrenceRule)}`
                   : 'Set recurrence'
               }
             >
@@ -1221,15 +1226,28 @@ function TaskRow({
       {recurrenceModalOpen && (
         <RecurrenceModal
           existing={
-            task.recurrenceInterval
-              ? {
-                  interval: task.recurrenceInterval,
-                  days: task.recurrenceDays,
-                  time: task.recurrenceTime,
-                  endType: task.recurrenceEndType,
-                  endDate: task.recurrenceEndDate,
-                  endCount: task.recurrenceEndCount,
-                }
+            task.recurrenceRule
+              ? (() => {
+                  const rule = task.recurrenceRule
+                  let interval = rule
+                  let days: number[] | undefined
+                  if (rule.startsWith('weekly:')) {
+                    interval = 'weekly'
+                    days = rule
+                      .slice('weekly:'.length)
+                      .split(',')
+                      .map((s) => parseInt(s, 10))
+                      .filter((n) => !isNaN(n))
+                  }
+                  return {
+                    interval,
+                    days,
+                    time: task.recurrenceNotifyAt,
+                    endType: task.recurrenceEndType,
+                    endDate: task.recurrenceEndDate,
+                    endCount: task.recurrenceEndCount,
+                  }
+                })()
               : undefined
           }
           onConfirm={(interval, days, time, endType, endDate, endCount) =>

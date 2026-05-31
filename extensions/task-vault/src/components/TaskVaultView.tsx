@@ -371,6 +371,9 @@ export function TaskVaultView(): React.JSX.Element {
       'task-vault:recurrence-spawned',
       () => {
         tickCalendar()
+        const vd = useVaultStore.getState().viewingDate
+        if (vd) void loadDate(vd)
+        else loadToday()
       }
     )
 

@@ -100,9 +100,11 @@ export interface IndexedTask {
   subtasks?: IndexedTask[]
   blockedReason?: string
   blockedCheckInterval?: string
-  recurrenceInterval?: string
-  recurrenceDays?: number[]
-  recurrenceTime?: string
+  // Recurrence fields — sourced from first-class SQL columns
+  recurrenceRule?: string // e.g. 'daily' | 'weekly:1,3' | 'biweekly' | 'monthly'
+  recurrenceTemplateId?: string // links spawned instance back to its template task
+  recurrenceNotifyAt?: string // HH:MM override for notification time
+  // End conditions — sourced from metadata (configuration, not runtime state)
   recurrenceEndType?: 'none' | 'on_date' | 'after_count'
   recurrenceEndDate?: string
   recurrenceEndCount?: number
