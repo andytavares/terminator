@@ -297,6 +297,82 @@ describe('useTerminalSession', () => {
         'horizontal'
       )
     })
+
+    it('splitSession bell callback fires incrementBellCount, notification.show, and addNotification', async () => {
+      const mockActivateSplit = vi.fn()
+      vi.mocked(useSessionStore).mockReturnValue({
+        createSession: mockCreateSession,
+        setTerminalInstance: mockSetTerminalInstance,
+        setActiveSessionForProject: mockSetActiveSessionForProject,
+        incrementBellCount: mockIncrementBellCount,
+        activateSplit: mockActivateSplit,
+        getFocusedSession: vi.fn().mockReturnValue('ses-focused'),
+        getActiveSessionForProject: vi.fn().mockReturnValue('ses-focused'),
+      } as unknown as ReturnType<typeof useSessionStore>)
+      Object.assign(useSessionStore, {
+        getState: vi.fn().mockReturnValue({
+          sessions: new Map([['session-123', { tabTitle: 'Split Terminal' }]]),
+          activeSessionIdByProject: new Map(),
+        }),
+      })
+      const { useTerminalSession } = await import(
+        '../../../../src/renderer/hooks/useTerminalSession'
+      )
+      const { result } = renderHook(() => useTerminalSession())
+      capturedBellCallback = undefined
+      await result.current.splitSession('proj-1', 'vertical', '/cwd', 5000)
+
+      capturedBellCallback?.()
+
+      expect(mockIncrementBellCount).toHaveBeenCalledWith('session-123')
+      expect(
+        (
+          globalThis as unknown as {
+            electronAPI: { notification: { show: ReturnType<typeof vi.fn> } }
+          }
+        ).electronAPI.notification.show
+      ).toHaveBeenCalledWith('Terminator', 'Split Terminal needs attention')
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Terminator',
+          message: 'Split Terminal needs attention',
+          type: 'info',
+          id: expect.any(String),
+          timestamp: expect.any(Number),
+        })
+      )
+    })
+
+    it('splitSession bell callback uses default tab title when session not found', async () => {
+      const mockActivateSplit = vi.fn()
+      vi.mocked(useSessionStore).mockReturnValue({
+        createSession: mockCreateSession,
+        setTerminalInstance: mockSetTerminalInstance,
+        setActiveSessionForProject: mockSetActiveSessionForProject,
+        incrementBellCount: mockIncrementBellCount,
+        activateSplit: mockActivateSplit,
+        getFocusedSession: vi.fn().mockReturnValue('ses-focused'),
+        getActiveSessionForProject: vi.fn().mockReturnValue('ses-focused'),
+      } as unknown as ReturnType<typeof useSessionStore>)
+      Object.assign(useSessionStore, {
+        getState: vi.fn().mockReturnValue({
+          sessions: new Map(), // session not in map
+          activeSessionIdByProject: new Map(),
+        }),
+      })
+      const { useTerminalSession } = await import(
+        '../../../../src/renderer/hooks/useTerminalSession'
+      )
+      const { result } = renderHook(() => useTerminalSession())
+      capturedBellCallback = undefined
+      await result.current.splitSession('proj-1', 'vertical', '/cwd', 5000)
+
+      capturedBellCallback?.()
+
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Terminal needs attention' })
+      )
+    })
   })
 
   describe('bell event — addNotification integration', () => {

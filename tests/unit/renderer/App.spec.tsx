@@ -27,6 +27,7 @@ type ShortcutCallbacks = {
   onOpenSettings?: () => void
   onToggleLog?: () => void
   onOpenCommandPalette?: () => void
+  onToggleOverview?: () => void
 }
 let capturedShortcutCallbacks: ShortcutCallbacks = {}
 vi.mock('../../../src/renderer/hooks/useKeyboardShortcuts', () => ({
@@ -357,6 +358,30 @@ describe('App', () => {
     await waitFor(() => screen.getByText('Close Palette'))
     fireEvent.click(screen.getByText('Close Palette'))
     await waitFor(() => expect(screen.queryByTestId('command-palette')).toBeNull())
+  })
+
+  it('onToggleOverview keyboard shortcut activates core.overview tab', () => {
+    const mockSetActiveGlobalTab = vi.fn()
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      activeGlobalTabId: null,
+      setActiveGlobalTab: mockSetActiveGlobalTab,
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    render(<App />)
+    capturedShortcutCallbacks.onToggleOverview?.()
+    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith('core.overview')
+  })
+
+  it('onToggleOverview keyboard shortcut deactivates core.overview tab when already active', () => {
+    const mockSetActiveGlobalTab = vi.fn()
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      activeGlobalTabId: 'core.overview',
+      setActiveGlobalTab: mockSetActiveGlobalTab,
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    render(<App />)
+    capturedShortcutCallbacks.onToggleOverview?.()
+    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
   })
 
   it('renders overlay components from extension registry', () => {

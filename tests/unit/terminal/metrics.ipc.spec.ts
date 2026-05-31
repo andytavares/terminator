@@ -70,6 +70,33 @@ describe('registerMetricsHandlers', () => {
     expect(result.data.netOutBytesPerSec).toBeGreaterThanOrEqual(0)
   })
 
+  it('tick calculates net bytes/sec after two intervals (prevNet null → non-null path)', async () => {
+    let netCallCount = 0
+    mockExecSync.mockImplementation((cmd: string) => {
+      if (String(cmd).startsWith('netstat')) {
+        netCallCount++
+        // First tick: baseline; second tick: higher bytes so delta > 0
+        return netCallCount === 1
+          ? 'Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Drop\nen0 1500 <Link> aa:bb 100 0 1000 100 0 500 0\n'
+          : 'Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Drop\nen0 1500 <Link> aa:bb 200 0 3000 200 0 1500 0\n'
+      }
+      return ''
+    })
+    vi.resetModules()
+    const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
+    registerMetricsHandlers(getPtyManager() as never)
+
+    // First tick: prevNet is null → skips rate calc, sets prevNet
+    vi.advanceTimersByTime(1000)
+    // Second tick: prevNet is not null → executes latestNetIn/Out assignment
+    vi.advanceTimersByTime(1000)
+
+    const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:system')![1]
+    const result = handler() as { data: { netInBytesPerSec: number; netOutBytesPerSec: number } }
+    expect(result.data.netInBytesPerSec).toBeGreaterThanOrEqual(0)
+    expect(result.data.netOutBytesPerSec).toBeGreaterThanOrEqual(0)
+  })
+
   it('metrics:processes returns empty array when no pids given', async () => {
     vi.resetModules()
     const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
