@@ -128,6 +128,36 @@ describe('TerminalInstance', () => {
     expect(result).toBe(true)
   })
 
+  it('pastes \\n when Shift+Enter is pressed', () => {
+    new TerminalInstance('ses-1', 1000)
+    const instance = vi.mocked(Terminal).mock.results[0].value
+    const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
+    const result = handler({
+      shiftKey: true,
+      metaKey: false,
+      ctrlKey: false,
+      key: 'Enter',
+      type: 'keydown',
+    })
+    expect(result).toBe(false)
+    expect(instance.paste).toHaveBeenCalledWith('\n')
+  })
+
+  it('does not intercept plain Enter without modifiers', () => {
+    new TerminalInstance('ses-1', 1000)
+    const instance = vi.mocked(Terminal).mock.results[0].value
+    const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
+    const result = handler({
+      shiftKey: false,
+      metaKey: false,
+      ctrlKey: false,
+      key: 'Enter',
+      type: 'keydown',
+    })
+    expect(result).toBe(true)
+    expect(instance.paste).not.toHaveBeenCalled()
+  })
+
   it('subscribes to terminal output on construction', () => {
     new TerminalInstance('ses-1', 1000)
     expect(mockOnOutput).toHaveBeenCalledTimes(1)

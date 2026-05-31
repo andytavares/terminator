@@ -157,6 +157,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:toggle-sidebar', listener)
       return () => ipcRenderer.removeListener('menu:toggle-sidebar', listener)
     },
+    onMenuCloseTab: (handler: () => void) => {
+      const listener = () => handler()
+      ipcRenderer.on('menu:close-tab', listener)
+      return () => ipcRenderer.removeListener('menu:close-tab', listener)
+    },
   },
   extensionBridge: {
     invoke: (channel: string, payload?: unknown) => ipcRenderer.invoke(channel, payload),

@@ -33,7 +33,8 @@ interface NetSnapshot {
   bytesOut: number
 }
 
-function readNetBytes(): { bytesIn: number; bytesOut: number } {
+/** @internal */
+export function readNetBytes(): { bytesIn: number; bytesOut: number } {
   try {
     if (process.platform === 'linux') {
       const raw = readFileSync('/proc/net/dev', 'utf-8')
@@ -74,7 +75,7 @@ function readNetBytes(): { bytesIn: number; bytesOut: number } {
 let prevCpu: CpuSnapshot = takeCpuSnapshot()
 let latestCpuPercent = 0
 
-let prevNet: NetSnapshot = { ts: Date.now(), ...readNetBytes() }
+let prevNet: NetSnapshot | null = null
 let latestNetIn = 0
 let latestNetOut = 0
 
@@ -89,10 +90,12 @@ function tick(): void {
   // Network
   const net = readNetBytes()
   const now = Date.now()
-  const elapsed = (now - prevNet.ts) / 1000
-  if (elapsed > 0) {
-    latestNetIn = Math.max(0, (net.bytesIn - prevNet.bytesIn) / elapsed)
-    latestNetOut = Math.max(0, (net.bytesOut - prevNet.bytesOut) / elapsed)
+  if (prevNet !== null) {
+    const elapsed = (now - prevNet.ts) / 1000
+    if (elapsed > 0) {
+      latestNetIn = Math.max(0, (net.bytesIn - prevNet.bytesIn) / elapsed)
+      latestNetOut = Math.max(0, (net.bytesOut - prevNet.bytesOut) / elapsed)
+    }
   }
   prevNet = { ts: now, ...net }
 }
@@ -103,7 +106,8 @@ function startSampler(): void {
 
 // ─── ps-based process metrics ────────────────────────────────────────────────
 
-function queryProcessMetrics(pids: number[]): ProcessMetrics[] {
+/** @internal */
+export function queryProcessMetrics(pids: number[]): ProcessMetrics[] {
   if (pids.length === 0) return []
   try {
     const pidArg = pids.join(',')

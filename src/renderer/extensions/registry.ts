@@ -91,6 +91,7 @@ export type ExtensionRendererAPI = Pick<
   | 'registerKeyboardShortcut'
   | 'registerCommand'
   | 'updateGlobalTab'
+  | 'updateCommand'
 >
 
 export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({

@@ -58,7 +58,7 @@ The run console is opened via `api.window.openAuxiliary('foundry-run', { runId }
 
 - Use ONLY `var(--token-name)` CSS custom properties from the core app
 - Never introduce raw hex colors or new CSS variable definitions
-- Icons: Tabler Icons only, flat, inheriting text color
+- Icons: Lucide icons only, flat, inheriting text color. No color CSS or inline style on icons.
 
 ## Isolation Test
 

@@ -1,0 +1,7 @@
+{
+  "name": "harness-baseline",
+  "version": "0.1.0",
+  "description": "A cookiecutter Claude harness for large multi-language codebases. Includes TDD enforcement, canonical-source guarding, find-reuse checks, and doc-sync subagents.",
+  "author": "your-org",
+  "license": "MIT"
+}

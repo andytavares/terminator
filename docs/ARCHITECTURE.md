@@ -235,13 +235,27 @@ Full API surface: [`specs/001-extension-first-terminal/contracts/extension-api.m
 
 The renderer uses [Zustand](https://github.com/pmndrs/zustand) for all client-side state. Each store maps to a domain:
 
-| Store                | State                                                           | Key actions                                             |
-| -------------------- | --------------------------------------------------------------- | ------------------------------------------------------- |
-| `workspace.store.ts` | workspaces[], projects by workspace, active IDs                 | loadWorkspaces, createWorkspace, setActiveWorkspace     |
-| `session.store.ts`   | sessions Map, terminalInstances Map, active session per project | createSession, closeSession, setActiveSessionForProject |
-| `settings.store.ts`  | globalSettings, workspaceSettings Map, resolvedTheme            | loadSettings, updateGlobalTheme, resolveSettings        |
+| Store                    | State                                                                       | Key actions                                                          |
+| ------------------------ | --------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `workspace.store.ts`     | workspaces[], projects by workspace, active IDs                             | loadWorkspaces, createWorkspace, setActiveWorkspace                  |
+| `session.store.ts`       | sessions Map, terminalInstances Map, active session per project             | createSession, closeSession, setActiveSessionForProject              |
+| `settings.store.ts`      | globalSettings, workspaceSettings Map, resolvedTheme                        | loadSettings, updateGlobalTheme, resolveSettings                     |
+| `notification.store.ts`  | notifications[], unreadCount, panelOpen                                     | addNotification, markRead, markAllRead, dismiss, togglePanel         |
+| `toast.store.ts`         | toasts[] (ephemeral queue)                                                  | addToast, removeToast                                                |
+| `log.store.ts`           | logEntries[], console interceptor                                           | (entries added via installLogInterceptor); clearLogs                 |
+| `metrics.store.ts`       | system CPU/memory/network, per-session process metrics                      | enableGlobalMetrics, disableGlobalMetrics, trackSession              |
+| `extensions/registry.ts` | extension registration maps (sidebarPanels, globalTabs, commands, overlays) | registerGlobalTab, registerCommand, togglePanel, setActiveProjectTab |
 
 All store actions are async — they call IPC first, then update local state only on success.
+
+### Notification Model
+
+Two distinct notification systems exist and are intentionally complementary:
+
+- **In-app notification center** (`notification.store.ts` + `notifications:*` IPC, plural): persisted notifications shown in the bell-icon panel. Survives OS notification mute settings.
+- **Native OS notification** (`notification.show` IPC, singular): fires a system-level desktop alert for immediate attention when a terminal session needs attention (bell event).
+
+When a bell event fires in a backgrounded terminal session, both systems are triggered: `window.electronAPI.notification.show` (OS) and `useNotificationStore.getState().addNotification` (in-app). This ensures the user sees the signal regardless of OS notification preferences.
 
 ---
 
