@@ -1,70 +1,19 @@
 {
-  "languages": ["TypeScript", "JavaScript", "TSX"],
+  "languages": ["javascript", "typescript"],
   "build": {
-    "tool": "electron-vite",
-    "commands": {
-      "app": "npm run build",
-      "extensions_only": "npm run build:extensions",
-      "dev": "npm run dev",
-      "preview": "npm run preview",
-      "package_mac": "npm run package",
-      "typecheck": "npm run typecheck"
-    },
-    "note": "npm run build runs build:extensions (node scripts/build-extensions.cjs) then electron-vite build"
+    "commands": ["npm run build"]
   },
   "test": {
-    "runner": "vitest",
-    "commands": {
-      "run_with_coverage": "npm test",
-      "watch": "npm run test:watch",
-      "coverage_junit": "npm run test:coverage",
-      "e2e": "npm run test:e2e"
-    },
-    "e2e_runner": "Playwright",
-    "coverage_provider": "v8",
-    "coverage_thresholds": {
-      "lines": 80,
-      "functions": 80,
-      "branches": 80,
-      "statements": 80
-    },
-    "config": "vitest.config.ts"
+    "commands": ["npm test"],
+    "command": "npm test"
   },
   "lint": {
-    "tool": "ESLint",
-    "commands": {
-      "lint": "npm run lint"
-    },
-    "config": ".eslintrc.json",
-    "plugins": ["@typescript-eslint", "react-hooks", "eslint-config-prettier"],
-    "pre_commit": "lint-staged (via husky)"
+    "commands": ["npm run lint"],
+    "command": "npm run lint"
   },
   "format": {
-    "tool": "Prettier",
-    "commands": {
-      "write": "npm run format",
-      "check": "npm run format:check"
-    },
-    "config": ".prettierrc.json"
+    "commands": ["npm run format"]
   },
-  "ci": {
-    "provider": "GitHub Actions",
-    "config_dir": ".github/workflows/",
-    "workflows": {
-      "ci": ".github/workflows/ci.yml",
-      "release": ".github/workflows/release.yml",
-      "notarize_test": ".github/workflows/notarize-test.yml",
-      "approve_pr": ".github/workflows/approve-pr.yml",
-      "fill_pr_description": ".github/workflows/fill-pr-description.yml"
-    },
-    "ci_jobs": [
-      "lint (npx eslint . --ext .ts,.tsx)",
-      "typecheck (npx tsc --noEmit)",
-      "format (npm run format:check)",
-      "test (npm run test:coverage)",
-      "build (npm run build)"
-    ],
-    "triggers": ["push to main", "pull_request to main"]
-  },
-  "detected_at_commit": "3c3990600a9ac5000378fcb6cc447b4985581ca2"
+  "detected_at_commit": "9be72af",
+  "detected_at": "2026-05-31T03:14:27Z"
 }
