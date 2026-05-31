@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useSessionStore } from '../../stores/session.store'
-import type { TerminalInstance } from './TerminalSession'
 import type { PaneNode } from '../../../../shared/types/index'
 import { SplitContainer } from './SplitContainer'
 import { LeafPane } from './LeafPane'

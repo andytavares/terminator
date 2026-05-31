@@ -5,7 +5,6 @@ import type {
   Project,
   ProcessMetrics,
 } from '../../../../shared/types/index'
-import type { TerminalInstance } from '../terminal/TerminalSession'
 import { ActivitySpinner } from '../ActivitySpinner'
 import { useSessionStore } from '../../stores/session.store'
 import './SessionTile.css'

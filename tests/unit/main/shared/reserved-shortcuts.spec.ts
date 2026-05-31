@@ -4,11 +4,22 @@ import { RESERVED_SHORTCUTS } from '../../../../src/main/shared/reserved-shortcu
 describe('RESERVED_SHORTCUTS', () => {
   it('contains all expected core accelerators', () => {
     const expected = [
-      'CmdOrCtrl+1', 'CmdOrCtrl+2', 'CmdOrCtrl+3', 'CmdOrCtrl+4',
-      'CmdOrCtrl+5', 'CmdOrCtrl+6', 'CmdOrCtrl+7', 'CmdOrCtrl+8',
-      'CmdOrCtrl+9', 'CmdOrCtrl+=', 'CmdOrCtrl+-',
-      'CmdOrCtrl+Left', 'CmdOrCtrl+Right',
-      'CmdOrCtrl+T', 'CmdOrCtrl+W', 'CmdOrCtrl+,',
+      'CmdOrCtrl+1',
+      'CmdOrCtrl+2',
+      'CmdOrCtrl+3',
+      'CmdOrCtrl+4',
+      'CmdOrCtrl+5',
+      'CmdOrCtrl+6',
+      'CmdOrCtrl+7',
+      'CmdOrCtrl+8',
+      'CmdOrCtrl+9',
+      'CmdOrCtrl+=',
+      'CmdOrCtrl+-',
+      'CmdOrCtrl+Left',
+      'CmdOrCtrl+Right',
+      'CmdOrCtrl+T',
+      'CmdOrCtrl+W',
+      'CmdOrCtrl+,',
     ]
     for (const acc of expected) {
       expect(RESERVED_SHORTCUTS.has(acc), `${acc} should be reserved`).toBe(true)

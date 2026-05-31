@@ -5,10 +5,7 @@ import { useNotificationStore } from '../stores/notification.store'
 import { TerminalInstance } from '../components/terminal/TerminalSession'
 import type { PaneSplitDirection } from '../../../shared/types/index'
 
-function makeBellHandler(
-  sessionId: string,
-  incrementBellCount: (id: string) => void
-): () => void {
+function makeBellHandler(sessionId: string, incrementBellCount: (id: string) => void): () => void {
   return () => {
     const { activeProjectId } = useWorkspaceStore.getState()
     const { activeSessionIdByProject, sessions } = useSessionStore.getState()

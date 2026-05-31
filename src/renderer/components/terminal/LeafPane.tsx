@@ -1,6 +1,5 @@
 import React, { useRef, useLayoutEffect, useCallback } from 'react'
 import { useSessionStore } from '../../stores/session.store'
-import type { TerminalInstance } from './TerminalSession'
 import './LeafPane.css'
 
 interface Props {

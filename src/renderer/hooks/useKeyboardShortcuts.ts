@@ -19,13 +19,8 @@ export function useKeyboardShortcuts({
   onOpenCommandPalette,
   onToggleOverview,
 }: Options = {}): void {
-  const {
-    workspaces,
-    activeWorkspaceId,
-    setActiveWorkspace,
-    activeProjectId,
-    resolveActiveCwd,
-  } = useWorkspaceStore()
+  const { workspaces, activeWorkspaceId, setActiveWorkspace, activeProjectId, resolveActiveCwd } =
+    useWorkspaceStore()
   const {
     getActiveSessionForProject,
     setActiveSessionForProject,

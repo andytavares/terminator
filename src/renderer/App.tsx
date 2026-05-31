@@ -87,13 +87,7 @@ export function App(): JSX.Element {
     const settings = resolveSettings(activeWorkspaceId)
     const cwd = resolveActiveCwd()
     void createSession(activeProjectId, 'human', '', cwd, settings.terminal.scrollbackLimit)
-  }, [
-    activeProjectId,
-    activeWorkspaceId,
-    resolveSettings,
-    resolveActiveCwd,
-    createSession,
-  ])
+  }, [activeProjectId, activeWorkspaceId, resolveSettings, resolveActiveCwd, createSession])
   useKeyboardShortcuts({
     onOpenSettings: handleOpenSettings,
     onToggleLog: handleToggleLog,
