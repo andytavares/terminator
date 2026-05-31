@@ -610,4 +610,133 @@ describe('App', () => {
     fireEvent.click(screen.getByText('Open Settings'))
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
   })
+
+  describe('menu:close-tab (onMenuCloseTab)', () => {
+    it('calls closeSession with active session id when active project has an active session', async () => {
+      const mockCloseSession = vi.fn().mockResolvedValue(undefined)
+      vi.mocked(useSessionStore).mockReturnValue({
+        handleProcessExit: mockHandleProcessExit,
+        getSessionsForProject: vi.fn().mockReturnValue([]),
+        closeSession: mockCloseSession,
+        activeSessionIdByProject: new Map([['proj-1', 'ses-active']]),
+      } as unknown as ReturnType<typeof useSessionStore>)
+      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+      vi.mocked(useSessionStore).mockReturnValue({
+        handleProcessExit: mockHandleProcessExit,
+        getSessionsForProject: vi.fn().mockReturnValue([]),
+        closeSession: mockCloseSession,
+        activeSessionIdByProject: new Map([['proj-1', 'ses-active']]),
+      } as unknown as ReturnType<typeof useSessionStore>)
+
+      let closeTabCallback: (() => void) | null = null
+      ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+        terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
+        extensionEvents: {
+          onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
+          onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
+          onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
+          onToast: vi.fn().mockReturnValue(vi.fn()),
+          onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
+          onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
+          onMenuCloseTab: (cb: () => void) => {
+            closeTabCallback = cb
+            return vi.fn()
+          },
+        },
+        notifications: {
+          list: vi.fn().mockResolvedValue([]),
+          dismiss: vi.fn().mockResolvedValue({ ok: true }),
+          onPush: vi.fn().mockReturnValue(mockUnsubscribe),
+        },
+        extensionBridge: {
+          on: vi.fn().mockReturnValue(mockUnsubscribe),
+          invoke: vi.fn().mockResolvedValue({}),
+        },
+      }
+      render(<App />)
+      closeTabCallback?.()
+      await waitFor(() => expect(mockCloseSession).toHaveBeenCalledWith('ses-active'))
+    })
+
+    it('does not crash when onMenuCloseTab fires and there is no active project', async () => {
+      const mockCloseSession = vi.fn().mockResolvedValue(undefined)
+      setupMocks({ activeProjectId: null, activeWorkspaceId: null })
+      vi.mocked(useSessionStore).mockReturnValue({
+        handleProcessExit: mockHandleProcessExit,
+        getSessionsForProject: vi.fn().mockReturnValue([]),
+        closeSession: mockCloseSession,
+        activeSessionIdByProject: new Map(),
+      } as unknown as ReturnType<typeof useSessionStore>)
+
+      let closeTabCallback: (() => void) | null = null
+      ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+        terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
+        extensionEvents: {
+          onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
+          onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
+          onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
+          onToast: vi.fn().mockReturnValue(vi.fn()),
+          onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
+          onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
+          onMenuCloseTab: (cb: () => void) => {
+            closeTabCallback = cb
+            return vi.fn()
+          },
+        },
+        notifications: {
+          list: vi.fn().mockResolvedValue([]),
+          dismiss: vi.fn().mockResolvedValue({ ok: true }),
+          onPush: vi.fn().mockReturnValue(mockUnsubscribe),
+        },
+        extensionBridge: {
+          on: vi.fn().mockReturnValue(mockUnsubscribe),
+          invoke: vi.fn().mockResolvedValue({}),
+        },
+      }
+      render(<App />)
+      expect(() => closeTabCallback?.()).not.toThrow()
+      expect(mockCloseSession).not.toHaveBeenCalled()
+    })
+
+    it('does not call closeSession when active project has no active session', async () => {
+      const mockCloseSession = vi.fn().mockResolvedValue(undefined)
+      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+      vi.mocked(useSessionStore).mockReturnValue({
+        handleProcessExit: mockHandleProcessExit,
+        getSessionsForProject: vi.fn().mockReturnValue([]),
+        closeSession: mockCloseSession,
+        // proj-1 has no active session mapped
+        activeSessionIdByProject: new Map(),
+      } as unknown as ReturnType<typeof useSessionStore>)
+
+      let closeTabCallback: (() => void) | null = null
+      ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+        terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
+        extensionEvents: {
+          onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
+          onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
+          onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
+          onToast: vi.fn().mockReturnValue(vi.fn()),
+          onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
+          onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
+          onMenuCloseTab: (cb: () => void) => {
+            closeTabCallback = cb
+            return vi.fn()
+          },
+        },
+        notifications: {
+          list: vi.fn().mockResolvedValue([]),
+          dismiss: vi.fn().mockResolvedValue({ ok: true }),
+          onPush: vi.fn().mockReturnValue(mockUnsubscribe),
+        },
+        extensionBridge: {
+          on: vi.fn().mockReturnValue(mockUnsubscribe),
+          invoke: vi.fn().mockResolvedValue({}),
+        },
+      }
+      render(<App />)
+      closeTabCallback?.()
+      expect(mockCloseSession).not.toHaveBeenCalled()
+    })
+  })
 })
