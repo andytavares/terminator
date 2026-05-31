@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Read(./**)",
+      "Edit(./**)",
+      "Write(./**)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git blame:*)",
+      "Bash(rg:*)",
+      "Bash(scc:*)",
+      "Bash(tokei:*)",
+      "Bash(cloc:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run test)",
+      "Bash(npm run test:*)",
+      "Bash(npm run build)",
+      "Bash(pytest:*)",
+      "Bash(go test:*)",
+      "Bash(cargo test:*)",
+      "Bash(bazel query:*)",
+      "Bash(bazel info:*)",
+      "Bash(bazel analyze-profile:*)",
+      "Bash(./scripts/detect-stack.sh)",
+      "Bash(./scripts/run-tests.sh:*)",
+      "Bash(./scripts/format.sh)"
+    ],
+    "deny": [
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(rm -rf *)",
+      "Bash(git push:*)",
+      "Bash(git reset --hard *)",
+      "Bash(npm publish:*)",
+      "Bash(pip install *)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(./**/*.pem)",
+      "Read(./**/id_rsa)"
+    ],
+    "ask": ["Bash(git commit:*)", "Bash(git checkout:*)", "Bash(git branch:*)"]
+  },
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": ".claude/hooks/session-start.sh" }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": ".claude/hooks/prompt-augment.sh" }] }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": ".claude/hooks/pre-edit-guard.sh" }]
+      }
+    ],
+    "PostCompact": [
+      { "hooks": [{ "type": "command", "command": ".claude/hooks/post-compact.sh" }] }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": ".claude/hooks/post-edit-format.sh" },
+          { "type": "command", "command": ".claude/hooks/post-edit-doc-mark.sh" }
+        ]
+      }
+    ]
+  }
+}
