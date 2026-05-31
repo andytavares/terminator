@@ -264,7 +264,8 @@ export function registerVaultIpcHandlers(): () => void {
           `SELECT t.id, t.text, p.name AS project, t.context, a.name AS area, t.due_date, t.project_id, t.area_id
            FROM tasks t ${TASK_JOINS}
            WHERE t.source='daily' AND t.source_ref < ? AND t.source_ref IS NOT NULL
-             AND t.status IN ('open','in-progress') AND t.parent_id IS NULL`
+             AND t.status IN ('open','in-progress','blocked') AND t.parent_id IS NULL
+             AND json_extract(t.metadata, '$.recurrence_interval') IS NULL`
         )
         .all(date) as Record<string, unknown>[]
 

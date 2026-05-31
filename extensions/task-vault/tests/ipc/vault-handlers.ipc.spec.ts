@@ -343,12 +343,36 @@ describe('task-vault:vault:get-today', () => {
     const staleRow = makeTaskRow({ source: 'daily', source_ref: '2026-05-01', status: 'open' })
     mockAll
       .mockReturnValueOnce([staleRow]) // rollover: one stale task found
-      .mockReturnValueOnce([]) // main task fetch (after rollover inserts)
-      .mockReturnValueOnce([]) // subtasks
+      .mockReturnValueOnce([]) // main task fetch (no tasks → no subtask fetch)
     const handler = getHandler('task-vault:vault:get-today')
     const result = (await handler({}, undefined)) as Record<string, unknown>
     expect(result.rolledOver).toBe(1)
     expect(mockRun).toHaveBeenCalled()
+  })
+
+  it('rolls over stale blocked tasks from past daily logs', async () => {
+    const staleRow = makeTaskRow({
+      source: 'daily',
+      source_ref: '2026-05-01',
+      status: 'blocked',
+      metadata: '{"blocked_reason":"Waiting on design"}',
+    })
+    mockAll
+      .mockReturnValueOnce([staleRow]) // rollover: one blocked stale task
+      .mockReturnValueOnce([]) // main task fetch (no tasks → no subtask fetch)
+    const handler = getHandler('task-vault:vault:get-today')
+    const result = (await handler({}, undefined)) as Record<string, unknown>
+    expect(result.rolledOver).toBe(1)
+  })
+
+  it('does not roll over stale recurring tasks', async () => {
+    // Recurring tasks are excluded by the SQL — mockAll returns empty to simulate that
+    mockAll
+      .mockReturnValueOnce([]) // rollover: no rows (recurring task filtered by SQL)
+      .mockReturnValueOnce([]) // main task fetch
+    const handler = getHandler('task-vault:vault:get-today')
+    const result = (await handler({}, undefined)) as Record<string, unknown>
+    expect(result.rolledOver).toBe(0)
   })
 
   it('returns error string when db throws', async () => {

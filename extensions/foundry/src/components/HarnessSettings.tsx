@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { X, Check, AlertCircle } from 'lucide-react'
 import './foundry.css'
 import type { Harness, Sensor } from '../types/foundry.types'
 
@@ -73,7 +74,7 @@ export function HarnessSettings({ repoRoot, onClose }: Props) {
       <div className="fnd-wizard-header">
         <span className="fnd-wizard-title">Foundry settings</span>
         <button className="fnd-wizard-close" onClick={onClose}>
-          ×
+          <X size={14} />
         </button>
       </div>
 
@@ -209,12 +210,8 @@ function SensorsPanel({
     onSave({ ...harness, sensors })
   }
 
-  const statusColor = {
-    checking: 'var(--tm-accent)',
-    pass: 'var(--tm-success)',
-    fail: 'var(--tm-danger)',
-  }
-  const statusLabel = { checking: 'checking…', pass: '✓ passing', fail: '✗ failing' }
+  const statusIcon = { pass: <Check size={11} />, fail: <AlertCircle size={11} />, checking: null }
+  const statusLabel = { checking: 'checking…', pass: 'passing', fail: 'failing' }
 
   return (
     <div>
@@ -228,7 +225,8 @@ function SensorsPanel({
               {s.name || `sensor ${i + 1}`}
             </span>
             {checking[i] && (
-              <span style={{ fontSize: 10, color: statusColor[checking[i]] }}>
+              <span style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                {statusIcon[checking[i]]}
                 {statusLabel[checking[i]]}
               </span>
             )}
@@ -248,7 +246,7 @@ function SensorsPanel({
                 borderRadius: 'var(--tm-radius-xs)',
               }}
             >
-              ×
+              <X size={11} />
             </button>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -479,14 +477,29 @@ interface ProviderConfig {
   requestDelayMs?: number
 }
 
-type ProviderType = 'claude' | 'openai' | 'gemini' | 'ollama'
+type ProviderType = 'claude-code' | 'claude' | 'openai' | 'gemini' | 'ollama'
 
 const PROVIDER_DEFAULTS: Record<
   ProviderType,
-  { label: string; model: string; streaming: boolean; needsKey: boolean; needsEndpoint: boolean }
+  {
+    label: string
+    model: string
+    streaming: boolean
+    needsKey: boolean
+    needsEndpoint: boolean
+    note?: string
+  }
 > = {
+  'claude-code': {
+    label: 'Claude Code (claude -p)',
+    model: '',
+    streaming: true,
+    needsKey: false,
+    needsEndpoint: false,
+    note: 'Uses your locally installed Claude Code CLI. No API key required — authentication is handled by the CLI.',
+  },
   claude: {
-    label: 'Claude (Anthropic)',
+    label: 'Claude (Anthropic API)',
     model: 'claude-sonnet-4-6',
     streaming: true,
     needsKey: true,
@@ -516,6 +529,7 @@ const PROVIDER_DEFAULTS: Record<
 }
 
 const MODELS: Record<ProviderType, string[]> = {
+  'claude-code': ['claude-sonnet-4-6', 'claude-opus-4-8', 'claude-haiku-4-5-20251001'],
   claude: ['claude-sonnet-4-6', 'claude-opus-4-7', 'claude-haiku-4-5'],
   openai: ['gpt-4o', 'gpt-4o-mini', 'o1'],
   gemini: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash'],
@@ -702,9 +716,10 @@ function ProvidersPanel({ repoRoot }: { repoRoot: string }) {
               </span>
               {tr && (
                 <span
-                  style={{ fontSize: 10, color: tr.ok ? 'var(--tm-success)' : 'var(--tm-danger)' }}
+                  style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 3 }}
                 >
-                  {tr.ok ? `✓ connected ${tr.latencyMs}ms` : '✗ failed'}
+                  {tr.ok ? <Check size={11} /> : <AlertCircle size={11} />}
+                  {tr.ok ? `connected ${tr.latencyMs}ms` : 'failed'}
                 </span>
               )}
               <button
@@ -726,7 +741,7 @@ function ProvidersPanel({ repoRoot }: { repoRoot: string }) {
                   lineHeight: 1,
                 }}
               >
-                ×
+                <X size={11} />
               </button>
             </div>
             <div
@@ -741,7 +756,9 @@ function ProvidersPanel({ repoRoot }: { repoRoot: string }) {
               <span>{p.model}</span>
               {p.endpoint && <span>{p.endpoint}</span>}
               {p.keychainKey && (
-                <span style={{ color: 'var(--tm-success)' }}>key stored in keychain ✓</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  key stored in keychain <Check size={11} />
+                </span>
               )}
               <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
                 {p.requestDelayMs ? (
@@ -802,8 +819,8 @@ function ProvidersPanel({ repoRoot }: { repoRoot: string }) {
                 >
                   {PROVIDER_DEFAULTS[type].label}
                   {already && (
-                    <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--tm-success)' }}>
-                      ✓
+                    <span style={{ marginLeft: 'auto', display: 'flex' }}>
+                      <Check size={11} />
                     </span>
                   )}
                 </button>
@@ -837,6 +854,29 @@ function AddProviderForm({
   const [endpoint, setEndpoint] = useState(type === 'ollama' ? 'http://localhost:11434' : '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [ollamaModels, setOllamaModels] = useState<string[]>([])
+  const [fetchingModels, setFetchingModels] = useState(false)
+
+  async function fetchOllamaModels(ep: string) {
+    if (!ep.trim()) return
+    setFetchingModels(true)
+    try {
+      const res = await fetch(`${ep.replace(/\/$/, '')}/api/tags`)
+      if (!res.ok) return
+      const data = (await res.json()) as { models?: Array<{ name: string }> }
+      const names = (data.models ?? []).map((m) => m.name).filter(Boolean)
+      setOllamaModels(names)
+      if (names.length > 0 && !names.includes(model)) setModel(names[0])
+    } catch {
+      /* Ollama not running or wrong endpoint */
+    } finally {
+      setFetchingModels(false)
+    }
+  }
+
+  React.useEffect(() => {
+    if (type === 'ollama') void fetchOllamaModels(endpoint)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save() {
     setSaving(true)
@@ -866,9 +906,7 @@ function AddProviderForm({
   }
 
   const canSave =
-    (!defaults.needsKey || apiKey.trim()) &&
-    (!defaults.needsEndpoint || endpoint.trim()) &&
-    model.trim()
+    (!defaults.needsKey || apiKey.trim()) && (!defaults.needsEndpoint || endpoint.trim())
 
   return (
     <div
@@ -886,23 +924,13 @@ function AddProviderForm({
         Add {defaults.label}
       </div>
 
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 11, color: 'var(--tm-text-secondary)', marginBottom: 4 }}>
-          Model
-        </div>
-        <select
-          className="fnd-editor-select"
-          style={{ width: '100%' }}
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
+      {defaults.note && (
+        <div
+          style={{ fontSize: 11, color: 'var(--tm-text-muted)', marginBottom: 12, lineHeight: 1.5 }}
         >
-          {MODELS[type].map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
-      </div>
+          {defaults.note}
+        </div>
+      )}
 
       {defaults.needsKey && (
         <div style={{ marginBottom: 10 }}>
@@ -929,15 +957,64 @@ function AddProviderForm({
           <div style={{ fontSize: 11, color: 'var(--tm-text-secondary)', marginBottom: 4 }}>
             Endpoint
           </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              className="fnd-sensor-cmd-input"
+              style={{ flex: 1 }}
+              value={endpoint}
+              onChange={(e) => setEndpoint(e.target.value)}
+              placeholder="http://localhost:11434"
+            />
+            {type === 'ollama' && (
+              <button
+                className="fnd-btn fnd-btn--secondary fnd-btn--sm"
+                style={{ flexShrink: 0 }}
+                disabled={fetchingModels}
+                onClick={() => void fetchOllamaModels(endpoint)}
+              >
+                {fetchingModels ? '…' : 'Fetch models'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: 'var(--tm-text-secondary)', marginBottom: 4 }}>
+          {type === 'ollama'
+            ? ollamaModels.length > 0
+              ? `Model — ${ollamaModels.length} local model${ollamaModels.length !== 1 ? 's' : ''} found`
+              : 'Model (enter endpoint above and click Fetch models)'
+            : !defaults.needsKey && !defaults.needsEndpoint
+              ? 'Model (optional — leave blank to use CLI default)'
+              : 'Model'}
+        </div>
+        {type === 'ollama' && ollamaModels.length === 0 ? (
           <input
             className="fnd-sensor-cmd-input"
             style={{ width: '100%' }}
-            value={endpoint}
-            onChange={(e) => setEndpoint(e.target.value)}
-            placeholder="http://localhost:11434"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder="e.g. llama3:latest"
           />
-        </div>
-      )}
+        ) : (
+          <select
+            className="fnd-editor-select"
+            style={{ width: '100%' }}
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+          >
+            {!defaults.needsKey && !defaults.needsEndpoint && (
+              <option value="">Default (use CLI / harness setting)</option>
+            )}
+            {(type === 'ollama' ? ollamaModels : MODELS[type]).map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
       {error && (
         <div

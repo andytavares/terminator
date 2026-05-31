@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react'
 import type { Project } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
+import { useExtensionRegistry } from '../../extensions/registry'
 import { AlertBadge } from '../AlertBadge'
 import { ActivitySpinner } from '../ActivitySpinner'
 import { ConfirmDialog } from '../ConfirmDialog'
@@ -16,6 +17,7 @@ interface Props {
 export function ProjectsPanel({ workspaceId }: Props): JSX.Element {
   const [createOpen, setCreateOpen] = useState(false)
   const { workspaces, projectsByWorkspaceId } = useWorkspaceStore()
+  const sidebarButtons = useExtensionRegistry((s) => s.sidebarButtons)
 
   const workspace = workspaces.find((w) => w.id === workspaceId)
   const projects = projectsByWorkspaceId.get(workspaceId) ?? []
@@ -57,6 +59,22 @@ export function ProjectsPanel({ workspaceId }: Props): JSX.Element {
         <span>+</span>
         <span>New project</span>
       </button>
+
+      {sidebarButtons.length > 0 && (
+        <div className="projects-panel__ext-buttons">
+          {sidebarButtons.map((btn) => (
+            <button
+              key={btn.id}
+              className="projects-panel__ext-btn"
+              onClick={btn.action}
+              title={btn.label}
+            >
+              {btn.icon && <span className="projects-panel__ext-btn-icon">{btn.icon}</span>}
+              <span>{btn.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {createOpen && (
         <CreateProjectDialog workspaceId={workspaceId} onClose={() => setCreateOpen(false)} />

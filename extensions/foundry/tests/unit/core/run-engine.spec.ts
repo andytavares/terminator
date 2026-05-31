@@ -42,6 +42,24 @@ function setupDefaultMocks() {
   vi.mocked(histMod.appendHistoryEntry).mockResolvedValue(undefined)
 }
 
+/** Helper: build required new params for createSpecToCodeRun */
+function runParams(
+  dir: string,
+  overrides: Partial<Parameters<typeof createSpecToCodeRun>[0]> = {}
+) {
+  return {
+    workspaceRoot: dir,
+    harness: DEFAULT_HARNESS,
+    providerId: 'p1',
+    model: 'claude',
+    prompt: 'Build auth',
+    baseBranch: 'main',
+    featureBranch: 'fix/auth',
+    worktreePath: path.join(dir, '.worktrees', 'fix-auth'),
+    ...overrides,
+  }
+}
+
 describe('createSpecToCodeRun()', () => {
   let dir: string
   let cleanup: () => Promise<void>
@@ -54,26 +72,22 @@ describe('createSpecToCodeRun()', () => {
   afterEach(async () => cleanup())
 
   it('returns run with UUID and running status', async () => {
-    const result = await createSpecToCodeRun({
-      workspaceRoot: dir,
-      harness: DEFAULT_HARNESS,
-      providerId: 'p1',
-      model: 'claude',
-      prompt: 'Build auth',
-    })
+    const result = await createSpecToCodeRun(runParams(dir))
     if ('error' in result) throw new Error(result.error)
     expect(result.run.id).toMatch(/^[0-9a-f-]{36}$/)
     expect(result.run.status).toBe('running')
   })
 
+  it('sets baseBranch, featureBranch, worktreePath on the run', async () => {
+    const result = await createSpecToCodeRun(runParams(dir))
+    if ('error' in result) throw new Error(result.error)
+    expect(result.run.baseBranch).toBe('main')
+    expect(result.run.featureBranch).toBe('fix/auth')
+    expect(result.run.worktreePath).toContain('.worktrees')
+  })
+
   it('calls createCheckpoint when autoCheckpointBeforeRun is true', async () => {
-    await createSpecToCodeRun({
-      workspaceRoot: dir,
-      harness: DEFAULT_HARNESS,
-      providerId: 'p1',
-      model: 'claude',
-      prompt: 'Build auth',
-    })
+    await createSpecToCodeRun(runParams(dir))
     expect(vi.mocked(gitMod.createCheckpoint)).toHaveBeenCalledOnce()
   })
 
@@ -82,13 +96,7 @@ describe('createSpecToCodeRun()', () => {
       isDirty: true,
       modifiedFiles: ['src/foo.ts'],
     })
-    const result = await createSpecToCodeRun({
-      workspaceRoot: dir,
-      harness: DEFAULT_HARNESS,
-      providerId: 'p1',
-      model: 'claude',
-      prompt: 'Build auth',
-    })
+    const result = await createSpecToCodeRun(runParams(dir))
     expect(result).toHaveProperty('error')
     expect((result as { error: string }).error).toContain('dirty')
   })
@@ -102,25 +110,13 @@ describe('createSpecToCodeRun()', () => {
       ...DEFAULT_HARNESS,
       gateDefaults: { ...DEFAULT_HARNESS.gateDefaults, requireCleanWorkingTree: false },
     }
-    const result = await createSpecToCodeRun({
-      workspaceRoot: dir,
-      harness,
-      providerId: 'p1',
-      model: 'claude',
-      prompt: 'Build auth',
-    })
+    const result = await createSpecToCodeRun(runParams(dir, { harness }))
     expect(result).not.toHaveProperty('error')
   })
 
   it('returns error when createCheckpoint fails', async () => {
     vi.mocked(gitMod.createCheckpoint).mockResolvedValueOnce({ error: 'git failure' })
-    const result = await createSpecToCodeRun({
-      workspaceRoot: dir,
-      harness: DEFAULT_HARNESS,
-      providerId: 'p1',
-      model: 'claude',
-      prompt: 'Build auth',
-    })
+    const result = await createSpecToCodeRun(runParams(dir))
     expect(result).toHaveProperty('error')
     expect((result as { error: string }).error).toContain('git failure')
   })
@@ -138,13 +134,7 @@ describe('gateDecide()', () => {
   afterEach(async () => cleanup())
 
   async function makeActiveRun() {
-    const r = await createSpecToCodeRun({
-      workspaceRoot: dir,
-      harness: DEFAULT_HARNESS,
-      providerId: 'p1',
-      model: 'claude',
-      prompt: 'Build auth',
-    })
+    const r = await createSpecToCodeRun(runParams(dir))
     if ('error' in r) throw new Error(`makeActiveRun failed: ${r.error}`)
     return r.run
   }
@@ -156,14 +146,14 @@ describe('gateDecide()', () => {
     expect(vi.mocked(histMod.appendHistoryEntry)).toHaveBeenCalledOnce()
   })
 
-  it('reject: reverts files and writes rejected history entry', async () => {
+  it('reject: reverts files in worktree and writes rejected history entry', async () => {
     const run = await makeActiveRun()
     run.fileChanges = [
       { filePath: 'src/foo.ts', status: 'new', linesAdded: 10, linesRemoved: 0, unifiedDiff: '' },
     ]
     const result = await gateDecide(run, 'reject', undefined, dir, DEFAULT_HARNESS)
     expect(result.status).toBe('rejected')
-    expect(vi.mocked(gitMod.revertFiles)).toHaveBeenCalledWith(dir, ['src/foo.ts'])
+    expect(vi.mocked(gitMod.revertFiles)).toHaveBeenCalledWith(run.worktreePath, ['src/foo.ts'])
     expect(vi.mocked(histMod.appendHistoryEntry)).toHaveBeenCalledOnce()
   })
 
@@ -193,13 +183,7 @@ describe('gateDecide() edge cases', () => {
   afterEach(async () => cleanup())
 
   it('buildHistoryEntry handles run without completedAt (durationMs = 0)', async () => {
-    const r = await createSpecToCodeRun({
-      workspaceRoot: dir,
-      harness: DEFAULT_HARNESS,
-      providerId: 'p1',
-      model: 'claude',
-      prompt: 'test',
-    })
+    const r = await createSpecToCodeRun(runParams(dir))
     if ('error' in r) throw new Error(r.error)
     // completedAt is undefined at gate time — test that it doesn't throw
     delete (r.run as Partial<typeof r.run>).completedAt
@@ -220,18 +204,12 @@ describe('abortRun()', () => {
   afterEach(async () => cleanup())
 
   async function makeRun() {
-    const r = await createSpecToCodeRun({
-      workspaceRoot: dir,
-      harness: DEFAULT_HARNESS,
-      providerId: 'p1',
-      model: 'claude',
-      prompt: 'Build auth',
-    })
+    const r = await createSpecToCodeRun(runParams(dir))
     if ('error' in r) throw new Error(`makeRun failed: ${r.error}`)
     return r.run
   }
 
-  it('reverts all file changes and completes within 2000ms (SC-005)', async () => {
+  it('marks run as aborted without reverting worktree files', async () => {
     const run = await makeRun()
     run.fileChanges = [
       { filePath: 'src/a.ts', status: 'new', linesAdded: 5, linesRemoved: 0, unifiedDiff: '' },
@@ -239,12 +217,10 @@ describe('abortRun()', () => {
     ]
     vi.resetAllMocks()
     setupDefaultMocks()
-    const start = Date.now()
     const result = await abortRun(run, dir)
-    const elapsed = Date.now() - start
     expect(result.status).toBe('aborted')
-    expect(vi.mocked(gitMod.revertFiles)).toHaveBeenCalledWith(dir, ['src/a.ts', 'src/b.ts'])
-    expect(elapsed).toBeLessThan(2000)
+    // Worktree files are NOT reverted — the worktree stays intact for inspection
+    expect(vi.mocked(gitMod.revertFiles)).not.toHaveBeenCalled()
   })
 
   it('writes aborted history entry', async () => {
@@ -257,24 +233,21 @@ describe('abortRun()', () => {
     expect(entry.status).toBe('aborted')
   })
 
+  it('history entry includes featureBranch and worktreePath for later delete', async () => {
+    const run = await makeRun()
+    vi.resetAllMocks()
+    setupDefaultMocks()
+    await abortRun(run, dir)
+    const [, entry] = vi.mocked(histMod.appendHistoryEntry).mock.calls[0]
+    expect(entry.featureBranch).toBe(run.featureBranch)
+    expect(entry.worktreePath).toBe(run.worktreePath)
+  })
+
   it('second concurrent createSpecToCodeRun for same workspace returns error', async () => {
-    const r1 = await createSpecToCodeRun({
-      workspaceRoot: dir,
-      harness: DEFAULT_HARNESS,
-      providerId: 'p1',
-      model: 'claude',
-      prompt: 'Build auth',
-    })
+    const r1 = await createSpecToCodeRun(runParams(dir))
     if ('error' in r1) throw new Error(r1.error)
 
-    const r2 = await createSpecToCodeRun({
-      workspaceRoot: dir,
-      harness: DEFAULT_HARNESS,
-      providerId: 'p1',
-      model: 'claude',
-      prompt: 'Another run',
-      existingActiveRun: r1.run,
-    })
+    const r2 = await createSpecToCodeRun(runParams(dir, { existingActiveRun: r1.run }))
     expect(r2).toHaveProperty('error')
     expect((r2 as { error: string }).error).toContain('already active')
   })
@@ -292,13 +265,7 @@ describe('gateDecide() coverage gaps', () => {
   afterEach(async () => cleanup())
 
   it('request-changes with no note uses default feedback text', async () => {
-    const r = await createSpecToCodeRun({
-      workspaceRoot: dir,
-      harness: DEFAULT_HARNESS,
-      providerId: 'p1',
-      model: 'claude',
-      prompt: 'Build auth',
-    })
+    const r = await createSpecToCodeRun(runParams(dir))
     if ('error' in r) throw new Error(r.error)
     const result = await gateDecide(r.run, 'request-changes', undefined, dir, DEFAULT_HARNESS)
     expect(result.status).toBe('running')
@@ -306,14 +273,8 @@ describe('gateDecide() coverage gaps', () => {
     expect(result.currentIteration).toBe(2)
   })
 
-  it('abortRun with no fileChanges skips revert, handles undefined prompt', async () => {
-    const r = await createSpecToCodeRun({
-      workspaceRoot: dir,
-      harness: DEFAULT_HARNESS,
-      providerId: 'p1',
-      model: 'claude',
-      prompt: '',
-    })
+  it('abortRun with no fileChanges handles undefined prompt', async () => {
+    const r = await createSpecToCodeRun(runParams(dir, { prompt: '' }))
     if ('error' in r) throw new Error(r.error)
     r.run.fileChanges = []
     r.run.prompt = undefined

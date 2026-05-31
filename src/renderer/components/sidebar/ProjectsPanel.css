@@ -258,6 +258,46 @@
   background: var(--accent-dim);
 }
 
+/* ── Extension-contributed sidebar buttons ───────────────────── */
+.projects-panel__ext-buttons {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.projects-panel__ext-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.projects-panel__ext-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.projects-panel__ext-btn-icon {
+  display: flex;
+  align-items: center;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
 .proj-card__indicators {
   position: absolute;
   top: -4px;

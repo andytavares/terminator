@@ -9,13 +9,27 @@ export interface CreateRunParams {
   model: string
   prompt: string
   specPath?: string
+  baseBranch: string
+  featureBranch: string
+  worktreePath: string
   existingActiveRun?: Run | null
 }
 
 export async function createSpecToCodeRun(
   params: CreateRunParams
 ): Promise<{ run: Run } | { error: string }> {
-  const { workspaceRoot, harness, providerId, model, prompt, specPath, existingActiveRun } = params
+  const {
+    workspaceRoot,
+    harness,
+    providerId,
+    model,
+    prompt,
+    specPath,
+    baseBranch,
+    featureBranch,
+    worktreePath,
+    existingActiveRun,
+  } = params
 
   if (
     existingActiveRun &&
@@ -58,6 +72,9 @@ export async function createSpecToCodeRun(
     iterationLimit: harness.iterationLimit,
     iterations: [],
     fileChanges: [],
+    baseBranch,
+    featureBranch,
+    worktreePath,
   }
 
   return { run }
@@ -67,22 +84,23 @@ export async function gateDecide(
   run: Run,
   decision: GateDecision,
   note: string | undefined,
-  workspaceRoot: string,
+  _workspaceRoot: string,
   _harness: Harness
 ): Promise<Run> {
   if (decision === 'reject') {
+    // Revert files in the worktree so the branch is clean for inspection
     const filePaths = run.fileChanges.map((c) => c.filePath)
-    if (filePaths.length > 0) await revertFiles(workspaceRoot, filePaths)
+    if (filePaths.length > 0) await revertFiles(run.worktreePath, filePaths)
     run.status = 'rejected'
     run.completedAt = new Date().toISOString()
-    await writeHistory(run, decision, note, workspaceRoot)
+    await writeHistory(run, decision, note, _workspaceRoot)
     return run
   }
 
   if (decision === 'approve') {
     run.status = 'done'
     run.completedAt = new Date().toISOString()
-    await writeHistory(run, decision, note, workspaceRoot)
+    await writeHistory(run, decision, note, _workspaceRoot)
     return run
   }
 
@@ -96,8 +114,8 @@ export async function gateDecide(
 }
 
 export async function abortRun(run: Run, workspaceRoot: string): Promise<Run> {
-  const filePaths = run.fileChanges.map((c) => c.filePath)
-  if (filePaths.length > 0) await revertFiles(workspaceRoot, filePaths)
+  // Abort leaves the worktree intact — user can inspect it and explicitly delete later.
+  // We do NOT revert files or remove the worktree here.
   run.status = 'aborted'
   run.completedAt = new Date().toISOString()
   await appendHistoryEntry(workspaceRoot, buildHistoryEntry(run, 'aborted', []))
@@ -130,6 +148,10 @@ function buildHistoryEntry(
       : 0,
     createdAt: run.createdAt,
     completedAt: run.completedAt ?? now,
+    featureBranch: run.featureBranch,
+    baseBranch: run.baseBranch,
+    worktreePath: run.worktreePath,
+    terminalProjectId: run.terminalProjectId,
   }
 }
 

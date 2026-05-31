@@ -62,6 +62,66 @@ export async function revertFiles(
 
 // ─── Worktree management ──────────────────────────────────────────────────────
 
+export async function getDefaultBranch(workspaceRoot: string): Promise<string> {
+  // Try to find the default branch from the remote
+  try {
+    const { stdout } = await execAsync(
+      'git',
+      ['symbolic-ref', 'refs/remotes/origin/HEAD', '--short'],
+      { cwd: workspaceRoot }
+    )
+    return stdout.trim().replace(/^origin\//, '') || 'main'
+  } catch {
+    // No remote HEAD — fall back to common names
+    for (const name of ['main', 'master']) {
+      try {
+        await execAsync('git', ['rev-parse', '--verify', name], { cwd: workspaceRoot })
+        return name
+      } catch {
+        // try next
+      }
+    }
+    return 'main'
+  }
+}
+
+export async function getRemoteUrl(workspaceRoot: string): Promise<string | null> {
+  try {
+    const { stdout } = await execAsync('git', ['remote', 'get-url', 'origin'], {
+      cwd: workspaceRoot,
+    })
+    return stdout.trim() || null
+  } catch {
+    return null
+  }
+}
+
+export async function commitWorktreeChanges(
+  worktreePath: string,
+  message: string
+): Promise<{ ok: true; commitHash: string } | { error: string }> {
+  try {
+    await execAsync('git', ['add', '-A'], { cwd: worktreePath })
+    const { stdout } = await execAsync('git', ['commit', '-m', message], { cwd: worktreePath })
+    const match = stdout.match(/\[[\w/]+ ([0-9a-f]+)\]/)
+    return { ok: true, commitHash: match ? match[1] : 'unknown' }
+  } catch (err) {
+    return { error: String(err) }
+  }
+}
+
+export async function pushBranch(
+  workspaceRoot: string,
+  branch: string
+): Promise<{ ok: true } | { error: string }> {
+  try {
+    await execAsync('git', ['push', '-u', 'origin', branch], { cwd: workspaceRoot })
+    return { ok: true }
+  } catch (err) {
+    return { error: String(err) }
+  }
+}
+
 export async function mergeWorktreeBranch(
   workspaceRoot: string,
   branch: string
@@ -71,18 +131,6 @@ export async function mergeWorktreeBranch(
     return { ok: true }
   } catch (err) {
     return { error: String(err) }
-  }
-}
-
-async function symlinkIfAbsent(src: string, dest: string): Promise<void> {
-  try {
-    await fs.access(dest)
-  } catch {
-    try {
-      await fs.symlink(src, dest)
-    } catch {
-      /* src may not exist */
-    }
   }
 }
 
@@ -100,7 +148,7 @@ async function ensureGitignoreEntry(workspaceRoot: string, entry: string): Promi
   }
 }
 
-async function resolveUniqueWorktreePath(base: string): Promise<string> {
+async function _resolveUniqueWorktreePath(base: string): Promise<string> {
   try {
     await fs.access(base)
     // Exists — find the next available suffix
@@ -131,35 +179,37 @@ export async function createWorktree(
     // Ensure .worktrees/ is gitignored so it doesn't pollute `git status`
     await ensureGitignoreEntry(workspaceRoot, '.worktrees/')
 
+    // Abort early if the repo has no commits — HEAD is invalid and worktrees require a commit
+    try {
+      await execAsync('git', ['rev-parse', 'HEAD'], { cwd: workspaceRoot })
+    } catch {
+      return { error: 'Repository has no commits — make an initial commit before using worktrees' }
+    }
+
     const basePath = path.join(worktreesDir, slug)
-    const worktreePath = await resolveUniqueWorktreePath(basePath)
-    const resolvedSlug = path.basename(worktreePath)
-    const branch = `foundry/${resolvedSlug}`
+
+    // Find a slug/branch pair where neither the path nor the branch already exists
+    let worktreePath = basePath
+    let resolvedSlug = slug
+    let branch = `foundry/${slug}`
+    for (let i = 2; i <= 99; i++) {
+      const pathFree = await fs
+        .access(worktreePath)
+        .then(() => false)
+        .catch(() => true)
+      const branchResult = await execAsync('git', ['branch', '--list', branch], {
+        cwd: workspaceRoot,
+      }).catch(() => ({ stdout: '' }))
+      const branchFree = !branchResult.stdout.trim()
+      if (pathFree && branchFree) break
+      worktreePath = `${basePath}-${i}`
+      resolvedSlug = `${slug}-${i}`
+      branch = `foundry/${resolvedSlug}`
+    }
 
     await execAsync('git', ['worktree', 'add', '-b', branch, worktreePath, 'HEAD'], {
       cwd: workspaceRoot,
     })
-
-    // Symlink node_modules so npm scripts (lint, test, format) work without reinstalling
-    await symlinkIfAbsent(
-      path.join(workspaceRoot, 'node_modules'),
-      path.join(worktreePath, 'node_modules')
-    )
-    // Symlink extension-level node_modules (npm workspace packages)
-    try {
-      const extEntries = await fs.readdir(path.join(workspaceRoot, 'extensions'), {
-        withFileTypes: true,
-      })
-      for (const entry of extEntries) {
-        if (!entry.isDirectory()) continue
-        await symlinkIfAbsent(
-          path.join(workspaceRoot, 'extensions', entry.name, 'node_modules'),
-          path.join(worktreePath, 'extensions', entry.name, 'node_modules')
-        )
-      }
-    } catch {
-      /* extensions dir may not exist in all projects */
-    }
 
     return { worktreePath, branch, label: resolvedSlug }
   } catch (err) {
@@ -187,6 +237,65 @@ export async function removeWorktree(
   }
 }
 
+export async function listBranches(
+  workspaceRoot: string
+): Promise<{ branches: Array<{ name: string; current: boolean }> } | { error: string }> {
+  try {
+    const { stdout } = await execAsync('git', ['branch', '--list'], { cwd: workspaceRoot })
+    const lines = stdout.split('\n').filter((l) => l.trim())
+    const branches = lines.map((l) => ({
+      name: l.replace(/^\*\s*/, '').trim(),
+      current: l.startsWith('*'),
+    }))
+    // Current branch first, then alphabetical
+    branches.sort((a, b) => {
+      if (a.current) return -1
+      if (b.current) return 1
+      return a.name.localeCompare(b.name)
+    })
+    return { branches }
+  } catch (err) {
+    return { error: String(err) }
+  }
+}
+
+export async function createWorktreeFromBranch(
+  workspaceRoot: string,
+  featureBranch: string,
+  baseBranch: string
+): Promise<{ worktreePath: string; featureBranch: string } | { error: string }> {
+  try {
+    const worktreesDir = path.join(workspaceRoot, '.worktrees')
+    await fs.mkdir(worktreesDir, { recursive: true })
+    await ensureGitignoreEntry(workspaceRoot, '.worktrees/')
+
+    try {
+      await execAsync('git', ['rev-parse', 'HEAD'], { cwd: workspaceRoot })
+    } catch {
+      return { error: 'Repository has no commits — make an initial commit before using worktrees' }
+    }
+
+    // Fail fast if branch already exists — no silent suffix
+    const branchCheck = await execAsync('git', ['branch', '--list', featureBranch], {
+      cwd: workspaceRoot,
+    }).catch(() => ({ stdout: '' }))
+    if (branchCheck.stdout.trim()) {
+      return { error: `Branch "${featureBranch}" already exists — choose a different name` }
+    }
+
+    const slug = featureBranch.replace(/\//g, '-')
+    const worktreePath = path.join(worktreesDir, slug)
+
+    await execAsync('git', ['worktree', 'add', '-b', featureBranch, worktreePath, baseBranch], {
+      cwd: workspaceRoot,
+    })
+
+    return { worktreePath, featureBranch }
+  } catch (err) {
+    return { error: String(err) }
+  }
+}
+
 export async function getDiffForFile(
   workspaceRoot: string,
   filePath: string
@@ -197,17 +306,49 @@ export async function getDiffForFile(
       path.isAbsolute(filePath) && filePath.startsWith(workspaceRoot)
         ? filePath.slice(workspaceRoot.length).replace(/^[\\/]/, '')
         : filePath
-    const { stdout } = await execAsync('git', ['diff', 'HEAD', '--', relative], {
-      cwd: workspaceRoot,
-    })
-    if (!stdout.trim()) return { unifiedDiff: '', linesAdded: 0, linesRemoved: 0 }
+    let diffOut = ''
+    let headFailed = false
+    try {
+      const { stdout } = await execAsync('git', ['diff', 'HEAD', '--', relative], {
+        cwd: workspaceRoot,
+      })
+      diffOut = stdout
+    } catch {
+      // HEAD may not exist (no commits yet) — fall through to --no-index
+      headFailed = true
+    }
+
+    // For new/untracked files, git diff HEAD returns nothing; same when there's no HEAD yet.
+    // Fall back to --no-index to show the file as all-additions.
+    if (!diffOut.trim()) {
+      const absPath = path.isAbsolute(filePath) ? filePath : path.join(workspaceRoot, filePath)
+      try {
+        const { stdout } = await execAsync(
+          'git',
+          ['diff', '--no-index', '--', '/dev/null', absPath],
+          { cwd: workspaceRoot }
+        )
+        diffOut = stdout
+      } catch (noIndexErr) {
+        // git diff --no-index exits 1 when files differ — stdout still has the diff
+        const out = (noIndexErr as { stdout?: string }).stdout ?? ''
+        if (out.trim()) {
+          diffOut = out
+        } else if (headFailed) {
+          // Both commands failed with no output — genuine error (not a git repo, etc.)
+          return { error: String(noIndexErr) }
+        }
+      }
+    }
+
+    if (!diffOut.trim()) return { unifiedDiff: '', linesAdded: 0, linesRemoved: 0 }
     let added = 0
     let removed = 0
-    for (const line of stdout.split('\n')) {
+    for (const line of diffOut.split('\n')) {
       if (line.startsWith('+') && !line.startsWith('+++')) added++
       if (line.startsWith('-') && !line.startsWith('---')) removed++
     }
-    return { unifiedDiff: stdout, linesAdded: added, linesRemoved: removed }
+    return { unifiedDiff: diffOut, linesAdded: added, linesRemoved: removed }
   } catch (err) {
     return { error: String(err) }
   }

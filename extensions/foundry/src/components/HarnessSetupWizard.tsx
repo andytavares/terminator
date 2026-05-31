@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { X, Check, AlertCircle } from 'lucide-react'
 import './foundry.css'
 
 const TEMPLATES: Record<string, string> = {
@@ -95,7 +96,7 @@ export function HarnessSetupWizard({ repoRoot, onComplete, onCancel }: Props) {
     { name: 'lint', command: '', status: 'unchecked' },
     { name: 'test', command: '', status: 'unchecked' },
   ])
-  const [provider, setProvider] = useState('claude')
+  const [provider, setProvider] = useState('claude-code')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -182,7 +183,7 @@ export function HarnessSetupWizard({ repoRoot, onComplete, onCancel }: Props) {
       <div className="fnd-wizard-header">
         <span className="fnd-wizard-title">Set up your harness</span>
         <button className="fnd-wizard-close" onClick={onCancel}>
-          ×
+          <X size={14} />
         </button>
       </div>
 
@@ -200,7 +201,7 @@ export function HarnessSetupWizard({ repoRoot, onComplete, onCancel }: Props) {
             <React.Fragment key={s}>
               {i > 0 && <div className="fnd-step-line" />}
               <div className={cls}>
-                <div className="fnd-step-num">{isDone ? '✓' : i + 1}</div>
+                <div className="fnd-step-num">{isDone ? <Check size={12} /> : i + 1}</div>
                 <span>{STEP_LABELS[s]}</span>
               </div>
             </React.Fragment>
@@ -212,7 +213,9 @@ export function HarnessSetupWizard({ repoRoot, onComplete, onCancel }: Props) {
       <div className="fnd-wizard-body">
         {step === 'done' ? (
           <div className="fnd-done">
-            <div className="fnd-done-icon">✓</div>
+            <div className="fnd-done-icon">
+              <Check size={32} />
+            </div>
             <div className="fnd-done-title">Harness ready</div>
             <div className="fnd-done-sub">
               AGENTS.md and .foundry/harness.json
@@ -435,7 +438,7 @@ function SensorsStep({
                 borderRadius: 'var(--tm-radius-xs)',
               }}
             >
-              ×
+              <X size={11} />
             </button>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -466,18 +469,35 @@ function SensorsStep({
 }
 
 function SensorStatusBadge({ status }: { status: SensorStatus }) {
+  const sensorIcons: Partial<Record<SensorStatus, React.ReactElement>> = {
+    pass: <Check size={10} />,
+    fail: <AlertCircle size={10} />,
+  }
   const labels: Record<SensorStatus, string> = {
     unchecked: 'not checked',
     checking: 'checking…',
-    pass: '✓ ok',
-    fail: '✗ failed',
+    pass: 'ok',
+    fail: 'failed',
   }
-  return <span className={`fnd-sensor-status fnd-sensor-status--${status}`}>{labels[status]}</span>
+  return (
+    <span
+      className={`fnd-sensor-status fnd-sensor-status--${status}`}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}
+    >
+      {sensorIcons[status]}
+      {labels[status]}
+    </span>
+  )
 }
 
 function ProviderStep({ selected, onSelect }: { selected: string; onSelect: (p: string) => void }) {
   const providers = [
-    { id: 'claude', label: 'Claude (Anthropic)', note: 'API key required' },
+    {
+      id: 'claude-code',
+      label: 'Claude Code (claude -p)',
+      note: 'No API key — uses local CLI (recommended)',
+    },
+    { id: 'claude', label: 'Claude (Anthropic API)', note: 'API key required' },
     { id: 'openai', label: 'OpenAI', note: 'API key required' },
     { id: 'gemini', label: 'Gemini (Google)', note: 'API key required' },
     { id: 'ollama', label: 'Ollama (local)', note: 'No API key needed' },

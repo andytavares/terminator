@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { X, RotateCcw, Play } from 'lucide-react'
 import './foundry.css'
 import type { HistoryEntry, Run } from '../types/foundry.types'
 
@@ -64,6 +65,7 @@ interface RunRow {
   durationMs: number
   createdAt: string
   isActive: boolean
+  workspaceRoot?: string
   entry?: HistoryEntry
 }
 
@@ -101,6 +103,7 @@ function activeToRow(r: Run): RunRow {
     durationMs: Date.now() - new Date(r.createdAt).getTime(),
     createdAt: r.createdAt,
     isActive: true,
+    workspaceRoot: r.workspaceRoot,
   }
 }
 
@@ -111,8 +114,8 @@ function DetailPane({
   onClose,
 }: {
   row: RunRow
-  repoRoot: string
-  onRerun: (row: RunRow) => void
+  repoRoot: string | null
+  onRerun: (row: RunRow) => void | Promise<void>
   onClose: () => void
 }) {
   const e = row.entry
@@ -150,7 +153,7 @@ function DetailPane({
           }}
           onClick={onClose}
         >
-          ×
+          <X size={14} />
         </button>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: '10px 12px' }}>
@@ -281,15 +284,18 @@ function DetailPane({
         <button
           className="fnd-btn fnd-btn--primary fnd-btn--sm"
           style={{ flex: 1, fontSize: 11 }}
-          onClick={() => onRerun(row)}
+          onClick={() => void onRerun(row)}
         >
-          ↺ Re-run
+          <RotateCcw size={11} /> Re-run
         </button>
         <button
           className="fnd-btn fnd-btn--secondary fnd-btn--sm"
           style={{ flex: 1, fontSize: 11 }}
           onClick={() =>
-            void invoke('foundry:open-run-console', { runId: row.id, workspaceRoot: repoRoot })
+            void invoke('foundry:open-run-console', {
+              runId: row.id,
+              workspaceRoot: row.workspaceRoot ?? repoRoot,
+            })
           }
         >
           View console
@@ -311,32 +317,65 @@ export function HistoryView({ repoRoot, onNewRun }: Props) {
   const PAGE = 100
 
   async function load(off = 0, replace = true) {
-    if (!repoRoot) {
-      setLoading(false)
-      return
-    }
     setLoading(true)
     try {
-      // Load active runs first
-      const activeRes = await invoke('foundry:run-list', { workspaceRoot: repoRoot })
-      const activeRuns = ((activeRes.runs as Run[]) ?? []).filter(
-        (r) => r.status === 'running' || r.status === 'gate' || r.status === 'paused-error'
-      )
-      const activeRows = activeRuns.map(activeToRow)
-      const activeIds = new Set(activeRows.map((r) => r.id))
+      if (repoRoot) {
+        // Single-workspace mode
+        const activeRes = await invoke('foundry:run-list', { workspaceRoot: repoRoot })
+        const activeRuns = ((activeRes.runs as Run[]) ?? []).filter(
+          (r) => r.status === 'running' || r.status === 'gate' || r.status === 'paused-error'
+        )
+        const activeRows = activeRuns.map(activeToRow)
+        const activeIds = new Set(activeRows.map((r) => r.id))
 
-      // Load history (exclude IDs already shown as active)
-      const histRes = await invoke('foundry:history-load', {
-        workspaceRoot: repoRoot,
-        offset: off,
-        limit: PAGE,
-      })
-      const histEntries = (histRes.entries as HistoryEntry[]) ?? []
-      const histRows = histEntries.filter((e) => !activeIds.has(e.runId)).map(toRow)
+        const histRes = await invoke('foundry:history-load', {
+          workspaceRoot: repoRoot,
+          offset: off,
+          limit: PAGE,
+        })
+        const histEntries = (histRes.entries as HistoryEntry[]) ?? []
+        const histRows = histEntries.filter((e) => !activeIds.has(e.runId)).map(toRow)
 
-      setHasMore((histRes.hasMore as boolean) ?? false)
-      setOffset(off + histEntries.length)
-      setRows((prev) => (replace ? [...activeRows, ...histRows] : [...prev, ...histRows]))
+        setHasMore((histRes.hasMore as boolean) ?? false)
+        setOffset(off + histEntries.length)
+        setRows((prev) => (replace ? [...activeRows, ...histRows] : [...prev, ...histRows]))
+      } else {
+        // Global mode — aggregate history across all workspaces
+        const { workspaces } = await window.electronAPI.workspace.list()
+        const allRows: RunRow[] = []
+        for (const ws of workspaces as { folderPath: string }[]) {
+          if (!ws.folderPath) continue
+          try {
+            const activeRes = await invoke('foundry:run-list', { workspaceRoot: ws.folderPath })
+            const activeRuns = ((activeRes.runs as Run[]) ?? []).filter(
+              (r) => r.status === 'running' || r.status === 'gate' || r.status === 'paused-error'
+            )
+            // activeToRow sets workspaceRoot from r.workspaceRoot — preserve it so IPC calls work
+            allRows.push(...activeRuns.map((r) => activeToRow(r)))
+            // Proxy workspaces have no independent history — skip history load
+            if (activeRes.isWorktreeProxy) continue
+            const activeIds = new Set(activeRuns.map((r) => r.id))
+
+            const histRes = await invoke('foundry:history-load', {
+              workspaceRoot: ws.folderPath,
+              offset: 0,
+              limit: PAGE,
+            })
+            const histEntries = (histRes.entries as HistoryEntry[]) ?? []
+            allRows.push(
+              ...histEntries
+                .filter((e) => !activeIds.has(e.runId))
+                .map((e) => ({ ...toRow(e), workspaceRoot: ws.folderPath }))
+            )
+          } catch {
+            // workspace may not have foundry configured — skip
+          }
+        }
+        // Sort by most recent first
+        allRows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        setHasMore(false)
+        setRows(replace ? allRows : (prev) => [...prev, ...allRows])
+      }
     } finally {
       setLoading(false)
     }
@@ -348,7 +387,6 @@ export function HistoryView({ repoRoot, onNewRun }: Props) {
 
   // Refresh when run status changes (new run started, aborted, etc.)
   useEffect(() => {
-    if (!repoRoot) return
     const unsub = window.electronAPI.extensionBridge.on('foundry:run-status-changed', () => {
       void load(0, true)
     })
@@ -356,10 +394,15 @@ export function HistoryView({ repoRoot, onNewRun }: Props) {
   }, [repoRoot]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function deleteRow(id: string) {
-    if (!repoRoot) return
+    const row = rows.find((r) => r.id === id)
+    const ws = row?.workspaceRoot ?? repoRoot
+    if (!ws) return
     setDeletingId(id)
     try {
-      await invoke('foundry:run-dismiss', { runId: id, workspaceRoot: repoRoot })
+      // Active runs: dismiss (marks aborted, clears from memory, no git cleanup)
+      // History entries: delete (removes history.jsonl entry + git worktree/branch)
+      const channel = row?.isActive ? 'foundry:run-dismiss' : 'foundry:run-delete'
+      await invoke(channel, { runId: id, workspaceRoot: ws })
       setRows((prev) => prev.filter((r) => r.id !== id))
       if (selectedRow?.id === id) setSelectedRow(null)
     } finally {
@@ -368,23 +411,73 @@ export function HistoryView({ repoRoot, onNewRun }: Props) {
   }
 
   async function openRun(id: string) {
-    if (!repoRoot) return
-    await invoke('foundry:open-run-console', { runId: id, workspaceRoot: repoRoot })
+    const ws = rows.find((r) => r.id === id)?.workspaceRoot ?? repoRoot
+    if (!ws) return
+    await invoke('foundry:open-run-console', { runId: id, workspaceRoot: ws })
   }
 
-  function handleRerun(row: RunRow) {
-    // Dispatch event so FoundryPanel opens NewRunDialog pre-filled with this run's config
-    window.dispatchEvent(
-      new CustomEvent('foundry:rerun', {
-        detail: {
-          providerId: row.providerId,
-          model: row.model,
-          mode: row.mode,
-          specPath: row.specPath,
-          prompt: row.promptSummary,
-        },
-      })
-    )
+  async function handleRerun(row: RunRow) {
+    const ws = row.workspaceRoot ?? repoRoot
+    if (!ws) return
+
+    // For orchestrate runs: load saved subAgents so we skip replanning
+    let manualDag:
+      | Array<{ id: string; role: string; task: string; dependsOn: string[] }>
+      | undefined
+    if (row.mode === 'orchestrate') {
+      const r = await invoke('foundry:history-get-agents', { runId: row.id, workspaceRoot: ws })
+      const agents =
+        (r.subAgents as Array<{
+          agentId: string
+          role: string
+          task?: string
+          dependsOn: string[]
+        }>) ?? []
+      if (agents.length > 0) {
+        manualDag = agents.map((a) => ({
+          id: a.agentId,
+          role: a.role,
+          task: a.task ?? a.role,
+          dependsOn: a.dependsOn,
+        }))
+      }
+    }
+
+    const result = await invoke('foundry:run-start', {
+      workspaceRoot: ws,
+      mode: row.mode,
+      providerId: row.providerId,
+      model: row.model,
+      baseBranch: row.entry?.baseBranch ?? '',
+      featureBranch: row.entry?.featureBranch ?? '',
+      existingWorktreePath: row.entry?.worktreePath,
+      specPath: row.entry?.specPath,
+      prompt: row.promptSummary,
+      manualDag,
+    })
+
+    if ('error' in result) {
+      // Fall back to dialog if direct start fails (e.g. branch conflict)
+      window.dispatchEvent(
+        new CustomEvent('foundry:rerun', {
+          detail: {
+            providerId: row.providerId,
+            model: row.model,
+            mode: row.mode,
+            specPath: row.specPath,
+            prompt: row.promptSummary,
+            featureBranch: row.entry?.featureBranch,
+            baseBranch: row.entry?.baseBranch,
+            worktreePath: row.entry?.worktreePath,
+          },
+        })
+      )
+      onNewRun?.()
+      return
+    }
+
+    const newRunId = result.runId as string
+    await invoke('foundry:open-run-console', { runId: newRunId, workspaceRoot: ws })
     onNewRun?.()
   }
 
@@ -482,7 +575,7 @@ export function HistoryView({ repoRoot, onNewRun }: Props) {
                 <span>No runs yet.</span>
                 {onNewRun && (
                   <button className="fnd-btn fnd-btn--primary fnd-btn--sm" onClick={onNewRun}>
-                    ▶ Start your first run
+                    <Play size={11} /> Start your first run
                   </button>
                 )}
               </div>
@@ -556,7 +649,7 @@ export function HistoryView({ repoRoot, onNewRun }: Props) {
                             void deleteRow(r.id)
                           }}
                         >
-                          ×
+                          <X size={12} />
                         </button>
                       </div>
                     </div>
@@ -579,10 +672,10 @@ export function HistoryView({ repoRoot, onNewRun }: Props) {
         </div>
 
         {/* Detail pane */}
-        {selectedRow && repoRoot && (
+        {selectedRow && (
           <DetailPane
             row={selectedRow}
-            repoRoot={repoRoot}
+            repoRoot={selectedRow.workspaceRoot ?? repoRoot}
             onRerun={handleRerun}
             onClose={() => setSelectedRow(null)}
           />

@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { X, Check, RotateCcw, ChevronRight, AlertCircle } from 'lucide-react'
 import './foundry.css'
 import type { Run, FileChange, RunLogEntry, RunLogKind, SensorResult } from '../types/foundry.types'
 import { CopilotView } from './CopilotView'
 import { OrchestrationView } from './OrchestrationView'
+import { DiffViewer } from './DiffViewer'
 
 interface Props {
   repoRoot: string | null
@@ -36,13 +38,11 @@ const STATUS_DOT: Record<string, string> = {
 
 // ─── Log line ─────────────────────────────────────────────────────────────────
 
-const LOG_KIND_PREFIX: Record<RunLogKind, string> = {
-  system: '●',
-  agent: '›',
-  file: '~',
-  sensor: '⬡',
-  ok: '✓',
-  error: '✗',
+function LogKindIcon({ kind }: { kind: RunLogKind }) {
+  if (kind === 'ok') return <Check size={10} />
+  if (kind === 'error') return <AlertCircle size={10} />
+  if (kind === 'agent') return <ChevronRight size={10} />
+  return <span style={{ fontSize: 8, lineHeight: 1 }}>●</span>
 }
 
 function LogLine({ entry }: { entry: RunLogEntry }) {
@@ -73,8 +73,16 @@ function LogLine({ entry }: { entry: RunLogEntry }) {
   return (
     <div className={`fnd-log-line fnd-log-line--${entry.kind}`}>
       <span className="fnd-log-ts">{time}</span>
-      <span className="fnd-log-ts" style={{ width: 14, textAlign: 'center', flexShrink: 0 }}>
-        {LOG_KIND_PREFIX[entry.kind]}
+      <span
+        style={{
+          width: 14,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <LogKindIcon kind={entry.kind} />
       </span>
       <span className="fnd-log-msg">{entry.message}</span>
     </div>
@@ -83,59 +91,7 @@ function LogLine({ entry }: { entry: RunLogEntry }) {
 
 // ─── Diff viewer ──────────────────────────────────────────────────────────────
 
-function DiffViewer({ diff }: { diff: string }) {
-  if (!diff)
-    return (
-      <div style={{ padding: 12, color: 'var(--tm-text-muted)', fontSize: 11 }}>
-        No diff available.
-      </div>
-    )
-
-  const lines = diff.split('\n')
-  return (
-    <div
-      style={{
-        fontFamily: 'monospace',
-        fontSize: 11,
-        lineHeight: 1.5,
-        overflow: 'auto',
-        flex: 1,
-        padding: '4px 0',
-      }}
-    >
-      {lines.map((line, i) => {
-        const isAdd = line.startsWith('+') && !line.startsWith('+++')
-        const isDel = line.startsWith('-') && !line.startsWith('---')
-        const isHunk = line.startsWith('@@')
-        return (
-          <div
-            key={i}
-            style={{
-              padding: '0 12px',
-              background: isAdd
-                ? 'rgba(74,222,128,0.08)'
-                : isDel
-                  ? 'rgba(239,68,68,0.08)'
-                  : isHunk
-                    ? 'rgba(92,107,192,0.08)'
-                    : 'transparent',
-              color: isAdd
-                ? 'var(--tm-success)'
-                : isDel
-                  ? 'var(--tm-danger)'
-                  : isHunk
-                    ? 'var(--tm-accent)'
-                    : 'var(--tm-text-secondary)',
-              whiteSpace: 'pre',
-            }}
-          >
-            {line || ' '}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
+// DiffViewer is imported from ./DiffViewer (shared component with syntax highlighting)
 
 // ─── File row ─────────────────────────────────────────────────────────────────
 
@@ -196,35 +152,64 @@ function FileRow({
 // ─── Sensor result row ────────────────────────────────────────────────────────
 
 function SensorRow({ r }: { r: SensorResult }) {
+  const [expanded, setExpanded] = useState(false)
+  const hasDetail = !r.pass && (r.stderrExcerpt || r.stdoutExcerpt)
+  const detail = [r.stderrExcerpt, r.stdoutExcerpt].filter(Boolean).join('\n').trim()
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '4px 10px',
-        fontSize: 11,
-        borderTop: '1px solid var(--tm-border)',
-      }}
-    >
-      <span style={{ color: r.pass ? 'var(--tm-success)' : 'var(--tm-danger)', flexShrink: 0 }}>
-        {r.pass ? '✓' : '✗'}
-      </span>
-      <span style={{ color: 'var(--tm-text-secondary)', flex: 1 }}>{r.sensorName}</span>
-      <span style={{ color: 'var(--tm-text-muted)' }}>{r.durationMs}ms</span>
-      {!r.pass && r.stderrExcerpt && (
-        <span
+    <div style={{ borderTop: '1px solid var(--tm-border)' }}>
+      <div
+        onClick={() => hasDetail && setExpanded((v) => !v)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '4px 10px',
+          fontSize: 11,
+          cursor: hasDetail ? 'pointer' : 'default',
+        }}
+      >
+        <span style={{ flexShrink: 0, display: 'flex' }}>
+          {r.pass ? <Check size={12} /> : <X size={12} />}
+        </span>
+        <span style={{ color: 'var(--tm-text-secondary)', flex: 1 }}>{r.sensorName}</span>
+        <span style={{ color: 'var(--tm-text-muted)' }}>{r.durationMs}ms</span>
+        {hasDetail && (
+          <>
+            <span
+              style={{
+                color: 'var(--tm-danger)',
+                fontFamily: 'monospace',
+                maxWidth: 180,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {detail.split('\n')[0]}
+            </span>
+            <span style={{ color: 'var(--tm-text-muted)', flexShrink: 0, fontSize: 10 }}>
+              {expanded ? '▲' : '▼'}
+            </span>
+          </>
+        )}
+      </div>
+      {expanded && hasDetail && (
+        <pre
           style={{
-            color: 'var(--tm-danger)',
+            margin: 0,
+            padding: '6px 10px 6px 28px',
+            fontSize: 10,
             fontFamily: 'monospace',
-            maxWidth: 200,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            color: 'var(--tm-danger)',
+            background: 'var(--tm-bg-subtle)',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all',
+            borderTop: '1px solid var(--tm-border)',
           }}
         >
-          {r.stderrExcerpt.split('\n')[0]}
-        </span>
+          {detail}
+        </pre>
       )}
     </div>
   )
@@ -247,6 +232,15 @@ export function RunConsole({ repoRoot }: Props) {
   const [gateNote, setGateNote] = useState('')
   const [decidingWith, setDecidingWith] = useState<string | null>(null)
   const [runningChecks, setRunningChecks] = useState(false)
+  const [mergeInfo, setMergeInfo] = useState<{
+    defaultBranch: string
+    remoteUrl: string | null
+    ghCommand?: string
+  } | null>(null)
+  const [showMergePanel, setShowMergePanel] = useState(false)
+  const [merging, setMerging] = useState<'merge' | 'pr' | null>(null)
+  const [mergeError, setMergeError] = useState<string | null>(null)
+  const [removeWorktreeAfterMerge, setRemoveWorktreeAfterMerge] = useState(false)
   const logEndRef = useRef<HTMLDivElement | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -285,11 +279,11 @@ export function RunConsole({ repoRoot }: Props) {
 
   useEffect(() => {
     if (!runId) return
-    void (invoke('foundry:run-logs', { runId }) as Promise<{ entries?: RunLogEntry[] }>).then(
-      (r) => {
-        if (r.entries) setLogs(r.entries)
-      }
-    )
+    void (
+      invoke('foundry:run-logs', { runId, workspaceRoot }) as Promise<{ entries?: RunLogEntry[] }>
+    ).then((r) => {
+      if (r.entries) setLogs(r.entries)
+    })
     const unsub = window.electronAPI.extensionBridge.on('foundry:run-log', (data) => {
       const { runId: id, entry } = data as { runId: string; entry: RunLogEntry }
       if (id === runId) setLogs((prev) => [...prev, entry])
@@ -325,6 +319,24 @@ export function RunConsole({ repoRoot }: Props) {
 
   async function decide(decision: 'approve' | 'request-changes' | 'reject') {
     if (decision === 'request-changes' && !gateNote.trim()) return
+    if (decision === 'approve' && run?.worktreePath) {
+      // Approve with worktree — show merge/PR panel before finalizing
+      setDecidingWith('approve')
+      try {
+        const info = await invoke('foundry:run-get-merge-info', { workspaceRoot })
+        setMergeInfo({
+          defaultBranch: (info.defaultBranch as string) ?? 'main',
+          remoteUrl: (info.remoteUrl as string | null) ?? null,
+        })
+        setShowMergePanel(true)
+      } catch {
+        // Fall through to simple approve if merge info unavailable
+        await finishApprove()
+      } finally {
+        setDecidingWith(null)
+      }
+      return
+    }
     setDecidingWith(decision)
     try {
       await invoke('foundry:run-gate-decide', {
@@ -339,6 +351,79 @@ export function RunConsole({ repoRoot }: Props) {
       setError(String(err))
     } finally {
       setDecidingWith(null)
+    }
+  }
+
+  async function finishApprove() {
+    setDecidingWith('approve')
+    try {
+      await invoke('foundry:run-gate-decide', {
+        runId,
+        workspaceRoot,
+        decision: 'approve',
+        removeWorktree: removeWorktreeAfterMerge,
+      })
+      setGateNote('')
+      setShowMergePanel(false)
+      void loadRun()
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setDecidingWith(null)
+    }
+  }
+
+  async function mergeToMain() {
+    setMerging('merge')
+    setMergeError(null)
+    try {
+      const res = await invoke('foundry:run-merge', { runId, workspaceRoot })
+      if ('error' in res) {
+        setMergeError(res.error as string)
+        return
+      }
+      setShowMergePanel(false)
+      void loadRun()
+    } finally {
+      setMerging(null)
+    }
+  }
+
+  async function createPR() {
+    setMerging('pr')
+    setMergeError(null)
+    try {
+      const res = await invoke('foundry:run-create-pr', { runId, workspaceRoot })
+      if ('error' in res) {
+        setMergeError(res.error as string)
+        return
+      }
+      // Open gh pr create in a terminal or copy command to clipboard
+      const branch = res.branch as string
+      const defaultBranch = res.defaultBranch as string
+      const prTitle = res.prTitle as string
+      // Open gh pr create via shell — pass as a command the user can run
+      await invoke('foundry:open-run-console', {
+        runId,
+        workspaceRoot,
+        action: 'open-terminal',
+        command: `gh pr create --base ${defaultBranch} --head ${branch} --title "${prTitle.replace(/"/g, '\\"')}"`,
+      }).catch(() => {})
+      // Fallback: just mark approved and show the gh command
+      setMergeInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              ghCommand: `gh pr create --base ${defaultBranch} --head ${branch} --title "${prTitle.replace(/"/g, '\\"')}"`,
+            }
+          : prev
+      )
+      // Mark the run as done
+      await invoke('foundry:run-gate-decide', { runId, workspaceRoot, decision: 'approve' })
+      setShowMergePanel(false)
+      void loadRun()
+    } finally {
+      setMerging(null)
     }
   }
 
@@ -411,7 +496,11 @@ export function RunConsole({ repoRoot }: Props) {
         className="fnd-panel"
         style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}
       >
-        <OrchestrationView run={run} workspaceRoot={workspaceRoot} onAbort={() => void loadRun()} />
+        <OrchestrationView
+          run={run}
+          workspaceRoot={workspaceRoot}
+          onRetried={() => void loadRun()}
+        />
       </div>
     )
   }
@@ -451,7 +540,7 @@ export function RunConsole({ repoRoot }: Props) {
               }
               disabled={decidingWith !== null}
             >
-              ↺ Retry
+              <RotateCcw size={11} /> Retry
             </button>
           )}
           {!isTerminal && (
@@ -593,7 +682,7 @@ export function RunConsole({ repoRoot }: Props) {
                 Loading diff…
               </div>
             ) : (
-              <DiffViewer diff={diffContent} />
+              <DiffViewer diff={diffContent} filePath={selectedFile ?? undefined} />
             )}
           </div>
 
@@ -622,7 +711,13 @@ export function RunConsole({ repoRoot }: Props) {
                       .finally(() => setRunningChecks(false))
                   }}
                 >
-                  {runningChecks ? 'Running…' : '↺ Re-run checks'}
+                  {runningChecks ? (
+                    'Running…'
+                  ) : (
+                    <>
+                      <RotateCcw size={10} /> Re-run checks
+                    </>
+                  )}
                 </button>
               </div>
               {run.sensorResults.map((r, i) => (
@@ -660,33 +755,109 @@ export function RunConsole({ repoRoot }: Props) {
                   fontFamily: 'inherit',
                 }}
               />
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button
-                  className="fnd-btn fnd-btn--primary fnd-btn--sm"
-                  onClick={() => void decide('approve')}
-                  disabled={decidingWith !== null}
-                  style={{ flex: 1 }}
+              {showMergePanel && mergeInfo ? (
+                <div
+                  style={{
+                    background: 'var(--tm-bg-card)',
+                    border: '1px solid var(--tm-border)',
+                    borderRadius: 6,
+                    padding: 12,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                  }}
                 >
-                  {decidingWith === 'approve' ? '…' : '✓ Approve'}
-                </button>
-                <button
-                  className="fnd-btn fnd-btn--secondary fnd-btn--sm"
-                  onClick={() => void decide('request-changes')}
-                  disabled={decidingWith !== null || !gateNote.trim()}
-                  style={{ flex: 1 }}
-                  title={!gateNote.trim() ? 'Add a note before requesting changes' : undefined}
-                >
-                  {decidingWith === 'request-changes' ? '…' : '✎ Request Changes'}
-                </button>
-                <button
-                  className="fnd-btn fnd-btn--secondary fnd-btn--sm"
-                  onClick={() => void decide('reject')}
-                  disabled={decidingWith !== null}
-                  style={{ color: 'var(--tm-danger)', borderColor: 'rgba(239,68,68,0.3)' }}
-                >
-                  {decidingWith === 'reject' ? '…' : '× Reject & Reset'}
-                </button>
-              </div>
+                  <div style={{ fontSize: 11, color: 'var(--tm-text-secondary)', fontWeight: 600 }}>
+                    Changes approved — what next?
+                  </div>
+                  {mergeError && (
+                    <div style={{ fontSize: 11, color: 'var(--tm-danger)' }}>{mergeError}</div>
+                  )}
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 11,
+                      color: 'var(--tm-text-secondary)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={removeWorktreeAfterMerge}
+                      onChange={(e) => setRemoveWorktreeAfterMerge(e.target.checked)}
+                    />
+                    Remove worktree after merge
+                  </label>
+                  <button
+                    className="fnd-btn fnd-btn--primary fnd-btn--sm"
+                    onClick={() => void mergeToMain()}
+                    disabled={merging !== null}
+                    style={{ width: '100%' }}
+                  >
+                    {merging === 'merge' ? '…' : `⤶ Merge to ${mergeInfo.defaultBranch}`}
+                  </button>
+                  {mergeInfo.remoteUrl && (
+                    <button
+                      className="fnd-btn fnd-btn--secondary fnd-btn--sm"
+                      onClick={() => void createPR()}
+                      disabled={merging !== null}
+                      style={{ width: '100%' }}
+                    >
+                      {merging === 'pr' ? '…' : '⎇ Create Pull Request'}
+                    </button>
+                  )}
+                  <button
+                    className="fnd-btn fnd-btn--secondary fnd-btn--sm"
+                    onClick={() => void finishApprove()}
+                    disabled={merging !== null}
+                    style={{ width: '100%', color: 'var(--tm-text-muted)' }}
+                  >
+                    Just approve (keep branch)
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    className="fnd-btn fnd-btn--primary fnd-btn--sm"
+                    onClick={() => void decide('approve')}
+                    disabled={decidingWith !== null}
+                    style={{ flex: 1 }}
+                  >
+                    {decidingWith === 'approve' ? (
+                      '…'
+                    ) : (
+                      <>
+                        <Check size={11} /> Approve
+                      </>
+                    )}
+                  </button>
+                  <button
+                    className="fnd-btn fnd-btn--secondary fnd-btn--sm"
+                    onClick={() => void decide('request-changes')}
+                    disabled={decidingWith !== null || !gateNote.trim()}
+                    style={{ flex: 1 }}
+                    title={!gateNote.trim() ? 'Add a note before requesting changes' : undefined}
+                  >
+                    {decidingWith === 'request-changes' ? '…' : '✎ Request Changes'}
+                  </button>
+                  <button
+                    className="fnd-btn fnd-btn--secondary fnd-btn--sm"
+                    onClick={() => void decide('reject')}
+                    disabled={decidingWith !== null}
+                    style={{ color: 'var(--tm-danger)', borderColor: 'rgba(239,68,68,0.3)' }}
+                  >
+                    {decidingWith === 'reject' ? (
+                      '…'
+                    ) : (
+                      <>
+                        <X size={11} /> Reject & Reset
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

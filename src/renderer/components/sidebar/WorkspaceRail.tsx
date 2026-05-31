@@ -74,7 +74,7 @@ export function WorkspaceRail({
   }
 
   const pinnedTab = globalTabs.find((t) => t.id === 'core.overview')
-  const otherTabs = globalTabs.filter((t) => t.id !== 'core.overview')
+  const otherTabs = globalTabs.filter((t) => t.id !== 'core.overview' && !t.hidden)
 
   return (
     <aside className="ws-rail">

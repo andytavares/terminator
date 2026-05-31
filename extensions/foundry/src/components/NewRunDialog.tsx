@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { X, ArrowRight, Code2, Network, MessageSquare } from 'lucide-react'
 import './foundry.css'
 
 type RunMode = 'spec-to-code' | 'orchestrate' | 'co-pilot'
@@ -159,7 +160,7 @@ function DagBuilder({
                   setDrawingFrom(isDrawSrc ? null : a.id)
                 }}
               >
-                {isDrawSrc ? '✕' : '→'}
+                {isDrawSrc ? <X size={11} /> : <ArrowRight size={11} />}
               </button>
               <button
                 style={{
@@ -176,7 +177,7 @@ function DagBuilder({
                   removeAgent(a.id)
                 }}
               >
-                ×
+                <X size={12} />
               </button>
             </div>
           )
@@ -190,7 +191,8 @@ function DagBuilder({
         </button>
         {drawingFrom && (
           <span style={{ fontSize: 11, color: 'var(--tm-accent)', marginLeft: 4 }}>
-            Click another agent to set it as downstream ↓ (or ✕ to cancel)
+            Click another agent to set it as downstream (or{' '}
+            <X size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> to cancel)
           </span>
         )}
       </div>
@@ -258,7 +260,7 @@ function DagBuilder({
                         })
                       }
                     >
-                      ×
+                      <X size={12} />
                     </button>
                   </span>
                 ) : null
@@ -308,6 +310,10 @@ interface RerunConfig {
 
 interface Props {
   repoRoot: string
+  baseBranch: string
+  featureBranch: string
+  /** Existing worktree path — only set for reruns, undefined for fresh runs */
+  worktreePath?: string
   onClose: () => void
   onLaunched: () => void
   rerunConfig?: RerunConfig
@@ -327,28 +333,39 @@ async function pickFile(filters?: Array<{ name: string; extensions: string[] }>)
 
 const MD_FILTER = [{ name: 'Markdown / text', extensions: ['md', 'txt', 'mdx'] }]
 
-const MODE_CARDS: { id: RunMode; icon: string; label: string; desc: string }[] = [
+const MODE_ICONS: Record<RunMode, React.ReactElement> = {
+  'spec-to-code': <Code2 size={18} />,
+  orchestrate: <Network size={18} />,
+  'co-pilot': <MessageSquare size={18} />,
+}
+
+const MODE_CARDS: { id: RunMode; label: string; desc: string }[] = [
   {
     id: 'spec-to-code',
-    icon: '⊞',
     label: 'Spec-to-code',
     desc: 'Spec drives code generation with approval gates',
   },
   {
     id: 'orchestrate',
-    icon: '✦',
     label: 'Orchestrate',
     desc: 'Decompose task across multiple sub-agents',
   },
   {
     id: 'co-pilot',
-    icon: '⊡',
     label: 'Co-pilot',
     desc: 'Continuous back-and-forth, no hard gates',
   },
 ]
 
-export function NewRunDialog({ repoRoot, onClose, onLaunched, rerunConfig }: Props) {
+export function NewRunDialog({
+  repoRoot,
+  baseBranch,
+  featureBranch,
+  worktreePath,
+  onClose,
+  onLaunched,
+  rerunConfig,
+}: Props) {
   const [mode, setMode] = useState<RunMode>((rerunConfig?.mode as RunMode) ?? 'spec-to-code')
   const [specPath, setSpecPath] = useState(rerunConfig?.specPath ?? '')
   const [taskDesc, setTaskDesc] = useState(rerunConfig?.prompt ?? '')
@@ -407,6 +424,9 @@ export function NewRunDialog({ repoRoot, onClose, onLaunched, rerunConfig }: Pro
         mode,
         providerId,
         model,
+        baseBranch,
+        featureBranch,
+        ...(worktreePath ? { existingWorktreePath: worktreePath } : {}),
         specPath: mode === 'spec-to-code' && specPath.trim() ? specPath.trim() : undefined,
         prompt:
           mode === 'spec-to-code'
@@ -463,7 +483,7 @@ export function NewRunDialog({ repoRoot, onClose, onLaunched, rerunConfig }: Pro
               className={`fnd-template-card${mode === m.id ? ' fnd-template-card--selected' : ''}`}
               style={{ cursor: 'pointer' }}
             >
-              <div style={{ fontSize: 18, marginBottom: 4, opacity: 0.7 }}>{m.icon}</div>
+              <div style={{ marginBottom: 4, opacity: 0.7 }}>{MODE_ICONS[m.id]}</div>
               <div className="fnd-template-name">{m.label}</div>
               <div className="fnd-template-desc">{m.desc}</div>
             </div>
@@ -650,7 +670,7 @@ export function NewRunDialog({ repoRoot, onClose, onLaunched, rerunConfig }: Pro
                   border: '1px solid var(--tm-border)',
                 }}
               >
-                <span style={{ fontSize: 12 }}>⊞</span>
+                <Code2 size={12} />
                 <span
                   style={{
                     flex: 1,
@@ -737,7 +757,13 @@ export function NewRunDialog({ repoRoot, onClose, onLaunched, rerunConfig }: Pro
             onClick={launch}
             disabled={launching || !canLaunch}
           >
-            {launching ? 'Launching…' : 'Launch →'}
+            {launching ? (
+              'Launching…'
+            ) : (
+              <>
+                <ArrowRight size={11} /> Launch
+              </>
+            )}
           </button>
         </div>
       </div>

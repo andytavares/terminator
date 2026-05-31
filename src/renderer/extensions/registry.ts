@@ -8,6 +8,8 @@ export interface GlobalTabRegistration {
   component: ComponentType<Record<string, never>>
   permanent?: boolean
   badge?: number
+  /** When true the tab is not shown as an icon in the WorkspaceRail. */
+  hidden?: boolean
 }
 
 export interface SidebarPanelRegistration {
@@ -40,11 +42,20 @@ export interface CommandRegistration {
   action(): void
 }
 
+export interface SidebarButtonRegistration {
+  id: string
+  label: string
+  icon?: ReactNode
+  /** Called when the user clicks the button in the ProjectsPanel */
+  action(): void
+}
+
 interface ExtensionRegistry {
   sidebarPanels: Map<string, SidebarPanelRegistration>
   projectTabs: Map<string, ProjectTabRegistration>
   globalTabs: Map<string, GlobalTabRegistration>
   windowViews: Map<string, ComponentType<{ repoRoot: string | null }>>
+  sidebarButtons: SidebarButtonRegistration[]
   activeGlobalTabId: string | null
   keyboardShortcuts: KeyboardShortcutRegistration[]
   commands: CommandRegistration[]
@@ -60,6 +71,7 @@ interface ExtensionRegistry {
   registerOverlay(component: ComponentType): () => void
   registerKeyboardShortcut(shortcut: KeyboardShortcutRegistration): () => void
   registerCommand(command: CommandRegistration): () => void
+  registerSidebarButton(button: SidebarButtonRegistration): () => void
   updateCommand(id: string, patch: Partial<Omit<CommandRegistration, 'id' | 'action'>>): void
   updateGlobalTab(id: string, patch: Partial<Omit<GlobalTabRegistration, 'id' | 'component'>>): void
   togglePanel(panelId: string): void
@@ -86,6 +98,7 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
   projectTabs: new Map(),
   globalTabs: new Map(),
   windowViews: new Map(),
+  sidebarButtons: [],
   activeGlobalTabId: null,
   keyboardShortcuts: [],
   commands: [],
@@ -166,6 +179,12 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
   registerCommand(command) {
     set((s) => ({ commands: [...s.commands, command] }))
     return () => set((s) => ({ commands: s.commands.filter((c) => c !== command) }))
+  },
+
+  registerSidebarButton(button) {
+    set((s) => ({ sidebarButtons: [...s.sidebarButtons, button] }))
+    return () =>
+      set((s) => ({ sidebarButtons: s.sidebarButtons.filter((b) => b.id !== button.id) }))
   },
 
   updateCommand(id, patch) {

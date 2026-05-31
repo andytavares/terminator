@@ -1,7 +1,12 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
+import { app } from 'electron'
 
-const PROVIDERS_PATH = (workspaceRoot: string) =>
+// Global providers file — shared across all workspaces
+const GLOBAL_PROVIDERS_PATH = () => path.join(app.getPath('userData'), 'foundry', 'providers.json')
+
+// Legacy per-workspace path — used only for one-time migration
+const LEGACY_PROVIDERS_PATH = (workspaceRoot: string) =>
   path.join(workspaceRoot, '.foundry', 'providers.json')
 
 export interface StoredProvider {
@@ -18,23 +23,40 @@ export interface StoredProvider {
   [key: string]: unknown
 }
 
-export async function readProviders(workspaceRoot: string): Promise<StoredProvider[]> {
+async function migrateFromWorkspace(workspaceRoot: string): Promise<StoredProvider[]> {
+  const legacyPath = LEGACY_PROVIDERS_PATH(workspaceRoot)
   try {
-    const raw = await fs.readFile(PROVIDERS_PATH(workspaceRoot), 'utf-8')
-    return JSON.parse(raw) as StoredProvider[]
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
-    throw err
+    const raw = await fs.readFile(legacyPath, 'utf-8')
+    const providers = JSON.parse(raw) as StoredProvider[]
+    if (providers.length > 0) {
+      // Migrate: write to global path, delete legacy file
+      await writeProviders(providers)
+      await fs.unlink(legacyPath).catch(() => {})
+    }
+    return providers
+  } catch {
+    return []
   }
 }
 
-export async function writeProviders(
-  workspaceRoot: string,
-  providers: StoredProvider[]
-): Promise<void> {
-  const foundryDir = path.join(workspaceRoot, '.foundry')
-  await fs.mkdir(foundryDir, { recursive: true })
-  const tmpPath = PROVIDERS_PATH(workspaceRoot) + '.tmp'
+export async function readProviders(workspaceRoot?: string): Promise<StoredProvider[]> {
+  try {
+    const raw = await fs.readFile(GLOBAL_PROVIDERS_PATH(), 'utf-8')
+    return JSON.parse(raw) as StoredProvider[]
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+    // Global file not found — check for legacy per-workspace file and migrate
+    if (workspaceRoot) {
+      return migrateFromWorkspace(workspaceRoot)
+    }
+    return []
+  }
+}
+
+export async function writeProviders(providers: StoredProvider[]): Promise<void> {
+  const globalDir = path.dirname(GLOBAL_PROVIDERS_PATH())
+  await fs.mkdir(globalDir, { recursive: true })
+  const tmpPath = GLOBAL_PROVIDERS_PATH() + '.tmp'
   await fs.writeFile(tmpPath, JSON.stringify(providers, null, 2), 'utf-8')
-  await fs.rename(tmpPath, PROVIDERS_PATH(workspaceRoot))
+  await fs.rename(tmpPath, GLOBAL_PROVIDERS_PATH())
 }
