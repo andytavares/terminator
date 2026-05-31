@@ -1,0 +1,24 @@
+.forge/001-full-documentation-audit/tasks.md
+  s_ad5148b6f4058b::t_4347050040047c 1-175,177,179-180,185-186,188-206
+  s_ad5148b6f4058b::t_c2f2e1c0b9fade 176,178,182-184,187
+.forge/001-full-documentation-audit/spec.md
+  s_ad5148b6f4058b::t_859eb21238ac71 1
+.forge/001-full-documentation-audit/clarifications.md
+  s_ad5148b6f4058b::t_313eb9b79199fe 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "53f530bdbef4c2b4e2b5bd42c7c18f395371f35b",
+  "prompts": {},
+  "sessions": {
+    "s_ad5148b6f4058b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9db0ea5b-b452-4183-8bb1-141e7e1c55ee",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
