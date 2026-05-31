@@ -1,0 +1,24 @@
+tests/unit/renderer/App.spec.tsx
+  s_ef9ca153e5c835::t_ffc3afd3094651 30
+  s_ef9ca153e5c835::t_6e08abeea71547 363-386
+tests/unit/terminal/metrics.ipc.spec.ts
+  s_ef9ca153e5c835::t_493cc15f98c66a 73-99
+tests/unit/renderer/hooks/useTerminalSession.spec.tsx
+  s_ef9ca153e5c835::t_5d78b7f5ffa5ef 300-375
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "cd9f37fbfd3e21b0748655e86c5f824b90917f9b",
+  "prompts": {},
+  "sessions": {
+    "s_ef9ca153e5c835": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c5e305e-02dc-4662-bbdf-271fb8bc8397",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
