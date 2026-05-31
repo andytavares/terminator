@@ -1,0 +1,21 @@
+docs/ARCHITECTURE.md
+  s_a6b41e30fbe839::t_90773024f725cb 3
+.claude/doc-index.json
+  s_a6b41e30fbe839::t_afc14e416ade88 3-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "77c5c39380e10f76e3d41940622e7bfa979aaf7e",
+  "prompts": {},
+  "sessions": {
+    "s_a6b41e30fbe839": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c4e37c50-1e8b-431e-bb83-1f1cdaa4a850",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
