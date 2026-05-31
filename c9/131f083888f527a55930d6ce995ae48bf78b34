@@ -1,0 +1,74 @@
+src/renderer/components/terminal/TerminalSession.tsx
+  s_ad5148b6f4058b::t_a58974a593d28b 189
+  s_ad5148b6f4058b::t_0d9af6a354625f 216
+  s_ad5148b6f4058b::t_a62f2baa6be3be 28-37
+  s_ad5148b6f4058b::t_1f34e4304066ba 207-208
+  s_ad5148b6f4058b::t_4a1a20cedbb602 154
+src/renderer/stores/session.store.ts
+  s_ad5148b6f4058b::t_86997bb659d5d7 5,9
+  s_ad5148b6f4058b::t_a294b50d5d25b6 26-27
+  s_ad5148b6f4058b::t_bcd84c528fabf1 111
+tests/unit/main/shared/reserved-shortcuts.spec.ts
+  s_ad5148b6f4058b::t_03a1e564967866 1-27
+src/renderer/stores/metrics.store.ts
+  s_ad5148b6f4058b::t_ee47bda374a0fb 95
+  s_ad5148b6f4058b::t_f13469d6054203 87
+  s_ad5148b6f4058b::t_0a448711d142a9 25-55,77,86,88,96-97
+src/renderer/stores/workspace.store.ts
+  s_ad5148b6f4058b::t_6e2b2541d9c173 184-191
+  s_ad5148b6f4058b::t_5a5822cdbd6bde 27
+src/renderer/App.tsx
+  s_ad5148b6f4058b::t_0ee600be19e771 217,223
+  s_ad5148b6f4058b::t_926d91def9801b 41
+  s_ad5148b6f4058b::t_f564c67a916d2a 88,94
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_ad5148b6f4058b::t_a900ee7c3e9d40 234
+  s_ad5148b6f4058b::t_893bbeab03ca87 27
+  s_ad5148b6f4058b::t_1db229f365f89d 153,170,183
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_ad5148b6f4058b::t_613f19475774e9 51
+src/main/preload.ts
+  s_ad5148b6f4058b::t_b6ac8ae4253ecf 2
+tests/unit/renderer/stores/session.store.spec.ts
+  s_ad5148b6f4058b::t_c65cf87b47693e 363-364
+src/main/git/git-service.ts
+  s_ad5148b6f4058b::t_a343ebf02319d5 18
+  s_ad5148b6f4058b::t_34ac19bcb022f3 28
+  s_ad5148b6f4058b::t_4df20d2e31bca2 7
+  s_ad5148b6f4058b::t_ea155823de6605 49
+src/main/extensions/api.ts
+  s_ad5148b6f4058b::t_2b48716287436a 202
+src/renderer/hooks/useTerminalSession.ts
+  s_ad5148b6f4058b::t_08b5323162ad77 8-34,55-59,80-84
+tests/unit/renderer/App.spec.tsx
+  s_ad5148b6f4058b::t_0823abcef30ff3 281-294,296,301-313,315
+  s_ad5148b6f4058b::t_380d2e1cb65c96 631
+  s_ad5148b6f4058b::t_210fe73fa5ddd1 156
+src/main/shared/reserved-shortcuts.ts
+  s_ad5148b6f4058b::t_80ee3a905d9f79 1-18
+tests/unit/renderer/stores/workspace.store.spec.ts
+  s_ad5148b6f4058b::t_fe8908a248ffbd 298-325
+tests/unit/renderer/stores/metrics.store.spec.ts
+  s_ad5148b6f4058b::t_98923d3d38d6e2 162-196
+src/main/git/git-env.ts
+  s_ad5148b6f4058b::t_1dc7aa9ecb974d 1
+tests/unit/renderer/hooks/useTerminalSession.spec.tsx
+  s_ad5148b6f4058b::t_bd51af57b34fde 501-533
+  s_ad5148b6f4058b::t_04f50d0adf7477 346-347,373
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c9131f083888f527a55930d6ce995ae48bf78b34",
+  "prompts": {},
+  "sessions": {
+    "s_ad5148b6f4058b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9db0ea5b-b452-4183-8bb1-141e7e1c55ee",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
