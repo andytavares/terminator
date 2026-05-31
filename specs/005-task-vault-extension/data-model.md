@@ -1,9 +1,18 @@
 # Data Model: Task Vault Extension
 
-**Date**: 2026-05-19  
-**Branch**: `005-task-vault-extension`
+**Date**: 2026-05-31 (revised)  
+**Branch**: `005-task-vault-extension`  
+**Supersedes**: original markdown-file architecture described at commit prior to `91f8685`
 
-All entities are stored as plain markdown files in the user-configured vault directory. The `.todo/index.json` is an ephemeral derived artifact — never the source of truth.
+All entities are stored in a SQLite database at `<vault>/.todo/vault.db`. The markdown-file architecture with `filepath:line` IDs described in earlier drafts of this document has been removed. See ADR-015 and ADR-016 for the formal supersession notices.
+
+---
+
+## Storage
+
+**Database**: `better-sqlite3`, WAL mode, foreign keys ON.  
+**Location**: `<vault>/.todo/vault.db` (created on first `initDb` call; `<vault>/.todo/` is gitignored).  
+**Initialization**: `initDb(vaultPath)` in `extensions/task-vault/src/vault/db.ts:11` creates the schema and runs additive migrations on every startup.
 
 ---
 
@@ -11,173 +20,229 @@ All entities are stored as plain markdown files in the user-configured vault dir
 
 ### Task
 
-A single bullet item in any vault file.
+A single unit of work stored as a row in the `tasks` table.
 
 ```typescript
+// extensions/task-vault/src/vault/types.ts:37
 interface Task {
-  id: string // "<filepath>:<line>" — session-scoped, rebuilt on file change
-  filePath: string // Absolute path to the vault file containing this task
-  line: number // 1-based line number within the file
-  status: TaskStatus // Derived from bullet marker
-  text: string // Raw task text (without marker and metadata tags)
-  project?: string // +project tag value (without +)
-  context?: string // @context tag value (without @)
-  area?: string // #area tag value (without #)
-  dueDate?: string // due:YYYY-MM-DD value
-  completedDate?: string // YYYY-MM-DD appended after [x] marker
-  migratedTo?: string // YYYY-MM-DD target date after [>] marker
-  metadata: Record<string, string> // Arbitrary key:value pairs
-  terminatorLinks: string[] // UUIDs of linked Terminator projects/workspaces
+  id: string // UUID v4 — stable across sessions and file changes
+  filePath: string // Derived at read time: "<source>/<source_ref>"
+  line: number // Legacy field; always 0 for SQLite-backed tasks
+  status: TaskStatus
+  text: string
+  project?: string // Denormalized tag; also mirrored in project_id FK
+  context?: string
+  area?: string // Denormalized tag; also mirrored in area_id FK
+  dueDate?: string // YYYY-MM-DD
+  completedDate?: string
+  migratedTo?: string
+  metadata: Record<string, string>
+  terminatorLinks: string[]
+  subtasks?: Task[]
 }
 
-type TaskStatus = 'open' | 'done' | 'migrated' | 'cancelled' | 'in-progress'
+// extensions/task-vault/src/vault/types.ts:1
+type TaskStatus =
+  | 'open'
+  | 'done'
+  | 'migrated'
+  | 'cancelled'
+  | 'in-progress'
+  | 'in-review' // added in recurrence engine rewrite
+  | 'blocked' // added in recurrence engine rewrite
 ```
 
-**Markdown representation**:
+**SQL schema** (`extensions/task-vault/src/vault/db.ts:146`):
 
-```
-- [ ] Open task +project @context #area due:2026-05-22
-- [x] Completed task                              2026-05-19
-- [>] Migrated task → 2026-05-20
-- [-] Cancelled task
-- [/] In-progress task
+```sql
+CREATE TABLE IF NOT EXISTS tasks (
+  id              TEXT PRIMARY KEY,          -- UUID v4
+  text            TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'open',
+  project         TEXT,                      -- denormalized tag string
+  context         TEXT,
+  area            TEXT,                      -- denormalized tag string
+  project_id      TEXT REFERENCES projects(id) ON DELETE SET NULL,
+  area_id         TEXT REFERENCES areas(id) ON DELETE SET NULL,
+  due_date        TEXT,                      -- YYYY-MM-DD
+  completed_date  TEXT,
+  migrated_to     TEXT,
+  source          TEXT NOT NULL DEFAULT 'inbox',
+  source_ref      TEXT,
+  parent_id       TEXT REFERENCES tasks(id) ON DELETE CASCADE,
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  metadata        TEXT NOT NULL DEFAULT '{}',
+  terminator_links TEXT NOT NULL DEFAULT '[]',
+  -- Recurrence columns (added in migration if absent)
+  recurrence_rule          TEXT,   -- 'daily' | 'weekly' | 'weekly:0,3' | 'biweekly' | 'monthly'
+  recurrence_template_id   TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+  recurrence_notify_at     TEXT,   -- HH:MM override
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL
+);
 ```
 
 **State transitions**:
 
 ```
-open → done       (complete_task)
-open → migrated   (migrate_task)
-open → cancelled  (manual edit only; no MCP tool)
-open → in-progress (manual edit only)
-done → (terminal, no transition)
-migrated → (terminal, no transition)
+open        → done        (complete_task)
+open        → migrated    (migrate_task)
+open        → cancelled   (cancel_task)
+open        → in-progress (edit_task / kanban drag)
+open        → in-review   (edit_task / kanban drag)
+open        → blocked     (block_task)
+blocked     → open        (unblock_task)
+done        → (terminal)
+migrated    → (terminal)
+cancelled   → open        (restore_task)
 ```
+
+---
+
+### Recurrence
+
+Recurring tasks are managed by the recurrence engine in `extensions/task-vault/src/vault/recurrence.ts` and `extensions/task-vault/src/vault/ensure-next-occurrence.ts`.
+
+**Rule format** (`extensions/task-vault/src/vault/recurrence.ts:5`):
+
+```typescript
+type RecurrenceRule =
+  | { kind: 'daily' }
+  | { kind: 'biweekly' }
+  | { kind: 'monthly' }
+  | { kind: 'weekly'; days: number[] } // days: 0=Sun … 6=Sat; empty = every 7 days
+```
+
+Serialised column strings: `'daily'`, `'weekly'`, `'weekly:1,3'`, `'biweekly'`, `'monthly'`.
+
+**Invariant**: For any recurring template task, exactly one `status='open'` future instance exists. `ensureNextOccurrence` in `ensure-next-occurrence.ts:27` enforces this atomically; `backfillRecurringTasks` in `ensure-next-occurrence.ts:125` runs at startup to close gaps caused by the app being offline.
+
+**Template vs. instance**:
+
+| Field                    | Template task | Spawned instance       |
+| ------------------------ | ------------- | ---------------------- |
+| `recurrence_rule`        | set           | copied from template   |
+| `recurrence_template_id` | `NULL`        | template's `id`        |
+| `due_date`               | seed date     | computed next due date |
+
+**End conditions** (stored in `metadata` JSON):
+
+| Key                          | Values                                     | Meaning                                            |
+| ---------------------------- | ------------------------------------------ | -------------------------------------------------- |
+| `recurrence_end_type`        | `'none'` \| `'on_date'` \| `'after_count'` | How the series terminates                          |
+| `recurrence_end_date`        | `YYYY-MM-DD`                               | Stop spawning after this date                      |
+| `recurrence_end_count`       | integer                                    | Total number of completions allowed                |
+| `recurrence_completed_count` | integer                                    | Completions so far (carried forward on each spawn) |
+
+**Deduplication**: A unique DB index (`idx_tasks_recurrence_unique`) on `(recurrence_template_id, due_date)` prevents duplicate future instances at the storage layer.
 
 ---
 
 ### DailyLog
 
-One markdown file per calendar day.
-
 ```typescript
+// extensions/task-vault/src/vault/types.ts:54
 interface DailyLog {
-  date: string // YYYY-MM-DD (derived from filename)
-  filePath: string // Absolute path: <vault>/daily/YYYY-MM-DD.md
-  tasks: Task[] // All task bullets in the file
-  events: Event[] // Bullet lines starting with 'o'
-  notes: Note[] // Bullet lines starting with '*'
-  exists: boolean // false if file not yet created
-}
-
-interface Event {
-  time?: string // e.g. "09:00"
-  text: string
-}
-
-interface Note {
-  text: string
+  date: string // YYYY-MM-DD
+  filePath: string // Logical: "daily/<YYYY-MM-DD>"
+  tasks: Task[] // tasks with source='daily' AND source_ref=date
+  exists: boolean
 }
 ```
 
-**File path**: `<vault>/daily/YYYY-MM-DD.md`
-
-**Auto-creation**: If file does not exist when the daily log view loads, it is created from a blank template with "Tasks", "Events", and "Notes" headings.
+Tasks belonging to a daily log are stored in the `tasks` table with `source='daily'` and `source_ref='YYYY-MM-DD'`. There is no separate `events` or `notes` table (those legacy tables are dropped in the migration at `db.ts:83`).
 
 ---
 
 ### InboxItem
 
-An unprocessed task in `inbox.md`.
-
 ```typescript
+// extensions/task-vault/src/vault/types.ts:61
 interface InboxItem extends Task {
-  capturedAt?: string // ISO timestamp if added via capture tool (metadata key)
-  source?: string // 'quick-capture' | 'mcp' | 'manual'
+  capturedAt?: string // ISO timestamp stored in metadata
+  source?: 'quick-capture' | 'mcp' | 'manual'
 }
 ```
 
-**File path**: `<vault>/inbox.md`
+Inbox items have `source='inbox'` in the `tasks` table.
 
 ---
 
 ### Project
 
-A markdown file with YAML frontmatter and structured sections.
-
 ```typescript
+// extensions/task-vault/src/vault/types.ts:66
 interface Project {
-  filePath: string
-  name: string // H1 heading from file body
+  filePath: string // Logical: "projects/<name>"
+  name: string // UNIQUE in projects table
   status: ProjectStatus
-  deadline?: string // YYYY-MM-DD from frontmatter
-  area?: string // PARA area from frontmatter
-  created: string // YYYY-MM-DD from frontmatter
-  outcome?: string // Content under "## Outcome" heading
-  nextActions: Task[] // Open tasks under "## Next action" heading
-  allTasks: Task[] // All tasks under "## All tasks" heading
-  isStale: boolean // true if nextActions is empty OR mtime > staleness threshold
-  lastModified: Date // File system mtime
-  terminatorLinks: string[] // UUIDs of linked Terminator workspaces/projects
+  deadline?: string
+  area?: string
+  created: string
+  outcome?: string
+  nextActions: Task[]
+  allTasks: Task[]
+  isStale: boolean
+  lastModified: Date
+  terminatorLinks: string[]
 }
 
 type ProjectStatus = 'active' | 'someday' | 'done' | 'archived'
 ```
 
-**YAML frontmatter**:
+**SQL schema** (`db.ts:172`):
 
-```yaml
----
-type: project
-status: active
-deadline: 2026-06-12
-area: engineering
-created: 2026-05-01
-terminator-links: ['uuid-1', 'uuid-2'] # TerminatorLink UUIDs (optional)
----
+```sql
+CREATE TABLE IF NOT EXISTS projects (
+  id               TEXT PRIMARY KEY,   -- UUID v4
+  name             TEXT UNIQUE NOT NULL,
+  status           TEXT NOT NULL DEFAULT 'active',
+  area             TEXT,
+  area_id          TEXT REFERENCES areas(id) ON DELETE SET NULL,
+  deadline         TEXT,
+  outcome          TEXT,
+  terminator_links TEXT NOT NULL DEFAULT '[]',
+  created_at       TEXT NOT NULL,
+  updated_at       TEXT NOT NULL
+);
 ```
-
-**Staleness rule**: `isStale = nextActions.length === 0 || (Date.now() - lastModified.getTime()) > stalenessThresholdMs`
-
-**Invariant**: Every active project SHOULD have at least one open task under "## Next action". Absence is flagged as stale (not enforced as a write constraint).
 
 ---
 
 ### Area
 
-A markdown file for an ongoing responsibility.
-
 ```typescript
+// extensions/task-vault/src/vault/types.ts:81
 interface Area {
   filePath: string
-  name: string // H1 heading from file body
-  area: string // Derived from filename
-  tasks: Task[] // Any tasks in the file
+  name: string
+  area: string
+  tasks: Task[]
   terminatorLinks: string[]
 }
 ```
 
-**File path**: `<vault>/areas/<name>.md`
-**Distinction from Project**: No frontmatter `deadline`, no completion state, no "Next action" invariant.
+**SQL schema** (`db.ts:187`):
+
+```sql
+CREATE TABLE IF NOT EXISTS areas (
+  id         TEXT PRIMARY KEY,    -- UUID v4
+  name       TEXT UNIQUE NOT NULL,
+  status     TEXT NOT NULL DEFAULT 'active',  -- added in migration
+  created_at TEXT NOT NULL
+);
+```
 
 ---
 
-### VaultIndex
+### IndexedTask / IndexedProject
 
-Ephemeral, rebuilt on every file change. Stored at `<vault>/.todo/index.json`. Never committed to git.
+These are the read-model shapes returned by IPC query handlers. `IndexedTask` carries all recurrence fields for the UI:
 
 ```typescript
-interface VaultIndex {
-  version: number // Schema version for cache invalidation
-  builtAt: string // ISO timestamp of last rebuild
-  vaultPath: string // Absolute path to vault root
-  tasks: IndexedTask[] // All tasks across all non-archive files
-  projects: IndexedProject[]
-  inboxCount: number
-}
-
+// extensions/task-vault/src/vault/types.ts:89
 interface IndexedTask {
-  id: string // filepath:line
+  id: string // UUID v4 — stable
   filePath: string
   line: number
   status: TaskStatus
@@ -187,61 +252,41 @@ interface IndexedTask {
   area?: string
   dueDate?: string
   terminatorLinks: string[]
-}
-
-interface IndexedProject {
-  id: string // filePath (stable within a session)
-  filePath: string
-  name: string
-  status: ProjectStatus
-  deadline?: string
-  area?: string
-  isStale: boolean
-  nextActionCount: number
-  lastModified: string // ISO timestamp
-  terminatorLinks: string[]
+  subtasks?: IndexedTask[]
+  blockedReason?: string
+  blockedCheckInterval?: string
+  recurrenceRule?: string
+  recurrenceTemplateId?: string
+  recurrenceNotifyAt?: string
+  recurrenceEndType?: 'none' | 'on_date' | 'after_count'
+  recurrenceEndDate?: string
+  recurrenceEndCount?: number
+  recurrenceCompletedCount?: number
 }
 ```
-
-**Rebuild trigger**: Any file change event from the chokidar watcher (debounced 200ms).
-**Archive exclusion**: Files under `<vault>/archive/` are excluded from the live index by default.
 
 ---
 
 ### TerminatorLink
 
-A navigational pointer from a vault item to a Terminator workspace or project.
-
 ```typescript
+// extensions/task-vault/src/vault/types.ts:127
 interface TerminatorLink {
-  targetId: string // Terminator workspace or project UUID (opaque, from Extension API)
+  targetId: string // Terminator workspace or project UUID
   targetType: 'workspace' | 'project'
-  displayName?: string // Resolved at render time; never stored in vault
-  isBroken: boolean // true if targetId no longer exists in Terminator
+  displayName?: string // Resolved at render time; never stored
+  isBroken: boolean
 }
 ```
 
-**Storage in task files** (inline metadata):
-
-```
-- [ ] Spike JWT rotation +auth @deep terminator:550e8400-e29b-41d4-a716-446655440000
-```
-
-**Storage in project frontmatter**:
-
-```yaml
-terminator-links: ['550e8400-e29b-41d4-a716-446655440000']
-```
-
-**Resolution**: Display names are fetched from `api.workspace.list()` at render time and never written to the vault file. Links survive workspace/project renames because only the UUID is stored.
+Links are stored as JSON arrays in the `terminator_links` column of `tasks` and `projects`.
 
 ---
 
-### CalendarEvent
-
-Parsed from user-configured ICS feed(s).
+### CalendarEvent / IcsFeedCache
 
 ```typescript
+// extensions/task-vault/src/vault/types.ts:134
 interface CalendarEvent {
   uid: string
   summary: string
@@ -253,16 +298,15 @@ interface CalendarEvent {
 }
 
 interface IcsFeedCache {
-  feedUrl: string // URL or file path
+  feedUrl: string
   events: CalendarEvent[]
-  lastFetchedAt: string // ISO timestamp
-  fetchError?: string // Last error message if fetch failed
+  lastFetchedAt: string
+  fetchError?: string
 }
 ```
 
-**Cache location**: `<vault>/.todo/ics-cache.json`
-**Refresh**: Background polling on configurable interval (default: 14400000ms = 4 hours).
-**Failure handling**: If fetch fails, last cached events are shown with a staleness warning.
+**Cache location**: `<vault>/.todo/ics-cache.json` (unchanged from original spec).  
+**Refresh**: Background polling, default 4-hour interval.
 
 ---
 
@@ -270,32 +314,22 @@ interface IcsFeedCache {
 
 ```
 <vault>/                          # User-configured root (default: ~/vault)
-├── daily/
-│   ├── 2026-05-19.md             # One file per day
-│   └── 2026-05-18.md
-├── inbox.md                      # All captured items
-├── projects/
-│   ├── q2-okr-planning.md        # Project file with YAML frontmatter
-│   └── refactor-auth-layer.md
-├── areas/
-│   ├── health.md
-│   └── engineering.md
-├── archive/
-│   └── 2026-Q1-finished.md       # Archived projects and old daily logs
 └── .todo/                        # Ephemeral; gitignored
-    ├── index.json                 # VaultIndex (rebuilt on file change)
-    ├── ics-cache.json             # ICS feed cache
-    └── config.yaml                # User settings (vault path, hotkey, thresholds)
+    ├── vault.db                  # SQLite database (WAL mode) — PRIMARY source of truth
+    ├── ics-cache.json            # ICS feed cache (unchanged)
+    └── config.yaml               # User settings (vault path, hotkey, thresholds)
 ```
+
+The `daily/`, `inbox.md`, `projects/`, `areas/`, and `archive/` directories from the earlier markdown-file spec are no longer used. All data lives in `vault.db`.
 
 ---
 
-## VaultIndex ID Stability Contract
+## Task ID Stability Contract
 
-| Scenario                         | Behavior                                                                              |
-| -------------------------------- | ------------------------------------------------------------------------------------- |
-| File unchanged since index built | ID `filepath:line` is valid                                                           |
-| File changed externally          | Watcher detects change; index rebuilt; old IDs invalid                                |
-| MCP tool writes to file          | Index rebuilt immediately after write; tool returns new IDs                           |
-| MCP client uses stale ID         | Tool returns `{ error: 'STALE_ID', message: 'Task not found at line N; re-query' }`   |
-| Two agents write simultaneously  | Atomic rename prevents corruption; second write gets stale ID error and must re-query |
+Task IDs are UUID v4 values generated at insert time (`randomUUID()` from `node:crypto`). They are:
+
+- **Stable across sessions** — survive app restarts, file-system changes, and index rebuilds.
+- **Stable across edits** — updating a task's text, status, or metadata does not change its ID.
+- **Never reused** — deleted task IDs are not recycled.
+
+The `STALE_ID` error and `filepath:line` contract described in ADR-014 are superseded by ADR-016. MCP tools may use task UUIDs indefinitely without re-querying after writes.

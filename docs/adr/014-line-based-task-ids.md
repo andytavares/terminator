@@ -1,6 +1,6 @@
 # ADR-014: Line-Based Task IDs (Session-Scoped, Rebuild-on-Write)
 
-**Status**: Accepted  
+**Status**: Superseded by ADR-016  
 **Date**: 2026-05-19  
 **Feature**: `005-task-vault-extension`
 

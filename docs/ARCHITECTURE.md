@@ -303,23 +303,21 @@ The task-vault extension (`extensions/task-vault/`) implements a GTD+BuJo+PARA p
 
 ### Vault Layer (`src/vault/`)
 
-- **db.ts** — Initialises the SQLite database at `.todo/vault.db`, applies schema (WAL mode, FK enforcement), and exports `getDb()` / `initDb()` / `closeDb()`. All IPC handlers access data through this layer.
-- **parser.ts** — Pure function `parseFile(content, filePath)` extracts tasks, events, notes, frontmatter, and `terminator:<uuid>` links from markdown content using `gray-matter`. Returns structured `ParseResult` used to sync records into SQLite.
-- **writer.ts** — Atomic markdown file writes (tmp + `fs.rename`). Task mutation: `completeTask`, `migrateTask`, `addTask`. Checks stale line references (STALE_ID per ADR-014).
-- **indexer.ts** — Walks vault directories, parses all `.md` files, writes a lightweight `.todo/index.json` summary for bulk queries. `getTaskById` resolves `filepath:line` IDs.
-- **watcher.ts** — chokidar watcher on vault root (excludes `archive/`) with debounce. Triggers re-parse and SQLite sync on file change.
+- **db.ts** — Initialises the SQLite database at `.todo/vault.db`, applies schema migrations (WAL mode, FK enforcement), and exports `getDb()` / `initDb()` / `closeDb()`. Runs `backfillRecurringTasks` on startup to gap-fill any missing future occurrences. All IPC handlers access data exclusively through this layer.
+- **recurrence.ts** — `RecurrenceRule` discriminated union, `parseRecurrenceRule` (throws `InvalidRecurrenceRuleError` on unknown input), `serializeRecurrenceRule`, and `computeNextDueDate` (strict mode: next date = previous + interval, never completion date). Also exports `localDate()` helper.
+- **ensure-next-occurrence.ts** — `ensureNextOccurrence(db, taskId)`: idempotent function that checks whether a future `status='open'` instance already exists and inserts one if not. `backfillRecurringTasks(db)`: called from `initDb` to handle days the app was closed.
+- **tags.ts** — Utilities for extracting and normalising `@context`, `+project`, `#area`, and `due:` inline tags from task text.
+- **types.ts** — `TaskStatus`, `IndexedTask`, `IndexedProject`, `KanbanConfig`, and other shared TypeScript types used by both the IPC layer and renderer components.
 
 ### IPC Layer (`src/ipc/`)
 
-- **vault.ipc.ts** — Handlers for vault CRUD (capture, get-today, add-task, complete-task, migrate-task, query, process-inbox-item). All validate with Zod; stale IDs return `{ error: 'STALE_ID' }`.
+- **vault.ipc.ts** — All vault CRUD handlers. Core task handlers: `capture`, `get-today`, `get-daily`, `add-task`, `add-subtask`, `edit-task`, `delete-task`, `complete-task`, `cancel-task`, `restore-task`, `reopen-task`, `migrate-task`, `block-task`, `unblock-task`, `reorder-tasks`. Recurrence handlers: `set-recurrence`, `clear-recurrence`. View/query handlers: `query`, `process-inbox-item`, `get-inbox`, `list-areas`, `archive-area`, `delete-area`, `create-area`, `list-archive`, `list-someday`, `someday-to-today`, `get-calendar-month`. Detail handlers: `get-task-detail`, `save-task-detail`. Bulk I/O: `export-json`, `import-json`. All handlers validate with Zod; stale IDs return `{ error: 'STALE_ID' }`.
 - **projects.ipc.ts** — project list, update-project-status, and weekly-review payload handler.
 - **links.ipc.ts** — bidirectional link handlers (create/remove/get-for-terminator-target).
 
-### MCP Sidecar (`src/mcp/`)
+### MCP Sidecar
 
-- Standalone stdio server (`server.ts`) runs as a separate process: `TASK_VAULT_PATH=/path node extensions/task-vault/src/mcp/server.js`.
-- Registers tools: capture, today, add_task, complete_task, migrate_task, query, list_projects, weekly_review.
-- Auto-execute gate: reads per-tool toggle from `.todo/settings.json`; returns a suggestion without writing if disabled; `confirmed: true` bypasses.
+The MCP stdio sidecar (`src/mcp/server.ts`) was present in earlier Task Vault versions and has since been removed from the codebase. The `extensions/task-vault/src/mcp/` directory no longer exists. AI agent access to vault data is now achieved through the extension's IPC handlers called from the in-app renderer, not a standalone MCP process.
 
 ### Recurring Task Engine
 
@@ -349,7 +347,7 @@ A `UNIQUE INDEX` on `(recurrence_template_id, due_date)` enforces the invariant 
 
 ### Task ID Format
 
-Tasks are identified as `filepath:lineNumber` (ADR-014). IDs are session-scoped and rebuilt after every write. STALE_ID is returned when a task has moved to a different line.
+Tasks are identified by a UUID (`crypto.randomUUID()`) assigned at insert time and stored in the `tasks.id` column. IDs are stable across restarts. `{ error: 'STALE_ID' }` is returned when a handler receives an ID that no longer exists in the database (e.g. after a delete or migration).
 
 ### Extension API v1.2.0
 

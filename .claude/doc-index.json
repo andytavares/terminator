@@ -90,6 +90,21 @@
       "referenced_code_paths": ["package.json"],
       "last_verified_commit": "148e9f1",
       "staleness_score": 0
+    },
+    {
+      "path": "specs/005-task-vault-extension/data-model.md",
+      "title": "Task Vault Data Model",
+      "summary": "SQLite-first entity model for tasks, projects, areas, recurrence, daily logs, inbox, and CalendarEvent. UUID v4 IDs. Supersedes markdown-file/filepath:line architecture.",
+      "owners": [],
+      "referenced_code_paths": [
+        "extensions/task-vault/src/vault/db.ts",
+        "extensions/task-vault/src/vault/types.ts",
+        "extensions/task-vault/src/vault/recurrence.ts",
+        "extensions/task-vault/src/vault/ensure-next-occurrence.ts",
+        "extensions/task-vault/src/ipc/vault.ipc.ts"
+      ],
+      "last_verified_commit": "148e9f1",
+      "staleness_score": 0
     }
   ]
 }

@@ -1,6 +1,6 @@
 # ADR-013: MCP Stdio Sidecar for Task Vault Agent Access
 
-**Status**: Accepted  
+**Status**: Superseded by ADR-015  
 **Date**: 2026-05-19  
 **Feature**: `005-task-vault-extension`
 
