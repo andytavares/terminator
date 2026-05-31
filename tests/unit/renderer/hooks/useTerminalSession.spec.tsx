@@ -343,7 +343,8 @@ describe('useTerminalSession', () => {
       )
     })
 
-    it('splitSession bell callback uses default tab title when session not found', async () => {
+    it('splitSession bell callback does not fire when session is not found in store', async () => {
+      // Consistent with createSession: if the session record is gone, no notification is sent.
       const mockActivateSplit = vi.fn()
       vi.mocked(useSessionStore).mockReturnValue({
         createSession: mockCreateSession,
@@ -369,9 +370,7 @@ describe('useTerminalSession', () => {
 
       capturedBellCallback?.()
 
-      expect(mockAddNotification).toHaveBeenCalledWith(
-        expect.objectContaining({ message: 'Terminal needs attention' })
-      )
+      expect(mockAddNotification).not.toHaveBeenCalled()
     })
   })
 
@@ -498,6 +497,39 @@ describe('useTerminalSession', () => {
       capturedBellCallback?.()
 
       expect(mockAddNotification).not.toHaveBeenCalled()
+    })
+
+    it('splitSession bell callback does not fire when session is active and project is active', async () => {
+      // Regression test: splitSession previously omitted this guard
+      const mockActivateSplit = vi.fn()
+      vi.mocked(useSessionStore).mockReturnValue({
+        createSession: mockCreateSession,
+        setTerminalInstance: mockSetTerminalInstance,
+        setActiveSessionForProject: mockSetActiveSessionForProject,
+        incrementBellCount: mockIncrementBellCount,
+        activateSplit: mockActivateSplit,
+        getFocusedSession: vi.fn().mockReturnValue('ses-focused'),
+        getActiveSessionForProject: vi.fn().mockReturnValue('ses-focused'),
+      } as unknown as ReturnType<typeof useSessionStore>)
+      Object.assign(useSessionStore, {
+        getState: vi.fn().mockReturnValue({
+          activeSessionIdByProject: new Map([['proj-1', 'session-123']]),
+          sessions: new Map([['session-123', { projectId: 'proj-1', tabTitle: 'Split' }]]),
+        }),
+      })
+      Object.assign(useWorkspaceStore, {
+        getState: vi.fn().mockReturnValue({ activeProjectId: 'proj-1' }),
+      })
+      const { useTerminalSession } = await import(
+        '../../../../src/renderer/hooks/useTerminalSession'
+      )
+      const { result } = renderHook(() => useTerminalSession())
+      capturedBellCallback = undefined
+      await result.current.splitSession('proj-1', 'vertical', '/cwd', 5000)
+      capturedBellCallback?.()
+
+      expect(mockAddNotification).not.toHaveBeenCalled()
+      expect(mockIncrementBellCount).not.toHaveBeenCalled()
     })
   })
 })

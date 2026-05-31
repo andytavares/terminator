@@ -17,7 +17,7 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
   const tabTitle = session?.tabTitle ?? sessionId
 
   useLayoutEffect(() => {
-    const instance = getTerminalInstance(sessionId) as TerminalInstance | undefined
+    const instance = getTerminalInstance(sessionId)
     if (!instance || !containerRef.current) return
     instance.mount(containerRef.current)
     return () => {
@@ -29,7 +29,7 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
   const handleClick = useCallback(() => {
     setFocusedSession(projectId, sessionId)
     clearBellCount(sessionId)
-    const instance = getTerminalInstance(sessionId) as TerminalInstance | undefined
+    const instance = getTerminalInstance(sessionId)
     instance?.terminal.scrollToBottom()
     instance?.terminal.focus()
   }, [projectId, sessionId, setFocusedSession, clearBellCount, getTerminalInstance])

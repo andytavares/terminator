@@ -295,4 +295,32 @@ describe('useWorkspaceStore', () => {
       expect(useWorkspaceStore.getState().activeProjectId).toBeNull()
     })
   })
+
+  describe('resolveActiveCwd', () => {
+    beforeEach(() => {
+      useWorkspaceStore.setState({
+        workspaces: [ws1, ws2],
+        projectsByWorkspaceId: new Map([
+          ['ws-1', [proj1, { ...proj1, id: 'p-wt', worktreePath: '/worktree/path' }]],
+        ]),
+        activeWorkspaceId: 'ws-1',
+        activeProjectId: null,
+      })
+    })
+
+    it('returns worktreePath when active project has one', () => {
+      useWorkspaceStore.setState({ activeProjectId: 'p-wt' })
+      expect(useWorkspaceStore.getState().resolveActiveCwd()).toBe('/worktree/path')
+    })
+
+    it('returns workspace folderPath when active project has no worktreePath', () => {
+      useWorkspaceStore.setState({ activeProjectId: 'p-1' })
+      expect(useWorkspaceStore.getState().resolveActiveCwd()).toBe('/a')
+    })
+
+    it("returns '~' when no workspace or project is active", () => {
+      useWorkspaceStore.setState({ activeWorkspaceId: null, activeProjectId: null })
+      expect(useWorkspaceStore.getState().resolveActiveCwd()).toBe('~')
+    })
+  })
 })

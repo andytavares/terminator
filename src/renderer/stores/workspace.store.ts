@@ -24,6 +24,7 @@ interface WorkspaceState {
   reorderProjects: (workspaceId: string, ids: string[]) => Promise<void>
   deleteProject: (id: string) => Promise<void>
   setActiveProject: (id: string | null) => void
+  resolveActiveCwd: () => string
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -180,4 +181,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   setActiveProject: (id) => set({ activeProjectId: id }),
+
+  resolveActiveCwd: () => {
+    const { activeWorkspaceId, activeProjectId, workspaces, projectsByWorkspaceId } = get()
+    const workspace = workspaces.find((w) => w.id === activeWorkspaceId)
+    const projects = activeWorkspaceId ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? []) : []
+    const project = projects.find((p) => p.id === activeProjectId)
+    return project?.worktreePath ?? workspace?.folderPath ?? '~'
+  },
 }))

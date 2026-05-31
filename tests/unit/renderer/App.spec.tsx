@@ -153,6 +153,7 @@ function setupMocks(
     workspaces,
     projectsByWorkspaceId: new Map(),
     setActiveWorkspace: vi.fn(),
+    resolveActiveCwd: vi.fn().mockReturnValue('~'),
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSettingsStore).mockReturnValue({
     loadSettings: mockLoadSettings,
@@ -277,15 +278,41 @@ describe('App', () => {
     expect(screen.queryByTestId('settings-panel')).toBeNull()
   })
 
-  it('opens SettingsPanel when open-settings event fires', async () => {
+  it('opens SettingsPanel via menu:open-settings IPC event', async () => {
+    let openSettingsCb: (() => void) | null = null
+    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
+      extensionEvents: {
+        onMenuOpenSettings: (cb: () => void) => { openSettingsCb = cb; return vi.fn() },
+        onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
+        onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
+        onToast: vi.fn().mockReturnValue(vi.fn()),
+        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
+        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
+      },
+      extensionBridge: { on: vi.fn().mockReturnValue(mockUnsubscribe), invoke: vi.fn().mockResolvedValue({}) },
+    }
     render(<App />)
-    await waitFor(() => window.dispatchEvent(new Event('open-settings')))
+    openSettingsCb?.()
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
   })
 
   it('closes SettingsPanel when onClose is called', async () => {
+    let openSettingsCb: (() => void) | null = null
+    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
+      extensionEvents: {
+        onMenuOpenSettings: (cb: () => void) => { openSettingsCb = cb; return vi.fn() },
+        onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
+        onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
+        onToast: vi.fn().mockReturnValue(vi.fn()),
+        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
+        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
+      },
+      extensionBridge: { on: vi.fn().mockReturnValue(mockUnsubscribe), invoke: vi.fn().mockResolvedValue({}) },
+    }
     render(<App />)
-    await waitFor(() => window.dispatchEvent(new Event('open-settings')))
+    openSettingsCb?.()
     await waitFor(() => screen.getByText('Close Settings'))
     fireEvent.click(screen.getByText('Close Settings'))
     await waitFor(() => expect(screen.queryByTestId('settings-panel')).toBeNull())
@@ -601,6 +628,7 @@ describe('App', () => {
       workspaces: [{ id: 'ws-1', name: 'Work', folderPath: '/', color: '#fff', tags: [] }],
       projectsByWorkspaceId: new Map(),
       setActiveWorkspace: mockSetActiveWorkspace,
+      resolveActiveCwd: vi.fn().mockReturnValue('~'),
     } as unknown as ReturnType<typeof useWorkspaceStore>)
     render(<App />)
     capturedShortcutCallbacks.onOpenCommandPalette?.()

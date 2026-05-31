@@ -159,4 +159,39 @@ describe('useMetricsStore', () => {
     // system stays null — no crash
     expect(useMetricsStore.getState().system).toBeNull()
   })
+
+  it('stopPolling does not call startPolling internally', () => {
+    // Ensure stopPolling owns its own restart logic rather than delegating back
+    useMetricsStore.setState({ globalMetricsEnabled: true })
+    const spy = vi.spyOn(useMetricsStore.getState(), 'startPolling')
+    useMetricsStore.getState().stopPolling()
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  it('stopPolling keeps system polling when globalMetricsEnabled and clears per-process metrics', async () => {
+    mockGetSystem.mockResolvedValue({ data: sysData })
+    mockGetProcesses.mockResolvedValue({ data: [] })
+    useMetricsStore.getState().startPolling([{ sessionId: 'sess-1', pid: 100 }])
+    useMetricsStore.setState({ globalMetricsEnabled: true })
+    useMetricsStore.getState().setSystem(sysData)
+
+    useMetricsStore.getState().stopPolling()
+
+    // Per-process metrics cleared
+    expect(useMetricsStore.getState().processesBySessionId.size).toBe(0)
+    // System metrics still populated (polling continued)
+    expect(useMetricsStore.getState().system).not.toBeNull()
+  })
+
+  it('enableGlobalMetrics called twice does not create a second interval', () => {
+    mockGetSystem.mockResolvedValue({ data: sysData })
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
+    useMetricsStore.getState().enableGlobalMetrics()
+    const callsAfterFirst = setIntervalSpy.mock.calls.length
+    useMetricsStore.getState().enableGlobalMetrics()
+    // No additional setInterval call on second invocation
+    expect(setIntervalSpy.mock.calls.length).toBe(callsAfterFirst)
+    setIntervalSpy.mockRestore()
+  })
 })

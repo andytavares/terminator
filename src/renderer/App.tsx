@@ -38,6 +38,7 @@ export function App(): JSX.Element {
     workspaces,
     setActiveWorkspace,
     projectsByWorkspaceId,
+    resolveActiveCwd,
   } = useWorkspaceStore()
   const { loadSettings, globalSettings, markWelcomeSeen, resolveSettings } = useSettingsStore()
   const { system, enableGlobalMetrics, disableGlobalMetrics } = useMetricsStore()
@@ -84,16 +85,13 @@ export function App(): JSX.Element {
   const handleNewTab = useCallback(() => {
     if (!activeProjectId) return
     const settings = resolveSettings(activeWorkspaceId)
-    const projects = activeWorkspaceId ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? []) : []
-    const activeProject = projects.find((p) => p.id === activeProjectId)
-    const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
+    const cwd = resolveActiveCwd()
     void createSession(activeProjectId, 'human', '', cwd, settings.terminal.scrollbackLimit)
   }, [
     activeProjectId,
     activeWorkspaceId,
-    activeWorkspace,
-    projectsByWorkspaceId,
     resolveSettings,
+    resolveActiveCwd,
     createSession,
   ])
   useKeyboardShortcuts({
@@ -216,26 +214,17 @@ export function App(): JSX.Element {
     if (!activeProjectId || activeProjectTabId !== null) return
     if (getSessionsForProject(activeProjectId).length > 0) return
     const settings = resolveSettings(activeWorkspaceId)
-    const projects = activeWorkspaceId ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? []) : []
-    const activeProject = projects.find((p) => p.id === activeProjectId)
-    const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
+    const cwd = resolveActiveCwd()
     void createSession(activeProjectId, 'human', '', cwd, settings.terminal.scrollbackLimit)
   }, [
     activeProjectId,
     activeProjectTabId,
     activeWorkspaceId,
-    activeWorkspace,
-    projectsByWorkspaceId,
+    resolveActiveCwd,
     resolveSettings,
     createSession,
     getSessionsForProject,
   ])
-
-  useEffect(() => {
-    const handler = (): void => setSettingsOpen(true)
-    window.addEventListener('open-settings', handler)
-    return () => window.removeEventListener('open-settings', handler)
-  }, [])
 
   useEffect(() => {
     if (!window.electronAPI.extensionEvents?.onMenuOpenSettings) return

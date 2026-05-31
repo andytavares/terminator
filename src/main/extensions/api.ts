@@ -199,25 +199,7 @@ import {
   listProjects as listProjectsFromStore,
 } from '../storage/workspace-store.js'
 import { onWorkspaceDelete, onProjectDelete } from './workspace-events.js'
-
-const RESERVED_SHORTCUTS = new Set([
-  'CmdOrCtrl+1',
-  'CmdOrCtrl+2',
-  'CmdOrCtrl+3',
-  'CmdOrCtrl+4',
-  'CmdOrCtrl+5',
-  'CmdOrCtrl+6',
-  'CmdOrCtrl+7',
-  'CmdOrCtrl+8',
-  'CmdOrCtrl+9',
-  'CmdOrCtrl+=',
-  'CmdOrCtrl+-',
-  'CmdOrCtrl+Left',
-  'CmdOrCtrl+Right',
-  'CmdOrCtrl+T',
-  'CmdOrCtrl+W',
-  'CmdOrCtrl+,',
-])
+import { RESERVED_SHORTCUTS } from '../shared/reserved-shortcuts.js'
 
 interface Registry {
   settingsSections: Map<string, ExtensionSettingsSchema>

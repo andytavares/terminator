@@ -24,7 +24,7 @@ export function useKeyboardShortcuts({
     activeWorkspaceId,
     setActiveWorkspace,
     activeProjectId,
-    projectsByWorkspaceId,
+    resolveActiveCwd,
   } = useWorkspaceStore()
   const {
     getActiveSessionForProject,
@@ -150,12 +150,7 @@ export function useKeyboardShortcuts({
         e.preventDefault()
         if (activeProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
-          const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
-          const projects = activeWorkspaceId
-            ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? [])
-            : []
-          const activeProject = projects.find((p) => p.id === activeProjectId)
-          const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
+          const cwd = resolveActiveCwd()
           createSession(
             activeProjectId,
             'human',
@@ -172,12 +167,7 @@ export function useKeyboardShortcuts({
         e.preventDefault()
         if (activeProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
-          const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
-          const projects = activeWorkspaceId
-            ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? [])
-            : []
-          const activeProject = projects.find((p) => p.id === activeProjectId)
-          const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
+          const cwd = resolveActiveCwd()
           splitSession(activeProjectId, 'vertical', cwd, settings.terminal.scrollbackLimit).catch(
             () => addToast({ type: 'error', message: 'Could not create split pane' })
           )
@@ -190,12 +180,7 @@ export function useKeyboardShortcuts({
         e.preventDefault()
         if (activeProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
-          const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
-          const projects = activeWorkspaceId
-            ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? [])
-            : []
-          const activeProject = projects.find((p) => p.id === activeProjectId)
-          const cwd = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? '~'
+          const cwd = resolveActiveCwd()
           splitSession(activeProjectId, 'horizontal', cwd, settings.terminal.scrollbackLimit).catch(
             () => addToast({ type: 'error', message: 'Could not create split pane' })
           )
@@ -246,7 +231,7 @@ export function useKeyboardShortcuts({
     keyboardShortcuts,
     setActiveWorkspace,
     resolveSettings,
-    projectsByWorkspaceId,
+    resolveActiveCwd,
     createSession,
     splitSession,
     getSessionsForProject,

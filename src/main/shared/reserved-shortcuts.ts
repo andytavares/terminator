@@ -1,0 +1,18 @@
+export const RESERVED_SHORTCUTS = new Set([
+  'CmdOrCtrl+1',
+  'CmdOrCtrl+2',
+  'CmdOrCtrl+3',
+  'CmdOrCtrl+4',
+  'CmdOrCtrl+5',
+  'CmdOrCtrl+6',
+  'CmdOrCtrl+7',
+  'CmdOrCtrl+8',
+  'CmdOrCtrl+9',
+  'CmdOrCtrl+=',
+  'CmdOrCtrl+-',
+  'CmdOrCtrl+Left',
+  'CmdOrCtrl+Right',
+  'CmdOrCtrl+T',
+  'CmdOrCtrl+W',
+  'CmdOrCtrl+,',
+])

@@ -2,10 +2,11 @@ import { create } from 'zustand'
 import type { TerminalSession, PaneNode, PaneSplitDirection } from '../../shared/types/index'
 import { splitLeaf, removeLeaf, leafIds, updateSplitRatio } from '../utils/pane-tree'
 import { useWorkspaceStore } from './workspace.store'
+import type { TerminalInstance } from '../components/terminal/TerminalSession'
 
 interface SessionState {
   sessions: Map<string, TerminalSession>
-  terminalInstances: Map<string, unknown>
+  terminalInstances: Map<string, TerminalInstance>
   activeSessionIdByProject: Map<string, string>
   bellCounts: Map<string, number>
   busySessions: Set<string>
@@ -22,8 +23,8 @@ interface SessionState {
   ) => Promise<string>
   closeSession: (sessionId: string) => Promise<void>
   getSessionsForProject: (projectId: string) => TerminalSession[]
-  setTerminalInstance: (sessionId: string, terminal: unknown) => void
-  getTerminalInstance: (sessionId: string) => unknown
+  setTerminalInstance: (sessionId: string, terminal: TerminalInstance) => void
+  getTerminalInstance: (sessionId: string) => TerminalInstance | undefined
   setActiveSessionForProject: (projectId: string, sessionId: string) => void
   getActiveSessionForProject: (projectId: string) => string | null
   handleProcessExit: (sessionId: string, exitCode: number) => void
@@ -107,7 +108,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // Capture projectId before removing the session from the store
     const projectId = get().sessions.get(sessionId)?.projectId ?? null
     // Dispose xterm instance before removing from store
-    const instance = get().terminalInstances.get(sessionId) as { dispose?: () => void } | undefined
+    const instance = get().terminalInstances.get(sessionId)
     instance?.dispose?.()
     await window.electronAPI.terminal.close(sessionId)
     set((s) => {

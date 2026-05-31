@@ -48,9 +48,7 @@ function setupMocks(
     activeWorkspaceId: overrides.activeWorkspaceId ?? 'ws-1',
     setActiveWorkspace: mockSetActiveWorkspace,
     activeProjectId: overrides.activeProjectId ?? null,
-    projectsByWorkspaceId: new Map([
-      ['ws-1', [{ id: 'proj-1', name: 'Proj', worktreePath: null }]],
-    ]),
+    resolveActiveCwd: vi.fn().mockReturnValue('/workspace/path'),
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSessionStore).mockReturnValue({
     getActiveSessionForProject: mockGetActiveSessionForProject,
