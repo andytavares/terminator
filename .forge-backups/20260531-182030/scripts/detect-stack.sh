@@ -59,10 +59,6 @@ has Makefile && {
   grep -E '^fmt:|^format:' Makefile >/dev/null && FORMAT_CMDS=("make format")
 }
 
-AST_TOOL=null
-command -v ast-grep >/dev/null 2>&1 && AST_TOOL='"ast-grep"'
-[ "$AST_TOOL" = "null" ] && command -v semgrep >/dev/null 2>&1 && AST_TOOL='"semgrep"'
-
 LANGS_JSON=$(printf '%s\n' "${LANGS[@]}" | jq -R . | jq -s 'unique')
 BUILD_JSON=$(printf '%s\n' "${BUILD_CMDS[@]}" | jq -R . | jq -s 'unique')
 TEST_JSON=$(printf '%s\n' "${TEST_CMDS[@]}" | jq -R . | jq -s 'unique')
@@ -77,7 +73,6 @@ jq -n \
   --argjson test "$TEST_JSON" \
   --argjson lint "$LINT_JSON" \
   --argjson fmt "$FMT_JSON" \
-  --argjson ast "$AST_TOOL" \
   --arg sha "$COMMIT" \
   '{
     languages: $langs,
@@ -85,7 +80,6 @@ jq -n \
     test: { commands: $test, command: ($test[0] // null) },
     lint: { commands: $lint, command: ($lint[0] // null) },
     format: { commands: $fmt },
-    ast_search_tool: $ast,
     detected_at_commit: $sha,
     detected_at: (now | todate)
   }' > .claude/stack.json

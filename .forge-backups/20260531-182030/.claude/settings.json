@@ -50,12 +50,7 @@
       { "hooks": [{ "type": "command", "command": ".claude/hooks/session-start.sh" }] }
     ],
     "UserPromptSubmit": [
-      {
-        "hooks": [
-          { "type": "command", "command": ".claude/hooks/prompt-augment.sh" },
-          { "type": "command", "command": ".claude/hooks/speckit-context-inject.sh" }
-        ]
-      }
+      { "hooks": [{ "type": "command", "command": ".claude/hooks/prompt-augment.sh" }] }
     ],
     "PreToolUse": [
       {

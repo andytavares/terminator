@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-VERSION="0.4.0"
+VERSION="0.3.0"
 ASSUME_YES="${FORGE_YES:-0}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANIFEST_NAME=".forge-manifest.json"
