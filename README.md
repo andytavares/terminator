@@ -25,19 +25,19 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 
 ## Tech Stack
 
-| Layer                  | Technology                                          |
-| ---------------------- | --------------------------------------------------- |
-| Framework              | Electron 30.x                                       |
-| Language               | TypeScript 5.x (strict)                             |
-| UI                     | React 18.x + Zustand + Lucide React (icons)         |
-| Terminal rendering     | xterm.js 5.x + xterm-addon-fit                      |
-| PTY management         | node-pty 1.x (main process only)                    |
-| Persistence            | electron-store 8.x                                  |
-| Schema validation      | Zod 3.x                                             |
-| Build                  | electron-vite 2.x                                   |
-| Unit/integration tests | Vitest 2.x                                          |
-| E2E tests              | Playwright 1.x                                      |
-| UI font                | IBM Plex Sans (@fontsource)                         |
+| Layer                  | Technology                                  |
+| ---------------------- | ------------------------------------------- |
+| Framework              | Electron 30.x                               |
+| Language               | TypeScript 5.x (strict)                     |
+| UI                     | React 18.x + Zustand + Lucide React (icons) |
+| Terminal rendering     | xterm.js 5.x + xterm-addon-fit              |
+| PTY management         | node-pty 1.x (main process only)            |
+| Persistence            | electron-store 8.x                          |
+| Schema validation      | Zod 3.x                                     |
+| Build                  | electron-vite 2.x                           |
+| Unit/integration tests | Vitest 2.x                                  |
+| E2E tests              | Playwright 1.x                              |
+| UI font                | IBM Plex Sans (@fontsource)                 |
 
 Extension dependencies (not part of the core app): `better-sqlite3`, `@modelcontextprotocol/sdk`, `chokidar`, `gray-matter`, `node-ical` — declared in each extension's own `package.json`.
 
@@ -181,11 +181,13 @@ The entry point exports an `activate(api)` function:
 const disposables = []
 
 function activate(api) {
+  disposables.push(api.settings.register({ label: 'My Settings', properties: {} }))
   disposables.push(
-    api.settings.register({ label: 'My Settings', properties: {} })
-  )
-  disposables.push(
-    api.contextMenu.registerItem('workspace', { id: 'my-action', label: 'Do Thing', onClick: (id) => {} })
+    api.contextMenu.registerItem('workspace', {
+      id: 'my-action',
+      label: 'Do Thing',
+      onClick: (id) => {},
+    })
   )
 }
 
@@ -208,22 +210,22 @@ See [docs/EXTENSION-DEVELOPMENT.md](docs/EXTENSION-DEVELOPMENT.md) for the full 
 
 ## Key Design Decisions
 
-| Decision                                             | Record                                                                                |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| PTY processes live in main process only              | [ADR-001](docs/adr/001-pty-in-main-process.md)                                        |
-| Extension host lives in main process (Phase 1)       | [ADR-002](docs/adr/002-extension-host-in-main-process.md)                             |
-| electron-store for persistence                       | [ADR-003](docs/adr/003-electron-store-for-persistence.md)                             |
-| xterm.js instances are never destroyed on tab switch | [ADR-004](docs/adr/004-xterm-instances-persist-on-tab-switch.md)                      |
-| Native fs.watch instead of chokidar                  | [ADR-005](docs/adr/005-native-fswatcher-over-chokidar.md)                             |
-| Sandboxed shell execution for extensions             | [ADR-006](docs/adr/006-sandboxed-shell-exec-for-extensions.md)                        |
-| Bundled-first extension distribution (no marketplace)| [ADR-007](docs/adr/007-bundled-first-extension-distribution.md)                       |
-| Extensions compile to CommonJS with esbuild          | [ADR-008](docs/adr/008-extension-commonjs-compilation.md)                             |
-| `gh` CLI for all GitHub PR review operations         | [ADR-009](docs/adr/009-gh-cli-for-review-ops.md)                                      |
-| Heuristic file ordering for code review (v1)         | [ADR-010](docs/adr/010-heuristic-file-ordering-v1.md)                                 |
-| `react-markdown` + `remark-gfm` for comment rendering | [ADR-011](docs/adr/011-react-markdown-for-comments.md)                               |
-| ExtensionAPI v1.2.0 additions                        | [ADR-012](docs/adr/012-extension-api-v1.2.0.md)                                       |
-| MCP stdio sidecar for Task Vault agent access        | [ADR-013](docs/adr/013-mcp-stdio-sidecar.md)                                          |
-| Line-based task IDs (session-scoped, rebuild-on-write) | [ADR-014](docs/adr/014-line-based-task-ids.md)                                      |
+| Decision                                               | Record                                                           |
+| ------------------------------------------------------ | ---------------------------------------------------------------- |
+| PTY processes live in main process only                | [ADR-001](docs/adr/001-pty-in-main-process.md)                   |
+| Extension host lives in main process (Phase 1)         | [ADR-002](docs/adr/002-extension-host-in-main-process.md)        |
+| electron-store for persistence                         | [ADR-003](docs/adr/003-electron-store-for-persistence.md)        |
+| xterm.js instances are never destroyed on tab switch   | [ADR-004](docs/adr/004-xterm-instances-persist-on-tab-switch.md) |
+| Native fs.watch instead of chokidar                    | [ADR-005](docs/adr/005-native-fswatcher-over-chokidar.md)        |
+| Sandboxed shell execution for extensions               | [ADR-006](docs/adr/006-sandboxed-shell-exec-for-extensions.md)   |
+| Bundled-first extension distribution (no marketplace)  | [ADR-007](docs/adr/007-bundled-first-extension-distribution.md)  |
+| Extensions compile to CommonJS with esbuild            | [ADR-008](docs/adr/008-extension-commonjs-compilation.md)        |
+| `gh` CLI for all GitHub PR review operations           | [ADR-009](docs/adr/009-gh-cli-for-review-ops.md)                 |
+| Heuristic file ordering for code review (v1)           | [ADR-010](docs/adr/010-heuristic-file-ordering-v1.md)            |
+| `react-markdown` + `remark-gfm` for comment rendering  | [ADR-011](docs/adr/011-react-markdown-for-comments.md)           |
+| ExtensionAPI v1.2.0 additions                          | [ADR-012](docs/adr/012-extension-api-v1.2.0.md)                  |
+| MCP stdio sidecar for Task Vault agent access          | [ADR-013](docs/adr/013-mcp-stdio-sidecar.md)                     |
+| Line-based task IDs (session-scoped, rebuild-on-write) | [ADR-014](docs/adr/014-line-based-task-ids.md)                   |
 
 ## Contributing
 

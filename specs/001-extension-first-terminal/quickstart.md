@@ -117,14 +117,14 @@ To install a third-party extension from an arbitrary directory, open Settings (`
 
 ## Common Commands Reference
 
-| Command                      | Description                              |
-| ---------------------------- | ---------------------------------------- |
-| `npm run dev`                | Start app in development mode            |
-| `npm test`                   | Run unit + integration tests             |
-| `npm run test:e2e`           | Run Playwright e2e tests                 |
-| `npm run rebuild`            | Recompile native modules for Electron    |
-| `npm run build:extensions`   | Compile extension TypeScript source      |
-| `npm run lint`               | ESLint check                             |
-| `npm run typecheck`          | TypeScript type check (no emit)          |
-| `npm run format`             | Prettier format                          |
-| `npm run create-extension`   | Scaffold a new extension from template   |
+| Command                    | Description                            |
+| -------------------------- | -------------------------------------- |
+| `npm run dev`              | Start app in development mode          |
+| `npm test`                 | Run unit + integration tests           |
+| `npm run test:e2e`         | Run Playwright e2e tests               |
+| `npm run rebuild`          | Recompile native modules for Electron  |
+| `npm run build:extensions` | Compile extension TypeScript source    |
+| `npm run lint`             | ESLint check                           |
+| `npm run typecheck`        | TypeScript type check (no emit)        |
+| `npm run format`           | Prettier format                        |
+| `npm run create-extension` | Scaffold a new extension from template |

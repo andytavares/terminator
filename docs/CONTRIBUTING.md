@@ -100,16 +100,16 @@ Test location by type:
 
 ### When you add or change something, update:
 
-| Change                              | Documentation to update                                                                             |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------- |
-| New feature or user-facing behavior | `README.md` features list and/or `docs/ARCHITECTURE.md`                                             |
+| Change                              | Documentation to update                                                                                           |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| New feature or user-facing behavior | `README.md` features list and/or `docs/ARCHITECTURE.md`                                                           |
 | New IPC channel                     | `specs/001-extension-first-terminal/contracts/ipc-channels.md` (master contract) and `src/renderer/electron.d.ts` |
-| Change to extension API             | `specs/001-extension-first-terminal/contracts/extension-api.md` and `docs/EXTENSION-DEVELOPMENT.md` |
-| New npm script                      | `README.md` scripts table and `specs/.../quickstart.md`                                             |
-| Architectural decision              | New ADR in `docs/adr/`                                                                              |
-| Data model change                   | `specs/.../data-model.md` and `docs/ARCHITECTURE.md`                                                |
-| Setup step change                   | `README.md`, `docs/CONTRIBUTING.md`, `specs/.../quickstart.md`                                      |
-| New keyboard shortcut               | `README.md` features list, `contracts/extension-api.md` reserved list                               |
+| Change to extension API             | `specs/001-extension-first-terminal/contracts/extension-api.md` and `docs/EXTENSION-DEVELOPMENT.md`               |
+| New npm script                      | `README.md` scripts table and `specs/.../quickstart.md`                                                           |
+| Architectural decision              | New ADR in `docs/adr/`                                                                                            |
+| Data model change                   | `specs/.../data-model.md` and `docs/ARCHITECTURE.md`                                                              |
+| Setup step change                   | `README.md`, `docs/CONTRIBUTING.md`, `specs/.../quickstart.md`                                                    |
+| New keyboard shortcut               | `README.md` features list, `contracts/extension-api.md` reserved list                                             |
 
 ---
 

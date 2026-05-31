@@ -182,7 +182,10 @@ function activate(api) {
   // disposables.push(
   //   api.sidebar.registerGlobalTab({
   //     id: '${id}-global-tab',
-  //     label: '${name.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}',
+  //     label: '${name
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')}',
   //     component: MyGlobalTabComponent,  // React component
   //     permanent: false,
   //   })

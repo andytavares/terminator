@@ -675,12 +675,16 @@ const workspaces = api.workspace.list()
 const projects = api.workspace.listProjects(workspaces[0].id)
 // [{ id, workspaceId, name }, ...]
 
-disposables.push(api.workspace.onDelete((workspaceId) => {
-  // Clean up any state keyed to this workspace
-}))
-disposables.push(api.workspace.onProjectDelete((projectId) => {
-  // Clean up any state keyed to this project
-}))
+disposables.push(
+  api.workspace.onDelete((workspaceId) => {
+    // Clean up any state keyed to this workspace
+  })
+)
+disposables.push(
+  api.workspace.onProjectDelete((projectId) => {
+    // Clean up any state keyed to this project
+  })
+)
 ```
 
 ---

@@ -10,11 +10,11 @@ This is the public API surface exposed to all Terminator extensions. Extensions 
 
 ## Version History
 
-| Version | Changes |
-| ------- | ------- |
-| 1.0.0 | Initial release: `app`, `log`, `settings`, `sidebar.registerItem`, `contextMenu`, `keyboard`, `terminal` |
-| 1.1.0 | Added: `sidebar.registerPanel`, `topBar`, `shell`, `notifications.showToast`, `nativeMenu`, `fs`, `ipc`, `commands` |
-| 1.2.0 | Added: `sidebar.registerGlobalTab`, `globalShortcut`, `workspace`, `window`, `notifications.createNotification` |
+| Version | Changes                                                                                                             |
+| ------- | ------------------------------------------------------------------------------------------------------------------- |
+| 1.0.0   | Initial release: `app`, `log`, `settings`, `sidebar.registerItem`, `contextMenu`, `keyboard`, `terminal`            |
+| 1.1.0   | Added: `sidebar.registerPanel`, `topBar`, `shell`, `notifications.showToast`, `nativeMenu`, `fs`, `ipc`, `commands` |
+| 1.2.0   | Added: `sidebar.registerGlobalTab`, `globalShortcut`, `workspace`, `window`, `notifications.createNotification`     |
 
 ---
 

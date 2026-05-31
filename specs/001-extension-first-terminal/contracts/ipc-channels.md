@@ -261,7 +261,9 @@ Reorders workspaces in the sidebar by providing the desired ID order.
 **Response**:
 
 ```typescript
-{ success: boolean }
+{
+  success: boolean
+}
 ```
 
 ---
@@ -372,7 +374,9 @@ Reorders projects within a workspace by providing the desired ID order.
 **Response**:
 
 ```typescript
-{ success: boolean }
+{
+  success: boolean
+}
 ```
 
 ---
