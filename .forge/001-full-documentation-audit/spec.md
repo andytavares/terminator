@@ -1,0 +1,1 @@
+we need to run a full documentation audit of every markdown file in this project and make sure that they are correct, and valid. Create any missing docs, update existing docs to fix any incorrect or out of date stuff, remove any documentation that is not valid or no longer exists.

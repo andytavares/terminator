@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-VERSION="0.1.0"
+VERSION="0.2.0"
 ASSUME_YES="${FORGE_YES:-0}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANIFEST_NAME=".forge-manifest.json"
@@ -37,7 +37,7 @@ need() {
 
 check_prereqs() {
   local missing=0
-  for t in bash git jq find rsync; do
+  for t in bash git jq find; do
     command -v "$t" >/dev/null 2>&1 || { err "missing: $t"; missing=1; }
   done
   return $missing
@@ -95,41 +95,69 @@ resolve_target() {
   (cd "$t" && pwd)
 }
 
+# Enumerate every file forge owns, as paths relative to SCRIPT_DIR.
+# These are the only files forge ever creates, updates, or removes.
+forge_source_files() {
+  # Files inside shared directories (skills, commands, hooks, agents)
+  # Use bash prefix-strip instead of sed to avoid metacharacter issues in SCRIPT_DIR.
+  for dir in .claude/agents .claude/skills .claude/commands .claude/hooks; do
+    if [ -d "$SCRIPT_DIR/$dir" ]; then
+      while IFS= read -r f; do
+        printf '%s\n' "${f#"$SCRIPT_DIR/"}"
+      done < <(find "$SCRIPT_DIR/$dir" -type f | sort)
+    fi
+  done
+  # Flat managed files
+  printf '%s\n' \
+    ".claude/settings.json" \
+    ".claude-plugin/plugin.json" \
+    ".mcp.json" \
+    "scripts/detect-stack.sh" \
+    "scripts/forge.sh"
+}
+
+# Copy every forge-owned file from SCRIPT_DIR into target, creating dirs as needed.
+# Never deletes anything in the target. Pass additional relative paths to skip as args.
+copy_forge_files() {
+  local target="$1"; shift
+  local -a skip_list=("$@")
+  while IFS= read -r rel; do
+    local src="$SCRIPT_DIR/$rel"
+    local dst="$target/$rel"
+    [ -f "$src" ] || continue
+    # Skip explicitly excluded files
+    local skip=0
+    for ex in "${skip_list[@]+"${skip_list[@]}"}"; do
+      [ "$rel" = "$ex" ] && { skip=1; break; }
+    done
+    [ "$skip" -eq 1 ] && continue
+    mkdir -p "$(dirname "$dst")"
+    cp "$src" "$dst"
+  done < <(forge_source_files)
+}
+
 write_manifest() {
   # write_manifest <target> <action>
   local target="$1" action="$2"
   local sha="unknown"
   [ -d "$SCRIPT_DIR/.git" ] && sha="$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  local files_json
+  files_json="$(forge_source_files | jq -R . | jq -s .)"
   jq -n \
     --arg v "$VERSION" \
     --arg sha "$sha" \
     --arg src "$SCRIPT_DIR" \
     --arg action "$action" \
     --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --argjson files "$files_json" \
     '{
       forge_version: $v,
       installed_from_commit: $sha,
       source_path: $src,
       last_action: $action,
       installed_at: $ts,
-      managed_files: []
+      managed_files: $files
     }' > "$target/$MANIFEST_NAME"
-}
-
-# Files & dirs the harness installs. Anything NOT in this list is the user's
-# and will never be overwritten or removed.
-list_managed_paths() {
-  cat <<'PATHS'
-.claude/agents
-.claude/skills
-.claude/commands
-.claude/hooks
-.claude/settings.json
-.claude-plugin/plugin.json
-.mcp.json
-scripts/detect-stack.sh
-scripts/forge.sh
-PATHS
 }
 
 # Files that should NEVER be overwritten on update (user customizations)
@@ -138,6 +166,7 @@ list_user_owned_paths() {
 CLAUDE.md
 .claude/doc-index.json
 .claude/stack.json
+.forge/constitution.md
 PATHS
 }
 
@@ -166,8 +195,8 @@ cmd_install() {
   fi
 
   # Show what will happen
-  say "${BOLD}Will install:${NC}"
-  while read -r p; do say "  + $p"; done < <(list_managed_paths)
+  say "${BOLD}Will install (forge-owned files only — your files in these dirs are untouched):${NC}"
+  forge_source_files | while read -r f; do say "  + $f"; done
   say ""
   say "${BOLD}Will create only if missing (your customizations are safe):${NC}"
   while read -r p; do say "  ~ $p"; done < <(list_user_owned_paths)
@@ -175,17 +204,8 @@ cmd_install() {
 
   read_yn "Proceed?" y || { err "cancelled"; return 1; }
 
-  # Copy managed paths
-  mkdir -p "$target/.claude" "$target/.claude-plugin" "$target/scripts"
-  rsync -a --delete "$SCRIPT_DIR/.claude/agents/"   "$target/.claude/agents/"
-  rsync -a --delete "$SCRIPT_DIR/.claude/skills/"   "$target/.claude/skills/"
-  rsync -a --delete "$SCRIPT_DIR/.claude/commands/" "$target/.claude/commands/"
-  rsync -a --delete "$SCRIPT_DIR/.claude/hooks/"    "$target/.claude/hooks/"
-  cp "$SCRIPT_DIR/.claude/settings.json"            "$target/.claude/settings.json"
-  cp "$SCRIPT_DIR/.claude-plugin/plugin.json"       "$target/.claude-plugin/plugin.json"
-  cp "$SCRIPT_DIR/.mcp.json"                        "$target/.mcp.json"
-  cp "$SCRIPT_DIR/scripts/detect-stack.sh"          "$target/scripts/detect-stack.sh"
-  cp "$SCRIPT_DIR/scripts/forge.sh"                 "$target/scripts/forge.sh"
+  # Copy forge-owned files only — never deletes anything in target
+  copy_forge_files "$target"
   chmod +x "$target/scripts/"*.sh "$target/.claude/hooks/"*.sh 2>/dev/null || true
 
   # Create user-owned files if missing
@@ -216,47 +236,51 @@ cmd_update() {
   local cur; cur="$(jq -r .forge_version < "$target/$MANIFEST_NAME" 2>/dev/null || echo unknown)"
   info "Updating $target ($cur → $VERSION)"
 
-  # Backup managed paths
+  # Read the old manifest's file list before we overwrite it
+  local old_files=()
+  while IFS= read -r f; do
+    [ -n "$f" ] && old_files+=("$f")
+  done < <(jq -r '.managed_files[]' < "$target/$MANIFEST_NAME" 2>/dev/null || true)
+
+  # Backup only forge-owned files (from old manifest)
   local bdir; bdir="$(backup_dir "$target")"
   mkdir -p "$bdir"
-  while read -r p; do
-    if [ -e "$target/$p" ]; then
-      mkdir -p "$bdir/$(dirname "$p")"
-      cp -R "$target/$p" "$bdir/$p"
+  for f in "${old_files[@]+"${old_files[@]}"}"; do
+    if [ -f "$target/$f" ]; then
+      mkdir -p "$bdir/$(dirname "$f")"
+      cp "$target/$f" "$bdir/$f"
     fi
-  done < <(list_managed_paths)
+  done
   ok "backup → $bdir"
 
-  # Diff preview if available
+  # Diff preview: compare forge source files vs target
   if command -v diff >/dev/null 2>&1; then
     say ""
-    say "${BOLD}Changes that will be applied to managed paths:${NC}"
-    while read -r p; do
-      if [ -e "$SCRIPT_DIR/$p" ] && [ -e "$target/$p" ]; then
-        if ! diff -qr "$target/$p" "$SCRIPT_DIR/$p" >/dev/null 2>&1; then
-          say "  ${YELLOW}~${NC} $p (modified)"
+    say "${BOLD}Changes that will be applied to forge-owned files:${NC}"
+    while IFS= read -r f; do
+      local src="$SCRIPT_DIR/$f" dst="$target/$f"
+      if [ -f "$src" ] && [ -f "$dst" ]; then
+        if ! diff -q "$dst" "$src" >/dev/null 2>&1; then
+          say "  ${YELLOW}~${NC} $f (modified)"
         fi
-      elif [ -e "$SCRIPT_DIR/$p" ]; then
-        say "  ${GREEN}+${NC} $p (new)"
+      elif [ -f "$src" ]; then
+        say "  ${GREEN}+${NC} $f (new)"
       fi
-    done < <(list_managed_paths)
+    done < <(forge_source_files)
+    # Show files forge is removing (in old manifest, absent from new source)
+    local new_source; new_source="$(forge_source_files | sort)"
+    for f in "${old_files[@]+"${old_files[@]}"}"; do
+      if ! printf '%s\n' "$new_source" | grep -qxF "$f"; then
+        say "  ${RED}-${NC} $f (removed from forge source)"
+      fi
+    done
     say ""
   fi
 
   read_yn "Proceed with update?" y || { err "cancelled"; return 1; }
 
-  # Apply
-  rsync -a --delete "$SCRIPT_DIR/.claude/agents/"   "$target/.claude/agents/"
-  rsync -a --delete "$SCRIPT_DIR/.claude/skills/"   "$target/.claude/skills/"
-  rsync -a --delete "$SCRIPT_DIR/.claude/commands/" "$target/.claude/commands/"
-  rsync -a --delete "$SCRIPT_DIR/.claude/hooks/"    "$target/.claude/hooks/"
-  cp "$SCRIPT_DIR/.claude/settings.json"            "$target/.claude/settings.json"
-  cp "$SCRIPT_DIR/.claude-plugin/plugin.json"       "$target/.claude-plugin/plugin.json"
-  cp "$SCRIPT_DIR/scripts/detect-stack.sh"          "$target/scripts/detect-stack.sh"
-  cp "$SCRIPT_DIR/scripts/forge.sh"                 "$target/scripts/forge.sh"
-  chmod +x "$target/scripts/"*.sh "$target/.claude/hooks/"*.sh 2>/dev/null || true
-
-  # .mcp.json is managed but might have been edited — never blow it away
+  # .mcp.json is managed but might have been edited — handle before copy_forge_files
+  # so we can skip it there and avoid silent overwrite of local edits.
   if [ -f "$target/.mcp.json" ]; then
     if ! diff -q "$SCRIPT_DIR/.mcp.json" "$target/.mcp.json" >/dev/null 2>&1; then
       cp "$SCRIPT_DIR/.mcp.json" "$target/.mcp.json.new"
@@ -265,6 +289,20 @@ cmd_update() {
   else
     cp "$SCRIPT_DIR/.mcp.json" "$target/.mcp.json"
   fi
+
+  # Apply: copy all current forge files (add new, overwrite changed); skip .mcp.json (handled above)
+  copy_forge_files "$target" ".mcp.json"
+  chmod +x "$target/scripts/"*.sh "$target/.claude/hooks/"*.sh 2>/dev/null || true
+
+  # Remove files that were forge-owned before but are no longer in the forge source
+  # (intentionally deleted between versions). Never touches files not in old manifest.
+  local new_source; new_source="$(forge_source_files | sort)"
+  for f in "${old_files[@]+"${old_files[@]}"}"; do
+    if ! printf '%s\n' "$new_source" | grep -qxF "$f"; then
+      rm -f "$target/$f"
+      ok "removed (no longer in forge source): $f"
+    fi
+  done
 
   write_manifest "$target" update
   ok "updated to $VERSION"
@@ -281,43 +319,56 @@ cmd_uninstall() {
     return 1
   fi
 
+  # Read the manifest file list
+  local managed_files=()
+  while IFS= read -r f; do
+    [ -n "$f" ] && managed_files+=("$f")
+  done < <(jq -r '.managed_files[]' < "$target/$MANIFEST_NAME" 2>/dev/null || true)
+
   warn "About to UNINSTALL Forge from $target"
   say ""
-  say "${BOLD}Will remove:${NC}"
-  while read -r p; do say "  - $p"; done < <(list_managed_paths)
+  say "${BOLD}Will remove (${#managed_files[@]} forge-owned files):${NC}"
+  for f in "${managed_files[@]+"${managed_files[@]}"}"; do
+    say "  - $f"
+  done
   say "  - $MANIFEST_NAME"
   say ""
   say "${BOLD}Will NOT touch (yours to keep or delete manually):${NC}"
   while read -r p; do say "  ~ $p"; done < <(list_user_owned_paths)
+  say "  ~ Any files you created in .claude/skills/, .claude/commands/, .claude/hooks/, .claude/agents/"
   say "  ~ .forge-backups/"
   say ""
 
   read_yn "Proceed?" n || { err "cancelled"; return 1; }
 
-  # Final backup before removal
+  # Final backup of forge-owned files before removal
   local bdir; bdir="$(backup_dir "$target")"
   mkdir -p "$bdir"
-  while read -r p; do
-    if [ -e "$target/$p" ]; then
-      mkdir -p "$bdir/$(dirname "$p")"
-      cp -R "$target/$p" "$bdir/$p"
+  for f in "${managed_files[@]+"${managed_files[@]}"}"; do
+    if [ -f "$target/$f" ]; then
+      mkdir -p "$bdir/$(dirname "$f")"
+      cp "$target/$f" "$bdir/$f"
     fi
-  done < <(list_managed_paths)
+  done
   ok "final backup → $bdir"
 
-  # Remove managed paths
-  while read -r p; do
-    rm -rf "$target/$p"
-  done < <(list_managed_paths)
+  # Remove only forge-owned files — leaves user files intact
+  for f in "${managed_files[@]+"${managed_files[@]}"}"; do
+    rm -f "$target/$f"
+  done
 
-  # Clean empty dirs we may have created
+  # Clean up directories that are now empty (user files keep their dirs alive).
+  # -depth ensures bottom-up traversal so subdirs are removed before parents.
+  for d in .claude/agents .claude/skills .claude/commands .claude/hooks; do
+    find "$target/$d" -depth -type d -empty -delete 2>/dev/null || true
+  done
   rmdir "$target/.claude-plugin" 2>/dev/null || true
   rmdir "$target/.claude" 2>/dev/null || true
 
   rm -f "$target/$MANIFEST_NAME"
   ok "uninstalled"
   say ""
-  say "  Your CLAUDE.md and doc-index.json were preserved."
+  say "  Your CLAUDE.md, doc-index.json, and any custom skills/commands/hooks were preserved."
   say "  Full backup at: $bdir"
 }
 
@@ -328,12 +379,36 @@ cmd_status() {
     return 1
   fi
   info "Forge status at $target"
-  jq < "$target/$MANIFEST_NAME"
+  jq 'del(.managed_files)' < "$target/$MANIFEST_NAME"
   say ""
-  say "${BOLD}Installed paths:${NC}"
-  while read -r p; do
-    if [ -e "$target/$p" ]; then ok "$p"; else warn "$p (missing)"; fi
-  done < <(list_managed_paths)
+
+  # Forge-owned files
+  local managed_files=()
+  while IFS= read -r f; do
+    [ -n "$f" ] && managed_files+=("$f")
+  done < <(jq -r '.managed_files[]' < "$target/$MANIFEST_NAME" 2>/dev/null || true)
+
+  say "${BOLD}Forge-managed files (${#managed_files[@]}):${NC}"
+  for f in "${managed_files[@]+"${managed_files[@]}"}"; do
+    if [ -f "$target/$f" ]; then ok "$f"; else warn "$f (missing — run update to restore)"; fi
+  done
+
+  # User files in shared directories not in the manifest
+  say ""
+  say "${BOLD}Your files in shared directories (not managed by Forge):${NC}"
+  local found_user=0
+  for d in .claude/agents .claude/skills .claude/commands .claude/hooks; do
+    if [ -d "$target/$d" ]; then
+      while IFS= read -r f; do
+        local rel="${f#"$target/"}"
+        if ! printf '%s\n' "${managed_files[@]+"${managed_files[@]}"}" | grep -qF "$rel"; then
+          say "  ${CYAN}~${NC} $rel"
+          found_user=1
+        fi
+      done < <(find "$target/$d" -type f | sort)
+    fi
+  done
+  [ "$found_user" -eq 0 ] && say "  (none)"
 }
 
 cmd_restore() {
@@ -342,17 +417,17 @@ cmd_restore() {
   target="$(resolve_target "$target")"
   [ -d "$bdir" ] || { err "backup dir not found: $bdir"; return 1; }
 
-  warn "Restoring $target from $bdir — this will overwrite current managed files"
+  warn "Restoring $target from $bdir — this will overwrite current forge-managed files"
   read_yn "Proceed?" n || { err "cancelled"; return 1; }
 
-  while read -r p; do
-    if [ -e "$bdir/$p" ]; then
-      rm -rf "$target/$p"
-      mkdir -p "$(dirname "$target/$p")"
-      cp -R "$bdir/$p" "$target/$p"
-      ok "restored $p"
-    fi
-  done < <(list_managed_paths)
+  # Restore all files present in the backup (these were forge-owned at backup time)
+  while IFS= read -r -d '' f; do
+    local rel="${f#$bdir/}"
+    local dst="$target/$rel"
+    mkdir -p "$(dirname "$dst")"
+    cp "$f" "$dst"
+    ok "restored $rel"
+  done < <(find "$bdir" -type f -print0)
   ok "restore complete"
 }
 
@@ -375,16 +450,26 @@ ${BOLD}FLAGS${NC}
   -y, --yes                          auto-accept all prompts (CI mode)
                                       also via FORGE_YES=1 env var
 
-${BOLD}WHAT IS MANAGED${NC}
-  Files under .claude/agents, .claude/skills, .claude/commands, .claude/hooks,
-  .claude/settings.json, .claude-plugin/plugin.json, .mcp.json,
-  scripts/detect-stack.sh, scripts/forge.sh.
+${BOLD}WHAT FORGE MANAGES${NC}
+  Forge tracks every file it installs in .forge-manifest.json.
+  It only ever creates, updates, or removes the specific files it owns.
+  Your files in .claude/skills/, .claude/commands/, .claude/hooks/, and
+  .claude/agents/ are never touched — Forge co-exists with them safely.
+
+  Forge-owned files:
+    .claude/agents/**      .claude/skills/**
+    .claude/commands/**    .claude/hooks/**
+    .claude/settings.json  .claude-plugin/plugin.json
+    .mcp.json              scripts/detect-stack.sh
+    scripts/forge.sh
 
 ${BOLD}WHAT IS NEVER OVERWRITTEN${NC}
-  CLAUDE.md (yours to customize), .claude/doc-index.json, .claude/stack.json.
+  CLAUDE.md (yours to customize), .claude/doc-index.json, .claude/stack.json,
+  .forge/constitution.md, and any files you create in the shared directories
+  (.claude/skills/, .claude/commands/, .claude/hooks/, .claude/agents/).
 
 ${BOLD}BACKUPS${NC}
-  Every update and every uninstall snapshots managed files to
+  Every update and every uninstall snapshots forge-owned files to
   .forge-backups/<timestamp>/ inside the target repo.
   Roll back with: $(basename "$0") restore <target> <backup-dir>
 HELP

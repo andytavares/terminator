@@ -4,11 +4,9 @@ description: Run the full researcher → test-author → implementer loop for a 
 
 For task: $ARGUMENTS
 
-1. Run the `researcher` subagent. Return the plan.
-2. Pause for my approval of the plan.
-3. After approval, run `test-author` to write failing tests and confirm they fail.
-4. Pause for my approval of the tests.
-5. After approval, run `implementer` to make them pass.
-6. Run `code-reviewer` before declaring done.
-
-Do not skip pauses.
+1. Run the `researcher` subagent to produce an implementation plan.
+2. Run `test-author` to write failing tests against the plan's acceptance criteria. Confirm tests fail before proceeding.
+3. Run `implementer` to write the minimum code that makes the tests pass.
+4. Run `code-reviewer` against the diff. Collect any issues found.
+5. If the code-reviewer finds blocking issues: fix them inline and re-run the reviewer. Do not surface these mid-loop — fix and continue.
+6. Return the completed task summary: what was built, test count, any non-blocking reviewer notes.

@@ -58,6 +58,9 @@
         "hooks": [{ "type": "command", "command": ".claude/hooks/pre-edit-guard.sh" }]
       }
     ],
+    "PostCompact": [
+      { "hooks": [{ "type": "command", "command": ".claude/hooks/post-compact.sh" }] }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",

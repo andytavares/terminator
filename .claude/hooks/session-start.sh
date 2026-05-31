@@ -32,3 +32,18 @@ if [ -f "$INDEX" ]; then
   STALE=$(jq '[.entries[] | select(.staleness_score > 0)] | length' < "$INDEX" 2>/dev/null || echo 0)
   echo "stale-docs: $STALE entries need doc-keeper attention"
 fi
+
+# Project constitution injection
+CONSTITUTION="$ROOT/.forge/constitution.md"
+if [ -f "$CONSTITUTION" ]; then
+  CHAR_COUNT=$(wc -m < "$CONSTITUTION" | tr -d ' ')
+  if [ "$CHAR_COUNT" -gt 2000 ]; then
+    echo "constitution: WARNING — .forge/constitution.md is ${CHAR_COUNT} characters (limit 2000). Trim it or Claude will not see it. Run /forge.constitution to edit."
+  else
+    echo "=== project-constitution ==="
+    cat "$CONSTITUTION"
+    echo "=== end project-constitution ==="
+  fi
+else
+  echo "constitution: not found — run /forge.constitution to create one"
+fi
