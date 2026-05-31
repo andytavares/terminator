@@ -25,6 +25,16 @@ const ANSI_COLORS = [
   '#e5e5e5',
 ]
 
+function measureCharWidth(fontSize: number): number {
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    ctx.font = `${fontSize}px Menlo, Monaco, "Courier New", monospace`
+    return ctx.measureText('M').width || 8
+  }
+  return 8
+}
+
 function ansiColorToCss(color: number, defaultCss: string): string {
   if (color === -1 || color === undefined) return defaultCss
   // 0–15: standard ANSI palette
@@ -141,13 +151,7 @@ export class TerminalInstance {
     // Compute natural pixel dimensions using the same font metrics as captureToDataUrl.
     const fontSize = 13
     const lineHeight = Math.ceil(fontSize * 1.2)
-    let charW = 8 // fallback if canvas measurement is unavailable
-    const measureCanvas = document.createElement('canvas')
-    const mctx = measureCanvas.getContext('2d')
-    if (mctx) {
-      mctx.font = `${fontSize}px Menlo, Monaco, "Courier New", monospace`
-      charW = mctx.measureText('M').width || charW
-    }
+    const charW = measureCharWidth(fontSize)
     const naturalW = Math.ceil(cols * charW + 12)
     const naturalH = rows * lineHeight + 8
 
@@ -182,11 +186,7 @@ export class TerminalInstance {
     // Measure character dimensions using the same font xterm uses
     const fontSize = 13
     const lineHeight = Math.ceil(fontSize * 1.2)
-    const measureCanvas = document.createElement('canvas')
-    const mctx = measureCanvas.getContext('2d')
-    if (!mctx) return null
-    mctx.font = `${fontSize}px Menlo, Monaco, "Courier New", monospace`
-    const charW = mctx.measureText('M').width
+    const charW = measureCharWidth(fontSize)
 
     const padX = 6
     const padY = 4
@@ -204,8 +204,8 @@ export class TerminalInstance {
     ctx.font = `${fontSize}px Menlo, Monaco, "Courier New", monospace`
 
     const buffer = this.terminal.buffer.active
-    const reusableCell: IBufferCell =
-      this.terminal.buffer.active.getLine(0)?.getCell(0) ?? (null as unknown as IBufferCell)
+    const reusableCell: IBufferCell | null =
+      this.terminal.buffer.active.getLine(0)?.getCell(0) ?? null
 
     for (let row = 0; row < rows; row++) {
       const line = buffer.getLine(row)
@@ -213,7 +213,7 @@ export class TerminalInstance {
       const y = padY + (row + 1) * lineHeight - 2
 
       for (let col = 0; col < cols; col++) {
-        const cell = line.getCell(col, reusableCell)
+        const cell = line.getCell(col, reusableCell ?? undefined)
         if (!cell) continue
 
         // Draw background if not default

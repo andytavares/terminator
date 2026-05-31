@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useSessionStore } from '../../stores/session.store'
-import type { TerminalInstance } from './TerminalSession'
 import type { PaneNode } from '../../../../shared/types/index'
 import { SplitContainer } from './SplitContainer'
 import { LeafPane } from './LeafPane'
@@ -44,12 +43,12 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     if (prevId === nextId) return
 
     if (prevId) {
-      const prev = getTerminalInstance(prevId) as TerminalInstance | undefined
+      const prev = getTerminalInstance(prevId)
       prev?.unmount()
     }
 
     if (nextId && containerRef.current) {
-      const next = getTerminalInstance(nextId) as TerminalInstance | undefined
+      const next = getTerminalInstance(nextId)
       next?.mount(containerRef.current)
     }
 
@@ -62,7 +61,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
       const currentId = prevSessionIdRef.current
       prevSessionIdRef.current = null
       if (currentId) {
-        const instance = getTerminalInstance(currentId) as TerminalInstance | undefined
+        const instance = getTerminalInstance(currentId)
         instance?.unmount()
       }
     }
@@ -71,7 +70,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
 
   const scrollActiveToBottom = useCallback(() => {
     if (activeSessionId) {
-      const instance = getTerminalInstance(activeSessionId) as TerminalInstance | undefined
+      const instance = getTerminalInstance(activeSessionId)
       instance?.terminal.scrollToBottom()
       instance?.terminal.focus()
     }

@@ -5,7 +5,6 @@ import type {
   Project,
   ProcessMetrics,
 } from '../../../../shared/types/index'
-import type { TerminalInstance } from '../terminal/TerminalSession'
 import { ActivitySpinner } from '../ActivitySpinner'
 import { useSessionStore } from '../../stores/session.store'
 import './SessionTile.css'
@@ -42,7 +41,7 @@ function SessionTileInner({
   }
 
   useLayoutEffect(() => {
-    const instance = getTerminalInstance(session.id) as TerminalInstance | undefined
+    const instance = getTerminalInstance(session.id)
     if (!instance || !previewRef.current) return
     const cleanup = instance.mountPreview(previewRef.current)
     return cleanup ?? undefined

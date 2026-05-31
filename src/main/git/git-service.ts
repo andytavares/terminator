@@ -4,6 +4,7 @@ import { join } from 'path'
 import type { Branch, WorktreeInfo } from '../../shared/types/index.js'
 import type { GitStatus, FileDiff } from '../../shared/schemas/git.schema.js'
 import { parseStatus, parseDiff } from './git-parser.js'
+import { GIT_ENV } from './git-env.js'
 
 const execFile = promisify(execFileCb)
 
@@ -14,7 +15,7 @@ async function git(args: string[], cwd: string): Promise<string> {
   const { stdout } = await execFile('git', args, {
     cwd,
     timeout: GIT_TIMEOUT,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    env: GIT_ENV,
   })
   return stdout.trim()
 }
@@ -24,7 +25,7 @@ export async function getStatus(repoRoot: string, maxFiles: number = 500): Promi
     execFile('git', ['status', '--porcelain=v1', '-z'], {
       cwd: repoRoot,
       timeout: GIT_TIMEOUT,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+      env: GIT_ENV,
     }).then(({ stdout }) => stdout),
     git(['branch', '--show-current'], repoRoot).catch(() => 'HEAD'),
   ])
@@ -45,7 +46,7 @@ export async function getDiff(
     cwd: repoRoot,
     timeout: GIT_TIMEOUT,
     maxBuffer: DIFF_MAX_BYTES + 1024,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    env: GIT_ENV,
   })
   return { ...parseDiff(stdout, DIFF_MAX_BYTES), path: filePath }
 }

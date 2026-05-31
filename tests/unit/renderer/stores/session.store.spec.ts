@@ -360,7 +360,8 @@ describe('useSessionStore', () => {
   describe('setTerminalInstance / getTerminalInstance', () => {
     it('stores and retrieves terminal instance by sessionId', () => {
       const fakeTerminal = { write: vi.fn() }
-      useSessionStore.getState().setTerminalInstance('sess-1', fakeTerminal)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      useSessionStore.getState().setTerminalInstance('sess-1', fakeTerminal as any)
       expect(useSessionStore.getState().getTerminalInstance('sess-1')).toBe(fakeTerminal)
     })
 
