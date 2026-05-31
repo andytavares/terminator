@@ -244,6 +244,30 @@ Removes a workspace and all its projects.
 
 ---
 
+### `workspace:reorder`
+
+Reorders workspaces in the sidebar by providing the desired ID order.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**:
+
+```typescript
+{
+  ids: string[]
+}
+```
+
+**Response**:
+
+```typescript
+{
+  success: boolean
+}
+```
+
+---
+
 ### `project:list`
 
 Returns all projects for a given workspace.
@@ -296,6 +320,54 @@ Returns all projects for a given workspace.
 ```typescript
 {
   id: string
+}
+```
+
+**Response**:
+
+```typescript
+{
+  success: boolean
+}
+```
+
+---
+
+### `project:rename`
+
+Renames a project. Returns an error if the project is not found or if another project in the same workspace already has that name.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**:
+
+```typescript
+{
+  id: string
+  name: string
+}
+```
+
+**Response**:
+
+```typescript
+{ project: Project } | { error: 'NOT_FOUND' | 'DUPLICATE_NAME' | 'VALIDATION_ERROR' }
+```
+
+---
+
+### `project:reorder`
+
+Reorders projects within a workspace by providing the desired ID order.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**:
+
+```typescript
+{
+  workspaceId: string
+  ids: string[]
 }
 ```
 
@@ -632,6 +704,18 @@ Checks out an existing branch.
 
 ---
 
+### `git:create-branch`
+
+Creates a new branch at HEAD without switching to it.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ path: string; branch: string }`
+
+**Response**: `{ success: true } | { error: 'VALIDATION_ERROR' | string }`
+
+---
+
 ### `git:suggest-worktree-path`
 
 Suggests a filesystem path for a new worktree based on repo root and branch name.
@@ -743,6 +827,54 @@ Opens a URL in the system default browser. The URL must be a valid absolute URL.
 **Request**: `{ url: string }`
 
 **Response**: `{ ok: true } | { error: string }`
+
+---
+
+## File System Channels
+
+### `fs:watch-start`
+
+Starts watching a project root directory for file-system changes. All change events are pushed back to the renderer via the `fs:changed` push event.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ projectRoot: string }`
+
+**Response**: `{ ok: true } | { error: 'VALIDATION_ERROR' }`
+
+---
+
+### `fs:watch-stop`
+
+Stops all active file-system watchers.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: _(none)_
+
+**Response**: `{ ok: true }`
+
+---
+
+### `fs:read-file`
+
+Reads the full text content of a file at the given path.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ filePath: string }`
+
+**Response**: `{ content: string } | { error: 'VALIDATION_ERROR' | 'FILE_NOT_FOUND' }`
+
+---
+
+### `fs:changed`
+
+Pushed from main to the renderer window whenever a watched directory emits a change event.
+
+**Direction**: main → renderer (webContents.send)
+
+**Payload**: `FsChangeEvent` (as defined by `fsWatcherService`)
 
 ---
 

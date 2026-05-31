@@ -86,49 +86,30 @@ specs/            — Feature specifications and plans
 2. **Validated IPC boundaries**: All IPC payloads are Zod-validated on both sides. See `specs/001-extension-first-terminal/contracts/ipc-channels.md`.
 3. **xterm.js instances are never destroyed on tab switch**: When a user navigates away from a project, xterm.js `Terminal` objects are detached from the DOM but kept in memory. Re-attaching restores the exact buffer and scroll state.
 4. **Extensions receive only ExtensionAPI**: See `specs/001-extension-first-terminal/contracts/extension-api.md`. Never import internal modules from extension code.
-5. **All ADRs in `docs/adr/`**: Read ADR-001 through ADR-004 before touching the relevant subsystem.
+5. **All ADRs in `docs/adr/`**: Read ADRs 001–014 before touching the relevant subsystem. Key ADRs by area: ADR-005 (file watching), ADR-006 (shell execution), ADR-007 (bundled extension distribution), ADR-008 (extension build pipeline), ADR-012 (ExtensionAPI v1.2.0), ADR-013 (MCP stdio sidecar), ADR-014 (line-based task IDs).
 
 ---
 
 ## Developing an Extension (local)
 
-1. Create a directory, e.g. `my-extension/`
-2. Add `extension.json`:
-   ```json
-   {
-     "id": "com.example.my-extension",
-     "name": "My Extension",
-     "version": "1.0.0",
-     "description": "...",
-     "main": "index.js",
-     "minAppVersion": "0.1.0"
-   }
-   ```
-3. Write `index.js` (CommonJS only — `module.exports`, not ES modules):
+Use the scaffold CLI to generate a complete, working hello-world extension:
 
-   ```js
-   function activate(api) {
-     api.settings.register({
-       label: 'My Settings',
-       properties: {
-         /* ... */
-       },
-     })
-     api.sidebar.registerItem({ id: 'my-panel', label: 'My Panel', onClick: () => {} })
-     api.keyboard.register('CmdOrCtrl+Shift+X', () => {
-       /* ... */
-     })
-   }
+```bash
+npm run create-extension -- my-extension
+# optional: npm run create-extension -- my-extension --id com.example.my-extension
+```
 
-   function deactivate() {}
+This creates `extensions/my-extension/` with a `manifest.json` and a `src/index.js` that demonstrates all v1.2.0 API surfaces as commented-out stubs. Run `npm run dev` and the extension loads automatically.
 
-   module.exports = { activate, deactivate }
-   ```
+After making TypeScript changes to your extension source, rebuild before testing:
 
-4. In the running app, open Settings (`Cmd+,`) → Extensions → **Install from Directory** → select `my-extension/`.
-5. The extension activates immediately. Check the Extensions panel for status (`enabled` / `error`).
+```bash
+npm run build:extensions
+```
 
-**Working example**: `tests/fixtures/sample-extension/` — registers a settings section, a workspace context menu item, and `CmdOrCtrl+Shift+S`. Study it as a starting point.
+To install a third-party extension from an arbitrary directory, open Settings (`Cmd+,`) → Extensions → **Install from Directory** → select the extension folder. The extension activates immediately. Check the Extensions panel for status (`enabled` / `error`).
+
+**Working example**: `extensions/git-integration/` — a full production extension demonstrating sidebar panels, context menus, top-bar items, IPC, and file watching.
 
 **Full API reference**: `docs/EXTENSION-DEVELOPMENT.md` and `contracts/extension-api.md`.
 
@@ -136,11 +117,14 @@ specs/            — Feature specifications and plans
 
 ## Common Commands Reference
 
-| Command            | Description                           |
-| ------------------ | ------------------------------------- |
-| `npm run dev`      | Start app in development mode         |
-| `npm test`         | Run unit + integration tests          |
-| `npm run test:e2e` | Run Playwright e2e tests              |
-| `npm run rebuild`  | Recompile native modules for Electron |
-| `npm run lint`     | ESLint + TypeScript type check        |
-| `npm run format`   | Prettier format                       |
+| Command                    | Description                            |
+| -------------------------- | -------------------------------------- |
+| `npm run dev`              | Start app in development mode          |
+| `npm test`                 | Run unit + integration tests           |
+| `npm run test:e2e`         | Run Playwright e2e tests               |
+| `npm run rebuild`          | Recompile native modules for Electron  |
+| `npm run build:extensions` | Compile extension TypeScript source    |
+| `npm run lint`             | ESLint check                           |
+| `npm run typecheck`        | TypeScript type check (no emit)        |
+| `npm run format`           | Prettier format                        |
+| `npm run create-extension` | Scaffold a new extension from template |

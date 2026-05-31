@@ -114,7 +114,7 @@ interface Extension {
 }
 ```
 
-**Extension manifest** (`extension.json` at extension root):
+**Extension manifest** (`manifest.json` at extension root):
 
 ```typescript
 interface ExtensionManifest {

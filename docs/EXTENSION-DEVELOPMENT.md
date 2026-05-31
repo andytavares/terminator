@@ -538,7 +538,7 @@ npm run create-extension -- <name> [options]
 
 **Exit codes**: `0` success, `1` bad arguments, `2` directory already exists, `3` filesystem error.
 
-The generated `src/index.ts` is a complete working hello-world demonstrating all v1.1.0 API surfaces. v1.1.0-specific surfaces (shell, fs, registerPanel, topBar) are included as commented-out stubs with `// TODO:` markers so you can activate them incrementally.
+The generated `src/index.js` is a complete working hello-world demonstrating all v1.2.0 API surfaces. v1.1.0-specific surfaces (shell, fs, registerPanel, topBar) and v1.2.0-specific surfaces (globalShortcut, registerGlobalTab, workspace, window, createNotification) are included as commented-out stubs with `// TODO:` markers so you can activate them incrementally.
 
 ---
 
@@ -664,13 +664,43 @@ const disposable = api.globalShortcut.register('CommandOrControl+Shift+Space', (
 disposables.push(disposable)
 ```
 
-### `api.notifications.showToast(type, message)`
+### `api.workspace` — Workspace and Project Access _(v1.2.0)_
 
-Shows an ephemeral toast notification and also records it in the persistent notification center. `type` is `'info' | 'success' | 'warning' | 'error'`.
+Read-only access to the workspace list and per-workspace project list. Also provides delete-event subscriptions.
 
 ```typescript
-api.notifications.showToast('info', 'Weekly review is ready')
+const workspaces = api.workspace.list()
+// [{ id, name, folderPath }, ...]
+
+const projects = api.workspace.listProjects(workspaces[0].id)
+// [{ id, workspaceId, name }, ...]
+
+disposables.push(
+  api.workspace.onDelete((workspaceId) => {
+    // Clean up any state keyed to this workspace
+  })
+)
+disposables.push(
+  api.workspace.onProjectDelete((projectId) => {
+    // Clean up any state keyed to this project
+  })
+)
 ```
+
+---
+
+### `api.window` — Auxiliary Window Management _(v1.2.0)_
+
+Opens a secondary `BrowserWindow` that renders an extension-specific view from the same renderer URL with a `?view=` query param.
+
+```typescript
+api.window.openAuxiliary('my-extension-view', { runId: '123' })
+// The renderer detects the `view` param and renders the corresponding component
+```
+
+Use `api.ipc.registerHandler` to back the auxiliary window's data needs.
+
+---
 
 ### `api.notifications.createNotification(opts): Disposable`
 

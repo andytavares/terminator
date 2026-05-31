@@ -87,7 +87,7 @@ describe('ExtensionHost', () => {
       minAppVersion: '0.1.0',
     })
 
-    vi.doMock('/fake/ext/extension.json', () => JSON.parse(mockManifest))
+    vi.doMock('/fake/ext/manifest.json', () => JSON.parse(mockManifest))
 
     const result = await host.load('/fake/ext')
     expect(

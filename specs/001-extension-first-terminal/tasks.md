@@ -225,7 +225,7 @@
 - [x] T082 Add extension sidebar item injection to Sidebar.tsx: subscribe to ExtensionAPI sidebar contributions registry; render contributed SidebarContribution items below workspace list
 - [x] T083 Add extension context menu item injection to WorkspaceItem.tsx, ProjectItem.tsx, and TabBar.tsx: merge contributed MenuItemContribution items into respective right-click menus, calling onClick(targetId) with the relevant entity ID
 - [x] T084 Add Extensions management section to GlobalSettings.tsx: list installed extensions with name, version, status badge (enabled/disabled/error); "Install from directory" button (triggers native folder picker then extension:install); enable/disable toggle per extension (calls extension:toggle IPC)
-- [x] T085 [P] Create fixture sample extension in tests/fixtures/sample-extension/ with extension.json manifest, main.js that contributes one settings section, one workspace context menu item, and one keyboard shortcut (non-reserved accelerator) — used by e2e tests in T075
+- [x] T085 [P] Create fixture sample extension in tests/fixtures/sample-extension/ with manifest.json manifest, main.js that contributes one settings section, one workspace context menu item, and one keyboard shortcut (non-reserved accelerator) — used by e2e tests in T075
 - [x] T091 [P] Write failing unit tests for ExtensionAPI keyboard namespace in tests/unit/extensions/extension-host.spec.ts: keyboard.register() with a non-reserved accelerator returns Disposable, keyboard.register() throws synchronously when given a reserved shortcut (e.g., "CmdOrCtrl+T"), disposing the returned Disposable removes the handler (FR-034)
 
 **Checkpoint**: US6 fully functional. Extension system operational. All 7 user stories complete.
