@@ -13,7 +13,7 @@ export interface Sensor {
   command: string
 }
 
-export type ProviderType = 'claude' | 'openai' | 'gemini' | 'ollama' | 'custom'
+export type ProviderType = 'claude-code' | 'claude' | 'openai' | 'gemini' | 'ollama' | 'custom'
 
 export interface ProviderRef {
   providerId: string
@@ -108,12 +108,16 @@ export type SubAgentStatus = 'pending' | 'running' | 'gate' | 'done' | 'rejected
 export interface SubAgent {
   agentId: string
   role: string
+  /** Full task description — persisted so retries use the original prompt, not just the role name */
+  task?: string
   dependsOn: string[]
   inputFrom: string[]
   outputArtifacts: string[]
   status: SubAgentStatus
   runId?: string
   position?: { x: number; y: number }
+  /** Injected when the user re-runs this agent with feedback */
+  retryFeedback?: string
 }
 
 export interface Run {
@@ -134,12 +138,16 @@ export interface Run {
   subAgents?: SubAgent[]
   fileChanges: FileChange[]
   sensorResults?: SensorResult[]
-  worktreePath?: string
-  worktreeBranch?: string
+  /** Branch the worktree was created from — set at run creation */
+  baseBranch: string
+  /** User-supplied feature branch name (replaces worktreeBranch) — set at run creation */
+  featureBranch: string
+  /** Absolute path to the git worktree — always set at run creation */
+  worktreePath: string
   /** Accumulated token counts across all iterations — written to history at completion */
   tokenCountIn?: number
   tokenCountOut?: number
-  /** Terminator project.id created for this run's worktree — used for cleanup on completion */
+  /** Terminator project.id created for this run's worktree — set by renderer after project creation */
   terminalProjectId?: string
 }
 
@@ -170,6 +178,11 @@ export interface HistoryEntry {
   createdAt: string
   completedAt: string
   subAgentRunIds?: string[]
+  /** Stored for the explicit delete action — allows removing the worktree and branch */
+  featureBranch?: string
+  baseBranch?: string
+  worktreePath?: string
+  terminalProjectId?: string
 }
 
 // ─── Co-pilot ───────────────────────────────────────────────────────────────

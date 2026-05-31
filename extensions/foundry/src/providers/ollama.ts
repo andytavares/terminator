@@ -14,9 +14,14 @@ export class OllamaAdapter implements ProviderAdapter {
   async *run(request: RunRequest): AsyncIterable<RunEvent> {
     if (this.requestDelayMs > 0) await new Promise((r) => setTimeout(r, this.requestDelayMs))
     const url = `${this.endpoint.replace(/\/$/, '')}/api/generate`
-    const prompt = request.agentsMdContent
-      ? `${request.agentsMdContent}\n\n${request.prompt}`
-      : request.prompt
+    const contextParts = [
+      request.agentsMdContent || '',
+      request.workspaceListing
+        ? `Current workspace file tree:\n\`\`\`\n${request.workspaceListing}\n\`\`\`\nWrite files at the correct location relative to this structure.`
+        : '',
+    ].filter(Boolean)
+    const prompt =
+      contextParts.length > 0 ? `${contextParts.join('\n\n')}\n\n${request.prompt}` : request.prompt
 
     try {
       const res = await fetch(url, {

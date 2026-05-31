@@ -81,6 +81,9 @@ describe('Full spec-to-code lifecycle integration', () => {
       model: 'claude-sonnet-4-6',
       prompt: '# Auth Middleware Spec\n\nImplement JWT auth middleware.',
       specPath: 'specs/001/spec.md',
+      baseBranch: 'main',
+      featureBranch: 'fix/auth-middleware',
+      worktreePath: path.join(dir, '.worktrees', 'fix-auth-middleware'),
     })
     expect(createResult).not.toHaveProperty('error')
     if ('error' in createResult) throw new Error(createResult.error)
@@ -135,13 +138,17 @@ describe('Full spec-to-code lifecycle integration', () => {
     expect(entry.completedAt).toBeDefined() // completedAt
   })
 
-  it('abort: reverts file changes and writes aborted history entry', async () => {
+  it('abort: preserves worktree and writes aborted history entry with worktree info', async () => {
+    const worktreePath = path.join(dir, '.worktrees', 'fix-auth')
     const createResult = await createSpecToCodeRun({
       workspaceRoot: dir,
       harness: HARNESS,
       providerId: 'provider-claude',
       model: 'claude-sonnet-4-6',
       prompt: 'Build auth',
+      baseBranch: 'main',
+      featureBranch: 'fix/auth',
+      worktreePath,
     })
     if ('error' in createResult) throw new Error(createResult.error)
     const { run } = createResult
@@ -151,10 +158,13 @@ describe('Full spec-to-code lifecycle integration', () => {
 
     const aborted = await abortRun(run, dir)
     expect(aborted.status).toBe('aborted')
-    expect(vi.mocked(gitMod.revertFiles)).toHaveBeenCalledWith(dir, ['src/temp.ts'])
+    // Abort does NOT revert files — the worktree stays intact for inspection
+    expect(vi.mocked(gitMod.revertFiles)).not.toHaveBeenCalled()
 
     const { entries } = await readHistory(dir, 0, 10)
     expect(entries[0].status).toBe('aborted')
+    expect(entries[0].featureBranch).toBe('fix/auth')
+    expect(entries[0].worktreePath).toBe(worktreePath)
   })
 
   it('activate() completes within 1000ms (SC-009 load-time assertion)', async () => {
@@ -169,6 +179,9 @@ describe('Full spec-to-code lifecycle integration', () => {
         providerId: 'p1',
         model: 'm1',
         prompt: 'test',
+        baseBranch: 'main',
+        featureBranch: 'fix/thing',
+        worktreePath: path.join(dir, '.worktrees', 'fix-thing'),
       }),
     ])
     const elapsed = Date.now() - start

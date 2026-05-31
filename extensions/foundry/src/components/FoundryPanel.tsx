@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react'
+import { AlertTriangle, Play, Settings } from 'lucide-react'
 import './foundry.css'
 import { HarnessSetupWizard } from './HarnessSetupWizard'
 import { HarnessSettings } from './HarnessSettings'
+import { BranchSelectForm } from './BranchSelectForm'
 import { NewRunDialog } from './NewRunDialog'
 import { HistoryView } from './HistoryView'
 import type { HarnessHealthEvent } from '../types/foundry.types'
 
 interface Props {
   repoRoot: string | null
+  onClose: () => void
 }
 
-type View = 'dashboard' | 'setup-wizard' | 'settings' | 'new-run'
+type View = 'dashboard' | 'setup-wizard' | 'settings' | 'branch-select' | 'new-run'
 
 function invoke(channel: string, payload: unknown) {
   return window.electronAPI.extensionBridge.invoke(channel, payload) as Promise<
@@ -52,7 +55,7 @@ function HealthAlertBar({
             fontSize: 11,
           }}
         >
-          <span style={{ color: 'var(--tm-warning)', flexShrink: 0 }}>⚠</span>
+          <AlertTriangle size={12} style={{ flexShrink: 0 }} />
           <span style={{ flex: 1, color: 'var(--tm-text-secondary)' }}>
             {HEALTH_MSG[e.kind]?.(e) ?? e.kind}
           </span>
@@ -89,21 +92,34 @@ function HealthAlertBar({
   )
 }
 
+interface BranchSelectResult {
+  baseBranch: string
+  featureBranch: string
+  /** Only set when re-running a previous run — undefined for fresh runs */
+  worktreePath?: string
+}
+
 interface RerunConfig {
   providerId?: string
   model?: string
   mode?: string
   specPath?: string
   prompt?: string
+  baseBranch?: string
+  featureBranch?: string
+  worktreePath?: string
 }
 
-export function FoundryPanel({ repoRoot }: Props) {
+export function FoundryPanel({ repoRoot, onClose: _onClose }: Props) {
   const [view, setView] = useState<View>('dashboard')
   const [setupRequired, setSetupRequired] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
   const [sensorCount, setSensorCount] = useState(0)
   const [healthEvents, setHealthEvents] = useState<HarnessHealthEvent[]>([])
   const [rerunConfig, setRerunConfig] = useState<RerunConfig | undefined>(undefined)
+  const [branchSelectResult, setBranchSelectResult] = useState<BranchSelectResult | undefined>(
+    undefined
+  )
 
   async function refresh() {
     if (!repoRoot) {
@@ -117,7 +133,6 @@ export function FoundryPanel({ repoRoot }: Props) {
       if (!needsSetup && 'harness' in harnessResult) {
         const h = harnessResult.harness as { sensors?: unknown[] }
         setSensorCount(h.sensors?.length ?? 0)
-        // Scan AGENTS.md for stale refs on load
         void invoke('foundry:agents-md-scan', { workspaceRoot: repoRoot })
       }
     } catch {
@@ -132,7 +147,7 @@ export function FoundryPanel({ repoRoot }: Props) {
     void refresh()
   }, [repoRoot]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Listen for navigation events dispatched by the renderer (⌘⇧R, command palette, etc.)
+  // Listen for navigation events
   useEffect(() => {
     function onNavigate(e: Event) {
       const target = (e as CustomEvent<string>).detail as View
@@ -147,64 +162,21 @@ export function FoundryPanel({ repoRoot }: Props) {
     function onRerun(e: Event) {
       const config = (e as CustomEvent<RerunConfig>).detail
       setRerunConfig(config)
-      setView('new-run')
+      // If history has featureBranch/worktreePath, skip branch-select and go straight to run config
+      if (config.featureBranch && config.worktreePath && config.baseBranch) {
+        setBranchSelectResult({
+          baseBranch: config.baseBranch,
+          featureBranch: config.featureBranch,
+          worktreePath: config.worktreePath,
+        })
+        setView('new-run')
+      } else {
+        setView('branch-select')
+      }
     }
     window.addEventListener('foundry:rerun', onRerun)
     return () => window.removeEventListener('foundry:rerun', onRerun)
   }, [])
-
-  // Auto-create a Terminator project when a worktree is created for a run
-  useEffect(() => {
-    if (!repoRoot) return
-    const unsub = window.electronAPI.extensionBridge.on('foundry:worktree-created', (data) => {
-      const { runId, workspaceRoot, worktreePath, branch, label } = data as {
-        runId: string
-        workspaceRoot: string
-        worktreePath: string
-        branch: string
-        label: string
-      }
-      void (async () => {
-        try {
-          const { workspaces } = await window.electronAPI.workspace.list()
-          const ws = workspaces.find(
-            (w: { folderPath: string }) => w.folderPath === workspaceRoot
-          ) as { id: string } | undefined
-          if (!ws) return
-          const result = await window.electronAPI.project.create({
-            workspaceId: ws.id,
-            name: label,
-            gitBranch: branch,
-            worktreePath,
-            isWorktree: true,
-          })
-          if ('project' in result) {
-            await invoke('foundry:set-project-id', {
-              runId,
-              workspaceRoot,
-              projectId: result.project.id,
-            })
-          }
-        } catch {
-          // best-effort — project creation must never break a run
-        }
-      })()
-    })
-    return () => unsub()
-  }, [repoRoot]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-delete the Terminator project when the worktree is cleaned up
-  useEffect(() => {
-    if (!repoRoot) return
-    const unsub = window.electronAPI.extensionBridge.on('foundry:worktree-removed', (data) => {
-      const { terminalProjectId } = data as { terminalProjectId?: string }
-      if (!terminalProjectId) return
-      void window.electronAPI.project.delete(terminalProjectId).catch(() => {
-        // best-effort
-      })
-    })
-    return () => unsub()
-  }, [repoRoot]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Subscribe to health-changed push events
   useEffect(() => {
@@ -217,6 +189,8 @@ export function FoundryPanel({ repoRoot }: Props) {
 
   function backToDashboard() {
     setView('dashboard')
+    setBranchSelectResult(undefined)
+    setRerunConfig(undefined)
     void refresh()
   }
 
@@ -273,26 +247,38 @@ export function FoundryPanel({ repoRoot }: Props) {
     )
   }
 
-  if (view === 'new-run') {
+  if (view === 'branch-select') {
+    return (
+      <div className="fnd-panel">
+        <BranchSelectForm
+          repoRoot={repoRoot}
+          onSubmit={(result) => {
+            setBranchSelectResult(result)
+            setView('new-run')
+          }}
+          onCancel={backToDashboard}
+        />
+      </div>
+    )
+  }
+
+  if (view === 'new-run' && branchSelectResult) {
     return (
       <div className="fnd-panel">
         <NewRunDialog
           repoRoot={repoRoot}
-          onClose={() => {
-            setView('dashboard')
-            setRerunConfig(undefined)
-          }}
-          onLaunched={() => {
-            setRerunConfig(undefined)
-            backToDashboard()
-          }}
+          baseBranch={branchSelectResult.baseBranch}
+          featureBranch={branchSelectResult.featureBranch}
+          worktreePath={branchSelectResult.worktreePath}
+          onClose={backToDashboard}
+          onLaunched={backToDashboard}
           rerunConfig={rerunConfig}
         />
       </div>
     )
   }
 
-  // ── Dashboard ── shows history + active runs directly
+  // ── Dashboard ── workspace-level runs list
   return (
     <div className="fnd-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="fnd-header">
@@ -301,16 +287,16 @@ export function FoundryPanel({ repoRoot }: Props) {
           <div style={{ display: 'flex', gap: 4 }}>
             <button
               className="fnd-btn fnd-btn--primary fnd-btn--sm"
-              onClick={() => setView('new-run')}
+              onClick={() => setView('branch-select')}
             >
-              ▶ Run
+              <Play size={11} /> New Run
             </button>
             <button
               className="fnd-btn fnd-btn--secondary fnd-btn--sm"
               onClick={() => setView('settings')}
               title="Settings"
             >
-              ⚙
+              <Settings size={13} />
             </button>
           </div>
         )}
@@ -342,7 +328,7 @@ export function FoundryPanel({ repoRoot }: Props) {
             <span>
               {healthEvents.length > 0
                 ? `${healthEvents.length} health alert${healthEvents.length !== 1 ? 's' : ''}`
-                : 'Harness ready — '}
+                : 'Harness ready — '}
             </span>
             {healthEvents.length === 0 && (
               <span style={{ color: 'var(--tm-success)' }}>
@@ -356,7 +342,7 @@ export function FoundryPanel({ repoRoot }: Props) {
             onResolve={(kind, key) => void resolveHealthEvent(kind, key)}
           />
           <div style={{ flex: 1, overflow: 'hidden' }}>
-            <HistoryView repoRoot={repoRoot} onNewRun={() => setView('new-run')} />
+            <HistoryView repoRoot={repoRoot} onNewRun={() => setView('branch-select')} />
           </div>
         </>
       )}

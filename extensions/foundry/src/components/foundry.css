@@ -280,6 +280,9 @@
 
 /* ── Buttons ── */
 .fnd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 5px 12px;
   border-radius: var(--tm-radius-xs);
   font-size: 12px;
@@ -790,4 +793,16 @@
 }
 .fnd-log-line--error .fnd-log-msg {
   color: var(--tm-danger);
+}
+
+.fnd-log-line--error {
+  background: rgba(239, 68, 68, 0.07);
+  border-left: 2px solid var(--tm-danger);
+  padding-left: 12px !important;
+}
+
+@keyframes fnd-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

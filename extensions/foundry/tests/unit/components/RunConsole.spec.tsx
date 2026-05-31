@@ -93,15 +93,15 @@ describe('RunConsole', () => {
     })
     render(<RunConsole repoRoot="/ws" />)
     await waitFor(() => {
-      expect(screen.getByText('✓ Approve')).toBeTruthy()
+      expect(screen.getByText('Approve')).toBeTruthy()
       expect(screen.getByText('✎ Request Changes')).toBeTruthy()
-      expect(screen.getByText('× Reject & Reset')).toBeTruthy()
+      expect(screen.getByText('Reject & Reset')).toBeTruthy()
     })
   })
 
   it('does not show gate controls when status is running', async () => {
     render(<RunConsole repoRoot="/ws" />)
-    await waitFor(() => expect(screen.queryByText('✓ Approve')).toBeNull())
+    await waitFor(() => expect(screen.queryByText('Approve')).toBeNull())
   })
 
   it('shows Abort button when run is active', async () => {
@@ -155,8 +155,8 @@ describe('RunConsole', () => {
       return Promise.resolve({ entries: [], diff: '', ok: true })
     })
     render(<RunConsole repoRoot="/ws" />)
-    await waitFor(() => screen.getByText('✓ Approve'))
-    fireEvent.click(screen.getByText('✓ Approve'))
+    await waitFor(() => screen.getByText('Approve'))
+    fireEvent.click(screen.getByText('Approve'))
     await waitFor(() => {
       const call = mockInvoke.mock.calls.find(([ch]) => ch === 'foundry:run-gate-decide')
       expect(call?.[1]).toMatchObject({ decision: 'approve', runId: 'run-1' })

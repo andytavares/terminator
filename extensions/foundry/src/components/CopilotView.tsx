@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { RotateCcw, Check, ArrowRight, ChevronRight } from 'lucide-react'
 import './foundry.css'
 import type { Run, FileChange } from '../types/foundry.types'
 
@@ -167,7 +168,7 @@ function DiffPanel({
                 style={{ color: 'var(--tm-warning)', fontSize: 11 }}
                 onClick={() => onRevert(selected)}
               >
-                ↺ Revert {selected.split('/').pop()}
+                <RotateCcw size={11} /> Revert {selected.split('/').pop()}
               </button>
             </div>
           )}
@@ -332,7 +333,9 @@ export function CopilotView({ run, workspaceRoot }: Props) {
         const args = parenIdx >= 0 ? body.slice(parenIdx) : ''
         return (
           <div key={i} className="fnd-tool-call">
-            <span className="fnd-tool-call__arrow">→</span>
+            <span className="fnd-tool-call__arrow">
+              <ChevronRight size={12} />
+            </span>
             <span className="fnd-tool-call__name">{name}</span>
             {args && <span className="fnd-tool-call__args">{args}</span>}
           </div>
@@ -376,7 +379,8 @@ export function CopilotView({ run, workspaceRoot }: Props) {
                 marginTop: 32,
               }}
             >
-              Start a conversation. Changes will appear in the live diff panel →
+              Start a conversation. Changes will appear in the live diff panel{' '}
+              <ArrowRight size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />
             </div>
           )}
           {messages.map((msg) => (
@@ -491,7 +495,13 @@ export function CopilotView({ run, workspaceRoot }: Props) {
             disabled={files.length === 0 || accepting}
             onClick={() => void acceptAll()}
           >
-            {accepting ? '…' : '✓ Accept all'}
+            {accepting ? (
+              '…'
+            ) : (
+              <>
+                <Check size={11} /> Accept all
+              </>
+            )}
           </button>
           <button
             className="fnd-btn fnd-btn--secondary fnd-btn--sm"

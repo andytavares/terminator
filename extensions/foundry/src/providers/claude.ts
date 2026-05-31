@@ -32,6 +32,9 @@ export class ClaudeAdapter implements ProviderAdapter {
       request.agentsMdContent
         ? `Follow these project-specific guidelines:\n\n${request.agentsMdContent}`
         : '',
+      request.workspaceListing
+        ? `Current workspace file tree:\n\`\`\`\n${request.workspaceListing}\n\`\`\`\nWrite files at the correct location relative to this structure. Do not create unnecessary top-level subdirectories — place files where they belong given the existing layout.`
+        : '',
       'Use the provided file tools to read existing code before making changes.',
       'After completing your work, write a short summary of what you changed and why.',
     ]

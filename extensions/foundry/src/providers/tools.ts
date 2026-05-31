@@ -180,6 +180,33 @@ export interface ToolResult {
   event?: RunEvent & { type: 'file-changed' }
 }
 
+/**
+ * Resolve a tool-supplied path to an absolute path inside workspaceRoot.
+ * If Claude provides an absolute path outside the workspace (e.g. the main
+ * workspace path when actually running in a worktree), strip the common prefix
+ * and re-anchor relative to workspaceRoot so files land in the correct location.
+ */
+function resolveWorkspacePath(workspaceRoot: string, inputPath: string): string {
+  if (!path.isAbsolute(inputPath)) {
+    return path.resolve(workspaceRoot, inputPath)
+  }
+  // Already inside the workspace — use directly
+  if (inputPath === workspaceRoot || inputPath.startsWith(workspaceRoot + path.sep)) {
+    return inputPath
+  }
+  // Absolute path outside workspace: find common directory prefix and use the
+  // remainder relative to workspaceRoot (handles main-workspace vs worktree mismatch)
+  const wsSegs = workspaceRoot.split(path.sep)
+  const pathSegs = inputPath.split(path.sep)
+  let commonLen = 0
+  for (let i = 0; i < Math.min(wsSegs.length, pathSegs.length); i++) {
+    if (wsSegs[i] === pathSegs[i]) commonLen = i + 1
+    else break
+  }
+  const relative = pathSegs.slice(commonLen).join(path.sep)
+  return path.resolve(workspaceRoot, relative || path.basename(inputPath))
+}
+
 export async function executeTool(
   name: string,
   input: Record<string, string>,
@@ -188,7 +215,7 @@ export async function executeTool(
   switch (name) {
     case 'read_file': {
       try {
-        const full = path.resolve(workspaceRoot, input.path)
+        const full = resolveWorkspacePath(workspaceRoot, input.path)
         const content = await fs.readFile(full, 'utf-8')
         return { output: content }
       } catch (err) {
@@ -198,7 +225,10 @@ export async function executeTool(
 
     case 'write_file': {
       try {
-        const full = path.resolve(workspaceRoot, input.path)
+        const full = resolveWorkspacePath(workspaceRoot, input.path)
+        console.log(
+          `[foundry:write_file] workspaceRoot=${workspaceRoot} input.path=${input.path} → ${full}`
+        )
         const existed = await fs
           .access(full)
           .then(() => true)
@@ -224,7 +254,7 @@ export async function executeTool(
 
     case 'str_replace': {
       try {
-        const full = path.resolve(workspaceRoot, input.path)
+        const full = resolveWorkspacePath(workspaceRoot, input.path)
         const content = await fs.readFile(full, 'utf-8')
         if (!content.includes(input.old_str)) {
           return {
@@ -254,7 +284,7 @@ export async function executeTool(
     case 'list_files': {
       try {
         const dir = input.dir ?? '.'
-        const full = path.resolve(workspaceRoot, dir)
+        const full = resolveWorkspacePath(workspaceRoot, dir)
         const entries = await fs.readdir(full, { withFileTypes: true })
         const lines = entries.map((e) =>
           e.isDirectory() ? `[dir]  ${e.name}` : `[file] ${e.name}`

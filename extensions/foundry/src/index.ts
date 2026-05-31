@@ -11,10 +11,16 @@ import {
   stashChanges,
   revertFiles,
   getDiffForFile,
-  createWorktree,
   removeWorktree,
   mergeWorktreeBranch,
+  getDefaultBranch,
+  getRemoteUrl,
+  commitWorktreeChanges,
+  pushBranch,
+  listBranches,
+  createWorktreeFromBranch,
 } from './core/git.js'
+import { cleanupLegacySessions } from './core/session-cleanup.js'
 import { runSensor, runAllSensors } from './core/sensors.js'
 import { isAvailable as keychainAvailable, storeKey, deleteKey } from './core/keychain.js'
 import { validateDag, topoSort } from './core/dag.js'
@@ -36,6 +42,7 @@ import type {
   HarnessHealthEvent,
 } from './types/foundry.types.js'
 import { ClaudeAdapter } from './providers/claude.js'
+import { ClaudeCodeAdapter } from './providers/claude-code.js'
 import { OpenAIAdapter } from './providers/openai.js'
 import { GeminiAdapter } from './providers/gemini.js'
 import { OllamaAdapter } from './providers/ollama.js'
@@ -55,15 +62,56 @@ async function saveSession(workspaceRoot: string, run: Run): Promise<void> {
   try {
     const dir = path.join(workspaceRoot, '.foundry')
     await fs.mkdir(dir, { recursive: true })
+    const agentMap = subAgentLogs.get(run.id)
+    const subAgentLogsObj: Record<string, RunLogEntry[]> = {}
+    if (agentMap) {
+      for (const [agentId, entries] of agentMap.entries()) {
+        subAgentLogsObj[agentId] = entries
+      }
+    }
     const session = {
       run,
       logs: runLogs.get(run.id) ?? [],
+      subAgentLogs: subAgentLogsObj,
     }
     const tmp = path.join(dir, 'session.json.tmp')
     await fs.writeFile(tmp, JSON.stringify(session), 'utf-8')
     await fs.rename(tmp, path.join(dir, 'session.json'))
   } catch {
     // non-fatal — session just won't persist
+  }
+}
+
+// Saves a permanent log archive for a completed run so logs survive app restarts.
+// Also persists subAgents so re-runs can skip replanning.
+async function saveRunLogs(workspaceRoot: string, run: Run): Promise<void> {
+  const runId = run.id
+  try {
+    const logsDir = path.join(workspaceRoot, '.foundry', 'logs')
+    await fs.mkdir(logsDir, { recursive: true })
+    const agentMap = subAgentLogs.get(runId)
+    const subAgentLogsObj: Record<string, RunLogEntry[]> = {}
+    if (agentMap) {
+      for (const [agentId, entries] of agentMap.entries()) {
+        subAgentLogsObj[agentId] = entries
+      }
+    }
+    const data = {
+      runLogs: runLogs.get(runId) ?? [],
+      subAgentLogs: subAgentLogsObj,
+      subAgents: run.subAgents ?? [],
+    }
+    await fs.writeFile(path.join(logsDir, `${runId}.json`), JSON.stringify(data), 'utf-8')
+  } catch {
+    // non-fatal
+  }
+}
+
+async function deleteRunLogs(workspaceRoot: string, runId: string): Promise<void> {
+  try {
+    await fs.unlink(path.join(workspaceRoot, '.foundry', 'logs', `${runId}.json`))
+  } catch {
+    // file may not exist
   }
 }
 
@@ -145,9 +193,9 @@ function broadcastAndSave(run: Run) {
 }
 
 function cleanupWorktree(run: Run, workspaceRoot: string): void {
-  if (!run.worktreePath || !run.worktreeBranch) return
-  const { worktreePath, worktreeBranch } = run
-  void removeWorktree(workspaceRoot, worktreePath, worktreeBranch)
+  if (!run.worktreePath || !run.featureBranch) return
+  const { worktreePath, featureBranch } = run
+  void removeWorktree(workspaceRoot, worktreePath, featureBranch)
   broadcast('foundry:worktree-removed', {
     runId: run.id,
     workspaceRoot,
@@ -180,6 +228,8 @@ function buildAdapter(provider: StoredProvider, _workspaceRoot: string): Provide
   const retries = provider.maxRetries ?? undefined
   const delay = provider.requestDelayMs ?? undefined
   switch (provider.type) {
+    case 'claude-code':
+      return new ClaudeCodeAdapter(provider.id, provider.model || '')
     case 'claude':
       if (!provider.keychainKey) return null
       return new ClaudeAdapter(provider.id, provider.model, provider.keychainKey, retries, delay)
@@ -259,8 +309,44 @@ async function executeOrchestrate(
   provider: StoredProvider,
   workspaceRoot: string,
   runRoot: string,
-  agentsMdContent: string
+  agentsMdContent: string,
+  workspaceListing: string
 ): Promise<void> {
+  // Build a fully-contextualized prompt for a sub-agent
+  function buildAgentPrompt(
+    subAgent: import('./types/foundry.types.js').SubAgent,
+    taskText: string
+  ): string {
+    const parts: string[] = [taskText]
+
+    // Include completed upstream agents so this agent knows what's already been done
+    const upstream = (subAgent.dependsOn ?? [])
+      .map((id) => run.subAgents!.find((a) => a.agentId === id))
+      .filter((a) => a && a.status === 'done')
+    if (upstream.length > 0) {
+      parts.push('\n## Completed upstream steps')
+      for (const up of upstream) {
+        if (!up) continue
+        const upTask = up.task && up.task !== up.role ? `${up.role}: ${up.task}` : up.role
+        parts.push(`- ${upTask}`)
+      }
+    }
+
+    // Include worktree file listing so the agent can see the current state
+    if (workspaceListing) {
+      parts.push(`\n## Current worktree state\n${workspaceListing}`)
+    }
+
+    // Append retry feedback last so the model treats it as the most specific instruction
+    if (subAgent.retryFeedback) {
+      parts.push(
+        `\n## Code review feedback — address these issues specifically\n${subAgent.retryFeedback}`
+      )
+    }
+
+    return parts.join('\n')
+  }
+
   // Skip AI planning if the user provided a manual DAG
   if (run.subAgents && run.subAgents.length > 0) {
     appendLog(
@@ -269,30 +355,33 @@ async function executeOrchestrate(
       `Using manual flow: ${run.subAgents.length} agents — ${run.subAgents.map((a) => a.role).join(', ')}`
     )
     broadcastAndSave(run)
-    // Jump straight to execution using stored parsedAgents-like data
-    const manualAgents = run.subAgents.map((a) => ({
-      id: a.agentId,
-      role: a.role,
-      task: a.role,
-      dependsOn: a.dependsOn,
-    }))
     const tiers = topoSort(run.subAgents)
     for (const tier of tiers) {
       if (activeRuns.get(workspaceRoot)?.id !== run.id) return
       await Promise.all(
         tier.map(async (agentId) => {
           const subAgent = run.subAgents!.find((a) => a.agentId === agentId)
-          const agentData = manualAgents.find((a) => a.id === agentId)
-          if (!subAgent || !agentData) return
+          if (!subAgent) return
+          // Skip agents that already completed successfully (retry-from support)
+          if (subAgent.status === 'done') return
           subAgent.status = 'running'
           broadcastAndSave(run)
+          const taskText = subAgent.task ?? subAgent.role
+          const manualPrompt = buildAgentPrompt(subAgent, taskText)
           appendSubAgentLog(run.id, agentId, 'system', `${subAgent.role} — starting`)
+          if (subAgent.retryFeedback)
+            appendSubAgentLog(
+              run.id,
+              agentId,
+              'system',
+              `Retry feedback: ${subAgent.retryFeedback}`
+            )
           try {
             for await (const event of adapter.run({
               mode: 'spec-to-code',
               providerId: run.providerId,
               model: run.model,
-              prompt: agentData.task,
+              prompt: manualPrompt,
               workspaceRoot: runRoot,
               agentsMdContent,
               iterationLimit: 1,
@@ -320,6 +409,7 @@ async function executeOrchestrate(
               }
             }
             subAgent.status = 'done'
+            subAgent.retryFeedback = undefined
             appendSubAgentLog(run.id, agentId, 'ok', `${subAgent.role} complete`)
           } catch (err) {
             subAgent.status = 'rejected'
@@ -333,40 +423,38 @@ async function executeOrchestrate(
       const sensorResults = await runAllSensors(harness.sensors, runRoot)
       run.sensorResults = sensorResults
       for (const r of sensorResults) {
-        appendLog(run.id, 'sensor', `${r.pass ? '✓' : '✗'} ${r.sensorName}`)
+        appendLog(run.id, 'sensor', `${r.pass ? '✓' : '✗'} ${r.sensorName} (${r.durationMs}ms)`)
+        if (!r.pass) {
+          const detail = [r.stderrExcerpt, r.stdoutExcerpt].filter(Boolean).join('\n').trim()
+          if (detail) appendLog(run.id, 'error', detail.slice(0, 300))
+        }
         trackSensorResult(r.sensorName, r.pass, workspaceRoot)
+      }
+      const allPassed = sensorResults.every((r) => r.pass)
+      if (harness.gateDefaults.sensorsMustPassBeforeGate && !allPassed) {
+        appendLog(
+          run.id,
+          'error',
+          'Sensors failed — fix the issues above or disable "sensors must pass before gate" in harness settings.'
+        )
+        run.status = 'paused-error'
+        broadcastAndSave(run)
+        return
       }
     }
     const anyRejected = run.subAgents.some((a) => a.status === 'rejected')
-    run.status = anyRejected ? 'paused-error' : 'done'
-    run.completedAt = new Date().toISOString()
-    if (run.status === 'done') activeRuns.delete(workspaceRoot)
-    appendLog(
-      run.id,
-      anyRejected ? 'error' : 'ok',
-      anyRejected ? 'Flow completed with errors' : 'Flow complete'
-    )
+    if (anyRejected) {
+      run.status = 'paused-error'
+      run.completedAt = new Date().toISOString()
+      appendLog(run.id, 'error', 'Flow completed with errors')
+      broadcastAndSave(run)
+      return
+    }
+    // Always gate orchestrate runs — user reviews changes before merging
+    appendLog(run.id, 'ok', 'All agents complete — review changes before merging')
+    run.status = 'gate'
     broadcastAndSave(run)
-    await appendHistoryEntry(workspaceRoot, {
-      runId: run.id,
-      mode: 'orchestrate',
-      providerId: run.providerId,
-      providerLabel: provider.id,
-      model: run.model,
-      promptSummary: (run.prompt ?? '').slice(0, 200),
-      status: run.status,
-      tokenCountIn: 0,
-      tokenCountOut: 0,
-      sensorSummary: run.sensorResults
-        ? `${run.sensorResults.filter((r) => r.pass).length}/${run.sensorResults.length}`
-        : '0/0',
-      gateDecisions: [],
-      filesChangedCount: run.fileChanges.length,
-      durationMs: runDurationMs(run),
-      createdAt: run.createdAt,
-      completedAt: run.completedAt ?? new Date().toISOString(),
-      subAgentRunIds: run.subAgents.map((a) => a.agentId),
-    })
+    return
     return
   }
 
@@ -381,10 +469,11 @@ async function executeOrchestrate(
   }
   const parsedAgents = planResult.agents
 
-  // Map to SubAgent type and attach to run
+  // Map to SubAgent type and attach to run — store task so retries have the full prompt
   run.subAgents = parsedAgents.map((a) => ({
     agentId: a.id,
     role: a.role,
+    task: a.task,
     dependsOn: a.dependsOn,
     inputFrom: a.dependsOn,
     outputArtifacts: [],
@@ -413,19 +502,24 @@ async function executeOrchestrate(
       tier.map(async (agentId) => {
         const subAgent = run.subAgents!.find((a) => a.agentId === agentId)
         if (!subAgent) return
+        // Skip agents that already completed successfully (retry-from support)
+        if (subAgent.status === 'done') return
         subAgent.status = 'running'
         broadcastAndSave(run)
 
         const agentData = parsedAgents.find((a) => a.id === agentId)
-        const agentTask = agentData?.task ?? subAgent.role
+        const baseTask = subAgent.task ?? agentData?.task ?? subAgent.role
+        const agentPrompt = buildAgentPrompt(subAgent, baseTask)
 
         appendSubAgentLog(run.id, agentId, 'system', `${subAgent.role} — starting`)
+        if (subAgent.retryFeedback)
+          appendSubAgentLog(run.id, agentId, 'system', `Retry feedback: ${subAgent.retryFeedback}`)
         try {
           for await (const event of adapter.run({
             mode: 'spec-to-code',
             providerId: run.providerId,
             model: run.model,
-            prompt: agentTask,
+            prompt: agentPrompt,
             workspaceRoot: runRoot,
             agentsMdContent,
             iterationLimit: 1,
@@ -453,6 +547,7 @@ async function executeOrchestrate(
             }
           }
           subAgent.status = 'done'
+          subAgent.retryFeedback = undefined
           appendSubAgentLog(run.id, agentId, 'ok', `${subAgent.role} complete`)
         } catch (err) {
           subAgent.status = 'rejected'
@@ -463,97 +558,123 @@ async function executeOrchestrate(
     )
   }
 
-  // All tiers done — run sensors and finish
+  // All tiers done — run sensors and open gate (or auto-approve)
   if (harness.sensors.length > 0) {
     appendLog(run.id, 'system', `Running ${harness.sensors.length} sensor(s)…`)
     const sensorResults = await runAllSensors(harness.sensors, runRoot)
     run.sensorResults = sensorResults
     for (const r of sensorResults) {
       appendLog(run.id, 'sensor', `${r.pass ? '✓' : '✗'} ${r.sensorName} (${r.durationMs}ms)`)
+      if (!r.pass) {
+        const detail = [r.stderrExcerpt, r.stdoutExcerpt].filter(Boolean).join('\n').trim()
+        if (detail) appendLog(run.id, 'error', detail.slice(0, 300))
+      }
       trackSensorResult(r.sensorName, r.pass, workspaceRoot)
+    }
+    const allPassed = sensorResults.every((r) => r.pass)
+    if (harness.gateDefaults.sensorsMustPassBeforeGate && !allPassed) {
+      appendLog(
+        run.id,
+        'error',
+        'Sensors failed — fix the issues above or disable "sensors must pass before gate" in harness settings.'
+      )
+      run.status = 'paused-error'
+      broadcastAndSave(run)
+      return
     }
   }
 
   const anyRejected = run.subAgents.some((a) => a.status === 'rejected')
-  run.status = anyRejected ? 'paused-error' : 'done'
-  run.completedAt = new Date().toISOString()
-  if (run.status === 'done') activeRuns.delete(workspaceRoot)
+  if (anyRejected) {
+    run.status = 'paused-error'
+    run.completedAt = new Date().toISOString()
+    appendLog(run.id, 'error', 'Orchestration completed with errors')
+    broadcastAndSave(run)
+    return
+  }
+
+  if (harness.gateDefaults.requireGateAfterEachIteration) {
+    appendLog(
+      run.id,
+      'system',
+      `Gate open — ${run.subAgents.length} agents done, awaiting your review`
+    )
+    run.status = 'gate'
+    broadcastAndSave(run)
+    return
+  }
+
+  // Always gate orchestrate runs — user reviews changes before merging
   appendLog(
     run.id,
-    anyRejected ? 'error' : 'ok',
-    anyRejected
-      ? 'Orchestration completed with errors'
-      : `Orchestration complete — ${run.subAgents.length} agents done`
+    'ok',
+    `All ${run.subAgents.length} agents complete — review changes before merging`
   )
+  run.status = 'gate'
   broadcastAndSave(run)
-
-  await appendHistoryEntry(workspaceRoot, {
-    runId: run.id,
-    mode: 'orchestrate',
-    providerId: run.providerId,
-    providerLabel: provider.id,
-    model: run.model,
-    promptSummary: (run.prompt ?? '').slice(0, 200),
-    status: run.status,
-    tokenCountIn: 0,
-    tokenCountOut: 0,
-    sensorSummary: run.sensorResults
-      ? `${run.sensorResults.filter((r) => r.pass).length}/${run.sensorResults.length}`
-      : '0/0',
-    gateDecisions: [],
-    filesChangedCount: run.fileChanges.length,
-    durationMs: run.completedAt
-      ? new Date(run.completedAt).getTime() - new Date(run.createdAt).getTime()
-      : 0,
-    createdAt: run.createdAt,
-    completedAt: run.completedAt ?? new Date().toISOString(),
-    subAgentRunIds: run.subAgents.map((a) => a.agentId),
-  })
 }
 
 // ─── Run execution loop ──────────────────────────────────────────────────────
 
-const SLUG_STOP = new Set([
-  'a',
-  'an',
-  'the',
-  'and',
-  'or',
-  'but',
-  'in',
-  'on',
-  'at',
-  'to',
-  'for',
-  'of',
-  'with',
-  'by',
-  'from',
-  'is',
-  'it',
-  'as',
-  'be',
-  'do',
-  'if',
+const LISTING_IGNORE = new Set([
+  'node_modules',
+  '.git',
+  '.worktrees',
+  'dist',
+  'build',
+  '.next',
+  '__pycache__',
+  '.venv',
+  'venv',
+  'target',
+  '.gradle',
 ])
 
-function slugifyPrompt(text: string): string {
-  return (
-    text
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .split(/\s+/)
-      .filter((w) => w.length > 1 && !SLUG_STOP.has(w))
-      .slice(0, 5)
-      .join('-')
-      .replace(/-+/g, '-')
-      .slice(0, 50) || 'run'
-  )
+async function buildWorktreeListing(root: string, depth = 0, prefix = ''): Promise<string> {
+  const MAX_DEPTH = 4
+  const MAX_ENTRIES = 300
+  const lines: string[] = []
+
+  let entries: import('node:fs').Dirent[]
+  try {
+    entries = await fs.readdir(root, { withFileTypes: true })
+  } catch {
+    return ''
+  }
+
+  entries.sort((a, b) => {
+    // Directories first, then files, alphabetically within each group
+    if (a.isDirectory() === b.isDirectory()) return a.name.localeCompare(b.name)
+    return a.isDirectory() ? -1 : 1
+  })
+
+  for (const entry of entries) {
+    if (lines.length >= MAX_ENTRIES) {
+      lines.push(`${prefix}… (truncated)`)
+      break
+    }
+    if (entry.name.startsWith('.') || LISTING_IGNORE.has(entry.name)) continue
+    if (entry.isDirectory()) {
+      lines.push(`${prefix}${entry.name}/`)
+      if (depth < MAX_DEPTH - 1) {
+        const sub = await buildWorktreeListing(
+          path.join(root, entry.name),
+          depth + 1,
+          prefix + '  '
+        )
+        if (sub) lines.push(sub)
+      }
+    } else {
+      lines.push(`${prefix}${entry.name}`)
+    }
+  }
+
+  return lines.join('\n')
 }
 
 async function executeRun(run: Run, harness: Harness): Promise<void> {
   const workspaceRoot = run.workspaceRoot
-  const providers = await readProviders(workspaceRoot)
+  const providers = await readProviders()
   const provider = providers.find((p) => p.id === run.providerId)
 
   if (!provider) {
@@ -579,43 +700,11 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
     return
   }
 
-  // Derive a human-readable label from the spec filename or prompt text
-  const worktreeLabel = slugifyPrompt(
-    run.specPath
-      ?.split('/')
-      .pop()
-      ?.replace(/\.\w+$/, '') ??
-      run.prompt ??
-      ''
-  )
-
-  // Create an isolated git worktree so the run doesn't pollute the working tree
-  const worktreeResult = await createWorktree(workspaceRoot, run.id, worktreeLabel)
-  if ('error' in worktreeResult) {
-    appendLog(
-      run.id,
-      'error',
-      `Could not create worktree: ${worktreeResult.error} — running in main workspace instead`
-    )
-  } else {
-    run.worktreePath = worktreeResult.worktreePath
-    run.worktreeBranch = worktreeResult.branch
-    appendLog(
-      run.id,
-      'system',
-      `Worktree: .worktrees/${worktreeResult.label}  (branch: ${worktreeResult.branch})`
-    )
-    broadcast('foundry:worktree-created', {
-      runId: run.id,
-      workspaceRoot,
-      worktreePath: worktreeResult.worktreePath,
-      branch: worktreeResult.branch,
-      label: worktreeResult.label,
-    })
-  }
-
-  // The agent operates in the worktree (or workspace if worktree failed)
-  const runRoot = run.worktreePath ?? workspaceRoot
+  // Worktree is always created in foundry:run-create before this function runs.
+  // run.worktreePath is always set at this point.
+  const runRoot = run.worktreePath
+  appendLog(run.id, 'system', `Worktree: ${runRoot}  (branch: ${run.featureBranch})`)
+  appendLog(run.id, 'system', `Working directory: ${runRoot}`)
 
   // Read AGENTS.md for system context
   let agentsMdContent = ''
@@ -630,6 +719,16 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
     )
   }
 
+  // Build a recursive file tree of the worktree so the agent knows the full structure
+  const workspaceListing = await buildWorktreeListing(runRoot)
+  if (workspaceListing) {
+    appendLog(
+      run.id,
+      'system',
+      `Workspace snapshot: ${workspaceListing.split('\n').length} entries`
+    )
+  }
+
   // ─── Orchestrate mode: plan then execute tiers ──────────────────────────────
   if (run.mode === 'orchestrate') {
     await executeOrchestrate(
@@ -639,8 +738,33 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
       provider,
       workspaceRoot,
       runRoot,
-      agentsMdContent
+      agentsMdContent,
+      workspaceListing
     )
+    return
+  }
+
+  // Build the user prompt — spec file content takes precedence, freeform prompt appended after
+  let effectivePrompt = run.prompt ?? ''
+  if (run.specPath) {
+    try {
+      const specFilePath = path.isAbsolute(run.specPath)
+        ? run.specPath
+        : path.join(workspaceRoot, run.specPath)
+      const specContent = await fs.readFile(specFilePath, 'utf-8')
+      effectivePrompt = specContent + (effectivePrompt ? `\n\n${effectivePrompt}` : '')
+    } catch {
+      appendLog(run.id, 'error', `Could not read spec file: ${run.specPath}`)
+      run.status = 'paused-error'
+      broadcastAndSave(run)
+      return
+    }
+  }
+
+  if (!effectivePrompt.trim()) {
+    appendLog(run.id, 'error', 'No prompt or spec content — cannot start run')
+    run.status = 'paused-error'
+    broadcastAndSave(run)
     return
   }
 
@@ -655,9 +779,10 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
       mode: run.mode,
       providerId: run.providerId,
       model: run.model,
-      prompt: run.prompt ?? '',
+      prompt: effectivePrompt,
       workspaceRoot: runRoot,
       agentsMdContent,
+      workspaceListing,
       iterationLimit: run.iterationLimit,
     }
 
@@ -715,7 +840,7 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
 
     // Run sensors before opening gate
     if (harness.sensors.length > 0) {
-      appendLog(run.id, 'system', `Running ${harness.sensors.length} sensor(s)…`)
+      appendLog(run.id, 'system', `Running ${harness.sensors.length} sensor(s) in ${runRoot}…`)
       const sensorResults = await runAllSensors(harness.sensors, runRoot)
       run.sensorResults = sensorResults
       for (const r of sensorResults) {
@@ -748,23 +873,21 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
       run.status = 'gate'
       broadcastAndSave(run)
     } else {
-      // Auto-approve: merge worktree changes back and clean up
-      if (run.worktreePath && run.worktreeBranch) {
-        appendLog(run.id, 'system', 'Merging changes back to workspace…')
-        const mergeResult = await mergeWorktreeBranch(workspaceRoot, run.worktreeBranch)
-        if ('error' in mergeResult) {
-          appendLog(
-            run.id,
-            'system',
-            `Merge note: ${mergeResult.error} — changes remain on branch ${run.worktreeBranch}`
-          )
-        }
-        cleanupWorktree(run, workspaceRoot)
+      // Auto-approve: merge worktree changes back (worktree kept per spec unless user opts in)
+      appendLog(run.id, 'system', 'Merging changes back to workspace…')
+      const mergeResult = await mergeWorktreeBranch(workspaceRoot, run.featureBranch)
+      if ('error' in mergeResult) {
+        appendLog(
+          run.id,
+          'system',
+          `Merge note: ${mergeResult.error} — changes remain on branch ${run.featureBranch}`
+        )
       }
       appendLog(run.id, 'ok', 'Run complete (auto-approved — no gate required)')
       run.status = 'done'
       run.completedAt = new Date().toISOString()
       activeRuns.delete(workspaceRoot)
+      void saveRunLogs(workspaceRoot, run)
       void clearSession(workspaceRoot)
       // Do NOT delete runLogs here — RunConsole needs to read them after completion
       const sensorSummaryAuto =
@@ -788,6 +911,10 @@ async function executeRun(run: Run, harness: Harness): Promise<void> {
         durationMs: Date.now() - new Date(run.createdAt).getTime(),
         createdAt: run.createdAt,
         completedAt: run.completedAt!,
+        featureBranch: run.featureBranch,
+        baseBranch: run.baseBranch,
+        worktreePath: run.worktreePath,
+        terminalProjectId: run.terminalProjectId,
       })
       broadcastAndSave(run)
     }
@@ -802,6 +929,15 @@ export function activate(api: ExtensionAPI): void {
   // Wire health broadcast callback
   setHealthChangedCallback(() => {
     broadcast('foundry:health-changed', { events: healthEvents })
+  })
+
+  // ─── Git ─────────────────────────────────────────────────────────────────────
+  reg(api, 'foundry:branch-list', async (payload: unknown) => {
+    const { workspaceRoot } = payload as { workspaceRoot: string }
+    if (!workspaceRoot) return { error: 'workspaceRoot required' }
+    const result = await listBranches(workspaceRoot)
+    if ('error' in result) return { error: result.error }
+    return { branches: result.branches }
   })
 
   // ─── Harness ───────────────────────────────────────────────────────────────
@@ -886,55 +1022,49 @@ export function activate(api: ExtensionAPI): void {
 
   // ─── Provider ──────────────────────────────────────────────────────────────
 
-  reg(api, 'foundry:provider-list', async (payload: unknown) => {
-    const { workspaceRoot } = payload as { workspaceRoot: string }
-    if (!workspaceRoot) return { providers: [] }
-    const providers = await readProviders(workspaceRoot)
+  reg(api, 'foundry:provider-list', async () => {
+    const providers = await readProviders()
     return { providers }
   })
 
   reg(api, 'foundry:provider-save', async (payload: unknown) => {
-    const { provider, apiKey, workspaceRoot } = payload as {
+    const { provider, apiKey } = payload as {
       provider: StoredProvider
       apiKey?: string
-      workspaceRoot: string
     }
-    if (!workspaceRoot) return { error: 'workspaceRoot required' }
     if (!keychainAvailable() && apiKey) {
       return { error: 'OS encryption unavailable — cannot store API key securely' }
     }
     if (apiKey && provider.keychainKey) {
       await storeKey(provider.keychainKey, apiKey)
     }
-    const providers = await readProviders(workspaceRoot)
+    const providers = await readProviders()
     const idx = providers.findIndex((p) => p.id === provider.id)
     if (idx >= 0) providers[idx] = provider
     else providers.push(provider)
-    await writeProviders(workspaceRoot, providers)
+    await writeProviders(providers)
     return { provider }
   })
 
   reg(api, 'foundry:provider-delete', async (payload: unknown) => {
-    const { providerId, workspaceRoot } = payload as { providerId: string; workspaceRoot: string }
-    if (!workspaceRoot) return { error: 'workspaceRoot required' }
-    const providers = await readProviders(workspaceRoot)
+    const { providerId } = payload as { providerId: string }
+    const providers = await readProviders()
     const idx = providers.findIndex((p) => p.id === providerId)
     if (idx >= 0) {
       const p = providers[idx]
       if (p.keychainKey) await deleteKey(p.keychainKey)
       providers.splice(idx, 1)
-      await writeProviders(workspaceRoot, providers)
+      await writeProviders(providers)
     }
     return { ok: true }
   })
 
   reg(api, 'foundry:provider-test', async (payload: unknown) => {
-    const { providerId, workspaceRoot } = payload as { providerId: string; workspaceRoot: string }
-    if (!workspaceRoot) return { error: 'workspaceRoot required' }
-    const providers = await readProviders(workspaceRoot)
+    const { providerId } = payload as { providerId: string }
+    const providers = await readProviders()
     const provider = providers.find((p) => p.id === providerId)
     if (!provider) return { error: 'Provider not found' }
-    const adapter = buildAdapter(provider, workspaceRoot)
+    const adapter = buildAdapter(provider, '')
     if (!adapter) return { error: 'Cannot build adapter — check API key is saved' }
     return adapter.testConnection()
   })
@@ -1015,19 +1145,36 @@ export function activate(api: ExtensionAPI): void {
 
   // ─── Run ───────────────────────────────────────────────────────────────────
   reg(api, 'foundry:run-create', async (payload: unknown) => {
-    const { workspaceRoot, mode, providerId, model, specPath, prompt, iterationLimit, manualDag } =
-      payload as {
-        workspaceRoot: string
-        mode: string
-        providerId: string
-        model: string
-        specPath?: string
-        prompt?: string
-        iterationLimit?: number
-        manualDag?: Array<{ id: string; role: string; task: string; dependsOn: string[] }>
-      }
+    const {
+      workspaceRoot,
+      mode,
+      providerId,
+      model,
+      baseBranch,
+      featureBranch,
+      existingWorktreePath,
+      specPath,
+      prompt,
+      iterationLimit,
+      manualDag,
+    } = payload as {
+      workspaceRoot: string
+      mode: string
+      providerId: string
+      model: string
+      baseBranch: string
+      featureBranch: string
+      /** When re-running a previous run, pass the existing worktree path to skip git worktree add */
+      existingWorktreePath?: string
+      specPath?: string
+      prompt?: string
+      iterationLimit?: number
+      manualDag?: Array<{ id: string; role: string; task: string; dependsOn: string[] }>
+    }
     if (!workspaceRoot || !mode || !providerId || !model)
       return { error: 'workspaceRoot, mode, providerId, model required' }
+    if (!baseBranch) return { error: 'baseBranch required — select a base branch to start from' }
+    if (!featureBranch) return { error: 'featureBranch required — provide a feature branch name' }
 
     const existing = activeRuns.get(workspaceRoot)
     if (existing && (existing.status === 'running' || existing.status === 'gate')) {
@@ -1037,6 +1184,30 @@ export function activate(api: ExtensionAPI): void {
     const harnessResult = await readHarness(workspaceRoot)
     if ('error' in harnessResult) return { error: `Cannot read harness: ${harnessResult.error}` }
     if ('notFound' in harnessResult) return { error: 'Harness not configured. Run setup first.' }
+
+    // Resolve the worktree path — reuse an existing one if provided, otherwise create fresh
+    let resolvedWorktreePath: string
+    if (existingWorktreePath) {
+      // Re-run: verify the worktree directory still exists, then reuse it
+      try {
+        await fs.access(existingWorktreePath)
+        resolvedWorktreePath = existingWorktreePath
+      } catch {
+        return {
+          error: `Worktree no longer exists at ${existingWorktreePath}. Delete the run and start fresh.`,
+        }
+      }
+    } else {
+      const worktreeResult = await createWorktreeFromBranch(
+        workspaceRoot,
+        featureBranch,
+        baseBranch
+      )
+      if ('error' in worktreeResult) {
+        return { error: `Could not create worktree: ${worktreeResult.error}` }
+      }
+      resolvedWorktreePath = worktreeResult.worktreePath
+    }
 
     const run: Run = {
       id: crypto.randomUUID(),
@@ -1052,13 +1223,26 @@ export function activate(api: ExtensionAPI): void {
       iterationLimit: iterationLimit ?? harnessResult.harness.iterationLimit,
       iterations: [],
       fileChanges: [],
+      baseBranch,
+      featureBranch,
+      worktreePath: resolvedWorktreePath,
     }
+
+    // Broadcast worktree-created so renderer can create/reuse a Terminator project for it
+    broadcast('foundry:worktree-created', {
+      runId: run.id,
+      workspaceRoot,
+      worktreePath: resolvedWorktreePath,
+      branch: featureBranch,
+      label: featureBranch.replace(/\//g, '-'),
+    })
 
     // Pre-populate subAgents if the user provided a manual DAG
     if (mode === 'orchestrate' && manualDag && manualDag.length > 0) {
       run.subAgents = manualDag.map((a) => ({
         agentId: a.id,
         role: a.role,
+        task: a.task,
         dependsOn: a.dependsOn,
         inputFrom: a.dependsOn,
         outputArtifacts: [],
@@ -1092,13 +1276,15 @@ export function activate(api: ExtensionAPI): void {
       appendLog(
         run.id,
         'system',
-        `Gate decision: reject — reverting ${run.fileChanges.length} file(s)`
+        `Gate decision: reject — reverting ${run.fileChanges.length} file(s) in worktree`
       )
+      // Revert files in the worktree so the branch is clean for inspection
       const filePaths = run.fileChanges.map((c) => c.filePath)
-      if (filePaths.length > 0) await revertFiles(workspaceRoot, filePaths)
+      if (filePaths.length > 0) await revertFiles(run.worktreePath, filePaths)
       run.status = 'rejected'
       run.completedAt = new Date().toISOString()
       activeRuns.delete(workspaceRoot)
+      void saveRunLogs(workspaceRoot, run)
       void clearSession(workspaceRoot)
       // Do NOT delete runLogs — RunConsole needs them after completion
       trackGateDecision(run.specPath ?? '', run.currentIteration, 'reject', workspaceRoot)
@@ -1130,29 +1316,40 @@ export function activate(api: ExtensionAPI): void {
         durationMs: runDurationMs(run),
         createdAt: run.createdAt,
         completedAt: run.completedAt,
+        featureBranch: run.featureBranch,
+        baseBranch: run.baseBranch,
+        worktreePath: run.worktreePath,
+        terminalProjectId: run.terminalProjectId,
       })
       broadcastAndSave(run)
       return { run }
     }
 
     if (decision === 'approve') {
-      appendLog(run.id, 'ok', 'Gate approved — merging changes to workspace…')
-      if (run.worktreePath && run.worktreeBranch) {
-        const mergeResult = await mergeWorktreeBranch(workspaceRoot, run.worktreeBranch)
+      const removeWorktreeAfterMerge = !!(payload as { removeWorktree?: boolean }).removeWorktree
+      const skipMerge = !!(payload as { skipMerge?: boolean }).skipMerge
+      if (skipMerge) {
+        appendLog(run.id, 'ok', `Changes kept on branch ${run.featureBranch}`)
+      } else {
+        appendLog(run.id, 'ok', 'Gate approved — merging changes to workspace…')
+        const mergeResult = await mergeWorktreeBranch(workspaceRoot, run.featureBranch)
         if ('error' in mergeResult) {
           appendLog(
             run.id,
             'system',
-            `Merge note: ${mergeResult.error} — changes remain on branch ${run.worktreeBranch}`
+            `Merge note: ${mergeResult.error} — changes remain on branch ${run.featureBranch}`
           )
         } else {
           appendLog(run.id, 'ok', 'Changes merged into workspace')
+          if (removeWorktreeAfterMerge) {
+            cleanupWorktree(run, workspaceRoot)
+          }
         }
-        cleanupWorktree(run, workspaceRoot)
       }
       run.status = 'done'
       run.completedAt = new Date().toISOString()
       activeRuns.delete(workspaceRoot)
+      void saveRunLogs(workspaceRoot, run)
       void clearSession(workspaceRoot)
       // Do NOT delete runLogs — RunConsole needs them after completion
       trackGateDecision(run.specPath ?? '', run.currentIteration, 'approve', workspaceRoot)
@@ -1184,6 +1381,10 @@ export function activate(api: ExtensionAPI): void {
         durationMs: runDurationMs(run),
         createdAt: run.createdAt,
         completedAt: run.completedAt,
+        featureBranch: run.featureBranch,
+        baseBranch: run.baseBranch,
+        worktreePath: removeWorktreeAfterMerge ? undefined : run.worktreePath,
+        terminalProjectId: run.terminalProjectId,
       })
       broadcastAndSave(run)
       return { run }
@@ -1222,22 +1423,104 @@ export function activate(api: ExtensionAPI): void {
     return { error: `Unknown decision: ${decision}` }
   })
 
+  // ── foundry:run-merge — commit worktree changes and merge to default branch ──
+  reg(api, 'foundry:run-merge', async (payload: unknown) => {
+    const { runId, workspaceRoot } = payload as { runId: string; workspaceRoot: string }
+    const run = activeRuns.get(workspaceRoot)
+    if (!run || run.id !== runId) return { error: 'Run not found' }
+
+    try {
+      // Commit any uncommitted changes in the worktree
+      const commitResult = await commitWorktreeChanges(
+        run.worktreePath,
+        `foundry: ${run.specPath ? path.basename(run.specPath, path.extname(run.specPath)) : 'run'}`
+      )
+      if ('error' in commitResult) {
+        // Nothing to commit is fine — may already be clean
+        if (!commitResult.error.includes('nothing to commit')) {
+          return { error: `Could not commit: ${commitResult.error}` }
+        }
+      }
+      // Merge the worktree branch into the default branch
+      const defaultBranch = await getDefaultBranch(workspaceRoot)
+      const mergeResult = await mergeWorktreeBranch(workspaceRoot, run.featureBranch)
+      if ('error' in mergeResult) return { error: `Could not merge: ${mergeResult.error}` }
+
+      appendLog(run.id, 'system', `Merged ${run.featureBranch} → ${defaultBranch}`)
+      run.status = 'done'
+      run.completedAt = new Date().toISOString()
+      broadcastAndSave(run)
+      return { ok: true, defaultBranch }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  // ── foundry:run-create-pr — push branch and open GitHub PR ────────────────
+  reg(api, 'foundry:run-create-pr', async (payload: unknown) => {
+    const { runId, workspaceRoot, title, body } = payload as {
+      runId: string
+      workspaceRoot: string
+      title?: string
+      body?: string
+    }
+    const run = activeRuns.get(workspaceRoot)
+    if (!run || run.id !== runId) return { error: 'Run not found' }
+
+    try {
+      // Commit any uncommitted changes first
+      const commitResult = await commitWorktreeChanges(
+        run.worktreePath,
+        `foundry: ${run.specPath ? path.basename(run.specPath, path.extname(run.specPath)) : 'run'}`
+      )
+      if ('error' in commitResult && !commitResult.error.includes('nothing to commit')) {
+        return { error: `Could not commit: ${commitResult.error}` }
+      }
+      // Push the worktree branch to origin
+      const pushResult = await pushBranch(workspaceRoot, run.featureBranch)
+      if ('error' in pushResult) return { error: `Could not push: ${pushResult.error}` }
+
+      const defaultBranch = await getDefaultBranch(workspaceRoot)
+      const remoteUrl = await getRemoteUrl(workspaceRoot)
+      const prTitle =
+        title ??
+        `foundry: ${run.specPath ? path.basename(run.specPath, path.extname(run.specPath)) : run.id.slice(0, 8)}`
+      const prBody = body ?? ''
+
+      appendLog(run.id, 'system', `Pushed ${run.featureBranch} to origin`)
+      return { ok: true, branch: run.featureBranch, defaultBranch, remoteUrl, prTitle, prBody }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  // ── foundry:run-get-merge-info — check default branch and remote ──────────
+  reg(api, 'foundry:run-get-merge-info', async (payload: unknown) => {
+    const { workspaceRoot } = payload as { workspaceRoot: string }
+    try {
+      const [defaultBranch, remoteUrl] = await Promise.all([
+        getDefaultBranch(workspaceRoot),
+        getRemoteUrl(workspaceRoot),
+      ])
+      return { defaultBranch, remoteUrl }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
   reg(api, 'foundry:run-abort', async (payload: unknown) => {
     const { runId, workspaceRoot } = payload as { runId: string; workspaceRoot: string }
     const run = activeRuns.get(workspaceRoot)
     if (!run || run.id !== runId) return { error: 'Run not found' }
-    appendLog(run.id, 'system', 'Run aborted — discarding worktree')
-    if (run.worktreePath && run.worktreeBranch) {
-      // Worktree is isolated — just remove it; main workspace is untouched
-      cleanupWorktree(run, workspaceRoot)
-    } else {
-      // Fallback: revert files in the main workspace
-      const filePaths = run.fileChanges.map((c) => c.filePath)
-      if (filePaths.length > 0) await revertFiles(workspaceRoot, filePaths)
-    }
+
+    // Abort leaves the worktree intact — user can inspect it and delete later.
+    // No file revert, no worktree removal. Just mark aborted.
+    appendLog(run.id, 'system', 'Run aborted — worktree preserved for inspection')
     run.status = 'aborted'
     run.completedAt = new Date().toISOString()
     activeRuns.delete(workspaceRoot)
+    void saveRunLogs(workspaceRoot, run)
+    void clearSession(workspaceRoot)
     // Do NOT delete runLogs — RunConsole needs them after completion
     await appendHistoryEntry(workspaceRoot, {
       runId: run.id,
@@ -1256,14 +1539,69 @@ export function activate(api: ExtensionAPI): void {
       durationMs: runDurationMs(run),
       createdAt: run.createdAt,
       completedAt: run.completedAt,
+      featureBranch: run.featureBranch,
+      baseBranch: run.baseBranch,
+      worktreePath: run.worktreePath,
+      terminalProjectId: run.terminalProjectId,
     })
     broadcastAndSave(run)
     return { ok: true }
   })
 
+  reg(api, 'foundry:run-delete', async (payload: unknown) => {
+    const { runId, workspaceRoot } = payload as { runId: string; workspaceRoot: string }
+
+    let worktreePath: string | undefined
+    let featureBranch: string | undefined
+    let terminalProjectId: string | undefined
+
+    const activeRun = activeRuns.get(workspaceRoot)
+    if (activeRun && activeRun.id === runId) {
+      worktreePath = activeRun.worktreePath
+      featureBranch = activeRun.featureBranch
+      terminalProjectId = activeRun.terminalProjectId
+      activeRun.status = 'aborted'
+      activeRun.completedAt = activeRun.completedAt ?? new Date().toISOString()
+      activeRuns.delete(workspaceRoot)
+      runLogs.delete(runId)
+      subAgentLogs.delete(runId)
+      void deleteRunLogs(workspaceRoot, runId)
+      void clearSession(workspaceRoot)
+    } else {
+      try {
+        const { entries } = await readHistory(workspaceRoot, 0, 200)
+        const entry = entries.find((e) => e.runId === runId)
+        if (!entry) return { error: `Run "${runId}" not found` }
+        worktreePath = entry.worktreePath
+        featureBranch = entry.featureBranch
+        terminalProjectId = entry.terminalProjectId
+      } catch {
+        return { error: `Run "${runId}" not found` }
+      }
+    }
+
+    if (worktreePath && featureBranch) {
+      await removeWorktree(workspaceRoot, worktreePath, featureBranch).catch(() => undefined)
+    }
+
+    await deleteHistoryEntry(workspaceRoot, runId).catch(() => undefined)
+
+    if (terminalProjectId) {
+      broadcast('foundry:worktree-removed', {
+        runId,
+        workspaceRoot,
+        worktreePath,
+        terminalProjectId,
+      })
+    }
+
+    return { ok: true }
+  })
+
   reg(api, 'foundry:run-dismiss', async (payload: unknown) => {
     const { runId, workspaceRoot } = payload as { runId: string; workspaceRoot: string }
-    // Active run: abort if still running, then remove from memory
+    // Dismiss removes the run from memory and clears its log buffer.
+    // Worktree is NOT cleaned up — user must use foundry:run-delete for that.
     const activeRun = activeRuns.get(workspaceRoot)
     if (activeRun && activeRun.id === runId) {
       const finalStatus =
@@ -1272,36 +1610,91 @@ export function activate(api: ExtensionAPI): void {
           : 'aborted'
       activeRun.status = finalStatus
       activeRun.completedAt = activeRun.completedAt ?? new Date().toISOString()
-      // Clean up associated git worktree if one was created
-      cleanupWorktree(activeRun, workspaceRoot)
+
+      // Write to history if the run wasn't already recorded (done/rejected are written at completion)
+      if (finalStatus === 'aborted') {
+        await appendHistoryEntry(workspaceRoot, {
+          runId: activeRun.id,
+          mode: activeRun.mode,
+          providerId: activeRun.providerId,
+          providerLabel: activeRun.providerId,
+          model: activeRun.model,
+          specPath: activeRun.specPath,
+          promptSummary: (activeRun.prompt ?? '').slice(0, 200),
+          status: 'aborted',
+          tokenCountIn: activeRun.tokenCountIn ?? 0,
+          tokenCountOut: activeRun.tokenCountOut ?? 0,
+          sensorSummary: activeRun.sensorResults
+            ? `${activeRun.sensorResults.filter((r) => r.pass).length}/${activeRun.sensorResults.length}`
+            : '0/0',
+          gateDecisions: [],
+          filesChangedCount: activeRun.fileChanges.length,
+          durationMs: runDurationMs(activeRun),
+          createdAt: activeRun.createdAt,
+          completedAt: activeRun.completedAt,
+          featureBranch: activeRun.featureBranch,
+          baseBranch: activeRun.baseBranch,
+          worktreePath: activeRun.worktreePath,
+          terminalProjectId: activeRun.terminalProjectId,
+        })
+      }
+
       activeRuns.delete(workspaceRoot)
       runLogs.delete(runId)
       subAgentLogs.delete(runId)
+      void deleteRunLogs(workspaceRoot, runId)
       void clearSession(workspaceRoot)
       broadcast('foundry:run-status-changed', { runId, status: finalStatus })
-    } else {
-      // Historical run — the session file may have a worktreePath; try cleaning it up
-      const session = await loadSession(workspaceRoot).catch(() => null)
-      if (session?.run.id === runId && session.run.worktreePath && session.run.worktreeBranch) {
-        cleanupWorktree(session.run, workspaceRoot)
-      }
-      void clearSession(workspaceRoot)
     }
-    // Remove from history file regardless (works for both active and historical runs)
-    await deleteHistoryEntry(workspaceRoot, runId)
     return { ok: true }
   })
 
-  reg(api, 'foundry:run-logs', (payload: unknown) => {
-    const { runId } = payload as { runId: string }
-    const entries = runLogs.get(runId) ?? []
-    return { entries }
+  reg(api, 'foundry:run-logs', async (payload: unknown) => {
+    const { runId, workspaceRoot: ws } = payload as { runId: string; workspaceRoot?: string }
+    const inMemory = runLogs.get(runId)
+    if (inMemory) return { entries: inMemory }
+    if (ws) {
+      try {
+        const raw = await fs.readFile(path.join(ws, '.foundry', 'logs', `${runId}.json`), 'utf-8')
+        const data = JSON.parse(raw) as { runLogs?: RunLogEntry[] }
+        return { entries: data.runLogs ?? [] }
+      } catch {
+        // log archive not found
+      }
+    }
+    return { entries: [] }
   })
 
-  reg(api, 'foundry:subagent-logs', (payload: unknown) => {
-    const { runId, agentId } = payload as { runId: string; agentId: string }
-    const entries = subAgentLogs.get(runId)?.get(agentId) ?? []
-    return { entries }
+  reg(api, 'foundry:subagent-logs', async (payload: unknown) => {
+    const {
+      runId,
+      agentId,
+      workspaceRoot: ws,
+    } = payload as { runId: string; agentId: string; workspaceRoot?: string }
+    const inMemory = subAgentLogs.get(runId)?.get(agentId)
+    if (inMemory) return { entries: inMemory }
+    if (ws) {
+      try {
+        const raw = await fs.readFile(path.join(ws, '.foundry', 'logs', `${runId}.json`), 'utf-8')
+        const data = JSON.parse(raw) as { subAgentLogs?: Record<string, RunLogEntry[]> }
+        return { entries: data.subAgentLogs?.[agentId] ?? [] }
+      } catch {
+        // log archive not found
+      }
+    }
+    return { entries: [] }
+  })
+
+  // Returns saved subAgents for a completed run so re-runs can skip replanning
+  reg(api, 'foundry:history-get-agents', async (payload: unknown) => {
+    const { runId, workspaceRoot: ws } = payload as { runId: string; workspaceRoot: string }
+    try {
+      const raw = await fs.readFile(path.join(ws, '.foundry', 'logs', `${runId}.json`), 'utf-8')
+      const data = JSON.parse(raw) as { subAgents?: SubAgent[] }
+      return { subAgents: data.subAgents ?? [] }
+    } catch {
+      return { subAgents: [] }
+    }
   })
 
   reg(api, 'foundry:run-retry', async (payload: unknown) => {
@@ -1312,6 +1705,62 @@ export function activate(api: ExtensionAPI): void {
     run.status = 'running'
     appendLog(run.id, 'system', 'Retrying run…')
     broadcastAndSave(run)
+    const harnessResult = await readHarness(workspaceRoot)
+    if ('error' in harnessResult || 'notFound' in harnessResult) {
+      run.status = 'paused-error'
+      appendLog(run.id, 'error', 'Cannot read harness — cannot retry')
+      broadcastAndSave(run)
+      return { error: 'Cannot read harness' }
+    }
+    void executeRun(run, harnessResult.harness)
+    return { ok: true }
+  })
+
+  reg(api, 'foundry:orchestrate-retry-from', async (payload: unknown) => {
+    const { runId, workspaceRoot, agentId, feedback } = payload as {
+      runId: string
+      workspaceRoot: string
+      agentId: string
+      feedback?: string
+    }
+    const run = activeRuns.get(workspaceRoot)
+    if (!run || run.id !== runId) return { error: 'Run not found' }
+    if (run.status !== 'paused-error') return { error: 'Run is not in a retryable state' }
+    if (!run.subAgents) return { error: 'No sub-agents on this run' }
+
+    const targetAgent = run.subAgents.find((a) => a.agentId === agentId)
+    if (!targetAgent) return { error: `Agent "${agentId}" not found` }
+
+    // Find all agents that depend on the target (transitively) — they must also be reset
+    function findDownstream(id: string, agents: typeof run.subAgents!): Set<string> {
+      const result = new Set<string>()
+      const queue = [id]
+      while (queue.length > 0) {
+        const current = queue.shift()!
+        for (const a of agents) {
+          if (a.dependsOn.includes(current) && !result.has(a.agentId)) {
+            result.add(a.agentId)
+            queue.push(a.agentId)
+          }
+        }
+      }
+      return result
+    }
+
+    const downstream = findDownstream(agentId, run.subAgents)
+
+    // Reset target and downstream agents to pending
+    for (const a of run.subAgents) {
+      if (a.agentId === agentId || downstream.has(a.agentId)) {
+        a.status = 'pending'
+        if (a.agentId === agentId && feedback) a.retryFeedback = feedback
+      }
+    }
+
+    run.status = 'running'
+    appendLog(run.id, 'system', `Retrying from agent "${targetAgent.role}"…`)
+    broadcastAndSave(run)
+
     const harnessResult = await readHarness(workspaceRoot)
     if ('error' in harnessResult || 'notFound' in harnessResult) {
       run.status = 'paused-error'
@@ -1364,29 +1813,47 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'foundry:run-list', async (payload: unknown) => {
     const { workspaceRoot } = payload as { workspaceRoot: string }
 
+    // Boot-time cleanup: detect and wipe legacy session.json files (old format without featureBranch)
+    await cleanupLegacySessions(workspaceRoot)
+
     // Restore a persisted session if the app restarted with an active run in progress
     if (!activeRuns.has(workspaceRoot)) {
       const session = await loadSession(workspaceRoot)
       if (session) {
         const { run, logs } = session
-        const isResumable = run.status === 'gate' || run.status === 'paused-error'
-        const wasRunning = run.status === 'running'
-        if (isResumable || wasRunning) {
-          if (wasRunning) {
-            run.status = 'paused-error'
-            logs.push({
-              ts: new Date().toISOString(),
-              kind: 'system',
-              message: 'App restarted — run paused. Use ↺ Retry to resume.',
-            })
-          }
-          activeRuns.set(workspaceRoot, run)
-          runLogs.set(run.id, logs)
-          // Re-save with the potentially updated status
-          void saveSession(workspaceRoot, run)
-        } else {
-          // Terminal status persisted — clean it up
+        if (run.workspaceRoot !== workspaceRoot) {
           void clearSession(workspaceRoot)
+        } else if (!run.featureBranch) {
+          // Legacy session without featureBranch — clean it up
+          void clearSession(workspaceRoot)
+        } else {
+          const isResumable = run.status === 'gate' || run.status === 'paused-error'
+          const wasRunning = run.status === 'running'
+          if (isResumable || wasRunning) {
+            if (wasRunning) {
+              run.status = 'paused-error'
+              logs.push({
+                ts: new Date().toISOString(),
+                kind: 'system',
+                message: 'App restarted — run paused. Use ↺ Retry to resume.',
+              })
+            }
+            activeRuns.set(workspaceRoot, run)
+            runLogs.set(run.id, logs)
+            // Restore per-agent logs if present in session
+            const savedSubAgentLogs = (session as { subAgentLogs?: Record<string, RunLogEntry[]> })
+              .subAgentLogs
+            if (savedSubAgentLogs) {
+              const agentMap = new Map<string, RunLogEntry[]>()
+              for (const [agentId, entries] of Object.entries(savedSubAgentLogs)) {
+                agentMap.set(agentId, entries)
+              }
+              subAgentLogs.set(run.id, agentMap)
+            }
+            void saveSession(workspaceRoot, run)
+          } else {
+            void clearSession(workspaceRoot)
+          }
         }
       }
     }
@@ -1408,6 +1875,9 @@ export function activate(api: ExtensionAPI): void {
       iterations: []
       providerId: string
       workspaceRoot: string
+      featureBranch?: string
+      baseBranch?: string
+      worktreePath?: string
     }> = []
     try {
       const { entries } = await readHistory(workspaceRoot, 0, 50)
@@ -1426,6 +1896,9 @@ export function activate(api: ExtensionAPI): void {
         iterations: [],
         providerId: e.providerId,
         workspaceRoot,
+        featureBranch: e.featureBranch,
+        baseBranch: e.baseBranch,
+        worktreePath: e.worktreePath,
       }))
     } catch {
       // history file may not exist yet
@@ -1476,7 +1949,7 @@ export function activate(api: ExtensionAPI): void {
     }
     if (!workspaceRoot || !taskDescription || !providerId)
       return { error: 'workspaceRoot, taskDescription, providerId required' }
-    const providers = await readProviders(workspaceRoot)
+    const providers = await readProviders()
     const provider = providers.find((p) => p.id === providerId)
     if (!provider) return { error: `Provider "${providerId}" not found` }
     const adapter = buildAdapter(provider, workspaceRoot)
@@ -1503,7 +1976,7 @@ export function activate(api: ExtensionAPI): void {
     const run = activeRuns.get(workspaceRoot)
     if (!run || run.id !== runId) return { error: 'Run not found' }
 
-    const providers = await readProviders(workspaceRoot)
+    const providers = await readProviders()
     const provider = providers.find((p) => p.id === run.providerId)
     if (!provider) return { error: `Provider "${run.providerId}" not found` }
     if (!provider.supportsStreaming) {

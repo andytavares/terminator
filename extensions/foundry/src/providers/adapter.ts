@@ -8,6 +8,8 @@ export interface RunRequest {
   prompt: string
   workspaceRoot: string
   agentsMdContent: string
+  /** Recursive file tree of the worktree, injected into the system prompt for structure awareness */
+  workspaceListing?: string
   iterationLimit: number
   conversationHistory?: Array<{ role: 'user' | 'agent'; content: string }>
   feedbackNote?: string
