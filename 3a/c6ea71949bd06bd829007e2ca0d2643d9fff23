@@ -1,0 +1,51 @@
+extensions/task-vault/src/vault/vault-path.ts
+  s_572568967d4875::t_3db86a8bb3411e 1-14
+extensions/task-vault/tests/ipc/kanban.ipc.spec.ts
+  s_572568967d4875::t_3db86a8bb3411e 11-33,35-41,43,49,58-59,82-83,96,102,113,125-126,220-222,228,282
+extensions/task-vault/src/stores/vault-data.store.ts
+  s_572568967d4875::t_3db86a8bb3411e 1-107
+extensions/task-vault/src/stores/vault.store.ts
+  s_572568967d4875::t_3db86a8bb3411e 1-16
+extensions/task-vault/src/vault/db.ts
+  s_572568967d4875::t_3db86a8bb3411e 20-21,84-94,158-235,283-285
+extensions/task-vault/src/vault/ensure-next-occurrence.ts
+  s_572568967d4875::t_3db86a8bb3411e 14,19-23,36-39,68-87,91,94,105-108,117-118,122,125-129
+extensions/task-vault/tests/vault/ensure-next-occurrence.spec.ts
+  s_572568967d4875::t_3db86a8bb3411e 82-88,103,106-109,141-144,181-195,226-238,252-263,280-282
+.forge/005-task-vault-review-best-practices/topic.md
+  s_572568967d4875::t_6e5a8756eb4eb9 1
+extensions/task-vault/src/stores/vault-filter.store.ts
+  s_572568967d4875::t_3db86a8bb3411e 1-51
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_572568967d4875::t_3db86a8bb3411e 33-34,36-37,41,1250-1253,1275-1277,1335-1349
+extensions/task-vault/src/vault/mappers.ts
+  s_572568967d4875::t_3db86a8bb3411e 1-139
+.forge/005-task-vault-review-best-practices/research.md
+  s_572568967d4875::t_e5d9bc31222786 1-145,147-173
+extensions/task-vault/src/ipc/projects.ipc.ts
+  s_572568967d4875::t_3db86a8bb3411e 10-12,14-15,19
+extensions/task-vault/tests/vault/mappers.spec.ts
+  s_572568967d4875::t_3db86a8bb3411e 1-193
+extensions/task-vault/src/stores/vault-nav.store.ts
+  s_572568967d4875::t_3db86a8bb3411e 1-42
+extensions/task-vault/src/ipc/links.ipc.ts
+  s_572568967d4875::t_3db86a8bb3411e 8-9,11-12,16
+extensions/task-vault/src/ipc/kanban.ipc.ts
+  s_572568967d4875::t_3db86a8bb3411e 6,8-9,14-15,17-19,26-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "3ac6ea71949bd06bd829007e2ca0d2643d9fff23",
+  "prompts": {},
+  "sessions": {
+    "s_572568967d4875": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "10454eae-eee3-49b6-8d51-9018839f60d7",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
