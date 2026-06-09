@@ -1,0 +1,81 @@
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_572568967d4875::t_123e2267ee0bc6 407-408
+  s_572568967d4875::t_017fdc55669ecc 339-358
+  s_572568967d4875::t_f2f3e6fe221157 156-164,166-198
+  s_572568967d4875::t_fb2d00afae3731 416-431
+  s_572568967d4875::t_02a02dd89a403b 16-21
+extensions/git-integration/tests/unit/PrReviewView.spec.tsx
+  s_572568967d4875::t_bef6f02b812586 328-391
+extensions/git-integration/tests/unit/HealthChips.spec.tsx
+  s_572568967d4875::t_4d4067488c6b9b 140
+extensions/git-integration/src/api/github.ts
+  s_572568967d4875::t_2eed6594393fac 62-64
+extensions/git-integration/src/components/pr-review/HealthChips.tsx
+  s_572568967d4875::t_49b56a947c84f8 9
+  s_572568967d4875::t_2f225ebaed9c6c 19-25
+  s_572568967d4875::t_c562d3c9a7330b 142-153
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_572568967d4875::t_edb83885179b65 2561-2622
+  s_572568967d4875::t_a7a49c0ecaf1fb 1386-1413
+  s_572568967d4875::t_18f58d34a29213 1414-1440
+  s_572568967d4875::t_4ddbe746c3531e 831-900
+extensions/git-integration/src/components/pr-review/PrReviewView.tsx
+  s_572568967d4875::t_852c12d0f7519d 92-95
+  s_572568967d4875::t_be0184dc84a5e6 315-339
+  s_572568967d4875::t_4217e9f7e145ed 59-60
+  s_572568967d4875::t_c55f0e9b0bbfc6 76-81
+  s_572568967d4875::t_c05575ad15931b 62-74
+extensions/git-integration/tests/unit/pr-review-service.spec.ts
+  s_572568967d4875::t_8a637047a10b63 8-10
+  s_572568967d4875::t_00483be8066307 696-848
+extensions/git-integration/src/components/pr-review/PrOverviewPanel.tsx
+  s_572568967d4875::t_c1833d8423201c 397,399-432
+  s_572568967d4875::t_f904e3075a1222 398
+  s_572568967d4875::t_79f1868b739a48 89
+extensions/git-integration/tests/unit/github-api.spec.ts
+  s_572568967d4875::t_8b7bfe91c0b306 173-182
+specs/001-extension-first-terminal/data-model.md
+  s_572568967d4875::t_656713ce27dd70 244-253,255-264,266-274,276-278
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_572568967d4875::t_37d19a3001cbe7 130-131
+  s_572568967d4875::t_a7b978c00180be 238-239
+  s_572568967d4875::t_bd375c12186269 92-107
+README.md
+  s_572568967d4875::t_28c0e1adf2c655 15
+extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx
+  s_572568967d4875::t_3e7f5a6e423246 310
+  s_572568967d4875::t_bf90023406d474 329
+  s_572568967d4875::t_a25c3f9b4e05a0 9
+  s_572568967d4875::t_ad2fdf713920a0 309,311-315
+  s_572568967d4875::t_1c94e699c56569 227,229-241
+  s_572568967d4875::t_1b2eb2bf5e580a 63
+  s_572568967d4875::t_90ed97e9bf55b5 228
+  s_572568967d4875::t_42e2c2a825e81a 342-354
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_572568967d4875::t_7bb9bbc84404ee 926-937
+extensions/git-integration/src/github/pr-review-service.ts
+  s_572568967d4875::t_dafba54d24bf12 798-806,809-876
+  s_572568967d4875::t_c26fa7622ae9c6 213,215-226
+  s_572568967d4875::t_3ff63319c98ee4 807-808
+  s_572568967d4875::t_eb99a1e94370fe 8-9
+  s_572568967d4875::t_a2e421fa6db6d7 374-377,400-412
+  s_572568967d4875::t_1631110ea51292 483-484,501
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_572568967d4875::t_afd36d34c2c1b0 20-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "b7e7442730111e78ffae3bfa84a94dd54a44e63a",
+  "prompts": {},
+  "sessions": {
+    "s_572568967d4875": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "10454eae-eee3-49b6-8d51-9018839f60d7",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
