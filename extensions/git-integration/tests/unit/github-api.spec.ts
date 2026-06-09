@@ -170,4 +170,14 @@ describe('githubAPI bridge', () => {
       prNumber: 42,
     })
   })
+
+  it('fileCoChange calls correct channel', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    const files = ['src/a.ts', 'src/b.ts']
+    await githubAPI.fileCoChange('/repo', files)
+    expect(mockInvoke).toHaveBeenCalledWith('github:file-cochange', {
+      repoRoot: '/repo',
+      files,
+    })
+  })
 })

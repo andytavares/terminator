@@ -17,10 +17,14 @@ vi.mock('../../src/components/pr-review/CommentComposer', () => ({
     </div>
   ),
 }))
-vi.mock('../../src/github/pr-review-service', () => ({
-  detectComplexityHotspots: vi.fn().mockReturnValue([]),
-  computeFileCyclomaticDelta: vi.fn().mockReturnValue(0),
-}))
+vi.mock('../../src/github/pr-review-service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/github/pr-review-service')>()
+  return {
+    ...actual,
+    detectComplexityHotspots: vi.fn().mockReturnValue([]),
+    computeFileCyclomaticDelta: vi.fn().mockReturnValue(0),
+  }
+})
 
 const mockPatchFileComplexity = vi.fn()
 const mockPrFileDiff = vi.fn()

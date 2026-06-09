@@ -56,8 +56,29 @@ export function PrReviewView({
   const [showRiskFor, setShowRiskFor] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'guided' | 'full'>('full')
   const [refreshing, setRefreshing] = useState(false)
+  const [focusMode, setFocusMode] = useState(false)
+  const [largePrDismissed, setLargePrDismissed] = useState(false)
 
-  const showMultipleChapters = pr.chapters.length > 1
+  // When focus mode is active, filter each chapter to only medium/high risk files
+  const displayPr = useMemo<PrReviewDetail>(() => {
+    if (!focusMode) return pr
+    const filteredChapters = pr.chapters
+      .map((c) => {
+        const focused = c.files.filter((f) => f.riskScore.level !== 'low')
+        return { ...c, files: focused.length > 0 ? focused : c.files }
+      })
+      .filter((c) => c.files.length > 0)
+    return { ...pr, chapters: filteredChapters.length > 0 ? filteredChapters : pr.chapters }
+  }, [pr, focusMode])
+
+  const showMultipleChapters = displayPr.chapters.length > 1
+
+  const totalLoc = pr.chapters
+    .flatMap((c) => c.files)
+    .reduce((s, f) => s + f.additions + f.deletions, 0)
+  const estimatedReviewMinutes = Math.round((totalLoc / 100) * 25)
+  const isLargePr = totalLoc > 400
+  const showLargePrBanner = isLargePr && !largePrDismissed
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -68,9 +89,10 @@ export function PrReviewView({
     }
   }
 
-  // Resolve active chapter and file
-  const activeChapterId = currentChapterId ?? pr.chapters[0]?.id ?? null
-  const activeChapter = pr.chapters.find((c) => c.id === activeChapterId) ?? pr.chapters[0] ?? null
+  // Resolve active chapter and file from the focus-filtered displayPr
+  const activeChapterId = currentChapterId ?? displayPr.chapters[0]?.id ?? null
+  const activeChapter =
+    displayPr.chapters.find((c) => c.id === activeChapterId) ?? displayPr.chapters[0] ?? null
 
   const orderedFiles = useMemo<PrChangedFile[]>(() => {
     if (!activeChapter) return []
@@ -289,6 +311,31 @@ export function PrReviewView({
       >
         <div className="pr-review-progress-fill" style={{ width: `${reviewPct}%` }} />
       </div>
+
+      {/* Large-PR cognitive load warning */}
+      {showLargePrBanner && (
+        <div className="pr-large-pr-banner" role="alert">
+          <span className="pr-large-pr-banner__icon">⚠</span>
+          <span className="pr-large-pr-banner__text">
+            Large PR — {totalLoc.toLocaleString()} LOC, estimated {estimatedReviewMinutes} min to
+            review. Consider requesting it be split.
+          </span>
+          <button
+            className={`pr-large-pr-banner__focus${focusMode ? ' pr-large-pr-banner__focus--active' : ''}`}
+            onClick={() => setFocusMode((v) => !v)}
+            title="Focus mode — show only medium/high risk files"
+          >
+            {focusMode ? 'All files' : 'Focus mode'}
+          </button>
+          <button
+            className="pr-large-pr-banner__dismiss"
+            onClick={() => setLargePrDismissed(true)}
+            aria-label="Dismiss large PR warning"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Chapter nav: guided mode only, hidden when ≤1 chapter */}
       {viewMode === 'guided' && showMultipleChapters && (

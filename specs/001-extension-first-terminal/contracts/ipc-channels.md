@@ -923,6 +923,18 @@ Returns all persisted review sessions for a given repo root, used to restore `se
 
 ---
 
+### `github:file-cochange`
+
+Returns co-change affinity data for a set of files by analysing git history over the past 90 days. Files that frequently appear in the same commits are considered "co-changing" and are grouped together as Signal 3 in the chapter-building algorithm. Language-agnostic — works for any repo (Go, Python, Ruby, Rust, Java, etc.).
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**: `{ repoRoot: string; files: string[] }`
+
+**Response**: `{ affinity: Record<string, string[]> } | { error: string }`
+
+---
+
 ### `github:file-metrics`
 
 Returns churn, blast radius (actual code importers only — not prose), test file presence, and patch coverage for a changed file.

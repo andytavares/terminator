@@ -241,3 +241,38 @@ Extension (many) ─── contributes to ──> GlobalSettings.extensions[exte
 | Extension                  | ✅ Yes    | electron-store       | Installed extensions list persists  |
 | GlobalSettings             | ✅ Yes    | electron-store       | Survives app restart                |
 | WorkspaceSettings          | ✅ Yes    | electron-store       | Survives app restart                |
+
+---
+
+## PR Review Schema (git-integration extension)
+
+### `PrReviewDetail`
+
+The full detail record returned by `github:pr-review-detail` and stored in the review session.
+
+| Field           | Type             | Description                                                    |
+| --------------- | ---------------- | -------------------------------------------------------------- |
+| `number`        | `number`         | PR number                                                      |
+| `chapters`      | `Chapter[]`      | Files organised into semantic review chapters                  |
+| `issueRefs`     | `IssueRef[]`     | Issue references parsed from PR body (`Fixes #N`, Linear URLs) |
+| `dryViolations` | `DryViolation[]` | Duplicate code blocks detected across files in this PR         |
+
+### `IssueRef`
+
+Represents an issue reference extracted from the PR body.
+
+| Field  | Type                   | Description                                 |
+| ------ | ---------------------- | ------------------------------------------- |
+| `type` | `'github' \| 'linear'` | Source system                               |
+| `ref`  | `string`               | Issue identifier, e.g. `#123` or `TEAM-456` |
+| `url`  | `string?`              | Full URL (Linear only)                      |
+
+### `DryViolation`
+
+A detected duplicate code block appearing in 2+ files in the same PR.
+
+| Field         | Type       | Description                                |
+| ------------- | ---------- | ------------------------------------------ |
+| `files`       | `string[]` | Paths of files sharing the duplicate block |
+| `fingerprint` | `string`   | Normalised token fingerprint of the block  |
+| `lineCount`   | `number`   | Window size (5 lines)                      |

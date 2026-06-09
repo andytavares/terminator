@@ -5,6 +5,9 @@ import {
   computeRiskScore,
   parseReviewQueuePR,
   chapterRiskLevel,
+  classifyHunk,
+  extractIssueRefs,
+  detectDryViolations,
 } from '../../src/github/pr-review-service'
 import { ReviewSessionSchema } from '../../src/schemas/pr-review.schema'
 import type { PrChangedFile, ReviewSession, FileMetrics } from '../../src/schemas/pr-review.schema'
@@ -689,5 +692,158 @@ describe('buildChapters() — additional branches', () => {
     const chapters = buildChapters(rawFiles)
     // Both files should be in the same chapter (connected by import)
     expect(chapters.some((c) => c.files.some((f) => f.path === 'src/api/service.ts'))).toBe(true)
+  })
+
+  it('uses co-change affinity to group files across directories', () => {
+    const coChangeAffinity = new Map([
+      ['cmd/server/main.go', ['internal/handler/user.go']],
+      ['internal/handler/user.go', ['cmd/server/main.go']],
+    ])
+    const rawFiles = [
+      { path: 'cmd/server/main.go', additions: 10, deletions: 0 },
+      { path: 'internal/handler/user.go', additions: 5, deletions: 0 },
+      { path: 'docs/readme.md', additions: 3, deletions: 0 },
+    ]
+    const chapters = buildChapters(rawFiles, undefined, coChangeAffinity)
+    // The two co-changing Go files should be in the same chapter
+    const goChapter = chapters.find(
+      (c) =>
+        c.files.some((f) => f.path === 'cmd/server/main.go') &&
+        c.files.some((f) => f.path === 'internal/handler/user.go')
+    )
+    expect(goChapter).toBeTruthy()
+  })
+})
+
+// ─── classifyHunk ─────────────────────────────────────────────────────────────
+
+describe('classifyHunk', () => {
+  it('returns semantic for hunk with only context lines', () => {
+    const hunk = {
+      lines: [{ type: 'context', content: 'const x = 1' }],
+    }
+    expect(classifyHunk(hunk)).toBe('semantic')
+  })
+
+  it('returns semantic when add and remove counts differ', () => {
+    const hunk = {
+      lines: [
+        { type: 'add', content: 'const x = 1' },
+        { type: 'add', content: 'const y = 2' },
+        { type: 'remove', content: 'const z = 3' },
+      ],
+    }
+    expect(classifyHunk(hunk)).toBe('semantic')
+  })
+
+  it('returns formatting when add and remove are whitespace variants of each other', () => {
+    const hunk = {
+      lines: [
+        { type: 'remove', content: 'const x = 1' },
+        { type: 'add', content: '  const x = 1' },
+      ],
+    }
+    expect(classifyHunk(hunk)).toBe('formatting')
+  })
+
+  it('returns semantic when content differs meaningfully', () => {
+    const hunk = {
+      lines: [
+        { type: 'remove', content: 'const x = 1' },
+        { type: 'add', content: 'const x = 2' },
+      ],
+    }
+    expect(classifyHunk(hunk)).toBe('semantic')
+  })
+
+  it('returns formatting for reordered import lines', () => {
+    const hunk = {
+      lines: [
+        { type: 'remove', content: "import { a } from './a'" },
+        { type: 'remove', content: "import { b } from './b'" },
+        { type: 'add', content: "import { b } from './b'" },
+        { type: 'add', content: "import { a } from './a'" },
+      ],
+    }
+    expect(classifyHunk(hunk)).toBe('formatting')
+  })
+})
+
+// ─── extractIssueRefs ─────────────────────────────────────────────────────────
+
+describe('extractIssueRefs', () => {
+  it('extracts GitHub issue references', () => {
+    const body = 'Fixes #123\nCloses #456'
+    const refs = extractIssueRefs(body)
+    expect(refs).toHaveLength(2)
+    expect(refs[0]).toEqual({ type: 'github', ref: '#123' })
+    expect(refs[1]).toEqual({ type: 'github', ref: '#456' })
+  })
+
+  it('extracts Linear issue URLs', () => {
+    const body = 'Fixes https://linear.app/myteam/issue/TEAM-123 some extra text'
+    const refs = extractIssueRefs(body)
+    expect(refs.some((r) => r.type === 'linear' && r.ref === 'TEAM-123')).toBe(true)
+  })
+
+  it('returns empty array for body with no refs', () => {
+    expect(extractIssueRefs('Just a description')).toHaveLength(0)
+  })
+
+  it('handles case-insensitive keywords', () => {
+    const refs = extractIssueRefs('FIXES #99 RESOLVES #100')
+    expect(refs).toHaveLength(2)
+  })
+})
+
+// ─── detectDryViolations ──────────────────────────────────────────────────────
+
+describe('detectDryViolations', () => {
+  it('returns empty array when no patches provided', () => {
+    const result = detectDryViolations([{ path: 'a.ts' }, { path: 'b.ts' }])
+    expect(result).toHaveLength(0)
+  })
+
+  it('detects duplicate added blocks across files', () => {
+    const sharedBlock = Array.from(
+      { length: 5 },
+      (_, i) => `+  const handler${i} = () => doSomethingWithThisLongLine${i}()`
+    ).join('\n')
+    const files = [
+      { path: 'src/a.ts', patch: sharedBlock },
+      { path: 'src/b.ts', patch: sharedBlock },
+    ]
+    const violations = detectDryViolations(files)
+    expect(violations.length).toBeGreaterThan(0)
+    expect(violations[0].files).toContain('src/a.ts')
+    expect(violations[0].files).toContain('src/b.ts')
+  })
+
+  it('returns no violations when blocks are unique', () => {
+    const files = [
+      { path: 'src/a.ts', patch: '+const uniqueA = doSomethingSpecificToFileA()' },
+      { path: 'src/b.ts', patch: '+const uniqueB = doSomethingSpecificToFileB()' },
+    ]
+    expect(detectDryViolations(files)).toHaveLength(0)
+  })
+})
+
+// ─── multi-language classifyTier ──────────────────────────────────────────────
+
+describe('buildChapters tier classification for multiple languages', () => {
+  const makeFile = (path: string) => ({ path, additions: 5, deletions: 0 })
+
+  it.each([
+    ['src/user_test.go', 2],
+    ['tests/test_service.py', 2],
+    ['conftest.py', 2],
+    ['spec/user_spec.rb', 2],
+    ['UserTest.java', 2],
+    ['UserTests.swift', 2],
+    ['tests/integration_test.rs', 2],
+  ])('classifies %s as tier %i', (path, expectedTier) => {
+    const chapters = buildChapters([makeFile(path)])
+    const file = chapters.flatMap((c) => c.files).find((f) => f.path === path)
+    expect(file?.tier).toBe(expectedTier)
   })
 })

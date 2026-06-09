@@ -325,4 +325,68 @@ describe('PrReviewView', () => {
     )
     expect(screen.getByText('Select a file to review.')).toBeTruthy()
   })
+
+  describe('large-PR banner', () => {
+    function makeLargeFile(path: string, additions: number) {
+      return { ...mockFile, path, additions, deletions: 0 }
+    }
+
+    it('shows large-PR banner when PR exceeds 400 LOC', async () => {
+      const bigFile = makeLargeFile('src/big.ts', 500)
+      const chapter = { ...mockChapter, files: [bigFile] }
+      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+      setupStore({ currentFilePath: 'src/big.ts' })
+      render(
+        <PrReviewView
+          repoRoot="/repo"
+          pr={{ ...mockPr, chapters: [chapter] }}
+          onClose={mockClose}
+          onRefresh={mockRefresh}
+        />
+      )
+      expect(screen.getByRole('alert')).toBeTruthy()
+      expect(screen.getByText(/Large PR/)).toBeTruthy()
+    })
+
+    it('does not show large-PR banner when PR is under 400 LOC', async () => {
+      await renderView()
+      expect(screen.queryByRole('alert')).toBeNull()
+    })
+
+    it('dismisses large-PR banner when × clicked', async () => {
+      const bigFile = makeLargeFile('src/big.ts', 500)
+      const chapter = { ...mockChapter, files: [bigFile] }
+      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+      setupStore({ currentFilePath: 'src/big.ts' })
+      render(
+        <PrReviewView
+          repoRoot="/repo"
+          pr={{ ...mockPr, chapters: [chapter] }}
+          onClose={mockClose}
+          onRefresh={mockRefresh}
+        />
+      )
+      fireEvent.click(screen.getByLabelText('Dismiss large PR warning'))
+      expect(screen.queryByRole('alert')).toBeNull()
+    })
+
+    it('toggles focus mode on/off', async () => {
+      const bigFile = makeLargeFile('src/big.ts', 500)
+      const chapter = { ...mockChapter, files: [bigFile] }
+      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+      setupStore({ currentFilePath: 'src/big.ts' })
+      render(
+        <PrReviewView
+          repoRoot="/repo"
+          pr={{ ...mockPr, chapters: [chapter] }}
+          onClose={mockClose}
+          onRefresh={mockRefresh}
+        />
+      )
+      const focusBtn = screen.getByTitle('Focus mode — show only medium/high risk files')
+      expect(focusBtn.textContent).toBe('Focus mode')
+      fireEvent.click(focusBtn)
+      expect(focusBtn.textContent).toBe('All files')
+    })
+  })
 })

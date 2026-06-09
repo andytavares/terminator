@@ -13,7 +13,12 @@ import type {
   StatusCheck,
 } from '../schemas/pr-review.schema.js'
 import { ReviewSessionSchema } from '../schemas/pr-review.schema.js'
-import { buildChapters, parseReviewQueuePR } from '../github/pr-review-service.js'
+import {
+  buildChapters,
+  parseReviewQueuePR,
+  extractIssueRefs,
+  detectDryViolations,
+} from '../github/pr-review-service.js'
 import type { FileDiff } from '../schemas/git.schema.js'
 import { FileDiffSchema } from '../schemas/git.schema.js'
 
@@ -147,6 +152,49 @@ async function runGit(cwd: string, args: string[]): Promise<string> {
 
 const PR_JSON_FIELDS =
   'number,title,author,createdAt,headRefName,baseRefName,isDraft,mergeStateStatus,statusCheckRollup,files,additions,deletions,reviews,assignees,latestReviews'
+
+// ─── Co-change affinity (language-agnostic Signal 3) ─────────────────────────
+
+async function computeCoChangeAffinityFromGit(
+  repoRoot: string,
+  files: string[]
+): Promise<Map<string, string[]>> {
+  const affinity = new Map<string, string[]>()
+  if (files.length < 2) return affinity
+  try {
+    const raw = await runGit(repoRoot, ['log', '--name-only', '--format=%H', '--since=90 days ago'])
+    const fileSet = new Set(files)
+    const lines = raw.split('\n')
+    let currentFiles: string[] = []
+
+    const flushCommit = () => {
+      const prFilesInCommit = currentFiles.filter((f) => fileSet.has(f))
+      if (prFilesInCommit.length >= 2) {
+        for (const a of prFilesInCommit) {
+          for (const b of prFilesInCommit) {
+            if (a === b) continue
+            const existing = affinity.get(a) ?? []
+            existing.push(b)
+            affinity.set(a, existing)
+          }
+        }
+      }
+      currentFiles = []
+    }
+
+    for (const line of lines) {
+      if (/^[0-9a-f]{40}$/.test(line.trim())) {
+        flushCommit()
+      } else if (line.trim()) {
+        currentFiles.push(line.trim())
+      }
+    }
+    flushCommit()
+  } catch {
+    // co-change is best-effort — failures degrade gracefully to Signal 1+2 only
+  }
+  return affinity
+}
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
@@ -288,7 +336,26 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
       const assigneeLogins = ((meta.assignees as Array<Record<string, unknown>> | undefined) ?? [])
         .map((a) => String(a.login ?? ''))
         .filter(Boolean)
-      const chapters = buildChapters(filesData)
+
+      // Compute co-change affinity for universal chapter grouping (language-agnostic Signal 3)
+      const filePaths = filesData.map((f) =>
+        String((f as Record<string, unknown>).filename ?? (f as Record<string, unknown>).path ?? '')
+      )
+      const coChangeAffinity = await computeCoChangeAffinityFromGit(repoRoot, filePaths)
+      const chapters = buildChapters(filesData, undefined, coChangeAffinity)
+
+      // Extract issue refs from PR body for context panel
+      const issueRefs = extractIssueRefs(String(meta.body ?? ''))
+
+      // Detect DRY violations across all changed files
+      const patchFiles = filesData.map((f) => {
+        const obj = f as Record<string, unknown>
+        return {
+          path: String(obj.filename ?? obj.path ?? ''),
+          patch: obj.patch ? String(obj.patch) : undefined,
+        }
+      })
+      const dryViolations = detectDryViolations(patchFiles)
 
       // When statusCheckRollup is null/empty (checks queued but not yet reported),
       // fall back to check-suites so "Expected" checks are visible.
@@ -337,10 +404,28 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
         requestedReviewers,
         assigneeLogins,
         chapters,
+        issueRefs,
+        dryViolations,
       }
       return { pr }
     } catch (e) {
       return catchError(e)
+    }
+  })
+
+  register('github:file-cochange', async (payload) => {
+    const schema = z.object({
+      repoRoot: z.string().min(1),
+      files: z.array(z.string()).min(1),
+    })
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+    const { repoRoot, files } = parsed.data
+    try {
+      const affinity = await computeCoChangeAffinityFromGit(repoRoot, files)
+      return { affinity: Object.fromEntries(affinity) }
+    } catch (e) {
+      return { error: String(e) }
     }
   })
 
