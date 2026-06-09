@@ -89,6 +89,22 @@ export const PrApprovalSchema = z.object({
   submittedAt: z.string(),
 })
 
+// ─── Issue references ─────────────────────────────────────────────────────────
+
+export const IssueRefSchema = z.object({
+  type: z.enum(['github', 'linear']),
+  ref: z.string(),
+  url: z.string().optional(),
+})
+
+// ─── DRY violations ───────────────────────────────────────────────────────────
+
+export const DryViolationSchema = z.object({
+  files: z.array(z.string()),
+  fingerprint: z.string(),
+  lineCount: z.number(),
+})
+
 // ─── PR review detail ─────────────────────────────────────────────────────────
 
 export const PrReviewDetailSchema = z.object({
@@ -111,6 +127,8 @@ export const PrReviewDetailSchema = z.object({
   requestedReviewers: z.array(z.string()).default([]),
   assigneeLogins: z.array(z.string()).default([]),
   chapters: z.array(ChapterSchema),
+  issueRefs: z.array(IssueRefSchema).default([]),
+  dryViolations: z.array(DryViolationSchema).default([]),
 })
 
 // ─── Review queue PR (lightweight summary) ────────────────────────────────────
@@ -217,3 +235,5 @@ export type IssueComment = z.infer<typeof IssueCommentSchema>
 export type InlineComment = z.infer<typeof InlineCommentSchema>
 export type Thread = z.infer<typeof ThreadSchema>
 export type ReviewSession = z.infer<typeof ReviewSessionSchema>
+export type IssueRef = z.infer<typeof IssueRefSchema>
+export type DryViolation = z.infer<typeof DryViolationSchema>

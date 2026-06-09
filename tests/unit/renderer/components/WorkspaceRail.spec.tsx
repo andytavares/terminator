@@ -293,4 +293,47 @@ describe('WorkspaceRail', () => {
     fireEvent.click(btn)
     expect(onSelectGlobalTab).toHaveBeenCalledWith('core.overview')
   })
+
+  describe('bell button', () => {
+    it('renders bell button when onBellClick is provided', () => {
+      render(<WorkspaceRail onBellClick={vi.fn()} />)
+      expect(screen.getByTitle('Notifications')).toBeTruthy()
+    })
+
+    it('does not render bell button when onBellClick is not provided', () => {
+      render(<WorkspaceRail />)
+      expect(screen.queryByTitle('Notifications')).toBeNull()
+    })
+
+    it('calls onBellClick when bell button is clicked', () => {
+      const onBellClick = vi.fn()
+      render(<WorkspaceRail onBellClick={onBellClick} />)
+      fireEvent.click(screen.getByTitle('Notifications'))
+      expect(onBellClick).toHaveBeenCalled()
+    })
+
+    it('applies active class when notificationPanelOpen is true', () => {
+      render(<WorkspaceRail onBellClick={vi.fn()} notificationPanelOpen={true} />)
+      const btn = screen.getByTitle('Notifications')
+      expect(btn.className).toContain('ws-rail__bell--active')
+    })
+
+    it('does not apply active class when notificationPanelOpen is false', () => {
+      render(<WorkspaceRail onBellClick={vi.fn()} notificationPanelOpen={false} />)
+      const btn = screen.getByTitle('Notifications')
+      expect(btn.className).not.toContain('ws-rail__bell--active')
+    })
+
+    it('includes unread count in aria-label when unreadNotifications > 0', () => {
+      render(<WorkspaceRail onBellClick={vi.fn()} unreadNotifications={3} />)
+      const btn = screen.getByTitle('Notifications')
+      expect(btn.getAttribute('aria-label')).toContain('3 unread')
+    })
+
+    it('omits unread count in aria-label when unreadNotifications is 0', () => {
+      render(<WorkspaceRail onBellClick={vi.fn()} unreadNotifications={0} />)
+      const btn = screen.getByTitle('Notifications')
+      expect(btn.getAttribute('aria-label')).toBe('Notifications')
+    })
+  })
 })

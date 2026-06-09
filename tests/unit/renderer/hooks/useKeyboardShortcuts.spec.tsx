@@ -345,4 +345,79 @@ describe('useKeyboardShortcuts', () => {
     pressKey('w', { metaKey: true })
     expect(mockCloseSession).not.toHaveBeenCalled()
   })
+
+  describe('scratch mode — scratchProjectId overrides activeProjectId', () => {
+    const SCRATCH_ID = '00000000-0000-0000-0000-000000000000'
+
+    it('Cmd+K clears scratch session when scratchProjectId is set and activeProjectId is null', async () => {
+      const mockTerminalInput = vi.fn()
+      ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+        terminal: { input: mockTerminalInput },
+      }
+      mockGetActiveSessionForProject.mockReturnValue('scratch-ses-1')
+      setupMocks({ activeProjectId: null })
+      const useKeyboardShortcuts = await importHook()
+      renderHook(() => useKeyboardShortcuts({ scratchProjectId: SCRATCH_ID }))
+      pressKey('k', { metaKey: true })
+      expect(mockGetActiveSessionForProject).toHaveBeenCalledWith(SCRATCH_ID)
+      expect(mockTerminalInput).toHaveBeenCalledWith('scratch-ses-1', '\x0c')
+      delete (globalThis as unknown as Record<string, unknown>).electronAPI
+    })
+
+    it('Cmd+T creates scratch session when scratchProjectId is set and activeProjectId is null', async () => {
+      setupMocks({ activeProjectId: null })
+      const useKeyboardShortcuts = await importHook()
+      renderHook(() => useKeyboardShortcuts({ scratchProjectId: SCRATCH_ID }))
+      pressKey('t', { metaKey: true })
+      expect(mockCreateSession).toHaveBeenCalledWith(
+        SCRATCH_ID,
+        'human',
+        'Terminal',
+        expect.any(String),
+        5000
+      )
+    })
+
+    it('Cmd+D splits scratch project when scratchProjectId is set', async () => {
+      setupMocks({ activeProjectId: null })
+      const useKeyboardShortcuts = await importHook()
+      renderHook(() => useKeyboardShortcuts({ scratchProjectId: SCRATCH_ID }))
+      pressKey('d', { metaKey: true })
+      expect(mockSplitSession).toHaveBeenCalledWith(
+        SCRATCH_ID,
+        'vertical',
+        expect.any(String),
+        5000
+      )
+    })
+
+    it('Cmd+W closes scratch tab when scratchProjectId is set', async () => {
+      mockGetPaneLayout.mockReturnValue(null)
+      mockGetActiveSessionForProject.mockReturnValue('scratch-ses-1')
+      setupMocks({ activeProjectId: null })
+      const useKeyboardShortcuts = await importHook()
+      renderHook(() => useKeyboardShortcuts({ scratchProjectId: SCRATCH_ID }))
+      pressKey('w', { metaKey: true })
+      expect(mockCloseSession).toHaveBeenCalledWith('scratch-ses-1')
+    })
+
+    it('Cmd+ArrowRight cycles scratch tabs when scratchProjectId is set', async () => {
+      const sessions = [{ id: 'ss1' }, { id: 'ss2' }]
+      mockGetSessionsForProject.mockReturnValue(sessions)
+      mockGetActiveSessionForProject.mockReturnValue('ss1')
+      setupMocks({ activeProjectId: null })
+      const useKeyboardShortcuts = await importHook()
+      renderHook(() => useKeyboardShortcuts({ scratchProjectId: SCRATCH_ID }))
+      pressKey('ArrowRight', { metaKey: true })
+      expect(mockSetActiveSessionForProject).toHaveBeenCalledWith(SCRATCH_ID, 'ss2')
+    })
+
+    it('regular project shortcuts still work when both activeProjectId and scratchProjectId are null', async () => {
+      setupMocks({ activeProjectId: null })
+      const useKeyboardShortcuts = await importHook()
+      renderHook(() => useKeyboardShortcuts({ scratchProjectId: null }))
+      pressKey('t', { metaKey: true })
+      expect(mockCreateSession).not.toHaveBeenCalled()
+    })
+  })
 })

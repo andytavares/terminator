@@ -147,6 +147,17 @@ interface ElectronAPI {
     onMenuOpenSettings(handler: () => void): () => void
     onMenuToggleSidebar(handler: () => void): () => void
     onMenuCloseTab(handler: () => void): () => void
+    onMenuOpenAbout(handler: () => void): () => void
+  }
+  app: {
+    getInfo(): Promise<{
+      appName: string
+      version: string
+      electronVersion: string
+      nodeVersion: string
+      chromeVersion: string
+      platform: string
+    }>
   }
   notification: {
     show(title: string, body: string): void

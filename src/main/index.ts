@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron'
 import { join } from 'path'
 import { registerWorkspaceHandlers } from './ipc/workspace.ipc.js'
 import { registerTerminalHandlers } from './ipc/terminal.ipc.js'
@@ -57,8 +57,30 @@ function createWindow(): void {
   }
 }
 
+function openAbout(): void {
+  mainWindow?.webContents.send('menu:open-about')
+}
+
 function setupMenu(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
+    ...(process.platform === 'darwin'
+      ? ([
+          {
+            label: app.getName(),
+            submenu: [
+              { label: `About ${app.getName()}`, click: openAbout },
+              { type: 'separator' },
+              { role: 'services' },
+              { type: 'separator' },
+              { role: 'hide' },
+              { role: 'hideOthers' },
+              { role: 'unhide' },
+              { type: 'separator' },
+              { role: 'quit' },
+            ],
+          },
+        ] as Electron.MenuItemConstructorOptions[])
+      : []),
     {
       label: 'File',
       submenu: [{ label: 'Quit', accelerator: 'CmdOrCtrl+Q', role: 'quit' }],
@@ -91,8 +113,30 @@ function setupMenu(): void {
         },
       ],
     },
+    {
+      label: 'Help',
+      submenu: [
+        { label: `About ${app.getName()}`, click: openAbout },
+        { type: 'separator' },
+        {
+          label: 'View on GitHub',
+          click: () => void shell.openExternal('https://github.com/anthropics/terminator'),
+        },
+      ],
+    },
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
+function registerAppHandlers(): void {
+  ipcMain.handle('app:get-info', () => ({
+    appName: app.getName(),
+    version: app.getVersion(),
+    electronVersion: process.versions.electron,
+    nodeVersion: process.versions.node,
+    chromeVersion: process.versions.chrome,
+    platform: process.platform,
+  }))
 }
 
 function registerDialogHandlers(): void {
@@ -122,6 +166,7 @@ app.whenReady().then(async () => {
   registerNotificationHandlers()
   registerMetricsHandlers(ptyManager)
   registerDialogHandlers()
+  registerAppHandlers()
 
   await extensionHost.loadAll()
   await extensionHost.loadBundledExtensions(join(__dirname, '../../extensions'))

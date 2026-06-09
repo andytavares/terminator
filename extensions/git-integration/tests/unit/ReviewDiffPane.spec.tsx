@@ -17,10 +17,14 @@ vi.mock('../../src/components/pr-review/CommentComposer', () => ({
     </div>
   ),
 }))
-vi.mock('../../src/github/pr-review-service', () => ({
-  detectComplexityHotspots: vi.fn().mockReturnValue([]),
-  computeFileCyclomaticDelta: vi.fn().mockReturnValue(0),
-}))
+vi.mock('../../src/github/pr-review-service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/github/pr-review-service')>()
+  return {
+    ...actual,
+    detectComplexityHotspots: vi.fn().mockReturnValue([]),
+    computeFileCyclomaticDelta: vi.fn().mockReturnValue(0),
+  }
+})
 
 const mockPatchFileComplexity = vi.fn()
 const mockPrFileDiff = vi.fn()
@@ -85,6 +89,7 @@ const defaultProps = {
   onPrevFile: vi.fn(),
   onNextFile: vi.fn(),
   onFinishChapter: vi.fn(),
+  isLastChapter: false,
   onPause: vi.fn(),
   onOpenSubmit: vi.fn(),
   onShowRisk: vi.fn(),
@@ -171,9 +176,14 @@ describe('ReviewDiffPane', () => {
     expect(screen.getByText('✓ Viewed')).toBeTruthy()
   })
 
-  it('shows Finish chapter button when on last file', async () => {
-    await renderPane({ chapterProgress: { index: 1, total: 2 } })
+  it('shows Finish chapter button when on last file of a non-final chapter', async () => {
+    await renderPane({ chapterProgress: { index: 1, total: 2 }, isLastChapter: false })
     expect(screen.getByText('Finish chapter ↵')).toBeTruthy()
+  })
+
+  it('shows Finish review button when on last file of the final chapter', async () => {
+    await renderPane({ chapterProgress: { index: 1, total: 2 }, isLastChapter: true })
+    expect(screen.getByText('Finish review ↵')).toBeTruthy()
   })
 
   it('shows Mark viewed button when not on last file', async () => {

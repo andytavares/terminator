@@ -828,6 +828,76 @@
   z-index: 100;
 }
 
+/* ─── Large-PR cognitive load banner ─────────────────────────────────────── */
+
+.pr-large-pr-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(234, 179, 8, 0.1);
+  border-bottom: 1px solid rgba(234, 179, 8, 0.25);
+  flex-shrink: 0;
+  min-height: 32px;
+}
+
+.pr-large-pr-banner__icon {
+  font-size: 11px;
+  color: rgb(234, 179, 8);
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.pr-large-pr-banner__text {
+  font-size: 11px;
+  color: rgba(234, 179, 8, 0.9);
+  flex: 1;
+  line-height: 1.4;
+}
+
+.pr-large-pr-banner__focus {
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  border-radius: 4px;
+  color: rgba(234, 179, 8, 0.85);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 2px 8px;
+  flex-shrink: 0;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+  line-height: 18px;
+}
+
+.pr-large-pr-banner__focus:hover {
+  background: rgba(234, 179, 8, 0.25);
+  border-color: rgba(234, 179, 8, 0.5);
+}
+
+.pr-large-pr-banner__focus--active {
+  background: rgba(234, 179, 8, 0.28);
+  border-color: rgba(234, 179, 8, 0.6);
+  color: rgb(234, 179, 8);
+}
+
+.pr-large-pr-banner__dismiss {
+  background: none;
+  border: none;
+  color: rgba(234, 179, 8, 0.5);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.pr-large-pr-banner__dismiss:hover {
+  color: rgba(234, 179, 8, 0.85);
+}
+
 /* ─── ChapterNav ──────────────────────────────────────────────────────────── */
 
 .chapter-nav {
@@ -1311,6 +1381,61 @@
   background: rgba(88, 166, 255, 0.8);
   pointer-events: none;
   z-index: 2;
+}
+
+/* Semantic-only filter toggle — standalone button next to the Unified/Split toggle */
+.review-diff-filter-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--tm-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.1s,
+    color 0.1s,
+    border-color 0.1s;
+}
+
+.review-diff-filter-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--tm-text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.review-diff-filter-btn--active {
+  background: rgba(99, 179, 237, 0.12);
+  border-color: rgba(99, 179, 237, 0.35);
+  color: rgb(99, 179, 237);
+  font-weight: 500;
+}
+
+/* Formatting-only hunks hidden notice */
+.review-diff-formatting-notice {
+  font-size: 11px;
+  color: var(--tm-text-tertiary);
+  padding: 5px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.review-diff-formatting-show-btn {
+  background: none;
+  border: none;
+  color: var(--tm-accent);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.review-diff-formatting-show-btn:hover {
+  opacity: 0.8;
 }
 
 /* Complexity hotspot annotation */
@@ -2431,6 +2556,68 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin: 0;
+}
+
+.pr-overview-section-title--collapsible {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.pr-overview-section-title--collapsible:hover {
+  color: var(--tm-text-secondary);
+}
+
+.pr-overview-section-toggle {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+/* Issue refs */
+
+.pr-overview-issue-refs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pr-overview-issue-ref {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 12px;
+}
+
+.pr-overview-issue-ref-link {
+  color: var(--tm-accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.pr-overview-issue-ref-link:hover {
+  text-decoration: underline;
+}
+
+.pr-overview-issue-ref-label {
+  color: var(--tm-text-primary);
+  font-weight: 500;
+}
+
+.pr-overview-issue-ref-type {
+  font-size: 10px;
+  color: var(--tm-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: auto;
 }
 
 .pr-overview-no-desc {

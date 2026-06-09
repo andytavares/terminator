@@ -5,6 +5,8 @@ import type {
   FileMetrics,
   ReviewQueuePR,
   SignalDots,
+  IssueRef,
+  DryViolation,
 } from '../schemas/pr-review.schema.js'
 import type { FileDiff } from '../schemas/git.schema.js'
 
@@ -208,7 +210,20 @@ function classifyTier(path: string): 0 | 1 | 2 | 3 {
     name === 'index.ts'
   )
     return 0
+  // JS/TS test files
   if (/\.(spec|test)\.[^.]+$/.test(name) || path.includes('__tests__/')) return 2
+  // Go test files (*_test.go)
+  if (/_test\.go$/.test(name)) return 2
+  // Python test files (test_*.py, conftest.py)
+  if (/^test_.*\.py$/.test(name) || name === 'conftest.py') return 2
+  // Ruby test/spec files (*_spec.rb, *_test.rb)
+  if (/_(spec|test)\.rb$/.test(name)) return 2
+  // Java test files (*Test.java, *Tests.java, *Spec.java)
+  if (/Tests?\.java$|Spec\.java$/.test(name)) return 2
+  // Swift test files (*Tests.swift, *Spec.swift)
+  if (/Tests?\.swift$|Spec\.swift$/.test(name)) return 2
+  // Rust tests directory
+  if (/^tests\/.*\.rs$/.test(path)) return 2
   if (isLockOrGeneratedFile(name)) return 3
   return 1
 }
@@ -356,7 +371,10 @@ class UnionFind {
 
 const MAX_GROUP_SIZE = 15
 
-function groupFilesIntoChapters(files: RawFile[]): Map<string, RawFile[]> {
+function groupFilesIntoChapters(
+  files: RawFile[],
+  coChangeAffinity?: Map<string, string[]>
+): Map<string, RawFile[]> {
   const uf = new UnionFind()
   const fileGroup = new Map<string, string>()
 
@@ -379,7 +397,19 @@ function groupFilesIntoChapters(files: RawFile[]): Map<string, RawFile[]> {
     for (let i = 1; i < groups.length; i++) uf.union(groups[0], groups[i])
   }
 
-  // Signal 3: merge groups connected by direct imports in patch text
+  // Signal 3: language-agnostic co-change affinity from git history
+  if (coChangeAffinity) {
+    for (const f of files) {
+      const cochanged = coChangeAffinity.get(f.path) ?? []
+      for (const other of cochanged) {
+        const ga = fileGroup.get(f.path)
+        const gb = fileGroup.get(other)
+        if (ga && gb) uf.union(ga, gb)
+      }
+    }
+  }
+
+  // Signal 3b: JS/TS import graph — merge groups connected by direct imports in patch text
   const knownPaths = new Set(files.map((f) => f.path))
   for (const f of files) {
     if (!f.patch) continue
@@ -450,7 +480,8 @@ function defaultRiskScore(): RiskScore {
 
 export function buildChapters(
   rawFiles: unknown[],
-  overrides?: Record<string, string[]>
+  overrides?: Record<string, string[]>,
+  coChangeAffinity?: Map<string, string[]>
 ): Chapter[] {
   const files: RawFile[] = rawFiles
     .map((f) => {
@@ -467,7 +498,7 @@ export function buildChapters(
 
   if (files.length === 0) return []
 
-  const groups = groupFilesIntoChapters(files)
+  const groups = groupFilesIntoChapters(files, coChangeAffinity)
 
   const chapters: Chapter[] = []
 
@@ -763,4 +794,83 @@ export function detectChangedFiles(
     }
   }
   return changed
+}
+
+// ─── Hunk classification (formatting vs semantic) ─────────────────────────────
+
+export function classifyHunk(hunk: {
+  lines: Array<{ type: string; content: string }>
+}): 'semantic' | 'formatting' {
+  const added = hunk.lines.filter((l) => l.type === 'add').map((l) => l.content.trim())
+  const removed = hunk.lines.filter((l) => l.type === 'remove').map((l) => l.content.trim())
+
+  // No actual changes in this hunk — just context lines; treat as semantic (don't filter)
+  if (added.length === 0 && removed.length === 0) return 'semantic'
+  if (added.length !== removed.length) return 'semantic'
+
+  // Check multiset equality: if stripped add lines == stripped remove lines, it's formatting
+  const counts = new Map<string, number>()
+  for (const line of added) counts.set(line, (counts.get(line) ?? 0) + 1)
+  for (const line of removed) counts.set(line, (counts.get(line) ?? 0) - 1)
+  return [...counts.values()].every((v) => v === 0) ? 'formatting' : 'semantic'
+}
+
+// ─── Issue reference extraction ───────────────────────────────────────────────
+
+export function extractIssueRefs(body: string): IssueRef[] {
+  const refs: IssueRef[] = []
+  // GitHub: Fixes #123, Closes #456, Resolves #789, Related #012
+  const ghRe = /(?:fixes|closes|resolves|related)\s+#(\d+)/gi
+  let m: RegExpExecArray | null
+  while ((m = ghRe.exec(body)) !== null) {
+    refs.push({ type: 'github', ref: `#${m[1]}` })
+  }
+  // Linear: https://linear.app/team/issue/TEAM-123
+  const linearRe = /https?:\/\/linear\.app\/[^\s/]+\/issue\/([A-Z]+-\d+)/g
+  while ((m = linearRe.exec(body)) !== null) {
+    refs.push({ type: 'linear', ref: m[1], url: m[0] })
+  }
+  return refs
+}
+
+// ─── DRY violation detection ──────────────────────────────────────────────────
+
+function normalizeForDry(line: string): string {
+  return line
+    .replace(/\s+/g, ' ')
+    .replace(/['"`]/g, '"')
+    .replace(/\b[a-z_][a-zA-Z0-9_]*\b/g, 'X')
+    .replace(/\d+/g, 'N')
+    .trim()
+}
+
+export function detectDryViolations(
+  files: Array<{ path: string; patch?: string }>
+): DryViolation[] {
+  const WINDOW = 5
+  const fingerprints = new Map<string, Set<string>>()
+
+  for (const file of files) {
+    if (!file.patch) continue
+    const addedLines = file.patch
+      .split('\n')
+      .filter((l) => l.startsWith('+') && !l.startsWith('+++'))
+      .map((l) => normalizeForDry(l.slice(1)))
+      .filter((l) => l.length > 10)
+
+    for (let i = 0; i <= addedLines.length - WINDOW; i++) {
+      const block = addedLines.slice(i, i + WINDOW).join('\n')
+      const existing = fingerprints.get(block) ?? new Set<string>()
+      existing.add(file.path)
+      fingerprints.set(block, existing)
+    }
+  }
+
+  const violations: DryViolation[] = []
+  for (const [fingerprint, fileSet] of fingerprints) {
+    if (fileSet.size >= 2) {
+      violations.push({ files: [...fileSet], fingerprint, lineCount: WINDOW })
+    }
+  }
+  return violations
 }

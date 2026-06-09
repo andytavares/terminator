@@ -137,6 +137,6 @@ describe('HealthChips', () => {
     render(<HealthChips riskScore={makeRiskScore()} />)
     expect(screen.getByRole('list')).toBeTruthy()
     const items = screen.getAllByRole('listitem')
-    expect(items.length).toBe(7)
+    expect(items.length).toBe(8)
   })
 })

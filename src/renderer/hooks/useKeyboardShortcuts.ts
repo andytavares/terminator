@@ -11,6 +11,9 @@ interface Options {
   onToggleLog?: () => void
   onOpenCommandPalette?: () => void
   onToggleOverview?: () => void
+  onNewScratch?: () => void
+  /** When scratch mode is active, pass SCRATCH_PROJECT_ID here so all terminal shortcuts work. */
+  scratchProjectId?: string | null
 }
 
 export function useKeyboardShortcuts({
@@ -18,6 +21,8 @@ export function useKeyboardShortcuts({
   onToggleLog,
   onOpenCommandPalette,
   onToggleOverview,
+  onNewScratch,
+  scratchProjectId,
 }: Options = {}): void {
   const { workspaces, activeWorkspaceId, setActiveWorkspace, activeProjectId, resolveActiveCwd } =
     useWorkspaceStore()
@@ -34,6 +39,8 @@ export function useKeyboardShortcuts({
   const { resolveSettings } = useSettingsStore()
   const { keyboardShortcuts } = useExtensionRegistry()
   const { addToast } = useToastStore()
+
+  const effectiveProjectId = scratchProjectId ?? activeProjectId
 
   useEffect(() => {
     function cycleWorkspace(delta: number): void {
@@ -88,6 +95,13 @@ export function useKeyboardShortcuts({
         return
       }
 
+      // Cmd+Shift+T: new scratch terminal
+      if (isMeta && e.shiftKey && e.key === 't') {
+        e.preventDefault()
+        onNewScratch?.()
+        return
+      }
+
       // Extension-registered keyboard shortcuts — skip bare-key shortcuts when focus is in a text field
       for (const shortcut of keyboardShortcuts) {
         if (matchesAccelerator(e, shortcut.accelerator)) {
@@ -131,8 +145,8 @@ export function useKeyboardShortcuts({
       // Cmd+K: clear terminal screen (skip if typing — Cmd+K kills to line start in text fields)
       if (isMeta && e.key === 'k' && !inTextField) {
         e.preventDefault()
-        if (activeProjectId) {
-          const activeSessionId = getActiveSessionForProject(activeProjectId)
+        if (effectiveProjectId) {
+          const activeSessionId = getActiveSessionForProject(effectiveProjectId)
           if (activeSessionId) {
             window.electronAPI.terminal.input(activeSessionId, '\x0c')
           }
@@ -143,11 +157,11 @@ export function useKeyboardShortcuts({
       // Cmd+T: new tab
       if (isMeta && e.key === 't') {
         e.preventDefault()
-        if (activeProjectId) {
+        if (effectiveProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
           const cwd = resolveActiveCwd()
           createSession(
-            activeProjectId,
+            effectiveProjectId,
             'human',
             'Terminal',
             cwd,
@@ -160,12 +174,15 @@ export function useKeyboardShortcuts({
       // Cmd+D: split vertically (side by side)
       if (isMeta && !e.shiftKey && e.key === 'd') {
         e.preventDefault()
-        if (activeProjectId) {
+        if (effectiveProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
           const cwd = resolveActiveCwd()
-          splitSession(activeProjectId, 'vertical', cwd, settings.terminal.scrollbackLimit).catch(
-            () => addToast({ type: 'error', message: 'Could not create split pane' })
-          )
+          splitSession(
+            effectiveProjectId,
+            'vertical',
+            cwd,
+            settings.terminal.scrollbackLimit
+          ).catch(() => addToast({ type: 'error', message: 'Could not create split pane' }))
         }
         return
       }
@@ -173,12 +190,15 @@ export function useKeyboardShortcuts({
       // Cmd+Shift+D: split horizontally (top / bottom)
       if (isMeta && e.shiftKey && e.key === 'd') {
         e.preventDefault()
-        if (activeProjectId) {
+        if (effectiveProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
           const cwd = resolveActiveCwd()
-          splitSession(activeProjectId, 'horizontal', cwd, settings.terminal.scrollbackLimit).catch(
-            () => addToast({ type: 'error', message: 'Could not create split pane' })
-          )
+          splitSession(
+            effectiveProjectId,
+            'horizontal',
+            cwd,
+            settings.terminal.scrollbackLimit
+          ).catch(() => addToast({ type: 'error', message: 'Could not create split pane' }))
         }
         return
       }
@@ -186,16 +206,16 @@ export function useKeyboardShortcuts({
       // Cmd+W: close focused split pane (or active tab if not in split mode)
       if (isMeta && e.key === 'w') {
         e.preventDefault()
-        if (activeProjectId) {
-          const layout = getPaneLayout(activeProjectId)
-          const focusedId = getFocusedSession(activeProjectId)
+        if (effectiveProjectId) {
+          const layout = getPaneLayout(effectiveProjectId)
+          const focusedId = getFocusedSession(effectiveProjectId)
           if (layout && focusedId) {
-            closeSplitLeaf(activeProjectId, focusedId)
+            closeSplitLeaf(effectiveProjectId, focusedId)
             closeSession(focusedId).catch(() =>
               addToast({ type: 'error', message: 'Could not close terminal' })
             )
           } else {
-            const activeId = getActiveSessionForProject(activeProjectId)
+            const activeId = getActiveSessionForProject(effectiveProjectId)
             if (activeId) closeSession(activeId)
           }
         }
@@ -205,14 +225,14 @@ export function useKeyboardShortcuts({
       // Cmd+Left: previous tab (skip if typing — Cmd+Left/Right navigates within text)
       if (isMeta && e.key === 'ArrowLeft' && !inTextField) {
         e.preventDefault()
-        if (activeProjectId) cycleTab(activeProjectId, -1)
+        if (effectiveProjectId) cycleTab(effectiveProjectId, -1)
         return
       }
 
       // Cmd+Right: next tab (skip if typing)
       if (isMeta && e.key === 'ArrowRight' && !inTextField) {
         e.preventDefault()
-        if (activeProjectId) cycleTab(activeProjectId, 1)
+        if (effectiveProjectId) cycleTab(effectiveProjectId, 1)
         return
       }
     }
@@ -223,6 +243,8 @@ export function useKeyboardShortcuts({
     workspaces,
     activeWorkspaceId,
     activeProjectId,
+    scratchProjectId,
+    effectiveProjectId,
     keyboardShortcuts,
     setActiveWorkspace,
     resolveSettings,
@@ -241,5 +263,6 @@ export function useKeyboardShortcuts({
     onToggleLog,
     onOpenCommandPalette,
     onToggleOverview,
+    onNewScratch,
   ])
 }

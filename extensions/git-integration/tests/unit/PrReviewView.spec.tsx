@@ -219,6 +219,33 @@ describe('PrReviewView', () => {
     expect(screen.getByTestId('risk-panel')).toBeTruthy()
   })
 
+  it('opens submit panel when FinishChapter is clicked on the last (only) chapter', async () => {
+    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+    setupStore({ currentFilePath: 'src/foo.ts' })
+    render(
+      <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
+    )
+    fireEvent.click(screen.getByText('FinishChapter'))
+    expect(screen.getByTestId('submit-panel')).toBeTruthy()
+  })
+
+  it('advances to next chapter (not submit) when FinishChapter is clicked on a non-final chapter', async () => {
+    const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2', files: [mockFile] }
+    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+    setupStore({ currentChapterId: 'ch-1', currentFilePath: 'src/foo.ts' })
+    render(
+      <PrReviewView
+        repoRoot="/repo"
+        pr={{ ...mockPr, chapters: [mockChapter, ch2] }}
+        onClose={mockClose}
+        onRefresh={mockRefresh}
+      />
+    )
+    fireEvent.click(screen.getByText('FinishChapter'))
+    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+    expect(screen.queryByTestId('submit-panel')).toBeNull()
+  })
+
   it('calls markFileViewed and advances file on MarkViewed', async () => {
     const file2 = { ...mockFile, path: 'src/bar.ts' }
     const chapter = { ...mockChapter, files: [mockFile, file2] }
@@ -297,5 +324,131 @@ describe('PrReviewView', () => {
       />
     )
     expect(screen.getByText('Select a file to review.')).toBeTruthy()
+  })
+
+  describe('large-PR banner', () => {
+    function makeLargeFile(path: string, additions: number) {
+      return { ...mockFile, path, additions, deletions: 0 }
+    }
+
+    it('shows large-PR banner when PR exceeds 400 LOC', async () => {
+      const bigFile = makeLargeFile('src/big.ts', 500)
+      const chapter = { ...mockChapter, files: [bigFile] }
+      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+      setupStore({ currentFilePath: 'src/big.ts' })
+      render(
+        <PrReviewView
+          repoRoot="/repo"
+          pr={{ ...mockPr, chapters: [chapter] }}
+          onClose={mockClose}
+          onRefresh={mockRefresh}
+        />
+      )
+      expect(screen.getByRole('alert')).toBeTruthy()
+      expect(screen.getByText(/Large PR/)).toBeTruthy()
+    })
+
+    it('does not show large-PR banner when PR is under 400 LOC', async () => {
+      await renderView()
+      expect(screen.queryByRole('alert')).toBeNull()
+    })
+
+    it('dismisses large-PR banner when × clicked', async () => {
+      const bigFile = makeLargeFile('src/big.ts', 500)
+      const chapter = { ...mockChapter, files: [bigFile] }
+      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+      setupStore({ currentFilePath: 'src/big.ts' })
+      render(
+        <PrReviewView
+          repoRoot="/repo"
+          pr={{ ...mockPr, chapters: [chapter] }}
+          onClose={mockClose}
+          onRefresh={mockRefresh}
+        />
+      )
+      fireEvent.click(screen.getByLabelText('Dismiss large PR warning'))
+      expect(screen.queryByRole('alert')).toBeNull()
+    })
+
+    it('toggles focus mode on/off', async () => {
+      const bigFile = makeLargeFile('src/big.ts', 500)
+      const chapter = { ...mockChapter, files: [bigFile] }
+      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+      setupStore({ currentFilePath: 'src/big.ts' })
+      render(
+        <PrReviewView
+          repoRoot="/repo"
+          pr={{ ...mockPr, chapters: [chapter] }}
+          onClose={mockClose}
+          onRefresh={mockRefresh}
+        />
+      )
+      const focusBtn = screen.getByTitle('Focus mode — show only medium/high risk files')
+      expect(focusBtn.textContent).toBe('Focus mode')
+      fireEvent.click(focusBtn)
+      expect(focusBtn.textContent).toBe('All files')
+    })
+
+    it('drops all-low-risk chapters in focus mode instead of showing their full file list', async () => {
+      const lowFile = makeLargeFile('src/low.ts', 300)
+      const highFile = {
+        ...makeLargeFile('src/high.ts', 300),
+        riskScore: { ...mockFile.riskScore, level: 'high' as const },
+      }
+      const lowChapter = {
+        id: 'ch-low',
+        name: 'Low only',
+        estimatedMinutes: 5,
+        status: 'not-started' as const,
+        files: [lowFile],
+      }
+      const highChapter = {
+        id: 'ch-high',
+        name: 'High risk',
+        estimatedMinutes: 5,
+        status: 'not-started' as const,
+        files: [highFile],
+      }
+      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+      setupStore({ currentFilePath: 'src/high.ts', currentChapterId: 'ch-high' })
+      const { unmount } = render(
+        <PrReviewView
+          repoRoot="/repo"
+          pr={{ ...mockPr, chapters: [lowChapter, highChapter] }}
+          onClose={mockClose}
+          onRefresh={mockRefresh}
+        />
+      )
+      const focusBtn = screen.getByTitle('Focus mode — show only medium/high risk files')
+      fireEvent.click(focusBtn)
+      // Progress total should reflect only the high-risk chapter (1 file), not both (2 files)
+      expect(screen.getByLabelText(/0 of 1 files reviewed/)).toBeTruthy()
+      unmount()
+    })
+
+    it('progress bar does not exceed 100% when viewedFiles exceeds displayPr files in focus mode', async () => {
+      const bigFile = {
+        ...makeLargeFile('src/low.ts', 500),
+        riskScore: { ...mockFile.riskScore, level: 'low' as const },
+      }
+      const chapter = { ...mockChapter, files: [bigFile] }
+      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+      // 3 viewed files but only 1 file in PR
+      setupStore({
+        currentFilePath: 'src/low.ts',
+        viewedFiles: new Set(['src/low.ts', 'src/other.ts', 'src/another.ts']),
+      })
+      const { container } = render(
+        <PrReviewView
+          repoRoot="/repo"
+          pr={{ ...mockPr, chapters: [chapter] }}
+          onClose={mockClose}
+          onRefresh={mockRefresh}
+        />
+      )
+      const fill = container.querySelector('.pr-review-progress-fill') as HTMLElement
+      const width = parseFloat(fill?.style.width ?? '0')
+      expect(width).toBeLessThanOrEqual(100)
+    })
   })
 })

@@ -138,6 +138,19 @@ button {
   min-width: 0;
 }
 
+/* Wraps ProjectsPanel + ScratchPanel in the sidebar column */
+.sidebar-stack {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar-stack .projects-panel {
+  flex: 1;
+  min-height: 0;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;

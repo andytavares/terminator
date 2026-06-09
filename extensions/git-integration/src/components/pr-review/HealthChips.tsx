@@ -6,6 +6,7 @@ interface Props {
   ciStatus?: 'passing' | 'failing' | 'pending' | 'none'
   lintStatus?: 'pass' | 'fail' | 'warn' | 'unknown'
   coverageStatus?: 'pass' | 'fail' | 'warn' | 'unknown'
+  dryViolationCount?: number
 }
 
 interface Chip {
@@ -15,7 +16,13 @@ interface Chip {
   status: 'pass' | 'warn' | 'fail' | 'unknown'
 }
 
-export function HealthChips({ riskScore, ciStatus, lintStatus, coverageStatus }: Props) {
+export function HealthChips({
+  riskScore,
+  ciStatus,
+  lintStatus,
+  coverageStatus,
+  dryViolationCount,
+}: Props) {
   const { metrics } = riskScore
 
   const ciChipStatus: Chip['status'] =
@@ -131,6 +138,18 @@ export function HealthChips({ riskScore, ciStatus, lintStatus, coverageStatus }:
             : metrics.blastRadius <= 30
               ? 'warn'
               : 'fail',
+    },
+    {
+      label: 'DRY',
+      tooltip:
+        'Duplicate code detection — similar blocks found in multiple files in this PR. 0=pass, warn if violations found.',
+      value:
+        dryViolationCount == null
+          ? null
+          : dryViolationCount === 0
+            ? 'clean'
+            : `${dryViolationCount} dup${dryViolationCount !== 1 ? 's' : ''}`,
+      status: dryViolationCount == null ? 'unknown' : dryViolationCount === 0 ? 'pass' : 'warn',
     },
   ]
 

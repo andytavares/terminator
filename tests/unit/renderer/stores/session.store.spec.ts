@@ -38,6 +38,7 @@ function resetStore() {
     terminalCountByProject: new Map(),
     paneLayoutByProject: new Map(),
     focusedSessionByProject: new Map(),
+    sessionOrderByProject: new Map(),
   })
 }
 
@@ -483,6 +484,137 @@ describe('useSessionStore', () => {
       await useSessionStore.getState().closeSession('sess-a')
       await useSessionStore.getState().closeSession('sess-b')
       expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
+    })
+  })
+
+  describe('getScratchSessions', () => {
+    it('returns sessions with SCRATCH_PROJECT_ID', () => {
+      const SCRATCH = '00000000-0000-0000-0000-000000000000'
+      const s1 = makeSession({ id: 'sess-1', projectId: SCRATCH })
+      const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
+      useSessionStore.setState({
+        sessions: new Map([
+          ['sess-1', s1],
+          ['sess-2', s2],
+        ]),
+      })
+      const scratch = useSessionStore.getState().getScratchSessions()
+      expect(scratch).toHaveLength(1)
+      expect(scratch[0].id).toBe('sess-1')
+    })
+
+    it('returns empty array when no scratch sessions exist', () => {
+      useSessionStore.setState({ sessions: new Map() })
+      expect(useSessionStore.getState().getScratchSessions()).toHaveLength(0)
+    })
+  })
+
+  describe('reorderSessions', () => {
+    it('stores the given order for a project', () => {
+      useSessionStore.getState().reorderSessions('proj-1', ['sess-2', 'sess-1'])
+      expect(useSessionStore.getState().sessionOrderByProject.get('proj-1')).toEqual([
+        'sess-2',
+        'sess-1',
+      ])
+    })
+
+    it('getSessionsForProject respects the order', () => {
+      const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+      const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
+      useSessionStore.setState({
+        sessions: new Map([
+          ['sess-1', s1],
+          ['sess-2', s2],
+        ]),
+      })
+      useSessionStore.getState().reorderSessions('proj-1', ['sess-2', 'sess-1'])
+      const ordered = useSessionStore.getState().getSessionsForProject('proj-1')
+      expect(ordered.map((s) => s.id)).toEqual(['sess-2', 'sess-1'])
+    })
+
+    it('untracked sessions appear after ordered ones', () => {
+      const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+      const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
+      const s3 = makeSession({ id: 'sess-3', projectId: 'proj-1' })
+      useSessionStore.setState({
+        sessions: new Map([
+          ['sess-1', s1],
+          ['sess-2', s2],
+          ['sess-3', s3],
+        ]),
+      })
+      useSessionStore.getState().reorderSessions('proj-1', ['sess-2', 'sess-1'])
+      const ordered = useSessionStore.getState().getSessionsForProject('proj-1')
+      expect(ordered[0].id).toBe('sess-2')
+      expect(ordered[1].id).toBe('sess-1')
+      expect(ordered[2].id).toBe('sess-3')
+    })
+  })
+
+  describe('moveSession', () => {
+    it('updates session projectId to target', () => {
+      const s = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+      useSessionStore.setState({ sessions: new Map([['sess-1', s]]) })
+      useSessionStore.getState().moveSession('sess-1', 'proj-2')
+      expect(useSessionStore.getState().sessions.get('sess-1')?.projectId).toBe('proj-2')
+    })
+
+    it('updates activeSessionIdByProject — removes from old, sets in target', () => {
+      const s = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+      useSessionStore.setState({
+        sessions: new Map([['sess-1', s]]),
+        activeSessionIdByProject: new Map([['proj-1', 'sess-1']]),
+      })
+      useSessionStore.getState().moveSession('sess-1', 'proj-2')
+      const active = useSessionStore.getState().activeSessionIdByProject
+      expect(active.has('proj-1')).toBe(false)
+      expect(active.get('proj-2')).toBe('sess-1')
+    })
+
+    it('removes sessionId from old project order, appends to target order', () => {
+      const s1 = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+      const s2 = makeSession({ id: 'sess-2', projectId: 'proj-1' })
+      useSessionStore.setState({
+        sessions: new Map([
+          ['sess-1', s1],
+          ['sess-2', s2],
+        ]),
+        sessionOrderByProject: new Map([
+          ['proj-1', ['sess-1', 'sess-2']],
+          ['proj-2', ['sess-3']],
+        ]),
+      })
+      useSessionStore.getState().moveSession('sess-1', 'proj-2')
+      expect(useSessionStore.getState().sessionOrderByProject.get('proj-1')).toEqual(['sess-2'])
+      expect(useSessionStore.getState().sessionOrderByProject.get('proj-2')).toEqual([
+        'sess-3',
+        'sess-1',
+      ])
+    })
+
+    it('is a no-op for unknown session', () => {
+      expect(() => useSessionStore.getState().moveSession('nonexistent', 'proj-2')).not.toThrow()
+    })
+
+    it('clears focusedSession for old project when moved session was focused', () => {
+      const s = makeSession({ id: 'sess-1', projectId: 'proj-1' })
+      useSessionStore.setState({
+        sessions: new Map([['sess-1', s]]),
+        focusedSessionByProject: new Map([['proj-1', 'sess-1']]),
+      })
+      useSessionStore.getState().moveSession('sess-1', 'proj-2')
+      expect(useSessionStore.getState().focusedSessionByProject.has('proj-1')).toBe(false)
+    })
+  })
+
+  describe('closeSession scratch guard', () => {
+    it('does not call deleteProject for SCRATCH_PROJECT_ID sessions', async () => {
+      const SCRATCH = '00000000-0000-0000-0000-000000000000'
+      const session = makeSession({ id: 'sess-1', projectId: SCRATCH })
+      useSessionStore.setState({ sessions: new Map([['sess-1', session]]) })
+      mockElectronAPI.terminal.close.mockResolvedValue({})
+      // If deleteProject were called it would throw (workspace store not mocked)
+      await expect(useSessionStore.getState().closeSession('sess-1')).resolves.not.toThrow()
     })
   })
 })

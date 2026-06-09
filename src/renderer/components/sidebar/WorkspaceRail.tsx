@@ -34,6 +34,9 @@ interface WorkspaceRailProps {
   unreadNotifications?: number
   notificationPanelOpen?: boolean
   onBellClick?: () => void
+  onNewScratch?: () => void
+  scratchActive?: boolean
+  hasScratchSessions?: boolean
 }
 
 export function WorkspaceRail({
@@ -43,6 +46,9 @@ export function WorkspaceRail({
   unreadNotifications = 0,
   notificationPanelOpen = false,
   onBellClick,
+  onNewScratch,
+  scratchActive = false,
+  hasScratchSessions = false,
 }: WorkspaceRailProps): JSX.Element {
   const [createOpen, setCreateOpen] = useState(false)
   const { workspaces, reorderWorkspaces } = useWorkspaceStore()
@@ -134,6 +140,14 @@ export function WorkspaceRail({
           <AlertBadge count={tab.badge ?? 0} className="alert-badge--tab-corner" />
         </button>
       ))}
+
+      <button
+        className={`ws-rail__scratch${scratchActive ? ' ws-rail__scratch--active' : ''}${hasScratchSessions && !scratchActive ? ' ws-rail__scratch--has-sessions' : ''}`}
+        onClick={onNewScratch}
+        title="New scratch terminal (⌘⇧T)"
+      >
+        ~
+      </button>
 
       <button className="ws-rail__add" onClick={() => setCreateOpen(true)} title="Create workspace">
         +

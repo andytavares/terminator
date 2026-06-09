@@ -6,6 +6,7 @@ import { usePrReviewStore } from '../../stores/pr-review.store'
 import {
   detectComplexityHotspots,
   computeFileCyclomaticDelta,
+  classifyHunk,
 } from '../../github/pr-review-service'
 import { detectLanguage, highlight, buildSplitRows } from '../FileDiffView'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
@@ -23,6 +24,7 @@ interface Props {
   onPrevFile: () => void
   onNextFile: () => void
   onFinishChapter: () => void
+  isLastChapter: boolean
   onPause: () => void
   onOpenSubmit: () => void
   onShowRisk: () => void
@@ -45,6 +47,7 @@ export function ReviewDiffPane({
   onPrevFile,
   onNextFile: _onNextFile,
   onFinishChapter,
+  isLastChapter,
   onPause,
   onOpenSubmit,
   onShowRisk,
@@ -57,6 +60,7 @@ export function ReviewDiffPane({
     null
   )
   const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>('unified')
+  const [hideFormattingHunks, setHideFormattingHunks] = useState(true)
   const lineDragRef = useRef<{
     active: boolean
     side: 'LEFT' | 'RIGHT' | null
@@ -220,6 +224,21 @@ export function ReviewDiffPane({
   const hotspots = diff ? detectComplexityHotspots(diff) : []
   const hotspotHunks = new Set(hotspots.map((h) => h.hunkIndex))
 
+  const dryViolationCount = useMemo(() => {
+    if (!pr.dryViolations?.length) return undefined
+    return pr.dryViolations.filter((v) => v.files.includes(file.path)).length
+  }, [pr.dryViolations, file.path])
+
+  const visibleHunks = useMemo(() => {
+    if (!diff) return []
+    if (!hideFormattingHunks) return diff.hunks.map((h, i) => ({ hunk: h, index: i }))
+    return diff.hunks
+      .map((h, i) => ({ hunk: h, index: i }))
+      .filter(({ hunk }) => classifyHunk(hunk) === 'semantic')
+  }, [diff, hideFormattingHunks])
+
+  const hiddenFormattingCount = diff ? diff.hunks.length - visibleHunks.length : 0
+
   const handleGutterMouseDown = useCallback(
     (e: React.MouseEvent, lineNum: number, side: 'LEFT' | 'RIGHT') => {
       e.preventDefault()
@@ -287,6 +306,13 @@ export function ReviewDiffPane({
               Split
             </button>
           </div>
+          <button
+            className={`review-diff-filter-btn${hideFormattingHunks ? ' review-diff-filter-btn--active' : ''}`}
+            onClick={() => setHideFormattingHunks((v) => !v)}
+            title="Hide formatting-only hunks (whitespace, import reordering)"
+          >
+            Semantic
+          </button>
           <span className="review-diff-changes">
             +{file.additions}/−{file.deletions}
           </span>
@@ -300,6 +326,7 @@ export function ReviewDiffPane({
         ciStatus={pr.ciStatus}
         lintStatus={pr.lintStatus}
         coverageStatus={pr.coverageStatus}
+        dryViolationCount={dryViolationCount}
       />
 
       {/* Diff content */}
@@ -312,7 +339,19 @@ export function ReviewDiffPane({
           <div className="review-diff-error">Failed to load diff: {diffError}</div>
         ) : diff ? (
           <div className={`review-diff-table-wrap review-diff-table-wrap--${diffViewMode}`}>
-            {diff.hunks.map((hunk, hi) => (
+            {hiddenFormattingCount > 0 && (
+              <div className="review-diff-formatting-notice">
+                {hiddenFormattingCount} formatting-only hunk
+                {hiddenFormattingCount !== 1 ? 's' : ''} hidden —{' '}
+                <button
+                  className="review-diff-formatting-show-btn"
+                  onClick={() => setHideFormattingHunks(false)}
+                >
+                  show all
+                </button>
+              </div>
+            )}
+            {visibleHunks.map(({ hunk, index: hi }) => (
               <React.Fragment key={hi}>
                 {diffViewMode === 'unified' ? (
                   <table className="diff-table diff-table--review">
@@ -709,7 +748,7 @@ export function ReviewDiffPane({
               className="review-diff-nav-btn review-diff-nav-btn--primary"
               onClick={onFinishChapter}
             >
-              Finish chapter ↵
+              {isLastChapter ? 'Finish review ↵' : 'Finish chapter ↵'}
             </button>
           ) : (
             <button

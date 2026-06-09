@@ -59,4 +59,7 @@ export const githubAPI = {
 
   pruneActiveReviews: (repoRoot: string, prNumbers: number[]) =>
     bridge().invoke('github:prune-active-reviews', { repoRoot, prNumbers }),
+
+  fileCoChange: (repoRoot: string, files: string[]) =>
+    bridge().invoke('github:file-cochange', { repoRoot, files }),
 }

@@ -86,6 +86,7 @@ export function PrOverviewPanel({
   const viewedCount = viewedFiles.size
   const reviewPct = totalFiles > 0 ? Math.round((viewedCount / totalFiles) * 100) : 0
   const isResume = sessionStatus === 'in-progress' || sessionStatus === 'paused'
+  const [issueRefsExpanded, setIssueRefsExpanded] = useState(true)
 
   const age = formatAge(pr.openedAt)
   const startLabel =
@@ -390,6 +391,42 @@ export function PrOverviewPanel({
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* Issue context */}
+        {pr.issueRefs && pr.issueRefs.length > 0 && (
+          <div className="pr-overview-section">
+            <h3
+              className="pr-overview-section-title pr-overview-section-title--collapsible"
+              onClick={() => setIssueRefsExpanded((v) => !v)}
+              role="button"
+              aria-expanded={issueRefsExpanded}
+            >
+              Context
+              <span className="pr-overview-section-toggle">{issueRefsExpanded ? '▾' : '▸'}</span>
+            </h3>
+            {issueRefsExpanded && (
+              <ul className="pr-overview-issue-refs">
+                {pr.issueRefs.map((ref, i) => (
+                  <li key={i} className="pr-overview-issue-ref">
+                    {ref.type === 'linear' && ref.url ? (
+                      <a
+                        href={ref.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="pr-overview-issue-ref-link"
+                      >
+                        {ref.ref}
+                      </a>
+                    ) : (
+                      <span className="pr-overview-issue-ref-label">{ref.ref}</span>
+                    )}
+                    <span className="pr-overview-issue-ref-type">{ref.type}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 
