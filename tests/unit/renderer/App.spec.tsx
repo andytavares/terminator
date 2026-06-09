@@ -790,6 +790,55 @@ describe('App', () => {
       expect(mockCloseSession).not.toHaveBeenCalled()
     })
 
+    it('closes scratch session when scratch is active and menu close fires', async () => {
+      const SCRATCH_PROJECT_ID = '00000000-0000-0000-0000-000000000000'
+      const mockCloseSession = vi.fn().mockResolvedValue(undefined)
+      const mockCreateSession = vi.fn().mockResolvedValue('ses-scratch')
+      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      setupMocks({ activeProjectId: null, activeWorkspaceId: 'ws-1' })
+      vi.mocked(useSessionStore).mockReturnValue({
+        handleProcessExit: mockHandleProcessExit,
+        getSessionsForProject: vi.fn().mockReturnValue([]),
+        getScratchSessions: vi.fn().mockReturnValue([]),
+        closeSession: mockCloseSession,
+        activeSessionIdByProject: new Map([[SCRATCH_PROJECT_ID, 'ses-scratch']]),
+        setActiveSessionForProject: vi.fn(),
+      } as unknown as ReturnType<typeof useSessionStore>)
+
+      let closeTabCallback: (() => void) | null = null
+      ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+        terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
+        extensionEvents: {
+          onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
+          onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
+          onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
+          onToast: vi.fn().mockReturnValue(vi.fn()),
+          onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
+          onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
+          onMenuCloseTab: (cb: () => void) => {
+            closeTabCallback = cb
+            return vi.fn()
+          },
+        },
+        notifications: {
+          list: vi.fn().mockResolvedValue([]),
+          dismiss: vi.fn().mockResolvedValue({ ok: true }),
+          onPush: vi.fn().mockReturnValue(mockUnsubscribe),
+        },
+        extensionBridge: {
+          on: vi.fn().mockReturnValue(mockUnsubscribe),
+          invoke: vi.fn().mockResolvedValue({}),
+        },
+      }
+      render(<App />)
+      // Activate scratch mode
+      capturedShortcutCallbacks.onNewScratch?.()
+      await waitFor(() => expect(mockCreateSession).toHaveBeenCalled())
+      // Now fire the menu close — should target the scratch session
+      closeTabCallback?.()
+      await waitFor(() => expect(mockCloseSession).toHaveBeenCalledWith('ses-scratch'))
+    })
+
     it('does not call closeSession when active project has no active session', async () => {
       const mockCloseSession = vi.fn().mockResolvedValue(undefined)
       setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })

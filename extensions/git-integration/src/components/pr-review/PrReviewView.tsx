@@ -123,7 +123,7 @@ export function PrReviewView({
 
   const handleSelectChapter = (id: string) => {
     setCurrentChapter(id)
-    const chapter = pr.chapters.find((c) => c.id === id)
+    const chapter = displayPr.chapters.find((c) => c.id === id)
     if (chapter) {
       const overrideOrder = fileOrderOverrides[chapter.id]
       const files = overrideOrder
@@ -173,8 +173,8 @@ export function PrReviewView({
         markFileViewed(repoRoot, pr.number, pr.headSHA, f.path)
       }
     })
-    const chapterIndex = pr.chapters.findIndex((c) => c.id === activeChapterId)
-    const nextChapter = pr.chapters[chapterIndex + 1]
+    const chapterIndex = displayPr.chapters.findIndex((c) => c.id === activeChapterId)
+    const nextChapter = displayPr.chapters[chapterIndex + 1]
     if (nextChapter) {
       handleSelectChapter(nextChapter.id)
     } else {
@@ -187,10 +187,10 @@ export function PrReviewView({
     onClose()
   }
 
-  const activeChapterIndex = pr.chapters.findIndex((c) => c.id === activeChapterId)
-  const isLastChapter = activeChapterIndex === pr.chapters.length - 1
+  const activeChapterIndex = displayPr.chapters.findIndex((c) => c.id === activeChapter?.id)
+  const isLastChapter = activeChapterIndex === displayPr.chapters.length - 1
 
-  const totalFiles = pr.chapters.flatMap((c) => c.files).length
+  const totalFiles = displayPr.chapters.flatMap((c) => c.files).length
   const reviewedCount = viewedFiles.size
   const reviewPct = totalFiles > 0 ? Math.round((reviewedCount / totalFiles) * 100) : 0
 
@@ -221,7 +221,7 @@ export function PrReviewView({
           </div>
         </div>
         <FullFileList
-          pr={pr}
+          pr={displayPr}
           repoRoot={repoRoot}
           headSHA={pr.headSHA}
           currentFilePath={currentFilePath}
@@ -339,7 +339,7 @@ export function PrReviewView({
 
       {/* Chapter nav: guided mode only, hidden when ≤1 chapter */}
       {viewMode === 'guided' && showMultipleChapters && (
-        <ChapterNav chapters={pr.chapters} onSelectChapter={handleSelectChapter} />
+        <ChapterNav chapters={displayPr.chapters} onSelectChapter={handleSelectChapter} />
       )}
 
       <div className="pr-review-panels">

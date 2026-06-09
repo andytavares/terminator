@@ -317,12 +317,13 @@ export function App(): JSX.Element {
   useEffect(() => {
     if (!window.electronAPI.extensionEvents?.onMenuCloseTab) return
     return window.electronAPI.extensionEvents.onMenuCloseTab(() => {
-      const sessionId = activeSessionIdByProject.get(activeProjectId ?? '')
-      if (activeProjectId && sessionId) {
+      const effectiveProjectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
+      const sessionId = activeSessionIdByProject.get(effectiveProjectId ?? '')
+      if (effectiveProjectId && sessionId) {
         void closeSession(sessionId)
       }
     })
-  }, [activeProjectId, activeSessionIdByProject, closeSession])
+  }, [scratchActive, activeProjectId, activeSessionIdByProject, closeSession])
 
   // Keep a ref so the effect always sees the latest openPanels without re-running on every change
   const openPanelsRef = useRef(openPanels)
