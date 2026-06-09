@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { TerminalSession, PaneNode, PaneSplitDirection } from '../../shared/types/index'
+import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
 import { splitLeaf, removeLeaf, leafIds, updateSplitRatio } from '../utils/pane-tree'
 import { useWorkspaceStore } from './workspace.store'
 import type { TerminalInstance } from '../components/terminal/TerminalSession'
@@ -13,6 +14,7 @@ interface SessionState {
   terminalCountByProject: Map<string, number>
   paneLayoutByProject: Map<string, PaneNode>
   focusedSessionByProject: Map<string, string>
+  sessionOrderByProject: Map<string, string[]>
 
   createSession: (
     projectId: string,
@@ -23,6 +25,9 @@ interface SessionState {
   ) => Promise<string>
   closeSession: (sessionId: string) => Promise<void>
   getSessionsForProject: (projectId: string) => TerminalSession[]
+  getScratchSessions: () => TerminalSession[]
+  moveSession: (sessionId: string, targetProjectId: string) => void
+  reorderSessions: (projectId: string, orderedIds: string[]) => void
   setTerminalInstance: (sessionId: string, terminal: TerminalInstance) => void
   getTerminalInstance: (sessionId: string) => TerminalInstance | undefined
   setActiveSessionForProject: (projectId: string, sessionId: string) => void
@@ -61,6 +66,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   terminalCountByProject: new Map(),
   paneLayoutByProject: new Map(),
   focusedSessionByProject: new Map(),
+  sessionOrderByProject: new Map(),
 
   createSession: async (projectId, type, title, cwd, scrollbackLimit) => {
     let resolvedTitle = title
@@ -98,7 +104,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set((s) => {
       const sessions = new Map(s.sessions)
       sessions.set(sessionId, session)
-      return { sessions }
+      // Append to ordering if an explicit order exists for this project
+      const sessionOrderByProject = new Map(s.sessionOrderByProject)
+      const existing = sessionOrderByProject.get(projectId)
+      if (existing) sessionOrderByProject.set(projectId, [...existing, sessionId])
+      return { sessions, sessionOrderByProject }
     })
 
     return sessionId
@@ -146,6 +156,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         focusedSessionByProject.delete(session.projectId)
       }
 
+      // Remove from session order
+      const sessionOrderByProject = new Map(s.sessionOrderByProject)
+      for (const [pid, order] of sessionOrderByProject) {
+        const filtered = order.filter((id) => id !== sessionId)
+        if (filtered.length !== order.length) {
+          if (filtered.length > 0) sessionOrderByProject.set(pid, filtered)
+          else sessionOrderByProject.delete(pid)
+        }
+      }
+
       return {
         sessions,
         terminalInstances,
@@ -154,11 +174,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         busySessions,
         paneLayoutByProject,
         focusedSessionByProject,
+        sessionOrderByProject,
       }
     })
 
-    // If this was the last session in the project, delete the project automatically.
-    if (projectId && get().getSessionsForProject(projectId).length === 0) {
+    // If this was the last session in a real project, delete the project automatically.
+    if (
+      projectId &&
+      projectId !== SCRATCH_PROJECT_ID &&
+      get().getSessionsForProject(projectId).length === 0
+    ) {
       useWorkspaceStore
         .getState()
         .deleteProject(projectId)
@@ -167,7 +192,81 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   getSessionsForProject: (projectId) => {
-    return [...get().sessions.values()].filter((s) => s.projectId === projectId)
+    const all = [...get().sessions.values()].filter((s) => s.projectId === projectId)
+    const order = get().sessionOrderByProject.get(projectId)
+    if (!order) return all
+    const byId = new Map(all.map((s) => [s.id, s]))
+    const ordered = order.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []))
+    const untracked = all.filter((s) => !order.includes(s.id))
+    return [...ordered, ...untracked]
+  },
+
+  getScratchSessions: () => {
+    return get().getSessionsForProject(SCRATCH_PROJECT_ID)
+  },
+
+  moveSession: (sessionId, targetProjectId) => {
+    set((s) => {
+      const sessions = new Map(s.sessions)
+      const session = sessions.get(sessionId)
+      if (!session) return s
+      const oldProjectId = session.projectId
+
+      sessions.set(sessionId, { ...session, projectId: targetProjectId })
+
+      // Update activeSessionIdByProject
+      const activeMap = new Map(s.activeSessionIdByProject)
+      if (activeMap.get(oldProjectId) === sessionId) {
+        const remaining = [...sessions.values()].filter(
+          (x) => x.projectId === oldProjectId && x.id !== sessionId
+        )
+        if (remaining.length > 0) activeMap.set(oldProjectId, remaining[0].id)
+        else activeMap.delete(oldProjectId)
+      }
+      activeMap.set(targetProjectId, sessionId)
+
+      // Remove from old pane layout
+      const paneLayoutByProject = new Map(s.paneLayoutByProject)
+      const oldLayout = paneLayoutByProject.get(oldProjectId)
+      if (oldLayout) {
+        const newLayout = removeLeaf(oldLayout, sessionId)
+        if (!newLayout || leafIds(newLayout).length <= 1) paneLayoutByProject.delete(oldProjectId)
+        else paneLayoutByProject.set(oldProjectId, newLayout)
+      }
+
+      // Update session order
+      const sessionOrderByProject = new Map(s.sessionOrderByProject)
+      const oldOrder = sessionOrderByProject.get(oldProjectId)
+      if (oldOrder) {
+        const newOrder = oldOrder.filter((id) => id !== sessionId)
+        if (newOrder.length > 0) sessionOrderByProject.set(oldProjectId, newOrder)
+        else sessionOrderByProject.delete(oldProjectId)
+      }
+      const targetOrder = sessionOrderByProject.get(targetProjectId)
+      if (targetOrder) sessionOrderByProject.set(targetProjectId, [...targetOrder, sessionId])
+
+      // Update focused session
+      const focusedSessionByProject = new Map(s.focusedSessionByProject)
+      if (focusedSessionByProject.get(oldProjectId) === sessionId) {
+        focusedSessionByProject.delete(oldProjectId)
+      }
+
+      return {
+        sessions,
+        activeSessionIdByProject: activeMap,
+        paneLayoutByProject,
+        sessionOrderByProject,
+        focusedSessionByProject,
+      }
+    })
+  },
+
+  reorderSessions: (projectId, orderedIds) => {
+    set((s) => {
+      const sessionOrderByProject = new Map(s.sessionOrderByProject)
+      sessionOrderByProject.set(projectId, orderedIds)
+      return { sessionOrderByProject }
+    })
   },
 
   setTerminalInstance: (sessionId, terminal) => {

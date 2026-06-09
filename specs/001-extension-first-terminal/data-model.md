@@ -62,7 +62,7 @@ interface Project {
 
 ### TerminalSession
 
-An active or backgrounded terminal process, scoped to a Project tab.
+An active or backgrounded terminal process. Normally scoped to a Project tab; may also be a **scratch session** (see below).
 
 ```typescript
 type SessionStatus = 'active' | 'backgrounded' | 'closed'
@@ -70,7 +70,7 @@ type SessionType = 'human' | 'agent'
 
 interface TerminalSession {
   id: string // UUID v4
-  projectId: string // FK → Project.id
+  projectId: string // FK → Project.id, or SCRATCH_PROJECT_ID for unassigned sessions
   tabTitle: string // Display name in the tab bar; defaults to shell name
   status: SessionStatus
   type: SessionType // 'human' (default) or 'agent' (FR-035, FR-036)
@@ -78,7 +78,16 @@ interface TerminalSession {
   createdAt: string
   closedAt?: string // Set when status transitions to 'closed'
 }
+
+// Sentinel value — valid UUID so it passes IPC validation; never persisted to disk
+export const SCRATCH_PROJECT_ID = '00000000-0000-0000-0000-000000000000'
 ```
+
+**Scratch sessions**: A session whose `projectId === SCRATCH_PROJECT_ID` is a _scratch session_ — not associated with any workspace or project. Users create scratch sessions from the WorkspaceRail (`~` button) or `⌘⇧T`. Scratch sessions can be moved to a real project at any time via the session tab's right-click context menu ("Move to project…"). The scratch sentinel is never stored by the main-process workspace store, so no `deleteProject` call is triggered when scratch sessions close.
+
+**Tab ordering**: `sessionOrderByProject` in `useSessionStore` (`Map<projectId, sessionId[]>`) tracks explicit tab order per project (including `SCRATCH_PROJECT_ID`). When an order entry exists, `getSessionsForProject` returns sessions in that order; untracked sessions append after ordered ones.
+
+**Session move**: Sessions can be reassigned to a different project entirely (renderer-only operation — the PTY manager tracks sessions by `sessionId`, not `projectId`). After a move, the empty source project is auto-deleted (unless it is `SCRATCH_PROJECT_ID`).
 
 **State transitions**:
 
@@ -87,6 +96,7 @@ interface TerminalSession {
 active → backgrounded  (user navigates away)
 backgrounded → active  (user returns to project)
 active | backgrounded → closed  (user closes tab or app exits)
+active | backgrounded → [moved to different projectId]  (user uses Move to project…)
 ```
 
 **In-memory only**: The `TerminalSession` record tracks metadata. The xterm.js `Terminal` instance and PTY process are runtime objects — not persisted. After app restart, no sessions are restored (per Assumptions).

@@ -144,6 +144,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:close-tab', listener)
       return () => ipcRenderer.removeListener('menu:close-tab', listener)
     },
+    onMenuOpenAbout: (handler: () => void) => {
+      const listener = () => handler()
+      ipcRenderer.on('menu:open-about', listener)
+      return () => ipcRenderer.removeListener('menu:open-about', listener)
+    },
+  },
+  app: {
+    getInfo: () => ipcRenderer.invoke('app:get-info'),
   },
   extensionBridge: {
     invoke: (channel: string, payload?: unknown) => ipcRenderer.invoke(channel, payload),

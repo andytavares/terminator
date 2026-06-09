@@ -23,6 +23,7 @@ interface Props {
   onPrevFile: () => void
   onNextFile: () => void
   onFinishChapter: () => void
+  isLastChapter: boolean
   onPause: () => void
   onOpenSubmit: () => void
   onShowRisk: () => void
@@ -45,6 +46,7 @@ export function ReviewDiffPane({
   onPrevFile,
   onNextFile: _onNextFile,
   onFinishChapter,
+  isLastChapter,
   onPause,
   onOpenSubmit,
   onShowRisk,
@@ -709,7 +711,7 @@ export function ReviewDiffPane({
               className="review-diff-nav-btn review-diff-nav-btn--primary"
               onClick={onFinishChapter}
             >
-              Finish chapter ↵
+              {isLastChapter ? 'Finish review ↵' : 'Finish chapter ↵'}
             </button>
           ) : (
             <button

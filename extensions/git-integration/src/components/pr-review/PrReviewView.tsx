@@ -153,13 +153,20 @@ export function PrReviewView({
     })
     const chapterIndex = pr.chapters.findIndex((c) => c.id === activeChapterId)
     const nextChapter = pr.chapters[chapterIndex + 1]
-    if (nextChapter) handleSelectChapter(nextChapter.id)
+    if (nextChapter) {
+      handleSelectChapter(nextChapter.id)
+    } else {
+      setShowSubmit(true)
+    }
   }
 
   const handlePause = () => {
     setPaused(repoRoot, pr.number, pr.headSHA, new Date().toISOString())
     onClose()
   }
+
+  const activeChapterIndex = pr.chapters.findIndex((c) => c.id === activeChapterId)
+  const isLastChapter = activeChapterIndex === pr.chapters.length - 1
 
   const totalFiles = pr.chapters.flatMap((c) => c.files).length
   const reviewedCount = viewedFiles.size
@@ -305,6 +312,7 @@ export function PrReviewView({
               onPrevFile={handlePrevFile}
               onNextFile={handleNextFile}
               onFinishChapter={handleFinishChapter}
+              isLastChapter={isLastChapter}
               onPause={handlePause}
               onOpenSubmit={() => setShowSubmit(true)}
               onShowRisk={() => setShowRiskFor(activeFile.path)}

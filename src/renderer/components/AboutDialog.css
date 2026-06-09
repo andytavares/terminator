@@ -1,0 +1,59 @@
+.about-dialog {
+  min-width: 320px;
+  max-width: 380px;
+  text-align: center;
+}
+
+.about-dialog__header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.about-dialog__logo {
+  font-size: 32px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.about-dialog__name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.about-dialog__version {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.about-dialog__info {
+  margin: 0 0 4px;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.about-dialog__row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.about-dialog__row dt {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.about-dialog__row dd {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  margin: 0;
+}

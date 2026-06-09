@@ -128,3 +128,5 @@ export type PaneNode =
       first: PaneNode
       second: PaneNode
     }
+
+export const SCRATCH_PROJECT_ID = '00000000-0000-0000-0000-000000000000'

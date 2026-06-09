@@ -23,14 +23,20 @@ import { EmptyState } from './components/EmptyState'
 import { OverviewScreen } from './components/overview/OverviewScreen'
 import { MetricsBar } from './components/overview/MetricsBar'
 import { useMetricsStore } from './stores/metrics.store'
+import { ScratchPanel } from './components/sidebar/ScratchPanel'
+import { AboutDialog } from './components/AboutDialog'
+import { SCRATCH_PROJECT_ID } from '../shared/types/index'
 
 installLogInterceptor()
 
 export function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [scratchActive, setScratchActive] = useState(false)
+  const [activeScratchSessionId, setActiveScratchSessionId] = useState<string | null>(null)
   const {
     loadWorkspaces,
     activeWorkspaceId,
@@ -42,8 +48,13 @@ export function App(): JSX.Element {
   } = useWorkspaceStore()
   const { loadSettings, globalSettings, markWelcomeSeen, resolveSettings } = useSettingsStore()
   const { system, enableGlobalMetrics, disableGlobalMetrics } = useMetricsStore()
-  const { handleProcessExit, getSessionsForProject, closeSession, activeSessionIdByProject } =
-    useSessionStore()
+  const {
+    handleProcessExit,
+    getSessionsForProject,
+    closeSession,
+    activeSessionIdByProject,
+    getScratchSessions,
+  } = useSessionStore()
   const { addToast } = useToastStore()
   const {
     addNotification,
@@ -83,16 +94,48 @@ export function App(): JSX.Element {
   }, [activeGlobalTabId, setActiveGlobalTab])
 
   const handleNewTab = useCallback(() => {
+    if (scratchActive) {
+      const settings = resolveSettings(activeWorkspaceId)
+      void createSession(
+        SCRATCH_PROJECT_ID,
+        'human',
+        '',
+        resolveActiveCwd(),
+        settings.terminal.scrollbackLimit
+      )
+      return
+    }
     if (!activeProjectId) return
     const settings = resolveSettings(activeWorkspaceId)
     const cwd = resolveActiveCwd()
     void createSession(activeProjectId, 'human', '', cwd, settings.terminal.scrollbackLimit)
-  }, [activeProjectId, activeWorkspaceId, resolveSettings, resolveActiveCwd, createSession])
+  }, [
+    scratchActive,
+    activeProjectId,
+    activeWorkspaceId,
+    resolveSettings,
+    resolveActiveCwd,
+    createSession,
+  ])
+
+  const handleNewScratch = useCallback(() => {
+    const settings = resolveSettings(activeWorkspaceId)
+    const cwd = resolveActiveCwd()
+    createSession(SCRATCH_PROJECT_ID, 'human', 'Scratch', cwd, settings.terminal.scrollbackLimit)
+      .then((sessionId) => {
+        setActiveScratchSessionId(sessionId)
+        setScratchActive(true)
+      })
+      .catch(() => {})
+  }, [activeWorkspaceId, resolveSettings, resolveActiveCwd, createSession])
+
   useKeyboardShortcuts({
     onOpenSettings: handleOpenSettings,
     onToggleLog: handleToggleLog,
     onOpenCommandPalette: handleOpenCommandPalette,
     onToggleOverview: handleToggleOverview,
+    onNewScratch: handleNewScratch,
+    scratchProjectId: scratchActive ? SCRATCH_PROJECT_ID : null,
   })
 
   function builtinCommands(): CommandRegistration[] {
@@ -128,7 +171,15 @@ export function App(): JSX.Element {
       },
     ]
 
-    if (activeProjectId) {
+    cmds.push({
+      id: 'core.new-scratch',
+      label: 'New Scratch Terminal',
+      shortcut: '⌘⇧T',
+      category: 'Terminal',
+      action: handleNewScratch,
+    })
+
+    if (activeProjectId || scratchActive) {
       cmds.push({
         id: 'core.new-tab',
         label: 'New Terminal Tab',
@@ -202,6 +253,11 @@ export function App(): JSX.Element {
     })
   }, [])
 
+  // Deactivate scratch view when a real project is selected
+  useEffect(() => {
+    if (activeProjectId) setScratchActive(false)
+  }, [activeProjectId])
+
   // Auto-open a terminal whenever the Terminal tab is active and has no sessions.
   // Covers: first project selection, switching back from an extension tab, all sessions closed.
   useEffect(() => {
@@ -223,6 +279,11 @@ export function App(): JSX.Element {
   useEffect(() => {
     if (!window.electronAPI.extensionEvents?.onMenuOpenSettings) return
     return window.electronAPI.extensionEvents.onMenuOpenSettings(() => setSettingsOpen(true))
+  }, [])
+
+  useEffect(() => {
+    if (!window.electronAPI.extensionEvents?.onMenuOpenAbout) return
+    return window.electronAPI.extensionEvents.onMenuOpenAbout(() => setAboutOpen(true))
   }, [])
 
   useEffect(() => {
@@ -306,6 +367,9 @@ export function App(): JSX.Element {
   }, [])
 
   const showMetricsBar = globalSettings?.ui?.showMetricsBar ?? false
+  const scratchSessions = getScratchSessions()
+  // Scratch view takes priority over project view when active
+  const displayProjectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
 
   return (
     <ErrorBoundary>
@@ -318,6 +382,9 @@ export function App(): JSX.Element {
             unreadNotifications={unreadCount}
             notificationPanelOpen={notificationPanelOpen}
             onBellClick={toggleNotificationPanel}
+            onNewScratch={handleNewScratch}
+            scratchActive={scratchActive}
+            hasScratchSessions={scratchSessions.length > 0}
           />
 
           {activeGlobalTabId && globalTabs.has(activeGlobalTabId) ? (
@@ -332,14 +399,38 @@ export function App(): JSX.Element {
             })()
           ) : (
             <>
-              {activeWorkspaceId && sidebarVisible && (
-                <ProjectsPanel workspaceId={activeWorkspaceId} />
+              {sidebarVisible && (
+                <div className="sidebar-stack">
+                  {activeWorkspaceId && <ProjectsPanel workspaceId={activeWorkspaceId} />}
+                  <ScratchPanel
+                    activeSessionId={scratchActive ? activeScratchSessionId : null}
+                    onSelectSession={(sessionId) => {
+                      setActiveScratchSessionId(sessionId)
+                      setScratchActive(true)
+                      useSessionStore
+                        .getState()
+                        .setActiveSessionForProject(SCRATCH_PROJECT_ID, sessionId)
+                    }}
+                  />
+                </div>
               )}
               <div className="main-content">
-                {activeProjectId ? (
+                {scratchActive ? (
                   <>
                     <TabBar
-                      projectId={activeProjectId}
+                      projectId={SCRATCH_PROJECT_ID}
+                      activeProjectTabId={null}
+                      projectTabs={[]}
+                      onSelectProjectTab={() => {}}
+                      onNewTab={handleNewTab}
+                      onScratchDeactivate={() => setScratchActive(false)}
+                    />
+                    <TerminalPane projectId={SCRATCH_PROJECT_ID} />
+                  </>
+                ) : displayProjectId ? (
+                  <>
+                    <TabBar
+                      projectId={displayProjectId}
                       activeProjectTabId={activeProjectTabId}
                       projectTabs={Array.from(projectTabs.values())}
                       onSelectProjectTab={setActiveProjectTab}
@@ -352,7 +443,7 @@ export function App(): JSX.Element {
                         return <TabComponent repoRoot={repoRoot} />
                       })()
                     ) : (
-                      <TerminalPane projectId={activeProjectId} />
+                      <TerminalPane projectId={displayProjectId} />
                     )}
                   </>
                 ) : globalSettings && !globalSettings.ui?.hasSeenWelcome ? (
@@ -399,6 +490,7 @@ export function App(): JSX.Element {
 
           <NotificationPanel />
           {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+          {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
           {logOpen && <LogWindow onClose={() => setLogOpen(false)} />}
           {paletteOpen && (
             <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />

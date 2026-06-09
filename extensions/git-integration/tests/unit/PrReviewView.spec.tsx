@@ -219,6 +219,33 @@ describe('PrReviewView', () => {
     expect(screen.getByTestId('risk-panel')).toBeTruthy()
   })
 
+  it('opens submit panel when FinishChapter is clicked on the last (only) chapter', async () => {
+    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+    setupStore({ currentFilePath: 'src/foo.ts' })
+    render(
+      <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
+    )
+    fireEvent.click(screen.getByText('FinishChapter'))
+    expect(screen.getByTestId('submit-panel')).toBeTruthy()
+  })
+
+  it('advances to next chapter (not submit) when FinishChapter is clicked on a non-final chapter', async () => {
+    const ch2 = { ...mockChapter, id: 'ch-2', name: 'Chapter 2', files: [mockFile] }
+    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+    setupStore({ currentChapterId: 'ch-1', currentFilePath: 'src/foo.ts' })
+    render(
+      <PrReviewView
+        repoRoot="/repo"
+        pr={{ ...mockPr, chapters: [mockChapter, ch2] }}
+        onClose={mockClose}
+        onRefresh={mockRefresh}
+      />
+    )
+    fireEvent.click(screen.getByText('FinishChapter'))
+    expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
+    expect(screen.queryByTestId('submit-panel')).toBeNull()
+  })
+
   it('calls markFileViewed and advances file on MarkViewed', async () => {
     const file2 = { ...mockFile, path: 'src/bar.ts' }
     const chapter = { ...mockChapter, files: [mockFile, file2] }

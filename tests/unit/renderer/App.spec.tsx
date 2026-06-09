@@ -6,6 +6,7 @@ import { useSettingsStore } from '../../../src/renderer/stores/settings.store'
 import { useSessionStore } from '../../../src/renderer/stores/session.store'
 import { useToastStore } from '../../../src/renderer/stores/toast.store'
 import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
+import { useTerminalSession } from '../../../src/renderer/hooks/useTerminalSession'
 import { App } from '../../../src/renderer/App'
 
 // Mock all child components and hooks to focus on App logic
@@ -28,6 +29,7 @@ type ShortcutCallbacks = {
   onToggleLog?: () => void
   onOpenCommandPalette?: () => void
   onToggleOverview?: () => void
+  onNewScratch?: () => void
 }
 let capturedShortcutCallbacks: ShortcutCallbacks = {}
 vi.mock('../../../src/renderer/hooks/useKeyboardShortcuts', () => ({
@@ -68,6 +70,20 @@ vi.mock('../../../src/renderer/components/sidebar/WorkspaceRail', () => ({
 vi.mock('../../../src/renderer/components/sidebar/ProjectsPanel', () => ({
   ProjectsPanel: ({ workspaceId }: { workspaceId: string }) => (
     <div data-testid="projects-panel" data-workspace-id={workspaceId} />
+  ),
+}))
+let capturedOnSelectSession: ((sessionId: string) => void) | null = null
+vi.mock('../../../src/renderer/components/sidebar/ScratchPanel', () => ({
+  ScratchPanel: ({ onSelectSession }: { onSelectSession?: (sessionId: string) => void }) => {
+    capturedOnSelectSession = onSelectSession ?? null
+    return <div data-testid="scratch-panel" />
+  },
+}))
+vi.mock('../../../src/renderer/components/AboutDialog', () => ({
+  AboutDialog: ({ onClose }: { onClose: () => void }) => (
+    <div data-testid="about-dialog">
+      <button onClick={onClose}>Close About</button>
+    </div>
   ),
 }))
 vi.mock('../../../src/renderer/components/terminal/TerminalPane', () => ({
@@ -164,6 +180,10 @@ function setupMocks(
   vi.mocked(useSessionStore).mockReturnValue({
     handleProcessExit: mockHandleProcessExit,
     getSessionsForProject: vi.fn().mockReturnValue([]),
+    getScratchSessions: vi.fn().mockReturnValue([]),
+    closeSession: vi.fn().mockResolvedValue(undefined),
+    activeSessionIdByProject: new Map(),
+    setActiveSessionForProject: vi.fn(),
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useToastStore).mockReturnValue({
     addToast: mockAddToast,
@@ -179,6 +199,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   capturedPaletteCommands = []
   capturedOnSelectGlobalTab = null
+  capturedOnSelectSession = null
   mockUnsubscribe = vi.fn()
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     terminal: {
@@ -682,15 +703,19 @@ describe('App', () => {
       vi.mocked(useSessionStore).mockReturnValue({
         handleProcessExit: mockHandleProcessExit,
         getSessionsForProject: vi.fn().mockReturnValue([]),
+        getScratchSessions: vi.fn().mockReturnValue([]),
         closeSession: mockCloseSession,
         activeSessionIdByProject: new Map([['proj-1', 'ses-active']]),
+        setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
       setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
       vi.mocked(useSessionStore).mockReturnValue({
         handleProcessExit: mockHandleProcessExit,
         getSessionsForProject: vi.fn().mockReturnValue([]),
+        getScratchSessions: vi.fn().mockReturnValue([]),
         closeSession: mockCloseSession,
         activeSessionIdByProject: new Map([['proj-1', 'ses-active']]),
+        setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
 
       let closeTabCallback: (() => void) | null = null
@@ -729,8 +754,10 @@ describe('App', () => {
       vi.mocked(useSessionStore).mockReturnValue({
         handleProcessExit: mockHandleProcessExit,
         getSessionsForProject: vi.fn().mockReturnValue([]),
+        getScratchSessions: vi.fn().mockReturnValue([]),
         closeSession: mockCloseSession,
         activeSessionIdByProject: new Map(),
+        setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
 
       let closeTabCallback: (() => void) | null = null
@@ -769,9 +796,11 @@ describe('App', () => {
       vi.mocked(useSessionStore).mockReturnValue({
         handleProcessExit: mockHandleProcessExit,
         getSessionsForProject: vi.fn().mockReturnValue([]),
+        getScratchSessions: vi.fn().mockReturnValue([]),
         closeSession: mockCloseSession,
         // proj-1 has no active session mapped
         activeSessionIdByProject: new Map(),
+        setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
 
       let closeTabCallback: (() => void) | null = null
@@ -803,5 +832,193 @@ describe('App', () => {
       closeTabCallback?.()
       expect(mockCloseSession).not.toHaveBeenCalled()
     })
+  })
+
+  it('command core.toggle-overview action toggles overview tab on and off', async () => {
+    const mockSetActiveGlobalTab = vi.fn()
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      activeGlobalTabId: null,
+      setActiveGlobalTab: mockSetActiveGlobalTab,
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    render(<App />)
+    capturedShortcutCallbacks.onOpenCommandPalette?.()
+    await waitFor(() => screen.getByTestId('command-palette'))
+    const cmd = capturedPaletteCommands.find((c) => c.id === 'core.toggle-overview')
+    cmd?.action()
+    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith('core.overview')
+  })
+
+  it('closes AboutDialog when onClose is called', async () => {
+    let openAboutCb: (() => void) | null = null
+    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
+      extensionEvents: {
+        onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
+        onMenuOpenAbout: (cb: () => void) => {
+          openAboutCb = cb
+          return vi.fn()
+        },
+        onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
+        onToast: vi.fn().mockReturnValue(vi.fn()),
+        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
+        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
+      },
+      notifications: {
+        list: vi.fn().mockResolvedValue([]),
+        onPush: vi.fn().mockReturnValue(mockUnsubscribe),
+      },
+      extensionBridge: {
+        on: vi.fn().mockReturnValue(mockUnsubscribe),
+        invoke: vi.fn().mockResolvedValue({}),
+      },
+    }
+    render(<App />)
+    openAboutCb?.()
+    await waitFor(() => screen.getByTestId('about-dialog'))
+    fireEvent.click(screen.getByText('Close About'))
+    await waitFor(() => expect(screen.queryByTestId('about-dialog')).toBeNull())
+  })
+
+  it('renders scratch terminal after handleNewScratch resolves', async () => {
+    const mockCreateSession = vi.fn().mockResolvedValue('sess-scratch')
+    vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+    render(<App />)
+    capturedShortcutCallbacks.onNewScratch?.()
+    await waitFor(() => {
+      expect(mockCreateSession).toHaveBeenCalled()
+      expect(screen.getByTestId('tab-bar')).toBeTruthy()
+    })
+  })
+
+  it('renders MetricsBar when showMetricsBar is true', () => {
+    setupMocks({
+      globalSettings: { ui: { hasSeenWelcome: true, showMetricsBar: true } },
+    })
+    const { container } = render(<App />)
+    expect(container.querySelector('.app-global-metrics')).toBeTruthy()
+  })
+
+  it('ScratchPanel onSelectSession activates scratch view for chosen session', async () => {
+    setupMocks({ activeWorkspaceId: 'ws-1' })
+    const mockSetActiveSessionForProject = vi.fn()
+    ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
+      setActiveSessionForProject: mockSetActiveSessionForProject,
+    })
+    render(<App />)
+    capturedOnSelectSession?.('sess-scratch')
+    await waitFor(() => {
+      expect(mockSetActiveSessionForProject).toHaveBeenCalledWith(
+        expect.any(String),
+        'sess-scratch'
+      )
+    })
+  })
+
+  it('triggers handleProcessExit when onProcessExit callback fires', () => {
+    let processExitCb: ((sessionId: string, exitCode: number) => void) | null = null
+    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+      terminal: {
+        onProcessExit: (cb: (sessionId: string, exitCode: number) => void) => {
+          processExitCb = cb
+          return mockUnsubscribe
+        },
+      },
+      extensionEvents: null,
+      notifications: {
+        list: vi.fn().mockResolvedValue([]),
+        onPush: vi.fn().mockReturnValue(mockUnsubscribe),
+      },
+      extensionBridge: {
+        on: vi.fn().mockReturnValue(mockUnsubscribe),
+        invoke: vi.fn().mockResolvedValue({}),
+      },
+    }
+    render(<App />)
+    processExitCb?.('sess-1', 0)
+    expect(mockHandleProcessExit).toHaveBeenCalledWith('sess-1', 0)
+  })
+
+  it('opens AboutDialog when onMenuOpenAbout event fires', async () => {
+    let openAboutCb: (() => void) | null = null
+    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
+      extensionEvents: {
+        onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
+        onMenuOpenAbout: (cb: () => void) => {
+          openAboutCb = cb
+          return vi.fn()
+        },
+        onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
+        onToast: vi.fn().mockReturnValue(vi.fn()),
+        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
+        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
+      },
+      notifications: {
+        list: vi.fn().mockResolvedValue([]),
+        onPush: vi.fn().mockReturnValue(mockUnsubscribe),
+      },
+      extensionBridge: {
+        on: vi.fn().mockReturnValue(mockUnsubscribe),
+        invoke: vi.fn().mockResolvedValue({}),
+      },
+    }
+    render(<App />)
+    expect(screen.queryByTestId('about-dialog')).toBeNull()
+    openAboutCb?.()
+    await waitFor(() => expect(screen.getByTestId('about-dialog')).toBeTruthy())
+  })
+
+  it('toggles sidebar when onMenuToggleSidebar event fires', async () => {
+    setupMocks({ activeWorkspaceId: 'ws-1' })
+    let toggleSidebarCb: (() => void) | null = null
+    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
+      extensionEvents: {
+        onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
+        onMenuOpenAbout: vi.fn().mockReturnValue(vi.fn()),
+        onMenuToggleSidebar: (cb: () => void) => {
+          toggleSidebarCb = cb
+          return vi.fn()
+        },
+        onToast: vi.fn().mockReturnValue(vi.fn()),
+        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
+        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
+      },
+      notifications: {
+        list: vi.fn().mockResolvedValue([]),
+        onPush: vi.fn().mockReturnValue(mockUnsubscribe),
+      },
+      extensionBridge: {
+        on: vi.fn().mockReturnValue(mockUnsubscribe),
+        invoke: vi.fn().mockResolvedValue({}),
+      },
+    }
+    render(<App />)
+    expect(screen.getByTestId('projects-panel')).toBeTruthy()
+    toggleSidebarCb?.()
+    await waitFor(() => expect(screen.queryByTestId('projects-panel')).toBeNull())
+  })
+
+  it('reopens saved panels when switching back to Terminal tab', async () => {
+    const mockTogglePanel = vi.fn()
+    setupMocks({ activeProjectId: 'proj-1' })
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      activeProjectTabId: 'git',
+      openPanels: new Set(['panel-a']),
+      togglePanel: mockTogglePanel,
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    const { rerender } = render(<App />)
+    // Switch back to terminal (activeProjectTabId → null), with a saved panel
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      activeProjectTabId: null,
+      openPanels: new Set<string>(),
+      togglePanel: mockTogglePanel,
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    rerender(<App />)
+    // togglePanel called when entering extension tab AND when returning to terminal
+    expect(mockTogglePanel).toHaveBeenCalledWith('panel-a')
   })
 })
