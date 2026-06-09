@@ -36,7 +36,6 @@ export function App(): JSX.Element {
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [scratchActive, setScratchActive] = useState(false)
-  const [activeScratchSessionId, setActiveScratchSessionId] = useState<string | null>(null)
   const {
     loadWorkspaces,
     activeWorkspaceId,
@@ -55,6 +54,7 @@ export function App(): JSX.Element {
     activeSessionIdByProject,
     getScratchSessions,
   } = useSessionStore()
+  const activeScratchSessionId = activeSessionIdByProject.get(SCRATCH_PROJECT_ID) ?? null
   const { addToast } = useToastStore()
   const {
     addNotification,
@@ -122,8 +122,7 @@ export function App(): JSX.Element {
     const settings = resolveSettings(activeWorkspaceId)
     const cwd = resolveActiveCwd()
     createSession(SCRATCH_PROJECT_ID, 'human', 'Scratch', cwd, settings.terminal.scrollbackLimit)
-      .then((sessionId) => {
-        setActiveScratchSessionId(sessionId)
+      .then(() => {
         setScratchActive(true)
       })
       .catch(() => {})
@@ -406,7 +405,6 @@ export function App(): JSX.Element {
                   <ScratchPanel
                     activeSessionId={scratchActive ? activeScratchSessionId : null}
                     onSelectSession={(sessionId) => {
-                      setActiveScratchSessionId(sessionId)
                       setScratchActive(true)
                       useSessionStore
                         .getState()

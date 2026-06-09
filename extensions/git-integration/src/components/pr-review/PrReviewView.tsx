@@ -59,14 +59,13 @@ export function PrReviewView({
   const [focusMode, setFocusMode] = useState(false)
   const [largePrDismissed, setLargePrDismissed] = useState(false)
 
-  // When focus mode is active, filter each chapter to only medium/high risk files
+  // When focus mode is active, filter each chapter to only medium/high risk files.
+  // Chapters where every file is low-risk are dropped entirely; if all chapters
+  // would be dropped (entire PR is low-risk) fall back to showing everything.
   const displayPr = useMemo<PrReviewDetail>(() => {
     if (!focusMode) return pr
     const filteredChapters = pr.chapters
-      .map((c) => {
-        const focused = c.files.filter((f) => f.riskScore.level !== 'low')
-        return { ...c, files: focused.length > 0 ? focused : c.files }
-      })
+      .map((c) => ({ ...c, files: c.files.filter((f) => f.riskScore.level !== 'low') }))
       .filter((c) => c.files.length > 0)
     return { ...pr, chapters: filteredChapters.length > 0 ? filteredChapters : pr.chapters }
   }, [pr, focusMode])
@@ -191,8 +190,13 @@ export function PrReviewView({
   const isLastChapter = activeChapterIndex === displayPr.chapters.length - 1
 
   const totalFiles = displayPr.chapters.flatMap((c) => c.files).length
-  const reviewedCount = viewedFiles.size
-  const reviewPct = totalFiles > 0 ? Math.round((reviewedCount / totalFiles) * 100) : 0
+  const displayedPaths = useMemo(
+    () => new Set(displayPr.chapters.flatMap((c) => c.files.map((f) => f.path))),
+    [displayPr]
+  )
+  const reviewedCount = [...viewedFiles].filter((p) => displayedPaths.has(p)).length
+  const reviewPct =
+    totalFiles > 0 ? Math.min(100, Math.round((reviewedCount / totalFiles) * 100)) : 0
 
   const leftPanel =
     viewMode === 'full' ? (

@@ -388,5 +388,67 @@ describe('PrReviewView', () => {
       fireEvent.click(focusBtn)
       expect(focusBtn.textContent).toBe('All files')
     })
+
+    it('drops all-low-risk chapters in focus mode instead of showing their full file list', async () => {
+      const lowFile = makeLargeFile('src/low.ts', 300)
+      const highFile = {
+        ...makeLargeFile('src/high.ts', 300),
+        riskScore: { ...mockFile.riskScore, level: 'high' as const },
+      }
+      const lowChapter = {
+        id: 'ch-low',
+        name: 'Low only',
+        estimatedMinutes: 5,
+        status: 'not-started' as const,
+        files: [lowFile],
+      }
+      const highChapter = {
+        id: 'ch-high',
+        name: 'High risk',
+        estimatedMinutes: 5,
+        status: 'not-started' as const,
+        files: [highFile],
+      }
+      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+      setupStore({ currentFilePath: 'src/high.ts', currentChapterId: 'ch-high' })
+      const { unmount } = render(
+        <PrReviewView
+          repoRoot="/repo"
+          pr={{ ...mockPr, chapters: [lowChapter, highChapter] }}
+          onClose={mockClose}
+          onRefresh={mockRefresh}
+        />
+      )
+      const focusBtn = screen.getByTitle('Focus mode — show only medium/high risk files')
+      fireEvent.click(focusBtn)
+      // Progress total should reflect only the high-risk chapter (1 file), not both (2 files)
+      expect(screen.getByLabelText(/0 of 1 files reviewed/)).toBeTruthy()
+      unmount()
+    })
+
+    it('progress bar does not exceed 100% when viewedFiles exceeds displayPr files in focus mode', async () => {
+      const bigFile = {
+        ...makeLargeFile('src/low.ts', 500),
+        riskScore: { ...mockFile.riskScore, level: 'low' as const },
+      }
+      const chapter = { ...mockChapter, files: [bigFile] }
+      const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
+      // 3 viewed files but only 1 file in PR
+      setupStore({
+        currentFilePath: 'src/low.ts',
+        viewedFiles: new Set(['src/low.ts', 'src/other.ts', 'src/another.ts']),
+      })
+      const { container } = render(
+        <PrReviewView
+          repoRoot="/repo"
+          pr={{ ...mockPr, chapters: [chapter] }}
+          onClose={mockClose}
+          onRefresh={mockRefresh}
+        />
+      )
+      const fill = container.querySelector('.pr-review-progress-fill') as HTMLElement
+      const width = parseFloat(fill?.style.width ?? '0')
+      expect(width).toBeLessThanOrEqual(100)
+    })
   })
 })
