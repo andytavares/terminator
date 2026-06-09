@@ -79,6 +79,13 @@ function createMockDb(initialRows: Row[] = []): {
         run(...params: unknown[]): void {
           if (sql.toLowerCase().startsWith('insert into tasks')) {
             // Extract positional values from the INSERT
+            // New column order (after adding recurrence_end_* columns):
+            // 0:id, 1:text, 2:status, 3:project_id, 4:context, 5:area_id, 6:due_date,
+            // 7:source, 8:source_ref, 9:recurrence_rule, 10:recurrence_template_id,
+            // 11:recurrence_notify_at, 12:metadata, 13:terminator_links,
+            // 14:created_at, 15:updated_at,
+            // 16:recurrence_end_type, 17:recurrence_end_date, 18:recurrence_end_count,
+            // 19:recurrence_completed_count
             const newRow: Row = {
               id: params[0] as string,
               text: params[1] as string,
@@ -93,9 +100,13 @@ function createMockDb(initialRows: Row[] = []): {
               recurrence_template_id: params[10] as string | null,
               recurrence_notify_at: params[11] as string | null,
               metadata: params[12] as string,
-              terminator_links: '[]',
+              terminator_links: params[13] as string,
               created_at: params[14] as string,
               updated_at: params[15] as string,
+              recurrence_end_type: params[16] as string | null,
+              recurrence_end_date: params[17] as string | null,
+              recurrence_end_count: params[18] as number | null,
+              recurrence_completed_count: params[19] as number | null,
             }
             rows.push(newRow)
           }
@@ -127,6 +138,10 @@ function makeTaskRow(overrides: Partial<Row> = {}): Row {
     terminator_links: '[]',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    recurrence_end_type: null,
+    recurrence_end_date: null,
+    recurrence_end_count: null,
+    recurrence_completed_count: null,
     ...overrides,
   }
 }
@@ -163,6 +178,21 @@ describe('ensureNextOccurrence', () => {
     expect(newRow?.recurrence_rule).toBe('daily')
   })
 
+  it('inherits source and source_ref from the template task', () => {
+    const task = makeTaskRow({
+      recurrence_rule: 'daily',
+      due_date: '2099-03-10',
+      source: 'project',
+      source_ref: 'my-project',
+    })
+    const { db, rows } = createMockDb([task])
+    const newId = ensureNextOccurrence(db as unknown as Database.Database, task.id as string)
+    expect(newId).toBeTruthy()
+    const newRow = rows.find((r) => r.id === newId)
+    expect(newRow?.source).toBe('project')
+    expect(newRow?.source_ref).toBe('my-project')
+  })
+
   it('is idempotent — second call creates no additional instance', () => {
     const task = makeTaskRow({ recurrence_rule: 'daily', due_date: '2099-03-10' })
     const { db, rows } = createMockDb([task])
@@ -193,7 +223,19 @@ describe('ensureNextOccurrence', () => {
     expect(newRow?.recurrence_template_id).toBe(templateId)
   })
 
-  it('does not spawn when after_count limit is exhausted', () => {
+  it('does not spawn when after_count limit is exhausted (column-based)', () => {
+    const task = makeTaskRow({
+      recurrence_rule: 'daily',
+      due_date: '2099-03-10',
+      recurrence_end_type: 'after_count',
+      recurrence_end_count: 3,
+      recurrence_completed_count: 2,
+    })
+    const { db } = createMockDb([task])
+    expect(ensureNextOccurrence(db as unknown as Database.Database, task.id as string)).toBeNull()
+  })
+
+  it('does not spawn when after_count limit is exhausted (metadata fallback)', () => {
     const task = makeTaskRow({
       recurrence_rule: 'daily',
       due_date: '2099-03-10',
@@ -207,7 +249,18 @@ describe('ensureNextOccurrence', () => {
     expect(ensureNextOccurrence(db as unknown as Database.Database, task.id as string)).toBeNull()
   })
 
-  it('does not spawn when on_date end condition has passed', () => {
+  it('does not spawn when on_date end condition has passed (column-based)', () => {
+    const task = makeTaskRow({
+      recurrence_rule: 'daily',
+      due_date: '2099-03-10',
+      recurrence_end_type: 'on_date',
+      recurrence_end_date: '2099-03-10', // next would be 2099-03-11 > end date
+    })
+    const { db } = createMockDb([task])
+    expect(ensureNextOccurrence(db as unknown as Database.Database, task.id as string)).toBeNull()
+  })
+
+  it('does not spawn when on_date end condition has passed (metadata fallback)', () => {
     const task = makeTaskRow({
       recurrence_rule: 'daily',
       due_date: '2099-03-10',
@@ -224,11 +277,9 @@ describe('ensureNextOccurrence', () => {
     const task = makeTaskRow({
       recurrence_rule: 'daily',
       due_date: '2099-03-10',
-      metadata: JSON.stringify({
-        recurrence_end_type: 'after_count',
-        recurrence_end_count: 3,
-        recurrence_completed_count: 1,
-      }),
+      recurrence_end_type: 'after_count',
+      recurrence_end_count: 3,
+      recurrence_completed_count: 1,
     })
     const { db } = createMockDb([task])
     expect(ensureNextOccurrence(db as unknown as Database.Database, task.id as string)).toBeTruthy()

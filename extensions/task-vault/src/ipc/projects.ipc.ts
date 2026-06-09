@@ -7,55 +7,16 @@ import {
   CreateProjectRequestSchema,
   DeleteProjectRequestSchema,
 } from '../schemas/vault.schema'
-import type { IndexedProject, IndexedTask, ProjectStatus, TaskStatus } from '../vault/types'
+import type { ProjectStatus } from '../vault/types'
+import { setVaultPath as _setVaultPath, getVaultPath as _getVaultPath } from '../vault/vault-path'
+import { rowToTask, rowToProject, PROJECT_COLS, PROJECT_JOINS } from '../vault/mappers'
 
-// vaultPath kept for API compatibility with activate()
-let vaultPath = ''
-
-export function setVaultPath(p: string) {
-  vaultPath = p
+export function setVaultPath(p: string): void {
+  _setVaultPath(p)
 }
 
-// Suppress unused warning
 export function getVaultPath(): string {
-  return vaultPath
-}
-
-function rowToTask(row: Record<string, unknown>): IndexedTask {
-  const source = row.source as string
-  const sourceRef = row.source_ref as string | null
-  const filePath = sourceRef ? `${source}/${sourceRef}` : source
-  return {
-    id: row.id as string,
-    filePath,
-    line: 0,
-    status: row.status as TaskStatus,
-    text: row.text as string,
-    project: (row.project as string) || undefined,
-    context: (row.context as string) || undefined,
-    area: (row.area as string) || undefined,
-    dueDate: (row.due_date as string) || undefined,
-    terminatorLinks: JSON.parse((row.terminator_links as string) || '[]'),
-    subtasks: [],
-  }
-}
-
-const PROJECT_COLS = `p.id, p.name, p.status, ar.name AS area, p.deadline, p.outcome, p.terminator_links, p.created_at, p.updated_at`
-const PROJECT_JOINS = `LEFT JOIN areas ar ON p.area_id = ar.id`
-
-function rowToProject(row: Record<string, unknown>): IndexedProject {
-  return {
-    id: row.id as string,
-    filePath: row.name as string,
-    name: row.name as string,
-    status: row.status as ProjectStatus,
-    area: (row.area as string) || undefined,
-    deadline: (row.deadline as string) || undefined,
-    isStale: false,
-    nextActionCount: 0,
-    lastModified: row.updated_at as string,
-    terminatorLinks: JSON.parse((row.terminator_links as string) || '[]'),
-  }
+  return _getVaultPath()
 }
 
 export function registerProjectsIpcHandlers(): () => void {

@@ -17,6 +17,8 @@ export function initDb(vaultPath: string): Database.Database {
   _db.pragma('foreign_keys = ON')
   applySchema(_db)
   applyMigrations(_db)
+  // One-time: migrate kanban.json to settings table
+  migrateKanbanJsonToDb(_db, vaultPath)
   // Startup gap-fill: create any missing future occurrences for recurring tasks
   try {
     backfillRecurringTasks(_db)
@@ -77,6 +79,17 @@ function applyMigrations(db: Database.Database): void {
     db.exec(`ALTER TABLE tasks ADD COLUMN recurrence_notify_at TEXT`)
     // Migrate existing metadata-based recurrence to new columns
     migrateRecurrenceMetadata(db)
+  }
+
+  // Promote blocked / recurrence-end fields from metadata JSON to first-class columns
+  if (!hasColumn(db, 'tasks', 'blocked_reason')) {
+    db.exec(`ALTER TABLE tasks ADD COLUMN blocked_reason TEXT`)
+    db.exec(`ALTER TABLE tasks ADD COLUMN blocked_check_interval TEXT`)
+    db.exec(`ALTER TABLE tasks ADD COLUMN recurrence_end_type TEXT`)
+    db.exec(`ALTER TABLE tasks ADD COLUMN recurrence_end_date TEXT`)
+    db.exec(`ALTER TABLE tasks ADD COLUMN recurrence_end_count INTEGER`)
+    db.exec(`ALTER TABLE tasks ADD COLUMN recurrence_completed_count INTEGER`)
+    migrateMetadataToColumns(db)
   }
 
   // Drop legacy tables no longer used by the app
@@ -142,6 +155,84 @@ function migrateRecurrenceMetadata(db: Database.Database): void {
   migrate()
 }
 
+function migrateKanbanJsonToDb(db: Database.Database, vaultPath: string): void {
+  const kanbanJsonPath = path.join(vaultPath, '.todo', 'kanban.json')
+  if (!fs.existsSync(kanbanJsonPath)) return
+  // Only migrate if settings table has no kanban_config yet
+  const existing = db.prepare(`SELECT value FROM settings WHERE key='kanban_config'`).get()
+  if (existing) {
+    // Already migrated — remove the old file
+    try {
+      fs.unlinkSync(kanbanJsonPath)
+    } catch {
+      // ignore
+    }
+    return
+  }
+  try {
+    const raw = fs.readFileSync(kanbanJsonPath, 'utf-8')
+    db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('kanban_config', ?)`).run(raw)
+    fs.unlinkSync(kanbanJsonPath)
+  } catch {
+    // Non-fatal: migration is best-effort
+  }
+}
+
+function migrateMetadataToColumns(db: Database.Database): void {
+  type Row = { id: string; metadata: string }
+  const rows = db
+    .prepare(`SELECT id, metadata FROM tasks WHERE metadata IS NOT NULL AND metadata != '{}'`)
+    .all() as Row[]
+
+  const update = db.prepare(
+    `UPDATE tasks SET
+       blocked_reason=?, blocked_check_interval=?,
+       recurrence_end_type=?, recurrence_end_date=?,
+       recurrence_end_count=?, recurrence_completed_count=?
+     WHERE id=?`
+  )
+
+  const migrate = db.transaction(() => {
+    for (const row of rows) {
+      let meta: Record<string, unknown> = {}
+      try {
+        meta = JSON.parse(row.metadata) as Record<string, unknown>
+      } catch {
+        continue
+      }
+      const blockedReason = (meta.blocked_reason as string) ?? null
+      const blockedCheckInterval = (meta.blocked_check_interval as string) ?? null
+      const recurrenceEndType = (meta.recurrence_end_type as string) ?? null
+      const recurrenceEndDate = (meta.recurrence_end_date as string) ?? null
+      const recurrenceEndCount =
+        meta.recurrence_end_count != null ? (meta.recurrence_end_count as number) : null
+      const recurrenceCompletedCount =
+        meta.recurrence_completed_count != null ? (meta.recurrence_completed_count as number) : null
+
+      // Only update rows that actually have at least one relevant field
+      if (
+        blockedReason !== null ||
+        blockedCheckInterval !== null ||
+        recurrenceEndType !== null ||
+        recurrenceEndDate !== null ||
+        recurrenceEndCount !== null ||
+        recurrenceCompletedCount !== null
+      ) {
+        update.run(
+          blockedReason,
+          blockedCheckInterval,
+          recurrenceEndType,
+          recurrenceEndDate,
+          recurrenceEndCount,
+          recurrenceCompletedCount,
+          row.id
+        )
+      }
+    }
+  })
+  migrate()
+}
+
 function applySchema(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS tasks (
@@ -187,6 +278,11 @@ function applySchema(db: Database.Database): void {
       id         TEXT PRIMARY KEY,
       name       TEXT UNIQUE NOT NULL,
       created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
     );
 
   `)

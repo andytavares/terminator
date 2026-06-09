@@ -1,16 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import * as fs from 'node:fs'
-
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>()
-  return {
-    ...actual,
-    readFileSync: vi.fn(),
-    writeFileSync: vi.fn(),
-    mkdirSync: vi.fn(),
-    existsSync: vi.fn().mockReturnValue(true),
-  }
-})
 
 const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
   mockHandle: vi.fn(),
@@ -20,17 +8,45 @@ vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
 }))
 
-const { mockRun, mockAll, mockPrepare } = vi.hoisted(() => {
-  const mockRun = vi.fn().mockReturnValue({ changes: 1 })
+// Settings table mock: persists across calls within a test
+const { mockRun, mockAll, mockGet, mockPrepare } = vi.hoisted(() => {
+  const settingsStore: Record<string, string> = {}
+  const mockRun = vi.fn().mockImplementation(function (this: unknown, ...args: unknown[]) {
+    // Detect INSERT OR REPLACE INTO settings
+    const sql = (this as { _sql?: string })._sql ?? ''
+    if (sql.includes('INSERT OR REPLACE INTO settings')) {
+      const key = args[0] as string
+      const value = args[1] as string
+      settingsStore[key] = value
+    }
+    return { changes: 1 }
+  })
+  const mockGet = vi.fn().mockImplementation(function (this: unknown, ...args: unknown[]) {
+    const sql = (this as { _sql?: string })._sql ?? ''
+    if (sql.includes("WHERE key='kanban_config'") || sql.includes('WHERE key=')) {
+      const key = args[0] as string | undefined
+      const lookupKey = key ?? 'kanban_config'
+      const value = settingsStore[lookupKey]
+      return value ? { value } : undefined
+    }
+    return undefined
+  })
   const mockAll = vi.fn().mockReturnValue([])
-  const mockPrepare = vi.fn().mockReturnValue({ run: mockRun, all: mockAll })
-  return { mockRun, mockAll, mockPrepare }
+  const mockPrepare = vi.fn().mockImplementation((sql: string) => ({
+    _sql: sql,
+    run: mockRun,
+    all: mockAll,
+    get: mockGet,
+  }))
+  return { mockRun, mockAll, mockGet, mockPrepare, _settingsStore: settingsStore }
 })
+
 vi.mock('../../src/vault/db', () => ({
   getDb: vi.fn(() => ({ prepare: mockPrepare })),
 }))
 
 import { registerKanbanIpcHandlers, setVaultPath } from '../../src/ipc/kanban.ipc.js'
+import { DEFAULT_KANBAN_CONFIG } from '../../src/vault/types.js'
 
 describe('registerKanbanIpcHandlers', () => {
   beforeEach(() => {
@@ -39,6 +55,8 @@ describe('registerKanbanIpcHandlers', () => {
     mockHandle.mockImplementation(
       (_channel: string, handler: (...args: unknown[]) => unknown) => handler
     )
+    // Reset the get mock to return undefined by default (no stored config)
+    mockGet.mockReturnValue(undefined)
   })
 
   it('registers five IPC handlers', () => {
@@ -61,10 +79,8 @@ describe('registerKanbanIpcHandlers', () => {
   })
 
   describe('get-config handler', () => {
-    it('returns default config when file does not exist', () => {
-      ;(fs.readFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
-        throw new Error('ENOENT')
-      })
+    it('returns default config when no config is stored in DB', () => {
+      mockGet.mockReturnValue(undefined)
       registerKanbanIpcHandlers()
       const handler = mockHandle.mock.calls.find(
         ([ch]) => ch === 'task-vault:kanban:get-config'
@@ -77,13 +93,13 @@ describe('registerKanbanIpcHandlers', () => {
       })
     })
 
-    it('returns parsed config from file', () => {
+    it('returns parsed config from DB', () => {
       const stored = {
         viewMode: 'kanban',
         lanes: [{ id: 'todo', label: 'Todo', taskStatuses: ['open'] }],
         swimlaneGrouping: 'project',
       }
-      ;(fs.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(JSON.stringify(stored))
+      mockGet.mockReturnValue({ value: JSON.stringify(stored) })
       registerKanbanIpcHandlers()
       const handler = mockHandle.mock.calls.find(
         ([ch]) => ch === 'task-vault:kanban:get-config'
@@ -94,8 +110,7 @@ describe('registerKanbanIpcHandlers', () => {
   })
 
   describe('save-config handler', () => {
-    it('writes valid config to disk', () => {
-      ;(fs.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('{}')
+    it('writes valid config to DB', () => {
       registerKanbanIpcHandlers()
       const handler = mockHandle.mock.calls.find(
         ([ch]) => ch === 'task-vault:kanban:save-config'
@@ -107,7 +122,8 @@ describe('registerKanbanIpcHandlers', () => {
       }
       const result = handler(null, config)
       expect(result).toEqual({ ok: true })
-      expect(fs.writeFileSync).toHaveBeenCalled()
+      // Verify it tried to INSERT OR REPLACE into settings
+      expect(mockRun).toHaveBeenCalled()
     })
 
     it('returns error for invalid payload', () => {
@@ -201,33 +217,15 @@ describe('registerKanbanIpcHandlers', () => {
     })
   })
 
-  describe('readConfig / writeConfig with empty vaultPath', () => {
-    it('get-config returns default config when vaultPath is empty', () => {
-      setVaultPath('')
+  describe('get-config with DB fallback', () => {
+    it('get-config returns default config when DB returns no row', () => {
+      mockGet.mockReturnValue(undefined)
       registerKanbanIpcHandlers()
       const handler = mockHandle.mock.calls.find(
         ([ch]) => ch === 'task-vault:kanban:get-config'
       )![1]
       const result = handler()
-      expect(result).toMatchObject({ viewMode: 'list', swimlaneGrouping: 'none' })
-      // readFileSync must not have been called (vaultPath guard returned early)
-      expect(fs.readFileSync).not.toHaveBeenCalled()
-    })
-
-    it('save-config writes nothing when vaultPath is empty', () => {
-      setVaultPath('')
-      registerKanbanIpcHandlers()
-      const handler = mockHandle.mock.calls.find(
-        ([ch]) => ch === 'task-vault:kanban:save-config'
-      )![1]
-      const config = {
-        viewMode: 'kanban',
-        lanes: [{ id: 'todo', label: 'Todo', taskStatuses: ['open'] }],
-        swimlaneGrouping: 'none',
-      }
-      const result = handler(null, config)
-      expect(result).toEqual({ ok: true })
-      expect(fs.writeFileSync).not.toHaveBeenCalled()
+      expect(result).toMatchObject(DEFAULT_KANBAN_CONFIG)
     })
   })
 
@@ -281,6 +279,7 @@ describe('registerKanbanIpcHandlers', () => {
 
   describe('move-task handler', () => {
     it('updates task status in DB', () => {
+      mockRun.mockReturnValue({ changes: 1 })
       registerKanbanIpcHandlers()
       const handler = mockHandle.mock.calls.find(([ch]) => ch === 'task-vault:kanban:move-task')![1]
       const result = handler(null, { taskId: 'task-1', toStatus: 'in-progress' })

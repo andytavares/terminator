@@ -1,36 +1,32 @@
-import * as fs from 'node:fs'
-import * as path from 'node:path'
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import { getDb } from '../vault/db'
 import type { KanbanConfig, TaskStatus } from '../vault/types'
 import { DEFAULT_KANBAN_CONFIG } from '../vault/types'
+import { setVaultPath as _setVaultPath } from '../vault/vault-path'
 
-let vaultPath = ''
-
-export function setVaultPath(p: string) {
-  vaultPath = p
-}
-
-function configPath(): string {
-  return path.join(vaultPath, '.todo', 'kanban.json')
+export function setVaultPath(p: string): void {
+  _setVaultPath(p)
 }
 
 function readConfig(): KanbanConfig {
-  if (!vaultPath) return { ...DEFAULT_KANBAN_CONFIG }
   try {
-    const raw = fs.readFileSync(configPath(), 'utf-8')
-    return JSON.parse(raw) as KanbanConfig
+    const db = getDb()
+    const row = db.prepare(`SELECT value FROM settings WHERE key='kanban_config'`).get() as
+      | { value: string }
+      | undefined
+    if (!row) return { ...DEFAULT_KANBAN_CONFIG }
+    return JSON.parse(row.value) as KanbanConfig
   } catch {
     return { ...DEFAULT_KANBAN_CONFIG }
   }
 }
 
 function writeConfig(config: KanbanConfig): void {
-  if (!vaultPath) return
-  const dir = path.join(vaultPath, '.todo')
-  fs.mkdirSync(dir, { recursive: true })
-  fs.writeFileSync(configPath(), JSON.stringify(config, null, 2), 'utf-8')
+  const db = getDb()
+  db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('kanban_config', ?)`).run(
+    JSON.stringify(config)
+  )
 }
 
 const MoveTaskSchema = z.object({

@@ -5,52 +5,15 @@ import {
   LinksRemoveRequestSchema,
   LinksGetForTargetRequestSchema,
 } from '../schemas/vault.schema'
-import type { IndexedTask, IndexedProject, TaskStatus, ProjectStatus } from '../vault/types'
+import { setVaultPath as _setVaultPath, getVaultPath as _getVaultPath } from '../vault/vault-path'
+import { rowToTask, rowToProject } from '../vault/mappers'
 
-// vaultPath kept for API compatibility with activate()
-let vaultPath = ''
-
-export function setVaultPath(p: string) {
-  vaultPath = p
+export function setVaultPath(p: string): void {
+  _setVaultPath(p)
 }
 
-// Suppress unused warning
 export function getVaultPath(): string {
-  return vaultPath
-}
-
-function rowToTask(row: Record<string, unknown>): IndexedTask {
-  const source = row.source as string
-  const sourceRef = row.source_ref as string | null
-  const filePath = sourceRef ? `${source}/${sourceRef}` : source
-  return {
-    id: row.id as string,
-    filePath,
-    line: 0,
-    status: row.status as TaskStatus,
-    text: row.text as string,
-    project: (row.project as string) || undefined,
-    context: (row.context as string) || undefined,
-    area: (row.area as string) || undefined,
-    dueDate: (row.due_date as string) || undefined,
-    terminatorLinks: JSON.parse((row.terminator_links as string) || '[]'),
-    subtasks: [],
-  }
-}
-
-function rowToProject(row: Record<string, unknown>): IndexedProject {
-  return {
-    id: row.id as string,
-    filePath: row.name as string,
-    name: row.name as string,
-    status: row.status as ProjectStatus,
-    area: (row.area as string) || undefined,
-    deadline: (row.deadline as string) || undefined,
-    isStale: false,
-    nextActionCount: 0,
-    lastModified: row.updated_at as string,
-    terminatorLinks: JSON.parse((row.terminator_links as string) || '[]'),
-  }
+  return _getVaultPath()
 }
 
 export function registerLinksIpcHandlers(): () => void {
