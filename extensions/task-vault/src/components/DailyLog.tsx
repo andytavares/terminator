@@ -26,7 +26,7 @@ import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useToastStore } from '../../../../src/renderer/stores/toast.store'
-import { useVaultStore } from '../stores/vault.store'
+import { useVaultNavStore } from '../stores/vault-nav.store'
 
 interface DailyLogProps {
   log: DailyLogData
@@ -147,7 +147,7 @@ function SessionPicker({
 function makeTaskNavHandler(taskId: string): () => void {
   return () => {
     useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
-    useVaultStore.getState().navigateToTask(taskId)
+    useVaultNavStore.getState().navigateToTask(taskId)
   }
 }
 

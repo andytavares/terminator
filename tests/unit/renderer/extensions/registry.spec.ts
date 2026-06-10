@@ -334,4 +334,15 @@ describe('matchesAccelerator', () => {
     const event = makeEvent({ key: 't', metaKey: true })
     expect(matchesAccelerator(event, 'CommandOrControl+Shift+T')).toBe(false)
   })
+
+  it('matches CmdOrCtrl+Alt+Shift+K when macOS Option changes e.key to a special char', () => {
+    // On macOS, Option+Shift+K produces a special e.key — matchesAccelerator must fall back to e.code
+    const event = makeEvent({ key: '˚', code: 'KeyK', metaKey: true, altKey: true, shiftKey: true })
+    expect(matchesAccelerator(event, 'CmdOrCtrl+Alt+Shift+K')).toBe(true)
+  })
+
+  it('still matches normally when e.key is unmodified by Alt', () => {
+    const event = makeEvent({ key: 'k', code: 'KeyK', metaKey: true, altKey: true, shiftKey: true })
+    expect(matchesAccelerator(event, 'CmdOrCtrl+Alt+Shift+K')).toBe(true)
+  })
 })

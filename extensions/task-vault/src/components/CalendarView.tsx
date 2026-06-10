@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { useVaultStore } from '../stores/vault.store'
+import { useVaultNavStore } from '../stores/vault-nav.store'
 
 type DayData = { date: string; status: string; count: number }
 type DayMap = Map<string, DayData[]>
@@ -78,7 +79,7 @@ export function CalendarView(): React.JSX.Element {
   }
 
   function handleDayClick(dateStr: string) {
-    useVaultStore.getState().setView('daily')
+    useVaultNavStore.getState().setView('daily')
     if (dateStr === todayStr) {
       void loadToday()
     } else {

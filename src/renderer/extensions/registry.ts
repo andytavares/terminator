@@ -263,10 +263,14 @@ function parseAccelerator(accelerator: string): ParsedAccelerator {
 export function matchesAccelerator(e: KeyboardEvent, accelerator: string): boolean {
   const parsed = parseAccelerator(accelerator)
   const metaOrCtrl = e.metaKey || e.ctrlKey
+  // On macOS, Option (Alt) changes e.key to a dead/special character (e.g. Opt+Shift+T → 'ˇ').
+  // Fall back to e.code ('KeyT' → 't') so Alt-combos match correctly on all platforms.
+  const keyCode = e.code?.toLowerCase().replace(/^key/, '') ?? ''
+  const keyMatch = e.key.toLowerCase() === parsed.key || (e.altKey && keyCode === parsed.key)
   return (
     metaOrCtrl === parsed.metaOrCtrl &&
     e.shiftKey === parsed.shift &&
     e.altKey === parsed.alt &&
-    e.key.toLowerCase() === parsed.key
+    keyMatch
   )
 }

@@ -2,7 +2,9 @@ import React from 'react'
 import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
 import { TaskVaultView, CaptureModal } from './components/TaskVaultView'
 import { LinkedVaultPanel } from './components/LinkedVaultPanel'
-import { useVaultStore } from './stores/vault.store'
+import { useVaultNavStore } from './stores/vault-nav.store'
+import { useVaultDataStore } from './stores/vault-data.store'
+import { DEFAULT_CAPTURE_HOTKEY } from './constants'
 import type { CommandRegistration } from '../../../src/renderer/extensions/registry'
 
 function LinkedVaultPanelWrapper({
@@ -40,7 +42,7 @@ registry.registerKeyboardShortcut({
   accelerator: 'CmdOrCtrl+R',
   description: 'Open Weekly Review',
   action: () => {
-    useVaultStore.getState().setView('review')
+    useVaultNavStore.getState().setView('review')
   },
 })
 
@@ -56,10 +58,8 @@ function acceleratorToDisplay(accel: string): string {
 }
 
 function openInboxModal() {
-  useVaultStore.getState().setShowCaptureModal(true)
+  useVaultNavStore.getState().setShowCaptureModal(true)
 }
-
-const DEFAULT_CAPTURE_HOTKEY = 'CommandOrControl+Shift+T'
 
 const captureCommand: CommandRegistration = {
   id: 'task-vault:capture-to-inbox',
@@ -71,27 +71,11 @@ const captureCommand: CommandRegistration = {
 }
 registry.registerCommand(captureCommand)
 
-// Register in-app keyboard shortcut using the same captureHotkey setting
-void (async () => {
-  try {
-    const { values } = await window.electronAPI.extensions.getSettingsValues()
-    const accel =
-      (values['terminator.task-vault.captureHotkey'] as string | undefined) ??
-      DEFAULT_CAPTURE_HOTKEY
-    registry.registerKeyboardShortcut({
-      accelerator: accel,
-      action: openInboxModal,
-      description: 'Quick Add to Inbox',
-    })
-    registry.updateCommand('task-vault:capture-to-inbox', { shortcut: acceleratorToDisplay(accel) })
-  } catch {
-    registry.registerKeyboardShortcut({
-      accelerator: DEFAULT_CAPTURE_HOTKEY,
-      action: openInboxModal,
-      description: 'Quick Add to Inbox',
-    })
-  }
-})()
+registry.registerKeyboardShortcut({
+  accelerator: DEFAULT_CAPTURE_HOTKEY,
+  action: openInboxModal,
+  description: 'Quick Add to Inbox',
+})
 
 // Inbox badge — keep the task-vault rail icon count in sync.
 // Updates both the store (inboxCount) and the registry badge so all sources stay consistent.
@@ -101,14 +85,14 @@ async function refreshInboxBadge(): Promise<void> {
     const items = (result as { tasks?: unknown[] } | null)?.tasks ?? []
     const count = items.length
     // Updating the store triggers the subscribe() below, which updates the registry badge.
-    useVaultStore.setState({ inboxCount: count })
+    useVaultDataStore.setState({ inboxCount: count })
   } catch {
     // Vault not configured — no badge
   }
 }
 
 // Sync badge whenever inboxCount changes in the store (e.g. after quick-add via CaptureModal)
-useVaultStore.subscribe((state, prevState) => {
+useVaultDataStore.subscribe((state, prevState) => {
   if (state.inboxCount !== prevState.inboxCount) {
     const count = state.inboxCount
     registry.updateGlobalTab('task-vault', { badge: count > 0 ? count : undefined })

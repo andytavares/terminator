@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom'
 import './task-vault.css'
 import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { useVaultStore } from '../stores/vault.store'
+import { useVaultNavStore } from '../stores/vault-nav.store'
+import { useVaultDataStore } from '../stores/vault-data.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { VaultSidebar } from './VaultSidebar'
 import { DailyLog } from './DailyLog'
@@ -324,9 +326,8 @@ export function TaskVaultView(): React.JSX.Element {
     const payload = pendingNavigation as { taskId: string; date?: string } | string
     const taskId = typeof payload === 'string' ? payload : payload.taskId
     const date = typeof payload === 'object' && payload.date ? payload.date : undefined
-    const store = useVaultStore.getState()
-    store.navigateToTask(taskId, date)
-    if (date) void store.loadDate(date)
+    useVaultNavStore.getState().navigateToTask(taskId, date)
+    if (date) void useVaultDataStore.getState().loadDate(date)
   }, [pendingNavigation, clearPendingNavigation])
 
   useEffect(() => {
@@ -349,7 +350,7 @@ export function TaskVaultView(): React.JSX.Element {
     const unsubIndexUpdated = window.electronAPI.extensionBridge.on(
       'task-vault:push:index-updated',
       () => {
-        const vd = useVaultStore.getState().viewingDate
+        const vd = useVaultNavStore.getState().viewingDate
         if (vd) void loadDate(vd)
         else loadToday()
         refreshInboxCount()
@@ -361,7 +362,7 @@ export function TaskVaultView(): React.JSX.Element {
     const unsubExternal = window.electronAPI.extensionBridge.on(
       'task-vault:push:file-changed-externally',
       () => {
-        const vd = useVaultStore.getState().viewingDate
+        const vd = useVaultNavStore.getState().viewingDate
         if (vd) void loadDate(vd)
         else loadToday()
       }
@@ -371,7 +372,7 @@ export function TaskVaultView(): React.JSX.Element {
       'task-vault:recurrence-spawned',
       () => {
         tickCalendar()
-        const vd = useVaultStore.getState().viewingDate
+        const vd = useVaultNavStore.getState().viewingDate
         if (vd) void loadDate(vd)
         else loadToday()
       }
@@ -387,7 +388,7 @@ export function TaskVaultView(): React.JSX.Element {
   function makeTaskNavHandler(taskId: string): () => void {
     return () => {
       useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
-      useVaultStore.getState().navigateToTask(taskId)
+      useVaultNavStore.getState().navigateToTask(taskId)
     }
   }
 

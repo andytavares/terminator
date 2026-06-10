@@ -4,6 +4,7 @@ import type { IndexedTask } from '../vault/types'
 import { InboxProcessor } from './InboxProcessor'
 import { SmartTaskInput } from './SmartTaskInput'
 import { useVaultStore } from '../stores/vault.store'
+import { useVaultDataStore } from '../stores/vault-data.store'
 
 export function InboxView(): React.JSX.Element {
   const [items, setItems] = useState<IndexedTask[]>([])
@@ -25,7 +26,7 @@ export function InboxView(): React.JSX.Element {
         const tasks = (result as { tasks: IndexedTask[] }).tasks
         setItems(tasks)
         // Keep the store's inboxCount in sync so the sidebar badge is always accurate
-        useVaultStore.setState({ inboxCount: tasks.length })
+        useVaultDataStore.setState({ inboxCount: tasks.length })
       }
     } catch (err) {
       setError(String(err))
