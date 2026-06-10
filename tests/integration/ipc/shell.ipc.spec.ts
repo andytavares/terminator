@@ -228,4 +228,21 @@ describe('shell:open-path IPC handler', () => {
     const result = (await handler({}, { filePath: '/some/file.txt' })) as { error: string }
     expect(result.error).toBe('No application found')
   })
+
+  it('expands leading ~ to the home directory before calling openPath', async () => {
+    await handler({}, { filePath: '~/projects/foo' })
+    const { homedir } = await import('os')
+    expect(mockOpenPath).toHaveBeenCalledWith(`${homedir()}/projects/foo`)
+  })
+
+  it('expands bare ~ to the home directory', async () => {
+    await handler({}, { filePath: '~' })
+    const { homedir } = await import('os')
+    expect(mockOpenPath).toHaveBeenCalledWith(homedir())
+  })
+
+  it('does not expand ~ that is not at the start of the path', async () => {
+    await handler({}, { filePath: '/some/~user/file' })
+    expect(mockOpenPath).toHaveBeenCalledWith('/some/~user/file')
+  })
 })
