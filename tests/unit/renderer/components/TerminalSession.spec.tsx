@@ -612,6 +612,13 @@ describe('TerminalInstance', () => {
         expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com')
       })
 
+      it('opens full URL including balanced parentheses (e.g. Wikipedia)', () => {
+        const url = 'https://en.wikipedia.org/wiki/Foo_(bar)'
+        const instance = makeInstanceWithLine(url)
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 8, clientY: 0 })
+        expect(mockOpenExternal).toHaveBeenCalledWith(url)
+      })
+
       it('does not open URL without metaKey or ctrlKey', () => {
         const instance = makeInstanceWithLine('https://example.com')
         fire(instance.element, 'mousedown', {

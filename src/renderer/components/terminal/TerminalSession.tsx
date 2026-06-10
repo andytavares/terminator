@@ -133,7 +133,7 @@ export class TerminalInstance {
   }
 
   private registerLinkProviders(): void {
-    const urlRegex = /https?:\/\/[^\s)>\]'"\\]+/g
+    const urlRegex = /https?:\/\/(?:[^\s()>\]'"\\]|\([^\s()>\]'"\\]*\))+/g
     const pathRegex = /(?<!\S)((?:~\/|\/(?!\/))[^\s:)>\]'"\\]+(?::\d+(?::\d+)?)?)/g
     const fontSize = 13
     const lineHeight = Math.ceil(fontSize * 1.2)
