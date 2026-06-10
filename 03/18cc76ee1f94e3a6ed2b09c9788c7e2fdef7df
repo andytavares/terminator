@@ -1,0 +1,28 @@
+extensions/git-integration/src/components/pr-review/RichContent.tsx
+  s_9e0b9210403356::t_e9aa1e4451ba6b 18,23,25
+extensions/git-integration/tests/unit/RichContent.spec.tsx
+  s_9e0b9210403356::t_2409fd13a773f1 29
+  s_9e0b9210403356::t_17ea84b8c2c295 67,69,78,85,92
+  s_9e0b9210403356::t_102a50fb2a22b6 2-3,6,15-28,30-39,41-44,65-66,68,70-77,79-84,86-91,93-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "0318cc76ee1f94e3a6ed2b09c9788c7e2fdef7df",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_9e0b9210403356": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee3fcd80-48df-4a45-9da9-3ec32a2849e2",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
