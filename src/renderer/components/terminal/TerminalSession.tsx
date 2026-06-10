@@ -133,7 +133,7 @@ export class TerminalInstance {
 
   private registerLinkProviders(): void {
     const urlRegex = /https?:\/\/[^\s)>\]'"\\]+/g
-    const pathRegex = /((?:~\/|\/(?!\/))[^\s:)>\]'"\\]+(?::\d+(?::\d+)?)?)/g
+    const pathRegex = /(?<!\S)((?:~\/|\/(?!\/))[^\s:)>\]'"\\]+(?::\d+(?::\d+)?)?)/g
     const fontSize = 13
     const lineHeight = Math.ceil(fontSize * 1.2)
     const charW = measureCharWidth(fontSize)
@@ -215,9 +215,11 @@ export class TerminalInstance {
 
     const onMouseLeave = () => this.clearLinkHover()
 
-    // mousedown: Cmd+click opens URLs in browser, paths in Finder/default app.
+    // mousedown: Cmd+click (macOS) or Ctrl+click (Windows/Linux) opens links.
+    // On macOS Ctrl+click is a secondary click — don't intercept it.
+    const isMac = navigator.platform.startsWith('Mac')
     const onMouseDown = (e: MouseEvent) => {
-      if (!e.metaKey && !e.ctrlKey) return
+      if (!(isMac ? e.metaKey : e.ctrlKey)) return
       const { col, bufferRow } = getPos(e)
       const line = this.terminal.buffer.active.getLine(bufferRow)
       if (!line) return

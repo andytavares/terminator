@@ -100,7 +100,12 @@ const mockUnsubscribe = vi.fn()
 const mockOpenExternal = vi.fn().mockResolvedValue({ ok: true })
 const mockOpenPath = vi.fn().mockResolvedValue({ ok: true })
 
+// Default to macOS so metaKey-based tests work; override per test as needed.
+let mockPlatform = 'MacIntel'
+Object.defineProperty(navigator, 'platform', { get: () => mockPlatform, configurable: true })
+
 beforeEach(() => {
+  mockPlatform = 'MacIntel'
   vi.clearAllMocks()
   mockMeasureText.mockReturnValue({ width: 8 })
   mockOnOutput.mockReturnValue(mockUnsubscribe)
@@ -619,6 +624,7 @@ describe('TerminalInstance', () => {
       })
 
       it('opens URL with openExternal on ctrl+click (Windows/Linux)', () => {
+        mockPlatform = 'Win32'
         const instance = makeInstanceWithLine('https://example.com')
         fire(instance.element, 'mousedown', {
           metaKey: false,
@@ -629,11 +635,30 @@ describe('TerminalInstance', () => {
         expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com')
       })
 
+      it('does not open on macOS ctrl+click (context menu key)', () => {
+        // macOS: ctrl+click = right-click, should not open link
+        const instance = makeInstanceWithLine('https://example.com')
+        fire(instance.element, 'mousedown', {
+          metaKey: false,
+          ctrlKey: true,
+          clientX: 8,
+          clientY: 0,
+        })
+        expect(mockOpenExternal).not.toHaveBeenCalled()
+      })
+
       it('does not treat protocol-relative URL as a path', () => {
         const instance = makeInstanceWithLine('//example.com/path')
         fire(instance.element, 'mousedown', { metaKey: true, clientX: 4, clientY: 0 })
         expect(mockOpenPath).not.toHaveBeenCalled()
         expect(mockOpenExternal).not.toHaveBeenCalled()
+      })
+
+      it('does not match mid-string slash as a path', () => {
+        // 'src/renderer/foo.ts' contains '/renderer/foo.ts' which is NOT a word-boundary path
+        const instance = makeInstanceWithLine('src/renderer/foo.ts')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 4, clientY: 0 })
+        expect(mockOpenPath).not.toHaveBeenCalled()
       })
 
       it('opens absolute path with openPath on cmd+click', () => {
