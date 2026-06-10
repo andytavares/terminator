@@ -21,13 +21,17 @@ function makeMockCell(chars = ' ', fg = -1, bg = -1, bold = false) {
 function makeMockBuffer(
   rows: number,
   cols: number,
-  cells: ReturnType<typeof makeMockCell>[][] = []
+  cells: ReturnType<typeof makeMockCell>[][] = [],
+  lineText = '',
+  viewportY = 0
 ) {
   return {
     active: {
-      getLine: (row: number) => ({
-        getCell: (col: number, _reuse?: unknown) => cells[row]?.[col] ?? makeMockCell(),
+      getLine: (_row: number) => ({
+        getCell: (col: number, _reuse?: unknown) => cells[_row]?.[col] ?? makeMockCell(),
+        translateToString: () => lineText,
       }),
+      viewportY,
     },
     cols,
     rows,
@@ -47,6 +51,7 @@ vi.mock('xterm', () => {
     paste: vi.fn(),
     dispose: vi.fn(),
     scrollToBottom: vi.fn(),
+    registerLinkProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
     buffer: makeMockBuffer(24, 80),
   }))
   return { Terminal }
@@ -92,16 +97,24 @@ const mockOnOutput = vi.fn()
 const mockInput = vi.fn()
 const mockResize = vi.fn()
 const mockUnsubscribe = vi.fn()
+const mockOpenExternal = vi.fn().mockResolvedValue({ ok: true })
+const mockOpenPath = vi.fn().mockResolvedValue({ ok: true })
 
 beforeEach(() => {
   vi.clearAllMocks()
   mockMeasureText.mockReturnValue({ width: 8 })
   mockOnOutput.mockReturnValue(mockUnsubscribe)
+  mockOpenExternal.mockResolvedValue({ ok: true })
+  mockOpenPath.mockResolvedValue({ ok: true })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     terminal: {
       onOutput: mockOnOutput,
       input: mockInput,
       resize: mockResize,
+    },
+    shell: {
+      openExternal: mockOpenExternal,
+      openPath: mockOpenPath,
     },
   }
 })
@@ -447,6 +460,190 @@ describe('TerminalInstance', () => {
 
       document.body.removeChild(mountContainer)
       document.body.removeChild(previewContainer)
+    })
+  })
+
+  describe('link providers (visual decoration)', () => {
+    it('registers two link providers on construction', () => {
+      new TerminalInstance('ses-links', 1000)
+      const instance = vi.mocked(Terminal).mock.results[0].value
+      expect(instance.registerLinkProvider).toHaveBeenCalledTimes(2)
+    })
+
+    function getProvider(lineText: string, providerIndex: number) {
+      new TerminalInstance('ses-links', 1000)
+      const instance = vi.mocked(Terminal).mock.results[0].value
+      Object.defineProperty(instance, 'buffer', {
+        value: makeMockBuffer(24, 80, [], lineText),
+        configurable: true,
+      })
+      return instance.registerLinkProvider.mock.calls[providerIndex][0]
+    }
+
+    it('URL provider detects https links and returns them in callback', () => {
+      const provider = getProvider('visit https://example.com/path for info', 0)
+      let result: unknown
+      provider.provideLinks(0, (links: unknown) => {
+        result = links
+      })
+      expect(Array.isArray(result)).toBe(true)
+      expect((result as { text: string }[])[0].text).toBe('https://example.com/path')
+    })
+
+    it('URL provider activate is a no-op (mousedown handler owns activation)', () => {
+      const provider = getProvider('https://example.com', 0)
+      let link: { activate: (e: MouseEvent, t: string) => void } | undefined
+      provider.provideLinks(0, (links: unknown[]) => {
+        link = links?.[0] as typeof link
+      })
+      link!.activate({ metaKey: true } as MouseEvent, 'https://example.com')
+      expect(mockOpenExternal).not.toHaveBeenCalled()
+    })
+
+    it('URL provider returns undefined for line with no URLs', () => {
+      const provider = getProvider('no links here', 0)
+      let result: unknown = 'sentinel'
+      provider.provideLinks(0, (links: unknown) => {
+        result = links
+      })
+      expect(result).toBeUndefined()
+    })
+
+    it('URL provider returns undefined when line is missing', () => {
+      new TerminalInstance('ses-links', 1000)
+      const instance = vi.mocked(Terminal).mock.results[0].value
+      Object.defineProperty(instance, 'buffer', {
+        value: { active: { getLine: () => undefined, viewportY: 0 } },
+        configurable: true,
+      })
+      const provider = instance.registerLinkProvider.mock.calls[0][0]
+      let result: unknown = 'sentinel'
+      provider.provideLinks(0, (links: unknown) => {
+        result = links
+      })
+      expect(result).toBeUndefined()
+    })
+
+    it('path provider detects absolute paths and returns them in callback', () => {
+      const provider = getProvider('Error in /Users/foo/bar.ts:12:3', 1)
+      let result: unknown
+      provider.provideLinks(0, (links: unknown) => {
+        result = links
+      })
+      expect(Array.isArray(result)).toBe(true)
+      expect((result as { text: string }[])[0].text).toContain('/Users/foo/bar.ts')
+    })
+  })
+
+  describe('link interaction (hover overlay + cmd+click)', () => {
+    // charW=8 (mocked measureText), lineHeight=ceil(13*1.2)=16, viewportY=0
+    // getBoundingClientRect() returns {left:0,top:0,...} in jsdom, so clientX/Y == relX/Y
+
+    function makeInstanceWithLine(lineText: string) {
+      const instance = new TerminalInstance('ses-link', 1000)
+      const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
+      Object.defineProperty(termMock, 'buffer', {
+        value: makeMockBuffer(24, 80, [], lineText, 0),
+        configurable: true,
+      })
+      return instance
+    }
+
+    const fire = (element: HTMLElement, type: string, opts: Partial<MouseEventInit> = {}) =>
+      element.dispatchEvent(new MouseEvent(type, { bubbles: true, ...opts }))
+
+    describe('hover overlay', () => {
+      it('shows overlay when hovering over a URL', () => {
+        const instance = makeInstanceWithLine('https://example.com')
+        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0 })
+        expect(instance.linkOverlay?.style.display).toBe('block')
+      })
+
+      it('hides overlay when hovering over plain text', () => {
+        const instance = makeInstanceWithLine('just some text')
+        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0 })
+        expect(instance.linkOverlay?.style.display).toBe('none')
+      })
+
+      it('hides overlay on mouseleave', () => {
+        const instance = makeInstanceWithLine('https://example.com')
+        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0 })
+        expect(instance.linkOverlay?.style.display).toBe('block')
+        fire(instance.element, 'mouseleave')
+        expect(instance.linkOverlay?.style.display).toBe('none')
+      })
+
+      it('positions overlay correctly for a URL at start of line', () => {
+        // URL 'https://example.com' at index 0, length 19
+        // overlay.left = 0*8=0, top = 0*16+16-2=14, width = 19*8=152
+        const instance = makeInstanceWithLine('https://example.com')
+        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0 })
+        expect(instance.linkOverlay?.style.left).toBe('0px')
+        expect(instance.linkOverlay?.style.top).toBe('14px')
+        expect(instance.linkOverlay?.style.width).toBe('152px')
+      })
+
+      it('shows overlay when hovering over an absolute path', () => {
+        const instance = makeInstanceWithLine('/Users/foo/bar.ts')
+        fire(instance.element, 'mousemove', { clientX: 4, clientY: 0 })
+        expect(instance.linkOverlay?.style.display).toBe('block')
+      })
+
+      it('hides overlay when cursor moves off a link', () => {
+        const instance = makeInstanceWithLine('text https://x.com more')
+        // Hover over URL (clientX=40 → col=5, URL starts at index 5)
+        fire(instance.element, 'mousemove', { clientX: 44, clientY: 0 })
+        expect(instance.linkOverlay?.style.display).toBe('block')
+        // Move to plain text before URL (col=0)
+        fire(instance.element, 'mousemove', { clientX: 0, clientY: 0 })
+        expect(instance.linkOverlay?.style.display).toBe('none')
+      })
+    })
+
+    describe('cmd+click mousedown', () => {
+      it('opens URL with openExternal on cmd+click', () => {
+        const instance = makeInstanceWithLine('https://example.com')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 8, clientY: 0 })
+        expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com')
+      })
+
+      it('does not open URL without metaKey', () => {
+        const instance = makeInstanceWithLine('https://example.com')
+        fire(instance.element, 'mousedown', { metaKey: false, clientX: 8, clientY: 0 })
+        expect(mockOpenExternal).not.toHaveBeenCalled()
+      })
+
+      it('opens absolute path with openPath on cmd+click', () => {
+        const instance = makeInstanceWithLine('/Users/foo/bar')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 4, clientY: 0 })
+        expect(mockOpenPath).toHaveBeenCalledWith('/Users/foo/bar')
+      })
+
+      it('strips line:col suffix from path before opening', () => {
+        const instance = makeInstanceWithLine('/Users/foo/bar.ts:12:3')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 4, clientY: 0 })
+        expect(mockOpenPath).toHaveBeenCalledWith('/Users/foo/bar.ts')
+      })
+
+      it('strips only col suffix when line number present', () => {
+        const instance = makeInstanceWithLine('/home/user/file.go:99')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 4, clientY: 0 })
+        expect(mockOpenPath).toHaveBeenCalledWith('/home/user/file.go')
+      })
+
+      it('does nothing when cmd+clicking on plain text', () => {
+        const instance = makeInstanceWithLine('just some output text')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 4, clientY: 0 })
+        expect(mockOpenExternal).not.toHaveBeenCalled()
+        expect(mockOpenPath).not.toHaveBeenCalled()
+      })
+
+      it('removes listeners on dispose — no action after dispose', () => {
+        const instance = makeInstanceWithLine('https://example.com')
+        instance.dispose()
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 8, clientY: 0 })
+        expect(mockOpenExternal).not.toHaveBeenCalled()
+      })
     })
   })
 })

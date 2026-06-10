@@ -41,6 +41,18 @@ function createWindow(): void {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  // Redirect all link clicks and window.open() calls to the system browser.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url).catch(() => {})
+    return { action: 'deny' }
+  })
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url !== mainWindow!.webContents.getURL()) {
+      event.preventDefault()
+      shell.openExternal(url).catch(() => {})
+    }
+  })
+
   // On macOS, hide instead of destroy so PTY sessions and renderer state survive.
   // Full quit (Cmd+Q / right-click Quit) still goes through before-quit → killAll().
   if (process.platform === 'darwin') {

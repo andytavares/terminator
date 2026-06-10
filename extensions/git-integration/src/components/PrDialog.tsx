@@ -207,7 +207,13 @@ export function PrDialog({
         {existingPr && (
           <div className="pr-dialog__existing-pr">
             A PR already exists:{' '}
-            <a href={existingPr.url} target="_blank" rel="noopener noreferrer">
+            <a
+              href={existingPr.url}
+              onClick={(e) => {
+                e.preventDefault()
+                window.electronAPI.shell.openExternal(existingPr.url).catch(() => {})
+              }}
+            >
               #{existingPr.number}: {existingPr.title}
             </a>
           </div>
