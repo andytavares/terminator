@@ -1,0 +1,35 @@
+extensions/task-vault/src/stores/vault-data.store.ts
+  s_572568967d4875::t_32223b791a2d21 50-51,75
+  s_572568967d4875::t_534ae4f687538e 3
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_572568967d4875::t_771f33e8052ff2 1397-1399
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_572568967d4875::t_03a195d36fc030 1356-1363
+extensions/task-vault/tests/stores/vault-nav.store.spec.ts
+  s_572568967d4875::t_60977c71e4b098 1-75
+extensions/task-vault/tests/stores/vault-data.store.spec.ts
+  s_572568967d4875::t_e43d7781a0d5f5 1-137
+extensions/task-vault/src/stores/vault-nav.store.ts
+  s_572568967d4875::t_7757571edf0741 33-34
+  s_572568967d4875::t_aa0e03e683e591 14
+extensions/task-vault/src/renderer.tsx
+  s_572568967d4875::t_d4f91bca788888 83
+  s_572568967d4875::t_33daf7c3881d2d 74,80-82,84-104
+  s_572568967d4875::t_88400ee8bae2ed 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "878b6415015c163cdd88f8ba5cf38c2b4af2617a",
+  "prompts": {},
+  "sessions": {
+    "s_572568967d4875": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "10454eae-eee3-49b6-8d51-9018839f60d7",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
