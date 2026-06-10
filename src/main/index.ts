@@ -41,6 +41,23 @@ function createWindow(): void {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  // Redirect external http(s) link clicks and window.open() calls to the system browser.
+  // Non-http URLs (e.g. same-origin navigations) are denied without opening externally.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url).catch(() => {})
+    }
+    return { action: 'deny' }
+  })
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url !== mainWindow!.webContents.getURL()) {
+      event.preventDefault()
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        shell.openExternal(url).catch(() => {})
+      }
+    }
+  })
+
   // On macOS, hide instead of destroy so PTY sessions and renderer state survive.
   // Full quit (Cmd+Q / right-click Quit) still goes through before-quit → killAll().
   if (process.platform === 'darwin') {

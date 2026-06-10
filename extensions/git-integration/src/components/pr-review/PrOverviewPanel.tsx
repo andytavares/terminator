@@ -413,8 +413,11 @@ export function PrOverviewPanel({
                     {ref.type === 'linear' && ref.url ? (
                       <a
                         href={ref.url}
-                        target="_blank"
-                        rel="noreferrer"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          if (ref.url)
+                            window.electronAPI.shell.openExternal(ref.url).catch(() => {})
+                        }}
                         className="pr-overview-issue-ref-link"
                       >
                         {ref.ref}

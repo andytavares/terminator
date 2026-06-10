@@ -1,4 +1,4 @@
-import { Terminal, IBufferCell } from 'xterm'
+import { Terminal, IBufferCell, ILinkProvider, ILink } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 import { useSessionStore } from '../../stores/session.store'
@@ -58,12 +58,15 @@ export class TerminalInstance {
   private fitAddon: FitAddon
   private outputUnsubscribe: (() => void) | null = null
   private resizeObserver: ResizeObserver | null = null
+  private cmdClickCleanup: (() => void) | null = null
   private opened = false
   private sessionId: string
   private busyTimer: ReturnType<typeof setTimeout> | null = null
 
   // The root element xterm renders into — created on first mount(), moved between containers.
   readonly element: HTMLDivElement
+  // Underline overlay for hovered links — positioned absolutely inside this.element.
+  linkOverlay: HTMLDivElement | null = null
   // Snapshot captured in unmount() so Overview can display it after the element is detached.
   lastSnapshot: string | null = null
 
@@ -73,6 +76,7 @@ export class TerminalInstance {
       scrollback: scrollbackLimit,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       fontSize: 13,
+      lineHeight: 1.2,
       theme: {
         background: '#1e1e1e',
         foreground: '#cccccc',
@@ -83,7 +87,7 @@ export class TerminalInstance {
     this.terminal.loadAddon(this.fitAddon)
 
     this.element = document.createElement('div')
-    this.element.style.cssText = 'width:100%;height:100%;'
+    this.element.style.cssText = 'width:100%;height:100%;position:relative;'
 
     this.terminal.attachCustomKeyEventHandler((e) => {
       // Cmd+Enter / Shift+Enter — send a literal newline to the running program.
@@ -114,6 +118,8 @@ export class TerminalInstance {
       this.terminal.onBell(onBell)
     }
 
+    this.registerLinkProviders()
+
     this.outputUnsubscribe = window.electronAPI.terminal.onOutput((sid, data) => {
       if (sid !== sessionId) return
       this.terminal.write(data)
@@ -124,6 +130,187 @@ export class TerminalInstance {
         useSessionStore.getState().setSessionIdle(sessionId)
       }, IDLE_DEBOUNCE_MS)
     })
+  }
+
+  private registerLinkProviders(): void {
+    const urlRegex = /https?:\/\/(?:[^\s()>\]'"\\]|\([^\s()>\]'"\\]*\))+/g
+    const pathRegex = /(?<!\S)((?:~\/|\/(?!\/))[^\s:)>\]'"\\]+(?::\d+(?::\d+)?)?)/g
+    // Matches paths inside " or ' to support spaces: File "/Users/Jane Doe/foo.py", line 5
+    const quotedPathRegex = /(?:"((?:~\/|\/(?!\/))[^"]+)"|'((?:~\/|\/(?!\/))[^']+)')/g
+    const fontSize = 13
+    const lineHeight = Math.ceil(fontSize * 1.2)
+    const charW = measureCharWidth(fontSize)
+
+    // xterm link providers: declare links for accessibility tooling.
+    // Visual decoration is handled by our own overlay below because xterm's
+    // built-in `decorations` don't render underlines reliably in DOM renderer mode.
+    const makeVisualProvider = (regex: RegExp): ILinkProvider => ({
+      provideLinks: (bufferLineIndex, callback) => {
+        const line = this.terminal.buffer.active.getLine(bufferLineIndex)
+        if (!line) {
+          callback(undefined)
+          return
+        }
+        const text = line.translateToString(true)
+        const links: ILink[] = []
+        regex.lastIndex = 0
+        let match: RegExpExecArray | null
+        while ((match = regex.exec(text)) !== null) {
+          const matchText = match[0]
+          links.push({
+            range: {
+              start: { x: match.index + 1, y: bufferLineIndex + 1 },
+              end: { x: match.index + matchText.length, y: bufferLineIndex + 1 },
+            },
+            text: matchText,
+            decorations: { pointerCursor: true, underline: true },
+            activate: () => {},
+          })
+        }
+        callback(links.length ? links : undefined)
+      },
+    })
+    // Quoted-path provider: range covers inner path text only (excludes quote chars).
+    const quotedPathProvider: ILinkProvider = {
+      provideLinks: (bufferLineIndex, callback) => {
+        const line = this.terminal.buffer.active.getLine(bufferLineIndex)
+        if (!line) {
+          callback(undefined)
+          return
+        }
+        const text = line.translateToString(true)
+        const links: ILink[] = []
+        quotedPathRegex.lastIndex = 0
+        let match: RegExpExecArray | null
+        while ((match = quotedPathRegex.exec(text)) !== null) {
+          const inner = match[1] ?? match[2]
+          const innerStart = match.index + 1
+          links.push({
+            range: {
+              start: { x: innerStart + 1, y: bufferLineIndex + 1 },
+              end: { x: innerStart + inner.length, y: bufferLineIndex + 1 },
+            },
+            text: inner,
+            decorations: { pointerCursor: true, underline: true },
+            activate: () => {},
+          })
+        }
+        callback(links.length ? links : undefined)
+      },
+    }
+    this.terminal.registerLinkProvider(makeVisualProvider(urlRegex))
+    this.terminal.registerLinkProvider(makeVisualProvider(pathRegex))
+    this.terminal.registerLinkProvider(quotedPathProvider)
+
+    // Underline overlay: a 1px div positioned absolutely over the hovered link text.
+    const overlay = document.createElement('div')
+    overlay.style.cssText =
+      'position:absolute;pointer-events:none;height:1px;background:#4a9eff;display:none;z-index:10;'
+    this.element.appendChild(overlay)
+    this.linkOverlay = overlay
+
+    type HitResult = { index: number; length: number; text: string }
+
+    // Hit-test a column position; returns normalised { index, length, text } for overlay/open.
+    // Quoted paths expose the inner bounds (excluding quote chars).
+    const hitTest = (text: string, col: number): HitResult | null => {
+      for (const re of [urlRegex, pathRegex]) {
+        re.lastIndex = 0
+        let m: RegExpExecArray | null
+        while ((m = re.exec(text)) !== null) {
+          if (col >= m.index && col < m.index + m[0].length)
+            return { index: m.index, length: m[0].length, text: m[0] }
+        }
+      }
+      quotedPathRegex.lastIndex = 0
+      let m: RegExpExecArray | null
+      while ((m = quotedPathRegex.exec(text)) !== null) {
+        const inner = m[1] ?? m[2]
+        const innerStart = m.index + 1
+        if (col >= innerStart && col < innerStart + inner.length)
+          return { index: innerStart, length: inner.length, text: inner }
+      }
+      return null
+    }
+
+    const getPos = (e: MouseEvent) => {
+      const rect = this.element.getBoundingClientRect()
+      const col = Math.floor((e.clientX - rect.left) / charW)
+      const viewportRow = Math.floor((e.clientY - rect.top) / lineHeight)
+      return { col, viewportRow, bufferRow: this.terminal.buffer.active.viewportY + viewportRow }
+    }
+
+    // mousemove: show underline overlay + pointer cursor over detected links.
+    const onMouseMove = (e: MouseEvent) => {
+      const { col, viewportRow, bufferRow } = getPos(e)
+      const line = this.terminal.buffer.active.getLine(bufferRow)
+      const match = line ? hitTest(line.translateToString(true), col) : null
+      if (match) {
+        overlay.style.left = `${match.index * charW}px`
+        overlay.style.top = `${viewportRow * lineHeight + lineHeight - 2}px`
+        overlay.style.width = `${match.length * charW}px`
+        overlay.style.display = 'block'
+        // xterm.css defines .xterm-cursor-pointer { cursor: pointer }
+        this.terminal.element?.classList.add('xterm-cursor-pointer')
+      } else {
+        this.clearLinkHover()
+      }
+    }
+
+    const onMouseLeave = () => this.clearLinkHover()
+
+    // mousedown: Cmd+click (macOS) or Ctrl+click (Windows/Linux) opens links.
+    // On macOS Ctrl+click is a secondary click — don't intercept it.
+    const isMac = navigator.platform.startsWith('Mac')
+    const onMouseDown = (e: MouseEvent) => {
+      if (!(isMac ? e.metaKey : e.ctrlKey)) return
+      const { col, bufferRow } = getPos(e)
+      const line = this.terminal.buffer.active.getLine(bufferRow)
+      if (!line) return
+      const text = line.translateToString(true)
+
+      urlRegex.lastIndex = 0
+      let m: RegExpExecArray | null
+      while ((m = urlRegex.exec(text)) !== null) {
+        if (col >= m.index && col < m.index + m[0].length) {
+          e.preventDefault()
+          window.electronAPI.shell.openExternal(m[0]).catch(() => {})
+          return
+        }
+      }
+      pathRegex.lastIndex = 0
+      while ((m = pathRegex.exec(text)) !== null) {
+        if (col >= m.index && col < m.index + m[0].length) {
+          e.preventDefault()
+          window.electronAPI.shell.openPath(m[0].replace(/:\d+(?::\d+)?$/, '')).catch(() => {})
+          return
+        }
+      }
+      quotedPathRegex.lastIndex = 0
+      while ((m = quotedPathRegex.exec(text)) !== null) {
+        const inner = m[1] ?? m[2]
+        const innerStart = m.index + 1
+        if (col >= innerStart && col < innerStart + inner.length) {
+          e.preventDefault()
+          window.electronAPI.shell.openPath(inner.replace(/:\d+(?::\d+)?$/, '')).catch(() => {})
+          return
+        }
+      }
+    }
+
+    this.element.addEventListener('mousemove', onMouseMove)
+    this.element.addEventListener('mouseleave', onMouseLeave)
+    this.element.addEventListener('mousedown', onMouseDown)
+    this.cmdClickCleanup = () => {
+      this.element.removeEventListener('mousemove', onMouseMove)
+      this.element.removeEventListener('mouseleave', onMouseLeave)
+      this.element.removeEventListener('mousedown', onMouseDown)
+    }
+  }
+
+  private clearLinkHover(): void {
+    if (this.linkOverlay) this.linkOverlay.style.display = 'none'
+    this.terminal.element?.classList.remove('xterm-cursor-pointer')
   }
 
   // Call once after the element is in a visible, sized container.
@@ -256,6 +443,9 @@ export class TerminalInstance {
       clearTimeout(this.busyTimer)
       this.busyTimer = null
     }
+    this.cmdClickCleanup?.()
+    this.cmdClickCleanup = null
+    this.linkOverlay = null
     useSessionStore.getState().setSessionIdle(this.sessionId)
     this.unmount()
     this.outputUnsubscribe?.()

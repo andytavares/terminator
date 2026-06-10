@@ -14,6 +14,21 @@ export function RichContent({ children, className }: Props) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          a({ href, children }) {
+            const isAbsolute = href?.startsWith('http://') || href?.startsWith('https://')
+            return (
+              <a
+                href={href}
+                onClick={(e) => {
+                  if (!isAbsolute) return
+                  e.preventDefault()
+                  window.electronAPI.shell.openExternal(href!).catch(() => {})
+                }}
+              >
+                {children}
+              </a>
+            )
+          },
           code({ className: cls, children: code }) {
             const match = /language-(\w+)/.exec(cls ?? '')
             if (!match) {

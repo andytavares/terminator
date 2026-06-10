@@ -27,6 +27,8 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 
 - **About** — View app version and runtime details (Electron, Node, Chrome, platform) via **Help → About Terminator** (or the **Terminator** app menu on macOS).
 
+- **Clickable terminal links** — URLs and file paths in terminal output are underlined on hover. `Cmd+click` a URL to open it in the system browser; `Cmd+click` an absolute path (e.g. `/Users/foo/bar.ts` or `~/project/file.go`) to open it with the default application. Line:col suffixes like `file.go:42:5` are stripped before opening. All links throughout the app (PR comments, CI check links, issue refs) always open in the system browser.
+
 - **Keyboard shortcuts** — `Cmd+1–9` (switch workspace), `Cmd++/-` (cycle workspaces), `Cmd+T` (new tab), `Cmd+Shift+T` (new scratch terminal), `Cmd+W` (close focused pane / active tab), `Cmd+D` (split pane vertically), `Cmd+Shift+D` (split pane horizontally), `Cmd+Left/Right` (cycle tabs), `Cmd+K` (clear terminal), `Cmd+P` (command palette), `Cmd+,` (settings), `Cmd+Shift+G` (toggle git sidebar), `Cmd+Shift+O` (toggle Overview), `Cmd+Enter` (send newline to running program — always intercepted), `Shift+Enter` (send newline — only active when the running program has enabled bracketed paste mode, e.g. the `claude` CLI; passes through normally in a plain shell).
 
 ## Tech Stack

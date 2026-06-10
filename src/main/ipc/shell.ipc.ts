@@ -1,4 +1,5 @@
 import { ipcMain, shell } from 'electron'
+import { homedir } from 'os'
 import { z } from 'zod'
 import {
   execShell,
@@ -20,7 +21,8 @@ export function registerShellHandlers(): void {
   ipcMain.handle('shell:open-path', async (_event, payload) => {
     const parsed = z.object({ filePath: z.string().min(1) }).safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const errorMsg = await shell.openPath(parsed.data.filePath)
+    const filePath = parsed.data.filePath.replace(/^~(?=\/|$)/, homedir())
+    const errorMsg = await shell.openPath(filePath)
     return errorMsg ? { error: errorMsg } : { ok: true as const }
   })
 

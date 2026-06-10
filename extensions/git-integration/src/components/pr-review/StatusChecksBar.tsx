@@ -64,8 +64,10 @@ export function StatusChecksBar({ checks, defaultExpanded = false }: Props) {
                 <a
                   className="pr-checks-link"
                   href={check.url}
-                  target="_blank"
-                  rel="noreferrer"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    window.electronAPI.shell.openExternal(check.url!).catch(() => {})
+                  }}
                   title="Open check details"
                 >
                   ↗
