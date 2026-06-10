@@ -1,0 +1,19 @@
+src/renderer/components/terminal/TerminalSession.tsx
+  s_9e0b9210403356::t_7b9fed43dabe9d 79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "96998749d39f37cd93e0d255731ca954f4d457d9",
+  "prompts": {},
+  "sessions": {
+    "s_9e0b9210403356": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee3fcd80-48df-4a45-9da9-3ec32a2849e2",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
