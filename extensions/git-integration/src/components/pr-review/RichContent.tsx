@@ -15,12 +15,14 @@ export function RichContent({ children, className }: Props) {
         remarkPlugins={[remarkGfm]}
         components={{
           a({ href, children }) {
+            const isAbsolute = href?.startsWith('http://') || href?.startsWith('https://')
             return (
               <a
                 href={href}
                 onClick={(e) => {
+                  if (!isAbsolute) return
                   e.preventDefault()
-                  if (href) window.electronAPI.shell.openExternal(href).catch(() => {})
+                  window.electronAPI.shell.openExternal(href!).catch(() => {})
                 }}
               >
                 {children}
