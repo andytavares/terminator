@@ -1394,7 +1394,9 @@ export function registerVaultIpcHandlers(): () => void {
       // Delete all future open instances
       db.prepare(`DELETE FROM tasks WHERE recurrence_template_id=? AND status='open'`).run(taskId)
       db.prepare(
-        `UPDATE tasks SET recurrence_rule=NULL, recurrence_notify_at=NULL, metadata=?, updated_at=? WHERE id=?`
+        `UPDATE tasks SET recurrence_rule=NULL, recurrence_notify_at=NULL,
+          recurrence_end_type=NULL, recurrence_end_date=NULL, recurrence_end_count=NULL,
+          recurrence_completed_count=NULL, metadata=?, updated_at=? WHERE id=?`
       ).run(JSON.stringify(meta), now, taskId)
     })
     clearTx()

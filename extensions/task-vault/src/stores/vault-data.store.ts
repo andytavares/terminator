@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { DailyLog, IndexedTask, KanbanLane } from '../vault/types'
+import { useVaultNavStore } from './vault-nav.store'
 
 interface VaultDataStore {
   vaultPath: string
@@ -46,6 +47,8 @@ export const useVaultDataStore = create<VaultDataStore>((set) => ({
         return
       }
       const res = result as DailyLog & { rolledOver?: number; rolledOverIds?: string[] }
+      const today = new Date().toISOString().split('T')[0]
+      useVaultNavStore.getState().setViewingDate(today)
       set((s) => ({
         todayLog: res,
         isLoading: false,
@@ -69,6 +72,7 @@ export const useVaultDataStore = create<VaultDataStore>((set) => ({
         return
       }
       const res = result as DailyLog
+      useVaultNavStore.getState().setViewingDate(date)
       set((s) => ({
         todayLog: res,
         isLoading: false,

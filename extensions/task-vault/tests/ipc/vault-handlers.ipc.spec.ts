@@ -1353,6 +1353,14 @@ describe('task-vault:vault:clear-recurrence', () => {
     expect(storedMeta.recurrence_end_count).toBeUndefined()
     expect(storedMeta.recurrence_completed_count).toBeUndefined()
     expect(storedMeta.other_key).toBe('keep')
+    // Verify the SQL UPDATE also nulls the promoted recurrence_end_* columns
+    const updateSql = mockPrepare.mock.calls
+      .map((c) => c[0] as string)
+      .find((sql) => sql.includes('recurrence_end_type=NULL'))
+    expect(updateSql).toBeTruthy()
+    expect(updateSql).toContain('recurrence_end_date=NULL')
+    expect(updateSql).toContain('recurrence_end_count=NULL')
+    expect(updateSql).toContain('recurrence_completed_count=NULL')
   })
 
   it('returns STALE_ID when task not found', async () => {

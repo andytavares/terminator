@@ -11,6 +11,7 @@ interface VaultNavStore {
   showCaptureModal: boolean
   setView: (view: VaultView) => void
   setShowCaptureModal: (show: boolean) => void
+  setViewingDate: (date: string | null) => void
   navToArea: (name: string) => void
   navToProject: (name: string) => void
   navigateToTask: (taskId: string, date?: string) => void
@@ -28,6 +29,8 @@ export const useVaultNavStore = create<VaultNavStore>((set) => ({
   setView: (view: VaultView) => set({ activeView: view }),
 
   setShowCaptureModal: (show: boolean) => set({ showCaptureModal: show }),
+
+  setViewingDate: (date: string | null) => set({ viewingDate: date }),
 
   navToArea: (name: string) =>
     set({ activeView: 'areas', selectedAreaName: name, selectedProjectName: null }),

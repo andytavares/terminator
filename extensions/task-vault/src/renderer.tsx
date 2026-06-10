@@ -4,7 +4,7 @@ import { TaskVaultView, CaptureModal } from './components/TaskVaultView'
 import { LinkedVaultPanel } from './components/LinkedVaultPanel'
 import { useVaultNavStore } from './stores/vault-nav.store'
 import { useVaultDataStore } from './stores/vault-data.store'
-import { DEFAULT_CAPTURE_HOTKEY } from './constants'
+import { DEFAULT_CAPTURE_HOTKEY, DEPRECATED_CAPTURE_HOTKEYS } from './constants'
 import type { CommandRegistration } from '../../../src/renderer/extensions/registry'
 
 function LinkedVaultPanelWrapper({
@@ -71,11 +71,37 @@ const captureCommand: CommandRegistration = {
 }
 registry.registerCommand(captureCommand)
 
-registry.registerKeyboardShortcut({
+let disposeCaptureShortcut = registry.registerKeyboardShortcut({
   accelerator: DEFAULT_CAPTURE_HOTKEY,
   action: openInboxModal,
   description: 'Quick Add to Inbox',
 })
+
+// Re-register in-app shortcut with user's custom key if they've changed it from the default.
+void (async () => {
+  try {
+    const result = await window.electronAPI.extension.getSettingsValues()
+    const stored = result?.values?.['terminator.task-vault.captureHotkey']
+    if (
+      typeof stored === 'string' &&
+      stored.length > 0 &&
+      stored !== DEFAULT_CAPTURE_HOTKEY &&
+      !DEPRECATED_CAPTURE_HOTKEYS.includes(stored)
+    ) {
+      disposeCaptureShortcut()
+      disposeCaptureShortcut = registry.registerKeyboardShortcut({
+        accelerator: stored,
+        action: openInboxModal,
+        description: 'Quick Add to Inbox',
+      })
+      registry.updateCommand('task-vault:capture-to-inbox', {
+        shortcut: acceleratorToDisplay(stored),
+      })
+    }
+  } catch {
+    // settings unavailable — use default
+  }
+})()
 
 // Inbox badge — keep the task-vault rail icon count in sync.
 // Updates both the store (inboxCount) and the registry badge so all sources stay consistent.
