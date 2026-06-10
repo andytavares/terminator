@@ -76,6 +76,7 @@ export class TerminalInstance {
       scrollback: scrollbackLimit,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       fontSize: 13,
+      lineHeight: 1.2,
       theme: {
         background: '#1e1e1e',
         foreground: '#cccccc',
