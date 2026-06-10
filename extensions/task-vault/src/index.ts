@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron'
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
+import { DEFAULT_CAPTURE_HOTKEY, DEPRECATED_CAPTURE_HOTKEYS } from './constants.js'
 import { registerVaultIpcHandlers, setVaultPath } from './ipc/vault.ipc.js'
 import {
   registerProjectsIpcHandlers,
@@ -29,7 +30,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
           type: 'string',
           label: 'Capture Hotkey',
           description: 'Global shortcut to open the quick capture overlay',
-          default: 'CommandOrControl+Shift+T',
+          default: DEFAULT_CAPTURE_HOTKEY,
         },
         'terminator.task-vault.staleThresholdDays': {
           type: 'number',
@@ -101,17 +102,28 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     scheduleWeeklyReviewNudge(api, reviewDay)
   }
 
-  // Register capture hotkey
+  // Register global capture hotkey (fires even when app is minimised or in background).
+  // Migrate any deprecated default that was stored from a previous version.
+  const storedHotkey = api.settings.get<string>('terminator.task-vault.captureHotkey') ?? ''
   const captureHotkey =
-    api.settings.get<string>('terminator.task-vault.captureHotkey') ??
-    'CommandOrControl+Shift+Space'
+    storedHotkey && !DEPRECATED_CAPTURE_HOTKEYS.includes(storedHotkey)
+      ? storedHotkey
+      : DEFAULT_CAPTURE_HOTKEY
   try {
     const hotkeyDisposable = api.globalShortcut.register(captureHotkey, () => {
       openCaptureOverlay(api)
     })
     disposables.push(hotkeyDisposable)
-  } catch {
-    // Hotkey may already be taken; continue without it
+    console.log(`[task-vault] Global capture shortcut registered: ${captureHotkey}`)
+  } catch (err) {
+    console.warn(
+      `[task-vault] Could not register global shortcut "${captureHotkey}" — claimed by another app. Change it in Task Vault settings.`,
+      err
+    )
+    api.notifications.showToast(
+      'warning',
+      `Task Vault: global shortcut "${captureHotkey}" is in use by another app — change it in settings.`
+    )
   }
 }
 
@@ -136,7 +148,9 @@ function scheduleWeeklyReviewNudge(api: ExtensionAPI, reviewDay: number): void {
 function openCaptureOverlay(_api: ExtensionAPI): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed()) continue
+    if (win.isMinimized()) win.restore()
     win.show()
+    win.focus()
     win.webContents.send('task-vault:push:open-capture')
   }
 }

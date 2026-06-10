@@ -11,10 +11,16 @@ type TaskRow = {
   area_id: string | null
   due_date: string | null
   source: string
+  source_ref: string | null
   recurrence_rule: string | null
   recurrence_template_id: string | null
   recurrence_notify_at: string | null
   metadata: string
+  // Promoted columns (may be null on older rows before migration)
+  recurrence_end_type: string | null
+  recurrence_end_date: string | null
+  recurrence_end_count: number | null
+  recurrence_completed_count: number | null
 }
 
 /**
@@ -27,8 +33,10 @@ type TaskRow = {
 export function ensureNextOccurrence(db: Database.Database, taskId: string): string | null {
   const task = db
     .prepare(
-      `SELECT id, text, status, project_id, context, area_id, due_date, source,
-              recurrence_rule, recurrence_template_id, recurrence_notify_at, metadata
+      `SELECT id, text, status, project_id, context, area_id, due_date, source, source_ref,
+              recurrence_rule, recurrence_template_id, recurrence_notify_at, metadata,
+              recurrence_end_type, recurrence_end_date, recurrence_end_count,
+              recurrence_completed_count
        FROM tasks WHERE id=?`
     )
     .get(taskId) as TaskRow | undefined
@@ -57,43 +65,47 @@ export function ensureNextOccurrence(db: Database.Database, taskId: string): str
   // Compute next due date from the most recent instance's due date (strict mode)
   const nextDue = computeNextDueDate(task.due_date, rule)
 
-  // Read end conditions from metadata
-  let meta: Record<string, unknown> = {}
-  try {
-    meta = JSON.parse(task.metadata || '{}') as Record<string, unknown>
-  } catch {
-    // malformed metadata — treat as no end conditions
+  // Read end conditions from promoted columns (fall back to metadata for legacy rows)
+  let endType = task.recurrence_end_type ?? 'none'
+  let endDateCol = task.recurrence_end_date ?? null
+  let endCountCol = task.recurrence_end_count ?? null
+  let spawnCount = task.recurrence_completed_count ?? 0
+
+  // Fall back to metadata if columns are empty (pre-migration rows)
+  if (endType === 'none' && task.metadata && task.metadata !== '{}') {
+    try {
+      const meta = JSON.parse(task.metadata) as Record<string, unknown>
+      if (meta.recurrence_end_type) {
+        endType = meta.recurrence_end_type as string
+        endDateCol = (meta.recurrence_end_date as string) ?? null
+        endCountCol =
+          meta.recurrence_end_count != null ? (meta.recurrence_end_count as number) : null
+        spawnCount = (meta.recurrence_completed_count as number) || 0
+      }
+    } catch {
+      // malformed metadata — treat as no end conditions
+    }
   }
 
-  const endType = (meta.recurrence_end_type as string) || 'none'
-  const spawnCount = (meta.recurrence_completed_count as number) || 0
-
   if (endType === 'on_date') {
-    const endDate = meta.recurrence_end_date as string | undefined
-    if (endDate && nextDue > endDate) return null
+    if (endDateCol && nextDue > endDateCol) return null
   } else if (endType === 'after_count') {
-    const endCount = meta.recurrence_end_count as number | undefined
     // Replicate existing boundary: spawnCount + 1 >= endCount means exhausted
-    if (endCount != null && spawnCount + 1 >= endCount) return null
+    if (endCountCol != null && spawnCount + 1 >= endCountCol) return null
   }
 
   const newId = randomUUID()
   const nowIso = new Date().toISOString()
-
-  // Carry forward the end configuration; bump completed count
-  const nextMeta: Record<string, unknown> = {}
-  if (endType !== 'none') nextMeta.recurrence_end_type = endType
-  if (meta.recurrence_end_date) nextMeta.recurrence_end_date = meta.recurrence_end_date
-  if (meta.recurrence_end_count != null) nextMeta.recurrence_end_count = meta.recurrence_end_count
-  nextMeta.recurrence_completed_count = spawnCount + 1
 
   const insert = db.transaction(() => {
     db.prepare(
       `INSERT INTO tasks
          (id, text, status, project_id, context, area_id, due_date,
           source, source_ref, recurrence_rule, recurrence_template_id,
-          recurrence_notify_at, metadata, terminator_links, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+          recurrence_notify_at, metadata, terminator_links, created_at, updated_at,
+          recurrence_end_type, recurrence_end_date, recurrence_end_count,
+          recurrence_completed_count)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).run(
       newId,
       task.text,
@@ -102,15 +114,21 @@ export function ensureNextOccurrence(db: Database.Database, taskId: string): str
       task.context ?? null,
       task.area_id ?? null,
       nextDue,
-      'daily',
-      nextDue,
+      task.source,
+      // For daily-log tasks, source_ref is the date string that must match the viewed date.
+      // Copy nextDue so the new occurrence appears in the correct day's log.
+      task.source === 'daily' ? nextDue : task.source_ref,
       task.recurrence_rule,
       templateId,
       task.recurrence_notify_at ?? null,
-      JSON.stringify(nextMeta),
+      '{}',
       '[]',
       nowIso,
-      nowIso
+      nowIso,
+      endType !== 'none' ? endType : null,
+      endDateCol,
+      endCountCol,
+      spawnCount + 1
     )
   })
 

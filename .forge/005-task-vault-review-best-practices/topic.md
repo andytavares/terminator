@@ -1,0 +1,1 @@
+I want you to review the task-vault plugin and compare its functionality feature by feature as well as its implementation against well known well documented patterns and practices for building these same kinds of tools and suggest improvements to get the tooling in line with best practcies and partterns maximizing readability and minimizing code.

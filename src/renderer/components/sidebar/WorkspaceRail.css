@@ -213,8 +213,8 @@
 }
 
 .ws-rail__scratch {
-  width: 36px;
-  height: 36px;
+  width: 46px;
+  height: 46px;
   border-radius: var(--radius-md);
   background: none;
   border: 1.5px solid var(--border);
@@ -250,9 +250,9 @@
 }
 
 .ws-rail__add {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-md);
   background: none;
   border: 1.5px dashed var(--text-muted);
   color: var(--text-muted);
