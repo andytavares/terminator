@@ -133,7 +133,7 @@ export class TerminalInstance {
 
   private registerLinkProviders(): void {
     const urlRegex = /https?:\/\/[^\s)>\]'"\\]+/g
-    const pathRegex = /((?:~\/|\/)[^\s:)>\]'"\\]+(?::\d+(?::\d+)?)?)/g
+    const pathRegex = /((?:~\/|\/(?!\/))[^\s:)>\]'"\\]+(?::\d+(?::\d+)?)?)/g
     const fontSize = 13
     const lineHeight = Math.ceil(fontSize * 1.2)
     const charW = measureCharWidth(fontSize)
@@ -217,7 +217,7 @@ export class TerminalInstance {
 
     // mousedown: Cmd+click opens URLs in browser, paths in Finder/default app.
     const onMouseDown = (e: MouseEvent) => {
-      if (!e.metaKey) return
+      if (!e.metaKey && !e.ctrlKey) return
       const { col, bufferRow } = getPos(e)
       const line = this.terminal.buffer.active.getLine(bufferRow)
       if (!line) return

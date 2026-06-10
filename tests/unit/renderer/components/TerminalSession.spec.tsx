@@ -607,9 +607,32 @@ describe('TerminalInstance', () => {
         expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com')
       })
 
-      it('does not open URL without metaKey', () => {
+      it('does not open URL without metaKey or ctrlKey', () => {
         const instance = makeInstanceWithLine('https://example.com')
-        fire(instance.element, 'mousedown', { metaKey: false, clientX: 8, clientY: 0 })
+        fire(instance.element, 'mousedown', {
+          metaKey: false,
+          ctrlKey: false,
+          clientX: 8,
+          clientY: 0,
+        })
+        expect(mockOpenExternal).not.toHaveBeenCalled()
+      })
+
+      it('opens URL with openExternal on ctrl+click (Windows/Linux)', () => {
+        const instance = makeInstanceWithLine('https://example.com')
+        fire(instance.element, 'mousedown', {
+          metaKey: false,
+          ctrlKey: true,
+          clientX: 8,
+          clientY: 0,
+        })
+        expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com')
+      })
+
+      it('does not treat protocol-relative URL as a path', () => {
+        const instance = makeInstanceWithLine('//example.com/path')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 4, clientY: 0 })
+        expect(mockOpenPath).not.toHaveBeenCalled()
         expect(mockOpenExternal).not.toHaveBeenCalled()
       })
 
