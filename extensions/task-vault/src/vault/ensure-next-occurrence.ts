@@ -115,7 +115,9 @@ export function ensureNextOccurrence(db: Database.Database, taskId: string): str
       task.area_id ?? null,
       nextDue,
       task.source,
-      task.source_ref,
+      // For daily-log tasks, source_ref is the date string that must match the viewed date.
+      // Copy nextDue so the new occurrence appears in the correct day's log.
+      task.source === 'daily' ? nextDue : task.source_ref,
       task.recurrence_rule,
       templateId,
       task.recurrence_notify_at ?? null,

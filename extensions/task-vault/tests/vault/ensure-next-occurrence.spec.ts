@@ -178,7 +178,7 @@ describe('ensureNextOccurrence', () => {
     expect(newRow?.recurrence_rule).toBe('daily')
   })
 
-  it('inherits source and source_ref from the template task', () => {
+  it('inherits source and source_ref from the template task for non-daily sources', () => {
     const task = makeTaskRow({
       recurrence_rule: 'daily',
       due_date: '2099-03-10',
@@ -191,6 +191,23 @@ describe('ensureNextOccurrence', () => {
     const newRow = rows.find((r) => r.id === newId)
     expect(newRow?.source).toBe('project')
     expect(newRow?.source_ref).toBe('my-project')
+  })
+
+  it('sets source_ref to nextDue for daily-source tasks so the occurrence appears in the correct day log', () => {
+    const task = makeTaskRow({
+      recurrence_rule: 'daily',
+      due_date: '2099-03-10',
+      source: 'daily',
+      source_ref: '2099-03-10',
+    })
+    const { db, rows } = createMockDb([task])
+    const newId = ensureNextOccurrence(db as unknown as Database.Database, task.id as string)
+    expect(newId).toBeTruthy()
+    const newRow = rows.find((r) => r.id === newId)
+    expect(newRow?.due_date).toBe('2099-03-11')
+    expect(newRow?.source).toBe('daily')
+    // source_ref must equal the new due date, not the completed instance's date
+    expect(newRow?.source_ref).toBe('2099-03-11')
   })
 
   it('is idempotent — second call creates no additional instance', () => {
