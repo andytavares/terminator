@@ -1,0 +1,19 @@
+src/main/index.ts
+  s_9e0b9210403356::t_7e5370aa608629 44-45,47-49,55-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "68ab79c5468be8796de82d5d97b7afedffb47818",
+  "prompts": {},
+  "sessions": {
+    "s_9e0b9210403356": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee3fcd80-48df-4a45-9da9-3ec32a2849e2",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
