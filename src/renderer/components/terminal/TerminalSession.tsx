@@ -135,6 +135,8 @@ export class TerminalInstance {
   private registerLinkProviders(): void {
     const urlRegex = /https?:\/\/(?:[^\s()>\]'"\\]|\([^\s()>\]'"\\]*\))+/g
     const pathRegex = /(?<!\S)((?:~\/|\/(?!\/))[^\s:)>\]'"\\]+(?::\d+(?::\d+)?)?)/g
+    // Matches paths inside " or ' to support spaces: File "/Users/Jane Doe/foo.py", line 5
+    const quotedPathRegex = /(?:"((?:~\/|\/(?!\/))[^"]+)"|'((?:~\/|\/(?!\/))[^']+)')/g
     const fontSize = 13
     const lineHeight = Math.ceil(fontSize * 1.2)
     const charW = measureCharWidth(fontSize)
@@ -168,8 +170,37 @@ export class TerminalInstance {
         callback(links.length ? links : undefined)
       },
     })
+    // Quoted-path provider: range covers inner path text only (excludes quote chars).
+    const quotedPathProvider: ILinkProvider = {
+      provideLinks: (bufferLineIndex, callback) => {
+        const line = this.terminal.buffer.active.getLine(bufferLineIndex)
+        if (!line) {
+          callback(undefined)
+          return
+        }
+        const text = line.translateToString(true)
+        const links: ILink[] = []
+        quotedPathRegex.lastIndex = 0
+        let match: RegExpExecArray | null
+        while ((match = quotedPathRegex.exec(text)) !== null) {
+          const inner = match[1] ?? match[2]
+          const innerStart = match.index + 1
+          links.push({
+            range: {
+              start: { x: innerStart + 1, y: bufferLineIndex + 1 },
+              end: { x: innerStart + inner.length, y: bufferLineIndex + 1 },
+            },
+            text: inner,
+            decorations: { pointerCursor: true, underline: true },
+            activate: () => {},
+          })
+        }
+        callback(links.length ? links : undefined)
+      },
+    }
     this.terminal.registerLinkProvider(makeVisualProvider(urlRegex))
     this.terminal.registerLinkProvider(makeVisualProvider(pathRegex))
+    this.terminal.registerLinkProvider(quotedPathProvider)
 
     // Underline overlay: a 1px div positioned absolutely over the hovered link text.
     const overlay = document.createElement('div')
@@ -178,14 +209,26 @@ export class TerminalInstance {
     this.element.appendChild(overlay)
     this.linkOverlay = overlay
 
-    // Hit-test a position against both regexes; returns the exec match if found.
-    const hitTest = (text: string, col: number): RegExpExecArray | null => {
+    type HitResult = { index: number; length: number; text: string }
+
+    // Hit-test a column position; returns normalised { index, length, text } for overlay/open.
+    // Quoted paths expose the inner bounds (excluding quote chars).
+    const hitTest = (text: string, col: number): HitResult | null => {
       for (const re of [urlRegex, pathRegex]) {
         re.lastIndex = 0
         let m: RegExpExecArray | null
         while ((m = re.exec(text)) !== null) {
-          if (col >= m.index && col < m.index + m[0].length) return m
+          if (col >= m.index && col < m.index + m[0].length)
+            return { index: m.index, length: m[0].length, text: m[0] }
         }
+      }
+      quotedPathRegex.lastIndex = 0
+      let m: RegExpExecArray | null
+      while ((m = quotedPathRegex.exec(text)) !== null) {
+        const inner = m[1] ?? m[2]
+        const innerStart = m.index + 1
+        if (col >= innerStart && col < innerStart + inner.length)
+          return { index: innerStart, length: inner.length, text: inner }
       }
       return null
     }
@@ -205,7 +248,7 @@ export class TerminalInstance {
       if (match) {
         overlay.style.left = `${match.index * charW}px`
         overlay.style.top = `${viewportRow * lineHeight + lineHeight - 2}px`
-        overlay.style.width = `${match[0].length * charW}px`
+        overlay.style.width = `${match.length * charW}px`
         overlay.style.display = 'block'
         // xterm.css defines .xterm-cursor-pointer { cursor: pointer }
         this.terminal.element?.classList.add('xterm-cursor-pointer')
@@ -240,6 +283,16 @@ export class TerminalInstance {
         if (col >= m.index && col < m.index + m[0].length) {
           e.preventDefault()
           window.electronAPI.shell.openPath(m[0].replace(/:\d+(?::\d+)?$/, '')).catch(() => {})
+          return
+        }
+      }
+      quotedPathRegex.lastIndex = 0
+      while ((m = quotedPathRegex.exec(text)) !== null) {
+        const inner = m[1] ?? m[2]
+        const innerStart = m.index + 1
+        if (col >= innerStart && col < innerStart + inner.length) {
+          e.preventDefault()
+          window.electronAPI.shell.openPath(inner.replace(/:\d+(?::\d+)?$/, '')).catch(() => {})
           return
         }
       }

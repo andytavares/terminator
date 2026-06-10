@@ -469,10 +469,10 @@ describe('TerminalInstance', () => {
   })
 
   describe('link providers (visual decoration)', () => {
-    it('registers two link providers on construction', () => {
+    it('registers three link providers on construction (URL, path, quoted-path)', () => {
       new TerminalInstance('ses-links', 1000)
       const instance = vi.mocked(Terminal).mock.results[0].value
-      expect(instance.registerLinkProvider).toHaveBeenCalledTimes(2)
+      expect(instance.registerLinkProvider).toHaveBeenCalledTimes(3)
     })
 
     function getProvider(lineText: string, providerIndex: number) {
@@ -666,6 +666,26 @@ describe('TerminalInstance', () => {
         const instance = makeInstanceWithLine('src/renderer/foo.ts')
         fire(instance.element, 'mousedown', { metaKey: true, clientX: 4, clientY: 0 })
         expect(mockOpenPath).not.toHaveBeenCalled()
+      })
+
+      it('opens double-quoted path with spaces', () => {
+        // Python tracebacks: File "/Users/Jane Doe/foo.py", line 5
+        const instance = makeInstanceWithLine('File "/Users/Jane Doe/foo.py", line 5')
+        // col inside the quoted path (char 6 = 'U' in /Users, offset by 1 for opening quote)
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 48, clientY: 0 })
+        expect(mockOpenPath).toHaveBeenCalledWith('/Users/Jane Doe/foo.py')
+      })
+
+      it('opens single-quoted path with spaces', () => {
+        const instance = makeInstanceWithLine("error: '/Users/Jane Doe/bar.ts'")
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 64, clientY: 0 })
+        expect(mockOpenPath).toHaveBeenCalledWith('/Users/Jane Doe/bar.ts')
+      })
+
+      it('strips line:col suffix from quoted path', () => {
+        const instance = makeInstanceWithLine('File "/Users/foo/bar.ts:10:3"')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 48, clientY: 0 })
+        expect(mockOpenPath).toHaveBeenCalledWith('/Users/foo/bar.ts')
       })
 
       it('opens absolute path with openPath on cmd+click', () => {
