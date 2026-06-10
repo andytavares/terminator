@@ -1,0 +1,21 @@
+extensions/task-vault/src/vault/ensure-next-occurrence.ts
+  s_572568967d4875::t_84496ec14024ed 118-120
+extensions/task-vault/tests/vault/ensure-next-occurrence.spec.ts
+  s_572568967d4875::t_af0b1cfd4955ef 181,196-210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "0ed7d709ea8a77c31c7579d04b2cce5e30e3b5d4",
+  "prompts": {},
+  "sessions": {
+    "s_572568967d4875": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "10454eae-eee3-49b6-8d51-9018839f60d7",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
