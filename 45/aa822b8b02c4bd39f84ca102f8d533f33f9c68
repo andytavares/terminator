@@ -1,0 +1,325 @@
+tests/unit/config/vitest-workspace.spec.ts
+  s_ac8a4310babbf3::t_f2fff7d8ad4414 1-24
+README.md
+  s_ac8a4310babbf3::t_f67570d9035efa 47-50
+  s_ac8a4310babbf3::t_d9dc3d819b978a 30-31
+.forge/006-remote-control-browser-access/research.md
+  s_ac8a4310babbf3::t_abffad2fa3c1d2 87,89,91,95-96,98,104-105,118
+  s_ac8a4310babbf3::t_13a97b1246d512 262-264,266,268
+  s_ac8a4310babbf3::t_ab2154c74eec84 143,145-146,148,151-154,156-161
+  s_ac8a4310babbf3::t_6c967c854125c7 235-236
+  s_ac8a4310babbf3::t_10feaad7041181 265
+  s_ac8a4310babbf3::t_8211cd8ca2655d 267
+  s_ac8a4310babbf3::t_c427fcd5e6415c 1-24,26-81,83-84,86,88,90,92,94,97,117,119-120,122-129,131-132,134-142,144,147,150,155,162-178,180-217,219-232,234,237-260,269-285,287-289,297-306
+  s_ac8a4310babbf3::t_9ee3aec733d62f 93,99-103,107-108,110-116
+src/main/remote/__tests__/ngrok-manager.spec.ts
+  s_ac8a4310babbf3::t_e15d785b678cb1 83
+  s_ac8a4310babbf3::t_adf75b082f7973 147-170
+  s_ac8a4310babbf3::t_8cfb4b180eefc7 1-75,77-82,85-87,105-146,192-193
+  s_ac8a4310babbf3::t_02b133ac30584d 76,84,88-104
+  s_ac8a4310babbf3::t_1f86009d7fef74 171-191
+src/renderer-remote/index.html
+  s_ac8a4310babbf3::t_95d46a23d6edde 2-30
+src/main/remote/ipc-registry.ts
+  s_ac8a4310babbf3::t_47039b51529df3 1-7
+specs/008-remote-control-browser/contracts/http-api.md
+  s_ac8a4310babbf3::t_e7c34b0e591200 1-204
+tests/unit/renderer/stores/settings.store.spec.ts
+  s_ac8a4310babbf3::t_60c6028c6aeed2 194-256
+.specify/feature.json
+  s_ac8a4310babbf3::t_1256b5631e33ce 2
+src/renderer-remote/api/remote-client.ts
+  s_ac8a4310babbf3::t_0738dff2c95ca1 1-81
+src/main/remote/__tests__/remote-server.spec.ts
+  s_ac8a4310babbf3::t_69ff848a0018fd 90-107
+  s_ac8a4310babbf3::t_f0fe191f5e8ade 2-7
+  s_ac8a4310babbf3::t_dfc1832080a8ba 41,55
+  s_ac8a4310babbf3::t_696b9112a1ef19 1,8-40,42-54,56-89,124-129,131-133,135-136
+  s_ac8a4310babbf3::t_19841d39bfa68e 130
+  s_ac8a4310babbf3::t_b342685811d972 108-123,134
+src/main/remote/__tests__/ws-subscriber-manager.spec.ts
+  s_ac8a4310babbf3::t_6c44dae799c6eb 1-125
+src/main/remote/__tests__/terminal.routes.spec.ts
+  s_ac8a4310babbf3::t_fd1de384a1aaaf 116-129
+  s_ac8a4310babbf3::t_c5ebf65e2e1bd7 25-26
+  s_ac8a4310babbf3::t_0d5e94e4b49cb6 1-3,6-17,20-24,27,29-62,109-115,130-226
+  s_ac8a4310babbf3::t_88750010b1625c 263,267-269,273,277-279,283,293-295,348,350-353
+  s_ac8a4310babbf3::t_9d3b0e21bec044 299-306,309-312,318-323,325-347,349,354-361
+  s_ac8a4310babbf3::t_d71a115bd59ff0 307-308,313-317,324
+  s_ac8a4310babbf3::t_f66e999b8215e8 28
+  s_ac8a4310babbf3::t_bc73a4af28b2c7 63-108
+  s_ac8a4310babbf3::t_83b4cf1d3d5342 227-262,264-266,270-272,274-276,280-282,284-292,296-298,362
+  s_ac8a4310babbf3::t_dbf938a23edb3f 4
+  s_ac8a4310babbf3::t_0c72649aabfedf 18-19
+  s_ac8a4310babbf3::t_becd9403cf6c45 5
+src/main/remote/__tests__/workspace.routes.spec.ts
+  s_ac8a4310babbf3::t_b04aa2e91cb5dc 43
+  s_ac8a4310babbf3::t_5d8ac87d0e25bb 6
+  s_ac8a4310babbf3::t_8d5bbef1228711 30
+  s_ac8a4310babbf3::t_b596d8e47839eb 7-8,10-13
+  s_ac8a4310babbf3::t_642b20cc3ce587 1-5,9,14-29,31-42,44-57
+src/main/remote/routes/terminal.routes.ts
+  s_ac8a4310babbf3::t_97ba38c5072073 1-3,5-45,47-107,146
+  s_ac8a4310babbf3::t_7dd1165069345f 4
+  s_ac8a4310babbf3::t_04e9bc70fa73f7 112,115,118,124,129,133,135-136,141-142
+  s_ac8a4310babbf3::t_5d092b0bfdf7b2 108-111,113-114,116-117,119-123,125-128,130-132,134,137-140,143-145
+  s_ac8a4310babbf3::t_bd7a0d6878f58b 46
+tests/unit/renderer-remote/electron-api-shim.spec.ts
+  s_ac8a4310babbf3::t_d5827b2af710e3 1-23,36-48,55,57-60,64-66,69-70,72-76,78,84,86-87,92,102-104,106-117,127,129-131,463,644-645
+  s_ac8a4310babbf3::t_be5b72697fe04c 24-35,49-54,56,61-63,67-68,71,77,79-83,85,88-91,93-101,105,118-121,123-126,128,132-462,464-643
+tests/unit/renderer-remote/components/RemoteTerminal.spec.tsx
+  s_ac8a4310babbf3::t_0f06aba6505c78 1-4,22,24,35,47-50,53-54,57-70,74,76-81,83-87,89,91-93,95-96,98-102,105,107-108,111,113-114,117-118,120-121
+  s_ac8a4310babbf3::t_9284a976f9403f 5-21,23,25-34,36-46,51-52,55-56,71-73,75,82,88,90,94,97,103-104,106,109-110,112,115-116,119
+specs/008-remote-control-browser/spec.md
+  s_ac8a4310babbf3::t_323a9dfc4b00f0 221
+  s_ac8a4310babbf3::t_24a7e600054bfe 1-111,113-115,117-129,132-133,136-149,152-172,175,177-189,191-212
+  s_ac8a4310babbf3::t_e88b3b552449cc 151
+  s_ac8a4310babbf3::t_03978f93bf7109 150
+  s_ac8a4310babbf3::t_15ce0ebafc3ea4 174
+  s_ac8a4310babbf3::t_7b8976b8f611f9 173
+  s_ac8a4310babbf3::t_ab4661d94f0a2a 220
+  s_ac8a4310babbf3::t_2636bde7173dc6 222
+  s_ac8a4310babbf3::t_6b431488aa1475 131
+  s_ac8a4310babbf3::t_34d243bbfc7202 219
+  s_ac8a4310babbf3::t_c89a15c43cf06a 190
+  s_ac8a4310babbf3::t_4690be8db967d3 112
+  s_ac8a4310babbf3::t_c189852a875159 116
+  s_ac8a4310babbf3::t_01fb8fe6a5efed 130
+  s_ac8a4310babbf3::t_93b92009894e85 176
+  s_ac8a4310babbf3::t_f499dab0731b2f 213-218
+  s_ac8a4310babbf3::t_74699e910ab957 135
+src/main/remote/__tests__/ws-ticket-store.spec.ts
+  s_ac8a4310babbf3::t_398b34626a294c 1-77
+src/shared/schemas/settings.schema.ts
+  s_ac8a4310babbf3::t_0422d627ab43a9 28,30
+  s_ac8a4310babbf3::t_fbb088dbb09999 22-27,29
+  s_ac8a4310babbf3::t_f2dc18fa5ea1c4 65
+src/renderer-remote/components/RemoteTerminal.tsx
+  s_ac8a4310babbf3::t_72ffa003ce3bfe 1-59
+src/renderer-remote/electron-api-shim.ts
+  s_ac8a4310babbf3::t_269d9c2ca14a5a 52-55
+  s_ac8a4310babbf3::t_a2c69653e3fb7e 122-126,129-133
+  s_ac8a4310babbf3::t_927139ad61236c 1-51,56-121,127-128,134-256
+src/main/remote/auth.middleware.ts
+  s_ac8a4310babbf3::t_db82e340917ce7 7-9
+  s_ac8a4310babbf3::t_6eb43b3278bc14 4-5,21,32-34
+  s_ac8a4310babbf3::t_77b37ebfcfb508 18
+  s_ac8a4310babbf3::t_5d9c946eb7a479 22-23
+  s_ac8a4310babbf3::t_261632f8f6036a 1-3,6,10-17,19-20,24-31,35-40
+CLAUDE.md
+  s_ac8a4310babbf3::t_11c4e82c365313 4-5
+src/main/remote/__tests__/auth.middleware.spec.ts
+  s_ac8a4310babbf3::t_b17fe14dc48c1e 103-104
+  s_ac8a4310babbf3::t_186dd5b07567f3 1
+  s_ac8a4310babbf3::t_00621ec904ff6c 8,17
+  s_ac8a4310babbf3::t_ca145c613e2777 99-101,106-109
+  s_ac8a4310babbf3::t_da8c208979ac78 12,33,44,50,61,66,72-73,77,80,102,105
+  s_ac8a4310babbf3::t_8af2d260b25975 13-14,16,31,43,54-55,59-60,65,76,83-90,92
+  s_ac8a4310babbf3::t_3544b1a53fc720 2-7,9-11,15,18-30,32,34-42,45-49,51-53,56-58,62-64,67-71,74-75,78-79,81-82,91,93-98,110
+tests/unit/schemas/settings.schema.spec.ts
+  s_ac8a4310babbf3::t_2db09ff502a83c 241-245,247
+  s_ac8a4310babbf3::t_6b34225af58821 153-162,164-170,178-184,192-198,206-212,220-226,234-240,248-254,262-266
+  s_ac8a4310babbf3::t_e0d1f82180874c 185-189,191
+  s_ac8a4310babbf3::t_25b6e3a07e41d9 267-286
+  s_ac8a4310babbf3::t_59e561bdd03593 213-217,219
+  s_ac8a4310babbf3::t_ac56bd488c44a9 227-231,233
+  s_ac8a4310babbf3::t_e61e469cfc6f90 255-259,261
+  s_ac8a4310babbf3::t_f231eab448bf16 171-175,177
+  s_ac8a4310babbf3::t_c3a96d9070b043 163
+  s_ac8a4310babbf3::t_7ec332fa7ad715 199-203,205
+src/main/remote/routes/bridge.route.ts
+  s_ac8a4310babbf3::t_9294fefe212af5 6
+  s_ac8a4310babbf3::t_4c8ed33ad72fbb 1-5,7-97
+specs/008-remote-control-browser/data-model.md
+  s_ac8a4310babbf3::t_2b6882163a1e5e 1-141
+tests/unit/config/vite-config-remote.spec.ts
+  s_ac8a4310babbf3::t_ba7876aad5dfa3 1-12,16-37
+  s_ac8a4310babbf3::t_8ab1fc9ed41f68 13-15
+docs/ARCHITECTURE.md
+  s_ac8a4310babbf3::t_bd504300abed7e 70-71
+  s_ac8a4310babbf3::t_57836a9ad5b2c8 271-308
+specs/008-remote-control-browser/plan.md
+  s_ac8a4310babbf3::t_b390a3845e0234 1,3-4,8,12-19,23,25-34,41-47,50,54-103,106,108-211,213-325,327-342,344
+  s_ac8a4310babbf3::t_2d7bb3f562b0a6 2,5-7,9-11,20-22,35-40,48-49,51-53,104-105,107,212,343
+src/main/remote/routes/workspace.routes.ts
+  s_ac8a4310babbf3::t_d6309992635b62 2
+  s_ac8a4310babbf3::t_07b093bc00ede8 1,3-14
+src/shared/types/index.ts
+  s_ac8a4310babbf3::t_99db0098febea3 98
+  s_ac8a4310babbf3::t_34f724ae4f1949 93-97,99
+vitest.workspace.ts
+  s_ac8a4310babbf3::t_ad0aecd164f4bc 17-18
+src/renderer/components/settings/GlobalSettings.tsx
+  s_ac8a4310babbf3::t_5a9317dabe424e 150
+  s_ac8a4310babbf3::t_3f1e5ca6b4660d 28
+  s_ac8a4310babbf3::t_d8573f3690e718 214-222
+  s_ac8a4310babbf3::t_add64b1d91ab1d 171
+  s_ac8a4310babbf3::t_d39dd7f9ace6ed 185-191,193-194,206-209,211,228-232,234-235,249-252,260-263,267-277,280-284,288-289,291,298-299
+  s_ac8a4310babbf3::t_a13151a4e8f959 312-315,317-338
+  s_ac8a4310babbf3::t_a47ea5a9bddb0c 12
+  s_ac8a4310babbf3::t_2b858f8e3a1148 29,31-34
+  s_ac8a4310babbf3::t_5a1d337c6f95f4 30,35-38
+  s_ac8a4310babbf3::t_28916270151f71 140-149,151-170,172-184,192,195-205,212-213,223-227,233,236-248,253-256,310-311
+  s_ac8a4310babbf3::t_9e8d15924201cf 40-45
+  s_ac8a4310babbf3::t_590a108cd2ae2b 23-24
+  s_ac8a4310babbf3::t_38ee1588abf77e 257-259,264-266,278-279,285-287,290,292-297,300-309
+  s_ac8a4310babbf3::t_560bcb9e600425 1,3,6-11,13-15,26-27
+src/renderer-remote/main.tsx
+  s_ac8a4310babbf3::t_7d2f9644140fcb 1-8
+src/renderer-remote/App.tsx
+  s_ac8a4310babbf3::t_903598990033d3 1-5,7-9,12,14-15,17,19-20,29-30,32-35,84-86
+  s_ac8a4310babbf3::t_4f50165c0a9743 6,10-11,13,16,18,21-28,31,36-83
+docs/adr/017-embedded-http-remote-server.md
+  s_ac8a4310babbf3::t_640d41baebcbc4 1-41
+src/main/remote/ngrok-manager.ts
+  s_ac8a4310babbf3::t_9f42916278402c 51
+  s_ac8a4310babbf3::t_09a2169d96eacb 28-31,33
+  s_ac8a4310babbf3::t_559ae04668b74d 23-26
+  s_ac8a4310babbf3::t_697790fc1a1a1d 32,34-35,43,45-46
+  s_ac8a4310babbf3::t_64969573b4f09c 4
+  s_ac8a4310babbf3::t_1dd998645b7a2d 37
+  s_ac8a4310babbf3::t_34cb6d41b2761a 1-3,5-22,27,36,38-42,47-50,52-74
+  s_ac8a4310babbf3::t_88aeba6a2d55ac 44
+src/main/remote/ws-subscriber-manager.ts
+  s_ac8a4310babbf3::t_057604cffbe373 1-60
+tests/unit/renderer-remote/App.spec.tsx
+  s_ac8a4310babbf3::t_d3c5ff4df47d4d 24-25,33,41,49
+  s_ac8a4310babbf3::t_eeb96cfaac894d 1-23,26-32,34-40,42-48,50-66,72-74
+  s_ac8a4310babbf3::t_8ab1fc9ed41f68 67-71
+tests/unit/renderer-remote/main.spec.tsx
+  s_ac8a4310babbf3::t_084ab565603365 1-21
+src/main/ipc/remote.ipc.ts
+  s_ac8a4310babbf3::t_7d2816d8541b66 46,52,61
+  s_ac8a4310babbf3::t_70fc13eb91077e 1-2,5-11,13-28,44-45,48-51,63
+  s_ac8a4310babbf3::t_4da109277494a8 3-4
+  s_ac8a4310babbf3::t_2d19d6a84def19 12
+  s_ac8a4310babbf3::t_ea73dd55f4c4ab 29-38
+  s_ac8a4310babbf3::t_e3ed94546ed6ff 39-43,47,53-60,62
+specs/008-remote-control-browser/checklists/requirements.md
+  s_ac8a4310babbf3::t_023343f282f260 1-34
+tests/unit/renderer/components/GlobalSettings.spec.tsx
+  s_ac8a4310babbf3::t_86cff31964cd01 128-130
+  s_ac8a4310babbf3::t_22734b9a1858e2 118-127,131-155,162-163,172-177,185-189,192,199,214-217,264,298,301-305,341-344
+  s_ac8a4310babbf3::t_3ffec4a52ae07e 156-161,164-171,178-182,184,190-191,193-198,200-213,218-263,265-287,289-297,299-300,306-327,329-340
+  s_ac8a4310babbf3::t_e9d80c4f925013 42-45
+  s_ac8a4310babbf3::t_50180a51d880a1 104
+  s_ac8a4310babbf3::t_260c4ae1322c96 11-14
+  s_ac8a4310babbf3::t_4b867f43bcaf7a 37-38
+  s_ac8a4310babbf3::t_039a1f74fa5e89 26
+  s_ac8a4310babbf3::t_219247aacf9578 19-20
+src/main/ipc/__tests__/remote.ipc.spec.ts
+  s_ac8a4310babbf3::t_e123aac17b2b85 10-19,24,28,33
+  s_ac8a4310babbf3::t_2d96d8289f14ef 1-2,20-22,25-27,29-31,34-64,143
+  s_ac8a4310babbf3::t_3829c52cf4d159 3-9,23,32
+  s_ac8a4310babbf3::t_a5e9d601e8cf1c 93-142
+  s_ac8a4310babbf3::t_49e2f359bec2b0 65-92
+src/renderer/stores/settings.store.ts
+  s_ac8a4310babbf3::t_db732bedb5560c 136-149
+  s_ac8a4310babbf3::t_91364011cb2ca8 18-19
+src/main/remote/bridge-event-bus.ts
+  s_ac8a4310babbf3::t_0df742840c5608 1-4
+src/main/remote/ws-ticket-store.ts
+  s_ac8a4310babbf3::t_d6f113b1342ce0 1-45
+tests/integration/ipc/settings.ipc.spec.ts
+  s_ac8a4310babbf3::t_f454ea8a26ae50 91-152
+  s_ac8a4310babbf3::t_e1b2bcced302ff 25
+tests/unit/renderer-remote/remote-client.spec.ts
+  s_ac8a4310babbf3::t_8ab1fc9ed41f68 24,58-61,97-99,135-137
+  s_ac8a4310babbf3::t_d976f1f0fafda7 1-23,25-57,62-96,100-134,138-145
+src/main/remote/remote-server.ts
+  s_ac8a4310babbf3::t_6c6b71c28840ec 1,6-8,13-15,21-23,25,27-38,40-45,73,79-83,97-113
+  s_ac8a4310babbf3::t_b8ce762412ead3 5,12,48-57,59-66,76-78
+  s_ac8a4310babbf3::t_1b4f76ed22711b 85
+  s_ac8a4310babbf3::t_275cc7fd457cf0 11
+  s_ac8a4310babbf3::t_9324925629a3e6 39
+  s_ac8a4310babbf3::t_47490a554058a9 2-4,9
+  s_ac8a4310babbf3::t_cdce07f7b84da0 46-47,67,75
+  s_ac8a4310babbf3::t_300ef73bd8c948 10
+  s_ac8a4310babbf3::t_54abe6becfca35 58
+  s_ac8a4310babbf3::t_0f71859dbc5b5f 16-20,24
+  s_ac8a4310babbf3::t_b241f43ffb14b6 26
+  s_ac8a4310babbf3::t_d1246f6b2ec704 68-72
+  s_ac8a4310babbf3::t_ba1b006d7b2b7d 74
+  s_ac8a4310babbf3::t_61b81cdc954248 84,86-96
+specs/008-remote-control-browser/research.md
+  s_ac8a4310babbf3::t_95d07a86623868 1-106
+package.json
+  s_ac8a4310babbf3::t_5f1a19dfa64586 17,19
+  s_ac8a4310babbf3::t_050c3f83181b47 55,57,59
+  s_ac8a4310babbf3::t_72d0f38cbd0d5a 49
+  s_ac8a4310babbf3::t_6b96c5815ab223 18
+  s_ac8a4310babbf3::t_afb8e301b9391b 52-54
+  s_ac8a4310babbf3::t_a9865c6e4e6a4a 73,77,97-98
+  s_ac8a4310babbf3::t_60b8630a2ffeba 48
+tests/unit/renderer-remote/components/WorkspaceNav.spec.tsx
+  s_ac8a4310babbf3::t_aace570635f934 5-8
+  s_ac8a4310babbf3::t_a48ed5066fc2c3 1-4,9-34,36-40,43-50,53-94,96-97
+  s_ac8a4310babbf3::t_ce44cba144409e 35,41-42,51-52,95
+src/main/remote/__tests__/bridge.route.spec.ts
+  s_ac8a4310babbf3::t_c8b818a95cf0e4 1-199,201-266
+vite.config.remote.ts
+  s_ac8a4310babbf3::t_200820af680b9c 6
+  s_ac8a4310babbf3::t_1b1102c850e3dc 14-18
+  s_ac8a4310babbf3::t_49aaf941bfe703 1-5,7-13,19-22
+vitest.config.ts
+  s_ac8a4310babbf3::t_eeff63e35dc913 16
+  s_ac8a4310babbf3::t_b82d280a2e0853 22-23
+  s_ac8a4310babbf3::t_240a3a2ddf56fc 17
+  s_ac8a4310babbf3::t_99b4223b23c13e 37-38
+specs/008-remote-control-browser/tasks.md
+  s_ac8a4310babbf3::t_cb158a2e411ce8 1-20,23-37,39,41-69,74-118,120-196,205-300
+  s_ac8a4310babbf3::t_77b0b19996e443 21-22
+  s_ac8a4310babbf3::t_27a45cb51b7687 38,40
+  s_ac8a4310babbf3::t_b21e025464c242 70-73
+  s_ac8a4310babbf3::t_629743753767a6 119
+src/main/remote/routes/health.route.ts
+  s_ac8a4310babbf3::t_504b7afd65ba86 1-5
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_ac8a4310babbf3::t_01751f12bc4bc3 1246-1301
+src/main/ipc/settings.ipc.ts
+  s_ac8a4310babbf3::t_a9f802578036c1 9,11,17-20,23-24
+  s_ac8a4310babbf3::t_1bbde6fa7b08a3 10,21-22
+src/main/index.ts
+  s_ac8a4310babbf3::t_b606f38e051af2 108-114
+  s_ac8a4310babbf3::t_35d975b0d03ec3 74-77
+  s_ac8a4310babbf3::t_1df3982015a706 80-87
+  s_ac8a4310babbf3::t_f0f4a36db568b7 325
+  s_ac8a4310babbf3::t_c357e8d83fcb54 320-324
+  s_ac8a4310babbf3::t_368f9212890710 27,29-30
+  s_ac8a4310babbf3::t_c329f0d00ab6c9 16,23-25
+  s_ac8a4310babbf3::t_44f5425e1a8548 17-20,22
+  s_ac8a4310babbf3::t_6cecc08018f141 58-59
+  s_ac8a4310babbf3::t_f5c371fc654feb 26,28,31-45
+  s_ac8a4310babbf3::t_87f57ee6b394e4 101,107,122,125-135,139-143,145
+  s_ac8a4310babbf3::t_296b20eef0437f 102-106
+  s_ac8a4310babbf3::t_6012e235181044 56-57,60-73,78-79,88-100,115-121,123-124,136-138,146-161
+  s_ac8a4310babbf3::t_4e36007a347284 180-186
+  s_ac8a4310babbf3::t_ded8d2131dc74e 343-353
+  s_ac8a4310babbf3::t_b6e2bab31b9b6c 354-356,360-361
+  s_ac8a4310babbf3::t_5551faf52a4f62 357-359
+  s_ac8a4310babbf3::t_74138b2fa95b95 374
+src/renderer/App.tsx
+  s_ac8a4310babbf3::t_5c2a1edcc7093e 16
+  s_ac8a4310babbf3::t_43488f8632d940 369,372-373,375-383,386-388
+  s_ac8a4310babbf3::t_d171f144783f7e 370-371,374,384-385
+.forge/006-remote-control-browser-access/topic.md
+  s_ac8a4310babbf3::t_9568ae87be904b 1
+src/renderer-remote/components/WorkspaceNav.tsx
+  s_ac8a4310babbf3::t_af25294df4a4b3 1-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "45aa822b8b02c4bd39f84ca102f8d533f33f9c68",
+  "prompts": {},
+  "sessions": {
+    "s_ac8a4310babbf3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3bd30aff-54f6-4b9d-9c65-9aae3ba25961",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
