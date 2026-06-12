@@ -13,7 +13,7 @@ import { useSettingsStore } from './stores/settings.store'
 import { useSessionStore } from './stores/session.store'
 import { useTerminalSession } from './hooks/useTerminalSession'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
-import { installLogInterceptor } from './stores/log.store'
+import { installLogInterceptor, useLogStore } from './stores/log.store'
 import { useToastStore } from './stores/toast.store'
 import { useNotificationStore } from './stores/notification.store'
 import { NotificationPanel } from './components/NotificationPanel'
@@ -365,6 +365,26 @@ export function App(): JSX.Element {
       permanent: true,
     })
   }, [])
+
+  useEffect(() => {
+    const unsubLog = window.electronAPI.extensionBridge.on('log:push', (data) => {
+      const { level, message } = data as { level: 'info' | 'warn' | 'error'; message: string }
+      useLogStore.getState().addEntry(level, message)
+    })
+    const unsubDisconnected = window.electronAPI.extensionBridge.on(
+      'remote:tunnel-disconnected',
+      () => {
+        addToast({
+          type: 'error',
+          message: 'ngrok tunnel disconnected. Click Reconnect in Settings to restore it.',
+        })
+      }
+    )
+    return () => {
+      unsubLog()
+      unsubDisconnected()
+    }
+  }, [addToast])
 
   const showMetricsBar = globalSettings?.ui?.showMetricsBar ?? false
   const scratchSessions = getScratchSessions()

@@ -13,10 +13,14 @@ export default defineConfig({
       'extensions/*/tests/**/*.spec.ts',
       'extensions/*/tests/**/*.spec.tsx',
       'extensions/*/tests/**/*.spec.js',
+      'src/main/remote/__tests__/**/*.spec.ts',
+      'src/main/ipc/__tests__/**/*.spec.ts',
     ],
     environment: 'node',
     environmentMatchGlobs: [
       ['tests/unit/**/*.spec.tsx', 'jsdom'],
+      ['tests/unit/renderer-remote/**/*.spec.ts', 'jsdom'],
+      ['tests/unit/config/**/*.spec.ts', 'node'],
       ['extensions/*/tests/unit/**/*.spec.tsx', 'jsdom'],
       ['extensions/*/tests/components/**/*.spec.tsx', 'jsdom'],
     ],
@@ -30,6 +34,8 @@ export default defineConfig({
         'src/**/*.tsx',
         'extensions/*/src/**/*.ts',
         'extensions/*/src/**/*.tsx',
+        'vite.config.remote.ts',
+        'vitest.workspace.ts',
       ],
       exclude: [
         'vitest.config.ts',

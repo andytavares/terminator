@@ -150,6 +150,140 @@ describe('GlobalSettingsSchema', () => {
   })
 })
 
+describe('GlobalSettingsSchema — remoteControl', () => {
+  it('applies default remoteControl when field omitted', () => {
+    const result = GlobalSettingsSchema.safeParse(validGlobal)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.remoteControl).toEqual({
+        enabled: false,
+        port: 7681,
+        password: '',
+        passwordHash: '',
+        ngrokAuthToken: '',
+      })
+    }
+  })
+
+  it('accepts valid remoteControl override', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      remoteControl: {
+        enabled: true,
+        port: 8080,
+        password: 'secret',
+        passwordHash: '$2a$10$abc',
+        ngrokAuthToken: '',
+      },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects port below minimum (1024)', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      remoteControl: {
+        enabled: false,
+        port: 1023,
+        password: '',
+        passwordHash: '',
+        ngrokAuthToken: '',
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts port at minimum boundary (1024)', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      remoteControl: {
+        enabled: false,
+        port: 1024,
+        password: '',
+        passwordHash: '',
+        ngrokAuthToken: '',
+      },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects port above maximum (65535)', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      remoteControl: {
+        enabled: false,
+        port: 65536,
+        password: '',
+        passwordHash: '',
+        ngrokAuthToken: '',
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts port at maximum boundary (65535)', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      remoteControl: {
+        enabled: false,
+        port: 65535,
+        password: '',
+        passwordHash: '',
+        ngrokAuthToken: '',
+      },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects non-integer port', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      remoteControl: {
+        enabled: false,
+        port: 7681.5,
+        password: '',
+        passwordHash: '',
+        ngrokAuthToken: '',
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects non-boolean enabled', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      remoteControl: {
+        enabled: 'yes',
+        port: 7681,
+        password: '',
+        passwordHash: '',
+        ngrokAuthToken: '',
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('DEFAULT_GLOBAL_SETTINGS', () => {
+  it('uses process.env.SHELL when set', async () => {
+    const origShell = process.env.SHELL
+    process.env.SHELL = '/bin/fish'
+    vi.resetModules()
+    const { DEFAULT_GLOBAL_SETTINGS } = await import('../../../src/shared/schemas/settings.schema')
+    expect(DEFAULT_GLOBAL_SETTINGS.terminal.defaultShell).toBe('/bin/fish')
+    process.env.SHELL = origShell
+  })
+
+  it('falls back to /bin/zsh when SHELL is not set', async () => {
+    const origShell = process.env.SHELL
+    delete process.env.SHELL
+    vi.resetModules()
+    const { DEFAULT_GLOBAL_SETTINGS } = await import('../../../src/shared/schemas/settings.schema')
+    expect(DEFAULT_GLOBAL_SETTINGS.terminal.defaultShell).toBe('/bin/zsh')
+    process.env.SHELL = origShell
+  })
+})
+
 describe('WorkspaceSettingsSchema', () => {
   const validWorkspace = {
     workspaceId: '550e8400-e29b-41d4-a716-446655440000',

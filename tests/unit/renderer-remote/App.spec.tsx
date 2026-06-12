@@ -1,0 +1,74 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import React from 'react'
+import { App } from '../../../src/renderer-remote/App'
+
+const mockFetch = vi.fn()
+global.fetch = mockFetch
+
+const mockReplace = vi.fn()
+Object.defineProperty(window, 'location', {
+  value: { ...window.location, replace: mockReplace },
+  writable: true,
+})
+
+beforeEach(() => {
+  mockFetch.mockReset()
+  mockReplace.mockReset()
+  sessionStorage.clear()
+})
+
+describe('App', () => {
+  it('renders password input and Connect button', () => {
+    render(<App />)
+    expect(screen.getByPlaceholderText('Password')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Connect' })).toBeTruthy()
+  })
+
+  it('shows "Wrong password" on 401 response', async () => {
+    mockFetch.mockResolvedValueOnce({ status: 401 })
+    render(<App />)
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'bad' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await waitFor(() => expect(screen.getByText('Wrong password')).toBeTruthy())
+  })
+
+  it('shows "Access denied" on 403 response', async () => {
+    mockFetch.mockResolvedValueOnce({ status: 403 })
+    render(<App />)
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await waitFor(() => expect(screen.getByText('Access denied')).toBeTruthy())
+  })
+
+  it('shows "Could not connect" on fetch error', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('Network failure'))
+    render(<App />)
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await waitFor(() => expect(screen.getByText('Could not connect to server')).toBeTruthy())
+  })
+
+  it('stores token in sessionStorage and redirects on success', async () => {
+    mockFetch.mockResolvedValueOnce({ status: 200 })
+    render(<App />)
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'correct' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/app/'))
+    expect(sessionStorage.getItem('remoteToken')).toBe('correct')
+  })
+
+  it('disables button and shows "Connecting…" while loading', async () => {
+    let resolvePromise: (v: unknown) => void
+    mockFetch.mockReturnValueOnce(new Promise((r) => (resolvePromise = r)))
+    render(<App />)
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Connecting…' }).hasAttribute('disabled')).toBe(
+        true
+      )
+    )
+    resolvePromise!({ status: 401 })
+  })
+})

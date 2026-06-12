@@ -22,7 +22,7 @@ function captureHandler(channel: string): (event: unknown, payload?: unknown) =>
   return match[1] as (event: unknown, payload?: unknown) => unknown
 }
 
-describe('settings IPC handlers', () => {
+describe('settings IPC handlers (no callback)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     registerSettingsHandlers()
@@ -86,5 +86,67 @@ describe('settings IPC handlers', () => {
       })
       expect(result.settings).toEqual(updated)
     })
+  })
+})
+
+describe('settings IPC handlers (with onRemoteControlChange callback)', () => {
+  const onRemoteControlChange = vi.fn()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    onRemoteControlChange.mockResolvedValue(undefined)
+    registerSettingsHandlers(onRemoteControlChange)
+  })
+
+  it('calls onRemoteControlChange when enabled transitions false → true', () => {
+    vi.mocked(settingsStore.getGlobalSettings).mockReturnValue({
+      remoteControl: { enabled: false },
+    } as unknown as ReturnType<typeof settingsStore.getGlobalSettings>)
+    vi.mocked(settingsStore.updateGlobalSettings).mockReturnValue({
+      remoteControl: { enabled: true },
+    } as unknown as ReturnType<typeof settingsStore.updateGlobalSettings>)
+
+    const handler = captureHandler('settings:update-global')
+    handler({}, { patch: { remoteControl: { enabled: true } } })
+    expect(onRemoteControlChange).toHaveBeenCalledWith(true)
+  })
+
+  it('calls onRemoteControlChange when enabled transitions true → false', () => {
+    vi.mocked(settingsStore.getGlobalSettings).mockReturnValue({
+      remoteControl: { enabled: true },
+    } as unknown as ReturnType<typeof settingsStore.getGlobalSettings>)
+    vi.mocked(settingsStore.updateGlobalSettings).mockReturnValue({
+      remoteControl: { enabled: false },
+    } as unknown as ReturnType<typeof settingsStore.updateGlobalSettings>)
+
+    const handler = captureHandler('settings:update-global')
+    handler({}, { patch: { remoteControl: { enabled: false } } })
+    expect(onRemoteControlChange).toHaveBeenCalledWith(false)
+  })
+
+  it('does NOT call onRemoteControlChange when enabled stays the same', () => {
+    vi.mocked(settingsStore.getGlobalSettings).mockReturnValue({
+      remoteControl: { enabled: true },
+    } as unknown as ReturnType<typeof settingsStore.getGlobalSettings>)
+    vi.mocked(settingsStore.updateGlobalSettings).mockReturnValue({
+      remoteControl: { enabled: true },
+    } as unknown as ReturnType<typeof settingsStore.updateGlobalSettings>)
+
+    const handler = captureHandler('settings:update-global')
+    handler({}, { patch: { remoteControl: { enabled: true } } })
+    expect(onRemoteControlChange).not.toHaveBeenCalled()
+  })
+
+  it('passes false (via ??) when remoteControl is absent from result', () => {
+    vi.mocked(settingsStore.getGlobalSettings).mockReturnValue({
+      remoteControl: { enabled: true },
+    } as unknown as ReturnType<typeof settingsStore.getGlobalSettings>)
+    vi.mocked(settingsStore.updateGlobalSettings).mockReturnValue(
+      {} as unknown as ReturnType<typeof settingsStore.updateGlobalSettings>
+    )
+
+    const handler = captureHandler('settings:update-global')
+    handler({}, { patch: {} })
+    expect(onRemoteControlChange).toHaveBeenCalledWith(false)
   })
 })

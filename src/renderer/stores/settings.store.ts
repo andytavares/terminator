@@ -15,6 +15,8 @@ interface SettingsState {
   updateWorkspaceWorktreeBaseDir: (workspaceId: string, dir: string | undefined) => Promise<void>
   markWelcomeSeen: () => Promise<void>
   updateShowMetricsBar: (show: boolean) => Promise<void>
+  updateRemoteControlEnabled: (enabled: boolean) => Promise<void>
+  updateRemoteControlPort: (port: number) => Promise<void>
   resolveSettings: (workspaceId?: string | null) => GlobalSettings
 }
 
@@ -128,6 +130,20 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   updateShowMetricsBar: async (show) => {
     const result = await window.electronAPI.settings.updateGlobal({ ui: { showMetricsBar: show } })
+    set({ globalSettings: result.settings })
+  },
+
+  updateRemoteControlEnabled: async (enabled) => {
+    const result = await window.electronAPI.settings.updateGlobal({
+      remoteControl: { enabled },
+    })
+    set({ globalSettings: result.settings })
+  },
+
+  updateRemoteControlPort: async (port) => {
+    const result = await window.electronAPI.settings.updateGlobal({
+      remoteControl: { port },
+    })
     set({ globalSettings: result.settings })
   },
 

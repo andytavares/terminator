@@ -55,18 +55,20 @@ All renderer-to-main communication goes through `window.electronAPI`, exposed by
 
 ### Channel namespaces
 
-| Namespace     | Direction        | Description                                                                                                                    |
-| ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `terminal:*`  | renderer ↔ main | PTY lifecycle: create, close, input, output, resize, cleanup                                                                   |
-| `workspace:*` | renderer → main  | Workspace and project CRUD                                                                                                     |
-| `project:*`   | renderer → main  | Project CRUD (scoped under workspace)                                                                                          |
-| `settings:*`  | renderer → main  | Global and per-workspace settings                                                                                              |
-| `dialog:*`    | renderer → main  | Native OS dialogs (folder picker)                                                                                              |
-| `extension:*` | renderer → main  | Extension install, toggle, contribution queries                                                                                |
-| `git:*`       | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create                                                                     |
-| `github:*`    | renderer → main  | PR review queue, diff, file metrics, inline comments, submit, session persistence, active-review tracking, prune closed/merged |
-| `shell:exec`  | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)                                                                            |
-| `fs:*`        | renderer ↔ main | File watch start/stop; `fs:read-file`; `fs:changed` push events                                                                |
+| Namespace     | Direction        | Description                                                                                                                          |
+| ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `terminal:*`  | renderer ↔ main | PTY lifecycle: create, close, input, output, resize, cleanup                                                                         |
+| `workspace:*` | renderer → main  | Workspace and project CRUD                                                                                                           |
+| `project:*`   | renderer → main  | Project CRUD (scoped under workspace)                                                                                                |
+| `settings:*`  | renderer → main  | Global and per-workspace settings                                                                                                    |
+| `dialog:*`    | renderer → main  | Native OS dialogs (folder picker)                                                                                                    |
+| `extension:*` | renderer → main  | Extension install, toggle, contribution queries                                                                                      |
+| `git:*`       | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create                                                                           |
+| `github:*`    | renderer → main  | PR review queue, diff, file metrics, inline comments, submit, session persistence, active-review tracking, prune closed/merged       |
+| `shell:exec`  | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)                                                                                  |
+| `fs:*`        | renderer ↔ main | File watch start/stop; `fs:read-file`; `fs:changed` push events                                                                      |
+| `remote:*`    | main ↔ renderer | Remote control server: `remote:status` (main→renderer), `remote:tunnel-reconnect` (renderer→main), `remote:update-password` (invoke) |
+| `log:push`    | main → renderer  | Forwards main-process log entries to renderer LogWindow                                                                              |
 
 Full channel specifications: [`specs/001-extension-first-terminal/contracts/ipc-channels.md`](../specs/001-extension-first-terminal/contracts/ipc-channels.md),
 [`specs/002-git-github-integration/contracts/ipc-channels-git.md`](../specs/002-git-github-integration/contracts/ipc-channels-git.md),
@@ -263,6 +265,44 @@ Two distinct notification systems exist and are intentionally complementary:
 - **Native OS notification** (`notification.show` IPC, singular): fires a system-level desktop alert for immediate attention when a terminal session needs attention (bell event).
 
 When a bell event fires in a backgrounded terminal session, both systems are triggered: `window.electronAPI.notification.show` (OS) and `useNotificationStore.getState().addNotification` (in-app). This ensures the user sees the signal regardless of OS notification preferences.
+
+---
+
+## Remote Control Server
+
+When enabled via Settings → Remote Control, Terminator starts an embedded [Fastify](https://fastify.dev/) 4.x HTTP/WebSocket server bound to `127.0.0.1` (never `0.0.0.0`).
+
+```
+Main Process
+│
+├── RemoteServer (Fastify 4.x, 127.0.0.1 only)
+│   ├── GET  /health                     → { ok: true }
+│   ├── GET  /api/workspaces             → workspace list
+│   ├── GET  /api/projects?workspaceId=  → project list
+│   ├── POST /api/terminals              → spawn PTY, returns sessionId
+│   ├── GET  /api/terminals/:id          → session metadata
+│   ├── DELETE /api/terminals/:id        → kill PTY
+│   ├── POST /api/terminals/:id/resize   → resize PTY
+│   ├── POST /api/terminals/:id/ws-ticket → single-use WS ticket (30s TTL)
+│   └── GET  /ws/terminals/:id?ticket=  → WebSocket upgrade → PTY fan-out
+│
+├── WsTicketStore        single-use 64-char hex tokens, 30s TTL, 60s cleanup
+├── WsSubscriberManager  per-session subscriber sets; first subscriber = primary
+│                        primary-only input, broadcast output to all
+└── NgrokManager         spawns `ngrok http <port>`, polls localhost:4040/api/tunnels
+```
+
+**Security constraints**:
+
+- Server binds to `127.0.0.1` only. External clients must reach it via ngrok or LAN (port forwarding).
+- All routes (except `/health`) require `Authorization: Bearer <password>` validated with `bcryptjs.compare()` (async, work factor 10).
+- `Host` header is checked against `localhost`, `127.0.0.1`, and the ngrok domain.
+- WebSocket upgrade requires a single-use ticket issued by `POST /api/terminals/:id/ws-ticket`; ticket is consumed on first use and expires after 30 s.
+- Input is accepted from the primary subscriber only (first WS client to connect to a session).
+
+**Browser SPA** (`src/renderer-remote/`): A separate Vite build (`npm run build:remote`) produces `out/renderer-remote/` which Fastify serves as static files. It uses xterm.js 6.x with `AttachAddon` (WebSocket) and `FitAddon` (resize).
+
+See [ADR-017](adr/017-embedded-http-remote-server.md) for the architectural decision.
 
 ---
 

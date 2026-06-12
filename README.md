@@ -27,6 +27,8 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 
 - **About** — View app version and runtime details (Electron, Node, Chrome, platform) via **Help → About Terminator** (or the **Terminator** app menu on macOS).
 
+- **Remote Control** — Enable a local HTTP/WebSocket server (default port 7681) and optionally an ngrok tunnel so you can access your Terminator terminals from any browser. Authenticate with a bcrypt-hashed password. Configure via Settings → Remote Control: toggle on/off, choose port, copy the public URL or LAN URL, show/copy/regenerate the session password. Requires `ngrok` for the public tunnel (`brew install ngrok`).
+
 - **Clickable terminal links** — URLs and file paths in terminal output are underlined on hover. `Cmd+click` a URL to open it in the system browser; `Cmd+click` an absolute path (e.g. `/Users/foo/bar.ts` or `~/project/file.go`) to open it with the default application. Line:col suffixes like `file.go:42:5` are stripped before opening. All links throughout the app (PR comments, CI check links, issue refs) always open in the system browser.
 
 - **Keyboard shortcuts** — `Cmd+1–9` (switch workspace), `Cmd++/-` (cycle workspaces), `Cmd+T` (new tab), `Cmd+Shift+T` (new scratch terminal), `Cmd+W` (close focused pane / active tab), `Cmd+D` (split pane vertically), `Cmd+Shift+D` (split pane horizontally), `Cmd+Left/Right` (cycle tabs), `Cmd+K` (clear terminal), `Cmd+P` (command palette), `Cmd+,` (settings), `Cmd+Shift+G` (toggle git sidebar), `Cmd+Shift+O` (toggle Overview), `Cmd+Enter` (send newline to running program — always intercepted), `Shift+Enter` (send newline — only active when the running program has enabled bracketed paste mode, e.g. the `claude` CLI; passes through normally in a plain shell).
@@ -42,7 +44,10 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 | PTY management         | node-pty 1.x (main process only)            |
 | Persistence            | electron-store 8.x                          |
 | Schema validation      | Zod 3.x                                     |
-| Build                  | electron-vite 2.x                           |
+| Remote server          | Fastify 4.x + @fastify/websocket 8.x        |
+| Browser SPA            | xterm.js 6.x (AttachAddon + FitAddon)       |
+| Password hashing       | bcryptjs (work factor 10, async only)       |
+| Build                  | electron-vite 2.x + vite (remote SPA)       |
 | Unit/integration tests | Vitest 2.x                                  |
 | E2E tests              | Playwright 1.x                              |
 | UI font                | IBM Plex Sans (@fontsource)                 |
