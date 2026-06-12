@@ -17,7 +17,7 @@ export async function registerBridgeRoute(
 
   // POST /api/bridge-ticket — Bearer auth enforced by the auth middleware for /api/* routes
   app.post('/api/bridge-ticket', async (_request, reply) => {
-    const ticket = ticketStore.createTicket('__bridge__')
+    const ticket = ticketStore.createTicket('__bridge__', 'bridge')
     return reply.status(201).send({ ticket })
   })
 
@@ -29,7 +29,7 @@ export async function registerBridgeRoute(
 
       // Authenticate via ?ticket= query param (WebSocket upgrades can't carry Authorization headers)
       const ticket = (request.query as Record<string, string>).ticket ?? ''
-      const sessionId = ticketStore.consumeTicket(ticket)
+      const sessionId = ticketStore.consumeTicket(ticket, 'bridge')
       if (!sessionId) {
         ws.close(4001, 'unauthorized')
         return

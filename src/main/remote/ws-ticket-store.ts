@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto'
 
 interface Ticket {
   sessionId: string
+  purpose: string
   expiresAt: number
 }
 
@@ -12,17 +13,18 @@ export class WsTicketStore {
   private tickets = new Map<string, Ticket>()
   private cleanupTimer: ReturnType<typeof setInterval> | null = null
 
-  createTicket(sessionId: string): string {
+  createTicket(sessionId: string, purpose: string): string {
     const ticket = randomBytes(32).toString('hex')
-    this.tickets.set(ticket, { sessionId, expiresAt: Date.now() + TICKET_TTL_MS })
+    this.tickets.set(ticket, { sessionId, purpose, expiresAt: Date.now() + TICKET_TTL_MS })
     return ticket
   }
 
-  consumeTicket(ticket: string): string | null {
+  consumeTicket(ticket: string, purpose: string): string | null {
     const entry = this.tickets.get(ticket)
     if (!entry) return null
     this.tickets.delete(ticket)
     if (Date.now() > entry.expiresAt) return null
+    if (entry.purpose !== purpose) return null
     return entry.sessionId
   }
 

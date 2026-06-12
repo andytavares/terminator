@@ -103,7 +103,7 @@ export async function registerTerminalRoutes(
     async (request, reply) => {
       const { sessionId } = request.params
       if (!sessions.has(sessionId)) return reply.status(404).send({ error: 'NOT_FOUND' })
-      const ticket = ticketStore.createTicket(sessionId)
+      const ticket = ticketStore.createTicket(sessionId, 'terminal')
       return reply.status(201).send({ ticket })
     }
   )
@@ -121,7 +121,7 @@ export async function registerTerminalRoutes(
         return
       }
 
-      const ticketSessionId = ticketStore.consumeTicket(ticket)
+      const ticketSessionId = ticketStore.consumeTicket(ticket, 'terminal')
       if (!ticketSessionId || ticketSessionId !== sessionId) {
         ws.close(4001, 'invalid or expired ticket')
         return

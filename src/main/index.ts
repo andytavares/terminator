@@ -37,6 +37,7 @@ type IpcSendHandler = (event: Electron.IpcMainEvent, payload: unknown) => void
 
 const _origHandle = ipcMain.handle.bind(ipcMain)
 const _origOn = ipcMain.on.bind(ipcMain)
+const _origRemoveHandler = ipcMain.removeHandler.bind(ipcMain)
 // @ts-expect-error - patch to intercept all handler registrations
 ipcMain.handle = (channel: string, fn: IpcHandler) => {
   ipcInvokeRegistry.set(channel, fn)
@@ -46,6 +47,11 @@ ipcMain.handle = (channel: string, fn: IpcHandler) => {
 ipcMain.on = (channel: string, fn: IpcSendHandler) => {
   ipcSendRegistry.set(channel, fn)
   return _origOn(channel, fn)
+}
+// @ts-expect-error - patch to keep bridge registry in sync when handlers are removed
+ipcMain.removeHandler = (channel: string) => {
+  ipcInvokeRegistry.delete(channel)
+  return _origRemoveHandler(channel)
 }
 
 declare module 'electron' {

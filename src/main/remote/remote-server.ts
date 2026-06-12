@@ -65,7 +65,7 @@ export async function createRemoteServer(
   // A valid one-time ticket (?t=) is required — issued by POST /api/app-ticket after login.
   app.get<{ Querystring: { t?: string } }>('/app/', async (request, reply) => {
     const t = request.query.t ?? ''
-    if (!t || !ticketStore.consumeTicket(t)) {
+    if (!t || !ticketStore.consumeTicket(t, 'app')) {
       return reply.redirect('/')
     }
     const shimTag = '<script type="module" src="/remote-shim.js"></script>'
@@ -80,7 +80,7 @@ export async function createRemoteServer(
 
   // POST /api/app-ticket — Bearer auth enforced by the auth middleware for /api/* routes
   app.post('/api/app-ticket', async (_request, reply) => {
-    const ticket = ticketStore.createTicket('__app__')
+    const ticket = ticketStore.createTicket('__app__', 'app')
     return reply.status(201).send({ ticket })
   })
 

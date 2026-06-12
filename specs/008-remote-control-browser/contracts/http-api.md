@@ -160,7 +160,31 @@ Ticket expires in 30 seconds. Used once in the WebSocket upgrade below.
 
 ---
 
-## WebSocket Endpoint
+### `POST /api/bridge-ticket`
+
+Issues a short-lived, single-use WebSocket upgrade ticket for the bridge connection. Required before connecting to `GET /api/bridge` — the bridge no longer accepts a raw password in the URL.
+
+**Response 201**:
+
+```json
+{ "ticket": "64-char hex string" }
+```
+
+---
+
+### `POST /api/app-ticket`
+
+Issues a short-lived, single-use ticket for loading the renderer app page at `GET /app/`. Required after successful login before navigating to `/app/`.
+
+**Response 201**:
+
+```json
+{ "ticket": "64-char hex string" }
+```
+
+---
+
+## WebSocket Endpoints
 
 ### `GET /ws/terminals/:sessionId?ticket=<ticket>`
 
@@ -182,11 +206,29 @@ Upgrades to a WebSocket connection for terminal streaming.
 
 ---
 
+### `GET /api/bridge?ticket=<ticket>`
+
+Upgrades to a WebSocket connection for the Electron IPC bridge. The bridge proxies all `window.electronAPI` calls from the remote browser to the Electron main process.
+
+**Query**: `ticket` — a single-use ticket obtained from `POST /api/bridge-ticket`. The ticket is consumed on first use; reconnects must fetch a new ticket.
+
+**Authentication**: Self-authed via ticket (browsers cannot send `Authorization` headers on WebSocket upgrade). DNS rebinding protection still applies to the `Host` header.
+
+**Close codes**:
+
+- `4001` — ticket invalid, expired, or already consumed
+
+---
+
 ## Static Assets
 
 ### `GET /` and `GET /*`
 
-Serves the remote-control browser SPA from `out/renderer-remote/`. All unmatched routes return `index.html` (SPA client-side routing).
+Serves the login SPA from `out/renderer-remote/`.
+
+### `GET /app/?t=<ticket>`
+
+Serves the full renderer app page (Terminator UI) with the `remote-shim.js` injected. Requires a valid one-time `t` ticket obtained from `POST /api/app-ticket` immediately after login. If no valid ticket is present, redirects to `/`.
 
 ---
 

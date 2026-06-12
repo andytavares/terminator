@@ -97,7 +97,7 @@ describe('bridge.route', () => {
     })
 
     it('accepts connection with a valid ticket', async () => {
-      const ticket = ticketStore.createTicket('__bridge__')
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.close()
@@ -105,8 +105,8 @@ describe('bridge.route', () => {
     })
 
     it('rejects a ticket that has already been consumed', async () => {
-      const ticket = ticketStore.createTicket('__bridge__')
-      ticketStore.consumeTicket(ticket)
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
+      ticketStore.consumeTicket(ticket, 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForClose(ws)
     })
@@ -114,7 +114,7 @@ describe('bridge.route', () => {
 
   describe('subscribe messages', () => {
     it('subscribes to a channel on bridgeEventBus', async () => {
-      const ticket = ticketStore.createTicket('__bridge__')
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
 
@@ -127,7 +127,7 @@ describe('bridge.route', () => {
     })
 
     it('does not double-subscribe to the same channel', async () => {
-      const ticket = ticketStore.createTicket('__bridge__')
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
 
@@ -146,7 +146,7 @@ describe('bridge.route', () => {
     it('dispatches invoke to ipcInvokeRegistry and sends result back', async () => {
       mockIpcInvokeRegistry.set('workspace:list', async () => [{ id: 'ws-1', name: 'Test' }])
 
-      const ticket = ticketStore.createTicket('__bridge__')
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(JSON.stringify({ type: 'invoke', id: 'r1', channel: 'workspace:list', args: [{}] }))
@@ -162,7 +162,7 @@ describe('bridge.route', () => {
     })
 
     it('sends result: undefined when channel has no handler', async () => {
-      const ticket = ticketStore.createTicket('__bridge__')
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(JSON.stringify({ type: 'invoke', id: 'r2', channel: 'nonexistent', args: [{}] }))
@@ -181,7 +181,7 @@ describe('bridge.route', () => {
         throw new Error('validation failed')
       })
 
-      const ticket = ticketStore.createTicket('__bridge__')
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(JSON.stringify({ type: 'invoke', id: 'r3', channel: 'workspace:create', args: [{}] }))
@@ -202,7 +202,7 @@ describe('bridge.route', () => {
       const handler = vi.fn()
       mockIpcSendRegistry.set('terminal:input', handler)
 
-      const ticket = ticketStore.createTicket('__bridge__')
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(
@@ -220,7 +220,7 @@ describe('bridge.route', () => {
     })
 
     it('ignores send for unknown channel (no crash)', async () => {
-      const ticket = ticketStore.createTicket('__bridge__')
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(JSON.stringify({ type: 'send', channel: 'no:handler', args: [{}] }))
@@ -232,7 +232,7 @@ describe('bridge.route', () => {
 
   describe('event forwarding', () => {
     it('forwards bridgeEventBus events to subscribed client', async () => {
-      const ticket = ticketStore.createTicket('__bridge__')
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
@@ -252,7 +252,7 @@ describe('bridge.route', () => {
 
   describe('close cleanup', () => {
     it('unregisters all channel forwarders on disconnect', async () => {
-      const ticket = ticketStore.createTicket('__bridge__')
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
@@ -266,9 +266,23 @@ describe('bridge.route', () => {
     })
   })
 
+  describe('ticket purpose scoping', () => {
+    it('rejects a terminal-purpose ticket on the bridge endpoint', async () => {
+      const terminalTicket = ticketStore.createTicket('some-session-id', 'terminal')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${terminalTicket}`)
+      await waitForClose(ws)
+    })
+
+    it('rejects an app-purpose ticket on the bridge endpoint', async () => {
+      const appTicket = ticketStore.createTicket('__app__', 'app')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${appTicket}`)
+      await waitForClose(ws)
+    })
+  })
+
   describe('invalid messages', () => {
     it('ignores non-JSON messages without crashing', async () => {
-      const ticket = ticketStore.createTicket('__bridge__')
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send('not json at all')
