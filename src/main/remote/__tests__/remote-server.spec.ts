@@ -130,15 +130,32 @@ describe('RemoteServer', () => {
   })
 
   describe('EADDRINUSE handling', () => {
-    it('start() with port in use calls getWindow and rejects', async () => {
-      const { createRemoteServer: create2 } = await import('../remote-server')
+    it('start() with port in use rejects with PortInUseError', async () => {
+      const { createRemoteServer: create2, PortInUseError } = await import('../remote-server')
       const conflictServer = await create2({
         port: 7682,
         ptyManager: mockPtyManager as never,
         deps: mockDeps,
         getWindow: mockGetWindow as never,
       })
-      await expect(conflictServer.start()).rejects.toThrow()
+      await expect(conflictServer.start()).rejects.toThrow(PortInUseError)
+    })
+
+    it('start() with port in use sends PORT_IN_USE status via getWindow', async () => {
+      const { createRemoteServer: create2 } = await import('../remote-server')
+      const mockSend = vi.fn()
+      const mockWindow = { webContents: { send: mockSend } }
+      const conflictServer = await create2({
+        port: 7682,
+        ptyManager: mockPtyManager as never,
+        deps: mockDeps,
+        getWindow: () => mockWindow as never,
+      })
+      await conflictServer.start().catch(() => {})
+      expect(mockSend).toHaveBeenCalledWith(
+        'remote:status',
+        expect.objectContaining({ error: 'PORT_IN_USE' })
+      )
     })
   })
 })

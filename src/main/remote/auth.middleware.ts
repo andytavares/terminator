@@ -1,11 +1,10 @@
 import bcryptjs from 'bcryptjs'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 
-// Only API routes require authentication; static assets and health are public
-const API_PREFIX = '/api'
+// Routes that require DNS rebinding protection (auth-gated or self-auth WebSocket routes)
+const PROTECTED_PREFIXES = ['/api', '/ws']
 
-// Routes that handle their own auth (e.g. WebSocket routes where browsers can't send headers)
-// They still get DNS rebinding checks applied via checkHost()
+// Routes that handle their own Bearer/token auth (browsers can't send Authorization headers on WS)
 const SELF_AUTHED = new Set(['/api/bridge', '/ws/terminals'])
 
 // Allowed hosts: loopback, private RFC-1918 ranges (LAN), and ngrok tunnel domains
@@ -35,16 +34,16 @@ export async function registerAuthMiddleware(
   const { getPasswordHash } = opts
 
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
-    if (!request.url.startsWith(API_PREFIX)) return
+    const isProtected = PROTECTED_PREFIXES.some((p) => request.url.startsWith(p))
+    if (!isProtected) return
 
-    // DNS rebinding protection: reject requests from unexpected origins.
-    // Applied to ALL /api routes including self-authed WebSocket routes.
+    // DNS rebinding protection: applies to all /api and /ws routes
     const rawHost = request.headers.host ?? ''
     if (rawHost && !isAllowedHost(rawHost)) {
       return reply.status(403).send({ error: 'FORBIDDEN' })
     }
 
-    // WebSocket routes handle their own Bearer/token auth — browsers can't set Authorization headers
+    // WebSocket routes handle their own Bearer/token auth — browsers can't send Authorization on WS
     if ([...SELF_AUTHED].some((p) => request.url.startsWith(p))) return
 
     const authHeader = request.headers.authorization

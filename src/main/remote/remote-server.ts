@@ -34,6 +34,13 @@ export interface RemoteServerHandle {
   inject: FastifyInstance['inject']
 }
 
+export class PortInUseError extends Error {
+  constructor(port: number) {
+    super(`Port ${port} is already in use. Change the port in Settings.`)
+    this.name = 'PortInUseError'
+  }
+}
+
 export async function createRemoteServer(
   options: RemoteServerOptions
 ): Promise<RemoteServerHandle> {
@@ -91,9 +98,12 @@ export async function createRemoteServer(
         await app.close().catch(() => {})
         const code = (err as NodeJS.ErrnoException).code
         if (code === 'EADDRINUSE') {
-          const msg = `Port ${port} is already in use. Change the port in Settings.`
-          getWindow()?.webContents.send('remote:status', { error: 'PORT_IN_USE', message: msg })
-          throw new Error(msg)
+          const portErr = new PortInUseError(port)
+          getWindow()?.webContents.send('remote:status', {
+            error: 'PORT_IN_USE',
+            message: portErr.message,
+          })
+          throw portErr
         }
         throw err
       }

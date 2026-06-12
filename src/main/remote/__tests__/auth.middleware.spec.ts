@@ -164,4 +164,32 @@ describe('auth.middleware', () => {
       expect(res.statusCode).toBe(200)
     })
   })
+
+  describe('/ws/ routes get DNS rebinding protection', () => {
+    it('blocks /ws/terminals with unexpected Host', async () => {
+      const app = await buildApp(hash, (a) => {
+        a.get('/ws/terminals/s1', async () => ({ ok: true }))
+      })
+      const res = await app.inject({
+        method: 'GET',
+        url: '/ws/terminals/s1',
+        headers: { Host: 'evil.attacker.com' },
+      })
+      await app.close()
+      expect(res.statusCode).toBe(403)
+    })
+
+    it('allows /ws/terminals from localhost', async () => {
+      const app = await buildApp(hash, (a) => {
+        a.get('/ws/terminals/s1', async () => ({ ok: true }))
+      })
+      const res = await app.inject({
+        method: 'GET',
+        url: '/ws/terminals/s1',
+        headers: { Host: 'localhost:7681' },
+      })
+      await app.close()
+      expect(res.statusCode).toBe(200)
+    })
+  })
 })

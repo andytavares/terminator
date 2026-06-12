@@ -13,7 +13,11 @@ import { registerMetricsHandlers } from './ipc/metrics.ipc.js'
 import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
 import { logger } from './logger.js'
-import { createRemoteServer, type RemoteServerHandle } from './remote/remote-server.js'
+import {
+  createRemoteServer,
+  type RemoteServerHandle,
+  PortInUseError,
+} from './remote/remote-server.js'
 import {
   registerRemoteHandlers,
   sendStatus,
@@ -145,8 +149,14 @@ async function startRemoteControl(): Promise<void> {
       })
     }
   } catch (err) {
-    sendLog(mainWindow, 'error', `Remote Control: failed to start server: ${String(err)}`)
     remoteServer = null
+    if (err instanceof PortInUseError) {
+      // PORT_IN_USE status was already sent inside start(); preserve user's enabled setting
+      sendLog(mainWindow, 'warn', `Remote Control: ${err.message}`)
+      return
+    }
+    sendLog(mainWindow, 'error', `Remote Control: failed to start server: ${String(err)}`)
+    updateGlobalSettings({ remoteControl: { enabled: false } })
     sendStatus(mainWindow, { enabled: false, error: 'START_FAILED' })
   }
 }
