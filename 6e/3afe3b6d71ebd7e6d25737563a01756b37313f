@@ -1,0 +1,39 @@
+src/main/index.ts
+  s_ac8a4310babbf3::t_1931ad95bbca06 40,51-54
+src/main/remote/__tests__/ws-ticket-store.spec.ts
+  s_ac8a4310babbf3::t_6164aea6407abe 19,24-25,31-33,37-39,43,47,49,53,55-66,73,76,82,85
+src/main/remote/remote-server.ts
+  s_ac8a4310babbf3::t_86f0c1e931d19e 83
+  s_ac8a4310babbf3::t_8c00bc3d0f59bf 68
+src/main/remote/ws-ticket-store.ts
+  s_ac8a4310babbf3::t_bd9fedd65da6bd 5,16,18,22,27
+src/main/remote/__tests__/bridge.route.spec.ts
+  s_ac8a4310babbf3::t_e698cf7af5534c 100,108,117,130,149,165,184,205,223,235,255,285
+  s_ac8a4310babbf3::t_192f54bf4550b2 109
+  s_ac8a4310babbf3::t_dbc6f06b576c6c 269-282
+specs/008-remote-control-browser/contracts/http-api.md
+  s_ac8a4310babbf3::t_0fc3c28fdc134d 163-187
+  s_ac8a4310babbf3::t_08536cbc636cc0 209-222,227-231
+src/main/remote/routes/terminal.routes.ts
+  s_ac8a4310babbf3::t_e9e6147d95d312 124
+  s_ac8a4310babbf3::t_f8f0acaaa02337 106
+src/main/remote/routes/bridge.route.ts
+  s_ac8a4310babbf3::t_2d928c5b2ded6f 20
+  s_ac8a4310babbf3::t_7046586fbcee43 32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "6e3afe3b6d71ebd7e6d25737563a01756b37313f",
+  "prompts": {},
+  "sessions": {
+    "s_ac8a4310babbf3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3bd30aff-54f6-4b9d-9c65-9aae3ba25961",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
