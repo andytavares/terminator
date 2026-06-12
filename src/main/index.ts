@@ -146,6 +146,8 @@ async function startRemoteControl(): Promise<void> {
     }
   } catch (err) {
     sendLog(mainWindow, 'error', `Remote Control: failed to start server: ${String(err)}`)
+    remoteServer = null
+    updateGlobalSettings({ remoteControl: { enabled: false } })
     sendStatus(mainWindow, { enabled: false, error: 'START_FAILED' })
   }
 }
@@ -348,7 +350,7 @@ app.whenReady().then(async () => {
     },
     {
       updateGlobalSettings,
-      disconnectAllClients: () => remoteServer?.inject && undefined,
+      disconnectAllClients: () => remoteServer?.disconnectAllClients(),
     }
   )
 

@@ -108,6 +108,18 @@ describe('WsSubscriberManager', () => {
     })
   })
 
+  describe('getCount', () => {
+    it('returns 0 for unknown session', () => {
+      expect(mgr.getCount('unknown')).toBe(0)
+    })
+
+    it('returns the number of active subscribers', () => {
+      mgr.addSubscriber('s1', mockWs() as never)
+      mgr.addSubscriber('s1', mockWs() as never)
+      expect(mgr.getCount('s1')).toBe(2)
+    })
+  })
+
   describe('destroyAll', () => {
     it('closes all subscribers across all sessions', () => {
       const ws1 = mockWs()

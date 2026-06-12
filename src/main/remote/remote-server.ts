@@ -30,6 +30,7 @@ export interface RemoteServerHandle {
   start(): Promise<void>
   stop(): Promise<void>
   isListening(): boolean
+  disconnectAllClients(): void
   inject: FastifyInstance['inject']
 }
 
@@ -86,6 +87,8 @@ export async function createRemoteServer(
         ticketStore.startCleanup()
         listening = true
       } catch (err) {
+        // Clean up the allocated Fastify instance so retries don't stack orphaned servers
+        await app.close().catch(() => {})
         const code = (err as NodeJS.ErrnoException).code
         if (code === 'EADDRINUSE') {
           const msg = `Port ${port} is already in use. Change the port in Settings.`
@@ -102,6 +105,10 @@ export async function createRemoteServer(
       subscriberManager.destroyAll()
       await app.close()
       listening = false
+    },
+
+    disconnectAllClients() {
+      subscriberManager.destroyAll()
     },
 
     isListening() {

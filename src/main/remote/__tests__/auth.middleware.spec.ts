@@ -69,6 +69,18 @@ describe('auth.middleware', () => {
       expect(res.statusCode).toBe(200)
     })
 
+    it('returns 403 when Host header is an unexpected external domain', async () => {
+      const app = await buildApp(hash)
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/protected',
+        headers: { Authorization: 'Bearer correct-password', Host: 'evil.attacker.com' },
+      })
+      await app.close()
+      expect(res.statusCode).toBe(403)
+      expect(JSON.parse(res.body)).toMatchObject({ error: 'FORBIDDEN' })
+    })
+
     it('returns 401 when hash is empty (no password set)', async () => {
       const app = await buildApp('')
       const res = await app.inject({

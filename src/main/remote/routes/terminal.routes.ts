@@ -65,7 +65,7 @@ export async function registerTerminalRoutes(
       if (!session) return reply.status(404).send({ error: 'NOT_FOUND' })
       return {
         ...session,
-        subscriberCount: 0,
+        subscriberCount: subscriberManager.getCount(request.params.sessionId),
       }
     }
   )

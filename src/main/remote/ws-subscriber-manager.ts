@@ -52,6 +52,10 @@ export class WsSubscriberManager {
     this.sessions.delete(sessionId)
   }
 
+  getCount(sessionId: string): number {
+    return this.sessions.get(sessionId)?.subscribers.size ?? 0
+  }
+
   destroyAll(): void {
     for (const sessionId of this.sessions.keys()) {
       this.destroySession(sessionId)

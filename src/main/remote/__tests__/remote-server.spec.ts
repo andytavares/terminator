@@ -15,16 +15,19 @@ vi.mock('../ws-ticket-store', () => ({
   })),
 }))
 
+const mockSubscriberManager = vi.hoisted(() => ({
+  addSubscriber: vi.fn(),
+  removeSubscriber: vi.fn(),
+  broadcast: vi.fn(),
+  destroySession: vi.fn(),
+  destroyAll: vi.fn(),
+  isPrimary: vi.fn(),
+  getPrimary: vi.fn(),
+  getCount: vi.fn(() => 0),
+}))
+
 vi.mock('../ws-subscriber-manager', () => ({
-  WsSubscriberManager: vi.fn().mockImplementation(() => ({
-    addSubscriber: vi.fn(),
-    removeSubscriber: vi.fn(),
-    broadcast: vi.fn(),
-    destroySession: vi.fn(),
-    destroyAll: vi.fn(),
-    isPrimary: vi.fn(),
-    getPrimary: vi.fn(),
-  })),
+  WsSubscriberManager: vi.fn(() => mockSubscriberManager),
 }))
 
 describe('RemoteServer', () => {
@@ -84,6 +87,11 @@ describe('RemoteServer', () => {
     it('double stop() is safe', async () => {
       await remoteServer.stop()
       await expect(remoteServer.stop()).resolves.not.toThrow()
+    })
+
+    it('disconnectAllClients() calls subscriberManager.destroyAll', () => {
+      remoteServer.disconnectAllClients()
+      expect(mockSubscriberManager.destroyAll).toHaveBeenCalled()
     })
   })
 
