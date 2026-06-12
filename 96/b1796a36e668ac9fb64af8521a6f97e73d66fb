@@ -1,0 +1,56 @@
+src/main/remote/routes/bridge.route.ts
+  s_ac8a4310babbf3::t_3e01ab04cf361c 6,9,16-22,30-33
+src/main/remote/__tests__/bridge.route.spec.ts
+  s_ac8a4310babbf3::t_0536e9f4ee770a 6,23,25,28-29,58,68,78-87,89,94-95,99-103,107-110,117-118,130-131,149-150,165-166,184-185,205-206,223-224,235-236,255-256,271-272
+tests/unit/renderer-remote/electron-api-shim.spec.ts
+  s_ac8a4310babbf3::t_0c537318d86bf9 83-87,89
+  s_ac8a4310babbf3::t_e2dfc5fd276eec 27-28,32-36,38-39,47
+  s_ac8a4310babbf3::t_87ff5c24547fa0 64,68-72
+src/main/remote/__tests__/terminal.routes.spec.ts
+  s_ac8a4310babbf3::t_c722db9efc60de 23,31
+  s_ac8a4310babbf3::t_0d6a2071d6acf2 6
+  s_ac8a4310babbf3::t_73f0135ffc58ba 365-411
+src/main/remote/remote-server.ts
+  s_ac8a4310babbf3::t_476c4934f388b8 64-70
+  s_ac8a4310babbf3::t_91c7cc8b552855 81-86,94-97,99
+  s_ac8a4310babbf3::t_ec5f493dd54911 128
+src/main/remote/__tests__/auth.middleware.spec.ts
+  s_ac8a4310babbf3::t_e12ca9ef97d5aa 153-162
+src/main/remote/__tests__/remote-server.spec.ts
+  s_ac8a4310babbf3::t_3334f107559474 107-108,114,116-117,124,128
+  s_ac8a4310babbf3::t_fd5cd8bf04ca23 101,103-106,109-113,115,123,133
+  s_ac8a4310babbf3::t_ae585ed61cd7a2 134-135
+  s_ac8a4310babbf3::t_03f8cb02db3dae 9-15,17
+src/main/remote/routes/terminal.routes.ts
+  s_ac8a4310babbf3::t_ec8893362ee2dd 148-157
+  s_ac8a4310babbf3::t_01868d2269965d 49,57-58
+  s_ac8a4310babbf3::t_625ab7b2846d64 37
+  s_ac8a4310babbf3::t_96e83e98054002 2
+src/renderer-remote/App.tsx
+  s_ac8a4310babbf3::t_9b412b7f1ff559 26-36,39
+src/renderer-remote/electron-api-shim.ts
+  s_ac8a4310babbf3::t_f207b3fef1931f 114,122
+  s_ac8a4310babbf3::t_9062e719f3fff8 62-64
+  s_ac8a4310babbf3::t_bccbbffb09196f 43-61
+tests/unit/renderer-remote/App.spec.tsx
+  s_ac8a4310babbf3::t_980fcb40ac6415 52-59,69
+  s_ac8a4310babbf3::t_9062e719f3fff8 61-65
+src/main/remote/auth.middleware.ts
+  s_ac8a4310babbf3::t_5110d9ba39d065 43-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "96b1796a36e668ac9fb64af8521a6f97e73d66fb",
+  "prompts": {},
+  "sessions": {
+    "s_ac8a4310babbf3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3bd30aff-54f6-4b9d-9c65-9aae3ba25961",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
