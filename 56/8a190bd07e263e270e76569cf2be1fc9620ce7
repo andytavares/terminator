@@ -1,0 +1,28 @@
+src/main/remote/remote-server.ts
+  s_ac8a4310babbf3::t_8c992a4052245e 86
+src/main/remote/auth.middleware.ts
+  s_ac8a4310babbf3::t_373c7a1de26b5b 8,11,14-16,18,24,40-41,47-48
+  s_ac8a4310babbf3::t_44ac1a50c1aba7 19-23
+src/main/remote/__tests__/auth.middleware.spec.ts
+  s_ac8a4310babbf3::t_adc7bc0b2b41bc 5
+  s_ac8a4310babbf3::t_e4ddb7d51b77e2 23-40
+  s_ac8a4310babbf3::t_182dcfe8915094 131,140-162
+src/main/index.ts
+  s_ac8a4310babbf3::t_968c3911dd3111 346-352
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "568a190bd07e263e270e76569cf2be1fc9620ce7",
+  "prompts": {},
+  "sessions": {
+    "s_ac8a4310babbf3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3bd30aff-54f6-4b9d-9c65-9aae3ba25961",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
