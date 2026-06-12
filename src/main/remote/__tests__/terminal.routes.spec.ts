@@ -3,6 +3,7 @@ import Fastify from 'fastify'
 import type { FastifyInstance } from 'fastify'
 import websocketPlugin from '@fastify/websocket'
 import { WebSocket } from 'ws'
+import { homedir } from 'os'
 import { registerTerminalRoutes } from '../routes/terminal.routes'
 import { WsTicketStore } from '../ws-ticket-store'
 import { WsSubscriberManager } from '../ws-subscriber-manager'
@@ -19,6 +20,7 @@ let mockTicketStore: WsTicketStore
 let mockSubscriberManager: WsSubscriberManager
 
 let app: FastifyInstance
+let terminalCleanup: { cleanup: () => void }
 
 beforeEach(async () => {
   vi.resetAllMocks()
@@ -26,7 +28,7 @@ beforeEach(async () => {
   mockSubscriberManager = new WsSubscriberManager()
   app = Fastify({ logger: false })
   await app.register(websocketPlugin)
-  await registerTerminalRoutes(app, {
+  terminalCleanup = await registerTerminalRoutes(app, {
     ptyManager: mockPtyManager as never,
     ticketStore: mockTicketStore,
     subscriberManager: mockSubscriberManager,
@@ -358,5 +360,52 @@ describe('WS /ws/terminals/:sessionId', () => {
         }
       }, 50)
     })
+  })
+})
+
+describe('cleanup()', () => {
+  it('kills all active PTY sessions and clears the session map', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/terminals',
+      payload: { cwd: '/tmp', type: 'human', tabTitle: 'Session A' },
+    })
+    await app.inject({
+      method: 'POST',
+      url: '/api/terminals',
+      payload: { cwd: '/tmp', type: 'human', tabTitle: 'Session B' },
+    })
+    expect(mockPtyManager.spawn).toHaveBeenCalledTimes(2)
+
+    terminalCleanup.cleanup()
+
+    expect(mockPtyManager.kill).toHaveBeenCalledTimes(2)
+  })
+
+  it('is safe to call when there are no active sessions', () => {
+    expect(() => terminalCleanup.cleanup()).not.toThrow()
+  })
+})
+
+describe('tilde expansion in cwd', () => {
+  it('expands ~ to the home directory when creating a terminal', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/terminals',
+      payload: { cwd: '~/projects', type: 'human', tabTitle: 'Tilde Test' },
+    })
+    expect(res.statusCode).toBe(201)
+    const spawnCall = mockPtyManager.spawn.mock.calls[0]
+    expect(spawnCall[1]).toBe(`${homedir()}/projects`)
+  })
+
+  it('leaves non-tilde paths unchanged', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/terminals',
+      payload: { cwd: '/absolute/path', type: 'human', tabTitle: 'No Tilde' },
+    })
+    expect(res.statusCode).toBe(201)
+    expect(mockPtyManager.spawn.mock.calls[0][1]).toBe('/absolute/path')
   })
 })

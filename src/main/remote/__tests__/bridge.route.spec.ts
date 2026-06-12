@@ -3,7 +3,7 @@ import Fastify from 'fastify'
 import type { FastifyInstance } from 'fastify'
 import websocketPlugin from '@fastify/websocket'
 import { WebSocket } from 'ws'
-import bcryptjs from 'bcryptjs'
+import { WsTicketStore } from '../ws-ticket-store'
 
 const mockBridgeEventBus = {
   on: vi.fn(),
@@ -20,12 +20,13 @@ vi.mock('../ipc-registry.js', () => ({
   ipcSendRegistry: mockIpcSendRegistry,
 }))
 
-async function buildBridgeApp(passwordHash: string): Promise<FastifyInstance> {
+async function buildBridgeApp(): Promise<{ app: FastifyInstance; ticketStore: WsTicketStore }> {
   const { registerBridgeRoute } = await import('../routes/bridge.route')
+  const ticketStore = new WsTicketStore()
   const app = Fastify({ logger: false })
   await app.register(websocketPlugin)
-  await registerBridgeRoute(app, { getPasswordHash: () => passwordHash })
-  return app
+  await registerBridgeRoute(app, { ticketStore })
+  return { app, ticketStore }
 }
 
 function waitForClose(ws: WebSocket): Promise<void> {
@@ -54,8 +55,8 @@ function waitForOpen(ws: WebSocket): Promise<void> {
 
 describe('bridge.route', () => {
   let app: FastifyInstance
+  let ticketStore: WsTicketStore
   let baseUrl: string
-  let hash: string
 
   beforeEach(async () => {
     vi.resetModules()
@@ -64,9 +65,7 @@ describe('bridge.route', () => {
     mockBridgeEventBus.emit.mockReset()
     mockIpcInvokeRegistry.clear()
     mockIpcSendRegistry.clear()
-
-    hash = await bcryptjs.hash('secret', 4)
-    app = await buildBridgeApp(hash)
+    ;({ app, ticketStore } = await buildBridgeApp())
     await app.listen({ port: 0, host: '127.0.0.1' })
     const addr = app.server.address() as { port: number; address: string }
     baseUrl = `ws://${addr.address}:${addr.port}`
@@ -76,38 +75,47 @@ describe('bridge.route', () => {
     await app.close()
   })
 
+  describe('POST /api/bridge-ticket', () => {
+    it('returns 201 with a ticket string', async () => {
+      const res = await app.inject({ method: 'POST', url: '/api/bridge-ticket' })
+      expect(res.statusCode).toBe(201)
+      const body = JSON.parse(res.body) as { ticket: string }
+      expect(typeof body.ticket).toBe('string')
+      expect(body.ticket.length).toBeGreaterThan(0)
+    })
+  })
+
   describe('authentication', () => {
-    it('closes connection when no token provided', async () => {
+    it('closes connection when no ticket provided', async () => {
       const ws = new WebSocket(`${baseUrl}/api/bridge`)
       await waitForClose(ws)
     })
 
-    it('closes connection when wrong token provided', async () => {
-      const ws = new WebSocket(`${baseUrl}/api/bridge?token=wrong`)
+    it('closes connection when invalid ticket provided', async () => {
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=invalid-ticket`)
       await waitForClose(ws)
     })
 
-    it('closes connection when hash is empty', async () => {
-      await app.close()
-      app = await buildBridgeApp('')
-      await app.listen({ port: 0, host: '127.0.0.1' })
-      const addr = app.server.address() as { port: number; address: string }
-      const url = `ws://${addr.address}:${addr.port}`
-      const ws = new WebSocket(`${url}/api/bridge?token=anything`)
-      await waitForClose(ws)
-    })
-
-    it('accepts connection with correct token', async () => {
-      const ws = new WebSocket(`${baseUrl}/api/bridge?token=secret`)
+    it('accepts connection with a valid ticket', async () => {
+      const ticket = ticketStore.createTicket('__bridge__')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.close()
+      await waitForClose(ws)
+    })
+
+    it('rejects a ticket that has already been consumed', async () => {
+      const ticket = ticketStore.createTicket('__bridge__')
+      ticketStore.consumeTicket(ticket)
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForClose(ws)
     })
   })
 
   describe('subscribe messages', () => {
     it('subscribes to a channel on bridgeEventBus', async () => {
-      const ws = new WebSocket(`${baseUrl}/api/bridge?token=secret`)
+      const ticket = ticketStore.createTicket('__bridge__')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
 
       ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
@@ -119,14 +127,14 @@ describe('bridge.route', () => {
     })
 
     it('does not double-subscribe to the same channel', async () => {
-      const ws = new WebSocket(`${baseUrl}/api/bridge?token=secret`)
+      const ticket = ticketStore.createTicket('__bridge__')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
 
       ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
       ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
       await new Promise((r) => setTimeout(r, 30))
 
-      // Should only subscribe once
       const calls = mockBridgeEventBus.on.mock.calls.filter(([ch]) => ch === 'terminal:output')
       expect(calls.length).toBe(1)
       ws.close()
@@ -138,7 +146,8 @@ describe('bridge.route', () => {
     it('dispatches invoke to ipcInvokeRegistry and sends result back', async () => {
       mockIpcInvokeRegistry.set('workspace:list', async () => [{ id: 'ws-1', name: 'Test' }])
 
-      const ws = new WebSocket(`${baseUrl}/api/bridge?token=secret`)
+      const ticket = ticketStore.createTicket('__bridge__')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(JSON.stringify({ type: 'invoke', id: 'r1', channel: 'workspace:list', args: [{}] }))
 
@@ -153,7 +162,8 @@ describe('bridge.route', () => {
     })
 
     it('sends result: undefined when channel has no handler', async () => {
-      const ws = new WebSocket(`${baseUrl}/api/bridge?token=secret`)
+      const ticket = ticketStore.createTicket('__bridge__')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(JSON.stringify({ type: 'invoke', id: 'r2', channel: 'nonexistent', args: [{}] }))
 
@@ -171,7 +181,8 @@ describe('bridge.route', () => {
         throw new Error('validation failed')
       })
 
-      const ws = new WebSocket(`${baseUrl}/api/bridge?token=secret`)
+      const ticket = ticketStore.createTicket('__bridge__')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(JSON.stringify({ type: 'invoke', id: 'r3', channel: 'workspace:create', args: [{}] }))
 
@@ -191,7 +202,8 @@ describe('bridge.route', () => {
       const handler = vi.fn()
       mockIpcSendRegistry.set('terminal:input', handler)
 
-      const ws = new WebSocket(`${baseUrl}/api/bridge?token=secret`)
+      const ticket = ticketStore.createTicket('__bridge__')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(
         JSON.stringify({
@@ -208,7 +220,8 @@ describe('bridge.route', () => {
     })
 
     it('ignores send for unknown channel (no crash)', async () => {
-      const ws = new WebSocket(`${baseUrl}/api/bridge?token=secret`)
+      const ticket = ticketStore.createTicket('__bridge__')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(JSON.stringify({ type: 'send', channel: 'no:handler', args: [{}] }))
       await new Promise((r) => setTimeout(r, 30))
@@ -219,12 +232,12 @@ describe('bridge.route', () => {
 
   describe('event forwarding', () => {
     it('forwards bridgeEventBus events to subscribed client', async () => {
-      const ws = new WebSocket(`${baseUrl}/api/bridge?token=secret`)
+      const ticket = ticketStore.createTicket('__bridge__')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
       await new Promise((r) => setTimeout(r, 30))
 
-      // Capture the forwarder function registered with bridgeEventBus.on
       const [[, forwarder]] = mockBridgeEventBus.on.mock.calls
       forwarder({ sessionId: 's1', data: 'hello' })
 
@@ -239,7 +252,8 @@ describe('bridge.route', () => {
 
   describe('close cleanup', () => {
     it('unregisters all channel forwarders on disconnect', async () => {
-      const ws = new WebSocket(`${baseUrl}/api/bridge?token=secret`)
+      const ticket = ticketStore.createTicket('__bridge__')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
       await new Promise((r) => setTimeout(r, 30))
@@ -254,11 +268,11 @@ describe('bridge.route', () => {
 
   describe('invalid messages', () => {
     it('ignores non-JSON messages without crashing', async () => {
-      const ws = new WebSocket(`${baseUrl}/api/bridge?token=secret`)
+      const ticket = ticketStore.createTicket('__bridge__')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send('not json at all')
       await new Promise((r) => setTimeout(r, 30))
-      // No crash — connection stays open
       ws.close()
       await waitForClose(ws)
     })

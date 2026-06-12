@@ -61,8 +61,13 @@ export async function createRemoteServer(
   const rendererDir = join(__dirname, '../renderer')
   await app.register(staticPlugin, { root: rendererDir, prefix: '/app', decorateReply: false })
 
-  // Intercept /app/ and /app/index.html to inject the shim before the renderer bundle
-  app.get('/app/', async (_request, reply) => {
+  // Intercept /app/ and /app/index.html to inject the shim before the renderer bundle.
+  // A valid one-time ticket (?t=) is required — issued by POST /api/app-ticket after login.
+  app.get<{ Querystring: { t?: string } }>('/app/', async (request, reply) => {
+    const t = request.query.t ?? ''
+    if (!t || !ticketStore.consumeTicket(t)) {
+      return reply.redirect('/')
+    }
     const shimTag = '<script type="module" src="/remote-shim.js"></script>'
     try {
       let html = readFileSync(join(rendererDir, 'index.html'), 'utf8')
@@ -73,6 +78,12 @@ export async function createRemoteServer(
     }
   })
 
+  // POST /api/app-ticket — Bearer auth enforced by the auth middleware for /api/* routes
+  app.post('/api/app-ticket', async (_request, reply) => {
+    const ticket = ticketStore.createTicket('__app__')
+    return reply.status(201).send({ ticket })
+  })
+
   await registerAuthMiddleware(app, {
     getPasswordHash: () => deps.getGlobalSettings().remoteControl.passwordHash,
     ngrokDomain: options.ngrokDomain,
@@ -80,10 +91,12 @@ export async function createRemoteServer(
 
   await registerHealthRoute(app)
   await registerWorkspaceRoutes(app)
-  await registerTerminalRoutes(app, { ptyManager, ticketStore, subscriberManager })
-  await registerBridgeRoute(app, {
-    getPasswordHash: () => deps.getGlobalSettings().remoteControl.passwordHash,
+  const terminalCleanup = await registerTerminalRoutes(app, {
+    ptyManager,
+    ticketStore,
+    subscriberManager,
   })
+  await registerBridgeRoute(app, { ticketStore })
 
   let listening = false
 
@@ -112,6 +125,7 @@ export async function createRemoteServer(
     async stop() {
       if (!listening) return
       ticketStore.stopCleanup()
+      terminalCleanup.cleanup()
       subscriberManager.destroyAll()
       await app.close()
       listening = false

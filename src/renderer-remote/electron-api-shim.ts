@@ -1,10 +1,6 @@
 // Runs as an IIFE before the renderer bundle. Sets up window.electronAPI over a WebSocket
 // bridge so the unmodified Electron renderer can run in any browser.
 ;(function () {
-  const token = sessionStorage.getItem('remoteToken') ?? ''
-  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const wsUrl = `${wsProto}//${location.host}/api/bridge?token=${encodeURIComponent(token)}`
-
   let ws: WebSocket
   let wsReady = false
   const sendQueue: string[] = []
@@ -44,8 +40,28 @@
     }
   }
 
-  function connectBridge() {
-    ws = new WebSocket(wsUrl)
+  async function connectBridge(): Promise<void> {
+    const token = sessionStorage.getItem('remoteToken') ?? ''
+    let ticket: string
+    try {
+      const res = await fetch('/api/bridge-ticket', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        setTimeout(() => void connectBridge(), 2000)
+        return
+      }
+      ticket = ((await res.json()) as { ticket: string }).ticket
+    } catch {
+      setTimeout(() => void connectBridge(), 2000)
+      return
+    }
+
+    const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+    ws = new WebSocket(
+      `${wsProto}//${location.host}/api/bridge?ticket=${encodeURIComponent(ticket)}`
+    )
 
     ws.onopen = () => {
       wsReady = true
@@ -95,7 +111,7 @@
 
     ws.onclose = () => {
       wsReady = false
-      setTimeout(connectBridge, 2000)
+      setTimeout(() => void connectBridge(), 2000)
     }
 
     ws.onerror = () => {
@@ -103,7 +119,7 @@
     }
   }
 
-  connectBridge()
+  void connectBridge()
 
   // Helper: build a subscription-based on() that matches the electronAPI signature
   // Most on* methods take (handler) and return unsubscribe fn

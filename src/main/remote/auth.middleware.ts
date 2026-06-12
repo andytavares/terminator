@@ -4,9 +4,6 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 // Routes that require DNS rebinding protection (auth-gated or self-auth WebSocket routes)
 const PROTECTED_PREFIXES = ['/api', '/ws']
 
-// Routes that handle their own Bearer/token auth (browsers can't send Authorization headers on WS)
-const SELF_AUTHED = new Set(['/api/bridge', '/ws/terminals'])
-
 // Allowed hosts: loopback, private RFC-1918 ranges (LAN), and ngrok tunnel domains
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
 const NGROK_PATTERN = /\.ngrok(-free)?\.app$|\.ngrok\.io$/
@@ -43,8 +40,9 @@ export async function registerAuthMiddleware(
       return reply.status(403).send({ error: 'FORBIDDEN' })
     }
 
-    // WebSocket routes handle their own Bearer/token auth — browsers can't send Authorization on WS
-    if ([...SELF_AUTHED].some((p) => request.url.startsWith(p))) return
+    // WebSocket upgrade routes handle their own auth via ticket — browsers can't send Authorization on WS
+    const pathname = request.url.split('?')[0]
+    if (pathname === '/api/bridge' || pathname.startsWith('/ws/terminals/')) return
 
     const authHeader = request.headers.authorization
     if (!authHeader?.startsWith('Bearer ')) {

@@ -6,13 +6,15 @@ vi.mock('fs', async (importOriginal) => {
   return { ...actual, readFileSync: vi.fn(actual.readFileSync) }
 })
 
+const mockTicketStore = vi.hoisted(() => ({
+  createTicket: vi.fn(() => 'a'.repeat(64)),
+  consumeTicket: vi.fn(() => null as string | null),
+  startCleanup: vi.fn(),
+  stopCleanup: vi.fn(),
+}))
+
 vi.mock('../ws-ticket-store', () => ({
-  WsTicketStore: vi.fn().mockImplementation(() => ({
-    createTicket: vi.fn(() => 'a'.repeat(64)),
-    consumeTicket: vi.fn(),
-    startCleanup: vi.fn(),
-    stopCleanup: vi.fn(),
-  })),
+  WsTicketStore: vi.fn().mockImplementation(() => mockTicketStore),
 }))
 
 const mockSubscriberManager = vi.hoisted(() => ({
@@ -96,20 +98,41 @@ describe('RemoteServer', () => {
   })
 
   describe('GET /app/', () => {
-    it('returns injected HTML when renderer is built', async () => {
-      vi.mocked(readFileSync).mockReturnValueOnce('<html><head></head></html>')
+    it('redirects to / when no ticket is provided', async () => {
       const response = await remoteServer.inject({ method: 'GET', url: '/app/' })
+      expect(response.statusCode).toBe(302)
+      expect(response.headers.location).toBe('/')
+    })
+
+    it('redirects to / when consumeTicket returns null (invalid/expired ticket)', async () => {
+      mockTicketStore.consumeTicket.mockReturnValueOnce(null)
+      const response = await remoteServer.inject({ method: 'GET', url: '/app/?t=bogus' })
+      expect(response.statusCode).toBe(302)
+      expect(response.headers.location).toBe('/')
+    })
+
+    it('returns injected HTML when consumeTicket returns a session (valid ticket)', async () => {
+      vi.mocked(readFileSync).mockReturnValueOnce('<html><head></head></html>')
+      mockTicketStore.consumeTicket.mockReturnValueOnce('__app__')
+      const response = await remoteServer.inject({ method: 'GET', url: '/app/?t=valid-ticket' })
       expect(response.statusCode).toBe(200)
       expect(response.headers['content-type']).toContain('text/html')
       expect(response.body).toContain('remote-shim.js')
     })
 
-    it('returns 503 when renderer is not built', async () => {
+    it('returns 503 when renderer is not built (valid ticket)', async () => {
+      mockTicketStore.consumeTicket.mockReturnValueOnce('__app__')
       vi.mocked(readFileSync).mockImplementationOnce(() => {
         throw new Error('ENOENT')
       })
-      const response = await remoteServer.inject({ method: 'GET', url: '/app/' })
+      const response = await remoteServer.inject({ method: 'GET', url: '/app/?t=valid-ticket' })
       expect(response.statusCode).toBe(503)
+    })
+  })
+
+  describe('stop() cleans up PTY sessions', () => {
+    it('stop() does not throw when no sessions exist (cleanup with empty map)', async () => {
+      await expect(remoteServer.stop()).resolves.not.toThrow()
     })
   })
 

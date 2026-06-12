@@ -49,12 +49,24 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText('Could not connect to server')).toBeTruthy())
   })
 
+  it('shows "Could not connect" on non-success HTTP status (5xx)', async () => {
+    mockFetch.mockResolvedValueOnce({ status: 503, ok: false })
+    render(<App />)
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await waitFor(() => expect(screen.getByText('Could not connect to server')).toBeTruthy())
+  })
+
   it('stores token in sessionStorage and redirects on success', async () => {
-    mockFetch.mockResolvedValueOnce({ status: 200 })
+    mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({
+      status: 201,
+      ok: true,
+      json: () => Promise.resolve({ ticket: 'tok-abc' }),
+    })
     render(<App />)
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'correct' } })
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/app/'))
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/app/?t=tok-abc'))
     expect(sessionStorage.getItem('remoteToken')).toBe('correct')
   })
 

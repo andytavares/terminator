@@ -24,10 +24,19 @@ class MockWebSocket {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type API = any
 
+const mockFetch = vi.fn()
+
 async function loadShim(): Promise<{ api: API; ws: MockWebSocket }> {
   vi.resetModules()
   MockWebSocket.instances = []
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve({ ticket: 'test-ticket' }),
+  })
+  global.fetch = mockFetch
   await import('../../../src/renderer-remote/electron-api-shim')
+  // Flush the async connectBridge microtask (fetch + WebSocket creation)
+  await new Promise((r) => setTimeout(r, 0))
   const ws = MockWebSocket.instances[0]
   ws.onopen?.()
   return { api: (window as API).electronAPI, ws }
@@ -35,6 +44,7 @@ async function loadShim(): Promise<{ api: API; ws: MockWebSocket }> {
 
 beforeEach(() => {
   MockWebSocket.instances = []
+  mockFetch.mockReset()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(global as any).WebSocket = MockWebSocket
   sessionStorage.clear()
@@ -51,11 +61,15 @@ function hasMsg(ws: MockWebSocket, substring: string) {
 }
 
 describe('electron-api-shim bootstrap', () => {
-  it('creates WebSocket to /api/bridge with token from sessionStorage', async () => {
+  it('creates WebSocket to /api/bridge with ticket from bridge-ticket endpoint', async () => {
     sessionStorage.setItem('remoteToken', 'my-token')
     await loadShim()
     expect(MockWebSocket.instances[0].url).toContain('/api/bridge')
-    expect(MockWebSocket.instances[0].url).toContain('my-token')
+    expect(MockWebSocket.instances[0].url).toContain('ticket=test-ticket')
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/bridge-ticket',
+      expect.objectContaining({ method: 'POST' })
+    )
   })
 
   it('sets window.electronAPI on import', async () => {
@@ -66,7 +80,13 @@ describe('electron-api-shim bootstrap', () => {
   it('queues messages before ws is open and flushes on open', async () => {
     vi.resetModules()
     MockWebSocket.instances = []
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ ticket: 'flush-ticket' }),
+    })
+    global.fetch = mockFetch
     await import('../../../src/renderer-remote/electron-api-shim')
+    await new Promise((r) => setTimeout(r, 0))
     const ws = MockWebSocket.instances[0]
     const api: API = (window as API).electronAPI
     void api.workspace.list()

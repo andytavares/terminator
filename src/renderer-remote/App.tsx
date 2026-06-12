@@ -23,9 +23,20 @@ export function App(): JSX.Element {
         setLoading(false)
         return
       }
+      if (!res.ok) {
+        setError('Could not connect to server')
+        setLoading(false)
+        return
+      }
+      // Fetch a one-time ticket so the /app/ page can verify access without exposing credentials
+      const ticketRes = await fetch('/api/app-ticket', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${password}` },
+      })
+      const { ticket } = (await ticketRes.json()) as { ticket: string }
       // Store token so the shim can pick it up, then navigate to the full app
       sessionStorage.setItem('remoteToken', password)
-      location.replace('/app/')
+      location.replace(`/app/?t=${encodeURIComponent(ticket)}`)
     } catch {
       setError('Could not connect to server')
       setLoading(false)

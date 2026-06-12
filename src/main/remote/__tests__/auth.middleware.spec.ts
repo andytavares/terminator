@@ -150,6 +150,16 @@ describe('auth.middleware', () => {
       await app.close()
       expect(res.statusCode).toBe(403)
     })
+
+    it('/api/bridge-ticket requires Bearer auth (not bypassed by self-authed check)', async () => {
+      const app = await buildApp(hash, (a) => {
+        a.post('/api/bridge-ticket', async () => ({ ticket: 'tok' }))
+      })
+      // No Authorization header → should get 401, not 200
+      const res = await app.inject({ method: 'POST', url: '/api/bridge-ticket' })
+      await app.close()
+      expect(res.statusCode).toBe(401)
+    })
   })
 
   describe('LAN access', () => {

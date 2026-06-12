@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { homedir } from 'os'
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { SocketStream } from '@fastify/websocket'
@@ -33,7 +34,7 @@ interface TerminalRouteOptions {
 export async function registerTerminalRoutes(
   app: FastifyInstance,
   opts: TerminalRouteOptions
-): Promise<void> {
+): Promise<{ cleanup: () => void }> {
   const { ptyManager, ticketStore, subscriberManager } = opts
   const sessions = new Map<string, TerminalSession>()
 
@@ -45,6 +46,7 @@ export async function registerTerminalRoutes(
 
     const { cwd, type } = result.data
     const sessionId = randomUUID()
+    const resolvedCwd = cwd.startsWith('~') ? cwd.replace(/^~/, homedir()) : cwd
 
     const onData = (data: string) => subscriberManager.broadcast(sessionId, data)
     const onExit = () => {
@@ -52,8 +54,8 @@ export async function registerTerminalRoutes(
       sessions.delete(sessionId)
     }
 
-    ptyManager.spawn(sessionId, cwd, process.env.SHELL || '/bin/zsh', type, onData, onExit)
-    sessions.set(sessionId, { sessionId, cwd, createdAt: new Date().toISOString() })
+    ptyManager.spawn(sessionId, resolvedCwd, process.env.SHELL || '/bin/zsh', type, onData, onExit)
+    sessions.set(sessionId, { sessionId, cwd: resolvedCwd, createdAt: new Date().toISOString() })
 
     return reply.status(201).send({ sessionId })
   })
@@ -143,4 +145,14 @@ export async function registerTerminalRoutes(
       })
     }
   )
+
+  return {
+    cleanup() {
+      for (const sessionId of sessions.keys()) {
+        ptyManager.kill(sessionId)
+        subscriberManager.destroySession(sessionId)
+      }
+      sessions.clear()
+    },
+  }
 }

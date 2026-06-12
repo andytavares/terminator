@@ -1,19 +1,25 @@
 import type { FastifyInstance } from 'fastify'
 import type { SocketStream } from '@fastify/websocket'
 import type { FastifyRequest } from 'fastify'
-import bcryptjs from 'bcryptjs'
 import { bridgeEventBus } from '../bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from '../ipc-registry.js'
+import type { WsTicketStore } from '../ws-ticket-store.js'
 
 interface BridgeOptions {
-  getPasswordHash: () => string
+  ticketStore: WsTicketStore
 }
 
 export async function registerBridgeRoute(
   app: FastifyInstance,
   opts: BridgeOptions
 ): Promise<void> {
-  const { getPasswordHash } = opts
+  const { ticketStore } = opts
+
+  // POST /api/bridge-ticket — Bearer auth enforced by the auth middleware for /api/* routes
+  app.post('/api/bridge-ticket', async (_request, reply) => {
+    const ticket = ticketStore.createTicket('__bridge__')
+    return reply.status(201).send({ ticket })
+  })
 
   app.get(
     '/api/bridge',
@@ -21,10 +27,10 @@ export async function registerBridgeRoute(
     async (connection: SocketStream, request: FastifyRequest) => {
       const ws = connection.socket
 
-      // Authenticate via ?token= query param (WebSocket can't send headers from browser)
-      const token = (request.query as Record<string, string>).token ?? ''
-      const hash = getPasswordHash()
-      if (!hash || !(await bcryptjs.compare(token, hash))) {
+      // Authenticate via ?ticket= query param (WebSocket upgrades can't carry Authorization headers)
+      const ticket = (request.query as Record<string, string>).ticket ?? ''
+      const sessionId = ticketStore.consumeTicket(ticket)
+      if (!sessionId) {
         ws.close(4001, 'unauthorized')
         return
       }
