@@ -1,0 +1,36 @@
+src/main/remote/ws-subscriber-manager.ts
+  s_ac8a4310babbf3::t_a8e1742b8b706e 55-58
+src/main/remote/auth.middleware.ts
+  s_ac8a4310babbf3::t_bc9f5b69e1c45e 10-19,35-39
+src/main/remote/__tests__/remote-server.spec.ts
+  s_ac8a4310babbf3::t_d9906bdefb29fa 18-28,30
+  s_ac8a4310babbf3::t_7615f79eaea72d 91-95
+src/main/remote/__tests__/ws-subscriber-manager.spec.ts
+  s_ac8a4310babbf3::t_9c3cb71688d58f 111-122
+src/main/remote/__tests__/auth.middleware.spec.ts
+  s_ac8a4310babbf3::t_c0c23f463bf34b 72-83
+src/main/remote/remote-server.ts
+  s_ac8a4310babbf3::t_db9eea92af1d86 33
+  s_ac8a4310babbf3::t_1f3d8a7f034d1f 90-91,110-111
+src/main/index.ts
+  s_ac8a4310babbf3::t_e8c5d52de7bfff 353
+  s_ac8a4310babbf3::t_363c879838de1e 149-150
+src/main/remote/routes/terminal.routes.ts
+  s_ac8a4310babbf3::t_12ea243091c830 68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "323422607cb965ab7c1b1716102bf7fc4ee27462",
+  "prompts": {},
+  "sessions": {
+    "s_ac8a4310babbf3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3bd30aff-54f6-4b9d-9c65-9aae3ba25961",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
