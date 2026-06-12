@@ -1,0 +1,23 @@
+src/main/remote/__tests__/terminal.routes.spec.ts
+  s_ac8a4310babbf3::t_6ce2d0185a9e9a 329-350
+  s_ac8a4310babbf3::t_ddb7f122ba42e8 402
+src/main/remote/routes/terminal.routes.ts
+  s_ac8a4310babbf3::t_00484246f5a17f 145
+  s_ac8a4310babbf3::t_e8c098e91f7ee6 146-148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "25a76d7ba92552f4ba244a973308974d92bb09ef",
+  "prompts": {},
+  "sessions": {
+    "s_ac8a4310babbf3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3bd30aff-54f6-4b9d-9c65-9aae3ba25961",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
