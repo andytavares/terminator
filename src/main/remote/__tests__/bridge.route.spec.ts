@@ -20,13 +20,17 @@ vi.mock('../ipc-registry.js', () => ({
   ipcSendRegistry: mockIpcSendRegistry,
 }))
 
-async function buildBridgeApp(): Promise<{ app: FastifyInstance; ticketStore: WsTicketStore }> {
+async function buildBridgeApp(): Promise<{
+  app: FastifyInstance
+  ticketStore: WsTicketStore
+  bridgeCleanup: { disconnectAll: () => void }
+}> {
   const { registerBridgeRoute } = await import('../routes/bridge.route')
   const ticketStore = new WsTicketStore()
   const app = Fastify({ logger: false })
   await app.register(websocketPlugin)
-  await registerBridgeRoute(app, { ticketStore })
-  return { app, ticketStore }
+  const bridgeCleanup = await registerBridgeRoute(app, { ticketStore })
+  return { app, ticketStore, bridgeCleanup }
 }
 
 function waitForClose(ws: WebSocket): Promise<void> {
@@ -56,6 +60,7 @@ function waitForOpen(ws: WebSocket): Promise<void> {
 describe('bridge.route', () => {
   let app: FastifyInstance
   let ticketStore: WsTicketStore
+  let bridgeCleanup: { disconnectAll: () => void }
   let baseUrl: string
 
   beforeEach(async () => {
@@ -65,7 +70,7 @@ describe('bridge.route', () => {
     mockBridgeEventBus.emit.mockReset()
     mockIpcInvokeRegistry.clear()
     mockIpcSendRegistry.clear()
-    ;({ app, ticketStore } = await buildBridgeApp())
+    ;({ app, ticketStore, bridgeCleanup } = await buildBridgeApp())
     await app.listen({ port: 0, host: '127.0.0.1' })
     const addr = app.server.address() as { port: number; address: string }
     baseUrl = `ws://${addr.address}:${addr.port}`
@@ -247,6 +252,26 @@ describe('bridge.route', () => {
       expect(parsed.channel).toBe('terminal:output')
       ws.close()
       await waitForClose(ws)
+    })
+  })
+
+  describe('disconnectAll()', () => {
+    it('closes all active bridge connections', async () => {
+      const ticket1 = ticketStore.createTicket('__bridge__', 'bridge')
+      const ticket2 = ticketStore.createTicket('__bridge__', 'bridge')
+      const ws1 = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket1}`)
+      const ws2 = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket2}`)
+      await waitForOpen(ws1)
+      await waitForOpen(ws2)
+
+      bridgeCleanup.disconnectAll()
+
+      await waitForClose(ws1)
+      await waitForClose(ws2)
+    })
+
+    it('is safe to call when no connections are open', () => {
+      expect(() => bridgeCleanup.disconnectAll()).not.toThrow()
     })
   })
 

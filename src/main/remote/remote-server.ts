@@ -96,7 +96,7 @@ export async function createRemoteServer(
     ticketStore,
     subscriberManager,
   })
-  await registerBridgeRoute(app, { ticketStore })
+  const bridgeCleanup = await registerBridgeRoute(app, { ticketStore })
 
   let listening = false
 
@@ -126,12 +126,14 @@ export async function createRemoteServer(
       if (!listening) return
       ticketStore.stopCleanup()
       terminalCleanup.cleanup()
+      bridgeCleanup.disconnectAll()
       subscriberManager.destroyAll()
       await app.close()
       listening = false
     },
 
     disconnectAllClients() {
+      bridgeCleanup.disconnectAll()
       subscriberManager.destroyAll()
     },
 

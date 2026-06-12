@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import type { SocketStream } from '@fastify/websocket'
 import type { FastifyRequest } from 'fastify'
+import type WebSocket from 'ws'
 import { bridgeEventBus } from '../bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from '../ipc-registry.js'
 import type { WsTicketStore } from '../ws-ticket-store.js'
@@ -12,8 +13,9 @@ interface BridgeOptions {
 export async function registerBridgeRoute(
   app: FastifyInstance,
   opts: BridgeOptions
-): Promise<void> {
+): Promise<{ disconnectAll: () => void }> {
   const { ticketStore } = opts
+  const bridgeConnections = new Set<WebSocket>()
 
   // POST /api/bridge-ticket — Bearer auth enforced by the auth middleware for /api/* routes
   app.post('/api/bridge-ticket', async (_request, reply) => {
@@ -34,6 +36,8 @@ export async function registerBridgeRoute(
         ws.close(4001, 'unauthorized')
         return
       }
+
+      bridgeConnections.add(ws)
 
       // Forward bridge-event-bus events to this client
       const subscribedChannels = new Set<string>()
@@ -92,6 +96,7 @@ export async function registerBridgeRoute(
       })
 
       ws.on('close', () => {
+        bridgeConnections.delete(ws)
         for (const [channel, forwarder] of channelForwarders) {
           bridgeEventBus.off(channel, forwarder)
         }
@@ -100,4 +105,13 @@ export async function registerBridgeRoute(
       })
     }
   )
+
+  return {
+    disconnectAll() {
+      for (const conn of bridgeConnections) {
+        conn.terminate()
+      }
+      bridgeConnections.clear()
+    },
+  }
 }
