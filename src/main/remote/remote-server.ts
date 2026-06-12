@@ -83,7 +83,7 @@ export async function createRemoteServer(
   return {
     async start() {
       try {
-        await app.listen({ port, host: '0.0.0.0' })
+        await app.listen({ port, host: '127.0.0.1' })
         ticketStore.startCleanup()
         listening = true
       } catch (err) {

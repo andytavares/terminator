@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import Fastify from 'fastify'
 import type { FastifyInstance } from 'fastify'
 import bcryptjs from 'bcryptjs'
+import { isAllowedHost } from '../auth.middleware'
 
 async function buildApp(
   passwordHash: string,
@@ -18,6 +19,24 @@ async function buildApp(
   await app.ready()
   return app
 }
+
+describe('isAllowedHost', () => {
+  it('allows localhost', () => expect(isAllowedHost('localhost')).toBe(true))
+  it('allows localhost with port', () => expect(isAllowedHost('localhost:7681')).toBe(true))
+  it('allows 127.0.0.1', () => expect(isAllowedHost('127.0.0.1')).toBe(true))
+  it('allows 127.0.0.1 with port', () => expect(isAllowedHost('127.0.0.1:7681')).toBe(true))
+  it('allows ::1', () => expect(isAllowedHost('::1')).toBe(true))
+  it('allows ngrok-free.app subdomain', () =>
+    expect(isAllowedHost('abc.ngrok-free.app')).toBe(true))
+  it('allows ngrok.io subdomain', () => expect(isAllowedHost('abc.ngrok.io')).toBe(true))
+  it('allows RFC-1918 10.x address', () => expect(isAllowedHost('10.0.0.5')).toBe(true))
+  it('allows RFC-1918 172.16.x address', () => expect(isAllowedHost('172.16.0.1')).toBe(true))
+  it('allows RFC-1918 192.168.x address', () => expect(isAllowedHost('192.168.1.50')).toBe(true))
+  it('allows RFC-1918 192.168.x address with port', () =>
+    expect(isAllowedHost('192.168.1.50:7681')).toBe(true))
+  it('blocks public domain', () => expect(isAllowedHost('evil.attacker.com')).toBe(false))
+  it('blocks public IP', () => expect(isAllowedHost('8.8.8.8')).toBe(false))
+})
 
 describe('auth.middleware', () => {
   let hash: string
@@ -109,12 +128,38 @@ describe('auth.middleware', () => {
     })
   })
 
-  describe('Self-authed routes bypass middleware', () => {
+  describe('Self-authed routes bypass Bearer check but still get Host check', () => {
     it('allows /api/bridge without Authorization header (WebSocket self-auth)', async () => {
       const app = await buildApp(hash, (a) => {
         a.get('/api/bridge', async () => ({ ok: true }))
       })
       const res = await app.inject({ method: 'GET', url: '/api/bridge' })
+      await app.close()
+      expect(res.statusCode).toBe(200)
+    })
+
+    it('blocks /api/bridge with unexpected Host (DNS rebinding still applies)', async () => {
+      const app = await buildApp(hash, (a) => {
+        a.get('/api/bridge', async () => ({ ok: true }))
+      })
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/bridge',
+        headers: { Host: 'evil.attacker.com' },
+      })
+      await app.close()
+      expect(res.statusCode).toBe(403)
+    })
+  })
+
+  describe('LAN access', () => {
+    it('allows request from RFC-1918 LAN IP host', async () => {
+      const app = await buildApp(hash)
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/protected',
+        headers: { Authorization: 'Bearer correct-password', Host: '192.168.1.42:7681' },
+      })
       await app.close()
       expect(res.statusCode).toBe(200)
     })

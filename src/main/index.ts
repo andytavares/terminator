@@ -147,7 +147,6 @@ async function startRemoteControl(): Promise<void> {
   } catch (err) {
     sendLog(mainWindow, 'error', `Remote Control: failed to start server: ${String(err)}`)
     remoteServer = null
-    updateGlobalSettings({ remoteControl: { enabled: false } })
     sendStatus(mainWindow, { enabled: false, error: 'START_FAILED' })
   }
 }
@@ -344,9 +343,13 @@ app.whenReady().then(async () => {
 
   registerRemoteHandlers(
     () => mainWindow,
-    async () => {
-      if (remoteServer) await stopRemoteControl()
-      await startRemoteControl()
+    () => {
+      remoteControlQueue = remoteControlQueue
+        .then(async () => {
+          if (remoteServer) await stopRemoteControl()
+          await startRemoteControl()
+        })
+        .catch(() => {})
     },
     {
       updateGlobalSettings,
