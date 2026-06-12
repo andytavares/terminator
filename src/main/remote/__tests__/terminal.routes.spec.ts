@@ -326,6 +326,28 @@ describe('WS /ws/terminals/:sessionId', () => {
     expect(removeSpy).toHaveBeenCalled()
   })
 
+  it('kills PTY and removes session when last subscriber disconnects', async () => {
+    const sessionId = await createSession()
+    const ticketRes = await wsApp.inject({
+      method: 'POST',
+      url: `/api/terminals/${sessionId}/ws-ticket`,
+    })
+    const { ticket } = JSON.parse(ticketRes.body)
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`${baseUrl}/ws/terminals/${sessionId}?ticket=${ticket}`)
+      ws.on('open', () => setTimeout(() => ws.close(), 20))
+      ws.on('close', resolve)
+      ws.on('error', reject)
+      setTimeout(() => reject(new Error('timeout')), 2000)
+    })
+
+    await new Promise<void>((r) => setTimeout(r, 50))
+    expect(mockPtyManager.kill).toHaveBeenCalledWith(sessionId)
+    const getRes = await wsApp.inject({ method: 'GET', url: `/api/terminals/${sessionId}` })
+    expect(getRes.statusCode).toBe(404)
+  })
+
   it('forwards messages from primary subscriber to ptyManager', async () => {
     const sessionId = await createSession()
     const ticketRes = await wsApp.inject({
@@ -377,6 +399,7 @@ describe('cleanup()', () => {
     })
     expect(mockPtyManager.spawn).toHaveBeenCalledTimes(2)
 
+    mockPtyManager.kill.mockClear()
     terminalCleanup.cleanup()
 
     expect(mockPtyManager.kill).toHaveBeenCalledTimes(2)

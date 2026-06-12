@@ -142,6 +142,10 @@ export async function registerTerminalRoutes(
 
       ws.on('close', () => {
         subscriberManager.removeSubscriber(sessionId, ws)
+        if (subscriberManager.getCount(sessionId) === 0 && sessions.has(sessionId)) {
+          ptyManager.kill(sessionId)
+          sessions.delete(sessionId)
+        }
       })
     }
   )
