@@ -1,0 +1,30 @@
+src/main/remote/__tests__/bridge.route.spec.ts
+  s_ac8a4310babbf3::t_ffc64b9d3804db 63,73
+  s_ac8a4310babbf3::t_dce2b0b477b602 258-277
+  s_ac8a4310babbf3::t_ab2475624d046f 23-27,32-33
+src/main/remote/routes/bridge.route.ts
+  s_ac8a4310babbf3::t_7cd86432ce8c96 4,16,18
+  s_ac8a4310babbf3::t_c6177663cd2c7a 40-41
+  s_ac8a4310babbf3::t_c15d56a48ff4f8 99,108-111,113-116
+  s_ac8a4310babbf3::t_a3034f0f1d7696 112
+src/main/remote/remote-server.ts
+  s_ac8a4310babbf3::t_8fec905bd9a087 136
+  s_ac8a4310babbf3::t_8fa8480e79651a 99
+  s_ac8a4310babbf3::t_6a37bf93ef1d39 129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "686a9f7c4039fb6b131b2adb1e99f64d7aed4ca1",
+  "prompts": {},
+  "sessions": {
+    "s_ac8a4310babbf3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3bd30aff-54f6-4b9d-9c65-9aae3ba25961",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
