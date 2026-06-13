@@ -10,7 +10,7 @@
     {
       "name": "desktop-renders",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", "-p", "4322", "/Users/atavares/Desktop"],
+      "runtimeArgs": ["serve", "-p", "4322", "ux-mockups"],
       "port": 4322
     }
   ]

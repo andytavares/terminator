@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react'
+import { Bot, Terminal } from 'lucide-react'
 import type { TerminalSession } from '../../../shared/types/index'
 import { useSessionStore } from '../../stores/session.store'
 import { MoveSessionDialog } from './MoveSessionDialog'
@@ -54,7 +55,7 @@ export function SessionRow({
     setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 
-  const prefix = session.type === 'agent' ? '⟡' : '$'
+  const PrefixIcon = session.type === 'agent' ? Bot : Terminal
 
   function renderStatus(): React.ReactNode {
     if (isBusy) return <span className="session-row__spinner" />
@@ -77,7 +78,9 @@ export function SessionRow({
         onDoubleClick={startRename}
         onContextMenu={handleContextMenu}
       >
-        <span className="session-row__prefix">{prefix}</span>
+        <span className="session-row__prefix">
+          <PrefixIcon size={11} />
+        </span>
         {renaming ? (
           <input
             ref={renameRef}

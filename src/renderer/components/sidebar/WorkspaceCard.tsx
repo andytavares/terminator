@@ -1,7 +1,10 @@
 import React, { useRef, useState } from 'react'
+import { ChevronRight, ChevronDown } from 'lucide-react'
 import type { Workspace, Project } from '../../../shared/types/index'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { useWorkspaceStore } from '../../stores/workspace.store'
+import { useSettingsStore } from '../../stores/settings.store'
+import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { EditWorkspaceDialog } from './EditWorkspaceDialog'
 import { ConfirmDialog } from '../ConfirmDialog'
@@ -36,7 +39,9 @@ export function WorkspaceCard({
     sidebarButtons: s.sidebarButtons,
     workspaceTabs: s.workspaceTabs,
   }))
-  const { deleteWorkspace } = useWorkspaceStore()
+  const { deleteWorkspace, resolveActiveCwd } = useWorkspaceStore()
+  const { resolveSettings } = useSettingsStore()
+  const { createSession } = useTerminalSession()
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -86,7 +91,9 @@ export function WorkspaceCard({
           onClick={onToggleCollapse}
           onContextMenu={handleContextMenu}
         >
-          <span className="ws-card__chevron">{isCollapsed ? '▸' : '▾'}</span>
+          <span className="ws-card__chevron">
+            {isCollapsed ? <ChevronRight size={10} /> : <ChevronDown size={10} />}
+          </span>
           <span className="ws-card__name">{workspace.name}</span>
           {workspaceTabs.size > 0 && (
             <div className="ws-card__ws-tabs" onClick={(e) => e.stopPropagation()}>
@@ -127,7 +134,17 @@ export function WorkspaceCard({
                   isExpanded={activeProjectId === project.id}
                   workspaceColor={workspace.color}
                   onSelect={() => onSelectProject(project.id)}
-                  onAddSession={() => {}}
+                  onAddSession={() => {
+                    const cwd = resolveActiveCwd()
+                    const settings = resolveSettings(workspace.id, project.id)
+                    void createSession(
+                      project.id,
+                      'human',
+                      '',
+                      cwd,
+                      settings.terminal.scrollbackLimit
+                    )
+                  }}
                   onBranchBadgeClick={() =>
                     useExtensionRegistry.getState().setActiveProjectTab('git')
                   }

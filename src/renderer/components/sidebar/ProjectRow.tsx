@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react'
+import { GitBranch } from 'lucide-react'
 import type { Project } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
@@ -94,7 +95,9 @@ export function ProjectRow({
         onContextMenu={handleContextMenu}
         draggable
       >
-        <span className="project-row__icon">⎇</span>
+        <span className="project-row__icon">
+          <GitBranch size={12} />
+        </span>
         {renaming ? (
           <input
             ref={renameRef}

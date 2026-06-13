@@ -57,14 +57,18 @@ beforeEach(() => {
 })
 
 describe('SessionRow', () => {
-  it('renders $ prefix for human sessions', () => {
-    render(<SessionRow session={makeSession({ type: 'human' })} {...defaultProps} />)
-    expect(screen.getByText('$')).toBeTruthy()
+  it('renders Terminal icon prefix for human sessions', () => {
+    const { container } = render(
+      <SessionRow session={makeSession({ type: 'human' })} {...defaultProps} />
+    )
+    expect(container.querySelector('.session-row__prefix svg')).toBeTruthy()
   })
 
-  it('renders ⟡ prefix for agent sessions', () => {
-    render(<SessionRow session={makeSession({ type: 'agent' })} {...defaultProps} />)
-    expect(screen.getByText('⟡')).toBeTruthy()
+  it('renders Bot icon prefix for agent sessions', () => {
+    const { container } = render(
+      <SessionRow session={makeSession({ type: 'agent' })} {...defaultProps} />
+    )
+    expect(container.querySelector('.session-row__prefix svg')).toBeTruthy()
   })
 
   it('renders the session tabTitle', () => {

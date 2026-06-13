@@ -267,7 +267,12 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
     set((s) => {
       const pendingNavigations = new Map(s.pendingNavigations)
       pendingNavigations.set(tabId, navigationData)
-      return { activeGlobalTabId: tabId, activeProjectTabId: null, pendingNavigations }
+      return {
+        activeGlobalTabId: tabId,
+        activeProjectTabId: null,
+        activeWorkspaceTabId: null,
+        pendingNavigations,
+      }
     })
   },
 
