@@ -2,7 +2,7 @@
 
 Extensions let you add functionality to Terminator without touching its core code. They contribute to the application through the `ExtensionAPI` — a stable, versioned interface. This guide covers everything you need to write, test, and distribute an extension.
 
-**Current API version**: 1.2.0
+**Current API version**: 1.3.0 (renderer registry)
 
 ---
 
@@ -460,18 +460,23 @@ registry.registerKeyboardShortcut({
 
 ### Registry API
 
-| Method                               | Description                                                                  |
-| ------------------------------------ | ---------------------------------------------------------------------------- |
-| `registerSidebarPanel(panel)`        | Adds a React component to the right sidebar. Returns an unregister function. |
-| `registerProjectTab(tab)`            | Adds a tab to the project view. Returns an unregister function.              |
-| `registerKeyboardShortcut(shortcut)` | Binds a renderer-side keyboard shortcut. Returns an unregister function.     |
-| `togglePanel(panelId)`               | Opens or closes a registered sidebar panel.                                  |
-| `setActiveProjectTab(tabId)`         | Activates a registered project tab.                                          |
+| Method                               | Description                                                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `registerSidebarPanel(panel)`        | Adds a React component to the right sidebar. Returns an unregister function.                                       |
+| `registerProjectTab(tab)`            | Adds a tab to the project view. Returns an unregister function.                                                    |
+| `registerGlobalTab(tab)`             | Adds a persistent tab to the global tab bar (survives workspace/project switches). Returns an unregister function. |
+| `registerWorkspaceTab(tab)`          | _(v1.3.0)_ Adds a workspace-scoped tab icon to every workspace card header. Returns an unregister function.        |
+| `registerKeyboardShortcut(shortcut)` | Binds a renderer-side keyboard shortcut. Returns an unregister function.                                           |
+| `togglePanel(panelId)`               | Opens or closes a registered sidebar panel.                                                                        |
+| `setActiveProjectTab(tabId)`         | Activates a registered project tab.                                                                                |
+| `setActiveWorkspaceTab(tabId)`       | _(v1.3.0)_ Activates a registered workspace tab (or clears it when `null`).                                        |
 
 Component prop shapes:
 
 - Sidebar panel: `{ repoRoot: string | null; onClose: () => void }`
 - Project tab: `{ repoRoot: string | null }`
+- Global tab: `Record<string, never>` (reads state from stores internally)
+- Workspace tab: `Record<string, never>` (reads active workspace from `useWorkspaceStore()` internally)
 
 ### Note on the internal import
 
@@ -538,7 +543,7 @@ npm run create-extension -- <name> [options]
 
 **Exit codes**: `0` success, `1` bad arguments, `2` directory already exists, `3` filesystem error.
 
-The generated `src/index.js` is a complete working hello-world demonstrating all v1.2.0 API surfaces. v1.1.0-specific surfaces (shell, fs, registerPanel, topBar) and v1.2.0-specific surfaces (globalShortcut, registerGlobalTab, workspace, window, createNotification) are included as commented-out stubs with `// TODO:` markers so you can activate them incrementally.
+The generated `src/index.js` is a complete working hello-world demonstrating all v1.2.0 API surfaces. v1.1.0-specific surfaces (shell, fs, registerPanel, topBar) and v1.2.0-specific surfaces (globalShortcut, registerGlobalTab, workspace, window, createNotification) are included as commented-out stubs with `// TODO:` markers so you can activate them incrementally. The v1.3.0 renderer-registry addition (`registerWorkspaceTab`) must be added manually to your `renderer.tsx`.
 
 ---
 
@@ -553,7 +558,9 @@ The pre-bundled git integration extension at `extensions/git-integration/` is th
 - `api.notifications.showToast` (all operation outcomes)
 - `api.fs.watch` (sidebar auto-refresh)
 - `api.settings.register` with `workspaceScoped` settings
-- `renderer.tsx` with sidebar panel, two project tabs, and renderer keyboard shortcuts
+- `renderer.tsx` with a sidebar panel, a project tab, a workspace-scoped tab (Code Reviews — `registerWorkspaceTab`), and renderer keyboard shortcuts
+
+The Code Reviews tab is registered as a workspace tab (`registerWorkspaceTab`), not a global tab. Its icon appears on hover in each workspace card header; clicking it shows the PR review UI scoped to that workspace's repository root.
 
 ---
 
@@ -652,6 +659,54 @@ api.sidebar.registerGlobalTab({
   permanent: true,
 })
 ```
+
+### `registry.registerWorkspaceTab(tab)` _(v1.3.0, renderer registry only)_
+
+Registers a workspace-scoped tab. Unlike `registerGlobalTab` (which adds an icon to the global sidebar header), workspace tabs appear as hover-reveal icons inside each workspace card header. Clicking one activates the tab's component in the main content area with that workspace set as active.
+
+The component receives **no props** — it must read its workspace context from `useWorkspaceStore()` internally.
+
+```typescript
+// In renderer.tsx:
+import React from 'react'
+import { GitPullRequest } from 'lucide-react'
+import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
+import { MyWorkspaceView } from './components/MyWorkspaceView'
+
+const registry = useExtensionRegistry.getState()
+
+registry.registerWorkspaceTab({
+  id: 'my-workspace-view',
+  label: 'My View',
+  icon: React.createElement(GitPullRequest),
+  component: MyWorkspaceView, // ComponentType<Record<string, never>>
+})
+```
+
+Inside `MyWorkspaceView`:
+
+```typescript
+import { useWorkspaceStore } from '../../../src/renderer/stores/workspace.store'
+
+export function MyWorkspaceView() {
+  const { workspaces, activeWorkspaceId } = useWorkspaceStore()
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) ?? null
+  // ... render using activeWorkspace
+}
+```
+
+**Tab mutual-exclusion rules:**
+
+- Activating a workspace tab clears any active global tab and active project tab.
+- Activating a global tab clears any active workspace tab.
+- Clicking a project or session row clears any active workspace tab and shows the terminal.
+
+**When to use workspace tab vs global tab:**
+
+| Need                                                           | Use                    |
+| -------------------------------------------------------------- | ---------------------- |
+| Feature is scoped to one workspace at a time (e.g. PR reviews) | `registerWorkspaceTab` |
+| Feature is truly app-global (e.g. Task Vault, notifications)   | `registerGlobalTab`    |
 
 ### `api.globalShortcut.register(accelerator, handler)`
 

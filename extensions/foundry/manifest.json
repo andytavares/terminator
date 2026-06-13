@@ -1,8 +1,0 @@
-{
-  "id": "terminator.foundry",
-  "name": "Foundry",
-  "version": "0.1.0",
-  "description": "Agentic harness extension — spec-to-code loops, multi-agent orchestration, and co-pilot mode with provider-agnostic AI backends.",
-  "main": "src/index.js",
-  "minAppVersion": "0.1.0"
-}

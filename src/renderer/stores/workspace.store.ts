@@ -6,6 +6,7 @@ interface WorkspaceState {
   activeWorkspaceId: string | null
   activeProjectId: string | null
   projectsByWorkspaceId: Map<string, Project[]>
+  collapsedWorkspaceIds: Set<string>
 
   loadWorkspaces: () => Promise<void>
   createWorkspace: (input: unknown) => Promise<{ workspace: Workspace } | { error: string }>
@@ -25,6 +26,21 @@ interface WorkspaceState {
   deleteProject: (id: string) => Promise<void>
   setActiveProject: (id: string | null) => void
   resolveActiveCwd: () => string
+  toggleWorkspaceCollapse: (id: string) => void
+  setCollapsedWorkspaceIds: (ids: Set<string>) => void
+}
+
+function loadCollapsedIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem('terminator.workspace.collapsed')
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown
+      if (Array.isArray(parsed)) return new Set(parsed as string[])
+    }
+  } catch {
+    // corrupted localStorage — return empty set
+  }
+  return new Set()
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -32,6 +48,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   activeWorkspaceId: null,
   activeProjectId: null,
   projectsByWorkspaceId: new Map(),
+  collapsedWorkspaceIds: loadCollapsedIds(),
 
   loadWorkspaces: async () => {
     const result = await window.electronAPI.workspace.list()
@@ -181,6 +198,28 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   setActiveProject: (id) => set({ activeProjectId: id }),
+
+  toggleWorkspaceCollapse: (id) => {
+    const current = get().collapsedWorkspaceIds
+    const next = new Set(current)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    try {
+      localStorage.setItem('terminator.workspace.collapsed', JSON.stringify([...next]))
+    } catch {
+      // ignore write failures (private browsing, storage full)
+    }
+    set({ collapsedWorkspaceIds: next })
+  },
+
+  setCollapsedWorkspaceIds: (ids) => {
+    try {
+      localStorage.setItem('terminator.workspace.collapsed', JSON.stringify([...ids]))
+    } catch {
+      // ignore write failures
+    }
+    set({ collapsedWorkspaceIds: ids })
+  },
 
   resolveActiveCwd: () => {
     const { activeWorkspaceId, activeProjectId, workspaces, projectsByWorkspaceId } = get()

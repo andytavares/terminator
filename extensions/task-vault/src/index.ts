@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron'
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
-import { DEFAULT_CAPTURE_HOTKEY, DEPRECATED_CAPTURE_HOTKEYS } from './constants.js'
+import { DEFAULT_CAPTURE_HOTKEY } from './constants.js'
 import { registerVaultIpcHandlers, setVaultPath } from './ipc/vault.ipc.js'
 import {
   registerProjectsIpcHandlers,
@@ -25,12 +25,6 @@ export async function activate(api: ExtensionAPI): Promise<void> {
           label: 'Vault Path',
           description: 'Absolute path to your vault directory',
           default: '',
-        },
-        'terminator.task-vault.captureHotkey': {
-          type: 'string',
-          label: 'Capture Hotkey',
-          description: 'Global shortcut to open the quick capture overlay',
-          default: DEFAULT_CAPTURE_HOTKEY,
         },
         'terminator.task-vault.staleThresholdDays': {
           type: 'number',
@@ -103,26 +97,20 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   }
 
   // Register global capture hotkey (fires even when app is minimised or in background).
-  // Migrate any deprecated default that was stored from a previous version.
-  const storedHotkey = api.settings.get<string>('terminator.task-vault.captureHotkey') ?? ''
-  const captureHotkey =
-    storedHotkey && !DEPRECATED_CAPTURE_HOTKEYS.includes(storedHotkey)
-      ? storedHotkey
-      : DEFAULT_CAPTURE_HOTKEY
   try {
-    const hotkeyDisposable = api.globalShortcut.register(captureHotkey, () => {
+    const hotkeyDisposable = api.globalShortcut.register(DEFAULT_CAPTURE_HOTKEY, () => {
       openCaptureOverlay(api)
     })
     disposables.push(hotkeyDisposable)
-    console.log(`[task-vault] Global capture shortcut registered: ${captureHotkey}`)
+    console.log(`[task-vault] Global capture shortcut registered: ${DEFAULT_CAPTURE_HOTKEY}`)
   } catch (err) {
     console.warn(
-      `[task-vault] Could not register global shortcut "${captureHotkey}" — claimed by another app. Change it in Task Vault settings.`,
+      `[task-vault] Could not register global shortcut "${DEFAULT_CAPTURE_HOTKEY}" — claimed by another app.`,
       err
     )
     api.notifications.showToast(
       'warning',
-      `Task Vault: global shortcut "${captureHotkey}" is in use by another app — change it in settings.`
+      `Task Vault: global shortcut "${DEFAULT_CAPTURE_HOTKEY}" is in use by another app.`
     )
   }
 }

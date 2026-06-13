@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ux-mockups",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-p", "4321", "ux-mockups"],
+      "port": 4321
+    },
+    {
+      "name": "desktop-renders",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-p", "4322", "/Users/atavares/Desktop"],
+      "port": 4322
+    }
+  ]
+}
