@@ -18,8 +18,27 @@ const mockElectronAPI = {
   },
 }
 
+const localStorageStore: Record<string, string> = {}
+const mockLocalStorage = {
+  getItem: vi.fn((k: string) => localStorageStore[k] ?? null),
+  setItem: vi.fn((k: string, v: string) => {
+    localStorageStore[k] = v
+  }),
+  removeItem: vi.fn((k: string) => {
+    delete localStorageStore[k]
+  }),
+  clear: vi.fn(() => {
+    Object.keys(localStorageStore).forEach((k) => delete localStorageStore[k])
+  }),
+}
+
 Object.defineProperty(globalThis, 'window', {
   value: { electronAPI: mockElectronAPI },
+  writable: true,
+})
+
+Object.defineProperty(globalThis, 'localStorage', {
+  value: mockLocalStorage,
   writable: true,
 })
 
@@ -321,6 +340,43 @@ describe('useWorkspaceStore', () => {
     it("returns '~' when no workspace or project is active", () => {
       useWorkspaceStore.setState({ activeWorkspaceId: null, activeProjectId: null })
       expect(useWorkspaceStore.getState().resolveActiveCwd()).toBe('~')
+    })
+  })
+
+  describe('collapsedWorkspaceIds', () => {
+    const storageKey = 'terminator.workspace.collapsed'
+
+    beforeEach(() => {
+      localStorage.clear()
+      useWorkspaceStore.setState({ collapsedWorkspaceIds: new Set() })
+    })
+
+    it('initializes as empty set when localStorage has no entry', () => {
+      expect(useWorkspaceStore.getState().collapsedWorkspaceIds.size).toBe(0)
+    })
+
+    it('toggleWorkspaceCollapse adds an ID that is not present', () => {
+      useWorkspaceStore.getState().toggleWorkspaceCollapse('ws-1')
+      expect(useWorkspaceStore.getState().collapsedWorkspaceIds.has('ws-1')).toBe(true)
+    })
+
+    it('toggleWorkspaceCollapse removes an ID that is already present', () => {
+      useWorkspaceStore.setState({ collapsedWorkspaceIds: new Set(['ws-1']) })
+      useWorkspaceStore.getState().toggleWorkspaceCollapse('ws-1')
+      expect(useWorkspaceStore.getState().collapsedWorkspaceIds.has('ws-1')).toBe(false)
+    })
+
+    it('writes collapsed IDs to localStorage on toggle', () => {
+      useWorkspaceStore.getState().toggleWorkspaceCollapse('ws-1')
+      const stored = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as string[]
+      expect(stored).toContain('ws-1')
+    })
+
+    it('removes ID from localStorage when toggled off', () => {
+      useWorkspaceStore.setState({ collapsedWorkspaceIds: new Set(['ws-1']) })
+      useWorkspaceStore.getState().toggleWorkspaceCollapse('ws-1')
+      const stored = JSON.parse(localStorage.getItem(storageKey) ?? '["ws-1"]') as string[]
+      expect(stored).not.toContain('ws-1')
     })
   })
 })

@@ -1,0 +1,72 @@
+.scratch-section {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding: 4px 0 4px;
+}
+
+.scratch-section__label {
+  padding: 4px 10px 2px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.scratch-section__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: var(--session-row-h, 28px);
+  padding: 0 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.scratch-section__row:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.scratch-section__row--active {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.scratch-section__row-prefix {
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.scratch-section__row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scratch-section__add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: var(--session-row-h, 28px);
+  padding: 0 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.scratch-section__add:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}

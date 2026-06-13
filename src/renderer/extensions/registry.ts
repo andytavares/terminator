@@ -12,6 +12,14 @@ export interface GlobalTabRegistration {
   hidden?: boolean
 }
 
+export interface WorkspaceTabRegistration {
+  id: string
+  label: string
+  icon?: ReactNode
+  /** Component reads active workspace from useWorkspaceStore internally. */
+  component: ComponentType<Record<string, never>>
+}
+
 export interface SidebarPanelRegistration {
   id: string
   label: string
@@ -54,9 +62,11 @@ interface ExtensionRegistry {
   sidebarPanels: Map<string, SidebarPanelRegistration>
   projectTabs: Map<string, ProjectTabRegistration>
   globalTabs: Map<string, GlobalTabRegistration>
+  workspaceTabs: Map<string, WorkspaceTabRegistration>
   windowViews: Map<string, ComponentType<{ repoRoot: string | null }>>
   sidebarButtons: SidebarButtonRegistration[]
   activeGlobalTabId: string | null
+  activeWorkspaceTabId: string | null
   keyboardShortcuts: KeyboardShortcutRegistration[]
   commands: CommandRegistration[]
   overlays: ComponentType[]
@@ -67,6 +77,7 @@ interface ExtensionRegistry {
   registerSidebarPanel(panel: SidebarPanelRegistration): () => void
   registerProjectTab(tab: ProjectTabRegistration): () => void
   registerGlobalTab(tab: GlobalTabRegistration): () => void
+  registerWorkspaceTab(tab: WorkspaceTabRegistration): () => void
   registerWindowView(id: string, component: ComponentType<{ repoRoot: string | null }>): void
   registerOverlay(component: ComponentType): () => void
   registerKeyboardShortcut(shortcut: KeyboardShortcutRegistration): () => void
@@ -77,6 +88,7 @@ interface ExtensionRegistry {
   togglePanel(panelId: string): void
   setActiveProjectTab(tabId: string | null): void
   setActiveGlobalTab(tabId: string | null): void
+  setActiveWorkspaceTab(tabId: string | null): void
   setActiveGlobalTabWithNavigation(tabId: string, navigationData: unknown): void
   clearPendingNavigation(extensionId: string): void
 }
@@ -84,6 +96,7 @@ interface ExtensionRegistry {
 export type ExtensionRendererAPI = Pick<
   ExtensionRegistry,
   | 'registerGlobalTab'
+  | 'registerWorkspaceTab'
   | 'registerSidebarPanel'
   | 'registerProjectTab'
   | 'registerWindowView'
@@ -98,9 +111,11 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
   sidebarPanels: new Map(),
   projectTabs: new Map(),
   globalTabs: new Map(),
+  workspaceTabs: new Map(),
   windowViews: new Map(),
   sidebarButtons: [],
   activeGlobalTabId: null,
+  activeWorkspaceTabId: null,
   keyboardShortcuts: [],
   commands: [],
   overlays: [],
@@ -154,6 +169,22 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
         tabs.delete(tab.id)
         const next: Partial<ExtensionRegistry> = { globalTabs: tabs }
         if (s.activeGlobalTabId === tab.id) next.activeGlobalTabId = null
+        return next
+      })
+  },
+
+  registerWorkspaceTab(tab) {
+    set((s) => {
+      const tabs = new Map(s.workspaceTabs)
+      tabs.set(tab.id, tab)
+      return { workspaceTabs: tabs }
+    })
+    return () =>
+      set((s) => {
+        const tabs = new Map(s.workspaceTabs)
+        tabs.delete(tab.id)
+        const next: Partial<ExtensionRegistry> = { workspaceTabs: tabs }
+        if (s.activeWorkspaceTabId === tab.id) next.activeWorkspaceTabId = null
         return next
       })
   },
@@ -217,14 +248,31 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
   },
 
   setActiveGlobalTab(tabId) {
-    set({ activeGlobalTabId: tabId, ...(tabId !== null ? { activeProjectTabId: null } : {}) })
+    set({
+      activeGlobalTabId: tabId,
+      activeWorkspaceTabId: null,
+      ...(tabId !== null ? { activeProjectTabId: null } : {}),
+    })
+  },
+
+  setActiveWorkspaceTab(tabId) {
+    set({
+      activeWorkspaceTabId: tabId,
+      activeGlobalTabId: null,
+      ...(tabId !== null ? { activeProjectTabId: null } : {}),
+    })
   },
 
   setActiveGlobalTabWithNavigation(tabId, navigationData) {
     set((s) => {
       const pendingNavigations = new Map(s.pendingNavigations)
       pendingNavigations.set(tabId, navigationData)
-      return { activeGlobalTabId: tabId, activeProjectTabId: null, pendingNavigations }
+      return {
+        activeGlobalTabId: tabId,
+        activeProjectTabId: null,
+        activeWorkspaceTabId: null,
+        pendingNavigations,
+      }
     })
   },
 

@@ -61,22 +61,26 @@ vi.mock('../../../src/renderer/components/CommandPalette', () => ({
 
 type GlobalTabCallback = (id: string) => void
 let capturedOnSelectGlobalTab: GlobalTabCallback | null = null
-vi.mock('../../../src/renderer/components/sidebar/WorkspaceRail', () => ({
-  WorkspaceRail: ({ onSelectGlobalTab }: { onSelectGlobalTab: GlobalTabCallback }) => {
-    capturedOnSelectGlobalTab = onSelectGlobalTab
-    return <div data-testid="workspace-rail" />
-  },
-}))
-vi.mock('../../../src/renderer/components/sidebar/ProjectsPanel', () => ({
-  ProjectsPanel: ({ workspaceId }: { workspaceId: string }) => (
-    <div data-testid="projects-panel" data-workspace-id={workspaceId} />
-  ),
-}))
 let capturedOnSelectSession: ((sessionId: string) => void) | null = null
-vi.mock('../../../src/renderer/components/sidebar/ScratchPanel', () => ({
-  ScratchPanel: ({ onSelectSession }: { onSelectSession?: (sessionId: string) => void }) => {
-    capturedOnSelectSession = onSelectSession ?? null
-    return <div data-testid="scratch-panel" />
+let capturedOnSelectProject: (() => void) | null = null
+vi.mock('../../../src/renderer/components/sidebar/UnifiedSidebar', () => ({
+  UnifiedSidebar: ({
+    onSelectGlobalTab,
+    onSelectScratchSession,
+    onSelectProject,
+    visible,
+  }: {
+    onSelectGlobalTab: GlobalTabCallback
+    onSelectScratchSession: (sessionId: string) => void
+    onSelectProject?: () => void
+    visible: boolean
+  }) => {
+    capturedOnSelectGlobalTab = onSelectGlobalTab
+    capturedOnSelectSession = onSelectScratchSession
+    capturedOnSelectProject = onSelectProject ?? null
+    return (
+      <div data-testid="unified-sidebar" className={visible ? '' : 'unified-sidebar--hidden'} />
+    )
   },
 }))
 vi.mock('../../../src/renderer/components/AboutDialog', () => ({
@@ -136,12 +140,15 @@ const defaultExtensionRegistry = {
   sidebarPanels: new Map(),
   projectTabs: new Map(),
   globalTabs: new Map(),
+  workspaceTabs: new Map(),
   openPanels: new Set<string>(),
   activeProjectTabId: null,
   activeGlobalTabId: null,
+  activeWorkspaceTabId: null,
   togglePanel: vi.fn(),
   setActiveProjectTab: vi.fn(),
   setActiveGlobalTab: vi.fn(),
+  setActiveWorkspaceTab: vi.fn(),
   keyboardShortcuts: [],
   commands: [],
   overlays: [],
@@ -200,6 +207,7 @@ beforeEach(() => {
   capturedPaletteCommands = []
   capturedOnSelectGlobalTab = null
   capturedOnSelectSession = null
+  capturedOnSelectProject = null
   mockUnsubscribe = vi.fn()
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     terminal: {
@@ -224,9 +232,9 @@ afterEach(() => {
 })
 
 describe('App', () => {
-  it('renders WorkspaceRail', () => {
+  it('renders UnifiedSidebar', () => {
     render(<App />)
-    expect(screen.getByTestId('workspace-rail')).toBeTruthy()
+    expect(screen.getByTestId('unified-sidebar')).toBeTruthy()
   })
 
   it('renders ToastContainer', () => {
@@ -240,19 +248,19 @@ describe('App', () => {
     expect(mockLoadSettings).toHaveBeenCalled()
   })
 
-  it('shows ProjectsPanel when activeWorkspaceId is set', () => {
+  it('shows UnifiedSidebar when activeWorkspaceId is set', () => {
     setupMocks({
       activeWorkspaceId: 'ws-1',
       workspaces: [{ id: 'ws-1', name: 'Test', folderPath: '/test', color: '#fff', tags: [] }],
     })
     render(<App />)
-    expect(screen.getByTestId('projects-panel')).toBeTruthy()
+    expect(screen.getByTestId('unified-sidebar')).toBeTruthy()
   })
 
-  it('does not show ProjectsPanel when no activeWorkspaceId', () => {
+  it('shows UnifiedSidebar even when no activeWorkspaceId (sidebar is always present)', () => {
     setupMocks({ activeWorkspaceId: null })
     render(<App />)
-    expect(screen.queryByTestId('projects-panel')).toBeNull()
+    expect(screen.getByTestId('unified-sidebar')).toBeTruthy()
   })
 
   it('shows TerminalPane when activeProjectId is set', () => {
@@ -632,15 +640,17 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
   })
 
-  it('command core.toggle-sidebar action hides ProjectsPanel', async () => {
+  it('command core.toggle-sidebar action adds hidden class to UnifiedSidebar', async () => {
     setupMocks({ activeWorkspaceId: 'ws-1' })
     render(<App />)
-    expect(screen.getByTestId('projects-panel')).toBeTruthy()
+    expect(screen.getByTestId('unified-sidebar')).toBeTruthy()
     capturedShortcutCallbacks.onOpenCommandPalette?.()
     await waitFor(() => screen.getByTestId('command-palette'))
     const cmd = capturedPaletteCommands.find((c) => c.id === 'core.toggle-sidebar')
     cmd?.action()
-    await waitFor(() => expect(screen.queryByTestId('projects-panel')).toBeNull())
+    await waitFor(() =>
+      expect(screen.getByTestId('unified-sidebar').className).toContain('unified-sidebar--hidden')
+    )
   })
 
   it('command core.toggle-log action opens LogWindow', async () => {
@@ -948,7 +958,7 @@ describe('App', () => {
     expect(container.querySelector('.app-global-metrics')).toBeTruthy()
   })
 
-  it('ScratchPanel onSelectSession activates scratch view for chosen session', async () => {
+  it('UnifiedSidebar onSelectScratchSession activates scratch view for chosen session', async () => {
     setupMocks({ activeWorkspaceId: 'ws-1' })
     const mockSetActiveSessionForProject = vi.fn()
     ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
@@ -1044,9 +1054,47 @@ describe('App', () => {
       },
     }
     render(<App />)
-    expect(screen.getByTestId('projects-panel')).toBeTruthy()
+    expect(screen.getByTestId('unified-sidebar')).toBeTruthy()
     toggleSidebarCb?.()
-    await waitFor(() => expect(screen.queryByTestId('projects-panel')).toBeNull())
+    await waitFor(() =>
+      expect(screen.getByTestId('unified-sidebar').className).toContain('unified-sidebar--hidden')
+    )
+  })
+
+  it('renders workspace tab component when activeWorkspaceTabId is set', () => {
+    const MockWorkspaceTab = () => <div data-testid="workspace-tab-content">Workspace Tab</div>
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      workspaceTabs: new Map([
+        [
+          'code-reviews',
+          { id: 'code-reviews', label: 'Code Reviews', component: MockWorkspaceTab },
+        ],
+      ]),
+      activeWorkspaceTabId: 'code-reviews',
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    render(<App />)
+    expect(screen.getByTestId('workspace-tab-content')).toBeTruthy()
+  })
+
+  it('onSelectProject clears active global, workspace, and project tabs', () => {
+    const mockSetActiveGlobalTab = vi.fn()
+    const mockSetActiveWorkspaceTab = vi.fn()
+    const mockSetActiveProjectTab = vi.fn()
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      activeGlobalTabId: 'task-vault',
+      activeWorkspaceTabId: 'code-reviews',
+      activeProjectTabId: 'git',
+      setActiveGlobalTab: mockSetActiveGlobalTab,
+      setActiveWorkspaceTab: mockSetActiveWorkspaceTab,
+      setActiveProjectTab: mockSetActiveProjectTab,
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    render(<App />)
+    capturedOnSelectProject?.()
+    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
+    expect(mockSetActiveWorkspaceTab).toHaveBeenCalledWith(null)
+    expect(mockSetActiveProjectTab).toHaveBeenCalledWith(null)
   })
 
   it('reopens saved panels when switching back to Terminal tab', async () => {

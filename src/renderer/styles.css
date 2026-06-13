@@ -32,8 +32,14 @@
   --agent-clr: #8b5cf6;
 
   /* spacing */
-  --rail-w: 72px;
-  --panel-w: 248px;
+  --sidebar-w: 260px;
+  --sidebar-min-w: 200px;
+  --sidebar-max-w: 480px;
+  --ws-card-radius: 8px;
+  --ws-band-w: 3px;
+  --session-row-h: 28px;
+  --project-row-h: 30px;
+  --ws-card-gap: 6px;
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -138,19 +144,6 @@ button {
   min-width: 0;
 }
 
-/* Wraps ProjectsPanel + ScratchPanel in the sidebar column */
-.sidebar-stack {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.sidebar-stack .projects-panel {
-  flex: 1;
-  min-height: 0;
-}
-
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -214,6 +207,57 @@ button {
   width: 16px;
   height: 16px;
   display: inline-block;
+}
+
+/* ── Context Menus ───────────────────────────────────────────── */
+.ctx-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 160px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  user-select: none;
+  overflow: hidden;
+}
+
+.ctx-menu__item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ctx-menu__item:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.ctx-menu__item--danger {
+  color: var(--danger);
+}
+
+.ctx-menu__item--danger:hover {
+  background: rgba(224, 92, 92, 0.12);
+  color: var(--danger);
+}
+
+.ctx-menu__separator {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
 }
 
 /* ── Scrollbars ──────────────────────────────────────────────── */

@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { WorkspaceRail } from './components/sidebar/WorkspaceRail'
-import { ProjectsPanel } from './components/sidebar/ProjectsPanel'
+import React, { useCallback, useEffect, useRef, useState, createElement } from 'react'
+import { LayoutGrid } from 'lucide-react'
+import { UnifiedSidebar } from './components/sidebar/UnifiedSidebar'
 import { TerminalPane } from './components/terminal/TerminalPane'
 import { TabBar } from './components/terminal/TabBar'
 import { SettingsPanel } from './components/settings/SettingsPanel'
@@ -23,7 +23,6 @@ import { EmptyState } from './components/EmptyState'
 import { OverviewScreen } from './components/overview/OverviewScreen'
 import { MetricsBar } from './components/overview/MetricsBar'
 import { useMetricsStore } from './stores/metrics.store'
-import { ScratchPanel } from './components/sidebar/ScratchPanel'
 import { AboutDialog } from './components/AboutDialog'
 import { SCRATCH_PROJECT_ID } from '../shared/types/index'
 
@@ -68,12 +67,15 @@ export function App(): JSX.Element {
     sidebarPanels,
     projectTabs,
     globalTabs,
+    workspaceTabs,
     activeGlobalTabId,
+    activeWorkspaceTabId,
     openPanels,
     activeProjectTabId,
     togglePanel,
     setActiveProjectTab,
     setActiveGlobalTab,
+    setActiveWorkspaceTab,
     commands: extensionCommands,
     overlays,
   } = useExtensionRegistry()
@@ -360,7 +362,7 @@ export function App(): JSX.Element {
     return useExtensionRegistry.getState().registerGlobalTab({
       id: 'core.overview',
       label: 'Overview',
-      icon: '⊞',
+      icon: createElement(LayoutGrid),
       component: OverviewScreen,
       permanent: true,
     })
@@ -395,16 +397,37 @@ export function App(): JSX.Element {
     <ErrorBoundary>
       <div className="app-layout">
         <div className="app-body">
-          <WorkspaceRail
-            globalTabs={Array.from(globalTabs.values())}
+          <UnifiedSidebar
+            globalTabs={Array.from(globalTabs.values()).sort(
+              (a, b) => (a.id.startsWith('core.') ? 0 : 1) - (b.id.startsWith('core.') ? 0 : 1)
+            )}
             activeGlobalTabId={activeGlobalTabId}
             onSelectGlobalTab={(id) => setActiveGlobalTab(id === activeGlobalTabId ? null : id)}
+            activeWorkspaceTabId={activeWorkspaceTabId}
+            onSelectWorkspaceTab={(workspaceId, tabId) => {
+              const isAlreadyActive =
+                tabId === activeWorkspaceTabId && workspaceId === activeWorkspaceId
+              setActiveWorkspace(workspaceId)
+              setActiveWorkspaceTab(isAlreadyActive ? null : tabId)
+            }}
+            onSelectProject={() => {
+              if (activeGlobalTabId) setActiveGlobalTab(null)
+              if (activeWorkspaceTabId) setActiveWorkspaceTab(null)
+              if (activeProjectTabId) setActiveProjectTab(null)
+            }}
             unreadNotifications={unreadCount}
             notificationPanelOpen={notificationPanelOpen}
             onBellClick={toggleNotificationPanel}
             onNewScratch={handleNewScratch}
             scratchActive={scratchActive}
             hasScratchSessions={scratchSessions.length > 0}
+            activeScratchSessionId={scratchActive ? activeScratchSessionId : null}
+            onSelectScratchSession={(sessionId) => {
+              setScratchActive(true)
+              if (activeWorkspaceTabId) setActiveWorkspaceTab(null)
+              useSessionStore.getState().setActiveSessionForProject(SCRATCH_PROJECT_ID, sessionId)
+            }}
+            visible={sidebarVisible}
           />
 
           {activeGlobalTabId && globalTabs.has(activeGlobalTabId) ? (
@@ -417,22 +440,18 @@ export function App(): JSX.Element {
                 </div>
               )
             })()
+          ) : activeWorkspaceTabId && workspaceTabs.has(activeWorkspaceTabId) ? (
+            (() => {
+              const tab = workspaceTabs.get(activeWorkspaceTabId)!
+              const TabComponent = tab.component as React.ComponentType<Record<string, never>>
+              return (
+                <div className="main-content">
+                  <TabComponent />
+                </div>
+              )
+            })()
           ) : (
             <>
-              {sidebarVisible && (
-                <div className="sidebar-stack">
-                  {activeWorkspaceId && <ProjectsPanel workspaceId={activeWorkspaceId} />}
-                  <ScratchPanel
-                    activeSessionId={scratchActive ? activeScratchSessionId : null}
-                    onSelectSession={(sessionId) => {
-                      setScratchActive(true)
-                      useSessionStore
-                        .getState()
-                        .setActiveSessionForProject(SCRATCH_PROJECT_ID, sessionId)
-                    }}
-                  />
-                </div>
-              )}
               <div className="main-content">
                 {scratchActive ? (
                   <>

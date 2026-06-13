@@ -2,7 +2,7 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/008-remote-control-browser/plan.md`
+`specs/009-remote-control-browser/plan.md`
 
 <!-- SPECKIT END -->
 

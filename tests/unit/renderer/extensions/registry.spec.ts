@@ -13,12 +13,14 @@ function resetStore() {
     sidebarPanels: new Map(),
     projectTabs: new Map(),
     globalTabs: new Map(),
+    workspaceTabs: new Map(),
     keyboardShortcuts: [],
     commands: [],
     overlays: [],
     openPanels: new Set(),
     activeProjectTabId: null,
     activeGlobalTabId: null,
+    activeWorkspaceTabId: null,
     pendingNavigations: new Map(),
   })
 }
@@ -240,6 +242,87 @@ describe('useExtensionRegistry', () => {
       const dispose = useExtensionRegistry.getState().registerOverlay(NullComponent)
       dispose()
       expect(useExtensionRegistry.getState().overlays).toHaveLength(0)
+    })
+  })
+
+  describe('registerWorkspaceTab', () => {
+    it('adds tab to workspaceTabs map', () => {
+      const tab = { id: 'code-reviews', label: 'Code Reviews', component: NullComponent }
+      useExtensionRegistry.getState().registerWorkspaceTab(tab)
+      expect(useExtensionRegistry.getState().workspaceTabs.has('code-reviews')).toBe(true)
+    })
+
+    it('returns dispose function that removes the tab', () => {
+      const tab = { id: 'code-reviews', label: 'Code Reviews', component: NullComponent }
+      const dispose = useExtensionRegistry.getState().registerWorkspaceTab(tab)
+      dispose()
+      expect(useExtensionRegistry.getState().workspaceTabs.has('code-reviews')).toBe(false)
+    })
+
+    it('clears activeWorkspaceTabId when active tab is disposed', () => {
+      const tab = { id: 'code-reviews', label: 'Code Reviews', component: NullComponent }
+      const dispose = useExtensionRegistry.getState().registerWorkspaceTab(tab)
+      useExtensionRegistry.setState({ activeWorkspaceTabId: 'code-reviews' })
+      dispose()
+      expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBeNull()
+    })
+
+    it('does not clear activeWorkspaceTabId when a different tab is disposed', () => {
+      const tab = { id: 'code-reviews', label: 'Code Reviews', component: NullComponent }
+      const dispose = useExtensionRegistry.getState().registerWorkspaceTab(tab)
+      useExtensionRegistry.setState({ activeWorkspaceTabId: 'other-tab' })
+      dispose()
+      expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBe('other-tab')
+    })
+  })
+
+  describe('setActiveGlobalTab', () => {
+    it('sets activeGlobalTabId', () => {
+      useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
+      expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('task-vault')
+    })
+
+    it('clears activeWorkspaceTabId when activating a global tab', () => {
+      useExtensionRegistry.setState({ activeWorkspaceTabId: 'code-reviews' })
+      useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
+      expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBeNull()
+    })
+
+    it('clears activeProjectTabId when activating a global tab', () => {
+      useExtensionRegistry.setState({ activeProjectTabId: 'git' })
+      useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
+      expect(useExtensionRegistry.getState().activeProjectTabId).toBeNull()
+    })
+
+    it('does not clear activeProjectTabId when setting global tab to null', () => {
+      useExtensionRegistry.setState({ activeProjectTabId: 'git' })
+      useExtensionRegistry.getState().setActiveGlobalTab(null)
+      expect(useExtensionRegistry.getState().activeProjectTabId).toBe('git')
+    })
+  })
+
+  describe('setActiveWorkspaceTab', () => {
+    it('sets activeWorkspaceTabId', () => {
+      useExtensionRegistry.getState().setActiveWorkspaceTab('code-reviews')
+      expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBe('code-reviews')
+    })
+
+    it('clears activeGlobalTabId when activating a workspace tab', () => {
+      useExtensionRegistry.setState({ activeGlobalTabId: 'task-vault' })
+      useExtensionRegistry.getState().setActiveWorkspaceTab('code-reviews')
+      expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
+    })
+
+    it('clears activeProjectTabId when activating a workspace tab', () => {
+      useExtensionRegistry.setState({ activeProjectTabId: 'git' })
+      useExtensionRegistry.getState().setActiveWorkspaceTab('code-reviews')
+      expect(useExtensionRegistry.getState().activeProjectTabId).toBeNull()
+    })
+
+    it('does not clear activeProjectTabId when setting workspace tab to null', () => {
+      useExtensionRegistry.setState({ activeProjectTabId: 'git' })
+      useExtensionRegistry.getState().setActiveWorkspaceTab(null)
+      expect(useExtensionRegistry.getState().activeProjectTabId).toBe('git')
     })
   })
 

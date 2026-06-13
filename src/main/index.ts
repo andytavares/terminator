@@ -271,6 +271,7 @@ function setupMenu(): void {
       submenu: [
         {
           label: 'Toggle Sidebar',
+          accelerator: 'CmdOrCtrl+B',
           click: () => mainWindow?.webContents.send('menu:toggle-sidebar'),
         },
         {

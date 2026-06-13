@@ -1,0 +1,44 @@
+.unified-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: var(--sidebar-w, 260px);
+  min-width: var(--sidebar-min-w, 200px);
+  max-width: var(--sidebar-max-w, 480px);
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+  transition: width 0.2s ease;
+  z-index: 10;
+}
+
+.unified-sidebar--hidden {
+  width: 0 !important;
+  min-width: 0 !important;
+  overflow: hidden;
+}
+
+.unified-sidebar__list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ws-card-gap, 6px);
+  padding: 8px 8px 4px;
+}
+
+.unified-sidebar__resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  z-index: 20;
+}
+
+.unified-sidebar__resize-handle:hover {
+  background: var(--border-strong);
+}

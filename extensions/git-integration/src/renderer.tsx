@@ -3,13 +3,29 @@
 // The core app never imports this file directly.
 
 import React from 'react'
+import { GitPullRequest } from 'lucide-react'
 import 'highlight.js/styles/atom-one-dark.css'
 import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
+import { useWorkspaceStore } from '../../../src/renderer/stores/workspace.store'
 import { GitSidebarPanel } from './components/GitSidebarPanel'
 import { GitFullView } from './components/GitFullView'
 import { PrReviewTab } from './components/pr-review/PrReviewTab'
 
 const registry = useExtensionRegistry.getState()
+
+// Wrapper reads the active project's repo root from the workspace store so
+// PrReviewTab can operate as a global (workspace-level) tab with no prop drilling.
+function PrReviewGlobalTab(): React.JSX.Element {
+  const { workspaces, activeWorkspaceId, activeProjectId, projectsByWorkspaceId } =
+    useWorkspaceStore()
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) ?? null
+  const workspaceProjects = activeWorkspaceId
+    ? (projectsByWorkspaceId.get(activeWorkspaceId) ?? [])
+    : []
+  const activeProject = workspaceProjects.find((p) => p.id === activeProjectId) ?? null
+  const repoRoot = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? null
+  return <PrReviewTab repoRoot={repoRoot} />
+}
 
 registry.registerSidebarPanel({
   id: 'git-changes',
@@ -23,10 +39,11 @@ registry.registerProjectTab({
   component: GitFullView,
 })
 
-registry.registerProjectTab({
+registry.registerWorkspaceTab({
   id: 'code-reviews',
   label: 'Code Reviews',
-  component: PrReviewTab,
+  icon: React.createElement(GitPullRequest),
+  component: PrReviewGlobalTab,
 })
 
 registry.registerWindowView(

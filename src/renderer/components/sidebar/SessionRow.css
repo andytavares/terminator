@@ -1,0 +1,103 @@
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--session-row-h, 28px);
+  padding: 0 10px 0 24px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  user-select: none;
+}
+
+.session-row:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.session-row--active {
+  color: var(--text-primary);
+}
+
+.session-row__prefix {
+  flex-shrink: 0;
+  opacity: 0.6;
+  width: 10px;
+}
+
+.session-row__title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.session-row__rename-input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 4px;
+  min-width: 0;
+}
+
+.session-row__status {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+}
+
+/* Status indicators */
+.session-row__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: block;
+}
+
+.session-row__dot--active {
+  background: var(--ws-color, var(--accent));
+}
+
+.session-row__dot--dim {
+  background: var(--text-muted);
+  opacity: 0.4;
+}
+
+.session-row__spinner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  border-top-color: var(--ws-color, var(--accent));
+  display: block;
+  animation: session-spin 0.8s linear infinite;
+}
+
+@keyframes session-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.session-row__bell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 9px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  padding: 0 3px;
+}
