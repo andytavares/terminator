@@ -1,0 +1,310 @@
+AGENTS.md
+  s_ebaaafeb4b1615::t_df49943aed948c 1
+specs/008-a3-color-band-sidebar/.pilot/history.jsonl
+  s_ebaaafeb4b1615::t_9b07b2db8ddcdb 1-5
+tests/unit/renderer/components/ProjectRow.spec.tsx
+  s_ebaaafeb4b1615::t_c581c9480d230e 142,146,150-153
+  s_ebaaafeb4b1615::t_0bee34f0b8dd15 141,143-145,147,156-157,159-160,162-169,172-173,175-176,178-189,191-192,194-200,203-208,211-219,278-279,281-282,284-296
+  s_ebaaafeb4b1615::t_2fee3986ee0b16 6-7,15,17,20,22-31,33-34,54-62,64-66,69-71,74-76,79-83,86-100,103-117,120-124
+  s_ebaaafeb4b1615::t_1fca39dca4605f 3,5,13-14
+  s_ebaaafeb4b1615::t_e285c6d50f80cc 222-223,225-226,228-277
+  s_ebaaafeb4b1615::t_81cce2898065d5 32,35-37,42-47
+  s_ebaaafeb4b1615::t_1ab1d8ced595c6 297-311
+  s_ebaaafeb4b1615::t_dc037fad6efdb9 313-321,323-330,332-392
+  s_ebaaafeb4b1615::t_e6c6e210e58b2f 312,393-441
+  s_ebaaafeb4b1615::t_a40676a37de6c5 127-131,134-138
+  s_ebaaafeb4b1615::t_4c133f4c0a281d 51
+tests/unit/renderer/components/SidebarHeader.spec.tsx
+  s_ebaaafeb4b1615::t_adaa4374f9c9bb 28,30-31,34-40
+  s_ebaaafeb4b1615::t_d0553e678283af 85-89,92-96,99-101
+  s_ebaaafeb4b1615::t_305244e84d0dd6 1,3-13,15-21,23-24,27,29,43-47,50-54,57-62,65-70,73-75,78-82
+tests/unit/renderer/components/SidebarSearch.spec.tsx
+  s_ebaaafeb4b1615::t_06a3a2965165af 4,10-13,16-20,23-27,30-32,35-37,40-44,47-50,53-56
+src/renderer/components/sidebar/UnifiedSidebar.css
+  s_ebaaafeb4b1615::t_a50769703238c6 1-44
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_ebaaafeb4b1615::t_595a1e76f3bd9f 52
+.specify/memory/constitution.md
+  s_ebaaafeb4b1615::t_476dd4ffd8edc5 187-196
+tests/unit/renderer/components/WorkspaceCard.spec.tsx
+  s_ebaaafeb4b1615::t_de1a942a20b590 182
+  s_ebaaafeb4b1615::t_7fab1770302381 128-130,133-135,138-141,144-148
+  s_ebaaafeb4b1615::t_0dfb368a5c867e 3
+  s_ebaaafeb4b1615::t_2e7e8dd29fbb9e 21-27,29,151-158,161-168,171-176,211-212,221-222,228,231-232,239,242-243,250,253-254,261
+  s_ebaaafeb4b1615::t_e3dc21433fae63 67-69
+  s_ebaaafeb4b1615::t_aeca2541327bf5 30-36,39-46
+  s_ebaaafeb4b1615::t_0df89b3b51e382 74-80
+  s_ebaaafeb4b1615::t_93adb7fff1fe90 2,4-6,8-9,11-18,20,48,50-52,54-66,83-91,93-95,98-100,103-106,109-112,115-119,122-125
+  s_ebaaafeb4b1615::t_218e3701da0c5d 179-181,185-196,199-208
+  s_ebaaafeb4b1615::t_15ec60cfbb2fcd 213-218,223-227,233-238,244-249,255-260
+docs/adr/017-a3-color-band-sidebar.md
+  s_ebaaafeb4b1615::t_f66b0f57b33a22 1,3-4,6,8,10,12,14-18,20,22,24,26-30,32,34-39
+tests/unit/renderer/components/SessionRow.spec.tsx
+  s_ebaaafeb4b1615::t_3f024c9cece764 190-251
+  s_ebaaafeb4b1615::t_7afe0a3565df4c 11-17,20-22,25-27
+  s_ebaaafeb4b1615::t_44b99edfd7a3cd 5-6,28-38,40-46,49-50,57-139
+  s_ebaaafeb4b1615::t_ad6c9f12d4b5a1 140-189
+  s_ebaaafeb4b1615::t_03270bd284da15 51-56
+specs/001-extension-first-terminal/contracts/extension-api.md
+  s_ebaaafeb4b1615::t_869d52eff8835e 375-402
+  s_ebaaafeb4b1615::t_70014972a2ef23 435
+  s_ebaaafeb4b1615::t_57be76f8fe61c6 3-4
+  s_ebaaafeb4b1615::t_1bb23945bb755d 18
+  s_ebaaafeb4b1615::t_9d17004aebc103 101-109
+.claude/launch.json
+  s_f2e7e658b9568b::t_3a0760ede14934 2-3,5-8,16
+  s_f2e7e658b9568b::t_d6594394ff6c7d 11-14
+src/renderer/components/sidebar/SessionRow.tsx
+  s_ebaaafeb4b1615::t_5dc823a8cfaa1f 32-33
+  s_ebaaafeb4b1615::t_f27eab7ba40b2f 1-2,5,7-14,18-24,26-28,31,34-50,57-69
+  s_ebaaafeb4b1615::t_ffaa805a82ce5c 3-4,29-30
+  s_ebaaafeb4b1615::t_1c86ebb3e637ed 75-77,80-90,92-95,97,100-114,116,119,125,128-129,131,135-136,138,141-144,147-156
+  s_ebaaafeb4b1615::t_426594825c52dd 15
+  s_ebaaafeb4b1615::t_fe9f78e067055f 25
+  s_ebaaafeb4b1615::t_ab9e6b8899c7ab 54
+tests/unit/renderer/components/ExtensionFooter.spec.tsx
+  s_ebaaafeb4b1615::t_09f092723960d3 1,3-5,7-16,18-22,24-28,31-36,39-43,46-49
+specs/008-a3-color-band-sidebar/plan.md
+  s_ebaaafeb4b1615::t_64844ee1f2425d 122
+  s_ebaaafeb4b1615::t_9983e0c6a61b08 1,3-4,10,16-24,30-32,34-50,59-62,64-66,69,72-112,115,121,123,125
+ux-mockups/index.html
+  s_f2e7e658b9568b::t_cb6d92de6524a5 6,8-30,36-38,40-41,44-45,49,51,53-54,57,59,61-62,65-66,68-72,74,76-78,80-83,87-89,91,93-95,97-103,105-108,110-115,117-124,126-128,130-132,134-136,138-146,148-149,152-155,157,162-163,165-197,199-202,207-208,210-212,214-227,229-233,235-237,242,252-253,261-262,271,296,300-303,306-312,314-328,330-331,333,344,347,355,357,359,370,429,433,455,464,480-481,490-491,505,508,511,521,527,530,556,564,569,582,593,624-626,641,678,689,695-696,705,707,709,711,725-726,734,871-873,883-884,911-918,922-924,931,1123,1127-1128,1148,1200,1245,1333,1338,1342-1345,1347-1349,1351-1352,1366,1379,1393,1411-1447,1449-1453,1456-1469,1471-1472,1474,1483,1485-1486,1501,1510,1514,1539,1549,1584-1585,1587,1589,1602,1610-1611,1616,1633-1635,1642,1647-1648,1653
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_ebaaafeb4b1615::t_21a0670440e72b 129,133-139
+src/renderer/styles.css
+  s_ebaaafeb4b1615::t_6c548739d928df 35-42
+  s_ebaaafeb4b1615::t_28b1e68498dd94 212-262
+tests/unit/renderer/components/ScratchSection.spec.tsx
+  s_ebaaafeb4b1615::t_e3d5228300c9dd 1-89
+src/renderer/components/sidebar/ProjectRow.tsx
+  s_ebaaafeb4b1615::t_3439a942e798f3 38,40
+  s_ebaaafeb4b1615::t_16e1c37de939d0 16-18,29-31
+  s_ebaaafeb4b1615::t_e85e0a29382e02 145-146,148-182,185,187,193-194
+  s_ebaaafeb4b1615::t_c1b89a983aab19 183-184,186
+  s_ebaaafeb4b1615::t_cdbf6822c47979 6-7,9-12,14-15,22,24-25,27-28,33,42-48,74,79,93,95,97-113,129-141,144,147,195-196,198,213,223
+  s_ebaaafeb4b1615::t_653f458c4a2833 114-125
+  s_ebaaafeb4b1615::t_f8cd9e3bb1ad60 49-54
+  s_ebaaafeb4b1615::t_695e3b1fba5b17 91
+  s_ebaaafeb4b1615::t_571b4ac0486803 188-192
+  s_ebaaafeb4b1615::t_61c9b9506650af 19
+  s_ebaaafeb4b1615::t_3e49e4786a3b5e 41
+  s_ebaaafeb4b1615::t_f0980d7bb4e197 32
+src/renderer/components/sidebar/SidebarSearch.css
+  s_ebaaafeb4b1615::t_ae01e4b2e45c58 1-54
+src/renderer/components/sidebar/ScratchSection.css
+  s_ebaaafeb4b1615::t_b56fa9c3b9bab6 1-2,4,7-9,14,17,21-28,30,33-35,38-40,43-44,48,54-61,64-66,69-70
+package-lock.json
+  s_ebaaafeb4b1615::t_9b07b2db8ddcdb 13539-13541,13684-13686,14652-14654
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_ebaaafeb4b1615::t_859279028383b2 199
+  s_ebaaafeb4b1615::t_3a1088cb5f07f2 204
+  s_ebaaafeb4b1615::t_2fd8f5d4347c31 1-2,4-14,18-26,29-44,47-50,56-74,76-111,114-121,124-129,132-134,137-149,153,155-157,159-164,172-198,200,205-206,210-214,217-220,222,224-225
+  s_ebaaafeb4b1615::t_c85a81530a43be 17
+  s_ebaaafeb4b1615::t_424b853da66dae 51-52
+  s_ebaaafeb4b1615::t_d0ffe9115e0001 54-55
+  s_ebaaafeb4b1615::t_9cda9b564d6c14 167-169
+  s_ebaaafeb4b1615::t_620056feb14d44 75
+  s_ebaaafeb4b1615::t_5d3fba73edc0a1 165-166
+  s_ebaaafeb4b1615::t_2aa7fbfe03f187 201
+  s_ebaaafeb4b1615::t_270156c0c1d9ff 15-16
+  s_ebaaafeb4b1615::t_ac08abee4c43d2 202-203
+  s_ebaaafeb4b1615::t_41c7ee3ce5278b 53
+src/renderer/components/sidebar/ExtensionFooter.tsx
+  s_ebaaafeb4b1615::t_1968ab12cffee1 2-18,20-21
+docs/EXTENSION-DEVELOPMENT.md
+  s_ebaaafeb4b1615::t_f8a929e341b692 5
+  s_ebaaafeb4b1615::t_a9e1d639eed177 561-563
+  s_ebaaafeb4b1615::t_42d6bf6cb8dc09 463,465-472,478-479
+  s_ebaaafeb4b1615::t_9ef30290d0bbf9 663-706,708-710
+  s_ebaaafeb4b1615::t_b25d56db13d4e5 546
+specs/008-a3-color-band-sidebar/contracts/ui-components.md
+  s_ebaaafeb4b1615::t_24991d3d7665e5 1,3-4,6,8,10,12-17,19-22,24-29,31-34,36,38-41,45,47-56,58,60-65,69,71-80,82,84-89,91,93-117,121-131,133,135-137,141,143-149,151,153-155,159,161-165,167,169-171,175,177-184,186,188-191,195-197,199-204
+tests/unit/renderer/stores/workspace.store.spec.ts
+  s_ebaaafeb4b1615::t_8749feb0d5af59 345-381
+  s_ebaaafeb4b1615::t_4f532c484ac691 21-34,40-41
+specs/008-a3-color-band-sidebar/data-model.md
+  s_ebaaafeb4b1615::t_12799386758b95 1,3-4,6,8,10,12,14-18,21-22,25,27,29,31,34,37-70,72,74,76-77,79,81,83-88
+specs/008-a3-color-band-sidebar/research.md
+  s_ebaaafeb4b1615::t_f307600e00d150 1,3-4,8,10,12,16-18,22,24,26,30-32,34,38,40,42,46-47,51,53,55,59-60,64,66,68,72,74,76,80,82,84,88,90,92
+src/renderer/components/sidebar/SidebarSearch.tsx
+  s_ebaaafeb4b1615::t_a1f75f0ed7e388 1-14,16-43
+src/main/index.ts
+  s_ebaaafeb4b1615::t_a57f632e039503 114
+specs/008-a3-color-band-sidebar/tasks.md
+  s_ebaaafeb4b1615::t_d2478ca1fa0867 167
+  s_ebaaafeb4b1615::t_b660159b98f589 1,3-4,6,8,10,12-14,18,20,26,30,32,34,36,42,48,54,58,60,62,64,70,83,87,89,91,93,97,104,108,110,112,114,118,123,127,129,131,133,138,144,148,150,152,154,159,168,170,174,176,178,180,185,191,195,197,209,213-215,233,242-250,254-259,261,263-266,268,270-273,275,277,279-280,282-284,286-297,304,306-308,310,312,314-321,327-333
+src/renderer/components/sidebar/ScratchSection.tsx
+  s_ebaaafeb4b1615::t_8f762110d73c88 2-3,5-6,9,12-17,19-34
+src/renderer/components/sidebar/WorkspaceCard.css
+  s_ebaaafeb4b1615::t_5fa81cd148f3d6 52,55-56,59,63-68,70,72-73,76-78,82-84,87-89,92-93
+  s_ebaaafeb4b1615::t_5c7c2fdead1cbe 1-2,8,11,13-18,21,24-26,28,31,35-39,42-45,47-48,96-99,102-103,119-127,130,133-140,142,145,147,150-152,155-156,158-163
+  s_ebaaafeb4b1615::t_0e3077b0d35041 3-4
+  s_ebaaafeb4b1615::t_20b66a8f8b9b19 104-105,108-116
+  s_ebaaafeb4b1615::t_57a81add06df63 32
+extensions/git-integration/package.json
+  s_ebaaafeb4b1615::t_19ef75f024fb38 18
+src/renderer/stores/workspace.store.ts
+  s_ebaaafeb4b1615::t_b529e41b9eb08f 9
+  s_ebaaafeb4b1615::t_d84f4bec40acba 215-223
+  s_ebaaafeb4b1615::t_6981413a5c1605 30
+  s_ebaaafeb4b1615::t_8da06cce146a63 202-214
+  s_ebaaafeb4b1615::t_6f029d10486f47 33-43,51
+  s_ebaaafeb4b1615::t_80e9e092faeb3f 29
+CLAUDE.md
+  s_ebaaafeb4b1615::t_94ba1d30bbe102 4-5
+package.json
+  h_16ba00fe96244d 51
+extensions/task-vault/src/renderer.tsx
+  s_ebaaafeb4b1615::t_a8f2271f4e6e5b 75
+  s_ebaaafeb4b1615::t_439a570959927d 8
+  s_ebaaafeb4b1615::t_0589ccf576195a 28
+  s_ebaaafeb4b1615::t_4eafbdc2d22c49 2
+specs/008-a3-color-band-sidebar/spec.md
+  s_ebaaafeb4b1615::t_5eb10f08cc10ac 1,3-6,10,12,14,16,18,20,22,24,26,30,32,34,36,40-44,48,50,52,54,58-62,66,68,70,72,76,78,80,82,84,86,88,90,92,94,96,98,100,102-104,106,110,112,114,116,120-124,128,130,132,134,138-140,146-151,155-157,159,161-166,168,170-175,177,179-184,186-197,199,201-203,205,207-208,210,212-213,215,217-219,221,223-225,227,229-232,234,236-238,240,242-243,245,247-248,250,252-254,260-266,270,274-280,286-296
+src/renderer/extensions/registry.ts
+  s_ebaaafeb4b1615::t_8ccf52fb9ee68d 15-22
+  s_ebaaafeb4b1615::t_2a5ceeb9174a41 65,69,80,91
+  s_ebaaafeb4b1615::t_1165db1d4b9834 251-253,255-261,263
+  s_ebaaafeb4b1615::t_e2bb26987d4dc9 99
+  s_ebaaafeb4b1615::t_49f582df77dc1c 114,118
+  s_ebaaafeb4b1615::t_d726b5bc3647bb 176-191
+specs/008-a3-color-band-sidebar/checklists/requirements.md
+  s_ebaaafeb4b1615::t_ef2275a9c66a70 1,4,34-36
+src/renderer/components/sidebar/SidebarHeader.tsx
+  s_ebaaafeb4b1615::t_9075cde6afa231 4,15-17,27-29,35-39
+  s_ebaaafeb4b1615::t_4ca92442c09d9a 2
+  s_ebaaafeb4b1615::t_5f2178f6014fd4 41-49,53,55-58,60-65,67-70
+  s_ebaaafeb4b1615::t_b6f74e41e63b48 1,3,5,7-12,20-24,30-31,34,40,54,59,66,71-72
+  s_ebaaafeb4b1615::t_213fb3d39410a9 13-14,25-26
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_ebaaafeb4b1615::t_1925d431c3e459 6-7,15-16,19-50,52-61,63,65,67-73,76-85,89-94,101,104-108,111-113,116-118,121,123-124,126-130,133-135,138-140,143-145
+  s_ebaaafeb4b1615::t_c22c8419ea41fb 148-152,155-170,174-182,185-192,195-197,199-200
+  s_ebaaafeb4b1615::t_6f49f1c3e82959 64,74-75
+  s_ebaaafeb4b1615::t_9e109aa768cf99 95-100
+  s_ebaaafeb4b1615::t_82bdb4c41024e9 203-208,211-217,220-225,228-233,236-237,239-240,242-246,249-255,258-264,267-275
+  s_ebaaafeb4b1615::t_758480ffdc8bde 62,66
+  s_ebaaafeb4b1615::t_9c25438257e082 51
+tests/unit/renderer/App.spec.tsx
+  s_ebaaafeb4b1615::t_af8213e279ff5a 66-69,71-74,76-79,82
+  s_ebaaafeb4b1615::t_f05b4e9c7f4cca 143,147,151
+  s_ebaaafeb4b1615::t_e82f6f3bc168f1 65,70,75,80
+  s_ebaaafeb4b1615::t_6655587f60f2c0 1069-1072
+  s_ebaaafeb4b1615::t_e52a7caadb2f9f 643,646,651-653
+  s_ebaaafeb4b1615::t_a7c9991efb6f48 1057,1059-1061
+  s_ebaaafeb4b1615::t_384f3c16200165 961
+  s_ebaaafeb4b1615::t_9cf3e169b81e5f 235,237
+  s_ebaaafeb4b1615::t_7fa1ea635f9d59 1064-1068,1073-1097
+  s_ebaaafeb4b1615::t_a682d4d73759a4 251,257,260,263
+  s_ebaaafeb4b1615::t_13f3fe65e94e7b 210
+extensions/git-integration/src/renderer.tsx
+  s_ebaaafeb4b1615::t_82f6f74d48d68c 6,9,16-29,45-46
+  s_ebaaafeb4b1615::t_9c0c2047b84da4 42
+extensions/task-vault/tests/constants.spec.ts
+  s_ebaaafeb4b1615::t_2e4f8e44a24f26 2,10-11
+docs/ARCHITECTURE.md
+  s_ebaaafeb4b1615::t_3f13a29747ed92 258
+  s_ebaaafeb4b1615::t_4266473179f519 283-290,294-297,300-302,304-305,316-330
+  s_ebaaafeb4b1615::t_68c030f5d3d0f9 199-202
+  s_ebaaafeb4b1615::t_76d42ffd0e58c9 291-293,298-299,303,306-311,313-315
+.claude/doc-index.json
+  s_ebaaafeb4b1615::t_a784dde8a1f63f 59,61-65
+  s_ebaaafeb4b1615::t_a8134bf16d5388 37-38,40
+  s_ebaaafeb4b1615::t_7f3ed890031904 12,24
+  s_ebaaafeb4b1615::t_0211a151ec2955 80,84,86-87,89
+ux-mockups/option-a-variants.html
+  s_f2e7e658b9568b::t_3f6e9338d986be 117
+  s_f2e7e658b9568b::t_8a868bc3636fa5 2-3,6-21,23-30,33-44,46,48-59,61-63,66,75,83-106,108-116,118-141,143-148,150-157,159,161-188,190-234,236-273,276-287,290-292,294,298,307,345-367,369,371,383,386-389,391-393,395,406-407,409-410,412-415,417-419,429-430,432-433,435-436,438-439,449,453,492,496-497,501,510,524,548,550-551,569,573-574,584,590,596,606-608,616-617,621-626,628-631,634-636,638,641,649-650,660,669,672-701,703,705,707,718,720-723,725-728,737-738,749-750,756-759,801-802,815,818,840-841,854,859-861,867,877-878,887,895,897,899,908,927-929,935-937,964,966,968-970,975,979,981,984-994,997-999,1004,1011-1012,1022,1031,1034,1047,1057-1058,1067,1070,1072,1108,1115-1116,1126-1127,1129-1130,1132-1135,1187,1196,1223,1235,1277-1278,1287,1292,1297,1310,1329-1332,1338,1343-1345,1349-1358,1453-1454,1461-1464,1466-1468,1478,1480-1481,1525-1526,1552-1554,1575,1624,1641,1681,1692,1702,1711,1713,1720,1724,1727,1738,1753,1782-1784,1795,1798-1800,1811,1814-1815,1827,1829,1842,1844-1845,1847-1856,1858-1946,1948-1988,1990-2009,2011,2020-2021,2033,2048,2052-2054,2064,2075,2084-2088,2093,2099,2103-2116
+  s_f2e7e658b9568b::t_69886af2920fef 45
+  s_f2e7e658b9568b::t_184e8be6dec92b 65,67-69,71-73
+  s_f2e7e658b9568b::t_1c9498c03f7ca4 275
+  s_f2e7e658b9568b::t_e4626042464984 1348
+  s_f2e7e658b9568b::t_b8c2b7b2f77864 158
+  s_f2e7e658b9568b::t_ba22701bcd48a3 77-82
+  s_f2e7e658b9568b::t_9bebddd5bd2717 64,70,74
+src/renderer/components/sidebar/SidebarHeader.css
+  s_ebaaafeb4b1615::t_8819709fb84561 1-2,5-6,10,13-19,21-24,27-29,32-34,37,41,43-44,71,73-80,83,94-95,99-100,146,149-151,153-156,160-162
+  s_ebaaafeb4b1615::t_3013bd8c86a792 45,48-51,54-55,60,64-67
+  s_ebaaafeb4b1615::t_1674b77fb5e99f 81-82,89-91
+  s_ebaaafeb4b1615::t_b6d12f17ed6aba 52-53,56-57,61
+  s_ebaaafeb4b1615::t_4621369e66b64f 86-88
+  s_ebaaafeb4b1615::t_ef09be979efe31 104-111,113,115,117,120,125-126,129-143
+tests/unit/renderer/extensions/registry.spec.ts
+  s_ebaaafeb4b1615::t_f51880e396045f 248-328
+  s_ebaaafeb4b1615::t_7ec04f04c0ddc6 16,23
+extensions/task-vault/src/index.ts
+  s_ebaaafeb4b1615::t_44184713f43eb1 3
+  s_ebaaafeb4b1615::t_a9874840356f1f 108,113
+  s_ebaaafeb4b1615::t_769eb1abccdc0a 101,105
+.specify/feature.json
+  s_ebaaafeb4b1615::t_b535fb002a14b2 2
+extensions/task-vault/src/constants.ts
+  s_ebaaafeb4b1615::t_e91e45239046bf 1
+specs/008-a3-color-band-sidebar/quickstart.md
+  s_ebaaafeb4b1615::t_0d98b450eae6fa 1,3-4,8,10,12-15,17,19,22-23,25-27,30,32,35,38,40,43,46,50,52,54,56-65,67,69-74,76,78-82,84,86-94,98,100,102-105,107,109-124,127-135,137-140,142,145-152,158,160,162-168,170-176
+src/renderer/components/sidebar/SessionRow.css
+  s_ebaaafeb4b1615::t_7af7afd3df4206 1,3-11,14-16,19-20,23-26,29-34,37-41,43-46,49-54,57-62,65-66,69-71,74-79,81,84-102
+src/renderer/components/sidebar/WorkspaceCard.tsx
+  s_ebaaafeb4b1615::t_e37edf4706f59f 35
+  s_ebaaafeb4b1615::t_69ac92350f0b08 22
+  s_ebaaafeb4b1615::t_b77ffb2daa3038 1-2,4-5,7-18,25-31,36,42-44,48,66,69-72,84-92,107,109-132,137-146,150,157-160,174,180-183,188
+  s_ebaaafeb4b1615::t_f5625a02562cd6 41
+  s_ebaaafeb4b1615::t_1dabeeb872896e 93-106
+  s_ebaaafeb4b1615::t_e83431266d5abb 20-21
+  s_ebaaafeb4b1615::t_0512ca5eec4ee0 133-135
+  s_ebaaafeb4b1615::t_7cf41e77df8c8f 19
+  s_ebaaafeb4b1615::t_03b2bebe008c63 33-34,37-40
+  s_ebaaafeb4b1615::t_957c23ed24c80d 136
+src/renderer/components/sidebar/ExtensionFooter.css
+  s_ebaaafeb4b1615::t_4acbc2c2ff9cdd 1-3,5-6,9-22,25-26,30-31
+src/renderer/components/sidebar/ProjectRow.css
+  s_ebaaafeb4b1615::t_5736fc055e303f 1-12,16,18,21-22,24,32,34-35,38,43,46-55,58,60-62,65-73,76-79,82-87,89-90,95,98-99,102-104,107-115,117-126,129-132,135-138
+  s_ebaaafeb4b1615::t_8159e4af709748 13,17,23
+  s_ebaaafeb4b1615::t_e01f88f78b2d25 27-29
+README.md
+  s_ebaaafeb4b1615::t_09ce80f1437239 132
+  s_ebaaafeb4b1615::t_22f397108747ad 32
+  s_ebaaafeb4b1615::t_2fd92708fbd267 12
+  s_ebaaafeb4b1615::t_1b98e98998178b 15
+  s_ebaaafeb4b1615::t_1316b61fafae3b 151
+src/renderer/App.tsx
+  s_ebaaafeb4b1615::t_342b78d1651e01 365
+  s_ebaaafeb4b1615::t_0ec6b45468cff9 386-387,390,392
+  s_ebaaafeb4b1615::t_cb8f8779fda8ad 70,72,78
+  s_ebaaafeb4b1615::t_708b4584ee49f3 393-395,397
+  s_ebaaafeb4b1615::t_17777b576288ae 380,404-409
+  s_ebaaafeb4b1615::t_3076f7addfabc8 1-2
+  s_ebaaafeb4b1615::t_9dc599dc3b4ad7 381-383
+  s_ebaaafeb4b1615::t_54fa71910797e7 388-389,391
+  s_ebaaafeb4b1615::t_14ebc1fb97f6cf 422-431
+  s_ebaaafeb4b1615::t_fa57053d23531e 3
+  s_ebaaafeb4b1615::t_9171cfbc91a831 396
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "cb64e950f52413ce1eb0bdb2532fb772021545d8",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_ebaaafeb4b1615": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c540f2bd-8d3f-4a87-9e8a-2711541520ee",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_f2e7e658b9568b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e3de9c79-57cd-4c02-b1fa-136e9e2feb27",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
