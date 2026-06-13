@@ -1,0 +1,25 @@
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_ebaaafeb4b1615::t_7d2774e5c6fa4e 192
+  s_ebaaafeb4b1615::t_1b9ce649d09bf8 64
+  s_ebaaafeb4b1615::t_d1f201deb125ab 200
+src/renderer/App.tsx
+  s_ebaaafeb4b1615::t_690e6e805e801d 407
+src/renderer/components/sidebar/WorkspaceCard.tsx
+  s_ebaaafeb4b1615::t_0ae1ce4f92a96b 131-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "42eb6e88920b5c48fb8884184c498f6549214b4f",
+  "prompts": {},
+  "sessions": {
+    "s_ebaaafeb4b1615": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c540f2bd-8d3f-4a87-9e8a-2711541520ee",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
