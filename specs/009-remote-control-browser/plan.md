@@ -1,344 +1,207 @@
 # Implementation Plan: Remote Control Browser Access
 
-**Branch**: `remote-control` | **Date**: 2026-06-11 | **Spec**: [spec.md](./spec.md)  
-**Input**: Feature specification from `specs/008-remote-control-browser/spec.md`
+**Branch**: `remote-control` | **Date**: 2026-06-13 | **Spec**: [spec.md](./spec.md)  
+**Input**: Feature specification from `specs/009-remote-control-browser/spec.md`
 
 ## Summary
 
-Embed a password-protected Fastify HTTP + WebSocket server in the Electron main process. When the user enables Remote Control in Settings, the server starts on a configurable localhost port and an ngrok tunnel is spawned to produce a temporary public HTTPS URL. Browser clients authenticate with a bcrypt-verified password, then interact with live terminal sessions (full PTY streaming via WebSocket), and browse workspaces/projects. All remote server events route to the app's existing LogWindow. The feature is off by default and shuts down completely when disabled.
+Embed a password-protected Fastify HTTP + WebSocket server in the Electron main process, exposed via an ngrok tunnel, so users can interact with their live Terminator terminals and workspaces from any browser. The server binds exclusively to `127.0.0.1`, uses bcrypt-hashed password auth with DNS-rebinding protection, and serves a minimal React SPA for login and terminal streaming (xterm.js v6). All core tech decisions are pre-resolved in `research.md` (8 decisions from the original planning session + 3 new decisions from the 2026-06-13 clarification session).
+
+---
 
 ## Technical Context
 
-**Language/Version**: TypeScript 5.x (existing project standard)  
-**Primary Dependencies**: Fastify 4.x + @fastify/websocket 11.x + @fastify/static 8.x (new); bcryptjs (new); @xterm/xterm 6.x + @xterm/addon-attach + @xterm/addon-fit (new, browser SPA only); existing: node-pty 1.0.0, electron-store, zod 3.x, vitest 2.x  
-**Storage**: electron-store (existing) — adds `remoteControl` key to GlobalSettings  
-**Testing**: vitest 2.0.5 + fastify's built-in `inject()` for HTTP routes; `ws` package in devDependencies for WebSocket integration tests  
-**Target Platform**: macOS (primary), Electron main process (Node.js runtime)  
-**Performance Goals**: Terminal output ≤200ms round-trip on LAN; tunnel up within 10s of enable  
-**Constraints**: Server binds 127.0.0.1 only; no 0.0.0.0 binding ever; bcrypt work factor 10; WsTickets expire in 30s  
-**Scale/Scope**: Single-owner, single active session; no concurrency beyond multiple WS subscribers per terminal
+**Language/Version**: TypeScript 5.x / Node.js 20 (Electron 30 runtime)  
+**Primary Dependencies**:
+
+- Server: `fastify@4.28.1`, `@fastify/websocket@11.0.1`, `@fastify/static@8.0.0`
+- Auth: `bcryptjs@2.4.3` (pure-JS bcrypt, no native recompile)
+- Browser SPA: `@xterm/xterm@6.0.0`, `@xterm/addon-attach@0.11.0`, `@xterm/addon-fit@0.10.0`
+- Dev: `ws@8.18.0` (WS client for tests), `@types/bcryptjs@2.4.6`, `@types/ws@8.5.13`
+
+**Storage**: `electron-store` (existing) — `GlobalSettings.remoteControl` key added  
+**Testing**: vitest + `fastify.inject()` for routes (no live port needed); `ws` package for WebSocket tests  
+**Target Platform**: macOS (primary), Electron 30 / Chromium 124 / Node.js 20  
+**Project Type**: Electron desktop-app with embedded HTTP server  
+**Performance Goals**: Terminal output <200ms p95 on LAN (SC-002); tunnel active <30s from enable (SC-001)  
+**Constraints**: Bind to `127.0.0.1` only (FR-002); 80% coverage gate (SC-007); no `0.0.0.0` exposure  
+**Scale/Scope**: Single owner, single password, up to 20 WS subscribers per terminal session (FR-032)
+
+---
 
 ## Constitution Check
 
-| Principle                        | Status       | Notes                                                                                                                                                   |
-| -------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| I. Source Integrity              | ✅           | All dependency choices cite official docs (see research.md)                                                                                             |
-| II. Extension Isolation          | ✅           | Remote server is core app code, not an extension                                                                                                        |
-| IV. Dependency Stewardship       | ✅           | Fastify (multi-maintainer), bcryptjs (established), @xterm/xterm (official xterm.js org). All pinned.                                                   |
-| V. Code Readability & Minimalism | ✅           | No speculative abstractions; WsTicket store is a plain Map                                                                                              |
-| VI. TDD — 80% coverage gate      | ⚠️ MANDATORY | All new files in `src/main/remote/` and `src/renderer-remote/` MUST reach ≥80% before merge. Fastify `inject()` covers HTTP routes without a live port. |
-| VII. SOLID & YAGNI               | ✅           | Phase 3 endpoints (git, task-vault) deferred; no premature abstraction                                                                                  |
-| VIII. Documentation              | ✅           | ADR-017, README update, ARCHITECTURE.md, ipc-channels.md additions are explicit tasks                                                                   |
-| IX. ADRs                         | ✅           | ADR-017 required for embedded HTTP server decision                                                                                                      |
-| X. Code Cleanliness              | ✅           | No dead exports; lint must pass 0 errors before done                                                                                                    |
-| XI. Functional Purity            | ✅           | WsSubscriberManager and WsTicketStore are side-effect-isolated modules                                                                                  |
+_GATE: Must pass before Phase 0 research. Re-checked after Phase 1 design._
+
+| Principle                  | Gate                                             | Status  | Notes                                                                                 |
+| -------------------------- | ------------------------------------------------ | ------- | ------------------------------------------------------------------------------------- |
+| I. Source Integrity        | All tech choices from official docs              | ✅ PASS | Fastify, ngrok agent API, xterm cited in research.md                                  |
+| II. Extension Isolation    | N/A — this feature is core app, not an extension | ✅ N/A  | The `src/main/remote/` module is standalone; no extension API surface required        |
+| IV. Dependency Stewardship | Multi-maintainer, no CVEs, pinned versions       | ✅ PASS | Fastify (multi-maintainer), bcryptjs (DefinitelyTyped), @xterm (official xtermjs org) |
+| V. Code Readability        | No speculative code; YAGNI                       | ✅ PASS | Phase 3 endpoints (git, task-vault) explicitly deferred out of scope                  |
+| VI. TDD                    | Red → Green → Refactor; 80% coverage gate        | ✅ PASS | All tasks.md test tasks precede their implementation tasks                            |
+| VII. SOLID & YAGNI         | Solve today's problem; no premature abstraction  | ✅ PASS | WsSubscriberManager, WsTicketStore are minimal focused classes                        |
+| VIII. Documentation        | Docs ship with code                              | ✅ PASS | ADR 017, ipc-channels.md, ARCHITECTURE.md updates required before merge               |
+| IX. ADRs                   | Significant decision captured                    | ✅ PASS | `docs/adr/017-embedded-http-remote-server.md` already exists                          |
+| X. Code Cleanliness        | 0 lint errors                                    | ✅ PASS | Enforced by pre-commit hook                                                           |
+| XI. Functional Purity      | Side effects isolated                            | ✅ PASS | WsTicketStore, NgrokManager have isolated I/O boundaries                              |
+| XII. UI Icons              | lucide-react only                                | ✅ PASS | Settings UI must use lucide-react icons (no emoji, no unicode)                        |
+
+**No violations. All gates pass. Proceed to Phase 1.**
+
+---
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
-specs/008-remote-control-browser/
-├── plan.md              ← this file
-├── research.md          ← Phase 0 output
-├── data-model.md        ← Phase 1 output
+specs/009-remote-control-browser/
+├── plan.md              ← This file
+├── spec.md              ← Feature specification
+├── research.md          ← 11 technical decisions
+├── data-model.md        ← Entity definitions + state transitions
+├── quickstart.md        ← End-to-end test scenarios
 ├── contracts/
-│   └── http-api.md      ← Phase 1 output
-└── tasks.md             ← Phase 2 output (/speckit-tasks)
+│   └── http-api.md      ← REST + WebSocket endpoint contract
+├── checklists/
+│   └── requirements.md  ← Quality checklist (all passing)
+└── tasks.md             ← Task breakdown (run /speckit-tasks to regenerate)
 ```
 
-### Source Code Layout
+### Source Code
 
 ```text
-src/
-├── main/
-│   ├── remote/                          ← NEW: entire remote server module
-│   │   ├── remote-server.ts             ← Fastify factory: start()/stop()
-│   │   ├── auth.middleware.ts           ← onRequest hook: Bearer + Host validation
-│   │   ├── ws-ticket-store.ts           ← In-memory ticket Map, expiry cleanup
-│   │   ├── ws-subscriber-manager.ts     ← Per-session WS subscriber sets + primary tracking
-│   │   ├── ngrok-manager.ts             ← spawn/kill ngrok, poll for URL
-│   │   ├── routes/
-│   │   │   ├── health.route.ts
-│   │   │   ├── workspace.routes.ts
-│   │   │   ├── terminal.routes.ts       ← CRUD + ws-ticket + WS upgrade
-│   │   │   └── static.routes.ts         ← serves out/renderer-remote/
-│   │   └── __tests__/
-│   │       ├── auth.middleware.spec.ts
-│   │       ├── ws-ticket-store.spec.ts
-│   │       ├── ws-subscriber-manager.spec.ts
-│   │       ├── ngrok-manager.spec.ts
-│   │       ├── health.route.spec.ts
-│   │       ├── workspace.routes.spec.ts
-│   │       └── terminal.routes.spec.ts
-│   ├── ipc/
-│   │   └── remote.ipc.ts                ← NEW: registers remote: IPC handlers (reconnect, status)
-│   ├── index.ts                         ← MODIFIED: wire remoteServer + remoteIpc
-│   └── logger.ts                        ← UNMODIFIED (used via makeLogger)
-├── shared/
-│   ├── types/index.ts                   ← MODIFIED: add remoteControl to GlobalSettings
-│   └── schemas/settings.schema.ts      ← MODIFIED: add remoteControl Zod schema + defaults
-└── renderer/
-    ├── App.tsx                          ← MODIFIED: add log:push + remote:* IPC listeners
-    ├── components/
-    │   └── settings/
-    │       └── GlobalSettings.tsx       ← MODIFIED: add Remote Control section
-    └── stores/
-        └── log.store.ts                 ← UNMODIFIED (addEntry called via IPC listener)
+src/main/remote/                        # NEW — HTTP server + tunnel management
+├── remote-server.ts                    # Fastify factory: start(), stop(), isListening()
+├── auth.middleware.ts                  # onRequest hook: Bearer token + Host header check
+├── ngrok-manager.ts                    # Spawn/poll/stop ngrok; --web-addr 0.0.0.0:4041
+├── ws-ticket-store.ts                  # 30s expiry, single-use, in-memory Map
+├── ws-subscriber-manager.ts            # Per-session Set<WebSocket>; primary tracking; cap enforcement
+├── bridge-event-bus.ts                 # EventEmitter: main-process → WS bridge relay
+├── ipc-registry.ts                     # Map of registered ipcMain handlers (for bridge routing)
+└── routes/
+    ├── health.route.ts                 # GET /health → { ok: true }
+    ├── terminal.routes.ts              # POST/GET/DELETE /api/terminals + resize + ws-ticket
+    ├── workspace.routes.ts             # GET /api/workspaces + /api/projects
+    └── bridge.route.ts                 # WS /api/bridge (IPC bridge proxy)
 
-src/renderer-remote/                     ← NEW: browser SPA entry
+src/main/remote/__tests__/              # NEW — vitest specs (1:1 with above files)
+├── remote-server.spec.ts
+├── auth.middleware.spec.ts
+├── ngrok-manager.spec.ts
+├── ws-ticket-store.spec.ts
+├── ws-subscriber-manager.spec.ts
+└── routes/
+    ├── terminal.routes.spec.ts
+    ├── workspace.routes.spec.ts
+    └── bridge.route.spec.ts
+
+src/main/ipc/remote.ipc.ts             # NEW — IPC handlers: remote:start/stop/status/reconnect
+src/main/ipc/__tests__/remote.ipc.spec.ts  # NEW
+
+src/renderer-remote/                   # NEW — Browser login + terminal SPA (separate Vite entry)
 ├── index.html
 ├── main.tsx
-├── App.tsx
+├── App.tsx                             # Login screen → authenticated shell
 ├── components/
-│   ├── RemoteTerminal.tsx               ← xterm.js v6 + @xterm/addon-attach
-│   └── WorkspaceNav.tsx
+│   ├── RemoteTerminal.tsx              # xterm.js v6 + addon-attach + addon-fit
+│   ├── WorkspaceNav.tsx                # Workspace/project sidebar
+│   └── Login.tsx                      # Password form
 └── api/
-    └── remote-client.ts                 ← fetch wrapper with Bearer token
+    └── remote-client.ts               # fetch wrapper: Authorization header injection
 
-docs/
-└── adr/
-    └── 017-embedded-http-remote-server.md   ← NEW
+src/shared/types/index.ts              # MODIFIED — GlobalSettings.remoteControl field added
+src/shared/schemas/settings.schema.ts  # MODIFIED — Zod remoteControl schema + defaults
 
-electron.vite.config.ts                 ← MODIFIED: add renderer-remote entry
+src/renderer/components/settings/GlobalSettings.tsx  # MODIFIED — Remote Control section
+src/renderer/App.tsx                                 # MODIFIED — log:push + remote:status IPC listeners
+
+docs/adr/017-embedded-http-remote-server.md  # EXISTS — no changes required
+docs/ARCHITECTURE.md                          # MODIFIED — Remote Control Server section
+specs/001-extension-first-terminal/contracts/ipc-channels.md  # MODIFIED — new channels + HTTP endpoints
 ```
+
+**Structure Decision**: Single-project layout. The remote server lives entirely within `src/main/remote/` — a self-contained module with no coupling to extension infrastructure. The browser SPA lives in `src/renderer-remote/` as a second Vite renderer entry that produces a separate bundle (`out/renderer-remote/`). This avoids any `xterm@5` / `@xterm/xterm@6` namespace collision with the Electron renderer.
+
+---
 
 ## Implementation Phases
 
-### Phase 1: Settings Schema Extension
+### Phase 1: Setup
 
-Extend `GlobalSettings` with `remoteControl` and wire defaults. No UI yet — just the data layer.
+Install dependencies, scaffold directories, add Vite entry for renderer-remote, extend `GlobalSettings` type + schema.
 
-**Files**:
+Key tasks:
 
-- `src/shared/types/index.ts` — add `remoteControl` to `GlobalSettings` interface
-- `src/shared/schemas/settings.schema.ts` — add `remoteControl` Zod schema + defaults
+- Pin all new deps (no `^` — exact versions)
+- `maxSubscribers` field included in GlobalSettings from day one (default: 5)
+- `renderer-remote` Vite entry outputs to `out/renderer-remote/` (served by `@fastify/static`)
 
-**Tests**: Settings schema tests (existing pattern — add test cases for new fields).
+### Phase 2: Foundational
 
----
+Core pure utilities with full test coverage before any user story work:
 
-### Phase 2: Core Remote Server (no auth yet)
+- `WsTicketStore` (30s expiry, single-use, 60s background prune)
+- `WsSubscriberManager` (primary tracking, per-session cap enforcement via `maxSubscribers`)
+- `GlobalSettings` schema validation tests
 
-Implement `RemoteServer` factory with Fastify, health route, and graceful start/stop. No auth middleware yet.
+### Phase 3: User Story 1 — Enable/Disable Remote Control
 
-**Files**:
+Server lifecycle + ngrok tunnel + Settings UI:
 
-- `src/main/remote/remote-server.ts`
-- `src/main/remote/routes/health.route.ts`
-- `src/main/remote/__tests__/health.route.spec.ts`
+- `RemoteServer` factory binds `127.0.0.1`, registers health route
+- `NgrokManager` spawns with `--web-addr 0.0.0.0:4041`, polls port 4041 for URL
+- Port-change-while-running triggers auto-restart (stop → start on new port, ngrok restart)
+- Settings UI toggle, URL display, LAN URL, ngrok status indicator
 
-**Acceptance test**: `fastify.inject({ method: 'GET', url: '/health' })` returns `{ ok: true }` with status 200.
+### Phase 4: User Story 2 — Browser Terminal Interaction
 
----
+Terminal streaming end-to-end:
 
-### Phase 3: Auth Middleware
+- Auth middleware (Bearer token + Host header)
+- Terminal routes (create/read/delete/resize/ws-ticket)
+- WebSocket terminal handler (subscriber fan-out, primary write gating, cap enforcement with close code 4003)
+- Browser SPA: Login → RemoteTerminal (xterm.js v6 + addon-attach + addon-fit)
 
-Implement Bearer token validation and Host header DNS rebinding protection.
+### Phase 5: User Story 3 — Password Configuration
 
-**Files**:
+- `POST /api/terminals/:id/ws-ticket` → 30s expiry, single-use
+- "Generate new" invalidates all active sessions
+- Password auto-generation on empty field save
 
-- `src/main/remote/auth.middleware.ts`
-- `src/main/remote/__tests__/auth.middleware.spec.ts`
+### Phase 6: User Story 4 — ngrok Crash / Reconnect
 
-**Acceptance tests**:
+- `onCrash` callback → `remote:tunnel-disconnected` IPC → toast + "Reconnect" button
+- Manual reconnect via `remote:tunnel-reconnect` IPC
+- 3-failure abort with error toast (per FR-006a)
 
-- Missing `Authorization` header → 401 `{ error: 'UNAUTHORIZED' }`
-- Wrong password → 401
-- Correct password → pass-through to route
-- `Host: evil.attacker.com` → 403 `{ error: 'FORBIDDEN' }`
-- `Host: localhost` → pass-through
+### Phase 7: User Story 5 — Workspace & Project Browsing
 
----
+- Workspace routes (`/api/workspaces`, `/api/projects`)
+- `WorkspaceNav.tsx` sidebar in browser SPA
+- Terminal creation with project `cwd`
 
-### Phase 4: WsTicket Store
+### Phase 8: User Story 6 — LAN-Only Access
 
-Implement ticket creation, consumption, and expiry.
+- LAN URL always shown (uses `os.networkInterfaces()`, Decision 5 in research.md)
+- "Copy Caddyfile" generates reverse-proxy config (FR-030)
 
-**Files**:
+### Phase 9: User Story 7 — ngrok Not Installed
 
-- `src/main/remote/ws-ticket-store.ts`
-- `src/main/remote/__tests__/ws-ticket-store.spec.ts`
+- `NgrokManager.isInstalled()` → Settings UI shows install hint if false
+- Local server still starts; LAN URL shown; tunnel section hidden with explanation
 
-**Acceptance tests**:
+### Phase 10: Polish & Validation
 
-- `createTicket(sessionId)` returns a 64-char hex string
-- `consumeTicket(ticket)` returns the sessionId on first call, `null` on second (single-use)
-- `consumeTicket(expiredTicket)` returns `null` after 30s
-- `startCleanup()` / `stopCleanup()` start/stop the 60s interval
-
----
-
-### Phase 5: WsSubscriberManager
-
-Implement per-session subscriber sets with primary tracking.
-
-**Files**:
-
-- `src/main/remote/ws-subscriber-manager.ts`
-- `src/main/remote/__tests__/ws-subscriber-manager.spec.ts`
-
-**Acceptance tests**:
-
-- `addSubscriber(sessionId, ws)` → first subscriber becomes primary
-- Second `addSubscriber` → added to set, not primary
-- `isPrimary(sessionId, ws)` → true only for first subscriber
-- `broadcast(sessionId, data)` → data sent to all subscribers
-- `removeSubscriber(sessionId, ws)` → removes from set; if was primary, `getPrimary()` returns `null`
-- `destroySession(sessionId)` → all subscribers receive close frame, session removed
+- `npm run lint` → 0 errors
+- `npx vitest run --coverage` → all thresholds ≥ 80%
+- `docs/ARCHITECTURE.md` Remote Control section
+- `ipc-channels.md` updated with all new channels + HTTP endpoints
+- Manual end-to-end test via quickstart.md scenarios
 
 ---
-
-### Phase 6: NgrokManager
-
-Implement ngrok child process lifecycle and URL discovery.
-
-**Files**:
-
-- `src/main/remote/ngrok-manager.ts`
-- `src/main/remote/__tests__/ngrok-manager.spec.ts`
-
-**Acceptance tests** (mock `child_process.spawn` and HTTP polling):
-
-- `start(port)` spawns `ngrok http <port>`, polls until URL found, returns URL
-- `start(port)` rejects after 10 failed polls
-- `stop()` sends SIGTERM to child process
-- `isInstalled()` returns `true` when `which ngrok` succeeds, `false` otherwise
-- Unexpected process exit fires `onCrash` callback
-
----
-
-### Phase 7: Workspace & Terminal HTTP Routes
-
-Wire workspace listing and terminal CRUD routes to existing service layer.
-
-**Files**:
-
-- `src/main/remote/routes/workspace.routes.ts`
-- `src/main/remote/routes/terminal.routes.ts` (CRUD + ws-ticket; WebSocket route in Phase 8)
-- `src/main/remote/__tests__/workspace.routes.spec.ts`
-- `src/main/remote/__tests__/terminal.routes.spec.ts`
-
-**Acceptance tests** (via `fastify.inject()`):
-
-- `GET /api/workspaces` → matches mock workspace store output
-- `GET /api/projects?workspaceId=<id>` → matches mock project store output
-- `POST /api/terminals` → 201 `{ sessionId }`, ptyManager.spawn called with correct args
-- `DELETE /api/terminals/:id` → 200 `{ ok: true }`, ptyManager.kill called
-- `POST /api/terminals/:id/resize` → 200, ptyManager.resize called with cols/rows
-- `POST /api/terminals/:id/ws-ticket` → 201 `{ ticket }`, ticket length 64
-- All above → 401 without correct password (auth middleware integration)
-
----
-
-### Phase 8: WebSocket Terminal Streaming
-
-Add the WS upgrade route and connect PTY output fan-out.
-
-**Files**:
-
-- `src/main/remote/routes/terminal.routes.ts` (WS route added)
-- `src/main/remote/__tests__/terminal.routes.spec.ts` (WS tests added — requires live test server + `ws` devDep)
-
-**Acceptance tests**:
-
-- WS upgrade with valid ticket → connection established, PTY output forwarded as text frames
-- WS upgrade with expired ticket → close code 4001
-- WS upgrade with invalid session → close code 4002
-- Text frame from primary subscriber → forwarded to ptyManager.write
-- Text frame from secondary subscriber → silently dropped
-- PTY exit → all subscribers receive close frame 1000
-
----
-
-### Phase 9: Remote IPC + LogWindow Bridge
-
-Wire `log:push` and `remote:*` IPC events to bridge main-process events to the renderer.
-
-**Files**:
-
-- `src/main/ipc/remote.ipc.ts` (NEW)
-- `src/renderer/App.tsx` (add `window.electron.ipcRenderer.on('log:push', ...)` and `remote:*` listeners)
-
-**Acceptance tests**:
-
-- `remote.ipc.ts` unit tests: mock mainWindow, verify `webContents.send` is called with correct events
-
----
-
-### Phase 10: Wiring in Main Process
-
-Integrate `remoteServer` and `ngrokManager` into `src/main/index.ts`.
-
-**Changes**:
-
-- `app.whenReady()`: call `registerRemoteHandlers()` + conditionally start server if `settings.remoteControl.enabled`
-- `before-quit`: `await remoteServer.stop()` BEFORE `ptyManager.killAll()`
-
----
-
-### Phase 11: Settings UI — Remote Control Panel
-
-Add Remote Control section to `GlobalSettings.tsx` in the Settings panel.
-
-**Components**:
-
-- Enable/disable toggle (calls `settings:update-global` with `remoteControl.enabled`)
-- Port input (validated 1024–65535)
-- Active tunnel URL display + copy button (reads from `remote:status` IPC)
-- LAN URL display + copy button
-- ngrok installed indicator with install hint
-- Password masked field + show/copy + "Generate new" button
-- All state driven by `remote:status` IPC event from main process
-
----
-
-### Phase 12: Browser SPA
-
-Implement the minimal remote-control browser UI.
-
-**Files**: `src/renderer-remote/` — complete standalone React app.
-
-**Components**:
-
-- Login screen (password entry → stores token in sessionStorage)
-- Workspace/project nav sidebar
-- Terminal area with xterm.js v6 + `@xterm/addon-attach` + `@xterm/addon-fit`
-- Terminal create/close controls
-
-**Build**: Add `renderer-remote` entry to `electron.vite.config.ts`.
-
----
-
-### Phase 13: Documentation
-
-- `docs/adr/017-embedded-http-remote-server.md`
-- `README.md` — add Remote Control to features table
-- `docs/ARCHITECTURE.md` — add remote server to process model diagram
-- `specs/001-extension-first-terminal/contracts/ipc-channels.md` — add `log:push`, `remote:*`, `remote:tunnel-disconnected`, `remote:tunnel-reconnect`, `remote:status`
-- `src/renderer/electron.d.ts` — add new IPC channel type declarations
-
----
-
-## New npm Dependencies
-
-| Package                       | Where              | Justification                                                                                         |
-| ----------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------- |
-| `fastify@^4.28.1`             | root               | HTTP server framework. Multi-maintainer, TypeScript-first, testable via `inject()` without live port. |
-| `@fastify/websocket@^11.0.1`  | root               | Official Fastify WS plugin, built on `ws@8`.                                                          |
-| `@fastify/static@^8.0.0`      | root               | Serves browser SPA bundle. Official Fastify plugin.                                                   |
-| `bcryptjs@^2.4.3`             | root               | Pure-JS bcrypt — no native compilation, no electron-rebuild step.                                     |
-| `@xterm/xterm@^6.0.0`         | root (browser SPA) | Browser terminal emulator. Official xterm.js v6 package namespace.                                    |
-| `@xterm/addon-attach@^0.11.0` | root (browser SPA) | Attaches xterm.js to WebSocket. Official addon.                                                       |
-| `@xterm/addon-fit@^0.10.0`    | root (browser SPA) | Resizes terminal to container. Official addon.                                                        |
-| `ws@^8.18.0`                  | devDependencies    | WebSocket test client for integration tests. Same version used by @fastify/websocket.                 |
-| `@types/bcryptjs@^2.4.6`      | devDependencies    | TypeScript types for bcryptjs.                                                                        |
-| `@types/ws@^8.5.13`           | devDependencies    | TypeScript types for ws test client.                                                                  |
-
-## ADR Reference
-
-**ADR-017** (`docs/adr/017-embedded-http-remote-server.md`): Documents the decision to embed a Fastify HTTP server in the Electron main process for remote browser access, including the rationale (PTY in main process as per ADR-001, no IPC double-hop), alternatives considered (separate Node.js process, Electron remote module), and security constraints (localhost-only binding, ngrok tunnel, password protection).
 
 ## Complexity Tracking
 
-No constitution violations requiring justification. No complexity deviations from spec.
+No constitution violations requiring justification. All complexity deviations from YAGNI are documented as explicit Phase 3 deferrals in the spec's Out of Scope section.

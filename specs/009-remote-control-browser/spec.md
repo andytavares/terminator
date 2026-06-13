@@ -2,8 +2,9 @@
 
 **Feature Branch**: `remote-control`  
 **Created**: 2026-06-11  
-**Status**: Draft  
-**Input**: User description: "read the prd in ~/Desktop/terminator-remote-control-prd.md and write a spec for it"
+**Last Reviewed**: 2026-06-13  
+**Status**: Ready for Planning  
+**Input**: PRD at `~/Desktop/terminator-remote-control-prd.md`
 
 ## User Scenarios & Testing _(mandatory)_
 
@@ -91,7 +92,23 @@ From the remote browser UI, the developer can see their workspaces and projects 
 
 ---
 
-### User Story 6 - ngrok Not Installed (Priority: P3)
+### User Story 6 - LAN-Only Access Without a Tunnel (Priority: P3)
+
+A developer on the same office or home network as their machine wants remote terminal access but cannot or chooses not to use ngrok or any public tunnel. They access Terminator via the local network IP and port shown in Settings — no external cloud service involved.
+
+**Why this priority**: LAN-only access is a useful subset that works even when ngrok is not installed, the corporate firewall blocks outbound tunnels, or the user is privacy-conscious.
+
+**Independent Test**: With Remote Control enabled and no tunnel running, open `http://<machine-LAN-IP>:<port>/` from a second device on the same network and authenticate with the password.
+
+**Acceptance Scenarios**:
+
+1. **Given** Remote Control is enabled, **When** the user views the Settings panel, **Then** the LAN URL (`http://<machine-IP>:<port>`) is always shown alongside the tunnel URL (or in place of it if no tunnel is active).
+2. **Given** the LAN URL is displayed, **When** a device on the same network navigates to it with the correct password, **Then** the browser terminal loads and works identically to tunnel access.
+3. **Given** the user wants HTTPS on the LAN without a public tunnel, **When** they click "Copy Caddyfile", **Then** they receive a ready-to-use reverse proxy config that adds HTTPS to the local server — no account or external service required.
+
+---
+
+### User Story 7 - ngrok Not Installed (Priority: P3)
 
 The developer enables Remote Control on a machine where ngrok is not installed. The Settings panel explains this clearly and provides the install command, rather than silently failing.
 
@@ -109,6 +126,7 @@ The developer enables Remote Control on a machine where ngrok is not installed. 
 ### Edge Cases
 
 - What happens when the configured port is already in use by another process? → The app surfaces a clear error (toast notification) prompting the user to change the port in Settings; the server does not start.
+- What happens if another ngrok session is already using port 4040 (the default ngrok management API port)? → Terminator always spawns ngrok with `--web-addr 0.0.0.0:4041` so it uses a dedicated management port (4041) that never collides with other ngrok sessions on the same machine.
 - What happens when ngrok fails mid-session (process crashes)? → The Settings UI shows "Tunnel disconnected"; the local server and LAN URL remain active; a toast notification appears with a manual "Reconnect" button — the user decides when to restart the tunnel. No automatic retry.
 - What happens when the app is closed with an active remote browser session? → In-flight WebSocket connections receive a close frame; ngrok and the local server are terminated before the app exits.
 - What happens if two Terminator instances try to use the same port? → Second instance fails with the port-collision error toast; first instance is unaffected.
@@ -156,7 +174,12 @@ The developer enables Remote Control on a machine where ngrok is not installed. 
 - **FR-021**: The Settings panel MUST show the active public URL with a one-click copy button while Remote Control is enabled.
 - **FR-022**: The Settings panel MUST show whether ngrok is installed and provide the install command if it is not.
 - **FR-023**: The Settings panel MUST show the password in a masked field with show/copy and "Generate new" actions.
-- **FR-024**: The Settings panel MUST allow configuring the local server port (default 7681, valid range 1024–65535).
+- **FR-024**: The Settings panel MUST allow configuring the local server port (default 7681, valid range 1024–65535). If the port is changed while the server is running, the system MUST automatically restart the server on the new port — stopping the server on the old port, starting it on the new port, restarting the ngrok tunnel if active, and displaying the updated URLs via a toast notification. No manual toggle is required.
+- **FR-029**: The Settings panel MUST display the LAN-accessible URL (`http://<machine-LAN-IP>:<port>`) at all times while Remote Control is enabled, independent of tunnel status.
+- **FR-030**: The Settings panel MUST provide a "Copy Caddyfile" action that generates a ready-to-use HTTPS reverse-proxy configuration for LAN use without a public tunnel.
+- **FR-031**: When spawning the ngrok process, the system MUST pass `--web-addr 0.0.0.0:4041` so Terminator's ngrok management API is bound to port 4041 — never port 4040 — preventing URL-discovery collisions with other ngrok sessions on the same machine.
+- **FR-032**: The Settings panel MUST expose a configurable maximum concurrent WebSocket subscribers per terminal session (default: 5, valid range: 1–20). When a new connection would exceed this limit, the server MUST reject it with WebSocket close code `4003` (subscriber limit reached) and log the event.
+- **FR-032a**: The configured subscriber cap MUST be persisted as part of `RemoteControlSettings` and survive app restarts.
 
 **Workspace / Project Navigation**
 
@@ -212,6 +235,12 @@ The developer enables Remote Control on a machine where ngrok is not installed. 
 - Persistent public URLs across sessions.
 
 ## Clarifications
+
+### Session 2026-06-13
+
+- Q: When the user changes the port in Settings while the server is running, does the server restart automatically or require a manual toggle? → A: Server restarts automatically on the new port — stops on old port, starts on new, ngrok restarts if active, URLs updated via toast. No manual toggle needed.
+- Q: How should NgrokManager handle port 4040 being occupied by another ngrok session on the same machine? → A: Always spawn ngrok with `--web-addr 0.0.0.0:4041` so Terminator uses a dedicated management port (4041) that cannot collide with other ngrok sessions.
+- Q: Should there be a maximum concurrent WebSocket subscriber limit per terminal session, and if so, should it be configurable? → A: Yes — user-configurable in Advanced Settings, default 5, valid range 1–20. Excess connections rejected with WS close code 4003.
 
 ### Session 2026-06-11
 

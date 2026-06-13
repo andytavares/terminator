@@ -1,23 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import Fastify from 'fastify'
 import type { FastifyInstance } from 'fastify'
-import { registerWorkspaceRoutes } from '../routes/workspace.routes'
+import { registerWorkspaceRoutes } from '../../src/server/routes/workspace.routes'
 
-vi.mock('../../storage/workspace-store.js', () => ({
-  listWorkspaces: vi.fn(),
-  listProjects: vi.fn(),
-}))
-
-import * as workspaceStore from '../../storage/workspace-store.js'
-const mockListWorkspaces = vi.mocked(workspaceStore.listWorkspaces)
-const mockListProjects = vi.mocked(workspaceStore.listProjects)
+const mockListWorkspaces = vi.fn()
+const mockListProjects = vi.fn()
 
 let app: FastifyInstance
 
 beforeEach(async () => {
   vi.resetAllMocks()
   app = Fastify({ logger: false })
-  await registerWorkspaceRoutes(app)
+  await registerWorkspaceRoutes(app, {
+    listWorkspaces: mockListWorkspaces,
+    listProjects: mockListProjects,
+  })
   await app.ready()
 })
 

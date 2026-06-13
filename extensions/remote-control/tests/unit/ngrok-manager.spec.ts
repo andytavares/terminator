@@ -3,17 +3,70 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 const mockSpawn = vi.fn()
 const mockExecSync = vi.fn()
 const mockFetch = vi.fn()
+const mockNetworkInterfaces = vi.fn()
 
 vi.mock('child_process', () => ({
   spawn: mockSpawn,
   execSync: mockExecSync,
 }))
 
+vi.mock('os', () => ({
+  networkInterfaces: mockNetworkInterfaces,
+}))
+
 global.fetch = mockFetch as never
 
+describe('generateCaddyfile', () => {
+  let generateCaddyfile: typeof import('../../src/server/ngrok-manager').generateCaddyfile
+
+  beforeEach(async () => {
+    vi.resetModules()
+    mockNetworkInterfaces.mockReset()
+    const mod = await import('../../src/server/ngrok-manager')
+    generateCaddyfile = mod.generateCaddyfile
+  })
+
+  it('uses local IPv4 address when a non-internal interface is found', () => {
+    mockNetworkInterfaces.mockReturnValue({
+      eth0: [{ family: 'IPv4', address: '192.168.1.100', internal: false }],
+    })
+    const result = generateCaddyfile(7681)
+    expect(result).toContain('192.168.1.100')
+    expect(result).toContain('reverse_proxy localhost:7681')
+    expect(result).toContain('tls internal')
+  })
+
+  it('falls back to localhost when only internal addresses exist', () => {
+    mockNetworkInterfaces.mockReturnValue({
+      lo: [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
+    })
+    const result = generateCaddyfile(8080)
+    expect(result).toMatch(/^localhost \{/)
+    expect(result).toContain('reverse_proxy localhost:8080')
+  })
+
+  it('falls back to localhost when networkInterfaces returns empty object', () => {
+    mockNetworkInterfaces.mockReturnValue({})
+    const result = generateCaddyfile(7681)
+    expect(result).toMatch(/^localhost \{/)
+  })
+
+  it('skips IPv6 addresses and uses first IPv4 non-internal', () => {
+    mockNetworkInterfaces.mockReturnValue({
+      eth0: [
+        { family: 'IPv6', address: 'fe80::1', internal: false },
+        { family: 'IPv4', address: '10.0.0.5', internal: false },
+      ],
+    })
+    const result = generateCaddyfile(9000)
+    expect(result).toContain('10.0.0.5')
+    expect(result).not.toContain('fe80')
+  })
+})
+
 describe('NgrokManager', () => {
-  let NgrokManager: typeof import('../ngrok-manager').NgrokManager
-  let manager: InstanceType<typeof import('../ngrok-manager').NgrokManager>
+  let NgrokManager: typeof import('../../src/server/ngrok-manager').NgrokManager
+  let manager: InstanceType<typeof import('../../src/server/ngrok-manager').NgrokManager>
 
   const mockProcess = {
     pid: 1234,
@@ -31,7 +84,7 @@ describe('NgrokManager', () => {
     mockProcess.on.mockReset()
     mockProcess.stdout.on.mockReset()
     mockProcess.stderr.on.mockReset()
-    const mod = await import('../ngrok-manager')
+    const mod = await import('../../src/server/ngrok-manager')
     NgrokManager = mod.NgrokManager
     manager = new NgrokManager()
   })
@@ -69,22 +122,50 @@ describe('NgrokManager', () => {
       await vi.runAllTimersAsync()
       const url = await urlPromise
 
-      expect(mockSpawn).toHaveBeenCalledWith('ngrok', ['http', '7681'], expect.anything())
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'ngrok',
+        ['http', '7681', '--web-addr', '0.0.0.0:4041'],
+        expect.anything()
+      )
       expect(url).toBe('https://abc.ngrok.io')
     })
 
-    it('rejects after 20 failed polls', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ tunnels: [] }),
-      })
+    it('rejects after all polls exhausted (MAX_POLLS=60) and stops process', async () => {
+      mockFetch.mockResolvedValue({ ok: false })
 
       const urlPromise = manager.start(7681)
       urlPromise.catch(() => {})
-      for (let i = 0; i < 21; i++) {
+      for (let i = 0; i < 65; i++) {
         await vi.runAllTimersAsync()
       }
-      await expect(urlPromise).rejects.toThrow()
+      await expect(urlPromise).rejects.toThrow('ngrok tunnel URL not available after polling')
+      // stop() should have been called inside pollForUrl after exhausting polls
+      expect(mockProcess.kill).toHaveBeenCalledWith('SIGTERM')
+    })
+
+    it('includes stdout/stderr output in rejection message', async () => {
+      let stdoutHandler: ((chunk: Buffer) => void) | undefined
+      let stderrHandler: ((chunk: Buffer) => void) | undefined
+      mockProcess.stdout.on.mockImplementation((event: string, fn: (chunk: Buffer) => void) => {
+        if (event === 'data') stdoutHandler = fn
+      })
+      mockProcess.stderr.on.mockImplementation((event: string, fn: (chunk: Buffer) => void) => {
+        if (event === 'data') stderrHandler = fn
+      })
+
+      mockFetch.mockRejectedValue(new Error('ECONNREFUSED'))
+
+      const urlPromise = manager.start(7681)
+      urlPromise.catch(() => {})
+
+      // Trigger output before polls exhaust
+      stdoutHandler?.(Buffer.from('ERR_NGROK_105'))
+      stderrHandler?.(Buffer.from('authentication failed'))
+
+      for (let i = 0; i < 65; i++) {
+        await vi.runAllTimersAsync()
+      }
+      await expect(urlPromise).rejects.toThrow(/authentication failed|ERR_NGROK/)
     })
 
     it('passes --authtoken flag when auth token provided', async () => {
@@ -99,7 +180,7 @@ describe('NgrokManager', () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'ngrok',
-        ['http', '7681', '--authtoken', 'my-token'],
+        ['http', '7681', '--web-addr', '0.0.0.0:4041', '--authtoken', 'my-token'],
         expect.anything()
       )
     })

@@ -1,0 +1,17 @@
+{
+  "name": "@terminator/extension-remote-control",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remote Control extension for Terminator — embedded HTTP server + ngrok tunnel",
+  "dependencies": {
+    "bcryptjs": "2.4.3",
+    "fastify": "4.28.1",
+    "@fastify/websocket": "11.0.1",
+    "@fastify/static": "8.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zustand": "4.5.5",
+    "lucide-react": "^0.475.0",
+    "zod": "3.23.8"
+  }
+}

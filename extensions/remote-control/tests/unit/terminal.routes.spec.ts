@@ -4,9 +4,9 @@ import type { FastifyInstance } from 'fastify'
 import websocketPlugin from '@fastify/websocket'
 import { WebSocket } from 'ws'
 import { homedir } from 'os'
-import { registerTerminalRoutes } from '../routes/terminal.routes'
-import { WsTicketStore } from '../ws-ticket-store'
-import { WsSubscriberManager } from '../ws-subscriber-manager'
+import { registerTerminalRoutes } from '../../src/server/routes/terminal.routes'
+import { WsTicketStore } from '../../src/server/ws-ticket-store'
+import { WsSubscriberManager } from '../../src/server/ws-subscriber-manager'
 
 const mockPtyManager = {
   spawn: vi.fn(() => 'session-id-from-spawn'),
@@ -32,6 +32,7 @@ beforeEach(async () => {
     ptyManager: mockPtyManager as never,
     ticketStore: mockTicketStore,
     subscriberManager: mockSubscriberManager,
+    getMaxSubscribers: () => 5,
   })
   await app.ready()
 })
@@ -243,6 +244,7 @@ describe('WS /ws/terminals/:sessionId', () => {
       ptyManager: mockPtyManager as never,
       ticketStore: wsTicketStore,
       subscriberManager: wsSubscriberManager,
+      getMaxSubscribers: () => 5,
     })
     await wsApp.listen({ port: 0, host: '127.0.0.1' })
     const addr = wsApp.server.address() as { port: number; address: string }
@@ -314,7 +316,7 @@ describe('WS /ws/terminals/:sessionId', () => {
       ws.on('open', () => {
         setTimeout(() => {
           // addSubscriber is called from the server-side handler (async after upgrade)
-          expect(addSpy).toHaveBeenCalledWith(sessionId, expect.anything())
+          expect(addSpy).toHaveBeenCalledWith(sessionId, expect.anything(), expect.any(Number))
           ws.close()
         }, 20)
       })

@@ -104,3 +104,47 @@ The renderer adds a listener for `log:push` in `App.tsx` (or a dedicated effect)
 
 - Rehash on every request comparison → ~100ms per request at work factor 10, unacceptable.
 - Store hash only, not plaintext → user cannot see/copy their password from Settings UI, violating FR-023.
+
+---
+
+## Decision 9: Port Change While Server is Running
+
+**Decision**: When the user changes the port in Settings while the remote server is running, the system automatically restarts the server on the new port. The sequence: stop server on old port → start server on new port → restart ngrok if active → push updated URLs via `remote:status` IPC and show a toast. No manual toggle required.
+
+**Rationale**: FR-020 establishes the principle that Remote Control changes take effect immediately without an app restart. Applying the same principle to port changes gives a consistent, predictable UX. A "deferred / requires manual toggle" approach would violate FR-020's spirit and confuse users who change the port and see the old URL still displayed.
+
+**Alternatives considered**:
+
+- Defer to manual toggle — requires user to toggle off/on; creates a confusing intermediate state where the displayed port doesn't match the running server.
+- Disable the port field while running — prevents configuration without stopping service; adds UI complexity.
+
+---
+
+## Decision 10: ngrok Management Port
+
+**Decision**: `NgrokManager.start()` always passes `--web-addr 0.0.0.0:4041` when spawning ngrok. Terminator polls `http://localhost:4041/api/tunnels` (not 4040) for the tunnel URL.
+
+**Rationale**: ngrok's default management port is 4040. If the user has an existing ngrok session for another project, port 4040 is occupied and Terminator's URL polling would either fail or return the wrong tunnel's URL. Pinning Terminator's management port to 4041 costs one CLI flag and eliminates the conflict entirely.
+
+Source: https://ngrok.com/docs/agent/config/#web_addr  
+Quote: _"web_addr: networkAddress — Address to serve the local web interface and api on. Defaults to 127.0.0.1:4040."_
+
+**Alternatives considered**:
+
+- Accept the collision risk → wrong URL silently served, support burden.
+- Detect 4040 in use and surface a toast → blocks the user unnecessarily; they may not know why.
+- User-configurable management port → adds Advanced Settings complexity for a problem the user shouldn't need to know about.
+
+---
+
+## Decision 11: Max Concurrent WebSocket Subscribers
+
+**Decision**: `maxSubscribers` is a user-configurable setting (default: 5, valid range: 1–20) stored in `RemoteControlSettings`. `WsSubscriberManager.addSubscriber()` checks the current count before adding. If the cap is reached, the WebSocket connection is rejected with close code `4003` (subscriber limit reached) and the event is logged.
+
+**Rationale**: An authenticated attacker with the ngrok URL and password could open unlimited WebSocket connections to a single terminal session, causing unbounded memory growth. A configurable cap (not hardcoded) lets power users who legitimately need more than 5 observers (e.g., classroom demos) raise the limit, while the default 5 protects against accidental or malicious flooding. `maxSubscribers` changes apply to new connections only — existing subscribers are not disconnected.
+
+**Alternatives considered**:
+
+- No cap (unlimited) → DoS vector; memory grows unbounded with no visibility.
+- Hardcoded cap of 2 or 5 → inflexible; legitimate broadcast use cases blocked.
+- Hardcoded cap of 5 (non-configurable) → simpler, but power users would need to fork or patch.

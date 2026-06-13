@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { WsTicketStore } from '../ws-ticket-store'
+import { WsTicketStore } from '../../src/server/ws-ticket-store'
 
 describe('WsTicketStore', () => {
   let store: WsTicketStore

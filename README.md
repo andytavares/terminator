@@ -19,7 +19,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 - **Split panes** — Split the current terminal vertically (`Cmd+D`, side by side) or horizontally (`Cmd+Shift+D`, top/bottom). Splits are recursive — each pane can be split further. Drag the divider bar to resize. Click a pane to focus it; keyboard input goes to the focused pane. `Cmd+W` closes the focused pane (collapsing the split) or the active tab when not in split mode. Each pane shows a blue focus border.
 - **Notification center** — Bell icon in the tab bar opens a panel listing all in-app notifications (toasts, extension events). Unread count badge on the bell. Per-notification dismiss (×), "Mark all read," and "Clear all." ESC or clicking the backdrop closes the panel. Extensions create persistent notifications with action buttons via `api.notifications.createNotification({ type, title, message, actions })` — action callbacks run in the main process. Every toast automatically appears in the center so nothing is lost after auto-dismiss.
 - **Activity indicators** — Spinning indicator on workspace tiles, project cards, and session tabs while a terminal is running a command or producing output (1.5 s idle debounce). Alert badge (red dot + count) coexists alongside the spinner for sessions awaiting input. OS-level system notification + Dock bounce fires on terminal bell.
-- **Overview screen** — Press `⊞` in the workspace rail or `Cmd+Shift+O` to open a full-screen tiled grid of all open sessions. Each tile shows a live canvas snapshot of the terminal (refreshed every ~3 s), the project name, and per-session CPU% and memory. A top bar shows system-wide CPU%, memory used/total, and network in/out rates updated every 2 s. Click any tile to navigate directly to that session.
+- **Overview screen** — Click the grid icon in the sidebar header or press `Cmd+Shift+I` to open a full-screen tiled grid of all open sessions. Each tile shows a live canvas snapshot of the terminal (refreshed every ~3 s), the project name, and per-session CPU% and memory. A top bar shows system-wide CPU%, memory used/total, and network in/out rates updated every 2 s. Click any tile to navigate directly to that session.
 - **Global metrics bar** — Optional CPU / Memory / Network bar pinned to the bottom of every screen. Enable via Settings → Interface → "Show CPU / Memory / Network bar".
 - **Scratch sessions** — Create a terminal instantly without selecting a workspace or project first. Click the `~` button in the workspace rail or press `Cmd+Shift+T`. Scratch sessions appear in a dedicated sidebar section beneath the project list. Move any scratch (or regular) session to an existing project — or create a new one — by right-clicking its tab and choosing "Move to project…".
 
@@ -31,7 +31,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 
 - **Clickable terminal links** — URLs and file paths in terminal output are underlined on hover. `Cmd+click` a URL to open it in the system browser; `Cmd+click` an absolute path (e.g. `/Users/foo/bar.ts` or `~/project/file.go`) to open it with the default application. Line:col suffixes like `file.go:42:5` are stripped before opening. All links throughout the app (PR comments, CI check links, issue refs) always open in the system browser.
 
-- **Keyboard shortcuts** — `Cmd+B` (toggle sidebar), `Cmd+1–9` (switch workspace + expand it), `Cmd++/-` (cycle workspaces), `Cmd+T` (new tab), `Cmd+Shift+T` (new scratch terminal), `Cmd+W` (close focused pane / active tab), `Cmd+D` (split pane vertically), `Cmd+Shift+D` (split pane horizontally), `Cmd+Left/Right` (cycle tabs), `Cmd+K` (clear terminal), `Cmd+P` (command palette), `Cmd+,` (settings), `Cmd+Shift+G` (toggle git sidebar), `Cmd+Shift+O` (toggle Overview), `Cmd+Enter` (send newline to running program — always intercepted), `Shift+Enter` (send newline — only active when the running program has enabled bracketed paste mode, e.g. the `claude` CLI; passes through normally in a plain shell).
+- **Keyboard shortcuts** — `Cmd+B` (toggle sidebar), `Cmd+1–9` (switch workspace + expand it), `Cmd++/-` (cycle workspaces), `Cmd+T` (new tab), `Cmd+Shift+T` (new scratch terminal), `Cmd+W` (close focused pane / active tab), `Cmd+D` (split pane vertically), `Cmd+Shift+D` (split pane horizontally), `Cmd+Left/Right` (cycle tabs), `Cmd+K` (clear terminal), `Cmd+P` (command palette), `Cmd+,` (settings), `Cmd+Shift+G` (toggle git sidebar), `Cmd+Shift+I` (toggle Overview), `Cmd+Enter` (send newline to running program — always intercepted), `Shift+Enter` (send newline — only active when the running program has enabled bracketed paste mode, e.g. the `claude` CLI; passes through normally in a plain shell).
 
 ## Tech Stack
 
@@ -95,22 +95,23 @@ Then open the app normally. You only need to run this once.
 
 ## Available Scripts
 
-| Script                     | Description                                           |
-| -------------------------- | ----------------------------------------------------- |
-| `npm run dev`              | Build extensions + development mode with hot-reload   |
-| `npm run build`            | Build extensions + production build                   |
-| `npm run build:extensions` | Compile extension TypeScript → `src/index.js` bundles |
-| `npm run preview`          | Preview production build                              |
-| `npm test`                 | Unit + integration tests (Vitest)                     |
-| `npm run test:watch`       | Tests in watch mode                                   |
-| `npm run test:e2e`         | E2E tests (Playwright, launches Electron)             |
-| `npm run test:coverage`    | Tests with V8 coverage report                         |
-| `npm run lint`             | ESLint check                                          |
-| `npm run typecheck`        | TypeScript type check (no emit)                       |
-| `npm run format`           | Prettier format                                       |
-| `npm run format:check`     | Check formatting without writing files (CI)           |
-| `npm run create-extension` | Scaffold a new extension from template                |
-| `npm run rebuild`          | Recompile native modules for Electron                 |
+| Script                     | Description                                                      |
+| -------------------------- | ---------------------------------------------------------------- |
+| `npm run dev`              | Build extensions + remote SPA + development mode with hot-reload |
+| `npm run build`            | Build extensions + remote SPA + production build                 |
+| `npm run build:extensions` | Compile extension TypeScript → `src/index.js` bundles            |
+| `npm run build:remote`     | Build browser remote-control SPA → `out/renderer-remote/`        |
+| `npm run preview`          | Preview production build                                         |
+| `npm test`                 | Unit + integration tests (Vitest)                                |
+| `npm run test:watch`       | Tests in watch mode                                              |
+| `npm run test:e2e`         | E2E tests (Playwright, launches Electron)                        |
+| `npm run test:coverage`    | Tests with V8 coverage report                                    |
+| `npm run lint`             | ESLint check                                                     |
+| `npm run typecheck`        | TypeScript type check (no emit)                                  |
+| `npm run format`           | Prettier format                                                  |
+| `npm run format:check`     | Check formatting without writing files (CI)                      |
+| `npm run create-extension` | Scaffold a new extension from template                           |
+| `npm run rebuild`          | Recompile native modules for Electron                            |
 
 ## Project Structure
 

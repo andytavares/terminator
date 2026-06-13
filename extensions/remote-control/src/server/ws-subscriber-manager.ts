@@ -10,14 +10,19 @@ interface SessionEntry {
 export class WsSubscriberManager {
   private sessions = new Map<string, SessionEntry>()
 
-  addSubscriber(sessionId: string, ws: WebSocket): void {
+  addSubscriber(sessionId: string, ws: WebSocket, maxSubscribers: number): boolean {
     let entry = this.sessions.get(sessionId)
     if (!entry) {
       entry = { subscribers: new Set(), primary: null }
       this.sessions.set(sessionId, entry)
     }
+    if (entry.subscribers.size >= maxSubscribers) {
+      ws.close(4003, 'subscriber limit reached')
+      return false
+    }
     entry.subscribers.add(ws)
     if (!entry.primary) entry.primary = ws
+    return true
   }
 
   removeSubscriber(sessionId: string, ws: WebSocket): void {

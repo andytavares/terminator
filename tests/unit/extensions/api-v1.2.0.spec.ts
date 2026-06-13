@@ -2,11 +2,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Electron mock ────────────────────────────────────────────────────────────
 const mockSend = vi.fn()
-const mockWindow = { webContents: { send: mockSend } }
+const mockWindow = { webContents: { send: mockSend }, isDestroyed: vi.fn(() => false) }
 const registeredGlobalShortcuts = new Map<string, () => void>()
 
+const mockBWInstance = vi.hoisted(() => ({
+  focus: vi.fn(),
+  isDestroyed: vi.fn(() => false),
+  on: vi.fn(),
+  loadURL: vi.fn(),
+  loadFile: vi.fn(),
+  webContents: { send: vi.fn() },
+}))
+
 vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn(() => [mockWindow]) },
+  BrowserWindow: Object.assign(
+    vi.fn(() => mockBWInstance),
+    {
+      getAllWindows: vi.fn(() => [mockWindow]),
+    }
+  ),
   Menu: {
     getApplicationMenu: vi.fn(() => null),
     buildFromTemplate: vi.fn((t) => t),
@@ -71,12 +85,16 @@ import {
   emitWorkspaceDelete,
   emitProjectDelete,
 } from '../../../src/main/extensions/workspace-events'
+import { setExtensionSetting } from '../../../src/main/storage/extension-settings-store'
+import { fsWatcherService } from '../../../src/main/fs/fs-watcher'
+import { EventEmitter } from 'events'
 
 beforeEach(() => {
   vi.clearAllMocks()
   registeredGlobalShortcuts.clear()
   globalRegistry.sidebarPanels.clear()
   globalRegistry.globalTabs?.clear()
+  globalRegistry.sidebarItems?.clear()
 })
 
 // ── sidebar.registerGlobalTab ────────────────────────────────────────────────
@@ -217,5 +235,241 @@ describe('api.workspace.onProjectDelete', () => {
     emitProjectDelete('proj-2')
 
     expect(handler).not.toHaveBeenCalled()
+  })
+})
+
+// ── settings.set ─────────────────────────────────────────────────────────────
+
+describe('api.settings.set', () => {
+  it('persists the value via setExtensionSetting', () => {
+    const api = createExtensionAPI('test.set', '0.1.0')
+    api.settings.set('myKey', 'myValue')
+    expect(vi.mocked(setExtensionSetting)).toHaveBeenCalledWith('myKey', 'myValue')
+  })
+})
+
+// ── sidebar.registerItem ──────────────────────────────────────────────────────
+
+describe('api.sidebar.registerItem', () => {
+  it('registers an item in the global registry', () => {
+    const api = createExtensionAPI('test.sbi', '0.1.0')
+    const item = { id: 'my-item', label: 'My Item' } as never
+    api.sidebar.registerItem(item)
+    expect(globalRegistry.sidebarItems.get('test.sbi.sidebar.my-item')).toBe(item)
+  })
+
+  it('returns a Disposable that removes the item on dispose', () => {
+    const api = createExtensionAPI('test.sbi2', '0.1.0')
+    const item = { id: 'my-item', label: 'My Item' } as never
+    const d = api.sidebar.registerItem(item)
+    d.dispose()
+    expect(globalRegistry.sidebarItems.has('test.sbi2.sidebar.my-item')).toBe(false)
+  })
+})
+
+// ── fs.watch ─────────────────────────────────────────────────────────────────
+
+describe('api.fs.watch', () => {
+  it('registers the handler with fsWatcherService', () => {
+    const api = createExtensionAPI('test.fs', '0.1.0')
+    const handler = vi.fn()
+    api.fs.watch(handler)
+    expect(vi.mocked(fsWatcherService.addHandler)).toHaveBeenCalledWith(handler)
+  })
+
+  it('returns a Disposable that removes the handler on dispose', () => {
+    const api = createExtensionAPI('test.fs2', '0.1.0')
+    const handler = vi.fn()
+    const d = api.fs.watch(handler)
+    d.dispose()
+    expect(vi.mocked(fsWatcherService.removeHandler)).toHaveBeenCalledWith(handler)
+  })
+})
+
+// ── ipc bridge channels ───────────────────────────────────────────────────────
+
+describe('api.ipc bridge channels', () => {
+  it('invokeChannel calls the registered handler and returns its result', async () => {
+    const handler = vi.fn().mockResolvedValue('result')
+    const bridge = {
+      invokeRegistry: new Map<string, (e: never, p: unknown) => unknown>([['my:channel', handler]]),
+      sendRegistry: new Map<string, (e: never, p: unknown) => void>(),
+      eventBus: new EventEmitter(),
+    }
+    const api = createExtensionAPI('test.ipc', '0.1.0', { bridge })
+    const result = await api.ipc.invokeChannel('my:channel', { data: 1 })
+    expect(result).toBe('result')
+    expect(handler).toHaveBeenCalledWith(null, { data: 1 })
+  })
+
+  it('invokeChannel returns undefined when channel is not registered', async () => {
+    const bridge = {
+      invokeRegistry: new Map<string, (e: never, p: unknown) => unknown>(),
+      sendRegistry: new Map<string, (e: never, p: unknown) => void>(),
+      eventBus: new EventEmitter(),
+    }
+    const api = createExtensionAPI('test.ipc2', '0.1.0', { bridge })
+    const result = await api.ipc.invokeChannel('missing:channel', {})
+    expect(result).toBeUndefined()
+  })
+
+  it('sendChannel calls the registered handler', () => {
+    const handler = vi.fn()
+    const bridge = {
+      invokeRegistry: new Map<string, (e: never, p: unknown) => unknown>(),
+      sendRegistry: new Map<string, (e: never, p: unknown) => void>([['my:send', handler]]),
+      eventBus: new EventEmitter(),
+    }
+    const api = createExtensionAPI('test.ipc3', '0.1.0', { bridge })
+    api.ipc.sendChannel('my:send', { payload: 42 })
+    expect(handler).toHaveBeenCalledWith(null, { payload: 42 })
+  })
+
+  it('sendChannel is a no-op when channel is not registered', () => {
+    const bridge = {
+      invokeRegistry: new Map<string, (e: never, p: unknown) => unknown>(),
+      sendRegistry: new Map<string, (e: never, p: unknown) => void>(),
+      eventBus: new EventEmitter(),
+    }
+    const api = createExtensionAPI('test.ipc4', '0.1.0', { bridge })
+    expect(() => api.ipc.sendChannel('missing:send', {})).not.toThrow()
+  })
+
+  it('onWindowEvent subscribes and unsubscribes from the event bus', () => {
+    const eventBus = new EventEmitter()
+    const bridge = {
+      invokeRegistry: new Map<string, (e: never, p: unknown) => unknown>(),
+      sendRegistry: new Map<string, (e: never, p: unknown) => void>(),
+      eventBus,
+    }
+    const api = createExtensionAPI('test.ipc5', '0.1.0', { bridge })
+    const handler = vi.fn()
+    const unsub = api.ipc.onWindowEvent('my:event', handler)
+    eventBus.emit('my:event', 'arg1', 'arg2')
+    expect(handler).toHaveBeenCalledWith('arg1', 'arg2')
+    unsub()
+    eventBus.emit('my:event', 'arg3')
+    expect(handler).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ── pty ──────────────────────────────────────────────────────────────────────
+
+describe('api.pty', () => {
+  const mockPtyManager = {
+    spawn: vi.fn(() => 'session-xyz'),
+    write: vi.fn(),
+    resize: vi.fn(),
+    kill: vi.fn(),
+  }
+
+  describe('with ptyManager', () => {
+    it('spawn delegates to ptyManager.spawn', () => {
+      const api = createExtensionAPI('test.pty', '0.1.0', { ptyManager: mockPtyManager })
+      const onData = vi.fn()
+      const onExit = vi.fn()
+      api.pty.spawn('s1', '/cwd', '/bin/zsh', 'human', onData, onExit)
+      expect(mockPtyManager.spawn).toHaveBeenCalledWith(
+        's1',
+        '/cwd',
+        '/bin/zsh',
+        'human',
+        onData,
+        onExit
+      )
+    })
+
+    it('write delegates to ptyManager.write', () => {
+      const api = createExtensionAPI('test.pty2', '0.1.0', { ptyManager: mockPtyManager })
+      api.pty.write('s1', 'hello')
+      expect(mockPtyManager.write).toHaveBeenCalledWith('s1', 'hello')
+    })
+
+    it('resize delegates to ptyManager.resize', () => {
+      const api = createExtensionAPI('test.pty3', '0.1.0', { ptyManager: mockPtyManager })
+      api.pty.resize('s1', 80, 24)
+      expect(mockPtyManager.resize).toHaveBeenCalledWith('s1', 80, 24)
+    })
+
+    it('kill delegates to ptyManager.kill', () => {
+      const api = createExtensionAPI('test.pty4', '0.1.0', { ptyManager: mockPtyManager })
+      api.pty.kill('s1')
+      expect(mockPtyManager.kill).toHaveBeenCalledWith('s1')
+    })
+  })
+
+  describe('without ptyManager', () => {
+    it('spawn throws PTY access not available', () => {
+      const api = createExtensionAPI('test.pty.nopty', '0.1.0')
+      expect(() => api.pty.spawn('s1', '/cwd', '/bin/zsh', 'human', vi.fn(), vi.fn())).toThrow(
+        'PTY access not available'
+      )
+    })
+
+    it('write is a no-op and does not throw', () => {
+      const api = createExtensionAPI('test.pty.nopty2', '0.1.0')
+      expect(() => api.pty.write('s1', 'hello')).not.toThrow()
+    })
+
+    it('resize is a no-op and does not throw', () => {
+      const api = createExtensionAPI('test.pty.nopty3', '0.1.0')
+      expect(() => api.pty.resize('s1', 80, 24)).not.toThrow()
+    })
+
+    it('kill is a no-op and does not throw', () => {
+      const api = createExtensionAPI('test.pty.nopty4', '0.1.0')
+      expect(() => api.pty.kill('s1')).not.toThrow()
+    })
+  })
+})
+
+// ── window.broadcast ─────────────────────────────────────────────────────────
+
+describe('api.window.broadcast', () => {
+  it('calls deps.broadcastToWindows when provided', () => {
+    const broadcastToWindows = vi.fn()
+    const api = createExtensionAPI('test.bcast', '0.1.0', { broadcastToWindows })
+    api.window.broadcast('my:event', { data: 1 })
+    expect(broadcastToWindows).toHaveBeenCalledWith('my:event', { data: 1 })
+  })
+
+  it('falls back to BrowserWindow.getAllWindows() when no broadcastToWindows dep', async () => {
+    const { BrowserWindow } = await import('electron')
+    const api = createExtensionAPI('test.bcast2', '0.1.0')
+    api.window.broadcast('my:event', { data: 2 })
+    expect(BrowserWindow.getAllWindows).toHaveBeenCalled()
+    expect(mockSend).toHaveBeenCalledWith('my:event', { data: 2 })
+  })
+})
+
+// ── window.openAuxiliary ─────────────────────────────────────────────────────
+
+describe('api.window.openAuxiliary', () => {
+  it('opens a new BrowserWindow for a new view', async () => {
+    const { BrowserWindow } = await import('electron')
+    const api = createExtensionAPI('test.aux', '0.1.0')
+    api.window.openAuxiliary('test-view-new-1')
+    expect(BrowserWindow).toHaveBeenCalled()
+  })
+
+  it('focuses the existing window when called again for the same view', async () => {
+    const { BrowserWindow } = await import('electron')
+    const api = createExtensionAPI('test.aux2', '0.1.0')
+    api.window.openAuxiliary('test-view-new-2')
+    vi.mocked(BrowserWindow).mockClear()
+    mockBWInstance.isDestroyed.mockReturnValueOnce(false)
+    api.window.openAuxiliary('test-view-new-2')
+    expect(BrowserWindow).not.toHaveBeenCalled()
+    expect(mockBWInstance.focus).toHaveBeenCalled()
+  })
+
+  it('opens a new window when the existing one is destroyed', async () => {
+    const { BrowserWindow } = await import('electron')
+    const api = createExtensionAPI('test.aux3', '0.1.0')
+    api.window.openAuxiliary('test-view-new-3')
+    vi.mocked(BrowserWindow).mockClear()
+    mockBWInstance.isDestroyed.mockReturnValueOnce(true)
+    api.window.openAuxiliary('test-view-new-3')
+    expect(BrowserWindow).toHaveBeenCalled()
   })
 })

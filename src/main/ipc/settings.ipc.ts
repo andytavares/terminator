@@ -6,22 +6,13 @@ import {
   updateWorkspaceSettings,
 } from '../storage/settings-store.js'
 
-export function registerSettingsHandlers(
-  onRemoteControlChange?: (enabled: boolean) => Promise<void>
-): void {
+export function registerSettingsHandlers(): void {
   ipcMain.handle('settings:get-global', () => {
     return { settings: getGlobalSettings() }
   })
 
   ipcMain.handle('settings:update-global', (_event, { patch }) => {
-    const before = getGlobalSettings().remoteControl?.enabled
-    const result = { settings: updateGlobalSettings(patch) }
-    const after = result.settings.remoteControl?.enabled
-    if (onRemoteControlChange && before !== after) {
-      // Fire-and-forget through the caller's queue; errors are caught inside start/stop
-      onRemoteControlChange(after ?? false).catch(() => {})
-    }
-    return result
+    return { settings: updateGlobalSettings(patch) }
   })
 
   ipcMain.handle('settings:get-workspace', (_event, { workspaceId }) => {

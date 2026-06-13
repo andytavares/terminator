@@ -3,9 +3,9 @@ import { homedir } from 'os'
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { SocketStream } from '@fastify/websocket'
-import type { PtyManager } from '../../terminal/pty-manager'
-import type { WsTicketStore } from '../ws-ticket-store'
-import type { WsSubscriberManager } from '../ws-subscriber-manager'
+import type { PtyManagerAPI } from '../../types.js'
+import type { WsTicketStore } from '../ws-ticket-store.js'
+import type { WsSubscriberManager } from '../ws-subscriber-manager.js'
 
 const CreateTerminalSchema = z.object({
   cwd: z.string().min(1),
@@ -26,16 +26,17 @@ interface TerminalSession {
 }
 
 interface TerminalRouteOptions {
-  ptyManager: PtyManager
+  ptyManager: PtyManagerAPI
   ticketStore: WsTicketStore
   subscriberManager: WsSubscriberManager
+  getMaxSubscribers: () => number
 }
 
 export async function registerTerminalRoutes(
   app: FastifyInstance,
   opts: TerminalRouteOptions
 ): Promise<{ cleanup: () => void }> {
-  const { ptyManager, ticketStore, subscriberManager } = opts
+  const { ptyManager, ticketStore, subscriberManager, getMaxSubscribers } = opts
   const sessions = new Map<string, TerminalSession>()
 
   app.post('/api/terminals', async (request, reply) => {
@@ -132,7 +133,8 @@ export async function registerTerminalRoutes(
         return
       }
 
-      subscriberManager.addSubscriber(sessionId, ws)
+      const accepted = subscriberManager.addSubscriber(sessionId, ws, getMaxSubscribers())
+      if (!accepted) return
 
       ws.on('message', (msg) => {
         if (subscriberManager.isPrimary(sessionId, ws)) {

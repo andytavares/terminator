@@ -21,7 +21,7 @@
         "extensions/task-vault/src/notifications/task-scheduler.ts",
         "extensions/task-vault/src/vault/types.ts"
       ],
-      "last_verified_commit": "3885875",
+      "last_verified_commit": "fe7fcf3",
       "staleness_score": 0
     },
     {
@@ -37,20 +37,19 @@
         "extensions/git-integration/src/index.ts",
         "extensions/git-integration/src/renderer.tsx"
       ],
-      "last_verified_commit": "3885875",
+      "last_verified_commit": "fe7fcf3",
       "staleness_score": 0
     },
     {
       "path": "extensions/task-vault/README.md",
       "title": "Task Vault Extension README",
-      "summary": "Feature list, MCP server setup, available tools, auto-execute toggles, task ID format.",
+      "summary": "Feature list, recurring tasks, task ID format (UUID, stable, STALE_ID on miss). MCP sidecar has been removed.",
       "owners": [],
       "referenced_code_paths": [
-        "extensions/task-vault/src/mcp/server.ts",
         "extensions/task-vault/src/vault/types.ts",
         "extensions/task-vault/src/ipc/vault.ipc.ts"
       ],
-      "last_verified_commit": "148e9f1",
+      "last_verified_commit": "fe7fcf3",
       "staleness_score": 0
     },
     {
@@ -62,7 +61,7 @@
         "src/main/extensions/api.ts",
         "src/renderer/extensions/registry.ts"
       ],
-      "last_verified_commit": "3885875",
+      "last_verified_commit": "fe7fcf3",
       "staleness_score": 0
     },
     {
@@ -71,7 +70,7 @@
       "summary": "Core IPC channel specifications: terminal:*, workspace:*, project:*, settings:*, dialog:*, extension:*, fs:*, notification.*.",
       "owners": [],
       "referenced_code_paths": ["src/main/preload.ts", "src/renderer/electron.d.ts"],
-      "last_verified_commit": "148e9f1",
+      "last_verified_commit": "fe7fcf3",
       "staleness_score": 0
     },
     {
@@ -86,7 +85,7 @@
         "scripts/create-extension.cjs",
         "extensions/git-integration/src/renderer.tsx"
       ],
-      "last_verified_commit": "3885875",
+      "last_verified_commit": "fe7fcf3",
       "staleness_score": 0
     },
     {
@@ -95,7 +94,7 @@
       "summary": "Development workflow, npm scripts, test coverage requirements, PR checklist.",
       "owners": [],
       "referenced_code_paths": ["package.json"],
-      "last_verified_commit": "148e9f1",
+      "last_verified_commit": "fe7fcf3",
       "staleness_score": 0
     },
     {
@@ -110,7 +109,7 @@
         "extensions/task-vault/src/vault/ensure-next-occurrence.ts",
         "extensions/task-vault/src/ipc/vault.ipc.ts"
       ],
-      "last_verified_commit": "148e9f1",
+      "last_verified_commit": "fe7fcf3",
       "staleness_score": 0
     }
   ]

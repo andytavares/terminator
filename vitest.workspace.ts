@@ -16,6 +16,7 @@ export default defineWorkspace([
         'extensions/git-integration/tests/**/*.spec.js',
         'src/main/remote/__tests__/**/*.spec.ts',
         'src/main/ipc/__tests__/**/*.spec.ts',
+        'src/shared/**/__tests__/**/*.spec.ts',
       ],
       exclude: ['extensions/speckit-pilot/**'],
     },

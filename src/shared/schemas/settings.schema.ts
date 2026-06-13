@@ -19,15 +19,6 @@ export const GlobalSettingsSchema = z.object({
       hasSeenWelcome: z.boolean(),
     })
     .default({ hasSeenWelcome: false }),
-  remoteControl: z
-    .object({
-      enabled: z.boolean(),
-      port: z.number().int().min(1024).max(65535),
-      password: z.string(),
-      passwordHash: z.string(),
-      ngrokAuthToken: z.string(),
-    })
-    .default({ enabled: false, port: 7681, password: '', passwordHash: '', ngrokAuthToken: '' }),
 })
 
 export const WorkspaceSettingsSchema = z.object({
@@ -62,7 +53,6 @@ export const DEFAULT_GLOBAL_SETTINGS = {
   git: { worktreeBaseDir: '' },
   extensions: {},
   ui: { hasSeenWelcome: false },
-  remoteControl: { enabled: false, port: 7681, password: '', passwordHash: '', ngrokAuthToken: '' },
 }
 
 export type GlobalSettingsData = z.infer<typeof GlobalSettingsSchema>

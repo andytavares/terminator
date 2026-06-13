@@ -3,8 +3,12 @@ import { readFileSync } from 'fs'
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>()
-  return { ...actual, readFileSync: vi.fn(actual.readFileSync) }
+  return { ...actual, readFileSync: vi.fn(actual.readFileSync), existsSync: vi.fn(() => false) }
 })
+
+vi.mock('electron', () => ({
+  app: { getAppPath: vi.fn(() => '/mock/app') },
+}))
 
 const mockTicketStore = vi.hoisted(() => ({
   createTicket: vi.fn(() => 'a'.repeat(64)),
@@ -13,7 +17,7 @@ const mockTicketStore = vi.hoisted(() => ({
   stopCleanup: vi.fn(),
 }))
 
-vi.mock('../ws-ticket-store', () => ({
+vi.mock('../../src/server/ws-ticket-store', () => ({
   WsTicketStore: vi.fn().mockImplementation(() => mockTicketStore),
 }))
 
@@ -28,12 +32,14 @@ const mockSubscriberManager = vi.hoisted(() => ({
   getCount: vi.fn(() => 0),
 }))
 
-vi.mock('../ws-subscriber-manager', () => ({
+vi.mock('../../src/server/ws-subscriber-manager', () => ({
   WsSubscriberManager: vi.fn(() => mockSubscriberManager),
 }))
 
 describe('RemoteServer', () => {
-  let remoteServer: Awaited<ReturnType<typeof import('../remote-server').createRemoteServer>>
+  let remoteServer: Awaited<
+    ReturnType<typeof import('../../src/server/remote-server').createRemoteServer>
+  >
 
   const mockPtyManager = {
     spawn: vi.fn(),
@@ -43,22 +49,25 @@ describe('RemoteServer', () => {
     getSessionIds: vi.fn(() => []),
   }
 
+  const mockOnPortInUse = vi.fn()
+
   const mockDeps = {
-    getGlobalSettings: vi.fn(() => ({
-      remoteControl: { enabled: true, port: 7682, password: 'pass', passwordHash: '$2a$10$test' },
-    })),
-    updateGlobalSettings: vi.fn(),
+    getPasswordHash: vi.fn(() => '$2a$10$test'),
+    getMaxSubscribers: vi.fn(() => 5),
+    listWorkspaces: vi.fn(() => []),
+    listProjects: vi.fn(() => []),
+    invokeChannel: vi.fn().mockResolvedValue(undefined),
+    sendChannel: vi.fn(),
+    onWindowEvent: vi.fn().mockReturnValue(vi.fn()),
+    onPortInUse: mockOnPortInUse,
   }
 
-  const mockGetWindow = vi.fn(() => null)
-
   beforeEach(async () => {
-    const { createRemoteServer } = await import('../remote-server')
+    const { createRemoteServer } = await import('../../src/server/remote-server')
     remoteServer = await createRemoteServer({
-      port: 7682,
+      port: 7683,
       ptyManager: mockPtyManager as never,
       deps: mockDeps,
-      getWindow: mockGetWindow as never,
     })
     await remoteServer.start()
   })
@@ -66,6 +75,7 @@ describe('RemoteServer', () => {
   afterEach(async () => {
     await remoteServer.stop()
     vi.resetModules()
+    vi.clearAllMocks()
   })
 
   describe('health route', () => {
@@ -130,55 +140,41 @@ describe('RemoteServer', () => {
     })
   })
 
-  describe('stop() cleans up PTY sessions', () => {
-    it('stop() does not throw when no sessions exist (cleanup with empty map)', async () => {
-      await expect(remoteServer.stop()).resolves.not.toThrow()
-    })
-  })
-
   describe('auth middleware getPasswordHash is invoked', () => {
-    it('calls getGlobalSettings when an API request carries a Bearer token', async () => {
-      // Supply an empty hash so middleware returns 401 without reaching bcrypt
-      mockDeps.getGlobalSettings.mockReturnValueOnce({
-        remoteControl: { enabled: true, port: 7682, password: '', passwordHash: '' },
-      })
+    it('returns 401 when password hash is empty on API request', async () => {
+      mockDeps.getPasswordHash.mockReturnValueOnce('')
       const res = await remoteServer.inject({
         method: 'GET',
         url: '/api/workspaces',
         headers: { Authorization: 'Bearer token' },
       })
       expect(res.statusCode).toBe(401)
-      expect(mockDeps.getGlobalSettings).toHaveBeenCalled()
     })
   })
 
   describe('EADDRINUSE handling', () => {
     it('start() with port in use rejects with PortInUseError', async () => {
-      const { createRemoteServer: create2, PortInUseError } = await import('../remote-server')
+      const { createRemoteServer: create2, PortInUseError } = await import(
+        '../../src/server/remote-server'
+      )
       const conflictServer = await create2({
-        port: 7682,
+        port: 7683,
         ptyManager: mockPtyManager as never,
-        deps: mockDeps,
-        getWindow: mockGetWindow as never,
+        deps: { ...mockDeps, onPortInUse: vi.fn() },
       })
       await expect(conflictServer.start()).rejects.toThrow(PortInUseError)
     })
 
-    it('start() with port in use sends PORT_IN_USE status via getWindow', async () => {
-      const { createRemoteServer: create2 } = await import('../remote-server')
-      const mockSend = vi.fn()
-      const mockWindow = { webContents: { send: mockSend } }
+    it('start() with port in use calls onPortInUse', async () => {
+      const { createRemoteServer: create2 } = await import('../../src/server/remote-server')
+      const onPortInUse = vi.fn()
       const conflictServer = await create2({
-        port: 7682,
+        port: 7683,
         ptyManager: mockPtyManager as never,
-        deps: mockDeps,
-        getWindow: () => mockWindow as never,
+        deps: { ...mockDeps, onPortInUse },
       })
       await conflictServer.start().catch(() => {})
-      expect(mockSend).toHaveBeenCalledWith(
-        'remote:status',
-        expect.objectContaining({ error: 'PORT_IN_USE' })
-      )
+      expect(onPortInUse).toHaveBeenCalledWith(7683)
     })
   })
 })

@@ -3,35 +3,11 @@ import Fastify from 'fastify'
 import type { FastifyInstance } from 'fastify'
 import websocketPlugin from '@fastify/websocket'
 import { WebSocket } from 'ws'
-import { WsTicketStore } from '../ws-ticket-store'
+import { WsTicketStore } from '../../src/server/ws-ticket-store'
 
-const mockBridgeEventBus = {
-  on: vi.fn(),
-  off: vi.fn(),
-  emit: vi.fn(),
-}
-
-const mockIpcInvokeRegistry = new Map<string, (...args: unknown[]) => unknown>()
-const mockIpcSendRegistry = new Map<string, (...args: unknown[]) => unknown>()
-
-vi.mock('../bridge-event-bus.js', () => ({ bridgeEventBus: mockBridgeEventBus }))
-vi.mock('../ipc-registry.js', () => ({
-  ipcInvokeRegistry: mockIpcInvokeRegistry,
-  ipcSendRegistry: mockIpcSendRegistry,
-}))
-
-async function buildBridgeApp(): Promise<{
-  app: FastifyInstance
-  ticketStore: WsTicketStore
-  bridgeCleanup: { disconnectAll: () => void }
-}> {
-  const { registerBridgeRoute } = await import('../routes/bridge.route')
-  const ticketStore = new WsTicketStore()
-  const app = Fastify({ logger: false })
-  await app.register(websocketPlugin)
-  const bridgeCleanup = await registerBridgeRoute(app, { ticketStore })
-  return { app, ticketStore, bridgeCleanup }
-}
+let mockInvokeChannel: ReturnType<typeof vi.fn>
+let mockSendChannel: ReturnType<typeof vi.fn>
+let mockOnWindowEvent: ReturnType<typeof vi.fn>
 
 function waitForClose(ws: WebSocket): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -57,6 +33,24 @@ function waitForOpen(ws: WebSocket): Promise<void> {
   })
 }
 
+async function buildBridgeApp(): Promise<{
+  app: FastifyInstance
+  ticketStore: WsTicketStore
+  bridgeCleanup: { disconnectAll: () => void }
+}> {
+  const { registerBridgeRoute } = await import('../../src/server/routes/bridge.route')
+  const ticketStore = new WsTicketStore()
+  const app = Fastify({ logger: false })
+  await app.register(websocketPlugin)
+  const bridgeCleanup = await registerBridgeRoute(app, {
+    ticketStore,
+    invokeChannel: mockInvokeChannel,
+    sendChannel: mockSendChannel,
+    onWindowEvent: mockOnWindowEvent,
+  })
+  return { app, ticketStore, bridgeCleanup }
+}
+
 describe('bridge.route', () => {
   let app: FastifyInstance
   let ticketStore: WsTicketStore
@@ -65,11 +59,9 @@ describe('bridge.route', () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    mockBridgeEventBus.on.mockReset()
-    mockBridgeEventBus.off.mockReset()
-    mockBridgeEventBus.emit.mockReset()
-    mockIpcInvokeRegistry.clear()
-    mockIpcSendRegistry.clear()
+    mockInvokeChannel = vi.fn().mockResolvedValue(undefined)
+    mockSendChannel = vi.fn()
+    mockOnWindowEvent = vi.fn().mockReturnValue(vi.fn())
     ;({ app, ticketStore, bridgeCleanup } = await buildBridgeApp())
     await app.listen({ port: 0, host: '127.0.0.1' })
     const addr = app.server.address() as { port: number; address: string }
@@ -118,7 +110,7 @@ describe('bridge.route', () => {
   })
 
   describe('subscribe messages', () => {
-    it('subscribes to a channel on bridgeEventBus', async () => {
+    it('subscribes to a channel via onWindowEvent', async () => {
       const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
@@ -126,7 +118,7 @@ describe('bridge.route', () => {
       ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
       await new Promise((r) => setTimeout(r, 30))
 
-      expect(mockBridgeEventBus.on).toHaveBeenCalledWith('terminal:output', expect.any(Function))
+      expect(mockOnWindowEvent).toHaveBeenCalledWith('terminal:output', expect.any(Function))
       ws.close()
       await waitForClose(ws)
     })
@@ -140,7 +132,7 @@ describe('bridge.route', () => {
       ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
       await new Promise((r) => setTimeout(r, 30))
 
-      const calls = mockBridgeEventBus.on.mock.calls.filter(([ch]) => ch === 'terminal:output')
+      const calls = mockOnWindowEvent.mock.calls.filter(([ch]) => ch === 'terminal:output')
       expect(calls.length).toBe(1)
       ws.close()
       await waitForClose(ws)
@@ -148,8 +140,10 @@ describe('bridge.route', () => {
   })
 
   describe('invoke messages', () => {
-    it('dispatches invoke to ipcInvokeRegistry and sends result back', async () => {
-      mockIpcInvokeRegistry.set('workspace:list', async () => [{ id: 'ws-1', name: 'Test' }])
+    it('dispatches invoke to invokeChannel and sends result back', async () => {
+      mockInvokeChannel.mockImplementation(async (ch: string) => {
+        if (ch === 'workspace:list') return [{ id: 'ws-1', name: 'Test' }]
+      })
 
       const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
@@ -166,7 +160,9 @@ describe('bridge.route', () => {
       await waitForClose(ws)
     })
 
-    it('sends result: undefined when channel has no handler', async () => {
+    it('sends result: undefined when invokeChannel returns undefined', async () => {
+      mockInvokeChannel.mockResolvedValue(undefined)
+
       const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
@@ -181,10 +177,8 @@ describe('bridge.route', () => {
       await waitForClose(ws)
     })
 
-    it('sends error response when handler throws', async () => {
-      mockIpcInvokeRegistry.set('workspace:create', async () => {
-        throw new Error('validation failed')
-      })
+    it('sends error response when invokeChannel throws', async () => {
+      mockInvokeChannel.mockRejectedValue(new Error('validation failed'))
 
       const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
@@ -203,10 +197,7 @@ describe('bridge.route', () => {
   })
 
   describe('send messages', () => {
-    it('dispatches fire-and-forget to ipcSendRegistry', async () => {
-      const handler = vi.fn()
-      mockIpcSendRegistry.set('terminal:input', handler)
-
+    it('dispatches fire-and-forget via sendChannel', async () => {
       const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
@@ -219,7 +210,10 @@ describe('bridge.route', () => {
       )
       await new Promise((r) => setTimeout(r, 30))
 
-      expect(handler).toHaveBeenCalledWith(null, { sessionId: 's1', data: 'ls' })
+      expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {
+        sessionId: 's1',
+        data: 'ls',
+      })
       ws.close()
       await waitForClose(ws)
     })
@@ -236,14 +230,14 @@ describe('bridge.route', () => {
   })
 
   describe('event forwarding', () => {
-    it('forwards bridgeEventBus events to subscribed client', async () => {
+    it('forwards onWindowEvent events to subscribed client', async () => {
       const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
       ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
       await new Promise((r) => setTimeout(r, 30))
 
-      const [[, forwarder]] = mockBridgeEventBus.on.mock.calls
+      const [[, forwarder]] = mockOnWindowEvent.mock.calls as [[string, (...a: unknown[]) => void]]
       forwarder({ sessionId: 's1', data: 'hello' })
 
       const msg = await waitForMessage(ws)
@@ -276,7 +270,10 @@ describe('bridge.route', () => {
   })
 
   describe('close cleanup', () => {
-    it('unregisters all channel forwarders on disconnect', async () => {
+    it('calls the unsub function returned by onWindowEvent on disconnect', async () => {
+      const unsub = vi.fn()
+      mockOnWindowEvent.mockReturnValue(unsub)
+
       const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
       await waitForOpen(ws)
@@ -287,7 +284,7 @@ describe('bridge.route', () => {
       await waitForClose(ws)
       await new Promise((r) => setTimeout(r, 30))
 
-      expect(mockBridgeEventBus.off).toHaveBeenCalledWith('terminal:output', expect.any(Function))
+      expect(unsub).toHaveBeenCalled()
     })
   })
 

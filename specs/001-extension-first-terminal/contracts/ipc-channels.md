@@ -1280,6 +1280,16 @@ Pushes a log entry from the main process into the renderer's LogWindow.
 
 ---
 
+### `remote:tunnel-disconnected`
+
+Pushed from main to renderer when the ngrok process exits unexpectedly (crash, not intentional stop).
+
+**Direction**: main → renderer (webContents.send via `extensionBridge.on`)
+
+**Payload**: none
+
+---
+
 ### `remote:tunnel-reconnect`
 
 Sent from renderer to main to trigger ngrok tunnel reconnection.
@@ -1287,6 +1297,25 @@ Sent from renderer to main to trigger ngrok tunnel reconnection.
 **Direction**: renderer → main (ipcMain.on / one-way)
 
 **Payload**: none
+
+---
+
+### `remote:caddyfile`
+
+Returns a Caddyfile snippet for a local HTTPS reverse-proxy in front of the remote control server. The returned config uses the machine's first non-loopback IPv4 address as the hostname (falls back to `localhost`).
+
+**Direction**: renderer → main (invoke/handle via `extensionBridge.invoke`)
+
+**Request**: `{ port: number }`
+
+**Response**: `string` — a ready-to-paste Caddyfile block, e.g.:
+
+```
+192.168.1.100 {
+  reverse_proxy localhost:7681
+  tls internal
+}
+```
 
 ---
 

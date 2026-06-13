@@ -293,7 +293,7 @@ Main Process
 ├── WsTicketStore        single-use 64-char hex tokens, 30s TTL, 60s cleanup
 ├── WsSubscriberManager  per-session subscriber sets; first subscriber = primary
 │                        primary-only input, broadcast output to all
-└── NgrokManager         spawns `ngrok http <port>`, polls localhost:4040/api/tunnels
+└── NgrokManager         spawns `ngrok http <port> --web-addr 0.0.0.0:4041`, polls localhost:4041/api/tunnels
 ```
 
 **Security constraints**:

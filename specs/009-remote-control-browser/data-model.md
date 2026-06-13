@@ -17,6 +17,7 @@ remoteControl: {
   port: number // Default: 7681. Valid range: 1024–65535.
   password: string // Plaintext — shown in Settings UI. Empty string = auto-generate on enable.
   passwordHash: string // bcrypt hash (work factor 10) — used for request validation. Never exposed to UI.
+  maxSubscribers: number // Default: 5. Valid range: 1–20. Max concurrent WS clients per terminal session.
 }
 ```
 
@@ -25,12 +26,15 @@ remoteControl: {
 - `port` must be an integer in [1024, 65535].
 - `password` empty string triggers auto-generation; empty is never persisted after enable.
 - `passwordHash` is always derived from `password` — never set independently by the UI.
+- `maxSubscribers` must be an integer in [1, 20].
 
 **State transitions**:
 
 - `enabled: false → true`: start server + ngrok, auto-generate password if empty.
 - `enabled: true → false`: stop server + ngrok, disconnect all WS clients.
 - `password` changed: rehash → update `passwordHash`, disconnect all active WS clients.
+- `port` changed while `enabled: true`: restart server on new port, restart ngrok if active, push updated URLs via toast.
+- `maxSubscribers` changed: applies to new connections only; existing subscribers are not disconnected.
 
 ---
 

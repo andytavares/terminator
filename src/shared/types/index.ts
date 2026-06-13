@@ -90,13 +90,6 @@ export interface GlobalSettings {
     hasSeenWelcome: boolean
     showMetricsBar?: boolean
   }
-  remoteControl: {
-    enabled: boolean
-    port: number
-    password: string
-    passwordHash: string
-    ngrokAuthToken: string
-  }
 }
 
 export interface WorkspaceSettings {

@@ -2,13 +2,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import Fastify from 'fastify'
 import type { FastifyInstance } from 'fastify'
 import bcryptjs from 'bcryptjs'
-import { isAllowedHost } from '../auth.middleware'
+import { isAllowedHost } from '../../src/server/auth.middleware'
 
 async function buildApp(
   passwordHash: string,
   extraRoutes?: (app: FastifyInstance) => void
 ): Promise<FastifyInstance> {
-  const { registerAuthMiddleware } = await import('../auth.middleware')
+  const { registerAuthMiddleware } = await import('../../src/server/auth.middleware')
   const app = Fastify({ logger: false })
   await registerAuthMiddleware(app, { getPasswordHash: () => passwordHash })
   // API route requires auth; non-API routes (static, health) do not

@@ -2,22 +2,22 @@ import type { FastifyInstance } from 'fastify'
 import type { SocketStream } from '@fastify/websocket'
 import type { FastifyRequest } from 'fastify'
 import type WebSocket from 'ws'
-import { bridgeEventBus } from '../bridge-event-bus.js'
-import { ipcInvokeRegistry, ipcSendRegistry } from '../ipc-registry.js'
 import type { WsTicketStore } from '../ws-ticket-store.js'
 
 interface BridgeOptions {
   ticketStore: WsTicketStore
+  invokeChannel: (channel: string, payload: unknown) => Promise<unknown>
+  sendChannel: (channel: string, payload: unknown) => void
+  onWindowEvent: (channel: string, handler: (...args: unknown[]) => void) => () => void
 }
 
 export async function registerBridgeRoute(
   app: FastifyInstance,
   opts: BridgeOptions
 ): Promise<{ disconnectAll: () => void }> {
-  const { ticketStore } = opts
+  const { ticketStore, invokeChannel, sendChannel, onWindowEvent } = opts
   const bridgeConnections = new Set<WebSocket>()
 
-  // POST /api/bridge-ticket — Bearer auth enforced by the auth middleware for /api/* routes
   app.post('/api/bridge-ticket', async (_request, reply) => {
     const ticket = ticketStore.createTicket('__bridge__', 'bridge')
     return reply.status(201).send({ ticket })
@@ -29,7 +29,6 @@ export async function registerBridgeRoute(
     async (connection: SocketStream, request: FastifyRequest) => {
       const ws = connection.socket
 
-      // Authenticate via ?ticket= query param (WebSocket upgrades can't carry Authorization headers)
       const ticket = (request.query as Record<string, string>).ticket ?? ''
       const sessionId = ticketStore.consumeTicket(ticket, 'bridge')
       if (!sessionId) {
@@ -39,22 +38,19 @@ export async function registerBridgeRoute(
 
       bridgeConnections.add(ws)
 
-      // Forward bridge-event-bus events to this client
       const subscribedChannels = new Set<string>()
+      const unsubscribers = new Map<string, () => void>()
 
       function forwardEvent(channel: string, ...args: unknown[]) {
         if (ws.readyState !== ws.OPEN) return
         ws.send(JSON.stringify({ type: 'event', channel, args }))
       }
 
-      const channelForwarders = new Map<string, (...args: unknown[]) => void>()
-
       function subscribe(channel: string) {
         if (subscribedChannels.has(channel)) return
         subscribedChannels.add(channel)
-        const forwarder = (...args: unknown[]) => forwardEvent(channel, ...args)
-        channelForwarders.set(channel, forwarder)
-        bridgeEventBus.on(channel, forwarder)
+        const unsub = onWindowEvent(channel, (...args) => forwardEvent(channel, ...args))
+        unsubscribers.set(channel, unsub)
       }
 
       ws.on('message', async (raw) => {
@@ -71,18 +67,14 @@ export async function registerBridgeRoute(
         }
 
         if (msg.type === 'send' && msg.channel) {
-          const handler = ipcSendRegistry.get(msg.channel)
-          if (handler) handler(null as never, (msg.args?.[0] ?? {}) as never)
+          sendChannel(msg.channel, (msg.args?.[0] ?? {}) as unknown)
           return
         }
 
         if (msg.type === 'invoke' && msg.id && msg.channel) {
           const { id, channel, args } = msg
-          const handler = ipcInvokeRegistry.get(channel)
           try {
-            const result = handler
-              ? await handler(null as never, (args?.[0] ?? {}) as never)
-              : undefined
+            const result = await invokeChannel(channel, args?.[0] ?? {})
             if (ws.readyState === ws.OPEN) {
               ws.send(JSON.stringify({ type: 'result', id, result }))
             }
@@ -97,10 +89,8 @@ export async function registerBridgeRoute(
 
       ws.on('close', () => {
         bridgeConnections.delete(ws)
-        for (const [channel, forwarder] of channelForwarders) {
-          bridgeEventBus.off(channel, forwarder)
-        }
-        channelForwarders.clear()
+        for (const unsub of unsubscribers.values()) unsub()
+        unsubscribers.clear()
         subscribedChannels.clear()
       })
     }
@@ -108,9 +98,7 @@ export async function registerBridgeRoute(
 
   return {
     disconnectAll() {
-      for (const conn of bridgeConnections) {
-        conn.terminate()
-      }
+      for (const conn of bridgeConnections) conn.terminate()
       bridgeConnections.clear()
     },
   }

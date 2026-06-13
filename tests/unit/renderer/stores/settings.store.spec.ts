@@ -218,42 +218,6 @@ describe('useSettingsStore', () => {
     })
   })
 
-  describe('updateRemoteControlEnabled', () => {
-    it('calls updateGlobal with remoteControl.enabled and updates store', async () => {
-      const updated = { ...DEFAULT_SETTINGS }
-      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
-
-      await useSettingsStore.getState().updateRemoteControlEnabled(true)
-      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
-        remoteControl: { enabled: true },
-      })
-      expect(useSettingsStore.getState().globalSettings).toEqual(updated)
-    })
-
-    it('calls updateGlobal with enabled false', async () => {
-      const updated = { ...DEFAULT_SETTINGS }
-      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
-
-      await useSettingsStore.getState().updateRemoteControlEnabled(false)
-      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
-        remoteControl: { enabled: false },
-      })
-    })
-  })
-
-  describe('updateRemoteControlPort', () => {
-    it('calls updateGlobal with remoteControl.port and updates store', async () => {
-      const updated = { ...DEFAULT_SETTINGS }
-      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
-
-      await useSettingsStore.getState().updateRemoteControlPort(8080)
-      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
-        remoteControl: { port: 8080 },
-      })
-      expect(useSettingsStore.getState().globalSettings).toEqual(updated)
-    })
-  })
-
   describe('updateShowMetricsBar', () => {
     it('calls updateGlobal with showMetricsBar true and updates store', async () => {
       const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: false, showMetricsBar: true } }
