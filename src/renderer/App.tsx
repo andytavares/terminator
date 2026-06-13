@@ -404,6 +404,7 @@ export function App(): JSX.Element {
             activeScratchSessionId={scratchActive ? activeScratchSessionId : null}
             onSelectScratchSession={(sessionId) => {
               setScratchActive(true)
+              if (activeWorkspaceTabId) setActiveWorkspaceTab(null)
               useSessionStore.getState().setActiveSessionForProject(SCRATCH_PROJECT_ID, sessionId)
             }}
             visible={sidebarVisible}

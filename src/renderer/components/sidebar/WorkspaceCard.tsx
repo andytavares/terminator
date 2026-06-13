@@ -16,7 +16,6 @@ interface WorkspaceCardProps {
   onToggleCollapse: () => void
   activeProjectId: string | null
   onSelectProject: (projectId: string) => void
-  onSelectGlobalTab?: (tabId: string) => void
   onSelectWorkspaceTab?: (workspaceId: string, tabId: string) => void
   activeWorkspaceTabId?: string | null
   searchQuery?: string
@@ -29,7 +28,6 @@ export function WorkspaceCard({
   onToggleCollapse,
   activeProjectId,
   onSelectProject,
-  onSelectGlobalTab,
   onSelectWorkspaceTab,
   activeWorkspaceTabId,
   searchQuery = '',
@@ -130,8 +128,8 @@ export function WorkspaceCard({
                   workspaceColor={workspace.color}
                   onSelect={() => onSelectProject(project.id)}
                   onAddSession={() => {}}
-                  onBranchBadgeClick={
-                    onSelectGlobalTab ? () => onSelectGlobalTab('git') : undefined
+                  onBranchBadgeClick={() =>
+                    useExtensionRegistry.getState().setActiveProjectTab('git')
                   }
                   searchQuery={searchQuery}
                 />

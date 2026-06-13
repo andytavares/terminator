@@ -61,6 +61,7 @@ export function UnifiedSidebar({
   const {
     workspaces,
     activeProjectId,
+    activeWorkspaceId,
     projectsByWorkspaceId,
     collapsedWorkspaceIds,
     toggleWorkspaceCollapse,
@@ -188,19 +189,15 @@ export function UnifiedSidebar({
                 workspace={ws}
                 projects={projectsByWorkspaceId.get(ws.id) ?? []}
                 isCollapsed={collapsedWorkspaceIds.has(ws.id)}
-                onToggleCollapse={() => {
-                  toggleWorkspaceCollapse(ws.id)
-                  setActiveWorkspace(ws.id)
-                }}
+                onToggleCollapse={() => toggleWorkspaceCollapse(ws.id)}
                 activeProjectId={activeProjectId}
                 onSelectProject={(projectId) => {
                   setActiveWorkspace(ws.id)
                   setActiveProject(projectId)
                   onSelectProject?.()
                 }}
-                onSelectGlobalTab={onSelectGlobalTab}
                 onSelectWorkspaceTab={onSelectWorkspaceTab}
-                activeWorkspaceTabId={activeWorkspaceTabId}
+                activeWorkspaceTabId={activeWorkspaceId === ws.id ? activeWorkspaceTabId : null}
                 searchQuery={searchQuery}
               />
             </div>
