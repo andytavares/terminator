@@ -1,7 +1,7 @@
 # Contract: Extension API
 
-**Version**: 1.2.0  
-**Date**: 2026-05-31  
+**Version**: 1.3.0  
+**Date**: 2026-06-13  
 **Branch**: `001-extension-first-terminal`
 
 This is the public API surface exposed to all Terminator extensions. Extensions receive an `ExtensionAPI` object as the sole argument to their `activate()` function. They MUST NOT import from `src/main/` or any internal module directly.
@@ -10,11 +10,12 @@ This is the public API surface exposed to all Terminator extensions. Extensions 
 
 ## Version History
 
-| Version | Changes                                                                                                             |
-| ------- | ------------------------------------------------------------------------------------------------------------------- |
-| 1.0.0   | Initial release: `app`, `log`, `settings`, `sidebar.registerItem`, `contextMenu`, `keyboard`, `terminal`            |
-| 1.1.0   | Added: `sidebar.registerPanel`, `topBar`, `shell`, `notifications.showToast`, `nativeMenu`, `fs`, `ipc`, `commands` |
-| 1.2.0   | Added: `sidebar.registerGlobalTab`, `globalShortcut`, `workspace`, `window`, `notifications.createNotification`     |
+| Version | Changes                                                                                                                  |
+| ------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 1.0.0   | Initial release: `app`, `log`, `settings`, `sidebar.registerItem`, `contextMenu`, `keyboard`, `terminal`                 |
+| 1.1.0   | Added: `sidebar.registerPanel`, `topBar`, `shell`, `notifications.showToast`, `nativeMenu`, `fs`, `ipc`, `commands`      |
+| 1.2.0   | Added: `sidebar.registerGlobalTab`, `globalShortcut`, `workspace`, `window`, `notifications.createNotification`          |
+| 1.3.0   | Added: `sidebar.registerWorkspaceTab`, `WorkspaceTabRegistration`, `activeWorkspaceTabId` state on the renderer registry |
 
 ---
 
@@ -97,6 +98,15 @@ interface ExtensionAPI {
      * Returns a Disposable; disposing removes the tab.
      */
     registerGlobalTab(tab: GlobalTabContribution): Disposable
+
+    /**
+     * _(v1.3.0)_ Register a workspace-scoped tab. The icon appears in each workspace card
+     * header on hover. Clicking it activates the component in the main content area with
+     * that workspace set as active. The component receives no props — it reads workspace
+     * context from `useWorkspaceStore()` internally.
+     * Returns a function that unregisters the tab when called.
+     */
+    registerWorkspaceTab(tab: WorkspaceTabRegistration): () => void
   }
 
   /**
@@ -362,6 +372,34 @@ interface GlobalTabContribution {
   permanent?: boolean
 }
 
+// v1.3.0 types
+
+/**
+ * A workspace-scoped tab contributed by an extension (renderer registry only).
+ * The icon appears in each workspace card header on hover. The component receives
+ * no props and reads active workspace context from useWorkspaceStore() internally.
+ */
+interface WorkspaceTabRegistration {
+  id: string
+  label: string
+  icon?: ReactNode
+  component: ComponentType<Record<string, never>>
+}
+
+/**
+ * Renderer registry state additions (v1.3.0):
+ *   activeWorkspaceTabId: string | null
+ *   workspaceTabs: Map<string, WorkspaceTabRegistration>
+ *
+ * Registry methods additions (v1.3.0):
+ *   registerWorkspaceTab(tab: WorkspaceTabRegistration): () => void
+ *   setActiveWorkspaceTab(tabId: string | null): void
+ *
+ * Activating a workspace tab clears activeGlobalTabId and activeProjectTabId.
+ * Activating a global or project tab clears activeWorkspaceTabId.
+ * Clicking a project/session row also clears activeWorkspaceTabId.
+ */
+
 interface WorkspaceSnapshot {
   readonly id: string
   readonly name: string
@@ -394,4 +432,4 @@ interface ProjectSnapshot {
 
 4. **Settings key namespacing**: Extension setting keys must be prefixed with the extension ID to avoid collisions (enforced by the host at registration time).
 
-5. **API versioning**: The `ExtensionAPI` interface follows semantic versioning. Breaking changes require a MAJOR version bump and a new ADR. The current version is `1.2.0` (see ADR-012).
+5. **API versioning**: The `ExtensionAPI` interface follows semantic versioning. Breaking changes require a MAJOR version bump and a new ADR. The current version is `1.3.0` (renderer registry). The main-process `ExtensionAPI` remains at `1.2.0` — `registerWorkspaceTab` is a renderer-registry-only surface, not exposed via `activate(api)`.

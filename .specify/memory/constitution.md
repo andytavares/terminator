@@ -184,6 +184,16 @@ wherever the problem domain allows.
 - A function with a hidden side effect MUST be refactored. If a side effect is truly
   unavoidable, it MUST be documented with an explicit justification.
 
+### XII. UI Icons (NON-NEGOTIABLE)
+
+All icons throughout the application MUST use `lucide-react` components exclusively.
+
+- **MUST** use `lucide-react` for every icon in the UI — no emoji, no unicode symbols, no other icon libraries.
+- Icons MUST be flat and inherit the current text color (`currentColor`). No inline `color` style, no color utility classes on icon elements.
+- Use `opacity` only for state differentiation (e.g., disabled or muted states). Never use color to differentiate icon states.
+- SVG size MUST be controlled via CSS (e.g., `width`/`height` on the icon's container or a CSS selector targeting `svg`), not via the `size` prop, so that all icons remain consistent and layout-controlled.
+- A PR that introduces an emoji, unicode character, or non-lucide icon as a visual element is **rejected** until corrected.
+
 ## Development Environment & Workflow
 
 Isolation and process discipline prevent environment drift and protect the shared codebase.

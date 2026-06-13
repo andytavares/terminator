@@ -9,6 +9,7 @@
       "referenced_code_paths": [
         "src/main/preload.ts",
         "src/main/extensions/api.ts",
+        "src/renderer/extensions/registry.ts",
         "src/renderer/stores/workspace.store.ts",
         "src/renderer/stores/session.store.ts",
         "src/renderer/stores/settings.store.ts",
@@ -20,7 +21,7 @@
         "extensions/task-vault/src/notifications/task-scheduler.ts",
         "extensions/task-vault/src/vault/types.ts"
       ],
-      "last_verified_commit": "148e9f1",
+      "last_verified_commit": "3885875",
       "staleness_score": 0
     },
     {
@@ -33,9 +34,10 @@
         "src/renderer/hooks/useKeyboardShortcuts.ts",
         "src/main/shared/reserved-shortcuts.ts",
         "extensions/task-vault/src/vault/types.ts",
-        "extensions/git-integration/src/index.ts"
+        "extensions/git-integration/src/index.ts",
+        "extensions/git-integration/src/renderer.tsx"
       ],
-      "last_verified_commit": "148e9f1",
+      "last_verified_commit": "3885875",
       "staleness_score": 0
     },
     {
@@ -54,10 +56,13 @@
     {
       "path": "specs/001-extension-first-terminal/contracts/extension-api.md",
       "title": "Extension API Contract",
-      "summary": "Full surface of ExtensionAPI passed to activate(api) — all namespaces, method signatures, and version annotations.",
+      "summary": "Full surface of ExtensionAPI passed to activate(api) — all namespaces, method signatures, and version annotations. Also documents renderer-registry-only surfaces (WorkspaceTabRegistration, registerWorkspaceTab, activeWorkspaceTabId) added in v1.3.0.",
       "owners": [],
-      "referenced_code_paths": ["src/main/extensions/api.ts"],
-      "last_verified_commit": "148e9f1",
+      "referenced_code_paths": [
+        "src/main/extensions/api.ts",
+        "src/renderer/extensions/registry.ts"
+      ],
+      "last_verified_commit": "3885875",
       "staleness_score": 0
     },
     {
@@ -72,14 +77,16 @@
     {
       "path": "docs/EXTENSION-DEVELOPMENT.md",
       "title": "Extension Development Guide",
-      "summary": "How to build, test, and publish extensions. Extension API reference, CSS token contract, manifest schema.",
+      "summary": "How to build, test, and publish extensions. Extension API reference, CSS token contract, manifest schema. Covers global tabs vs workspace-scoped tabs (v1.3.0).",
       "owners": [],
       "referenced_code_paths": [
         "src/main/extensions/api.ts",
+        "src/renderer/extensions/registry.ts",
         "src/renderer/styles.css",
-        "scripts/create-extension.cjs"
+        "scripts/create-extension.cjs",
+        "extensions/git-integration/src/renderer.tsx"
       ],
-      "last_verified_commit": "148e9f1",
+      "last_verified_commit": "3885875",
       "staleness_score": 0
     },
     {

@@ -1,0 +1,1688 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terminator — UX Navigation Mockups</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+      :root {
+        --font-mono: 'IBM Plex Mono', monospace;
+        --font-ui: 'IBM Plex Sans', -apple-system, sans-serif;
+        --bg-base: #0c0c0f;
+        --bg-surface: #111116;
+        --bg-elevated: #18181f;
+        --bg-card: #1c1c25;
+        --bg-card-hover: #22222e;
+        --bg-input: #16161c;
+        --text-primary: #e2e2ee;
+        --text-secondary: #7070a0;
+        --text-muted: #7878b0;
+        --border: rgba(255, 255, 255, 0.06);
+        --border-strong: rgba(255, 255, 255, 0.12);
+        --accent: #5c6bc0;
+        --accent-dim: rgba(92, 107, 192, 0.18);
+        --danger: #e05c5c;
+        --success: #4ade80;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: var(--font-ui);
+        font-size: 13px;
+        background: #07070a;
+        color: var(--text-primary);
+        -webkit-font-smoothing: antialiased;
+        padding: 40px 32px;
+      }
+
+      h1 {
+        font-size: 22px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        color: var(--text-primary);
+        letter-spacing: -0.3px;
+      }
+      .subtitle {
+        color: var(--text-secondary);
+        margin-bottom: 48px;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .subtitle a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      .nav-pills {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 40px;
+        flex-wrap: wrap;
+      }
+      .nav-pill {
+        padding: 6px 14px;
+        border-radius: 100px;
+        border: 1px solid var(--border-strong);
+        background: var(--bg-card);
+        color: var(--text-secondary);
+        font-size: 12px;
+        cursor: pointer;
+        font-family: var(--font-ui);
+        transition: all 0.15s;
+        text-decoration: none;
+      }
+      .nav-pill:hover,
+      .nav-pill.active {
+        background: var(--accent-dim);
+        border-color: var(--accent);
+        color: var(--text-primary);
+      }
+
+      .option-section {
+        margin-bottom: 64px;
+        scroll-margin-top: 20px;
+      }
+      .option-header {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .option-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        font-family: var(--font-mono);
+      }
+      .option-title {
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: -0.2px;
+      }
+      .option-desc {
+        color: var(--text-secondary);
+        margin-bottom: 20px;
+        line-height: 1.6;
+        max-width: 680px;
+        font-size: 13px;
+      }
+      .tag {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 500;
+        margin-left: 8px;
+        vertical-align: middle;
+      }
+      .tag-low {
+        background: rgba(74, 222, 128, 0.12);
+        color: #4ade80;
+      }
+      .tag-med {
+        background: rgba(250, 204, 21, 0.12);
+        color: #facc15;
+      }
+      .tag-high {
+        background: rgba(224, 92, 92, 0.12);
+        color: #e05c5c;
+      }
+
+      .mockup-frame {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--border-strong);
+        box-shadow:
+          0 24px 80px rgba(0, 0, 0, 0.6),
+          0 0 0 1px rgba(255, 255, 255, 0.04);
+        background: var(--bg-base);
+      }
+
+      .traffic-lights {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        padding: 12px 16px 10px;
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border);
+      }
+      .tl {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+      .tl-r {
+        background: #ff5f57;
+      }
+      .tl-y {
+        background: #ffbd2e;
+      }
+      .tl-g {
+        background: #28c840;
+      }
+
+      .pros-cons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 16px;
+        max-width: 680px;
+      }
+      .pro,
+      .con {
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .pro {
+        background: rgba(74, 222, 128, 0.07);
+        border: 1px solid rgba(74, 222, 128, 0.15);
+        color: #a7f3c0;
+      }
+      .con {
+        background: rgba(224, 92, 92, 0.07);
+        border: 1px solid rgba(224, 92, 92, 0.15);
+        color: #f5a0a0;
+      }
+      .pro strong,
+      .con strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 11px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Terminator — Navigation UX Proposals</h1>
+    <p class="subtitle">
+      5 interactive mockups. Each keeps the Workspace → Project → Session lineage.<br />
+      Click through the nav to jump between options. Open each mockup file for the full interactive
+      prototype.
+    </p>
+
+    <div class="nav-pills">
+      <a class="nav-pill" href="option-a.html">A — Unified Tree Sidebar</a>
+      <a class="nav-pill" href="option-b.html">B — Command-Palette First</a>
+      <a class="nav-pill" href="option-c.html">C — Workspaces as Windows</a>
+      <a class="nav-pill" href="option-d.html">D — Two-Level Tab Bar</a>
+      <a class="nav-pill" href="option-e.html">E — Quickswitcher Overlay</a>
+    </div>
+
+    <div class="option-section">
+      <div class="option-header">
+        <span class="option-label">Option A</span>
+        <span class="option-title"
+          >Unified Tree Sidebar <span class="tag tag-low">Low disruption</span></span
+        >
+      </div>
+      <p class="option-desc">
+        Collapse the workspace rail + projects panel into one resizable sidebar with expandable
+        workspace sections. Sessions appear inline under their project. No separate tab bar for
+        project switching.
+      </p>
+      <div class="mockup-frame" style="height: 380px; display: flex; flex-direction: column">
+        <div class="traffic-lights">
+          <div class="tl tl-r"></div>
+          <div class="tl tl-y"></div>
+          <div class="tl tl-g"></div>
+        </div>
+        <div style="flex: 1; display: flex; overflow: hidden">
+          <!-- Unified sidebar -->
+          <div
+            style="
+              width: 220px;
+              background: #111116;
+              border-right: 1px solid rgba(255, 255, 255, 0.06);
+              display: flex;
+              flex-direction: column;
+              overflow: hidden;
+              flex-shrink: 0;
+            "
+          >
+            <div
+              style="
+                padding: 10px 12px 6px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+              "
+            >
+              <span
+                style="
+                  font-size: 11px;
+                  font-weight: 600;
+                  letter-spacing: 0.06em;
+                  text-transform: uppercase;
+                  color: #7070a0;
+                "
+                >Workspaces</span
+              >
+              <div style="display: flex; gap: 4px">
+                <button
+                  style="
+                    background: none;
+                    border: none;
+                    color: #7070a0;
+                    font-size: 14px;
+                    cursor: pointer;
+                    padding: 2px 4px;
+                    border-radius: 4px;
+                  "
+                >
+                  ⚙
+                </button>
+                <button
+                  style="
+                    background: none;
+                    border: none;
+                    color: #7070a0;
+                    font-size: 16px;
+                    cursor: pointer;
+                    padding: 2px 4px;
+                    border-radius: 4px;
+                  "
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            <div style="flex: 1; overflow-y: auto; padding: 6px 0">
+              <!-- Workspace: Backend (expanded) -->
+              <div style="padding: 4px 8px">
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 5px 6px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    background: rgba(255, 255, 255, 0.04);
+                  "
+                >
+                  <span style="color: #7070a0; font-size: 10px">▾</span>
+                  <div
+                    style="
+                      width: 8px;
+                      height: 8px;
+                      border-radius: 50%;
+                      background: #5c6bc0;
+                      flex-shrink: 0;
+                    "
+                  ></div>
+                  <span style="font-size: 12px; font-weight: 600; color: #e2e2ee; flex: 1"
+                    >Backend</span
+                  >
+                  <span style="font-size: 10px; color: #7070a0">3</span>
+                </div>
+
+                <!-- Project: API Service (active) -->
+                <div style="padding-left: 16px; margin-top: 2px">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 5px;
+                      padding: 4px 6px;
+                      border-radius: 5px;
+                      background: rgba(92, 107, 192, 0.15);
+                      cursor: pointer;
+                      margin-bottom: 1px;
+                    "
+                  >
+                    <span style="font-size: 10px; color: #5c6bc0">📁</span>
+                    <span style="font-size: 12px; color: #e2e2ee; flex: 1">API Service</span>
+                    <div
+                      style="
+                        width: 6px;
+                        height: 6px;
+                        border-radius: 50%;
+                        background: #4ade80;
+                        animation: pulse 2s infinite;
+                      "
+                    ></div>
+                  </div>
+                  <!-- Sessions under project -->
+                  <div style="padding-left: 14px; margin-bottom: 2px">
+                    <div
+                      style="
+                        display: flex;
+                        align-items: center;
+                        gap: 5px;
+                        padding: 3px 6px;
+                        border-radius: 4px;
+                        background: rgba(92, 107, 192, 0.25);
+                        cursor: pointer;
+                        margin-bottom: 1px;
+                      "
+                    >
+                      <span style="font-size: 10px; color: #7070a0; font-family: monospace">$</span>
+                      <span style="font-size: 11px; color: #e2e2ee">zsh</span>
+                      <span style="font-size: 10px; color: #5c6bc0; margin-left: auto">●</span>
+                    </div>
+                    <div
+                      style="
+                        display: flex;
+                        align-items: center;
+                        gap: 5px;
+                        padding: 3px 6px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        margin-bottom: 1px;
+                      "
+                    >
+                      <span style="font-size: 10px; color: #7070a0; font-family: monospace">$</span>
+                      <span style="font-size: 11px; color: #b0b0cc">npm run dev</span>
+                      <div
+                        style="
+                          width: 8px;
+                          height: 8px;
+                          border-radius: 50%;
+                          border: 1.5px solid #5c6bc0;
+                          border-top-color: transparent;
+                          animation: spin 0.8s linear infinite;
+                          margin-left: auto;
+                        "
+                      ></div>
+                    </div>
+                    <div
+                      style="
+                        display: flex;
+                        align-items: center;
+                        gap: 5px;
+                        padding: 3px 6px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        opacity: 0.5;
+                      "
+                    >
+                      <span style="font-size: 10px; color: #7070a0">+</span>
+                      <span style="font-size: 11px; color: #7070a0">New session</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Project: Auth Service -->
+                <div style="padding-left: 16px; margin-top: 2px">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 5px;
+                      padding: 4px 6px;
+                      border-radius: 5px;
+                      cursor: pointer;
+                      margin-bottom: 1px;
+                    "
+                  >
+                    <span style="font-size: 10px; color: #7070a0">📁</span>
+                    <span style="font-size: 12px; color: #b0b0cc; flex: 1">Auth Service</span>
+                  </div>
+                </div>
+
+                <div style="padding-left: 16px; padding-top: 2px">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 5px;
+                      padding: 3px 6px;
+                      border-radius: 4px;
+                      cursor: pointer;
+                      opacity: 0.4;
+                    "
+                  >
+                    <span style="font-size: 10px; color: #7070a0">+</span>
+                    <span style="font-size: 11px; color: #7070a0">New project</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Workspace: Frontend (collapsed) -->
+              <div style="padding: 4px 8px; margin-top: 2px">
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 5px 6px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                  "
+                >
+                  <span style="color: #7070a0; font-size: 10px">▸</span>
+                  <div
+                    style="
+                      width: 8px;
+                      height: 8px;
+                      border-radius: 50%;
+                      background: #4ade80;
+                      flex-shrink: 0;
+                    "
+                  ></div>
+                  <span style="font-size: 12px; font-weight: 600; color: #b0b0cc; flex: 1"
+                    >Frontend</span
+                  >
+                  <span style="font-size: 10px; color: #7070a0">2</span>
+                </div>
+              </div>
+
+              <!-- Scratch -->
+              <div
+                style="
+                  padding: 4px 8px;
+                  margin-top: 8px;
+                  border-top: 1px solid rgba(255, 255, 255, 0.06);
+                  padding-top: 10px;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 5px 6px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                  "
+                >
+                  <span style="color: #7070a0; font-size: 12px">〜</span>
+                  <span style="font-size: 12px; color: #7070a0; flex: 1">Scratch</span>
+                  <span style="font-size: 10px; color: #7070a0">1</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Terminal area -->
+          <div style="flex: 1; display: flex; flex-direction: column; background: #0c0c0f">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                padding: 0 16px;
+                height: 36px;
+                background: #111116;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+                gap: 8px;
+              "
+            >
+              <span style="font-size: 11px; color: #7070a0">Backend</span>
+              <span style="font-size: 11px; color: #7070a0">/</span>
+              <span style="font-size: 11px; color: #5c6bc0; font-weight: 500">API Service</span>
+              <span style="font-size: 11px; color: #7070a0">/</span>
+              <span style="font-size: 11px; color: #e2e2ee">zsh</span>
+              <span
+                style="margin-left: auto; font-size: 10px; color: #4ade80; font-family: monospace"
+                >main</span
+              >
+            </div>
+            <div
+              style="
+                flex: 1;
+                padding: 16px;
+                font-family: monospace;
+                font-size: 12px;
+                color: #4ade80;
+                line-height: 1.6;
+              "
+            >
+              <div>
+                <span style="color: #5c6bc0">~/api-service</span>
+                <span style="color: #7070a0">on</span> <span style="color: #4ade80">main</span>
+              </div>
+              <div>❯ <span style="color: #e2e2ee">docker compose up</span></div>
+              <div style="color: #7070a0">Starting api_postgres_1 ... done</div>
+              <div style="color: #7070a0">Starting api_redis_1 ... done</div>
+              <div style="color: #4ade80">✓ API listening on :8080</div>
+              <div style="margin-top: 8px">
+                <span style="color: #5c6bc0">~/api-service</span>
+                <span style="color: #7070a0">on</span> <span style="color: #4ade80">main</span>
+              </div>
+              <div>
+                ❯
+                <span
+                  style="animation: blink 1s step-end infinite; background: #e2e2ee; color: #0c0c0f"
+                  >_</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pro">
+          <strong>Pros</strong>No data model changes · Sessions visible at a glance · One scroll to
+          see all context · Natural tree mental model
+        </div>
+        <div class="con">
+          <strong>Cons</strong>Sidebar gets tall with many sessions · Less visual workspace identity
+          · Drag-to-reorder is harder in a tree
+        </div>
+      </div>
+    </div>
+
+    <div class="option-section">
+      <div class="option-header">
+        <span class="option-label">Option B</span>
+        <span class="option-title"
+          >Command-Palette First <span class="tag tag-low">Low disruption</span></span
+        >
+      </div>
+      <p class="option-desc">
+        Keep the current layout but make ⌘P the primary navigation surface. The sidebar folds to a
+        narrow icon rail on hover. Jumping to any session is 2 keystrokes.
+      </p>
+      <div class="mockup-frame" style="height: 380px; display: flex; flex-direction: column">
+        <div class="traffic-lights">
+          <div class="tl tl-r"></div>
+          <div class="tl tl-y"></div>
+          <div class="tl tl-g"></div>
+        </div>
+        <div style="flex: 1; display: flex; overflow: hidden; position: relative">
+          <!-- Narrow rail -->
+          <div
+            style="
+              width: 44px;
+              background: #111116;
+              border-right: 1px solid rgba(255, 255, 255, 0.06);
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              padding: 8px 0;
+              gap: 4px;
+              flex-shrink: 0;
+            "
+          >
+            <div
+              style="
+                width: 28px;
+                height: 28px;
+                border-radius: 8px;
+                background: rgba(92, 107, 192, 0.25);
+                border: 1px solid rgba(92, 107, 192, 0.4);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 10px;
+                font-weight: 700;
+                color: #5c6bc0;
+                cursor: pointer;
+              "
+            >
+              B
+            </div>
+            <div
+              style="
+                width: 28px;
+                height: 28px;
+                border-radius: 8px;
+                background: rgba(74, 222, 128, 0.12);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 10px;
+                font-weight: 700;
+                color: #4ade80;
+                cursor: pointer;
+              "
+            >
+              F
+            </div>
+            <div
+              style="
+                width: 28px;
+                height: 28px;
+                border-radius: 8px;
+                background: rgba(255, 255, 255, 0.04);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 10px;
+                font-weight: 700;
+                color: #7070a0;
+                cursor: pointer;
+              "
+            >
+              P
+            </div>
+            <div
+              style="
+                margin-top: auto;
+                width: 28px;
+                height: 28px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 16px;
+                color: #7070a0;
+                cursor: pointer;
+              "
+            >
+              +
+            </div>
+          </div>
+
+          <!-- Terminal area (dimmed) -->
+          <div
+            style="
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              background: #0c0c0f;
+              opacity: 0.3;
+            "
+          >
+            <div
+              style="
+                height: 36px;
+                background: #111116;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+              "
+            ></div>
+            <div
+              style="
+                flex: 1;
+                padding: 16px;
+                font-family: monospace;
+                font-size: 12px;
+                color: #4ade80;
+                line-height: 1.6;
+              "
+            >
+              <div><span style="color: #5c6bc0">~/api-service</span> ❯</div>
+            </div>
+          </div>
+
+          <!-- Command palette overlay -->
+          <div
+            style="
+              position: absolute;
+              top: 40px;
+              left: 50%;
+              transform: translateX(-50%);
+              width: 480px;
+              background: #18181f;
+              border: 1px solid rgba(255, 255, 255, 0.12);
+              border-radius: 12px;
+              box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+              overflow: hidden;
+              z-index: 10;
+            "
+          >
+            <div
+              style="
+                padding: 12px 14px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+                display: flex;
+                align-items: center;
+                gap: 8px;
+              "
+            >
+              <span style="color: #7070a0; font-size: 14px">⌘</span>
+              <input
+                style="
+                  flex: 1;
+                  background: none;
+                  border: none;
+                  color: #e2e2ee;
+                  font-family: monospace;
+                  font-size: 13px;
+                  outline: none;
+                "
+                placeholder="Jump to session, project, or workspace…"
+                value="auth"
+              />
+              <span
+                style="
+                  font-size: 10px;
+                  color: #7070a0;
+                  background: rgba(255, 255, 255, 0.07);
+                  padding: 2px 6px;
+                  border-radius: 4px;
+                "
+                >ESC</span
+              >
+            </div>
+            <div style="max-height: 280px; overflow-y: auto">
+              <div
+                style="
+                  padding: 6px 8px;
+                  font-size: 10px;
+                  color: #7070a0;
+                  letter-spacing: 0.06em;
+                  text-transform: uppercase;
+                  font-weight: 600;
+                "
+              >
+                Sessions
+              </div>
+
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  padding: 8px 12px;
+                  background: rgba(92, 107, 192, 0.15);
+                  cursor: pointer;
+                "
+              >
+                <div
+                  style="
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 50%;
+                    background: #5c6bc0;
+                    flex-shrink: 0;
+                  "
+                ></div>
+                <div style="flex: 1">
+                  <div style="font-size: 12px; color: #e2e2ee">
+                    <span style="color: #5c6bc0">Auth</span> Service
+                    <span style="color: #7070a0">›</span> zsh
+                  </div>
+                  <div style="font-size: 10px; color: #7070a0">Backend workspace</div>
+                </div>
+                <span
+                  style="
+                    font-size: 10px;
+                    color: #7070a0;
+                    background: rgba(255, 255, 255, 0.07);
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                  "
+                  >↵</span
+                >
+              </div>
+
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  padding: 8px 12px;
+                  cursor: pointer;
+                "
+              >
+                <div
+                  style="
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 50%;
+                    background: #4ade80;
+                    flex-shrink: 0;
+                  "
+                ></div>
+                <div style="flex: 1">
+                  <div style="font-size: 12px; color: #b0b0cc">
+                    Frontend <span style="color: #7070a0">›</span>
+                    <span style="color: #4ade80">Auth</span> UI
+                    <span style="color: #7070a0">›</span> npm test
+                  </div>
+                  <div style="font-size: 10px; color: #7070a0">Frontend workspace · busy</div>
+                </div>
+              </div>
+
+              <div
+                style="
+                  padding: 6px 8px;
+                  font-size: 10px;
+                  color: #7070a0;
+                  letter-spacing: 0.06em;
+                  text-transform: uppercase;
+                  font-weight: 600;
+                  margin-top: 4px;
+                "
+              >
+                Projects
+              </div>
+
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  padding: 8px 12px;
+                  cursor: pointer;
+                "
+              >
+                <span style="font-size: 12px">📁</span>
+                <div style="flex: 1">
+                  <div style="font-size: 12px; color: #b0b0cc">
+                    <span style="color: #e2e2ee">Auth</span> Service
+                  </div>
+                  <div style="font-size: 10px; color: #7070a0">Backend workspace · 1 session</div>
+                </div>
+                <span style="font-size: 10px; color: #7070a0">open</span>
+              </div>
+
+              <div
+                style="
+                  padding: 6px 8px;
+                  font-size: 10px;
+                  color: #7070a0;
+                  letter-spacing: 0.06em;
+                  text-transform: uppercase;
+                  font-weight: 600;
+                  margin-top: 4px;
+                "
+              >
+                Actions
+              </div>
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  padding: 8px 12px;
+                  cursor: pointer;
+                "
+              >
+                <span style="font-size: 12px">+</span>
+                <span style="font-size: 12px; color: #b0b0cc">New session in Auth Service</span>
+              </div>
+            </div>
+            <div
+              style="
+                padding: 8px 12px;
+                border-top: 1px solid rgba(255, 255, 255, 0.06);
+                display: flex;
+                gap: 16px;
+              "
+            >
+              <span style="font-size: 10px; color: #7070a0">↑↓ navigate</span>
+              <span style="font-size: 10px; color: #7070a0">↵ jump</span>
+              <span style="font-size: 10px; color: #7070a0">⌘P close</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pro">
+          <strong>Pros</strong>Zero layout change · Keyboard-first power use · Sidebar recovers
+          screen space · Works great with many workspaces
+        </div>
+        <div class="con">
+          <strong>Cons</strong>Discoverability requires learning ⌘P · Mouse users still use old
+          sidebar · Doesn't fix the root click-depth problem
+        </div>
+      </div>
+    </div>
+
+    <div class="option-section">
+      <div class="option-header">
+        <span class="option-label">Option C</span>
+        <span class="option-title"
+          >Workspaces as Windows <span class="tag tag-high">High disruption</span></span
+        >
+      </div>
+      <p class="option-desc">
+        Each workspace is a native macOS window. Projects become top-level tabs within the window.
+        Sessions are tab-bar entries below. The workspace rail vanishes — switch with ⌘` or the
+        dock.
+      </p>
+      <div class="mockup-frame" style="height: 380px; display: flex; flex-direction: column">
+        <div
+          style="
+            background: #1c1c25;
+            padding: 10px 16px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+          "
+        >
+          <div style="display: flex; gap: 4px; margin-bottom: -1px">
+            <div
+              style="
+                display: flex;
+                gap: 6px;
+                align-items: center;
+                padding: 8px 14px 9px;
+                border-radius: 8px 8px 0 0;
+                background: #111116;
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                border-bottom: 1px solid #111116;
+                cursor: pointer;
+              "
+            >
+              <div
+                style="
+                  width: 7px;
+                  height: 7px;
+                  border-radius: 50%;
+                  background: #4ade80;
+                  animation: pulse 2s infinite;
+                "
+              ></div>
+              <span style="font-size: 12px; font-weight: 600; color: #e2e2ee">API Service</span>
+              <span style="font-size: 10px; color: #7070a0">2</span>
+            </div>
+            <div
+              style="
+                display: flex;
+                gap: 6px;
+                align-items: center;
+                padding: 8px 14px 9px;
+                border-radius: 8px 8px 0 0;
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                border-bottom-color: transparent;
+                cursor: pointer;
+              "
+            >
+              <span style="font-size: 12px; color: #7070a0">Auth Service</span>
+            </div>
+            <div
+              style="
+                display: flex;
+                gap: 6px;
+                align-items: center;
+                padding: 8px 14px 9px;
+                border-radius: 8px 8px 0 0;
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                border-bottom-color: transparent;
+                cursor: pointer;
+              "
+            >
+              <span style="font-size: 12px; color: #7070a0">Workers</span>
+            </div>
+            <div style="display: flex; align-items: center; padding: 8px 10px 9px; cursor: pointer">
+              <span style="font-size: 14px; color: #7070a0">+</span>
+            </div>
+            <div
+              style="
+                margin-left: auto;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding-bottom: 8px;
+              "
+            >
+              <span
+                style="
+                  font-size: 10px;
+                  color: #7070a0;
+                  background: rgba(255, 255, 255, 0.06);
+                  padding: 3px 8px;
+                  border-radius: 100px;
+                  cursor: pointer;
+                "
+                >⌘` switch window</span
+              >
+            </div>
+          </div>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; background: #0c0c0f">
+          <!-- Session tabs -->
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              padding: 0 12px;
+              height: 36px;
+              background: #111116;
+              border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+              gap: 2px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 4px 10px;
+                border-radius: 5px;
+                background: rgba(92, 107, 192, 0.18);
+                cursor: pointer;
+              "
+            >
+              <span style="font-size: 10px; color: #7070a0; font-family: monospace">$</span>
+              <span style="font-size: 11px; color: #e2e2ee">zsh</span>
+              <div
+                style="
+                  width: 5px;
+                  height: 5px;
+                  border-radius: 50%;
+                  background: #5c6bc0;
+                  margin-left: 2px;
+                "
+              ></div>
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 4px 10px;
+                border-radius: 5px;
+                cursor: pointer;
+              "
+            >
+              <span style="font-size: 10px; color: #7070a0; font-family: monospace">$</span>
+              <span style="font-size: 11px; color: #7070a0">npm run dev</span>
+              <div
+                style="
+                  width: 8px;
+                  height: 8px;
+                  border-radius: 50%;
+                  border: 1.5px solid #5c6bc0;
+                  border-top-color: transparent;
+                  animation: spin 0.8s linear infinite;
+                "
+              ></div>
+            </div>
+            <div style="padding: 4px 8px; cursor: pointer; color: #7070a0; font-size: 14px">+</div>
+            <div style="margin-left: auto; display: flex; align-items: center; gap: 8px">
+              <span style="font-size: 10px; color: #4ade80; font-family: monospace">main</span>
+              <span style="font-size: 10px; color: #7070a0">Backend</span>
+            </div>
+          </div>
+          <!-- Terminal -->
+          <div
+            style="
+              flex: 1;
+              padding: 16px;
+              font-family: monospace;
+              font-size: 12px;
+              color: #4ade80;
+              line-height: 1.6;
+            "
+          >
+            <div>
+              <span style="color: #5c6bc0">~/api-service</span>
+              <span style="color: #7070a0">on</span> <span style="color: #4ade80">main</span>
+            </div>
+            <div>❯ <span style="color: #e2e2ee">go test ./...</span></div>
+            <div style="color: #7070a0">ok github.com/example/api/handlers 0.234s</div>
+            <div style="color: #7070a0">ok github.com/example/api/models 0.089s</div>
+            <div style="color: #4ade80">✓ All tests passed</div>
+            <div style="margin-top: 8px">
+              <span style="color: #5c6bc0">~/api-service</span> ❯
+              <span style="background: #e2e2ee; color: #0c0c0f">_</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pro">
+          <strong>Pros</strong>macOS-native feel · No sidebar at all · Maximum terminal real estate
+          · Mission Control shows all workspaces
+        </div>
+        <div class="con">
+          <strong>Cons</strong>Major architectural change · Overview screen loses context · Window
+          management gets complex · Breaks current workspace color UX
+        </div>
+      </div>
+    </div>
+
+    <div class="option-section">
+      <div class="option-header">
+        <span class="option-label">Option D</span>
+        <span class="option-title"
+          >Two-Level Tab Bar <span class="tag tag-med">Medium disruption</span></span
+        >
+      </div>
+      <p class="option-desc">
+        Replace the three-level hierarchy (rail → panel → tab bar) with two horizontal tab bars:
+        workspaces on top, sessions on bottom. Projects are a dropdown on each workspace tab. No
+        sidebar.
+      </p>
+      <div class="mockup-frame" style="height: 380px; display: flex; flex-direction: column">
+        <div class="traffic-lights">
+          <div class="tl tl-r"></div>
+          <div class="tl tl-y"></div>
+          <div class="tl tl-g"></div>
+        </div>
+        <!-- Workspace tab bar -->
+        <div
+          style="
+            display: flex;
+            align-items: stretch;
+            background: #18181f;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 0 12px;
+            gap: 2px;
+            height: 40px;
+          "
+        >
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              padding: 0 14px;
+              border-bottom: 2px solid #5c6bc0;
+              cursor: pointer;
+              position: relative;
+            "
+          >
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: #5c6bc0"></div>
+            <span style="font-size: 12px; font-weight: 600; color: #e2e2ee">Backend</span>
+            <span style="font-size: 10px; color: #7070a0">▾</span>
+            <!-- Dropdown hint -->
+          </div>
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              padding: 0 14px;
+              cursor: pointer;
+              opacity: 0.6;
+            "
+          >
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: #4ade80"></div>
+            <span style="font-size: 12px; color: #b0b0cc">Frontend</span>
+            <span style="font-size: 10px; color: #7070a0">▾</span>
+          </div>
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              padding: 0 14px;
+              cursor: pointer;
+              opacity: 0.6;
+            "
+          >
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b"></div>
+            <span style="font-size: 12px; color: #b0b0cc">Personal</span>
+            <span style="font-size: 10px; color: #7070a0">▾</span>
+          </div>
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              padding: 0 10px;
+              cursor: pointer;
+              color: #7070a0;
+              font-size: 16px;
+              margin-left: 4px;
+            "
+          >
+            +
+          </div>
+          <div style="margin-left: auto; display: flex; align-items: center; gap: 8px">
+            <span
+              style="
+                font-size: 10px;
+                color: #7070a0;
+                background: rgba(255, 255, 255, 0.06);
+                padding: 3px 8px;
+                border-radius: 4px;
+              "
+              >⌘1–9</span
+            >
+            <span style="font-size: 10px; color: #7070a0">Overview</span>
+            <span style="font-size: 12px; color: #7070a0">⚙</span>
+          </div>
+        </div>
+
+        <!-- Project + session tab bar -->
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            background: #111116;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 0 12px;
+            gap: 8px;
+            height: 34px;
+          "
+        >
+          <!-- Project pill -->
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 5px;
+              padding: 3px 10px;
+              border-radius: 100px;
+              background: rgba(92, 107, 192, 0.15);
+              border: 1px solid rgba(92, 107, 192, 0.3);
+              cursor: pointer;
+            "
+          >
+            <span style="font-size: 11px; color: #5c6bc0; font-weight: 500">API Service</span>
+            <span style="font-size: 9px; color: #5c6bc0">▾</span>
+          </div>
+          <span style="color: rgba(255, 255, 255, 0.15)">/</span>
+          <!-- Session tabs -->
+          <div style="display: flex; align-items: center; gap: 2px; flex: 1">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                padding: 3px 10px;
+                border-radius: 5px;
+                background: rgba(92, 107, 192, 0.2);
+                cursor: pointer;
+              "
+            >
+              <span style="font-size: 11px; color: #e2e2ee">zsh</span>
+              <div style="width: 5px; height: 5px; border-radius: 50%; background: #5c6bc0"></div>
+              <span style="font-size: 11px; color: #7070a0; margin-left: 2px">×</span>
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                padding: 3px 10px;
+                border-radius: 5px;
+                cursor: pointer;
+              "
+            >
+              <span style="font-size: 11px; color: #7070a0">npm run dev</span>
+              <div
+                style="
+                  width: 8px;
+                  height: 8px;
+                  border-radius: 50%;
+                  border: 1.5px solid #5c6bc0;
+                  border-top-color: transparent;
+                  animation: spin 0.8s linear infinite;
+                "
+              ></div>
+              <span style="font-size: 11px; color: #7070a0; margin-left: 2px">×</span>
+            </div>
+            <div style="padding: 3px 8px; color: #7070a0; font-size: 14px; cursor: pointer">+</div>
+          </div>
+          <span style="font-size: 10px; color: #4ade80; font-family: monospace">main</span>
+        </div>
+
+        <!-- Terminal -->
+        <div
+          style="
+            flex: 1;
+            padding: 16px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #4ade80;
+            line-height: 1.6;
+            background: #0c0c0f;
+          "
+        >
+          <div>
+            <span style="color: #5c6bc0">~/api-service</span>
+            <span style="color: #7070a0">on</span> <span style="color: #4ade80">main</span>
+          </div>
+          <div>❯ <span style="color: #e2e2ee">make build</span></div>
+          <div style="color: #7070a0">go build -o bin/api ./cmd/api</div>
+          <div style="color: #4ade80">✓ Build complete (2.1s)</div>
+          <div style="margin-top: 8px">
+            <span style="color: #5c6bc0">~/api-service</span>
+            <span style="color: #7070a0">on</span> <span style="color: #4ade80">main</span>
+          </div>
+          <div>❯ <span style="background: #e2e2ee; color: #0c0c0f">_</span></div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pro">
+          <strong>Pros</strong>Maximum terminal space · Clear 3-level breadcrumb · Fast mouse
+          navigation · Familiar (browser tabs mental model)
+        </div>
+        <div class="con">
+          <strong>Cons</strong>Project panel removed — project list is in dropdown only · Split view
+          needs rethinking · Medium engineering effort
+        </div>
+      </div>
+    </div>
+
+    <div class="option-section">
+      <div class="option-header">
+        <span class="option-label">Option E</span>
+        <span class="option-title"
+          >Quickswitcher Overlay <span class="tag tag-low">Additive only</span></span
+        >
+      </div>
+      <p class="option-desc">
+        Keep the current sidebar exactly as-is. Add a ⌘K full-screen session picker (inspired by
+        tmux's session picker and Linear's search). Shows recent sessions first, fuzzy matches
+        across all levels.
+      </p>
+      <div class="mockup-frame" style="height: 380px; display: flex; flex-direction: column">
+        <div class="traffic-lights">
+          <div class="tl tl-r"></div>
+          <div class="tl tl-y"></div>
+          <div class="tl tl-g"></div>
+        </div>
+        <div style="flex: 1; display: flex; overflow: hidden; position: relative">
+          <!-- Current sidebar (unchanged, dimmed) -->
+          <div
+            style="
+              width: 72px;
+              background: #111116;
+              border-right: 1px solid rgba(255, 255, 255, 0.06);
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              padding: 8px 0;
+              gap: 4px;
+              flex-shrink: 0;
+              opacity: 0.3;
+            "
+          >
+            <div
+              style="
+                width: 40px;
+                height: 40px;
+                border-radius: 10px;
+                background: rgba(92, 107, 192, 0.25);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                font-weight: 700;
+                color: #5c6bc0;
+              "
+            >
+              B
+            </div>
+            <div
+              style="
+                width: 40px;
+                height: 40px;
+                border-radius: 10px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                font-weight: 700;
+                color: #4ade80;
+              "
+            >
+              F
+            </div>
+          </div>
+          <div
+            style="
+              width: 200px;
+              background: #111116;
+              border-right: 1px solid rgba(255, 255, 255, 0.06);
+              opacity: 0.3;
+            "
+          ></div>
+          <div style="flex: 1; background: #0c0c0f; opacity: 0.3"></div>
+
+          <!-- Full overlay -->
+          <div
+            style="
+              position: absolute;
+              inset: 0;
+              background: rgba(7, 7, 10, 0.85);
+              backdrop-filter: blur(4px);
+              display: flex;
+              align-items: flex-start;
+              justify-content: center;
+              padding-top: 48px;
+              z-index: 20;
+            "
+          >
+            <div
+              style="
+                width: 520px;
+                background: #18181f;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 14px;
+                box-shadow: 0 32px 96px rgba(0, 0, 0, 0.8);
+                overflow: hidden;
+              "
+            >
+              <!-- Search input -->
+              <div
+                style="
+                  padding: 14px 16px;
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+                "
+              >
+                <span style="color: #7070a0; font-size: 16px">⌘</span>
+                <input
+                  style="
+                    flex: 1;
+                    background: none;
+                    border: none;
+                    color: #e2e2ee;
+                    font-family: monospace;
+                    font-size: 14px;
+                    outline: none;
+                  "
+                  placeholder="Jump to any session…"
+                  value="api z"
+                />
+              </div>
+
+              <!-- Results -->
+              <div style="padding: 8px 0; max-height: 260px; overflow-y: auto">
+                <div
+                  style="
+                    padding: 4px 14px 6px;
+                    font-size: 10px;
+                    color: #7070a0;
+                    letter-spacing: 0.07em;
+                    text-transform: uppercase;
+                    font-weight: 600;
+                  "
+                >
+                  Best match
+                </div>
+
+                <!-- Selected result -->
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 10px 16px;
+                    background: rgba(92, 107, 192, 0.18);
+                    border-left: 2px solid #5c6bc0;
+                    cursor: pointer;
+                  "
+                >
+                  <div style="display: flex; flex-direction: column; gap: 2px; flex: 1">
+                    <div style="display: flex; align-items: center; gap: 6px">
+                      <span
+                        style="
+                          font-size: 11px;
+                          color: #7070a0;
+                          background: rgba(92, 107, 192, 0.2);
+                          padding: 1px 6px;
+                          border-radius: 3px;
+                        "
+                        >Backend</span
+                      >
+                      <span style="color: #7070a0; font-size: 11px">›</span>
+                      <span style="font-size: 11px; color: #b0b0cc"
+                        ><span style="color: #e2e2ee; font-weight: 500">API</span> Service</span
+                      >
+                      <span style="color: #7070a0; font-size: 11px">›</span>
+                      <span style="font-size: 12px; color: #e2e2ee; font-family: monospace"
+                        ><span style="color: #5c6bc0">z</span>sh</span
+                      >
+                    </div>
+                    <div style="font-size: 10px; color: #7070a0">Active · 4 min ago · main</div>
+                  </div>
+                  <div style="display: flex; gap: 4px; align-items: center">
+                    <div
+                      style="width: 6px; height: 6px; border-radius: 50%; background: #5c6bc0"
+                    ></div>
+                    <span
+                      style="
+                        font-size: 10px;
+                        color: #7070a0;
+                        background: rgba(255, 255, 255, 0.07);
+                        padding: 2px 8px;
+                        border-radius: 4px;
+                      "
+                      >↵</span
+                    >
+                  </div>
+                </div>
+
+                <div
+                  style="
+                    padding: 4px 14px 6px;
+                    font-size: 10px;
+                    color: #7070a0;
+                    letter-spacing: 0.07em;
+                    text-transform: uppercase;
+                    font-weight: 600;
+                    margin-top: 4px;
+                  "
+                >
+                  Other sessions
+                </div>
+
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 9px 16px;
+                    cursor: pointer;
+                  "
+                >
+                  <div style="flex: 1">
+                    <div style="display: flex; align-items: center; gap: 6px">
+                      <span
+                        style="
+                          font-size: 11px;
+                          color: #7070a0;
+                          background: rgba(255, 255, 255, 0.06);
+                          padding: 1px 6px;
+                          border-radius: 3px;
+                        "
+                        >Frontend</span
+                      >
+                      <span style="color: #7070a0; font-size: 11px">›</span>
+                      <span style="font-size: 11px; color: #b0b0cc"
+                        ><span style="color: #e2e2ee">API</span> UI</span
+                      >
+                      <span style="color: #7070a0; font-size: 11px">›</span>
+                      <span style="font-size: 12px; color: #b0b0cc; font-family: monospace"
+                        ><span style="color: #b0b0cc">z</span>sh</span
+                      >
+                    </div>
+                    <div style="font-size: 10px; color: #7070a0">Idle · 12 min ago</div>
+                  </div>
+                  <div
+                    style="width: 6px; height: 6px; border-radius: 50%; background: #4ade80"
+                  ></div>
+                </div>
+
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 9px 16px;
+                    cursor: pointer;
+                    opacity: 0.7;
+                  "
+                >
+                  <div style="flex: 1">
+                    <div style="display: flex; align-items: center; gap: 6px">
+                      <span
+                        style="
+                          font-size: 11px;
+                          color: #7070a0;
+                          background: rgba(255, 255, 255, 0.06);
+                          padding: 1px 6px;
+                          border-radius: 3px;
+                        "
+                        >Personal</span
+                      >
+                      <span style="color: #7070a0; font-size: 11px">›</span>
+                      <span style="font-size: 11px; color: #b0b0cc">Dotfiles</span>
+                      <span style="color: #7070a0; font-size: 11px">›</span>
+                      <span style="font-size: 12px; color: #b0b0cc; font-family: monospace"
+                        >nvim (api*)</span
+                      >
+                    </div>
+                    <div style="font-size: 10px; color: #7070a0">Busy · 2 min ago</div>
+                  </div>
+                  <div
+                    style="
+                      width: 8px;
+                      height: 8px;
+                      border-radius: 50%;
+                      border: 1.5px solid #f59e0b;
+                      border-top-color: transparent;
+                      animation: spin 0.8s linear infinite;
+                    "
+                  ></div>
+                </div>
+              </div>
+
+              <!-- Footer -->
+              <div
+                style="
+                  padding: 8px 16px;
+                  border-top: 1px solid rgba(255, 255, 255, 0.06);
+                  display: flex;
+                  gap: 16px;
+                "
+              >
+                <span style="font-size: 10px; color: #7070a0">↑↓ navigate</span>
+                <span style="font-size: 10px; color: #7070a0">↵ jump</span>
+                <span style="font-size: 10px; color: #7070a0">⌘K close</span>
+                <span style="margin-left: auto; font-size: 10px; color: #7070a0"
+                  >⌘N new session here</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pro">
+          <strong>Pros</strong>Zero regression risk · Ships in days · Immediately useful ·
+          Recency-sorted results mean 1-2 keystrokes for common jumps
+        </div>
+        <div class="con">
+          <strong>Cons</strong>Doesn't fix sidebar click-depth · Mouse users unaffected ·
+          Discoverability only via keyboard shortcut hint
+        </div>
+      </div>
+    </div>
+
+    <style>
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+    </style>
+  </body>
+</html>

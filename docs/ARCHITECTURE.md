@@ -196,6 +196,10 @@ ExtensionHost.load(directoryPath)
       │           api.terminal.onSessionCreate()    → globalRegistry.sessionCreateHandlers
       │           api.sidebar.registerGlobalTab()   → globalRegistry.globalTabs (v1.2.0)
       │           api.globalShortcut.register()     → electron globalShortcut (v1.2.0)
+      │
+      │        Note: registerWorkspaceTab() is a renderer-registry-only surface (v1.3.0).
+      │        It is called from the extension's renderer.tsx, not from activate(api).
+      │           registry.registerWorkspaceTab()   → registry.workspaceTabs Map
       │           api.workspace.list()              → workspace-store.listWorkspaces() (v1.2.0)
       │           api.window.openAuxiliary()        → BrowserWindow factory (v1.2.0)
       │           api.notifications.createNotification() → notificationManager (v1.2.0)
@@ -242,16 +246,16 @@ Full API surface: [`specs/001-extension-first-terminal/contracts/extension-api.m
 
 The renderer uses [Zustand](https://github.com/pmndrs/zustand) for all client-side state. Each store maps to a domain:
 
-| Store                    | State                                                                       | Key actions                                                          |
-| ------------------------ | --------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `workspace.store.ts`     | workspaces[], projects by workspace, active IDs                             | loadWorkspaces, createWorkspace, setActiveWorkspace                  |
-| `session.store.ts`       | sessions Map, terminalInstances Map, active session per project             | createSession, closeSession, setActiveSessionForProject              |
-| `settings.store.ts`      | globalSettings, workspaceSettings Map, resolvedTheme                        | loadSettings, updateGlobalTheme, resolveSettings                     |
-| `notification.store.ts`  | notifications[], unreadCount, panelOpen                                     | addNotification, markRead, markAllRead, dismiss, togglePanel         |
-| `toast.store.ts`         | toasts[] (ephemeral queue)                                                  | addToast, removeToast                                                |
-| `log.store.ts`           | logEntries[], console interceptor                                           | (entries added via installLogInterceptor); clearLogs                 |
-| `metrics.store.ts`       | system CPU/memory/network, per-session process metrics                      | enableGlobalMetrics, disableGlobalMetrics, trackSession              |
-| `extensions/registry.ts` | extension registration maps (sidebarPanels, globalTabs, commands, overlays) | registerGlobalTab, registerCommand, togglePanel, setActiveProjectTab |
+| Store                    | State                                                                                                                               | Key actions                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `workspace.store.ts`     | workspaces[], projects by workspace, active IDs                                                                                     | loadWorkspaces, createWorkspace, setActiveWorkspace                                                               |
+| `session.store.ts`       | sessions Map, terminalInstances Map, active session per project                                                                     | createSession, closeSession, setActiveSessionForProject                                                           |
+| `settings.store.ts`      | globalSettings, workspaceSettings Map, resolvedTheme                                                                                | loadSettings, updateGlobalTheme, resolveSettings                                                                  |
+| `notification.store.ts`  | notifications[], unreadCount, panelOpen                                                                                             | addNotification, markRead, markAllRead, dismiss, togglePanel                                                      |
+| `toast.store.ts`         | toasts[] (ephemeral queue)                                                                                                          | addToast, removeToast                                                                                             |
+| `log.store.ts`           | logEntries[], console interceptor                                                                                                   | (entries added via installLogInterceptor); clearLogs                                                              |
+| `metrics.store.ts`       | system CPU/memory/network, per-session process metrics                                                                              | enableGlobalMetrics, disableGlobalMetrics, trackSession                                                           |
+| `extensions/registry.ts` | extension registration maps (sidebarPanels, globalTabs, workspaceTabs, commands, overlays); activeGlobalTabId, activeWorkspaceTabId | registerGlobalTab, registerWorkspaceTab, registerCommand, togglePanel, setActiveProjectTab, setActiveWorkspaceTab |
 
 All store actions are async — they call IPC first, then update local state only on success.
 
@@ -273,6 +277,54 @@ When a bell event fires in a backgrounded terminal session, both systems are tri
 - All user input that crosses the IPC boundary is Zod-validated before use.
 - Extensions are loaded via `require()` in the main process — they run with full Node.js privileges. Phase 1 does not sandbox extensions. This is a known limitation documented for Phase 2 consideration (see ADR-002).
 - Reserved keyboard shortcuts are enforced in both preload.ts (renderer guard) and the extension API (main process throw).
+
+---
+
+## Navigation Chrome — UnifiedSidebar
+
+The primary navigation is a single resizable sidebar (`UnifiedSidebar`) replacing the old two-column WorkspaceRail + ProjectsPanel layout.
+
+### Component hierarchy
+
+```
+UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
+├── SidebarHeader — search placeholder + global tab icons (scrolls horizontally when
+│                   many global tabs registered; bell + add button stay pinned right)
+│                   + "+ workspace" button
+├── [workspace list] — draggable wrappers around WorkspaceCard components
+│   └── WorkspaceCard — color-coded card per workspace
+│       ├── ws-card__band — 3px left color bar (background: var(--ws-color))
+│       ├── ws-card__header — click toggles collapse; right-click shows ctx menu
+│       │   └── workspace tab icons — hover-reveal icons from registerWorkspaceTab()
+│       │         clicking one sets activeWorkspaceTabId and clears global/project tabs
+│       └── ws-card__projects — collapsible list of ProjectRow + ExtensionFooter
+│           └── ProjectRow — project name, branch chip, inline rename, session expansion
+│               └── SessionRow — per-session status dot/spinner/bell + inline rename
+│                     clicking a session also clears activeWorkspaceTabId (shows terminal)
+└── ScratchSection — pinned scratch terminal sessions at the bottom
+```
+
+### Tab activation mutual-exclusion
+
+Three tab layers compete for the main content area. Only one is active at a time:
+
+| Layer         | Registry state         | Activated by                                           | Cleared by                                             |
+| ------------- | ---------------------- | ------------------------------------------------------ | ------------------------------------------------------ |
+| Global tab    | `activeGlobalTabId`    | Clicking an icon in `SidebarHeader`                    | Activating workspace/project tab, clicking any session |
+| Workspace tab | `activeWorkspaceTabId` | Clicking a hover-reveal icon in `WorkspaceCard` header | Activating global/project tab, clicking any session    |
+| Project tab   | `activeProjectTabId`   | Clicking a tab in the project view tab bar             | Activating global/workspace tab                        |
+
+### Color propagation
+
+Each workspace has a `color` field (hex string). The `WorkspaceCard` sets `style={{ '--ws-color': workspace.color }}` on its root element. All descendant CSS rules (`ProjectRow`, `SessionRow`, etc.) inherit `var(--ws-color)` for accent colors, tinted backgrounds, and border highlights without any prop drilling.
+
+### Collapse persistence
+
+`useWorkspaceStore` maintains `collapsedWorkspaceIds: Set<string>` initialized from `localStorage` key `terminator.workspace.collapsed` (JSON array). `toggleWorkspaceCollapse(id)` updates the set and writes back to localStorage. `setCollapsedWorkspaceIds(ids)` replaces the entire set (used by `⌘1–9` to expand one workspace and collapse all others).
+
+### Resize
+
+The sidebar has a `div.unified-sidebar__resize-handle` on its right edge. `mousedown` on it starts a document-level `mousemove`/`mouseup` drag. During drag, `widthRef` (a `useRef`) tracks the pixel delta; the sidebar's inline `style.width` is updated directly on each frame to avoid re-renders. On `mouseup`, the value is clamped to `[200, 480]` and committed via `useState` and written to `localStorage` key `terminator.sidebar.width`. Double-click snaps to `260px` (default).
 
 ---
 

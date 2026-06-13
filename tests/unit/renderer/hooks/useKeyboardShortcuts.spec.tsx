@@ -49,6 +49,7 @@ function setupMocks(
     setActiveWorkspace: mockSetActiveWorkspace,
     activeProjectId: overrides.activeProjectId ?? null,
     resolveActiveCwd: vi.fn().mockReturnValue('/workspace/path'),
+    setCollapsedWorkspaceIds: vi.fn(),
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useSessionStore).mockReturnValue({
     getActiveSessionForProject: mockGetActiveSessionForProject,

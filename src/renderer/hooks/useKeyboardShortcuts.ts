@@ -24,8 +24,14 @@ export function useKeyboardShortcuts({
   onNewScratch,
   scratchProjectId,
 }: Options = {}): void {
-  const { workspaces, activeWorkspaceId, setActiveWorkspace, activeProjectId, resolveActiveCwd } =
-    useWorkspaceStore()
+  const {
+    workspaces,
+    activeWorkspaceId,
+    setActiveWorkspace,
+    activeProjectId,
+    resolveActiveCwd,
+    setCollapsedWorkspaceIds,
+  } = useWorkspaceStore()
   const {
     getActiveSessionForProject,
     setActiveSessionForProject,
@@ -120,11 +126,17 @@ export function useKeyboardShortcuts({
         }
       }
 
-      // Cmd+1–9: switch to nth workspace
+      // Cmd+1–9: switch to nth workspace, expand it, collapse all others
       if (isMeta && e.key >= '1' && e.key <= '9') {
         e.preventDefault()
         const idx = parseInt(e.key, 10) - 1
-        if (workspaces[idx]) setActiveWorkspace(workspaces[idx].id)
+        if (workspaces[idx]) {
+          setActiveWorkspace(workspaces[idx].id)
+          const collapseAll = new Set(
+            workspaces.map((w) => w.id).filter((id) => id !== workspaces[idx].id)
+          )
+          setCollapsedWorkspaceIds(collapseAll)
+        }
         return
       }
 
