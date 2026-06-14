@@ -37,5 +37,5 @@ Embed a Fastify HTTP + WebSocket server in the Electron **main process** to prov
 
 - The Electron app gains three new npm dependencies: `fastify`, `@fastify/websocket`, `@fastify/static`.
 - A second Vite renderer entry (`src/renderer-remote/`) is added for the browser SPA. This bundle uses `@xterm/xterm@6` (new package namespace) independently of the Electron renderer's `xterm@5`.
-- The `before-quit` handler must be updated to stop the remote server before `ptyManager.killAll()`.
-- All new files in `src/main/remote/` must reach ≥80% test coverage before merge.
+- The `before-quit` handler calls `ExtensionHost.unloadAll()` before `ptyManager.killAll()`, so the remote server (and ngrok) stop in the correct order as part of extension teardown.
+- All new files in `extensions/remote-control/` must reach ≥80% test coverage before merge.
