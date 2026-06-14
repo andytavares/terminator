@@ -1,0 +1,63 @@
+extensions/task-vault/src/utils/notify.ts
+  s_fb2f77018153a9::t_886e10259e748e 1-14
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_fb2f77018153a9::t_25e862d22344dd 46
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_fb2f77018153a9::t_54e309db8f9c57 5
+  s_fb2f77018153a9::t_30cc8563079782 398,426
+  s_fb2f77018153a9::t_febee6704a24a7 476-484
+  s_fb2f77018153a9::t_46b4fc4332d22a 602
+extensions/task-vault/tests/ipc/inbox.ipc.spec.ts
+  s_fb2f77018153a9::t_4cd5ed8d5cf8fe 54
+extensions/task-vault/src/vault/db.ts
+  s_fb2f77018153a9::t_f6814dcd65ad41 11-13
+extensions/task-vault/tests/ipc/links.ipc.spec.ts
+  s_fb2f77018153a9::t_02c1120ba16389 24
+extensions/task-vault/src/index.ts
+  s_fb2f77018153a9::t_c741569f517be9 1
+  s_fb2f77018153a9::t_e5cd0c89bf622a 4-7
+  s_fb2f77018153a9::t_6be6ef8456f315 64-70,74-78
+extensions/task-vault/tests/ipc/capture.ipc.spec.ts
+  s_fb2f77018153a9::t_a948366fae62bd 60
+extensions/task-vault/tests/ipc/projects.ipc.spec.ts
+  s_fb2f77018153a9::t_35acb63b3ed0b8 32
+extensions/task-vault/src/components/DailyLog.tsx
+  s_fb2f77018153a9::t_018b6385cd2f43 798
+  s_fb2f77018153a9::t_30cc8563079782 839-843
+  s_fb2f77018153a9::t_74cffa9ba35325 817
+  s_fb2f77018153a9::t_00ae9d4d8a6234 861
+  s_fb2f77018153a9::t_b366a32e4515e9 852
+  s_fb2f77018153a9::t_90d693a944bdff 774
+  s_fb2f77018153a9::t_94e080edc9e0bd 29
+  s_fb2f77018153a9::t_c0c22f01eba653 809
+  s_fb2f77018153a9::t_2bce499f6f3690 179
+extensions/remote-control/src/server/ngrok-manager.ts
+  s_fb2f77018153a9::t_5f684262551ee8 37
+  s_fb2f77018153a9::t_3a7dd6267523a7 52
+  s_fb2f77018153a9::t_f3838f9c3151ed 4-7
+extensions/task-vault/tests/utils/notify.spec.ts
+  s_fb2f77018153a9::t_f1c31538e3e658 1-29,31-54
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_fb2f77018153a9::t_7a014838ae3722 797
+  s_fb2f77018153a9::t_5a73bbc2b71684 361
+  s_fb2f77018153a9::t_b7854c3eea00af 111-119
+  s_fb2f77018153a9::t_369888a5cc1552 1250-1254
+extensions/task-vault/tests/ipc/kanban.ipc.spec.ts
+  s_fb2f77018153a9::t_bd047bf732afef 48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "195a19b994933bf33308f021f3c1c6889338da4b",
+  "prompts": {},
+  "sessions": {
+    "s_fb2f77018153a9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f91d8784-bc90-4d02-a69a-6eece3c4aaee",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
