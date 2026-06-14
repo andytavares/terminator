@@ -176,7 +176,6 @@ function SubtaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', {
       taskId: subtask.id,
     })
-    notify('success', `Completed: ${subtask.text}`, { onClick: makeTaskNavHandler(subtask.id) })
     await onRefresh()
   }
 
