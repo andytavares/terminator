@@ -647,13 +647,24 @@ describe('task-vault:vault:rename-area', () => {
 // ── restore-area ──────────────────────────────────────────────────────────────
 
 describe('task-vault:vault:restore-area', () => {
-  it('restores an archived area and its projects, returns success', async () => {
+  it('restores an archived area, its projects, and cancelled tasks', async () => {
     mockGet.mockReturnValueOnce({ id: 'area-1' })
     const handler = getHandler('task-vault:vault:restore-area')
     const result = await handler({}, { areaName: 'Work' })
     expect(result).toMatchObject({ success: true })
-    // area status UPDATE + projects status UPDATE
-    expect(mockRun).toHaveBeenCalledTimes(2)
+    // area UPDATE + projects UPDATE + tasks UPDATE (cancelled tasks restored)
+    expect(mockRun).toHaveBeenCalledTimes(3)
+  })
+
+  it('restores cancelled tasks when area is restored', async () => {
+    mockGet.mockReturnValueOnce({ id: 'area-1' })
+    const handler = getHandler('task-vault:vault:restore-area')
+    await handler({}, { areaName: 'Work' })
+    const sqls = mockPrepare.mock.calls.map((c) => c[0] as string)
+    const taskRestoreSql = sqls.find(
+      (s) => s.includes("status='open'") && s.includes("status='cancelled'")
+    )
+    expect(taskRestoreSql).toBeTruthy()
   })
 
   it('returns VALIDATION_ERROR when areaName is missing', async () => {

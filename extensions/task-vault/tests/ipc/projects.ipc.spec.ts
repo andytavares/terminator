@@ -205,6 +205,15 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
     expect(result.somedayProjects).toHaveLength(1)
   })
 
+  it('somedayTasks query excludes subtasks (parent_id IS NULL filter)', async () => {
+    mockAll.mockReturnValue([])
+    const handler = getHandler('task-vault:projects:weekly-review')
+    await handler({}, {})
+    const sqls = vi.mocked(mockPrepare).mock.calls.map((c) => c[0] as string)
+    const somedaySql = sqls.find((s) => s.includes("source='someday'"))
+    expect(somedaySql).toContain('parent_id IS NULL')
+  })
+
   it('returns prior week completed tasks', async () => {
     const completedRow = makeTaskRow({ status: 'done', text: 'Completed task' })
     mockAll

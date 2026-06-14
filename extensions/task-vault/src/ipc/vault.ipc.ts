@@ -829,6 +829,13 @@ export function registerVaultIpcHandlers(): () => void {
     db.prepare(
       `UPDATE projects SET status='active', updated_at=? WHERE area_id=? AND status='archived'`
     ).run(now, area.id)
+    // Restore tasks cancelled during area archival (directly in the area or in its projects)
+    db.prepare(
+      `UPDATE tasks SET status='open', updated_at=?
+       WHERE status='cancelled'
+         AND (area_id=? AND project_id IS NULL
+              OR project_id IN (SELECT id FROM projects WHERE area_id=?))`
+    ).run(now, area.id, area.id)
     return { success: true }
   })
 

@@ -92,7 +92,7 @@ export function registerProjectsIpcHandlers(): () => void {
 
     const somedayTaskRows = db
       .prepare(
-        `SELECT * FROM tasks WHERE source='someday' AND status='open' ORDER BY created_at ASC`
+        `SELECT * FROM tasks WHERE source='someday' AND status='open' AND parent_id IS NULL ORDER BY created_at ASC`
       )
       .all() as Record<string, unknown>[]
     const somedayTasks = somedayTaskRows.map(rowToTask)
