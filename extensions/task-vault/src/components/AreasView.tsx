@@ -45,8 +45,8 @@ export function AreasView(): React.JSX.Element {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
-  async function load() {
-    setIsLoading(true)
+  async function load(silent = false) {
+    if (!silent) setIsLoading(true)
     setError(null)
     try {
       const result = await window.electronAPI.extensionBridge.invoke(
@@ -61,7 +61,7 @@ export function AreasView(): React.JSX.Element {
     } catch (err) {
       setError(String(err))
     } finally {
-      setIsLoading(false)
+      if (!silent) setIsLoading(false)
     }
   }
 
@@ -71,7 +71,7 @@ export function AreasView(): React.JSX.Element {
 
   useEffect(() => {
     const unsub = window.electronAPI.extensionBridge.on('task-vault:push:index-updated', () => {
-      void load()
+      void load(true)
     })
     return unsub
   }, [statusFilter])
