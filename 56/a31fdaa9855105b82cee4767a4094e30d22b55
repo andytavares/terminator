@@ -1,0 +1,173 @@
+extensions/task-vault/src/components/SmartTaskInput.tsx
+  s_8e723948aeb460::t_aa73338b9ecb19 2
+  s_8e723948aeb460::t_f02f6e462b358a 314-315,317-319,321
+tests/unit/renderer/stores/toast.store.spec.ts
+  s_8e723948aeb460::t_6c2385f3670b4a 78,81
+src/renderer/components/sidebar/ProjectRow.tsx
+  s_8e723948aeb460::t_a2deba6fba6c40 1
+  s_8e723948aeb460::t_de1f00cb086c79 57-64,67
+extensions/task-vault/tests/ipc/projects.ipc.spec.ts
+  s_8e723948aeb460::t_faf7dbed6d5866 166
+  s_8e723948aeb460::t_a7b463d8792e37 200
+  s_8e723948aeb460::t_93cadc3502b4a4 223
+  s_8e723948aeb460::t_02c95c50f18149 153
+  s_8e723948aeb460::t_7ff8f7372ae9ef 214
+  s_8e723948aeb460::t_a43bf6c2a45e48 187
+src/renderer/components/sidebar/SessionRow.tsx
+  s_8e723948aeb460::t_f7357e76d3d717 1
+  s_8e723948aeb460::t_69d0692a2cc8d6 34-41
+  s_8e723948aeb460::t_452d2f5e9fb04b 63
+extensions/task-vault/src/components/WeeklyReviewStep5Someday.tsx
+  s_8e723948aeb460::t_8327e051d5591b 2,6,12,16,18,26-37,41-97
+extensions/task-vault/tests/components/WeeklyReview.spec.tsx
+  s_8e723948aeb460::t_f68528beb12812 79
+extensions/task-vault/tests/components/DateTimePicker.spec.tsx
+  s_8e723948aeb460::t_1ce9f0384bc9e9 3,28-32,35,37-38,42,44-45,49,51-54,59,69-71,75-77,79,83-85,87,93-95,103,105-107,111,113-115,119-121,123-124,128-129,131-135,138,140,142-146,150,152,154-156,159-161,163-167,171-173,189,201,206,212,214-215,224,229,231-233,237,239,241,250-255,260,262-263,268,270,272-276,280,282,284-285,289
+  s_8e723948aeb460::t_8be5db68870dc6 15,57,61-62,64-65,170,179-185,188,190-200,202,204-205,207-209,216-217,219-222,225-226,240,242-245,247-248,259,265,286-287,290
+  s_8e723948aeb460::t_ee46c85a001303 1-2,4-14,16-27,33-34,39-41,46-48,55-56,60,66-68,72-74,78,80-82,86,88-92,96-102,104,108-110,112,116-118,122,125-127,136-137,139,147-149,151,157-158,168-169,174-178,186-187,210-211,213,227-228,230,234-236,249,256-258,264,266-267,269,277-279,281,291-293
+extensions/task-vault/src/stores/vault-data.store.ts
+  s_8e723948aeb460::t_d3b670d0b3b697 50-51
+src/renderer/components/sidebar/WorkspaceCard.tsx
+  s_8e723948aeb460::t_b47e91669926ff 1
+  s_8e723948aeb460::t_4f53f31f6bef6c 90
+  s_8e723948aeb460::t_92f11c92f76eee 53-60
+extensions/task-vault/src/ipc/projects.ipc.ts
+  s_8e723948aeb460::t_7a73786a1fe725 247-264
+  s_8e723948aeb460::t_348c0751a46719 236
+  s_8e723948aeb460::t_b5936ecadc2bea 138-139,234-235
+  s_8e723948aeb460::t_d073780a73d5bd 265-290
+  s_8e723948aeb460::t_b5e88e9bc44b63 93-99,111
+  s_8e723948aeb460::t_229fb7ef53299e 140
+tests/unit/renderer/stores/workspace.store.spec.ts
+  s_8e723948aeb460::t_0fa252b922ef9d 346,351,355,360,364,366,376
+  s_8e723948aeb460::t_f5e09357e50ccd 347
+extensions/task-vault/src/components/VaultSidebar.tsx
+  s_8e723948aeb460::t_04c49d6050ff62 10
+extensions/task-vault/src/vault/db.ts
+  s_8e723948aeb460::t_e54d58be7460b7 72-75
+  s_8e723948aeb460::t_dc958b4ea667d3 284-285
+extensions/task-vault/src/components/ProjectsBrowser.tsx
+  s_8e723948aeb460::t_a7770d9fccdda1 807-815,817-822,824-834,836-845,847-852
+  s_8e723948aeb460::t_62668d6cdef8a4 3-15
+  s_8e723948aeb460::t_1c8ae026d5fab7 404-411,413-418,420-425,427-432,434-441,464,480,484,495-498,527-528,533
+  s_8e723948aeb460::t_ba0fffbe1af139 752-760,762-775,777-789,792-799
+  s_8e723948aeb460::t_b8fb92eb0a0657 286-291
+  s_8e723948aeb460::t_df481e7c7bd573 2
+  s_8e723948aeb460::t_96c6f8b5b9ec84 643-644
+  s_8e723948aeb460::t_c5f1450379f3c3 688-707
+  s_8e723948aeb460::t_73bf63ecb52ead 640-642
+  s_8e723948aeb460::t_f0ac5daf6708a3 679-687
+extensions/task-vault/tests/notifications/task-scheduler.spec.ts
+  s_8e723948aeb460::t_71537b42146c9f 10
+extensions/task-vault/src/components/AreasView.tsx
+  s_8e723948aeb460::t_7a83447f1e6759 419-427,429-442,444-459,461-468,494,509,511-519,526,530-533,536-540,545-547
+  s_8e723948aeb460::t_3f43c908f6acad 309-311,365-367,369-371,373-374,376-384,395-407,410-411
+  s_8e723948aeb460::t_785bcb6e2cc15a 2-9,11
+extensions/task-vault/src/components/DateTimePicker.tsx
+  s_8e723948aeb460::t_dbed93b28eafdf 7,65,74-83,86-97,99,218-222,226,256,258-263,265-279,288-294,326-328,396-420,473,476-493,495,502
+  s_8e723948aeb460::t_641c48b1a0b5b6 1-6,8-64,66-73,84-85,98,100-217,223-225,227-255,257,280-287,295-325,329-384,392-395,421-472,474-475,494,496-501,503-530,532-535
+  s_8e723948aeb460::t_408533a8c8261f 385-391
+  s_8e723948aeb460::t_cdc0b01cfbf51c 264
+extensions/task-vault/src/components/ArchiveView.tsx
+  s_8e723948aeb460::t_ef7afb5acfa513 63,67
+  s_8e723948aeb460::t_1f2fb4c73c3211 13-18,22
+  s_8e723948aeb460::t_5a43f034580ea5 126-132,136-138
+  s_8e723948aeb460::t_8b93c48a3ce214 80-81
+  s_8e723948aeb460::t_f3f2f916c0d6d6 149
+  s_8e723948aeb460::t_02bc5cc1a1364f 177-182
+  s_8e723948aeb460::t_3828704f7e85a4 133,135
+  s_8e723948aeb460::t_be322484fe6f08 272-304
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_8e723948aeb460::t_aa7b4b6d631b3e 33
+  s_8e723948aeb460::t_cf347068a684af 135
+src/renderer/stores/toast.store.ts
+  s_8e723948aeb460::t_728822c5f51f1d 10
+  s_8e723948aeb460::t_8e5fd0249633f2 29
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_8e723948aeb460::t_1a23519f5f3107 586
+extensions/task-vault/src/components/WeeklyReviewStep1GetClear.tsx
+  s_8e723948aeb460::t_ae38fe8f5561b3 1,7-28,34-62,69
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_8e723948aeb460::t_a8da3f6b1344bd 52
+extensions/task-vault/src/components/task-vault.css
+  s_8e723948aeb460::t_4f4a65e3103fda 6387-6393
+  s_8e723948aeb460::t_16a7c8d34e2e05 7499-7543
+  s_8e723948aeb460::t_ac54f855e20faa 35
+  s_8e723948aeb460::t_b105fa805a8346 4733-4768
+  s_8e723948aeb460::t_1ce14d11e67df5 1285
+  s_8e723948aeb460::t_57345af87ef426 440-470
+  s_8e723948aeb460::t_835654bb34ba1a 3562
+  s_8e723948aeb460::t_50f0e5cee07e81 717-725
+  s_8e723948aeb460::t_d66bac3f80b88f 3462-3470,3473,3478
+  s_8e723948aeb460::t_c402395f663f3f 3378,3385-3388
+  s_8e723948aeb460::t_9fca8a135022b7 7284-7320
+  s_8e723948aeb460::t_b8bbf6a73a4a8d 4896,4898-4899,4901-4903,4909
+  s_8e723948aeb460::t_6588abfdf2e45a 216-230,233-240,243-244
+  s_8e723948aeb460::t_77a7f09046f90c 3722
+  s_8e723948aeb460::t_bfa14b3c8ce7bf 241-242
+  s_8e723948aeb460::t_117eafa8a824ce 209
+  s_8e723948aeb460::t_2ff8fa4de7ee9b 7040-7105,7130-7283,7321-7443
+  s_8e723948aeb460::t_6cde017bf1033d 3220-3221
+  s_8e723948aeb460::t_5c896806b2f75d 7106-7129
+  s_8e723948aeb460::t_0475a1caae4732 7444-7498
+extensions/task-vault/src/components/DailyLog.tsx
+  s_8e723948aeb460::t_c8d2ab39b3795f 660
+  s_8e723948aeb460::t_01ec3458ae9be6 430-431,434,436
+  s_8e723948aeb460::t_2015a300c78c8f 943-954,956-957,959-1115,1117-1159,1161-1163,1165-1167,1169,1171-1172,1174-1175,1177-1182,1184-1185
+  s_8e723948aeb460::t_c7280227dce24a 2
+  s_8e723948aeb460::t_85b00bfe36b951 1632-1646,1655-1659
+  s_8e723948aeb460::t_bdb72863caf94c 642
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_8e723948aeb460::t_5b4c43dd680ef7 673-674
+  s_8e723948aeb460::t_237fd24a71c5ce 769
+  s_8e723948aeb460::t_19610d96c68516 1089-1091,1093
+  s_8e723948aeb460::t_364ab88f62d657 370-371,379-382,390,400-401,406-407,410,420-421,428
+  s_8e723948aeb460::t_43d1ee92e64647 695,698
+  s_8e723948aeb460::t_78c3bbb8459c02 85-87
+  s_8e723948aeb460::t_53750885f31493 677,679
+  s_8e723948aeb460::t_8c8ab87c3ec2bf 495-496,498,503-504
+  s_8e723948aeb460::t_57be7d93169be8 704-722
+  s_8e723948aeb460::t_c050e09b6bd392 817-834
+  s_8e723948aeb460::t_cc57ee4ea19add 977-979,981-983,985-986
+extensions/task-vault/src/notifications/task-scheduler.ts
+  s_8e723948aeb460::t_71f889eeef2f0a 210-220,223
+  s_8e723948aeb460::t_ccd34a08a4a197 1
+  s_8e723948aeb460::t_6ebf0675822d84 146-154,157
+extensions/task-vault/src/components/WeeklyReview.tsx
+  s_8e723948aeb460::t_65c6fa22c5f539 1
+  s_8e723948aeb460::t_b82db31343e818 15
+  s_8e723948aeb460::t_b0990c4ba8a7ee 150
+extensions/task-vault/tests/stores/vault-data.store.spec.ts
+  s_8e723948aeb460::t_a0fd3e3a86f2d8 71-72
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_8e723948aeb460::t_f9c06139fa58c8 66
+  s_8e723948aeb460::t_48761e5b85d373 203
+  s_8e723948aeb460::t_1b893659bd7ba6 70,75-84
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_8e723948aeb460::t_45341ccd910ca5 180
+  s_8e723948aeb460::t_d824cdb3a54948 48,51
+  s_8e723948aeb460::t_6e70c1bc980e54 123,126
+  s_8e723948aeb460::t_9391169cb8c1c6 46
+src/renderer/stores/workspace.store.ts
+  s_8e723948aeb460::t_50f00c0e8114cc 30
+  s_8e723948aeb460::t_035009022fb083 33,35,41
+  s_8e723948aeb460::t_ce24f775965b43 203,208,212,215,217,221
+  s_8e723948aeb460::t_2be864872e277a 51
+  s_8e723948aeb460::t_f0a9b1680fc338 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "56a31fdaa9855105b82cee4767a4094e30d22b55",
+  "prompts": {},
+  "sessions": {
+    "s_8e723948aeb460": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bafe19cd-02b4-42a6-9919-66a462467a04",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
