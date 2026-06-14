@@ -62,8 +62,23 @@ export function WeeklyReview(): React.JSX.Element {
   function nextStep() {
     if (step < TOTAL_STEPS) {
       const next = step + 1
-      setStep(next)
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ step: next }))
+      if (step === 1) {
+        // Refresh inbox before mounting Step 2 so captures from Get Clear appear immediately.
+        // Step 2 uses useState(inboxItems) which only reads props at mount time.
+        void window.electronAPI.extensionBridge
+          .invoke('task-vault:projects:weekly-review', {})
+          .then((result) => {
+            const fresh = result as WeeklyReviewPayload
+            setPayload((prev) => (prev ? { ...prev, inboxItems: fresh.inboxItems } : fresh))
+          })
+          .catch(() => {
+            // Non-fatal — Step 2 shows items from the initial load
+          })
+          .finally(() => setStep(next))
+      } else {
+        setStep(next)
+      }
     }
   }
 
