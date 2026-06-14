@@ -1,49 +1,72 @@
-import React from 'react'
-import type { IndexedTask } from '../vault/types'
+import React, { useState } from 'react'
 
 interface Props {
-  inboxItems: IndexedTask[]
-  onItemFiled: (taskId: string) => void
   onComplete: () => void
 }
 
-export function WeeklyReviewStep1GetClear({
-  inboxItems,
-  onItemFiled,
-  onComplete,
-}: Props): React.JSX.Element {
-  const remaining = inboxItems.filter((t) => t.status === 'open')
+export function WeeklyReviewStep1GetClear({ onComplete }: Props): React.JSX.Element {
+  const [text, setText] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [captured, setCaptured] = useState<string[]>([])
 
-  async function fileToInbox(taskId: string) {
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:process-inbox-item', {
-      taskId,
-      action: 'someday',
-    })
-    onItemFiled(taskId)
+  async function handleAdd() {
+    if (!text.trim()) return
+    setAdding(true)
+    try {
+      await window.electronAPI.extensionBridge.invoke('task-vault:vault:add-task', {
+        text: text.trim(),
+        source: 'inbox',
+      })
+      setCaptured((prev) => [...prev, text.trim()])
+      setText('')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  function handleKey(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') void handleAdd()
   }
 
   return (
     <div className="wr-step wr-step-1">
       <h3>Step 1: Get Clear</h3>
-      <p>Capture any loose items not yet in your inbox.</p>
+      <p>
+        Capture any loose items not yet in your inbox — physical papers, email, sticky notes, open
+        browser tabs.
+      </p>
 
-      {remaining.length === 0 ? (
-        <p className="wr-step__done">All items captured!</p>
-      ) : (
-        <ul className="wr-step__list">
-          {remaining.map((item) => (
-            <li key={item.id} className="wr-step__item">
-              <span>{item.text}</span>
-              <button className="tv-btn tv-btn--secondary" onClick={() => fileToInbox(item.id)}>
-                File to inbox
-              </button>
+      <div className="wr-step__capture-row">
+        <input
+          className="wr-step__capture-input"
+          placeholder="Add to inbox…"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={handleKey}
+          disabled={adding}
+          autoFocus
+        />
+        <button
+          className="tv-btn tv-btn--primary"
+          onClick={() => void handleAdd()}
+          disabled={adding || !text.trim()}
+        >
+          Add
+        </button>
+      </div>
+
+      {captured.length > 0 && (
+        <ul className="wr-step__captured-list">
+          {captured.map((item, i) => (
+            <li key={i} className="wr-step__captured-item">
+              ✓ {item}
             </li>
           ))}
         </ul>
       )}
 
       <button className="wr-step__next" onClick={onComplete}>
-        Next
+        {captured.length === 0 ? 'Nothing to add — Next' : 'Done capturing — Next'}
       </button>
     </div>
   )

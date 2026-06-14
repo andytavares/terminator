@@ -150,6 +150,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
       ]) // inboxRows
       .mockReturnValueOnce([]) // activeRows
       .mockReturnValueOnce([]) // somedayRows
+      .mockReturnValueOnce([]) // somedayTaskRows
       .mockReturnValueOnce([]) // completedRows
     const handler = getHandler('task-vault:projects:weekly-review')
     const result = (await handler({}, {})) as { inboxItems: unknown[] }
@@ -162,6 +163,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
       .mockReturnValueOnce([]) // inboxRows
       .mockReturnValueOnce([activeRow]) // activeRows
       .mockReturnValueOnce([]) // somedayRows
+      .mockReturnValueOnce([]) // somedayTaskRows
       .mockReturnValueOnce([]) // completedRows
     mockGet.mockReturnValue({ c: 0 }) // count for active project → stale
     const handler = getHandler('task-vault:projects:weekly-review')
@@ -182,6 +184,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
       .mockReturnValueOnce([activeRow])
       .mockReturnValueOnce([])
       .mockReturnValueOnce([])
+      .mockReturnValueOnce([])
     mockGet.mockReturnValue({ c: 2 }) // not stale
     const handler = getHandler('task-vault:projects:weekly-review')
     const result = (await handler({}, {})) as { staleProjects: unknown[] }
@@ -194,6 +197,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
       .mockReturnValueOnce([]) // inboxRows
       .mockReturnValueOnce([]) // activeRows
       .mockReturnValueOnce([somedayRow]) // somedayRows
+      .mockReturnValueOnce([]) // somedayTaskRows
       .mockReturnValueOnce([]) // completedRows
     const handler = getHandler('task-vault:projects:weekly-review')
     const result = (await handler({}, {})) as { somedayProjects: unknown[] }
@@ -207,6 +211,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
       .mockReturnValueOnce([]) // inboxRows
       .mockReturnValueOnce([]) // activeRows
       .mockReturnValueOnce([]) // somedayRows
+      .mockReturnValueOnce([]) // somedayTaskRows
       .mockReturnValueOnce([completedRow]) // completedRows
     const handler = getHandler('task-vault:projects:weekly-review')
     const result = (await handler({}, {})) as { completedLastWeek: unknown[] }
@@ -215,7 +220,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
   })
 
   it('returns null lastReviewDate when no review recorded', async () => {
-    mockAll.mockReturnValue([])
+    mockAll.mockReturnValue([]) // covers all remaining calls
     const handler = getHandler('task-vault:projects:weekly-review')
     const result = (await handler({}, {})) as { lastReviewDate: string | null }
     expect(result.lastReviewDate).toBeNull()

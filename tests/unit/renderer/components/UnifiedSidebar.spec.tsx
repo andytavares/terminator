@@ -43,10 +43,12 @@ const mockWorkspaceStore = {
     ['ws-1', []],
     ['ws-2', []],
   ]),
-  collapsedWorkspaceIds: new Set<string>(),
+  expandedWorkspaceIds: new Set<string>(),
   toggleWorkspaceCollapse: vi.fn(),
+  setExpandedWorkspaceIds: vi.fn(),
   setActiveWorkspace: vi.fn(),
   setActiveProject: vi.fn(),
+  loadProjects: vi.fn().mockResolvedValue(undefined),
   loadWorkspaces: vi.fn(),
   reorderWorkspaces: vi.fn().mockResolvedValue(undefined),
 }
@@ -118,10 +120,10 @@ describe('UnifiedSidebar', () => {
     expect(container.querySelector('.scratch-section')).toBeTruthy()
   })
 
-  it('passes isCollapsed=true to a WorkspaceCard whose id is in collapsedWorkspaceIds', () => {
+  it('passes isCollapsed=true to a WorkspaceCard whose id is NOT in expandedWorkspaceIds', () => {
     vi.mocked(useWorkspaceStore).mockReturnValue({
       ...mockWorkspaceStore,
-      collapsedWorkspaceIds: new Set(['ws-1']),
+      expandedWorkspaceIds: new Set<string>(),
     } as unknown as ReturnType<typeof useWorkspaceStore>)
     const { container } = render(<UnifiedSidebar {...defaultProps} />)
     const cards = container.querySelectorAll('.ws-card')
@@ -175,6 +177,7 @@ describe('UnifiedSidebar', () => {
       ]),
       setActiveWorkspace,
       setActiveProject,
+      expandedWorkspaceIds: new Set<string>(['ws-1']),
     } as unknown as ReturnType<typeof useWorkspaceStore>)
     render(<UnifiedSidebar {...defaultProps} />)
     fireEvent.click(screen.getByText('API'))

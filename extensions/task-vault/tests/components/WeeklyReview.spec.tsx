@@ -76,6 +76,7 @@ const weeklyReviewPayload = {
       terminatorLinks: [],
     },
   ],
+  somedayTasks: [],
   completedLastWeek: [],
   lastReviewDate: null,
 }

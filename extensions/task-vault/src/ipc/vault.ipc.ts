@@ -82,11 +82,9 @@ function resolveProjectAndAreaIds(
       areaId = existingArea.id
     } else {
       areaId = randomUUID()
-      db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
-        areaId,
-        areaName,
-        now
-      )
+      db.prepare(
+        `INSERT OR IGNORE INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?)`
+      ).run(areaId, areaName, now, now)
     }
   }
 
@@ -369,6 +367,8 @@ export function registerVaultIpcHandlers(): () => void {
       .prepare(`SELECT t.*, t.project_id, t.area_id FROM tasks t WHERE t.id=?`)
       .get(taskId) as Record<string, unknown> | undefined
     if (!task) return { error: 'STALE_ID' }
+    // Noop if the task is already on the target date (prevents duplication)
+    if ((task.source_ref as string | null) === targetDate) return { newTaskId: taskId, noop: true }
     const now = new Date().toISOString()
     const newId = randomUUID()
     const existingMeta = JSON.parse((task.metadata as string) || '{}') as Record<string, unknown>
@@ -376,6 +376,10 @@ export function registerVaultIpcHandlers(): () => void {
     db.prepare(
       `UPDATE tasks SET status='migrated', migrated_to=?, metadata=?, updated_at=? WHERE id=?`
     ).run(targetDate, JSON.stringify(existingMeta), now, taskId)
+    // Preserve original status for the twin (open/in-progress carry over; done/cancelled stay done)
+    const originalStatus = task.status as string
+    const twinStatus =
+      originalStatus === 'done' || originalStatus === 'cancelled' ? originalStatus : 'open'
     // Create new parent task on target date
     db.prepare(
       `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,created_at,updated_at)
@@ -383,7 +387,7 @@ export function registerVaultIpcHandlers(): () => void {
     ).run(
       newId,
       task.text,
-      'open',
+      twinStatus,
       task.project_id ?? null,
       task.context ?? null,
       task.area_id ?? null,
@@ -393,11 +397,17 @@ export function registerVaultIpcHandlers(): () => void {
       now,
       now
     )
-    // Migrate subtasks: create twins under the new parent, mark originals as migrated
-    type SubRow = { id: string; text: string; sort_order: number | null; metadata: string }
+    // Migrate subtasks: create twins under the new parent, preserve their statuses
+    type SubRow = {
+      id: string
+      text: string
+      status: string
+      sort_order: number | null
+      metadata: string
+    }
     const subtasks = db
       .prepare(
-        `SELECT id, text, sort_order, metadata FROM tasks WHERE parent_id=? ORDER BY sort_order, created_at`
+        `SELECT id, text, status, sort_order, metadata FROM tasks WHERE parent_id=? ORDER BY sort_order, created_at`
       )
       .all(taskId) as SubRow[]
     for (const sub of subtasks) {
@@ -407,13 +417,15 @@ export function registerVaultIpcHandlers(): () => void {
       db.prepare(
         `UPDATE tasks SET status='migrated', migrated_to=?, metadata=?, updated_at=? WHERE id=?`
       ).run(targetDate, JSON.stringify(subMeta), now, sub.id)
+      const subTwinStatus =
+        sub.status === 'done' || sub.status === 'cancelled' ? sub.status : 'open'
       db.prepare(
         `INSERT INTO tasks (id,text,status,parent_id,sort_order,source,source_ref,created_at,updated_at)
          VALUES (?,?,?,?,?,?,?,?,?)`
       ).run(
         subTwinId,
         sub.text,
-        'open',
+        subTwinStatus,
         newId,
         sub.sort_order ?? null,
         'daily',
@@ -480,16 +492,16 @@ export function registerVaultIpcHandlers(): () => void {
     if (!task) return { error: 'STALE_ID' }
 
     if (action === 'trash') {
+      // Soft-delete: archive (cancel) the task rather than permanently deleting it
+      const archiveNow = new Date().toISOString()
       db.prepare(
-        `
-        WITH RECURSIVE subtree(id) AS (
+        `WITH RECURSIVE subtree(id) AS (
           SELECT id FROM tasks WHERE id = ?
           UNION ALL
           SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
         )
-        DELETE FROM tasks WHERE id IN (SELECT id FROM subtree)
-      `
-      ).run(taskId)
+        UPDATE tasks SET status='cancelled', updated_at=? WHERE id IN (SELECT id FROM subtree)`
+      ).run(taskId, archiveNow)
       return { success: true }
     }
 
@@ -658,12 +670,13 @@ export function registerVaultIpcHandlers(): () => void {
     db.prepare(
       `UPDATE tasks SET status='open', migrated_to=NULL, metadata=json_remove(metadata, '$.migration_twin_id'), updated_at=? WHERE parent_id=? AND status='migrated'`
     ).run(now, taskId)
-    // Always move back to inbox so the task is findable regardless of original source
+    // Restore to today's daily log so the task is immediately visible (local date, not UTC)
+    const todayDate = today()
     const changes = db
       .prepare(
-        `UPDATE tasks SET status='open', source='inbox', source_ref=NULL, completed_date=NULL, migrated_to=NULL, metadata=?, updated_at=? WHERE id=?`
+        `UPDATE tasks SET status='open', source='daily', source_ref=?, completed_date=NULL, migrated_to=NULL, metadata=?, updated_at=? WHERE id=?`
       )
-      .run(JSON.stringify(meta), now, taskId)
+      .run(todayDate, JSON.stringify(meta), now, taskId)
     if (changes.changes === 0) return { error: 'STALE_ID' }
     return { success: true }
   })
@@ -679,12 +692,32 @@ export function registerVaultIpcHandlers(): () => void {
     const now = new Date().toISOString()
     const existing = db.prepare(`SELECT id FROM areas WHERE name=?`).get(displayName)
     if (existing) return { error: 'AREA_EXISTS' }
-    db.prepare(`INSERT INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
+    db.prepare(`INSERT INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?)`).run(
       randomUUID(),
       displayName,
+      now,
       now
     )
     return { success: true, filePath: displayName }
+  })
+
+  // ── vault:rename-area ────────────────────────────────────────────────────────
+
+  handle('task-vault:vault:rename-area', async (_event, payload) => {
+    const { areaFilePath, newName } = payload as { areaFilePath: string; newName: string }
+    if (!areaFilePath || !newName?.trim()) return { error: 'VALIDATION_ERROR' }
+    const db = getDb()
+    const now = new Date().toISOString()
+    const area = db.prepare(`SELECT id, name FROM areas WHERE name=?`).get(areaFilePath) as
+      | { id: string; name: string }
+      | undefined
+    if (!area) return { error: 'NOT_FOUND' }
+    const existing = db
+      .prepare(`SELECT id FROM areas WHERE name=? AND id != ?`)
+      .get(newName.trim(), area.id)
+    if (existing) return { error: 'AREA_EXISTS' }
+    db.prepare(`UPDATE areas SET name=?, updated_at=? WHERE id=?`).run(newName.trim(), now, area.id)
+    return { success: true }
   })
 
   // ── vault:archive-area ───────────────────────────────────────────────────────
@@ -733,7 +766,7 @@ export function registerVaultIpcHandlers(): () => void {
     )
 
     // Archive the area itself
-    db.prepare(`UPDATE areas SET status='archived' WHERE id=?`).run(area.id)
+    db.prepare(`UPDATE areas SET status='archived', updated_at=? WHERE id=?`).run(now, area.id)
 
     return { success: true }
   })
@@ -778,6 +811,24 @@ export function registerVaultIpcHandlers(): () => void {
     // Delete the area
     db.prepare(`DELETE FROM areas WHERE id=?`).run(area.id)
 
+    return { success: true }
+  })
+
+  // ── vault:restore-area ───────────────────────────────────────────────────────
+
+  handle('task-vault:vault:restore-area', async (_event, payload) => {
+    const { areaName } = payload as { areaName: string }
+    if (!areaName) return { error: 'VALIDATION_ERROR' }
+    const db = getDb()
+    const now = new Date().toISOString()
+    const area = db.prepare(`SELECT id FROM areas WHERE name=?`).get(areaName) as
+      | { id: string }
+      | undefined
+    if (!area) return { error: 'NOT_FOUND' }
+    db.prepare(`UPDATE areas SET status='active', updated_at=? WHERE id=?`).run(now, area.id)
+    db.prepare(
+      `UPDATE projects SET status='active', updated_at=? WHERE area_id=? AND status='archived'`
+    ).run(now, area.id)
     return { success: true }
   })
 
@@ -923,8 +974,16 @@ export function registerVaultIpcHandlers(): () => void {
       const projectRows = db
         .prepare(`SELECT * FROM projects WHERE status='archived' ORDER BY updated_at DESC`)
         .all() as Record<string, unknown>[]
+      const areaRows = db
+        .prepare(`SELECT * FROM areas WHERE status='archived' ORDER BY updated_at DESC`)
+        .all() as Record<string, unknown>[]
       const projects = projectRows.map(rowToProject)
-      return { tasks: taskRows.map(rowToTask), projects }
+      const areas = areaRows.map((a) => ({
+        id: a.id as string,
+        name: a.name as string,
+        updatedAt: a.updated_at as string,
+      }))
+      return { tasks: taskRows.map(rowToTask), projects, areas }
     } catch (err) {
       return { error: String(err) }
     }
@@ -1027,9 +1086,11 @@ export function registerVaultIpcHandlers(): () => void {
       let imported = 0
 
       if (Array.isArray(data.areas)) {
-        const stmt = db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`)
+        const stmt = db.prepare(
+          `INSERT OR IGNORE INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?)`
+        )
         for (const a of data.areas) {
-          stmt.run(a.id, a.name, a.created_at)
+          stmt.run(a.id, a.name, a.created_at, a.updated_at ?? a.created_at)
           imported++
         }
       }

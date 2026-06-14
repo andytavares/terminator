@@ -583,7 +583,7 @@ export function TaskVaultView(): React.JSX.Element {
                   onNextDay={goToNextDay}
                   onGoToToday={loadToday}
                   isToday={isToday}
-                  somedayTasks={isToday ? somedayTasks : []}
+                  somedayTasks={somedayTasks}
                   onPickUpToday={handlePickUpToday}
                   onDeleteBacklogTask={handleDeleteBacklogTask}
                   onRefreshBacklog={loadSomedayTasks}

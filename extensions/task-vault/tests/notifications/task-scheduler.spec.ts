@@ -7,6 +7,7 @@ const mockWin = { isDestroyed: vi.fn(() => false), webContents: { send: mockSend
 
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: vi.fn(() => [mockWin]) },
+  Notification: { isSupported: vi.fn(() => false) },
 }))
 
 const mockRun = vi.fn().mockReturnValue({ changes: 1 })

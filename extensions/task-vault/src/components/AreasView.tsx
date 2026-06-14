@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react'
-import { Trash2, Pencil, Check, X, Archive } from 'lucide-react'
+import {
+  Pencil,
+  X,
+  Archive,
+  CheckCircle2,
+  Circle,
+  ArrowRightCircle,
+  MinusCircle,
+  Timer,
+} from 'lucide-react'
 import type { IndexedTask } from '../vault/types'
 import { SmartTaskInput, invalidateSmartInputCache } from './SmartTaskInput'
 import { useVaultStore } from '../stores/vault.store'
@@ -297,6 +306,9 @@ function AreaDetail({
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
+  const [renamingArea, setRenamingArea] = useState(false)
+  const [renameText, setRenameText] = useState(area.name)
+  const [renameError, setRenameError] = useState<string | null>(null)
 
   async function reloadTasks() {
     const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:list-areas')
@@ -335,17 +347,6 @@ function AreaDetail({
     await reloadTasks()
   }
 
-  async function handleCancel(taskId: string) {
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:cancel-task', { taskId })
-    await reloadTasks()
-  }
-
-  async function handleDelete(taskId: string, text: string) {
-    if (!confirm(`Delete: "${text}"?`)) return
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-task', { taskId })
-    await reloadTasks()
-  }
-
   async function handleEdit(taskId: string) {
     if (!editText.trim()) return
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:edit-task', {
@@ -361,6 +362,26 @@ function AreaDetail({
     await reloadTasks()
   }
 
+  async function handleRenameArea() {
+    const trimmed = renameText.trim()
+    if (!trimmed || trimmed === area.name) {
+      setRenamingArea(false)
+      return
+    }
+    setRenameError(null)
+    const result = (await window.electronAPI.extensionBridge.invoke(
+      'task-vault:vault:rename-area',
+      { areaFilePath: area.filePath, newName: trimmed }
+    )) as { error?: string } | undefined
+    if (result && 'error' in result) {
+      setRenameError(result.error ?? 'Rename failed')
+    } else {
+      setRenamingArea(false)
+      invalidateSmartInputCache()
+      await onRefresh()
+    }
+  }
+
   function startEdit(task: IndexedTask) {
     const parts = [task.text]
     if (task.project) parts.push(`@${task.project}`)
@@ -371,13 +392,23 @@ function AreaDetail({
     setEditingId(task.id)
   }
 
-  const STATUS_ICON: Record<string, string> = {
-    open: '[ ]',
-    done: '[x]',
-    cancelled: '[-]',
-    migrated: '[>]',
-    'in-progress': '[/]',
+  function TaskStatusIcon({ status }: { status: string }): React.JSX.Element {
+    switch (status) {
+      case 'done':
+        return <CheckCircle2 size={15} className="task-status task-status--done" />
+      case 'migrated':
+        return <ArrowRightCircle size={15} className="task-status task-status--migrated" />
+      case 'cancelled':
+        return <MinusCircle size={15} className="task-status task-status--cancelled" />
+      case 'in-progress':
+        return <Timer size={15} className="task-status task-status--in-progress" />
+      default:
+        return <Circle size={15} className="task-status task-status--open" />
+    }
   }
+
+  const isDone = (t: IndexedTask) =>
+    t.status === 'done' || t.status === 'cancelled' || t.status === 'migrated'
 
   return (
     <div className="area-detail">
@@ -385,12 +416,56 @@ function AreaDetail({
         <button className="tv-btn tv-btn--ghost tv-btn--xs" onClick={onBack}>
           ← Areas
         </button>
-        <h2>
-          {area.name}
-          {area.status === 'archived' && (
-            <span className="projects-browser__archived-badge tv-ml-2">archived</span>
-          )}
-        </h2>
+        {renamingArea ? (
+          <div className="area-detail__rename-row">
+            <input
+              className="area-detail__rename-input"
+              value={renameText}
+              onChange={(e) => setRenameText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleRenameArea()
+                if (e.key === 'Escape') {
+                  setRenamingArea(false)
+                  setRenameText(area.name)
+                }
+              }}
+              autoFocus
+            />
+            <button
+              className="tv-btn tv-btn--primary tv-btn--xs"
+              onClick={() => void handleRenameArea()}
+            >
+              Save
+            </button>
+            <button
+              className="tv-btn tv-btn--ghost tv-btn--xs"
+              onClick={() => {
+                setRenamingArea(false)
+                setRenameText(area.name)
+              }}
+            >
+              <X size={13} />
+            </button>
+            {renameError && <span className="area-detail__rename-error">{renameError}</span>}
+          </div>
+        ) : (
+          <h2>
+            {area.name}
+            {area.status === 'archived' && (
+              <span className="projects-browser__archived-badge tv-ml-2">archived</span>
+            )}
+            <button
+              className="tv-btn tv-btn--ghost tv-btn--xs area-detail__rename-btn"
+              onClick={() => {
+                setRenameText(area.name)
+                setRenamingArea(true)
+              }}
+              title="Rename area"
+            >
+              <Pencil size={12} />
+            </button>
+          </h2>
+        )}
         {area.status !== 'archived' ? (
           <button className="area-detail__delete-btn" onClick={onArchive} title="Archive area">
             Archive area
@@ -416,7 +491,7 @@ function AreaDetail({
           autoFocus
         />
         <button
-          className="tv-btn tv-btn--primary"
+          className="tv-btn tv-btn--primary area-detail__add-btn"
           onClick={handleAddTask}
           disabled={adding || !newTaskText.trim()}
         >
@@ -431,31 +506,45 @@ function AreaDetail({
           {tasks.map((task) => (
             <div
               key={task.id}
-              className={`area-detail__task${task.status === 'done' || task.status === 'cancelled' ? ' area-detail__task--done' : ''}`}
+              className={`area-detail__task${isDone(task) ? ' area-detail__task--done' : ''}`}
             >
-              <span className="area-detail__task-status">{STATUS_ICON[task.status] ?? '[ ]'}</span>
+              <button
+                className="daily-log__task-checkbox"
+                onClick={() =>
+                  isDone(task) ? void handleRestore(task.id) : void handleComplete(task.id)
+                }
+                title={isDone(task) ? 'Restore' : 'Complete'}
+              >
+                <TaskStatusIcon status={task.status} />
+              </button>
 
               {editingId === task.id ? (
                 <span className="area-detail__task-edit">
                   <SmartTaskInput
                     value={editText}
                     onChange={setEditText}
-                    onSubmit={() => handleEdit(task.id)}
+                    onSubmit={() => void handleEdit(task.id)}
                     onCancel={() => setEditingId(null)}
                     autoFocus
                   />
-                  <button className="tv-btn tv-btn--primary" onClick={() => handleEdit(task.id)}>
+                  <button
+                    className="tv-btn tv-btn--primary tv-btn--xs"
+                    onClick={() => void handleEdit(task.id)}
+                  >
                     Save
                   </button>
-                  <button className="tv-btn tv-btn--icon" onClick={() => setEditingId(null)}>
-                    <X size={14} />
+                  <button
+                    className="tv-btn tv-btn--ghost tv-btn--xs"
+                    onClick={() => setEditingId(null)}
+                  >
+                    <X size={13} />
                   </button>
                 </span>
               ) : (
                 <span
-                  className={`area-detail__task-text${task.status === 'done' || task.status === 'cancelled' ? ' area-detail__task-text--done' : ''}`}
-                  onDoubleClick={() => task.status === 'open' && startEdit(task)}
-                  title={task.status === 'open' ? 'Double-click to edit' : undefined}
+                  className={`area-detail__task-text${isDone(task) ? ' area-detail__task-text--done' : ''}`}
+                  onDoubleClick={() => !isDone(task) && startEdit(task)}
+                  title={!isDone(task) ? 'Double-click to edit' : undefined}
                 >
                   {task.text}
                   {task.project && (
@@ -467,52 +556,6 @@ function AreaDetail({
                   {task.dueDate && (
                     <span className="daily-log__tag daily-log__tag--due">due:{task.dueDate}</span>
                   )}
-                </span>
-              )}
-
-              {editingId !== task.id && (
-                <span className="area-detail__task-actions">
-                  {task.status === 'open' && (
-                    <>
-                      <button
-                        className="tv-btn tv-btn--outline"
-                        onClick={() => handleComplete(task.id)}
-                        title="Complete"
-                      >
-                        <Check size={14} />
-                      </button>
-                      <button
-                        className="tv-btn tv-btn--outline"
-                        onClick={() => startEdit(task)}
-                        title="Edit"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        className="tv-btn tv-btn--icon"
-                        onClick={() => handleCancel(task.id)}
-                        title="Cancel task"
-                      >
-                        <X size={14} />
-                      </button>
-                    </>
-                  )}
-                  {(task.status === 'done' || task.status === 'cancelled') && (
-                    <button
-                      className="tv-btn tv-btn--outline"
-                      onClick={() => handleRestore(task.id)}
-                      title="Restore to open"
-                    >
-                      ↩
-                    </button>
-                  )}
-                  <button
-                    className="tv-btn tv-btn--outline"
-                    onClick={() => handleDelete(task.id, task.text)}
-                    title="Delete"
-                  >
-                    <Trash2 size={14} />
-                  </button>
                 </span>
               )}
             </div>

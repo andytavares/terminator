@@ -10,9 +10,16 @@ import {
 } from 'lucide-react'
 import type { IndexedTask, IndexedProject } from '../vault/types'
 
+interface ArchivedArea {
+  id: string
+  name: string
+  updatedAt: string
+}
+
 interface ArchiveData {
   tasks: IndexedTask[]
   projects: IndexedProject[]
+  areas: ArchivedArea[]
 }
 
 function ArchiveStatusIcon({ status }: { status: string }): React.JSX.Element {
@@ -53,11 +60,11 @@ function ArchiveStatusIcon({ status }: { status: string }): React.JSX.Element {
 }
 
 export function ArchiveView(): React.JSX.Element {
-  const [data, setData] = useState<ArchiveData>({ tasks: [], projects: [] })
+  const [data, setData] = useState<ArchiveData>({ tasks: [], projects: [], areas: [] })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [days, setDays] = useState(30)
-  const [tab, setTab] = useState<'tasks' | 'projects'>('tasks')
+  const [tab, setTab] = useState<'tasks' | 'projects' | 'areas'>('tasks')
 
   async function load(windowDays: number) {
     setIsLoading(true)
@@ -70,7 +77,8 @@ export function ArchiveView(): React.JSX.Element {
       if (result && typeof result === 'object' && 'error' in result) {
         setError((result as { error: string }).error)
       } else if (result && typeof result === 'object') {
-        setData(result as ArchiveData)
+        const r = result as Partial<ArchiveData>
+        setData({ tasks: r.tasks ?? [], projects: r.projects ?? [], areas: r.areas ?? [] })
       }
     } catch (err) {
       setError(String(err))
@@ -115,6 +123,19 @@ export function ArchiveView(): React.JSX.Element {
     await load(days)
   }
 
+  async function handleRestoreArea(areaName: string) {
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:restore-area', { areaName })
+    await load(days)
+  }
+
+  async function handleDeleteArea(areaName: string) {
+    if (!confirm(`Permanently delete area "${areaName}"?`)) return
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-area', {
+      areaFilePath: areaName,
+    })
+    await load(days)
+  }
+
   if (isLoading) return <div className="archive-view__loading">Loading archive…</div>
   if (error) return <div className="archive-view__error">{error}</div>
 
@@ -125,7 +146,7 @@ export function ArchiveView(): React.JSX.Element {
   return (
     <div className="archive-view">
       <div className="archive-view__header">
-        <h2>Archive</h2>
+        <h2>History</h2>
         <div className="archive-view__window-picker">
           <span>Show last:</span>
           {[7, 30, 90].map((d) => (
@@ -152,6 +173,12 @@ export function ArchiveView(): React.JSX.Element {
           onClick={() => setTab('projects')}
         >
           Archived Projects ({data.projects.length})
+        </button>
+        <button
+          className={`archive-view__tab${tab === 'areas' ? ' archive-view__tab--active' : ''}`}
+          onClick={() => setTab('areas')}
+        >
+          Archived Areas ({data.areas.length})
         </button>
       </div>
 
@@ -233,6 +260,39 @@ export function ArchiveView(): React.JSX.Element {
                   <button
                     className="archive-view__delete-btn"
                     onClick={() => deleteProject(project.filePath, project.name)}
+                  >
+                    Delete permanently
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {tab === 'areas' && (
+        <div className="archive-view__projects">
+          {data.areas.length === 0 ? (
+            <p className="archive-view__empty">No archived areas.</p>
+          ) : (
+            data.areas.map((area) => (
+              <div key={area.id} className="archive-view__project-card">
+                <div className="archive-view__project-header">
+                  <span className="archive-view__project-name">{area.name}</span>
+                  <span className="archive-view__project-date">
+                    {new Date(area.updatedAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="archive-view__project-actions">
+                  <button
+                    className="archive-view__restore-btn"
+                    onClick={() => void handleRestoreArea(area.name)}
+                  >
+                    Restore to active
+                  </button>
+                  <button
+                    className="archive-view__delete-btn"
+                    onClick={() => void handleDeleteArea(area.name)}
                   >
                     Delete permanently
                   </button>

@@ -90,6 +90,13 @@ export function registerProjectsIpcHandlers(): () => void {
       .all() as Record<string, unknown>[]
     const somedayProjects = somedayRows.map(rowToProject)
 
+    const somedayTaskRows = db
+      .prepare(
+        `SELECT * FROM tasks WHERE source='someday' AND status='open' ORDER BY created_at ASC`
+      )
+      .all() as Record<string, unknown>[]
+    const somedayTasks = somedayTaskRows.map(rowToTask)
+
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     const completedRows = db
       .prepare(`SELECT * FROM tasks WHERE status='done' AND updated_at >= ?`)
@@ -101,6 +108,7 @@ export function registerProjectsIpcHandlers(): () => void {
       activeProjects,
       staleProjects,
       somedayProjects,
+      somedayTasks,
       completedLastWeek,
       lastReviewDate: null,
     }
@@ -127,11 +135,9 @@ export function registerProjectsIpcHandlers(): () => void {
         areaId = existingArea.id
       } else {
         areaId = randomUUID()
-        db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
-          areaId,
-          displayArea,
-          now
-        )
+        db.prepare(
+          `INSERT OR IGNORE INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?)`
+        ).run(areaId, displayArea, now, now)
       }
     }
     db.prepare(
@@ -225,17 +231,59 @@ export function registerProjectsIpcHandlers(): () => void {
         areaId = existingArea.id
       } else {
         areaId = randomUUID()
-        db.prepare(`INSERT OR IGNORE INTO areas (id,name,created_at) VALUES (?,?,?)`).run(
-          areaId,
-          area,
-          now
-        )
+        db.prepare(
+          `INSERT OR IGNORE INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?)`
+        ).run(areaId, area, now, now)
       }
     }
     db.prepare(`UPDATE projects SET area_id=?, updated_at=? WHERE name=?`).run(
       areaId,
       now,
       projectName
+    )
+    return { success: true }
+  })
+
+  // ── projects:update-deadline ─────────────────────────────────────────────────
+
+  handle('task-vault:projects:update-deadline', async (_event, payload) => {
+    const { projectFilePath: projectName, deadline } = payload as {
+      projectFilePath: string
+      deadline: string | null
+    }
+    if (!projectName) return { error: 'VALIDATION_ERROR' }
+    const db = getDb()
+    const now = new Date().toISOString()
+    db.prepare(`UPDATE projects SET deadline=?, updated_at=? WHERE name=?`).run(
+      deadline || null,
+      now,
+      projectName
+    )
+    return { success: true }
+  })
+
+  // ── projects:rename ──────────────────────────────────────────────────────────
+
+  handle('task-vault:projects:rename', async (_event, payload) => {
+    const { projectFilePath: projectName, newName } = payload as {
+      projectFilePath: string
+      newName: string
+    }
+    if (!projectName || !newName?.trim()) return { error: 'VALIDATION_ERROR' }
+    const db = getDb()
+    const now = new Date().toISOString()
+    const proj = db.prepare(`SELECT id FROM projects WHERE name=?`).get(projectName) as
+      | { id: string }
+      | undefined
+    if (!proj) return { error: 'NOT_FOUND' }
+    const existing = db
+      .prepare(`SELECT id FROM projects WHERE name=? AND id != ?`)
+      .get(newName.trim(), proj.id)
+    if (existing) return { error: 'PROJECT_EXISTS' }
+    db.prepare(`UPDATE projects SET name=?, updated_at=? WHERE id=?`).run(
+      newName.trim(),
+      now,
+      proj.id
     )
     return { success: true }
   })

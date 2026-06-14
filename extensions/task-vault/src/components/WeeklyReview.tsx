@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { IndexedTask, IndexedProject } from '../vault/types'
 import { WeeklyReviewStep1GetClear } from './WeeklyReviewStep1GetClear'
@@ -12,6 +12,7 @@ interface WeeklyReviewPayload {
   activeProjects: IndexedProject[]
   staleProjects: IndexedProject[]
   somedayProjects: IndexedProject[]
+  somedayTasks: IndexedTask[]
   completedLastWeek: IndexedTask[]
   lastReviewDate: string | null
 }
@@ -75,13 +76,6 @@ export function WeeklyReview(): React.JSX.Element {
     setDone(true)
   }
 
-  const handleItemFiled = useCallback((taskId: string) => {
-    setPayload((prev) => {
-      if (!prev) return prev
-      return { ...prev, inboxItems: prev.inboxItems.filter((t) => t.id !== taskId) }
-    })
-  }, [])
-
   if (isLoading)
     return <div className="weekly-review weekly-review--loading">Loading review data…</div>
   if (done)
@@ -140,13 +134,7 @@ export function WeeklyReview(): React.JSX.Element {
       </div>
 
       <div className="weekly-review__content">
-        {step === 1 && (
-          <WeeklyReviewStep1GetClear
-            inboxItems={payload.inboxItems}
-            onItemFiled={handleItemFiled}
-            onComplete={nextStep}
-          />
-        )}
+        {step === 1 && <WeeklyReviewStep1GetClear onComplete={nextStep} />}
         {step === 2 && (
           <WeeklyReviewStep2Inbox inboxItems={payload.inboxItems} onComplete={nextStep} />
         )}
@@ -159,6 +147,7 @@ export function WeeklyReview(): React.JSX.Element {
         {step === 4 && (
           <WeeklyReviewStep5Someday
             somedayProjects={payload.somedayProjects}
+            somedayTasks={payload.somedayTasks}
             onComplete={nextStep}
           />
         )}

@@ -343,27 +343,27 @@ describe('useWorkspaceStore', () => {
     })
   })
 
-  describe('collapsedWorkspaceIds', () => {
-    const storageKey = 'terminator.workspace.collapsed'
+  describe('expandedWorkspaceIds', () => {
+    const storageKey = 'terminator.workspace.expanded'
 
     beforeEach(() => {
       localStorage.clear()
-      useWorkspaceStore.setState({ collapsedWorkspaceIds: new Set() })
+      useWorkspaceStore.setState({ expandedWorkspaceIds: new Set() })
     })
 
     it('initializes as empty set when localStorage has no entry', () => {
-      expect(useWorkspaceStore.getState().collapsedWorkspaceIds.size).toBe(0)
+      expect(useWorkspaceStore.getState().expandedWorkspaceIds.size).toBe(0)
     })
 
     it('toggleWorkspaceCollapse adds an ID that is not present', () => {
       useWorkspaceStore.getState().toggleWorkspaceCollapse('ws-1')
-      expect(useWorkspaceStore.getState().collapsedWorkspaceIds.has('ws-1')).toBe(true)
+      expect(useWorkspaceStore.getState().expandedWorkspaceIds.has('ws-1')).toBe(true)
     })
 
     it('toggleWorkspaceCollapse removes an ID that is already present', () => {
-      useWorkspaceStore.setState({ collapsedWorkspaceIds: new Set(['ws-1']) })
+      useWorkspaceStore.setState({ expandedWorkspaceIds: new Set(['ws-1']) })
       useWorkspaceStore.getState().toggleWorkspaceCollapse('ws-1')
-      expect(useWorkspaceStore.getState().collapsedWorkspaceIds.has('ws-1')).toBe(false)
+      expect(useWorkspaceStore.getState().expandedWorkspaceIds.has('ws-1')).toBe(false)
     })
 
     it('writes collapsed IDs to localStorage on toggle', () => {
@@ -373,7 +373,7 @@ describe('useWorkspaceStore', () => {
     })
 
     it('removes ID from localStorage when toggled off', () => {
-      useWorkspaceStore.setState({ collapsedWorkspaceIds: new Set(['ws-1']) })
+      useWorkspaceStore.setState({ expandedWorkspaceIds: new Set(['ws-1']) })
       useWorkspaceStore.getState().toggleWorkspaceCollapse('ws-1')
       const stored = JSON.parse(localStorage.getItem(storageKey) ?? '["ws-1"]') as string[]
       expect(stored).not.toContain('ws-1')

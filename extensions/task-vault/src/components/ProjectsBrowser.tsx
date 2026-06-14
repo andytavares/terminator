@@ -1,5 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Zap, Pencil, Check, X, Trash2, Archive } from 'lucide-react'
+import { DateTimePicker } from './DateTimePicker'
+import {
+  Zap,
+  Pencil,
+  Check,
+  X,
+  Trash2,
+  Archive,
+  Circle,
+  CheckCircle2,
+  MinusCircle,
+  ArrowRightCircle,
+  Timer,
+} from 'lucide-react'
 import type { IndexedProject, IndexedTask } from '../vault/types'
 import { useVaultStore } from '../stores/vault.store'
 import { SmartTaskInput } from './SmartTaskInput'
@@ -270,7 +283,12 @@ function CreateProjectForm({ onCreated, onCancel }: CreateProjectFormProps): Rea
         </div>
         <div className="create-project-form__field">
           <label>Deadline</label>
-          <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+          <DateTimePicker
+            mode="date"
+            value={deadline}
+            onChange={setDeadline}
+            className="dtp--full"
+          />
         </div>
       </div>
       <div className="create-project-form__actions">
@@ -321,21 +339,8 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
     tickCalendar()
   }
 
-  async function handleCancel(taskId: string) {
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:cancel-task', { taskId })
-    await load()
-    tickCalendar()
-  }
-
   async function handleRestore(taskId: string) {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:restore-task', { taskId })
-    await load()
-    tickCalendar()
-  }
-
-  async function handleDelete(taskId: string, text: string) {
-    if (!confirm(`Delete task: "${text}"?`)) return
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-task', { taskId })
     await load()
     tickCalendar()
   }
@@ -396,17 +401,45 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
     )
   }
 
-  const STATUS_ICON: Record<string, string> = {
-    done: '[x]',
-    migrated: '[>]',
-    cancelled: '[-]',
-    'in-progress': '[/]',
-    open: '[ ]',
+  const isDone = (t: IndexedTask) =>
+    t.status === 'done' || t.status === 'cancelled' || t.status === 'migrated'
+  const openTasks = tasks.filter((t) => !isDone(t))
+  const doneTasks = tasks.filter(isDone)
+
+  function TaskStatusIcon({ task }: { task: IndexedTask }): React.JSX.Element {
+    switch (task.status) {
+      case 'done':
+        return (
+          <CheckCircle2
+            size={15}
+            className="daily-log__task-status-icon daily-log__task-status-icon--done"
+          />
+        )
+      case 'cancelled':
+        return (
+          <MinusCircle
+            size={15}
+            className="daily-log__task-status-icon daily-log__task-status-icon--cancelled"
+          />
+        )
+      case 'migrated':
+        return (
+          <ArrowRightCircle
+            size={15}
+            className="daily-log__task-status-icon daily-log__task-status-icon--migrated"
+          />
+        )
+      case 'in-progress':
+        return (
+          <Timer
+            size={15}
+            className="daily-log__task-status-icon daily-log__task-status-icon--in-progress"
+          />
+        )
+      default:
+        return <Circle size={15} className="daily-log__task-status-icon" />
+    }
   }
-  const openTasks = tasks.filter((t) => t.status === 'open' || t.status === 'in-progress')
-  const doneTasks = tasks.filter(
-    (t) => t.status === 'done' || t.status === 'cancelled' || t.status === 'migrated'
-  )
 
   return (
     <div className="projects-browser__task-list">
@@ -428,7 +461,7 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
           disabled={adding}
         />
         <button
-          className="tv-btn tv-btn--primary"
+          className="tv-btn tv-btn--primary projects-browser__add-btn"
           onClick={() => void handleAddTask()}
           disabled={adding || !addingText.trim()}
         >
@@ -444,11 +477,11 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
       {openTasks.map((t) => (
         <div key={t.id} className="projects-browser__task-row">
           <button
-            className="projects-browser__task-check"
+            className="daily-log__task-checkbox"
             onClick={() => void handleComplete(t.id)}
             title="Complete"
           >
-            {STATUS_ICON[t.status] ?? '[ ]'}
+            <TaskStatusIcon task={t} />
           </button>
           {editingId === t.id ? (
             <span className="projects-browser__task-edit">
@@ -459,7 +492,10 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
                 onCancel={() => setEditingId(null)}
                 autoFocus
               />
-              <button className="tv-btn tv-btn--primary" onClick={() => void handleSaveEdit(t.id)}>
+              <button
+                className="tv-btn tv-btn--primary tv-btn--icon"
+                onClick={() => void handleSaveEdit(t.id)}
+              >
                 <Check size={13} />
               </button>
               <button className="tv-btn tv-btn--icon" onClick={() => setEditingId(null)}>
@@ -479,29 +515,6 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
               <span className="projects-browser__task-file">
                 {t.filePath.split('/').pop()?.replace('.md', '')}
               </span>
-              <span className="projects-browser__task-actions">
-                <button
-                  className="tv-btn tv-btn--outline"
-                  onClick={() => startEdit(t)}
-                  title="Edit"
-                >
-                  <Pencil size={12} />
-                </button>
-                <button
-                  className="tv-btn tv-btn--outline"
-                  onClick={() => void handleCancel(t.id)}
-                  title="Cancel task"
-                >
-                  <X size={12} />
-                </button>
-                <button
-                  className="tv-btn tv-btn--outline"
-                  onClick={() => void handleDelete(t.id, t.text)}
-                  title="Delete"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </span>
             </>
           )}
         </div>
@@ -511,24 +524,17 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
           <summary>{doneTasks.length} completed/cancelled</summary>
           {doneTasks.map((t) => (
             <div key={t.id} className="projects-browser__task-row projects-browser__task-row--done">
-              <span className="projects-browser__task-marker">
-                {STATUS_ICON[t.status] ?? '[x]'}
+              <span className="daily-log__task-checkbox projects-browser__task-done-icon">
+                <TaskStatusIcon task={t} />
               </span>
               <span className="projects-browser__task-text">{t.text}</span>
               <span className="projects-browser__task-actions">
                 <button
-                  className="tv-btn tv-btn--outline"
+                  className="tv-btn tv-btn--ghost tv-btn--xs"
                   onClick={() => void handleRestore(t.id)}
                   title="Restore to inbox"
                 >
                   ↩
-                </button>
-                <button
-                  className="tv-btn tv-btn--outline"
-                  onClick={() => void handleDelete(t.id, t.text)}
-                  title="Delete"
-                >
-                  <Trash2 size={12} />
                 </button>
               </span>
             </div>
@@ -631,6 +637,11 @@ export function ProjectsBrowser(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<'active' | 'archived' | 'all'>('active')
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [renamingProject, setRenamingProject] = useState<string | null>(null)
+  const [renameText, setRenameText] = useState('')
+  const [renameError, setRenameError] = useState<string | null>(null)
+  const [editingDeadlineProject, setEditingDeadlineProject] = useState<string | null>(null)
+  const [deadlineValue, setDeadlineValue] = useState('')
   const { selectedProjectName } = useVaultStore()
 
   async function load() {
@@ -663,6 +674,35 @@ export function ProjectsBrowser(): React.JSX.Element {
       projectFilePath: filePath,
     })
     await load()
+  }
+
+  async function handleUpdateDeadline(projectName: string, value: string | null) {
+    await window.electronAPI.extensionBridge.invoke('task-vault:projects:update-deadline', {
+      projectFilePath: projectName,
+      deadline: value || null,
+    })
+    setEditingDeadlineProject(null)
+    await load()
+  }
+
+  async function handleRenameProject() {
+    if (!renamingProject || !renameText.trim()) return
+    setRenameError(null)
+    try {
+      const result = await window.electronAPI.extensionBridge.invoke('task-vault:projects:rename', {
+        projectFilePath: renamingProject,
+        newName: renameText.trim(),
+      })
+      if (result && typeof result === 'object' && 'error' in result) {
+        const err = (result as { error: string }).error
+        setRenameError(err === 'PROJECT_EXISTS' ? 'A project with that name already exists.' : err)
+      } else {
+        setRenamingProject(null)
+        await load()
+      }
+    } catch (err) {
+      setRenameError(String(err))
+    }
   }
 
   if (isLoading) return <div className="projects-browser__loading">Loading projects…</div>
@@ -709,7 +749,54 @@ export function ProjectsBrowser(): React.JSX.Element {
           className={`projects-browser__card${project.isStale ? ' projects-browser__card--stale' : ''}${project.name === selectedProjectName ? ' projects-browser__card--selected' : ''}`}
         >
           <div className="projects-browser__card-header">
-            <span className="projects-browser__name">{project.name}</span>
+            {renamingProject === project.name ? (
+              <div className="area-detail__rename-row projects-browser__rename-row">
+                <input
+                  className="area-detail__rename-input projects-browser__rename-input"
+                  value={renameText}
+                  onChange={(e) => setRenameText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleRenameProject()
+                    if (e.key === 'Escape') {
+                      setRenamingProject(null)
+                      setRenameError(null)
+                    }
+                  }}
+                  autoFocus
+                />
+                <button
+                  className="tv-btn tv-btn--primary tv-btn--xs"
+                  onClick={() => void handleRenameProject()}
+                >
+                  Save
+                </button>
+                <button
+                  className="tv-btn tv-btn--ghost tv-btn--xs"
+                  onClick={() => {
+                    setRenamingProject(null)
+                    setRenameError(null)
+                  }}
+                >
+                  <X size={13} />
+                </button>
+                {renameError && <span className="area-detail__rename-error">{renameError}</span>}
+              </div>
+            ) : (
+              <span className="projects-browser__name-wrap">
+                <span className="projects-browser__name">{project.name}</span>
+                <button
+                  className="tv-btn tv-btn--ghost tv-btn--xs area-detail__rename-btn"
+                  onClick={() => {
+                    setRenameText(project.name)
+                    setRenamingProject(project.name)
+                    setRenameError(null)
+                  }}
+                  title="Rename project"
+                >
+                  <Pencil size={12} />
+                </button>
+              </span>
+            )}
             {project.status === 'archived' && (
               <span className="projects-browser__archived-badge">archived</span>
             )}
@@ -717,8 +804,52 @@ export function ProjectsBrowser(): React.JSX.Element {
               <span className="projects-browser__someday-badge">someday</span>
             )}
             <ProjectAreaBadge project={project} onUpdated={load} />
-            {project.deadline && (
-              <span className="projects-browser__deadline">due: {project.deadline}</span>
+            {editingDeadlineProject === project.name ? (
+              <span className="projects-browser__deadline-edit">
+                <DateTimePicker mode="date" value={deadlineValue} onChange={setDeadlineValue} />
+                <button
+                  className="tv-btn tv-btn--primary tv-btn--xs"
+                  onClick={() => void handleUpdateDeadline(project.name, deadlineValue)}
+                >
+                  Save
+                </button>
+                {project.deadline && (
+                  <button
+                    className="tv-btn tv-btn--ghost tv-btn--xs"
+                    onClick={() => void handleUpdateDeadline(project.name, null)}
+                  >
+                    Clear
+                  </button>
+                )}
+                <button
+                  className="tv-btn tv-btn--ghost tv-btn--xs"
+                  onClick={() => setEditingDeadlineProject(null)}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ) : project.deadline ? (
+              <button
+                className="projects-browser__deadline"
+                onClick={() => {
+                  setDeadlineValue(project.deadline ?? '')
+                  setEditingDeadlineProject(project.name)
+                }}
+                title="Edit deadline"
+              >
+                due: {project.deadline}
+              </button>
+            ) : (
+              <button
+                className="projects-browser__deadline-add-btn"
+                onClick={() => {
+                  setDeadlineValue('')
+                  setEditingDeadlineProject(project.name)
+                }}
+                title="Set deadline"
+              >
+                + due date
+              </button>
             )}
           </div>
           <div className="projects-browser__stats">

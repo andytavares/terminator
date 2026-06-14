@@ -47,7 +47,8 @@ export const useVaultDataStore = create<VaultDataStore>((set) => ({
         return
       }
       const res = result as DailyLog & { rolledOver?: number; rolledOverIds?: string[] }
-      const today = new Date().toISOString().split('T')[0]
+      const d = new Date()
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       useVaultNavStore.getState().setViewingDate(today)
       set((s) => ({
         todayLog: res,

@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, Notification } from 'electron'
 import { getDb } from '../vault/db.js'
 import type { ExtensionAPI, Disposable } from '../../../../src/main/extensions/api.js'
 
@@ -143,9 +143,18 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
         notifiedDueIds.add(task.id)
         const taskId = task.id
         const taskDate = task.due_date
+        const notifTitle = isOverdue ? `Overdue: ${task.text}` : `Due today: ${task.text}`
+        // OS system notification (clickable — navigates to the task)
+        if (Notification.isSupported()) {
+          const osNotif = new Notification({ title: notifTitle, silent: false })
+          osNotif.on('click', () =>
+            broadcast('task-vault:navigate-task', { taskId, date: taskDate })
+          )
+          osNotif.show()
+        }
         const notif = api.notifications.createNotification({
           type: isOverdue ? 'error' : 'warning',
-          title: isOverdue ? `Overdue: ${task.text}` : `Due today: ${task.text}`,
+          title: notifTitle,
           actions: [
             {
               id: 'open',
@@ -198,9 +207,20 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
         // Dismiss any existing notification for this blocked task before creating a new one
         blockedTaskNotifs.get(task.id)?.dispose()
 
+        const blockedTitle = `Check in: ${task.text}`
+        // OS system notification (clickable — navigates to the task)
+        if (Notification.isSupported()) {
+          const osNotif = new Notification({
+            title: blockedTitle,
+            body: meta.blocked_reason ?? '',
+            silent: false,
+          })
+          osNotif.on('click', () => broadcast('task-vault:navigate-task', taskId))
+          osNotif.show()
+        }
         const notif = api.notifications.createNotification({
           type: 'info',
-          title: `Check in: ${task.text}`,
+          title: blockedTitle,
           message: meta.blocked_reason ?? undefined,
           actions: [
             {
