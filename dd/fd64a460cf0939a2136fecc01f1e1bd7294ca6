@@ -1,0 +1,25 @@
+extensions/remote-control/src/index.ts
+  s_8e723948aeb460::t_f414efdb37558c 237-238,241,245
+extensions/remote-control/src/server/remote-server.ts
+  s_8e723948aeb460::t_7af0a953cb9636 165
+src/renderer-remote/electron-api-shim.ts
+  s_8e723948aeb460::t_f86c60315fd522 114-117
+extensions/remote-control/src/components/RemoteControlSettings.tsx
+  s_8e723948aeb460::t_400ea7da4013d3 41-42,50-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "ddfd64a460cf0939a2136fecc01f1e1bd7294ca6",
+  "prompts": {},
+  "sessions": {
+    "s_8e723948aeb460": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bafe19cd-02b4-42a6-9919-66a462467a04",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
