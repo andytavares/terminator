@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Settings, Download, Upload, Kanban, List, ChevronDown } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import './task-vault.css'
-import { useToastStore } from '../../../../src/renderer/stores/toast.store'
+import { notify } from '../utils/notify'
 import { useVaultStore } from '../stores/vault.store'
 import { useVaultNavStore } from '../stores/vault-nav.store'
 import { useVaultDataStore } from '../stores/vault-data.store'
@@ -271,7 +271,6 @@ export function TaskVaultView(): React.JSX.Element {
     setKanbanLanes,
     tickCalendar,
   } = useVaultStore()
-  const { addToast } = useToastStore()
   const [showDataTools, setShowDataTools] = useState(false)
   const [availableContexts, setAvailableContexts] = useState<string[]>([])
   const [contextMenuOpen, setContextMenuOpen] = useState(false)
@@ -396,9 +395,7 @@ export function TaskVaultView(): React.JSX.Element {
   async function handleComplete(taskId: string) {
     const taskText = (todayLog?.tasks ?? []).find((t) => t.id === taskId)?.text ?? ''
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', { taskId })
-    addToast({
-      type: 'success',
-      message: taskText ? `Completed: ${taskText}` : 'Task completed',
+    notify('success', taskText ? `Completed: ${taskText}` : 'Task completed', {
       onClick: makeTaskNavHandler(taskId),
     })
     if (viewingDate) await loadDate(viewingDate)
@@ -426,9 +423,7 @@ export function TaskVaultView(): React.JSX.Element {
       }
     )) as { noop?: boolean } | undefined
     if (result?.noop) return
-    addToast({
-      type: 'info',
-      message: taskText ? `Migrated: ${taskText}` : 'Task migrated',
+    notify('info', taskText ? `Migrated: ${taskText}` : 'Task migrated', {
       onClick: makeTaskNavHandler(taskId),
     })
     if (viewingDate) await loadDate(viewingDate)
@@ -477,6 +472,15 @@ export function TaskVaultView(): React.JSX.Element {
     setSelectedTaskId(taskId)
     setSelectedTaskText(task?.text ?? '')
   }
+
+  useEffect(() => {
+    if (!selectedTaskId) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') handleSelectTask(null)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [selectedTaskId])
 
   return (
     <div className="task-vault-view">
@@ -595,9 +599,7 @@ export function TaskVaultView(): React.JSX.Element {
                 />
               )}
               {activeView === 'daily' && !isLoading && !error && !todayLog && (
-                <div className="task-vault-view__empty">
-                  No vault configured. Set vault path in settings.
-                </div>
+                <div className="task-vault-view__empty">Loading…</div>
               )}
               {activeView === 'inbox' && <InboxView />}
               {activeView === 'projects' && <ProjectsBrowser />}

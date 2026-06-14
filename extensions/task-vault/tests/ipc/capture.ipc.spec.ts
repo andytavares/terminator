@@ -57,9 +57,7 @@ vi.mock('../../src/vault/db', () => ({
   randomUUID: vi.fn(() => 'test-uuid'),
 }))
 
-import { registerVaultIpcHandlers, setVaultPath } from '../../src/ipc/vault.ipc'
-
-const VAULT = '/vault'
+import { registerVaultIpcHandlers } from '../../src/ipc/vault.ipc'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -69,7 +67,6 @@ beforeEach(() => {
   vi.mocked(fs.stat).mockResolvedValue({ mtime: new Date() } as unknown as Awaited<
     ReturnType<typeof fs.stat>
   >)
-  setVaultPath(VAULT)
 })
 
 afterEach(() => {

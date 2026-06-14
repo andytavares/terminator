@@ -45,13 +45,12 @@ vi.mock('../../src/vault/db', () => ({
   getDb: vi.fn(() => ({ prepare: mockPrepare })),
 }))
 
-import { registerKanbanIpcHandlers, setVaultPath } from '../../src/ipc/kanban.ipc.js'
+import { registerKanbanIpcHandlers } from '../../src/ipc/kanban.ipc.js'
 import { DEFAULT_KANBAN_CONFIG } from '../../src/vault/types.js'
 
 describe('registerKanbanIpcHandlers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    setVaultPath('/tmp/vault')
     mockHandle.mockImplementation(
       (_channel: string, handler: (...args: unknown[]) => unknown) => handler
     )

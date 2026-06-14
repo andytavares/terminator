@@ -26,7 +26,7 @@ import { SmartTaskInput } from './SmartTaskInput'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
-import { useToastStore } from '../../../../src/renderer/stores/toast.store'
+import { notify } from '../utils/notify'
 import { useVaultNavStore } from '../stores/vault-nav.store'
 
 interface DailyLogProps {
@@ -161,7 +161,6 @@ function SubtaskRow({
 }): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(subtask.text)
-  const { addToast } = useToastStore()
 
   async function saveEdit() {
     if (!editText.trim()) return
@@ -177,11 +176,7 @@ function SubtaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', {
       taskId: subtask.id,
     })
-    addToast({
-      type: 'success',
-      message: `Completed: ${subtask.text}`,
-      onClick: makeTaskNavHandler(subtask.id),
-    })
+    notify('success', `Completed: ${subtask.text}`, { onClick: makeTaskNavHandler(subtask.id) })
     await onRefresh()
   }
 
@@ -737,7 +732,6 @@ function TaskRow({
   const [subtaskText, setSubtaskText] = useState('')
   const [savingSubtask, setSavingSubtask] = useState(false)
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const { addToast } = useToastStore()
 
   useEffect(() => {
     setLinked(task.terminatorLinks.length > 0)
@@ -777,11 +771,7 @@ function TaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:cancel-task', {
       taskId: task.id,
     })
-    addToast({
-      type: 'info',
-      message: `Archived: ${task.text}`,
-      onClick: makeTaskNavHandler(task.id),
-    })
+    notify('info', `Archived: ${task.text}`, { onClick: makeTaskNavHandler(task.id) })
     await onRefresh()
   }
 
@@ -805,11 +795,7 @@ function TaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:reopen-task', {
       taskId: task.id,
     })
-    addToast({
-      type: 'info',
-      message: `Reopened: ${task.text}`,
-      onClick: makeTaskNavHandler(task.id),
-    })
+    notify('info', `Reopened: ${task.text}`, { onClick: makeTaskNavHandler(task.id) })
     await onRefresh()
   }
 
@@ -820,11 +806,7 @@ function TaskRow({
       reason,
       checkInterval,
     })
-    addToast({
-      type: 'warning',
-      message: `Blocked: ${task.text}`,
-      onClick: makeTaskNavHandler(task.id),
-    })
+    notify('warning', `Blocked: ${task.text}`, { onClick: makeTaskNavHandler(task.id) })
     await onRefresh()
   }
 
@@ -832,11 +814,7 @@ function TaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:unblock-task', {
       taskId: task.id,
     })
-    addToast({
-      type: 'success',
-      message: `Unblocked: ${task.text}`,
-      onClick: makeTaskNavHandler(task.id),
-    })
+    notify('success', `Unblocked: ${task.text}`, { onClick: makeTaskNavHandler(task.id) })
     await onRefresh()
   }
 
@@ -858,11 +836,11 @@ function TaskRow({
       endDate: endType === 'on_date' ? endDate : undefined,
       endCount: endType === 'after_count' ? endCount : undefined,
     })
-    addToast({
-      type: 'success',
-      message: `Recurrence set: ${formatRecurrenceRule(days && days.length > 0 ? `weekly:${days.sort((a, b) => a - b).join(',')}` : interval)}`,
-      onClick: makeTaskNavHandler(task.id),
-    })
+    notify(
+      'success',
+      `Recurrence set: ${formatRecurrenceRule(days && days.length > 0 ? `weekly:${days.sort((a, b) => a - b).join(',')}` : interval)}`,
+      { onClick: makeTaskNavHandler(task.id) }
+    )
     await onRefresh()
   }
 
@@ -871,7 +849,7 @@ function TaskRow({
       taskId: task.id,
       action: 'someday',
     })
-    addToast({ type: 'info', message: `Moved to backlog: ${task.text}` })
+    notify('info', `Moved to backlog: ${task.text}`)
     await onRefresh()
   }
 
@@ -880,7 +858,7 @@ function TaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:clear-recurrence', {
       taskId: task.id,
     })
-    addToast({ type: 'info', message: `Recurrence removed: ${task.text}` })
+    notify('info', `Recurrence removed: ${task.text}`)
     await onRefresh()
   }
 

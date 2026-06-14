@@ -30,16 +30,7 @@ import {
   ArchiveAreaRequestSchema,
 } from '../schemas/vault.schema'
 import { triggerSchedulerTick, broadcast } from '../notifications/task-scheduler.js'
-import { setVaultPath as _setVaultPath, getVaultPath as _getVaultPath } from '../vault/vault-path'
 import { rowToTask, rowToProject, TASK_COLS, TASK_JOINS } from '../vault/mappers'
-
-export function setVaultPath(p: string): void {
-  _setVaultPath(p)
-}
-
-export function getVaultPath(): string {
-  return _getVaultPath()
-}
 
 const localDate = _localDate
 
@@ -116,6 +107,15 @@ export function registerVaultIpcHandlers(): () => void {
     ipcMain.handle(channel, fn)
     handlers.push([channel, fn as (...args: unknown[]) => unknown])
   }
+
+  // ── system-notify ────────────────────────────────────────────────────────────
+  handle('task-vault:system-notify', async (_event, payload) => {
+    const { title = 'Task Vault', body = '' } = (payload ?? {}) as { title?: string; body?: string }
+    if (Notification.isSupported()) {
+      new Notification({ title, body, silent: true }).show()
+    }
+    return { ok: true }
+  })
 
   // ── vault:capture ────────────────────────────────────────────────────────────
 
@@ -358,6 +358,7 @@ export function registerVaultIpcHandlers(): () => void {
       if (Notification.isSupported()) {
         new Notification({ title: 'Task completed', body: taskText, silent: true }).show()
       }
+      broadcast('extension:toast', { type: 'success', message: `Completed: ${taskText}` })
       broadcast('task-vault:push:index-updated', {})
       return { success: true }
     } catch (err) {
@@ -793,6 +794,7 @@ export function registerVaultIpcHandlers(): () => void {
     if (Notification.isSupported()) {
       new Notification({ title: 'Area archived', body: areaName, silent: true }).show()
     }
+    broadcast('extension:toast', { type: 'info', message: `Area archived: ${areaName}` })
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
@@ -1245,8 +1247,11 @@ export function registerVaultIpcHandlers(): () => void {
     }
 
     db.prepare(`UPDATE projects SET status=?, updated_at=? WHERE id=?`).run(status, now, proj.id)
-    if (status === 'archived' && Notification.isSupported()) {
-      new Notification({ title: 'Project archived', body: projectName, silent: true }).show()
+    if (status === 'archived') {
+      if (Notification.isSupported()) {
+        new Notification({ title: 'Project archived', body: projectName, silent: true }).show()
+      }
+      broadcast('extension:toast', { type: 'info', message: `Project archived: ${projectName}` })
     }
     broadcast('task-vault:push:index-updated', {})
     return { success: true }

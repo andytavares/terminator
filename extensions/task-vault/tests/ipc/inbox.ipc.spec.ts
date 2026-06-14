@@ -51,9 +51,8 @@ vi.mock('../../src/vault/db', () => ({
   randomUUID: vi.fn(() => 'test-uuid'),
 }))
 
-import { registerVaultIpcHandlers, setVaultPath } from '../../src/ipc/vault.ipc'
+import { registerVaultIpcHandlers } from '../../src/ipc/vault.ipc'
 
-const VAULT = '/vault'
 const TASK_ID = 'task-uuid-1'
 const TASK_ROW = {
   id: TASK_ID,
@@ -65,7 +64,6 @@ const TASK_ROW = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  setVaultPath(VAULT)
   mockPrepare.mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
   mockGet.mockReturnValue(TASK_ROW)
   vi.mocked(fs.mkdir).mockResolvedValue(undefined)

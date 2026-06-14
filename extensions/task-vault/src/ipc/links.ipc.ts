@@ -5,16 +5,7 @@ import {
   LinksRemoveRequestSchema,
   LinksGetForTargetRequestSchema,
 } from '../schemas/vault.schema'
-import { setVaultPath as _setVaultPath, getVaultPath as _getVaultPath } from '../vault/vault-path'
 import { rowToTask, rowToProject } from '../vault/mappers'
-
-export function setVaultPath(p: string): void {
-  _setVaultPath(p)
-}
-
-export function getVaultPath(): string {
-  return _getVaultPath()
-}
 
 export function registerLinksIpcHandlers(): () => void {
   const channels: string[] = []

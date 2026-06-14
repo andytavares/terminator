@@ -43,9 +43,7 @@ vi.mock('../../src/notifications/task-scheduler.js', () => ({
   broadcast: vi.fn(),
 }))
 
-import { registerVaultIpcHandlers, setVaultPath, getVaultPath } from '../../src/ipc/vault.ipc'
-
-const VAULT = '/vault'
+import { registerVaultIpcHandlers } from '../../src/ipc/vault.ipc'
 
 const makeTaskRow = (overrides: Record<string, unknown> = {}) => ({
   id: 'task-1',
@@ -83,7 +81,6 @@ beforeEach(() => {
   mockGet.mockReturnValue(undefined)
   mockAll.mockReturnValue([])
   mockPrepare.mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
-  setVaultPath(VAULT)
 })
 
 // ── get-inbox ────────────────────────────────────────────────────────────────
@@ -1071,16 +1068,6 @@ describe('task-vault:vault:import-json', () => {
     const result = (await handler({}, {})) as { success: boolean; imported: number }
     expect(result.success).toBe(true)
     expect(result.imported).toBe(0)
-  })
-})
-
-// ── getVaultPath (vault.ipc) ──────────────────────────────────────────────────
-
-describe('getVaultPath (vault.ipc)', () => {
-  it('returns the vault path set via setVaultPath', () => {
-    setVaultPath('/test/vault/path')
-    expect(getVaultPath()).toBe('/test/vault/path')
-    setVaultPath(VAULT) // restore
   })
 })
 

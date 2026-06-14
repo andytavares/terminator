@@ -3,12 +3,6 @@ import { z } from 'zod'
 import { getDb } from '../vault/db'
 import type { KanbanConfig, TaskStatus } from '../vault/types'
 import { DEFAULT_KANBAN_CONFIG } from '../vault/types'
-import { setVaultPath as _setVaultPath } from '../vault/vault-path'
-
-export function setVaultPath(p: string): void {
-  _setVaultPath(p)
-}
-
 function readConfig(): KanbanConfig {
   try {
     const db = getDb()

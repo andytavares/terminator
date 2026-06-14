@@ -21,9 +21,8 @@ vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
 }))
 
-import { registerLinksIpcHandlers, setVaultPath, getVaultPath } from '../../src/ipc/links.ipc'
+import { registerLinksIpcHandlers } from '../../src/ipc/links.ipc'
 
-const VAULT = '/vault'
 const UUID = '550e8400-e29b-41d4-a716-446655440000'
 const TASK_ID = 'task-uuid-1'
 const PROJECT_NAME = 'alpha'
@@ -33,7 +32,6 @@ beforeEach(() => {
   mockGet.mockReturnValue(undefined)
   mockAll.mockReturnValue([])
   mockPrepare.mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
-  setVaultPath(VAULT)
 })
 
 function getHandler(channel: string) {
@@ -214,14 +212,6 @@ describe('task-vault:links:remove error handling (lines 145-147)', () => {
     const { handler } = getHandler('task-vault:links:remove')
     const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
     expect(result).toMatchObject({ error: expect.stringContaining('db remove error') })
-  })
-})
-
-describe('getVaultPath', () => {
-  it('returns the vault path set via setVaultPath', () => {
-    setVaultPath('/my/vault')
-    expect(getVaultPath()).toBe('/my/vault')
-    setVaultPath(VAULT) // restore
   })
 })
 

@@ -9,16 +9,7 @@ import {
   DeleteProjectRequestSchema,
 } from '../schemas/vault.schema'
 import type { ProjectStatus } from '../vault/types'
-import { setVaultPath as _setVaultPath, getVaultPath as _getVaultPath } from '../vault/vault-path'
 import { rowToTask, rowToProject, PROJECT_COLS, PROJECT_JOINS } from '../vault/mappers'
-
-export function setVaultPath(p: string): void {
-  _setVaultPath(p)
-}
-
-export function getVaultPath(): string {
-  return _getVaultPath()
-}
 
 export function registerProjectsIpcHandlers(): () => void {
   const handlers: string[] = []
