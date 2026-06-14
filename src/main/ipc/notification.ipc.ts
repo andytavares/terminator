@@ -1,6 +1,15 @@
-import { ipcMain, Notification, app } from 'electron'
+import { ipcMain } from 'electron'
 import { z } from 'zod'
 import { notificationManager } from '../notifications/notification-manager'
+
+const NotificationTargetSchema = z.enum(['system', 'center', 'toast'])
+
+const CreateSchema = z.object({
+  type: z.enum(['info', 'success', 'warning', 'error']),
+  title: z.string().min(1),
+  message: z.string().optional(),
+  targets: z.array(NotificationTargetSchema).optional(),
+})
 
 const DismissSchema = z.object({ id: z.string().min(1) })
 const TriggerActionSchema = z.object({
@@ -9,14 +18,11 @@ const TriggerActionSchema = z.object({
 })
 
 export function registerNotificationHandlers(): void {
-  ipcMain.on('notification:show', (_event, payload: { title: string; body: string }) => {
-    if (Notification.isSupported()) {
-      new Notification({ title: payload.title, body: payload.body }).show()
-    }
-    // Bounce the dock icon as a secondary attention signal on macOS
-    if (process.platform === 'darwin' && app.dock) {
-      app.dock.bounce('informational')
-    }
+  ipcMain.handle('notifications:create', (_event, payload: unknown) => {
+    const parsed = CreateSchema.safeParse(payload)
+    if (!parsed.success) return { error: 'VALIDATION_ERROR', message: parsed.error.message }
+    const id = notificationManager.create(parsed.data)
+    return { id }
   })
 
   ipcMain.handle('notifications:list', () => {

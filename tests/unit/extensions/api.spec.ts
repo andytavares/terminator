@@ -18,6 +18,13 @@ vi.mock('electron', () => ({
     setApplicationMenu: vi.fn(),
   },
   MenuItem: vi.fn().mockImplementation((opts) => opts),
+  Notification: Object.assign(
+    vi.fn().mockImplementation(() => ({ show: vi.fn() })),
+    {
+      isSupported: vi.fn(() => false),
+    }
+  ),
+  app: { dock: null },
 }))
 
 vi.mock('../../../src/main/shell/shell-executor', () => ({

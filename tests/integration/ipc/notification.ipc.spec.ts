@@ -41,6 +41,40 @@ describe('notification IPC handlers', () => {
     registerNotificationHandlers()
   })
 
+  describe('notifications:create', () => {
+    it('calls notificationManager.create and returns the id', async () => {
+      mockCreate.mockReturnValue('new-id')
+      const handler = captureHandle('notifications:create')
+      const result = await handler(null, { type: 'info', title: 'Hello' })
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'info', title: 'Hello' })
+      )
+      expect(result).toEqual({ id: 'new-id' })
+    })
+
+    it('returns VALIDATION_ERROR for missing title', async () => {
+      const handler = captureHandle('notifications:create')
+      const result = await handler(null, { type: 'info' })
+      expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+      expect(mockCreate).not.toHaveBeenCalled()
+    })
+
+    it('returns VALIDATION_ERROR for invalid type', async () => {
+      const handler = captureHandle('notifications:create')
+      const result = await handler(null, { type: 'bad', title: 'T' })
+      expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+    })
+
+    it('passes optional targets to the manager', async () => {
+      mockCreate.mockReturnValue('tid')
+      const handler = captureHandle('notifications:create')
+      await handler(null, { type: 'success', title: 'T', targets: ['system', 'toast'] })
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: ['system', 'toast'] })
+      )
+    })
+  })
+
   describe('notifications:list', () => {
     it('returns serialized notification list', async () => {
       const notifications = [{ id: '1', type: 'info', title: 'Hello', timestamp: 123 }]

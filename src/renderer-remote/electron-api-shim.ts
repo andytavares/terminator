@@ -257,10 +257,13 @@
       on: (channel: string, handler: (data: unknown) => void) =>
         on(channel, (data) => handler(data)),
     },
-    notification: {
-      show: (title: string, body: string) => fire('notification:show', { title, body }),
-    },
     notifications: {
+      create: (payload: {
+        type: 'info' | 'success' | 'warning' | 'error'
+        title: string
+        message?: string
+        targets?: Array<'system' | 'center' | 'toast'>
+      }) => invoke('notifications:create', payload),
       list: () => invoke('notifications:list'),
       dismiss: (id: string) => invoke('notifications:dismiss', { id }),
       triggerAction: (notifId: string, actionId: string) =>
