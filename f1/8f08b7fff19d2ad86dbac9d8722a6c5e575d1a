@@ -1,0 +1,22 @@
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_8e723948aeb460::t_ac660312b93156 824-825,828-830,835-836,839,842
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_8e723948aeb460::t_42b10f9d1a1cc4 650-651,653,661-662,668-671
+  s_8e723948aeb460::t_897f602e0426d4 665,674-676
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "f18f08b7fff19d2ad86dbac9d8722a6c5e575d1a",
+  "prompts": {},
+  "sessions": {
+    "s_8e723948aeb460": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bafe19cd-02b4-42a6-9919-66a462467a04",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
