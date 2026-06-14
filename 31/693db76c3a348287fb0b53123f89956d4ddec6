@@ -1,0 +1,25 @@
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_1b76435cf764c0::t_a2351646413e22 58,62
+extensions/remote-control/src/server/auth.middleware.ts
+  s_1b76435cf764c0::t_d956ab5e61da50 38-39,41
+extensions/remote-control/tests/unit/auth.middleware.spec.ts
+  s_1b76435cf764c0::t_1cebe9346bacf5 24-25
+extensions/remote-control/src/server/routes/terminal.routes.ts
+  s_1b76435cf764c0::t_f8a4ce2aa98ef0 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "31693db76c3a348287fb0b53123f89956d4ddec6",
+  "prompts": {},
+  "sessions": {
+    "s_1b76435cf764c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec6c5757-6559-41ff-8b14-c282d16bfec4",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
