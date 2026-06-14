@@ -378,5 +378,32 @@ describe('useWorkspaceStore', () => {
       const stored = JSON.parse(localStorage.getItem(storageKey) ?? '["ws-1"]') as string[]
       expect(stored).not.toContain('ws-1')
     })
+
+    it('survives a localStorage.setItem failure in toggleWorkspaceCollapse', () => {
+      mockLocalStorage.setItem.mockImplementationOnce(() => {
+        throw new Error('QuotaExceededError')
+      })
+      expect(() => useWorkspaceStore.getState().toggleWorkspaceCollapse('ws-1')).not.toThrow()
+      expect(useWorkspaceStore.getState().expandedWorkspaceIds.has('ws-1')).toBe(true)
+    })
+
+    it('setExpandedWorkspaceIds updates the store and writes to localStorage', () => {
+      useWorkspaceStore.getState().setExpandedWorkspaceIds(new Set(['ws-1', 'ws-2']))
+      expect(useWorkspaceStore.getState().expandedWorkspaceIds.has('ws-1')).toBe(true)
+      expect(useWorkspaceStore.getState().expandedWorkspaceIds.has('ws-2')).toBe(true)
+      const stored = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as string[]
+      expect(stored).toContain('ws-1')
+      expect(stored).toContain('ws-2')
+    })
+
+    it('setExpandedWorkspaceIds survives a localStorage.setItem failure', () => {
+      mockLocalStorage.setItem.mockImplementationOnce(() => {
+        throw new Error('QuotaExceededError')
+      })
+      expect(() =>
+        useWorkspaceStore.getState().setExpandedWorkspaceIds(new Set(['ws-1']))
+      ).not.toThrow()
+      expect(useWorkspaceStore.getState().expandedWorkspaceIds.has('ws-1')).toBe(true)
+    })
   })
 })

@@ -1369,6 +1369,37 @@ describe('task-vault:vault:clear-recurrence', () => {
     const result = await handler({}, { taskId: 'missing' })
     expect(result).toEqual({ error: 'STALE_ID' })
   })
+
+  it('handles invalid metadata JSON gracefully and still clears recurrence columns', async () => {
+    mockGet.mockReturnValue({ metadata: 'NOT_VALID_JSON' })
+    const handler = getHandler('task-vault:vault:clear-recurrence')
+    const result = await handler({}, { taskId: 'task-1' })
+    // Should still succeed — invalid JSON is caught and treated as empty metadata
+    expect(result).toEqual({ success: true })
+  })
+})
+
+// ── get-calendar-month ────────────────────────────────────────────────────────
+
+describe('task-vault:vault:get-calendar-month', () => {
+  it('returns day summaries for the requested month', async () => {
+    const dayRows = [
+      { date: '2026-06-01', status: 'done', count: 3 },
+      { date: '2026-06-01', status: 'open', count: 1 },
+    ]
+    mockAll.mockReturnValueOnce(dayRows)
+    const handler = getHandler('task-vault:vault:get-calendar-month')
+    const result = (await handler({}, { year: 2026, month: 6 })) as { days: unknown[] }
+    expect(Array.isArray(result.days)).toBe(true)
+    expect(result.days).toHaveLength(2)
+  })
+
+  it('returns empty days array when no tasks exist for the month', async () => {
+    mockAll.mockReturnValueOnce([])
+    const handler = getHandler('task-vault:vault:get-calendar-month')
+    const result = (await handler({}, { year: 2026, month: 1 })) as { days: unknown[] }
+    expect(result.days).toHaveLength(0)
+  })
 })
 
 describe('registerVaultIpcHandlers dispose', () => {
@@ -1388,5 +1419,6 @@ describe('registerVaultIpcHandlers dispose', () => {
     expect(removedChannels).toContain('task-vault:vault:reorder-tasks')
     expect(removedChannels).toContain('task-vault:vault:set-recurrence')
     expect(removedChannels).toContain('task-vault:vault:clear-recurrence')
+    expect(removedChannels).toContain('task-vault:vault:get-calendar-month')
   })
 })

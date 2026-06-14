@@ -348,6 +348,67 @@ describe('getVaultPath (projects.ipc)', () => {
   })
 })
 
+describe('task-vault:projects:update-deadline IPC handler', () => {
+  it('updates the project deadline and returns success', async () => {
+    const handler = getHandler('task-vault:projects:update-deadline')
+    const result = await handler({}, { projectFilePath: 'Alpha', deadline: '2026-12-31' })
+    expect(result).toMatchObject({ success: true })
+    expect(mockRun).toHaveBeenCalled()
+  })
+
+  it('clears the deadline when passed null', async () => {
+    const handler = getHandler('task-vault:projects:update-deadline')
+    const result = await handler({}, { projectFilePath: 'Alpha', deadline: null })
+    expect(result).toMatchObject({ success: true })
+  })
+
+  it('returns VALIDATION_ERROR when projectFilePath is missing', async () => {
+    const handler = getHandler('task-vault:projects:update-deadline')
+    const result = await handler({}, { deadline: '2026-12-31' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+})
+
+describe('task-vault:projects:rename IPC handler', () => {
+  it('renames the project and returns success', async () => {
+    mockGet
+      .mockReturnValueOnce({ id: 'proj-1' }) // SELECT id FROM projects WHERE name=?
+      .mockReturnValueOnce(undefined) // SELECT id WHERE name=newName AND id!=
+    const handler = getHandler('task-vault:projects:rename')
+    const result = await handler({}, { projectFilePath: 'Alpha', newName: 'Beta' })
+    expect(result).toMatchObject({ success: true })
+    expect(mockRun).toHaveBeenCalled()
+  })
+
+  it('returns VALIDATION_ERROR when projectFilePath is missing', async () => {
+    const handler = getHandler('task-vault:projects:rename')
+    const result = await handler({}, { newName: 'Beta' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+
+  it('returns VALIDATION_ERROR when newName is missing', async () => {
+    const handler = getHandler('task-vault:projects:rename')
+    const result = await handler({}, { projectFilePath: 'Alpha' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+
+  it('returns NOT_FOUND when project does not exist', async () => {
+    mockGet.mockReturnValueOnce(undefined)
+    const handler = getHandler('task-vault:projects:rename')
+    const result = await handler({}, { projectFilePath: 'Ghost', newName: 'Specter' })
+    expect(result).toMatchObject({ error: 'NOT_FOUND' })
+  })
+
+  it('returns PROJECT_EXISTS when new name is already taken', async () => {
+    mockGet
+      .mockReturnValueOnce({ id: 'proj-1' }) // project found
+      .mockReturnValueOnce({ id: 'proj-2' }) // collision found
+    const handler = getHandler('task-vault:projects:rename')
+    const result = await handler({}, { projectFilePath: 'Alpha', newName: 'Existing' })
+    expect(result).toMatchObject({ error: 'PROJECT_EXISTS' })
+  })
+})
+
 describe('registerProjectsIpcHandlers dispose (lines 229-232)', () => {
   it('calls ipcMain.removeHandler for all registered channels', () => {
     const dispose = registerProjectsIpcHandlers()
@@ -358,5 +419,7 @@ describe('registerProjectsIpcHandlers dispose (lines 229-232)', () => {
     expect(removedChannels).toContain('task-vault:projects:delete')
     expect(removedChannels).toContain('task-vault:projects:update-status')
     expect(removedChannels).toContain('task-vault:projects:update-area')
+    expect(removedChannels).toContain('task-vault:projects:update-deadline')
+    expect(removedChannels).toContain('task-vault:projects:rename')
   })
 })

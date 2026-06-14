@@ -2,12 +2,23 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+const { mockOsNotif, mockNotifIsSupported } = vi.hoisted(() => {
+  const mockOsNotif = { on: vi.fn(), show: vi.fn() }
+  const mockNotifIsSupported = vi.fn(() => false)
+  return { mockOsNotif, mockNotifIsSupported }
+})
+
 const mockSend = vi.fn()
 const mockWin = { isDestroyed: vi.fn(() => false), webContents: { send: mockSend } }
 
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: vi.fn(() => [mockWin]) },
-  Notification: { isSupported: vi.fn(() => false) },
+  Notification: Object.assign(
+    vi.fn(() => mockOsNotif),
+    {
+      isSupported: mockNotifIsSupported,
+    }
+  ),
 }))
 
 const mockRun = vi.fn().mockReturnValue({ changes: 1 })
@@ -70,6 +81,7 @@ beforeEach(() => {
   mockAll.mockReturnValue([])
   mockAutoDismissAll.mockReturnValue([])
   mockRun.mockReturnValue({ changes: 1 })
+  mockNotifIsSupported.mockReturnValue(false)
   vi.useFakeTimers()
 })
 
@@ -618,5 +630,60 @@ describe('startTaskScheduler — scheduler never inserts task rows', () => {
     dispose()
 
     expect(createNotification).not.toHaveBeenCalled()
+  })
+})
+
+// ── OS system notifications (Notification.isSupported = true) ─────────────────
+
+describe('startTaskScheduler — OS system notifications', () => {
+  it('shows an OS notification for a due task when Notification.isSupported returns true', () => {
+    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+    mockNotifIsSupported.mockReturnValue(true)
+
+    const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
+    mockAll.mockImplementation((date: string) => {
+      if (typeof date === 'string' && date.startsWith('2026')) {
+        return [
+          {
+            id: 't-os',
+            text: 'OS Due Task',
+            due_date: '2026-05-26',
+            metadata: '{}',
+            recurrence_notify_at: null,
+          },
+        ]
+      }
+      return []
+    })
+
+    const { dispose } = startTaskScheduler(api)
+    dispose()
+
+    expect(mockOsNotif.show).toHaveBeenCalled()
+  })
+
+  it('shows an OS notification for a blocked task when Notification.isSupported returns true', () => {
+    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+    mockNotifIsSupported.mockReturnValue(true)
+
+    const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
+    // First mockAll call = due tasks (empty), second = blocked tasks
+    mockAll
+      .mockReturnValueOnce([])
+      .mockReturnValue([
+        blockedRow({
+          id: 'b-os',
+          text: 'OS Blocked Task',
+          metadata: JSON.stringify({
+            blocked_check_interval: '1-hour',
+            blocked_reason: 'waiting on PR',
+          }),
+        }),
+      ])
+
+    const { dispose } = startTaskScheduler(api)
+    dispose()
+
+    expect(mockOsNotif.show).toHaveBeenCalled()
   })
 })
