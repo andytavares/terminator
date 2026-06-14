@@ -124,7 +124,7 @@ describe('NgrokManager', () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'ngrok',
-        ['http', '7681', '--web-addr', '0.0.0.0:4041'],
+        ['http', '7681', '--web-addr', '127.0.0.1:4041'],
         expect.anything()
       )
       expect(url).toBe('https://abc.ngrok.io')
@@ -180,7 +180,7 @@ describe('NgrokManager', () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'ngrok',
-        ['http', '7681', '--web-addr', '0.0.0.0:4041', '--authtoken', 'my-token'],
+        ['http', '7681', '--web-addr', '127.0.0.1:4041', '--authtoken', 'my-token'],
         expect.anything()
       )
     })

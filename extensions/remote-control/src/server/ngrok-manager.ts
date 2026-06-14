@@ -41,7 +41,7 @@ export class NgrokManager {
   }
 
   start(port: number, authToken?: string): Promise<string> {
-    const args = ['http', String(port), '--web-addr', '0.0.0.0:4041']
+    const args = ['http', String(port), '--web-addr', '127.0.0.1:4041']
     if (authToken) args.push('--authtoken', authToken)
     this.process = spawn('ngrok', args, { detached: false })
 

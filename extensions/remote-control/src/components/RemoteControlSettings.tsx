@@ -80,13 +80,13 @@ export function RemoteControlSettings(): React.JSX.Element {
         <input
           type="number"
           className="settings-section__input"
-          defaultValue={port}
+          value={port}
           min={1024}
           max={65535}
+          onChange={(e) => setPort(parseInt(e.target.value, 10) || 7681)}
           onBlur={(e) => {
             const val = parseInt(e.target.value, 10)
             if (val >= 1024 && val <= 65535) {
-              setPort(val)
               void window.electronAPI.extensionBridge.invoke('remote:port-change', { port: val })
             }
           }}
@@ -101,9 +101,10 @@ export function RemoteControlSettings(): React.JSX.Element {
         <input
           type="number"
           className="settings-section__input"
-          defaultValue={maxSubscribers}
+          value={maxSubscribers}
           min={1}
           max={20}
+          onChange={(e) => setMaxSubscribers(parseInt(e.target.value, 10) || 1)}
           onBlur={(e) => {
             const val = parseInt(e.target.value, 10)
             if (val >= 1 && val <= 20) {

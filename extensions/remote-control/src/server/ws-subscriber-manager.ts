@@ -29,7 +29,9 @@ export class WsSubscriberManager {
     const entry = this.sessions.get(sessionId)
     if (!entry) return
     entry.subscribers.delete(ws)
-    if (entry.primary === ws) entry.primary = null
+    if (entry.primary === ws) {
+      entry.primary = entry.subscribers.size > 0 ? entry.subscribers.values().next().value! : null
+    }
   }
 
   isPrimary(sessionId: string, ws: WebSocket): boolean {

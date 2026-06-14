@@ -98,12 +98,20 @@ describe('WsSubscriberManager', () => {
       expect(mgr.isPrimary('s1', ws as never)).toBe(false)
     })
 
-    it('clears primary when primary subscriber is removed', () => {
+    it('promotes next subscriber to primary when primary disconnects', () => {
       const ws1 = mockWs()
       const ws2 = mockWs()
       mgr.addSubscriber('s1', ws1 as never, 5)
       mgr.addSubscriber('s1', ws2 as never, 5)
       mgr.removeSubscriber('s1', ws1 as never)
+      expect(mgr.getPrimary('s1')).toBe(ws2)
+      expect(mgr.isPrimary('s1', ws2 as never)).toBe(true)
+    })
+
+    it('clears primary when last subscriber is removed', () => {
+      const ws = mockWs()
+      mgr.addSubscriber('s1', ws as never, 5)
+      mgr.removeSubscriber('s1', ws as never)
       expect(mgr.getPrimary('s1')).toBeNull()
     })
 
