@@ -647,8 +647,10 @@ describe('task-vault:vault:rename-area', () => {
 // ── restore-area ──────────────────────────────────────────────────────────────
 
 describe('task-vault:vault:restore-area', () => {
+  const ARCHIVED_AT = '2024-01-01T10:00:00.000Z'
+
   it('restores an archived area, its projects, and cancelled tasks', async () => {
-    mockGet.mockReturnValueOnce({ id: 'area-1' })
+    mockGet.mockReturnValueOnce({ id: 'area-1', updated_at: ARCHIVED_AT })
     const handler = getHandler('task-vault:vault:restore-area')
     const result = await handler({}, { areaName: 'Work' })
     expect(result).toMatchObject({ success: true })
@@ -656,15 +658,22 @@ describe('task-vault:vault:restore-area', () => {
     expect(mockRun).toHaveBeenCalledTimes(3)
   })
 
-  it('restores cancelled tasks when area is restored', async () => {
-    mockGet.mockReturnValueOnce({ id: 'area-1' })
+  it('task restore SQL filters by archived_at timestamp to exclude user-cancelled tasks', async () => {
+    mockGet.mockReturnValueOnce({ id: 'area-1', updated_at: ARCHIVED_AT })
     const handler = getHandler('task-vault:vault:restore-area')
     await handler({}, { areaName: 'Work' })
+    // Verify the restore SQL includes updated_at=? (timestamp filter)
     const sqls = mockPrepare.mock.calls.map((c) => c[0] as string)
     const taskRestoreSql = sqls.find(
-      (s) => s.includes("status='open'") && s.includes("status='cancelled'")
+      (s) =>
+        s.includes("status='open'") &&
+        s.includes("status='cancelled'") &&
+        s.includes('updated_at=?')
     )
     expect(taskRestoreSql).toBeTruthy()
+    // Verify the archive timestamp is actually passed as a bind argument to mockRun
+    const archivedAtWasPassed = mockRun.mock.calls.some((args) => args.includes(ARCHIVED_AT))
+    expect(archivedAtWasPassed).toBe(true)
   })
 
   it('returns VALIDATION_ERROR when areaName is missing', async () => {

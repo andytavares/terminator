@@ -821,21 +821,25 @@ export function registerVaultIpcHandlers(): () => void {
     if (!areaName) return { error: 'VALIDATION_ERROR' }
     const db = getDb()
     const now = new Date().toISOString()
-    const area = db.prepare(`SELECT id FROM areas WHERE name=?`).get(areaName) as
-      | { id: string }
+    const area = db.prepare(`SELECT id, updated_at FROM areas WHERE name=?`).get(areaName) as
+      | { id: string; updated_at: string }
       | undefined
     if (!area) return { error: 'NOT_FOUND' }
+    // Capture the archive timestamp before overwriting it — used to identify tasks
+    // that were auto-cancelled by this specific archive operation (not user-cancelled beforehand)
+    const archivedAt = area.updated_at
     db.prepare(`UPDATE areas SET status='active', updated_at=? WHERE id=?`).run(now, area.id)
     db.prepare(
       `UPDATE projects SET status='active', updated_at=? WHERE area_id=? AND status='archived'`
     ).run(now, area.id)
-    // Restore tasks cancelled during area archival (directly in the area or in its projects)
+    // Only restore tasks whose updated_at matches the archive timestamp — tasks cancelled
+    // before archival have an earlier updated_at and are intentionally excluded
     db.prepare(
       `UPDATE tasks SET status='open', updated_at=?
-       WHERE status='cancelled'
+       WHERE status='cancelled' AND updated_at=?
          AND (area_id=? AND project_id IS NULL
               OR project_id IN (SELECT id FROM projects WHERE area_id=?))`
-    ).run(now, area.id, area.id)
+    ).run(now, archivedAt, area.id, area.id)
     return { success: true }
   })
 
