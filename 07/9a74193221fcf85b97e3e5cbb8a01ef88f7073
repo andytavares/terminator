@@ -1,0 +1,23 @@
+.claude/commands/forge-context.md
+  s_1b76435cf764c0::t_9c3fd93b49ed04 11
+.gitignore
+  s_1b76435cf764c0::t_5b61aed0a56416 21-23
+.claude/hooks/speckit-context-inject.sh
+  s_1b76435cf764c0::t_5f4da0bd34d4a9 33-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "079a74193221fcf85b97e3e5cbb8a01ef88f7073",
+  "prompts": {},
+  "sessions": {
+    "s_1b76435cf764c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec6c5757-6559-41ff-8b14-c282d16bfec4",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
