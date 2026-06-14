@@ -1,0 +1,33 @@
+docs/adr/017-embedded-http-remote-server.md
+  s_1b76435cf764c0::t_d07e2e2136259e 40-41
+.claude/doc-index.json
+  s_1b76435cf764c0::t_5df2849608a0e3 22-24,26,42,54,60,66,75,90,99,114-128
+specs/001-extension-first-terminal/contracts/extension-api.md
+  s_1b76435cf764c0::t_19ed9f5aace0bc 19
+  s_1b76435cf764c0::t_67db68edb53a1f 79-84
+  s_1b76435cf764c0::t_b121f594623a0b 3-4
+  s_1b76435cf764c0::t_68ba6b40e8f11e 222,229-246
+  s_1b76435cf764c0::t_b1792ce24dd2a9 267-285,291-297
+  s_1b76435cf764c0::t_587ded88e27303 487
+docs/ARCHITECTURE.md
+  s_1b76435cf764c0::t_25e8a5f304ea43 187-188,197-199,206,213
+  s_1b76435cf764c0::t_ba83769bc8274a 379
+  s_1b76435cf764c0::t_72286f03f967bd 260
+  s_1b76435cf764c0::t_2a8b28c1f4ef25 287,290-303,318-319,321-323
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "e0fd24cedeaa7b65df40b86d880831f352b267e1",
+  "prompts": {},
+  "sessions": {
+    "s_1b76435cf764c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec6c5757-6559-41ff-8b14-c282d16bfec4",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
