@@ -8,7 +8,7 @@ Write `.forge/context-snapshot.json` with the following steps:
 
 2. Read `.claude/doc-index.json`. Collect all entries where `staleness_score > 0`. These are stale docs.
 
-3. Find the most recently modified file matching `.forge/*/research.md`. Record its path.
+3. Find the most recently modified file matching `.forge/*/research.md` (sort by mtime, not path name). Record its path.
 
 4. Write `.forge/context-snapshot.json`:
 
