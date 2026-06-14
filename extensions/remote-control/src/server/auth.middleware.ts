@@ -22,13 +22,14 @@ export function isAllowedHost(rawHost: string): boolean {
 
 interface AuthMiddlewareOptions {
   getPasswordHash: () => string
+  hasValidSession?: (cookieHeader: string) => boolean
 }
 
 export async function registerAuthMiddleware(
   app: FastifyInstance,
   opts: AuthMiddlewareOptions
 ): Promise<void> {
-  const { getPasswordHash } = opts
+  const { getPasswordHash, hasValidSession } = opts
 
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
     const isProtected = PROTECTED_PREFIXES.some((p) => request.url.startsWith(p))
@@ -43,6 +44,11 @@ export async function registerAuthMiddleware(
     // WebSocket upgrade routes handle their own auth via ticket — browsers can't send Authorization on WS
     const pathname = request.url.split('?')[0]
     if (pathname === '/api/bridge' || pathname.startsWith('/ws/terminals/')) return
+
+    // Bridge-ticket requests from a new tab can authenticate via session cookie instead of bearer
+    if (pathname === '/api/bridge-ticket' && hasValidSession) {
+      if (hasValidSession(request.headers.cookie ?? '')) return
+    }
 
     const authHeader = request.headers.authorization
     if (!authHeader?.startsWith('Bearer ')) {

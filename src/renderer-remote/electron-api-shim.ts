@@ -44,11 +44,15 @@
     const token = sessionStorage.getItem('remoteToken') ?? ''
     let ticket: string
     try {
-      const res = await fetch('/api/bridge-ticket', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const headers: Record<string, string> = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch('/api/bridge-ticket', { method: 'POST', headers })
       if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          // Session expired or missing — send back to login
+          location.replace('/')
+          return
+        }
         setTimeout(() => void connectBridge(), 2000)
         return
       }

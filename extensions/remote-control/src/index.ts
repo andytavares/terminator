@@ -36,18 +36,13 @@ let queue: Promise<void> = Promise.resolve()
 let currentPublicUrl: string | null = null
 
 export function activate(api: ExtensionAPI): void {
+  // Only register keys that are safe to update via the generic settings panel.
+  // enabled/port/password/passwordHash are managed exclusively through dedicated IPC handlers
+  // (remote:toggle, remote:port-change, remote:update-password) which run lifecycle code.
+  // Exposing them here would let extension:update-setting bypass the server lifecycle.
   api.settings.register({
     label: 'Remote Control',
     properties: {
-      [KEY.enabled]: { type: 'boolean', label: 'Enable Remote Control', default: false },
-      [KEY.port]: { type: 'number', label: 'Port', default: 7681, min: 1024, max: 65535 },
-      [KEY.password]: { type: 'string', label: 'Password', default: '', secret: true },
-      [KEY.passwordHash]: {
-        type: 'string',
-        label: 'Password Hash (internal)',
-        default: '',
-        secret: true,
-      },
       [KEY.maxSubscribers]: {
         type: 'number',
         label: 'Max Concurrent Viewers',

@@ -270,5 +270,21 @@ describe('NgrokManager', () => {
       manager.stop()
       expect(mockProcess.kill).not.toHaveBeenCalled()
     })
+
+    it('stop() during polling causes start() to reject immediately without waiting for all polls', async () => {
+      mockFetch.mockRejectedValue(new Error('ECONNREFUSED'))
+
+      const urlPromise = manager.start(7681)
+      urlPromise.catch(() => {})
+
+      // Complete first poll iteration (500ms wait + fetch rejection)
+      await vi.advanceTimersByTimeAsync(500)
+      // Now waiting on second-iteration 500ms timer — call stop so stopped=true
+      manager.stop()
+      // Fire the second-iteration timer; post-check sees stopped=true and throws immediately
+      await vi.advanceTimersByTimeAsync(500)
+
+      await expect(urlPromise).rejects.toThrow('ngrok stopped')
+    })
   })
 })

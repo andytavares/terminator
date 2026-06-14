@@ -26,6 +26,7 @@ export function generateCaddyfile(port: number): string {
 export class NgrokManager {
   private process: ChildProcess | null = null
   private onCrashCallback: (() => void) | null = null
+  private stopped = false
 
   static isInstalled(): boolean {
     try {
@@ -41,6 +42,7 @@ export class NgrokManager {
   }
 
   start(port: number, authToken?: string): Promise<string> {
+    this.stopped = false
     const args = ['http', String(port), '--web-addr', '127.0.0.1:4041']
     if (authToken) args.push('--authtoken', authToken)
     this.process = spawn('ngrok', args, { detached: false })
@@ -67,6 +69,7 @@ export class NgrokManager {
   }
 
   stop(): void {
+    this.stopped = true
     if (this.process) {
       this.onCrashCallback = null // clear before kill so exit event does not trigger crash handler
       this.process.kill('SIGTERM')
@@ -76,7 +79,9 @@ export class NgrokManager {
 
   private async pollForUrl(): Promise<string> {
     for (let i = 0; i < MAX_POLLS; i++) {
+      if (this.stopped) throw new Error('ngrok stopped')
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+      if (this.stopped) throw new Error('ngrok stopped')
       try {
         const res = await fetch('http://localhost:4041/api/tunnels')
         if (res.ok) {

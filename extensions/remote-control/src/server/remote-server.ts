@@ -150,6 +150,7 @@ export async function createRemoteServer(
   await registerAuthMiddleware(fastify, {
     getPasswordHash: deps.getPasswordHash,
     ngrokDomain: options.ngrokDomain,
+    hasValidSession,
   })
 
   await registerHealthRoute(fastify)

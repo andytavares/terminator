@@ -160,6 +160,40 @@ describe('auth.middleware', () => {
       await app.close()
       expect(res.statusCode).toBe(401)
     })
+
+    it('/api/bridge-ticket allows through when hasValidSession returns true (new-tab cookie auth)', async () => {
+      const { registerAuthMiddleware } = await import('../../src/server/auth.middleware')
+      const app = Fastify({ logger: false })
+      await registerAuthMiddleware(app, {
+        getPasswordHash: () => hash,
+        hasValidSession: (cookie) => cookie.includes('app-session=valid-tok'),
+      })
+      app.post('/api/bridge-ticket', async () => ({ ticket: 'tok' }))
+      await app.ready()
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/bridge-ticket',
+        headers: { cookie: 'app-session=valid-tok' },
+      })
+      await app.close()
+      expect(res.statusCode).toBe(200)
+    })
+
+    it('/api/bridge-ticket still requires Bearer when hasValidSession returns false', async () => {
+      const { registerAuthMiddleware } = await import('../../src/server/auth.middleware')
+      const app = Fastify({ logger: false })
+      await registerAuthMiddleware(app, {
+        getPasswordHash: () => hash,
+        hasValidSession: () => false,
+      })
+      app.post('/api/bridge-ticket', async () => ({ ticket: 'tok' }))
+      await app.ready()
+
+      const res = await app.inject({ method: 'POST', url: '/api/bridge-ticket' })
+      await app.close()
+      expect(res.statusCode).toBe(401)
+    })
   })
 
   describe('LAN access', () => {
