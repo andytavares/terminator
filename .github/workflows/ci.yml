@@ -102,13 +102,14 @@ jobs:
 
       - name: Test
         run: npm run test:coverage
+        timeout-minutes: 10
 
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-report.junit.xml
-          path: coverage/
+          path: test-report.junit.xml
           retention-days: 14
 
       - name: Upload coverage to Codecov

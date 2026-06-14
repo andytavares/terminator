@@ -185,14 +185,17 @@ describe('extension git-service', () => {
 
     it('returns TIMEOUT when kill timer fires', async () => {
       vi.useFakeTimers()
-      const proc = makeFakeProc()
-      spawnMock.mockReturnValue(proc)
-      const p = commitChanges('/repo', 'msg')
-      vi.advanceTimersByTime(120_001)
-      proc.resolve(null as unknown as number) // kill fires close
-      const result = await p
-      expect('error' in result && result.error).toBe('TIMEOUT')
-      vi.useRealTimers()
+      try {
+        const proc = makeFakeProc()
+        spawnMock.mockReturnValue(proc)
+        const p = commitChanges('/repo', 'msg')
+        vi.advanceTimersByTime(120_001)
+        proc.resolve(null as unknown as number) // kill fires close
+        const result = await p
+        expect('error' in result && result.error).toBe('TIMEOUT')
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     it('strips ANSI escape codes from hook output', async () => {

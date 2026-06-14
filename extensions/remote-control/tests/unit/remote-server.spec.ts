@@ -240,23 +240,26 @@ describe('RemoteServer', () => {
 
     it('rejects /app/assets/* when session cookie has expired (server-side TTL)', async () => {
       vi.useFakeTimers()
-      vi.mocked(readFileSync).mockReturnValueOnce('<html><head></head></html>')
-      mockTicketStore.consumeTicket.mockReturnValueOnce('__app__')
-      const ticketResp = await remoteServer.inject({ method: 'GET', url: '/app/?t=valid-ticket' })
-      const setCookie = ticketResp.headers['set-cookie'] as string | string[]
-      const cookieStr = Array.isArray(setCookie) ? setCookie[0] : (setCookie ?? '')
-      const token = cookieStr.split(';')[0]
+      try {
+        vi.mocked(readFileSync).mockReturnValueOnce('<html><head></head></html>')
+        mockTicketStore.consumeTicket.mockReturnValueOnce('__app__')
+        const ticketResp = await remoteServer.inject({ method: 'GET', url: '/app/?t=valid-ticket' })
+        const setCookie = ticketResp.headers['set-cookie'] as string | string[]
+        const cookieStr = Array.isArray(setCookie) ? setCookie[0] : (setCookie ?? '')
+        const token = cookieStr.split(';')[0]
 
-      // Advance time past 8-hour TTL
-      vi.advanceTimersByTime(8 * 60 * 60 * 1000 + 1)
+        // Advance time past 8-hour TTL
+        vi.advanceTimersByTime(8 * 60 * 60 * 1000 + 1)
 
-      const assetResp = await remoteServer.inject({
-        method: 'GET',
-        url: '/app/assets/main.js',
-        headers: { cookie: token },
-      })
-      expect(assetResp.statusCode).toBe(403)
-      vi.useRealTimers()
+        const assetResp = await remoteServer.inject({
+          method: 'GET',
+          url: '/app/assets/main.js',
+          headers: { cookie: token },
+        })
+        expect(assetResp.statusCode).toBe(403)
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 
