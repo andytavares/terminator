@@ -1,0 +1,35 @@
+extensions/remote-control/tests/unit/remote-server.spec.ts
+  s_1b76435cf764c0::t_bcf149830e146e 4-10
+  s_1b76435cf764c0::t_7bd2246013c0f4 240-260
+  s_1b76435cf764c0::t_836261c1e3944d 115-133
+extensions/remote-control/tests/unit/extension-index.spec.ts
+  s_1b76435cf764c0::t_aedd640fbe82d1 153-158,160-170,180-185,187,189-194
+  s_1b76435cf764c0::t_65bb157d2d5fb7 188
+  s_1b76435cf764c0::t_833bc2d887017a 171-179
+  s_1b76435cf764c0::t_6d5d6281c8c0a3 21-24,28-30
+  s_1b76435cf764c0::t_3711a350a29b98 159,186
+extensions/remote-control/src/index.ts
+  s_1b76435cf764c0::t_c293a2ce05c644 257-267,275
+extensions/remote-control/src/server/remote-server.ts
+  s_1b76435cf764c0::t_2fcb3e94ebbf5a 104
+  s_1b76435cf764c0::t_a504e05768a8a3 119
+  s_1b76435cf764c0::t_19e9950fbb8e57 73-76,86-95
+  s_1b76435cf764c0::t_bbedfe41ea8ce7 180-189,205-208,219-220
+  s_1b76435cf764c0::t_e8c26321d5c06d 127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "df7eca02de74bfd0b2ab7efd41cfdbed70ea1c2f",
+  "prompts": {},
+  "sessions": {
+    "s_1b76435cf764c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec6c5757-6559-41ff-8b14-c282d16bfec4",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
