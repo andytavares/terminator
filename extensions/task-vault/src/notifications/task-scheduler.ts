@@ -167,10 +167,16 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
       }
 
       // ── Blocked tasks with check interval ────────────────────────
-      type BlockedRow = { id: string; text: string; updated_at: string; metadata: string }
+      type BlockedRow = {
+        id: string
+        text: string
+        updated_at: string
+        metadata: string
+        source_ref: string | null
+      }
       const blockedTasks = db
         .prepare(
-          `SELECT id, text, updated_at, metadata FROM tasks
+          `SELECT id, text, updated_at, metadata, source_ref FROM tasks
            WHERE status='blocked' AND metadata IS NOT NULL AND parent_id IS NULL`
         )
         .all() as BlockedRow[]
@@ -203,6 +209,7 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
 
         lastNotifiedBlocked.set(task.id, now)
         const taskId = task.id
+        const taskDate = task.source_ref ?? null
 
         // Dismiss any existing notification for this blocked task before creating a new one
         blockedTaskNotifs.get(task.id)?.dispose()
@@ -215,7 +222,9 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
             body: meta.blocked_reason ?? '',
             silent: false,
           })
-          osNotif.on('click', () => broadcast('task-vault:navigate-task', taskId))
+          osNotif.on('click', () =>
+            broadcast('task-vault:navigate-task', { taskId, date: taskDate })
+          )
           osNotif.show()
         }
         const notif = api.notifications.createNotification({
@@ -226,7 +235,7 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
             {
               id: 'open',
               label: 'Open Vault',
-              handler: () => broadcast('task-vault:navigate-task', taskId),
+              handler: () => broadcast('task-vault:navigate-task', { taskId, date: taskDate }),
             },
           ],
         })

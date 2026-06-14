@@ -316,7 +316,17 @@ export function SmartTaskInput({
                 value={dateValue}
                 onChange={(v) => {
                   setDateValue(v)
-                  if (v) handleDateSelect(v)
+                  if (v) {
+                    handleDateSelect(v)
+                  } else if (active) {
+                    const before = value.slice(0, active.triggerStart)
+                    const after = value.slice(
+                      active.triggerStart + active.triggerChar.length + active.query.length
+                    )
+                    onChange(`${before}${after.trimStart()}`)
+                    setActive(null)
+                    inputRef.current?.focus()
+                  }
                 }}
                 className="dtp--full"
               />

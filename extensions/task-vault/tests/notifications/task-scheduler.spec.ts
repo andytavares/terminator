@@ -72,6 +72,7 @@ function blockedRow(overrides: Record<string, unknown> = {}) {
     text: 'Blocked task',
     updated_at: new Date(Date.now() - 2 * 3_600_000).toISOString(), // 2 hours ago
     metadata: JSON.stringify({ blocked_check_interval: '1-hour' }),
+    source_ref: null,
     ...overrides,
   }
 }
@@ -715,6 +716,60 @@ describe('startTaskScheduler — OS system notifications', () => {
     dispose()
 
     expect(mockOsNotif.show).toHaveBeenCalled()
+  })
+
+  it('OS notification click handler for blocked task broadcasts { taskId, date }', () => {
+    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+    mockNotifIsSupported.mockReturnValue(true)
+
+    const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
+    mockAll.mockReturnValueOnce([]).mockReturnValue([
+      blockedRow({
+        id: 'b-click',
+        source_ref: '2026-05-20',
+        metadata: JSON.stringify({ blocked_check_interval: '1-hour' }),
+      }),
+    ])
+
+    const { dispose } = startTaskScheduler(api)
+    dispose()
+
+    const clickArgs = mockOsNotif.on.mock.calls.find(([event]: [string]) => event === 'click')
+    expect(clickArgs).toBeTruthy()
+    clickArgs![1]()
+    expect(mockSend).toHaveBeenCalledWith(
+      'task-vault:navigate-task',
+      expect.objectContaining({ taskId: 'b-click', date: '2026-05-20' })
+    )
+  })
+
+  it('in-app action handler for blocked task broadcasts { taskId, date }', () => {
+    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+    mockNotifIsSupported.mockReturnValue(false)
+
+    const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
+    const createNotification = vi.spyOn(api.notifications, 'createNotification')
+
+    mockAll.mockReturnValueOnce([]).mockReturnValue([
+      blockedRow({
+        id: 'b-inapp',
+        source_ref: '2026-05-21',
+        metadata: JSON.stringify({ blocked_check_interval: '1-hour' }),
+      }),
+    ])
+
+    const { dispose } = startTaskScheduler(api)
+    dispose()
+
+    const call = createNotification.mock.calls[0]?.[0] as {
+      actions: Array<{ handler: () => void }>
+    }
+    expect(call?.actions).toHaveLength(1)
+    call.actions[0].handler()
+    expect(mockSend).toHaveBeenCalledWith(
+      'task-vault:navigate-task',
+      expect.objectContaining({ taskId: 'b-inapp', date: '2026-05-21' })
+    )
   })
 })
 
