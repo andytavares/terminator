@@ -1,0 +1,29 @@
+extensions/remote-control/src/server/ngrok-manager.ts
+  s_b924fed75606c0::t_c67bf57b0964a3 65
+  s_b924fed75606c0::t_1a79605daeb5f7 80,88-94
+extensions/remote-control/tests/unit/ngrok-manager.spec.ts
+  s_b924fed75606c0::t_ce7f3a5243f28d 172-174,177
+  s_b924fed75606c0::t_b7a0f5cfe4301c 220,222
+  s_b924fed75606c0::t_0f14d4aa4c2b8a 244,246
+  s_b924fed75606c0::t_8b67550dc99b7e 117,119
+  s_b924fed75606c0::t_815bbf15dcd522 198,200
+  s_b924fed75606c0::t_c4720bc18029f1 267,269
+extensions/task-vault/src/components/AreasView.tsx
+  s_b924fed75606c0::t_b48e64c0a51411 80-84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "0d42dfaa83499427ef27e37ed5c08dade9641c50",
+  "prompts": {},
+  "sessions": {
+    "s_b924fed75606c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fed56da4-0b77-4421-addd-e4e4a908a987",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
