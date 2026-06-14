@@ -1,0 +1,26 @@
+extensions/task-vault/src/notifications/task-scheduler.ts
+  s_8e723948aeb460::t_091eb9cf31386d 212,238
+  s_8e723948aeb460::t_5ae00e0d862c0c 225-227
+  s_8e723948aeb460::t_bc4273c0f21a6a 170-176,179
+extensions/task-vault/tests/notifications/task-scheduler.spec.ts
+  s_8e723948aeb460::t_823627f40b2ff6 720-773
+  s_8e723948aeb460::t_aa634dfb90e7bc 75
+extensions/task-vault/src/components/SmartTaskInput.tsx
+  s_8e723948aeb460::t_0df39b9532ba61 319-329
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "d29cd73eea731d7ea28dacae7da7f0227c8212c5",
+  "prompts": {},
+  "sessions": {
+    "s_8e723948aeb460": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bafe19cd-02b4-42a6-9919-66a462467a04",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
