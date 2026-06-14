@@ -1,0 +1,97 @@
+extensions/task-vault/tests/ipc/inbox.ipc.spec.ts
+  s_b924fed75606c0::t_eddeabb00a8beb 23-31
+extensions/remote-control/src/server/auth.middleware.ts
+  s_b924fed75606c0::t_e579b9430b0fb7 9
+extensions/remote-control/tests/unit/ngrok-manager.spec.ts
+  s_b924fed75606c0::t_b84b11d8a92683 125
+  s_b924fed75606c0::t_5fe4c1c140e963 179
+extensions/remote-control/src/server/remote-server.ts
+  s_b924fed75606c0::t_7e9a47828938a0 177
+extensions/task-vault/src/ipc/projects.ipc.ts
+  s_b924fed75606c0::t_a2c45b3896f94e 215
+  s_b924fed75606c0::t_c7eea4cd297da9 148
+  s_b924fed75606c0::t_f6e9ecd741cc47 248
+  s_b924fed75606c0::t_de5de5d4b4f34a 267
+  s_b924fed75606c0::t_1e8501cf32e4c6 294
+  s_b924fed75606c0::t_5b33dc587d5ec3 178
+  s_b924fed75606c0::t_1af57c4195257d 4
+extensions/task-vault/src/components/ArchiveView.tsx
+  s_b924fed75606c0::t_b618f7635ca61e 94-100
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_b924fed75606c0::t_ceb919740bbdcc 319
+  s_b924fed75606c0::t_b662dcc907445c 158
+  s_b924fed75606c0::t_dc680f27e248e8 793-796
+  s_b924fed75606c0::t_1a36ddfc0216cf 333-337,358-361
+  s_b924fed75606c0::t_7658cf963f50e2 840
+  s_b924fed75606c0::t_aeef887cd28c00 1467
+  s_b924fed75606c0::t_aba455e6396ad6 2
+  s_b924fed75606c0::t_497b6bbe19ccf3 648
+  s_b924fed75606c0::t_818544745bd464 1067
+  s_b924fed75606c0::t_7ad457ba3a2f03 1388
+  s_b924fed75606c0::t_09b925aaf45b20 741
+  s_b924fed75606c0::t_300d03a21368c1 591
+  s_b924fed75606c0::t_bc51b89998f841 664
+  s_b924fed75606c0::t_cb01eab09bc855 1513
+  s_b924fed75606c0::t_2ba17bf74db88f 1090
+  s_b924fed75606c0::t_4b48176a337769 870
+  s_b924fed75606c0::t_65ee2ddb353f61 1248-1251
+  s_b924fed75606c0::t_89e3fe7ebc0fe1 517,530,543
+  s_b924fed75606c0::t_7cb99efd012553 1337
+  s_b924fed75606c0::t_f629238d9679ca 721
+  s_b924fed75606c0::t_2d2e5c7cf24ac8 1363
+  s_b924fed75606c0::t_60546c98c88402 1532
+  s_b924fed75606c0::t_426e09885d721d 448
+  s_b924fed75606c0::t_d4243ce11d97bb 624
+  s_b924fed75606c0::t_7eab35f4897cef 700
+src/renderer/components/sidebar/SidebarHeader.css
+  s_b924fed75606c0::t_a0abd7bebe96b3 100
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_b924fed75606c0::t_467ee5878b607e 7-10,13-16
+extensions/task-vault/tests/ipc/projects.ipc.spec.ts
+  s_b924fed75606c0::t_c8c865afe10bb2 16-19
+  s_b924fed75606c0::t_c074888c18181d 26-29
+extensions/remote-control/src/server/ngrok-manager.ts
+  s_b924fed75606c0::t_6486b57adb9ef2 86
+  s_b924fed75606c0::t_3dea22ed6bfb15 46
+extensions/task-vault/src/components/ProjectsBrowser.tsx
+  s_b924fed75606c0::t_04a3f9f6d92902 663-669
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_b924fed75606c0::t_e2c223a985172e 561,563,567-572,575,581,589,591,593,599,605-606,609-617
+extensions/task-vault/src/components/AreasView.tsx
+  s_b924fed75606c0::t_418757c2067f79 73-78
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_b924fed75606c0::t_a65f5e9b0eec37 359
+extensions/task-vault/src/components/InboxView.tsx
+  s_b924fed75606c0::t_5ad01be08f4dcf 42-48
+extensions/remote-control/src/components/RemoteControlSettings.tsx
+  s_b924fed75606c0::t_160317f3bd8e87 222-237
+  s_b924fed75606c0::t_e12374a789ce10 64-67
+  s_b924fed75606c0::t_e316567bc176ec 117
+  s_b924fed75606c0::t_b5644de55d25df 95
+  s_b924fed75606c0::t_6c7bc10eb23324 146-162
+scripts/check-patch-coverage.cjs
+  s_b924fed75606c0::t_b902cfbd3d9bde 69-71,73-74,77
+src/renderer/components/terminal/TerminalSession.tsx
+  s_b924fed75606c0::t_bd07fa9f451e2f 337-338
+  s_b924fed75606c0::t_004d9324fba8db 144-145,202-203,234-235,243-246,251,260-290
+extensions/task-vault/tests/ipc/capture.ipc.spec.ts
+  s_b924fed75606c0::t_ef07d82d0760d3 23-31
+extensions/remote-control/tests/unit/auth.middleware.spec.ts
+  s_b924fed75606c0::t_79cfc32769f9ed 34-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "c9c71073a9f0a9a64a1b060a1419dbc3b235fd98",
+  "prompts": {},
+  "sessions": {
+    "s_b924fed75606c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fed56da4-0b77-4421-addd-e4e4a908a987",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
