@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { useNotificationStore } from './notification.store'
 
 export type ToastType = 'info' | 'success' | 'warning' | 'error'
 
@@ -8,6 +7,7 @@ export interface Toast {
   type: ToastType
   message: string
   duration: number
+  onClick?: () => void
 }
 
 interface ToastState {
@@ -26,18 +26,10 @@ export const useToastStore = create<ToastState>((set) => ({
 
   addToast: ({ type, message, duration = type === 'error' ? 6000 : 3500, onClick }) => {
     const id = crypto.randomUUID()
-    set((s) => ({ toasts: [...s.toasts, { id, type, message, duration }] }))
+    set((s) => ({ toasts: [...s.toasts, { id, type, message, duration, onClick }] }))
     setTimeout(() => {
       set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))
     }, duration)
-    useNotificationStore.getState().addNotification({
-      id,
-      type,
-      title: message,
-      timestamp: Date.now(),
-      source: 'core',
-      onClick,
-    })
   },
 
   removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),

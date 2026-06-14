@@ -75,13 +75,10 @@ describe('useToastStore', () => {
       expect(toasts[0].message).toBe('B')
     })
 
-    it('also adds to the notification store', () => {
+    it('does NOT add to the notification store (toasts are ephemeral)', () => {
       useToastStore.getState().addToast({ type: 'success', message: 'Saved' })
       const { notifications } = useNotificationStore.getState()
-      expect(notifications).toHaveLength(1)
-      expect(notifications[0].title).toBe('Saved')
-      expect(notifications[0].type).toBe('success')
-      expect(notifications[0].source).toBe('core')
+      expect(notifications).toHaveLength(0)
     })
   })
 

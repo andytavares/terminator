@@ -76,6 +76,7 @@ const weeklyReviewPayload = {
       terminatorLinks: [],
     },
   ],
+  somedayTasks: [],
   completedLastWeek: [],
   lastReviewDate: null,
 }
@@ -138,6 +139,52 @@ describe('WeeklyReview', () => {
         'task-vault:vault:update-project-status',
         expect.objectContaining({ status: 'archived' })
       )
+    })
+  })
+
+  it('re-fetches inbox items when advancing from Step 1 so captures appear in Step 2', async () => {
+    const capturedTask = {
+      id: 'new-1',
+      text: 'Mind sweep item',
+      status: 'open',
+      terminatorLinks: [],
+      filePath: '/vault/inbox.md',
+      line: 2,
+      metadata: {},
+    }
+    const freshPayload = {
+      ...weeklyReviewPayload,
+      inboxItems: [...weeklyReviewPayload.inboxItems, capturedTask],
+    }
+    // Second call to weekly-review returns the fresh payload with the new item
+    mockInvoke
+      .mockResolvedValueOnce(weeklyReviewPayload) // initial load
+      .mockImplementation((channel: string) => {
+        if (channel === 'task-vault:projects:weekly-review') return Promise.resolve(freshPayload)
+        if (channel === 'task-vault:vault:update-project-status')
+          return Promise.resolve({ success: true })
+        if (channel === 'task-vault:vault:add-task') return Promise.resolve({ success: true })
+        return Promise.resolve({})
+      })
+
+    render(<WeeklyReview />)
+    await waitFor(() => screen.getByText(/step 1 of 5/i))
+
+    // Click the step 1 "Next" button (inside step content, not header nav)
+    const step1Next = screen.getByRole('button', { name: /nothing to add|done capturing/i })
+    fireEvent.click(step1Next)
+
+    await waitFor(() => screen.getByText(/step 2 of 5/i))
+
+    // weekly-review was called twice: once at mount, once on step 1 completion
+    const reviewCalls = mockInvoke.mock.calls.filter(
+      ([ch]: [string]) => ch === 'task-vault:projects:weekly-review'
+    )
+    expect(reviewCalls.length).toBeGreaterThanOrEqual(2)
+
+    // Step 2 inbox processor shows "1 of 2" — fresh data has both the original and captured item
+    await waitFor(() => {
+      expect(screen.getByText('1 of 2')).toBeTruthy()
     })
   })
 

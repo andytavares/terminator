@@ -6,7 +6,7 @@ interface WorkspaceState {
   activeWorkspaceId: string | null
   activeProjectId: string | null
   projectsByWorkspaceId: Map<string, Project[]>
-  collapsedWorkspaceIds: Set<string>
+  expandedWorkspaceIds: Set<string>
 
   loadWorkspaces: () => Promise<void>
   createWorkspace: (input: unknown) => Promise<{ workspace: Workspace } | { error: string }>
@@ -27,18 +27,18 @@ interface WorkspaceState {
   setActiveProject: (id: string | null) => void
   resolveActiveCwd: () => string
   toggleWorkspaceCollapse: (id: string) => void
-  setCollapsedWorkspaceIds: (ids: Set<string>) => void
+  setExpandedWorkspaceIds: (ids: Set<string>) => void
 }
 
-function loadCollapsedIds(): Set<string> {
+function loadExpandedIds(): Set<string> {
   try {
-    const raw = localStorage.getItem('terminator.workspace.collapsed')
+    const raw = localStorage.getItem('terminator.workspace.expanded')
     if (raw) {
       const parsed = JSON.parse(raw) as unknown
       if (Array.isArray(parsed)) return new Set(parsed as string[])
     }
   } catch {
-    // corrupted localStorage — return empty set
+    // corrupted localStorage — return empty set (all collapsed)
   }
   return new Set()
 }
@@ -48,7 +48,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   activeWorkspaceId: null,
   activeProjectId: null,
   projectsByWorkspaceId: new Map(),
-  collapsedWorkspaceIds: loadCollapsedIds(),
+  expandedWorkspaceIds: loadExpandedIds(),
 
   loadWorkspaces: async () => {
     const result = await window.electronAPI.workspace.list()
@@ -200,25 +200,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setActiveProject: (id) => set({ activeProjectId: id }),
 
   toggleWorkspaceCollapse: (id) => {
-    const current = get().collapsedWorkspaceIds
+    const current = get().expandedWorkspaceIds
     const next = new Set(current)
     if (next.has(id)) next.delete(id)
     else next.add(id)
     try {
-      localStorage.setItem('terminator.workspace.collapsed', JSON.stringify([...next]))
+      localStorage.setItem('terminator.workspace.expanded', JSON.stringify([...next]))
     } catch {
       // ignore write failures (private browsing, storage full)
     }
-    set({ collapsedWorkspaceIds: next })
+    set({ expandedWorkspaceIds: next })
   },
 
-  setCollapsedWorkspaceIds: (ids) => {
+  setExpandedWorkspaceIds: (ids) => {
     try {
-      localStorage.setItem('terminator.workspace.collapsed', JSON.stringify([...ids]))
+      localStorage.setItem('terminator.workspace.expanded', JSON.stringify([...ids]))
     } catch {
       // ignore write failures
     }
-    set({ collapsedWorkspaceIds: ids })
+    set({ expandedWorkspaceIds: ids })
   },
 
   resolveActiveCwd: () => {

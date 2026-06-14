@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { GitBranch } from 'lucide-react'
 import type { Project } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
@@ -54,8 +54,17 @@ export function ProjectRow({
     !projectNameMatches &&
     !sessions.some((s) => s.tabTitle.toLowerCase().includes(lowerQuery))
 
+  useEffect(() => {
+    function closeHandler() {
+      setCtxMenu(null)
+    }
+    window.addEventListener('close-context-menus', closeHandler)
+    return () => window.removeEventListener('close-context-menus', closeHandler)
+  }, [])
+
   function handleContextMenu(e: React.MouseEvent): void {
     e.preventDefault()
+    window.dispatchEvent(new CustomEvent('close-context-menus'))
     setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 

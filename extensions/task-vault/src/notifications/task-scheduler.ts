@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, Notification } from 'electron'
 import { getDb } from '../vault/db.js'
 import type { ExtensionAPI, Disposable } from '../../../../src/main/extensions/api.js'
 
@@ -109,6 +109,7 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
         id: string
         text: string
         due_date: string
+        source_ref: string | null
         project_id: string | null
         context: string | null
         area_id: string | null
@@ -117,7 +118,7 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
       }
       const dueTasks = db
         .prepare(
-          `SELECT id, text, due_date, project_id, context, area_id,
+          `SELECT id, text, due_date, source_ref, project_id, context, area_id,
                   recurrence_notify_at, metadata FROM tasks
            WHERE status='open' AND due_date IS NOT NULL AND due_date <= ? AND parent_id IS NULL`
         )
@@ -142,10 +143,20 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
 
         notifiedDueIds.add(task.id)
         const taskId = task.id
-        const taskDate = task.due_date
+        // Navigate to the log that contains the task (source_ref), not the due date
+        const taskDate = task.source_ref ?? null
+        const notifTitle = isOverdue ? `Overdue: ${task.text}` : `Due today: ${task.text}`
+        // OS system notification (clickable — navigates to the task)
+        if (Notification.isSupported()) {
+          const osNotif = new Notification({ title: notifTitle, silent: false })
+          osNotif.on('click', () =>
+            broadcast('task-vault:navigate-task', { taskId, date: taskDate })
+          )
+          osNotif.show()
+        }
         const notif = api.notifications.createNotification({
           type: isOverdue ? 'error' : 'warning',
-          title: isOverdue ? `Overdue: ${task.text}` : `Due today: ${task.text}`,
+          title: notifTitle,
           actions: [
             {
               id: 'open',
@@ -158,10 +169,16 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
       }
 
       // ── Blocked tasks with check interval ────────────────────────
-      type BlockedRow = { id: string; text: string; updated_at: string; metadata: string }
+      type BlockedRow = {
+        id: string
+        text: string
+        updated_at: string
+        metadata: string
+        source_ref: string | null
+      }
       const blockedTasks = db
         .prepare(
-          `SELECT id, text, updated_at, metadata FROM tasks
+          `SELECT id, text, updated_at, metadata, source_ref FROM tasks
            WHERE status='blocked' AND metadata IS NOT NULL AND parent_id IS NULL`
         )
         .all() as BlockedRow[]
@@ -194,19 +211,33 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
 
         lastNotifiedBlocked.set(task.id, now)
         const taskId = task.id
+        const taskDate = task.source_ref ?? null
 
         // Dismiss any existing notification for this blocked task before creating a new one
         blockedTaskNotifs.get(task.id)?.dispose()
 
+        const blockedTitle = `Check in: ${task.text}`
+        // OS system notification (clickable — navigates to the task)
+        if (Notification.isSupported()) {
+          const osNotif = new Notification({
+            title: blockedTitle,
+            body: meta.blocked_reason ?? '',
+            silent: false,
+          })
+          osNotif.on('click', () =>
+            broadcast('task-vault:navigate-task', { taskId, date: taskDate })
+          )
+          osNotif.show()
+        }
         const notif = api.notifications.createNotification({
           type: 'info',
-          title: `Check in: ${task.text}`,
+          title: blockedTitle,
           message: meta.blocked_reason ?? undefined,
           actions: [
             {
               id: 'open',
               label: 'Open Vault',
-              handler: () => broadcast('task-vault:navigate-task', taskId),
+              handler: () => broadcast('task-vault:navigate-task', { taskId, date: taskDate }),
             },
           ],
         })

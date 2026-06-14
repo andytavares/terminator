@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
+import { DateTimePicker } from './DateTimePicker'
 
 interface SmartTaskInputProps {
   value: string
@@ -310,27 +311,25 @@ export function SmartTaskInput({
           {active?.type === 'date' ? (
             <div className="smart-input__date-picker">
               <div className="smart-input__dropdown-label">Pick a due date</div>
-              <input
-                type="date"
-                className="smart-input__date-input"
+              <DateTimePicker
+                mode="date"
                 value={dateValue}
-                onChange={(e) => setDateValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleDateSelect(dateValue)
-                  if (e.key === 'Escape') {
-                    e.stopPropagation()
+                onChange={(v) => {
+                  setDateValue(v)
+                  if (v) {
+                    handleDateSelect(v)
+                  } else if (active) {
+                    const before = value.slice(0, active.triggerStart)
+                    const after = value.slice(
+                      active.triggerStart + active.triggerChar.length + active.query.length
+                    )
+                    onChange(`${before}${after.trimStart()}`)
                     setActive(null)
+                    inputRef.current?.focus()
                   }
                 }}
-                autoFocus
+                className="dtp--full"
               />
-              <button
-                className="smart-input__date-apply tv-btn tv-btn--primary"
-                onClick={() => handleDateSelect(dateValue)}
-                disabled={!dateValue}
-              >
-                Apply
-              </button>
             </div>
           ) : (
             <>

@@ -63,13 +63,25 @@ export function UnifiedSidebar({
     activeProjectId,
     activeWorkspaceId,
     projectsByWorkspaceId,
-    collapsedWorkspaceIds,
+    expandedWorkspaceIds,
     toggleWorkspaceCollapse,
     setActiveProject,
     setActiveWorkspace,
+    loadProjects,
   } = useWorkspaceStore()
   const { getScratchSessions } = useSessionStore()
   const scratchSessions = getScratchSessions()
+
+  // Eager-load projects for every workspace that has not been fetched yet.
+  // The unified sidebar shows all workspaces simultaneously, so we cannot
+  // rely on setActiveWorkspace to trigger loadProjects one-at-a-time.
+  useEffect(() => {
+    for (const ws of workspaces) {
+      if (!projectsByWorkspaceId.has(ws.id)) {
+        void loadProjects(ws.id)
+      }
+    }
+  }, [workspaces, projectsByWorkspaceId, loadProjects])
 
   const [width, setWidth] = useState(readStoredWidth)
   const [createWsOpen, setCreateWsOpen] = useState(false)
@@ -188,7 +200,7 @@ export function UnifiedSidebar({
               <WorkspaceCard
                 workspace={ws}
                 projects={projectsByWorkspaceId.get(ws.id) ?? []}
-                isCollapsed={collapsedWorkspaceIds.has(ws.id)}
+                isCollapsed={!expandedWorkspaceIds.has(ws.id)}
                 onToggleCollapse={() => toggleWorkspaceCollapse(ws.id)}
                 activeProjectId={activeProjectId}
                 onSelectProject={(projectId) => {
