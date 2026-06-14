@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from 'fastify'
 import websocketPlugin from '@fastify/websocket'
 import staticPlugin from '@fastify/static'
 import { join, resolve } from 'path'
+import { randomBytes } from 'crypto'
 import { readFileSync, existsSync } from 'fs'
 import { app as electronApp } from 'electron'
 import type { PtyManagerAPI, WorkspaceSnapshot, ProjectSnapshot } from '../types.js'
@@ -69,8 +70,27 @@ export async function createRemoteServer(
 
   const ticketStore = new WsTicketStore()
   const subscriberManager = new WsSubscriberManager()
+  const appSessions = new Set<string>()
+
+  function parseAppSession(cookieHeader: string): string | null {
+    const match = cookieHeader
+      .split(';')
+      .map((s) => s.trim())
+      .find((s) => s.startsWith('app-session='))
+    return match ? match.slice('app-session='.length) : null
+  }
 
   const fastify = Fastify({ logger: false })
+
+  // Gate /app/* static assets behind a session cookie issued on ticket auth
+  fastify.addHook('onRequest', async (request, reply) => {
+    const pathname = request.url.split('?')[0]
+    if (!pathname.startsWith('/app/') || pathname === '/app/') return
+    const token = parseAppSession(request.headers.cookie ?? '')
+    if (!token || !appSessions.has(token)) {
+      return reply.status(403).send({ error: 'FORBIDDEN' })
+    }
+  })
 
   await fastify.register(websocketPlugin)
 
@@ -81,10 +101,24 @@ export async function createRemoteServer(
   await fastify.register(staticPlugin, { root: rendererDir, prefix: '/app', decorateReply: false })
 
   fastify.get<{ Querystring: { t?: string } }>('/app/', async (request, reply) => {
-    const t = request.query.t ?? ''
-    if (!t || !ticketStore.consumeTicket(t, 'app')) {
-      return reply.redirect('/')
+    // Accept an existing valid session cookie (allows page refresh without re-auth)
+    const existingToken = parseAppSession(request.headers.cookie ?? '')
+    const hasSession = existingToken !== null && appSessions.has(existingToken)
+
+    if (!hasSession) {
+      const t = request.query.t ?? ''
+      if (!t || !ticketStore.consumeTicket(t, 'app')) {
+        return reply.redirect('/')
+      }
+      const sessionToken = randomBytes(32).toString('hex')
+      appSessions.add(sessionToken)
+      // 8-hour HttpOnly session cookie scoped to /app
+      reply.header(
+        'Set-Cookie',
+        `app-session=${sessionToken}; Path=/app; HttpOnly; SameSite=Strict; Max-Age=28800`
+      )
     }
+
     const shimTag = '<script type="module" src="/remote-shim.js"></script>'
     try {
       let html = readFileSync(join(rendererDir, 'index.html'), 'utf8')
@@ -145,6 +179,7 @@ export async function createRemoteServer(
     async stop() {
       if (!listening) return
       ticketStore.stopCleanup()
+      appSessions.clear()
       terminalCleanup.cleanup()
       bridgeCleanup.disconnectAll()
       subscriberManager.destroyAll()
@@ -153,6 +188,7 @@ export async function createRemoteServer(
     },
 
     disconnectAllClients() {
+      appSessions.clear()
       bridgeCleanup.disconnectAll()
       subscriberManager.destroyAll()
     },
