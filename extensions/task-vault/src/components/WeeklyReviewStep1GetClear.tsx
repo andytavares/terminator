@@ -13,10 +13,11 @@ export function WeeklyReviewStep1GetClear({ onComplete }: Props): React.JSX.Elem
     if (!text.trim()) return
     setAdding(true)
     try {
-      await window.electronAPI.extensionBridge.invoke('task-vault:vault:add-task', {
+      const result = (await window.electronAPI.extensionBridge.invoke('task-vault:vault:add-task', {
+        filePath: 'inbox.md',
         text: text.trim(),
-        source: 'inbox',
-      })
+      })) as { error?: string }
+      if (result?.error) return
       setCaptured((prev) => [...prev, text.trim()])
       setText('')
     } finally {

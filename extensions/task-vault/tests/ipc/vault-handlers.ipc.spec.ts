@@ -552,6 +552,28 @@ describe('task-vault:vault:list-archive (lines 647-664)', () => {
     expect(result.projects[0].terminatorLinks).toContain('link-1')
   })
 
+  it('returns archived areas with id, name, and updatedAt', async () => {
+    const areaRow = {
+      id: 'area-1',
+      name: 'Old Area',
+      status: 'archived',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    mockAll
+      .mockReturnValueOnce([]) // tasks
+      .mockReturnValueOnce([]) // projects
+      .mockReturnValueOnce([areaRow]) // areas
+    const handler = getHandler('task-vault:vault:list-archive')
+    const result = (await handler({}, {})) as {
+      areas: { id: string; name: string; updatedAt: string }[]
+    }
+    expect(result.areas).toHaveLength(1)
+    expect(result.areas[0].id).toBe('area-1')
+    expect(result.areas[0].name).toBe('Old Area')
+    expect(result.areas[0].updatedAt).toBeTruthy()
+  })
+
   it('returns error string when db throws', async () => {
     mockPrepare.mockImplementationOnce(() => {
       throw new Error('archive db error')
@@ -577,6 +599,74 @@ describe('task-vault:projects:get-tasks', () => {
     const handler = getHandler('task-vault:projects:get-tasks')
     const result = (await handler({}, {})) as { tasks: unknown[] }
     expect(result.tasks).toHaveLength(0)
+  })
+})
+
+// ── rename-area ───────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:rename-area', () => {
+  it('renames an area and returns success', async () => {
+    mockGet
+      .mockReturnValueOnce({ id: 'area-1', name: 'Work' }) // area found
+      .mockReturnValueOnce(undefined) // no collision
+    const handler = getHandler('task-vault:vault:rename-area')
+    const result = await handler({}, { areaFilePath: 'Work', newName: 'Work 2026' })
+    expect(result).toMatchObject({ success: true })
+    expect(mockRun).toHaveBeenCalled()
+  })
+
+  it('returns VALIDATION_ERROR when areaFilePath is missing', async () => {
+    const handler = getHandler('task-vault:vault:rename-area')
+    const result = await handler({}, { newName: 'New Name' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+
+  it('returns VALIDATION_ERROR when newName is missing', async () => {
+    const handler = getHandler('task-vault:vault:rename-area')
+    const result = await handler({}, { areaFilePath: 'Work' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+
+  it('returns NOT_FOUND when area does not exist', async () => {
+    mockGet.mockReturnValueOnce(undefined)
+    const handler = getHandler('task-vault:vault:rename-area')
+    const result = await handler({}, { areaFilePath: 'Ghost', newName: 'Specter' })
+    expect(result).toMatchObject({ error: 'NOT_FOUND' })
+  })
+
+  it('returns AREA_EXISTS when new name is already taken', async () => {
+    mockGet
+      .mockReturnValueOnce({ id: 'area-1', name: 'Work' }) // area found
+      .mockReturnValueOnce({ id: 'area-2' }) // collision
+    const handler = getHandler('task-vault:vault:rename-area')
+    const result = await handler({}, { areaFilePath: 'Work', newName: 'Personal' })
+    expect(result).toMatchObject({ error: 'AREA_EXISTS' })
+  })
+})
+
+// ── restore-area ──────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:restore-area', () => {
+  it('restores an archived area and its projects, returns success', async () => {
+    mockGet.mockReturnValueOnce({ id: 'area-1' })
+    const handler = getHandler('task-vault:vault:restore-area')
+    const result = await handler({}, { areaName: 'Work' })
+    expect(result).toMatchObject({ success: true })
+    // area status UPDATE + projects status UPDATE
+    expect(mockRun).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns VALIDATION_ERROR when areaName is missing', async () => {
+    const handler = getHandler('task-vault:vault:restore-area')
+    const result = await handler({}, {})
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+
+  it('returns NOT_FOUND when area does not exist', async () => {
+    mockGet.mockReturnValueOnce(undefined)
+    const handler = getHandler('task-vault:vault:restore-area')
+    const result = await handler({}, { areaName: 'Ghost' })
+    expect(result).toMatchObject({ error: 'NOT_FOUND' })
   })
 })
 
@@ -1417,6 +1507,8 @@ describe('registerVaultIpcHandlers dispose', () => {
     expect(removedChannels).toContain('task-vault:vault:block-task')
     expect(removedChannels).toContain('task-vault:vault:unblock-task')
     expect(removedChannels).toContain('task-vault:vault:reorder-tasks')
+    expect(removedChannels).toContain('task-vault:vault:rename-area')
+    expect(removedChannels).toContain('task-vault:vault:restore-area')
     expect(removedChannels).toContain('task-vault:vault:set-recurrence')
     expect(removedChannels).toContain('task-vault:vault:clear-recurrence')
     expect(removedChannels).toContain('task-vault:vault:get-calendar-month')
