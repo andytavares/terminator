@@ -23,7 +23,8 @@ function getLanUrl(port: number): string {
   const ifaces = networkInterfaces()
   for (const iface of Object.values(ifaces)) {
     for (const addr of iface ?? []) {
-      if (addr.family === 'IPv4' && !addr.internal) return `http://${addr.address}:${port}`
+      if ((addr.family === 'IPv4' || (addr.family as unknown) === 4) && !addr.internal)
+        return `http://${addr.address}:${port}`
     }
   }
   return `http://localhost:${port}`
@@ -32,6 +33,7 @@ function getLanUrl(port: number): string {
 let remoteServer: RemoteServerHandle | null = null
 const ngrokManager = new NgrokManager()
 let queue: Promise<void> = Promise.resolve()
+let currentPublicUrl: string | null = null
 
 export function activate(api: ExtensionAPI): void {
   api.settings.register({
@@ -117,7 +119,9 @@ export function activate(api: ExtensionAPI): void {
         const authToken = api.settings.get<string>(KEY.ngrokAuthToken) || undefined
         try {
           const publicUrl = await ngrokManager.start(port, authToken)
+          currentPublicUrl = publicUrl
           ngrokManager.setOnCrash(() => {
+            currentPublicUrl = null
             api.window.broadcast('remote:tunnel-disconnected', {})
             api.window.broadcast('remote:status', {
               enabled: true,
@@ -135,6 +139,7 @@ export function activate(api: ExtensionAPI): void {
             ngrokError: null,
           })
         } catch (err) {
+          currentPublicUrl = null
           const needsAuth = !authToken
           api.window.broadcast('remote:status', {
             enabled: true,
@@ -148,6 +153,7 @@ export function activate(api: ExtensionAPI): void {
           })
         }
       } else {
+        currentPublicUrl = null
         api.window.broadcast('remote:status', {
           enabled: true,
           port,
@@ -165,6 +171,7 @@ export function activate(api: ExtensionAPI): void {
   }
 
   async function stopServer(): Promise<void> {
+    currentPublicUrl = null
     ngrokManager.stop()
     if (remoteServer) {
       await remoteServer.stop()
@@ -200,7 +207,12 @@ export function activate(api: ExtensionAPI): void {
     api.settings.set(KEY.password, actual)
     api.settings.set(KEY.passwordHash, hash)
     remoteServer?.disconnectAllClients()
-    api.window.broadcast('remote:status', { enabled: !!remoteServer?.isListening() })
+    const listening = !!remoteServer?.isListening()
+    const port = api.settings.get<number>(KEY.port) ?? 7681
+    api.window.broadcast('remote:status', {
+      enabled: listening,
+      ...(listening && { port, lanUrl: getLanUrl(port), publicUrl: currentPublicUrl }),
+    })
     return { password: actual }
   })
 

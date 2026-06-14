@@ -248,6 +248,7 @@ app.whenReady().then(async () => {
 app.on('before-quit', async (event) => {
   event.preventDefault()
   app.isQuitting = true
+  await extensionHost.unloadAll()
   await ptyManager.killAll()
   app.exit(0)
 })

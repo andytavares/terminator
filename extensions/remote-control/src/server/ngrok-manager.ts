@@ -9,7 +9,7 @@ export function generateCaddyfile(port: number): string {
   let hostname = 'localhost'
   for (const iface of Object.values(ifaces)) {
     for (const addr of iface ?? []) {
-      if (addr.family === 'IPv4' && !addr.internal) {
+      if ((addr.family === 'IPv4' || (addr.family as unknown) === 4) && !addr.internal) {
         hostname = addr.address
         break
       }

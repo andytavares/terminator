@@ -183,6 +183,12 @@ export class ExtensionHost {
     return ext
   }
 
+  async unloadAll(): Promise<void> {
+    for (const id of [...this.loaded.keys()]) {
+      await this.unload(id)
+    }
+  }
+
   listExtensions(): Extension[] {
     return store.get('extensions').map(({ directoryPath: _dp, ...ext }) => ext)
   }
