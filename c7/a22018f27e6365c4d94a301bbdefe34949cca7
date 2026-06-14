@@ -1,0 +1,33 @@
+extensions/remote-control/tests/unit/auth.middleware.spec.ts
+  s_1b76435cf764c0::t_5c18401d1faf5b 163-196
+extensions/remote-control/src/index.ts
+  s_1b76435cf764c0::t_d92d1337bbffaa 39-42
+extensions/remote-control/src/server/auth.middleware.ts
+  s_1b76435cf764c0::t_39012d77741937 25,32,48-51
+extensions/remote-control/src/server/ngrok-manager.ts
+  s_1b76435cf764c0::t_f24bfd8e69b2e2 29,45,72,82,84
+extensions/remote-control/tests/unit/ngrok-manager.spec.ts
+  s_1b76435cf764c0::t_03afb0b42a4e3d 281
+  s_1b76435cf764c0::t_e1e9fd1bbd68d0 273-279,283,286-288
+  s_1b76435cf764c0::t_824fbb0531c744 280,282,284-285
+src/renderer-remote/electron-api-shim.ts
+  s_1b76435cf764c0::t_969a7e409c8f44 47-49,51-55
+extensions/remote-control/src/server/remote-server.ts
+  s_1b76435cf764c0::t_aa550acb5358d9 153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "c7a22018f27e6365c4d94a301bbdefe34949cca7",
+  "prompts": {},
+  "sessions": {
+    "s_1b76435cf764c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec6c5757-6559-41ff-8b14-c282d16bfec4",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
