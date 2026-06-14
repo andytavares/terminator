@@ -1,0 +1,19 @@
+extensions/task-vault/src/components/AreasView.tsx
+  s_b924fed75606c0::t_069b0ef60b4787 48-49,64,74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "bdc3418b75c54f6558d85de1e2a0adaf185ea43d",
+  "prompts": {},
+  "sessions": {
+    "s_b924fed75606c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fed56da4-0b77-4421-addd-e4e4a908a987",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
