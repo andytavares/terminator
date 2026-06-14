@@ -1,5 +1,5 @@
 import * as path from 'node:path'
-import { ipcMain } from 'electron'
+import { ipcMain, Notification } from 'electron'
 import { getDb, randomUUID } from '../vault/db'
 import { extractTags, toDisplayName } from '../vault/tags'
 import { localDate as _localDate } from '../vault/recurrence'
@@ -155,6 +155,7 @@ export function registerVaultIpcHandlers(): () => void {
       now,
       now
     )
+    broadcast('task-vault:push:index-updated', {})
     return { taskId: id }
   })
 
@@ -315,6 +316,7 @@ export function registerVaultIpcHandlers(): () => void {
       now,
       now
     )
+    broadcast('task-vault:push:index-updated', {})
     return { taskId: id }
   })
 
@@ -327,6 +329,11 @@ export function registerVaultIpcHandlers(): () => void {
     const db = getDb()
     const now = new Date().toISOString()
     const todayStr = today()
+
+    const taskRow = db.prepare(`SELECT text FROM tasks WHERE id=?`).get(taskId) as
+      | { text: string }
+      | undefined
+    const taskText = taskRow?.text ?? ''
 
     try {
       let nextTaskId: string | null = null
@@ -348,6 +355,10 @@ export function registerVaultIpcHandlers(): () => void {
         broadcast('task-vault:recurrence-spawned', { taskId, nextTaskId, nextDue })
       }
 
+      if (Notification.isSupported()) {
+        new Notification({ title: 'Task completed', body: taskText, silent: true }).show()
+      }
+      broadcast('task-vault:push:index-updated', {})
       return { success: true }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -434,6 +445,7 @@ export function registerVaultIpcHandlers(): () => void {
         now
       )
     }
+    broadcast('task-vault:push:index-updated', {})
     return { newTaskId: newId }
   })
 
@@ -502,6 +514,7 @@ export function registerVaultIpcHandlers(): () => void {
         )
         UPDATE tasks SET status='cancelled', updated_at=? WHERE id IN (SELECT id FROM subtree)`
       ).run(taskId, archiveNow)
+      broadcast('task-vault:push:index-updated', {})
       return { success: true }
     }
 
@@ -514,6 +527,7 @@ export function registerVaultIpcHandlers(): () => void {
       db.prepare(
         `UPDATE tasks SET source='daily', source_ref=?, updated_at=? WHERE parent_id=?`
       ).run(todayDate, now, taskId)
+      broadcast('task-vault:push:index-updated', {})
       return { success: true }
     }
 
@@ -526,6 +540,7 @@ export function registerVaultIpcHandlers(): () => void {
       db.prepare(
         `UPDATE tasks SET source='someday', source_ref=NULL, updated_at=? WHERE parent_id=?`
       ).run(now, taskId)
+      broadcast('task-vault:push:index-updated', {})
       return { success: true }
     }
 
@@ -573,6 +588,7 @@ export function registerVaultIpcHandlers(): () => void {
       `UPDATE tasks SET source='daily', source_ref=?, area_id=?, project_id=?, updated_at=? WHERE parent_id=?`
     ).run(todayDate, areaId, projectId, now, taskId)
 
+    broadcast('task-vault:push:index-updated', {})
     return { success: true, newTaskId: taskId }
   })
 
@@ -605,6 +621,7 @@ export function registerVaultIpcHandlers(): () => void {
         taskId
       )
     if (changes.changes === 0) return { error: 'STALE_ID' }
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -628,6 +645,7 @@ export function registerVaultIpcHandlers(): () => void {
       )
       .run(taskId)
     if (changes.changes === 0) return { error: 'STALE_ID' }
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -643,6 +661,7 @@ export function registerVaultIpcHandlers(): () => void {
       .prepare(`UPDATE tasks SET status='cancelled', updated_at=? WHERE id=?`)
       .run(now, taskId)
     if (changes.changes === 0) return { error: 'STALE_ID' }
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -678,6 +697,7 @@ export function registerVaultIpcHandlers(): () => void {
       )
       .run(todayDate, JSON.stringify(meta), now, taskId)
     if (changes.changes === 0) return { error: 'STALE_ID' }
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -698,6 +718,7 @@ export function registerVaultIpcHandlers(): () => void {
       now,
       now
     )
+    broadcast('task-vault:push:index-updated', {})
     return { success: true, filePath: displayName }
   })
 
@@ -717,6 +738,7 @@ export function registerVaultIpcHandlers(): () => void {
       .get(newName.trim(), area.id)
     if (existing) return { error: 'AREA_EXISTS' }
     db.prepare(`UPDATE areas SET name=?, updated_at=? WHERE id=?`).run(newName.trim(), now, area.id)
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -768,6 +790,10 @@ export function registerVaultIpcHandlers(): () => void {
     // Archive the area itself
     db.prepare(`UPDATE areas SET status='archived', updated_at=? WHERE id=?`).run(now, area.id)
 
+    if (Notification.isSupported()) {
+      new Notification({ title: 'Area archived', body: areaName, silent: true }).show()
+    }
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -811,6 +837,7 @@ export function registerVaultIpcHandlers(): () => void {
     // Delete the area
     db.prepare(`DELETE FROM areas WHERE id=?`).run(area.id)
 
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -840,6 +867,7 @@ export function registerVaultIpcHandlers(): () => void {
          AND (area_id=? AND project_id IS NULL
               OR project_id IN (SELECT id FROM projects WHERE area_id=?))`
     ).run(now, archivedAt, area.id, area.id)
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -1036,6 +1064,7 @@ export function registerVaultIpcHandlers(): () => void {
       db.prepare(
         `UPDATE tasks SET source='daily', source_ref=?, updated_at=? WHERE parent_id=?`
       ).run(todayDate, now, taskId)
+      broadcast('task-vault:push:index-updated', {})
       return { success: true }
     } catch (err) {
       return { error: String(err) }
@@ -1058,6 +1087,7 @@ export function registerVaultIpcHandlers(): () => void {
       `INSERT INTO tasks (id,text,status,source,source_ref,parent_id,created_at,updated_at)
        VALUES (?,?,?,?,?,?,?,?)`
     ).run(newId, text.trim(), 'open', parent.source, parent.source_ref, taskId, now, now)
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -1215,6 +1245,10 @@ export function registerVaultIpcHandlers(): () => void {
     }
 
     db.prepare(`UPDATE projects SET status=?, updated_at=? WHERE id=?`).run(status, now, proj.id)
+    if (status === 'archived' && Notification.isSupported()) {
+      new Notification({ title: 'Project archived', body: projectName, silent: true }).show()
+    }
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -1300,6 +1334,7 @@ export function registerVaultIpcHandlers(): () => void {
       )
       .run(JSON.stringify(meta), now, taskId)
     if (changes.changes === 0) return { error: 'STALE_ID' }
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -1325,6 +1360,7 @@ export function registerVaultIpcHandlers(): () => void {
       .run(JSON.stringify(meta), reason, checkInterval, now, taskId)
     if (changes.changes === 0) return { error: 'STALE_ID' }
     triggerSchedulerTick()
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -1349,6 +1385,7 @@ export function registerVaultIpcHandlers(): () => void {
       )
       .run(JSON.stringify(meta), now, taskId)
     if (changes.changes === 0) return { error: 'STALE_ID' }
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -1427,6 +1464,7 @@ export function registerVaultIpcHandlers(): () => void {
       if (nextTaskId) {
         broadcast('task-vault:recurrence-spawned', { taskId, nextTaskId })
       }
+      broadcast('task-vault:push:index-updated', {})
       return { success: true }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -1472,6 +1510,7 @@ export function registerVaultIpcHandlers(): () => void {
       ).run(JSON.stringify(meta), now, taskId)
     })
     clearTx()
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -1490,6 +1529,7 @@ export function registerVaultIpcHandlers(): () => void {
       }
     })
     updateMany(orderedIds)
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 

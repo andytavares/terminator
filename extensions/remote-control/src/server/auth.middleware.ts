@@ -6,7 +6,7 @@ const PROTECTED_PREFIXES = ['/api', '/ws']
 
 // Allowed hosts: loopback, private RFC-1918 ranges (LAN), and ngrok tunnel domains
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
-const NGROK_PATTERN = /\.ngrok(-free)?\.app$|\.ngrok\.io$/
+const NGROK_PATTERN = /\.ngrok(-free)?\.app$|\.ngrok(-free)?\.dev$|\.ngrok\.io$/
 // RFC 1918 private ranges: 10.x, 172.16-31.x, 192.168.x
 const PRIVATE_IP_PATTERN =
   /^(10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)$/

@@ -20,6 +20,15 @@ const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
 }))
 vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
+  Notification: Object.assign(
+    vi.fn(() => ({ show: vi.fn() })),
+    { isSupported: vi.fn(() => false) }
+  ),
+}))
+
+vi.mock('../../src/notifications/task-scheduler.js', () => ({
+  triggerSchedulerTick: vi.fn(),
+  broadcast: vi.fn(),
 }))
 
 vi.mock('gray-matter', () => ({

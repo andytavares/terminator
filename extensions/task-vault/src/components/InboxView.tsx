@@ -39,6 +39,13 @@ export function InboxView(): React.JSX.Element {
     load()
   }, [])
 
+  useEffect(() => {
+    const unsub = window.electronAPI.extensionBridge.on('task-vault:push:index-updated', () => {
+      void load()
+    })
+    return unsub
+  }, [])
+
   async function handleCapture() {
     if (!newTaskText.trim()) return
     setAdding(true)

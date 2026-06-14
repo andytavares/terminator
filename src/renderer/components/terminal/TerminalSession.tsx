@@ -141,9 +141,8 @@ export class TerminalInstance {
     const lineHeight = Math.ceil(fontSize * 1.2)
     const charW = measureCharWidth(fontSize)
 
-    // xterm link providers: declare links for accessibility tooling.
-    // Visual decoration is handled by our own overlay below because xterm's
-    // built-in `decorations` don't render underlines reliably in DOM renderer mode.
+    // xterm link providers: declare links for accessibility tooling only (no visual decorations —
+    // visual feedback is handled by our own overlay and is cmd-key gated).
     const makeVisualProvider = (regex: RegExp): ILinkProvider => ({
       provideLinks: (bufferLineIndex, callback) => {
         const line = this.terminal.buffer.active.getLine(bufferLineIndex)
@@ -163,7 +162,6 @@ export class TerminalInstance {
               end: { x: match.index + matchText.length, y: bufferLineIndex + 1 },
             },
             text: matchText,
-            decorations: { pointerCursor: true, underline: true },
             activate: () => {},
           })
         }
@@ -191,7 +189,6 @@ export class TerminalInstance {
               end: { x: innerStart + inner.length, y: bufferLineIndex + 1 },
             },
             text: inner,
-            decorations: { pointerCursor: true, underline: true },
             activate: () => {},
           })
         }
@@ -202,7 +199,8 @@ export class TerminalInstance {
     this.terminal.registerLinkProvider(makeVisualProvider(pathRegex))
     this.terminal.registerLinkProvider(quotedPathProvider)
 
-    // Underline overlay: a 1px div positioned absolutely over the hovered link text.
+    // Underline overlay: a 1px div positioned absolutely under hovered link text.
+    // Only shown when Cmd (macOS) or Ctrl (Win/Linux) is held.
     const overlay = document.createElement('div')
     overlay.style.cssText =
       'position:absolute;pointer-events:none;height:1px;background:#4a9eff;display:none;z-index:10;'
@@ -233,6 +231,8 @@ export class TerminalInstance {
       return null
     }
 
+    const isMac = navigator.platform.startsWith('Mac')
+
     const getPos = (e: MouseEvent) => {
       const rect = this.element.getBoundingClientRect()
       const col = Math.floor((e.clientX - rect.left) / charW)
@@ -240,28 +240,57 @@ export class TerminalInstance {
       return { col, viewportRow, bufferRow: this.terminal.buffer.active.viewportY + viewportRow }
     }
 
-    // mousemove: show underline overlay + pointer cursor over detected links.
-    const onMouseMove = (e: MouseEvent) => {
-      const { col, viewportRow, bufferRow } = getPos(e)
+    // Show overlay under the link at the given position. The overlay sits at the
+    // baseline of the text row: (rowIndex + 1) * lineHeight gives the bottom of the row,
+    // so subtracting a small gap lands just below the descenders.
+    const showOverlayAt = (col: number, viewportRow: number, bufferRow: number) => {
       const line = this.terminal.buffer.active.getLine(bufferRow)
       const match = line ? hitTest(line.translateToString(true), col) : null
       if (match) {
         overlay.style.left = `${match.index * charW}px`
-        overlay.style.top = `${viewportRow * lineHeight + lineHeight - 2}px`
+        overlay.style.top = `${(viewportRow + 1) * lineHeight - 1}px`
         overlay.style.width = `${match.length * charW}px`
         overlay.style.display = 'block'
-        // xterm.css defines .xterm-cursor-pointer { cursor: pointer }
         this.terminal.element?.classList.add('xterm-cursor-pointer')
       } else {
         this.clearLinkHover()
       }
     }
 
-    const onMouseLeave = () => this.clearLinkHover()
+    // Last known mouse position (needed to re-check when cmd is pressed while hovering).
+    let lastPos: { col: number; viewportRow: number; bufferRow: number } | null = null
+
+    // mousemove: only show overlay when Cmd/Ctrl is held.
+    const onMouseMove = (e: MouseEvent) => {
+      const pos = getPos(e)
+      lastPos = pos
+      if (isMac ? e.metaKey : e.ctrlKey) {
+        showOverlayAt(pos.col, pos.viewportRow, pos.bufferRow)
+      } else {
+        this.clearLinkHover()
+      }
+    }
+
+    const onMouseLeave = () => {
+      lastPos = null
+      this.clearLinkHover()
+    }
+
+    // keydown/keyup on document: show/hide overlay when Cmd is pressed/released while hovering.
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isModKey = isMac ? e.key === 'Meta' : e.key === 'Control'
+      if (!isModKey || !lastPos) return
+      showOverlayAt(lastPos.col, lastPos.viewportRow, lastPos.bufferRow)
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      const isModKey = isMac ? e.key === 'Meta' : e.key === 'Control'
+      if (isModKey) this.clearLinkHover()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('keyup', onKeyUp)
 
     // mousedown: Cmd+click (macOS) or Ctrl+click (Windows/Linux) opens links.
     // On macOS Ctrl+click is a secondary click — don't intercept it.
-    const isMac = navigator.platform.startsWith('Mac')
     const onMouseDown = (e: MouseEvent) => {
       if (!(isMac ? e.metaKey : e.ctrlKey)) return
       const { col, bufferRow } = getPos(e)
@@ -305,6 +334,8 @@ export class TerminalInstance {
       this.element.removeEventListener('mousemove', onMouseMove)
       this.element.removeEventListener('mouseleave', onMouseLeave)
       this.element.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('keyup', onKeyUp)
     }
   }
 

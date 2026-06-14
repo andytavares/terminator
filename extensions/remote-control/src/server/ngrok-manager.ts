@@ -43,7 +43,7 @@ export class NgrokManager {
 
   start(port: number, authToken?: string): Promise<string> {
     this.stopped = false
-    const args = ['http', String(port), '--web-addr', '127.0.0.1:4041']
+    const args = ['http', String(port)]
     if (authToken) args.push('--authtoken', authToken)
     this.process = spawn('ngrok', args, { detached: false })
 
@@ -83,7 +83,7 @@ export class NgrokManager {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
       if (this.stopped) throw new Error('ngrok stopped')
       try {
-        const res = await fetch('http://localhost:4041/api/tunnels')
+        const res = await fetch('http://localhost:4040/api/tunnels')
         if (res.ok) {
           const data = (await res.json()) as { tunnels: Array<{ public_url: string }> }
           const tunnel = data.tunnels.find((t) => t.public_url.startsWith('https://'))

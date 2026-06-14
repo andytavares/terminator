@@ -61,7 +61,10 @@ export function RemoteControlSettings(): React.JSX.Element {
   }, [])
 
   return (
-    <div className="settings-section">
+    <div
+      className="settings-section"
+      style={{ padding: '24px', overflowY: 'auto', height: '100%', boxSizing: 'border-box' }}
+    >
       <h3 className="settings-section__title">Remote Control</h3>
 
       <div className="settings-section__field">
@@ -89,6 +92,7 @@ export function RemoteControlSettings(): React.JSX.Element {
         <input
           type="number"
           className="settings-section__input"
+          style={{ width: '100%', maxWidth: 200 }}
           value={port}
           min={1024}
           max={65535}
@@ -110,6 +114,7 @@ export function RemoteControlSettings(): React.JSX.Element {
         <input
           type="number"
           className="settings-section__input"
+          style={{ width: '100%', maxWidth: 200 }}
           value={maxSubscribers}
           min={1}
           max={20}
@@ -138,7 +143,23 @@ export function RemoteControlSettings(): React.JSX.Element {
                 className="settings-section__hint"
                 style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}
               >
-                <code style={{ flex: 1, wordBreak: 'break-all', userSelect: 'all' }}>
+                <code
+                  style={{
+                    flex: 1,
+                    userSelect: 'all',
+                    wordBreak: 'break-all',
+                    alignSelf: 'stretch',
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: 'var(--bg-input)',
+                    border: '1px solid var(--border-strong)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '6px 9px',
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
                   {status.publicUrl}
                 </code>
                 <button
@@ -198,7 +219,22 @@ export function RemoteControlSettings(): React.JSX.Element {
                 className="settings-section__hint"
                 style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}
               >
-                <code style={{ flex: 1, userSelect: 'all' }}>
+                <code
+                  style={{
+                    flex: 1,
+                    userSelect: 'all',
+                    alignSelf: 'stretch',
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: 'var(--bg-input)',
+                    border: '1px solid var(--border-strong)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '6px 9px',
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
                   {status.lanUrl ?? `http://…:${port}`}
                 </code>
                 {status.lanUrl && (

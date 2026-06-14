@@ -97,8 +97,7 @@
 }
 
 .sidebar-header__tab--active {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+  color: var(--accent);
 }
 
 .sidebar-header__bell {

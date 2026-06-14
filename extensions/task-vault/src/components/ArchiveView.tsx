@@ -91,6 +91,13 @@ export function ArchiveView(): React.JSX.Element {
     load(days)
   }, [])
 
+  useEffect(() => {
+    const unsub = window.electronAPI.extensionBridge.on('task-vault:push:index-updated', () => {
+      void load(days)
+    })
+    return unsub
+  }, [days])
+
   function changeWindow(newDays: number) {
     setDays(newDays)
     load(newDays)

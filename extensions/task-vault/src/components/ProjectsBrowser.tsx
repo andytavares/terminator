@@ -660,6 +660,13 @@ export function ProjectsBrowser(): React.JSX.Element {
     load()
   }, [statusFilter])
 
+  useEffect(() => {
+    const unsub = window.electronAPI.extensionBridge.on('task-vault:push:index-updated', () => {
+      void load()
+    })
+    return unsub
+  }, [statusFilter])
+
   async function handleUpdateStatus(filePath: string, status: string) {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:update-project-status', {
       projectFilePath: filePath,

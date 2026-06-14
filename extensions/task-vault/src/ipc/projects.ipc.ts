@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { getDb, randomUUID } from '../vault/db'
 import { toDisplayName } from '../vault/tags'
+import { broadcast } from '../notifications/task-scheduler.js'
 import {
   ListProjectsRequestSchema,
   UpdateProjectStatusRequestSchema,
@@ -144,6 +145,7 @@ export function registerProjectsIpcHandlers(): () => void {
       `INSERT INTO projects (id,name,status,area_id,deadline,outcome,created_at,updated_at)
        VALUES (?,?,?,?,?,?,?,?)`
     ).run(randomUUID(), displayName, 'active', areaId, deadline ?? null, outcome ?? null, now, now)
+    broadcast('task-vault:push:index-updated', {})
     return { success: true, filePath: displayName }
   })
 
@@ -173,6 +175,7 @@ export function registerProjectsIpcHandlers(): () => void {
     // Also catch any orphaned tasks remaining
     db.prepare(`DELETE FROM tasks WHERE project_id=?`).run(proj.id)
     db.prepare(`DELETE FROM projects WHERE id=?`).run(proj.id)
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -209,6 +212,7 @@ export function registerProjectsIpcHandlers(): () => void {
     }
 
     db.prepare(`UPDATE projects SET status=?, updated_at=? WHERE id=?`).run(status, now, proj.id)
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -241,6 +245,7 @@ export function registerProjectsIpcHandlers(): () => void {
       now,
       projectName
     )
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -259,6 +264,7 @@ export function registerProjectsIpcHandlers(): () => void {
       now,
       projectName
     )
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
@@ -285,6 +291,7 @@ export function registerProjectsIpcHandlers(): () => void {
       now,
       proj.id
     )
+    broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 

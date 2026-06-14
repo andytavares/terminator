@@ -4,8 +4,16 @@ const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
   mockHandle: vi.fn(),
   mockRemoveHandler: vi.fn(),
 }))
+const mockNotification = {
+  isSupported: vi.fn(() => false),
+  show: vi.fn(),
+}
 vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
+  Notification: Object.assign(
+    vi.fn(() => mockNotification),
+    { isSupported: vi.fn(() => false) }
+  ),
 }))
 
 const { mockRun, mockGet, mockAll, mockPrepare } = vi.hoisted(() => {

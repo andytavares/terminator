@@ -70,6 +70,13 @@ export function AreasView(): React.JSX.Element {
   }, [statusFilter])
 
   useEffect(() => {
+    const unsub = window.electronAPI.extensionBridge.on('task-vault:push:index-updated', () => {
+      void load()
+    })
+    return unsub
+  }, [statusFilter])
+
+  useEffect(() => {
     if (selectedAreaName && areas.length > 0) {
       const found = areas.find((a) => a.name === selectedAreaName)
       if (found) setSelectedArea(found)
