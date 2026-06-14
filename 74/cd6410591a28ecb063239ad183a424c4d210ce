@@ -1,0 +1,28 @@
+extensions/remote-control/src/server/ngrok-manager.ts
+  s_8e723948aeb460::t_d850373c3ce40c 44
+extensions/remote-control/src/server/ws-subscriber-manager.ts
+  s_8e723948aeb460::t_ae21cdb2a0aeaa 32-34
+extensions/remote-control/src/components/RemoteControlSettings.tsx
+  s_8e723948aeb460::t_0f1252c7c15d02 104,107
+  s_8e723948aeb460::t_7dbd10b60ebe60 83,86
+extensions/remote-control/tests/unit/ws-subscriber-manager.spec.ts
+  s_8e723948aeb460::t_7bdbd79e0ae16a 101,107-114
+extensions/remote-control/tests/unit/ngrok-manager.spec.ts
+  s_8e723948aeb460::t_af0d9d518cd907 127,183
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "74cd6410591a28ecb063239ad183a424c4d210ce",
+  "prompts": {},
+  "sessions": {
+    "s_8e723948aeb460": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bafe19cd-02b4-42a6-9919-66a462467a04",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
