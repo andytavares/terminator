@@ -1,0 +1,32 @@
+tests/unit/extensions/api.spec.ts
+  s_f88f4d30f513d0::t_5b098092e535fd 27
+  s_f88f4d30f513d0::t_ec25b24b801a73 21-26
+tests/unit/terminal/notification.ipc.spec.ts
+  s_f88f4d30f513d0::t_ec25b24b801a73 4,7,11-16,19-24,26,35-37,40-41,44-48,50,53-57,59-77
+tests/unit/notifications/notification-manager.spec.ts
+  s_f88f4d30f513d0::t_ec25b24b801a73 40-75,98,118,132
+  s_f88f4d30f513d0::t_c68bcabb45fb55 3-11
+tests/integration/ipc/notification.ipc.spec.ts
+  s_f88f4d30f513d0::t_ec25b24b801a73 44-77
+tests/unit/renderer-remote/electron-api-shim.spec.ts
+  s_f88f4d30f513d0::t_ab58525fbd1612 427,429-430
+src/main/notifications/notification-manager.ts
+  s_f88f4d30f513d0::t_7d6b27e0cef2fd 105
+  s_f88f4d30f513d0::t_1a5f5cea84af1b 73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "fd7e52a8537c0f3d888aebd8a51f027c95a41490",
+  "prompts": {},
+  "sessions": {
+    "s_f88f4d30f513d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3dc2bcfd-a5fa-4817-aec6-416c367ee179",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
