@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
@@ -43,10 +43,12 @@ const mockWorkspaceStore = {
     ['ws-1', []],
     ['ws-2', []],
   ]),
-  collapsedWorkspaceIds: new Set<string>(),
+  expandedWorkspaceIds: new Set<string>(),
   toggleWorkspaceCollapse: vi.fn(),
+  setExpandedWorkspaceIds: vi.fn(),
   setActiveWorkspace: vi.fn(),
   setActiveProject: vi.fn(),
+  loadProjects: vi.fn().mockResolvedValue(undefined),
   loadWorkspaces: vi.fn(),
   reorderWorkspaces: vi.fn().mockResolvedValue(undefined),
 }
@@ -118,10 +120,10 @@ describe('UnifiedSidebar', () => {
     expect(container.querySelector('.scratch-section')).toBeTruthy()
   })
 
-  it('passes isCollapsed=true to a WorkspaceCard whose id is in collapsedWorkspaceIds', () => {
+  it('passes isCollapsed=true to a WorkspaceCard whose id is NOT in expandedWorkspaceIds', () => {
     vi.mocked(useWorkspaceStore).mockReturnValue({
       ...mockWorkspaceStore,
-      collapsedWorkspaceIds: new Set(['ws-1']),
+      expandedWorkspaceIds: new Set<string>(),
     } as unknown as ReturnType<typeof useWorkspaceStore>)
     const { container } = render(<UnifiedSidebar {...defaultProps} />)
     const cards = container.querySelectorAll('.ws-card')
@@ -175,6 +177,7 @@ describe('UnifiedSidebar', () => {
       ]),
       setActiveWorkspace,
       setActiveProject,
+      expandedWorkspaceIds: new Set<string>(['ws-1']),
     } as unknown as ReturnType<typeof useWorkspaceStore>)
     render(<UnifiedSidebar {...defaultProps} />)
     fireEvent.click(screen.getByText('API'))
@@ -273,5 +276,19 @@ describe('UnifiedSidebar', () => {
     render(<UnifiedSidebar {...defaultProps} />)
     fireEvent.click(screen.getByText('Backend'))
     expect(toggleWorkspaceCollapse).toHaveBeenCalledWith('ws-1')
+  })
+
+  it('eager-loads projects for workspaces not yet in projectsByWorkspaceId', async () => {
+    const loadProjects = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      ...mockWorkspaceStore,
+      projectsByWorkspaceId: new Map(), // neither workspace has been loaded yet
+      loadProjects,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    render(<UnifiedSidebar {...defaultProps} />)
+    await waitFor(() => {
+      expect(loadProjects).toHaveBeenCalledWith('ws-1')
+      expect(loadProjects).toHaveBeenCalledWith('ws-2')
+    })
   })
 })

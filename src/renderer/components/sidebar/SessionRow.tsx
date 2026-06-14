@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Bot, Terminal } from 'lucide-react'
 import type { TerminalSession } from '../../../shared/types/index'
 import { useSessionStore } from '../../stores/session.store'
@@ -31,6 +31,14 @@ export function SessionRow({
   const [moveOpen, setMoveOpen] = useState(false)
   const renameRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    function closeHandler() {
+      setCtxMenu(null)
+    }
+    window.addEventListener('close-context-menus', closeHandler)
+    return () => window.removeEventListener('close-context-menus', closeHandler)
+  }, [])
+
   if (hidden) return <></>
 
   function startRename(): void {
@@ -52,6 +60,7 @@ export function SessionRow({
 
   function handleContextMenu(e: React.MouseEvent): void {
     e.preventDefault()
+    window.dispatchEvent(new CustomEvent('close-context-menus'))
     setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 

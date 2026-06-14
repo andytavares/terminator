@@ -69,6 +69,10 @@ function applyMigrations(db: Database.Database): void {
   if (!hasColumn(db, 'areas', 'status')) {
     db.exec(`ALTER TABLE areas ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`)
   }
+  if (!hasColumn(db, 'areas', 'updated_at')) {
+    db.exec(`ALTER TABLE areas ADD COLUMN updated_at TEXT`)
+    db.exec(`UPDATE areas SET updated_at = created_at WHERE updated_at IS NULL`)
+  }
 
   // Recurrence engine v2: column-based rule storage
   if (!hasColumn(db, 'tasks', 'recurrence_rule')) {
@@ -277,7 +281,8 @@ function applySchema(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS areas (
       id         TEXT PRIMARY KEY,
       name       TEXT UNIQUE NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      updated_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS settings (

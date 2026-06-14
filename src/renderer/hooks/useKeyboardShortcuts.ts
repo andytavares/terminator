@@ -30,7 +30,7 @@ export function useKeyboardShortcuts({
     setActiveWorkspace,
     activeProjectId,
     resolveActiveCwd,
-    setCollapsedWorkspaceIds,
+    setExpandedWorkspaceIds,
   } = useWorkspaceStore()
   const {
     getActiveSessionForProject,
@@ -132,10 +132,7 @@ export function useKeyboardShortcuts({
         const idx = parseInt(e.key, 10) - 1
         if (workspaces[idx]) {
           setActiveWorkspace(workspaces[idx].id)
-          const collapseAll = new Set(
-            workspaces.map((w) => w.id).filter((id) => id !== workspaces[idx].id)
-          )
-          setCollapsedWorkspaceIds(collapseAll)
+          setExpandedWorkspaceIds(new Set([workspaces[idx].id]))
         }
         return
       }

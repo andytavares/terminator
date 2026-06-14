@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import type { Workspace, Project } from '../../../shared/types/index'
 import { useExtensionRegistry } from '../../extensions/registry'
@@ -50,6 +50,14 @@ export function WorkspaceCard({
   const [dragOver, setDragOver] = useState<number | null>(null)
   const { reorderProjects } = useWorkspaceStore()
 
+  useEffect(() => {
+    function closeHandler() {
+      setCtxMenu(null)
+    }
+    window.addEventListener('close-context-menus', closeHandler)
+    return () => window.removeEventListener('close-context-menus', closeHandler)
+  }, [])
+
   function handleDragStart(index: number): void {
     dragIndexRef.current = index
   }
@@ -79,6 +87,7 @@ export function WorkspaceCard({
 
   function handleContextMenu(e: React.MouseEvent): void {
     e.preventDefault()
+    window.dispatchEvent(new CustomEvent('close-context-menus'))
     setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 

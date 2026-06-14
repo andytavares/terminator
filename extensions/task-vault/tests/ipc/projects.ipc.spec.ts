@@ -150,6 +150,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
       ]) // inboxRows
       .mockReturnValueOnce([]) // activeRows
       .mockReturnValueOnce([]) // somedayRows
+      .mockReturnValueOnce([]) // somedayTaskRows
       .mockReturnValueOnce([]) // completedRows
     const handler = getHandler('task-vault:projects:weekly-review')
     const result = (await handler({}, {})) as { inboxItems: unknown[] }
@@ -162,6 +163,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
       .mockReturnValueOnce([]) // inboxRows
       .mockReturnValueOnce([activeRow]) // activeRows
       .mockReturnValueOnce([]) // somedayRows
+      .mockReturnValueOnce([]) // somedayTaskRows
       .mockReturnValueOnce([]) // completedRows
     mockGet.mockReturnValue({ c: 0 }) // count for active project → stale
     const handler = getHandler('task-vault:projects:weekly-review')
@@ -182,6 +184,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
       .mockReturnValueOnce([activeRow])
       .mockReturnValueOnce([])
       .mockReturnValueOnce([])
+      .mockReturnValueOnce([])
     mockGet.mockReturnValue({ c: 2 }) // not stale
     const handler = getHandler('task-vault:projects:weekly-review')
     const result = (await handler({}, {})) as { staleProjects: unknown[] }
@@ -194,11 +197,21 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
       .mockReturnValueOnce([]) // inboxRows
       .mockReturnValueOnce([]) // activeRows
       .mockReturnValueOnce([somedayRow]) // somedayRows
+      .mockReturnValueOnce([]) // somedayTaskRows
       .mockReturnValueOnce([]) // completedRows
     const handler = getHandler('task-vault:projects:weekly-review')
     const result = (await handler({}, {})) as { somedayProjects: unknown[] }
     expect(Array.isArray(result.somedayProjects)).toBe(true)
     expect(result.somedayProjects).toHaveLength(1)
+  })
+
+  it('somedayTasks query excludes subtasks (parent_id IS NULL filter)', async () => {
+    mockAll.mockReturnValue([])
+    const handler = getHandler('task-vault:projects:weekly-review')
+    await handler({}, {})
+    const sqls = vi.mocked(mockPrepare).mock.calls.map((c) => c[0] as string)
+    const somedaySql = sqls.find((s) => s.includes("source='someday'"))
+    expect(somedaySql).toContain('parent_id IS NULL')
   })
 
   it('returns prior week completed tasks', async () => {
@@ -207,6 +220,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
       .mockReturnValueOnce([]) // inboxRows
       .mockReturnValueOnce([]) // activeRows
       .mockReturnValueOnce([]) // somedayRows
+      .mockReturnValueOnce([]) // somedayTaskRows
       .mockReturnValueOnce([completedRow]) // completedRows
     const handler = getHandler('task-vault:projects:weekly-review')
     const result = (await handler({}, {})) as { completedLastWeek: unknown[] }
@@ -215,7 +229,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
   })
 
   it('returns null lastReviewDate when no review recorded', async () => {
-    mockAll.mockReturnValue([])
+    mockAll.mockReturnValue([]) // covers all remaining calls
     const handler = getHandler('task-vault:projects:weekly-review')
     const result = (await handler({}, {})) as { lastReviewDate: string | null }
     expect(result.lastReviewDate).toBeNull()
@@ -343,6 +357,67 @@ describe('getVaultPath (projects.ipc)', () => {
   })
 })
 
+describe('task-vault:projects:update-deadline IPC handler', () => {
+  it('updates the project deadline and returns success', async () => {
+    const handler = getHandler('task-vault:projects:update-deadline')
+    const result = await handler({}, { projectFilePath: 'Alpha', deadline: '2026-12-31' })
+    expect(result).toMatchObject({ success: true })
+    expect(mockRun).toHaveBeenCalled()
+  })
+
+  it('clears the deadline when passed null', async () => {
+    const handler = getHandler('task-vault:projects:update-deadline')
+    const result = await handler({}, { projectFilePath: 'Alpha', deadline: null })
+    expect(result).toMatchObject({ success: true })
+  })
+
+  it('returns VALIDATION_ERROR when projectFilePath is missing', async () => {
+    const handler = getHandler('task-vault:projects:update-deadline')
+    const result = await handler({}, { deadline: '2026-12-31' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+})
+
+describe('task-vault:projects:rename IPC handler', () => {
+  it('renames the project and returns success', async () => {
+    mockGet
+      .mockReturnValueOnce({ id: 'proj-1' }) // SELECT id FROM projects WHERE name=?
+      .mockReturnValueOnce(undefined) // SELECT id WHERE name=newName AND id!=
+    const handler = getHandler('task-vault:projects:rename')
+    const result = await handler({}, { projectFilePath: 'Alpha', newName: 'Beta' })
+    expect(result).toMatchObject({ success: true })
+    expect(mockRun).toHaveBeenCalled()
+  })
+
+  it('returns VALIDATION_ERROR when projectFilePath is missing', async () => {
+    const handler = getHandler('task-vault:projects:rename')
+    const result = await handler({}, { newName: 'Beta' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+
+  it('returns VALIDATION_ERROR when newName is missing', async () => {
+    const handler = getHandler('task-vault:projects:rename')
+    const result = await handler({}, { projectFilePath: 'Alpha' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+
+  it('returns NOT_FOUND when project does not exist', async () => {
+    mockGet.mockReturnValueOnce(undefined)
+    const handler = getHandler('task-vault:projects:rename')
+    const result = await handler({}, { projectFilePath: 'Ghost', newName: 'Specter' })
+    expect(result).toMatchObject({ error: 'NOT_FOUND' })
+  })
+
+  it('returns PROJECT_EXISTS when new name is already taken', async () => {
+    mockGet
+      .mockReturnValueOnce({ id: 'proj-1' }) // project found
+      .mockReturnValueOnce({ id: 'proj-2' }) // collision found
+    const handler = getHandler('task-vault:projects:rename')
+    const result = await handler({}, { projectFilePath: 'Alpha', newName: 'Existing' })
+    expect(result).toMatchObject({ error: 'PROJECT_EXISTS' })
+  })
+})
+
 describe('registerProjectsIpcHandlers dispose (lines 229-232)', () => {
   it('calls ipcMain.removeHandler for all registered channels', () => {
     const dispose = registerProjectsIpcHandlers()
@@ -353,5 +428,7 @@ describe('registerProjectsIpcHandlers dispose (lines 229-232)', () => {
     expect(removedChannels).toContain('task-vault:projects:delete')
     expect(removedChannels).toContain('task-vault:projects:update-status')
     expect(removedChannels).toContain('task-vault:projects:update-area')
+    expect(removedChannels).toContain('task-vault:projects:update-deadline')
+    expect(removedChannels).toContain('task-vault:projects:rename')
   })
 })

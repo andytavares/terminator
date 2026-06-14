@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { IndexedTask, IndexedProject } from '../vault/types'
 import { WeeklyReviewStep1GetClear } from './WeeklyReviewStep1GetClear'
@@ -12,6 +12,7 @@ interface WeeklyReviewPayload {
   activeProjects: IndexedProject[]
   staleProjects: IndexedProject[]
   somedayProjects: IndexedProject[]
+  somedayTasks: IndexedTask[]
   completedLastWeek: IndexedTask[]
   lastReviewDate: string | null
 }
@@ -61,8 +62,23 @@ export function WeeklyReview(): React.JSX.Element {
   function nextStep() {
     if (step < TOTAL_STEPS) {
       const next = step + 1
-      setStep(next)
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ step: next }))
+      if (step === 1) {
+        // Refresh inbox before mounting Step 2 so captures from Get Clear appear immediately.
+        // Step 2 uses useState(inboxItems) which only reads props at mount time.
+        void window.electronAPI.extensionBridge
+          .invoke('task-vault:projects:weekly-review', {})
+          .then((result) => {
+            const fresh = result as WeeklyReviewPayload
+            setPayload((prev) => (prev ? { ...prev, inboxItems: fresh.inboxItems } : fresh))
+          })
+          .catch(() => {
+            // Non-fatal — Step 2 shows items from the initial load
+          })
+          .finally(() => setStep(next))
+      } else {
+        setStep(next)
+      }
     }
   }
 
@@ -74,13 +90,6 @@ export function WeeklyReview(): React.JSX.Element {
     sessionStorage.removeItem(DRAFT_KEY)
     setDone(true)
   }
-
-  const handleItemFiled = useCallback((taskId: string) => {
-    setPayload((prev) => {
-      if (!prev) return prev
-      return { ...prev, inboxItems: prev.inboxItems.filter((t) => t.id !== taskId) }
-    })
-  }, [])
 
   if (isLoading)
     return <div className="weekly-review weekly-review--loading">Loading review data…</div>
@@ -140,13 +149,7 @@ export function WeeklyReview(): React.JSX.Element {
       </div>
 
       <div className="weekly-review__content">
-        {step === 1 && (
-          <WeeklyReviewStep1GetClear
-            inboxItems={payload.inboxItems}
-            onItemFiled={handleItemFiled}
-            onComplete={nextStep}
-          />
-        )}
+        {step === 1 && <WeeklyReviewStep1GetClear onComplete={nextStep} />}
         {step === 2 && (
           <WeeklyReviewStep2Inbox inboxItems={payload.inboxItems} onComplete={nextStep} />
         )}
@@ -159,6 +162,7 @@ export function WeeklyReview(): React.JSX.Element {
         {step === 4 && (
           <WeeklyReviewStep5Someday
             somedayProjects={payload.somedayProjects}
+            somedayTasks={payload.somedayTasks}
             onComplete={nextStep}
           />
         )}

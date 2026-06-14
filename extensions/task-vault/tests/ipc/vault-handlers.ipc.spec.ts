@@ -552,6 +552,28 @@ describe('task-vault:vault:list-archive (lines 647-664)', () => {
     expect(result.projects[0].terminatorLinks).toContain('link-1')
   })
 
+  it('returns archived areas with id, name, and updatedAt', async () => {
+    const areaRow = {
+      id: 'area-1',
+      name: 'Old Area',
+      status: 'archived',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    mockAll
+      .mockReturnValueOnce([]) // tasks
+      .mockReturnValueOnce([]) // projects
+      .mockReturnValueOnce([areaRow]) // areas
+    const handler = getHandler('task-vault:vault:list-archive')
+    const result = (await handler({}, {})) as {
+      areas: { id: string; name: string; updatedAt: string }[]
+    }
+    expect(result.areas).toHaveLength(1)
+    expect(result.areas[0].id).toBe('area-1')
+    expect(result.areas[0].name).toBe('Old Area')
+    expect(result.areas[0].updatedAt).toBeTruthy()
+  })
+
   it('returns error string when db throws', async () => {
     mockPrepare.mockImplementationOnce(() => {
       throw new Error('archive db error')
@@ -577,6 +599,94 @@ describe('task-vault:projects:get-tasks', () => {
     const handler = getHandler('task-vault:projects:get-tasks')
     const result = (await handler({}, {})) as { tasks: unknown[] }
     expect(result.tasks).toHaveLength(0)
+  })
+})
+
+// ── rename-area ───────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:rename-area', () => {
+  it('renames an area and returns success', async () => {
+    mockGet
+      .mockReturnValueOnce({ id: 'area-1', name: 'Work' }) // area found
+      .mockReturnValueOnce(undefined) // no collision
+    const handler = getHandler('task-vault:vault:rename-area')
+    const result = await handler({}, { areaFilePath: 'Work', newName: 'Work 2026' })
+    expect(result).toMatchObject({ success: true })
+    expect(mockRun).toHaveBeenCalled()
+  })
+
+  it('returns VALIDATION_ERROR when areaFilePath is missing', async () => {
+    const handler = getHandler('task-vault:vault:rename-area')
+    const result = await handler({}, { newName: 'New Name' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+
+  it('returns VALIDATION_ERROR when newName is missing', async () => {
+    const handler = getHandler('task-vault:vault:rename-area')
+    const result = await handler({}, { areaFilePath: 'Work' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+
+  it('returns NOT_FOUND when area does not exist', async () => {
+    mockGet.mockReturnValueOnce(undefined)
+    const handler = getHandler('task-vault:vault:rename-area')
+    const result = await handler({}, { areaFilePath: 'Ghost', newName: 'Specter' })
+    expect(result).toMatchObject({ error: 'NOT_FOUND' })
+  })
+
+  it('returns AREA_EXISTS when new name is already taken', async () => {
+    mockGet
+      .mockReturnValueOnce({ id: 'area-1', name: 'Work' }) // area found
+      .mockReturnValueOnce({ id: 'area-2' }) // collision
+    const handler = getHandler('task-vault:vault:rename-area')
+    const result = await handler({}, { areaFilePath: 'Work', newName: 'Personal' })
+    expect(result).toMatchObject({ error: 'AREA_EXISTS' })
+  })
+})
+
+// ── restore-area ──────────────────────────────────────────────────────────────
+
+describe('task-vault:vault:restore-area', () => {
+  const ARCHIVED_AT = '2024-01-01T10:00:00.000Z'
+
+  it('restores an archived area, its projects, and cancelled tasks', async () => {
+    mockGet.mockReturnValueOnce({ id: 'area-1', updated_at: ARCHIVED_AT })
+    const handler = getHandler('task-vault:vault:restore-area')
+    const result = await handler({}, { areaName: 'Work' })
+    expect(result).toMatchObject({ success: true })
+    // area UPDATE + projects UPDATE + tasks UPDATE (cancelled tasks restored)
+    expect(mockRun).toHaveBeenCalledTimes(3)
+  })
+
+  it('task restore SQL filters by archived_at timestamp to exclude user-cancelled tasks', async () => {
+    mockGet.mockReturnValueOnce({ id: 'area-1', updated_at: ARCHIVED_AT })
+    const handler = getHandler('task-vault:vault:restore-area')
+    await handler({}, { areaName: 'Work' })
+    // Verify the restore SQL includes updated_at=? (timestamp filter)
+    const sqls = mockPrepare.mock.calls.map((c) => c[0] as string)
+    const taskRestoreSql = sqls.find(
+      (s) =>
+        s.includes("status='open'") &&
+        s.includes("status='cancelled'") &&
+        s.includes('updated_at=?')
+    )
+    expect(taskRestoreSql).toBeTruthy()
+    // Verify the archive timestamp is actually passed as a bind argument to mockRun
+    const archivedAtWasPassed = mockRun.mock.calls.some((args) => args.includes(ARCHIVED_AT))
+    expect(archivedAtWasPassed).toBe(true)
+  })
+
+  it('returns VALIDATION_ERROR when areaName is missing', async () => {
+    const handler = getHandler('task-vault:vault:restore-area')
+    const result = await handler({}, {})
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+
+  it('returns NOT_FOUND when area does not exist', async () => {
+    mockGet.mockReturnValueOnce(undefined)
+    const handler = getHandler('task-vault:vault:restore-area')
+    const result = await handler({}, { areaName: 'Ghost' })
+    expect(result).toMatchObject({ error: 'NOT_FOUND' })
   })
 })
 
@@ -718,6 +828,19 @@ describe('task-vault:vault:migrate-task', () => {
       sql.startsWith('INSERT INTO tasks')
     )
     expect(insertCalls).toHaveLength(3) // parent twin + 2 subtask twins
+  })
+
+  it('returns noop:true when targetDate equals task source_ref (no migration performed)', async () => {
+    const row = makeTaskRow({ source_ref: '2026-05-21' })
+    mockGet.mockReturnValue(row)
+    const handler = getHandler('task-vault:vault:migrate-task')
+    const result = await handler({}, { taskId: 'task-1', targetDate: '2026-05-21' })
+    expect(result).toMatchObject({ noop: true })
+    // No INSERT should have been executed
+    const insertCalls = mockPrepare.mock.calls.filter(([sql]: [string]) =>
+      sql.startsWith('INSERT INTO tasks')
+    )
+    expect(insertCalls).toHaveLength(0)
   })
 })
 
@@ -1369,6 +1492,37 @@ describe('task-vault:vault:clear-recurrence', () => {
     const result = await handler({}, { taskId: 'missing' })
     expect(result).toEqual({ error: 'STALE_ID' })
   })
+
+  it('handles invalid metadata JSON gracefully and still clears recurrence columns', async () => {
+    mockGet.mockReturnValue({ metadata: 'NOT_VALID_JSON' })
+    const handler = getHandler('task-vault:vault:clear-recurrence')
+    const result = await handler({}, { taskId: 'task-1' })
+    // Should still succeed — invalid JSON is caught and treated as empty metadata
+    expect(result).toEqual({ success: true })
+  })
+})
+
+// ── get-calendar-month ────────────────────────────────────────────────────────
+
+describe('task-vault:vault:get-calendar-month', () => {
+  it('returns day summaries for the requested month', async () => {
+    const dayRows = [
+      { date: '2026-06-01', status: 'done', count: 3 },
+      { date: '2026-06-01', status: 'open', count: 1 },
+    ]
+    mockAll.mockReturnValueOnce(dayRows)
+    const handler = getHandler('task-vault:vault:get-calendar-month')
+    const result = (await handler({}, { year: 2026, month: 6 })) as { days: unknown[] }
+    expect(Array.isArray(result.days)).toBe(true)
+    expect(result.days).toHaveLength(2)
+  })
+
+  it('returns empty days array when no tasks exist for the month', async () => {
+    mockAll.mockReturnValueOnce([])
+    const handler = getHandler('task-vault:vault:get-calendar-month')
+    const result = (await handler({}, { year: 2026, month: 1 })) as { days: unknown[] }
+    expect(result.days).toHaveLength(0)
+  })
 })
 
 describe('registerVaultIpcHandlers dispose', () => {
@@ -1386,7 +1540,10 @@ describe('registerVaultIpcHandlers dispose', () => {
     expect(removedChannels).toContain('task-vault:vault:block-task')
     expect(removedChannels).toContain('task-vault:vault:unblock-task')
     expect(removedChannels).toContain('task-vault:vault:reorder-tasks')
+    expect(removedChannels).toContain('task-vault:vault:rename-area')
+    expect(removedChannels).toContain('task-vault:vault:restore-area')
     expect(removedChannels).toContain('task-vault:vault:set-recurrence')
     expect(removedChannels).toContain('task-vault:vault:clear-recurrence')
+    expect(removedChannels).toContain('task-vault:vault:get-calendar-month')
   })
 })

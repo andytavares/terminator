@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { DateTimePicker } from './DateTimePicker'
 import {
   Trash2,
   Pencil,
@@ -426,19 +427,13 @@ function IntervalPicker({
       </div>
       {isCustom && (
         <div className="interval-picker__custom-row">
-          <input
-            type="date"
-            className="interval-picker__date-input"
+          <DateTimePicker
+            mode="date"
             value={customDate}
             min={localDateMin()}
-            onChange={(e) => handleDateChange(e.target.value)}
+            onChange={handleDateChange}
           />
-          <input
-            type="time"
-            className="interval-picker__time-input"
-            value={customTime}
-            onChange={(e) => handleTimeChange(e.target.value)}
-          />
+          <DateTimePicker mode="time" value={customTime} onChange={handleTimeChange} />
         </div>
       )}
     </div>
@@ -644,12 +639,7 @@ function RecurrenceModal({
 
         <div className="daily-log__block-modal-label">
           Notify at
-          <input
-            type="time"
-            className="interval-picker__time-input"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-          />
+          <DateTimePicker mode="time" value={time} onChange={setTime} />
         </div>
 
         <div className="daily-log__block-modal-label">
@@ -667,12 +657,7 @@ function RecurrenceModal({
             ))}
           </div>
           {endType === 'on_date' && (
-            <input
-              type="date"
-              className="interval-picker__date-input"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
+            <DateTimePicker mode="date" value={endDate} onChange={setEndDate} />
           )}
           {endType === 'after_count' && (
             <div className="recurrence-modal__count-row">
@@ -955,235 +940,249 @@ function TaskRow({
           </span>
         )}
 
-        {editing ? (
-          <span className="daily-log__task-edit">
-            <SmartTaskInput
-              value={editText}
-              onChange={setEditText}
-              onSubmit={saveEdit}
-              onCancel={() => setEditing(false)}
-              autoFocus
+        <div className="daily-log__task-body">
+          {editing ? (
+            <span className="daily-log__task-edit">
+              <SmartTaskInput
+                value={editText}
+                onChange={setEditText}
+                onSubmit={saveEdit}
+                onCancel={() => setEditing(false)}
+                autoFocus
+              />
+              <button className="tv-btn tv-btn--primary" onClick={() => void saveEdit()}>
+                Save
+              </button>
+              <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)}>
+                <X size={14} />
+              </button>
+            </span>
+          ) : (
+            <>
+              <div className="daily-log__task-line1">
+                <span
+                  className={`daily-log__task-text${isDone || task.status === 'migrated' ? ' daily-log__task-text--strikethrough' : task.status === 'cancelled' ? ' daily-log__task-text--cancelled' : ''}`}
+                  onClick={() => {
+                    if (!(isOpen || isBlocked)) {
+                      onSelect?.()
+                      return
+                    }
+                    if (clickTimer.current) {
+                      clearTimeout(clickTimer.current)
+                      clickTimer.current = null
+                      startEdit()
+                    } else {
+                      clickTimer.current = setTimeout(() => {
+                        clickTimer.current = null
+                        onSelect?.()
+                      }, 220)
+                    }
+                  }}
+                  title={
+                    isOpen || isBlocked
+                      ? 'Click to open detail · Double-click to edit'
+                      : 'Click to open detail'
+                  }
+                  style={{ cursor: onSelect ? 'pointer' : undefined }}
+                >
+                  {task.text}
+                </span>
+
+                {isOpen && (
+                  <span className="daily-log__task-actions">
+                    <button
+                      className="tv-btn tv-btn--outline tv-btn--action-icon"
+                      onClick={() => setMigratingOpen(true)}
+                      title="Migrate to another day"
+                    >
+                      <ArrowRight size={13} />
+                    </button>
+                    <button
+                      className="tv-btn tv-btn--outline tv-btn--action-icon"
+                      onClick={() => void handleSendToBacklog()}
+                      title="Send to backlog"
+                    >
+                      <Sunset size={13} />
+                    </button>
+                    {linked || task.terminatorLinks.length > 0 ? (
+                      <button
+                        className="tv-btn tv-btn--outline tv-btn--action-icon"
+                        title="Jump to linked terminal"
+                        onClick={() => {
+                          useExtensionRegistry.getState().setActiveGlobalTab(null)
+                        }}
+                      >
+                        <Zap size={13} />
+                      </button>
+                    ) : (
+                      <button
+                        className="tv-btn tv-btn--outline tv-btn--action-icon"
+                        onClick={() => setLinking(true)}
+                        title="Link to terminal session"
+                      >
+                        <Zap size={13} />
+                      </button>
+                    )}
+                    {!hasSubtasks && (
+                      <button
+                        className="tv-btn tv-btn--outline tv-btn--action-icon"
+                        onClick={() => setAddingSubtask(true)}
+                        title="Add subtask"
+                      >
+                        <ListPlus size={13} />
+                      </button>
+                    )}
+                    <button
+                      className={`tv-btn tv-btn--outline tv-btn--action-icon${task.recurrenceRule ? ' tv-btn--accent-active' : ''}`}
+                      onClick={() => setRecurrenceModalOpen(true)}
+                      title={
+                        task.recurrenceRule
+                          ? `Recurrence: ${formatRecurrenceRule(task.recurrenceRule)}`
+                          : 'Set recurrence'
+                      }
+                    >
+                      <Repeat size={13} />
+                    </button>
+                    <button
+                      className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--warning-hover"
+                      onClick={() => setBlockModalOpen(true)}
+                      title="Mark as blocked"
+                    >
+                      <OctagonAlert size={13} />
+                    </button>
+                    <button
+                      className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--danger-hover"
+                      onClick={() => void handleCancel()}
+                      title="Archive task"
+                    >
+                      <Archive size={13} />
+                    </button>
+                  </span>
+                )}
+
+                {isBlocked && (
+                  <span className="daily-log__task-actions">
+                    {!hasSubtasks && (
+                      <button
+                        className="tv-btn tv-btn--outline tv-btn--action-icon"
+                        onClick={() => setAddingSubtask(true)}
+                        title="Add subtask"
+                      >
+                        <ListPlus size={13} />
+                      </button>
+                    )}
+                    <button
+                      className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--success-hover"
+                      onClick={() => void handleUnblock()}
+                      title="Unblock task"
+                    >
+                      Unblock
+                    </button>
+                    <button
+                      className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--danger-hover"
+                      onClick={() => void handleCancel()}
+                      title="Archive task"
+                    >
+                      <Archive size={13} />
+                    </button>
+                  </span>
+                )}
+
+                {!isOpen && !isBlocked && (
+                  <span className="daily-log__task-actions">
+                    {(task.status === 'done' ||
+                      task.status === 'migrated' ||
+                      task.status === 'cancelled') && (
+                      <button
+                        className="tv-btn tv-btn--outline tv-btn--action-icon"
+                        onClick={() => void handleRestore()}
+                        title="Restore to open"
+                      >
+                        ↩
+                      </button>
+                    )}
+                    {(task.status === 'migrated' || task.status === 'cancelled') && (
+                      <button
+                        className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--danger-hover"
+                        onClick={() => void handleDelete()}
+                        title="Remove"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </span>
+                )}
+              </div>
+
+              {(task.project ||
+                task.context ||
+                task.area ||
+                task.dueDate ||
+                (isBlocked && task.blockedReason) ||
+                task.recurrenceRule) && (
+                <div className="daily-log__task-meta">
+                  {task.project && (
+                    <span className="daily-log__tag daily-log__tag--project">@{task.project}</span>
+                  )}
+                  {task.context && (
+                    <span className="daily-log__tag daily-log__tag--context">+{task.context}</span>
+                  )}
+                  {task.area && (
+                    <span className="daily-log__tag daily-log__tag--area">#{task.area}</span>
+                  )}
+                  {task.dueDate && (
+                    <span className="daily-log__tag daily-log__tag--due">due:{task.dueDate}</span>
+                  )}
+                  {isBlocked && task.blockedReason && (
+                    <span
+                      className="daily-log__blocked-reason"
+                      title={
+                        task.blockedCheckInterval
+                          ? `Check in: ${formatCheckInterval(task.blockedCheckInterval)}`
+                          : undefined
+                      }
+                    >
+                      ⊘ {task.blockedReason}
+                    </span>
+                  )}
+                  {task.recurrenceRule && (
+                    <span
+                      className="daily-log__recurrence-badge"
+                      title={`Repeats: ${formatRecurrenceRule(task.recurrenceRule)}${task.recurrenceNotifyAt ? ` at ${format12h(task.recurrenceNotifyAt)}` : ''}`}
+                    >
+                      <Repeat size={11} />
+                    </span>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {migratingOpen && (
+            <span className="daily-log__migrate-picker">
+              <DateTimePicker mode="date" value={migrateDate} onChange={setMigrateDate} />
+              <button
+                className="tv-btn tv-btn--primary"
+                onClick={() => void handleMigrate()}
+                disabled={!migrateDate}
+              >
+                Move
+              </button>
+              <button className="tv-btn tv-btn--icon" onClick={() => setMigratingOpen(false)}>
+                <X size={14} />
+              </button>
+            </span>
+          )}
+
+          {linking && (
+            <SessionPicker
+              onSelect={(sessionId) => {
+                void handleLinkSession(sessionId)
+              }}
+              onClose={() => setLinking(false)}
             />
-            <button className="tv-btn tv-btn--primary" onClick={() => void saveEdit()}>
-              Save
-            </button>
-            <button className="tv-btn tv-btn--icon" onClick={() => setEditing(false)}>
-              <X size={14} />
-            </button>
-          </span>
-        ) : (
-          <span
-            className={`daily-log__task-text${isDone || task.status === 'migrated' ? ' daily-log__task-text--strikethrough' : task.status === 'cancelled' ? ' daily-log__task-text--cancelled' : ''}`}
-            onClick={() => {
-              if (!(isOpen || isBlocked)) {
-                onSelect?.()
-                return
-              }
-              if (clickTimer.current) {
-                clearTimeout(clickTimer.current)
-                clickTimer.current = null
-                startEdit()
-              } else {
-                clickTimer.current = setTimeout(() => {
-                  clickTimer.current = null
-                  onSelect?.()
-                }, 220)
-              }
-            }}
-            title={
-              isOpen || isBlocked
-                ? 'Click to open detail · Double-click to edit'
-                : 'Click to open detail'
-            }
-            style={{ cursor: onSelect ? 'pointer' : undefined }}
-          >
-            {task.text}
-            {task.project && (
-              <span className="daily-log__tag daily-log__tag--project">@{task.project}</span>
-            )}
-            {task.context && (
-              <span className="daily-log__tag daily-log__tag--context">+{task.context}</span>
-            )}
-            {task.area && <span className="daily-log__tag daily-log__tag--area">#{task.area}</span>}
-            {task.dueDate && (
-              <span className="daily-log__tag daily-log__tag--due">due:{task.dueDate}</span>
-            )}
-            {isBlocked && task.blockedReason && (
-              <span
-                className="daily-log__blocked-reason"
-                title={
-                  task.blockedCheckInterval
-                    ? `Check in: ${formatCheckInterval(task.blockedCheckInterval)}`
-                    : undefined
-                }
-              >
-                ⊘ {task.blockedReason}
-              </span>
-            )}
-            {task.recurrenceRule && (
-              <span
-                className="daily-log__recurrence-badge"
-                title={`Repeats: ${formatRecurrenceRule(task.recurrenceRule)}${task.recurrenceNotifyAt ? ` at ${format12h(task.recurrenceNotifyAt)}` : ''}`}
-              >
-                <Repeat size={11} />
-              </span>
-            )}
-          </span>
-        )}
-
-        {isOpen && !editing && (
-          <span className="daily-log__task-actions">
-            <button
-              className="tv-btn tv-btn--outline tv-btn--action-icon"
-              onClick={() => setMigratingOpen(true)}
-              title="Migrate to another day"
-            >
-              <ArrowRight size={13} />
-            </button>
-            <button
-              className="tv-btn tv-btn--outline tv-btn--action-icon"
-              onClick={() => void handleSendToBacklog()}
-              title="Send to backlog"
-            >
-              <Sunset size={13} />
-            </button>
-            {linked || task.terminatorLinks.length > 0 ? (
-              <button
-                className="tv-btn tv-btn--outline tv-btn--action-icon"
-                title="Jump to linked terminal"
-                onClick={() => {
-                  useExtensionRegistry.getState().setActiveGlobalTab(null)
-                }}
-              >
-                <Zap size={13} />
-              </button>
-            ) : (
-              <button
-                className="tv-btn tv-btn--outline tv-btn--action-icon"
-                onClick={() => setLinking(true)}
-                title="Link to terminal session"
-              >
-                <Zap size={13} />
-              </button>
-            )}
-            {!hasSubtasks && (
-              <button
-                className="tv-btn tv-btn--outline tv-btn--action-icon"
-                onClick={() => setAddingSubtask(true)}
-                title="Add subtask"
-              >
-                <ListPlus size={13} />
-              </button>
-            )}
-            <button
-              className={`tv-btn tv-btn--outline tv-btn--action-icon${task.recurrenceRule ? ' tv-btn--accent-active' : ''}`}
-              onClick={() => setRecurrenceModalOpen(true)}
-              title={
-                task.recurrenceRule
-                  ? `Recurrence: ${formatRecurrenceRule(task.recurrenceRule)}`
-                  : 'Set recurrence'
-              }
-            >
-              <Repeat size={13} />
-            </button>
-            <button
-              className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--warning-hover"
-              onClick={() => setBlockModalOpen(true)}
-              title="Mark as blocked"
-            >
-              <OctagonAlert size={13} />
-            </button>
-            <button
-              className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--danger-hover"
-              onClick={() => void handleCancel()}
-              title="Archive task"
-            >
-              <Archive size={13} />
-            </button>
-          </span>
-        )}
-
-        {isBlocked && !editing && (
-          <span className="daily-log__task-actions">
-            {!hasSubtasks && (
-              <button
-                className="tv-btn tv-btn--outline tv-btn--action-icon"
-                onClick={() => setAddingSubtask(true)}
-                title="Add subtask"
-              >
-                <ListPlus size={13} />
-              </button>
-            )}
-            <button
-              className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--success-hover"
-              onClick={() => void handleUnblock()}
-              title="Unblock task"
-            >
-              Unblock
-            </button>
-            <button
-              className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--danger-hover"
-              onClick={() => void handleCancel()}
-              title="Archive task"
-            >
-              <Archive size={13} />
-            </button>
-          </span>
-        )}
-
-        {!isOpen && !isBlocked && !editing && (
-          <span className="daily-log__task-actions">
-            {(task.status === 'done' ||
-              task.status === 'migrated' ||
-              task.status === 'cancelled') && (
-              <button
-                className="tv-btn tv-btn--outline tv-btn--action-icon"
-                onClick={() => void handleRestore()}
-                title="Restore to open"
-              >
-                ↩
-              </button>
-            )}
-            {(task.status === 'migrated' || task.status === 'cancelled') && (
-              <button
-                className="tv-btn tv-btn--outline tv-btn--action-icon tv-btn--danger-hover"
-                onClick={() => void handleDelete()}
-                title="Remove"
-              >
-                <Trash2 size={13} />
-              </button>
-            )}
-          </span>
-        )}
-
-        {migratingOpen && (
-          <span className="daily-log__migrate-picker">
-            <input
-              type="date"
-              value={migrateDate}
-              onChange={(e) => setMigrateDate(e.target.value)}
-            />
-            <button
-              className="tv-btn tv-btn--primary"
-              onClick={() => void handleMigrate()}
-              disabled={!migrateDate}
-            >
-              Move
-            </button>
-            <button className="tv-btn tv-btn--icon" onClick={() => setMigratingOpen(false)}>
-              <X size={14} />
-            </button>
-          </span>
-        )}
-
-        {linking && (
-          <SessionPicker
-            onSelect={(sessionId) => {
-              void handleLinkSession(sessionId)
-            }}
-            onClose={() => setLinking(false)}
-          />
-        )}
+          )}
+        </div>
       </div>
       {addingSubtask && (
         <div className="daily-log__subtask-add-row daily-log__subtask-add-row--inline">
@@ -1630,19 +1629,21 @@ export function DailyLog({
         )}
         {terminalTodayTasks.map((task) => renderTaskWithSubtasks(task))}
         <AddTaskRow onAdd={handleAddTask} />
-        {isToday && somedayTasks.length > 0 && (
-          <>
-            <div className="daily-log__backlog-divider" />
-            <button
-              className="daily-log__backlog-header"
-              onClick={() => setBacklogExpanded((v) => !v)}
-            >
-              <span className="daily-log__backlog-label">Backlog ({somedayTasks.length})</span>
-              {backlogExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            </button>
-            {backlogExpanded && (
-              <div className="daily-log__backlog-list">
-                {somedayTasks.map((task) => (
+        <>
+          <div className="daily-log__backlog-divider" />
+          <button
+            className="daily-log__backlog-header"
+            onClick={() => setBacklogExpanded((v) => !v)}
+          >
+            <span className="daily-log__backlog-label">Backlog ({somedayTasks.length})</span>
+            {backlogExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          </button>
+          {backlogExpanded && (
+            <div className="daily-log__backlog-list">
+              {somedayTasks.length === 0 ? (
+                <p className="daily-log__backlog-empty">No backlog items.</p>
+              ) : (
+                somedayTasks.map((task) => (
                   <BacklogTaskRow
                     key={task.id}
                     task={task}
@@ -1651,11 +1652,11 @@ export function DailyLog({
                     onRefreshBacklog={onRefreshBacklog}
                     onSelect={onSelectTask}
                   />
-                ))}
-              </div>
-            )}
-          </>
-        )}
+                ))
+              )}
+            </div>
+          )}
+        </>
       </section>
 
       {!log.exists && (
