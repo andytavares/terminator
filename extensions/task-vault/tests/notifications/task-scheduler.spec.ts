@@ -663,7 +663,7 @@ describe('startTaskScheduler — OS system notifications', () => {
     expect(mockOsNotif.show).toHaveBeenCalled()
   })
 
-  it('OS notification click handler broadcasts navigate-task for due task', () => {
+  it('OS notification click handler broadcasts navigate-task with source_ref (not due_date)', () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
     mockNotifIsSupported.mockReturnValue(true)
 
@@ -675,6 +675,7 @@ describe('startTaskScheduler — OS system notifications', () => {
             id: 't-click',
             text: 'Clickable',
             due_date: '2026-05-26',
+            source_ref: '2026-05-20', // task lives on an older log, not the due date
             metadata: '{}',
             recurrence_notify_at: null,
           },
@@ -689,9 +690,10 @@ describe('startTaskScheduler — OS system notifications', () => {
     const clickArgs = mockOsNotif.on.mock.calls.find(([event]: [string]) => event === 'click')
     expect(clickArgs).toBeTruthy()
     clickArgs![1]()
+    // Must navigate to source_ref ('2026-05-20'), not due_date ('2026-05-26')
     expect(mockSend).toHaveBeenCalledWith(
       'task-vault:navigate-task',
-      expect.objectContaining({ taskId: 't-click' })
+      expect.objectContaining({ taskId: 't-click', date: '2026-05-20' })
     )
   })
 

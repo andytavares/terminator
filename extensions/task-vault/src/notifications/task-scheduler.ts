@@ -109,6 +109,7 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
         id: string
         text: string
         due_date: string
+        source_ref: string | null
         project_id: string | null
         context: string | null
         area_id: string | null
@@ -117,7 +118,7 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
       }
       const dueTasks = db
         .prepare(
-          `SELECT id, text, due_date, project_id, context, area_id,
+          `SELECT id, text, due_date, source_ref, project_id, context, area_id,
                   recurrence_notify_at, metadata FROM tasks
            WHERE status='open' AND due_date IS NOT NULL AND due_date <= ? AND parent_id IS NULL`
         )
@@ -142,7 +143,8 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
 
         notifiedDueIds.add(task.id)
         const taskId = task.id
-        const taskDate = task.due_date
+        // Navigate to the log that contains the task (source_ref), not the due date
+        const taskDate = task.source_ref ?? null
         const notifTitle = isOverdue ? `Overdue: ${task.text}` : `Due today: ${task.text}`
         // OS system notification (clickable — navigates to the task)
         if (Notification.isSupported()) {

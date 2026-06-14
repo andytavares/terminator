@@ -829,6 +829,19 @@ describe('task-vault:vault:migrate-task', () => {
     )
     expect(insertCalls).toHaveLength(3) // parent twin + 2 subtask twins
   })
+
+  it('returns noop:true when targetDate equals task source_ref (no migration performed)', async () => {
+    const row = makeTaskRow({ source_ref: '2026-05-21' })
+    mockGet.mockReturnValue(row)
+    const handler = getHandler('task-vault:vault:migrate-task')
+    const result = await handler({}, { taskId: 'task-1', targetDate: '2026-05-21' })
+    expect(result).toMatchObject({ noop: true })
+    // No INSERT should have been executed
+    const insertCalls = mockPrepare.mock.calls.filter(([sql]: [string]) =>
+      sql.startsWith('INSERT INTO tasks')
+    )
+    expect(insertCalls).toHaveLength(0)
+  })
 })
 
 // ── vault:query ───────────────────────────────────────────────────────────────

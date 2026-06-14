@@ -417,10 +417,14 @@ export function TaskVaultView(): React.JSX.Element {
 
   async function handleMigrate(taskId: string, targetDate: string) {
     const taskText = (todayLog?.tasks ?? []).find((t) => t.id === taskId)?.text ?? ''
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:migrate-task', {
-      taskId,
-      targetDate,
-    })
+    const result = (await window.electronAPI.extensionBridge.invoke(
+      'task-vault:vault:migrate-task',
+      {
+        taskId,
+        targetDate,
+      }
+    )) as { noop?: boolean } | undefined
+    if (result?.noop) return
     addToast({
       type: 'info',
       message: taskText ? `Migrated: ${taskText}` : 'Task migrated',
