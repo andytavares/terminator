@@ -1,0 +1,19 @@
+extensions/remote-control/src/server/remote-server.ts
+  s_8e723948aeb460::t_f387a4d00eb72c 165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "4b540a184caae8504cb3717a9608a18ba7397ae6",
+  "prompts": {},
+  "sessions": {
+    "s_8e723948aeb460": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bafe19cd-02b4-42a6-9919-66a462467a04",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
