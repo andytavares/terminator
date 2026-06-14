@@ -1,0 +1,19 @@
+extensions/task-vault/src/components/ProjectsBrowser.tsx
+  s_8e723948aeb460::t_2afacd6323da1b 535
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "c94cf33c03ed843ace3c7c9846c29b98d9fe419a",
+  "prompts": {},
+  "sessions": {
+    "s_8e723948aeb460": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bafe19cd-02b4-42a6-9919-66a462467a04",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
