@@ -78,9 +78,14 @@ export function AreasView(): React.JSX.Element {
 
   useEffect(() => {
     if (selectedArea) {
-      // Refresh the open detail view from the newly loaded list
+      // Refresh the open detail view from the newly loaded list.
+      // If the area is no longer in the list (deleted/renamed), close the detail.
       const refreshed = areas.find((a) => a.name === selectedArea.name)
-      if (refreshed) setSelectedArea(refreshed)
+      if (refreshed) {
+        setSelectedArea(refreshed)
+      } else if (areas.length > 0) {
+        setSelectedArea(null)
+      }
     } else if (selectedAreaName && areas.length > 0) {
       const found = areas.find((a) => a.name === selectedAreaName)
       if (found) setSelectedArea(found)

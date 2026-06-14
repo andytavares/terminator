@@ -310,7 +310,10 @@ export class TerminalInstance {
     const onKeyDown = (e: KeyboardEvent) => {
       const isModKey = isMac ? e.key === 'Meta' : e.key === 'Control'
       if (!isModKey || !lastPos) return
-      showOverlayAt(lastPos.col, lastPos.viewportRow, lastPos.bufferRow)
+      // Recompute bufferRow from current viewportY — scroll since last mousemove would make the
+      // cached lastPos.bufferRow point at the wrong line.
+      const currentBufferRow = this.terminal.buffer.active.viewportY + lastPos.viewportRow
+      showOverlayAt(lastPos.col, lastPos.viewportRow, currentBufferRow)
     }
     const onKeyUp = (e: KeyboardEvent) => {
       const isModKey = isMac ? e.key === 'Meta' : e.key === 'Control'
