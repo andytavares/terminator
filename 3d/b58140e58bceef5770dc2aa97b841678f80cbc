@@ -1,0 +1,147 @@
+.forge-backups/20260614-120232/.claude/commands/forge.audit.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-9
+.forge-backups/20260614-120232/.claude/commands/forge.stats.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-12
+.forge-backups/20260614-120232/.claude/skills/code-review/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-19
+.forge-backups/20260614-120232/.claude/skills/doc-sync/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-24
+.forge-backups/20260614-120232/.claude/commands/forge.constitution.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-25
+.forge-backups/20260614-120232/.claude/skills/pattern-survey/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-63
+.forge-backups/20260614-120232/.claude/skills/pattern-survey/references/pattern-cluster-shapes.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-11
+.forge-backups/20260614-120232/.claude/commands/forge.ast-search.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-7
+.forge-backups/20260614-120232/.claude/skills/canonical-research/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-30
+.forge-backups/20260614-120232/.claude/skills/find-reuse/references/reuse-anti-patterns.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-11
+.forge-backups/20260614-120232/.claude/hooks/prompt-augment.sh
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-20
+.forge-backups/20260614-120232/.claude/skills/research-topic/references/research-doc-schema.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-83
+.forge-manifest.json
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 3-4,6,38-50
+.forge-backups/20260614-120232/.mcp.json
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-14
+.forge-backups/20260614-120232/.claude/skills/canonical-research/references/citation-format.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-15
+.forge-backups/20260614-120232/.claude/agents/code-reviewer.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-24
+.forge-backups/20260614-120232/.claude/skills/build-audit/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-67
+.forge-backups/20260614-120232/.claude/skills/doc-sync/references/doc-index-schema.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-20
+.forge-backups/20260614-120232/.claude/skills/tdd-workflow/references/bdd-spec-style.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-15
+.forge-backups/20260614-120232/.claude/agents/build-detective.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-25
+.claude/commands/forge-context.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-31
+.claude/skills/project-constitution/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 18
+.forge-backups/20260614-120232/.claude/agents/test-author.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-22
+.forge-backups/20260614-120232/.claude/agents/doc-keeper.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-24
+.forge-backups/20260614-120232/.claude/skills/research-topic/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-86
+.claude/skills/ast-search/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 16
+.forge-backups/20260614-120232/.claude/skills/build-audit/references/diagnostic-checklist.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-26
+.forge-backups/20260614-120232/.claude/skills/codebase-stats/references/scc-flags.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-10
+.forge-backups/20260614-120232/.claude-plugin/plugin.json
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-7
+.forge-backups/20260614-120232/.claude/commands/forge.survey.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-9
+.forge-backups/20260614-120232/.claude/skills/tdd-workflow/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-27
+.forge-backups/20260614-120232/.claude/skills/project-constitution/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-68
+.forge-backups/20260614-120232/scripts/detect-stack.sh
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-94
+.claude/settings.json
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 3-47
+.claude/hooks/session-start.sh
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 16,41,48
+.forge-backups/20260614-120232/.claude/hooks/session-start.sh
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-49
+.forge-backups/20260614-120232/.claude/commands/forge.tdd.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-12
+.forge-backups/20260614-120232/.claude/settings.json
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-34
+.forge-backups/20260614-120232/.claude/agents/codebase-oracle.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-81
+.claude/skills/research-topic/references/research-doc-schema.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 76,82-83
+.forge-backups/20260614-120232/scripts/forge.sh
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-531
+.claude/hooks/speckit-context-inject.sh
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 24
+.forge-backups/20260614-120232/.claude/hooks/post-edit-doc-mark.sh
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-24
+.claude/hooks/post-compact.sh
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 15,22
+.forge-backups/20260614-120232/.claude/commands/forge.ask.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-9
+.forge-backups/20260614-120232/.claude/skills/code-review/references/review-rubric.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-11
+scripts/forge.sh
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 224
+.forge-backups/20260614-120232/.claude/agents/researcher.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-22
+.forge-backups/20260614-120232/.claude/skills/find-reuse/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-43
+.forge-backups/20260614-120232/.claude/hooks/post-compact.sh
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-23
+.forge-backups/20260614-120232/.claude/commands/forge.review.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-11
+.forge-backups/20260614-120232/.claude/skills/repo-conventions/references/file-layout-patterns.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-9
+.forge-backups/20260614-120232/.claude/hooks/post-edit-format.sh
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-17
+.claude/skills/research-topic/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 83-84
+.forge-backups/20260614-120232/.claude/skills/codebase-stats/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-55
+.forge-backups/20260614-120232/.claude/commands/forge.detect-stack.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-5
+.forge-backups/20260614-120232/.claude/commands/forge.docs-sync.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-12
+.forge-backups/20260614-120232/.claude/hooks/speckit-context-inject.sh
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-43
+.forge-backups/20260614-120232/.claude/skills/ast-search/references/pattern-syntax.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-131
+.forge-backups/20260614-120232/.claude/commands/forge.find-reuse.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-7
+.forge-backups/20260614-120232/.claude/skills/tdd-workflow/references/test-naming.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-11
+.forge-backups/20260614-120232/.claude/skills/ast-search/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-63
+.forge-backups/20260614-120232/.claude/skills/repo-conventions/SKILL.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-22
+.forge-backups/20260614-120232/.claude/hooks/pre-edit-guard.sh
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-72
+.claude/commands/forge-research.md
+  s_8e723948aeb460::t_2fbf41e6fc5f1d 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "3db58140e58bceef5770dc2aa97b841678f80cbc",
+  "prompts": {},
+  "sessions": {
+    "s_8e723948aeb460": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bafe19cd-02b4-42a6-9919-66a462467a04",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
