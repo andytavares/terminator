@@ -1,0 +1,23 @@
+extensions/remote-control/tests/unit/remote-server.spec.ts
+  s_8e723948aeb460::t_7f6268d413ea76 124,131-152,165-212
+extensions/remote-control/src/server/remote-server.ts
+  s_8e723948aeb460::t_df6ae06b18fab6 5
+  s_8e723948aeb460::t_065db61cc1c7de 73-81,85-94,104-119,121
+  s_8e723948aeb460::t_2934aaf1473142 182,191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "0b42fb3c6907c44fb2a5dd63d9a5ad4738e0ca0a",
+  "prompts": {},
+  "sessions": {
+    "s_8e723948aeb460": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bafe19cd-02b4-42a6-9919-66a462467a04",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
