@@ -532,7 +532,7 @@ function ProjectTaskList({ projectName }: { projectName: string }): React.JSX.El
                 <button
                   className="tv-btn tv-btn--ghost tv-btn--xs"
                   onClick={() => void handleRestore(t.id)}
-                  title="Restore to inbox"
+                  title="Reopen on today's log"
                 >
                   ↩
                 </button>
