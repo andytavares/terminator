@@ -1,0 +1,25 @@
+extensions/task-vault/src/components/WeeklyReviewStep1GetClear.tsx
+  s_8e723948aeb460::t_b5b47485d5c9b0 16-17,19-20
+extensions/task-vault/tests/notifications/task-scheduler.spec.ts
+  s_8e723948aeb460::t_78a8866082087d 665-677,680-696,703-709,711-712,720-733,735-744
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_8e723948aeb460::t_20c5a4c48e4c67 605-672
+  s_8e723948aeb460::t_a1f0e477027565 555-576
+  s_8e723948aeb460::t_106ce6d1012df4 1510-1511
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "fb58a717ce56808e8dbc36cb9f677a891522a4b0",
+  "prompts": {},
+  "sessions": {
+    "s_8e723948aeb460": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bafe19cd-02b4-42a6-9919-66a462467a04",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
