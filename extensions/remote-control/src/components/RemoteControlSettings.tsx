@@ -38,6 +38,8 @@ export function RemoteControlSettings(): React.JSX.Element {
           maxSubscribers: number
           password: string
           ngrokAuthToken: string
+          lanUrl?: string
+          publicUrl?: string | null
         }
         if (s) {
           setEnabled(s.enabled ?? false)
@@ -45,6 +47,13 @@ export function RemoteControlSettings(): React.JSX.Element {
           setMaxSubscribers(s.maxSubscribers ?? 5)
           setPasswordInput(s.password ?? '')
           setNgrokTokenInput(s.ngrokAuthToken ?? '')
+          if (s.lanUrl || s.publicUrl !== undefined) {
+            setStatus((prev) => ({
+              ...prev,
+              ...(s.lanUrl && { lanUrl: s.lanUrl }),
+              ...(s.publicUrl !== undefined && { publicUrl: s.publicUrl }),
+            }))
+          }
         }
       })
       .catch(() => {})

@@ -234,12 +234,15 @@ export function activate(api: ExtensionAPI): void {
   })
 
   api.ipc.registerHandler('remote:get-settings', () => {
+    const listening = !!remoteServer?.isListening()
+    const port = getPort()
     return {
       enabled: api.settings.get<boolean>(KEY.enabled) ?? false,
-      port: getPort(),
+      port,
       maxSubscribers: getMaxSubscribers(),
       password: api.settings.get<string>(KEY.password) ?? '',
       ngrokAuthToken: api.settings.get<string>(KEY.ngrokAuthToken) ?? '',
+      ...(listening && { lanUrl: getLanUrl(port), publicUrl: currentPublicUrl }),
     }
   })
 

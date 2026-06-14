@@ -111,6 +111,10 @@
 
     ws.onclose = () => {
       wsReady = false
+      for (const { reject } of pending.values()) {
+        reject(new Error('bridge disconnected'))
+      }
+      pending.clear()
       setTimeout(() => void connectBridge(), 2000)
     }
 
