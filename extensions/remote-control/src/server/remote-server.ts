@@ -29,7 +29,6 @@ export interface RemoteServerOptions {
   port: number
   ptyManager: PtyManagerAPI
   deps: RemoteServerDeps
-  ngrokDomain?: string
 }
 
 export interface RemoteServerHandle {
@@ -149,7 +148,6 @@ export async function createRemoteServer(
 
   await registerAuthMiddleware(fastify, {
     getPasswordHash: deps.getPasswordHash,
-    ngrokDomain: options.ngrokDomain,
     hasValidSession,
   })
 
