@@ -469,10 +469,10 @@ describe('TerminalInstance', () => {
   })
 
   describe('link providers (visual decoration)', () => {
-    it('registers three link providers on construction (URL, path, quoted-path)', () => {
+    it('registers five link providers on construction (URL, bare, naked, path, quoted-path)', () => {
       new TerminalInstance('ses-links', 1000)
       const instance = vi.mocked(Terminal).mock.results[0].value
-      expect(instance.registerLinkProvider).toHaveBeenCalledTimes(3)
+      expect(instance.registerLinkProvider).toHaveBeenCalledTimes(5)
     })
 
     function getProvider(lineText: string, providerIndex: number) {
@@ -529,8 +529,28 @@ describe('TerminalInstance', () => {
       expect(result).toBeUndefined()
     })
 
+    it('bare URL provider (index 1) detects www. links', () => {
+      const provider = getProvider('visit www.google.com for info', 1)
+      let result: unknown
+      provider.provideLinks(0, (links: unknown) => {
+        result = links
+      })
+      expect(Array.isArray(result)).toBe(true)
+      expect((result as { text: string }[])[0].text).toBe('www.google.com')
+    })
+
+    it('naked URL provider (index 2) detects bare domain links', () => {
+      const provider = getProvider('check google.com for info', 2)
+      let result: unknown
+      provider.provideLinks(0, (links: unknown) => {
+        result = links
+      })
+      expect(Array.isArray(result)).toBe(true)
+      expect((result as { text: string }[])[0].text).toBe('google.com')
+    })
+
     it('path provider detects absolute paths and returns them in callback', () => {
-      const provider = getProvider('Error in /Users/foo/bar.ts:12:3', 1)
+      const provider = getProvider('Error in /Users/foo/bar.ts:12:3', 3)
       let result: unknown
       provider.provideLinks(0, (links: unknown) => {
         result = links
@@ -592,6 +612,18 @@ describe('TerminalInstance', () => {
         expect(instance.linkOverlay?.style.left).toBe('0px')
         expect(instance.linkOverlay?.style.top).toBe('15px')
         expect(instance.linkOverlay?.style.width).toBe('152px')
+      })
+
+      it('shows overlay when hovering over a www. URL with cmd held', () => {
+        const instance = makeInstanceWithLine('www.google.com')
+        fire(instance.element, 'mousemove', { clientX: 0, clientY: 0, metaKey: true })
+        expect(instance.linkOverlay?.style.display).toBe('block')
+      })
+
+      it('shows overlay when hovering over a bare domain URL with cmd held', () => {
+        const instance = makeInstanceWithLine('google.com')
+        fire(instance.element, 'mousemove', { clientX: 0, clientY: 0, metaKey: true })
+        expect(instance.linkOverlay?.style.display).toBe('block')
       })
 
       it('shows overlay when hovering over an absolute path', () => {
@@ -666,6 +698,18 @@ describe('TerminalInstance', () => {
           clientY: 0,
         })
         expect(mockOpenExternal).not.toHaveBeenCalled()
+      })
+
+      it('opens www. URL with https:// prepended on cmd+click', () => {
+        const instance = makeInstanceWithLine('www.google.com')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 0, clientY: 0 })
+        expect(mockOpenExternal).toHaveBeenCalledWith('https://www.google.com')
+      })
+
+      it('opens bare domain URL with https:// prepended on cmd+click', () => {
+        const instance = makeInstanceWithLine('google.com')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 0, clientY: 0 })
+        expect(mockOpenExternal).toHaveBeenCalledWith('https://google.com')
       })
 
       it('does not treat protocol-relative URL as a path', () => {

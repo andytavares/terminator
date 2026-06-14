@@ -134,12 +134,32 @@ export class TerminalInstance {
 
   private registerLinkProviders(): void {
     const urlRegex = /https?:\/\/(?:[^\s()>\]'"\\]|\([^\s()>\]'"\\]*\))+/g
+    // www. prefix URLs without a protocol (opened with https:// prepended)
+    const bareUrlRegex = /\bwww\.[a-zA-Z0-9][a-zA-Z0-9\-.]*\.[a-zA-Z]{2,}(?:\/[^\s()>\]'"\\]*)?/g
+    // Bare domain URLs like google.com or sub.example.io — TLD allowlist avoids false positives
+    // on source file extensions (.js, .ts, .tsx, .py, etc.)
+    const nakedUrlRegex =
+      /\b(?!www\.)(?:[a-zA-Z0-9][a-zA-Z0-9-]*\.)+(?:com|net|org|io|dev|app|ai|sh|co|uk|me|tv|info|edu|gov|mil|eu|us|de|fr|jp|cn|au|in|nl|br|ru|it|es|ca|mx|ar|nz|za|sg|hk|kr|se|no|dk|fi|pl|at|ch|pt|gr|tr|be|xyz|tech|cloud|id|cc|biz|pro|media|live|link|site|run|codes|page|studio|zone|digital|pub)(?:\/[^\s()>\]'"\\]*)?/g
     const pathRegex = /(?<!\S)((?:~\/|\/(?!\/))[^\s:)>\]'"\\]+(?::\d+(?::\d+)?)?)/g
     // Matches paths inside " or ' to support spaces: File "/Users/Jane Doe/foo.py", line 5
     const quotedPathRegex = /(?:"((?:~\/|\/(?!\/))[^"]+)"|'((?:~\/|\/(?!\/))[^']+)')/g
     const fontSize = 13
     const lineHeight = Math.ceil(fontSize * 1.2)
     const charW = measureCharWidth(fontSize)
+
+    // xterm computes its actual cell height from real font metrics after rendering;
+    // it differs from our formula. We lazy-read it from the DOM on first use and cache it.
+    let cachedCellH: number | null = null
+    const getCellH = (): number => {
+      if (cachedCellH !== null) return cachedCellH
+      const rowsEl = this.terminal.element?.querySelector('.xterm-rows')
+      const firstRow = rowsEl?.firstElementChild as HTMLElement | null
+      if (firstRow) {
+        const h = firstRow.getBoundingClientRect().height
+        if (h > 0) cachedCellH = h
+      }
+      return cachedCellH ?? lineHeight
+    }
 
     // xterm link providers: declare links for accessibility tooling only (no visual decorations —
     // visual feedback is handled by our own overlay and is cmd-key gated).
@@ -196,6 +216,8 @@ export class TerminalInstance {
       },
     }
     this.terminal.registerLinkProvider(makeVisualProvider(urlRegex))
+    this.terminal.registerLinkProvider(makeVisualProvider(bareUrlRegex))
+    this.terminal.registerLinkProvider(makeVisualProvider(nakedUrlRegex))
     this.terminal.registerLinkProvider(makeVisualProvider(pathRegex))
     this.terminal.registerLinkProvider(quotedPathProvider)
 
@@ -212,7 +234,7 @@ export class TerminalInstance {
     // Hit-test a column position; returns normalised { index, length, text } for overlay/open.
     // Quoted paths expose the inner bounds (excluding quote chars).
     const hitTest = (text: string, col: number): HitResult | null => {
-      for (const re of [urlRegex, pathRegex]) {
+      for (const re of [urlRegex, bareUrlRegex, nakedUrlRegex, pathRegex]) {
         re.lastIndex = 0
         let m: RegExpExecArray | null
         while ((m = re.exec(text)) !== null) {
@@ -236,19 +258,27 @@ export class TerminalInstance {
     const getPos = (e: MouseEvent) => {
       const rect = this.element.getBoundingClientRect()
       const col = Math.floor((e.clientX - rect.left) / charW)
-      const viewportRow = Math.floor((e.clientY - rect.top) / lineHeight)
+      // Use the actual rendered cell height for row calculation so the hit zone
+      // matches the visual rows even when the font renders taller than our formula.
+      const viewportRow = Math.floor((e.clientY - rect.top) / getCellH())
       return { col, viewportRow, bufferRow: this.terminal.buffer.active.viewportY + viewportRow }
     }
 
-    // Show overlay under the link at the given position. The overlay sits at the
-    // baseline of the text row: (rowIndex + 1) * lineHeight gives the bottom of the row,
-    // so subtracting a small gap lands just below the descenders.
+    // Show overlay under the link at the given position.
+    // We read the actual row element's bottom from the DOM so the underline lands
+    // exactly below the descenders regardless of the font's true cell height.
     const showOverlayAt = (col: number, viewportRow: number, bufferRow: number) => {
       const line = this.terminal.buffer.active.getLine(bufferRow)
       const match = line ? hitTest(line.translateToString(true), col) : null
       if (match) {
+        const rowsEl = this.terminal.element?.querySelector('.xterm-rows')
+        const rowEl = rowsEl?.children[viewportRow] as HTMLElement | null
+        const elRect = this.element.getBoundingClientRect()
+        const top = rowEl
+          ? rowEl.getBoundingClientRect().bottom - elRect.top - 1
+          : (viewportRow + 1) * getCellH() - 1
         overlay.style.left = `${match.index * charW}px`
-        overlay.style.top = `${(viewportRow + 1) * lineHeight - 1}px`
+        overlay.style.top = `${top}px`
         overlay.style.width = `${match.length * charW}px`
         overlay.style.display = 'block'
         this.terminal.element?.classList.add('xterm-cursor-pointer')
@@ -305,6 +335,16 @@ export class TerminalInstance {
           e.preventDefault()
           window.electronAPI.shell.openExternal(m[0]).catch(() => {})
           return
+        }
+      }
+      for (const re of [bareUrlRegex, nakedUrlRegex]) {
+        re.lastIndex = 0
+        while ((m = re.exec(text)) !== null) {
+          if (col >= m.index && col < m.index + m[0].length) {
+            e.preventDefault()
+            window.electronAPI.shell.openExternal(`https://${m[0]}`).catch(() => {})
+            return
+          }
         }
       }
       pathRegex.lastIndex = 0
