@@ -35,9 +35,10 @@ export async function registerAuthMiddleware(
     const isProtected = PROTECTED_PREFIXES.some((p) => request.url.startsWith(p))
     if (!isProtected) return
 
-    // DNS rebinding protection: applies to all /api and /ws routes
+    // DNS rebinding protection: applies to all /api and /ws routes.
+    // Reject missing Host too — HTTP/1.0 or crafted requests with no Host must not bypass this.
     const rawHost = request.headers.host ?? ''
-    if (rawHost && !isAllowedHost(rawHost)) {
+    if (!rawHost || !isAllowedHost(rawHost)) {
       return reply.status(403).send({ error: 'FORBIDDEN' })
     }
 

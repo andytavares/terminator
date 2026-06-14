@@ -55,11 +55,11 @@ describe('POST /api/terminals', () => {
     expect(typeof body.sessionId).toBe('string')
   })
 
-  it('returns 400 for missing required fields', async () => {
+  it('returns 400 when cwd is missing', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/terminals',
-      payload: { cwd: '/tmp' },
+      payload: { type: 'human' },
     })
     expect(res.statusCode).toBe(400)
   })

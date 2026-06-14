@@ -21,6 +21,8 @@ async function buildApp(
 }
 
 describe('isAllowedHost', () => {
+  it('returns false for empty string (missing Host header should be blocked)', () =>
+    expect(isAllowedHost('')).toBe(false))
   it('allows localhost', () => expect(isAllowedHost('localhost')).toBe(true))
   it('allows localhost with port', () => expect(isAllowedHost('localhost:7681')).toBe(true))
   it('allows 127.0.0.1', () => expect(isAllowedHost('127.0.0.1')).toBe(true))

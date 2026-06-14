@@ -10,7 +10,7 @@ import type { WsSubscriberManager } from '../ws-subscriber-manager.js'
 const CreateTerminalSchema = z.object({
   cwd: z.string().min(1),
   type: z.enum(['human', 'agent']).default('human'),
-  tabTitle: z.string().min(1).max(100),
+  tabTitle: z.string().min(1).max(100).optional(),
   scrollbackLimit: z.number().int().min(1000).max(100000).optional().default(10000),
 })
 
