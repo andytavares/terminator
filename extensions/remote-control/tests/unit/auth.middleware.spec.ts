@@ -31,6 +31,8 @@ describe('isAllowedHost', () => {
   it('allows ngrok-free.app subdomain', () =>
     expect(isAllowedHost('abc.ngrok-free.app')).toBe(true))
   it('allows ngrok.io subdomain', () => expect(isAllowedHost('abc.ngrok.io')).toBe(true))
+  it('allows ngrok-free.dev subdomain', () =>
+    expect(isAllowedHost('abc.ngrok-free.dev')).toBe(true))
   it('allows RFC-1918 10.x address', () => expect(isAllowedHost('10.0.0.5')).toBe(true))
   it('allows RFC-1918 172.16.x address', () => expect(isAllowedHost('172.16.0.1')).toBe(true))
   it('allows RFC-1918 192.168.x address', () => expect(isAllowedHost('192.168.1.50')).toBe(true))

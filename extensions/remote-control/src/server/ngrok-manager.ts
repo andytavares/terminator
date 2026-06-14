@@ -43,7 +43,7 @@ export class NgrokManager {
 
   start(port: number, authToken?: string): Promise<string> {
     this.stopped = false
-    const args = ['http', String(port), '--web-addr', '127.0.0.1:4041']
+    const args = ['http', String(port)]
     if (authToken) args.push('--authtoken', authToken)
     this.process = spawn('ngrok', args, { detached: false })
 
@@ -62,7 +62,7 @@ export class NgrokManager {
       }
     })
 
-    return this.pollForUrl().catch((err: Error) => {
+    return this.pollForUrl(port).catch((err: Error) => {
       const detail = outputLines.slice(-5).join(' | ')
       throw new Error(detail ? `${err.message}: ${detail}` : err.message)
     })
@@ -77,16 +77,21 @@ export class NgrokManager {
     }
   }
 
-  private async pollForUrl(): Promise<string> {
+  private async pollForUrl(port: number): Promise<string> {
     for (let i = 0; i < MAX_POLLS; i++) {
       if (this.stopped) throw new Error('ngrok stopped')
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
       if (this.stopped) throw new Error('ngrok stopped')
       try {
-        const res = await fetch('http://localhost:4041/api/tunnels')
+        const res = await fetch('http://localhost:4040/api/tunnels')
         if (res.ok) {
-          const data = (await res.json()) as { tunnels: Array<{ public_url: string }> }
-          const tunnel = data.tunnels.find((t) => t.public_url.startsWith('https://'))
+          const data = (await res.json()) as {
+            tunnels: Array<{ public_url: string; config?: { addr?: string } }>
+          }
+          const tunnel = data.tunnels.find(
+            (t) =>
+              t.public_url.startsWith('https://') && (t.config?.addr?.endsWith(`:${port}`) ?? false)
+          )
           if (tunnel) return tunnel.public_url
         }
       } catch {

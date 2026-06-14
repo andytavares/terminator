@@ -469,10 +469,10 @@ describe('TerminalInstance', () => {
   })
 
   describe('link providers (visual decoration)', () => {
-    it('registers three link providers on construction (URL, path, quoted-path)', () => {
+    it('registers five link providers on construction (URL, bare, naked, path, quoted-path)', () => {
       new TerminalInstance('ses-links', 1000)
       const instance = vi.mocked(Terminal).mock.results[0].value
-      expect(instance.registerLinkProvider).toHaveBeenCalledTimes(3)
+      expect(instance.registerLinkProvider).toHaveBeenCalledTimes(5)
     })
 
     function getProvider(lineText: string, providerIndex: number) {
@@ -529,8 +529,28 @@ describe('TerminalInstance', () => {
       expect(result).toBeUndefined()
     })
 
+    it('bare URL provider (index 1) detects www. links', () => {
+      const provider = getProvider('visit www.google.com for info', 1)
+      let result: unknown
+      provider.provideLinks(0, (links: unknown) => {
+        result = links
+      })
+      expect(Array.isArray(result)).toBe(true)
+      expect((result as { text: string }[])[0].text).toBe('www.google.com')
+    })
+
+    it('naked URL provider (index 2) detects bare domain links', () => {
+      const provider = getProvider('check google.com for info', 2)
+      let result: unknown
+      provider.provideLinks(0, (links: unknown) => {
+        result = links
+      })
+      expect(Array.isArray(result)).toBe(true)
+      expect((result as { text: string }[])[0].text).toBe('google.com')
+    })
+
     it('path provider detects absolute paths and returns them in callback', () => {
-      const provider = getProvider('Error in /Users/foo/bar.ts:12:3', 1)
+      const provider = getProvider('Error in /Users/foo/bar.ts:12:3', 3)
       let result: unknown
       provider.provideLinks(0, (links: unknown) => {
         result = links
@@ -558,21 +578,27 @@ describe('TerminalInstance', () => {
       element.dispatchEvent(new MouseEvent(type, { bubbles: true, ...opts }))
 
     describe('hover overlay', () => {
-      it('shows overlay when hovering over a URL', () => {
+      it('shows overlay when hovering over a URL with cmd held', () => {
         const instance = makeInstanceWithLine('https://example.com')
-        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0 })
+        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0, metaKey: true })
         expect(instance.linkOverlay?.style.display).toBe('block')
+      })
+
+      it('does not show overlay when hovering over a URL without cmd', () => {
+        const instance = makeInstanceWithLine('https://example.com')
+        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0, metaKey: false })
+        expect(instance.linkOverlay?.style.display).toBe('none')
       })
 
       it('hides overlay when hovering over plain text', () => {
         const instance = makeInstanceWithLine('just some text')
-        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0 })
+        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0, metaKey: true })
         expect(instance.linkOverlay?.style.display).toBe('none')
       })
 
       it('hides overlay on mouseleave', () => {
         const instance = makeInstanceWithLine('https://example.com')
-        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0 })
+        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0, metaKey: true })
         expect(instance.linkOverlay?.style.display).toBe('block')
         fire(instance.element, 'mouseleave')
         expect(instance.linkOverlay?.style.display).toBe('none')
@@ -580,27 +606,47 @@ describe('TerminalInstance', () => {
 
       it('positions overlay correctly for a URL at start of line', () => {
         // URL 'https://example.com' at index 0, length 19
-        // overlay.left = 0*8=0, top = 0*16+16-2=14, width = 19*8=152
+        // overlay.left = 0*8=0, top = (0+1)*16-1=15, width = 19*8=152
         const instance = makeInstanceWithLine('https://example.com')
-        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0 })
+        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0, metaKey: true })
         expect(instance.linkOverlay?.style.left).toBe('0px')
-        expect(instance.linkOverlay?.style.top).toBe('14px')
+        expect(instance.linkOverlay?.style.top).toBe('15px')
         expect(instance.linkOverlay?.style.width).toBe('152px')
+      })
+
+      it('shows overlay when hovering over a www. URL with cmd held', () => {
+        const instance = makeInstanceWithLine('www.google.com')
+        fire(instance.element, 'mousemove', { clientX: 0, clientY: 0, metaKey: true })
+        expect(instance.linkOverlay?.style.display).toBe('block')
+      })
+
+      it('shows overlay when hovering over a bare domain URL with cmd held', () => {
+        const instance = makeInstanceWithLine('google.com')
+        fire(instance.element, 'mousemove', { clientX: 0, clientY: 0, metaKey: true })
+        expect(instance.linkOverlay?.style.display).toBe('block')
       })
 
       it('shows overlay when hovering over an absolute path', () => {
         const instance = makeInstanceWithLine('/Users/foo/bar.ts')
-        fire(instance.element, 'mousemove', { clientX: 4, clientY: 0 })
+        fire(instance.element, 'mousemove', { clientX: 4, clientY: 0, metaKey: true })
         expect(instance.linkOverlay?.style.display).toBe('block')
       })
 
       it('hides overlay when cursor moves off a link', () => {
         const instance = makeInstanceWithLine('text https://x.com more')
-        // Hover over URL (clientX=40 → col=5, URL starts at index 5)
-        fire(instance.element, 'mousemove', { clientX: 44, clientY: 0 })
+        // Hover over URL with cmd (clientX=44 → col=5, URL starts at index 5)
+        fire(instance.element, 'mousemove', { clientX: 44, clientY: 0, metaKey: true })
         expect(instance.linkOverlay?.style.display).toBe('block')
         // Move to plain text before URL (col=0)
-        fire(instance.element, 'mousemove', { clientX: 0, clientY: 0 })
+        fire(instance.element, 'mousemove', { clientX: 0, clientY: 0, metaKey: true })
+        expect(instance.linkOverlay?.style.display).toBe('none')
+      })
+
+      it('hides overlay when cmd is released while hovering', () => {
+        const instance = makeInstanceWithLine('https://example.com')
+        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0, metaKey: true })
+        expect(instance.linkOverlay?.style.display).toBe('block')
+        document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta', bubbles: true }))
         expect(instance.linkOverlay?.style.display).toBe('none')
       })
     })
@@ -652,6 +698,18 @@ describe('TerminalInstance', () => {
           clientY: 0,
         })
         expect(mockOpenExternal).not.toHaveBeenCalled()
+      })
+
+      it('opens www. URL with https:// prepended on cmd+click', () => {
+        const instance = makeInstanceWithLine('www.google.com')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 0, clientY: 0 })
+        expect(mockOpenExternal).toHaveBeenCalledWith('https://www.google.com')
+      })
+
+      it('opens bare domain URL with https:// prepended on cmd+click', () => {
+        const instance = makeInstanceWithLine('google.com')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 0, clientY: 0 })
+        expect(mockOpenExternal).toHaveBeenCalledWith('https://google.com')
       })
 
       it('does not treat protocol-relative URL as a path', () => {

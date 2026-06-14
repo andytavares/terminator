@@ -356,6 +356,7 @@ export function TaskVaultView(): React.JSX.Element {
         refreshInboxCount()
         void loadContexts()
         void loadSomedayTasks()
+        tickCalendar()
       }
     )
 

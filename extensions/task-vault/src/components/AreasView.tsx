@@ -45,8 +45,8 @@ export function AreasView(): React.JSX.Element {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
-  async function load() {
-    setIsLoading(true)
+  async function load(silent = false) {
+    if (!silent) setIsLoading(true)
     setError(null)
     try {
       const result = await window.electronAPI.extensionBridge.invoke(
@@ -61,7 +61,7 @@ export function AreasView(): React.JSX.Element {
     } catch (err) {
       setError(String(err))
     } finally {
-      setIsLoading(false)
+      if (!silent) setIsLoading(false)
     }
   }
 
@@ -70,7 +70,23 @@ export function AreasView(): React.JSX.Element {
   }, [statusFilter])
 
   useEffect(() => {
-    if (selectedAreaName && areas.length > 0) {
+    const unsub = window.electronAPI.extensionBridge.on('task-vault:push:index-updated', () => {
+      void load(true)
+    })
+    return unsub
+  }, [statusFilter])
+
+  useEffect(() => {
+    if (selectedArea) {
+      // Refresh the open detail view from the newly loaded list.
+      // If the area is no longer in the list (deleted/renamed), close the detail.
+      const refreshed = areas.find((a) => a.name === selectedArea.name)
+      if (refreshed) {
+        setSelectedArea(refreshed)
+      } else if (areas.length > 0) {
+        setSelectedArea(null)
+      }
+    } else if (selectedAreaName && areas.length > 0) {
       const found = areas.find((a) => a.name === selectedAreaName)
       if (found) setSelectedArea(found)
     }

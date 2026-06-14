@@ -174,7 +174,7 @@ export async function createRemoteServer(
   return {
     async start() {
       try {
-        await fastify.listen({ port, host: '127.0.0.1' })
+        await fastify.listen({ port, host: '0.0.0.0' })
         ticketStore.startCleanup()
         // Purge expired app-session tokens once per hour
         sessionCleanupTimer = setInterval(

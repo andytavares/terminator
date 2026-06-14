@@ -13,12 +13,20 @@ vi.mock('../../src/vault/db', () => ({
   randomUUID: vi.fn(() => 'test-uuid'),
 }))
 
+vi.mock('../../src/notifications/task-scheduler.js', () => ({
+  broadcast: vi.fn(),
+}))
+
 const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
   mockHandle: vi.fn(),
   mockRemoveHandler: vi.fn(),
 }))
 vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
+  Notification: Object.assign(
+    vi.fn(() => ({ show: vi.fn() })),
+    { isSupported: vi.fn(() => false) }
+  ),
 }))
 
 import {

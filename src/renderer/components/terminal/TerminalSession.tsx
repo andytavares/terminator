@@ -134,6 +134,12 @@ export class TerminalInstance {
 
   private registerLinkProviders(): void {
     const urlRegex = /https?:\/\/(?:[^\s()>\]'"\\]|\([^\s()>\]'"\\]*\))+/g
+    // www. prefix URLs without a protocol (opened with https:// prepended)
+    const bareUrlRegex = /\bwww\.[a-zA-Z0-9][a-zA-Z0-9\-.]*\.[a-zA-Z]{2,}(?:\/[^\s()>\]'"\\]*)?/g
+    // Bare domain URLs like google.com or sub.example.io — TLD allowlist avoids false positives
+    // on source file extensions (.js, .ts, .tsx, .py, etc.)
+    const nakedUrlRegex =
+      /\b(?!www\.)(?:[a-zA-Z0-9][a-zA-Z0-9-]*\.)+(?:com|net|org|io|dev|app|ai|sh|co|uk|me|tv|info|edu|gov|mil|eu|us|de|fr|jp|cn|au|in|nl|br|ru|it|es|ca|mx|ar|nz|za|sg|hk|kr|se|no|dk|fi|pl|at|ch|pt|gr|tr|be|xyz|tech|cloud|id|cc|biz|pro|media|live|link|site|run|codes|page|studio|zone|digital|pub)(?:\/[^\s()>\]'"\\]*)?/g
     const pathRegex = /(?<!\S)((?:~\/|\/(?!\/))[^\s:)>\]'"\\]+(?::\d+(?::\d+)?)?)/g
     // Matches paths inside " or ' to support spaces: File "/Users/Jane Doe/foo.py", line 5
     const quotedPathRegex = /(?:"((?:~\/|\/(?!\/))[^"]+)"|'((?:~\/|\/(?!\/))[^']+)')/g
@@ -141,9 +147,22 @@ export class TerminalInstance {
     const lineHeight = Math.ceil(fontSize * 1.2)
     const charW = measureCharWidth(fontSize)
 
-    // xterm link providers: declare links for accessibility tooling.
-    // Visual decoration is handled by our own overlay below because xterm's
-    // built-in `decorations` don't render underlines reliably in DOM renderer mode.
+    // xterm computes its actual cell height from real font metrics after rendering;
+    // it differs from our formula. We lazy-read it from the DOM on first use and cache it.
+    let cachedCellH: number | null = null
+    const getCellH = (): number => {
+      if (cachedCellH !== null) return cachedCellH
+      const rowsEl = this.terminal.element?.querySelector('.xterm-rows')
+      const firstRow = rowsEl?.firstElementChild as HTMLElement | null
+      if (firstRow) {
+        const h = firstRow.getBoundingClientRect().height
+        if (h > 0) cachedCellH = h
+      }
+      return cachedCellH ?? lineHeight
+    }
+
+    // xterm link providers: declare links for accessibility tooling only (no visual decorations —
+    // visual feedback is handled by our own overlay and is cmd-key gated).
     const makeVisualProvider = (regex: RegExp): ILinkProvider => ({
       provideLinks: (bufferLineIndex, callback) => {
         const line = this.terminal.buffer.active.getLine(bufferLineIndex)
@@ -163,7 +182,6 @@ export class TerminalInstance {
               end: { x: match.index + matchText.length, y: bufferLineIndex + 1 },
             },
             text: matchText,
-            decorations: { pointerCursor: true, underline: true },
             activate: () => {},
           })
         }
@@ -191,7 +209,6 @@ export class TerminalInstance {
               end: { x: innerStart + inner.length, y: bufferLineIndex + 1 },
             },
             text: inner,
-            decorations: { pointerCursor: true, underline: true },
             activate: () => {},
           })
         }
@@ -199,10 +216,13 @@ export class TerminalInstance {
       },
     }
     this.terminal.registerLinkProvider(makeVisualProvider(urlRegex))
+    this.terminal.registerLinkProvider(makeVisualProvider(bareUrlRegex))
+    this.terminal.registerLinkProvider(makeVisualProvider(nakedUrlRegex))
     this.terminal.registerLinkProvider(makeVisualProvider(pathRegex))
     this.terminal.registerLinkProvider(quotedPathProvider)
 
-    // Underline overlay: a 1px div positioned absolutely over the hovered link text.
+    // Underline overlay: a 1px div positioned absolutely under hovered link text.
+    // Only shown when Cmd (macOS) or Ctrl (Win/Linux) is held.
     const overlay = document.createElement('div')
     overlay.style.cssText =
       'position:absolute;pointer-events:none;height:1px;background:#4a9eff;display:none;z-index:10;'
@@ -214,7 +234,7 @@ export class TerminalInstance {
     // Hit-test a column position; returns normalised { index, length, text } for overlay/open.
     // Quoted paths expose the inner bounds (excluding quote chars).
     const hitTest = (text: string, col: number): HitResult | null => {
-      for (const re of [urlRegex, pathRegex]) {
+      for (const re of [urlRegex, bareUrlRegex, nakedUrlRegex, pathRegex]) {
         re.lastIndex = 0
         let m: RegExpExecArray | null
         while ((m = re.exec(text)) !== null) {
@@ -233,35 +253,77 @@ export class TerminalInstance {
       return null
     }
 
+    const isMac = navigator.platform.startsWith('Mac')
+
     const getPos = (e: MouseEvent) => {
       const rect = this.element.getBoundingClientRect()
       const col = Math.floor((e.clientX - rect.left) / charW)
-      const viewportRow = Math.floor((e.clientY - rect.top) / lineHeight)
+      // Use the actual rendered cell height for row calculation so the hit zone
+      // matches the visual rows even when the font renders taller than our formula.
+      const viewportRow = Math.floor((e.clientY - rect.top) / getCellH())
       return { col, viewportRow, bufferRow: this.terminal.buffer.active.viewportY + viewportRow }
     }
 
-    // mousemove: show underline overlay + pointer cursor over detected links.
-    const onMouseMove = (e: MouseEvent) => {
-      const { col, viewportRow, bufferRow } = getPos(e)
+    // Show overlay under the link at the given position.
+    // We read the actual row element's bottom from the DOM so the underline lands
+    // exactly below the descenders regardless of the font's true cell height.
+    const showOverlayAt = (col: number, viewportRow: number, bufferRow: number) => {
       const line = this.terminal.buffer.active.getLine(bufferRow)
       const match = line ? hitTest(line.translateToString(true), col) : null
       if (match) {
+        const rowsEl = this.terminal.element?.querySelector('.xterm-rows')
+        const rowEl = rowsEl?.children[viewportRow] as HTMLElement | null
+        const elRect = this.element.getBoundingClientRect()
+        const top = rowEl
+          ? rowEl.getBoundingClientRect().bottom - elRect.top - 1
+          : (viewportRow + 1) * getCellH() - 1
         overlay.style.left = `${match.index * charW}px`
-        overlay.style.top = `${viewportRow * lineHeight + lineHeight - 2}px`
+        overlay.style.top = `${top}px`
         overlay.style.width = `${match.length * charW}px`
         overlay.style.display = 'block'
-        // xterm.css defines .xterm-cursor-pointer { cursor: pointer }
         this.terminal.element?.classList.add('xterm-cursor-pointer')
       } else {
         this.clearLinkHover()
       }
     }
 
-    const onMouseLeave = () => this.clearLinkHover()
+    // Last known mouse position (needed to re-check when cmd is pressed while hovering).
+    let lastPos: { col: number; viewportRow: number; bufferRow: number } | null = null
+
+    // mousemove: only show overlay when Cmd/Ctrl is held.
+    const onMouseMove = (e: MouseEvent) => {
+      const pos = getPos(e)
+      lastPos = pos
+      if (isMac ? e.metaKey : e.ctrlKey) {
+        showOverlayAt(pos.col, pos.viewportRow, pos.bufferRow)
+      } else {
+        this.clearLinkHover()
+      }
+    }
+
+    const onMouseLeave = () => {
+      lastPos = null
+      this.clearLinkHover()
+    }
+
+    // keydown/keyup on document: show/hide overlay when Cmd is pressed/released while hovering.
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isModKey = isMac ? e.key === 'Meta' : e.key === 'Control'
+      if (!isModKey || !lastPos) return
+      // Recompute bufferRow from current viewportY — scroll since last mousemove would make the
+      // cached lastPos.bufferRow point at the wrong line.
+      const currentBufferRow = this.terminal.buffer.active.viewportY + lastPos.viewportRow
+      showOverlayAt(lastPos.col, lastPos.viewportRow, currentBufferRow)
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      const isModKey = isMac ? e.key === 'Meta' : e.key === 'Control'
+      if (isModKey) this.clearLinkHover()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('keyup', onKeyUp)
 
     // mousedown: Cmd+click (macOS) or Ctrl+click (Windows/Linux) opens links.
     // On macOS Ctrl+click is a secondary click — don't intercept it.
-    const isMac = navigator.platform.startsWith('Mac')
     const onMouseDown = (e: MouseEvent) => {
       if (!(isMac ? e.metaKey : e.ctrlKey)) return
       const { col, bufferRow } = getPos(e)
@@ -276,6 +338,16 @@ export class TerminalInstance {
           e.preventDefault()
           window.electronAPI.shell.openExternal(m[0]).catch(() => {})
           return
+        }
+      }
+      for (const re of [bareUrlRegex, nakedUrlRegex]) {
+        re.lastIndex = 0
+        while ((m = re.exec(text)) !== null) {
+          if (col >= m.index && col < m.index + m[0].length) {
+            e.preventDefault()
+            window.electronAPI.shell.openExternal(`https://${m[0]}`).catch(() => {})
+            return
+          }
         }
       }
       pathRegex.lastIndex = 0
@@ -305,6 +377,8 @@ export class TerminalInstance {
       this.element.removeEventListener('mousemove', onMouseMove)
       this.element.removeEventListener('mouseleave', onMouseLeave)
       this.element.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('keyup', onKeyUp)
     }
   }
 
