@@ -1,0 +1,29 @@
+src/main/extensions/extension-host.ts
+  s_8e723948aeb460::t_374019807b46ca 186-191
+extensions/remote-control/src/index.ts
+  s_8e723948aeb460::t_e86ce6076f3cbf 122,124,142,156
+  s_8e723948aeb460::t_c0ba5de9a199cd 174
+  s_8e723948aeb460::t_bdcac1fb92584c 210-215
+  s_8e723948aeb460::t_305bcf8f01b48a 36
+  s_8e723948aeb460::t_c6da6e9e8ad4f1 26-27
+extensions/remote-control/src/server/ngrok-manager.ts
+  s_8e723948aeb460::t_3bd7d24fd25e13 12
+src/main/index.ts
+  s_8e723948aeb460::t_aba132fa2e853c 251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "71f885be7272e1ae2946f48709fd3957c5cd6085",
+  "prompts": {},
+  "sessions": {
+    "s_8e723948aeb460": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bafe19cd-02b4-42a6-9919-66a462467a04",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
