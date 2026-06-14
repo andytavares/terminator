@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync } from 'fs'
 
+vi.mock('bcryptjs', () => ({
+  default: {
+    hash: vi.fn().mockResolvedValue('$2a$10$mocked'),
+    compare: vi.fn().mockResolvedValue(true),
+  },
+}))
+
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>()
   return { ...actual, readFileSync: vi.fn(actual.readFileSync), existsSync: vi.fn(() => false) }
@@ -104,6 +111,25 @@ describe('RemoteServer', () => {
     it('disconnectAllClients() calls subscriberManager.destroyAll', () => {
       remoteServer.disconnectAllClients()
       expect(mockSubscriberManager.destroyAll).toHaveBeenCalled()
+    })
+
+    it('disconnectAllClients() kills remote PTY sessions', async () => {
+      mockSubscriberManager.addSubscriber.mockReturnValueOnce(true)
+      const body = JSON.stringify({ cwd: '/tmp', type: 'human', tabTitle: 'test' })
+      const createRes = await remoteServer.inject({
+        method: 'POST',
+        url: '/api/terminals',
+        headers: {
+          'content-type': 'application/json',
+          authorization: 'Bearer anypassword',
+        },
+        body,
+      })
+      expect(createRes.statusCode).toBe(201)
+      const { sessionId } = JSON.parse(createRes.body) as { sessionId: string }
+
+      remoteServer.disconnectAllClients()
+      expect(mockPtyManager.kill).toHaveBeenCalledWith(sessionId)
     })
   })
 
@@ -210,6 +236,27 @@ describe('RemoteServer', () => {
         headers: { cookie: token },
       })
       expect(assetResp.statusCode).toBe(403)
+    })
+
+    it('rejects /app/assets/* when session cookie has expired (server-side TTL)', async () => {
+      vi.useFakeTimers()
+      vi.mocked(readFileSync).mockReturnValueOnce('<html><head></head></html>')
+      mockTicketStore.consumeTicket.mockReturnValueOnce('__app__')
+      const ticketResp = await remoteServer.inject({ method: 'GET', url: '/app/?t=valid-ticket' })
+      const setCookie = ticketResp.headers['set-cookie'] as string | string[]
+      const cookieStr = Array.isArray(setCookie) ? setCookie[0] : (setCookie ?? '')
+      const token = cookieStr.split(';')[0]
+
+      // Advance time past 8-hour TTL
+      vi.advanceTimersByTime(8 * 60 * 60 * 1000 + 1)
+
+      const assetResp = await remoteServer.inject({
+        method: 'GET',
+        url: '/app/assets/main.js',
+        headers: { cookie: token },
+      })
+      expect(assetResp.statusCode).toBe(403)
+      vi.useRealTimers()
     })
   })
 

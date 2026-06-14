@@ -254,6 +254,17 @@ export function activate(api: ExtensionAPI): void {
       const authToken = api.settings.get<string>(KEY.ngrokAuthToken) || undefined
       try {
         const publicUrl = await ngrokManager.start(port, authToken)
+        currentPublicUrl = publicUrl
+        ngrokManager.setOnCrash(() => {
+          currentPublicUrl = null
+          api.window.broadcast('remote:tunnel-disconnected', {})
+          api.window.broadcast('remote:status', {
+            enabled: true,
+            port,
+            publicUrl: null,
+            lanUrl: getLanUrl(port),
+          })
+        })
         api.window.broadcast('remote:status', {
           enabled: true,
           port,
@@ -261,6 +272,7 @@ export function activate(api: ExtensionAPI): void {
           lanUrl: getLanUrl(port),
         })
       } catch (err) {
+        currentPublicUrl = null
         api.window.broadcast('remote:status', {
           enabled: true,
           port,

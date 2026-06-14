@@ -70,7 +70,10 @@ export async function createRemoteServer(
 
   const ticketStore = new WsTicketStore()
   const subscriberManager = new WsSubscriberManager()
-  const appSessions = new Set<string>()
+  // token → expiresAt (ms). Mirrors the 8-hour cookie lifetime.
+  const SESSION_TTL_MS = 8 * 60 * 60 * 1000
+  const appSessions = new Map<string, number>()
+  let sessionCleanupTimer: ReturnType<typeof setInterval> | null = null
 
   function parseAppSession(cookieHeader: string): string | null {
     const match = cookieHeader
@@ -80,14 +83,25 @@ export async function createRemoteServer(
     return match ? match.slice('app-session='.length) : null
   }
 
+  function hasValidSession(cookieHeader: string): boolean {
+    const token = parseAppSession(cookieHeader)
+    if (!token) return false
+    const expiresAt = appSessions.get(token)
+    if (expiresAt === undefined) return false
+    if (Date.now() > expiresAt) {
+      appSessions.delete(token)
+      return false
+    }
+    return true
+  }
+
   const fastify = Fastify({ logger: false })
 
   // Gate /app/* static assets behind a session cookie issued on ticket auth
   fastify.addHook('onRequest', async (request, reply) => {
     const pathname = request.url.split('?')[0]
     if (!pathname.startsWith('/app/') || pathname === '/app/') return
-    const token = parseAppSession(request.headers.cookie ?? '')
-    if (!token || !appSessions.has(token)) {
+    if (!hasValidSession(request.headers.cookie ?? '')) {
       return reply.status(403).send({ error: 'FORBIDDEN' })
     }
   })
@@ -102,8 +116,7 @@ export async function createRemoteServer(
 
   fastify.get<{ Querystring: { t?: string } }>('/app/', async (request, reply) => {
     // Accept an existing valid session cookie (allows page refresh without re-auth)
-    const existingToken = parseAppSession(request.headers.cookie ?? '')
-    const hasSession = existingToken !== null && appSessions.has(existingToken)
+    const hasSession = hasValidSession(request.headers.cookie ?? '')
 
     if (!hasSession) {
       const t = request.query.t ?? ''
@@ -111,7 +124,7 @@ export async function createRemoteServer(
         return reply.redirect('/')
       }
       const sessionToken = randomBytes(32).toString('hex')
-      appSessions.add(sessionToken)
+      appSessions.set(sessionToken, Date.now() + SESSION_TTL_MS)
       // 8-hour HttpOnly session cookie scoped to /app
       reply.header(
         'Set-Cookie',
@@ -164,6 +177,16 @@ export async function createRemoteServer(
       try {
         await fastify.listen({ port, host: '127.0.0.1' })
         ticketStore.startCleanup()
+        // Purge expired app-session tokens once per hour
+        sessionCleanupTimer = setInterval(
+          () => {
+            const now = Date.now()
+            for (const [token, expiresAt] of appSessions) {
+              if (now > expiresAt) appSessions.delete(token)
+            }
+          },
+          60 * 60 * 1000
+        )
         listening = true
       } catch (err) {
         await fastify.close().catch(() => {})
@@ -179,6 +202,10 @@ export async function createRemoteServer(
     async stop() {
       if (!listening) return
       ticketStore.stopCleanup()
+      if (sessionCleanupTimer) {
+        clearInterval(sessionCleanupTimer)
+        sessionCleanupTimer = null
+      }
       appSessions.clear()
       terminalCleanup.cleanup()
       bridgeCleanup.disconnectAll()
@@ -189,6 +216,8 @@ export async function createRemoteServer(
 
     disconnectAllClients() {
       appSessions.clear()
+      // Kill all remote PTYs — password rotation invalidates existing sessions
+      terminalCleanup.cleanup()
       bridgeCleanup.disconnectAll()
       subscriberManager.destroyAll()
     },

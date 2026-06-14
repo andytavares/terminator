@@ -18,12 +18,16 @@ vi.mock('../../src/server/remote-server', () => ({
   },
 }))
 
+const mockNgrokStart = vi.hoisted(() => vi.fn().mockResolvedValue('https://example.ngrok.app'))
+const mockNgrokStop = vi.hoisted(() => vi.fn())
+const mockNgrokSetOnCrash = vi.hoisted(() => vi.fn())
+
 vi.mock('../../src/server/ngrok-manager', () => {
   class MockNgrokManager {
     static isInstalled = mockNgrokIsInstalled
-    start = vi.fn().mockResolvedValue('https://example.ngrok.app')
-    stop = vi.fn()
-    setOnCrash = vi.fn()
+    start = mockNgrokStart
+    stop = mockNgrokStop
+    setOnCrash = mockNgrokSetOnCrash
   }
   return { NgrokManager: MockNgrokManager, generateCaddyfile: vi.fn(() => '') }
 })
@@ -143,6 +147,48 @@ describe('remote-control extension index', () => {
       expect(mockBroadcast).not.toHaveBeenCalledWith(
         'remote:status',
         expect.objectContaining({ error: 'START_FAILED' })
+      )
+    })
+  })
+
+  describe('remote:tunnel-reconnect', () => {
+    it('re-registers crash handler and updates currentPublicUrl after reconnect', async () => {
+      mockNgrokIsInstalled.mockReturnValue(true)
+
+      const serverHandle = makeServerHandle()
+      serverHandle.isListening.mockReturnValue(true)
+      mockCreateRemoteServer.mockResolvedValue(serverHandle)
+      mockSettingsGet.mockImplementation((key: string) => {
+        if (key === 'terminator.remote-control.enabled') return false
+        if (key === 'terminator.remote-control.port') return 7681
+        if (key === 'terminator.remote-control.passwordHash') return '$2a$10$existing'
+        return null
+      })
+
+      const { activate } = await import('../../src/index.ts')
+      const api = makeApi()
+      activate(api as never)
+
+      // Start the server so remoteServer is set
+      const toggleHandler = mockIpcRegisterHandler.mock.calls.find(
+        ([ch]: [string]) => ch === 'remote:toggle'
+      )?.[1] as (p: unknown) => Promise<unknown>
+      await toggleHandler({ enabled: true })
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      mockNgrokSetOnCrash.mockClear()
+
+      const reconnectHandler = mockIpcRegisterHandler.mock.calls.find(
+        ([ch]: [string]) => ch === 'remote:tunnel-reconnect'
+      )?.[1] as () => Promise<unknown>
+
+      await reconnectHandler()
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      expect(mockNgrokSetOnCrash).toHaveBeenCalled()
+      expect(mockBroadcast).toHaveBeenCalledWith(
+        'remote:status',
+        expect.objectContaining({ publicUrl: 'https://example.ngrok.app' })
       )
     })
   })
