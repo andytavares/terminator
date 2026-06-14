@@ -1,0 +1,21 @@
+src/renderer/components/terminal/TerminalSession.tsx
+  s_b924fed75606c0::t_80c0f8dc7fc635 313-316
+extensions/task-vault/src/components/AreasView.tsx
+  s_b924fed75606c0::t_6fd0cb586d01b1 81-82,84-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "1be8dd5e5411b05fac5cdcb9fb02ca01e7f8b834",
+  "prompts": {},
+  "sessions": {
+    "s_b924fed75606c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fed56da4-0b77-4421-addd-e4e4a908a987",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
