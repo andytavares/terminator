@@ -55,18 +55,20 @@ All renderer-to-main communication goes through `window.electronAPI`, exposed by
 
 ### Channel namespaces
 
-| Namespace     | Direction        | Description                                                                                                                    |
-| ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `terminal:*`  | renderer ↔ main | PTY lifecycle: create, close, input, output, resize, cleanup                                                                   |
-| `workspace:*` | renderer → main  | Workspace and project CRUD                                                                                                     |
-| `project:*`   | renderer → main  | Project CRUD (scoped under workspace)                                                                                          |
-| `settings:*`  | renderer → main  | Global and per-workspace settings                                                                                              |
-| `dialog:*`    | renderer → main  | Native OS dialogs (folder picker)                                                                                              |
-| `extension:*` | renderer → main  | Extension install, toggle, contribution queries                                                                                |
-| `git:*`       | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create                                                                     |
-| `github:*`    | renderer → main  | PR review queue, diff, file metrics, inline comments, submit, session persistence, active-review tracking, prune closed/merged |
-| `shell:exec`  | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)                                                                            |
-| `fs:*`        | renderer ↔ main | File watch start/stop; `fs:read-file`; `fs:changed` push events                                                                |
+| Namespace     | Direction        | Description                                                                                                                          |
+| ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `terminal:*`  | renderer ↔ main | PTY lifecycle: create, close, input, output, resize, cleanup                                                                         |
+| `workspace:*` | renderer → main  | Workspace and project CRUD                                                                                                           |
+| `project:*`   | renderer → main  | Project CRUD (scoped under workspace)                                                                                                |
+| `settings:*`  | renderer → main  | Global and per-workspace settings                                                                                                    |
+| `dialog:*`    | renderer → main  | Native OS dialogs (folder picker)                                                                                                    |
+| `extension:*` | renderer → main  | Extension install, toggle, contribution queries                                                                                      |
+| `git:*`       | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create                                                                           |
+| `github:*`    | renderer → main  | PR review queue, diff, file metrics, inline comments, submit, session persistence, active-review tracking, prune closed/merged       |
+| `shell:exec`  | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)                                                                                  |
+| `fs:*`        | renderer ↔ main | File watch start/stop; `fs:read-file`; `fs:changed` push events                                                                      |
+| `remote:*`    | main ↔ renderer | Remote control server: `remote:status` (main→renderer), `remote:tunnel-reconnect` (renderer→main), `remote:update-password` (invoke) |
+| `log:push`    | main → renderer  | Forwards main-process log entries to renderer LogWindow                                                                              |
 
 Full channel specifications: [`specs/001-extension-first-terminal/contracts/ipc-channels.md`](../specs/001-extension-first-terminal/contracts/ipc-channels.md),
 [`specs/002-git-github-integration/contracts/ipc-channels-git.md`](../specs/002-git-github-integration/contracts/ipc-channels-git.md),
@@ -182,6 +184,8 @@ ExtensionHost.load(directoryPath)
       ├─ calls activate(api) with ExtensionAPI instance
       │        │
       │        └─ api.settings.register()           → globalRegistry.settingsSections
+      │           api.settings.get()               → getExtensionSetting(key)
+      │           api.settings.set()               → setExtensionSetting(key, value) (v1.4.0)
       │           api.sidebar.registerItem()        → globalRegistry.sidebarItems
       │           api.sidebar.registerPanel(slot)   → globalRegistry.sidebarPanels (v1.1.0)
       │           api.topBar.registerMenuItem()     → globalRegistry.topBarItems (v1.1.0)
@@ -190,18 +194,23 @@ ExtensionHost.load(directoryPath)
       │           api.notifications.showToast()     → BrowserWindow.webContents.send (v1.1.0)
       │           api.fs.watch()                    → FsWatcherService handlers (v1.1.0)
       │           api.ipc.registerHandler()         → ipcMain.handle() (v1.1.0)
+      │           api.ipc.invokeChannel()           → dispatches to a registered ipcMain handler (v1.4.0)
+      │           api.ipc.sendChannel()             → dispatches to a registered ipcMain send handler (v1.4.0)
+      │           api.ipc.onWindowEvent()           → subscribes to EventEmitter events from renderer (v1.4.0)
       │           api.commands.register()           → globalRegistry.commandContributions / commandHandlers (v1.1.0)
       │           api.contextMenu.registerItem()    → globalRegistry.contextMenuItems
       │           api.keyboard.register()           → globalRegistry.keyboardHandlers (throws on reserved)
       │           api.terminal.onSessionCreate()    → globalRegistry.sessionCreateHandlers
       │           api.sidebar.registerGlobalTab()   → globalRegistry.globalTabs (v1.2.0)
       │           api.globalShortcut.register()     → electron globalShortcut (v1.2.0)
+      │           api.pty.spawn/write/resize/kill() → PtyManager (injected via ExtensionAPIDeps, v1.4.0)
       │
       │        Note: registerWorkspaceTab() is a renderer-registry-only surface (v1.3.0).
       │        It is called from the extension's renderer.tsx, not from activate(api).
       │           registry.registerWorkspaceTab()   → registry.workspaceTabs Map
       │           api.workspace.list()              → workspace-store.listWorkspaces() (v1.2.0)
       │           api.window.openAuxiliary()        → BrowserWindow factory (v1.2.0)
+      │           api.window.broadcast()            → send channel to all BrowserWindows (v1.4.0)
       │           api.notifications.createNotification() → notificationManager (v1.2.0)
       │
       └─ errors in activate() set status: 'error', app stays stable (FR-028)
@@ -248,7 +257,7 @@ The renderer uses [Zustand](https://github.com/pmndrs/zustand) for all client-si
 
 | Store                    | State                                                                                                                               | Key actions                                                                                                       |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `workspace.store.ts`     | workspaces[], projects by workspace, active IDs                                                                                     | loadWorkspaces, createWorkspace, setActiveWorkspace                                                               |
+| `workspace.store.ts`     | workspaces[], projects by workspace, active IDs, expandedWorkspaceIds                                                               | loadWorkspaces, createWorkspace, setActiveWorkspace, toggleWorkspaceCollapse, setExpandedWorkspaceIds             |
 | `session.store.ts`       | sessions Map, terminalInstances Map, active session per project                                                                     | createSession, closeSession, setActiveSessionForProject                                                           |
 | `settings.store.ts`      | globalSettings, workspaceSettings Map, resolvedTheme                                                                                | loadSettings, updateGlobalTheme, resolveSettings                                                                  |
 | `notification.store.ts`  | notifications[], unreadCount, panelOpen                                                                                             | addNotification, markRead, markAllRead, dismiss, togglePanel                                                      |
@@ -267,6 +276,53 @@ Two distinct notification systems exist and are intentionally complementary:
 - **Native OS notification** (`notification.show` IPC, singular): fires a system-level desktop alert for immediate attention when a terminal session needs attention (bell event).
 
 When a bell event fires in a backgrounded terminal session, both systems are triggered: `window.electronAPI.notification.show` (OS) and `useNotificationStore.getState().addNotification` (in-app). This ensures the user sees the signal regardless of OS notification preferences.
+
+---
+
+## Remote Control Server
+
+When enabled via Settings → Remote Control, Terminator starts an embedded [Fastify](https://fastify.dev/) 4.x HTTP/WebSocket server bound to `127.0.0.1` (never `0.0.0.0`).
+
+```
+Remote Control Extension (extensions/remote-control/)
+│
+├── RemoteServer (Fastify 4.x, 127.0.0.1 only)
+│   ├── GET    /health                         → { ok: true }
+│   ├── GET    /api/workspaces                 → workspace list
+│   ├── GET    /api/projects?workspaceId=      → project list
+│   ├── POST   /api/terminals                  → spawn PTY, returns sessionId
+│   ├── GET    /api/terminals/:id              → session metadata
+│   ├── DELETE /api/terminals/:id              → kill PTY
+│   ├── POST   /api/terminals/:id/resize       → resize PTY
+│   ├── POST   /api/terminals/:id/ws-ticket    → single-use WS ticket (30s TTL)
+│   ├── GET    /ws/terminals/:id?ticket=       → WebSocket upgrade → PTY fan-out
+│   ├── POST   /api/bridge-ticket              → single-use bridge WS ticket
+│   ├── GET    /api/bridge?ticket=             → WebSocket IPC bridge (invoke/send/subscribe)
+│   ├── POST   /api/app-ticket                 → single-use ticket to enter /app/
+│   └── GET    /app/?t=<ticket>                → serves full Electron renderer SPA (session-cookie-gated)
+│       Static /app/*                          → 403 unless valid app-session cookie present (8h HttpOnly)
+│
+├── WsTicketStore        single-use 64-char hex tokens, 30s TTL, 60s cleanup
+├── WsSubscriberManager  per-session subscriber sets; first subscriber = primary
+│                        primary-only input, broadcast output to all
+└── NgrokManager         spawns `ngrok http <port> --web-addr 0.0.0.0:4041`, polls localhost:4041/api/tunnels
+```
+
+**Security constraints**:
+
+- Server binds to `127.0.0.1` only. External clients must reach it via ngrok or LAN (port forwarding).
+- All routes (except `/health`) require `Authorization: Bearer <password>` validated with `bcryptjs.compare()` (async, work factor 10).
+- `Host` header is checked against `localhost`, `127.0.0.1`, and the ngrok domain.
+- WebSocket upgrade requires a single-use ticket issued by `POST /api/terminals/:id/ws-ticket`; ticket is consumed on first use and expires after 30 s.
+- Input is accepted from the primary subscriber only (first WS client to connect to a session).
+- `/app/*` static assets are gated behind an `app-session` HttpOnly SameSite=Strict cookie (8h TTL) issued when a valid one-time app-ticket (`POST /api/app-ticket`) is consumed at `GET /app/`. Requests to any `/app/*` path without a valid cookie receive `403 FORBIDDEN`.
+- The IPC bridge (`GET /api/bridge`) requires a single-use bridge ticket and lets the browser invoke/send/subscribe to IPC channels on behalf of the browser-side SPA.
+
+**Browser login SPA** (`src/renderer-remote/`): A separate Vite build (`npm run build:remote`) produces `out/renderer-remote/` which Fastify serves at `/`. After password authentication the login page calls `POST /api/app-ticket` and redirects to `/app/?t=<ticket>` to load the full Electron renderer bundle.
+
+**Full Electron renderer in browser** (`out/renderer/`): Fastify also serves the regular Electron renderer bundle under `/app/`. A `remote-shim.js` script is injected into `index.html` to polyfill `window.electronAPI` — all IPC calls are forwarded over the bridge WebSocket instead of the Electron `contextBridge`.
+
+See [ADR-017](adr/017-embedded-http-remote-server.md) for the architectural decision.
 
 ---
 
@@ -320,7 +376,7 @@ Each workspace has a `color` field (hex string). The `WorkspaceCard` sets `style
 
 ### Collapse persistence
 
-`useWorkspaceStore` maintains `collapsedWorkspaceIds: Set<string>` initialized from `localStorage` key `terminator.workspace.collapsed` (JSON array). `toggleWorkspaceCollapse(id)` updates the set and writes back to localStorage. `setCollapsedWorkspaceIds(ids)` replaces the entire set (used by `⌘1–9` to expand one workspace and collapse all others).
+`useWorkspaceStore` maintains `expandedWorkspaceIds: Set<string>` initialized from `localStorage` key `terminator.workspace.expanded` (JSON array). `toggleWorkspaceCollapse(id)` updates the set and writes back to localStorage. `setExpandedWorkspaceIds(ids)` replaces the entire set (used by `⌘1–9` to expand one workspace and collapse all others).
 
 ### Resize
 

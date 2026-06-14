@@ -13,6 +13,32 @@ import { registerMetricsHandlers } from './ipc/metrics.ipc.js'
 import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
 import { logger } from './logger.js'
+import { bridgeEventBus } from './remote/bridge-event-bus.js'
+import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
+
+// Intercept ipcMain.handle/on to capture handlers into the bridge registry
+// so the remote-control extension bridge can dispatch IPC calls from browser clients.
+type IpcHandler = (event: Electron.IpcMainInvokeEvent, payload: unknown) => unknown
+type IpcSendHandler = (event: Electron.IpcMainEvent, payload: unknown) => void
+
+const _origHandle = ipcMain.handle.bind(ipcMain)
+const _origOn = ipcMain.on.bind(ipcMain)
+const _origRemoveHandler = ipcMain.removeHandler.bind(ipcMain)
+// @ts-expect-error - patch to intercept all handler registrations
+ipcMain.handle = (channel: string, fn: IpcHandler) => {
+  ipcInvokeRegistry.set(channel, fn)
+  return _origHandle(channel, fn)
+}
+// @ts-expect-error - patch to intercept fire-and-forget handlers
+ipcMain.on = (channel: string, fn: IpcSendHandler) => {
+  ipcSendRegistry.set(channel, fn)
+  return _origOn(channel, fn)
+}
+// @ts-expect-error - patch to keep bridge registry in sync when handlers are removed
+ipcMain.removeHandler = (channel: string) => {
+  ipcInvokeRegistry.delete(channel)
+  return _origRemoveHandler(channel)
+}
 
 declare module 'electron' {
   interface App {
@@ -39,6 +65,13 @@ function createWindow(): void {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] || 'http://localhost:5173')
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+
+  // Forward all main→renderer IPC push events to browser bridge clients
+  const _origSend = mainWindow.webContents.send.bind(mainWindow.webContents)
+  mainWindow.webContents.send = (channel: string, ...args: unknown[]) => {
+    _origSend(channel, ...args)
+    bridgeEventBus.emit(channel, ...args)
   }
 
   // Redirect external http(s) link clicks and window.open() calls to the system browser.
@@ -186,6 +219,16 @@ app.whenReady().then(async () => {
   registerDialogHandlers()
   registerAppHandlers()
 
+  extensionHost.setDeps({
+    ptyManager,
+    broadcastToWindows: (channel, data) => mainWindow?.webContents.send(channel, data),
+    bridge: {
+      invokeRegistry: ipcInvokeRegistry,
+      sendRegistry: ipcSendRegistry,
+      eventBus: bridgeEventBus,
+    },
+  })
+
   await extensionHost.loadAll()
   await extensionHost.loadBundledExtensions(join(__dirname, '../../extensions'))
 
@@ -205,6 +248,7 @@ app.whenReady().then(async () => {
 app.on('before-quit', async (event) => {
   event.preventDefault()
   app.isQuitting = true
+  await extensionHost.unloadAll()
   await ptyManager.killAll()
   app.exit(0)
 })

@@ -11,12 +11,15 @@ vi.mock('../../../../src/renderer/stores/settings.store', () => ({
 const mockUpdateTheme = vi.fn()
 const mockUpdateScrollback = vi.fn()
 const mockUpdateWorktreeBaseDir = vi.fn()
+const mockUpdateShowMetrics = vi.fn()
 const mockUpdateGlobal = vi.fn()
 
 const globalSettings = {
   appearance: { theme: 'dark' as const },
   terminal: { scrollbackLimit: 5000, defaultShell: '/bin/zsh' },
   git: { worktreeBaseDir: '' },
+  extensions: {},
+  ui: { hasSeenWelcome: false, showMetricsBar: false },
 }
 
 beforeEach(() => {
@@ -27,6 +30,7 @@ beforeEach(() => {
     updateGlobalTheme: mockUpdateTheme,
     updateScrollbackLimit: mockUpdateScrollback,
     updateWorktreeBaseDir: mockUpdateWorktreeBaseDir,
+    updateShowMetricsBar: mockUpdateShowMetrics,
   } as unknown as ReturnType<typeof useSettingsStore>)
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     settings: { updateGlobal: mockUpdateGlobal },
@@ -88,8 +92,7 @@ describe('GlobalSettings', () => {
 
   it('calls updateWorktreeBaseDir on blur of worktree input', () => {
     render(<GlobalSettings />)
-    const inputs = screen.getAllByRole('textbox')
-    const worktreeInput = inputs[inputs.length - 1]
+    const worktreeInput = screen.getByPlaceholderText('Leave empty to use <repo>/.worktrees')
     fireEvent.change(worktreeInput, { target: { value: '/my/worktrees' } })
     fireEvent.blur(worktreeInput)
     expect(mockUpdateWorktreeBaseDir).toHaveBeenCalledWith('/my/worktrees')
@@ -102,5 +105,17 @@ describe('GlobalSettings', () => {
     fireEvent.change(shellInput, { target: { value: '/bin/bash' } })
     fireEvent.blur(shellInput)
     expect(mockUpdateGlobal).toHaveBeenCalledWith({ terminal: { defaultShell: '/bin/bash' } })
+  })
+
+  it('calls updateShowMetricsBar when metrics bar checkbox is toggled', () => {
+    render(<GlobalSettings />)
+    const checkbox = screen.getByRole('checkbox', { name: /show cpu/i })
+    fireEvent.click(checkbox)
+    expect(mockUpdateShowMetrics).toHaveBeenCalledWith(true)
+  })
+
+  it('renders the worktree base directory hint', () => {
+    render(<GlobalSettings />)
+    expect(screen.getByText(/where new git worktrees are created/i)).toBeTruthy()
   })
 })

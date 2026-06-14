@@ -73,11 +73,11 @@ One option, clearly named. Two to four sentences: what to pick, why, and what th
 
 ### 8. Open Questions _(optional)_
 
-Bulleted list of questions this research could not resolve. Each is a candidate for `/forge.clarify`. Only include if genuine gaps exist.
+Bulleted list of questions this research could not resolve. Each is a candidate for `/forge-clarify`. Only include if genuine gaps exist.
 
 ### 9. Next Steps _(optional)_
 
 Suggested follow-on commands, e.g.:
 
-- `/forge.tasks NNN — decompose into implementation tasks`
-- `/forge.clarify NNN — resolve the open questions above`
+- `/forge-tasks NNN — decompose into implementation tasks`
+- `/forge-clarify NNN — resolve the open questions above`

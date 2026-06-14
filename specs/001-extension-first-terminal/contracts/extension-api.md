@@ -1,7 +1,7 @@
 # Contract: Extension API
 
-**Version**: 1.3.0  
-**Date**: 2026-06-13  
+**Version**: 1.4.0  
+**Date**: 2026-06-14  
 **Branch**: `001-extension-first-terminal`
 
 This is the public API surface exposed to all Terminator extensions. Extensions receive an `ExtensionAPI` object as the sole argument to their `activate()` function. They MUST NOT import from `src/main/` or any internal module directly.
@@ -16,6 +16,7 @@ This is the public API surface exposed to all Terminator extensions. Extensions 
 | 1.1.0   | Added: `sidebar.registerPanel`, `topBar`, `shell`, `notifications.showToast`, `nativeMenu`, `fs`, `ipc`, `commands`      |
 | 1.2.0   | Added: `sidebar.registerGlobalTab`, `globalShortcut`, `workspace`, `window`, `notifications.createNotification`          |
 | 1.3.0   | Added: `sidebar.registerWorkspaceTab`, `WorkspaceTabRegistration`, `activeWorkspaceTabId` state on the renderer registry |
+| 1.4.0   | Added: `settings.set`, `ipc.invokeChannel`, `ipc.sendChannel`, `ipc.onWindowEvent`, `pty` namespace, `window.broadcast`  |
 
 ---
 
@@ -75,6 +76,12 @@ interface ExtensionAPI {
      * Respects workspace-level overrides when called in workspace context.
      */
     get<T>(key: string): T | undefined
+
+    /**
+     * _(v1.4.0)_ Persist a value for an extension-contributed setting key.
+     * Written to extension-settings-store; readable by all instances of this extension.
+     */
+    set(key: string, value: unknown): void
   }
 
   /**
@@ -212,13 +219,31 @@ interface ExtensionAPI {
   }
 
   /**
-   * _(v1.1.0)_ Custom IPC channel registration.
+   * _(v1.1.0)_ Custom IPC channel registration and dispatch.
    */
   ipc: {
     registerHandler(
       channel: string,
       handler: (payload: unknown) => Promise<unknown> | unknown
     ): Disposable
+
+    /**
+     * _(v1.4.0)_ Invoke a registered ipcMain handler from the main process
+     * (bypasses the Electron IPC pipe — for use by extensions running in main).
+     */
+    invokeChannel(channel: string, payload: unknown): Promise<unknown>
+
+    /**
+     * _(v1.4.0)_ Dispatch to a registered ipcMain send-type handler
+     * (bypasses the Electron IPC pipe — for use by extensions running in main).
+     */
+    sendChannel(channel: string, payload: unknown): void
+
+    /**
+     * _(v1.4.0)_ Subscribe to events forwarded from renderer windows via the
+     * main-process EventEmitter bridge. Returns an unsubscribe function.
+     */
+    onWindowEvent(channel: string, handler: (...args: unknown[]) => void): () => void
   }
 
   /**
@@ -239,10 +264,37 @@ interface ExtensionAPI {
   }
 
   /**
+   * _(v1.4.0)_ Direct PTY access for extensions that need to spawn/control
+   * terminal processes (e.g. the remote-control extension). Requires that
+   * PtyManagerAPI is injected via ExtensionAPIDeps at host construction time.
+   * Throws if ptyManager is not available in the current context.
+   */
+  pty: {
+    spawn(
+      sessionId: string,
+      cwd: string,
+      shell: string,
+      type: 'human' | 'agent',
+      onData: (data: string) => void,
+      onExit: (exitCode: number) => void
+    ): string
+    write(sessionId: string, data: string): void
+    resize(sessionId: string, cols: number, rows: number): void
+    kill(sessionId: string): void
+  }
+
+  /**
    * _(v1.2.0)_ Auxiliary window management.
    */
   window: {
     openAuxiliary(view: string, params?: Record<string, string>): void
+
+    /**
+     * _(v1.4.0)_ Send an IPC channel message to all open BrowserWindows.
+     * Falls back to BrowserWindow.getAllWindows() when broadcastToWindows dep
+     * is not injected.
+     */
+    broadcast(channel: string, data: unknown): void
   }
 }
 ```
@@ -432,4 +484,4 @@ interface ProjectSnapshot {
 
 4. **Settings key namespacing**: Extension setting keys must be prefixed with the extension ID to avoid collisions (enforced by the host at registration time).
 
-5. **API versioning**: The `ExtensionAPI` interface follows semantic versioning. Breaking changes require a MAJOR version bump and a new ADR. The current version is `1.3.0` (renderer registry). The main-process `ExtensionAPI` remains at `1.2.0` — `registerWorkspaceTab` is a renderer-registry-only surface, not exposed via `activate(api)`.
+5. **API versioning**: The `ExtensionAPI` interface follows semantic versioning. Breaking changes require a MAJOR version bump and a new ADR. The current version is `1.4.0` (added `settings.set`, `ipc.invokeChannel/sendChannel/onWindowEvent`, `pty` namespace, `window.broadcast`). The renderer-registry surface remains at `1.3.0` — `registerWorkspaceTab` is a renderer-registry-only surface, not exposed via `activate(api)`.

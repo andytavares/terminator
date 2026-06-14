@@ -1,8 +1,8 @@
 <!-- SPECKIT START -->
 
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan at
-`specs/008-a3-color-band-sidebar/plan.md`
+shell commands, and other important information, read the current plan:
+`specs/009-remote-control-browser/plan.md`
 
 <!-- SPECKIT END -->
 

@@ -22,7 +22,7 @@ function captureHandler(channel: string): (event: unknown, payload?: unknown) =>
   return match[1] as (event: unknown, payload?: unknown) => unknown
 }
 
-describe('settings IPC handlers', () => {
+describe('settings IPC handlers (no callback)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     registerSettingsHandlers()

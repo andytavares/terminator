@@ -191,6 +191,33 @@ describe('useSettingsStore', () => {
     })
   })
 
+  describe('markWelcomeSeen', () => {
+    it('calls updateGlobal with hasSeenWelcome true', async () => {
+      const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: true } }
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+      await useSettingsStore.getState().markWelcomeSeen()
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        ui: { hasSeenWelcome: true },
+      })
+      expect(useSettingsStore.getState().globalSettings).toEqual(updated)
+    })
+  })
+
+  describe('updateWorkspaceScrollback', () => {
+    it('calls updateWorkspace with scrollbackLimit and updates workspace settings', async () => {
+      const wsSettings = { overrides: { terminal: { scrollbackLimit: 3000 } } }
+      mockElectronAPI.settings.updateWorkspace.mockResolvedValue({ settings: wsSettings })
+
+      await useSettingsStore.getState().updateWorkspaceScrollback('ws-1', 3000)
+      expect(mockElectronAPI.settings.updateWorkspace).toHaveBeenCalledWith('ws-1', {
+        terminal: { scrollbackLimit: 3000 },
+      })
+      const stored = useSettingsStore.getState().workspaceSettings.get('ws-1')
+      expect(stored).toEqual(wsSettings)
+    })
+  })
+
   describe('updateShowMetricsBar', () => {
     it('calls updateGlobal with showMetricsBar true and updates store', async () => {
       const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: false, showMetricsBar: true } }

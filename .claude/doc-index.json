@@ -19,9 +19,11 @@
         "extensions/task-vault/src/vault/ensure-next-occurrence.ts",
         "extensions/task-vault/src/ipc/vault.ipc.ts",
         "extensions/task-vault/src/notifications/task-scheduler.ts",
-        "extensions/task-vault/src/vault/types.ts"
+        "extensions/task-vault/src/vault/types.ts",
+        "extensions/remote-control/src/server/remote-server.ts",
+        "extensions/remote-control/src/server/routes/bridge.route.ts"
       ],
-      "last_verified_commit": "3885875",
+      "last_verified_commit": "3db5814",
       "staleness_score": 0
     },
     {
@@ -37,32 +39,31 @@
         "extensions/git-integration/src/index.ts",
         "extensions/git-integration/src/renderer.tsx"
       ],
-      "last_verified_commit": "3885875",
+      "last_verified_commit": "3db5814",
       "staleness_score": 0
     },
     {
       "path": "extensions/task-vault/README.md",
       "title": "Task Vault Extension README",
-      "summary": "Feature list, MCP server setup, available tools, auto-execute toggles, task ID format.",
+      "summary": "Feature list, recurring tasks, task ID format (UUID, stable, STALE_ID on miss). MCP sidecar has been removed.",
       "owners": [],
       "referenced_code_paths": [
-        "extensions/task-vault/src/mcp/server.ts",
         "extensions/task-vault/src/vault/types.ts",
         "extensions/task-vault/src/ipc/vault.ipc.ts"
       ],
-      "last_verified_commit": "148e9f1",
+      "last_verified_commit": "3db5814",
       "staleness_score": 0
     },
     {
       "path": "specs/001-extension-first-terminal/contracts/extension-api.md",
       "title": "Extension API Contract",
-      "summary": "Full surface of ExtensionAPI passed to activate(api) — all namespaces, method signatures, and version annotations. Also documents renderer-registry-only surfaces (WorkspaceTabRegistration, registerWorkspaceTab, activeWorkspaceTabId) added in v1.3.0.",
+      "summary": "Full surface of ExtensionAPI passed to activate(api) — all namespaces, method signatures, and version annotations. Also documents renderer-registry-only surfaces (WorkspaceTabRegistration, registerWorkspaceTab, activeWorkspaceTabId) added in v1.3.0. v1.4.0 adds settings.set, ipc.invokeChannel/sendChannel/onWindowEvent, pty namespace, window.broadcast.",
       "owners": [],
       "referenced_code_paths": [
         "src/main/extensions/api.ts",
         "src/renderer/extensions/registry.ts"
       ],
-      "last_verified_commit": "3885875",
+      "last_verified_commit": "3db5814",
       "staleness_score": 0
     },
     {
@@ -71,7 +72,7 @@
       "summary": "Core IPC channel specifications: terminal:*, workspace:*, project:*, settings:*, dialog:*, extension:*, fs:*, notification.*.",
       "owners": [],
       "referenced_code_paths": ["src/main/preload.ts", "src/renderer/electron.d.ts"],
-      "last_verified_commit": "148e9f1",
+      "last_verified_commit": "3db5814",
       "staleness_score": 0
     },
     {
@@ -86,7 +87,7 @@
         "scripts/create-extension.cjs",
         "extensions/git-integration/src/renderer.tsx"
       ],
-      "last_verified_commit": "3885875",
+      "last_verified_commit": "3db5814",
       "staleness_score": 0
     },
     {
@@ -95,7 +96,7 @@
       "summary": "Development workflow, npm scripts, test coverage requirements, PR checklist.",
       "owners": [],
       "referenced_code_paths": ["package.json"],
-      "last_verified_commit": "148e9f1",
+      "last_verified_commit": "3db5814",
       "staleness_score": 0
     },
     {
@@ -110,7 +111,21 @@
         "extensions/task-vault/src/vault/ensure-next-occurrence.ts",
         "extensions/task-vault/src/ipc/vault.ipc.ts"
       ],
-      "last_verified_commit": "148e9f1",
+      "last_verified_commit": "3db5814",
+      "staleness_score": 0
+    },
+    {
+      "path": "docs/adr/017-embedded-http-remote-server.md",
+      "title": "ADR-017: Embedded HTTP Server for Remote Browser Access",
+      "summary": "Decision to embed Fastify HTTP+WebSocket server in Electron main process (via remote-control extension). Binds to 127.0.0.1 only, exposed via ngrok. Covers security constraints and test coverage requirement.",
+      "owners": [],
+      "referenced_code_paths": [
+        "extensions/remote-control/src/server/remote-server.ts",
+        "extensions/remote-control/src/index.ts",
+        "src/main/extensions/extension-host.ts",
+        "src/main/index.ts"
+      ],
+      "last_verified_commit": "3db5814",
       "staleness_score": 0
     }
   ]

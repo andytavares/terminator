@@ -104,6 +104,26 @@ export interface ProjectSnapshot {
   readonly name: string
 }
 
+export interface PtyManagerAPI {
+  spawn(
+    sessionId: string,
+    cwd: string,
+    shell: string,
+    type: 'human' | 'agent',
+    onData: (data: string) => void,
+    onExit: (exitCode: number) => void
+  ): string
+  write(sessionId: string, data: string): void
+  resize(sessionId: string, cols: number, rows: number): void
+  kill(sessionId: string): void
+}
+
+export interface BridgeDeps {
+  invokeRegistry: Map<string, (event: never, payload: unknown) => unknown>
+  sendRegistry: Map<string, (event: never, payload: unknown) => void>
+  eventBus: import('events').EventEmitter
+}
+
 export interface ExtensionAPI {
   readonly app: { readonly version: string }
   log: {
@@ -115,6 +135,7 @@ export interface ExtensionAPI {
   settings: {
     register(schema: ExtensionSettingsSchema): Disposable
     get<T>(key: string): T | undefined
+    set(key: string, value: unknown): void
   }
   sidebar: {
     registerItem(item: SidebarContribution): Disposable
@@ -170,13 +191,18 @@ export interface ExtensionAPI {
       channel: string,
       handler: (payload: unknown) => Promise<unknown> | unknown
     ): Disposable
+    invokeChannel(channel: string, payload: unknown): Promise<unknown>
+    sendChannel(channel: string, payload: unknown): void
+    onWindowEvent(channel: string, handler: (...args: unknown[]) => void): () => void
   }
   terminal: {
     onSessionCreate(handler: (session: Readonly<SessionSnapshot>) => void): Disposable
     onSessionClose(handler: (sessionId: string) => void): Disposable
   }
+  pty: PtyManagerAPI
   window: {
     openAuxiliary(view: string, params?: Record<string, string>): void
+    broadcast(channel: string, data: unknown): void
   }
 }
 
@@ -192,7 +218,7 @@ import { join } from 'path'
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
 import { fsWatcherService } from '../fs/fs-watcher.js'
 import { notificationManager } from '../notifications/notification-manager.js'
-import { getExtensionSetting } from '../storage/extension-settings-store.js'
+import { getExtensionSetting, setExtensionSetting } from '../storage/extension-settings-store.js'
 import { makeLogger } from '../logger.js'
 import {
   listWorkspaces,
@@ -271,10 +297,16 @@ function rebuildViewMenu(): void {
 // Map from view name to open auxiliary BrowserWindow (shared across all extensions)
 const auxiliaryWindows = new Map<string, BrowserWindow>()
 
+export interface ExtensionAPIDeps {
+  ptyManager?: PtyManagerAPI
+  broadcastToWindows?: (channel: string, data: unknown) => void
+  bridge?: BridgeDeps
+}
+
 export function createExtensionAPI(
   extensionId: string,
   appVersion: string,
-  _getActiveWorkspaceId?: () => string | undefined
+  deps?: ExtensionAPIDeps
 ): ExtensionAPI {
   const disposables: Disposable[] = []
 
@@ -305,6 +337,9 @@ export function createExtensionAPI(
           return schema.properties[key].default as T
         }
         return undefined
+      },
+      set(key: string, value: unknown): void {
+        setExtensionSetting(key, value)
       },
     },
     sidebar: {
@@ -463,6 +498,19 @@ export function createExtensionAPI(
         ipcMain.handle(channel, (_event, payload) => handler(payload))
         return disposable(() => ipcMain.removeHandler(channel))
       },
+      async invokeChannel(channel: string, payload: unknown): Promise<unknown> {
+        const handler = deps?.bridge?.invokeRegistry.get(channel)
+        if (!handler) return undefined
+        return handler(null as never, payload)
+      },
+      sendChannel(channel: string, payload: unknown): void {
+        const handler = deps?.bridge?.sendRegistry.get(channel)
+        if (handler) handler(null as never, payload)
+      },
+      onWindowEvent(channel: string, handler: (...args: unknown[]) => void): () => void {
+        deps?.bridge?.eventBus.on(channel, handler)
+        return () => deps?.bridge?.eventBus.off(channel, handler)
+      },
     },
     terminal: {
       onSessionCreate(handler: (session: Readonly<SessionSnapshot>) => void): Disposable {
@@ -472,6 +520,21 @@ export function createExtensionAPI(
       onSessionClose(handler: (sessionId: string) => void): Disposable {
         globalRegistry.sessionCloseHandlers.add(handler)
         return disposable(() => globalRegistry.sessionCloseHandlers.delete(handler))
+      },
+    },
+    pty: {
+      spawn(sessionId, cwd, shell, type, onData, onExit) {
+        if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
+        return deps.ptyManager.spawn(sessionId, cwd, shell, type, onData, onExit)
+      },
+      write(sessionId, data) {
+        deps?.ptyManager?.write(sessionId, data)
+      },
+      resize(sessionId, cols, rows) {
+        deps?.ptyManager?.resize(sessionId, cols, rows)
+      },
+      kill(sessionId) {
+        deps?.ptyManager?.kill(sessionId)
       },
     },
     window: {
@@ -500,6 +563,15 @@ export function createExtensionAPI(
           win.loadURL(`${devUrl}?${new URLSearchParams(query).toString()}`)
         } else {
           win.loadFile(join(__dirname, '../renderer/index.html'), { query })
+        }
+      },
+      broadcast(channel: string, data: unknown): void {
+        if (deps?.broadcastToWindows) {
+          deps.broadcastToWindows(channel, data)
+        } else {
+          for (const win of BrowserWindow.getAllWindows()) {
+            if (!win.isDestroyed()) win.webContents.send(channel, data)
+          }
         }
       },
     },

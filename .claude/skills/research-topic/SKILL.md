@@ -80,7 +80,7 @@ Rules:
 - Every external claim: `Source: <Title> — <URL>` + `Quote: "<verbatim>"` on the next line.
 - Every codebase claim: `file:line` citation inline.
 - Recommendation section must name exactly one option and reference at least one finding from Phase 2.
-- Open Questions section lists anything this research could not resolve — each is a candidate for `/forge.clarify`.
-- Next Steps section may suggest follow-on commands (e.g. `/forge.tasks NNN`).
+- Open Questions section lists anything this research could not resolve — each is a candidate for `/forge-clarify`.
+- Next Steps section may suggest follow-on commands (e.g. `/forge-tasks NNN`).
 
 Write the assembled document to the path specified by the calling command (default: `.forge/NNN-slug/research.md`).

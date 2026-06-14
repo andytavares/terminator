@@ -1243,3 +1243,88 @@ Sent from main to all renderer windows when a new notification is created via `n
 **Direction**: main → renderer (webContents.send)
 
 **Payload**: `SerializedNotification`
+
+---
+
+## Remote Control Channels
+
+### `remote:status`
+
+Sent from main to renderer when the remote control server state changes (start, stop, URL update, error).
+
+**Direction**: main → renderer (webContents.send via `extensionBridge.on`)
+
+**Payload**:
+
+```typescript
+{
+  enabled?: boolean
+  port?: number
+  publicUrl?: string | null
+  lanUrl?: string | null
+  ngrokInstalled?: boolean
+  error?: 'PORT_IN_USE' | string
+  message?: string
+}
+```
+
+---
+
+### `log:push`
+
+Pushes a log entry from the main process into the renderer's LogWindow.
+
+**Direction**: main → renderer (webContents.send via `extensionBridge.on`)
+
+**Payload**: `{ level: 'info' | 'warn' | 'error'; message: string }`
+
+---
+
+### `remote:tunnel-disconnected`
+
+Pushed from main to renderer when the ngrok process exits unexpectedly (crash, not intentional stop).
+
+**Direction**: main → renderer (webContents.send via `extensionBridge.on`)
+
+**Payload**: none
+
+---
+
+### `remote:tunnel-reconnect`
+
+Sent from renderer to main to trigger ngrok tunnel reconnection.
+
+**Direction**: renderer → main (ipcMain.on / one-way)
+
+**Payload**: none
+
+---
+
+### `remote:caddyfile`
+
+Returns a Caddyfile snippet for a local HTTPS reverse-proxy in front of the remote control server. The returned config uses the machine's first non-loopback IPv4 address as the hostname (falls back to `localhost`).
+
+**Direction**: renderer → main (invoke/handle via `extensionBridge.invoke`)
+
+**Request**: `{ port: number }`
+
+**Response**: `string` — a ready-to-paste Caddyfile block, e.g.:
+
+```
+192.168.1.100 {
+  reverse_proxy localhost:7681
+  tls internal
+}
+```
+
+---
+
+### `remote:update-password`
+
+Requests a new password hash to be generated and saved; optionally rotates the plaintext password.
+
+**Direction**: renderer → main (invoke/handle via `extensionBridge.invoke`)
+
+**Request**: `{ password: string }` — pass empty string to auto-generate a new password
+
+**Response**: `{ password: string } | { error: string }`

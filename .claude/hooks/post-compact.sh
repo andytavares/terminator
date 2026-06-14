@@ -12,12 +12,12 @@ CONSTITUTION="$ROOT/.forge/constitution.md"
 if [ -f "$CONSTITUTION" ]; then
   CHAR_COUNT=$(wc -m < "$CONSTITUTION" | tr -d ' ')
   if [ "$CHAR_COUNT" -gt 2000 ]; then
-    echo "PostCompact: constitution is ${CHAR_COUNT} characters (limit 2000) — skipping injection. Run /forge.constitution to trim it." >&2
+    echo "PostCompact: constitution is ${CHAR_COUNT} characters (limit 2000) — skipping injection. Run /forge-constitution to trim it." >&2
   else
     CONTENT=$(cat "$CONSTITUTION")
     jq -n --arg c "$CONTENT" \
       '{ hookSpecificOutput: { hookEventName: "PostCompact", additionalContext: $c } }'
   fi
 else
-  echo "PostCompact: no project constitution found — run /forge.constitution to create one" >&2
+  echo "PostCompact: no project constitution found — run /forge-constitution to create one" >&2
 fi

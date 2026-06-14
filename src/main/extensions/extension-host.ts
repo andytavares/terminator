@@ -4,7 +4,12 @@ import { app } from 'electron'
 import Store from 'electron-store'
 import type { Extension } from '../../shared/types/index.js'
 import { ExtensionManifestSchema } from '../../shared/schemas/extension.schema.js'
-import { createExtensionAPI, globalRegistry, type Disposable } from './api.js'
+import {
+  createExtensionAPI,
+  globalRegistry,
+  type Disposable,
+  type ExtensionAPIDeps,
+} from './api.js'
 import { makeLogger } from '../logger.js'
 
 const hostLogger = makeLogger('extension-host')
@@ -30,6 +35,11 @@ interface LoadedExtension {
 
 export class ExtensionHost {
   private loaded = new Map<string, LoadedExtension>()
+  private deps: ExtensionAPIDeps = {}
+
+  setDeps(deps: ExtensionAPIDeps): void {
+    this.deps = deps
+  }
 
   async load(
     directoryPath: string
@@ -173,6 +183,12 @@ export class ExtensionHost {
     return ext
   }
 
+  async unloadAll(): Promise<void> {
+    for (const id of [...this.loaded.keys()]) {
+      await this.unload(id)
+    }
+  }
+
   listExtensions(): Extension[] {
     return store.get('extensions').map(({ directoryPath: _dp, ...ext }) => ext)
   }
@@ -225,7 +241,7 @@ export class ExtensionHost {
         activate?: (api: unknown) => void | Promise<void>
         deactivate?: () => void | Promise<void>
       }
-      const api = createExtensionAPI(record.id, app.getVersion())
+      const api = createExtensionAPI(record.id, app.getVersion(), this.deps)
       await mod.activate?.(api)
       this.loaded.set(record.id, { record, disposables: [], module: mod })
       return { ok: true }

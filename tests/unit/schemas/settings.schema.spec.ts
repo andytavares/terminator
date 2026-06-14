@@ -150,6 +150,26 @@ describe('GlobalSettingsSchema', () => {
   })
 })
 
+describe('DEFAULT_GLOBAL_SETTINGS', () => {
+  it('uses process.env.SHELL when set', async () => {
+    const origShell = process.env.SHELL
+    process.env.SHELL = '/bin/fish'
+    vi.resetModules()
+    const { DEFAULT_GLOBAL_SETTINGS } = await import('../../../src/shared/schemas/settings.schema')
+    expect(DEFAULT_GLOBAL_SETTINGS.terminal.defaultShell).toBe('/bin/fish')
+    process.env.SHELL = origShell
+  })
+
+  it('falls back to /bin/zsh when SHELL is not set', async () => {
+    const origShell = process.env.SHELL
+    delete process.env.SHELL
+    vi.resetModules()
+    const { DEFAULT_GLOBAL_SETTINGS } = await import('../../../src/shared/schemas/settings.schema')
+    expect(DEFAULT_GLOBAL_SETTINGS.terminal.defaultShell).toBe('/bin/zsh')
+    process.env.SHELL = origShell
+  })
+})
+
 describe('WorkspaceSettingsSchema', () => {
   const validWorkspace = {
     workspaceId: '550e8400-e29b-41d4-a716-446655440000',
