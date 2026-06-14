@@ -159,6 +159,7 @@ export function activate(api: ExtensionAPI): void {
     } catch (err) {
       remoteServer = null
       if (err instanceof PortInUseError) return
+      api.settings.set(KEY.enabled, false)
       api.window.broadcast('remote:status', { enabled: false, error: 'START_FAILED' })
     }
   }
