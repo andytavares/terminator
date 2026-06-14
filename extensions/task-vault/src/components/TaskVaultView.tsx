@@ -3,6 +3,7 @@ import { X, Settings, Download, Upload, Kanban, List, ChevronDown } from 'lucide
 import { createPortal } from 'react-dom'
 import './task-vault.css'
 import { notify } from '../utils/notify'
+import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { useVaultStore } from '../stores/vault.store'
 import { useVaultNavStore } from '../stores/vault-nav.store'
 import { useVaultDataStore } from '../stores/vault-data.store'
@@ -271,6 +272,7 @@ export function TaskVaultView(): React.JSX.Element {
     setKanbanLanes,
     tickCalendar,
   } = useVaultStore()
+  const { addToast } = useToastStore()
   const [showDataTools, setShowDataTools] = useState(false)
   const [availableContexts, setAvailableContexts] = useState<string[]>([])
   const [contextMenuOpen, setContextMenuOpen] = useState(false)
@@ -393,7 +395,13 @@ export function TaskVaultView(): React.JSX.Element {
   }
 
   async function handleComplete(taskId: string) {
+    const taskText = (todayLog?.tasks ?? []).find((t) => t.id === taskId)?.text ?? ''
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', { taskId })
+    addToast({
+      type: 'success',
+      message: taskText ? `Completed: ${taskText}` : 'Task completed',
+      onClick: makeTaskNavHandler(taskId),
+    })
     if (viewingDate) await loadDate(viewingDate)
     else await loadToday()
   }

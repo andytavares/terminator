@@ -358,7 +358,6 @@ export function registerVaultIpcHandlers(): () => void {
       if (Notification.isSupported()) {
         new Notification({ title: 'Task completed', body: taskText, silent: true }).show()
       }
-      broadcast('extension:toast', { type: 'success', message: `Completed: ${taskText}` })
       broadcast('task-vault:push:index-updated', {})
       return { success: true }
     } catch (err) {
