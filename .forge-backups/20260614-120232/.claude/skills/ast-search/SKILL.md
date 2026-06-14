@@ -13,7 +13,7 @@ Read `.claude/stack.json` and check the `ast_search_tool` key before running.
 
 - If `ast_search_tool` is `"ast-grep"`: use `ast-grep` commands.
 - If `ast_search_tool` is `"semgrep"`: use `semgrep` commands.
-- If `ast_search_tool` is `null`: inform the caller that no AST search tool is available. Suggest `brew install ast-grep` or `pip install semgrep`, then re-run `/forge-detect-stack`.
+- If `ast_search_tool` is `null`: inform the caller that no AST search tool is available. Suggest `brew install ast-grep` or `pip install semgrep`, then re-run `/forge.detect-stack`.
 
 Do not attempt to install the tool. Do not fall back to ripgrep — the caller already ran a text pass.
 

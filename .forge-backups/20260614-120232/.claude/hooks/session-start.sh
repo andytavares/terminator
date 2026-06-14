@@ -13,7 +13,7 @@ echo "branch: $(git -C "$ROOT" branch --show-current 2>/dev/null || echo n/a)"
 # Re-detect stack if missing or stale (>7 days)
 STACK="$ROOT/.claude/stack.json"
 if [ ! -f "$STACK" ] || [ "$(find "$STACK" -mtime +7 2>/dev/null)" ]; then
-  echo "stack.json missing or stale — run /forge-detect-stack to refresh"
+  echo "stack.json missing or stale — run /forge.detect-stack to refresh"
 else
   echo "stack: $(jq -r '.languages | join(",")' < "$STACK" 2>/dev/null || echo 'unparseable')"
   echo "test:  $(jq -r '.test.command // "n/a"' < "$STACK" 2>/dev/null)"
@@ -38,12 +38,12 @@ CONSTITUTION="$ROOT/.forge/constitution.md"
 if [ -f "$CONSTITUTION" ]; then
   CHAR_COUNT=$(wc -m < "$CONSTITUTION" | tr -d ' ')
   if [ "$CHAR_COUNT" -gt 2000 ]; then
-    echo "constitution: WARNING — .forge/constitution.md is ${CHAR_COUNT} characters (limit 2000). Trim it or Claude will not see it. Run /forge-constitution to edit."
+    echo "constitution: WARNING — .forge/constitution.md is ${CHAR_COUNT} characters (limit 2000). Trim it or Claude will not see it. Run /forge.constitution to edit."
   else
     echo "=== project-constitution ==="
     cat "$CONSTITUTION"
     echo "=== end project-constitution ==="
   fi
 else
-  echo "constitution: not found — run /forge-constitution to create one"
+  echo "constitution: not found — run /forge.constitution to create one"
 fi

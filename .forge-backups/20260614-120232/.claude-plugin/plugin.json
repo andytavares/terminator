@@ -1,0 +1,7 @@
+{
+  "name": "forge",
+  "version": "0.1.0",
+  "description": "Forge — a cookiecutter Claude Code harness for large multi-language codebases. Includes TDD enforcement, canonical-source guarding, find-reuse checks, and doc-sync subagents.",
+  "author": "your-org",
+  "license": "MIT"
+}

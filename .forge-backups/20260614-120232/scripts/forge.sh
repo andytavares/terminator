@@ -221,7 +221,7 @@ cmd_install() {
   say "${BOLD}Next steps:${NC}"
   say "  1. Edit ${target}/CLAUDE.md — replace {{REPO_NAME}} and {{LANGUAGES}}"
   say "  2. Review ${target}/.mcp.json — uncomment the MCP servers your team uses"
-  say "  3. Run: cd ${target} && claude  →  try /forge-detect-stack, /forge-ask, /forge-tdd, /forge-review"
+  say "  3. Run: cd ${target} && claude  →  try /forge.detect-stack, /forge.ask, /forge.tdd, /forge.review"
 }
 
 cmd_update() {

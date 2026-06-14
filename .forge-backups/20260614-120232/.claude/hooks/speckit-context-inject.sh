@@ -21,7 +21,7 @@ if [ -f "$STACK_FILE" ]; then
   AST_TOOL=$(jq -r '.ast_search_tool // "not installed"' "$STACK_FILE" 2>/dev/null || echo "unknown")
   STACK_SUMMARY="Stack: $LANGS | ast-search: $AST_TOOL"
 else
-  STACK_SUMMARY="Stack: unknown (run /forge-detect-stack)"
+  STACK_SUMMARY="Stack: unknown (run /forge.detect-stack)"
 fi
 
 # Count stale docs
