@@ -1,0 +1,25 @@
+package.json
+  s_b924fed75606c0::t_0415bf4ac34ea3 24
+extensions/remote-control/tests/unit/remote-server.spec.ts
+  s_b924fed75606c0::t_c1470378badb5d 243-262
+tests/unit/extensions/ext-git-service.spec.ts
+  s_b924fed75606c0::t_f75000facb4832 188-198
+.github/workflows/ci.yml
+  s_b924fed75606c0::t_6c316f0ddbc75a 105,112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "ed844d7590b29c39ef980936b0f535f1270bb305",
+  "prompts": {},
+  "sessions": {
+    "s_b924fed75606c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fed56da4-0b77-4421-addd-e4e4a908a987",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
