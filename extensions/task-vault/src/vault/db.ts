@@ -8,17 +8,14 @@ export { randomUUID }
 
 let _db: Database.Database | null = null
 
-export function initDb(vaultPath: string): Database.Database {
-  const dbDir = path.join(vaultPath, '.todo')
-  fs.mkdirSync(dbDir, { recursive: true })
-  const dbPath = path.join(dbDir, 'vault.db')
+export function initDb(userData: string): Database.Database {
+  fs.mkdirSync(userData, { recursive: true })
+  const dbPath = path.join(userData, 'vault.db')
   _db = new Database(dbPath)
   _db.pragma('journal_mode = WAL')
   _db.pragma('foreign_keys = ON')
   applySchema(_db)
   applyMigrations(_db)
-  // One-time: migrate kanban.json to settings table
-  migrateKanbanJsonToDb(_db, vaultPath)
   // Startup gap-fill: create any missing future occurrences for recurring tasks
   try {
     backfillRecurringTasks(_db)
@@ -157,29 +154,6 @@ function migrateRecurrenceMetadata(db: Database.Database): void {
     }
   })
   migrate()
-}
-
-function migrateKanbanJsonToDb(db: Database.Database, vaultPath: string): void {
-  const kanbanJsonPath = path.join(vaultPath, '.todo', 'kanban.json')
-  if (!fs.existsSync(kanbanJsonPath)) return
-  // Only migrate if settings table has no kanban_config yet
-  const existing = db.prepare(`SELECT value FROM settings WHERE key='kanban_config'`).get()
-  if (existing) {
-    // Already migrated — remove the old file
-    try {
-      fs.unlinkSync(kanbanJsonPath)
-    } catch {
-      // ignore
-    }
-    return
-  }
-  try {
-    const raw = fs.readFileSync(kanbanJsonPath, 'utf-8')
-    db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('kanban_config', ?)`).run(raw)
-    fs.unlinkSync(kanbanJsonPath)
-  } catch {
-    // Non-fatal: migration is best-effort
-  }
 }
 
 function migrateMetadataToColumns(db: Database.Database): void {

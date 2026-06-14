@@ -1,6 +1,10 @@
 import { spawn, execSync, type ChildProcess } from 'child_process'
 import { networkInterfaces } from 'os'
 
+// Packaged Electron apps launch without the user's shell, so Homebrew paths are absent.
+const EXTRA_PATH = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'].join(':')
+const EXTENDED_ENV = { ...process.env, PATH: `${EXTRA_PATH}:${process.env.PATH ?? ''}` }
+
 const POLL_INTERVAL_MS = 500
 const MAX_POLLS = 60
 
@@ -30,7 +34,7 @@ export class NgrokManager {
 
   static isInstalled(): boolean {
     try {
-      execSync('which ngrok', { stdio: 'ignore' })
+      execSync('which ngrok', { stdio: 'ignore', env: EXTENDED_ENV })
       return true
     } catch {
       return false
@@ -45,7 +49,7 @@ export class NgrokManager {
     this.stopped = false
     const args = ['http', String(port)]
     if (authToken) args.push('--authtoken', authToken)
-    this.process = spawn('ngrok', args, { detached: false })
+    this.process = spawn('ngrok', args, { detached: false, env: EXTENDED_ENV })
 
     const outputLines: string[] = []
     this.process.stdout?.on('data', (chunk: Buffer) => {

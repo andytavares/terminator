@@ -1,13 +1,10 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, app } from 'electron'
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import { DEFAULT_CAPTURE_HOTKEY } from './constants.js'
-import { registerVaultIpcHandlers, setVaultPath } from './ipc/vault.ipc.js'
-import {
-  registerProjectsIpcHandlers,
-  setVaultPath as setProjectsVaultPath,
-} from './ipc/projects.ipc.js'
-import { registerLinksIpcHandlers, setVaultPath as setLinksVaultPath } from './ipc/links.ipc.js'
-import { registerKanbanIpcHandlers, setVaultPath as setKanbanVaultPath } from './ipc/kanban.ipc.js'
+import { registerVaultIpcHandlers } from './ipc/vault.ipc.js'
+import { registerProjectsIpcHandlers } from './ipc/projects.ipc.js'
+import { registerLinksIpcHandlers } from './ipc/links.ipc.js'
+import { registerKanbanIpcHandlers } from './ipc/kanban.ipc.js'
 import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
 import { initDb, closeDb } from './vault/db.js'
 import { startTaskScheduler, setSchedulerTick } from './notifications/task-scheduler.js'
@@ -20,12 +17,6 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     api.settings.register({
       label: 'Task Vault',
       properties: {
-        'terminator.task-vault.vaultPath': {
-          type: 'string',
-          label: 'Vault Path',
-          description: 'Absolute path to your vault directory',
-          default: '',
-        },
         'terminator.task-vault.staleThresholdDays': {
           type: 'number',
           label: 'Stale Project Threshold (days)',
@@ -58,8 +49,6 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     })
   )
 
-  const vaultPath = api.settings.get<string>('terminator.task-vault.vaultPath') ?? ''
-
   // Register IPC handlers first so they're always available
   const disposeIpc = registerVaultIpcHandlers()
   disposables.push({ dispose: disposeIpc })
@@ -71,30 +60,22 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   disposables.push({ dispose: disposeKanbanIpc })
   const disposeAdminIpc = registerAdminIpcHandlers()
   disposables.push({ dispose: disposeAdminIpc })
-  if (vaultPath) {
-    setVaultPath(vaultPath)
-    setProjectsVaultPath(vaultPath)
-    setLinksVaultPath(vaultPath)
-    setKanbanVaultPath(vaultPath)
 
-    try {
-      initDb(vaultPath)
-      const scheduler = startTaskScheduler(api)
-      disposables.push({ dispose: scheduler.dispose })
-      setSchedulerTick(scheduler.tick)
-    } catch (err) {
-      console.error('[task-vault] Failed to initialize SQLite DB:', err)
-    }
+  try {
+    initDb(app.getPath('userData'))
+    const scheduler = startTaskScheduler(api)
+    disposables.push({ dispose: scheduler.dispose })
+    setSchedulerTick(scheduler.tick)
+  } catch (err) {
+    console.error('[task-vault] Failed to initialize SQLite DB:', err)
   }
 
   // Weekly review nudge
-  if (vaultPath) {
-    const reviewDay = parseInt(
-      api.settings.get<string>('terminator.task-vault.weeklyReviewDay') ?? '0',
-      10
-    )
-    scheduleWeeklyReviewNudge(api, reviewDay)
-  }
+  const reviewDay = parseInt(
+    api.settings.get<string>('terminator.task-vault.weeklyReviewDay') ?? '0',
+    10
+  )
+  scheduleWeeklyReviewNudge(api, reviewDay)
 
   // Register global capture hotkey (fires even when app is minimised or in background).
   try {

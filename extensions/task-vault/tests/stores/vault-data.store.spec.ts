@@ -13,7 +13,6 @@ import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 
 function resetStores() {
   useVaultDataStore.setState({
-    vaultPath: '',
     todayLog: null,
     inboxCount: 0,
     somedayTasks: [],
@@ -37,13 +36,6 @@ function resetStores() {
 
 describe('useVaultDataStore', () => {
   beforeEach(resetStores)
-
-  describe('setVaultPath', () => {
-    it('updates vaultPath', () => {
-      useVaultDataStore.getState().setVaultPath('/my/vault')
-      expect(useVaultDataStore.getState().vaultPath).toBe('/my/vault')
-    })
-  })
 
   describe('tickCalendar', () => {
     it('increments calendarRefreshKey', () => {

@@ -3,7 +3,6 @@ import type { DailyLog, IndexedTask, KanbanLane } from '../vault/types'
 import { useVaultNavStore } from './vault-nav.store'
 
 interface VaultDataStore {
-  vaultPath: string
   todayLog: DailyLog | null
   inboxCount: number
   somedayTasks: IndexedTask[]
@@ -15,7 +14,6 @@ interface VaultDataStore {
   error: string | null
   lastRolledOver: number
   rolledOverTaskIds: string[]
-  setVaultPath: (p: string) => void
   loadToday: () => Promise<void>
   loadDate: (date: string) => Promise<void>
   refreshInboxCount: () => Promise<void>
@@ -23,7 +21,6 @@ interface VaultDataStore {
 }
 
 export const useVaultDataStore = create<VaultDataStore>((set) => ({
-  vaultPath: '',
   todayLog: null,
   inboxCount: 0,
   somedayTasks: [],
@@ -35,8 +32,6 @@ export const useVaultDataStore = create<VaultDataStore>((set) => ({
   error: null,
   lastRolledOver: 0,
   rolledOverTaskIds: [],
-
-  setVaultPath: (p: string) => set({ vaultPath: p }),
 
   loadToday: async () => {
     set({ isLoading: true, error: null })

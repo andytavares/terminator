@@ -43,9 +43,7 @@ vi.mock('../../src/notifications/task-scheduler.js', () => ({
   broadcast: vi.fn(),
 }))
 
-import { registerVaultIpcHandlers, setVaultPath, getVaultPath } from '../../src/ipc/vault.ipc'
-
-const VAULT = '/vault'
+import { registerVaultIpcHandlers } from '../../src/ipc/vault.ipc'
 
 const makeTaskRow = (overrides: Record<string, unknown> = {}) => ({
   id: 'task-1',
@@ -83,7 +81,6 @@ beforeEach(() => {
   mockGet.mockReturnValue(undefined)
   mockAll.mockReturnValue([])
   mockPrepare.mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
-  setVaultPath(VAULT)
 })
 
 // ── get-inbox ────────────────────────────────────────────────────────────────
@@ -1074,16 +1071,6 @@ describe('task-vault:vault:import-json', () => {
   })
 })
 
-// ── getVaultPath (vault.ipc) ──────────────────────────────────────────────────
-
-describe('getVaultPath (vault.ipc)', () => {
-  it('returns the vault path set via setVaultPath', () => {
-    setVaultPath('/test/vault/path')
-    expect(getVaultPath()).toBe('/test/vault/path')
-    setVaultPath(VAULT) // restore
-  })
-})
-
 // ── vault:get-task-detail ─────────────────────────────────────────────────────
 
 describe('task-vault:vault:get-task-detail', () => {
@@ -1553,5 +1540,66 @@ describe('registerVaultIpcHandlers dispose', () => {
     expect(removedChannels).toContain('task-vault:vault:set-recurrence')
     expect(removedChannels).toContain('task-vault:vault:clear-recurrence')
     expect(removedChannels).toContain('task-vault:vault:get-calendar-month')
+    expect(removedChannels).toContain('task-vault:system-notify')
+  })
+})
+
+// ── system-notify ─────────────────────────────────────────────────────────────
+
+import { broadcast } from '../../src/notifications/task-scheduler.js'
+
+describe('task-vault:system-notify', () => {
+  it('returns { ok: true } and skips Notification when isSupported is false', async () => {
+    const handler = getHandler('task-vault:system-notify')
+    const result = await handler({}, { title: 'Test', body: 'Hello' })
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('shows a native Notification when isSupported is true', async () => {
+    const { Notification: MockNotif } = await import('electron')
+    vi.mocked(MockNotif.isSupported).mockReturnValueOnce(true)
+    const handler = getHandler('task-vault:system-notify')
+    await handler({}, { title: 'Task Vault', body: 'Done' })
+    expect(MockNotif).toHaveBeenCalledWith({ title: 'Task Vault', body: 'Done', silent: true })
+    expect(mockNotification.show).toHaveBeenCalled()
+  })
+
+  it('uses default title and empty body when payload omits them', async () => {
+    const handler = getHandler('task-vault:system-notify')
+    const result = await handler({}, {})
+    expect(result).toEqual({ ok: true })
+  })
+})
+
+describe('task-vault:vault:archive-area broadcasts extension:toast', () => {
+  it('calls broadcast with extension:toast on success', async () => {
+    mockGet.mockReturnValue({ id: 'area-1' })
+    mockAll.mockReturnValue([])
+    const handler = getHandler('task-vault:vault:archive-area')
+    await handler({}, { areaName: 'Work' })
+    expect(vi.mocked(broadcast)).toHaveBeenCalledWith('extension:toast', {
+      type: 'info',
+      message: 'Area archived: Work',
+    })
+  })
+})
+
+describe('task-vault:vault:update-project-status broadcasts extension:toast when archiving', () => {
+  it('calls broadcast with extension:toast on archive', async () => {
+    mockGet.mockReturnValue({ id: 'proj-1', name: 'Alpha' })
+    const handler = getHandler('task-vault:vault:update-project-status')
+    await handler({}, { projectFilePath: 'Alpha', status: 'archived' })
+    expect(vi.mocked(broadcast)).toHaveBeenCalledWith('extension:toast', {
+      type: 'info',
+      message: 'Project archived: Alpha',
+    })
+  })
+
+  it('does not broadcast extension:toast when status is not archived', async () => {
+    mockGet.mockReturnValue({ id: 'proj-1', name: 'Alpha' })
+    const handler = getHandler('task-vault:vault:update-project-status')
+    await handler({}, { projectFilePath: 'Alpha', status: 'active' })
+    const toastCalls = vi.mocked(broadcast).mock.calls.filter((c) => c[0] === 'extension:toast')
+    expect(toastCalls).toHaveLength(0)
   })
 })

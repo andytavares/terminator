@@ -29,13 +29,7 @@ vi.mock('electron', () => ({
   ),
 }))
 
-import {
-  registerProjectsIpcHandlers,
-  setVaultPath as setProjectsVaultPath,
-  getVaultPath as getProjectsVaultPath,
-} from '../../src/ipc/projects.ipc'
-
-const VAULT = '/vault'
+import { registerProjectsIpcHandlers } from '../../src/ipc/projects.ipc'
 
 const makeProjectRow = (overrides: Record<string, unknown> = {}) => ({
   id: 'proj-1',
@@ -76,7 +70,6 @@ beforeEach(() => {
   mockAll.mockReturnValue([])
   mockRun.mockReturnValue({ changes: 1 })
   mockPrepare.mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
-  setProjectsVaultPath(VAULT)
 })
 
 function getHandler(channel: string) {
@@ -354,14 +347,6 @@ describe('task-vault:projects:update-area IPC handler (lines 206-225)', () => {
     const handler = getHandler('task-vault:projects:update-area')
     const result = await handler({}, { area: 'Work' })
     expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-  })
-})
-
-describe('getVaultPath (projects.ipc)', () => {
-  it('returns the vault path set via setVaultPath', () => {
-    setProjectsVaultPath('/projects/vault')
-    expect(getProjectsVaultPath()).toBe('/projects/vault')
-    setProjectsVaultPath(VAULT) // restore
   })
 })
 
