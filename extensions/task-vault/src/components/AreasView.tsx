@@ -77,7 +77,11 @@ export function AreasView(): React.JSX.Element {
   }, [statusFilter])
 
   useEffect(() => {
-    if (selectedAreaName && areas.length > 0) {
+    if (selectedArea) {
+      // Refresh the open detail view from the newly loaded list
+      const refreshed = areas.find((a) => a.name === selectedArea.name)
+      if (refreshed) setSelectedArea(refreshed)
+    } else if (selectedAreaName && areas.length > 0) {
       const found = areas.find((a) => a.name === selectedAreaName)
       if (found) setSelectedArea(found)
     }

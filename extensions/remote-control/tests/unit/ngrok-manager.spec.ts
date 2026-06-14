@@ -114,7 +114,9 @@ describe('NgrokManager', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            tunnels: [{ public_url: 'https://abc.ngrok.io' }],
+            tunnels: [
+              { public_url: 'https://abc.ngrok.io', config: { addr: 'http://localhost:7681' } },
+            ],
           }),
       })
 
@@ -167,7 +169,12 @@ describe('NgrokManager', () => {
     it('passes --authtoken flag when auth token provided', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ tunnels: [{ public_url: 'https://auth.ngrok.io' }] }),
+        json: () =>
+          Promise.resolve({
+            tunnels: [
+              { public_url: 'https://auth.ngrok.io', config: { addr: 'http://localhost:7681' } },
+            ],
+          }),
       })
 
       const urlPromise = manager.start(7681, 'my-token')
@@ -188,7 +195,9 @@ describe('NgrokManager', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            tunnels: [{ public_url: 'https://xyz.ngrok.io' }],
+            tunnels: [
+              { public_url: 'https://xyz.ngrok.io', config: { addr: 'http://localhost:7681' } },
+            ],
           }),
       })
       const startPromise = manager.start(7681)
@@ -208,7 +217,9 @@ describe('NgrokManager', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            tunnels: [{ public_url: 'https://crash.ngrok.io' }],
+            tunnels: [
+              { public_url: 'https://crash.ngrok.io', config: { addr: 'http://localhost:7681' } },
+            ],
           }),
       })
 
@@ -230,7 +241,9 @@ describe('NgrokManager', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            tunnels: [{ public_url: 'https://stop.ngrok.io' }],
+            tunnels: [
+              { public_url: 'https://stop.ngrok.io', config: { addr: 'http://localhost:7681' } },
+            ],
           }),
       })
 
@@ -251,7 +264,9 @@ describe('NgrokManager', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            tunnels: [{ public_url: 'https://ref.ngrok.io' }],
+            tunnels: [
+              { public_url: 'https://ref.ngrok.io', config: { addr: 'http://localhost:7681' } },
+            ],
           }),
       })
 
