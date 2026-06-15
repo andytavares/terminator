@@ -1,0 +1,23 @@
+src/renderer/electron.d.ts
+  s_f88f4d30f513d0::t_05c0222ab0bd9f 165-167
+src/renderer/App.tsx
+  s_f88f4d30f513d0::t_f4acdffa9d492f 241-243
+src/main/preload.ts
+  s_f88f4d30f513d0::t_195cb0f44c2195 164-172
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "9846487b6ac876e57e9b277c9995073bb3bec015",
+  "prompts": {},
+  "sessions": {
+    "s_f88f4d30f513d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3dc2bcfd-a5fa-4817-aec6-416c367ee179",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
