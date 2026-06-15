@@ -1,0 +1,21 @@
+src/renderer-remote/electron-api-shim.ts
+  s_f88f4d30f513d0::t_59cb72b5d47a03 260-263
+tests/unit/renderer-remote/electron-api-shim.spec.ts
+  s_f88f4d30f513d0::t_6f66a2286cad2f 427-432
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "f9646bec04b9ffe3860dec4a5ce58aca13b7202a",
+  "prompts": {},
+  "sessions": {
+    "s_f88f4d30f513d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3dc2bcfd-a5fa-4817-aec6-416c367ee179",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
