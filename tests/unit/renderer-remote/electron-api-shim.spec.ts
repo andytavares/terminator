@@ -424,6 +424,12 @@ describe('electron-api-shim other APIs', () => {
     expect(hasMsg(ws, 'app:get-info')).toBe(true)
   })
 
+  it('notification.show invokes notifications:create with system target', async () => {
+    const { api, ws } = await loadShim()
+    void api.notification.show('title', 'body')
+    expect(hasMsg(ws, 'notifications:create')).toBe(true)
+  })
+
   it('notifications.create invokes notifications:create', async () => {
     const { api, ws } = await loadShim()
     void api.notifications.create({ type: 'info', title: 'title', message: 'body' })

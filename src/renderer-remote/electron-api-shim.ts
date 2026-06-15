@@ -257,6 +257,10 @@
       on: (channel: string, handler: (data: unknown) => void) =>
         on(channel, (data) => handler(data)),
     },
+    notification: {
+      show: (title: string, body: string) =>
+        invoke('notifications:create', { type: 'info', title, message: body, targets: ['system'] }),
+    },
     notifications: {
       create: (payload: {
         type: 'info' | 'success' | 'warning' | 'error'
