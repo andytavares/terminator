@@ -145,6 +145,22 @@ describe('NotificationManager.list', () => {
     const list = notificationManager.list()
     expect(list.some((n) => n.title === 'Listed')).toBe(true)
   })
+
+  it('does not store system-only notifications in the list', () => {
+    notificationManager.create({ type: 'info', title: 'Bell', targets: ['system'] })
+    const list = notificationManager.list()
+    expect(list.some((n) => n.title === 'Bell')).toBe(false)
+  })
+
+  it('stores a center-only notification in the list', () => {
+    notificationManager.create({ type: 'info', title: 'Center', targets: ['center'] })
+    expect(notificationManager.list().some((n) => n.title === 'Center')).toBe(true)
+  })
+
+  it('stores a toast-only notification in the list', () => {
+    notificationManager.create({ type: 'info', title: 'Toast', targets: ['toast'] })
+    expect(notificationManager.list().some((n) => n.title === 'Toast')).toBe(true)
+  })
 })
 
 describe('NotificationManager.dismiss', () => {

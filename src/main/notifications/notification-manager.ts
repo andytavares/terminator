@@ -47,6 +47,16 @@ class NotificationManager {
     }
 
     const targets = opts.targets ?? ALL_TARGETS
+    const persistent = targets.includes('center') || targets.includes('toast')
+
+    if (targets.includes('system') && Notification.isSupported()) {
+      new Notification({ title: opts.title, body: opts.message ?? '' }).show()
+      if (process.platform === 'darwin' && app.dock) {
+        app.dock.bounce('informational')
+      }
+    }
+
+    if (!persistent) return id
 
     const record: NotificationRecord = {
       id,
@@ -61,17 +71,7 @@ class NotificationManager {
     }
 
     this.records.set(id, record)
-
-    if (targets.includes('system') && Notification.isSupported()) {
-      new Notification({ title: opts.title, body: opts.message ?? '' }).show()
-      if (process.platform === 'darwin' && app.dock) {
-        app.dock.bounce('informational')
-      }
-    }
-
-    if (targets.includes('center') || targets.includes('toast')) {
-      this.broadcast(this.serialize(record))
-    }
+    this.broadcast(this.serialize(record))
 
     return id
   }
