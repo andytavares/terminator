@@ -161,6 +161,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener(channel, listener)
     },
   },
+  notification: {
+    show: (title: string, body: string) =>
+      ipcRenderer.invoke('notifications:create', {
+        type: 'info',
+        title,
+        message: body,
+        targets: ['system'],
+      }),
+  },
   notifications: {
     create: (payload: {
       type: 'info' | 'success' | 'warning' | 'error'

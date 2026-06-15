@@ -162,6 +162,9 @@ interface ElectronAPI {
       platform: string
     }>
   }
+  notification: {
+    show(title: string, body: string): void
+  }
   notifications: {
     create(payload: {
       type: 'info' | 'success' | 'warning' | 'error'

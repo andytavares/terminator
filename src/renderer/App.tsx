@@ -238,7 +238,9 @@ export function App(): JSX.Element {
   // Hydrate notification store from main process on mount
   useEffect(() => {
     void window.electronAPI.notifications?.list().then((notifications) => {
-      for (const n of notifications) addNotification(n)
+      for (const n of notifications) {
+        if (n.targets?.includes('center')) addNotification(n)
+      }
     })
   }, [addNotification])
 
