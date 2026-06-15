@@ -1,0 +1,23 @@
+src/main/extensions/api.ts
+  s_f88f4d30f513d0::t_50c4857967c120 171
+  s_f88f4d30f513d0::t_8ae6915547530e 437,445
+extensions/task-vault/src/notifications/task-scheduler.ts
+  s_f88f4d30f513d0::t_7d449d37e2585d 237
+  s_f88f4d30f513d0::t_2b0a97c73d0d27 160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "f779dd374175189d3bbe1f98b7b6fb691c3651ae",
+  "prompts": {},
+  "sessions": {
+    "s_f88f4d30f513d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3dc2bcfd-a5fa-4817-aec6-416c367ee179",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
