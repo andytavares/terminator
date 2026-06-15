@@ -1,0 +1,22 @@
+src/main/notifications/notification-manager.ts
+  s_f88f4d30f513d0::t_78b7ccd155097e 50-59,74
+tests/unit/notifications/notification-manager.spec.ts
+  s_f88f4d30f513d0::t_fa3e9b966c7447 148-154,156,161,163
+  s_f88f4d30f513d0::t_c144590e789e8e 155,157-160,162
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "5c3148d4bab93690a3032ffe9fae7e0a00723596",
+  "prompts": {},
+  "sessions": {
+    "s_f88f4d30f513d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3dc2bcfd-a5fa-4817-aec6-416c367ee179",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
