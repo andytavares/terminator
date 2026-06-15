@@ -27,7 +27,6 @@ import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { notify } from '../utils/notify'
-import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { useVaultNavStore } from '../stores/vault-nav.store'
 
 interface DailyLogProps {
@@ -162,8 +161,6 @@ function SubtaskRow({
 }): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(subtask.text)
-  const { addToast } = useToastStore()
-
   async function saveEdit() {
     if (!editText.trim()) return
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:edit-task', {
@@ -178,9 +175,7 @@ function SubtaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', {
       taskId: subtask.id,
     })
-    addToast({
-      type: 'success',
-      message: `Completed: ${subtask.text}`,
+    notify('success', `Completed: ${subtask.text}`, {
       onClick: makeTaskNavHandler(subtask.id),
     })
     await onRefresh()

@@ -162,9 +162,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
   notification: {
-    show: (title: string, body: string) => ipcRenderer.send('notification:show', { title, body }),
+    show: (title: string, body: string) =>
+      ipcRenderer.invoke('notifications:create', {
+        type: 'info',
+        title,
+        message: body,
+        targets: ['system'],
+      }),
   },
   notifications: {
+    create: (payload: {
+      type: 'info' | 'success' | 'warning' | 'error'
+      title: string
+      message?: string
+      targets?: Array<'system' | 'center' | 'toast'>
+    }) => ipcRenderer.invoke('notifications:create', payload),
     list: () => ipcRenderer.invoke('notifications:list'),
     dismiss: (id: string) => ipcRenderer.invoke('notifications:dismiss', { id }),
     triggerAction: (notifId: string, actionId: string) =>

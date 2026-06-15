@@ -157,6 +157,7 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
         const notif = api.notifications.createNotification({
           type: isOverdue ? 'error' : 'warning',
           title: notifTitle,
+          targets: ['center', 'toast'],
           actions: [
             {
               id: 'open',
@@ -233,6 +234,7 @@ export function startTaskScheduler(api: ExtensionAPI): { dispose: () => void; ti
           type: 'info',
           title: blockedTitle,
           message: meta.blocked_reason ?? undefined,
+          targets: ['center', 'toast'],
           actions: [
             {
               id: 'open',

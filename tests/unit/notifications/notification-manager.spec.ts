@@ -1,11 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const mockSend = vi.fn()
+const { mockNotificationShow, MockNotification, mockDockBounce, mockSend } = vi.hoisted(() => {
+  const mockNotificationShow = vi.fn()
+  const MockNotification = vi.fn().mockImplementation(() => ({ show: mockNotificationShow }))
+  Object.assign(MockNotification, { isSupported: vi.fn(() => true) })
+  const mockDockBounce = vi.fn()
+  const mockSend = vi.fn()
+  return { mockNotificationShow, MockNotification, mockDockBounce, mockSend }
+})
+
 const mockWin = { isDestroyed: vi.fn(() => false), webContents: { send: mockSend } }
 const mockDestroyedWin = { isDestroyed: vi.fn(() => true), webContents: { send: mockSend } }
 
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: vi.fn(() => [mockWin]) },
+  Notification: MockNotification,
+  app: { dock: { bounce: mockDockBounce } },
 }))
 
 vi.mock('crypto', () => ({
@@ -20,17 +30,72 @@ beforeEach(() => {
   vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([mockWin] as unknown as ReturnType<
     typeof BrowserWindow.getAllWindows
   >)
+  MockNotification.isSupported.mockReturnValue(true)
 })
 
-describe('NotificationManager.create', () => {
+describe('NotificationManager.create — targets', () => {
+  it('defaults to all three targets', () => {
+    notificationManager.create({ type: 'info', title: 'Hello' })
+    expect(MockNotification).toHaveBeenCalled()
+    expect(mockSend).toHaveBeenCalledWith(
+      'notifications:push',
+      expect.objectContaining({ targets: ['system', 'center', 'toast'] })
+    )
+  })
+
+  it('fires system notification when targets includes system', () => {
+    notificationManager.create({ type: 'info', title: 'Sys', targets: ['system'] })
+    expect(MockNotification).toHaveBeenCalledWith({ title: 'Sys', body: '' })
+    expect(mockNotificationShow).toHaveBeenCalled()
+  })
+
+  it('does not fire system notification when targets omits system', () => {
+    notificationManager.create({ type: 'info', title: 'No sys', targets: ['center', 'toast'] })
+    expect(MockNotification).not.toHaveBeenCalled()
+  })
+
+  it('does not broadcast when targets is only system', () => {
+    notificationManager.create({ type: 'info', title: 'Only sys', targets: ['system'] })
+    expect(mockSend).not.toHaveBeenCalled()
+  })
+
+  it('broadcasts when targets includes center', () => {
+    notificationManager.create({ type: 'info', title: 'Center only', targets: ['center'] })
+    expect(mockSend).toHaveBeenCalledWith(
+      'notifications:push',
+      expect.objectContaining({ targets: ['center'] })
+    )
+  })
+
+  it('broadcasts when targets includes toast', () => {
+    notificationManager.create({ type: 'info', title: 'Toast only', targets: ['toast'] })
+    expect(mockSend).toHaveBeenCalledWith(
+      'notifications:push',
+      expect.objectContaining({ targets: ['toast'] })
+    )
+  })
+
+  it('skips system notification when not supported', () => {
+    MockNotification.isSupported.mockReturnValue(false)
+    notificationManager.create({ type: 'info', title: 'No support' })
+    expect(mockNotificationShow).not.toHaveBeenCalled()
+  })
+
+  it('bounces dock on macOS when system notification fires', () => {
+    const originalPlatform = process.platform
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    notificationManager.create({ type: 'info', title: 'Bounce', targets: ['system'] })
+    expect(mockDockBounce).toHaveBeenCalledWith('informational')
+    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+  })
+})
+
+describe('NotificationManager.create — broadcast', () => {
   it('broadcasts notification to all windows on create', () => {
     notificationManager.create({ type: 'info', title: 'Hello' })
     expect(mockSend).toHaveBeenCalledWith(
       'notifications:push',
-      expect.objectContaining({
-        type: 'info',
-        title: 'Hello',
-      })
+      expect.objectContaining({ type: 'info', title: 'Hello' })
     )
   })
 
@@ -38,7 +103,7 @@ describe('NotificationManager.create', () => {
     vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([
       mockDestroyedWin,
     ] as unknown as ReturnType<typeof BrowserWindow.getAllWindows>)
-    notificationManager.create({ type: 'info', title: 'Skip me' })
+    notificationManager.create({ type: 'info', title: 'Skip me', targets: ['center'] })
     expect(mockSend).not.toHaveBeenCalled()
   })
 
@@ -50,9 +115,7 @@ describe('NotificationManager.create', () => {
     })
     expect(mockSend).toHaveBeenCalledWith(
       'notifications:push',
-      expect.objectContaining({
-        actions: [{ id: 'go', label: 'Go' }],
-      })
+      expect.objectContaining({ actions: [{ id: 'go', label: 'Go' }] })
     )
   })
 
@@ -66,18 +129,13 @@ describe('NotificationManager.create', () => {
     notificationManager.create({ type: 'error', title: 'Err', message: 'Details', source: 'ext' })
     expect(mockSend).toHaveBeenCalledWith(
       'notifications:push',
-      expect.objectContaining({
-        message: 'Details',
-        source: 'ext',
-      })
+      expect.objectContaining({ message: 'Details', source: 'ext' })
     )
   })
 })
 
 describe('NotificationManager.list', () => {
   it('returns empty array when no notifications exist', () => {
-    // Create a fresh manager to avoid cross-test pollution
-    // notificationManager is a singleton — just check that list() works
     const result = notificationManager.list()
     expect(Array.isArray(result)).toBe(true)
   })
@@ -86,6 +144,22 @@ describe('NotificationManager.list', () => {
     notificationManager.create({ type: 'info', title: 'Listed' })
     const list = notificationManager.list()
     expect(list.some((n) => n.title === 'Listed')).toBe(true)
+  })
+
+  it('does not store system-only notifications in the list', () => {
+    notificationManager.create({ type: 'info', title: 'Bell', targets: ['system'] })
+    const list = notificationManager.list()
+    expect(list.some((n) => n.title === 'Bell')).toBe(false)
+  })
+
+  it('stores a center-only notification in the list', () => {
+    notificationManager.create({ type: 'info', title: 'Center', targets: ['center'] })
+    expect(notificationManager.list().some((n) => n.title === 'Center')).toBe(true)
+  })
+
+  it('stores a toast-only notification in the list', () => {
+    notificationManager.create({ type: 'info', title: 'Toast', targets: ['toast'] })
+    expect(notificationManager.list().some((n) => n.title === 'Toast')).toBe(true)
   })
 })
 

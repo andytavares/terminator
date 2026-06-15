@@ -1,7 +1,8 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, Notification, app } from 'electron'
 import { randomUUID } from 'crypto'
 
 export type NotificationType = 'info' | 'success' | 'warning' | 'error'
+export type NotificationTarget = 'system' | 'center' | 'toast'
 
 export interface NotificationAction {
   id: string
@@ -16,11 +17,14 @@ export interface SerializedNotification {
   timestamp: number
   source?: string
   actions?: NotificationAction[]
+  targets: NotificationTarget[]
 }
 
 interface NotificationRecord extends SerializedNotification {
   callbacks: Map<string, () => void>
 }
+
+const ALL_TARGETS: NotificationTarget[] = ['system', 'center', 'toast']
 
 class NotificationManager {
   private records = new Map<string, NotificationRecord>()
@@ -30,6 +34,7 @@ class NotificationManager {
     title: string
     message?: string
     source?: string
+    targets?: NotificationTarget[]
     actions?: Array<{ id: string; label: string; handler: () => void }>
   }): string {
     const id = randomUUID()
@@ -41,6 +46,18 @@ class NotificationManager {
       actions.push({ id: action.id, label: action.label })
     }
 
+    const targets = opts.targets ?? ALL_TARGETS
+    const persistent = targets.includes('center') || targets.includes('toast')
+
+    if (targets.includes('system') && Notification.isSupported()) {
+      new Notification({ title: opts.title, body: opts.message ?? '' }).show()
+      if (process.platform === 'darwin' && app.dock) {
+        app.dock.bounce('informational')
+      }
+    }
+
+    if (!persistent) return id
+
     const record: NotificationRecord = {
       id,
       type: opts.type,
@@ -49,11 +66,13 @@ class NotificationManager {
       timestamp: Date.now(),
       source: opts.source,
       actions: actions.length > 0 ? actions : undefined,
+      targets,
       callbacks,
     }
 
     this.records.set(id, record)
     this.broadcast(this.serialize(record))
+
     return id
   }
 
@@ -83,6 +102,7 @@ class NotificationManager {
       timestamp: record.timestamp,
       source: record.source,
       actions: record.actions,
+      targets: record.targets,
     }
   }
 

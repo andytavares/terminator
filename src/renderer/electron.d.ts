@@ -10,6 +10,8 @@ import type {
   ProcessMetrics,
 } from '../shared/types/index'
 
+export type NotificationTarget = 'system' | 'center' | 'toast'
+
 export interface SerializedNotification {
   id: string
   type: 'info' | 'success' | 'warning' | 'error'
@@ -18,6 +20,7 @@ export interface SerializedNotification {
   timestamp: number
   source?: string
   actions?: Array<{ id: string; label: string }>
+  targets: NotificationTarget[]
 }
 
 interface ElectronAPI {
@@ -163,6 +166,12 @@ interface ElectronAPI {
     show(title: string, body: string): void
   }
   notifications: {
+    create(payload: {
+      type: 'info' | 'success' | 'warning' | 'error'
+      title: string
+      message?: string
+      targets?: NotificationTarget[]
+    }): Promise<{ id: string } | { error: string }>
     list(): Promise<SerializedNotification[]>
     dismiss(id: string): Promise<{ ok: true } | { error: string }>
     triggerAction(notifId: string, actionId: string): Promise<{ ok: true } | { error: string }>

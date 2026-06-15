@@ -1,88 +1,79 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const mockOn = vi.fn()
 const mockHandle = vi.fn()
-const mockIsSupported = vi.fn().mockReturnValue(true)
-const mockNotificationShow = vi.fn()
-const MockNotification = vi.fn().mockImplementation(() => ({ show: mockNotificationShow }))
-Object.assign(MockNotification, { isSupported: mockIsSupported })
+const mockCreate = vi.fn(() => 'test-uuid')
 
-const mockDockBounce = vi.fn()
 vi.mock('electron', () => ({
-  ipcMain: { on: mockOn, handle: mockHandle },
-  Notification: MockNotification,
-  app: { dock: { bounce: mockDockBounce } },
+  ipcMain: { handle: mockHandle },
 }))
 
 vi.mock('../../../src/main/notifications/notification-manager', () => ({
-  notificationManager: { list: vi.fn(), dismiss: vi.fn(), triggerAction: vi.fn() },
+  notificationManager: {
+    list: vi.fn(),
+    dismiss: vi.fn(),
+    triggerAction: vi.fn(),
+    create: mockCreate,
+  },
 }))
 
+function captureHandle(channel: string): (event: unknown, payload?: unknown) => unknown {
+  const match = mockHandle.mock.calls.find(([ch]) => ch === channel)
+  if (!match) throw new Error(`No handler registered for: ${channel}`)
+  return match[1] as (event: unknown, payload?: unknown) => unknown
+}
+
 describe('registerNotificationHandlers', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
-    mockIsSupported.mockReturnValue(true)
-    mockOn.mockImplementation((_ch: string, fn: (...args: unknown[]) => unknown) => fn)
-  })
-
-  it('registers notification:show listener', async () => {
     vi.resetModules()
     const { registerNotificationHandlers } = await import(
       '../../../src/main/ipc/notification.ipc.js'
     )
     registerNotificationHandlers()
-    expect(mockOn).toHaveBeenCalledWith('notification:show', expect.any(Function))
   })
 
-  it('shows a Notification when supported', async () => {
-    vi.resetModules()
-    const { registerNotificationHandlers } = await import(
-      '../../../src/main/ipc/notification.ipc.js'
-    )
-    registerNotificationHandlers()
-    const handler = mockOn.mock.calls.find(([ch]) => ch === 'notification:show')![1]
-    handler(null, { title: 'Test', body: 'Hello' })
-    expect(MockNotification).toHaveBeenCalledWith({ title: 'Test', body: 'Hello' })
-    expect(mockNotificationShow).toHaveBeenCalled()
+  it('does not register a notification:show listener (removed)', () => {
+    const showCall = mockHandle.mock.calls.find(([ch]) => ch === 'notification:show')
+    expect(showCall).toBeUndefined()
   })
 
-  it('does not create Notification when not supported', async () => {
-    mockIsSupported.mockReturnValue(false)
-    vi.resetModules()
-    const { registerNotificationHandlers } = await import(
-      '../../../src/main/ipc/notification.ipc.js'
-    )
-    registerNotificationHandlers()
-    const handler = mockOn.mock.calls.find(([ch]) => ch === 'notification:show')![1]
-    handler(null, { title: 'T', body: 'B' })
-    expect(mockNotificationShow).not.toHaveBeenCalled()
+  it('registers notifications:create handler', () => {
+    expect(mockHandle).toHaveBeenCalledWith('notifications:create', expect.any(Function))
   })
 
-  it('bounces dock on macOS', async () => {
-    const originalPlatform = process.platform
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    vi.resetModules()
-    const { registerNotificationHandlers } = await import(
-      '../../../src/main/ipc/notification.ipc.js'
+  it('creates a notification and returns its id', async () => {
+    const handler = captureHandle('notifications:create')
+    const result = await handler(null, { type: 'info', title: 'Hello' })
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'info', title: 'Hello' })
     )
-    registerNotificationHandlers()
-    const handler = mockOn.mock.calls.find(([ch]) => ch === 'notification:show')![1]
-    handler(null, { title: 'T', body: 'B' })
-    expect(mockDockBounce).toHaveBeenCalledWith('informational')
-    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+    expect(result).toEqual({ id: 'test-uuid' })
   })
 
-  it('does not bounce dock on non-macOS', async () => {
-    const originalPlatform = process.platform
-    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
-    vi.resetModules()
-    const { registerNotificationHandlers } = await import(
-      '../../../src/main/ipc/notification.ipc.js'
+  it('passes targets through to notificationManager.create', async () => {
+    const handler = captureHandle('notifications:create')
+    await handler(null, { type: 'success', title: 'T', targets: ['system', 'toast'] })
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ targets: ['system', 'toast'] })
     )
-    registerNotificationHandlers()
-    const handler = mockOn.mock.calls.find(([ch]) => ch === 'notification:show')![1]
-    handler(null, { title: 'T', body: 'B' })
-    expect(mockDockBounce).not.toHaveBeenCalled()
-    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+  })
+
+  it('returns VALIDATION_ERROR for invalid type', async () => {
+    const handler = captureHandle('notifications:create')
+    const result = await handler(null, { type: 'bad', title: 'T' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+    expect(mockCreate).not.toHaveBeenCalled()
+  })
+
+  it('returns VALIDATION_ERROR for missing title', async () => {
+    const handler = captureHandle('notifications:create')
+    const result = await handler(null, { type: 'info' })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  })
+
+  it('returns VALIDATION_ERROR for invalid target value', async () => {
+    const handler = captureHandle('notifications:create')
+    const result = await handler(null, { type: 'info', title: 'T', targets: ['unknown'] })
+    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
   })
 })

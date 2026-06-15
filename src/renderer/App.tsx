@@ -238,14 +238,21 @@ export function App(): JSX.Element {
   // Hydrate notification store from main process on mount
   useEffect(() => {
     void window.electronAPI.notifications?.list().then((notifications) => {
-      for (const n of notifications) addNotification(n)
+      for (const n of notifications) {
+        if (n.targets?.includes('center')) addNotification(n)
+      }
     })
   }, [addNotification])
 
   // Subscribe to push notifications from extensions
   useEffect(() => {
-    return window.electronAPI.notifications?.onPush((n) => addNotification(n))
-  }, [addNotification])
+    return window.electronAPI.notifications?.onPush((n) => {
+      if (n.targets.includes('center')) addNotification(n)
+      if (n.targets.includes('toast')) {
+        addToast({ type: n.type, message: n.message ? `${n.title}: ${n.message}` : n.title })
+      }
+    })
+  }, [addNotification, addToast])
 
   // Global handler for extension navigation events — works even when the target tab is unmounted
   useEffect(() => {
