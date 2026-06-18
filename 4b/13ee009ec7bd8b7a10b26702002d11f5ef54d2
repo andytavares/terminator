@@ -1,0 +1,167 @@
+src/renderer/components/sidebar/BranchSwitcher.tsx
+  s_772fe7b4592cf9::t_68f41c42858609 197,207
+  s_772fe7b4592cf9::t_6c9b6af3954b27 107-108
+  s_772fe7b4592cf9::t_81599cd7746a73 82-99
+  s_772fe7b4592cf9::t_a7515f5175368c 232,238,248,254
+  s_772fe7b4592cf9::t_8e1cd42ef8372a 6,13-29
+  s_772fe7b4592cf9::t_284ac966554d4d 38-40,42,47,54-55
+  s_772fe7b4592cf9::t_77b83340283258 56
+tests/unit/renderer/stores/settings.store.spec.ts
+  s_772fe7b4592cf9::t_6c84de97cbb9d4 23
+src/renderer/hooks/useBranchSync.ts
+  s_772fe7b4592cf9::t_637db75839c485 8-9,15,25-39
+extensions/task-vault/src/components/DailyLog.tsx
+  s_772fe7b4592cf9::t_3b81d303fa107f 1451
+  s_772fe7b4592cf9::t_b6460e28080f0b 710,725
+  s_772fe7b4592cf9::t_3f7754a0e66ee9 892-898
+  s_772fe7b4592cf9::t_08f52bf8fea590 906
+  s_772fe7b4592cf9::t_61796f5776da15 1521-1528,1559
+  s_772fe7b4592cf9::t_2353952074f53a 1111-1112,1146-1154,1156-1161
+  s_772fe7b4592cf9::t_93f3e6758ebe01 49
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_772fe7b4592cf9::t_26e9ef5b75a2bf 183,186,189-191,196,199,202
+extensions/task-vault/tests/components/WeeklyReview.spec.tsx
+  s_772fe7b4592cf9::t_a0c200bbe5cc71 119,121,133,135,179
+  s_772fe7b4592cf9::t_f10892d2047ebf 108,114,129,173,195
+  s_772fe7b4592cf9::t_3cc85f48cb4320 105
+  s_772fe7b4592cf9::t_7e2451972e92aa 81-82
+tests/unit/renderer/components/WorkspaceSettings.spec.tsx
+  s_772fe7b4592cf9::t_5b22d092babea8 42
+  s_772fe7b4592cf9::t_cfbcf57c3772c3 196
+  s_772fe7b4592cf9::t_a05570937fffb7 179-181,183-195,197-220
+  s_772fe7b4592cf9::t_01a99c048327c7 182
+  s_772fe7b4592cf9::t_a5b3334daac15c 18
+  s_772fe7b4592cf9::t_e674bc5f2a216d 25
+extensions/task-vault/src/stores/vault-data.store.ts
+  s_772fe7b4592cf9::t_944d9511d14cb8 36,46,49-50,59
+  s_772fe7b4592cf9::t_b1f216bde99fdd 17
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_772fe7b4592cf9::t_9b3299f69c9c50 273
+  s_772fe7b4592cf9::t_2990bcb7379dfb 600
+src/renderer/components/settings/SettingsPanel.css
+  s_772fe7b4592cf9::t_f126ab2d653ae0 157-162
+src/renderer/components/terminal/TerminalPane.tsx
+  s_772fe7b4592cf9::t_cfe97dc5fa57b6 115-116
+  s_772fe7b4592cf9::t_6056326fb0aefc 140
+  s_772fe7b4592cf9::t_64500730d2c028 22
+  s_772fe7b4592cf9::t_63fecec21879cf 72-78
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_772fe7b4592cf9::t_8c9e23600b5544 79
+  s_772fe7b4592cf9::t_029c017bf9f3aa 289
+  s_772fe7b4592cf9::t_d431cb7351baf1 133
+tests/unit/renderer/components/LeafPane.spec.tsx
+  s_772fe7b4592cf9::t_88c3af203bdbec 80,85,87,91,94-96
+extensions/task-vault/src/vault/db.ts
+  s_772fe7b4592cf9::t_e64ca69ed43824 96-100
+extensions/task-vault/src/components/WeeklyReviewStepStaleTasks.tsx
+  s_772fe7b4592cf9::t_1b83e96d05c933 1-102
+src/renderer/components/terminal/LeafPane.tsx
+  s_772fe7b4592cf9::t_12be87dd41ead6 28-30
+  s_772fe7b4592cf9::t_86ab77938c7539 59
+tests/unit/renderer/App.spec.tsx
+  s_772fe7b4592cf9::t_f506d65682f4b9 41
+  s_772fe7b4592cf9::t_69b3e7c29685fc 684-723
+src/renderer/components/settings/GlobalSettings.tsx
+  s_772fe7b4592cf9::t_693c95cdffd4b8 108-128
+  s_772fe7b4592cf9::t_43c6b26ca7491f 11
+src/renderer/hooks/useTerminalSession.ts
+  s_772fe7b4592cf9::t_334a82be499f26 49-50,52-59
+  s_772fe7b4592cf9::t_16387d2c78e87b 84-95
+src/renderer/components/sidebar/BranchSwitcher.css
+  s_772fe7b4592cf9::t_9ccd354bcf252e 169-178
+extensions/task-vault/tests/ipc/projects.ipc.spec.ts
+  s_772fe7b4592cf9::t_9cc4fbe9d6315f 170
+  s_772fe7b4592cf9::t_3551ca38e7cb03 191
+  s_772fe7b4592cf9::t_a2fd0bbea25068 156
+src/renderer/components/sidebar/WorkspaceCard.tsx
+  s_772fe7b4592cf9::t_f1a0813914f026 142
+src/renderer/stores/settings.store.ts
+  s_772fe7b4592cf9::t_652087e07d6bff 16-20
+  s_772fe7b4592cf9::t_27cd1b3ae318ab 29
+  s_772fe7b4592cf9::t_9643da0b19f401 129-146
+extensions/task-vault/tests/components/WeeklyReviewStepStaleTasks.spec.tsx
+  s_772fe7b4592cf9::t_b6e96e71a907be 1-90,92-119
+extensions/task-vault/src/vault/types.ts
+  s_772fe7b4592cf9::t_b748c13ef2f960 112
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_772fe7b4592cf9::t_0621b26ee259bd 382,387
+extensions/task-vault/src/vault/mappers.ts
+  s_772fe7b4592cf9::t_f83521e3dbfba3 102
+  s_772fe7b4592cf9::t_871b9a3dfd65f1 130-131
+src/renderer/components/settings/WorkspaceSettings.tsx
+  s_772fe7b4592cf9::t_8879589f3c5938 37-39
+  s_772fe7b4592cf9::t_cdfe96f8326641 126-157
+  s_772fe7b4592cf9::t_ac4f1fecc20224 17
+src/renderer/components/sidebar/SessionRow.tsx
+  s_772fe7b4592cf9::t_e77d91e24e9531 16,27,87
+tests/unit/renderer/components/WorkspaceCard.spec.tsx
+  s_772fe7b4592cf9::t_53982fdcb0b227 12-15
+  s_772fe7b4592cf9::t_0ecfa65251f652 28-29
+src/renderer/components/terminal/TabBar.tsx
+  s_772fe7b4592cf9::t_7eb69b250d53fe 151
+  s_772fe7b4592cf9::t_3f4b0946f6afb4 179
+  s_772fe7b4592cf9::t_66f68383c5b962 44-45,47-48
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_772fe7b4592cf9::t_6c471ce5ced743 233-237,245
+  s_772fe7b4592cf9::t_de7c3b7fae4089 173,184-185,195-196,207
+  s_772fe7b4592cf9::t_7218c8df80ac60 312,314-315,326
+  s_772fe7b4592cf9::t_c2529f308c0990 1572-1594
+extensions/task-vault/src/components/WeeklyReview.tsx
+  s_772fe7b4592cf9::t_59b88ffed24721 166-172,179
+  s_772fe7b4592cf9::t_7367d9c2ebf1ec 7,18-19,23
+extensions/task-vault/src/components/task-vault.css
+  s_772fe7b4592cf9::t_f9684375118ebc 204-237
+src/renderer/stores/session.store.ts
+  s_772fe7b4592cf9::t_32865a89dcb514 23-24
+  s_772fe7b4592cf9::t_a5c79d959a554f 71
+  s_772fe7b4592cf9::t_16f2b5810b1e3a 102
+tests/unit/renderer/hooks/useBranchSync.spec.tsx
+  s_772fe7b4592cf9::t_d6d28f2c64cc99 131-141,143-169
+src/shared/types/index.ts
+  s_772fe7b4592cf9::t_f5f2383f168864 50
+  s_772fe7b4592cf9::t_32083bc7f4afd0 86
+src/renderer/components/sidebar/ProjectRow.tsx
+  s_772fe7b4592cf9::t_58acff29ce3db8 48-50
+  s_772fe7b4592cf9::t_1337b3fcd6b481 13,27,56-65,173-182,184-247
+  s_772fe7b4592cf9::t_159b2b2b9a0bdd 6
+  s_772fe7b4592cf9::t_b34d360156bb62 45
+src/renderer/App.tsx
+  s_772fe7b4592cf9::t_8f2010f81ebf3e 194-213
+  s_772fe7b4592cf9::t_605b981fa848b1 65
+  s_772fe7b4592cf9::t_17de2289c32dfb 193,214-215
+extensions/task-vault/src/ipc/projects.ipc.ts
+  s_772fe7b4592cf9::t_551e50c947fcff 105-107,110-115,117-119,121-122,130-131
+  s_772fe7b4592cf9::t_5809f40cd34565 116,120
+  s_772fe7b4592cf9::t_695947d734b67e 108-109
+  s_772fe7b4592cf9::t_1f85898c52e36c 12-17,19
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_772fe7b4592cf9::t_5e9820b7717265 19-22
+src/shared/schemas/settings.schema.ts
+  s_772fe7b4592cf9::t_e8cffd6da02dae 55
+  s_772fe7b4592cf9::t_c9e88662486834 43
+  s_772fe7b4592cf9::t_ca8dc769f366fb 15
+tests/unit/renderer/hooks/useTerminalSession.spec.tsx
+  s_772fe7b4592cf9::t_05687a77db5cb0 88-95
+  s_772fe7b4592cf9::t_f4041296587745 268-275
+src/renderer/components/sidebar/SessionRow.css
+  s_772fe7b4592cf9::t_e4ad18783a0017 90-93
+tests/unit/renderer/components/ProjectRow.spec.tsx
+  s_772fe7b4592cf9::t_2ff668a895ebb3 38-39
+  s_772fe7b4592cf9::t_3ce6209df21c71 59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "4b13ee009ec7bd8b7a10b26702002d11f5ef54d2",
+  "prompts": {},
+  "sessions": {
+    "s_772fe7b4592cf9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71520318-f880-4ee8-ba27-0fd9f22f879e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
