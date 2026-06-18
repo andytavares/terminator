@@ -134,6 +134,15 @@ export function BranchSwitcher({
         addToast({ type: 'error', message: `Could not switch to "${branch}": ${result.error}` })
       } else {
         await updateProjectBranch(project.id, branch)
+        // Update sibling non-worktree projects that share the same repo
+        if (workspaceId) {
+          const siblings = useWorkspaceStore.getState().projectsByWorkspaceId.get(workspaceId) ?? []
+          await Promise.all(
+            siblings
+              .filter((p) => p.id !== project.id && !p.isWorktree)
+              .map((p) => updateProjectBranch(p.id, branch))
+          )
+        }
       }
     } catch (err) {
       addToast({

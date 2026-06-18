@@ -6,7 +6,9 @@ import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { BranchSwitcher } from '../../../../src/renderer/components/sidebar/BranchSwitcher'
 
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: vi.fn(),
+  useWorkspaceStore: Object.assign(vi.fn(), {
+    getState: vi.fn().mockReturnValue({ projectsByWorkspaceId: new Map() }),
+  }),
 }))
 vi.mock('../../../../src/renderer/stores/toast.store', () => ({
   useToastStore: vi.fn(),
@@ -260,5 +262,31 @@ describe('BranchSwitcher', () => {
     render(<BranchSwitcher project={project} workspaceFolderPath="/repo" />)
     fireEvent.click(screen.getByTitle('Branch: main'))
     await waitFor(() => expect(screen.getByText(/Could not load branches/)).toBeTruthy())
+  })
+
+  it('updates sibling non-worktree projects in the same workspace after checkout', async () => {
+    const sibling = {
+      id: 'proj-2',
+      workspaceId: 'ws-1',
+      name: 'Sibling',
+      gitBranch: 'main',
+      worktreePath: null,
+      isWorktree: false,
+      createdAt: '',
+      updatedAt: '',
+    }
+    const worktreeSibling = { ...sibling, id: 'proj-wt', isWorktree: true, worktreePath: '/wt' }
+    vi.mocked(useWorkspaceStore).getState.mockReturnValue({
+      projectsByWorkspaceId: new Map([['ws-1', [project, sibling, worktreeSibling]]]),
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    render(<BranchSwitcher project={project} workspaceFolderPath="/repo" workspaceId="ws-1" />)
+    fireEvent.click(screen.getByTitle('Branch: main'))
+    await waitFor(() => screen.getByText('feature/test'))
+    fireEvent.click(screen.getByText('feature/test'))
+    await waitFor(() =>
+      expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-2', 'feature/test')
+    )
+    // worktree sibling must NOT be updated
+    expect(mockUpdateProjectBranch).not.toHaveBeenCalledWith('proj-wt', expect.anything())
   })
 })

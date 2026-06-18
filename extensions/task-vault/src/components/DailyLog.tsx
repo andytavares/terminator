@@ -1521,10 +1521,10 @@ export function DailyLog({
   function isTaskStale(task: IndexedTask): boolean {
     if (!isToday) return false
     if (!staleDaysThreshold || !task.todaySince) return false
-    const sinceDate = new Date(task.todaySince)
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - staleDaysThreshold)
-    return sinceDate <= cutoff
+    const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`
+    return task.todaySince <= cutoffStr
   }
 
   function renderTaskWithSubtasks(

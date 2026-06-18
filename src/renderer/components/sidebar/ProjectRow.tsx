@@ -19,6 +19,7 @@ interface ProjectRowProps {
   gitDirty?: boolean
   gitConflict?: boolean
   onBranchBadgeClick?: () => void
+  branchSwitcher?: React.ReactNode
   searchQuery?: string
 }
 
@@ -33,6 +34,7 @@ export function ProjectRow({
   gitDirty,
   gitConflict,
   onBranchBadgeClick,
+  branchSwitcher,
   searchQuery = '',
 }: ProjectRowProps): JSX.Element {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
@@ -140,19 +142,21 @@ export function ProjectRow({
           </span>
         )}
         <div className="project-row__badges">
-          {project.gitBranch && (
-            <span
-              className={`project-row__branch-chip ${
-                gitConflict ? 'chip-conflict' : gitDirty ? 'chip-dirty' : 'chip-clean'
-              }`}
-              onClick={(e) => {
-                e.stopPropagation()
-                onBranchBadgeClick?.()
-              }}
-            >
-              {project.gitBranch}
-            </span>
-          )}
+          {branchSwitcher
+            ? branchSwitcher
+            : project.gitBranch && (
+                <span
+                  className={`project-row__branch-chip ${
+                    gitConflict ? 'chip-conflict' : gitDirty ? 'chip-dirty' : 'chip-clean'
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onBranchBadgeClick?.()
+                  }}
+                >
+                  {project.gitBranch}
+                </span>
+              )}
         </div>
         {isBusy && <span className="project-row__busy" />}
         {isExpanded && (
