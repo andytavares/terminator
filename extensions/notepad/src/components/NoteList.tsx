@@ -19,6 +19,7 @@ interface ContextMenuState {
   noteId: string
   title: string
   tags: string[]
+  isArchived: boolean
   x: number
   y: number
 }
@@ -215,7 +216,10 @@ function NoteRow({
           dangerouslySetInnerHTML={{ __html: snippet || preview.slice(0, 80) }}
         />
       )}
-      <div className="notepad-note-row__meta">{formatDate(note.updatedAt)}</div>
+      <div className="notepad-note-row__meta">
+        {note.archivedAt && <span className="notepad-note-row__archived-badge">Archived</span>}
+        {formatDate(note.updatedAt)}
+      </div>
     </button>
   )
 }
@@ -223,7 +227,7 @@ function NoteRow({
 // ── NoteList ──────────────────────────────────────────────────────
 
 export function NoteList(): React.JSX.Element {
-  const { notes, setNotes } = useNotesStore()
+  const { notes, setNotes, selectedNoteId, setSelected } = useNotesStore()
   const { searchQuery, activeTagId, includeArchived, setQuery, setTag, toggleArchived } =
     useFilterStore()
 
@@ -316,9 +320,28 @@ export function NoteList(): React.JSX.Element {
       noteId: note.id,
       title: note.title,
       tags: note.tags ?? [],
+      isArchived: !!note.archivedAt,
       x: e.clientX,
       y: e.clientY,
     })
+  }
+
+  async function handleArchiveToggle(noteId: string, isArchived: boolean) {
+    const channel = isArchived
+      ? 'terminator.notepad:notes.unarchive'
+      : 'terminator.notepad:notes.archive'
+    await window.electronAPI.extensionBridge.invoke(channel, { id: noteId }).catch(console.error)
+    await reloadNotes()
+  }
+
+  async function handleDelete(noteId: string) {
+    const ok = window.confirm('Permanently delete this note? This cannot be undone.')
+    if (!ok) return
+    await window.electronAPI.extensionBridge
+      .invoke('terminator.notepad:notes.hardDelete', { id: noteId })
+      .catch(console.error)
+    if (selectedNoteId === noteId) setSelected(null)
+    await reloadNotes()
   }
 
   async function reloadNotes() {
@@ -395,6 +418,26 @@ export function NoteList(): React.JSX.Element {
             }}
           >
             Edit title &amp; tags
+          </button>
+          <button
+            className="notepad-context-menu__item"
+            onClick={() => {
+              const { noteId, isArchived } = contextMenu
+              setContextMenu(null)
+              void handleArchiveToggle(noteId, isArchived)
+            }}
+          >
+            {contextMenu.isArchived ? 'Unarchive' : 'Archive'}
+          </button>
+          <button
+            className="notepad-context-menu__item notepad-context-menu__item--danger"
+            onClick={() => {
+              const { noteId } = contextMenu
+              setContextMenu(null)
+              void handleDelete(noteId)
+            }}
+          >
+            Delete
           </button>
         </div>
       )}
