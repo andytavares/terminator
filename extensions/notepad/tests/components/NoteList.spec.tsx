@@ -116,14 +116,16 @@ describe('NoteList tag sidebar', () => {
 
   it('renders unique tag names from notes', () => {
     render(<NoteList />)
-    expect(screen.getByText('work')).toBeDefined()
-    expect(screen.getByText('infra')).toBeDefined()
+    // Tag may appear in both sidebar chip and note row chip
+    expect(screen.getAllByText('work').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('infra').length).toBeGreaterThanOrEqual(1)
   })
 
   it('clicking a tag sets filter.store activeTagId for that tag', async () => {
     mockInvoke.mockResolvedValueOnce({ data: [{ id: 'tag-infra', name: 'infra', noteCount: 1 }] })
     render(<NoteList />)
-    const tagBtn = screen.getByText('infra')
+    // Sidebar filter chips are <button> elements; note row tags are <span> elements
+    const tagBtn = screen.getByRole('button', { name: 'infra' })
     await act(async () => {
       fireEvent.click(tagBtn)
     })

@@ -34,36 +34,44 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   disposables.push(
     api.settings.register({
       label: 'Notepad',
+      description: 'Markdown notes with live preview, comments, and export.',
       properties: {
         'terminator.notepad.exportPath': {
-          type: 'string',
-          label: 'Export folder path',
-          description: 'Folder to export notes as .md files',
+          type: 'folder',
+          label: 'Export folder',
+          description: 'Where "Export" writes .md files',
           default: '~/Documents/Terminator Notes',
         },
         'terminator.notepad.commentExportFormat': {
-          type: 'string',
-          label: 'Comment export format',
-          description: 'How to export comments: sidecar, inline, or both',
+          type: 'enum',
+          label: 'Export comments as',
+          description: 'Format for comment export',
           default: 'sidecar',
+          options: ['sidecar', 'inline', 'both'],
         },
         'terminator.notepad.autosaveMs': {
           type: 'number',
-          label: 'Autosave debounce (ms)',
-          description: 'Delay before autosaving changes (200–5000 ms)',
+          label: 'Autosave debounce',
+          description: 'Idle delay before write (ms)',
           default: 800,
         },
         'terminator.notepad.defaultTags': {
           type: 'string',
-          label: 'Default new-note tags',
-          description: 'Comma-separated tags to apply to every new note',
+          label: 'Default tags for new notes',
+          description: 'Applied on quick-create',
           default: '',
         },
         'terminator.notepad.editorFontSize': {
           type: 'number',
           label: 'Editor font size',
-          description: 'Font size for the note editor (pt)',
+          description: 'Font size in pixels',
           default: 14,
+        },
+        'terminator.notepad.mcpSidecar': {
+          type: 'boolean',
+          label: 'Enable MCP sidecar',
+          description: 'Let agents read/search notes',
+          default: false,
         },
       },
     })

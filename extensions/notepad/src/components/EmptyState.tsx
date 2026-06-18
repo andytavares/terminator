@@ -1,20 +1,35 @@
 import React from 'react'
-import { FileText, FolderOpen } from 'lucide-react'
 
-export function EmptyState({ onImport }: { onImport?: () => void }): React.JSX.Element {
+interface EmptyStateProps {
+  onNewNote?: () => void
+  onImport?: () => void
+}
+
+export function EmptyState({ onNewNote, onImport }: EmptyStateProps): React.JSX.Element {
   return (
     <div className="notepad-empty-state">
-      <FileText size={40} className="notepad-empty-state__icon" />
+      <span className="notepad-empty-state__icon" role="img" aria-label="pencil">
+        ✏️
+      </span>
       <h2 className="notepad-empty-state__heading">No notes yet</h2>
-      <p className="notepad-empty-state__hint">
-        Press <kbd className="notepad-kbd">Cmd+Shift+N</kbd> to create your first note
+      <p className="notepad-empty-state__desc">
+        Capture your first note from anywhere in Terminator — even mid-command. Notes live in a
+        local SQLite vault and export to plain markdown whenever you want.
       </p>
-      {onImport && (
-        <button onClick={onImport} className="notepad-btn-ghost notepad-empty-state__import">
-          <FolderOpen size={14} />
-          Import folder…
+      <div className="notepad-empty-state__buttons">
+        <button className="notepad-btn-primary notepad-empty-state__new" onClick={onNewNote}>
+          New note <kbd className="notepad-kbd notepad-kbd--inline">⌘⇧N</kbd>
         </button>
-      )}
+        {onImport && (
+          <button className="notepad-btn-outline" onClick={onImport}>
+            Import a folder…
+          </button>
+        )}
+      </div>
+      <p className="notepad-empty-state__tip">
+        Tip: press <kbd className="notepad-kbd">⌘⇧N</kbd> anytime — the overlay opens over your
+        terminal.
+      </p>
     </div>
   )
 }

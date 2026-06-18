@@ -80,6 +80,7 @@ type SettingPropDef = {
 type ExtensionSchema = {
   extensionId: string
   label: string
+  description?: string
   properties: Record<string, SettingPropDef>
 }
 
@@ -238,6 +239,9 @@ function ExtensionsSection(): JSX.Element {
             </div>
             {schema && isExpanded && (
               <div className="extension-settings-panel">
+                {schema.description && (
+                  <p className="extension-settings-panel__desc">{schema.description}</p>
+                )}
                 {Object.entries(schema.properties).map(([key, def]) => (
                   <ExtensionSettingRow
                     key={key}
@@ -306,6 +310,12 @@ function ExtensionSettingRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  async function handleFolderPick(): Promise<void> {
+    const result = await window.electronAPI.dialog.openDirectory()
+    if ('cancelled' in result) return
+    handleChange(result.filePath)
+  }
+
   return (
     <div className="extension-setting-row">
       <label className="extension-setting-row__label">
@@ -313,26 +323,37 @@ function ExtensionSettingRow({
         {def.description && <span className="extension-setting-row__desc">{def.description}</span>}
       </label>
       {def.type === 'boolean' ? (
-        <select
-          className="extension-setting-row__input"
-          value={localValue}
-          onChange={(e) => handleChange(e.target.value)}
-        >
-          <option value="true">Enabled</option>
-          <option value="false">Disabled</option>
-        </select>
+        <button
+          className={`ext-toggle${localValue === 'true' ? ' ext-toggle--on' : ''}`}
+          role="switch"
+          aria-checked={localValue === 'true'}
+          aria-label={def.label}
+          onClick={() => handleChange(localValue === 'true' ? 'false' : 'true')}
+        />
       ) : def.type === 'enum' && def.options ? (
-        <select
-          className="extension-setting-row__input"
-          value={localValue}
-          onChange={(e) => handleChange(e.target.value)}
-        >
+        <div className="ext-segmented">
           {def.options.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
+            <button
+              key={opt}
+              className={`ext-segmented__btn${localValue === opt ? ' ext-segmented__btn--active' : ''}`}
+              onClick={() => handleChange(opt)}
+            >
+              {opt.charAt(0).toUpperCase() + opt.slice(1)}
+            </button>
           ))}
-        </select>
+        </div>
+      ) : def.type === 'folder' ? (
+        <div className="ext-folder-row">
+          <input
+            className="extension-setting-row__input ext-folder-row__input"
+            type="text"
+            value={localValue}
+            onChange={(e) => handleChange(e.target.value)}
+          />
+          <button className="ext-btn ext-folder-row__btn" onClick={() => void handleFolderPick()}>
+            Choose…
+          </button>
+        </div>
       ) : (
         <input
           className="extension-setting-row__input"

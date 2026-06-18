@@ -19,7 +19,7 @@ const baseComment: Comment = {
   noteId: 'n1',
   parentId: null,
   body: 'Test comment',
-  author: 'me',
+  author: 'Andrew',
   status: 'open',
   startOffset: 0,
   endOffset: 5,
@@ -37,6 +37,12 @@ const orphanedComment: Comment = {
   status: 'orphaned',
 }
 
+const resolvedComment: Comment = {
+  ...baseComment,
+  id: 'c3',
+  status: 'resolved',
+}
+
 describe('CommentMargin', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -48,10 +54,34 @@ describe('CommentMargin', () => {
     expect(container.querySelector('.notepad-comment-margin--empty')).toBeTruthy()
   })
 
-  it('renders comment list from store', () => {
+  it('renders Comments header', () => {
+    render(<CommentMargin noteId="n1" anchorTops={{}} />)
+    expect(screen.getByText('Comments')).toBeDefined()
+  })
+
+  it('shows open count badge when there are open comments', () => {
+    useCommentsStore.setState({ comments: [baseComment], loading: false })
+    render(<CommentMargin noteId="n1" anchorTops={{}} />)
+    expect(screen.getByText('1 open')).toBeDefined()
+  })
+
+  it('does not show badge when all resolved', () => {
+    useCommentsStore.setState({ comments: [resolvedComment], loading: false })
+    render(<CommentMargin noteId="n1" anchorTops={{}} />)
+    expect(screen.queryByText(/open/)).toBeNull()
+  })
+
+  it('renders comment body from store', () => {
     useCommentsStore.setState({ comments: [baseComment], loading: false })
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
     expect(screen.getByText('Test comment')).toBeDefined()
+  })
+
+  it('renders author avatar initial and name', () => {
+    useCommentsStore.setState({ comments: [baseComment], loading: false })
+    render(<CommentMargin noteId="n1" anchorTops={{}} />)
+    expect(screen.getByText('A')).toBeDefined()
+    expect(screen.getByText('Andrew')).toBeDefined()
   })
 
   it('shows orphaned comment with orphaned class', () => {
@@ -64,7 +94,7 @@ describe('CommentMargin', () => {
   it('Resolve button calls comments.resolve IPC', async () => {
     useCommentsStore.setState({ comments: [baseComment], loading: false })
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
-    const resolveBtn = screen.getByTitle('Resolve')
+    const resolveBtn = screen.getByText('Resolve')
     fireEvent.click(resolveBtn)
     await Promise.resolve()
     expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:comments.resolve', {
@@ -80,5 +110,31 @@ describe('CommentMargin', () => {
     fireEvent.click(deleteBtn)
     await Promise.resolve()
     expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:comments.delete', { id: 'c1' })
+  })
+
+  it('renders inline replies with arrow prefix', () => {
+    const commentWithReply: Comment = {
+      ...baseComment,
+      replies: [
+        {
+          ...baseComment,
+          id: 'r1',
+          parentId: 'c1',
+          body: 'Reply body text',
+        },
+      ],
+    }
+    useCommentsStore.setState({ comments: [commentWithReply], loading: false })
+    render(<CommentMargin noteId="n1" anchorTops={{}} />)
+    expect(screen.getByText('↳')).toBeDefined()
+    expect(screen.getByText('reply:')).toBeDefined()
+    expect(screen.getByText('Reply body text')).toBeDefined()
+  })
+
+  it('Reply text link opens reply form', () => {
+    useCommentsStore.setState({ comments: [baseComment], loading: false })
+    render(<CommentMargin noteId="n1" anchorTops={{}} />)
+    fireEvent.click(screen.getByText('Reply'))
+    expect(screen.getByPlaceholderText('Write a reply…')).toBeDefined()
   })
 })

@@ -4,11 +4,12 @@ export interface Disposable {
 
 export interface ExtensionSettingsSchema {
   label: string
+  description?: string
   properties: Record<string, SettingDefinition>
 }
 
 export interface SettingDefinition {
-  type: 'string' | 'number' | 'boolean' | 'enum'
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'folder'
   label: string
   description?: string
   default: unknown

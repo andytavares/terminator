@@ -5,6 +5,7 @@ import { useNotesStore } from '../stores/notes.store'
 import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
 import { NoteList } from './NoteList'
+import { EmptyState } from './EmptyState'
 import { CommentMargin } from './CommentMargin'
 import { CommentComposer } from './CommentComposer'
 import { ExportDialog } from './ExportDialog'
@@ -24,6 +25,18 @@ const ANCHOR_DEBOUNCE_MS = 2000
 const CARD_HEIGHT_EST = 110
 const CARD_GAP = 8
 
+async function importNotes(): Promise<void> {
+  const result = await window.electronAPI.extensionBridge.invoke(
+    'terminator.notepad:export.pickFolder',
+    {}
+  )
+  const folder = (result as { data: string | null }).data
+  if (!folder) return
+  await window.electronAPI.extensionBridge
+    .invoke('terminator.notepad:import.run', { folder })
+    .catch(console.error)
+}
+
 export function NotepadView(): React.JSX.Element {
   const [showExport, setShowExport] = useState(false)
   const [showComments, setShowComments] = useState(true)
@@ -34,7 +47,7 @@ export function NotepadView(): React.JSX.Element {
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
   const [commentHover, setCommentHover] = useState<{ id: string; top: number } | null>(null)
   const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const { selectedNoteId, notes, setNotes } = useNotesStore()
+  const { selectedNoteId, notes, setNotes, setShowQuickCreate } = useNotesStore()
   const { bodyDraft, isDirty, saveStatus, setActiveNote, markDirty, markSaving, markSaved } =
     useEditorStore()
   const { comments, setComments } = useCommentsStore()
@@ -299,6 +312,17 @@ export function NotepadView(): React.JSX.Element {
     if (saveStatus === 'saving') return 'Saving…'
     if (saveStatus === 'saved') return 'Saved'
     return ''
+  }
+
+  if (notes.length === 0) {
+    return (
+      <div className="notepad-view notepad-view--empty-screen">
+        <EmptyState
+          onNewNote={() => setShowQuickCreate(true)}
+          onImport={() => void importNotes()}
+        />
+      </div>
+    )
   }
 
   return (

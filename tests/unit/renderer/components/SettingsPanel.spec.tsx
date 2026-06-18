@@ -491,8 +491,8 @@ describe('ExtensionsSection', () => {
     await waitFor(() => screen.getByTitle('Configure'))
     fireEvent.click(screen.getByTitle('Configure'))
     await waitFor(() => expect(screen.getByText('Enable Feature')).toBeTruthy())
-    // The boolean select shows text 'Enabled'/'Disabled', not values 'true'/'false'
-    expect(screen.getByDisplayValue('Enabled')).toBeTruthy()
+    // The boolean setting renders as a toggle switch (role="switch")
+    expect(screen.getByRole('switch', { name: 'Enable Feature' })).toBeTruthy()
   })
 
   it('ExtensionSettingRow renders enum select', async () => {
@@ -525,9 +525,10 @@ describe('ExtensionsSection', () => {
     await waitFor(() => screen.getByTitle('Configure'))
     fireEvent.click(screen.getByTitle('Configure'))
     await waitFor(() => expect(screen.getByText('Mode')).toBeTruthy())
-    expect(screen.getByText('fast')).toBeTruthy()
-    expect(screen.getByText('slow')).toBeTruthy()
-    expect(screen.getByText('auto')).toBeTruthy()
+    // Enum options are capitalized in the segmented control
+    expect(screen.getByText('Fast')).toBeTruthy()
+    expect(screen.getByText('Slow')).toBeTruthy()
+    expect(screen.getByText('Auto')).toBeTruthy()
   })
 
   it('toggleSettingsExpand collapses panel when clicked again', async () => {

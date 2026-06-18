@@ -216,6 +216,20 @@ function NoteRow({
           dangerouslySetInnerHTML={{ __html: snippet || preview.slice(0, 80) }}
         />
       )}
+      {note.tags && note.tags.length > 0 && (
+        <div className="notepad-note-row__tags">
+          {note.tags.slice(0, 3).map((tag) => (
+            <span key={tag} className="notepad-note-row__tag">
+              {tag}
+            </span>
+          ))}
+          {note.tags.length > 3 && (
+            <span className="notepad-note-row__tag notepad-note-row__tag--more">
+              +{note.tags.length - 3}
+            </span>
+          )}
+        </div>
+      )}
       <div className="notepad-note-row__meta">
         {note.archivedAt && <span className="notepad-note-row__archived-badge">Archived</span>}
         {formatDate(note.updatedAt)}
