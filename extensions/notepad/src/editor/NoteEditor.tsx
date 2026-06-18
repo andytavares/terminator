@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { EditorView, keymap } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
+import { Compartment, EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import { LanguageDescription, syntaxHighlighting } from '@codemirror/language'
@@ -55,6 +55,7 @@ export function NoteEditor({
 }: NoteEditorProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const readOnlyCompartment = useRef(new Compartment())
   const onSelectionChangeRef = useRef(onSelectionChange)
   useEffect(() => {
     onSelectionChangeRef.current = onSelectionChange
@@ -130,7 +131,7 @@ export function NoteEditor({
           commentAnchorField,
           hoveredAnchorField,
           commentAnchorDecorations,
-          EditorState.readOnly.of(readOnly ?? false),
+          readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly ?? false)),
           keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
           /* v8 ignore next 3 */
           EditorView.updateListener.of((update) => {
@@ -263,7 +264,9 @@ export function NoteEditor({
     const view = viewRef.current
     /* v8 ignore next 3 */
     if (!view) return
-    view.dispatch({ effects: EditorState.readOnly.reconfigure(readOnly ?? false) })
+    view.dispatch({
+      effects: readOnlyCompartment.current.reconfigure(EditorState.readOnly.of(readOnly ?? false)),
+    })
   }, [readOnly])
 
   return <div ref={containerRef} className="notepad-editor-cm" style={{ height: '100%' }} />

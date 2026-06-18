@@ -2,6 +2,7 @@ import './notepad.css'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { useNotesStore } from '../stores/notes.store'
+import { NoteEditor } from '../editor/NoteEditor'
 
 function toFilenameSlug(title: string): string {
   return (
@@ -132,13 +133,7 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
         />
         <div className="notepad-quick-create__divider" />
         <div className="notepad-quick-create__body">
-          <textarea
-            className="notepad-textarea"
-            placeholder="Start writing…"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={8}
-          />
+          <NoteEditor key={showQuickCreate ? 'open' : 'closed'} initialDoc="" onChange={setBody} />
         </div>
         <div className="notepad-quick-create__footer">
           <div className="notepad-quick-create__tags">

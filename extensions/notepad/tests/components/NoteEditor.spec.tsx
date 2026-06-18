@@ -26,8 +26,12 @@ vi.mock('@codemirror/view', () => {
 vi.mock('@codemirror/state', () => ({
   EditorState: {
     create: vi.fn().mockReturnValue({}),
-    readOnly: { of: vi.fn(() => ({})), reconfigure: vi.fn(() => ({})) },
+    readOnly: { of: vi.fn(() => ({})) },
   },
+  Compartment: vi.fn().mockImplementation(() => ({
+    of: vi.fn(() => ({})),
+    reconfigure: vi.fn(() => ({})),
+  })),
   RangeSetBuilder: vi.fn().mockImplementation(() => ({ add: vi.fn(), finish: vi.fn(() => ({})) })),
   StateField: { define: vi.fn(() => ({})) },
   StateEffect: { define: vi.fn(() => ({ of: vi.fn() })) },

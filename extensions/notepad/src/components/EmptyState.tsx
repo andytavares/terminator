@@ -1,4 +1,5 @@
 import React from 'react'
+import { Pencil } from 'lucide-react'
 
 interface EmptyStateProps {
   onNewNote?: () => void
@@ -8,8 +9,8 @@ interface EmptyStateProps {
 export function EmptyState({ onNewNote, onImport }: EmptyStateProps): React.JSX.Element {
   return (
     <div className="notepad-empty-state">
-      <span className="notepad-empty-state__icon" role="img" aria-label="pencil">
-        ✏️
+      <span className="notepad-empty-state__icon">
+        <Pencil size={36} />
       </span>
       <h2 className="notepad-empty-state__heading">No notes yet</h2>
       <p className="notepad-empty-state__desc">

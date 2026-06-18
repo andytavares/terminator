@@ -24,11 +24,12 @@ afterEach(() => {
 })
 
 describe('QuickCreateOverlay', () => {
-  it('renders title and body inputs', () => {
+  it('renders title input and editor container', () => {
     useNotesStore.setState({ showQuickCreate: true })
-    render(<QuickCreateOverlay />)
+    const { container } = render(<QuickCreateOverlay />)
     expect(screen.getByPlaceholderText(/title/i)).toBeTruthy()
-    expect(screen.getByPlaceholderText(/start writing/i)).toBeTruthy()
+    // Body is now a CodeMirror editor (NoteEditor), not a textarea
+    expect(container.querySelector('.notepad-quick-create__body')).toBeTruthy()
   })
 
   it('Esc key closes the overlay via store', () => {

@@ -48,8 +48,8 @@ describe('EmptyState', () => {
     expect(onImport).toHaveBeenCalledOnce()
   })
 
-  it('renders pencil emoji icon', () => {
-    render(<EmptyState />)
-    expect(screen.getByRole('img', { name: 'pencil' })).toBeDefined()
+  it('renders pencil icon', () => {
+    const { container } = render(<EmptyState />)
+    expect(container.querySelector('.notepad-empty-state__icon')).toBeTruthy()
   })
 })

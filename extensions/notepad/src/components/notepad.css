@@ -253,10 +253,11 @@
 
 .notepad-btn-new {
   font-size: 12px;
-  padding: 5px 10px;
+  padding: 3px 10px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  border-radius: 5px;
 }
 
 /* Archived collapsible */
@@ -410,9 +411,10 @@
 }
 
 .notepad-empty-state__icon {
-  font-size: 48px;
-  opacity: 0.5;
-  line-height: 1;
+  opacity: 0.4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .notepad-empty-state__heading {
@@ -480,8 +482,9 @@
 }
 
 .notepad-kbd--inline {
-  font-size: 12px;
-  padding: 2px 6px;
+  font-size: 10px;
+  padding: 1px 4px;
+  line-height: 1.4;
 }
 
 /* ── Tag chips ──────────────────────────────────────────────────── */
@@ -679,7 +682,7 @@
 
 .notepad-quick-create__vault-status {
   font-size: 12px;
-  color: var(--tm-text-muted, rgba(255, 255, 255, 0.4));
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .notepad-quick-create__vault-status code {
@@ -701,15 +704,15 @@
   background: transparent;
   border: none;
   outline: none;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 600;
-  color: var(--tm-text-primary, rgba(255, 255, 255, 0.9));
-  padding: 14px 20px 10px;
+  color: rgba(255, 255, 255, 0.9);
+  padding: 12px 20px 8px;
   font-family: inherit;
 }
 
 .notepad-quick-create__title-input::placeholder {
-  color: var(--tm-text-muted, rgba(255, 255, 255, 0.25));
+  color: rgba(255, 255, 255, 0.25);
   font-weight: 400;
 }
 
@@ -717,7 +720,25 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 0 20px 12px;
+  padding: 0;
+  height: 220px;
+  overflow: hidden;
+}
+
+/* Constrain the CodeMirror editor when embedded in the quick-create dialog */
+.notepad-quick-create__body .notepad-editor-cm,
+.notepad-quick-create__body .cm-editor,
+.notepad-quick-create__body .cm-scroller {
+  height: 100% !important;
+  overflow-y: auto;
+}
+
+/* Tone down heading sizes inside the quick-create editor */
+.notepad-quick-create__body .notepad-h1 {
+  font-size: 1.3em;
+}
+.notepad-quick-create__body .notepad-h2 {
+  font-size: 1.15em;
 }
 
 .notepad-quick-create__footer {
