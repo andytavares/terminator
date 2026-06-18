@@ -35,6 +35,8 @@ const mockSessionStore = {
 const mockWorkspaceStore = {
   deleteProject: vi.fn().mockResolvedValue(undefined),
   renameProject: vi.fn().mockResolvedValue(undefined),
+  workspaces: [],
+  updateProjectBranch: vi.fn().mockResolvedValue(undefined),
 }
 
 beforeEach(() => {
@@ -54,6 +56,7 @@ afterEach(() => {
 describe('ProjectRow', () => {
   const defaultProps = {
     project: makeProject(),
+    workspaceId: 'ws-1',
     isActive: false,
     isExpanded: false,
     workspaceColor: '#5c6bc0',

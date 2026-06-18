@@ -153,6 +153,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
       .mockReturnValueOnce([]) // somedayRows
       .mockReturnValueOnce([]) // somedayTaskRows
       .mockReturnValueOnce([]) // completedRows
+      .mockReturnValueOnce([]) // staleTaskRows
     const handler = getHandler('task-vault:projects:weekly-review')
     const result = (await handler({}, {})) as { inboxItems: unknown[] }
     expect(result.inboxItems.length).toBeGreaterThan(0)
@@ -166,6 +167,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
       .mockReturnValueOnce([]) // somedayRows
       .mockReturnValueOnce([]) // somedayTaskRows
       .mockReturnValueOnce([]) // completedRows
+      .mockReturnValueOnce([]) // staleTaskRows
     mockGet.mockReturnValue({ c: 0 }) // count for active project → stale
     const handler = getHandler('task-vault:projects:weekly-review')
     const result = (await handler({}, {})) as {
@@ -186,6 +188,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
       .mockReturnValueOnce([])
       .mockReturnValueOnce([])
       .mockReturnValueOnce([])
+      .mockReturnValueOnce([]) // staleTaskRows
     mockGet.mockReturnValue({ c: 2 }) // not stale
     const handler = getHandler('task-vault:projects:weekly-review')
     const result = (await handler({}, {})) as { staleProjects: unknown[] }

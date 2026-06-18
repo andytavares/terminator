@@ -77,21 +77,23 @@ describe('LeafPane', () => {
     const instance = makeInstance()
     mockGetTerminalInstance.mockReturnValue(instance)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    fireEvent.click(container.querySelector('.leaf-pane')!)
+    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
     expect(mockSetFocusedSession).toHaveBeenCalledWith('proj-1', 'sess-1')
     expect(instance.terminal.focus).toHaveBeenCalled()
   })
 
-  it('calls clearBellCount on click', () => {
+  it('calls clearBellCount on mousedown', () => {
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    fireEvent.click(container.querySelector('.leaf-pane')!)
+    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
     expect(mockClearBellCount).toHaveBeenCalledWith('sess-1')
   })
 
-  it('does not throw on click when no terminal instance', () => {
+  it('does not throw on mousedown when no terminal instance', () => {
     mockGetTerminalInstance.mockReturnValue(undefined)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    expect(() => fireEvent.click(container.querySelector('.leaf-pane')!)).not.toThrow()
+    expect(() =>
+      fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
+    ).not.toThrow()
   })
 
   it('pastes file paths into terminal on drop', () => {

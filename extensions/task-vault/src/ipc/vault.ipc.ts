@@ -170,7 +170,7 @@ export function registerVaultIpcHandlers(): () => void {
       // Rollover: move open/in-progress tasks from past daily logs to today
       const staleRows = db
         .prepare(
-          `SELECT t.id, t.text, p.name AS project, t.context, a.name AS area, t.due_date, t.project_id, t.area_id
+          `SELECT t.id, t.text, p.name AS project, t.context, a.name AS area, t.due_date, t.project_id, t.area_id, t.source_ref, t.today_since
            FROM tasks t ${TASK_JOINS}
            WHERE t.source='daily' AND t.source_ref < ? AND t.source_ref IS NOT NULL
              AND t.status IN ('open','in-progress','blocked') AND t.parent_id IS NULL
@@ -181,8 +181,8 @@ export function registerVaultIpcHandlers(): () => void {
       const rolledOverIds: string[] = []
       if (staleRows.length > 0) {
         const insertStmt = db.prepare(
-          `INSERT OR IGNORE INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,created_at,updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+          `INSERT OR IGNORE INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,today_since,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
         )
         const migrateStmt = db.prepare(
           `UPDATE tasks SET status='migrated', migrated_to=?, updated_at=? WHERE id=?`
@@ -192,6 +192,8 @@ export function registerVaultIpcHandlers(): () => void {
         )
         for (const row of staleRows) {
           const newId = randomUUID()
+          const inheritedTodaySince =
+            (row.today_since as string) || (row.source_ref as string) || date
           insertStmt.run(
             newId,
             row.text,
@@ -202,6 +204,7 @@ export function registerVaultIpcHandlers(): () => void {
             row.due_date ?? null,
             'daily',
             date,
+            inheritedTodaySince,
             now,
             now
           )
@@ -227,6 +230,11 @@ export function registerVaultIpcHandlers(): () => void {
             .all(task.id) as Record<string, unknown>[]
         ).map(rowToTask)
       }
+      const thresholdRow = db
+        .prepare(`SELECT value FROM settings WHERE key='stale_days_threshold'`)
+        .get() as { value: string } | undefined
+      const staleDaysThreshold = thresholdRow ? parseInt(thresholdRow.value, 10) : 7
+
       return {
         date,
         filePath: `daily/${date}.md`,
@@ -234,6 +242,7 @@ export function registerVaultIpcHandlers(): () => void {
         rolledOver: staleRows.length,
         rolledOverIds,
         exists: tasks.length > 0,
+        staleDaysThreshold,
       }
     } catch (err) {
       return { error: String(err) }
@@ -300,9 +309,10 @@ export function registerVaultIpcHandlers(): () => void {
       extracted.area,
       now
     )
+    const todaySinceVal = source === 'daily' ? (sourceRef ?? null) : null
     db.prepare(
-      `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,today_since,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
     ).run(
       id,
       extracted.text,
@@ -313,6 +323,7 @@ export function registerVaultIpcHandlers(): () => void {
       extracted.dueDate ?? null,
       source,
       sourceRef,
+      todaySinceVal,
       now,
       now
     )
@@ -1556,6 +1567,29 @@ export function registerVaultIpcHandlers(): () => void {
       )
       .all(startDate, endDate) as DayRow[]
     return { days: rows }
+  })
+
+  // ── vault:reset-today-since ──────────────────────────────────────────────────
+
+  handle('task-vault:vault:reset-today-since', async (_event, payload) => {
+    const { taskId } = payload as { taskId: string }
+    if (!taskId) return { error: 'VALIDATION_ERROR' }
+    const db = getDb()
+    const now = new Date().toISOString()
+    db.prepare(`UPDATE tasks SET today_since=?, updated_at=? WHERE id=?`).run(today(), now, taskId)
+    return { success: true }
+  })
+
+  // ── settings:set-stale-threshold ────────────────────────────────────────────
+
+  handle('task-vault:settings:set-stale-threshold', async (_event, payload) => {
+    const { days } = payload as { days: number }
+    if (typeof days !== 'number' || days < 1) return { error: 'VALIDATION_ERROR' }
+    const db = getDb()
+    db.prepare(
+      `INSERT OR REPLACE INTO settings (key, value) VALUES ('stale_days_threshold', ?)`
+    ).run(String(days))
+    return { success: true }
   })
 
   return () => {

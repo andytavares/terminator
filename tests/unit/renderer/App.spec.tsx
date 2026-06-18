@@ -38,7 +38,7 @@ vi.mock('../../../src/renderer/hooks/useKeyboardShortcuts', () => ({
   }),
 }))
 vi.mock('../../../src/renderer/hooks/useTerminalSession', () => ({
-  useTerminalSession: vi.fn(() => ({ createSession: vi.fn() })),
+  useTerminalSession: vi.fn(() => ({ createSession: vi.fn(), splitSession: vi.fn() })),
 }))
 type CommandRegistration = { id: string; label: string; action: () => void }
 let capturedPaletteCommands: CommandRegistration[] = []
@@ -679,6 +679,46 @@ describe('App', () => {
     const cmd = capturedPaletteCommands.find((c) => c.id === 'core.switch-workspace-ws-1')
     cmd?.action()
     expect(mockSetActiveWorkspace).toHaveBeenCalledWith('ws-1')
+  })
+
+  it('command core.split-vertical action calls splitSession with activeProjectId', async () => {
+    const mockSplitSession = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(useTerminalSession).mockReturnValue({
+      createSession: vi.fn(),
+      splitSession: mockSplitSession,
+    })
+    setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+    render(<App />)
+    capturedShortcutCallbacks.onOpenCommandPalette?.()
+    await waitFor(() => screen.getByTestId('command-palette'))
+    const cmd = capturedPaletteCommands.find((c) => c.id === 'core.split-vertical')
+    cmd?.action()
+    expect(mockSplitSession).toHaveBeenCalledWith(
+      'proj-1',
+      'vertical',
+      expect.any(String),
+      expect.any(Number)
+    )
+  })
+
+  it('command core.split-horizontal action calls splitSession with activeProjectId', async () => {
+    const mockSplitSession = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(useTerminalSession).mockReturnValue({
+      createSession: vi.fn(),
+      splitSession: mockSplitSession,
+    })
+    setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+    render(<App />)
+    capturedShortcutCallbacks.onOpenCommandPalette?.()
+    await waitFor(() => screen.getByTestId('command-palette'))
+    const cmd = capturedPaletteCommands.find((c) => c.id === 'core.split-horizontal')
+    cmd?.action()
+    expect(mockSplitSession).toHaveBeenCalledWith(
+      'proj-1',
+      'horizontal',
+      expect.any(String),
+      expect.any(Number)
+    )
   })
 
   it('onSelectGlobalTab toggles activeGlobalTab off when same id clicked', async () => {

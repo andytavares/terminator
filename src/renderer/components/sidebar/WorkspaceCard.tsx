@@ -139,6 +139,7 @@ export function WorkspaceCard({
               >
                 <ProjectRow
                   project={project}
+                  workspaceId={workspace.id}
                   isActive={activeProjectId === project.id}
                   isExpanded={activeProjectId === project.id}
                   workspaceColor={workspace.color}

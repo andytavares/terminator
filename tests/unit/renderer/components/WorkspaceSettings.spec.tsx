@@ -15,13 +15,14 @@ vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
 const mockUpdateTheme = vi.fn()
 const mockUpdateScrollback = vi.fn()
 const mockUpdateWorktreeDir = vi.fn()
+const mockUpdateBranchExcludePatterns = vi.fn()
 const mockLoadSettings = vi.fn()
 const mockUpdateWorkspace = vi.fn()
 
 const globalSettings = {
   appearance: { theme: 'dark' as const },
   terminal: { scrollbackLimit: 5000, defaultShell: '/bin/zsh' },
-  git: { worktreeBaseDir: '' },
+  git: { worktreeBaseDir: '', branchExcludePatterns: [] as string[] },
   extensions: {},
 }
 
@@ -38,6 +39,7 @@ beforeEach(() => {
     updateWorkspaceTheme: mockUpdateTheme,
     updateWorkspaceScrollback: mockUpdateScrollback,
     updateWorkspaceWorktreeBaseDir: mockUpdateWorktreeDir,
+    updateWorkspaceBranchExcludePatterns: mockUpdateBranchExcludePatterns,
     loadSettings: mockLoadSettings,
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -173,5 +175,47 @@ describe('WorkspaceSettings', () => {
     // Click the worktree "Use global default" (last one)
     fireEvent.click(globalDefaults[globalDefaults.length - 1])
     expect(mockUpdateWorktreeDir).toHaveBeenCalledWith('ws-1', undefined)
+  })
+
+  it('calls updateWorkspaceBranchExcludePatterns on blur of branch exclude textarea', () => {
+    render(<WorkspaceSettings workspaceId="ws-1" />)
+    const textarea = screen.getByPlaceholderText(/gh-readonly-queue/)
+    Object.defineProperty(textarea, 'value', {
+      value: 'gh-readonly-queue/*\nrenovate/*',
+      writable: true,
+    })
+    fireEvent.blur(textarea)
+    expect(mockUpdateBranchExcludePatterns).toHaveBeenCalledWith('ws-1', [
+      'gh-readonly-queue/*',
+      'renovate/*',
+    ])
+  })
+
+  it('calls updateWorkspaceBranchExcludePatterns with undefined when textarea is empty on blur', () => {
+    render(<WorkspaceSettings workspaceId="ws-1" />)
+    const textarea = screen.getByPlaceholderText(/gh-readonly-queue/)
+    Object.defineProperty(textarea, 'value', { value: '   ', writable: true })
+    fireEvent.blur(textarea)
+    expect(mockUpdateBranchExcludePatterns).toHaveBeenCalledWith('ws-1', undefined)
+  })
+
+  it('shows Use global default button for branch exclude when override is set and clicking it calls update with undefined', () => {
+    vi.mocked(useSettingsStore).mockReturnValue({
+      globalSettings,
+      workspaceSettings: new Map([
+        ['ws-1', { overrides: { git: { branchExcludePatterns: ['renovate/*'] } } }],
+      ]),
+      updateWorkspaceTheme: mockUpdateTheme,
+      updateWorkspaceScrollback: mockUpdateScrollback,
+      updateWorkspaceWorktreeBaseDir: mockUpdateWorktreeDir,
+      updateWorkspaceBranchExcludePatterns: mockUpdateBranchExcludePatterns,
+      loadSettings: mockLoadSettings,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    render(<WorkspaceSettings workspaceId="ws-1" />)
+    const buttons = screen.getAllByRole('button')
+    const globalDefaults = buttons.filter((b) => b.textContent === 'Use global default')
+    expect(globalDefaults.length).toBeGreaterThanOrEqual(1)
+    fireEvent.click(globalDefaults[globalDefaults.length - 1])
+    expect(mockUpdateBranchExcludePatterns).toHaveBeenCalledWith('ws-1', undefined)
   })
 })

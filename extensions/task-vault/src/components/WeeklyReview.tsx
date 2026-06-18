@@ -4,6 +4,7 @@ import type { IndexedTask, IndexedProject } from '../vault/types'
 import { WeeklyReviewStep1GetClear } from './WeeklyReviewStep1GetClear'
 import { WeeklyReviewStep2Inbox } from './WeeklyReviewStep2Inbox'
 import { WeeklyReviewStep3Projects } from './WeeklyReviewStep3Projects'
+import { WeeklyReviewStepStaleTasks } from './WeeklyReviewStepStaleTasks'
 import { WeeklyReviewStep5Someday } from './WeeklyReviewStep5Someday'
 import { WeeklyReviewStep6Reflect } from './WeeklyReviewStep6Reflect'
 
@@ -14,10 +15,12 @@ interface WeeklyReviewPayload {
   somedayProjects: IndexedProject[]
   somedayTasks: IndexedTask[]
   completedLastWeek: IndexedTask[]
+  staleTasks: IndexedTask[]
+  staleDaysThreshold: number
   lastReviewDate: string | null
 }
 
-const TOTAL_STEPS = 5
+const TOTAL_STEPS = 6
 
 const DRAFT_KEY = 'task-vault:weekly-review-draft'
 
@@ -160,13 +163,20 @@ export function WeeklyReview(): React.JSX.Element {
           />
         )}
         {step === 4 && (
+          <WeeklyReviewStepStaleTasks
+            staleTasks={payload.staleTasks}
+            staleDaysThreshold={payload.staleDaysThreshold}
+            onComplete={nextStep}
+          />
+        )}
+        {step === 5 && (
           <WeeklyReviewStep5Someday
             somedayProjects={payload.somedayProjects}
             somedayTasks={payload.somedayTasks}
             onComplete={nextStep}
           />
         )}
-        {step === 5 && <WeeklyReviewStep6Reflect onComplete={handleDone} />}
+        {step === 6 && <WeeklyReviewStep6Reflect onComplete={handleDone} />}
       </div>
     </div>
   )

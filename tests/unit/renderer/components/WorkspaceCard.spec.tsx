@@ -9,6 +9,10 @@ vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: vi.fn(),
 }))
 
+vi.mock('../../../../src/renderer/hooks/useBranchSync', () => ({
+  useBranchSync: vi.fn(),
+}))
+
 vi.mock('../../../../src/renderer/stores/session.store', () => ({
   useSessionStore: vi.fn().mockReturnValue({
     getSessionsForProject: vi.fn().mockReturnValue([]),
@@ -21,6 +25,8 @@ vi.mock('../../../../src/renderer/stores/session.store', () => ({
 const mockWorkspaceStore = {
   deleteWorkspace: vi.fn().mockResolvedValue(undefined),
   reorderProjects: vi.fn().mockResolvedValue(undefined),
+  workspaces: [] as Workspace[],
+  updateProjectBranch: vi.fn().mockResolvedValue(undefined),
 }
 
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({

@@ -76,6 +76,7 @@ beforeEach(() => {
     clearBellCount: mockClearBell,
     getPaneLayout: mockGetPaneLayout,
     setSplitRatio: mockSetSplitRatio,
+    setFocusedSession: vi.fn(),
   } as unknown as ReturnType<typeof useSessionStore>)
   mockGetSessions.mockReturnValue([])
   mockGetActive.mockReturnValue(null)
@@ -129,7 +130,7 @@ describe('TerminalPane', () => {
       unmount: vi.fn(),
     })
     const { container } = render(<TerminalPane projectId="proj-1" />)
-    fireEvent.click(container.querySelector('.terminal-pane')!)
+    fireEvent.mouseDown(container.querySelector('.terminal-pane')!, { button: 0 })
     expect(mockFocus).toHaveBeenCalled()
   })
 
@@ -285,6 +286,7 @@ describe('TerminalPane', () => {
         clearBellCount: mockClearBell,
         getPaneLayout: mockGetPaneLayout,
         setSplitRatio: mockSetSplitRatio,
+        setFocusedSession: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
       const layout = {
         type: 'split',

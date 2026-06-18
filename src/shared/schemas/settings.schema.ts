@@ -12,6 +12,7 @@ export const GlobalSettingsSchema = z.object({
   }),
   git: z.object({
     worktreeBaseDir: z.string(),
+    branchExcludePatterns: z.array(z.string()).default([]),
   }),
   extensions: z.record(z.string(), z.record(z.string(), z.unknown())),
   ui: z
@@ -39,6 +40,7 @@ export const WorkspaceSettingsSchema = z.object({
       git: z
         .object({
           worktreeBaseDir: z.string().optional(),
+          branchExcludePatterns: z.array(z.string()).optional(),
         })
         .optional(),
     })
@@ -50,7 +52,7 @@ export const WorkspaceSettingsSchema = z.object({
 export const DEFAULT_GLOBAL_SETTINGS = {
   appearance: { theme: 'dark' as const },
   terminal: { scrollbackLimit: 10000, defaultShell: process.env.SHELL || '/bin/zsh' },
-  git: { worktreeBaseDir: '' },
+  git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},
   ui: { hasSeenWelcome: false },
 }

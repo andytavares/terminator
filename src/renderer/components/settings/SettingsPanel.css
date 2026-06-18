@@ -154,6 +154,12 @@
   border-color: var(--accent);
 }
 
+.settings-section__textarea {
+  width: 300px;
+  resize: vertical;
+  min-height: 72px;
+}
+
 .settings-section__radio-group {
   display: flex;
   gap: 16px;

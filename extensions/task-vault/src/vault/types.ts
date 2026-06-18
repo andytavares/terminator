@@ -109,6 +109,7 @@ export interface IndexedTask {
   recurrenceEndDate?: string
   recurrenceEndCount?: number
   recurrenceCompletedCount?: number
+  todaySince?: string
 }
 
 export interface IndexedProject {

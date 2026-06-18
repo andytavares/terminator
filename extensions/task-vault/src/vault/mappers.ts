@@ -99,6 +99,7 @@ export function rowToTask(row: Record<string, unknown>): IndexedTask {
     recurrenceEndDate,
     recurrenceEndCount,
     recurrenceCompletedCount,
+    todaySince: (row.today_since as string) || undefined,
   }
 }
 
@@ -126,7 +127,8 @@ export const TASK_COLS = `
   t.project_id, t.area_id,
   t.recurrence_rule, t.recurrence_template_id, t.recurrence_notify_at,
   t.blocked_reason, t.blocked_check_interval,
-  t.recurrence_end_type, t.recurrence_end_date, t.recurrence_end_count, t.recurrence_completed_count
+  t.recurrence_end_type, t.recurrence_end_date, t.recurrence_end_count, t.recurrence_completed_count,
+  t.today_since
 `
 
 /** JOIN fragment for tasks (aliases p=projects, a=areas) */

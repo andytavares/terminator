@@ -93,6 +93,11 @@ function applyMigrations(db: Database.Database): void {
     migrateMetadataToColumns(db)
   }
 
+  // today_since: tracks when a task first appeared in today's daily view
+  if (!hasColumn(db, 'tasks', 'today_since')) {
+    db.exec(`ALTER TABLE tasks ADD COLUMN today_since TEXT`)
+  }
+
   // Drop legacy tables no longer used by the app
   db.exec(`DROP TABLE IF EXISTS events`)
   db.exec(`DROP TABLE IF EXISTS notes`)

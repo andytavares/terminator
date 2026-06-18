@@ -270,6 +270,7 @@ export function TaskVaultView(): React.JSX.Element {
     loadSomeday,
     setKanbanLanes,
     tickCalendar,
+    staleDaysThreshold,
   } = useVaultStore()
   const [showDataTools, setShowDataTools] = useState(false)
   const [availableContexts, setAvailableContexts] = useState<string[]>([])
@@ -596,6 +597,7 @@ export function TaskVaultView(): React.JSX.Element {
                   onPickUpToday={handlePickUpToday}
                   onDeleteBacklogTask={handleDeleteBacklogTask}
                   onRefreshBacklog={loadSomedayTasks}
+                  staleDaysThreshold={staleDaysThreshold}
                 />
               )}
               {activeView === 'daily' && !isLoading && !error && !todayLog && (

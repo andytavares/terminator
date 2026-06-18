@@ -19,6 +19,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     clearBellCount,
     getPaneLayout,
     setSplitRatio,
+    setFocusedSession,
   } = useSessionStore()
 
   const activeSessionId = getActiveSessionForProject(projectId)
@@ -68,6 +69,13 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // In split mode, focus the active terminal when it changes (e.g., sidebar click).
+  useEffect(() => {
+    if (!layout || !activeSessionId) return
+    setFocusedSession(projectId, activeSessionId)
+    getTerminalInstance(activeSessionId)?.terminal.focus()
+  }, [activeSessionId, layout, projectId, setFocusedSession, getTerminalInstance])
+
   const scrollActiveToBottom = useCallback(() => {
     if (activeSessionId) {
       const instance = getTerminalInstance(activeSessionId)
@@ -104,7 +112,8 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     )
   }
 
-  function handleClick(): void {
+  function handleMouseDown(e: React.MouseEvent): void {
+    if (e.button !== 0) return
     scrollActiveToBottom()
   }
 
@@ -128,7 +137,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
   return (
     <div
       className="terminal-pane"
-      onClick={handleClick}
+      onMouseDown={handleMouseDown}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
