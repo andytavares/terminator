@@ -104,6 +104,13 @@ describe('task-vault:vault:process-inbox-item', () => {
     expect(result).toMatchObject({ success: true })
   })
 
+  it('action:someday clears today_since so task is not immediately stale on return', async () => {
+    const handler = getHandler('task-vault:vault:process-inbox-item')
+    await handler({}, { taskId: TASK_ID, action: 'someday' })
+    const preparedSqls: string[] = vi.mocked(mockPrepare).mock.calls.map((c) => c[0] as string)
+    expect(preparedSqls.some((sql) => sql.includes('today_since=NULL'))).toBe(true)
+  })
+
   it('action:file with destination files to destination', async () => {
     const handler = getHandler('task-vault:vault:process-inbox-item')
     const result = await handler(

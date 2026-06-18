@@ -543,13 +543,12 @@ export function registerVaultIpcHandlers(): () => void {
     }
 
     if (action === 'someday') {
-      db.prepare(`UPDATE tasks SET source='someday', source_ref=NULL, updated_at=? WHERE id=?`).run(
-        now,
-        taskId
-      )
+      db.prepare(
+        `UPDATE tasks SET source='someday', source_ref=NULL, today_since=NULL, updated_at=? WHERE id=?`
+      ).run(now, taskId)
       // Move subtasks too
       db.prepare(
-        `UPDATE tasks SET source='someday', source_ref=NULL, updated_at=? WHERE parent_id=?`
+        `UPDATE tasks SET source='someday', source_ref=NULL, today_since=NULL, updated_at=? WHERE parent_id=?`
       ).run(now, taskId)
       broadcast('task-vault:push:index-updated', {})
       return { success: true }

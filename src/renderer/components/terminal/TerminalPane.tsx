@@ -70,11 +70,14 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
   }, [])
 
   // In split mode, focus the active terminal when it changes (e.g., sidebar click).
+  // layout is intentionally excluded from deps: changes to split ratio should not
+  // clobber focus that activateSplit or the user already set.
   useEffect(() => {
     if (!layout || !activeSessionId) return
     setFocusedSession(projectId, activeSessionId)
     getTerminalInstance(activeSessionId)?.terminal.focus()
-  }, [activeSessionId, layout, projectId, setFocusedSession, getTerminalInstance])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId, projectId, setFocusedSession, getTerminalInstance])
 
   const scrollActiveToBottom = useCallback(() => {
     if (activeSessionId) {
