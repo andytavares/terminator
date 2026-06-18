@@ -10,6 +10,7 @@ import { EditWorkspaceDialog } from './EditWorkspaceDialog'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { ExtensionFooter } from './ExtensionFooter'
 import { ProjectRow } from './ProjectRow'
+import { BranchSwitcher } from './BranchSwitcher'
 import './WorkspaceCard.css'
 
 interface WorkspaceCardProps {
@@ -139,6 +140,7 @@ export function WorkspaceCard({
               >
                 <ProjectRow
                   project={project}
+                  workspaceId={workspace.id}
                   isActive={activeProjectId === project.id}
                   isExpanded={activeProjectId === project.id}
                   workspaceColor={workspace.color}
@@ -154,8 +156,12 @@ export function WorkspaceCard({
                       settings.terminal.scrollbackLimit
                     )
                   }}
-                  onBranchBadgeClick={() =>
-                    useExtensionRegistry.getState().setActiveProjectTab('git')
+                  branchSwitcher={
+                    <BranchSwitcher
+                      project={project}
+                      workspaceFolderPath={workspace.folderPath}
+                      workspaceId={workspace.id}
+                    />
                   }
                   searchQuery={searchQuery}
                 />

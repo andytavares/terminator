@@ -8,6 +8,7 @@ export function GlobalSettings(): JSX.Element {
     updateGlobalTheme,
     updateScrollbackLimit,
     updateWorktreeBaseDir,
+    updateBranchExcludePatterns,
     updateShowMetricsBar,
   } = useSettingsStore()
 
@@ -102,6 +103,27 @@ export function GlobalSettings(): JSX.Element {
         <span className="settings-section__hint">
           Where new git worktrees are created. Leave empty for the default (<code>.worktrees</code>{' '}
           inside the repo).
+        </span>
+      </div>
+
+      <div className="settings-section__field">
+        <label className="settings-section__label">Branch Exclude Patterns</label>
+        <textarea
+          className="settings-section__input settings-section__textarea"
+          defaultValue={(globalSettings.git.branchExcludePatterns ?? []).join('\n')}
+          placeholder={'gh-readonly-queue/*\nrenovate/*'}
+          rows={4}
+          onBlur={(e) => {
+            const patterns = e.target.value
+              .split('\n')
+              .map((p) => p.trim())
+              .filter(Boolean)
+            void updateBranchExcludePatterns(patterns)
+          }}
+        />
+        <span className="settings-section__hint">
+          One pattern per line. Supports <code>*</code> wildcards (e.g.{' '}
+          <code>gh-readonly-queue/*</code>). Matching branches are hidden from the branch selector.
         </span>
       </div>
     </div>

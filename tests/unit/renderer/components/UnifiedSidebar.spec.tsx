@@ -16,6 +16,10 @@ vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: vi.fn(),
 }))
 
+vi.mock('../../../../src/renderer/hooks/useBranchSync', () => ({
+  useBranchSync: vi.fn(),
+}))
+
 const ws1 = {
   id: 'ws-1',
   name: 'Backend',

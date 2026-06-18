@@ -13,6 +13,7 @@ interface SessionRowProps {
   workspaceColor: string
   onSelect: () => void
   onRename: (newTitle: string) => void
+  isSubSession?: boolean
   hidden?: boolean
 }
 
@@ -23,6 +24,7 @@ export function SessionRow({
   bellCount,
   onSelect,
   onRename,
+  isSubSession,
   hidden,
 }: SessionRowProps): JSX.Element {
   const [renaming, setRenaming] = useState(false)
@@ -82,7 +84,7 @@ export function SessionRow({
   return (
     <>
       <div
-        className={`session-row${isActive ? ' session-row--active' : ''}`}
+        className={`session-row${isActive ? ' session-row--active' : ''}${isSubSession ? ' session-row--sub' : ''}`}
         onClick={onSelect}
         onDoubleClick={startRename}
         onContextMenu={handleContextMenu}

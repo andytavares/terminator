@@ -180,34 +180,28 @@ export function useKeyboardShortcuts({
         return
       }
 
-      // Cmd+D: split vertically (side by side)
+      // Cmd+D: split vertically (side by side) — always in the active project, never scratch
       if (isMeta && !e.shiftKey && e.key === 'd') {
         e.preventDefault()
-        if (effectiveProjectId) {
+        if (activeProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
           const cwd = resolveActiveCwd()
-          splitSession(
-            effectiveProjectId,
-            'vertical',
-            cwd,
-            settings.terminal.scrollbackLimit
-          ).catch(() => addToast({ type: 'error', message: 'Could not create split pane' }))
+          splitSession(activeProjectId, 'vertical', cwd, settings.terminal.scrollbackLimit).catch(
+            () => addToast({ type: 'error', message: 'Could not create split pane' })
+          )
         }
         return
       }
 
-      // Cmd+Shift+D: split horizontally (top / bottom)
+      // Cmd+Shift+D: split horizontally (top / bottom) — always in the active project, never scratch
       if (isMeta && e.shiftKey && e.key === 'd') {
         e.preventDefault()
-        if (effectiveProjectId) {
+        if (activeProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
           const cwd = resolveActiveCwd()
-          splitSession(
-            effectiveProjectId,
-            'horizontal',
-            cwd,
-            settings.terminal.scrollbackLimit
-          ).catch(() => addToast({ type: 'error', message: 'Could not create split pane' }))
+          splitSession(activeProjectId, 'horizontal', cwd, settings.terminal.scrollbackLimit).catch(
+            () => addToast({ type: 'error', message: 'Could not create split pane' })
+          )
         }
         return
       }

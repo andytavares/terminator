@@ -14,6 +14,7 @@ export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
     updateWorkspaceTheme,
     updateWorkspaceScrollback,
     updateWorkspaceWorktreeBaseDir,
+    updateWorkspaceBranchExcludePatterns,
     loadSettings,
   } = useSettingsStore()
   const { workspaces } = useWorkspaceStore()
@@ -33,6 +34,9 @@ export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
   const hasWorktreeDirOverride = ws?.overrides?.git?.worktreeBaseDir !== undefined
   const effectiveWorktreeBaseDir =
     ws?.overrides?.git?.worktreeBaseDir ?? globalSettings.git.worktreeBaseDir
+  const hasBranchExcludeOverride = ws?.overrides?.git?.branchExcludePatterns !== undefined
+  const effectiveBranchExcludePatterns =
+    ws?.overrides?.git?.branchExcludePatterns ?? globalSettings.git.branchExcludePatterns ?? []
 
   return (
     <div className="settings-section">
@@ -114,6 +118,38 @@ export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
           <button
             className="settings-section__btn-link"
             onClick={() => updateWorkspaceWorktreeBaseDir(workspaceId, undefined)}
+          >
+            Use global default
+          </button>
+        )}
+      </div>
+
+      <div className="settings-section__field">
+        <label className="settings-section__label">Branch Exclude Patterns</label>
+        <textarea
+          className="settings-section__input settings-section__textarea"
+          key={effectiveBranchExcludePatterns.join('\n')}
+          defaultValue={effectiveBranchExcludePatterns.join('\n')}
+          placeholder={'gh-readonly-queue/*\nrenovate/*'}
+          rows={4}
+          onBlur={(e) => {
+            const patterns = e.target.value
+              .split('\n')
+              .map((p) => p.trim())
+              .filter(Boolean)
+            void updateWorkspaceBranchExcludePatterns(
+              workspaceId,
+              patterns.length > 0 ? patterns : undefined
+            )
+          }}
+        />
+        <span className="settings-section__hint">
+          Overrides global branch exclude patterns for this workspace.
+        </span>
+        {hasBranchExcludeOverride && (
+          <button
+            className="settings-section__btn-link"
+            onClick={() => void updateWorkspaceBranchExcludePatterns(workspaceId, undefined)}
           >
             Use global default
           </button>

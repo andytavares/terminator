@@ -25,13 +25,17 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId])
 
-  const handleClick = useCallback(() => {
-    setFocusedSession(projectId, sessionId)
-    clearBellCount(sessionId)
-    const instance = getTerminalInstance(sessionId)
-    instance?.terminal.scrollToBottom()
-    instance?.terminal.focus()
-  }, [projectId, sessionId, setFocusedSession, clearBellCount, getTerminalInstance])
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button !== 0) return
+      setFocusedSession(projectId, sessionId)
+      clearBellCount(sessionId)
+      const instance = getTerminalInstance(sessionId)
+      instance?.terminal.scrollToBottom()
+      instance?.terminal.focus()
+    },
+    [projectId, sessionId, setFocusedSession, clearBellCount, getTerminalInstance]
+  )
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
     if (e.dataTransfer.types.includes('Files')) e.preventDefault()
@@ -52,7 +56,7 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
   return (
     <div
       className={`leaf-pane${isFocused ? ' leaf-pane--focused' : ''}`}
-      onClick={handleClick}
+      onMouseDown={handleMouseDown}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >

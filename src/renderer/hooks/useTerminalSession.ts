@@ -46,9 +46,17 @@ export function useTerminalSession() {
       type: 'human' | 'agent',
       title: string,
       cwd: string,
-      scrollbackLimit: number
+      scrollbackLimit: number,
+      parentSessionId?: string
     ): Promise<string> {
-      const sessionId = await storeCreateSession(projectId, type, title, cwd, scrollbackLimit)
+      const sessionId = await storeCreateSession(
+        projectId,
+        type,
+        title,
+        cwd,
+        scrollbackLimit,
+        parentSessionId
+      )
       const instance = new TerminalInstance(
         sessionId,
         scrollbackLimit,
@@ -73,7 +81,18 @@ export function useTerminalSession() {
       const focusedId = getFocusedSession(projectId) ?? getActiveSessionForProject(projectId)
       if (!focusedId) return
 
-      const sessionId = await storeCreateSession(projectId, 'human', '', cwd, scrollbackLimit)
+      // Pin split panes to the root session (one level of nesting max).
+      const focusedSession = useSessionStore.getState().sessions.get(focusedId)
+      const parentSessionId = focusedSession?.parentSessionId ?? focusedId
+
+      const sessionId = await storeCreateSession(
+        projectId,
+        'human',
+        '',
+        cwd,
+        scrollbackLimit,
+        parentSessionId
+      )
       const instance = new TerminalInstance(
         sessionId,
         scrollbackLimit,

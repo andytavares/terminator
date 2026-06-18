@@ -87,6 +87,10 @@
   }
 }
 
+.session-row--sub {
+  padding-left: calc(24px + 14px);
+}
+
 .session-row__bell {
   display: flex;
   align-items: center;

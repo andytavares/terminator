@@ -379,17 +379,12 @@ describe('useKeyboardShortcuts', () => {
       )
     })
 
-    it('Cmd+D splits scratch project when scratchProjectId is set', async () => {
+    it('Cmd+D does nothing when scratchProjectId is set but activeProjectId is null', async () => {
       setupMocks({ activeProjectId: null })
       const useKeyboardShortcuts = await importHook()
       renderHook(() => useKeyboardShortcuts({ scratchProjectId: SCRATCH_ID }))
       pressKey('d', { metaKey: true })
-      expect(mockSplitSession).toHaveBeenCalledWith(
-        SCRATCH_ID,
-        'vertical',
-        expect.any(String),
-        5000
-      )
+      expect(mockSplitSession).not.toHaveBeenCalled()
     })
 
     it('Cmd+W closes scratch tab when scratchProjectId is set', async () => {

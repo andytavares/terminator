@@ -14,6 +14,7 @@ interface VaultDataStore {
   error: string | null
   lastRolledOver: number
   rolledOverTaskIds: string[]
+  staleDaysThreshold: number
   loadToday: () => Promise<void>
   loadDate: (date: string) => Promise<void>
   refreshInboxCount: () => Promise<void>
@@ -32,6 +33,7 @@ export const useVaultDataStore = create<VaultDataStore>((set) => ({
   error: null,
   lastRolledOver: 0,
   rolledOverTaskIds: [],
+  staleDaysThreshold: 7,
 
   loadToday: async () => {
     set({ isLoading: true, error: null })
@@ -41,7 +43,11 @@ export const useVaultDataStore = create<VaultDataStore>((set) => ({
         set({ error: (result as { error: string }).error, isLoading: false })
         return
       }
-      const res = result as DailyLog & { rolledOver?: number; rolledOverIds?: string[] }
+      const res = result as DailyLog & {
+        rolledOver?: number
+        rolledOverIds?: string[]
+        staleDaysThreshold?: number
+      }
       const d = new Date()
       const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       useVaultNavStore.getState().setViewingDate(today)
@@ -50,6 +56,7 @@ export const useVaultDataStore = create<VaultDataStore>((set) => ({
         isLoading: false,
         lastRolledOver: res.rolledOver ?? 0,
         rolledOverTaskIds: res.rolledOverIds ?? [],
+        staleDaysThreshold: res.staleDaysThreshold ?? s.staleDaysThreshold,
         calendarRefreshKey: s.calendarRefreshKey + 1,
       }))
     } catch (err) {

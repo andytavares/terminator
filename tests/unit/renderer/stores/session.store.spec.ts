@@ -168,6 +168,23 @@ describe('useSessionStore', () => {
       await useSessionStore.getState().closeSession('sess-1')
       expect(useSessionStore.getState().activeSessionIdByProject.has('proj-1')).toBe(false)
     })
+
+    it('cascades close to child sessions with matching parentSessionId', async () => {
+      const parent = makeSession({ id: 'parent', projectId: 'proj-1' })
+      const child = makeSession({ id: 'child', projectId: 'proj-1', parentSessionId: 'parent' })
+      useSessionStore.setState({
+        sessions: new Map([
+          ['parent', parent],
+          ['child', child],
+        ]),
+      })
+      mockElectronAPI.terminal.close.mockResolvedValue({})
+      await useSessionStore.getState().closeSession('parent')
+      expect(useSessionStore.getState().sessions.has('parent')).toBe(false)
+      expect(useSessionStore.getState().sessions.has('child')).toBe(false)
+      expect(mockElectronAPI.terminal.close).toHaveBeenCalledWith('child')
+      expect(mockElectronAPI.terminal.close).toHaveBeenCalledWith('parent')
+    })
   })
 
   describe('getSessionsForProject', () => {

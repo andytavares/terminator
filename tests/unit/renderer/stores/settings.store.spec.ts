@@ -20,7 +20,7 @@ import { useSettingsStore } from '../../../../src/renderer/stores/settings.store
 const DEFAULT_SETTINGS = {
   appearance: { theme: 'dark' },
   terminal: { scrollbackLimit: 10000, defaultShell: '/bin/zsh' },
-  git: { worktreeBaseDir: '' },
+  git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},
   ui: { hasSeenWelcome: false },
 }

@@ -13,6 +13,11 @@ interface SettingsState {
   updateWorkspaceScrollback: (workspaceId: string, limit: number) => Promise<void>
   updateWorktreeBaseDir: (dir: string) => Promise<void>
   updateWorkspaceWorktreeBaseDir: (workspaceId: string, dir: string | undefined) => Promise<void>
+  updateBranchExcludePatterns: (patterns: string[]) => Promise<void>
+  updateWorkspaceBranchExcludePatterns: (
+    workspaceId: string,
+    patterns: string[] | undefined
+  ) => Promise<void>
   markWelcomeSeen: () => Promise<void>
   updateShowMetricsBar: (show: boolean) => Promise<void>
   resolveSettings: (workspaceId?: string | null) => GlobalSettings
@@ -21,7 +26,7 @@ interface SettingsState {
 const DEFAULT_SETTINGS: GlobalSettings = {
   appearance: { theme: 'dark' },
   terminal: { scrollbackLimit: 10000, defaultShell: '/bin/zsh' },
-  git: { worktreeBaseDir: '' },
+  git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},
   ui: { hasSeenWelcome: false },
 }
@@ -113,6 +118,24 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   updateWorkspaceWorktreeBaseDir: async (workspaceId, dir) => {
     const result = await window.electronAPI.settings.updateWorkspace(workspaceId, {
       git: dir !== undefined ? { worktreeBaseDir: dir } : undefined,
+    })
+    set((s) => {
+      const map = new Map(s.workspaceSettings)
+      map.set(workspaceId, result.settings)
+      return { workspaceSettings: map }
+    })
+  },
+
+  updateBranchExcludePatterns: async (patterns) => {
+    const result = await window.electronAPI.settings.updateGlobal({
+      git: { branchExcludePatterns: patterns },
+    })
+    set({ globalSettings: result.settings })
+  },
+
+  updateWorkspaceBranchExcludePatterns: async (workspaceId, patterns) => {
+    const result = await window.electronAPI.settings.updateWorkspace(workspaceId, {
+      git: patterns !== undefined ? { branchExcludePatterns: patterns } : undefined,
     })
     set((s) => {
       const map = new Map(s.workspaceSettings)

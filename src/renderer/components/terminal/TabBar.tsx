@@ -41,8 +41,11 @@ export function TabBar({
   const dragIndexRef = useRef<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const { workspaces, activeWorkspaceId } = useWorkspaceStore()
-  const sessions = getSessionsForProject(projectId)
+  const allSessions = getSessionsForProject(projectId)
+  const sessions = allSessions.filter((s) => !s.parentSessionId)
   const activeSessionId = getActiveSessionForProject(projectId)
+  const activeSession = allSessions.find((s) => s.id === activeSessionId)
+  const effectiveActiveId = activeSession?.parentSessionId ?? activeSessionId
   const wsColor = workspaces.find((w) => w.id === activeWorkspaceId)?.color
   const isTerminalActive = activeProjectTabId === null
 
@@ -145,7 +148,7 @@ export function TabBar({
                 dragIndexRef.current = null
                 setDragOverIndex(null)
               }}
-              className={`tab-bar__tab tab-bar__tab--session${session.id === activeSessionId ? ' tab-bar__tab--active' : ''}${dragOverIndex === index ? ' tab-bar__tab--dnd-over' : ''}`}
+              className={`tab-bar__tab tab-bar__tab--session${session.id === effectiveActiveId ? ' tab-bar__tab--active' : ''}${dragOverIndex === index ? ' tab-bar__tab--dnd-over' : ''}`}
               onClick={() => handleSessionTabClick(session.id)}
               onContextMenu={(e) => handleSessionContextMenu(e, session.id)}
             >
@@ -173,7 +176,7 @@ export function TabBar({
                 </span>
               )}
               {renamingId !== session.id && isSessionBusy(session.id) && <ActivitySpinner />}
-              {session.id !== activeSessionId && renamingId !== session.id && (
+              {session.id !== effectiveActiveId && renamingId !== session.id && (
                 <AlertBadge
                   count={getBellCountForSession(session.id)}
                   className="alert-badge--tab"

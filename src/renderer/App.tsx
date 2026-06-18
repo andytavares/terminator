@@ -62,7 +62,7 @@ export function App(): JSX.Element {
     togglePanel: toggleNotificationPanel,
   } = useNotificationStore()
 
-  const { createSession } = useTerminalSession()
+  const { createSession, splitSession } = useTerminalSession()
   const {
     sidebarPanels,
     projectTabs,
@@ -187,6 +187,29 @@ export function App(): JSX.Element {
         shortcut: '⌘T',
         category: 'Terminal',
         action: handleNewTab,
+      })
+    }
+
+    if (activeProjectId) {
+      const settings = resolveSettings(activeWorkspaceId)
+      const cwd = resolveActiveCwd()
+      cmds.push({
+        id: 'core.split-vertical',
+        label: 'Split Pane Vertically',
+        shortcut: '⌘D',
+        category: 'Terminal',
+        action: () => {
+          void splitSession(activeProjectId, 'vertical', cwd, settings.terminal.scrollbackLimit)
+        },
+      })
+      cmds.push({
+        id: 'core.split-horizontal',
+        label: 'Split Pane Horizontally',
+        shortcut: '⌘⇧D',
+        category: 'Terminal',
+        action: () => {
+          void splitSession(activeProjectId, 'horizontal', cwd, settings.terminal.scrollbackLimit)
+        },
       })
     }
 

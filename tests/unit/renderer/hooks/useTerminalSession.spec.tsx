@@ -85,7 +85,14 @@ describe('useTerminalSession', () => {
     const { useTerminalSession } = await import('../../../../src/renderer/hooks/useTerminalSession')
     const { result } = renderHook(() => useTerminalSession())
     await result.current.createSession('proj-1', 'human', 'Terminal', '/cwd', 5000)
-    expect(mockCreateSession).toHaveBeenCalledWith('proj-1', 'human', 'Terminal', '/cwd', 5000)
+    expect(mockCreateSession).toHaveBeenCalledWith(
+      'proj-1',
+      'human',
+      'Terminal',
+      '/cwd',
+      5000,
+      undefined
+    )
   })
 
   it('createSession stores terminal instance and activates session', async () => {
@@ -258,7 +265,14 @@ describe('useTerminalSession', () => {
       )
       const { result } = renderHook(() => useTerminalSession())
       await result.current.splitSession('proj-1', 'vertical', '/cwd', 5000)
-      expect(mockCreateSession).toHaveBeenCalledWith('proj-1', 'human', '', '/cwd', 5000)
+      expect(mockCreateSession).toHaveBeenCalledWith(
+        'proj-1',
+        'human',
+        '',
+        '/cwd',
+        5000,
+        'ses-focused'
+      )
       expect(mockSetTerminalInstance).toHaveBeenCalled()
       expect(mockActivateSplit).toHaveBeenCalledWith(
         'proj-1',

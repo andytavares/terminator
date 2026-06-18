@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import type { TerminalSession, PaneNode, PaneSplitDirection } from '../../shared/types/index'
 import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
 import { splitLeaf, removeLeaf, leafIds, updateSplitRatio } from '../utils/pane-tree'
-import { useWorkspaceStore } from './workspace.store'
 import type { TerminalInstance } from '../components/terminal/TerminalSession'
 
 interface SessionState {
@@ -21,7 +20,8 @@ interface SessionState {
     type: 'human' | 'agent',
     title: string,
     cwd: string,
-    scrollbackLimit: number
+    scrollbackLimit: number,
+    parentSessionId?: string
   ) => Promise<string>
   closeSession: (sessionId: string) => Promise<void>
   getSessionsForProject: (projectId: string) => TerminalSession[]
@@ -68,7 +68,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   focusedSessionByProject: new Map(),
   sessionOrderByProject: new Map(),
 
-  createSession: async (projectId, type, title, cwd, scrollbackLimit) => {
+  createSession: async (projectId, type, title, cwd, scrollbackLimit, parentSessionId) => {
     let resolvedTitle = title
     if (!resolvedTitle) {
       const counts = get().terminalCountByProject
@@ -99,6 +99,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       type,
       scrollbackLimit,
       createdAt: new Date().toISOString(),
+      parentSessionId,
     }
 
     set((s) => {
@@ -115,8 +116,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   closeSession: async (sessionId) => {
-    // Capture projectId before removing the session from the store
-    const projectId = get().sessions.get(sessionId)?.projectId ?? null
+    // Close any split children that belong to this session before closing the parent
+    const children = [...get().sessions.values()].filter((s) => s.parentSessionId === sessionId)
+    for (const child of children) {
+      await get().closeSession(child.id)
+    }
     // Dispose xterm instance before removing from store
     const instance = get().terminalInstances.get(sessionId)
     instance?.dispose?.()
@@ -177,18 +181,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         sessionOrderByProject,
       }
     })
-
-    // If this was the last session in a real project, delete the project automatically.
-    if (
-      projectId &&
-      projectId !== SCRATCH_PROJECT_ID &&
-      get().getSessionsForProject(projectId).length === 0
-    ) {
-      useWorkspaceStore
-        .getState()
-        .deleteProject(projectId)
-        .catch(() => {})
-    }
   },
 
   getSessionsForProject: (projectId) => {

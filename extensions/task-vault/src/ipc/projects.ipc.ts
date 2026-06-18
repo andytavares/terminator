@@ -9,7 +9,14 @@ import {
   DeleteProjectRequestSchema,
 } from '../schemas/vault.schema'
 import type { ProjectStatus } from '../vault/types'
-import { rowToTask, rowToProject, PROJECT_COLS, PROJECT_JOINS } from '../vault/mappers'
+import {
+  rowToTask,
+  rowToProject,
+  PROJECT_COLS,
+  PROJECT_JOINS,
+  TASK_COLS,
+  TASK_JOINS,
+} from '../vault/mappers'
 
 export function registerProjectsIpcHandlers(): () => void {
   const handlers: string[] = []
@@ -95,6 +102,28 @@ export function registerProjectsIpcHandlers(): () => void {
       .all(sevenDaysAgo) as Record<string, unknown>[]
     const completedLastWeek = completedRows.map(rowToTask)
 
+    const thresholdRow = db
+      .prepare(`SELECT value FROM settings WHERE key='stale_days_threshold'`)
+      .get() as { value: string } | undefined
+    const parsedThreshold = thresholdRow?.value ? parseInt(thresholdRow.value, 10) : NaN
+    const staleDaysThreshold = Number.isFinite(parsedThreshold) ? parsedThreshold : 7
+    const staleDate = new Date()
+    staleDate.setDate(staleDate.getDate() - staleDaysThreshold)
+    const staleDateStr = [
+      staleDate.getFullYear(),
+      String(staleDate.getMonth() + 1).padStart(2, '0'),
+      String(staleDate.getDate()).padStart(2, '0'),
+    ].join('-')
+    const staleTaskRows = db
+      .prepare(
+        `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+         WHERE t.source='daily' AND t.parent_id IS NULL
+           AND t.status IN ('open','in-progress','blocked')
+           AND t.today_since IS NOT NULL AND t.today_since <= ?`
+      )
+      .all(staleDateStr) as Record<string, unknown>[]
+    const staleTasks = staleTaskRows.map(rowToTask)
+
     return {
       inboxItems,
       activeProjects,
@@ -102,6 +131,8 @@ export function registerProjectsIpcHandlers(): () => void {
       somedayProjects,
       somedayTasks,
       completedLastWeek,
+      staleTasks,
+      staleDaysThreshold,
       lastReviewDate: null,
     }
   })

@@ -47,6 +47,7 @@ export interface TerminalSession {
   scrollbackLimit: number
   createdAt: string
   closedAt?: string
+  parentSessionId?: string
 }
 
 export type ExtensionStatus = 'enabled' | 'disabled' | 'error'
@@ -82,6 +83,7 @@ export interface GlobalSettings {
   git: {
     /** Base directory for new worktrees. Empty string means <repoRoot>/.worktrees. */
     worktreeBaseDir: string
+    branchExcludePatterns: string[]
   }
   extensions: {
     [extensionId: string]: Record<string, unknown>

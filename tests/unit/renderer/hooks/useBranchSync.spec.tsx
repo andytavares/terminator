@@ -128,4 +128,43 @@ describe('useBranchSync', () => {
     })
     expect(mockUpdateProjectBranch).not.toHaveBeenCalled()
   })
+
+  it('propagates branch change to non-worktree siblings in the same workspace', async () => {
+    mockCurrentBranch.mockResolvedValue({ branch: 'feature/new' })
+    const sibling = makeProject({ id: 'proj-2', gitBranch: 'main', isWorktree: false })
+    const worktreeSibling = makeProject({ id: 'proj-3', gitBranch: 'main', isWorktree: true })
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      updateProjectBranch: mockUpdateProjectBranch,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    Object.assign(useWorkspaceStore, {
+      getState: vi.fn().mockReturnValue({
+        workspaces: [{ id: 'ws-1' }],
+        projectsByWorkspaceId: new Map([['ws-1', [makeProject(), sibling, worktreeSibling]]]),
+      }),
+    })
+    renderHook(() => useBranchSync(makeProject({ gitBranch: 'main' }), '/workspace'))
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-1', 'feature/new')
+    expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-2', 'feature/new')
+    expect(mockUpdateProjectBranch).not.toHaveBeenCalledWith('proj-3', expect.anything())
+  })
+
+  it('does not propagate when no workspace contains the project', async () => {
+    mockCurrentBranch.mockResolvedValue({ branch: 'feature/new' })
+    Object.assign(useWorkspaceStore, {
+      getState: vi.fn().mockReturnValue({
+        workspaces: [],
+        projectsByWorkspaceId: new Map(),
+      }),
+    })
+    renderHook(() => useBranchSync(makeProject({ gitBranch: 'main' }), '/workspace'))
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-1', 'feature/new')
+    expect(mockUpdateProjectBranch).toHaveBeenCalledTimes(1)
+  })
 })

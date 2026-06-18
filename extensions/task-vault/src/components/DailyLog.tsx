@@ -46,6 +46,7 @@ interface DailyLogProps {
   onPickUpToday?: (taskId: string) => Promise<void>
   onDeleteBacklogTask?: (taskId: string) => Promise<void>
   onRefreshBacklog?: () => Promise<void>
+  staleDaysThreshold?: number
 }
 
 function StatusIcon({
@@ -706,6 +707,7 @@ function TaskRow({
   onDrop,
   isDragOver,
   hasSubtasks,
+  isStale,
 }: {
   task: IndexedTask
   isSelected?: boolean
@@ -720,6 +722,7 @@ function TaskRow({
   onDrop?: (e: React.DragEvent) => void
   isDragOver?: boolean
   hasSubtasks?: boolean
+  isStale?: boolean
 }): React.JSX.Element {
   const [migratingOpen, setMigratingOpen] = useState(false)
   const [migrateDate, setMigrateDate] = useState('')
@@ -886,6 +889,13 @@ function TaskRow({
     }
   }
 
+  async function handleResetStaleSince() {
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:reset-today-since', {
+      taskId: task.id,
+    })
+    await onRefresh()
+  }
+
   const isOpen = task.status === 'open' || task.status === 'in-progress'
   const isDone = task.status === 'done'
   const isBlocked = task.status === 'blocked'
@@ -893,7 +903,7 @@ function TaskRow({
   return (
     <>
       <div
-        className={`daily-log__task${isDone ? ' daily-log__task--done' : task.status === 'cancelled' ? ' daily-log__task--cancelled' : isBlocked ? ' daily-log__task--blocked' : ''}${isSelected ? ' daily-log__task--selected' : ''}${isDragOver ? ' daily-log__task--drag-over' : ''}`}
+        className={`daily-log__task${isDone ? ' daily-log__task--done' : task.status === 'cancelled' ? ' daily-log__task--cancelled' : isBlocked ? ' daily-log__task--blocked' : ''}${isSelected ? ' daily-log__task--selected' : ''}${isDragOver ? ' daily-log__task--drag-over' : ''}${isStale && isOpen ? ' daily-log__task--stale' : ''}`}
         draggable={isDraggable}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
@@ -1098,7 +1108,8 @@ function TaskRow({
                 task.area ||
                 task.dueDate ||
                 (isBlocked && task.blockedReason) ||
-                task.recurrenceRule) && (
+                task.recurrenceRule ||
+                isStale) && (
                 <div className="daily-log__task-meta">
                   {task.project && (
                     <span className="daily-log__tag daily-log__tag--project">@{task.project}</span>
@@ -1130,6 +1141,24 @@ function TaskRow({
                       title={`Repeats: ${formatRecurrenceRule(task.recurrenceRule)}${task.recurrenceNotifyAt ? ` at ${format12h(task.recurrenceNotifyAt)}` : ''}`}
                     >
                       <Repeat size={11} />
+                    </span>
+                  )}
+                  {isStale && isOpen && (
+                    <span
+                      className="daily-log__stale-badge"
+                      title="This task has been rolling over for a while. Keep it, send to backlog, or delete it."
+                    >
+                      stale
+                      <button
+                        className="daily-log__stale-dismiss"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleResetStaleSince()
+                        }}
+                        title="Keep as-is (reset stale timer)"
+                      >
+                        keep
+                      </button>
                     </span>
                   )}
                 </div>
@@ -1419,6 +1448,7 @@ export function DailyLog({
   onPickUpToday,
   onDeleteBacklogTask,
   onRefreshBacklog,
+  staleDaysThreshold,
 }: DailyLogProps): React.JSX.Element {
   const [backlogExpanded, setBacklogExpanded] = useState(true)
   const [rolloverExpanded, setRolloverExpanded] = useState(true)
@@ -1488,6 +1518,15 @@ export function DailyLog({
     await onRefresh()
   }
 
+  function isTaskStale(task: IndexedTask): boolean {
+    if (!isToday) return false
+    if (!staleDaysThreshold || !task.todaySince) return false
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - staleDaysThreshold)
+    const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`
+    return task.todaySince <= cutoffStr
+  }
+
   function renderTaskWithSubtasks(
     task: IndexedTask,
     opts: { draggable?: boolean } = {}
@@ -1518,6 +1557,7 @@ export function DailyLog({
           onDrop={opts.draggable ? (e) => void handleDrop(e, task.id) : undefined}
           isDragOver={dragOverId === task.id}
           hasSubtasks={hasSubtasks}
+          isStale={isTaskStale(task)}
         />
         {hasSubtasks && (
           <div className="daily-log__subtasks">

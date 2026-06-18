@@ -3,12 +3,14 @@ import { GitBranch } from 'lucide-react'
 import type { Project } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
+import { useBranchSync } from '../../hooks/useBranchSync'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { SessionRow } from './SessionRow'
 import './ProjectRow.css'
 
 interface ProjectRowProps {
   project: Project
+  workspaceId: string
   isActive: boolean
   isExpanded: boolean
   workspaceColor: string
@@ -17,11 +19,13 @@ interface ProjectRowProps {
   gitDirty?: boolean
   gitConflict?: boolean
   onBranchBadgeClick?: () => void
+  branchSwitcher?: React.ReactNode
   searchQuery?: string
 }
 
 export function ProjectRow({
   project,
+  workspaceId,
   isActive,
   isExpanded,
   workspaceColor,
@@ -30,6 +34,7 @@ export function ProjectRow({
   gitDirty,
   gitConflict,
   onBranchBadgeClick,
+  branchSwitcher,
   searchQuery = '',
 }: ProjectRowProps): JSX.Element {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
@@ -39,13 +44,26 @@ export function ProjectRow({
   const [sessionDragOver, setSessionDragOver] = useState<number | null>(null)
   const renameRef = useRef<HTMLInputElement>(null)
   const sessionDragIndexRef = useRef<number | null>(null)
-  const { deleteProject, renameProject } = useWorkspaceStore()
+  const { deleteProject, renameProject, workspaces } = useWorkspaceStore()
   const { getSessionsForProject, activeSessionIdByProject, getBellCountForProject, isProjectBusy } =
     useSessionStore()
+  const workspace = workspaces.find((w) => w.id === workspaceId)
+  const cwd = project.worktreePath ?? workspace?.folderPath ?? ''
+  useBranchSync(project, cwd)
 
   const sessions = getSessionsForProject(project.id)
   const activeSessionId = activeSessionIdByProject.get(project.id) ?? null
   const isBusy = isProjectBusy(project.id)
+
+  const rootSessions = sessions.filter((s) => !s.parentSessionId)
+  const childSessionsByParentId = new Map<string, typeof sessions>()
+  for (const s of sessions) {
+    if (s.parentSessionId) {
+      const arr = childSessionsByParentId.get(s.parentSessionId) ?? []
+      arr.push(s)
+      childSessionsByParentId.set(s.parentSessionId, arr)
+    }
+  }
 
   const lowerQuery = searchQuery.toLowerCase()
   const projectNameMatches = !lowerQuery || project.name.toLowerCase().includes(lowerQuery)
@@ -124,19 +142,21 @@ export function ProjectRow({
           </span>
         )}
         <div className="project-row__badges">
-          {project.gitBranch && (
-            <span
-              className={`project-row__branch-chip ${
-                gitConflict ? 'chip-conflict' : gitDirty ? 'chip-dirty' : 'chip-clean'
-              }`}
-              onClick={(e) => {
-                e.stopPropagation()
-                onBranchBadgeClick?.()
-              }}
-            >
-              {project.gitBranch}
-            </span>
-          )}
+          {branchSwitcher
+            ? branchSwitcher
+            : project.gitBranch && (
+                <span
+                  className={`project-row__branch-chip ${
+                    gitConflict ? 'chip-conflict' : gitDirty ? 'chip-dirty' : 'chip-clean'
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onBranchBadgeClick?.()
+                  }}
+                >
+                  {project.gitBranch}
+                </span>
+              )}
         </div>
         {isBusy && <span className="project-row__busy" />}
         {isExpanded && (
@@ -154,55 +174,81 @@ export function ProjectRow({
       </div>
 
       {isExpanded &&
-        sessions.map((session, index) => (
-          <div
-            key={session.id}
-            draggable
-            onDragStart={() => {
-              sessionDragIndexRef.current = index
-            }}
-            onDragOver={(e) => {
-              e.preventDefault()
-              setSessionDragOver(index)
-            }}
-            onDragLeave={() => setSessionDragOver(null)}
-            onDrop={() => {
-              const from = sessionDragIndexRef.current
-              if (from !== null && from !== index) {
-                const reordered = [...sessions]
-                const [moved] = reordered.splice(from, 1)
-                reordered.splice(index, 0, moved)
-                useSessionStore.getState().reorderSessions(
-                  project.id,
-                  reordered.map((s) => s.id)
-                )
-              }
-              sessionDragIndexRef.current = null
-              setSessionDragOver(null)
-            }}
-            onDragEnd={() => {
-              sessionDragIndexRef.current = null
-              setSessionDragOver(null)
-            }}
-            className={sessionDragOver === index ? 'session-dnd-over' : ''}
-          >
-            <SessionRow
-              session={session}
-              isActive={activeSessionId === session.id}
-              isBusy={false}
-              bellCount={getBellCountForProject(project.id)}
-              workspaceColor={workspaceColor}
-              onSelect={() => {
-                onSelect()
-                useSessionStore.getState().setActiveSessionForProject(project.id, session.id)
+        rootSessions.map((session, index) => (
+          <div key={session.id}>
+            <div
+              draggable
+              onDragStart={() => {
+                sessionDragIndexRef.current = index
               }}
-              onRename={() => {}}
-              hidden={
-                !!lowerQuery &&
-                !session.tabTitle.toLowerCase().includes(lowerQuery) &&
-                !projectNameMatches
-              }
-            />
+              onDragOver={(e) => {
+                e.preventDefault()
+                setSessionDragOver(index)
+              }}
+              onDragLeave={() => setSessionDragOver(null)}
+              onDrop={() => {
+                const from = sessionDragIndexRef.current
+                if (from !== null && from !== index) {
+                  const reordered = [...rootSessions]
+                  const [moved] = reordered.splice(from, 1)
+                  reordered.splice(index, 0, moved)
+                  useSessionStore.getState().reorderSessions(
+                    project.id,
+                    reordered.map((s) => s.id)
+                  )
+                }
+                sessionDragIndexRef.current = null
+                setSessionDragOver(null)
+              }}
+              onDragEnd={() => {
+                sessionDragIndexRef.current = null
+                setSessionDragOver(null)
+              }}
+              className={sessionDragOver === index ? 'session-dnd-over' : ''}
+            >
+              <SessionRow
+                session={session}
+                isActive={activeSessionId === session.id}
+                isBusy={false}
+                bellCount={getBellCountForProject(project.id)}
+                workspaceColor={workspaceColor}
+                onSelect={() => {
+                  onSelect()
+                  useSessionStore.getState().setActiveSessionForProject(project.id, session.id)
+                }}
+                onRename={(newTitle) =>
+                  useSessionStore.getState().renameSession(session.id, newTitle)
+                }
+                hidden={
+                  !!lowerQuery &&
+                  !session.tabTitle.toLowerCase().includes(lowerQuery) &&
+                  !projectNameMatches
+                }
+              />
+            </div>
+            {(childSessionsByParentId.get(session.id) ?? []).map((child) => (
+              <SessionRow
+                key={child.id}
+                session={child}
+                isActive={activeSessionId === child.id}
+                isBusy={false}
+                bellCount={getBellCountForProject(project.id)}
+                workspaceColor={workspaceColor}
+                isSubSession
+                onSelect={() => {
+                  onSelect()
+                  useSessionStore.getState().setActiveSessionForProject(project.id, child.id)
+                }}
+                onRename={(newTitle) =>
+                  useSessionStore.getState().renameSession(child.id, newTitle)
+                }
+                hidden={
+                  !!lowerQuery &&
+                  !child.tabTitle.toLowerCase().includes(lowerQuery) &&
+                  !projectNameMatches
+                }
+              />
+            ))}
           </div>
         ))}
 

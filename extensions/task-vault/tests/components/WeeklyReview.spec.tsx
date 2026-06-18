@@ -78,6 +78,8 @@ const weeklyReviewPayload = {
   ],
   somedayTasks: [],
   completedLastWeek: [],
+  staleTasks: [],
+  staleDaysThreshold: 7,
   lastReviewDate: null,
 }
 
@@ -100,23 +102,23 @@ beforeEach(() => {
 })
 
 describe('WeeklyReview', () => {
-  it('renders 5-step stepper', async () => {
+  it('renders 6-step stepper', async () => {
     render(<WeeklyReview />)
     await waitFor(() => {
-      expect(screen.getByText(/step 1 of 5/i)).toBeTruthy()
+      expect(screen.getByText(/step 1 of 6/i)).toBeTruthy()
     })
   })
 
   it('step 3 shows all active projects', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText(/step 1 of 5/i))
+    await waitFor(() => screen.getByText(/step 1 of 6/i))
 
     // Navigate using header nav button (aria-label="Next step")
     const nextStepBtn = screen.getByRole('button', { name: 'Next step' })
     fireEvent.click(nextStepBtn) // → step 2
-    await waitFor(() => screen.getByText(/step 2 of 5/i))
+    await waitFor(() => screen.getByText(/step 2 of 6/i))
     fireEvent.click(screen.getByRole('button', { name: 'Next step' })) // → step 3
-    await waitFor(() => screen.getByText(/step 3 of 5/i))
+    await waitFor(() => screen.getByText(/step 3 of 6/i))
 
     expect(screen.getByText('Alpha Project')).toBeTruthy()
     expect(screen.getByText('Stale Project')).toBeTruthy()
@@ -124,13 +126,13 @@ describe('WeeklyReview', () => {
 
   it('archiving stale project removes it from step 3 list', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText(/step 1 of 5/i))
+    await waitFor(() => screen.getByText(/step 1 of 6/i))
 
     // Navigate to step 3
     fireEvent.click(screen.getByRole('button', { name: 'Next step' }))
-    await waitFor(() => screen.getByText(/step 2 of 5/i))
+    await waitFor(() => screen.getByText(/step 2 of 6/i))
     fireEvent.click(screen.getByRole('button', { name: 'Next step' }))
-    await waitFor(() => screen.getByText(/step 3 of 5/i))
+    await waitFor(() => screen.getByText(/step 3 of 6/i))
 
     const archiveBtn = screen.getAllByRole('button', { name: /archive/i })[0]
     fireEvent.click(archiveBtn)
@@ -168,13 +170,13 @@ describe('WeeklyReview', () => {
       })
 
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText(/step 1 of 5/i))
+    await waitFor(() => screen.getByText(/step 1 of 6/i))
 
     // Click the step 1 "Next" button (inside step content, not header nav)
     const step1Next = screen.getByRole('button', { name: /nothing to add|done capturing/i })
     fireEvent.click(step1Next)
 
-    await waitFor(() => screen.getByText(/step 2 of 5/i))
+    await waitFor(() => screen.getByText(/step 2 of 6/i))
 
     // weekly-review was called twice: once at mount, once on step 1 completion
     const reviewCalls = mockInvoke.mock.calls.filter(
@@ -190,7 +192,7 @@ describe('WeeklyReview', () => {
 
   it('completing all steps writes completion to daily log', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText(/step 1 of 5/i))
+    await waitFor(() => screen.getByText(/step 1 of 6/i))
 
     // Navigate through steps 1-5 using header nav
     for (let i = 0; i < 5; i++) {

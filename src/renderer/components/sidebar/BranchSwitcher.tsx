@@ -3,12 +3,29 @@ import { createPortal } from 'react-dom'
 import type { Branch, Project } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useToastStore } from '../../stores/toast.store'
-import { useBranchSync } from '../../hooks/useBranchSync'
+import { useSettingsStore } from '../../stores/settings.store'
 import './BranchSwitcher.css'
 
 interface Props {
   project: Project
   workspaceFolderPath: string
+  workspaceId?: string
+}
+
+function matchesGlob(pattern: string, name: string): boolean {
+  const regex = new RegExp(
+    '^' +
+      pattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*\*/g, '.*')
+        .replace(/\*/g, '[^/]*') +
+      '$'
+  )
+  return regex.test(name)
+}
+
+function shouldExclude(patterns: string[], name: string): boolean {
+  return patterns.some((p) => matchesGlob(p, name))
 }
 
 interface DropdownPos {
@@ -17,25 +34,31 @@ interface DropdownPos {
   width: number
 }
 
-export function BranchSwitcher({ project, workspaceFolderPath }: Props): JSX.Element | null {
+export function BranchSwitcher({
+  project,
+  workspaceFolderPath,
+  workspaceId,
+}: Props): JSX.Element | null {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<DropdownPos | null>(null)
   const [localBranches, setLocalBranches] = useState<Branch[]>([])
   const [remoteBranches, setRemoteBranches] = useState<Branch[]>([])
+  const [defaultBranch, setDefaultBranch] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [switching, setSwitching] = useState(false)
   const [filter, setFilter] = useState('')
   const { updateProjectBranch } = useWorkspaceStore()
   const { addToast } = useToastStore()
+  const { resolveSettings } = useSettingsStore()
+  const excludePatterns = resolveSettings(workspaceId).git.branchExcludePatterns ?? []
+  const excludePatternsKey = excludePatterns.join('\n')
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const filterRef = useRef<HTMLInputElement>(null)
 
   const cwd = project.worktreePath ?? workspaceFolderPath
   const currentBranch = project.gitBranch ?? '—'
-
-  useBranchSync(project, cwd)
 
   function openDropdown(): void {
     if (!triggerRef.current || switching) return
@@ -53,8 +76,24 @@ export function BranchSwitcher({ project, workspaceFolderPath }: Props): JSX.Ele
     window.electronAPI.git
       .listBranches(cwd)
       .then((r) => {
-        setLocalBranches(r.branches.filter((b) => !b.isRemote))
-        setRemoteBranches(r.branches.filter((b) => b.isRemote))
+        const allLocal = r.branches.filter((b) => !b.isRemote)
+        const allRemote = r.branches.filter((b) => b.isRemote)
+        const detected =
+          allLocal.find((b) => b.name === 'main')?.name ??
+          allLocal.find((b) => b.name === 'master')?.name ??
+          null
+        setDefaultBranch(detected)
+        const filterFn = (b: Branch) => !shouldExclude(excludePatterns, b.name)
+        const sortWithDefault = (branches: Branch[]) => {
+          if (!detected) return branches
+          return [...branches].sort((a, b) => {
+            if (a.name === detected) return -1
+            if (b.name === detected) return 1
+            return 0
+          })
+        }
+        setLocalBranches(sortWithDefault(allLocal.filter(filterFn)))
+        setRemoteBranches(sortWithDefault(allRemote.filter(filterFn)))
         setLoading(false)
       })
       .catch((err: unknown) => {
@@ -62,7 +101,8 @@ export function BranchSwitcher({ project, workspaceFolderPath }: Props): JSX.Ele
         setError(`Could not load branches: ${msg}`)
         setLoading(false)
       })
-  }, [open, cwd])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, cwd, excludePatternsKey])
 
   useEffect(() => {
     if (!open) return
@@ -91,6 +131,15 @@ export function BranchSwitcher({ project, workspaceFolderPath }: Props): JSX.Ele
         addToast({ type: 'error', message: `Could not switch to "${branch}": ${result.error}` })
       } else {
         await updateProjectBranch(project.id, branch)
+        // Update sibling non-worktree projects that share the same repo
+        if (workspaceId) {
+          const siblings = useWorkspaceStore.getState().projectsByWorkspaceId.get(workspaceId) ?? []
+          await Promise.all(
+            siblings
+              .filter((p) => p.id !== project.id && !p.isWorktree)
+              .map((p) => updateProjectBranch(p.id, branch))
+          )
+        }
       }
     } catch (err) {
       addToast({
@@ -151,6 +200,7 @@ export function BranchSwitcher({ project, workspaceFolderPath }: Props): JSX.Ele
                     b.name.toLowerCase().includes(filter.toLowerCase())
                   )}
                   current={currentBranch}
+                  defaultBranch={defaultBranch}
                   onSelect={handleSelect}
                 />
                 {remoteBranches.length > 0 && (
@@ -160,6 +210,7 @@ export function BranchSwitcher({ project, workspaceFolderPath }: Props): JSX.Ele
                       b.name.toLowerCase().includes(filter.toLowerCase())
                     )}
                     current={currentBranch}
+                    defaultBranch={defaultBranch}
                     onSelect={handleSelect}
                   />
                 )}
@@ -184,11 +235,13 @@ function BranchSection({
   label,
   branches,
   current,
+  defaultBranch,
   onSelect,
 }: {
   label: string
   branches: Branch[]
   current: string
+  defaultBranch?: string | null
   onSelect: (name: string) => void
 }): JSX.Element | null {
   if (branches.length === 0) return null
@@ -198,12 +251,13 @@ function BranchSection({
       {branches.map((b) => (
         <button
           key={b.name}
-          className={`branch-sw__item${b.name === current ? ' branch-sw__item--active' : ''}`}
+          className={`branch-sw__item${b.name === current ? ' branch-sw__item--active' : ''}${b.name === defaultBranch && b.name !== current ? ' branch-sw__item--default' : ''}`}
           onClick={() => onSelect(b.name)}
           title={b.name}
         >
           <span className="branch-sw__check">{b.name === current ? '✓' : ''}</span>
           <span className="branch-sw__item-name">{b.name}</span>
+          {b.name === defaultBranch && <span className="branch-sw__default-badge">default</span>}
         </button>
       ))}
     </div>
