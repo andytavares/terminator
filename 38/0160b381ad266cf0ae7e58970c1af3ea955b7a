@@ -1,0 +1,42 @@
+extensions/notepad/tests/components/EmptyState.spec.tsx
+  s_342a3bb060d924::t_aaacf50a480cc8 51-53
+extensions/notepad/src/editor/NoteEditor.tsx
+  s_342a3bb060d924::t_62b0b88621ce26 3
+  s_342a3bb060d924::t_20b21ad8f51ce3 58
+  s_342a3bb060d924::t_d88fb2856e054e 267,269
+  s_342a3bb060d924::t_d7305e4543427c 134
+extensions/notepad/tests/components/QuickCreateOverlay.spec.tsx
+  s_342a3bb060d924::t_c57c720607f067 27,29,31-32
+extensions/notepad/src/components/notepad.css
+  s_342a3bb060d924::t_6380fb1a17db8a 723
+  s_342a3bb060d924::t_e82a5a5835917a 685
+  s_342a3bb060d924::t_3f35bce45c41bf 707,709-710
+  s_342a3bb060d924::t_3d6ee04b5dfc46 485-487
+  s_342a3bb060d924::t_edea40a2134d35 724-741
+  s_342a3bb060d924::t_242f0242b7f80a 414-417
+  s_342a3bb060d924::t_dee6612429821f 715
+  s_342a3bb060d924::t_28cb2dae9dc954 256,260
+extensions/notepad/tests/components/NoteEditor.spec.tsx
+  s_342a3bb060d924::t_05220a8a9ecb72 29,31-34
+extensions/notepad/src/components/EmptyState.tsx
+  s_342a3bb060d924::t_8d1fc2540fd590 2,12-13
+extensions/notepad/src/components/QuickCreateOverlay.tsx
+  s_342a3bb060d924::t_5de9f4a509fb2a 5
+  s_342a3bb060d924::t_188aea85841a83 136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "380160b381ad266cf0ae7e58970c1af3ea955b7a",
+  "prompts": {},
+  "sessions": {
+    "s_342a3bb060d924": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd40730-1532-4616-8e6b-4ba24bd10787",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
