@@ -33,7 +33,12 @@ export function CaptureModal(): React.JSX.Element | null {
   useEffect(() => {
     if (!showCaptureModal) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') close()
+      if (e.key === 'Escape') {
+        // Let SmartTaskInput close its own dropdown first via stopPropagation;
+        // only close the modal if no inline dropdown is open.
+        const openDropdown = document.querySelector('.smart-input__dropdown')
+        if (!openDropdown) close()
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -477,7 +482,9 @@ export function TaskVaultView(): React.JSX.Element {
   useEffect(() => {
     if (!selectedTaskId) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') handleSelectTask(null)
+      if (e.key === 'Escape' && !document.querySelector('.smart-input__dropdown')) {
+        handleSelectTask(null)
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)

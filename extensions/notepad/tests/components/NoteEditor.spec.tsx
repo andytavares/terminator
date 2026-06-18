@@ -16,6 +16,7 @@ vi.mock('@codemirror/view', () => {
   // Static methods that NoteEditor uses
   ;(EditorView as unknown as Record<string, unknown>).updateListener = { of: vi.fn(() => ({})) }
   ;(EditorView as unknown as Record<string, unknown>).theme = vi.fn(() => ({}))
+  ;(EditorView as unknown as Record<string, unknown>).lineWrapping = {}
   return {
     EditorView,
     keymap: { of: vi.fn(() => ({})) },

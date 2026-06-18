@@ -280,7 +280,53 @@ export function CommentMargin({
         </div>
       ) : (
         <>
-          {/* Anchored open comments — absolutely positioned */}
+          {/* Orphaned + resolved sit in a sticky block above the scroll-synced zone
+              so they remain visible regardless of editor scroll position */}
+          {(orphanedComments.length > 0 || resolvedComments.length > 0) && (
+            <div className="notepad-comment-static-sections">
+              {orphanedComments.length > 0 && (
+                <div className="notepad-comment-orphaned-section">
+                  <div className="notepad-comment-orphaned-header">
+                    <AlertTriangle size={13} />
+                    <span>Orphaned ({orphanedComments.length})</span>
+                  </div>
+                  {orphanedComments.map((comment) => (
+                    <CommentCard
+                      key={comment.id}
+                      comment={comment}
+                      noteId={noteId}
+                      positioned={false}
+                      isActive={activeCommentId === comment.id}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {resolvedComments.length > 0 && (
+                <div className="notepad-comment-resolved-section">
+                  <button
+                    className="notepad-comment-resolved-toggle"
+                    onClick={() => setShowResolved((v) => !v)}
+                  >
+                    {showResolved ? '▼' : '▶'} {resolvedComments.length} resolved{' '}
+                    {showResolved ? '(hide)' : '(show)'}
+                  </button>
+                  {showResolved &&
+                    resolvedComments.map((comment) => (
+                      <CommentCard
+                        key={comment.id}
+                        comment={comment}
+                        noteId={noteId}
+                        positioned={false}
+                        isActive={activeCommentId === comment.id}
+                      />
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Anchored open comments — absolutely positioned, scroll-synced with editor */}
           <div
             className="notepad-comment-margin"
             style={{
@@ -303,48 +349,6 @@ export function CommentMargin({
               )
             })}
           </div>
-
-          {/* Orphaned section */}
-          {orphanedComments.length > 0 && (
-            <div className="notepad-comment-orphaned-section">
-              <div className="notepad-comment-orphaned-header">
-                <AlertTriangle size={13} />
-                <span>Orphaned ({orphanedComments.length})</span>
-              </div>
-              {orphanedComments.map((comment) => (
-                <CommentCard
-                  key={comment.id}
-                  comment={comment}
-                  noteId={noteId}
-                  positioned={false}
-                  isActive={activeCommentId === comment.id}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Resolved section — collapsible */}
-          {resolvedComments.length > 0 && (
-            <div className="notepad-comment-resolved-section">
-              <button
-                className="notepad-comment-resolved-toggle"
-                onClick={() => setShowResolved((v) => !v)}
-              >
-                {showResolved ? '▼' : '▶'} {resolvedComments.length} resolved{' '}
-                {showResolved ? '(hide)' : '(show)'}
-              </button>
-              {showResolved &&
-                resolvedComments.map((comment) => (
-                  <CommentCard
-                    key={comment.id}
-                    comment={comment}
-                    noteId={noteId}
-                    positioned={false}
-                    isActive={activeCommentId === comment.id}
-                  />
-                ))}
-            </div>
-          )}
         </>
       )}
     </div>

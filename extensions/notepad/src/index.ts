@@ -99,6 +99,15 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     console.warn('[notepad] Could not register Cmd+Alt+M for comment margin toggle')
   }
 
+  try {
+    const searchDisposable = api.globalShortcut.register('CommandOrControl+Shift+F', () => {
+      api.window.broadcast('terminator.notepad:ui.openSearch', {})
+    })
+    disposables.push(searchDisposable)
+  } catch {
+    console.warn('[notepad] Could not register Cmd+Shift+F for search')
+  }
+
   disposables.push(
     api.nativeMenu.addViewMenuItem({
       id: 'notepad-new-note',

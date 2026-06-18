@@ -262,6 +262,7 @@ export function SmartTaskInput({
 
     if (e.key === 'Escape') {
       if (active) {
+        e.stopPropagation()
         setActive(null)
         return
       }
@@ -271,8 +272,12 @@ export function SmartTaskInput({
 
     if (e.key === 'Enter') {
       e.preventDefault()
-      setActive(null)
-      onSubmit()
+      if (active) {
+        // A trigger is active (date picker or dropdown with no options) — close it, don't submit
+        setActive(null)
+      } else {
+        onSubmit()
+      }
     }
   }
 

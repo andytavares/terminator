@@ -1,6 +1,7 @@
 import './notepad.css'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { MessageSquarePlus } from 'lucide-react'
+import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useNotesStore } from '../stores/notes.store'
 import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
@@ -9,6 +10,7 @@ import { EmptyState } from './EmptyState'
 import { CommentMargin } from './CommentMargin'
 import { CommentComposer } from './CommentComposer'
 import { ExportDialog } from './ExportDialog'
+import { SearchOverlay } from './SearchOverlay'
 import {
   NoteEditor,
   applyAnchors,
@@ -39,6 +41,7 @@ async function importNotes(): Promise<void> {
 
 export function NotepadView(): React.JSX.Element {
   const [showExport, setShowExport] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
   const [showComments, setShowComments] = useState(true)
   const [readingMode, setReadingMode] = useState(false)
   const [pendingAnchor, setPendingAnchor] = useState<SelectionAnchor | null>(null)
@@ -246,6 +249,48 @@ export function NotepadView(): React.JSX.Element {
             tags: note?.tags ?? [],
           })
           markSaved()
+
+          // Re-check anchors after save — body may have changed enough to orphan a comment
+          const currentComments = useCommentsStore.getState().comments
+          const orphanIds: string[] = []
+          const anchorUpdates: { id: string; newFrom: number; newTo: number }[] = []
+
+          for (const comment of currentComments) {
+            if (comment.parentId !== null || comment.status === 'orphaned') continue
+            const result = reanchorComment(comment, newBody)
+            if (result.status === 'orphaned') {
+              orphanIds.push(comment.id)
+            } else if (result.newFrom !== undefined && result.newTo !== undefined) {
+              anchorUpdates.push({ id: comment.id, newFrom: result.newFrom, newTo: result.newTo })
+            }
+          }
+
+          if (orphanIds.length > 0 || anchorUpdates.length > 0) {
+            const updatedMap = new Map(anchorUpdates.map((u) => [u.id, u]))
+            useCommentsStore.getState().setComments(
+              currentComments.map((c) => {
+                if (orphanIds.includes(c.id)) return { ...c, status: 'orphaned' as const }
+                const upd = updatedMap.get(c.id)
+                return upd ? { ...c, startOffset: upd.newFrom, endOffset: upd.newTo } : c
+              })
+            )
+            await Promise.all([
+              ...orphanIds.map((id) =>
+                window.electronAPI.extensionBridge
+                  .invoke('terminator.notepad:comments.markOrphaned', { id })
+                  .catch((err) => console.error('[notepad] markOrphaned failed', err))
+              ),
+              ...anchorUpdates.map((u) =>
+                window.electronAPI.extensionBridge
+                  .invoke('terminator.notepad:comments.updateAnchor', {
+                    id: u.id,
+                    startOffset: u.newFrom,
+                    endOffset: u.newTo,
+                  })
+                  .catch((err) => console.error('[notepad] updateAnchor failed', err))
+              ),
+            ])
+          }
         } catch (err) {
           console.error('[notepad] Autosave failed', err)
         }
@@ -281,6 +326,41 @@ export function NotepadView(): React.JSX.Element {
     }
     window.addEventListener('notepad:openExport', onOpenExport)
     return () => window.removeEventListener('notepad:openExport', onOpenExport)
+  }, [])
+
+  // Cmd+Shift+F opens search overlay
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
+        e.preventDefault()
+        setShowSearch(true)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  // Listen for global shortcut broadcast to open search
+  useEffect(() => {
+    const off = window.electronAPI.extensionBridge.on('terminator.notepad:ui.openSearch', () => {
+      setShowSearch(true)
+    })
+    return off
+  }, [])
+
+  // Listen for open-in-window push: activate notepad tab and select the note
+  useEffect(() => {
+    const off = window.electronAPI.extensionBridge.on(
+      'terminator.notepad:selectNote',
+      (data: unknown) => {
+        const id = (data as { id?: string })?.id
+        if (id) {
+          useExtensionRegistry.getState().setActiveGlobalTab('notepad')
+          useNotesStore.getState().setSelected(id)
+        }
+      }
+    )
+    return off
   }, [])
 
   function scheduleHoverHide() {
@@ -326,6 +406,7 @@ export function NotepadView(): React.JSX.Element {
   if (notes.length === 0) {
     return (
       <div className="notepad-view notepad-view--empty-screen">
+        {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
         <EmptyState
           onNewNote={() => setShowQuickCreate(true)}
           onImport={() => void importNotes()}
@@ -336,6 +417,7 @@ export function NotepadView(): React.JSX.Element {
 
   return (
     <div className="notepad-view">
+      {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
       <div className="notepad-view__sidebar">
         <NoteList />
       </div>

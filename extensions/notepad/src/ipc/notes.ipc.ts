@@ -1,4 +1,5 @@
-import { ipcMain } from 'electron'
+import { ipcMain, BrowserWindow, app } from 'electron'
+import { join } from 'path'
 import { z } from 'zod'
 import { getDb, randomUUID, insertFts, deleteFts } from '../db/db'
 
@@ -282,6 +283,38 @@ export async function hardDeleteNote(payload: unknown): Promise<Record<string, u
   return { data: { ok: true } }
 }
 
+export async function openNoteInWindow(payload: unknown): Promise<Record<string, unknown>> {
+  const schema = z.object({ id: z.string() })
+  const parsed = schema.safeParse(payload)
+  if (!parsed.success) return VALIDATION_ERROR
+
+  const mainWindow = BrowserWindow.getAllWindows()[0]
+  if (!mainWindow) return { error: 'NO_MAIN_WINDOW' }
+
+  const url = mainWindow.webContents.getURL()
+  // electron-vite builds preload to out/preload/index.js (mirrors package.json "main")
+  const preload = join(app.getAppPath(), 'out', 'preload', 'index.js')
+
+  const win = new BrowserWindow({
+    width: 1000,
+    height: 720,
+    webPreferences: {
+      preload,
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+
+  win
+    .loadURL(url)
+    .then(() => {
+      win.webContents.send('terminator.notepad:selectNote', { id: parsed.data.id })
+    })
+    .catch((err) => console.error('[notepad] openNoteInWindow: failed to load', err))
+
+  return { data: { ok: true } }
+}
+
 // ---- Tags IPC handlers ----
 
 export async function listTags(_payload: unknown): Promise<Record<string, unknown>> {
@@ -346,6 +379,7 @@ export function registerNotesIpcHandlers(): () => void {
   ipcMain.handle('terminator.notepad:notes.archive', (_, payload) => archiveNote(payload))
   ipcMain.handle('terminator.notepad:notes.restore', (_, payload) => restoreNote(payload))
   ipcMain.handle('terminator.notepad:notes.hardDelete', (_, payload) => hardDeleteNote(payload))
+  ipcMain.handle('terminator.notepad:notes.openWindow', (_, payload) => openNoteInWindow(payload))
 
   return () => {
     ipcMain.removeHandler('terminator.notepad:notes.create')
@@ -355,5 +389,6 @@ export function registerNotesIpcHandlers(): () => void {
     ipcMain.removeHandler('terminator.notepad:notes.archive')
     ipcMain.removeHandler('terminator.notepad:notes.restore')
     ipcMain.removeHandler('terminator.notepad:notes.hardDelete')
+    ipcMain.removeHandler('terminator.notepad:notes.openWindow')
   }
 }

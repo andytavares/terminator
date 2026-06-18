@@ -40,18 +40,49 @@ function parseTagFilters(query: string): {
 }
 
 function makeSnippet(body: string, query: string): string {
-  if (!query) return body.slice(0, 120)
-  const word = query.replace(/[*"]/g, '').split(/\s+/)[0]
-  if (!word) return body.slice(0, 120)
-  const idx = body.toLowerCase().indexOf(word.toLowerCase())
-  if (idx === -1) return body.slice(0, 120)
-  const start = Math.max(0, idx - 40)
-  const end = Math.min(body.length, idx + 80)
+  if (!query) return escapeHtml(body.slice(0, 120))
+
+  const words = query
+    .replace(/[*"]/g, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.toLowerCase())
+
+  if (words.length === 0) return escapeHtml(body.slice(0, 120))
+
+  // Find the earliest match in body to center the snippet window
+  const bodyLower = body.toLowerCase()
+  let anchorIdx = -1
+  for (const word of words) {
+    const idx = bodyLower.indexOf(word)
+    if (idx !== -1 && (anchorIdx === -1 || idx < anchorIdx)) anchorIdx = idx
+  }
+
+  const start = anchorIdx === -1 ? 0 : Math.max(0, anchorIdx - 40)
+  const end = Math.min(body.length, start + 160)
   const prefix = start > 0 ? '…' : ''
   const suffix = end < body.length ? '…' : ''
   const slice = body.slice(start, end)
-  const marked = slice.replace(new RegExp(`(${word})`, 'gi'), '<mark>$1</mark>')
+
+  // Escape HTML then re-apply mark tags for each query word
+  let marked = escapeHtml(slice)
+  for (const word of words) {
+    marked = marked.replace(new RegExp(`(${escapeRegex(word)})`, 'gi'), '<mark>$1</mark>')
+  }
+
   return `${prefix}${marked}${suffix}`
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 export async function searchNotes(

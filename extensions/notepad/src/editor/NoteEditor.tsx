@@ -132,6 +132,7 @@ export function NoteEditor({
           hoveredAnchorField,
           commentAnchorDecorations,
           readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly ?? false)),
+          EditorView.lineWrapping,
           keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
           /* v8 ignore next 3 */
           EditorView.updateListener.of((update) => {
