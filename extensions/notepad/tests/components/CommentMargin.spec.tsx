@@ -88,7 +88,7 @@ describe('CommentMargin', () => {
     useCommentsStore.setState({ comments: [orphanedComment], loading: false })
     const { container } = render(<CommentMargin noteId="n1" anchorTops={{}} />)
     expect(container.querySelector('.notepad-comment--orphaned')).toBeTruthy()
-    expect(screen.getByText('Anchor lost')).toBeDefined()
+    expect(container.querySelector('.notepad-comment-orphaned-section')).toBeTruthy()
   })
 
   it('Resolve button calls comments.resolve IPC', async () => {

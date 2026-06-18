@@ -43,6 +43,7 @@ interface NoteEditorProps {
   onChange: (doc: string) => void
   onAnchorsReady?: (getView: () => EditorView | null) => void
   onSelectionChange?: (sel: SelectionAnchor | null) => void
+  readOnly?: boolean
 }
 
 export function NoteEditor({
@@ -50,6 +51,7 @@ export function NoteEditor({
   onChange,
   onAnchorsReady,
   onSelectionChange,
+  readOnly,
 }: NoteEditorProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
@@ -128,6 +130,7 @@ export function NoteEditor({
           commentAnchorField,
           hoveredAnchorField,
           commentAnchorDecorations,
+          EditorState.readOnly.of(readOnly ?? false),
           keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
           /* v8 ignore next 3 */
           EditorView.updateListener.of((update) => {
@@ -255,6 +258,13 @@ export function NoteEditor({
       view.dispatch({ changes: { from: 0, to: current.length, insert: initialDoc } })
     }
   }, [initialDoc])
+
+  useEffect(() => {
+    const view = viewRef.current
+    /* v8 ignore next 3 */
+    if (!view) return
+    view.dispatch({ effects: EditorState.readOnly.reconfigure(readOnly ?? false) })
+  }, [readOnly])
 
   return <div ref={containerRef} className="notepad-editor-cm" style={{ height: '100%' }} />
 }

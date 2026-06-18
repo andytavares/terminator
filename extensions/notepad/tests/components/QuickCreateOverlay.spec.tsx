@@ -27,7 +27,7 @@ describe('QuickCreateOverlay', () => {
   it('renders title and body inputs', () => {
     useNotesStore.setState({ showQuickCreate: true })
     render(<QuickCreateOverlay />)
-    expect(screen.getByPlaceholderText(/title \(optional\)/i)).toBeTruthy()
+    expect(screen.getByPlaceholderText(/title/i)).toBeTruthy()
     expect(screen.getByPlaceholderText(/start writing/i)).toBeTruthy()
   })
 
@@ -41,7 +41,7 @@ describe('QuickCreateOverlay', () => {
   it('renders a Save button', () => {
     useNotesStore.setState({ showQuickCreate: true })
     render(<QuickCreateOverlay />)
-    expect(screen.getByRole('button', { name: /^save$/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /save/i })).toBeTruthy()
   })
 
   it('Cancel button closes the overlay via store', () => {

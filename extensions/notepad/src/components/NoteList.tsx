@@ -5,12 +5,17 @@ import { useFilterStore } from '../stores/filter.store'
 import { EmptyState } from './EmptyState'
 import type { NoteListItem, SearchResult, Tag } from '../db/types'
 
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-  } catch {
-    return ''
-  }
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(iso).getDay()]
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 // ── Context menu ──────────────────────────────────────────────────
@@ -120,7 +125,6 @@ function NoteEditModal({
     if (saving) return
     setSaving(true)
     try {
-      // Fetch current body so autosave doesn't clobber it
       const noteResult = await window.electronAPI.extensionBridge.invoke(
         'terminator.notepad:notes.get',
         { id: state.noteId }
@@ -187,21 +191,28 @@ function NoteEditModal({
 function NoteRow({
   note,
   onContextMenu,
+  dimmed,
 }: {
   note: NoteListItem | SearchResult
   onContextMenu: (e: React.MouseEvent, note: NoteListItem | SearchResult) => void
+  dimmed?: boolean
 }): React.JSX.Element {
   const { selectedNoteId, setSelected } = useNotesStore()
   const id = note.id
   const isSelected = selectedNoteId === id
   const title = note.title
-  const preview = 'bodyPreview' in note ? note.bodyPreview : ''
-  const snippet = 'snippet' in note && note.snippet ? note.snippet : ''
+
+  const tagList = note.tags ?? []
 
   return (
     <button
-      className={`notepad-note-row${isSelected ? ' notepad-note-row--selected' : ''}`}
+      className={`notepad-note-row${isSelected ? ' notepad-note-row--selected' : ''}${dimmed ? ' notepad-note-row--dimmed' : ''}`}
       onClick={() => setSelected(id)}
+      onDoubleClick={() => {
+        window.electronAPI.extensionBridge
+          .invoke('terminator.notepad:notes.openWindow', { id })
+          .catch(console.error)
+      }}
       onContextMenu={(e) => {
         e.preventDefault()
         onContextMenu(e, note)
@@ -209,30 +220,19 @@ function NoteRow({
       aria-selected={isSelected}
     >
       <div className="notepad-note-row__title">{title}</div>
-      {(snippet || preview) && (
-        <div
-          className="notepad-note-row__preview"
-          // snippet may contain <mark> from search highlight — safe, comes from our own data
-          dangerouslySetInnerHTML={{ __html: snippet || preview.slice(0, 80) }}
-        />
-      )}
-      {note.tags && note.tags.length > 0 && (
-        <div className="notepad-note-row__tags">
-          {note.tags.slice(0, 3).map((tag) => (
-            <span key={tag} className="notepad-note-row__tag">
-              {tag}
+      <div className="notepad-note-row__meta-line">
+        <span className="notepad-note-row__time">{relativeTime(note.updatedAt)}</span>
+        {tagList.length > 0 && (
+          <>
+            <span className="notepad-note-row__dot">·</span>
+            <span className="notepad-note-row__tags-inline">
+              {tagList
+                .slice(0, 3)
+                .map((t) => `#${t}`)
+                .join(' ')}
             </span>
-          ))}
-          {note.tags.length > 3 && (
-            <span className="notepad-note-row__tag notepad-note-row__tag--more">
-              +{note.tags.length - 3}
-            </span>
-          )}
-        </div>
-      )}
-      <div className="notepad-note-row__meta">
-        {note.archivedAt && <span className="notepad-note-row__archived-badge">Archived</span>}
-        {formatDate(note.updatedAt)}
+          </>
+        )}
       </div>
     </button>
   )
@@ -241,15 +241,15 @@ function NoteRow({
 // ── NoteList ──────────────────────────────────────────────────────
 
 export function NoteList(): React.JSX.Element {
-  const { notes, setNotes, selectedNoteId, setSelected } = useNotesStore()
-  const { searchQuery, activeTagId, includeArchived, setQuery, setTag, toggleArchived } =
-    useFilterStore()
+  const { notes, setNotes, selectedNoteId, setSelected, setShowQuickCreate } = useNotesStore()
+  const { searchQuery, activeTagId, setQuery, setTag } = useFilterStore()
 
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const tagsRef = useRef<Tag[]>([])
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [editModal, setEditModal] = useState<EditModalState | null>(null)
+  const [archivedExpanded, setArchivedExpanded] = useState(false)
 
   useEffect(() => {
     const tagMap = new Map<string, { id: string; name: string; count: number }>()
@@ -311,13 +311,13 @@ export function NoteList(): React.JSX.Element {
     const run = async () => {
       const result = await window.electronAPI.extensionBridge.invoke(
         'terminator.notepad:search.query',
-        { query: parts.join(' '), includeArchived }
+        { query: parts.join(' '), includeArchived: true }
       )
       const data = (result as { data?: SearchResult[] }).data
       if (data) setSearchResults(data)
     }
     void run()
-  }, [searchQuery, activeTagId, includeArchived, tags])
+  }, [searchQuery, activeTagId, tags])
 
   // Close context menu on any click outside
   useEffect(() => {
@@ -342,13 +342,17 @@ export function NoteList(): React.JSX.Element {
 
   async function handleArchiveToggle(noteId: string, isArchived: boolean) {
     const channel = isArchived
-      ? 'terminator.notepad:notes.unarchive'
+      ? 'terminator.notepad:notes.restore'
       : 'terminator.notepad:notes.archive'
     await window.electronAPI.extensionBridge.invoke(channel, { id: noteId }).catch(console.error)
     await reloadNotes()
   }
 
-  async function handleDelete(noteId: string) {
+  async function handleDelete(noteId: string, isArchived: boolean) {
+    if (!isArchived) {
+      window.alert('Archive this note before deleting it.')
+      return
+    }
     const ok = window.confirm('Permanently delete this note? This cannot be undone.')
     if (!ok) return
     await window.electronAPI.extensionBridge
@@ -362,7 +366,7 @@ export function NoteList(): React.JSX.Element {
     try {
       const result = await window.electronAPI.extensionBridge.invoke(
         'terminator.notepad:notes.list',
-        {}
+        { includeArchived: true }
       )
       const data = (result as { data?: unknown[] }).data
       if (Array.isArray(data)) setNotes(data as Parameters<typeof setNotes>[0])
@@ -371,7 +375,9 @@ export function NoteList(): React.JSX.Element {
     }
   }
 
-  const displayNotes = searchResults ?? notes
+  const allNotes = searchResults ?? notes
+  const activeNotes = allNotes.filter((n) => !n.archivedAt)
+  const archivedNotes = allNotes.filter((n) => n.archivedAt)
 
   return (
     <div className="notepad-note-list">
@@ -383,6 +389,7 @@ export function NoteList(): React.JSX.Element {
           value={searchQuery}
           onChange={(e) => setQuery(e.target.value)}
         />
+        <kbd className="notepad-search-kbd">⌘⇧F</kbd>
       </div>
 
       {tags.length > 0 && (
@@ -393,23 +400,51 @@ export function NoteList(): React.JSX.Element {
               className={`notepad-tag-chip${activeTagId === tag.id ? ' notepad-tag-chip--active' : ''}`}
               onClick={() => void handleTagClick(tag.name)}
             >
+              <span className="notepad-tag-chip__hash">#</span>
               {tag.name}
+              <span className="notepad-tag-chip__count">{tag.noteCount}</span>
             </button>
           ))}
         </div>
       )}
 
-      {displayNotes.length === 0 ? (
-        <EmptyState />
-      ) : (
-        displayNotes.map((note) => (
-          <NoteRow key={note.id} note={note} onContextMenu={handleContextMenu} />
-        ))
-      )}
+      <div className="notepad-note-list__notes">
+        {activeNotes.length === 0 && archivedNotes.length === 0 ? (
+          <EmptyState />
+        ) : (
+          activeNotes.map((note) => (
+            <NoteRow key={note.id} note={note} onContextMenu={handleContextMenu} />
+          ))
+        )}
+
+        {archivedNotes.length > 0 && (
+          <>
+            <button
+              className="notepad-archived-toggle"
+              onClick={() => setArchivedExpanded((v) => !v)}
+            >
+              {archivedExpanded ? '▼' : '▶'} Archived ({archivedNotes.length})
+            </button>
+            {archivedExpanded &&
+              archivedNotes.map((note) => (
+                <NoteRow key={note.id} note={note} onContextMenu={handleContextMenu} dimmed />
+              ))}
+          </>
+        )}
+      </div>
 
       <div className="notepad-note-list__footer">
-        <button className="notepad-btn-ghost" onClick={toggleArchived}>
-          Include archived
+        <button
+          className="notepad-btn-export"
+          onClick={() => window.dispatchEvent(new CustomEvent('notepad:openExport'))}
+        >
+          ↓ Export
+        </button>
+        <button
+          className="notepad-btn-primary notepad-btn-new"
+          onClick={() => setShowQuickCreate(true)}
+        >
+          + New <kbd className="notepad-kbd notepad-kbd--inline">⌘⇧N</kbd>
         </button>
       </div>
 
@@ -446,9 +481,9 @@ export function NoteList(): React.JSX.Element {
           <button
             className="notepad-context-menu__item notepad-context-menu__item--danger"
             onClick={() => {
-              const { noteId } = contextMenu
+              const { noteId, isArchived } = contextMenu
               setContextMenu(null)
-              void handleDelete(noteId)
+              void handleDelete(noteId, isArchived)
             }}
           >
             Delete

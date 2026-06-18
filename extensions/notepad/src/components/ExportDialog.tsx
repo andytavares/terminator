@@ -5,6 +5,19 @@ import { useNotesStore } from '../stores/notes.store'
 type ExportScope = 'all' | 'note'
 type CommentFormat = 'sidecar' | 'inline' | 'both'
 
+function previewSlug(title: string, id: string): string {
+  return (
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 50) +
+    '-' +
+    id.slice(0, 8) +
+    '.md'
+  )
+}
+
 interface ExportDialogProps {
   onClose: () => void
   noteId?: string
@@ -12,6 +25,7 @@ interface ExportDialogProps {
 
 export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.Element {
   const { notes } = useNotesStore()
+  const previewNote = noteId ? notes.find((n) => n.id === noteId) : notes[0]
   const [folder, setFolder] = useState('~/Documents/Terminator Notes')
   const [scope, setScope] = useState<ExportScope>('all')
   const [includeFrontmatter, setIncludeFrontmatter] = useState(true)
@@ -167,18 +181,21 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
           </div>
 
           {/* Preview box */}
-          <div className="notepad-export-dialog__preview">
-            <div className="notepad-export-dialog__preview-line notepad-export-dialog__preview-filename">
-              auth-retry-budget.md
-            </div>
-            <div className="notepad-export-dialog__preview-line">---</div>
-            {includeFrontmatter && (
-              <div className="notepad-export-dialog__preview-line">
-                id: 7f3a… · title: Auth retry budget · tags: [infra, design]
+          {previewNote && (
+            <div className="notepad-export-dialog__preview">
+              <div className="notepad-export-dialog__preview-line notepad-export-dialog__preview-filename">
+                {previewSlug(previewNote.title, previewNote.id)}
               </div>
-            )}
-            <div className="notepad-export-dialog__preview-line">---</div>
-          </div>
+              <div className="notepad-export-dialog__preview-line">---</div>
+              {includeFrontmatter && (
+                <div className="notepad-export-dialog__preview-line">
+                  id: {previewNote.id.slice(0, 8)}… · title: {previewNote.title} · tags: [
+                  {previewNote.tags.join(', ')}]
+                </div>
+              )}
+              <div className="notepad-export-dialog__preview-line">---</div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

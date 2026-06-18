@@ -40,6 +40,7 @@ async function importNotes(): Promise<void> {
 export function NotepadView(): React.JSX.Element {
   const [showExport, setShowExport] = useState(false)
   const [showComments, setShowComments] = useState(true)
+  const [readingMode, setReadingMode] = useState(false)
   const [pendingAnchor, setPendingAnchor] = useState<SelectionAnchor | null>(null)
   const [composingAnchor, setComposingAnchor] = useState<SelectionAnchor | null>(null)
   const [anchorTops, setAnchorTops] = useState<Record<string, number>>({})
@@ -64,7 +65,7 @@ export function NotepadView(): React.JSX.Element {
       try {
         const result = await window.electronAPI.extensionBridge.invoke(
           'terminator.notepad:notes.list',
-          {}
+          { includeArchived: true }
         )
         const data = (result as { data?: unknown[] }).data
         if (Array.isArray(data)) {
@@ -274,6 +275,14 @@ export function NotepadView(): React.JSX.Element {
     return () => window.removeEventListener('notepad:toggleComments', onToggleComments)
   }, [])
 
+  useEffect(() => {
+    function onOpenExport() {
+      setShowExport(true)
+    }
+    window.addEventListener('notepad:openExport', onOpenExport)
+    return () => window.removeEventListener('notepad:openExport', onOpenExport)
+  }, [])
+
   function scheduleHoverHide() {
     if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current)
     hoverHideTimer.current = setTimeout(() => setCommentHover(null), 200)
@@ -334,6 +343,20 @@ export function NotepadView(): React.JSX.Element {
         <div className="notepad-view__toolbar">
           <span className="notepad-view__save-status">{saveStatusLabel()}</span>
           <button
+            className="notepad-btn-ghost"
+            onClick={() => setReadingMode((v) => !v)}
+            title={readingMode ? 'Switch to edit mode' : 'Switch to reading mode'}
+          >
+            {readingMode ? 'Edit' : 'Read'}
+          </button>
+          <button
+            className={`notepad-btn-ghost${showComments ? ' notepad-view__comments-toggle--on' : ''}`}
+            onClick={() => setShowComments((v) => !v)}
+            title={showComments ? 'Hide comments' : 'Show comments'}
+          >
+            {showComments ? 'Hide comments' : 'Show comments'}
+          </button>
+          <button
             className="notepad-btn-ghost notepad-view__export-btn"
             onClick={() => setShowExport(true)}
           >
@@ -361,6 +384,7 @@ export function NotepadView(): React.JSX.Element {
                 setPendingAnchor(sel)
                 if (!sel) setComposingAnchor(null)
               }}
+              readOnly={readingMode}
             />
             {pendingAnchor && !composingAnchor && (
               <button

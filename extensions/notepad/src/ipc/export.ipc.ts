@@ -1,6 +1,7 @@
 import { ipcMain, dialog } from 'electron'
 import { z } from 'zod'
 import * as fs from 'node:fs'
+import * as os from 'node:os'
 import * as path from 'node:path'
 import matter from 'gray-matter'
 import { getDb, randomUUID, insertFts } from '../db/db'
@@ -64,6 +65,7 @@ export async function exportNotes(
   if (!parsed.success) return { error: 'VALIDATION_ERROR' }
 
   const { folder, scope = 'all', noteId, tagId } = parsed.data
+  const resolvedFolder = folder.replace(/^~(?=$|\/)/, os.homedir())
 
   const db = getDb()
   let query = `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at, n.rowid,
@@ -87,9 +89,9 @@ export async function exportNotes(
   const notes = db.prepare(query).all(...params) as NoteRow[]
 
   // Build map of existing files by id for idempotent re-export
-  const existingMap = buildExistingIdMap(folder)
+  const existingMap = buildExistingIdMap(resolvedFolder)
 
-  fs.mkdirSync(folder, { recursive: true })
+  fs.mkdirSync(resolvedFolder, { recursive: true })
 
   for (const note of notes) {
     const tags = note.tags ? note.tags.split(',').filter(Boolean) : []
@@ -104,7 +106,7 @@ export async function exportNotes(
     const fileContent = matter.stringify(note.body, frontmatter)
     const slug = toSlug(note.title, note.id)
     const filename = existingMap.get(note.id) ?? `${slug}.md`
-    fs.writeFileSync(path.join(folder, filename), fileContent, 'utf-8')
+    fs.writeFileSync(path.join(resolvedFolder, filename), fileContent, 'utf-8')
   }
 
   return { data: { exported: notes.length } }

@@ -25,8 +25,9 @@ interface CommentMarginProps {
 interface CommentCardProps {
   comment: Comment
   noteId: string
-  topOffset: number
+  topOffset?: number
   isActive?: boolean
+  positioned?: boolean
   onCommentClick?: (from: number, to: number) => void
   onHoverComment?: (id: string | null) => void
 }
@@ -36,6 +37,7 @@ function CommentCard({
   noteId,
   topOffset,
   isActive,
+  positioned = true,
   onCommentClick,
   onHoverComment,
 }: CommentCardProps): React.JSX.Element {
@@ -123,10 +125,14 @@ function CommentCard({
 
   const initial = (comment.author?.[0] ?? '?').toUpperCase()
 
+  const style: React.CSSProperties = positioned
+    ? { position: 'absolute', top: topOffset ?? 0, left: 8, right: 8 }
+    : {}
+
   return (
     <div
       className={`notepad-comment${isOrphaned ? ' notepad-comment--orphaned' : ''}${isResolved ? ' notepad-comment--resolved' : ''}${isActive ? ' notepad-comment--active' : ''}`}
-      style={{ position: 'absolute', top: topOffset, left: 8, right: 8 }}
+      style={style}
       onMouseEnter={() => onHoverComment?.(comment.id)}
       onMouseLeave={() => onHoverComment?.(null)}
     >
@@ -146,30 +152,22 @@ function CommentCard({
       </div>
 
       {/* Quote anchor */}
-      {comment.quote && (
+      {comment.quote && !isOrphaned && (
         <button
           className="notepad-comment__quote"
           onClick={() => {
-            if (comment.startOffset !== null && comment.endOffset !== null && !isOrphaned) {
+            if (comment.startOffset !== null && comment.endOffset !== null) {
               onCommentClick?.(comment.startOffset, comment.endOffset)
             }
           }}
           title="Click to jump to this text in the editor"
-          disabled={isOrphaned}
         >
           &ldquo;{comment.quote.slice(0, 60)}
           {comment.quote.length > 60 ? '…' : ''}&rdquo;
         </button>
       )}
 
-      {isOrphaned && (
-        <div className="notepad-comment__orphan-label">
-          <AlertTriangle size={12} />
-          <span>Anchor lost</span>
-        </div>
-      )}
-
-      {/* Body (click to edit) */}
+      {/* Body */}
       {editMode ? (
         <div className="notepad-comment__edit">
           <textarea
@@ -190,10 +188,10 @@ function CommentCard({
       ) : (
         <div
           className="notepad-comment__body"
-          onClick={() => setEditMode(true)}
+          onClick={() => !isResolved && setEditMode(true)}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && setEditMode(true)}
+          onKeyDown={(e) => e.key === 'Enter' && !isResolved && setEditMode(true)}
           aria-label="Edit comment (click to edit)"
         >
           {comment.body}
@@ -228,21 +226,26 @@ function CommentCard({
         </div>
       )}
 
-      {/* Footer: Reply | Resolve text links */}
-      <div className="notepad-comment__actions-row">
-        {!isOrphaned && (
-          <button className="notepad-comment__action-link" onClick={() => setReplyOpen((v) => !v)}>
-            Reply
+      {/* Footer actions */}
+      {!isOrphaned && (
+        <div className="notepad-comment__actions-row">
+          {!isResolved && (
+            <button
+              className="notepad-comment__action-link"
+              onClick={() => setReplyOpen((v) => !v)}
+            >
+              Reply
+            </button>
+          )}
+          <button
+            className={`notepad-comment__action-link${isResolved ? ' notepad-comment__action-link--active' : ''}`}
+            onClick={() => void handleResolve()}
+            title={isResolved ? 'Unresolve' : 'Resolve'}
+          >
+            {isResolved ? 'Unresolve' : 'Resolve'}
           </button>
-        )}
-        <button
-          className={`notepad-comment__action-link${isResolved ? ' notepad-comment__action-link--active' : ''}`}
-          onClick={() => void handleResolve()}
-          title={isResolved ? 'Unresolve' : 'Resolve'}
-        >
-          {isResolved ? 'Unresolve' : 'Resolve'}
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -256,8 +259,13 @@ export function CommentMargin({
   onHoverComment,
 }: CommentMarginProps): React.JSX.Element {
   const { comments } = useCommentsStore()
+  const [showResolved, setShowResolved] = useState(false)
+
   const rootComments = comments.filter((c) => c.parentId === null)
-  const openCount = rootComments.filter((c) => c.status === 'open').length
+  const openComments = rootComments.filter((c) => c.status === 'open')
+  const orphanedComments = rootComments.filter((c) => c.status === 'orphaned')
+  const resolvedComments = rootComments.filter((c) => c.status === 'resolved')
+  const openCount = openComments.length
 
   return (
     <div className="notepad-comment-column">
@@ -265,32 +273,79 @@ export function CommentMargin({
         <span className="notepad-comment-column__title">Comments</span>
         {openCount > 0 && <span className="notepad-comment-column__badge">{openCount} open</span>}
       </div>
+
       {rootComments.length === 0 ? (
         <div className="notepad-comment-margin notepad-comment-margin--empty">
           <p className="notepad-comment-margin__hint">Select text and click + to add a comment</p>
         </div>
       ) : (
-        <div
-          className="notepad-comment-margin"
-          style={{
-            minHeight: containerHeight && containerHeight > 0 ? containerHeight : undefined,
-          }}
-        >
-          {rootComments.map((comment) => {
-            const topOffset = anchorTops[comment.id] ?? 0
-            return (
-              <CommentCard
-                key={comment.id}
-                comment={comment}
-                noteId={noteId}
-                topOffset={topOffset}
-                isActive={activeCommentId === comment.id}
-                onCommentClick={onCommentClick}
-                onHoverComment={onHoverComment}
-              />
-            )
-          })}
-        </div>
+        <>
+          {/* Anchored open comments — absolutely positioned */}
+          <div
+            className="notepad-comment-margin"
+            style={{
+              minHeight: containerHeight && containerHeight > 0 ? containerHeight : undefined,
+            }}
+          >
+            {openComments.map((comment) => {
+              const topOffset = anchorTops[comment.id] ?? 0
+              return (
+                <CommentCard
+                  key={comment.id}
+                  comment={comment}
+                  noteId={noteId}
+                  topOffset={topOffset}
+                  positioned
+                  isActive={activeCommentId === comment.id}
+                  onCommentClick={onCommentClick}
+                  onHoverComment={onHoverComment}
+                />
+              )
+            })}
+          </div>
+
+          {/* Orphaned section */}
+          {orphanedComments.length > 0 && (
+            <div className="notepad-comment-orphaned-section">
+              <div className="notepad-comment-orphaned-header">
+                <AlertTriangle size={13} />
+                <span>Orphaned ({orphanedComments.length})</span>
+              </div>
+              {orphanedComments.map((comment) => (
+                <CommentCard
+                  key={comment.id}
+                  comment={comment}
+                  noteId={noteId}
+                  positioned={false}
+                  isActive={activeCommentId === comment.id}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Resolved section — collapsible */}
+          {resolvedComments.length > 0 && (
+            <div className="notepad-comment-resolved-section">
+              <button
+                className="notepad-comment-resolved-toggle"
+                onClick={() => setShowResolved((v) => !v)}
+              >
+                {showResolved ? '▼' : '▶'} {resolvedComments.length} resolved{' '}
+                {showResolved ? '(hide)' : '(show)'}
+              </button>
+              {showResolved &&
+                resolvedComments.map((comment) => (
+                  <CommentCard
+                    key={comment.id}
+                    comment={comment}
+                    noteId={noteId}
+                    positioned={false}
+                    isActive={activeCommentId === comment.id}
+                  />
+                ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

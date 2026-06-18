@@ -61,10 +61,10 @@ describe('NoteList', () => {
     expect(useNotesStore.getState().selectedNoteId).toBe('n1')
   })
 
-  it('renders body preview text', () => {
+  it('renders inline tags in meta-line', () => {
     useNotesStore.setState({ notes: [note1], selectedNoteId: null, archivedVisible: false })
     render(<NoteList />)
-    expect(screen.getByText(/preview of first note/i)).toBeDefined()
+    expect(screen.getByText(/#work/)).toBeDefined()
   })
 })
 
@@ -88,11 +88,20 @@ describe('NoteList search bar', () => {
     expect(useFilterStore.getState().searchQuery).toBe('hello')
   })
 
-  it('includes archived toggle flips filter.store includeArchived', () => {
+  it('archived notes appear in a collapsible section', () => {
+    const archivedNote: NoteListItem = {
+      ...note1,
+      id: 'n3',
+      title: 'Archived Note',
+      archivedAt: '2026-01-01T00:00:00Z',
+    }
+    useNotesStore.setState({
+      notes: [note1, archivedNote],
+      selectedNoteId: null,
+      archivedVisible: false,
+    })
     render(<NoteList />)
-    const toggle = screen.getByRole('button', { name: /include archived/i })
-    fireEvent.click(toggle)
-    expect(useFilterStore.getState().includeArchived).toBe(true)
+    expect(screen.getByText(/Archived \(1\)/)).toBeDefined()
   })
 })
 
@@ -124,10 +133,12 @@ describe('NoteList tag sidebar', () => {
   it('clicking a tag sets filter.store activeTagId for that tag', async () => {
     mockInvoke.mockResolvedValueOnce({ data: [{ id: 'tag-infra', name: 'infra', noteCount: 1 }] })
     render(<NoteList />)
-    // Sidebar filter chips are <button> elements; note row tags are <span> elements
-    const tagBtn = screen.getByRole('button', { name: 'infra' })
+    // Tag chips are buttons; find the one whose text content includes 'infra'
+    const tagBtns = screen.getAllByRole('button').filter((b) => b.textContent?.includes('infra'))
+    const sidebarBtn = tagBtns.find((b) => b.className.includes('notepad-tag-chip'))
+    expect(sidebarBtn).toBeDefined()
     await act(async () => {
-      fireEvent.click(tagBtn)
+      fireEvent.click(sidebarBtn!)
     })
     expect(useFilterStore.getState().activeTagId).toBeTruthy()
   })
