@@ -116,6 +116,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   closeSession: async (sessionId) => {
+    // Close any split children that belong to this session before closing the parent
+    const children = [...get().sessions.values()].filter((s) => s.parentSessionId === sessionId)
+    for (const child of children) {
+      await get().closeSession(child.id)
+    }
     // Dispose xterm instance before removing from store
     const instance = get().terminalInstances.get(sessionId)
     instance?.dispose?.()

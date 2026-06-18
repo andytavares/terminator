@@ -109,12 +109,16 @@ export function registerProjectsIpcHandlers(): () => void {
     const staleDaysThreshold = Number.isFinite(parsedThreshold) ? parsedThreshold : 7
     const staleDate = new Date()
     staleDate.setDate(staleDate.getDate() - staleDaysThreshold)
-    const staleDateStr = staleDate.toISOString().slice(0, 10)
+    const staleDateStr = [
+      staleDate.getFullYear(),
+      String(staleDate.getMonth() + 1).padStart(2, '0'),
+      String(staleDate.getDate()).padStart(2, '0'),
+    ].join('-')
     const staleTaskRows = db
       .prepare(
         `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
          WHERE t.source='daily' AND t.parent_id IS NULL
-           AND t.status IN ('open','in-progress')
+           AND t.status IN ('open','in-progress','blocked')
            AND t.today_since IS NOT NULL AND t.today_since <= ?`
       )
       .all(staleDateStr) as Record<string, unknown>[]

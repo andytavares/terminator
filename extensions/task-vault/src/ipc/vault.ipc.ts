@@ -233,7 +233,7 @@ export function registerVaultIpcHandlers(): () => void {
       const thresholdRow = db
         .prepare(`SELECT value FROM settings WHERE key='stale_days_threshold'`)
         .get() as { value: string } | undefined
-      const staleDaysThreshold = thresholdRow ? parseInt(thresholdRow.value, 10) : 7
+      const staleDaysThreshold = thresholdRow ? parseInt(thresholdRow.value, 10) || 7 : 7
 
       return {
         date,
