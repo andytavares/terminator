@@ -1,0 +1,56 @@
+extensions/notepad/src/ipc/export.ipc.ts
+  s_342a3bb060d924::t_3e4ef0a2955a5e 4
+  s_342a3bb060d924::t_da4f737e24e96c 68,92,94,109
+extensions/notepad/src/components/NotepadView.tsx
+  s_342a3bb060d924::t_53c68aaa8dfd40 346-358
+  s_342a3bb060d924::t_cf0d7a2835386f 68
+  s_342a3bb060d924::t_95e3828a769ea7 387
+  s_342a3bb060d924::t_287a8860a3b8d0 43
+  s_342a3bb060d924::t_c0dae45e64a65c 278-285
+extensions/notepad/src/components/ExportDialog.tsx
+  s_342a3bb060d924::t_afa3543de14a6d 184-187,189-198
+  s_342a3bb060d924::t_5909fa2477c7f1 28
+  s_342a3bb060d924::t_69516775c6271b 8-20
+extensions/notepad/src/components/QuickCreateOverlay.tsx
+  s_342a3bb060d924::t_05e2a779fce44e 6-16,30,33-35,41,64,88-108,120-123,125-133,137,144-178,180,182-187
+extensions/notepad/src/components/CommentMargin.tsx
+  s_342a3bb060d924::t_021030975e57dc 28,30,40,128-131,135,155,159,170,191,194,229-245,247-248,262-263,265-268,276,282-348
+extensions/notepad/tests/components/NoteList.spec.tsx
+  s_342a3bb060d924::t_9a93a7e41b7ac6 64,67,91-102,104,136-139,141
+extensions/notepad/tests/components/NoteEditor.spec.tsx
+  s_342a3bb060d924::t_3a29f265c5cfc0 27-30
+extensions/notepad/tests/components/QuickCreateOverlay.spec.tsx
+  s_342a3bb060d924::t_013662f1b6a428 44
+  s_342a3bb060d924::t_3202523326b099 30
+extensions/notepad/src/components/notepad.css
+  s_342a3bb060d924::t_c655a9fd0582a4 177-180,186-188,190,199-208
+  s_342a3bb060d924::t_f81aace9f09b70 654,658,669,671,675-704,707-713,719-720,726-727,731-778
+  s_342a3bb060d924::t_ceb406301edb64 226-229,232-287
+  s_342a3bb060d924::t_c3d8fe5f4e00d4 489-497,510-521
+  s_342a3bb060d924::t_7b54d29aeab905 1641-1694
+  s_342a3bb060d924::t_93adc457ff106a 367-392
+extensions/notepad/src/components/NoteList.tsx
+  s_342a3bb060d924::t_ce4e7ee63b7563 8-18,194,198,204-205,209,211-215,223-232,234-235,244-245,252,314,320,345,351-355,369,378-380,392,403,405,411-434,437-447,484,486
+extensions/notepad/src/editor/NoteEditor.tsx
+  s_342a3bb060d924::t_b5b0da807915b1 46,54
+  s_342a3bb060d924::t_acb86753c5d62b 262-268
+  s_342a3bb060d924::t_28a04a88eccda5 133
+extensions/notepad/tests/components/CommentMargin.spec.tsx
+  s_342a3bb060d924::t_84df9ecce5fbd5 91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "d29a6b677096f806af42b85e57879dfaed3dda73",
+  "prompts": {},
+  "sessions": {
+    "s_342a3bb060d924": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd40730-1532-4616-8e6b-4ba24bd10787",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
