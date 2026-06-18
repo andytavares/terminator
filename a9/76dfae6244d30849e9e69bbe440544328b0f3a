@@ -1,0 +1,23 @@
+extensions/task-vault/src/components/WeeklyReviewStepStaleTasks.tsx
+  s_772fe7b4592cf9::t_a1aa7bd6149e2f 17,24-31,36-42,47-54
+  s_772fe7b4592cf9::t_fde7dcbd759907 2
+extensions/task-vault/tests/components/WeeklyReviewStepStaleTasks.spec.tsx
+  s_772fe7b4592cf9::t_2a2e50f4bcd576 124-162
+  s_772fe7b4592cf9::t_be48b0be39bf9e 6,19-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "a976dfae6244d30849e9e69bbe440544328b0f3a",
+  "prompts": {},
+  "sessions": {
+    "s_772fe7b4592cf9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71520318-f880-4ee8-ba27-0fd9f22f879e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
