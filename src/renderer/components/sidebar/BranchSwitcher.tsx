@@ -4,7 +4,6 @@ import type { Branch, Project } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useToastStore } from '../../stores/toast.store'
 import { useSettingsStore } from '../../stores/settings.store'
-import { useBranchSync } from '../../hooks/useBranchSync'
 import './BranchSwitcher.css'
 
 interface Props {
@@ -60,8 +59,6 @@ export function BranchSwitcher({
 
   const cwd = project.worktreePath ?? workspaceFolderPath
   const currentBranch = project.gitBranch ?? '—'
-
-  useBranchSync(project, cwd)
 
   function openDropdown(): void {
     if (!triggerRef.current || switching) return

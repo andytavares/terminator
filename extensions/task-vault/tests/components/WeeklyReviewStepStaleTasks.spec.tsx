@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 
 const mockInvoke = vi.fn()
+const mockAddToast = vi.fn()
 
 Object.defineProperty(window, 'electronAPI', {
   value: {
@@ -14,6 +15,10 @@ Object.defineProperty(window, 'electronAPI', {
   writable: true,
   configurable: true,
 })
+
+vi.mock('../../../../src/renderer/stores/toast.store', () => ({
+  useToastStore: vi.fn(() => ({ addToast: mockAddToast })),
+}))
 
 import { WeeklyReviewStepStaleTasks } from '../../src/components/WeeklyReviewStepStaleTasks'
 import type { IndexedTask } from '../../src/vault/types'
@@ -115,5 +120,44 @@ describe('WeeklyReviewStepStaleTasks', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: /next/i }))
     expect(onComplete).toHaveBeenCalled()
+  })
+
+  it('backlog error: keeps task in list and shows toast', async () => {
+    mockInvoke.mockResolvedValue({ error: 'DB_ERROR' })
+    const task = makeTask({ id: 'task-err', text: 'Backlog fail task' })
+    render(
+      <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /backlog/i }))
+    await waitFor(() =>
+      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
+    )
+    expect(screen.getByText('Backlog fail task')).toBeTruthy()
+  })
+
+  it('delete error: keeps task in list and shows toast', async () => {
+    mockInvoke.mockResolvedValue({ error: 'DB_ERROR' })
+    const task = makeTask({ id: 'task-err2', text: 'Delete fail task' })
+    render(
+      <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /delete/i }))
+    await waitFor(() =>
+      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
+    )
+    expect(screen.getByText('Delete fail task')).toBeTruthy()
+  })
+
+  it('keep error: keeps task in list and shows toast', async () => {
+    mockInvoke.mockResolvedValue({ error: 'DB_ERROR' })
+    const task = makeTask({ id: 'task-err3', text: 'Keep fail task' })
+    render(
+      <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /keep/i }))
+    await waitFor(() =>
+      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
+    )
+    expect(screen.getByText('Keep fail task')).toBeTruthy()
   })
 })

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import type { IndexedTask } from '../vault/types'
 
 interface Props {
@@ -13,28 +14,44 @@ export function WeeklyReviewStepStaleTasks({
   onComplete,
 }: Props): React.JSX.Element {
   const [tasks, setTasks] = useState(initialTasks)
+  const { addToast } = useToastStore()
 
   function remove(taskId: string) {
     setTasks((prev) => prev.filter((t) => t.id !== taskId))
   }
 
   async function handleBacklog(taskId: string) {
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:process-inbox-item', {
-      taskId,
-      action: 'someday',
-    })
+    const result = await window.electronAPI.extensionBridge.invoke(
+      'task-vault:vault:process-inbox-item',
+      { taskId, action: 'someday' }
+    )
+    if (result && 'error' in result) {
+      addToast({ type: 'error', message: `Could not move to backlog: ${result.error}` })
+      return
+    }
     remove(taskId)
   }
 
   async function handleDelete(taskId: string) {
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:cancel-task', { taskId })
+    const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:cancel-task', {
+      taskId,
+    })
+    if (result && 'error' in result) {
+      addToast({ type: 'error', message: `Could not delete task: ${result.error}` })
+      return
+    }
     remove(taskId)
   }
 
   async function handleKeep(taskId: string) {
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:reset-today-since', {
-      taskId,
-    })
+    const result = await window.electronAPI.extensionBridge.invoke(
+      'task-vault:vault:reset-today-since',
+      { taskId }
+    )
+    if (result && 'error' in result) {
+      addToast({ type: 'error', message: `Could not reset task: ${result.error}` })
+      return
+    }
     remove(taskId)
   }
 
