@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import { FolderOpen, X } from 'lucide-react'
 
-type ExportScope = 'all' | 'note' | 'tag'
+type ExportScope = 'all' | 'note'
 
 interface ExportDialogProps {
   onClose: () => void
@@ -66,7 +66,7 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
 
         <fieldset className="notepad-export-dialog__scope">
           <legend>Scope</legend>
-          {(['all', 'note', 'tag'] as ExportScope[]).map((s) => (
+          {(['all', 'note'] as ExportScope[]).map((s) => (
             <label key={s} className="notepad-export-dialog__scope-option">
               <input
                 type="radio"
@@ -75,7 +75,7 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
                 checked={scope === s}
                 onChange={() => setScope(s)}
               />
-              {s === 'all' ? 'All notes' : s === 'note' ? 'Current note' : 'By tag'}
+              {s === 'all' ? 'All notes' : 'Current note'}
             </label>
           ))}
         </fieldset>

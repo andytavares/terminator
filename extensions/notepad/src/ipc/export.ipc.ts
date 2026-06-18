@@ -160,6 +160,23 @@ export async function importNotes(
             id
           )
           insertFts(db, existing.rowid, title, body.trim(), tags.join(','))
+          db.prepare('DELETE FROM note_tags WHERE note_id=?').run(id)
+          for (const tagName of tags) {
+            const normalized = tagName.toLowerCase().trim()
+            if (!normalized) continue
+            let tagRow = db.prepare('SELECT id FROM tags WHERE name=?').get(normalized) as
+              | { id: string }
+              | undefined
+            if (!tagRow) {
+              const tagId = randomUUID()
+              db.prepare('INSERT INTO tags (id, name) VALUES (?, ?)').run(tagId, normalized)
+              tagRow = { id: tagId }
+            }
+            db.prepare('INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?, ?)').run(
+              id,
+              tagRow.id
+            )
+          }
         })()
         updated++
       } else {

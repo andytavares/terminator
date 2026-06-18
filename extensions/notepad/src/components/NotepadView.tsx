@@ -26,6 +26,7 @@ const CARD_GAP = 8
 
 export function NotepadView(): React.JSX.Element {
   const [showExport, setShowExport] = useState(false)
+  const [showComments, setShowComments] = useState(true)
   const [pendingAnchor, setPendingAnchor] = useState<SelectionAnchor | null>(null)
   const [composingAnchor, setComposingAnchor] = useState<SelectionAnchor | null>(null)
   const [anchorTops, setAnchorTops] = useState<Record<string, number>>({})
@@ -123,19 +124,21 @@ export function NotepadView(): React.JSX.Element {
   // Sync comment panel scroll with editor scroll
   useEffect(() => {
     if (!selectedNoteId) return
+    let removeScroll: (() => void) | undefined
     const t = setTimeout(() => {
       const view = editorViewRef.current
       const panel = commentPanelRef.current
       if (!view || !panel) return
-
       function onEditorScroll() {
         if (panel) panel.scrollTop = view.scrollDOM.scrollTop
       }
-
       view.scrollDOM.addEventListener('scroll', onEditorScroll, { passive: true })
-      return () => view.scrollDOM.removeEventListener('scroll', onEditorScroll)
+      removeScroll = () => view.scrollDOM.removeEventListener('scroll', onEditorScroll)
     }, 100)
-    return () => clearTimeout(t)
+    return () => {
+      clearTimeout(t)
+      removeScroll?.()
+    }
   }, [selectedNoteId])
 
   // Load selected note body and comments
@@ -172,7 +175,18 @@ export function NotepadView(): React.JSX.Element {
           }
         }
 
-        setComments(allComments)
+        // Apply reanchored offsets immediately so the editor and margin reflect correct positions
+        if (anchorUpdates.length > 0) {
+          const updatedMap = new Map(anchorUpdates.map((u) => [u.id, u]))
+          setComments(
+            allComments.map((c) => {
+              const upd = updatedMap.get(c.id)
+              return upd ? { ...c, startOffset: upd.newFrom, endOffset: upd.newTo } : c
+            })
+          )
+        } else {
+          setComments(allComments)
+        }
 
         if (anchorUpdates.length > 0 || orphanIds.length > 0) {
           if (anchorTimer.current) clearTimeout(anchorTimer.current)
@@ -237,6 +251,14 @@ export function NotepadView(): React.JSX.Element {
       if (anchorTimer.current) clearTimeout(anchorTimer.current)
       if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current)
     }
+  }, [])
+
+  useEffect(() => {
+    function onToggleComments() {
+      setShowComments((v) => !v)
+    }
+    window.addEventListener('notepad:toggleComments', onToggleComments)
+    return () => window.removeEventListener('notepad:toggleComments', onToggleComments)
   }, [])
 
   function scheduleHoverHide() {
@@ -349,7 +371,7 @@ export function NotepadView(): React.JSX.Element {
           <div className="notepad-view__no-selection">Select a note to start editing</div>
         )}
       </div>
-      <div className="notepad-view__comments" ref={commentPanelRef}>
+      <div className="notepad-view__comments" ref={commentPanelRef} hidden={!showComments}>
         {selectedNoteId && (
           <>
             {composingAnchor && (

@@ -181,6 +181,45 @@ describe('importNotes', () => {
     expect(row?.body).toContain('Updated via import')
   })
 
+  it('creates note with tags and links note_tags rows', async () => {
+    const importDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-import-tags-'))
+    const content = `---\nid: cccccccc-dddd-eeee-ffff-000000000001\ntitle: Tagged Note\ntags:\n  - work\n  - project\n---\n\nBody.`
+    fs.writeFileSync(path.join(importDir, 'tagged-note.md'), content)
+    try {
+      const result = await importNotes({ folder: importDir })
+      expect((result as { data: { imported: number } }).data.imported).toBe(1)
+      const db = getDb()
+      const tagRows = db
+        .prepare(
+          `SELECT t.name FROM tags t JOIN note_tags nt ON nt.tag_id = t.id WHERE nt.note_id = ?`
+        )
+        .all('cccccccc-dddd-eeee-ffff-000000000001') as { name: string }[]
+      const tagNames = tagRows.map((r) => r.name).sort()
+      expect(tagNames).toEqual(['project', 'work'])
+    } finally {
+      fs.rmSync(importDir, { recursive: true, force: true })
+    }
+  })
+
+  it('updates existing note tags on re-import', async () => {
+    // Export the existing note (no tags), then re-import with tags
+    await exportNotes({ folder: exportDir, scope: 'all' })
+    const files = fs.readdirSync(exportDir).filter((f) => f.endsWith('.md'))
+    const filePath = path.join(exportDir, files[0])
+    // Rewrite the frontmatter to include a tag
+    const updatedContent = `---\nid: ${noteId}\ntitle: My Test Note\ntags:\n  - updated-tag\n---\n\n# Hello\n\nUpdated.`
+    fs.writeFileSync(filePath, updatedContent)
+    const result = await importNotes({ folder: exportDir })
+    expect((result as { data: { updated: number } }).data.updated).toBe(1)
+    const db = getDb()
+    const tagRows = db
+      .prepare(
+        `SELECT t.name FROM tags t JOIN note_tags nt ON nt.tag_id = t.id WHERE nt.note_id = ?`
+      )
+      .all(noteId) as { name: string }[]
+    expect(tagRows.map((r) => r.name)).toContain('updated-tag')
+  })
+
   it('skips files with no frontmatter id gracefully', async () => {
     const importDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-import-bad-'))
     fs.writeFileSync(

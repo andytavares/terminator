@@ -374,16 +374,18 @@ export function buildDecorations(state: EditorState, selection: { anchor: number
         }
 
         case 'Link': {
-          const urlChild = node.node.getChild('URL')
-          if (urlChild) {
-            const url = state.sliceDoc(urlChild.from, urlChild.to)
-            const raw = state.sliceDoc(node.from, urlChild.from - 2)
-            const label = raw.startsWith('[') ? raw.slice(1, raw.lastIndexOf(']')) : url
-            builder.add(
-              node.from,
-              node.to,
-              Decoration.replace({ widget: new LinkWidget(label || url, url) })
-            )
+          if (!onCursorLine) {
+            const urlChild = node.node.getChild('URL')
+            if (urlChild) {
+              const url = state.sliceDoc(urlChild.from, urlChild.to)
+              const raw = state.sliceDoc(node.from, urlChild.from - 2)
+              const label = raw.startsWith('[') ? raw.slice(1, raw.lastIndexOf(']')) : url
+              builder.add(
+                node.from,
+                node.to,
+                Decoration.replace({ widget: new LinkWidget(label || url, url) })
+              )
+            }
           }
           return false
         }

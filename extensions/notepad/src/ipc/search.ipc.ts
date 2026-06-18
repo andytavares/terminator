@@ -147,29 +147,27 @@ export async function searchNotes(
 
     return { data: toResults(rows) }
   } catch {
-    // FTS5 syntax error fallback — plain-text LIKE search
+    // FTS5 syntax error fallback — plain-text LIKE search, same tag filters as primary query
     try {
-      const conditions2: string[] = []
-      const params2: unknown[] = []
+      const fallbackConditions = [...whereConditions]
+      const fallbackParams: unknown[] = []
       if (ftsQuery) {
-        conditions2.push(`(n.title LIKE ? OR n.body LIKE ?)`)
-        params2.push(`%${ftsQuery}%`, `%${ftsQuery}%`)
+        fallbackConditions.push(`(n.title LIKE ? OR n.body LIKE ?)`)
+        fallbackParams.push(`%${ftsQuery}%`, `%${ftsQuery}%`)
       }
-      if (!includeArchived) conditions2.push('n.archived_at IS NULL')
-
-      const fallbackWhere = conditions2.length > 0 ? `WHERE ${conditions2.join(' AND ')}` : ''
+      const fallbackWhere =
+        fallbackConditions.length > 0 ? `WHERE ${fallbackConditions.join(' AND ')}` : ''
       const rows = db
         .prepare(
           `SELECT n.id, n.title, n.body, n.updated_at, n.archived_at,
-                  GROUP_CONCAT(t.name, ',') AS tags
+                  GROUP_CONCAT(t_all.name, ',') AS tags
            FROM notes n
-           LEFT JOIN note_tags nt ON nt.note_id = n.id
-           LEFT JOIN tags t ON t.id = nt.tag_id
+           ${joinSql}
            ${fallbackWhere}
            GROUP BY n.id
            ORDER BY n.updated_at DESC`
         )
-        .all(...params2) as SearchRow[]
+        .all(...joinParams, ...fallbackParams, ...whereParams) as SearchRow[]
 
       return { data: toResults(rows) }
     } catch {

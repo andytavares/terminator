@@ -46,11 +46,10 @@ describe('ExportDialog', () => {
     })
   })
 
-  it('renders scope radio options (All Notes, Current Note, By Tag)', () => {
+  it('renders scope radio options (All Notes, Current Note)', () => {
     render(<ExportDialog onClose={vi.fn()} />)
     expect(screen.getByText(/all notes/i)).toBeTruthy()
     expect(screen.getByText(/current note/i)).toBeTruthy()
-    expect(screen.getByText(/by tag/i)).toBeTruthy()
   })
 
   it('Export button enabled after folder is selected', async () => {
