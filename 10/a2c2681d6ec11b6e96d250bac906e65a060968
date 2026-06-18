@@ -1,0 +1,27 @@
+src/renderer/stores/session.store.ts
+  s_772fe7b4592cf9::t_aec1f3b5e6e0fa 119-123
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_772fe7b4592cf9::t_f764e401b068d7 236
+tests/unit/renderer/stores/session.store.spec.ts
+  s_772fe7b4592cf9::t_13175554e4bfda 171-187
+extensions/task-vault/src/ipc/projects.ipc.ts
+  s_772fe7b4592cf9::t_d6a67835720206 112-116,121
+extensions/task-vault/src/components/DailyLog.tsx
+  s_772fe7b4592cf9::t_330fdf3ffeb30a 1522
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "10a2c2681d6ec11b6e96d250bac906e65a060968",
+  "prompts": {},
+  "sessions": {
+    "s_772fe7b4592cf9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71520318-f880-4ee8-ba27-0fd9f22f879e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
