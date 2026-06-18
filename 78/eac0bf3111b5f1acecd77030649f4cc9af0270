@@ -1,0 +1,32 @@
+src/renderer/components/sidebar/BranchSwitcher.tsx
+  s_772fe7b4592cf9::t_c4dd732c0f62ba 137-138,140-145
+  s_772fe7b4592cf9::t_7b61a0e056ca7f 139
+tests/unit/renderer/components/BranchSwitcher.spec.tsx
+  s_772fe7b4592cf9::t_c740dd98f655a2 266-291
+  s_772fe7b4592cf9::t_8a7c7cdb6b87cc 9-11
+src/renderer/components/sidebar/ProjectRow.tsx
+  s_772fe7b4592cf9::t_86d0448c6df229 145-159
+  s_772fe7b4592cf9::t_1cab2772dccaa5 22
+  s_772fe7b4592cf9::t_23516f414a897f 37
+src/renderer/components/sidebar/WorkspaceCard.tsx
+  s_772fe7b4592cf9::t_3b73e5d5030c9b 13
+  s_772fe7b4592cf9::t_f254b6e4e5bcbd 159-164
+extensions/task-vault/src/components/DailyLog.tsx
+  s_772fe7b4592cf9::t_6b1f6ef25ec35b 1526-1527
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "78eac0bf3111b5f1acecd77030649f4cc9af0270",
+  "prompts": {},
+  "sessions": {
+    "s_772fe7b4592cf9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "71520318-f880-4ee8-ba27-0fd9f22f879e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
