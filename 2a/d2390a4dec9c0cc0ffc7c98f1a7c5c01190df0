@@ -1,0 +1,63 @@
+extensions/notepad/tests/components/NoteEditor.spec.tsx
+  s_342a3bb060d924::t_5e6e274b79c3a3 19
+extensions/notepad/src/ipc/notes.ipc.ts
+  s_342a3bb060d924::t_6f25ec686e88b3 295-296
+  s_342a3bb060d924::t_12c0a4bf7995f6 308-313
+  s_342a3bb060d924::t_c2eb574a960826 382,392
+  s_342a3bb060d924::t_c005f968c0fe5f 1-2
+  s_342a3bb060d924::t_65ad66f88cb784 301-305
+  s_342a3bb060d924::t_b499cdd1aa008a 286-294,297-300,306-307,314-317
+extensions/notepad/src/components/notepad.css
+  s_342a3bb060d924::t_12c0a4bf7995f6 1898-1900
+  s_342a3bb060d924::t_ef53d7329886b3 1965
+  s_342a3bb060d924::t_015aa7c8336a32 1663-1670
+  s_342a3bb060d924::t_7ae867132dc7d7 1819-1897,1901-1964,1966-1987
+extensions/task-vault/src/components/SmartTaskInput.tsx
+  s_342a3bb060d924::t_52429377d8a3ab 265
+  s_342a3bb060d924::t_72e84b7f57e90d 275-280
+extensions/notepad/src/components/NotepadView.tsx
+  s_342a3bb060d924::t_3e6be9d13bd39a 252-293
+  s_342a3bb060d924::t_9b368b41d51aaa 351,357-360
+  s_342a3bb060d924::t_a240996f145e44 44
+  s_342a3bb060d924::t_35467f2178665f 409,420
+  s_342a3bb060d924::t_77ced7e7efe484 331-350,352-356,361-365
+  s_342a3bb060d924::t_09600e7adb6fb1 13
+  s_342a3bb060d924::t_fea6cca112107d 4
+extensions/notepad/src/editor/NoteEditor.tsx
+  s_342a3bb060d924::t_6369fd2a407324 135
+extensions/notepad/src/ipc/search.ipc.ts
+  s_342a3bb060d924::t_12c0a4bf7995f6 70
+  s_342a3bb060d924::t_6d1c7904018dda 43-62,66-69,71-72,76-85
+extensions/notepad/src/components/SearchOverlay.tsx
+  s_342a3bb060d924::t_bd265075292c90 1-6,28-158,160-202,206-224
+  s_342a3bb060d924::t_bd3c681026b5cb 203-205
+  s_342a3bb060d924::t_12c0a4bf7995f6 14-17,159
+  s_342a3bb060d924::t_abc54ad10a798f 7-13,18-27
+extensions/notepad/src/index.ts
+  s_342a3bb060d924::t_b6fd3d50274cdd 102-110
+extensions/notepad/src/stores/notes.store.ts
+  s_342a3bb060d924::t_0e1bf95abc38b7 9,14,22,27
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_342a3bb060d924::t_e09623683a0778 36-41
+  s_342a3bb060d924::t_93986430caff2d 485-487
+extensions/notepad/tests/components/SearchOverlay.spec.tsx
+  s_342a3bb060d924::t_c65cd59dcf4921 1-97
+extensions/notepad/src/components/CommentMargin.tsx
+  s_342a3bb060d924::t_71e01a4124b552 283-329
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "2ad2390a4dec9c0cc0ffc7c98f1a7c5c01190df0",
+  "prompts": {},
+  "sessions": {
+    "s_342a3bb060d924": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd40730-1532-4616-8e6b-4ba24bd10787",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
