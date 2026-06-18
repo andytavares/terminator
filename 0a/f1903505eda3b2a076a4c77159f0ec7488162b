@@ -1,0 +1,38 @@
+extensions/notepad/src/editor/livePreview.ts
+  s_342a3bb060d924::t_8eb1fba3441453 377-388
+extensions/notepad/tests/components/ExportDialog.spec.tsx
+  s_342a3bb060d924::t_579497bfa487a5 49
+extensions/notepad/src/components/ExportDialog.tsx
+  s_342a3bb060d924::t_055865ac6d20de 4
+  s_342a3bb060d924::t_ade42282ce26cb 69,78
+extensions/notepad/src/components/NotepadView.tsx
+  s_342a3bb060d924::t_289a939a62a402 178-189
+  s_342a3bb060d924::t_f9ead28a81bf18 29
+  s_342a3bb060d924::t_f3401ef9d6f1b5 374
+  s_342a3bb060d924::t_a2b756d456ccf8 256-263
+  s_342a3bb060d924::t_4908d22d3c289d 127,136,138-141
+extensions/notepad/src/ipc/export.ipc.ts
+  s_342a3bb060d924::t_8337cd4df5704e 163-179
+extensions/notepad/src/ipc/search.ipc.ts
+  s_342a3bb060d924::t_d56802dc59622f 150,152-153,155-156,158-159,163,165,170
+.github/workflows/ci.yml
+  s_342a3bb060d924::t_974bc8bd1d8a2d 103-105
+extensions/notepad/tests/unit/ipc/export.ipc.spec.ts
+  s_342a3bb060d924::t_0d46ceab98b950 184-222
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "0af1903505eda3b2a076a4c77159f0ec7488162b",
+  "prompts": {},
+  "sessions": {
+    "s_342a3bb060d924": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd40730-1532-4616-8e6b-4ba24bd10787",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
