@@ -143,4 +143,17 @@ describe('MobileTerminalView', () => {
       render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     ).not.toThrow()
   })
+
+  it('closes previous WebSocket when openWs is called a second time', async () => {
+    const { MobileTerminalView } = await import(
+      '../../../../src/renderer-remote/components/MobileTerminalView'
+    )
+    const { rerender } = render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
+    // Let first openWs complete so wsRef.current is set
+    await act(async () => {})
+    // Re-render with a different sessionId — triggers a new openWs call while prev socket exists
+    rerender(<MobileTerminalView sessionId="s2" cwd="/tmp" onBack={vi.fn()} />)
+    await act(async () => {})
+    expect(mockWs.close).toHaveBeenCalled()
+  })
 })

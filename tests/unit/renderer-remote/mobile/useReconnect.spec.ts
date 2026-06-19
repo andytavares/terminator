@@ -95,6 +95,65 @@ describe('useReconnect', () => {
     expect(result.current.status).toBe('disconnected')
   })
 
+  it('does not call openWs again while socket is still CONNECTING', async () => {
+    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
+    const ws = { readyState: 0 } as WebSocket // CONNECTING
+    renderHook(() => useReconnect(mockOpenWs, ws))
+
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    // Advance past 2s — should re-check but not call openWs (still CONNECTING)
+    await act(async () => {
+      vi.advanceTimersByTime(2000)
+    })
+
+    expect(mockOpenWs).not.toHaveBeenCalled()
+  })
+
+  it('clears reconnecting status when new ws fires onopen', async () => {
+    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
+    const listeners: Record<string, (() => void)[]> = {}
+    const ws = {
+      readyState: 3, // starts CLOSED
+      addEventListener: (ev: string, fn: () => void) => {
+        listeners[ev] = listeners[ev] ?? []
+        listeners[ev].push(fn)
+      },
+      removeEventListener: (_ev: string, _fn: () => void) => undefined,
+    } as unknown as WebSocket
+
+    const { result, rerender } = renderHook(
+      ({ currentWs }) => useReconnect(mockOpenWs, currentWs),
+      { initialProps: { currentWs: ws } }
+    )
+
+    // Trigger reconnect
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(result.current.status).toBe('reconnecting')
+
+    // Simulate new socket passed in after openWs called
+    const openWs2 = {
+      readyState: 0, // CONNECTING
+      addEventListener: (ev: string, fn: () => void) => {
+        listeners[ev] = listeners[ev] ?? []
+        listeners[ev].push(fn)
+      },
+      removeEventListener: (_ev: string, _fn: () => void) => undefined,
+    } as unknown as WebSocket
+
+    rerender({ currentWs: openWs2 })
+
+    // Fire onopen — status should clear
+    act(() => {
+      listeners['open']?.forEach((fn) => fn())
+    })
+
+    expect(result.current.status).toBe('connected')
+  })
+
   it('retry() resets attempt count and starts reconnect', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
     const ws = { readyState: 3 } as WebSocket

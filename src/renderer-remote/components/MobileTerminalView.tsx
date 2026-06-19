@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Terminal } from '@xterm/xterm'
+import '@xterm/xterm/css/xterm.css'
 import { FitAddon } from '@xterm/addon-fit'
 import { AttachAddon } from '@xterm/addon-attach'
 import { useReconnect } from '../hooks/useReconnect'
@@ -19,6 +20,11 @@ export function MobileTerminalView({ sessionId, cwd, onBack }: Props) {
   const [ws, setWs] = useState<WebSocket | null>(null)
 
   const openWs = useCallback(async () => {
+    // Tear down any existing socket before opening a new one to prevent stacking connections
+    const prev = wsRef.current
+    if (prev && prev.readyState !== WebSocket.CLOSED) {
+      prev.close()
+    }
     try {
       const ticket = await getWsTicket(sessionId)
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'

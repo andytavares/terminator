@@ -139,6 +139,31 @@ describe('MobileTerminalList', () => {
     expect(screen.getAllByText('myapp')).toHaveLength(1)
   })
 
+  it('does not assign a terminal to workspace when cwd only shares a prefix without a path separator', async () => {
+    // workspace.folderPath = '/Users/me/projects'
+    // a cwd of '/Users/me/projects-extra' must NOT match
+    const terminal: TerminalSession = {
+      sessionId: 's-prefix-trap',
+      cwd: '/Users/me/projects-extra/thing',
+      createdAt: '2026-06-19T10:00:00.000Z',
+    }
+    const { MobileTerminalList } = await import(
+      '../../../../src/renderer-remote/components/MobileTerminalList'
+    )
+    render(
+      <MobileTerminalList
+        workspaces={[workspace]}
+        terminals={[terminal]}
+        onSelectTerminal={mockOnSelectTerminal}
+        onCreateTerminal={mockOnCreateTerminal}
+      />
+    )
+    // Should appear in the fallback section, not under the workspace
+    expect(screen.getByText('thing')).toBeTruthy()
+    // Only one occurrence — not duplicated
+    expect(screen.getAllByText('thing')).toHaveLength(1)
+  })
+
   it('shows unmatched terminal in fallback section outside any workspace', async () => {
     const unmatched: TerminalSession = {
       sessionId: 's-global',

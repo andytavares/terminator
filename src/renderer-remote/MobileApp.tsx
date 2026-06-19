@@ -37,14 +37,15 @@ export function MobileApp() {
     void workspaceId
   }
 
+  function handleBack() {
+    listTerminals()
+      .then(setTerminals)
+      .catch(() => undefined)
+    setRoute({ view: 'list' })
+  }
+
   if (route.view === 'terminal') {
-    return (
-      <MobileTerminalView
-        sessionId={route.sessionId}
-        cwd={route.cwd}
-        onBack={() => setRoute({ view: 'list' })}
-      />
-    )
+    return <MobileTerminalView sessionId={route.sessionId} cwd={route.cwd} onBack={handleBack} />
   }
 
   return (

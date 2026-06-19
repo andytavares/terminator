@@ -19,10 +19,31 @@ export function useReconnect(
     openWsRef.current = openWs
   }, [openWs])
 
-  const attempt = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+  // Clear 'reconnecting' status as soon as the new socket opens
+  useEffect(() => {
+    if (!ws) return
+    if (ws.readyState === WebSocket.OPEN) {
       setStatus('connected')
       attemptsRef.current = 0
+    }
+    const handleOpen = () => {
+      setStatus('connected')
+      attemptsRef.current = 0
+    }
+    ws.addEventListener?.('open', handleOpen)
+    return () => ws.removeEventListener?.('open', handleOpen)
+  }, [ws])
+
+  const attempt = useCallback(() => {
+    const state = wsRef.current?.readyState
+    if (state === WebSocket.OPEN) {
+      setStatus('connected')
+      attemptsRef.current = 0
+      return
+    }
+    // Socket is already trying to connect — wait for it rather than opening another
+    if (state === WebSocket.CONNECTING) {
+      setTimeout(attempt, 2000)
       return
     }
     if (attemptsRef.current >= 3) {

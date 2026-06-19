@@ -23,7 +23,9 @@ export function MobileTerminalList({
   return (
     <div className="mobile-list">
       {workspaces.map((ws) => {
-        const wsTerminals = terminals.filter((t) => t.cwd.startsWith(ws.folderPath))
+        const wsTerminals = terminals.filter(
+          (t) => t.cwd === ws.folderPath || t.cwd.startsWith(ws.folderPath + '/')
+        )
         wsTerminals.forEach((t) => assignedSessionIds.add(t.sessionId))
         return (
           <div key={ws.id} className="mobile-list__workspace">
