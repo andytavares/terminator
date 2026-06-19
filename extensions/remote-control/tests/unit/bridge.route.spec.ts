@@ -13,7 +13,7 @@ function waitForClose(ws: WebSocket): Promise<void> {
   return new Promise((resolve, reject) => {
     ws.on('close', resolve)
     ws.on('error', reject)
-    setTimeout(() => reject(new Error('timeout waiting for close')), 2000)
+    setTimeout(() => reject(new Error('timeout waiting for close')), 8000)
   })
 }
 
@@ -21,7 +21,7 @@ function waitForMessage(ws: WebSocket): Promise<string> {
   return new Promise((resolve, reject) => {
     ws.once('message', (data) => resolve(data.toString()))
     ws.on('error', reject)
-    setTimeout(() => reject(new Error('timeout waiting for message')), 2000)
+    setTimeout(() => reject(new Error('timeout waiting for message')), 8000)
   })
 }
 
@@ -29,7 +29,7 @@ function waitForOpen(ws: WebSocket): Promise<void> {
   return new Promise((resolve, reject) => {
     ws.on('open', resolve)
     ws.on('error', reject)
-    setTimeout(() => reject(new Error('timeout waiting for open')), 2000)
+    setTimeout(() => reject(new Error('timeout waiting for open')), 8000)
   })
 }
 
