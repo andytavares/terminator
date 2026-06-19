@@ -1127,6 +1127,11 @@
 .linked-vault-panel {
   padding: 12px;
   font-size: 12px;
+  width: 280px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  background: var(--bg-sidebar);
 }
 
 .linked-vault-panel--loading {
@@ -6873,6 +6878,58 @@ h2.daily-log__date {
   color: var(--tm-text-muted);
 }
 
+/* ── Vault Sidebar Calendar Panel ─────────────────────────────── */
+.vault-cal-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-left: 1px solid var(--tm-border);
+  background: var(--tm-bg-surface);
+}
+
+.vault-cal-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 12px;
+  height: 36px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.vault-cal-panel__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tm-text-primary);
+}
+
+.vault-cal-panel__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--tm-text-muted);
+  border-radius: var(--tm-radius-xs);
+  padding: 0;
+}
+
+.vault-cal-panel__close:hover {
+  background: var(--tm-bg-hover);
+  color: var(--tm-text-primary);
+}
+
+.vault-cal-panel .cal-drawer {
+  flex: 1;
+  min-height: 0;
+  border-left: none;
+  width: 100%;
+}
+
 /* ── Calendar Panel ───────────────────────────────────────────── */
 .cal-drawer {
   width: 252px;
@@ -7026,7 +7083,18 @@ h2.daily-log__date {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 0;
+  padding: 4px 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  border-radius: var(--tm-radius-xs);
+  color: inherit;
+}
+
+.cal-drawer__day-task:hover {
+  background: var(--tm-bg-hover);
 }
 
 .cal-drawer__day-task-dot {

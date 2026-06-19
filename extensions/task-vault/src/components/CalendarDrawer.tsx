@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react'
 import { useVaultStore } from '../stores/vault.store'
+import { useVaultNavStore } from '../stores/vault-nav.store'
+import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import type { KanbanLane, Task } from '../vault/types'
 
 type DayData = { date: string; status: string; count: number }
@@ -117,10 +119,20 @@ export function CalendarDrawer(): React.JSX.Element {
     }
   }
 
+  function openTaskVault() {
+    useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
+  }
+
   function handleGoToDay() {
     if (!selectedDate) return
     if (selectedDate === todayStr) void loadToday()
     else void loadDate(selectedDate)
+    openTaskVault()
+  }
+
+  function handleTaskClick(task: Task) {
+    useVaultNavStore.getState().navigateToTask(task.id, selectedDate ?? undefined)
+    openTaskVault()
   }
 
   const firstDay = new Date(year, month - 1, 1).getDay()
@@ -209,13 +221,15 @@ export function CalendarDrawer(): React.JSX.Element {
             )}
             {!loadingDay &&
               selectedDayTasks.map((task) => (
-                <div
+                <button
                   key={task.id}
                   className={`cal-drawer__day-task cal-drawer__day-task--${task.status}`}
+                  onClick={() => handleTaskClick(task)}
+                  title={task.text}
                 >
                   <span className="cal-drawer__day-task-dot" />
                   <span className="cal-drawer__day-task-text">{task.text}</span>
-                </div>
+                </button>
               ))}
           </div>
         )}

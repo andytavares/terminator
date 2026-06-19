@@ -149,6 +149,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:open-about', listener)
       return () => ipcRenderer.removeListener('menu:open-about', listener)
     },
+    notifyPanelState: (panelId: string, open: boolean) => {
+      ipcRenderer.send('menu:set-panel-checked', { panelId, open })
+    },
   },
   app: {
     getInfo: () => ipcRenderer.invoke('app:get-info'),

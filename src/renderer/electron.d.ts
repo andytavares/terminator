@@ -154,6 +154,7 @@ interface ElectronAPI {
     onMenuToggleSidebar(handler: () => void): () => void
     onMenuCloseTab(handler: () => void): () => void
     onMenuOpenAbout(handler: () => void): () => void
+    notifyPanelState(panelId: string, open: boolean): void
   }
   app: {
     getInfo(): Promise<{
