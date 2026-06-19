@@ -1,0 +1,34 @@
+tests/unit/renderer-remote/mobile/MobileTerminalView.spec.tsx
+  s_691b7cdd284c28::t_197a533dfed752 39-41
+  s_691b7cdd284c28::t_a2c82bdb2669e8 126-128,130
+  s_691b7cdd284c28::t_bc16ed63b09b77 112-114,116
+  s_691b7cdd284c28::t_3fe86d7f4dc314 98-100,102
+  s_691b7cdd284c28::t_7ccaebdb6e283c 140-142,144
+src/renderer-remote/hooks/useReconnect.ts
+  s_691b7cdd284c28::t_953cf3e0c1deca 3,9,22,49-52
+  s_691b7cdd284c28::t_6630cba53133aa 8,57-68,85
+tests/unit/renderer-remote/mobile/useReconnect.spec.ts
+  s_691b7cdd284c28::t_58b1672cffc955 28,31
+  s_691b7cdd284c28::t_098ce610003530 143-155
+  s_691b7cdd284c28::t_9439743e777c2e 98,101,106-113,119-142,156-157
+src/renderer-remote/electron-api-shim.ts
+  s_691b7cdd284c28::t_b590a22c10214a 44
+src/renderer-remote/components/MobileTerminalView.tsx
+  s_691b7cdd284c28::t_6993b1b6c3fbde 22-24,43-44,48-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "34f8a17f22665040dec1b4099ea80b438e4c72e1",
+  "prompts": {},
+  "sessions": {
+    "s_691b7cdd284c28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc2f31ca-0e76-4d10-8922-c93237fadd53",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
