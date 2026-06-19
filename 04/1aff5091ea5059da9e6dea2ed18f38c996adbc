@@ -1,0 +1,19 @@
+extensions/notepad/src/components/NoteWindowView.tsx
+  s_342a3bb060d924::t_bba91cf09062e0 344-356
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "041aff5091ea5059da9e6dea2ed18f38c996adbc",
+  "prompts": {},
+  "sessions": {
+    "s_342a3bb060d924": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd40730-1532-4616-8e6b-4ba24bd10787",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
