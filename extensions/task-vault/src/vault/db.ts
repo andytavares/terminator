@@ -97,11 +97,10 @@ export function resetDb(userData: string): Database.Database {
       }
     }
   }
-  const db = initDb(userData)
   if (failed.length > 0) {
     throw new Error(`Reset incomplete — could not delete: ${failed.join(', ')}`)
   }
-  return db
+  return initDb(userData)
 }
 
 function hasColumn(db: Database.Database, table: string, column: string): boolean {
