@@ -7,11 +7,18 @@ import { backfillRecurringTasks } from './ensure-next-occurrence.js'
 export { randomUUID }
 
 let _db: Database.Database | null = null
+let _initError: Error | null = null
 
 export function initDb(userData: string): Database.Database {
+  _initError = null
   fs.mkdirSync(userData, { recursive: true })
   const dbPath = path.join(userData, 'vault.db')
-  _db = new Database(dbPath)
+  try {
+    _db = new Database(dbPath)
+  } catch (err) {
+    _initError = err instanceof Error ? err : new Error(String(err))
+    throw _initError
+  }
   _db.pragma('journal_mode = WAL')
   _db.pragma('foreign_keys = ON')
   applySchema(_db)
@@ -26,7 +33,10 @@ export function initDb(userData: string): Database.Database {
 }
 
 export function getDb(): Database.Database {
-  if (!_db) throw new Error('VaultDB not initialized — call initDb first')
+  if (!_db) {
+    const detail = _initError ? _initError.message : 'call initDb first'
+    throw new Error(`VaultDB not initialized — ${detail}`)
+  }
   return _db
 }
 
