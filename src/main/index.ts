@@ -147,6 +147,17 @@ function setupMenu(): void {
           accelerator: 'CmdOrCtrl+B',
           click: () => mainWindow?.webContents.send('menu:toggle-sidebar'),
         },
+        { type: 'separator' },
+        {
+          label: 'Toggle Git Changes',
+          accelerator: 'CmdOrCtrl+Shift+G',
+          click: () => mainWindow?.webContents.send('extension:toggle-panel', 'git-changes'),
+        },
+        {
+          label: 'Toggle Vault Links',
+          click: () => mainWindow?.webContents.send('extension:toggle-panel', 'task-vault-links'),
+        },
+        { type: 'separator' },
         {
           label: 'Open Settings',
           accelerator: 'CmdOrCtrl+,',
