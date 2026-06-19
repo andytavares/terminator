@@ -189,6 +189,9 @@ export function NoteEditor({
             '.notepad-comment-highlight': {
               background: 'rgba(250,210,50,0.35)',
             },
+            '.notepad-comment-highlight .notepad-comment-highlight': {
+              background: 'transparent',
+            },
             '.notepad-comment-highlight--hover': {
               textDecoration: 'underline',
               textDecorationColor: 'rgba(120,200,255,0.9)',
