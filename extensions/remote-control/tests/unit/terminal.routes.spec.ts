@@ -328,7 +328,8 @@ describe('WS /ws/terminals/:sessionId', () => {
     expect(removeSpy).toHaveBeenCalled()
   })
 
-  it('kills PTY and removes session when last subscriber disconnects', async () => {
+  it('kills PTY and removes session after grace period when last subscriber disconnects', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     const sessionId = await createSession()
     const ticketRes = await wsApp.inject({
       method: 'POST',
@@ -344,10 +345,19 @@ describe('WS /ws/terminals/:sessionId', () => {
       setTimeout(() => reject(new Error('timeout')), 2000)
     })
 
+    // Grace period hasn't elapsed — PTY should still be alive
     await new Promise<void>((r) => setTimeout(r, 50))
+    expect(mockPtyManager.kill).not.toHaveBeenCalled()
+
+    // Advance past 30-second grace period
+    vi.advanceTimersByTime(31_000)
+    await Promise.resolve()
+
     expect(mockPtyManager.kill).toHaveBeenCalledWith(sessionId)
     const getRes = await wsApp.inject({ method: 'GET', url: `/api/terminals/${sessionId}` })
     expect(getRes.statusCode).toBe(404)
+
+    vi.useRealTimers()
   })
 
   it('forwards messages from primary subscriber to ptyManager', async () => {

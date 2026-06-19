@@ -147,8 +147,15 @@ export async function registerTerminalRoutes(
       ws.on('close', () => {
         subscriberManager.removeSubscriber(sessionId, ws)
         if (subscriberManager.getCount(sessionId) === 0 && sessions.has(sessionId)) {
-          ptyManager.kill(sessionId)
-          sessions.delete(sessionId)
+          // Grace period: mobile clients navigate away (unmounting the view) without
+          // intending to end the session. Wait 30s before tearing down the PTY so
+          // navigating back reconnects to the live process.
+          setTimeout(() => {
+            if (subscriberManager.getCount(sessionId) === 0 && sessions.has(sessionId)) {
+              ptyManager.kill(sessionId)
+              sessions.delete(sessionId)
+            }
+          }, 30_000)
         }
       })
     }

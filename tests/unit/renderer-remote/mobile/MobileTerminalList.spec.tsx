@@ -117,4 +117,98 @@ describe('MobileTerminalList', () => {
     )
     expect(container).toBeTruthy()
   })
+
+  it('shows terminal under matching workspace by cwd prefix', async () => {
+    const terminal: TerminalSession = {
+      sessionId: 's-ws',
+      cwd: '/Users/me/projects/myapp',
+      createdAt: '2026-06-19T10:00:00.000Z',
+    }
+    const { MobileTerminalList } = await import(
+      '../../../../src/renderer-remote/components/MobileTerminalList'
+    )
+    render(
+      <MobileTerminalList
+        workspaces={[workspace]}
+        terminals={[terminal]}
+        onSelectTerminal={mockOnSelectTerminal}
+        onCreateTerminal={mockOnCreateTerminal}
+      />
+    )
+    // appears exactly once (under the workspace, not duplicated)
+    expect(screen.getAllByText('myapp')).toHaveLength(1)
+  })
+
+  it('shows unmatched terminal in fallback section outside any workspace', async () => {
+    const unmatched: TerminalSession = {
+      sessionId: 's-global',
+      cwd: '/tmp/scratch',
+      createdAt: '2026-06-19T10:00:00.000Z',
+    }
+    const { MobileTerminalList } = await import(
+      '../../../../src/renderer-remote/components/MobileTerminalList'
+    )
+    render(
+      <MobileTerminalList
+        workspaces={[workspace]}
+        terminals={[unmatched]}
+        onSelectTerminal={mockOnSelectTerminal}
+        onCreateTerminal={mockOnCreateTerminal}
+      />
+    )
+    expect(screen.getByText('scratch')).toBeTruthy()
+    fireEvent.click(screen.getByText('scratch'))
+    expect(mockOnSelectTerminal).toHaveBeenCalledWith({
+      sessionId: 's-global',
+      cwd: '/tmp/scratch',
+    })
+  })
+
+  it('triggers onSelectTerminal via Enter key on workspace terminal', async () => {
+    const terminal: TerminalSession = {
+      sessionId: 's-enter-ws',
+      cwd: '/Users/me/projects/myapp',
+      createdAt: '2026-06-19T10:00:00.000Z',
+    }
+    const { MobileTerminalList } = await import(
+      '../../../../src/renderer-remote/components/MobileTerminalList'
+    )
+    render(
+      <MobileTerminalList
+        workspaces={[workspace]}
+        terminals={[terminal]}
+        onSelectTerminal={mockOnSelectTerminal}
+        onCreateTerminal={mockOnCreateTerminal}
+      />
+    )
+    fireEvent.keyDown(screen.getByText('myapp'), { key: 'Enter' })
+    expect(mockOnSelectTerminal).toHaveBeenCalledWith({
+      sessionId: 's-enter-ws',
+      cwd: '/Users/me/projects/myapp',
+    })
+  })
+
+  it('triggers onSelectTerminal via Enter key on fallback terminal', async () => {
+    const unmatched: TerminalSession = {
+      sessionId: 's-enter-global',
+      cwd: '/tmp/enter-scratch',
+      createdAt: '2026-06-19T10:00:00.000Z',
+    }
+    const { MobileTerminalList } = await import(
+      '../../../../src/renderer-remote/components/MobileTerminalList'
+    )
+    render(
+      <MobileTerminalList
+        workspaces={[workspace]}
+        terminals={[unmatched]}
+        onSelectTerminal={mockOnSelectTerminal}
+        onCreateTerminal={mockOnCreateTerminal}
+      />
+    )
+    fireEvent.keyDown(screen.getByText('enter-scratch'), { key: 'Enter' })
+    expect(mockOnSelectTerminal).toHaveBeenCalledWith({
+      sessionId: 's-enter-global',
+      cwd: '/tmp/enter-scratch',
+    })
+  })
 })

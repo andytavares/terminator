@@ -172,16 +172,20 @@ export async function createRemoteServer(
   })
 
   fastify.get<{ Querystring: { t?: string } }>('/mobile/', async (request, reply) => {
-    const t = request.query.t ?? ''
-    if (!t || !ticketStore.consumeTicket(t, 'mobile')) {
-      return reply.redirect('/')
+    const hasSession = hasValidMobileSession(request.headers.cookie ?? '')
+
+    if (!hasSession) {
+      const t = request.query.t ?? ''
+      if (!t || !ticketStore.consumeTicket(t, 'mobile')) {
+        return reply.redirect('/')
+      }
+      const sessionToken = randomBytes(32).toString('hex')
+      mobileSessions.set(sessionToken, Date.now() + SESSION_TTL_MS)
+      reply.header(
+        'Set-Cookie',
+        `mobile-session=${sessionToken}; Path=/mobile; HttpOnly; SameSite=Strict; Max-Age=28800`
+      )
     }
-    const sessionToken = randomBytes(32).toString('hex')
-    mobileSessions.set(sessionToken, Date.now() + SESSION_TTL_MS)
-    reply.header(
-      'Set-Cookie',
-      `mobile-session=${sessionToken}; Path=/mobile; HttpOnly; SameSite=Strict; Max-Age=28800`
-    )
     try {
       const html = readFileSync(join(loginStaticDir, 'mobile.html'), 'utf8')
       return reply.type('text/html').send(html)
