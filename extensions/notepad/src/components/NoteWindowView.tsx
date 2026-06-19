@@ -86,8 +86,10 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
           }
         }
         const updMap = new Map(anchorUpdates.map((u) => [u.id, u]))
+        const orphanSet = new Set(orphanIds)
         setComments(
           allComments.map((c) => {
+            if (orphanSet.has(c.id)) return { ...c, status: 'orphaned' as const }
             const u = updMap.get(c.id)
             return u ? { ...c, startOffset: u.newFrom, endOffset: u.newTo } : c
           })

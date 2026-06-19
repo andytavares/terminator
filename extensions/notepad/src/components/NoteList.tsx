@@ -410,7 +410,13 @@ export function NoteList(): React.JSX.Element {
 
       <div className="notepad-note-list__notes">
         {activeNotes.length === 0 && archivedNotes.length === 0 ? (
-          <EmptyState />
+          searchResults !== null ? (
+            <div className="notepad-note-list__no-results">
+              No results for "{searchQuery || activeTagId}"
+            </div>
+          ) : (
+            <EmptyState />
+          )
         ) : (
           activeNotes.map((note) => (
             <NoteRow key={note.id} note={note} onContextMenu={handleContextMenu} />

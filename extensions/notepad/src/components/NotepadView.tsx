@@ -322,7 +322,6 @@ export function NotepadView(): React.JSX.Element {
           }
         } catch (err) {
           console.error('[notepad] Autosave failed', err)
-          markSaved()
         }
       }, AUTOSAVE_DELAY_MS)
     },
@@ -348,6 +347,14 @@ export function NotepadView(): React.JSX.Element {
     }
     window.addEventListener('notepad:toggleComments', onToggleComments)
     return () => window.removeEventListener('notepad:toggleComments', onToggleComments)
+  }, [])
+
+  useEffect(() => {
+    function onToggleEditorMode() {
+      setReadingMode((v) => !v)
+    }
+    window.addEventListener('notepad:toggleEditorMode', onToggleEditorMode)
+    return () => window.removeEventListener('notepad:toggleEditorMode', onToggleEditorMode)
   }, [])
 
   useEffect(() => {
