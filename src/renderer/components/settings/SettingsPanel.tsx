@@ -277,8 +277,11 @@ function ActionSettingRow({ def }: { def: SettingPropDef }): JSX.Element {
     try {
       const result = await window.electronAPI.extensionBridge.invoke(def.channel!, {})
       const errMsg = (result as { error?: string } | null)?.error
+      const integrity = (result as { data?: { integrity?: string } } | null)?.data?.integrity
       if (errMsg) {
         addToast({ type: 'error', message: `${def.label}: ${errMsg}` })
+      } else if (integrity && integrity !== 'ok') {
+        addToast({ type: 'warning', message: `${def.label}: integrity issues — ${integrity}` })
       } else {
         addToast({ type: 'success', message: `${def.label}: done` })
       }

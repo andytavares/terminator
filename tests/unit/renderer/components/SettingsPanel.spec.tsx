@@ -674,6 +674,29 @@ describe('ExtensionsSection', () => {
       expect(btn.className).toContain('ext-btn--danger')
     })
 
+    it('shows warning toast when repair result has non-ok integrity', async () => {
+      const extAPI = setupExtWithAction()
+      extAPI.extensionBridge.invoke.mockResolvedValue({ data: { integrity: 'corruption found' } })
+      await openSettings()
+      fireEvent.click(screen.getByText('Do Thing'))
+      await waitFor(() =>
+        expect(mockAddToast).toHaveBeenCalledWith({
+          type: 'warning',
+          message: 'Do Thing: integrity issues — corruption found',
+        })
+      )
+    })
+
+    it('shows success toast when repair result integrity is ok', async () => {
+      const extAPI = setupExtWithAction()
+      extAPI.extensionBridge.invoke.mockResolvedValue({ data: { integrity: 'ok' } })
+      await openSettings()
+      fireEvent.click(screen.getByText('Do Thing'))
+      await waitFor(() =>
+        expect(mockAddToast).toHaveBeenCalledWith({ type: 'success', message: 'Do Thing: done' })
+      )
+    })
+
     it('cancels action when confirm dialog is rejected', async () => {
       const extAPI = setupExtWithAction({
         confirmMessage: 'Are you sure?',

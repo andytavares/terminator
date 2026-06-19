@@ -10,8 +10,23 @@ import { initDb, closeDb, reinitDb, repairDb, resetDb } from './vault/db.js'
 import { startTaskScheduler, setSchedulerTick } from './notifications/task-scheduler.js'
 
 const disposables: Disposable[] = []
+let _api: ExtensionAPI | null = null
+let _schedulerStarted = false
+
+function maybeStartScheduler(): void {
+  if (_schedulerStarted || !_api) return
+  try {
+    const scheduler = startTaskScheduler(_api)
+    _schedulerStarted = true
+    disposables.push({ dispose: scheduler.dispose })
+    setSchedulerTick(scheduler.tick)
+  } catch {
+    // best-effort
+  }
+}
 
 export async function activate(api: ExtensionAPI): Promise<void> {
+  _api = api
   // Register settings
   disposables.push(
     api.settings.register({
@@ -77,6 +92,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   ipcMain.handle('task-vault:db.reinit', async () => {
     try {
       reinitDb(app.getPath('userData'))
+      maybeStartScheduler()
       return { data: { ok: true } }
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) }
@@ -85,6 +101,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   ipcMain.handle('task-vault:db.repair', async () => {
     try {
       const result = repairDb(app.getPath('userData'))
+      maybeStartScheduler()
       return { data: result }
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) }
@@ -93,6 +110,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   ipcMain.handle('task-vault:db.reset', async () => {
     try {
       resetDb(app.getPath('userData'))
+      maybeStartScheduler()
       return { data: { ok: true } }
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) }
@@ -120,9 +138,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
 
   try {
     initDb(app.getPath('userData'))
-    const scheduler = startTaskScheduler(api)
-    disposables.push({ dispose: scheduler.dispose })
-    setSchedulerTick(scheduler.tick)
+    maybeStartScheduler()
   } catch (err) {
     console.error('[task-vault] Failed to initialize SQLite DB:', err)
     api.notifications.showToast(
@@ -187,6 +203,8 @@ function openCaptureOverlay(_api: ExtensionAPI): void {
 
 export async function deactivate(): Promise<void> {
   closeDb()
+  _api = null
+  _schedulerStarted = false
   if (reviewNudgeInterval !== null) {
     clearInterval(reviewNudgeInterval)
     reviewNudgeInterval = null

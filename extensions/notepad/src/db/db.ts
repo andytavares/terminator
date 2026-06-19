@@ -56,7 +56,11 @@ export function repairDb(userData: string): { integrity: string } {
   if (_db) {
     const rows = _db.prepare('PRAGMA integrity_check').all() as { integrity_check: string }[]
     const integrity = rows.map((r) => r.integrity_check).join(', ')
-    _db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').run()
+    try {
+      _db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').run()
+    } catch {
+      // ignore — non-fatal
+    }
     try {
       _db.exec('VACUUM')
     } catch {
@@ -75,7 +79,13 @@ export function resetDb(userData: string): Database.Database {
   closeDb()
   for (const suffix of ['', '-wal', '-shm']) {
     const file = dbPath + suffix
-    if (fs.existsSync(file)) fs.unlinkSync(file)
+    if (fs.existsSync(file)) {
+      try {
+        fs.unlinkSync(file)
+      } catch {
+        // best-effort per-file deletion
+      }
+    }
   }
   return initDb(userData)
 }
