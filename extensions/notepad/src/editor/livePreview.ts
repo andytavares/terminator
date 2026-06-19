@@ -40,6 +40,10 @@ class CheckboxWidget extends WidgetType {
       e.preventDefault()
     })
     cb.addEventListener('change', () => {
+      if (view.state.readOnly) {
+        cb.checked = this.checked
+        return
+      }
       const replacement = cb.checked ? '[x]' : '[ ]'
       view.dispatch({
         changes: { from: this.markerFrom, to: this.markerTo, insert: replacement },
