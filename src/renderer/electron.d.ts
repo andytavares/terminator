@@ -119,6 +119,9 @@ interface ElectronAPI {
             options?: string[]
             min?: number
             max?: number
+            channel?: string
+            confirmMessage?: string
+            danger?: boolean
           }
         >
       }>

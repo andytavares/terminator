@@ -1,8 +1,17 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { initDb, getDb, closeDb, insertFts, deleteFts } from '../../../src/db/db'
+import {
+  initDb,
+  getDb,
+  closeDb,
+  insertFts,
+  deleteFts,
+  reinitDb,
+  repairDb,
+  resetDb,
+} from '../../../src/db/db'
 
 describe('initDb', () => {
   let tmpDir: string
@@ -69,6 +78,91 @@ describe('initDb', () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
     initDb(tmpDir)
     expect(() => getDb()).not.toThrow()
+  })
+
+  it('initDb failure closes db and surfaces real error in subsequent getDb call', () => {
+    // /dev/null is a file, not a dir — mkdirSync will throw ENOTDIR
+    expect(() => initDb('/dev/null/notepad-test')).toThrow()
+    expect(() => getDb()).toThrow('NotepadDB not initialized')
+  })
+})
+
+describe('reinitDb', () => {
+  let tmpDir: string
+
+  afterEach(() => {
+    closeDb()
+    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('closes the existing connection and reopens', () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
+    initDb(tmpDir)
+    const db = reinitDb(tmpDir)
+    expect(db).toBeTruthy()
+    expect(() => getDb()).not.toThrow()
+  })
+})
+
+describe('repairDb', () => {
+  let tmpDir: string
+
+  afterEach(() => {
+    closeDb()
+    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
+
+  it('runs integrity_check and returns result when db is open', () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
+    initDb(tmpDir)
+    const result = repairDb(tmpDir)
+    expect(result.integrity).toBe('ok')
+    expect(() => getDb()).not.toThrow()
+  })
+
+  it('initializes db when none is open and returns ok', () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
+    const result = repairDb(tmpDir)
+    expect(result.integrity).toBe('ok')
+    expect(() => getDb()).not.toThrow()
+  })
+
+  it('swallows VACUUM errors and still reopens db', () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
+    initDb(tmpDir)
+    const db = getDb()
+    vi.spyOn(db, 'exec').mockImplementationOnce(() => {
+      throw new Error('VACUUM error')
+    })
+    const result = repairDb(tmpDir)
+    expect(result.integrity).toBe('ok')
+    expect(() => getDb()).not.toThrow()
+  })
+})
+
+describe('resetDb', () => {
+  let tmpDir: string
+
+  afterEach(() => {
+    closeDb()
+    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
+
+  it('deletes the db file and reinitializes', () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
+    initDb(tmpDir)
+    const dbPath = path.join(tmpDir, 'notepad.db')
+    expect(fs.existsSync(dbPath)).toBe(true)
+    resetDb(tmpDir)
+    expect(() => getDb()).not.toThrow()
+  })
+
+  it('works when no db file exists yet', () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
+    const db = resetDb(tmpDir)
+    expect(db).toBeTruthy()
   })
 })
 

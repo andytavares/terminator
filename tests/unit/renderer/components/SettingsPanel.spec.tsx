@@ -44,6 +44,9 @@ beforeEach(() => {
     dialog: {
       openDirectory: vi.fn(),
     },
+    extensionBridge: {
+      invoke: vi.fn().mockResolvedValue({ data: { ok: true } }),
+    },
   }
 })
 
@@ -569,5 +572,154 @@ describe('ExtensionsSection', () => {
     fireEvent.click(screen.getByText('Extensions'))
     fireEvent.click(screen.getByText('Appearance & Terminal'))
     expect(screen.getByTestId('global-settings')).toBeTruthy()
+  })
+
+  describe('ActionSettingRow', () => {
+    function setupExtWithAction(
+      opts: {
+        danger?: boolean
+        confirmMessage?: string
+      } = {}
+    ) {
+      const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+      const extAPI = window.electronAPI as unknown as {
+        extension: {
+          list: ReturnType<typeof vi.fn>
+          getSettingsSchemas: ReturnType<typeof vi.fn>
+        }
+        extensionBridge: { invoke: ReturnType<typeof vi.fn> }
+      }
+      extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
+      extAPI.extension.getSettingsSchemas.mockResolvedValue({
+        schemas: [
+          {
+            extensionId: 'com.test',
+            label: 'Test Extension',
+            properties: {
+              'com.test.action': {
+                type: 'action',
+                label: 'Do Thing',
+                description: 'Does the thing',
+                channel: 'com.test:do-thing',
+                default: null,
+                ...opts,
+              },
+            },
+          },
+        ],
+      })
+      return extAPI
+    }
+
+    async function openSettings() {
+      render(<SettingsPanel onClose={vi.fn()} />)
+      fireEvent.click(screen.getByText('Extensions'))
+      await waitFor(() => screen.getByTitle('Configure'))
+      fireEvent.click(screen.getByTitle('Configure'))
+      await waitFor(() => screen.getByText('Do Thing'))
+    }
+
+    beforeEach(() => {
+      ;(window.electronAPI as unknown as Record<string, unknown>).extensionBridge = {
+        invoke: vi.fn().mockResolvedValue({ data: { ok: true } }),
+      }
+    })
+
+    it('renders action button with label and description', async () => {
+      setupExtWithAction()
+      await openSettings()
+      expect(screen.getByText('Do Thing')).toBeTruthy()
+      expect(screen.getByText('Does the thing')).toBeTruthy()
+    })
+
+    it('shows success toast when action resolves without error', async () => {
+      setupExtWithAction()
+      await openSettings()
+      fireEvent.click(screen.getByText('Do Thing'))
+      await waitFor(() =>
+        expect(mockAddToast).toHaveBeenCalledWith({ type: 'success', message: 'Do Thing: done' })
+      )
+    })
+
+    it('shows error toast when result contains { error }', async () => {
+      const extAPI = setupExtWithAction()
+      extAPI.extensionBridge.invoke.mockResolvedValue({ error: 'DB locked' })
+      await openSettings()
+      fireEvent.click(screen.getByText('Do Thing'))
+      await waitFor(() =>
+        expect(mockAddToast).toHaveBeenCalledWith({
+          type: 'error',
+          message: 'Do Thing: DB locked',
+        })
+      )
+    })
+
+    it('shows error toast when invoke rejects', async () => {
+      const extAPI = setupExtWithAction()
+      extAPI.extensionBridge.invoke.mockRejectedValue(new Error('IPC failed'))
+      await openSettings()
+      fireEvent.click(screen.getByText('Do Thing'))
+      await waitFor(() =>
+        expect(mockAddToast).toHaveBeenCalledWith({
+          type: 'error',
+          message: 'Do Thing: IPC failed',
+        })
+      )
+    })
+
+    it('danger button has danger CSS class', async () => {
+      setupExtWithAction({ danger: true })
+      await openSettings()
+      const btn = screen.getByText('Do Thing')
+      expect(btn.className).toContain('ext-btn--danger')
+    })
+
+    it('shows warning toast when repair result has non-ok integrity', async () => {
+      const extAPI = setupExtWithAction()
+      extAPI.extensionBridge.invoke.mockResolvedValue({ data: { integrity: 'corruption found' } })
+      await openSettings()
+      fireEvent.click(screen.getByText('Do Thing'))
+      await waitFor(() =>
+        expect(mockAddToast).toHaveBeenCalledWith({
+          type: 'warning',
+          message: 'Do Thing: integrity issues — corruption found',
+        })
+      )
+    })
+
+    it('shows success toast when repair result integrity is ok', async () => {
+      const extAPI = setupExtWithAction()
+      extAPI.extensionBridge.invoke.mockResolvedValue({ data: { integrity: 'ok' } })
+      await openSettings()
+      fireEvent.click(screen.getByText('Do Thing'))
+      await waitFor(() =>
+        expect(mockAddToast).toHaveBeenCalledWith({ type: 'success', message: 'Do Thing: done' })
+      )
+    })
+
+    it('cancels action when confirm dialog is rejected', async () => {
+      const extAPI = setupExtWithAction({
+        confirmMessage: 'Are you sure?',
+        danger: true,
+      })
+      vi.spyOn(window, 'confirm').mockReturnValue(false)
+      await openSettings()
+      fireEvent.click(screen.getByText('Do Thing'))
+      await new Promise((r) => setTimeout(r, 50))
+      expect(extAPI.extensionBridge.invoke).not.toHaveBeenCalled()
+      vi.restoreAllMocks()
+    })
+
+    it('proceeds when confirm dialog is accepted', async () => {
+      const extAPI = setupExtWithAction({
+        confirmMessage: 'Are you sure?',
+        danger: true,
+      })
+      vi.spyOn(window, 'confirm').mockReturnValue(true)
+      await openSettings()
+      fireEvent.click(screen.getByText('Do Thing'))
+      await waitFor(() => expect(extAPI.extensionBridge.invoke).toHaveBeenCalled())
+      vi.restoreAllMocks()
+    })
   })
 })

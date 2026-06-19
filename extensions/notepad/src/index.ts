@@ -1,6 +1,6 @@
-import { app } from 'electron'
+import { app, ipcMain } from 'electron'
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
-import { initDb, closeDb } from './db/db'
+import { initDb, closeDb, reinitDb, repairDb, resetDb } from './db/db'
 import { registerNotesIpcHandlers, registerTagsIpcHandlers } from './ipc/notes.ipc'
 import { registerCommentsIpcHandlers } from './ipc/comments.ipc'
 import { registerSearchIpcHandlers } from './ipc/search.ipc'
@@ -13,7 +13,10 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     initDb(app.getPath('userData'))
   } catch (err) {
     console.error('[notepad] Failed to initialize SQLite DB:', err)
-    return
+    api.notifications.showToast(
+      'error',
+      'Notepad: database failed to open. Restart the app — if the problem persists, check the logs.'
+    )
   }
 
   const disposeNotes = registerNotesIpcHandlers()
@@ -30,6 +33,38 @@ export async function activate(api: ExtensionAPI): Promise<void> {
 
   const disposeExport = registerExportIpcHandlers()
   disposables.push({ dispose: disposeExport })
+
+  ipcMain.handle('terminator.notepad:db.reinit', async () => {
+    try {
+      reinitDb(app.getPath('userData'))
+      return { data: { ok: true } }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  ipcMain.handle('terminator.notepad:db.repair', async () => {
+    try {
+      const result = repairDb(app.getPath('userData'))
+      return { data: result }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  ipcMain.handle('terminator.notepad:db.reset', async () => {
+    try {
+      resetDb(app.getPath('userData'))
+      return { data: { ok: true } }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  disposables.push({
+    dispose: () => {
+      ipcMain.removeHandler('terminator.notepad:db.reinit')
+      ipcMain.removeHandler('terminator.notepad:db.repair')
+      ipcMain.removeHandler('terminator.notepad:db.reset')
+    },
+  })
 
   disposables.push(
     api.settings.register({
@@ -72,6 +107,30 @@ export async function activate(api: ExtensionAPI): Promise<void> {
           label: 'Enable MCP sidecar',
           description: 'Let agents read/search notes',
           default: false,
+        },
+        'terminator.notepad.db.reinit': {
+          type: 'action',
+          label: 'Re-initialize',
+          description: 'Close and reopen the database connection. Use if notes stop loading.',
+          channel: 'terminator.notepad:db.reinit',
+          default: null,
+        },
+        'terminator.notepad.db.repair': {
+          type: 'action',
+          label: 'Repair',
+          description: 'Checkpoint WAL and run VACUUM. Fixes fragmentation without data loss.',
+          channel: 'terminator.notepad:db.repair',
+          default: null,
+        },
+        'terminator.notepad.db.reset': {
+          type: 'action',
+          label: 'Reset (delete all data)',
+          description: 'Permanently delete the database and start fresh. All notes will be lost.',
+          channel: 'terminator.notepad:db.reset',
+          danger: true,
+          confirmMessage:
+            'This will permanently delete ALL your notes. This cannot be undone. Continue?',
+          default: null,
         },
       },
     })

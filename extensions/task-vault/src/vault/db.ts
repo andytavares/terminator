@@ -56,6 +56,53 @@ export function closeDb(): void {
   }
 }
 
+export function reinitDb(userData: string): Database.Database {
+  closeDb()
+  return initDb(userData)
+}
+
+export function repairDb(userData: string): { integrity: string } {
+  if (!_db) {
+    initDb(userData)
+  }
+  const db = getDb()
+  const rows = db.prepare('PRAGMA integrity_check').all() as { integrity_check: string }[]
+  const integrity = rows.map((r) => r.integrity_check).join(', ')
+  try {
+    db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').run()
+  } catch {
+    // ignore — non-fatal
+  }
+  try {
+    db.exec('VACUUM')
+  } catch {
+    // ignore — non-fatal
+  }
+  closeDb()
+  initDb(userData)
+  return { integrity }
+}
+
+export function resetDb(userData: string): Database.Database {
+  const dbPath = path.join(userData, 'vault.db')
+  closeDb()
+  const failed: string[] = []
+  for (const suffix of ['', '-wal', '-shm']) {
+    const file = dbPath + suffix
+    if (fs.existsSync(file)) {
+      try {
+        fs.unlinkSync(file)
+      } catch {
+        failed.push(file)
+      }
+    }
+  }
+  if (failed.length > 0) {
+    throw new Error(`Reset incomplete — could not delete: ${failed.join(', ')}`)
+  }
+  return initDb(userData)
+}
+
 function hasColumn(db: Database.Database, table: string, column: string): boolean {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
   return cols.some((c) => c.name === column)

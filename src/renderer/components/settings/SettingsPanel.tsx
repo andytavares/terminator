@@ -75,6 +75,9 @@ type SettingPropDef = {
   options?: string[]
   min?: number
   max?: number
+  channel?: string
+  confirmMessage?: string
+  danger?: boolean
 }
 
 type ExtensionSchema = {
@@ -242,20 +245,70 @@ function ExtensionsSection(): JSX.Element {
                 {schema.description && (
                   <p className="extension-settings-panel__desc">{schema.description}</p>
                 )}
-                {Object.entries(schema.properties).map(([key, def]) => (
-                  <ExtensionSettingRow
-                    key={key}
-                    propKey={key}
-                    def={def}
-                    value={settingValues[key] ?? def.default}
-                    onChange={handleSettingChange}
-                  />
-                ))}
+                {Object.entries(schema.properties).map(([key, def]) =>
+                  def.type === 'action' && def.channel ? (
+                    <ActionSettingRow key={key} def={def} />
+                  ) : (
+                    <ExtensionSettingRow
+                      key={key}
+                      propKey={key}
+                      def={def}
+                      value={settingValues[key] ?? def.default}
+                      onChange={handleSettingChange}
+                    />
+                  )
+                )}
               </div>
             )}
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function ActionSettingRow({ def }: { def: SettingPropDef }): JSX.Element {
+  const { addToast } = useToastStore()
+  const [busy, setBusy] = React.useState(false)
+
+  async function run(): Promise<void> {
+    if (def.confirmMessage && !window.confirm(def.confirmMessage)) return
+    setBusy(true)
+    try {
+      const result = await window.electronAPI.extensionBridge.invoke(def.channel!, {})
+      const errMsg = (result as { error?: string } | null)?.error
+      const integrity = (result as { data?: { integrity?: string } } | null)?.data?.integrity
+      if (errMsg) {
+        addToast({ type: 'error', message: `${def.label}: ${errMsg}` })
+      } else if (integrity && integrity !== 'ok') {
+        addToast({ type: 'warning', message: `${def.label}: integrity issues — ${integrity}` })
+      } else {
+        addToast({ type: 'success', message: `${def.label}: done` })
+      }
+    } catch (err) {
+      addToast({
+        type: 'error',
+        message: `${def.label}: ${err instanceof Error ? err.message : String(err)}`,
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="extension-setting-row">
+      {def.description && (
+        <span className="extension-setting-row__label">
+          <span className="extension-setting-row__desc">{def.description}</span>
+        </span>
+      )}
+      <button
+        className={`ext-btn${def.danger ? ' ext-btn--danger' : ''}`}
+        onClick={() => void run()}
+        disabled={busy}
+      >
+        {busy ? '…' : def.label}
+      </button>
     </div>
   )
 }

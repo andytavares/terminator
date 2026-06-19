@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { ipcMain } from 'electron'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -284,5 +285,26 @@ describe('registerExportIpcHandlers', () => {
     const dispose = registerExportIpcHandlers()
     expect(typeof dispose).toBe('function')
     dispose()
+  })
+})
+
+describe('IPC reject — DB not initialized', () => {
+  function getHandler(channel: string) {
+    let handler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
+    vi.mocked(ipcMain.handle).mockImplementation((ch, fn) => {
+      if (ch === channel) handler = fn as typeof handler
+    })
+    registerExportIpcHandlers()
+    vi.mocked(ipcMain.handle).mockReset()
+    if (!handler) throw new Error(`Handler for ${channel} not registered`)
+    return handler
+  }
+
+  it('rejects from export.run when getDb throws so renderer catch fires', async () => {
+    closeDb()
+    const handler = getHandler('terminator.notepad:export.run')
+    await expect(handler({}, { folder: '/tmp/export-test' })).rejects.toThrow(
+      'NotepadDB not initialized'
+    )
   })
 })
