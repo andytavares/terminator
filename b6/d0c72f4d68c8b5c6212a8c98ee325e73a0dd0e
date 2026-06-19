@@ -1,0 +1,22 @@
+src/renderer-remote/App.tsx
+  s_691b7cdd284c28::t_2f196a48a152b1 3
+  s_691b7cdd284c28::t_1389db9dc27a2e 40
+tests/unit/renderer-remote/App.spec.tsx
+  s_691b7cdd284c28::t_24bc1929bb7dd9 73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "b6d0c72f4d68c8b5c6212a8c98ee325e73a0dd0e",
+  "prompts": {},
+  "sessions": {
+    "s_691b7cdd284c28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc2f31ca-0e76-4d10-8922-c93237fadd53",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
