@@ -62,25 +62,25 @@ export function reinitDb(userData: string): Database.Database {
 }
 
 export function repairDb(userData: string): { integrity: string } {
-  if (_db) {
-    const rows = _db.prepare('PRAGMA integrity_check').all() as { integrity_check: string }[]
-    const integrity = rows.map((r) => r.integrity_check).join(', ')
-    try {
-      _db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').run()
-    } catch {
-      // ignore — non-fatal
-    }
-    try {
-      _db.exec('VACUUM')
-    } catch {
-      // ignore — non-fatal
-    }
-    closeDb()
+  if (!_db) {
     initDb(userData)
-    return { integrity }
   }
+  const db = getDb()
+  const rows = db.prepare('PRAGMA integrity_check').all() as { integrity_check: string }[]
+  const integrity = rows.map((r) => r.integrity_check).join(', ')
+  try {
+    db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').run()
+  } catch {
+    // ignore — non-fatal
+  }
+  try {
+    db.exec('VACUUM')
+  } catch {
+    // ignore — non-fatal
+  }
+  closeDb()
   initDb(userData)
-  return { integrity: 'ok' }
+  return { integrity }
 }
 
 export function resetDb(userData: string): Database.Database {
