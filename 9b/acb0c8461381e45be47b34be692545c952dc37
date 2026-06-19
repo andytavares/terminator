@@ -1,0 +1,21 @@
+extensions/notepad/src/db/db.ts
+  s_342a3bb060d924::t_6b0d175e73dd62 80,87-88,92-96
+extensions/task-vault/src/vault/db.ts
+  s_342a3bb060d924::t_0e61889ce18396 89,96-97,101-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "9bacb0c8461381e45be47b34be692545c952dc37",
+  "prompts": {},
+  "sessions": {
+    "s_342a3bb060d924": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd40730-1532-4616-8e6b-4ba24bd10787",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
