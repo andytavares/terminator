@@ -54,7 +54,6 @@ export default defineConfig({
         'extensions/*/src/schemas/project.schema.ts',
         'extensions/*/src/types/**',
         'extensions/*/src/providers/adapter.ts',
-        'extensions/*/src/editor/highlightOverlay.ts',
         'src/shared/types/**',
         '**/*.d.ts',
         '**/*.spec.ts',

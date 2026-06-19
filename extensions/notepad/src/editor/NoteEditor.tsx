@@ -19,7 +19,6 @@ import { StreamLanguage } from '@codemirror/language'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { searchKeymap } from '@codemirror/search'
 import { livePreviewPlugin } from './livePreview'
-import { highlightOverlayPlugin } from './highlightOverlay'
 import {
   commentAnchorField,
   commentAnchorDecorations,
@@ -127,7 +126,6 @@ export function NoteEditor({
           }),
           syntaxHighlighting(oneDarkHighlightStyle),
           livePreviewPlugin,
-          highlightOverlayPlugin,
           commentAnchorField,
           hoveredAnchorField,
           commentAnchorDecorations,
@@ -188,8 +186,10 @@ export function NoteEditor({
               padding: '0 2px',
             },
             '.notepad-link': { textDecoration: 'underline', opacity: '0.8' },
-            '.notepad-comment-anchor': {},
-            '.notepad-comment-anchor--hover': {
+            '.notepad-comment-highlight': {
+              background: 'rgba(250,210,50,0.35)',
+            },
+            '.notepad-comment-highlight--hover': {
               textDecoration: 'underline',
               textDecorationColor: 'rgba(120,200,255,0.9)',
               textDecorationThickness: '2px',
