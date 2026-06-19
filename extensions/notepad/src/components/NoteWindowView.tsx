@@ -172,14 +172,22 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
   }, [comments, computeAnchorTops])
 
   useEffect(() => {
-    const view = editorViewRef.current
-    const panel = commentPanelRef.current
-    if (!view || !panel) return
-    function onScroll() {
-      if (panel) panel.scrollTop = view.scrollDOM.scrollTop
+    if (!note) return
+    let removeScroll: (() => void) | undefined
+    const t = setTimeout(() => {
+      const view = editorViewRef.current
+      const panel = commentPanelRef.current
+      if (!view || !panel) return
+      function onScroll() {
+        if (panel) panel.scrollTop = view.scrollDOM.scrollTop
+      }
+      view.scrollDOM.addEventListener('scroll', onScroll, { passive: true })
+      removeScroll = () => view.scrollDOM.removeEventListener('scroll', onScroll)
+    }, 100)
+    return () => {
+      clearTimeout(t)
+      removeScroll?.()
     }
-    view.scrollDOM.addEventListener('scroll', onScroll, { passive: true })
-    return () => view.scrollDOM.removeEventListener('scroll', onScroll)
   }, [note])
 
   const scheduleAutosave = useCallback(

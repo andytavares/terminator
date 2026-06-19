@@ -252,6 +252,7 @@ export function NoteList(): React.JSX.Element {
   const [archivedExpanded, setArchivedExpanded] = useState(false)
 
   useEffect(() => {
+    const previousTags = tagsRef.current
     const tagMap = new Map<string, { id: string; name: string; count: number }>()
     for (const note of notes) {
       for (const name of note.tags) {
@@ -259,7 +260,8 @@ export function NoteList(): React.JSX.Element {
         if (existing) {
           existing.count++
         } else {
-          tagMap.set(name, { id: `local:${name}`, name, count: 1 })
+          const known = previousTags.find((t) => t.name === name)
+          tagMap.set(name, { id: known?.id ?? `local:${name}`, name, count: 1 })
         }
       }
     }
