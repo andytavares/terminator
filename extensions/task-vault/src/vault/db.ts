@@ -11,9 +11,9 @@ let _initError: Error | null = null
 
 export function initDb(userData: string): Database.Database {
   _initError = null
-  fs.mkdirSync(userData, { recursive: true })
-  const dbPath = path.join(userData, 'vault.db')
   try {
+    fs.mkdirSync(userData, { recursive: true })
+    const dbPath = path.join(userData, 'vault.db')
     _db = new Database(dbPath)
     _db.pragma('journal_mode = WAL')
     _db.pragma('foreign_keys = ON')
