@@ -1,0 +1,28 @@
+vitest.config.ts
+  s_342a3bb060d924::t_4da270735c8b4e 57
+extensions/task-vault/tests/ipc/links.ipc.spec.ts
+  s_342a3bb060d924::t_f685f5fa41fee8 229-239
+  s_342a3bb060d924::t_e612e8e2b3689b 25
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_342a3bb060d924::t_4c30088d073a36 47
+  s_342a3bb060d924::t_d76ebbce94ebeb 1607-1617
+extensions/task-vault/tests/ipc/projects.ipc.spec.ts
+  s_342a3bb060d924::t_ed39d45f1f9c8a 432-442
+  s_342a3bb060d924::t_4e40f2f69e72df 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "7f0d98b5e95a5ab7be9b48dc2a12bf453875715a",
+  "prompts": {},
+  "sessions": {
+    "s_342a3bb060d924": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd40730-1532-4616-8e6b-4ba24bd10787",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
