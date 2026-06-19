@@ -1,0 +1,44 @@
+extensions/notepad/src/ipc/comments.ipc.ts
+  s_342a3bb060d924::t_ad6f76fa7e06b3 192-198
+extensions/notepad/tests/unit/db/db.spec.ts
+  s_342a3bb060d924::t_fdae444d9d5d58 73-78
+extensions/notepad/src/ipc/notes.ipc.ts
+  s_342a3bb060d924::t_4f2623a9a28570 390-397
+  s_342a3bb060d924::t_16dab7afcea03a 365-374,376-378
+extensions/notepad/src/ipc/export.ipc.ts
+  s_342a3bb060d924::t_827d807a4cb967 253-259,261-267
+extensions/notepad/src/db/db.ts
+  s_342a3bb060d924::t_b0c73939b28938 9,12-32,36-39
+extensions/notepad/tests/unit/ipc/search.ipc.spec.ts
+  s_342a3bb060d924::t_4c08c4245d2eb7 2
+  s_342a3bb060d924::t_20f5db57658324 177-191
+extensions/notepad/src/index.ts
+  s_342a3bb060d924::t_4ff5d7d2c07960 16-19
+extensions/notepad/src/ipc/search.ipc.ts
+  s_342a3bb060d924::t_bf104b0cda38f1 211-217
+extensions/notepad/tests/unit/ipc/notes.ipc.spec.ts
+  s_342a3bb060d924::t_5a63c0e60a7465 394-413
+  s_342a3bb060d924::t_f5acf9f7d83f7b 2
+extensions/notepad/tests/unit/ipc/comments.ipc.spec.ts
+  s_342a3bb060d924::t_0a13020a363e29 2
+  s_342a3bb060d924::t_833ae32cf11256 334-353
+extensions/notepad/tests/unit/ipc/export.ipc.spec.ts
+  s_342a3bb060d924::t_7f6663580eb366 2
+  s_342a3bb060d924::t_91fb9f34ff68a4 290-309
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "fbf7d79ae835b079c9ddf7a2f89c32c845f9c3fb",
+  "prompts": {},
+  "sessions": {
+    "s_342a3bb060d924": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd40730-1532-4616-8e6b-4ba24bd10787",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
