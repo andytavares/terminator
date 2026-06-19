@@ -1,0 +1,19 @@
+extensions/notepad/src/editor/NoteEditor.tsx
+  s_342a3bb060d924::t_6030cb49dcf69b 192-194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "3af3ea2567394482693c8a779c21420b9741257f",
+  "prompts": {},
+  "sessions": {
+    "s_342a3bb060d924": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd40730-1532-4616-8e6b-4ba24bd10787",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
