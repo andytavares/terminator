@@ -304,7 +304,8 @@ export function NoteList(): React.JSX.Element {
     if (searchQuery) parts.push(searchQuery)
     if (activeTagId) {
       const tag = tags.find((t) => t.id === activeTagId)
-      if (tag) parts.push(`tag:${tag.name}`)
+      const tagName = tag?.name ?? (activeTagId.startsWith('local:') ? activeTagId.slice(6) : null)
+      if (tagName) parts.push(`tag:${tagName}`)
     }
 
     /* v8 ignore next */

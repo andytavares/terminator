@@ -62,6 +62,7 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
           }),
           window.electronAPI.extensionBridge.invoke('terminator.notepad:comments.list', {
             noteId: NOTE_ID,
+            includeResolved: true,
           }),
         ])
         const data = (noteResult as { data?: NoteData }).data
@@ -169,6 +170,17 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
     applyAnchors(view, validAnchors)
     computeAnchorTops(view, comments)
   }, [comments, computeAnchorTops])
+
+  useEffect(() => {
+    const view = editorViewRef.current
+    const panel = commentPanelRef.current
+    if (!view || !panel) return
+    function onScroll() {
+      if (panel) panel.scrollTop = view.scrollDOM.scrollTop
+    }
+    view.scrollDOM.addEventListener('scroll', onScroll, { passive: true })
+    return () => view.scrollDOM.removeEventListener('scroll', onScroll)
+  }, [note])
 
   const scheduleAutosave = useCallback(
     (newBody: string) => {

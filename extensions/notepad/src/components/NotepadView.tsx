@@ -19,6 +19,7 @@ import {
   type SelectionAnchor,
 } from '../editor/NoteEditor'
 import { reanchorComment } from '../editor/reanchor'
+import { commentAnchorField } from '../editor/commentField'
 import type { EditorView } from '@codemirror/view'
 import type { Comment } from '../db/types'
 
@@ -44,6 +45,7 @@ export function NotepadView(): React.JSX.Element {
   const [showSearch, setShowSearch] = useState(false)
   const [showComments, setShowComments] = useState(true)
   const [readingMode, setReadingMode] = useState(false)
+  const [loadedNoteId, setLoadedNoteId] = useState<string | null>(null)
   const [pendingAnchor, setPendingAnchor] = useState<SelectionAnchor | null>(null)
   const [composingAnchor, setComposingAnchor] = useState<SelectionAnchor | null>(null)
   const [anchorTops, setAnchorTops] = useState<Record<string, number>>({})
@@ -87,12 +89,18 @@ export function NotepadView(): React.JSX.Element {
       const scrollTop = view.scrollDOM.scrollTop
       const rect = view.scrollDOM.getBoundingClientRect()
 
+      // Use live-mapped positions from the editor state field (updated on every keystroke)
+      const livePositions = new Map(view.state.field(commentAnchorField).map((a) => [a.id, a.from]))
+
       type Target = { id: string; targetTop: number; createdAt: string }
       const targets: Target[] = []
 
       for (const c of commentList) {
-        if (c.startOffset !== null && c.parentId === null && c.status !== 'orphaned') {
-          const pos = Math.min(c.startOffset, Math.max(0, view.state.doc.length - 1))
+        if (c.parentId === null && c.status !== 'orphaned') {
+          const livePos = livePositions.get(c.id)
+          const rawPos = livePos !== undefined ? livePos : c.startOffset
+          if (rawPos === null) continue
+          const pos = Math.min(rawPos, Math.max(0, view.state.doc.length - 1))
           try {
             const coords = view.coordsAtPos(pos)
             if (coords) {
@@ -162,6 +170,9 @@ export function NotepadView(): React.JSX.Element {
   useEffect(() => {
     if (!selectedNoteId) return
     activeIdRef.current = selectedNoteId
+    // Clear stale comments immediately so the previous note's anchors don't
+    // get applied to the newly mounted editor before the new note loads.
+    setComments([])
 
     async function loadNoteAndComments() {
       try {
@@ -178,6 +189,7 @@ export function NotepadView(): React.JSX.Element {
         const note = (noteResult as { data?: { body: string } }).data
         if (!note || activeIdRef.current !== selectedNoteId) return
         setActiveNote(selectedNoteId, note.body)
+        setLoadedNoteId(selectedNoteId)
 
         const allComments = (commentsResult as { data?: Comment[] }).data ?? []
         const anchorUpdates: { id: string; newFrom: number; newTo: number }[] = []
@@ -493,7 +505,7 @@ export function NotepadView(): React.JSX.Element {
             onMouseLeave={scheduleHoverHide}
           >
             <NoteEditor
-              key={selectedNoteId}
+              key={loadedNoteId}
               initialDoc={bodyDraft}
               onChange={handleEditorChange}
               onAnchorsReady={(getView) => {
