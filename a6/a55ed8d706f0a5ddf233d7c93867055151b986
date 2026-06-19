@@ -1,0 +1,28 @@
+extensions/remote-control/src/server/remote-server.ts
+  s_691b7cdd284c28::t_aa6f23b34c032d 175-187
+src/renderer-remote/components/MobileTerminalList.tsx
+  s_691b7cdd284c28::t_4472a37aa81ff0 21-22,25-47,49-65,67
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_691b7cdd284c28::t_be27ab2ff17dc6 331-332,348,350-355,359-360
+tests/unit/renderer-remote/mobile/MobileTerminalList.spec.tsx
+  s_691b7cdd284c28::t_111b4031828651 166-213
+  s_691b7cdd284c28::t_31e24c5d49712c 120-162,164-165
+extensions/remote-control/src/server/routes/terminal.routes.ts
+  s_691b7cdd284c28::t_96377a0e9ef8d1 150-158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "a6a55ed8d706f0a5ddf233d7c93867055151b986",
+  "prompts": {},
+  "sessions": {
+    "s_691b7cdd284c28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc2f31ca-0e76-4d10-8922-c93237fadd53",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
