@@ -306,14 +306,17 @@ export function NotepadView(): React.JSX.Element {
           })
           markSaved()
 
-          // Re-check anchors after save — body may have changed enough to orphan a comment
+          // Re-check anchors after save against the live editor body, not the
+          // stale newBody captured at debounce time — the user may have typed
+          // more during the IPC round-trip.
+          const liveBody = useEditorStore.getState().bodyDraft
           const currentComments = useCommentsStore.getState().comments
           const orphanIds: string[] = []
           const anchorUpdates: { id: string; newFrom: number; newTo: number }[] = []
 
           for (const comment of currentComments) {
             if (comment.parentId !== null || comment.status === 'orphaned') continue
-            const result = reanchorComment(comment, newBody)
+            const result = reanchorComment(comment, liveBody)
             if (result.status === 'orphaned') {
               orphanIds.push(comment.id)
             } else if (result.newFrom !== undefined && result.newTo !== undefined) {
