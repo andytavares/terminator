@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import './Login.css'
+import { setToken } from './api/remote-client'
 
 export function App(): JSX.Element {
   const [password, setPassword] = useState('')
@@ -36,7 +37,7 @@ export function App(): JSX.Element {
         headers: { Authorization: `Bearer ${password}` },
       })
       const { ticket } = (await ticketRes.json()) as { ticket: string }
-      sessionStorage.setItem('remoteToken', password)
+      setToken(password)
       const dest = isMobile ? '/mobile/' : '/app/'
       location.replace(`${dest}?t=${encodeURIComponent(ticket)}`)
     } catch {

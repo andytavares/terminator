@@ -70,7 +70,7 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'correct' } })
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/app/?t=tok-abc'))
-    expect(sessionStorage.getItem('remoteToken')).toBe('correct')
+    expect(sessionStorage.getItem('remote_token')).toBe('correct')
   })
 
   it('redirects to /mobile/ when viewport is narrower than 768px', async () => {
