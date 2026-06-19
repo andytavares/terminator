@@ -44,6 +44,7 @@ vi.mock('../../src/notifications/task-scheduler.js', () => ({
 }))
 
 import { registerVaultIpcHandlers } from '../../src/ipc/vault.ipc'
+import { getDb } from '../../src/vault/db'
 
 const makeTaskRow = (overrides: Record<string, unknown> = {}) => ({
   id: 'task-1',
@@ -1601,5 +1602,16 @@ describe('task-vault:vault:update-project-status broadcasts extension:toast when
     await handler({}, { projectFilePath: 'Alpha', status: 'active' })
     const toastCalls = vi.mocked(broadcast).mock.calls.filter((c) => c[0] === 'extension:toast')
     expect(toastCalls).toHaveLength(0)
+  })
+})
+
+describe('handle() catch — DB not initialized', () => {
+  it('returns { error } from vault:capture instead of throwing when getDb throws', async () => {
+    vi.mocked(getDb).mockImplementationOnce(() => {
+      throw new Error('VaultDB not initialized')
+    })
+    const handler = getHandler('task-vault:vault:capture')
+    const result = await handler({}, { text: 'test task', filePath: '' })
+    expect(result).toMatchObject({ error: 'VaultDB not initialized' })
   })
 })

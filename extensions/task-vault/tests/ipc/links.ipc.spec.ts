@@ -22,6 +22,7 @@ vi.mock('electron', () => ({
 }))
 
 import { registerLinksIpcHandlers } from '../../src/ipc/links.ipc'
+import { getDb } from '../../src/vault/db'
 
 const UUID = '550e8400-e29b-41d4-a716-446655440000'
 const TASK_ID = 'task-uuid-1'
@@ -223,5 +224,16 @@ describe('registerLinksIpcHandlers dispose', () => {
     expect(removedChannels).toContain('task-vault:links:create')
     expect(removedChannels).toContain('task-vault:links:remove')
     expect(removedChannels).toContain('task-vault:links:get-for-terminator-target')
+  })
+})
+
+describe('handle() catch — DB not initialized', () => {
+  it('returns { error } from links:create instead of throwing when getDb throws', async () => {
+    vi.mocked(getDb).mockImplementationOnce(() => {
+      throw new Error('VaultDB not initialized')
+    })
+    const { handler } = getHandler('task-vault:links:create')
+    const result = await handler({}, { taskId: 'task-1', targetId: UUID })
+    expect(result).toMatchObject({ error: 'VaultDB not initialized' })
   })
 })
