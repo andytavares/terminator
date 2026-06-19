@@ -12,12 +12,13 @@
     "access": "restricted"
   },
   "scripts": {
-    "postinstall": "electron-rebuild -w better-sqlite3",
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
     "build:extensions": "node scripts/build-extensions.cjs",
     "build:remote": "vite build --config vite.config.remote.ts",
-    "dev": "npm run build:extensions && npm run build:remote && electron-vite dev",
+    "dev": "electron-rebuild -f -w better-sqlite3 && npm run build:extensions && npm run build:remote && electron-vite dev",
     "build": "npm run build:extensions && npm run build:remote && electron-vite build",
     "preview": "electron-vite preview",
+    "pretest": "npm rebuild better-sqlite3",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

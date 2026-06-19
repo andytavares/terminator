@@ -1942,6 +1942,103 @@
   border-bottom: none;
 }
 
+/* ── Standalone note window ──────────────────────────────────────────────── */
+
+.notepad-window {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--tm-bg, #1a1a1a);
+  color: var(--tm-text, #e0e0e0);
+}
+
+.notepad-window__titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--tm-bg-sidebar, #141414);
+  flex-shrink: 0;
+  min-height: 40px;
+  -webkit-app-region: drag;
+  gap: 12px;
+}
+
+.notepad-window__title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tm-text, #e0e0e0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-app-region: drag;
+  flex: 1;
+  min-width: 0;
+}
+
+.notepad-window__titlebar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
+.notepad-window__tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.notepad-window__tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.notepad-window__status {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+  min-width: 48px;
+  text-align: right;
+}
+
+.notepad-window__status--saved {
+  color: rgba(100, 200, 100, 0.7);
+}
+.notepad-window__status--error {
+  color: rgba(255, 100, 100, 0.8);
+}
+
+.notepad-window__body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.notepad-window__body .notepad-view__editor-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.notepad-window__body .notepad-view__comments {
+  flex-shrink: 0;
+}
+
+.notepad-window-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+}
+
 .notepad-search-overlay__result--selected,
 .notepad-search-overlay__result:hover {
   background: rgba(255, 255, 255, 0.05);

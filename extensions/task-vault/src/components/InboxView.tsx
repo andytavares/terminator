@@ -9,6 +9,7 @@ import { useVaultDataStore } from '../stores/vault-data.store'
 export function InboxView(): React.JSX.Element {
   const [items, setItems] = useState<IndexedTask[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [initialized, setInitialized] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [newTaskText, setNewTaskText] = useState('')
   const [adding, setAdding] = useState(false)
@@ -32,6 +33,7 @@ export function InboxView(): React.JSX.Element {
       setError(String(err))
     } finally {
       setIsLoading(false)
+      setInitialized(true)
     }
   }
 
@@ -68,7 +70,7 @@ export function InboxView(): React.JSX.Element {
     setView('daily')
   }
 
-  if (isLoading) return <div className="inbox-view__loading">Loading inbox…</div>
+  if (isLoading && !initialized) return <div className="inbox-view__loading">Loading inbox…</div>
   if (error) return <div className="inbox-view__error">{error}</div>
 
   return (

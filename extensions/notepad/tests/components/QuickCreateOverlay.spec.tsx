@@ -9,6 +9,7 @@ const mockInvoke = vi.fn().mockResolvedValue({
 Object.defineProperty(window, 'electronAPI', {
   value: {
     extensionBridge: { invoke: mockInvoke },
+    extension: { getSettingsValues: vi.fn().mockResolvedValue({ values: {} }) },
   },
   writable: true,
   configurable: true,

@@ -573,13 +573,13 @@ export function TaskVaultView(): React.JSX.Element {
         ) : (
           <div className="task-vault-view__main">
             <div className="task-vault-view__list">
-              {activeView === 'daily' && isLoading && (
+              {activeView === 'daily' && isLoading && !todayLog && (
                 <div className="task-vault-view__loading">Loading…</div>
               )}
               {activeView === 'daily' && error && (
                 <div className="task-vault-view__error">{error}</div>
               )}
-              {activeView === 'daily' && !isLoading && !error && todayLog && (
+              {activeView === 'daily' && !error && todayLog && (
                 <DailyLog
                   log={todayLog}
                   rolledOverTaskIds={rolledOverTaskIds}
@@ -608,7 +608,7 @@ export function TaskVaultView(): React.JSX.Element {
                 />
               )}
               {activeView === 'daily' && !isLoading && !error && !todayLog && (
-                <div className="task-vault-view__empty">Loading…</div>
+                <div className="task-vault-view__loading">Loading…</div>
               )}
               {activeView === 'inbox' && <InboxView />}
               {activeView === 'projects' && <ProjectsBrowser />}

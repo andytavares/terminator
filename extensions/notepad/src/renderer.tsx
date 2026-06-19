@@ -2,6 +2,7 @@ import React from 'react'
 import { FileText } from 'lucide-react'
 import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
 import { NotepadView } from './components/NotepadView'
+import { NoteWindowView } from './components/NoteWindowView'
 import { QuickCreateOverlay } from './components/QuickCreateOverlay'
 import { useNotesStore } from './stores/notes.store'
 
@@ -14,6 +15,8 @@ registry.registerGlobalTab({
   component: NotepadView,
   permanent: true,
 })
+
+registry.registerWindowView('notepad-note', NoteWindowView)
 
 // Overlay renders inside the main window — visibility controlled by store
 registry.registerOverlay(QuickCreateOverlay)

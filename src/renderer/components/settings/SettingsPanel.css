@@ -496,21 +496,24 @@
   color: #fff;
 }
 
-/* Folder picker row */
-.ext-folder-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.ext-folder-row__input {
-  width: 160px;
+/* Folder picker */
+.ext-folder-row__path {
+  display: block;
+  margin-top: 2px;
   font-family: var(--font-mono);
   font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-folder-row__placeholder {
+  font-style: italic;
 }
 
 .ext-folder-row__btn {
   white-space: nowrap;
   flex-shrink: 0;
+  align-self: center;
 }

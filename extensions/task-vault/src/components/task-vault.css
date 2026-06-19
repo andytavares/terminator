@@ -185,6 +185,7 @@
 }
 
 .daily-log__task {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--tv-space-2);
@@ -240,7 +241,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  align-self: flex-start;
+  align-self: center;
   color: var(--tv-status-open);
   width: 22px;
   height: 22px;
@@ -256,7 +257,6 @@
 }
 
 .daily-log__task-line1 {
-  position: relative;
   display: flex;
   align-items: center;
   min-height: 22px;
@@ -3753,7 +3753,7 @@
   cursor: pointer;
   border-radius: 50%;
   flex-shrink: 0;
-  align-self: flex-start;
+  align-self: center;
   color: var(--tv-status-open);
   transition:
     background 120ms ease-out,

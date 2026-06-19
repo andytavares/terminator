@@ -321,6 +321,11 @@ function ExtensionSettingRow({
       <label className="extension-setting-row__label">
         {def.label}
         {def.description && <span className="extension-setting-row__desc">{def.description}</span>}
+        {def.type === 'folder' && (
+          <span className="ext-folder-row__path">
+            {localValue || <span className="ext-folder-row__placeholder">Not set</span>}
+          </span>
+        )}
       </label>
       {def.type === 'boolean' ? (
         <button
@@ -343,17 +348,9 @@ function ExtensionSettingRow({
           ))}
         </div>
       ) : def.type === 'folder' ? (
-        <div className="ext-folder-row">
-          <input
-            className="extension-setting-row__input ext-folder-row__input"
-            type="text"
-            value={localValue}
-            onChange={(e) => handleChange(e.target.value)}
-          />
-          <button className="ext-btn ext-folder-row__btn" onClick={() => void handleFolderPick()}>
-            Choose…
-          </button>
-        </div>
+        <button className="ext-btn ext-folder-row__btn" onClick={() => void handleFolderPick()}>
+          Choose…
+        </button>
       ) : (
         <input
           className="extension-setting-row__input"

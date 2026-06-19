@@ -291,13 +291,19 @@ export async function openNoteInWindow(payload: unknown): Promise<Record<string,
   const mainWindow = BrowserWindow.getAllWindows()[0]
   if (!mainWindow) return { error: 'NO_MAIN_WINDOW' }
 
-  const url = mainWindow.webContents.getURL()
+  // Build a standalone URL with view=notepad-note so only the note editor renders
+  const baseUrl = mainWindow.webContents.getURL()
+  const urlObj = new URL(baseUrl)
+  urlObj.searchParams.set('view', 'notepad-note')
+  urlObj.searchParams.set('noteId', parsed.data.id)
+  const noteUrl = urlObj.toString()
+
   // electron-vite builds preload to out/preload/index.js (mirrors package.json "main")
   const preload = join(app.getAppPath(), 'out', 'preload', 'index.js')
 
   const win = new BrowserWindow({
-    width: 1000,
-    height: 720,
+    width: 900,
+    height: 700,
     webPreferences: {
       preload,
       contextIsolation: true,
@@ -306,10 +312,7 @@ export async function openNoteInWindow(payload: unknown): Promise<Record<string,
   })
 
   win
-    .loadURL(url)
-    .then(() => {
-      win.webContents.send('terminator.notepad:selectNote', { id: parsed.data.id })
-    })
+    .loadURL(noteUrl)
     .catch((err) => console.error('[notepad] openNoteInWindow: failed to load', err))
 
   return { data: { ok: true } }

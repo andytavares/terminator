@@ -47,6 +47,23 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
   useEffect(() => {
     if (!showQuickCreate) return
     const t = setTimeout(() => titleRef.current?.focus(), 50)
+    // Load default tags from settings
+    window.electronAPI.extension
+      .getSettingsValues()
+      .then((result) => {
+        const values = (result as { values: Record<string, unknown> }).values
+        const raw = values['terminator.notepad.defaultTags']
+        if (typeof raw === 'string' && raw.trim()) {
+          const defaults = raw
+            .split(',')
+            .map((t) => t.trim().toLowerCase())
+            .filter(Boolean)
+          if (defaults.length > 0) setTags(defaults)
+        }
+      })
+      .catch(() => {
+        /* ignore */
+      })
     return () => clearTimeout(t)
   }, [showQuickCreate])
 
