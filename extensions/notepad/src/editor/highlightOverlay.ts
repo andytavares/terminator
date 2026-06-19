@@ -87,14 +87,22 @@ export const highlightOverlayPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
+      const anchorsChanged =
+        update.startState.field(commentAnchorField) !== update.state.field(commentAnchorField)
+
       if (
         update.docChanged ||
         update.viewportChanged ||
         update.geometryChanged ||
-        update.startState.field(commentAnchorField) !== update.state.field(commentAnchorField) ||
         update.startState.field(hoveredAnchorField) !== update.state.field(hoveredAnchorField)
       ) {
         this.render(update.view)
+      }
+
+      if (anchorsChanged) {
+        // Defer until CM has flushed the decoration DOM so querySelectorAll finds the spans
+        const view = update.view
+        requestAnimationFrame(() => this.render(view))
       }
     }
 

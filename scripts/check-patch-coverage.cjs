@@ -32,6 +32,7 @@ const COVERAGE_EXCLUDED_PATTERNS = [
   /extensions\/[^/]+\/src\/schemas\/project\.schema\.ts$/,
   /extensions\/[^/]+\/src\/types\//, // pure TypeScript type declarations — no executable code
   /extensions\/[^/]+\/src\/providers\/adapter\.ts$/, // interface-only adapter contract
+  /extensions\/[^/]+\/src\/editor\/highlightOverlay\.ts$/, // DOM-only ViewPlugin, excluded in vitest.config.ts
   /src\/shared\/types\//,
   /\.d\.ts$/,
   /vitest\.config\.ts$/, // test runner config, not application code
