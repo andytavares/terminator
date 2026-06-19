@@ -30,6 +30,7 @@ vi.mock('electron', () => ({
 }))
 
 import { registerProjectsIpcHandlers } from '../../src/ipc/projects.ipc'
+import { getDb } from '../../src/vault/db'
 
 const makeProjectRow = (overrides: Record<string, unknown> = {}) => ({
   id: 'proj-1',
@@ -426,5 +427,16 @@ describe('registerProjectsIpcHandlers dispose (lines 229-232)', () => {
     expect(removedChannels).toContain('task-vault:projects:update-area')
     expect(removedChannels).toContain('task-vault:projects:update-deadline')
     expect(removedChannels).toContain('task-vault:projects:rename')
+  })
+})
+
+describe('handle() catch — DB not initialized', () => {
+  it('returns { error } from projects:list instead of throwing when getDb throws', async () => {
+    vi.mocked(getDb).mockImplementationOnce(() => {
+      throw new Error('VaultDB not initialized')
+    })
+    const handler = getHandler('task-vault:projects:list')
+    const result = await handler({}, {})
+    expect(result).toMatchObject({ error: 'VaultDB not initialized' })
   })
 })

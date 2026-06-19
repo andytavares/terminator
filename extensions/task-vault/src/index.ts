@@ -68,6 +68,10 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     setSchedulerTick(scheduler.tick)
   } catch (err) {
     console.error('[task-vault] Failed to initialize SQLite DB:', err)
+    api.notifications.showToast(
+      'error',
+      'Task Vault: database failed to open. Restart the app — if the problem persists, check the logs.'
+    )
   }
 
   // Weekly review nudge

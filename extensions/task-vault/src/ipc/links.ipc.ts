@@ -14,7 +14,13 @@ export function registerLinksIpcHandlers(): () => void {
     channel: string,
     fn: (event: Electron.IpcMainInvokeEvent, payload: unknown) => Promise<unknown>
   ) {
-    ipcMain.handle(channel, fn)
+    ipcMain.handle(channel, async (event, payload) => {
+      try {
+        return await fn(event, payload)
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : String(err) }
+      }
+    })
     channels.push(channel)
   }
 

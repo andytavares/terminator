@@ -7,26 +7,45 @@ import { backfillRecurringTasks } from './ensure-next-occurrence.js'
 export { randomUUID }
 
 let _db: Database.Database | null = null
+let _initError: Error | null = null
 
 export function initDb(userData: string): Database.Database {
-  fs.mkdirSync(userData, { recursive: true })
-  const dbPath = path.join(userData, 'vault.db')
-  _db = new Database(dbPath)
-  _db.pragma('journal_mode = WAL')
-  _db.pragma('foreign_keys = ON')
-  applySchema(_db)
-  applyMigrations(_db)
-  // Startup gap-fill: create any missing future occurrences for recurring tasks
+  _initError = null
   try {
-    backfillRecurringTasks(_db)
-  } catch {
-    // Non-fatal: gap-fill runs best-effort; individual task errors are caught inside
+    fs.mkdirSync(userData, { recursive: true })
+    const dbPath = path.join(userData, 'vault.db')
+    _db = new Database(dbPath)
+    _db.pragma('journal_mode = WAL')
+    _db.pragma('foreign_keys = ON')
+    applySchema(_db)
+    applyMigrations(_db)
+    // Startup gap-fill: create any missing future occurrences for recurring tasks
+    try {
+      backfillRecurringTasks(_db)
+    } catch {
+      // Non-fatal: gap-fill runs best-effort; individual task errors are caught inside
+    }
+    return _db
+  } catch (err) {
+    // If anything in the init sequence fails, close the DB so getDb() stays null
+    if (_db) {
+      try {
+        _db.close()
+      } catch {
+        // ignore close errors during cleanup
+      }
+      _db = null
+    }
+    _initError = err instanceof Error ? err : new Error(String(err))
+    throw _initError
   }
-  return _db
 }
 
 export function getDb(): Database.Database {
-  if (!_db) throw new Error('VaultDB not initialized — call initDb first')
+  if (!_db) {
+    const detail = _initError ? _initError.message : 'call initDb first'
+    throw new Error(`VaultDB not initialized — ${detail}`)
+  }
   return _db
 }
 
