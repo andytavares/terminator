@@ -3,9 +3,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 
-// jsdom provides sessionStorage — reset between tests
+// jsdom provides localStorage — reset between tests
 beforeEach(() => {
-  sessionStorage.clear()
+  localStorage.clear()
   mockFetch.mockReset()
 })
 
@@ -14,17 +14,17 @@ afterEach(() => {
 })
 
 describe('remote-client token helpers', () => {
-  it('setToken persists to sessionStorage and getToken returns it', async () => {
+  it('setToken persists to localStorage and getToken returns it', async () => {
     const { setToken } = await import('../../../src/renderer-remote/api/remote-client')
     setToken('abc123')
-    expect(sessionStorage.getItem('remote_token')).toBe('abc123')
+    expect(localStorage.getItem('remote_token')).toBe('abc123')
   })
 
-  it('clearToken removes the token from sessionStorage', async () => {
+  it('clearToken removes the token from localStorage', async () => {
     const { setToken, clearToken } = await import('../../../src/renderer-remote/api/remote-client')
     setToken('abc123')
     clearToken()
-    expect(sessionStorage.getItem('remote_token')).toBeNull()
+    expect(localStorage.getItem('remote_token')).toBeNull()
   })
 })
 
@@ -130,8 +130,32 @@ describe('listProjects', () => {
   })
 })
 
+describe('listTerminals', () => {
+  it('GET /api/terminals returns terminal session array', async () => {
+    const terminals = [{ sessionId: 's1', cwd: '/tmp', createdAt: '2026-06-19T10:00:00.000Z' }]
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => terminals })
+    const { listTerminals } = await import('../../../src/renderer-remote/api/remote-client')
+    const result = await listTerminals()
+    expect(result).toEqual(terminals)
+    expect(mockFetch).toHaveBeenCalledWith('/api/terminals', expect.anything())
+  })
+
+  it('returns empty array when no terminals are active', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => [] })
+    const { listTerminals } = await import('../../../src/renderer-remote/api/remote-client')
+    const result = await listTerminals()
+    expect(result).toEqual([])
+  })
+
+  it('throws when response is not ok', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
+    const { listTerminals } = await import('../../../src/renderer-remote/api/remote-client')
+    await expect(listTerminals()).rejects.toThrow('listTerminals failed')
+  })
+})
+
 describe('Authorization header', () => {
-  it('includes Bearer token from sessionStorage in requests', async () => {
+  it('includes Bearer token from localStorage in requests', async () => {
     const { setToken, listWorkspaces } = await import(
       '../../../src/renderer-remote/api/remote-client'
     )

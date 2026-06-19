@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Settings, Download, Upload, Kanban, List, ChevronDown } from 'lucide-react'
+import {
+  X,
+  Settings,
+  Download,
+  Upload,
+  Kanban,
+  List,
+  ChevronDown,
+  CalendarDays,
+} from 'lucide-react'
 import { createPortal } from 'react-dom'
 import './task-vault.css'
 import { notify } from '../utils/notify'
@@ -278,6 +287,7 @@ export function TaskVaultView(): React.JSX.Element {
     staleDaysThreshold,
   } = useVaultStore()
   const [showDataTools, setShowDataTools] = useState(false)
+  const [showCalendar, setShowCalendar] = useState(true)
   const [availableContexts, setAvailableContexts] = useState<string[]>([])
   const [contextMenuOpen, setContextMenuOpen] = useState(false)
   const contextMenuRef = useRef<HTMLDivElement>(null)
@@ -341,9 +351,13 @@ export function TaskVaultView(): React.JSX.Element {
     if (task) {
       setSelectedTaskId(pendingTaskId)
       setSelectedTaskText(task.text)
+      clearPendingTask()
+    } else if (!isLoading) {
+      // Data has finished loading but task wasn't found — stale/deleted task, clear to avoid looping
+      clearPendingTask()
     }
-    clearPendingTask()
-  }, [pendingTaskId, todayLog, clearPendingTask])
+    // If still loading: wait for todayLog to update with the correct date's data
+  }, [pendingTaskId, todayLog, isLoading, clearPendingTask])
 
   useEffect(() => {
     loadToday()
@@ -558,6 +572,15 @@ export function TaskVaultView(): React.JSX.Element {
                   </div>
                 )}
               </div>
+              {activeView === 'daily' && (
+                <button
+                  className={`tv-btn tv-btn--ghost task-vault-view__tools-btn${showCalendar ? ' tv-btn--active' : ''}`}
+                  onClick={() => setShowCalendar((v) => !v)}
+                  title={showCalendar ? 'Hide calendar' : 'Show calendar'}
+                >
+                  <CalendarDays size={14} />
+                </button>
+              )}
               <button
                 className="tv-btn tv-btn--ghost task-vault-view__tools-btn"
                 onClick={() => setShowDataTools(true)}
@@ -626,7 +649,7 @@ export function TaskVaultView(): React.JSX.Element {
                 />
               </>
             )}
-            {activeView === 'daily' && <CalendarDrawer />}
+            {activeView === 'daily' && showCalendar && <CalendarDrawer />}
           </div>
         )}
       </div>

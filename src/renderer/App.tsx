@@ -428,9 +428,11 @@ export function App(): JSX.Element {
       <div className="app-layout">
         <div className="app-body">
           <UnifiedSidebar
-            globalTabs={Array.from(globalTabs.values()).sort(
-              (a, b) => (a.id.startsWith('core.') ? 0 : 1) - (b.id.startsWith('core.') ? 0 : 1)
-            )}
+            globalTabs={Array.from(globalTabs.values()).sort((a, b) => {
+              const weight = (t: typeof a) =>
+                t.sortOrder !== undefined ? t.sortOrder : t.id.startsWith('core.') ? 0 : 1
+              return weight(a) - weight(b)
+            })}
             activeGlobalTabId={activeGlobalTabId}
             onSelectGlobalTab={(id) => setActiveGlobalTab(id === activeGlobalTabId ? null : id)}
             activeWorkspaceTabId={activeWorkspaceTabId}

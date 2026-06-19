@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 const mockInvoke = vi.fn()
 const mockLoadDate = vi.fn()
 const mockLoadToday = vi.fn()
+const mockNavigateToTask = vi.fn()
 
 vi.mock('../../src/stores/vault.store', () => ({
   useVaultStore: (
@@ -24,6 +25,12 @@ vi.mock('../../src/stores/vault.store', () => ({
     }
     if (sel) return sel(store)
     return store
+  },
+}))
+
+vi.mock('../../src/stores/vault-nav.store', () => ({
+  useVaultNavStore: {
+    getState: () => ({ navigateToTask: mockNavigateToTask }),
   },
 }))
 
@@ -70,7 +77,7 @@ describe('CalendarDrawer', () => {
     })
   })
 
-  it('shows day task list and Go button when a day cell is clicked', async () => {
+  it('navigates to today and shows task list when today cell is clicked', async () => {
     const user = userEvent.setup()
     const today = new Date()
     const pad = (n: number) => String(n).padStart(2, '0')
@@ -98,13 +105,13 @@ describe('CalendarDrawer', () => {
     await waitFor(() => screen.getByTitle(todayStr))
     await user.click(screen.getByTitle(todayStr))
 
+    expect(mockLoadToday).toHaveBeenCalled()
     await waitFor(() => {
       expect(screen.getByText('Test task')).toBeTruthy()
-      expect(screen.getByTitle('Go to this day')).toBeTruthy()
     })
   })
 
-  it('calls loadToday when Go is clicked for today', async () => {
+  it('calls navigateToTask when a task in the day panel is clicked', async () => {
     const user = userEvent.setup()
     const today = new Date()
     const pad = (n: number) => String(n).padStart(2, '0')
@@ -115,7 +122,15 @@ describe('CalendarDrawer', () => {
         return Promise.resolve({ days: [{ date: todayStr, status: 'done', count: 1 }] })
       }
       if (channel === 'task-vault:vault:get-daily') {
-        return Promise.resolve({ date: todayStr, tasks: [], events: [], notes: [], exists: true })
+        return Promise.resolve({
+          date: todayStr,
+          tasks: [
+            { id: 'task-abc', text: 'My task', status: 'open', metadata: {}, terminatorLinks: [] },
+          ],
+          events: [],
+          notes: [],
+          exists: true,
+        })
       }
       return Promise.resolve({})
     })
@@ -123,10 +138,10 @@ describe('CalendarDrawer', () => {
     await renderDrawer()
     await waitFor(() => screen.getByTitle(todayStr))
     await user.click(screen.getByTitle(todayStr))
-    await waitFor(() => screen.getByTitle('Go to this day'))
-    await user.click(screen.getByTitle('Go to this day'))
+    await waitFor(() => screen.getByText('My task'))
+    await user.click(screen.getByText('My task'))
 
-    expect(mockLoadToday).toHaveBeenCalled()
+    expect(mockNavigateToTask).toHaveBeenCalledWith('task-abc', todayStr)
   })
 
   it('navigates to previous month on prev button click', async () => {

@@ -21,6 +21,7 @@ export default defineConfig({
     environmentMatchGlobs: [
       ['tests/unit/**/*.spec.tsx', 'jsdom'],
       ['tests/unit/renderer-remote/**/*.spec.ts', 'jsdom'],
+      ['tests/unit/renderer-remote/mobile/**/*.spec.ts', 'jsdom'],
       ['tests/unit/config/**/*.spec.ts', 'node'],
       ['extensions/*/tests/unit/**/*.spec.tsx', 'jsdom'],
       ['extensions/*/tests/components/**/*.spec.tsx', 'jsdom'],
@@ -41,6 +42,7 @@ export default defineConfig({
       exclude: [
         'vitest.config.ts',
         'src/renderer/index.tsx',
+        'src/renderer-remote/mobile.main.tsx',
         'src/main/index.ts',
         'src/main/preload.ts',
         'extensions/*/src/index.ts',

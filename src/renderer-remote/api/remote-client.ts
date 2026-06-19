@@ -1,15 +1,15 @@
 const TOKEN_KEY = 'remote_token'
 
 function getToken(): string {
-  return sessionStorage.getItem(TOKEN_KEY) ?? ''
+  return localStorage.getItem(TOKEN_KEY) ?? ''
 }
 
 export function setToken(token: string): void {
-  sessionStorage.setItem(TOKEN_KEY, token)
+  localStorage.setItem(TOKEN_KEY, token)
 }
 
 export function clearToken(): void {
-  sessionStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(TOKEN_KEY)
 }
 
 async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -66,6 +66,18 @@ export interface Project {
   name: string
   worktreePath?: string
   gitBranch?: string
+}
+
+export interface TerminalSession {
+  sessionId: string
+  cwd: string
+  createdAt: string
+}
+
+export async function listTerminals(): Promise<TerminalSession[]> {
+  const res = await apiFetch('/api/terminals')
+  if (!res.ok) throw new Error(`listTerminals failed: ${res.status}`)
+  return res.json()
 }
 
 export async function listWorkspaces(): Promise<Workspace[]> {

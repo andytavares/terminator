@@ -237,6 +237,16 @@ export function NoteEditor({
               display: 'block',
               margin: '4px 0',
             },
+            '.notepad-mermaid': {
+              display: 'block',
+              margin: '8px 0',
+              maxWidth: '100%',
+              overflow: 'auto',
+            },
+            '.notepad-mermaid svg': {
+              maxWidth: '100%',
+              height: 'auto',
+            },
           }),
         ],
       }),

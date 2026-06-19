@@ -328,7 +328,8 @@ describe('WS /ws/terminals/:sessionId', () => {
     expect(removeSpy).toHaveBeenCalled()
   })
 
-  it('kills PTY and removes session when last subscriber disconnects', async () => {
+  it('kills PTY and removes session after grace period when last subscriber disconnects', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     const sessionId = await createSession()
     const ticketRes = await wsApp.inject({
       method: 'POST',
@@ -344,10 +345,60 @@ describe('WS /ws/terminals/:sessionId', () => {
       setTimeout(() => reject(new Error('timeout')), 2000)
     })
 
+    // Grace period hasn't elapsed — PTY should still be alive
     await new Promise<void>((r) => setTimeout(r, 50))
+    expect(mockPtyManager.kill).not.toHaveBeenCalled()
+
+    // Advance past 30-second grace period
+    vi.advanceTimersByTime(31_000)
+    await Promise.resolve()
+
     expect(mockPtyManager.kill).toHaveBeenCalledWith(sessionId)
     const getRes = await wsApp.inject({ method: 'GET', url: `/api/terminals/${sessionId}` })
     expect(getRes.statusCode).toBe(404)
+
+    vi.useRealTimers()
+  })
+
+  it('cancels grace timer when client reconnects before 30s, preventing stale kill', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const sessionId = await createSession()
+
+    const getTicket = async () => {
+      const res = await wsApp.inject({
+        method: 'POST',
+        url: `/api/terminals/${sessionId}/ws-ticket`,
+      })
+      return (JSON.parse(res.body) as { ticket: string }).ticket
+    }
+
+    // First connect then disconnect — starts grace timer
+    const ticket1 = await getTicket()
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`${baseUrl}/ws/terminals/${sessionId}?ticket=${ticket1}`)
+      ws.on('open', () => setTimeout(() => ws.close(), 20))
+      ws.on('close', resolve)
+      ws.on('error', reject)
+      setTimeout(() => reject(new Error('timeout')), 2000)
+    })
+    await new Promise<void>((r) => setTimeout(r, 50))
+    expect(mockPtyManager.kill).not.toHaveBeenCalled()
+
+    // Reconnect within grace window — should cancel the timer
+    const ticket2 = await getTicket()
+    await new Promise<void>((resolve, reject) => {
+      const ws2 = new WebSocket(`${baseUrl}/ws/terminals/${sessionId}?ticket=${ticket2}`)
+      ws2.on('open', resolve)
+      ws2.on('error', reject)
+      setTimeout(() => reject(new Error('timeout')), 2000)
+    })
+
+    // Advance past original 30s window — PTY must NOT be killed (timer was cancelled)
+    vi.advanceTimersByTime(31_000)
+    await Promise.resolve()
+    expect(mockPtyManager.kill).not.toHaveBeenCalled()
+
+    vi.useRealTimers()
   })
 
   it('forwards messages from primary subscriber to ptyManager', async () => {
@@ -432,5 +483,50 @@ describe('tilde expansion in cwd', () => {
     })
     expect(res.statusCode).toBe(201)
     expect(mockPtyManager.spawn.mock.calls[0][1]).toBe('/absolute/path')
+  })
+})
+
+describe('GET /api/terminals', () => {
+  it('returns empty array when no sessions are active', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/terminals' })
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body)).toEqual([])
+  })
+
+  it('returns all active sessions with sessionId, cwd, and createdAt', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/terminals',
+      payload: { cwd: '/tmp/a', type: 'human', tabTitle: 'A' },
+    })
+    await app.inject({
+      method: 'POST',
+      url: '/api/terminals',
+      payload: { cwd: '/tmp/b', type: 'human', tabTitle: 'B' },
+    })
+    const res = await app.inject({ method: 'GET', url: '/api/terminals' })
+    expect(res.statusCode).toBe(200)
+    const sessions = JSON.parse(res.body) as { sessionId: string; cwd: string; createdAt: string }[]
+    expect(sessions).toHaveLength(2)
+    const cwds = sessions.map((s) => s.cwd).sort()
+    expect(cwds).toEqual(['/tmp/a', '/tmp/b'])
+    for (const s of sessions) {
+      expect(s.sessionId).toBeTruthy()
+      expect(s.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    }
+  })
+
+  it('excludes sessions that have been deleted', async () => {
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/terminals',
+      payload: { cwd: '/tmp/del', type: 'human', tabTitle: 'Del' },
+    })
+    const { sessionId } = JSON.parse(createRes.body)
+    await app.inject({ method: 'DELETE', url: `/api/terminals/${sessionId}` })
+    const res = await app.inject({ method: 'GET', url: '/api/terminals' })
+    expect(res.statusCode).toBe(200)
+    const sessions = JSON.parse(res.body) as { sessionId: string }[]
+    expect(sessions.find((s) => s.sessionId === sessionId)).toBeUndefined()
   })
 })

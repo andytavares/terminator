@@ -275,6 +275,96 @@ describe('RemoteServer', () => {
     })
   })
 
+  describe('POST /api/mobile-ticket', () => {
+    it('returns 201 with a ticket when authenticated', async () => {
+      const res = await remoteServer.inject({
+        method: 'POST',
+        url: '/api/mobile-ticket',
+        headers: { authorization: 'Bearer anypassword' },
+      })
+      expect(res.statusCode).toBe(201)
+      const body = JSON.parse(res.body) as { ticket: string }
+      expect(typeof body.ticket).toBe('string')
+      expect(body.ticket.length).toBeGreaterThan(0)
+    })
+
+    it('returns 401 without credentials', async () => {
+      const res = await remoteServer.inject({ method: 'POST', url: '/api/mobile-ticket' })
+      expect(res.statusCode).toBe(401)
+    })
+  })
+
+  describe('GET /mobile/', () => {
+    it('redirects to / when no ticket is provided', async () => {
+      const res = await remoteServer.inject({ method: 'GET', url: '/mobile/' })
+      expect(res.statusCode).toBe(302)
+      expect(res.headers.location).toBe('/')
+    })
+
+    it('redirects to / when consumeTicket returns null (invalid/expired ticket)', async () => {
+      mockTicketStore.consumeTicket.mockReturnValueOnce(null)
+      const res = await remoteServer.inject({ method: 'GET', url: '/mobile/?t=bogus' })
+      expect(res.statusCode).toBe(302)
+      expect(res.headers.location).toBe('/')
+    })
+
+    it('returns 200 and sets mobile-session cookie when ticket is valid', async () => {
+      vi.mocked(readFileSync).mockReturnValueOnce('<html><head></head></html>')
+      mockTicketStore.consumeTicket.mockReturnValueOnce('__mobile__')
+      const res = await remoteServer.inject({ method: 'GET', url: '/mobile/?t=valid-ticket' })
+      expect(res.statusCode).toBe(200)
+      expect(res.headers['content-type']).toContain('text/html')
+      const setCookie = res.headers['set-cookie'] as string | string[]
+      const cookieStr = Array.isArray(setCookie) ? setCookie.join('; ') : (setCookie ?? '')
+      expect(cookieStr).toContain('mobile-session=')
+      expect(cookieStr).toContain('HttpOnly')
+    })
+
+    it('returns 503 when renderer is not built (valid ticket)', async () => {
+      mockTicketStore.consumeTicket.mockReturnValueOnce('__mobile__')
+      vi.mocked(readFileSync).mockImplementationOnce(() => {
+        throw new Error('ENOENT')
+      })
+      const res = await remoteServer.inject({ method: 'GET', url: '/mobile/?t=valid-ticket' })
+      expect(res.statusCode).toBe(503)
+    })
+  })
+
+  describe('/mobile/* static asset session gate', () => {
+    it('returns 403 for /mobile/assets/* without a session cookie', async () => {
+      const res = await remoteServer.inject({ method: 'GET', url: '/mobile/assets/main.js' })
+      expect(res.statusCode).toBe(403)
+    })
+
+    it('returns 403 for /mobile/assets/* with an invalid session token', async () => {
+      const res = await remoteServer.inject({
+        method: 'GET',
+        url: '/mobile/assets/main.js',
+        headers: { cookie: 'mobile-session=bad-token' },
+      })
+      expect(res.statusCode).toBe(403)
+    })
+
+    it('allows /mobile/assets/* with a valid mobile-session cookie', async () => {
+      vi.mocked(readFileSync).mockReturnValueOnce('<html><head></head></html>')
+      mockTicketStore.consumeTicket.mockReturnValueOnce('__mobile__')
+      const ticketResp = await remoteServer.inject({
+        method: 'GET',
+        url: '/mobile/?t=valid-ticket',
+      })
+      const setCookie = ticketResp.headers['set-cookie'] as string | string[]
+      const cookieStr = Array.isArray(setCookie) ? setCookie[0] : (setCookie ?? '')
+      const token = cookieStr.split(';')[0]
+
+      const assetResp = await remoteServer.inject({
+        method: 'GET',
+        url: '/mobile/assets/main.js',
+        headers: { cookie: token },
+      })
+      expect(assetResp.statusCode).not.toBe(403)
+    })
+  })
+
   describe('EADDRINUSE handling', () => {
     it('start() with port in use rejects with PortInUseError', async () => {
       const { createRemoteServer: create2, PortInUseError } = await import(

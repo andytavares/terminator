@@ -11,8 +11,14 @@ let mockOnWindowEvent: ReturnType<typeof vi.fn>
 
 function waitForClose(ws: WebSocket): Promise<void> {
   return new Promise((resolve, reject) => {
-    ws.on('close', resolve)
-    ws.on('error', reject)
+    if (ws.readyState === WebSocket.CLOSED) {
+      resolve()
+      return
+    }
+    // terminate() on the server causes ECONNRESET (error) on the client before or
+    // instead of a clean close frame — resolve on either, not reject on error
+    ws.once('close', resolve)
+    ws.once('error', resolve)
     setTimeout(() => reject(new Error('timeout waiting for close')), 8000)
   })
 }
