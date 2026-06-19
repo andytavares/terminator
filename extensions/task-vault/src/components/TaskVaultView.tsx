@@ -351,9 +351,13 @@ export function TaskVaultView(): React.JSX.Element {
     if (task) {
       setSelectedTaskId(pendingTaskId)
       setSelectedTaskText(task.text)
+      clearPendingTask()
+    } else if (!isLoading) {
+      // Data has finished loading but task wasn't found — stale/deleted task, clear to avoid looping
+      clearPendingTask()
     }
-    clearPendingTask()
-  }, [pendingTaskId, todayLog, clearPendingTask])
+    // If still loading: wait for todayLog to update with the correct date's data
+  }, [pendingTaskId, todayLog, isLoading, clearPendingTask])
 
   useEffect(() => {
     loadToday()

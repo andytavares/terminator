@@ -111,6 +111,10 @@ export async function registerTerminalRoutes(
     }
   )
 
+  // Track pending grace-period teardown timers per session so they can be
+  // cancelled if the same session reconnects before the window expires.
+  const gracePeriodTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
   app.get<{ Params: { sessionId: string }; Querystring: { ticket?: string } }>(
     '/ws/terminals/:sessionId',
     { websocket: true },
@@ -138,6 +142,13 @@ export async function registerTerminalRoutes(
       const accepted = subscriberManager.addSubscriber(sessionId, ws, getMaxSubscribers())
       if (!accepted) return
 
+      // Cancel any pending grace-period teardown — client reconnected in time
+      const pending = gracePeriodTimers.get(sessionId)
+      if (pending !== undefined) {
+        clearTimeout(pending)
+        gracePeriodTimers.delete(sessionId)
+      }
+
       ws.on('message', (msg) => {
         if (subscriberManager.isPrimary(sessionId, ws)) {
           ptyManager.write(sessionId, msg.toString())
@@ -150,12 +161,14 @@ export async function registerTerminalRoutes(
           // Grace period: mobile clients navigate away (unmounting the view) without
           // intending to end the session. Wait 30s before tearing down the PTY so
           // navigating back reconnects to the live process.
-          setTimeout(() => {
+          const timer = setTimeout(() => {
+            gracePeriodTimers.delete(sessionId)
             if (subscriberManager.getCount(sessionId) === 0 && sessions.has(sessionId)) {
               ptyManager.kill(sessionId)
               sessions.delete(sessionId)
             }
           }, 30_000)
+          gracePeriodTimers.set(sessionId, timer)
         }
       })
     }
@@ -163,6 +176,8 @@ export async function registerTerminalRoutes(
 
   return {
     cleanup() {
+      for (const timer of gracePeriodTimers.values()) clearTimeout(timer)
+      gracePeriodTimers.clear()
       for (const sessionId of sessions.keys()) {
         ptyManager.kill(sessionId)
         subscriberManager.destroySession(sessionId)

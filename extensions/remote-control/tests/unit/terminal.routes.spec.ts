@@ -360,6 +360,47 @@ describe('WS /ws/terminals/:sessionId', () => {
     vi.useRealTimers()
   })
 
+  it('cancels grace timer when client reconnects before 30s, preventing stale kill', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const sessionId = await createSession()
+
+    const getTicket = async () => {
+      const res = await wsApp.inject({
+        method: 'POST',
+        url: `/api/terminals/${sessionId}/ws-ticket`,
+      })
+      return (JSON.parse(res.body) as { ticket: string }).ticket
+    }
+
+    // First connect then disconnect — starts grace timer
+    const ticket1 = await getTicket()
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`${baseUrl}/ws/terminals/${sessionId}?ticket=${ticket1}`)
+      ws.on('open', () => setTimeout(() => ws.close(), 20))
+      ws.on('close', resolve)
+      ws.on('error', reject)
+      setTimeout(() => reject(new Error('timeout')), 2000)
+    })
+    await new Promise<void>((r) => setTimeout(r, 50))
+    expect(mockPtyManager.kill).not.toHaveBeenCalled()
+
+    // Reconnect within grace window — should cancel the timer
+    const ticket2 = await getTicket()
+    await new Promise<void>((resolve, reject) => {
+      const ws2 = new WebSocket(`${baseUrl}/ws/terminals/${sessionId}?ticket=${ticket2}`)
+      ws2.on('open', resolve)
+      ws2.on('error', reject)
+      setTimeout(() => reject(new Error('timeout')), 2000)
+    })
+
+    // Advance past original 30s window — PTY must NOT be killed (timer was cancelled)
+    vi.advanceTimersByTime(31_000)
+    await Promise.resolve()
+    expect(mockPtyManager.kill).not.toHaveBeenCalled()
+
+    vi.useRealTimers()
+  })
+
   it('forwards messages from primary subscriber to ptyManager', async () => {
     const sessionId = await createSession()
     const ticketRes = await wsApp.inject({
