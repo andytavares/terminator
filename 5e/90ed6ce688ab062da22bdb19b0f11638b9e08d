@@ -1,0 +1,39 @@
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_691b7cdd284c28::t_76067f272c6ae1 571-579
+  s_691b7cdd284c28::t_c4d507f0de01d6 648
+  s_691b7cdd284c28::t_eb61727929de43 2-9,11
+  s_691b7cdd284c28::t_4ae2e61b731e87 290
+extensions/task-vault/src/components/DateTimePicker.tsx
+  s_691b7cdd284c28::t_92a65efa80a2b9 18-19
+  s_691b7cdd284c28::t_04d92fb896f12f 202
+  s_691b7cdd284c28::t_4d016234a7a00a 237-239
+extensions/task-vault/tests/components/CalendarDrawer.spec.tsx
+  s_691b7cdd284c28::t_b28715d3d22544 9,31-36,80,108,114,125-127,129-133,141-142,144
+extensions/task-vault/src/components/CalendarDrawer.tsx
+  s_691b7cdd284c28::t_c0d82c8ee57817 2,4
+  s_691b7cdd284c28::t_14a21e771e2d31 205,208-209,214
+  s_691b7cdd284c28::t_c7c401d837b5d6 123-124
+  s_691b7cdd284c28::t_5614254b23a6b1 105-106
+extensions/task-vault/src/components/task-vault.css
+  s_691b7cdd284c28::t_0a1b5ff4afeee2 3385-3388
+  s_691b7cdd284c28::t_06403d782a8a61 7089-7096
+  s_691b7cdd284c28::t_b697472db91959 7034-7043
+extensions/task-vault/src/components/SmartTaskInput.tsx
+  s_691b7cdd284c28::t_085c3b8dab69a6 320
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "5e90ed6ce688ab062da22bdb19b0f11638b9e08d",
+  "prompts": {},
+  "sessions": {
+    "s_691b7cdd284c28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc2f31ca-0e76-4d10-8922-c93237fadd53",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
