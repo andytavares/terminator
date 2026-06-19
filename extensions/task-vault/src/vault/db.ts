@@ -15,21 +15,30 @@ export function initDb(userData: string): Database.Database {
   const dbPath = path.join(userData, 'vault.db')
   try {
     _db = new Database(dbPath)
+    _db.pragma('journal_mode = WAL')
+    _db.pragma('foreign_keys = ON')
+    applySchema(_db)
+    applyMigrations(_db)
+    // Startup gap-fill: create any missing future occurrences for recurring tasks
+    try {
+      backfillRecurringTasks(_db)
+    } catch {
+      // Non-fatal: gap-fill runs best-effort; individual task errors are caught inside
+    }
+    return _db
   } catch (err) {
+    // If anything in the init sequence fails, close the DB so getDb() stays null
+    if (_db) {
+      try {
+        _db.close()
+      } catch {
+        // ignore close errors during cleanup
+      }
+      _db = null
+    }
     _initError = err instanceof Error ? err : new Error(String(err))
     throw _initError
   }
-  _db.pragma('journal_mode = WAL')
-  _db.pragma('foreign_keys = ON')
-  applySchema(_db)
-  applyMigrations(_db)
-  // Startup gap-fill: create any missing future occurrences for recurring tasks
-  try {
-    backfillRecurringTasks(_db)
-  } catch {
-    // Non-fatal: gap-fill runs best-effort; individual task errors are caught inside
-  }
-  return _db
 }
 
 export function getDb(): Database.Database {
