@@ -247,6 +247,7 @@ export function NoteList(): React.JSX.Element {
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const tagsRef = useRef<Tag[]>([])
+  const searchGenRef = useRef(0)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [editModal, setEditModal] = useState<EditModalState | null>(null)
   const [archivedExpanded, setArchivedExpanded] = useState(false)
@@ -311,11 +312,13 @@ export function NoteList(): React.JSX.Element {
     }
 
     /* v8 ignore next */
+    const gen = ++searchGenRef.current
     const run = async () => {
       const result = await window.electronAPI.extensionBridge.invoke(
         'terminator.notepad:search.query',
         { query: parts.join(' '), includeArchived: true }
       )
+      if (gen !== searchGenRef.current) return
       const data = (result as { data?: SearchResult[] }).data
       if (data) setSearchResults(data)
     }

@@ -13,6 +13,7 @@ import {
   type SelectionAnchor,
 } from '../editor/NoteEditor'
 import { reanchorComment } from '../editor/reanchor'
+import { commentAnchorField } from '../editor/commentField'
 import type { EditorView } from '@codemirror/view'
 import type { Comment } from '../db/types'
 
@@ -128,10 +129,14 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
     requestAnimationFrame(() => {
       const scrollTop = view.scrollDOM.scrollTop
       const rect = view.scrollDOM.getBoundingClientRect()
+      const livePositions = new Map(view.state.field(commentAnchorField).map((a) => [a.id, a.from]))
       const targets: { id: string; targetTop: number; createdAt: string }[] = []
       for (const c of commentList) {
-        if (c.startOffset !== null && c.parentId === null && c.status !== 'orphaned') {
-          const pos = Math.min(c.startOffset, Math.max(0, view.state.doc.length - 1))
+        if (c.parentId === null && c.status !== 'orphaned') {
+          const livePos = livePositions.get(c.id)
+          const rawPos = livePos !== undefined ? livePos : c.startOffset
+          if (rawPos === null) continue
+          const pos = Math.min(rawPos, Math.max(0, view.state.doc.length - 1))
           try {
             const coords = view.coordsAtPos(pos)
             if (coords)
