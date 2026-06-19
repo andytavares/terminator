@@ -29,13 +29,16 @@ export function App(): JSX.Element {
         setLoading(false)
         return
       }
-      const ticketRes = await fetch('/api/app-ticket', {
+      const isMobile = window.innerWidth < 768
+      const ticketEndpoint = isMobile ? '/api/mobile-ticket' : '/api/app-ticket'
+      const ticketRes = await fetch(ticketEndpoint, {
         method: 'POST',
         headers: { Authorization: `Bearer ${password}` },
       })
       const { ticket } = (await ticketRes.json()) as { ticket: string }
       sessionStorage.setItem('remoteToken', password)
-      location.replace(`/app/?t=${encodeURIComponent(ticket)}`)
+      const dest = isMobile ? '/mobile/' : '/app/'
+      location.replace(`${dest}?t=${encodeURIComponent(ticket)}`)
     } catch {
       setError('Could not connect to server')
       setLoading(false)

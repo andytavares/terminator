@@ -11,6 +11,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         index: resolve(__dirname, 'src/renderer-remote/index.html'),
+        mobile: resolve(__dirname, 'src/renderer-remote/mobile.html'),
         shim: resolve(__dirname, 'src/renderer-remote/electron-api-shim.ts'),
       },
       output: {

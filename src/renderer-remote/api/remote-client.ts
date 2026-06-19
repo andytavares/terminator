@@ -68,6 +68,18 @@ export interface Project {
   gitBranch?: string
 }
 
+export interface TerminalSession {
+  sessionId: string
+  cwd: string
+  createdAt: string
+}
+
+export async function listTerminals(): Promise<TerminalSession[]> {
+  const res = await apiFetch('/api/terminals')
+  if (!res.ok) throw new Error(`listTerminals failed: ${res.status}`)
+  return res.json()
+}
+
 export async function listWorkspaces(): Promise<Workspace[]> {
   const res = await apiFetch('/api/workspaces')
   if (!res.ok) throw new Error(`listWorkspaces failed: ${res.status}`)

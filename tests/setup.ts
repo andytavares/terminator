@@ -11,3 +11,11 @@ vi.mock('*.module.css', () => ({ default: {} }))
 if (typeof window !== 'undefined' && !window.getSelection) {
   window.getSelection = (): Selection | null => null
 }
+
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+}

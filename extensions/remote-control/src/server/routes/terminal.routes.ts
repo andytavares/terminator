@@ -39,6 +39,8 @@ export async function registerTerminalRoutes(
   const { ptyManager, ticketStore, subscriberManager, getMaxSubscribers } = opts
   const sessions = new Map<string, TerminalSession>()
 
+  app.get('/api/terminals', async () => Array.from(sessions.values()))
+
   app.post('/api/terminals', async (request, reply) => {
     const result = CreateTerminalSchema.safeParse(request.body)
     if (!result.success) {

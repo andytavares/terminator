@@ -434,3 +434,48 @@ describe('tilde expansion in cwd', () => {
     expect(mockPtyManager.spawn.mock.calls[0][1]).toBe('/absolute/path')
   })
 })
+
+describe('GET /api/terminals', () => {
+  it('returns empty array when no sessions are active', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/terminals' })
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body)).toEqual([])
+  })
+
+  it('returns all active sessions with sessionId, cwd, and createdAt', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/terminals',
+      payload: { cwd: '/tmp/a', type: 'human', tabTitle: 'A' },
+    })
+    await app.inject({
+      method: 'POST',
+      url: '/api/terminals',
+      payload: { cwd: '/tmp/b', type: 'human', tabTitle: 'B' },
+    })
+    const res = await app.inject({ method: 'GET', url: '/api/terminals' })
+    expect(res.statusCode).toBe(200)
+    const sessions = JSON.parse(res.body) as { sessionId: string; cwd: string; createdAt: string }[]
+    expect(sessions).toHaveLength(2)
+    const cwds = sessions.map((s) => s.cwd).sort()
+    expect(cwds).toEqual(['/tmp/a', '/tmp/b'])
+    for (const s of sessions) {
+      expect(s.sessionId).toBeTruthy()
+      expect(s.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    }
+  })
+
+  it('excludes sessions that have been deleted', async () => {
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/terminals',
+      payload: { cwd: '/tmp/del', type: 'human', tabTitle: 'Del' },
+    })
+    const { sessionId } = JSON.parse(createRes.body)
+    await app.inject({ method: 'DELETE', url: `/api/terminals/${sessionId}` })
+    const res = await app.inject({ method: 'GET', url: '/api/terminals' })
+    expect(res.statusCode).toBe(200)
+    const sessions = JSON.parse(res.body) as { sessionId: string }[]
+    expect(sessions.find((s) => s.sessionId === sessionId)).toBeUndefined()
+  })
+})

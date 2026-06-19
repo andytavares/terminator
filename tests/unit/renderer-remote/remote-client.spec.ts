@@ -130,6 +130,30 @@ describe('listProjects', () => {
   })
 })
 
+describe('listTerminals', () => {
+  it('GET /api/terminals returns terminal session array', async () => {
+    const terminals = [{ sessionId: 's1', cwd: '/tmp', createdAt: '2026-06-19T10:00:00.000Z' }]
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => terminals })
+    const { listTerminals } = await import('../../../src/renderer-remote/api/remote-client')
+    const result = await listTerminals()
+    expect(result).toEqual(terminals)
+    expect(mockFetch).toHaveBeenCalledWith('/api/terminals', expect.anything())
+  })
+
+  it('returns empty array when no terminals are active', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => [] })
+    const { listTerminals } = await import('../../../src/renderer-remote/api/remote-client')
+    const result = await listTerminals()
+    expect(result).toEqual([])
+  })
+
+  it('throws when response is not ok', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
+    const { listTerminals } = await import('../../../src/renderer-remote/api/remote-client')
+    await expect(listTerminals()).rejects.toThrow('listTerminals failed')
+  })
+})
+
 describe('Authorization header', () => {
   it('includes Bearer token from sessionStorage in requests', async () => {
     const { setToken, listWorkspaces } = await import(

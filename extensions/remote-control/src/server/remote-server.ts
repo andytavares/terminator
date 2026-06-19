@@ -72,18 +72,19 @@ export async function createRemoteServer(
   // token → expiresAt (ms). Mirrors the 8-hour cookie lifetime.
   const SESSION_TTL_MS = 8 * 60 * 60 * 1000
   const appSessions = new Map<string, number>()
+  const mobileSessions = new Map<string, number>()
   let sessionCleanupTimer: ReturnType<typeof setInterval> | null = null
 
-  function parseAppSession(cookieHeader: string): string | null {
+  function parseCookieToken(cookieHeader: string, cookieName: string): string | null {
     const match = cookieHeader
       .split(';')
       .map((s) => s.trim())
-      .find((s) => s.startsWith('app-session='))
-    return match ? match.slice('app-session='.length) : null
+      .find((s) => s.startsWith(`${cookieName}=`))
+    return match ? match.slice(`${cookieName}=`.length) : null
   }
 
-  function hasValidSession(cookieHeader: string): boolean {
-    const token = parseAppSession(cookieHeader)
+  function hasValidAppSession(cookieHeader: string): boolean {
+    const token = parseCookieToken(cookieHeader, 'app-session')
     if (!token) return false
     const expiresAt = appSessions.get(token)
     if (expiresAt === undefined) return false
@@ -94,14 +95,37 @@ export async function createRemoteServer(
     return true
   }
 
+  function hasValidMobileSession(cookieHeader: string): boolean {
+    const token = parseCookieToken(cookieHeader, 'mobile-session')
+    if (!token) return false
+    const expiresAt = mobileSessions.get(token)
+    if (expiresAt === undefined) return false
+    if (Date.now() > expiresAt) {
+      mobileSessions.delete(token)
+      return false
+    }
+    return true
+  }
+
+  // hasValidSession is the union of app + mobile sessions (used by auth middleware)
+  function hasValidSession(cookieHeader: string): boolean {
+    return hasValidAppSession(cookieHeader) || hasValidMobileSession(cookieHeader)
+  }
+
   const fastify = Fastify({ logger: false })
 
-  // Gate /app/* static assets behind a session cookie issued on ticket auth
+  // Gate /app/* and /mobile/* static assets behind their respective session cookies
   fastify.addHook('onRequest', async (request, reply) => {
     const pathname = request.url.split('?')[0]
-    if (!pathname.startsWith('/app/') || pathname === '/app/') return
-    if (!hasValidSession(request.headers.cookie ?? '')) {
-      return reply.status(403).send({ error: 'FORBIDDEN' })
+    if (pathname.startsWith('/app/') && pathname !== '/app/') {
+      if (!hasValidAppSession(request.headers.cookie ?? '')) {
+        return reply.status(403).send({ error: 'FORBIDDEN' })
+      }
+    }
+    if (pathname.startsWith('/mobile/') && pathname !== '/mobile/') {
+      if (!hasValidMobileSession(request.headers.cookie ?? '')) {
+        return reply.status(403).send({ error: 'FORBIDDEN' })
+      }
     }
   })
 
@@ -112,10 +136,16 @@ export async function createRemoteServer(
 
   const rendererDir = getRendererDir()
   await fastify.register(staticPlugin, { root: rendererDir, prefix: '/app', decorateReply: false })
+  // Mobile static assets share the same renderer-remote output directory
+  await fastify.register(staticPlugin, {
+    root: loginStaticDir,
+    prefix: '/mobile',
+    decorateReply: false,
+  })
 
   fastify.get<{ Querystring: { t?: string } }>('/app/', async (request, reply) => {
     // Accept an existing valid session cookie (allows page refresh without re-auth)
-    const hasSession = hasValidSession(request.headers.cookie ?? '')
+    const hasSession = hasValidAppSession(request.headers.cookie ?? '')
 
     if (!hasSession) {
       const t = request.query.t ?? ''
@@ -141,8 +171,32 @@ export async function createRemoteServer(
     }
   })
 
+  fastify.get<{ Querystring: { t?: string } }>('/mobile/', async (request, reply) => {
+    const t = request.query.t ?? ''
+    if (!t || !ticketStore.consumeTicket(t, 'mobile')) {
+      return reply.redirect('/')
+    }
+    const sessionToken = randomBytes(32).toString('hex')
+    mobileSessions.set(sessionToken, Date.now() + SESSION_TTL_MS)
+    reply.header(
+      'Set-Cookie',
+      `mobile-session=${sessionToken}; Path=/mobile; HttpOnly; SameSite=Strict; Max-Age=28800`
+    )
+    try {
+      const html = readFileSync(join(loginStaticDir, 'mobile.html'), 'utf8')
+      return reply.type('text/html').send(html)
+    } catch {
+      return reply.status(503).send('Mobile renderer not built. Run: npm run build:remote')
+    }
+  })
+
   fastify.post('/api/app-ticket', async (_request, reply) => {
     const ticket = ticketStore.createTicket('__app__', 'app')
+    return reply.status(201).send({ ticket })
+  })
+
+  fastify.post('/api/mobile-ticket', async (_request, reply) => {
+    const ticket = ticketStore.createTicket('__mobile__', 'mobile')
     return reply.status(201).send({ ticket })
   })
 
@@ -183,6 +237,9 @@ export async function createRemoteServer(
             for (const [token, expiresAt] of appSessions) {
               if (now > expiresAt) appSessions.delete(token)
             }
+            for (const [token, expiresAt] of mobileSessions) {
+              if (now > expiresAt) mobileSessions.delete(token)
+            }
           },
           60 * 60 * 1000
         )
@@ -206,6 +263,7 @@ export async function createRemoteServer(
         sessionCleanupTimer = null
       }
       appSessions.clear()
+      mobileSessions.clear()
       terminalCleanup.cleanup()
       bridgeCleanup.disconnectAll()
       subscriberManager.destroyAll()
@@ -215,6 +273,7 @@ export async function createRemoteServer(
 
     disconnectAllClients() {
       appSessions.clear()
+      mobileSessions.clear()
       // Kill all remote PTYs — password rotation invalidates existing sessions
       terminalCleanup.cleanup()
       bridgeCleanup.disconnectAll()
