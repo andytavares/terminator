@@ -1,0 +1,34 @@
+extensions/notepad/tests/unit/ipc/comments.ipc.spec.ts
+  s_342a3bb060d924::t_34d175fdd60334 335,347,350
+extensions/notepad/tests/unit/ipc/search.ipc.spec.ts
+  s_342a3bb060d924::t_82b8295f9d707c 178-179,188-190
+extensions/notepad/tests/unit/ipc/notes.ipc.spec.ts
+  s_342a3bb060d924::t_014596b2441272 395,407,410
+extensions/notepad/src/ipc/notes.ipc.ts
+  s_342a3bb060d924::t_9b7b104119829a 380-387
+  s_342a3bb060d924::t_2b952cc2fe2c95 366-368
+extensions/notepad/src/ipc/comments.ipc.ts
+  s_342a3bb060d924::t_344211f9e7e4fe 192
+extensions/notepad/src/ipc/export.ipc.ts
+  s_342a3bb060d924::t_9ee9a88b00e266 253,255
+extensions/notepad/tests/unit/ipc/export.ipc.spec.ts
+  s_342a3bb060d924::t_d66ae43ede5951 291,303,306-308
+extensions/notepad/src/ipc/search.ipc.ts
+  s_342a3bb060d924::t_fd563c77640d95 211-213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "485ccb5a591d00503f231ca69f71f6da5e5fa4c4",
+  "prompts": {},
+  "sessions": {
+    "s_342a3bb060d924": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd40730-1532-4616-8e6b-4ba24bd10787",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
