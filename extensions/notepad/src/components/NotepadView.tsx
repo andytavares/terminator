@@ -254,27 +254,33 @@ export function NotepadView(): React.JSX.Element {
     void loadNoteAndComments()
 
     return () => {
-      // Flush pending autosave for this note before switching to another
-      if (autosaveTimer.current) {
+      // Flush pending autosave for this note before switching to another.
+      // Check isDirty first — if the timer already fired but the save is still
+      // in-flight (or failed), autosaveTimer.current may be null while isDirty
+      // is still true, so we must not gate the flush on the timer alone.
+      const { bodyDraft, isDirty } = useEditorStore.getState()
+      if (isDirty) {
+        if (autosaveTimer.current) {
+          clearTimeout(autosaveTimer.current)
+          autosaveTimer.current = null
+        }
+        const n = useNotesStore.getState().notes.find((x) => x.id === selectedNoteId)
+        const headingMatch = /^#{1,6}\s+(.+)/m.exec(bodyDraft)
+        const firstLine = bodyDraft.split('\n').find((l) => l.trim().length > 0)
+        const title = headingMatch
+          ? headingMatch[1].trim()
+          : (firstLine?.trim().slice(0, 120) ?? 'Untitled note')
+        window.electronAPI.extensionBridge
+          .invoke('terminator.notepad:notes.autosave', {
+            id: selectedNoteId,
+            title,
+            body: bodyDraft,
+            tags: n?.tags ?? [],
+          })
+          .catch((err) => console.error('[notepad] flush autosave failed', err))
+      } else if (autosaveTimer.current) {
         clearTimeout(autosaveTimer.current)
         autosaveTimer.current = null
-        const { bodyDraft, isDirty } = useEditorStore.getState()
-        if (isDirty) {
-          const n = useNotesStore.getState().notes.find((x) => x.id === selectedNoteId)
-          const headingMatch = /^#{1,6}\s+(.+)/m.exec(bodyDraft)
-          const firstLine = bodyDraft.split('\n').find((l) => l.trim().length > 0)
-          const title = headingMatch
-            ? headingMatch[1].trim()
-            : (firstLine?.trim().slice(0, 120) ?? 'Untitled note')
-          window.electronAPI.extensionBridge
-            .invoke('terminator.notepad:notes.autosave', {
-              id: selectedNoteId,
-              title,
-              body: bodyDraft,
-              tags: n?.tags ?? [],
-            })
-            .catch((err) => console.error('[notepad] flush autosave failed', err))
-        }
       }
     }
   }, [selectedNoteId, setActiveNote, setComments])

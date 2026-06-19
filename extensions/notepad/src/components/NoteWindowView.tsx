@@ -211,6 +211,46 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
           setNote((n) => (n ? { ...n, title } : n))
           document.title = title || 'Note'
           markSaved()
+
+          // Re-check anchors after save — body may have changed enough to orphan a comment
+          const currentComments = useCommentsStore.getState().comments
+          const orphanIds: string[] = []
+          const anchorUpdates: { id: string; newFrom: number; newTo: number }[] = []
+          for (const comment of currentComments) {
+            if (comment.parentId !== null || comment.status === 'orphaned') continue
+            const result = reanchorComment(comment, newBody)
+            if (result.status === 'orphaned') {
+              orphanIds.push(comment.id)
+            } else if (result.newFrom !== undefined && result.newTo !== undefined) {
+              anchorUpdates.push({ id: comment.id, newFrom: result.newFrom, newTo: result.newTo })
+            }
+          }
+          if (orphanIds.length > 0 || anchorUpdates.length > 0) {
+            const updatedMap = new Map(anchorUpdates.map((u) => [u.id, u]))
+            useCommentsStore.getState().setComments(
+              currentComments.map((c) => {
+                if (orphanIds.includes(c.id)) return { ...c, status: 'orphaned' as const }
+                const upd = updatedMap.get(c.id)
+                return upd ? { ...c, startOffset: upd.newFrom, endOffset: upd.newTo } : c
+              })
+            )
+            await Promise.all([
+              ...orphanIds.map((id) =>
+                window.electronAPI.extensionBridge
+                  .invoke('terminator.notepad:comments.markOrphaned', { id })
+                  .catch((err) => console.error('[notepad] markOrphaned failed', err))
+              ),
+              ...anchorUpdates.map((u) =>
+                window.electronAPI.extensionBridge
+                  .invoke('terminator.notepad:comments.updateAnchor', {
+                    id: u.id,
+                    startOffset: u.newFrom,
+                    endOffset: u.newTo,
+                  })
+                  .catch((err) => console.error('[notepad] updateAnchor failed', err))
+              ),
+            ])
+          }
         } catch {
           /* silent — main window will retry */
         }
