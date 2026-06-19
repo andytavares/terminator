@@ -29,6 +29,9 @@ const exportSchema = z.object({
   scope: z.enum(['all', 'note', 'tag']).optional(),
   noteId: z.string().optional(),
   tagId: z.string().optional(),
+  includeFrontmatter: z.boolean().optional(),
+  commentFormat: z.enum(['sidecar', 'inline', 'both', 'none']).optional(),
+  overwriteById: z.boolean().optional(),
 })
 
 interface NoteRow {
@@ -64,7 +67,14 @@ export async function exportNotes(
   const parsed = exportSchema.safeParse(payload)
   if (!parsed.success) return { error: 'VALIDATION_ERROR' }
 
-  const { folder, scope = 'all', noteId, tagId } = parsed.data
+  const {
+    folder,
+    scope = 'all',
+    noteId,
+    tagId,
+    includeFrontmatter = true,
+    overwriteById = true,
+  } = parsed.data
   const resolvedFolder = folder.replace(/^~(?=$|\/)/, os.homedir())
 
   const db = getDb()
@@ -95,17 +105,24 @@ export async function exportNotes(
 
   for (const note of notes) {
     const tags = note.tags ? note.tags.split(',').filter(Boolean) : []
-    const frontmatter = {
-      id: note.id,
-      title: note.title,
-      tags,
-      created: note.created_at,
-      updated: note.updated_at,
+    const slug = toSlug(note.title, note.id)
+    const existingFilename = overwriteById ? existingMap.get(note.id) : undefined
+    const filename = existingFilename ?? `${slug}.md`
+
+    let fileContent: string
+    if (includeFrontmatter) {
+      const frontmatter = {
+        id: note.id,
+        title: note.title,
+        tags,
+        created: note.created_at,
+        updated: note.updated_at,
+      }
+      fileContent = matter.stringify(note.body, frontmatter)
+    } else {
+      fileContent = note.body
     }
 
-    const fileContent = matter.stringify(note.body, frontmatter)
-    const slug = toSlug(note.title, note.id)
-    const filename = existingMap.get(note.id) ?? `${slug}.md`
     fs.writeFileSync(path.join(resolvedFolder, filename), fileContent, 'utf-8')
   }
 

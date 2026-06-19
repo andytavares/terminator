@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-type SaveStatus = 'idle' | 'saving' | 'saved'
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
 interface EditorState {
   activeNoteId: string | null
@@ -12,6 +12,7 @@ interface EditorState {
   markDirty: (body: string) => void
   markSaving: () => void
   markSaved: () => void
+  markError: () => void
   togglePreviewMode: () => void
 }
 
@@ -26,5 +27,6 @@ export const useEditorStore = create<EditorState>((set) => ({
   markDirty: (body) => set({ bodyDraft: body, isDirty: true }),
   markSaving: () => set({ saveStatus: 'saving' }),
   markSaved: () => set({ saveStatus: 'saved', isDirty: false }),
+  markError: () => set({ saveStatus: 'error' }),
   togglePreviewMode: () => set((s) => ({ previewMode: !s.previewMode })),
 }))

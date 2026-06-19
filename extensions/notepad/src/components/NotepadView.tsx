@@ -28,7 +28,7 @@ const ANCHOR_DEBOUNCE_MS = 2000
 const CARD_HEIGHT_EST = 110
 const CARD_GAP = 8
 
-async function importNotes(): Promise<void> {
+async function importNotes(onDone: () => void): Promise<void> {
   const result = await window.electronAPI.extensionBridge.invoke(
     'terminator.notepad:export.pickFolder',
     {}
@@ -38,6 +38,7 @@ async function importNotes(): Promise<void> {
   await window.electronAPI.extensionBridge
     .invoke('terminator.notepad:import.run', { folder })
     .catch(console.error)
+  onDone()
 }
 
 export function NotepadView(): React.JSX.Element {
@@ -54,8 +55,16 @@ export function NotepadView(): React.JSX.Element {
   const [commentHover, setCommentHover] = useState<{ id: string; top: number } | null>(null)
   const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { selectedNoteId, notes, setNotes, setShowQuickCreate } = useNotesStore()
-  const { bodyDraft, isDirty, saveStatus, setActiveNote, markDirty, markSaving, markSaved } =
-    useEditorStore()
+  const {
+    bodyDraft,
+    isDirty,
+    saveStatus,
+    setActiveNote,
+    markDirty,
+    markSaving,
+    markSaved,
+    markError,
+  } = useEditorStore()
   const { comments, setComments } = useCommentsStore()
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const anchorTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -334,10 +343,11 @@ export function NotepadView(): React.JSX.Element {
           }
         } catch (err) {
           console.error('[notepad] Autosave failed', err)
+          markError()
         }
       }, AUTOSAVE_DELAY_MS)
     },
-    [selectedNoteId, notes, markSaving, markSaved]
+    [selectedNoteId, notes, markSaving, markSaved, markError]
   )
 
   function handleEditorChange(newBody: string) {
@@ -449,6 +459,7 @@ export function NotepadView(): React.JSX.Element {
     if (isDirty) return 'Unsaved'
     if (saveStatus === 'saving') return 'Saving…'
     if (saveStatus === 'saved') return 'Saved'
+    if (saveStatus === 'error') return 'Save failed'
     return ''
   }
 
@@ -458,7 +469,16 @@ export function NotepadView(): React.JSX.Element {
         {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
         <EmptyState
           onNewNote={() => setShowQuickCreate(true)}
-          onImport={() => void importNotes()}
+          onImport={() =>
+            void importNotes(async () => {
+              const result = await window.electronAPI.extensionBridge.invoke(
+                'terminator.notepad:notes.list',
+                { includeArchived: true }
+              )
+              const data = (result as { data?: unknown[] }).data
+              if (Array.isArray(data)) setNotes(data as Parameters<typeof setNotes>[0])
+            })
+          }
         />
       </div>
     )
