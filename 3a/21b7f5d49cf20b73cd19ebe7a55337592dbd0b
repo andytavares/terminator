@@ -1,0 +1,19 @@
+extensions/remote-control/tests/unit/bridge.route.spec.ts
+  s_342a3bb060d924::t_dfb750514103f9 265
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "3a21b7f5d49cf20b73cd19ebe7a55337592dbd0b",
+  "prompts": {},
+  "sessions": {
+    "s_342a3bb060d924": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd40730-1532-4616-8e6b-4ba24bd10787",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
