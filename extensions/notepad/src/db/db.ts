@@ -47,6 +47,39 @@ export function closeDb(): void {
   }
 }
 
+export function reinitDb(userData: string): Database.Database {
+  closeDb()
+  return initDb(userData)
+}
+
+export function repairDb(userData: string): { integrity: string } {
+  if (_db) {
+    const rows = _db.prepare('PRAGMA integrity_check').all() as { integrity_check: string }[]
+    const integrity = rows.map((r) => r.integrity_check).join(', ')
+    _db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').run()
+    try {
+      _db.exec('VACUUM')
+    } catch {
+      // VACUUM can fail on a corrupt DB; that's non-fatal here
+    }
+    closeDb()
+    initDb(userData)
+    return { integrity }
+  }
+  initDb(userData)
+  return { integrity: 'ok' }
+}
+
+export function resetDb(userData: string): Database.Database {
+  const dbPath = path.join(userData, 'notepad.db')
+  closeDb()
+  for (const suffix of ['', '-wal', '-shm']) {
+    const file = dbPath + suffix
+    if (fs.existsSync(file)) fs.unlinkSync(file)
+  }
+  return initDb(userData)
+}
+
 export function hasColumn(db: Database.Database, table: string, column: string): boolean {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
   return cols.some((c) => c.name === column)

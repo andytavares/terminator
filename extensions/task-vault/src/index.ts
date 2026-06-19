@@ -1,4 +1,4 @@
-import { BrowserWindow, app } from 'electron'
+import { BrowserWindow, app, ipcMain } from 'electron'
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import { DEFAULT_CAPTURE_HOTKEY } from './constants.js'
 import { registerVaultIpcHandlers } from './ipc/vault.ipc.js'
@@ -6,7 +6,7 @@ import { registerProjectsIpcHandlers } from './ipc/projects.ipc.js'
 import { registerLinksIpcHandlers } from './ipc/links.ipc.js'
 import { registerKanbanIpcHandlers } from './ipc/kanban.ipc.js'
 import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
-import { initDb, closeDb } from './vault/db.js'
+import { initDb, closeDb, reinitDb, repairDb, resetDb } from './vault/db.js'
 import { startTaskScheduler, setSchedulerTick } from './notifications/task-scheduler.js'
 
 const disposables: Disposable[] = []
@@ -45,9 +45,66 @@ export async function activate(api: ExtensionAPI): Promise<void> {
             'Time of day to send due-date notifications (24-hour HH:MM format, e.g. 09:00)',
           default: '09:00',
         },
+        'terminator.task-vault.db.reinit': {
+          type: 'action',
+          label: 'Re-initialize',
+          description: 'Close and reopen the database connection. Use if tasks stop loading.',
+          channel: 'task-vault:db.reinit',
+          default: null,
+        },
+        'terminator.task-vault.db.repair': {
+          type: 'action',
+          label: 'Repair',
+          description: 'Checkpoint WAL and run VACUUM. Fixes fragmentation without data loss.',
+          channel: 'task-vault:db.repair',
+          default: null,
+        },
+        'terminator.task-vault.db.reset': {
+          type: 'action',
+          label: 'Reset (delete all data)',
+          description:
+            'Permanently delete the database and start fresh. All tasks and projects will be lost.',
+          channel: 'task-vault:db.reset',
+          danger: true,
+          confirmMessage:
+            'This will permanently delete ALL your tasks and projects. This cannot be undone. Continue?',
+          default: null,
+        },
       },
     })
   )
+
+  ipcMain.handle('task-vault:db.reinit', async () => {
+    try {
+      reinitDb(app.getPath('userData'))
+      return { data: { ok: true } }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  ipcMain.handle('task-vault:db.repair', async () => {
+    try {
+      const result = repairDb(app.getPath('userData'))
+      return { data: result }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  ipcMain.handle('task-vault:db.reset', async () => {
+    try {
+      resetDb(app.getPath('userData'))
+      return { data: { ok: true } }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  disposables.push({
+    dispose: () => {
+      ipcMain.removeHandler('task-vault:db.reinit')
+      ipcMain.removeHandler('task-vault:db.repair')
+      ipcMain.removeHandler('task-vault:db.reset')
+    },
+  })
 
   // Register IPC handlers first so they're always available
   const disposeIpc = registerVaultIpcHandlers()

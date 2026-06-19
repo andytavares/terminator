@@ -9,7 +9,7 @@ export interface ExtensionSettingsSchema {
 }
 
 export interface SettingDefinition {
-  type: 'string' | 'number' | 'boolean' | 'enum' | 'folder'
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'folder' | 'action'
   label: string
   description?: string
   default: unknown
@@ -18,6 +18,9 @@ export interface SettingDefinition {
   max?: number
   workspaceScoped?: boolean
   secret?: boolean
+  channel?: string
+  confirmMessage?: string
+  danger?: boolean
 }
 
 // v1.1.0 types

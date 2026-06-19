@@ -56,6 +56,49 @@ export function closeDb(): void {
   }
 }
 
+export function reinitDb(userData: string): Database.Database {
+  closeDb()
+  return initDb(userData)
+}
+
+export function repairDb(userData: string): { integrity: string } {
+  if (_db) {
+    const rows = _db.prepare('PRAGMA integrity_check').all() as { integrity_check: string }[]
+    const integrity = rows.map((r) => r.integrity_check).join(', ')
+    try {
+      _db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').run()
+    } catch {
+      // ignore — non-fatal
+    }
+    try {
+      _db.exec('VACUUM')
+    } catch {
+      // ignore — non-fatal
+    }
+    closeDb()
+    initDb(userData)
+    return { integrity }
+  }
+  initDb(userData)
+  return { integrity: 'ok' }
+}
+
+export function resetDb(userData: string): Database.Database {
+  const dbPath = path.join(userData, 'vault.db')
+  closeDb()
+  for (const suffix of ['', '-wal', '-shm']) {
+    const file = dbPath + suffix
+    if (fs.existsSync(file)) {
+      try {
+        fs.unlinkSync(file)
+      } catch {
+        // ignore — may not exist
+      }
+    }
+  }
+  return initDb(userData)
+}
+
 function hasColumn(db: Database.Database, table: string, column: string): boolean {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
   return cols.some((c) => c.name === column)
