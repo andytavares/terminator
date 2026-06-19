@@ -86,21 +86,20 @@ export function repairDb(userData: string): { integrity: string } {
 export function resetDb(userData: string): Database.Database {
   const dbPath = path.join(userData, 'vault.db')
   closeDb()
-  let mainDeleteFailed = false
+  const failed: string[] = []
   for (const suffix of ['', '-wal', '-shm']) {
     const file = dbPath + suffix
     if (fs.existsSync(file)) {
       try {
         fs.unlinkSync(file)
       } catch {
-        if (suffix === '') mainDeleteFailed = true
-        // aux file failures are non-fatal
+        failed.push(file)
       }
     }
   }
   const db = initDb(userData)
-  if (mainDeleteFailed) {
-    throw new Error('Failed to delete database file — existing data is still intact')
+  if (failed.length > 0) {
+    throw new Error(`Reset incomplete — could not delete: ${failed.join(', ')}`)
   }
   return db
 }
