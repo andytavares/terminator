@@ -77,17 +77,23 @@ export function repairDb(userData: string): { integrity: string } {
 export function resetDb(userData: string): Database.Database {
   const dbPath = path.join(userData, 'notepad.db')
   closeDb()
+  let mainDeleteFailed = false
   for (const suffix of ['', '-wal', '-shm']) {
     const file = dbPath + suffix
     if (fs.existsSync(file)) {
       try {
         fs.unlinkSync(file)
       } catch {
-        // best-effort per-file deletion
+        if (suffix === '') mainDeleteFailed = true
+        // aux file failures are non-fatal
       }
     }
   }
-  return initDb(userData)
+  const db = initDb(userData)
+  if (mainDeleteFailed) {
+    throw new Error('Failed to delete database file — existing data is still intact')
+  }
+  return db
 }
 
 export function hasColumn(db: Database.Database, table: string, column: string): boolean {
