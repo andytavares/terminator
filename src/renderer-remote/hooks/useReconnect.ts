@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-export type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected'
+export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected'
 
 export function useReconnect(
   openWs: () => void,
   ws: WebSocket | null
-): { status: ConnectionStatus; retry: () => void } {
-  const [status, setStatus] = useState<ConnectionStatus>('connected')
+): { status: ConnectionStatus; retry: () => void; onOpenWsFailed: () => void } {
+  const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const attemptsRef = useRef(0)
   const wsRef = useRef(ws)
   const openWsRef = useRef(openWs)
@@ -19,7 +19,7 @@ export function useReconnect(
     openWsRef.current = openWs
   }, [openWs])
 
-  // Clear 'reconnecting' status as soon as the new socket opens
+  // Clear status as soon as the socket opens
   useEffect(() => {
     if (!ws) return
     if (ws.readyState === WebSocket.OPEN) {
@@ -41,20 +41,30 @@ export function useReconnect(
       attemptsRef.current = 0
       return
     }
-    // Socket is already trying to connect — wait for it rather than opening another
-    if (state === WebSocket.CONNECTING) {
-      setTimeout(attempt, 2000)
-      return
-    }
     if (attemptsRef.current >= 3) {
       setStatus('disconnected')
       return
     }
     attemptsRef.current += 1
-    openWsRef.current()
+    // If already CONNECTING, don't open another socket — just wait and count the attempt
+    if (state !== WebSocket.CONNECTING) {
+      openWsRef.current()
+    }
     setStatus('reconnecting')
     setTimeout(attempt, 2000)
   }, [])
+
+  // Called by openWs when a connection attempt fails (ticket fetch error, socket error, etc.)
+  // so that the first failure immediately enters the reconnect loop rather than freezing.
+  const onOpenWsFailed = useCallback(() => {
+    if (attemptsRef.current < 3) {
+      attemptsRef.current += 1
+      setStatus('reconnecting')
+      setTimeout(attempt, 2000)
+    } else {
+      setStatus('disconnected')
+    }
+  }, [attempt])
 
   const retry = useCallback(() => {
     attemptsRef.current = 0
@@ -72,5 +82,5 @@ export function useReconnect(
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
   }, [attempt])
 
-  return { status, retry }
+  return { status, retry, onOpenWsFailed }
 }

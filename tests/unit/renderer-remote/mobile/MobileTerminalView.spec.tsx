@@ -36,7 +36,9 @@ vi.mock('@xterm/addon-attach', () => ({
 }))
 
 vi.mock('../../../../src/renderer-remote/hooks/useReconnect', () => ({
-  useReconnect: vi.fn().mockReturnValue({ status: 'connected', retry: vi.fn() }),
+  useReconnect: vi
+    .fn()
+    .mockReturnValue({ status: 'connected', retry: vi.fn(), onOpenWsFailed: vi.fn() }),
 }))
 
 vi.mock('../../../../src/renderer-remote/components/MobileControlToolbar', () => ({
@@ -93,7 +95,11 @@ describe('MobileTerminalView', () => {
 
   it('shows reconnecting banner when status is reconnecting', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
-    vi.mocked(useReconnect).mockReturnValue({ status: 'reconnecting', retry: vi.fn() })
+    vi.mocked(useReconnect).mockReturnValue({
+      status: 'reconnecting',
+      retry: vi.fn(),
+      onOpenWsFailed: vi.fn(),
+    })
     const { MobileTerminalView } = await import(
       '../../../../src/renderer-remote/components/MobileTerminalView'
     )
@@ -103,7 +109,11 @@ describe('MobileTerminalView', () => {
 
   it('shows error state with retry button when status is disconnected', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
-    vi.mocked(useReconnect).mockReturnValue({ status: 'disconnected', retry: vi.fn() })
+    vi.mocked(useReconnect).mockReturnValue({
+      status: 'disconnected',
+      retry: vi.fn(),
+      onOpenWsFailed: vi.fn(),
+    })
     const { MobileTerminalView } = await import(
       '../../../../src/renderer-remote/components/MobileTerminalView'
     )
@@ -113,7 +123,11 @@ describe('MobileTerminalView', () => {
 
   it('renders MobileControlToolbar', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
-    vi.mocked(useReconnect).mockReturnValue({ status: 'connected', retry: vi.fn() })
+    vi.mocked(useReconnect).mockReturnValue({
+      status: 'connected',
+      retry: vi.fn(),
+      onOpenWsFailed: vi.fn(),
+    })
     const { MobileTerminalView } = await import(
       '../../../../src/renderer-remote/components/MobileTerminalView'
     )
@@ -123,7 +137,11 @@ describe('MobileTerminalView', () => {
 
   it('sends key sequence to WebSocket when toolbar key is pressed', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
-    vi.mocked(useReconnect).mockReturnValue({ status: 'connected', retry: vi.fn() })
+    vi.mocked(useReconnect).mockReturnValue({
+      status: 'connected',
+      retry: vi.fn(),
+      onOpenWsFailed: vi.fn(),
+    })
     const { MobileTerminalView } = await import(
       '../../../../src/renderer-remote/components/MobileTerminalView'
     )

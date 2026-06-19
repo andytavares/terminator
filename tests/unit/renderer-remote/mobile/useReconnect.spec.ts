@@ -25,10 +25,10 @@ describe('useReconnect', () => {
     expect(result.current.status).toBe('connected')
   })
 
-  it('returns status "connected" when ws is null (not yet opened)', async () => {
+  it('returns status "connecting" when ws is null (not yet opened)', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
     const { result } = renderHook(() => useReconnect(mockOpenWs, null))
-    expect(result.current.status).toBe('connected')
+    expect(result.current.status).toBe('connecting')
   })
 
   it('calls openWs when page becomes visible and ws is closed', async () => {
@@ -95,20 +95,66 @@ describe('useReconnect', () => {
     expect(result.current.status).toBe('disconnected')
   })
 
-  it('does not call openWs again while socket is still CONNECTING', async () => {
+  it('does not call openWs again while socket is still CONNECTING but counts the attempt', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
     const ws = { readyState: 0 } as WebSocket // CONNECTING
-    renderHook(() => useReconnect(mockOpenWs, ws))
+    const { result } = renderHook(() => useReconnect(mockOpenWs, ws))
 
     act(() => {
       document.dispatchEvent(new Event('visibilitychange'))
     })
-    // Advance past 2s — should re-check but not call openWs (still CONNECTING)
+    expect(result.current.status).toBe('reconnecting')
+    // Advance past all 3 attempt delays — should reach disconnected without calling openWs
+    await act(async () => {
+      vi.advanceTimersByTime(2000)
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(2000)
+    })
     await act(async () => {
       vi.advanceTimersByTime(2000)
     })
 
     expect(mockOpenWs).not.toHaveBeenCalled()
+    expect(result.current.status).toBe('disconnected')
+  })
+
+  it('onOpenWsFailed enters the reconnect loop when initial openWs throws', async () => {
+    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
+    const { result } = renderHook(() => useReconnect(mockOpenWs, null))
+    expect(result.current.status).toBe('connecting')
+
+    act(() => {
+      result.current.onOpenWsFailed()
+    })
+
+    expect(result.current.status).toBe('reconnecting')
+    // After 2s, attempt() fires and calls openWs again
+    await act(async () => {
+      vi.advanceTimersByTime(2000)
+    })
+    expect(mockOpenWs).toHaveBeenCalled()
+  })
+
+  it('onOpenWsFailed sets disconnected after 3 failures', async () => {
+    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
+    const { result } = renderHook(() => useReconnect(mockOpenWs, null))
+
+    act(() => {
+      result.current.onOpenWsFailed()
+    }) // attempt 1
+    act(() => {
+      result.current.onOpenWsFailed()
+    }) // attempt 2
+    act(() => {
+      result.current.onOpenWsFailed()
+    }) // attempt 3 — schedules final timer
+    // Timer fires, attempt() sees count >= 3 → disconnected
+    await act(async () => {
+      vi.advanceTimersByTime(2000)
+    })
+
+    expect(result.current.status).toBe('disconnected')
   })
 
   it('clears reconnecting status when new ws fires onopen', async () => {

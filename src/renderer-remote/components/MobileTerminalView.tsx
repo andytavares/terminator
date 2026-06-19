@@ -19,6 +19,9 @@ export function MobileTerminalView({ sessionId, cwd, onBack }: Props) {
   const wsRef = useRef<WebSocket | null>(null)
   const [ws, setWs] = useState<WebSocket | null>(null)
 
+  // onOpenWsFailed is populated once useReconnect runs; stable via ref to avoid circular deps
+  const onOpenWsFailedRef = useRef<(() => void) | null>(null)
+
   const openWs = useCallback(async () => {
     // Tear down any existing socket before opening a new one to prevent stacking connections
     const prev = wsRef.current
@@ -37,11 +40,13 @@ export function MobileTerminalView({ sessionId, cwd, onBack }: Props) {
       const attachAddon = new AttachAddon(socket)
       termRef.current?.loadAddon(attachAddon)
     } catch {
-      // openWs failure is handled by useReconnect status
+      // Notify the reconnect hook so it enters the retry loop immediately
+      onOpenWsFailedRef.current?.()
     }
   }, [sessionId])
 
-  const { status, retry } = useReconnect(openWs, ws)
+  const { status, retry, onOpenWsFailed } = useReconnect(openWs, ws)
+  onOpenWsFailedRef.current = onOpenWsFailed
 
   useEffect(() => {
     if (!containerRef.current) return
