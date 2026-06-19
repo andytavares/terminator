@@ -10,6 +10,8 @@ export interface GlobalTabRegistration {
   badge?: number
   /** When true the tab is not shown as an icon in the WorkspaceRail. */
   hidden?: boolean
+  /** Higher values sort later in the sidebar. Core tabs default to 0, extensions to 1. */
+  sortOrder?: number
 }
 
 export interface WorkspaceTabRegistration {

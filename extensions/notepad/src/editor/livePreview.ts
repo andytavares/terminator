@@ -113,6 +113,33 @@ class HRWidget extends WidgetType {
   }
 }
 
+class MermaidWidget extends WidgetType {
+  constructor(readonly code: string) {
+    super()
+  }
+
+  toDOM(): HTMLElement {
+    const container = document.createElement('div')
+    container.className = 'notepad-mermaid'
+    const id = `mermaid-${Math.random().toString(36).slice(2)}`
+    void import('mermaid').then(({ default: mermaid }) => {
+      mermaid.initialize({ startOnLoad: false, theme: 'dark' })
+      void mermaid.render(id, this.code).then(({ svg }) => {
+        container.innerHTML = svg
+      })
+    })
+    return container
+  }
+
+  eq(other: MermaidWidget): boolean {
+    return other.code === this.code
+  }
+
+  ignoreEvent(): boolean {
+    return true
+  }
+}
+
 class ImageWidget extends WidgetType {
   constructor(
     readonly alt: string,
@@ -243,6 +270,20 @@ export function buildDecorations(state: EditorState, selection: { anchor: number
           // Show raw fences when cursor is anywhere inside the block
           const isInBlock = cursorPos >= node.from && cursorPos <= node.to
           if (!isInBlock) {
+            const codeInfoNode = node.node.getChild('CodeInfo')
+            const lang = codeInfoNode
+              ? state.sliceDoc(codeInfoNode.from, codeInfoNode.to).trim()
+              : ''
+            if (lang === 'mermaid') {
+              const codeText = node.node.getChild('CodeText')
+              const code = codeText ? state.sliceDoc(codeText.from, codeText.to) : ''
+              builder.add(
+                node.from,
+                node.to,
+                Decoration.replace({ widget: new MermaidWidget(code) })
+              )
+              return false
+            }
             const codeText = node.node.getChild('CodeText')
             if (codeText && codeText.to > codeText.from) {
               // Opening fence: collapse the line to zero-height by adding a line class
