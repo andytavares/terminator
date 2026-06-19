@@ -1,0 +1,56 @@
+extensions/notepad/src/ipc/notes.ipc.ts
+  s_342a3bb060d924::t_2b4c8c581c725e 294-300,305-306,315
+extensions/notepad/src/components/NoteWindowView.tsx
+  s_342a3bb060d924::t_722ee84d740252 1-2,17-18,23-30,32-33,44,49,51-55,71,73,157,163-168,170-183,185,187,189,191-192,194-196,214-215,231-238,253,329-332
+  s_342a3bb060d924::t_6d690a5822c9f0 31
+  s_342a3bb060d924::t_579f8e405b8d78 3-16,19-22,34-43,45-48,50,56-59,61-62,64-67,69-70,72,74-102,104-136,138-156,158-162,169,184,186,188,190,193,197-213,216-230,239-252,254-328
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_342a3bb060d924::t_9e4a73f9f623e7 576,582
+  s_342a3bb060d924::t_2a1205c105e82e 611
+extensions/task-vault/src/components/task-vault.css
+  s_342a3bb060d924::t_124a5d40438110 3756
+  s_342a3bb060d924::t_803bdbba4d12f7 188
+  s_342a3bb060d924::t_a4adb138a1ee07 244
+extensions/task-vault/src/components/InboxView.tsx
+  s_342a3bb060d924::t_bcea10376991dd 73
+  s_342a3bb060d924::t_62025f0ac37e09 12
+  s_342a3bb060d924::t_12d0394baf0a69 36
+extensions/notepad/src/renderer.tsx
+  s_342a3bb060d924::t_57fe70e94b6ce2 5,19
+extensions/notepad/src/components/notepad.css
+  s_342a3bb060d924::t_0c03e772582d45 1965,1976-1999,2006-2007,2017,2020-2030,2033
+  s_342a3bb060d924::t_3e907cad0dd980 1945-1964,1966-1975,2000-2005,2008-2016,2018-2019,2031-2032,2034-2041
+package.json
+  s_342a3bb060d924::t_d8df6e8e452ddb 15
+  s_342a3bb060d924::t_8379a7a8dbcf57 18
+  s_342a3bb060d924::t_2f5b6f1175a210 21
+extensions/notepad/tests/components/QuickCreateOverlay.spec.tsx
+  s_342a3bb060d924::t_627e8ed21b5237 12
+src/renderer/components/settings/SettingsPanel.tsx
+  s_342a3bb060d924::t_37cea0c8a835d4 324-328,351-353
+extensions/notepad/src/components/QuickCreateOverlay.tsx
+  s_342a3bb060d924::t_726758a8f4a51d 50-66
+extensions/task-vault/src/components/ProjectsBrowser.tsx
+  s_342a3bb060d924::t_fb0da9dd97fc25 717-718
+  s_342a3bb060d924::t_4622703b195d98 638
+  s_342a3bb060d924::t_0ab61ab9ecfb24 658
+src/renderer/components/settings/SettingsPanel.css
+  s_342a3bb060d924::t_9e4dfea3e06bce 500,506-512
+  s_342a3bb060d924::t_ec18353bf0cef2 499,501-502,505,518
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "a1f02ad7e4c8fe1628e5091d1a0e2ed24582cfba",
+  "prompts": {},
+  "sessions": {
+    "s_342a3bb060d924": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd40730-1532-4616-8e6b-4ba24bd10787",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
