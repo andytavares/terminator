@@ -3387,6 +3387,10 @@
   background: var(--tm-surface-2, rgba(255, 255, 255, 0.06));
   color: var(--tm-text);
 }
+.tv-btn--active {
+  background: var(--tm-surface-2, rgba(255, 255, 255, 0.06));
+  color: var(--tm-text);
+}
 
 .tv-btn--outline {
   background: transparent;
@@ -7138,6 +7142,14 @@ h2.daily-log__date {
 .cal-drawer__day-task--cancelled .cal-drawer__day-task-text {
   text-decoration: line-through;
   opacity: 0.6;
+}
+
+.cal-drawer__day-task-due {
+  font-size: 10px;
+  color: var(--tm-text-muted);
+  margin-left: auto;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ── DateTimePicker ──────────────────────────────────────────────── */

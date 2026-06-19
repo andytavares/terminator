@@ -19,6 +19,7 @@ const COVERAGE_FILE = path.join(__dirname, '..', 'coverage', 'coverage-final.jso
 // Keep in sync with the `coverage.exclude` array in vitest.config.ts.
 const COVERAGE_EXCLUDED_PATTERNS = [
   /src\/renderer\/index\.tsx$/,
+  /src\/renderer-remote\/mobile\.main\.tsx$/, // SPA entry point — no executable logic to test
   /src\/main\/index\.ts$/,
   /src\/main\/preload\.ts$/,
   /extensions\/[^/]+\/src\/index\.ts$/,
@@ -52,8 +53,9 @@ function getStagedSourceFiles() {
       if (!/\.(ts|tsx)$/.test(f)) return false
       // Skip test files
       if (/\.(spec|test)\.(ts|tsx)$/.test(f)) return false
-      // Skip test directories
-      if (/\/(tests?|__tests?__)\//.test(f)) return false
+      // Skip test directories (including paths that start with tests/ at repo root)
+      if (/(^|\/)tests?\//.test(f)) return false
+      if (/\/__tests?__\//.test(f)) return false
       // Skip type declaration files
       if (/\.d\.ts$/.test(f)) return false
       // Skip files that vitest.config.ts excludes from coverage collection —

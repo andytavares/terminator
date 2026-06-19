@@ -12,10 +12,13 @@ Object.defineProperty(window, 'location', {
   writable: true,
 })
 
+// Allow tests to override innerWidth for mobile/desktop detection
+Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1024 })
+
 beforeEach(() => {
   mockFetch.mockReset()
   mockReplace.mockReset()
-  sessionStorage.clear()
+  localStorage.clear()
 })
 
 describe('App', () => {
@@ -57,7 +60,7 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText('Could not connect to server')).toBeTruthy())
   })
 
-  it('stores token in sessionStorage and redirects on success', async () => {
+  it('stores token in localStorage and redirects on success', async () => {
     mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({
       status: 201,
       ok: true,
@@ -67,7 +70,41 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'correct' } })
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/app/?t=tok-abc'))
-    expect(sessionStorage.getItem('remoteToken')).toBe('correct')
+    expect(localStorage.getItem('remote_token')).toBe('correct')
+  })
+
+  it('redirects to /mobile/ when viewport is narrower than 768px', async () => {
+    Object.defineProperty(window, 'innerWidth', { value: 375, configurable: true })
+    mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({
+      status: 201,
+      ok: true,
+      json: () => Promise.resolve({ ticket: 'mob-tok' }),
+    })
+    render(<App />)
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/mobile/?t=mob-tok'))
+    const [[, mobileTicketOpts]] = mockFetch.mock.calls.slice(-1) as [[string, RequestInit]]
+    expect(
+      (mobileTicketOpts as RequestInit & { url?: string }) || mockFetch.mock.calls[1][0]
+    ).toBeTruthy()
+    // Verify mobile-ticket endpoint was called (second fetch call)
+    expect(mockFetch.mock.calls[1][0]).toBe('/api/mobile-ticket')
+    Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true })
+  })
+
+  it('redirects to /app/ when viewport is 768px or wider', async () => {
+    Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true })
+    mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({
+      status: 201,
+      ok: true,
+      json: () => Promise.resolve({ ticket: 'desk-tok' }),
+    })
+    render(<App />)
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/app/?t=desk-tok'))
+    expect(mockFetch.mock.calls[1][0]).toBe('/api/app-ticket')
   })
 
   it('disables button and shows "Connecting…" while loading', async () => {

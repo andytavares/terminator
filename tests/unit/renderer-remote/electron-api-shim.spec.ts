@@ -47,7 +47,7 @@ beforeEach(() => {
   mockFetch.mockReset()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(global as any).WebSocket = MockWebSocket
-  sessionStorage.clear()
+  localStorage.clear()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   delete (window as any).electronAPI
 })
@@ -62,7 +62,7 @@ function hasMsg(ws: MockWebSocket, substring: string) {
 
 describe('electron-api-shim bootstrap', () => {
   it('creates WebSocket to /api/bridge with ticket from bridge-ticket endpoint', async () => {
-    sessionStorage.setItem('remoteToken', 'my-token')
+    localStorage.setItem('remote_token', 'my-token')
     await loadShim()
     expect(MockWebSocket.instances[0].url).toContain('/api/bridge')
     expect(MockWebSocket.instances[0].url).toContain('ticket=test-ticket')

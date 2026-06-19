@@ -41,7 +41,7 @@
   }
 
   async function connectBridge(): Promise<void> {
-    const token = sessionStorage.getItem('remoteToken') ?? ''
+    const token = localStorage.getItem('remote_token') ?? ''
     let ticket: string
     try {
       const headers: Record<string, string> = {}

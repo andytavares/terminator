@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { useVaultStore } from '../stores/vault.store'
 import { useVaultNavStore } from '../stores/vault-nav.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
@@ -103,6 +103,8 @@ export function CalendarDrawer(): React.JSX.Element {
 
   async function handleDayClick(dateStr: string) {
     setSelectedDate(dateStr)
+    if (dateStr === todayStr) void loadToday()
+    else void loadDate(dateStr)
     setLoadingDay(true)
     setSelectedDayTasks([])
     try {
@@ -130,8 +132,8 @@ export function CalendarDrawer(): React.JSX.Element {
     openTaskVault()
   }
 
-  function handleTaskClick(task: Task) {
-    useVaultNavStore.getState().navigateToTask(task.id, selectedDate ?? undefined)
+  function handleTaskClick(task: Task, dateStr: string) {
+    useVaultNavStore.getState().navigateToTask(task.id, dateStr)
     openTaskVault()
   }
 
@@ -207,12 +209,11 @@ export function CalendarDrawer(): React.JSX.Element {
                 {selectedDate === todayStr ? 'Today' : selectedDate}
               </span>
               <button
-                className="tv-btn tv-btn--xs tv-btn--primary"
+                className="tv-btn tv-btn--icon"
                 onClick={handleGoToDay}
-                title="Go to this day"
+                title="Open in Task Vault"
               >
-                Go&nbsp;
-                <ArrowRight size={11} />
+                <ExternalLink size={12} />
               </button>
             </div>
             {loadingDay && <div className="cal-drawer__day-loading">…</div>}
@@ -224,11 +225,12 @@ export function CalendarDrawer(): React.JSX.Element {
                 <button
                   key={task.id}
                   className={`cal-drawer__day-task cal-drawer__day-task--${task.status}`}
-                  onClick={() => handleTaskClick(task)}
+                  onClick={() => handleTaskClick(task, selectedDate!)}
                   title={task.text}
                 >
                   <span className="cal-drawer__day-task-dot" />
                   <span className="cal-drawer__day-task-text">{task.text}</span>
+                  {task.dueDate && <span className="cal-drawer__day-task-due">{task.dueDate}</span>}
                 </button>
               ))}
           </div>

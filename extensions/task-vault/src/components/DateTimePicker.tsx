@@ -15,6 +15,8 @@ export interface DateTimePickerProps {
   /** minimum selectable date as 'YYYY-MM-DD' (date/datetime modes) */
   min?: string
   className?: string
+  /** When true, open the picker popover on mount without requiring a button click. */
+  defaultOpen?: boolean
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -197,6 +199,7 @@ export function DateTimePicker({
   placeholder,
   min,
   className,
+  defaultOpen,
 }: DateTimePickerProps): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
@@ -229,6 +232,10 @@ export function DateTimePicker({
     setPos({ top, left: rect.left })
     setOpen(true)
   }, [])
+
+  useEffect(() => {
+    if (defaultOpen) openPicker()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) return
