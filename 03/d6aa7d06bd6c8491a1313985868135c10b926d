@@ -1,0 +1,119 @@
+src/renderer-remote/mobile.html
+  s_691b7cdd284c28::t_fc66b8e76321f0 1-18
+README.md
+  s_691b7cdd284c28::t_5678ecc8047c32 30
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_691b7cdd284c28::t_cadf2f18894739 437-481
+CLAUDE.md
+  s_691b7cdd284c28::t_89a5ad763261ef 5
+.specify/feature.json
+  s_691b7cdd284c28::t_c421d442c09a97 2
+tests/unit/renderer-remote/mobile/useReconnect.spec.ts
+  s_691b7cdd284c28::t_a1cff4ae715305 1-119
+tests/unit/renderer-remote/mobile/MobileApp.spec.tsx
+  s_691b7cdd284c28::t_8d94a0fb348b2f 2
+  s_691b7cdd284c28::t_e8e0958f93f4b6 1,3-96,114
+  s_691b7cdd284c28::t_3d46844d37e9a7 97-113
+tests/unit/renderer-remote/mobile/MobileTerminalView.spec.tsx
+  s_691b7cdd284c28::t_1596fe1543f52d 2
+  s_691b7cdd284c28::t_a74678b9456f1b 1,3-49,51-55,59-122,146
+  s_691b7cdd284c28::t_b03b9ccbe00fe9 50,56-58
+  s_691b7cdd284c28::t_15e0c062fa1b96 123-130,133-145
+  s_691b7cdd284c28::t_f5f18d42e3e96d 131-132
+src/renderer-remote/components/MobileTerminalView.tsx
+  s_691b7cdd284c28::t_9867b30118ca61 1-25,27-82,84-96
+specs/011-remote-control-mobile/spec.md
+  s_691b7cdd284c28::t_7d2a60f9d6d253 91
+  s_691b7cdd284c28::t_46508847788c2b 92
+  s_691b7cdd284c28::t_14f0966d440bfa 90
+  s_691b7cdd284c28::t_94c8c8b96ec81c 84-88,93
+  s_691b7cdd284c28::t_10115643ded7f3 98
+  s_691b7cdd284c28::t_57d6b98269821f 136
+  s_691b7cdd284c28::t_8a1b189e995cc4 1-44,62,64-66,68-78,80-83,94-97,101-108,110-127,129-131,133-134,137-138
+  s_691b7cdd284c28::t_ccadd46085df83 135
+  s_691b7cdd284c28::t_e25cde851e6cc9 63,67
+  s_691b7cdd284c28::t_83ce742cbd6f74 132
+  s_691b7cdd284c28::t_db9394ca646f12 79
+  s_691b7cdd284c28::t_7906f088e42d21 128
+  s_691b7cdd284c28::t_5853d98bdf7ce1 109
+  s_691b7cdd284c28::t_b929ffea30950a 89
+  s_691b7cdd284c28::t_0b503e37657e2c 99-100
+  s_691b7cdd284c28::t_896601f8e57451 45-61
+src/renderer-remote/api/remote-client.ts
+  s_691b7cdd284c28::t_b4f58933dfa5f2 71-82
+tests/unit/renderer-remote/mobile/MobileTerminalList.spec.tsx
+  s_691b7cdd284c28::t_e69a518d260678 1-120
+specs/011-remote-control-mobile/data-model.md
+  s_691b7cdd284c28::t_09d1cb933a15f1 1-60,62-72,74-110
+extensions/remote-control/src/server/remote-server.ts
+  s_691b7cdd284c28::t_e995a99f54021a 266,276
+  s_691b7cdd284c28::t_1350e2e564a516 139-144,148,174-192,198-199
+  s_691b7cdd284c28::t_5cd74ad1bb5938 75,78,82-83,86-87,98-114,117,120-128
+  s_691b7cdd284c28::t_d11d61ccb25090 240-242
+tests/unit/renderer-remote/remote-client.spec.ts
+  s_691b7cdd284c28::t_5b606b2f561a80 133-156
+src/renderer-remote/hooks/useReconnect.ts
+  s_691b7cdd284c28::t_8291007c8e84a3 1-6,8-55
+specs/011-remote-control-mobile/plan.md
+  s_691b7cdd284c28::t_db1b8a1f6a9c21 2,5-7,9-11,21-25,38-43,53-54,56-57,91-94,96
+  s_691b7cdd284c28::t_21c50f263ccd74 1,3-4,8,12-20,26,28-34,44-52,55,58-90,95,97-134
+specs/011-remote-control-mobile/research.md
+  s_691b7cdd284c28::t_514147042bfa20 1-29,33-59,62-86,90-106,109-116
+specs/011-remote-control-mobile/checklists/requirements.md
+  s_691b7cdd284c28::t_7b5c2ae80e7900 1-33
+  s_691b7cdd284c28::t_8e64cd6909c28d 34
+src/renderer-remote/components/MobileTerminalList.tsx
+  s_691b7cdd284c28::t_98925fc79c2129 1-2,7-50
+  s_691b7cdd284c28::t_07eec993cf5e10 3-6
+src/renderer-remote/MobileApp.tsx
+  s_691b7cdd284c28::t_1149970e47aa2c 1-6,8-58
+vite.config.remote.ts
+  s_691b7cdd284c28::t_2f1a62d5b9c329 14
+src/renderer-remote/mobile.main.tsx
+  s_691b7cdd284c28::t_72f334da2f4461 1-7
+tests/unit/renderer-remote/mobile/MobileControlToolbar.spec.tsx
+  s_691b7cdd284c28::t_e7ce913962bd62 1-74
+tests/setup.ts
+  s_691b7cdd284c28::t_731152905a16d7 14-21
+specs/011-remote-control-mobile/quickstart.md
+  s_691b7cdd284c28::t_a380719fc1b944 1-54,56-65
+scripts/check-patch-coverage.cjs
+  s_691b7cdd284c28::t_d3f9c9d2c8bde4 22
+  s_691b7cdd284c28::t_a288056b2c51f3 56-58
+extensions/remote-control/tests/unit/remote-server.spec.ts
+  s_691b7cdd284c28::t_3ed599ec2c99f1 278-367
+src/renderer-remote/components/MobileControlToolbar.tsx
+  s_691b7cdd284c28::t_95eff7bd09c287 1-34
+vitest.config.ts
+  s_691b7cdd284c28::t_9647426f2f74ad 24
+  s_691b7cdd284c28::t_5a869238148667 45
+specs/011-remote-control-mobile/tasks.md
+  s_691b7cdd284c28::t_eb538a5dda2595 1-20,24-36,44-46,49-51,54-66,71-73,80-92,95-97,100-112,115-117,120-240
+src/renderer-remote/App.tsx
+  s_691b7cdd284c28::t_2dd8336d6d81fc 32-34,40-41
+tests/unit/renderer-remote/App.spec.tsx
+  s_691b7cdd284c28::t_24e115bfcfd6a7 15-17
+  s_691b7cdd284c28::t_6d3dd0ff5d7d46 76-109
+specs/011-remote-control-mobile/contracts/api-changes.md
+  s_691b7cdd284c28::t_705d350ab4bc80 1-78,80-95,97-102
+extensions/remote-control/src/server/routes/terminal.routes.ts
+  s_691b7cdd284c28::t_f0170c99f91ab2 42-43
+src/renderer-remote/mobile.css
+  s_691b7cdd284c28::t_e0f02226aba68b 1-204
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "03d6aa7d06bd6c8491a1313985868135c10b926d",
+  "prompts": {},
+  "sessions": {
+    "s_691b7cdd284c28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc2f31ca-0e76-4d10-8922-c93237fadd53",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
