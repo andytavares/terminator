@@ -208,9 +208,13 @@ export async function searchNotes(
 }
 
 export function registerSearchIpcHandlers(): () => void {
-  ipcMain.handle('terminator.notepad:search.query', (_evt, payload: unknown) =>
-    searchNotes(payload)
-  )
+  ipcMain.handle('terminator.notepad:search.query', async (_evt, payload: unknown) => {
+    try {
+      return await searchNotes(payload)
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
 
   return () => {
     ipcMain.removeHandler('terminator.notepad:search.query')

@@ -70,6 +70,12 @@ describe('initDb', () => {
     initDb(tmpDir)
     expect(() => getDb()).not.toThrow()
   })
+
+  it('initDb failure closes db and surfaces real error in subsequent getDb call', () => {
+    // /dev/null is a file, not a dir — mkdirSync will throw ENOTDIR
+    expect(() => initDb('/dev/null/notepad-test')).toThrow()
+    expect(() => getDb()).toThrow('NotepadDB not initialized')
+  })
 })
 
 describe('insertFts / deleteFts', () => {

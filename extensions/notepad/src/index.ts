@@ -13,7 +13,10 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     initDb(app.getPath('userData'))
   } catch (err) {
     console.error('[notepad] Failed to initialize SQLite DB:', err)
-    return
+    api.notifications.showToast(
+      'error',
+      'Notepad: database failed to open. Restart the app — if the problem persists, check the logs.'
+    )
   }
 
   const disposeNotes = registerNotesIpcHandlers()

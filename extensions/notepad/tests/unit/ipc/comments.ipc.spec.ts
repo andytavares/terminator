@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { ipcMain } from 'electron'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -328,5 +329,25 @@ describe('validation errors', () => {
   it('replyComment returns PARENT_NOT_FOUND for non-existent parentId', async () => {
     const result = await replyComment({ noteId, parentId: 'non-existent-id', body: 'reply' })
     expect((result as { error: string }).error).toBe('PARENT_NOT_FOUND')
+  })
+})
+
+describe('handle() catch — DB not initialized', () => {
+  function getHandler(channel: string) {
+    let handler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
+    vi.mocked(ipcMain.handle).mockImplementation((ch, fn) => {
+      if (ch === channel) handler = fn as typeof handler
+    })
+    registerCommentsIpcHandlers()
+    vi.mocked(ipcMain.handle).mockReset()
+    if (!handler) throw new Error(`Handler for ${channel} not registered`)
+    return handler
+  }
+
+  it('returns { error } from comments.list when getDb throws', async () => {
+    closeDb()
+    const handler = getHandler('terminator.notepad:comments.list')
+    const result = await handler({}, { noteId: 'any' })
+    expect(result).toMatchObject({ error: expect.stringContaining('NotepadDB not initialized') })
   })
 })

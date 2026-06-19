@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { ipcMain } from 'electron'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -388,5 +389,25 @@ describe('registerTagsIpcHandlers', () => {
     const dispose = registerTagsIpcHandlers()
     expect(typeof dispose).toBe('function')
     expect(() => dispose()).not.toThrow()
+  })
+})
+
+describe('handle() catch — DB not initialized', () => {
+  function getHandler(channel: string) {
+    let handler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
+    vi.mocked(ipcMain.handle).mockImplementation((ch, fn) => {
+      if (ch === channel) handler = fn as typeof handler
+    })
+    registerNotesIpcHandlers()
+    vi.mocked(ipcMain.handle).mockReset()
+    if (!handler) throw new Error(`Handler for ${channel} not registered`)
+    return handler
+  }
+
+  it('returns { error } from notes.list when getDb throws', async () => {
+    closeDb()
+    const handler = getHandler('terminator.notepad:notes.list')
+    const result = await handler({}, {})
+    expect(result).toMatchObject({ error: expect.stringContaining('NotepadDB not initialized') })
   })
 })

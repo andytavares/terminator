@@ -6,19 +6,37 @@ import { randomUUID } from 'node:crypto'
 export { randomUUID }
 
 let _db: Database.Database | null = null
+let _initError: Error | null = null
 
 export function initDb(userData: string): Database.Database {
-  fs.mkdirSync(userData, { recursive: true })
-  const dbPath = path.join(userData, 'notepad.db')
-  _db = new Database(dbPath)
-  _db.pragma('journal_mode = WAL')
-  _db.pragma('foreign_keys = ON')
-  applySchema(_db)
-  return _db
+  _initError = null
+  try {
+    fs.mkdirSync(userData, { recursive: true })
+    const dbPath = path.join(userData, 'notepad.db')
+    _db = new Database(dbPath)
+    _db.pragma('journal_mode = WAL')
+    _db.pragma('foreign_keys = ON')
+    applySchema(_db)
+    return _db
+  } catch (err) {
+    if (_db) {
+      try {
+        _db.close()
+      } catch {
+        // ignore close errors during cleanup
+      }
+      _db = null
+    }
+    _initError = err instanceof Error ? err : new Error(String(err))
+    throw _initError
+  }
 }
 
 export function getDb(): Database.Database {
-  if (!_db) throw new Error('NotepadDB not initialized — call initDb first')
+  if (!_db) {
+    const detail = _initError ? _initError.message : 'call initDb first'
+    throw new Error(`NotepadDB not initialized — ${detail}`)
+  }
   return _db
 }
 

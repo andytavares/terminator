@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { ipcMain } from 'electron'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -171,5 +172,20 @@ describe('searchNotes — validation', () => {
   it('returns error on invalid payload', async () => {
     const result = await searchNotes({ query: 123 as unknown as string })
     expect(result).toHaveProperty('error')
+  })
+})
+
+describe('handle() catch — DB not initialized', () => {
+  it('returns { error } from search.query handler when getDb throws', async () => {
+    closeDb()
+    let capturedHandler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
+    vi.mocked(ipcMain.handle).mockImplementationOnce((_ch, fn) => {
+      capturedHandler = fn as typeof capturedHandler
+    })
+    registerSearchIpcHandlers()
+    vi.mocked(ipcMain.handle).mockReset()
+    expect(capturedHandler).toBeDefined()
+    const result = await capturedHandler!({}, { query: 'test' })
+    expect(result).toMatchObject({ error: expect.stringContaining('NotepadDB not initialized') })
   })
 })

@@ -250,9 +250,21 @@ export function registerExportIpcHandlers(): () => void {
     return { data: result.filePaths[0] }
   })
 
-  ipcMain.handle('terminator.notepad:export.run', (_evt, payload: unknown) => exportNotes(payload))
+  ipcMain.handle('terminator.notepad:export.run', async (_evt, payload: unknown) => {
+    try {
+      return await exportNotes(payload)
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
 
-  ipcMain.handle('terminator.notepad:import.run', (_evt, payload: unknown) => importNotes(payload))
+  ipcMain.handle('terminator.notepad:import.run', async (_evt, payload: unknown) => {
+    try {
+      return await importNotes(payload)
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
 
   return () => {
     ipcMain.removeHandler('terminator.notepad:export.pickFolder')

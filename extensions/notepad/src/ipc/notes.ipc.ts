@@ -362,10 +362,20 @@ export async function deleteTag(payload: unknown): Promise<Record<string, unknow
   return { data: { ok: true } }
 }
 
+function handle(channel: string, fn: (payload: unknown) => Promise<Record<string, unknown>>): void {
+  ipcMain.handle(channel, async (_event, payload) => {
+    try {
+      return await fn(payload)
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+}
+
 export function registerTagsIpcHandlers(): () => void {
-  ipcMain.handle('terminator.notepad:tags.list', (_, payload) => listTags(payload))
-  ipcMain.handle('terminator.notepad:tags.rename', (_, payload) => renameTag(payload))
-  ipcMain.handle('terminator.notepad:tags.delete', (_, payload) => deleteTag(payload))
+  handle('terminator.notepad:tags.list', listTags)
+  handle('terminator.notepad:tags.rename', renameTag)
+  handle('terminator.notepad:tags.delete', deleteTag)
 
   return () => {
     ipcMain.removeHandler('terminator.notepad:tags.list')
@@ -377,14 +387,14 @@ export function registerTagsIpcHandlers(): () => void {
 // ---- IPC Registration ----
 
 export function registerNotesIpcHandlers(): () => void {
-  ipcMain.handle('terminator.notepad:notes.create', (_, payload) => createNote(payload))
-  ipcMain.handle('terminator.notepad:notes.list', (_, payload) => listNotes(payload))
-  ipcMain.handle('terminator.notepad:notes.get', (_, payload) => getNote(payload))
-  ipcMain.handle('terminator.notepad:notes.autosave', (_, payload) => autosaveNote(payload))
-  ipcMain.handle('terminator.notepad:notes.archive', (_, payload) => archiveNote(payload))
-  ipcMain.handle('terminator.notepad:notes.restore', (_, payload) => restoreNote(payload))
-  ipcMain.handle('terminator.notepad:notes.hardDelete', (_, payload) => hardDeleteNote(payload))
-  ipcMain.handle('terminator.notepad:notes.openWindow', (_, payload) => openNoteInWindow(payload))
+  handle('terminator.notepad:notes.create', createNote)
+  handle('terminator.notepad:notes.list', listNotes)
+  handle('terminator.notepad:notes.get', getNote)
+  handle('terminator.notepad:notes.autosave', autosaveNote)
+  handle('terminator.notepad:notes.archive', archiveNote)
+  handle('terminator.notepad:notes.restore', restoreNote)
+  handle('terminator.notepad:notes.hardDelete', hardDeleteNote)
+  handle('terminator.notepad:notes.openWindow', openNoteInWindow)
 
   return () => {
     ipcMain.removeHandler('terminator.notepad:notes.create')
