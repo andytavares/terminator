@@ -1,0 +1,30 @@
+extensions/notepad/src/ipc/export.ipc.ts
+  s_342a3bb060d924::t_0ed96a54a771b6 70-77
+  s_342a3bb060d924::t_cb1cb6bbc9ee8d 32-34
+  s_342a3bb060d924::t_43cd2734723905 108-123
+extensions/notepad/src/stores/editor.store.ts
+  s_342a3bb060d924::t_36876bff19db12 3
+  s_342a3bb060d924::t_d8f9df2db5c001 30
+  s_342a3bb060d924::t_57c7c567e7e365 15
+extensions/notepad/src/components/NotepadView.tsx
+  s_342a3bb060d924::t_ddb84d39e957a8 31,41
+  s_342a3bb060d924::t_3076234a49fbb4 462
+  s_342a3bb060d924::t_0ed96a54a771b6 58-67,472-481
+  s_342a3bb060d924::t_34fc43fc3e8d48 346,350
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "40aee88e1dab87171eca1179d29f66e1bbb1cef9",
+  "prompts": {},
+  "sessions": {
+    "s_342a3bb060d924": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd40730-1532-4616-8e6b-4ba24bd10787",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
