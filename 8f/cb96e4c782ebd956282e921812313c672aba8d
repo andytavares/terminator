@@ -1,0 +1,48 @@
+src/renderer/components/settings/SettingsPanel.tsx
+  s_342a3bb060d924::t_d3614565b60ee8 248-260
+  s_342a3bb060d924::t_fe5a365a3f65d9 78-80
+  s_342a3bb060d924::t_ca7eb79b1819bb 270-312
+extensions/task-vault/src/index.ts
+  s_342a3bb060d924::t_bbc94d88f6f91c 77-108
+  s_342a3bb060d924::t_89cd6647a3ea71 1,9
+  s_342a3bb060d924::t_cb42a7b265fd01 48-72
+src/renderer/electron.d.ts
+  s_342a3bb060d924::t_8fd99a5a8ccaf5 122-124
+src/main/extensions/api.ts
+  s_342a3bb060d924::t_43ab012528edd3 12,21-23
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_342a3bb060d924::t_2479137238d280 576-701
+  s_342a3bb060d924::t_2a8df2c7c08fb0 47-49
+extensions/notepad/src/db/db.ts
+  s_342a3bb060d924::t_efe9ab4f3bcb0c 50-58,60-62,64-77,79-82
+  s_342a3bb060d924::t_c9ccc10a6877a8 59,63
+  s_342a3bb060d924::t_1533443131f187 78
+extensions/task-vault/src/vault/db.ts
+  s_342a3bb060d924::t_6f53ed679e862d 59-101
+extensions/notepad/src/index.ts
+  s_342a3bb060d924::t_21276ef76702ce 111-134
+  s_342a3bb060d924::t_9fe1eade57431c 1,3
+  s_342a3bb060d924::t_02fa148d94671b 37-68
+extensions/notepad/tests/unit/db/db.spec.ts
+  s_342a3bb060d924::t_0a5b5f35788216 90-112,114-125,138-149,151-163,167-168
+  s_342a3bb060d924::t_63d7072665d77d 113,126-137
+  s_342a3bb060d924::t_b01f443d37cc6c 150,164-166
+  s_342a3bb060d924::t_b6cc705ebfe23a 5-12,14
+  s_342a3bb060d924::t_833b0278e13ab1 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "8fcb96e4c782ebd956282e921812313c672aba8d",
+  "prompts": {},
+  "sessions": {
+    "s_342a3bb060d924": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd40730-1532-4616-8e6b-4ba24bd10787",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
