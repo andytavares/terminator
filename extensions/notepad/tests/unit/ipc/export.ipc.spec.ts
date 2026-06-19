@@ -288,7 +288,7 @@ describe('registerExportIpcHandlers', () => {
   })
 })
 
-describe('handle() catch — DB not initialized', () => {
+describe('IPC reject — DB not initialized', () => {
   function getHandler(channel: string) {
     let handler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
     vi.mocked(ipcMain.handle).mockImplementation((ch, fn) => {
@@ -300,10 +300,11 @@ describe('handle() catch — DB not initialized', () => {
     return handler
   }
 
-  it('returns { error } from export.run when getDb throws', async () => {
+  it('rejects from export.run when getDb throws so renderer catch fires', async () => {
     closeDb()
     const handler = getHandler('terminator.notepad:export.run')
-    const result = await handler({}, { folder: '/tmp/export-test' })
-    expect(result).toMatchObject({ error: expect.stringContaining('NotepadDB not initialized') })
+    await expect(handler({}, { folder: '/tmp/export-test' })).rejects.toThrow(
+      'NotepadDB not initialized'
+    )
   })
 })

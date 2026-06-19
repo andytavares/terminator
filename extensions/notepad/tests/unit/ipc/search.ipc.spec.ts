@@ -175,8 +175,8 @@ describe('searchNotes — validation', () => {
   })
 })
 
-describe('handle() catch — DB not initialized', () => {
-  it('returns { error } from search.query handler when getDb throws', async () => {
+describe('IPC reject — DB not initialized', () => {
+  it('rejects from search.query when getDb throws so renderer catch fires', async () => {
     closeDb()
     let capturedHandler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
     vi.mocked(ipcMain.handle).mockImplementationOnce((_ch, fn) => {
@@ -185,7 +185,8 @@ describe('handle() catch — DB not initialized', () => {
     registerSearchIpcHandlers()
     vi.mocked(ipcMain.handle).mockReset()
     expect(capturedHandler).toBeDefined()
-    const result = await capturedHandler!({}, { query: 'test' })
-    expect(result).toMatchObject({ error: expect.stringContaining('NotepadDB not initialized') })
+    await expect(capturedHandler!({}, { query: 'test' })).rejects.toThrow(
+      'NotepadDB not initialized'
+    )
   })
 })

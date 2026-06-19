@@ -189,13 +189,7 @@ export function registerCommentsIpcHandlers(): () => void {
   ]
 
   for (const [channel, handler] of channels) {
-    ipcMain.handle(channel, async (_event, payload) => {
-      try {
-        return await handler(payload)
-      } catch (err) {
-        return { error: err instanceof Error ? err.message : String(err) }
-      }
-    })
+    ipcMain.handle(channel, (_event, payload) => handler(payload))
   }
 
   return () => {
