@@ -1,15 +1,15 @@
 const TOKEN_KEY = 'remote_token'
 
 function getToken(): string {
-  return sessionStorage.getItem(TOKEN_KEY) ?? ''
+  return localStorage.getItem(TOKEN_KEY) ?? ''
 }
 
 export function setToken(token: string): void {
-  sessionStorage.setItem(TOKEN_KEY, token)
+  localStorage.setItem(TOKEN_KEY, token)
 }
 
 export function clearToken(): void {
-  sessionStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(TOKEN_KEY)
 }
 
 async function apiFetch(path: string, init?: RequestInit): Promise<Response> {

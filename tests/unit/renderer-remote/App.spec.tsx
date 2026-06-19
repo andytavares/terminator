@@ -18,7 +18,7 @@ Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true
 beforeEach(() => {
   mockFetch.mockReset()
   mockReplace.mockReset()
-  sessionStorage.clear()
+  localStorage.clear()
 })
 
 describe('App', () => {
@@ -60,7 +60,7 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText('Could not connect to server')).toBeTruthy())
   })
 
-  it('stores token in sessionStorage and redirects on success', async () => {
+  it('stores token in localStorage and redirects on success', async () => {
     mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({
       status: 201,
       ok: true,
@@ -70,7 +70,7 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'correct' } })
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/app/?t=tok-abc'))
-    expect(sessionStorage.getItem('remote_token')).toBe('correct')
+    expect(localStorage.getItem('remote_token')).toBe('correct')
   })
 
   it('redirects to /mobile/ when viewport is narrower than 768px', async () => {
