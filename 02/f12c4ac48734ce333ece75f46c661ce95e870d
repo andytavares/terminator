@@ -1,0 +1,35 @@
+tests/unit/renderer-remote/App.spec.tsx
+  s_691b7cdd284c28::t_f09c1c2c740284 63
+  s_691b7cdd284c28::t_55bd065f32cfaf 21
+  s_691b7cdd284c28::t_d3b087ccb29498 73
+extensions/remote-control/tests/unit/bridge.route.spec.ts
+  s_691b7cdd284c28::t_0ccee8fb003523 14-17
+  s_691b7cdd284c28::t_5f7c0053f96eb0 18-21
+tests/unit/renderer-remote/electron-api-shim.spec.ts
+  s_691b7cdd284c28::t_743e91385443bc 65
+  s_691b7cdd284c28::t_37a12de5c93579 50
+tests/unit/renderer-remote/remote-client.spec.ts
+  s_691b7cdd284c28::t_36d70f427868f5 6,8
+  s_691b7cdd284c28::t_b81463c2550e02 158
+  s_691b7cdd284c28::t_1c7ef035ddc779 17,20,23,27
+src/renderer-remote/electron-api-shim.ts
+  s_691b7cdd284c28::t_93af838ba3e77b 44
+src/renderer-remote/api/remote-client.ts
+  s_691b7cdd284c28::t_fece49143b5178 4,8,12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "02f12c4ac48734ce333ece75f46c661ce95e870d",
+  "prompts": {},
+  "sessions": {
+    "s_691b7cdd284c28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc2f31ca-0e76-4d10-8922-c93237fadd53",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
