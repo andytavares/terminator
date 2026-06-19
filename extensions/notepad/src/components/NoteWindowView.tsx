@@ -341,7 +341,19 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
             initialDoc={bodyDraft}
             onChange={handleEditorChange}
             onAnchorsReady={(getView) => {
-              editorViewRef.current = getView()
+              const v = getView()
+              editorViewRef.current = v
+              // Apply anchors immediately so React Strict Mode's double-mount doesn't
+              // leave the second view without highlights (parent effect won't re-run
+              // if deps haven't changed, but editorViewRef now holds a fresh view).
+              if (v) {
+                const live = useCommentsStore.getState().comments
+                const validAnchors = live
+                  .filter((c) => c.parentId === null && c.status !== 'orphaned')
+                  .map((c) => ({ id: c.id, from: c.startOffset ?? 0, to: c.endOffset ?? 0 }))
+                  .filter((a) => a.from < a.to)
+                applyAnchors(v, validAnchors)
+              }
             }}
             onSelectionChange={(sel) => {
               setPendingAnchor(sel)

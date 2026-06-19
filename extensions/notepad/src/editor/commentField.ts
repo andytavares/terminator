@@ -57,7 +57,7 @@ export const commentAnchorField = StateField.define<CommentAnchor[]>({
 })
 
 /* v8 ignore start */
-function buildAnchorDecorations(anchors: CommentAnchor[]): DecorationSet {
+function buildAnchorDecorations(anchors: CommentAnchor[], hoveredId: string | null): DecorationSet {
   if (anchors.length === 0) return Decoration.none
 
   const sorted = [...anchors].sort((a, b) => a.from - b.from || a.to - b.to)
@@ -65,11 +65,14 @@ function buildAnchorDecorations(anchors: CommentAnchor[]): DecorationSet {
 
   for (const anchor of sorted) {
     if (anchor.from >= anchor.to) continue
+    const isHovered = anchor.id === hoveredId
     builder.add(
       anchor.from,
       anchor.to,
       Decoration.mark({
-        class: 'notepad-comment-anchor',
+        class: isHovered
+          ? 'notepad-comment-highlight notepad-comment-highlight--hover'
+          : 'notepad-comment-highlight',
         attributes: { 'data-comment-id': anchor.id },
       })
     )
@@ -78,19 +81,29 @@ function buildAnchorDecorations(anchors: CommentAnchor[]): DecorationSet {
   return builder.finish()
 }
 
+// Single decoration ViewPlugin that handles both the yellow background highlight
+// and the hover underline. Uses CM's built-in mark decorations — no DOM queries,
+// no absolute overlay divs, no requestAnimationFrame needed. CM automatically
+// applies marks to all visible text in the range (including text that scrolls
+// into view) on every update cycle.
 export const commentAnchorDecorations = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet
 
     constructor(view: EditorView) {
-      this.decorations = buildAnchorDecorations(view.state.field(commentAnchorField))
+      this.decorations = buildAnchorDecorations(
+        view.state.field(commentAnchorField),
+        view.state.field(hoveredAnchorField)
+      )
     }
 
     update(update: ViewUpdate) {
       const prevAnchors = update.startState.field(commentAnchorField)
       const nextAnchors = update.state.field(commentAnchorField)
-      if (update.docChanged || prevAnchors !== nextAnchors) {
-        this.decorations = buildAnchorDecorations(nextAnchors)
+      const prevHovered = update.startState.field(hoveredAnchorField)
+      const nextHovered = update.state.field(hoveredAnchorField)
+      if (update.docChanged || prevAnchors !== nextAnchors || prevHovered !== nextHovered) {
+        this.decorations = buildAnchorDecorations(nextAnchors, nextHovered)
       }
     }
   },

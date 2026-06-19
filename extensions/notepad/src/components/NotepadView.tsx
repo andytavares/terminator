@@ -538,7 +538,20 @@ export function NotepadView(): React.JSX.Element {
               initialDoc={bodyDraft}
               onChange={handleEditorChange}
               onAnchorsReady={(getView) => {
-                editorViewRef.current = getView()
+                const v = getView()
+                editorViewRef.current = v
+                // Apply anchors immediately so React Strict Mode's double-mount doesn't
+                // leave the second view without highlights. The parent anchors effect
+                // won't re-run if its deps haven't changed, but editorViewRef now holds
+                // a fresh view that needs anchors dispatched to it.
+                if (v && selectedNoteId) {
+                  const live = useCommentsStore.getState().comments
+                  const validAnchors = live
+                    .filter((c) => c.parentId === null && c.status !== 'orphaned')
+                    .map((c) => ({ id: c.id, from: c.startOffset ?? 0, to: c.endOffset ?? 0 }))
+                    .filter((a) => a.from < a.to)
+                  applyAnchors(v, validAnchors)
+                }
               }}
               onSelectionChange={(sel) => {
                 setPendingAnchor(sel)
