@@ -1,0 +1,25 @@
+src/main/index.ts
+  s_691b7cdd284c28::t_eedc413b17d021 155-156,162-163
+extensions/task-vault/src/components/CalendarDrawer.tsx
+  s_691b7cdd284c28::t_1b0c5eadaf2374 130
+src/renderer/App.tsx
+  s_691b7cdd284c28::t_c370e1438c1330 348-350
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_691b7cdd284c28::t_a3f68bf25e6b2f 363-365
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "4e1ca5011ba1e3a343cf9c45c2c66dc4af50f75d",
+  "prompts": {},
+  "sessions": {
+    "s_691b7cdd284c28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc2f31ca-0e76-4d10-8922-c93237fadd53",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
