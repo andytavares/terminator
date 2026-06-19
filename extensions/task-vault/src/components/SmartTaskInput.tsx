@@ -315,9 +315,9 @@ export function SmartTaskInput({
         <div ref={dropdownRef} className="smart-input__dropdown">
           {active?.type === 'date' ? (
             <div className="smart-input__date-picker">
-              <div className="smart-input__dropdown-label">Pick a due date</div>
               <DateTimePicker
                 mode="date"
+                defaultOpen
                 value={dateValue}
                 onChange={(v) => {
                   setDateValue(v)
