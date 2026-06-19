@@ -13,7 +13,7 @@ function highlightTitle(title: string, query: string): React.JSX.Element {
   if (words.length === 0) return <>{title}</>
   const pattern = new RegExp(
     `(${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`,
-    'gi'
+    'i'
   )
   const parts = title.split(pattern)
   return (

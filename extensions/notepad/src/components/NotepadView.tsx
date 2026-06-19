@@ -171,6 +171,7 @@ export function NotepadView(): React.JSX.Element {
           }),
           window.electronAPI.extensionBridge.invoke('terminator.notepad:comments.list', {
             noteId: selectedNoteId,
+            includeResolved: true,
           }),
         ])
 
@@ -192,18 +193,16 @@ export function NotepadView(): React.JSX.Element {
           }
         }
 
-        // Apply reanchored offsets immediately so the editor and margin reflect correct positions
-        if (anchorUpdates.length > 0) {
-          const updatedMap = new Map(anchorUpdates.map((u) => [u.id, u]))
-          setComments(
-            allComments.map((c) => {
-              const upd = updatedMap.get(c.id)
-              return upd ? { ...c, startOffset: upd.newFrom, endOffset: upd.newTo } : c
-            })
-          )
-        } else {
-          setComments(allComments)
-        }
+        // Apply reanchored offsets and orphan status immediately
+        const updatedMap = new Map(anchorUpdates.map((u) => [u.id, u]))
+        const orphanSet = new Set(orphanIds)
+        setComments(
+          allComments.map((c) => {
+            if (orphanSet.has(c.id)) return { ...c, status: 'orphaned' as const }
+            const upd = updatedMap.get(c.id)
+            return upd ? { ...c, startOffset: upd.newFrom, endOffset: upd.newTo } : c
+          })
+        )
 
         if (anchorUpdates.length > 0 || orphanIds.length > 0) {
           if (anchorTimer.current) clearTimeout(anchorTimer.current)
@@ -232,6 +231,31 @@ export function NotepadView(): React.JSX.Element {
     }
 
     void loadNoteAndComments()
+
+    return () => {
+      // Flush pending autosave for this note before switching to another
+      if (autosaveTimer.current) {
+        clearTimeout(autosaveTimer.current)
+        autosaveTimer.current = null
+        const { bodyDraft, isDirty } = useEditorStore.getState()
+        if (isDirty) {
+          const n = useNotesStore.getState().notes.find((x) => x.id === selectedNoteId)
+          const headingMatch = /^#{1,6}\s+(.+)/m.exec(bodyDraft)
+          const firstLine = bodyDraft.split('\n').find((l) => l.trim().length > 0)
+          const title = headingMatch
+            ? headingMatch[1].trim()
+            : (firstLine?.trim().slice(0, 120) ?? 'Untitled note')
+          window.electronAPI.extensionBridge
+            .invoke('terminator.notepad:notes.autosave', {
+              id: selectedNoteId,
+              title,
+              body: bodyDraft,
+              tags: n?.tags ?? [],
+            })
+            .catch((err) => console.error('[notepad] flush autosave failed', err))
+        }
+      }
+    }
   }, [selectedNoteId, setActiveNote, setComments])
 
   const scheduleAutosave = useCallback(
@@ -241,10 +265,15 @@ export function NotepadView(): React.JSX.Element {
       autosaveTimer.current = setTimeout(async () => {
         markSaving()
         const note = notes.find((n) => n.id === selectedNoteId)
+        const headingMatch = /^#{1,6}\s+(.+)/m.exec(newBody)
+        const firstLine = newBody.split('\n').find((l) => l.trim().length > 0)
+        const derivedTitle = headingMatch
+          ? headingMatch[1].trim()
+          : (firstLine?.trim().slice(0, 120) ?? 'Untitled note')
         try {
           await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.autosave', {
             id: selectedNoteId,
-            title: note?.title ?? '',
+            title: derivedTitle,
             body: newBody,
             tags: note?.tags ?? [],
           })
@@ -293,6 +322,7 @@ export function NotepadView(): React.JSX.Element {
           }
         } catch (err) {
           console.error('[notepad] Autosave failed', err)
+          markSaved()
         }
       }, AUTOSAVE_DELAY_MS)
     },

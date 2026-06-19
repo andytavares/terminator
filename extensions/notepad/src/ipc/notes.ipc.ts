@@ -95,9 +95,12 @@ export async function listNotes(payload: unknown): Promise<Record<string, unknow
   const db = getDb()
 
   const archivedFilter = includeArchived ? '' : 'AND n.archived_at IS NULL'
-  const tagJoin = tagId ? `JOIN note_tags nt ON nt.note_id = n.id AND nt.tag_id = '${tagId}'` : ''
+  const tagFilter = tagId
+    ? 'AND EXISTS (SELECT 1 FROM note_tags nt WHERE nt.note_id = n.id AND nt.tag_id = ?)'
+    : ''
   const orderCol = ['title', 'created_at', 'updated_at'].includes(sortBy) ? sortBy : 'updated_at'
   const orderDir = sortDir === 'asc' ? 'ASC' : 'DESC'
+  const params: unknown[] = tagId ? [tagId] : []
 
   const rows = db
     .prepare(
@@ -109,11 +112,10 @@ export async function listNotes(payload: unknown): Promise<Record<string, unknow
                 WHERE nt2.note_id = n.id
               ), '') AS tags
        FROM notes n
-       ${tagJoin}
-       WHERE 1=1 ${archivedFilter}
+       WHERE 1=1 ${tagFilter} ${archivedFilter}
        ORDER BY n.${orderCol} ${orderDir}`
     )
-    .all() as {
+    .all(...params) as {
     id: string
     title: string
     updated_at: string

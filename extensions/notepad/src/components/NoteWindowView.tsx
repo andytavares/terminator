@@ -7,6 +7,7 @@ import { CommentMargin } from './CommentMargin'
 import { CommentComposer } from './CommentComposer'
 import {
   NoteEditor,
+  applyAnchors,
   scrollToAnchor,
   setEditorHoverAnchor,
   type SelectionAnchor,
@@ -157,8 +158,14 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
   }, [])
 
   useEffect(() => {
-    if (!editorViewRef.current) return
-    computeAnchorTops(editorViewRef.current, comments)
+    const view = editorViewRef.current
+    if (!view) return
+    const validAnchors = comments
+      .filter((c) => c.parentId === null && c.status !== 'orphaned')
+      .map((c) => ({ id: c.id, from: c.startOffset ?? 0, to: c.endOffset ?? 0 }))
+      .filter((a) => a.from < a.to)
+    applyAnchors(view, validAnchors)
+    computeAnchorTops(view, comments)
   }, [comments, computeAnchorTops])
 
   const scheduleAutosave = useCallback(
@@ -196,12 +203,14 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
 
   function handleEditorMouseOver(e: React.MouseEvent<HTMLDivElement>) {
     const target = e.target as HTMLElement
-    const anchor = target.closest<HTMLElement>('[data-anchor-id]')
+    const anchor = target.closest<HTMLElement>('[data-comment-id]')
     if (anchor) {
-      const id = anchor.dataset.anchorId!
-      const top = anchorTops[id] ?? 0
-      if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current)
-      setCommentHover({ id, top })
+      const id = anchor.dataset.commentId
+      if (id) {
+        if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current)
+        const top = anchorTops[id] ?? 0
+        setCommentHover({ id, top })
+      }
     }
   }
 

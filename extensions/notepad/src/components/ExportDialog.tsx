@@ -47,6 +47,7 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
 
   const handleExport = useCallback(async () => {
     if (!folder || running) return
+    if (scope === 'note' && !noteId) return
     setRunning(true)
     try {
       const result = await window.electronAPI.extensionBridge.invoke(
@@ -55,6 +56,9 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
           folder,
           scope,
           ...(scope === 'note' && noteId ? { noteId } : {}),
+          includeFrontmatter,
+          commentFormat,
+          overwriteById,
         }
       )
       const data = (result as { data?: { exported: number } }).data
@@ -64,7 +68,7 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
     } finally {
       setRunning(false)
     }
-  }, [folder, scope, noteId, running])
+  }, [folder, scope, noteId, running, includeFrontmatter, commentFormat, overwriteById])
 
   const commentFormatLabels: Record<CommentFormat, string> = {
     sidecar: 'Sidecar JSON',
