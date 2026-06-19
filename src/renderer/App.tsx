@@ -345,7 +345,9 @@ export function App(): JSX.Element {
       const saved = localStorage.getItem('openPanels')
       if (saved) {
         const ids: string[] = JSON.parse(saved)
-        ids.forEach((id) => togglePanel(id))
+        ids.forEach((id) => {
+          if (!useExtensionRegistry.getState().openPanels.has(id)) togglePanel(id)
+        })
       }
     } catch {
       // ignore malformed data

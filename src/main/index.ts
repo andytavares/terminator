@@ -152,11 +152,15 @@ function setupMenu(): void {
         { type: 'separator' },
         {
           label: 'Toggle Git Changes',
+          type: 'checkbox',
+          checked: false,
           accelerator: 'CmdOrCtrl+Shift+G',
           click: () => mainWindow?.webContents.send('extension:toggle-panel', 'git-changes'),
         },
         {
           label: 'Toggle Vault Links',
+          type: 'checkbox',
+          checked: false,
           click: () => mainWindow?.webContents.send('extension:toggle-panel', 'task-vault-links'),
         },
         { type: 'separator' },

@@ -127,6 +127,7 @@ export function CalendarDrawer(): React.JSX.Element {
 
   function handleGoToDay() {
     if (!selectedDate) return
+    useVaultNavStore.getState().setView('daily')
     if (selectedDate === todayStr) void loadToday()
     else void loadDate(selectedDate)
     openTaskVault()
