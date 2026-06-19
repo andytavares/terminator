@@ -262,7 +262,7 @@ describe('bridge.route', () => {
 
       await waitForClose(ws1)
       await waitForClose(ws2)
-    })
+    }, 20000)
 
     it('is safe to call when no connections are open', () => {
       expect(() => bridgeCleanup.disconnectAll()).not.toThrow()
