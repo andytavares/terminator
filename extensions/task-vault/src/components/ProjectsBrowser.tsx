@@ -635,6 +635,7 @@ function ProjectAreaBadge({
 export function ProjectsBrowser(): React.JSX.Element {
   const [projects, setProjects] = useState<IndexedProject[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [initialized, setInitialized] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'active' | 'archived' | 'all'>('active')
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [renamingProject, setRenamingProject] = useState<string | null>(null)
@@ -654,6 +655,7 @@ export function ProjectsBrowser(): React.JSX.Element {
       setProjects((result as { projects: IndexedProject[] }).projects)
     }
     setIsLoading(false)
+    setInitialized(true)
   }
 
   useEffect(() => {
@@ -712,7 +714,8 @@ export function ProjectsBrowser(): React.JSX.Element {
     }
   }
 
-  if (isLoading) return <div className="projects-browser__loading">Loading projects…</div>
+  if (isLoading && !initialized)
+    return <div className="projects-browser__loading">Loading projects…</div>
 
   return (
     <div className="projects-browser">

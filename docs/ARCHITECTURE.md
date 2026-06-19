@@ -499,3 +499,54 @@ All registered in `extensions/git-integration/src/ipc/merge-flow.ipc.ts` and doc
 ### AI Suggestion
 
 `git:merge-ai-suggest` is stubbed to return `{ error: 'NOT_IMPLEMENTED' }` in this feature scope (Phase 3 PRD work). The channel contract is locked for future implementation.
+
+---
+
+## Markdown Notepad Extension (`extensions/notepad/`)
+
+See [ADR-018](adr/018-codemirror6-editor.md) for the editor engine decision.
+
+### 3-Process Split
+
+```
+Main process (Node.js)
+  └─ extensions/notepad/src/index.ts (activate/deactivate)
+       ├─ SQLite DB (better-sqlite3, WAL mode, FTS5)
+       ├─ registerNotesIpcHandlers()   — notes.create/list/get/autosave/archive/restore/hardDelete
+       ├─ registerTagsIpcHandlers()    — tags.list/rename/delete
+       ├─ registerCommentsIpcHandlers() — comments.create/reply/update/delete/resolve/updateAnchor/markOrphaned/list
+       ├─ registerSearchIpcHandlers()  — search.query (FTS5 + BM25 ranking)
+       └─ registerExportIpcHandlers()  — export.pickFolder/export.run/import.run
+
+Renderer process (jsdom + React + CM6)
+  └─ extensions/notepad/src/renderer.tsx
+       ├─ NotepadView (main 3-pane layout)
+       │    ├─ NoteList (sidebar: search bar, tag sidebar, note rows)
+       │    ├─ NoteEditor (CM6 host: livePreviewPlugin + commentAnchorField)
+       │    └─ CommentMargin (right pane: comment cards with anchor status)
+       ├─ QuickCreateOverlay (Cmd+Shift+N floating input)
+       └─ ExportDialog (folder picker + scope selector)
+```
+
+### Data Flow
+
+1. **Note create/autosave**: Renderer → `notes.autosave` IPC → SQLite `notes` table + `notes_fts` FTS5 virtual table (contentless, rowid-linked). Inline `#tag` parsing on autosave reconciles `note_tags` join table.
+
+2. **Search**: Renderer → `search.query` IPC → FTS5 `MATCH` with BM25 `rank` subquery; `tag:foo` / `-tag:bar` tokens parsed before FTS5 pass; plain-text LIKE fallback on FTS5 syntax errors.
+
+3. **Comment anchoring lifecycle**:
+
+   - Text selection → `CommentComposer` → `comments.create` IPC (stores `startOffset`, `endOffset`, `quote`, `prefix`, `suffix`)
+   - On note load → `reanchorComment()` tries offset-first, falls back to text-quote search (W3C TextQuoteSelector pattern)
+   - CM6 `commentAnchorField` (`StateField<CommentAnchor[]>`) remaps positions via `tr.changes.mapPos()` on every transaction
+   - Orphaned anchors (collapsed or not found) surface in the "Orphaned" section of `CommentMargin`
+
+4. **Export/Import**: `export.run` → `gray-matter` YAML frontmatter → `.md` files; re-export matches existing files by frontmatter `id` (idempotent). `import.run` upserts by `id`.
+
+### FTS5 Approach
+
+The `notes_fts` virtual table is contentless (`content=''`). Tokens are stored manually via `insertFts(db, rowid, title, body, tags)` on every create/autosave. Deletions use the FTS5 `delete` command. BM25 ranking is extracted via the hidden `rank` column in a subquery to avoid the "bm25 in the requested context" error when joining with other tables.
+
+### New IPC Channels (22 total)
+
+Documented in `specs/010-markdown-notepad/contracts/ipc-channels.md` and typed in `src/renderer/electron.d.ts`.
