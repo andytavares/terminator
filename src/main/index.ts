@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Menu, MenuItem, shell } from 'electron'
 import { join } from 'path'
 import { registerWorkspaceHandlers } from './ipc/workspace.ipc.js'
 import { registerTerminalHandlers } from './ipc/terminal.ipc.js'
@@ -47,6 +47,8 @@ declare module 'electron' {
 }
 
 let mainWindow: BrowserWindow | null = null
+let gitChangesMenuItem: MenuItem | null = null
+let vaultLinksMenuItem: MenuItem | null = null
 const ptyManager = new PtyManager()
 const extensionHost = new ExtensionHost()
 
@@ -150,11 +152,15 @@ function setupMenu(): void {
         { type: 'separator' },
         {
           label: 'Toggle Git Changes',
+          type: 'checkbox',
+          checked: false,
           accelerator: 'CmdOrCtrl+Shift+G',
           click: () => mainWindow?.webContents.send('extension:toggle-panel', 'git-changes'),
         },
         {
           label: 'Toggle Vault Links',
+          type: 'checkbox',
+          checked: false,
           click: () => mainWindow?.webContents.send('extension:toggle-panel', 'task-vault-links'),
         },
         { type: 'separator' },
@@ -187,10 +193,22 @@ function setupMenu(): void {
       ],
     },
   ]
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+  const menu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(menu)
+  const viewSubmenu = menu.items.find((i) => i.label === 'View')?.submenu
+  gitChangesMenuItem = viewSubmenu?.items.find((i) => i.label === 'Toggle Git Changes') ?? null
+  vaultLinksMenuItem = viewSubmenu?.items.find((i) => i.label === 'Toggle Vault Links') ?? null
 }
 
 function registerAppHandlers(): void {
+  _origOn(
+    'menu:set-panel-checked',
+    (_event, { panelId, open }: { panelId: string; open: boolean }) => {
+      if (panelId === 'git-changes' && gitChangesMenuItem) gitChangesMenuItem.checked = open
+      if (panelId === 'task-vault-links' && vaultLinksMenuItem) vaultLinksMenuItem.checked = open
+    }
+  )
+
   ipcMain.handle('app:get-info', () => ({
     appName: app.getName(),
     version: app.getVersion(),

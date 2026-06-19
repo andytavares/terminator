@@ -1,23 +1,30 @@
 import React from 'react'
-import { Check } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
 import { TaskVaultView, CaptureModal } from './components/TaskVaultView'
-import { LinkedVaultPanel } from './components/LinkedVaultPanel'
+import { CalendarDrawer } from './components/CalendarDrawer'
 import { useVaultNavStore } from './stores/vault-nav.store'
 import { useVaultDataStore } from './stores/vault-data.store'
 import { DEFAULT_CAPTURE_HOTKEY } from './constants'
 import type { CommandRegistration } from '../../../src/renderer/extensions/registry'
 
-function LinkedVaultPanelWrapper({
-  repoRoot,
+function VaultCalendarPanel({
+  onClose,
 }: {
   repoRoot: string | null
   onClose: () => void
 }): React.JSX.Element {
-  if (!repoRoot) {
-    return <div className="linked-vault-panel linked-vault-panel--empty">No active project.</div>
-  }
-  return <LinkedVaultPanel targetId={repoRoot} />
+  return (
+    <div className="vault-cal-panel">
+      <div className="vault-cal-panel__header">
+        <span className="vault-cal-panel__title">Calendar</span>
+        <button className="vault-cal-panel__close" onClick={onClose} title="Close">
+          <X size={13} />
+        </button>
+      </div>
+      <CalendarDrawer />
+    </div>
+  )
 }
 
 const registry = useExtensionRegistry.getState()
@@ -32,8 +39,8 @@ registry.registerGlobalTab({
 
 registry.registerSidebarPanel({
   id: 'task-vault-links',
-  label: 'Vault Links',
-  component: LinkedVaultPanelWrapper,
+  label: 'Vault Calendar',
+  component: VaultCalendarPanel,
   defaultOpen: false,
 })
 

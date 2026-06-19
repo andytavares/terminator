@@ -338,6 +338,37 @@ export function App(): JSX.Element {
     })
   }, [togglePanel])
 
+  // Restore persisted open panels on mount (after extensions have registered their panels)
+  const panelsRestored = useRef(false)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('openPanels')
+      if (saved) {
+        const ids: string[] = JSON.parse(saved)
+        ids.forEach((id) => {
+          if (!useExtensionRegistry.getState().openPanels.has(id)) togglePanel(id)
+        })
+      }
+    } catch {
+      // ignore malformed data
+    }
+    panelsRestored.current = true
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist open panels whenever they change (skip until restore has run)
+  useEffect(() => {
+    if (!panelsRestored.current) return
+    localStorage.setItem('openPanels', JSON.stringify(Array.from(openPanels)))
+    window.electronAPI.extensionEvents?.notifyPanelState?.(
+      'git-changes',
+      openPanels.has('git-changes')
+    )
+    window.electronAPI.extensionEvents?.notifyPanelState?.(
+      'task-vault-links',
+      openPanels.has('task-vault-links')
+    )
+  }, [openPanels])
+
   useEffect(() => {
     if (!window.electronAPI.extensionEvents?.onSelectProjectTab) return
     return window.electronAPI.extensionEvents.onSelectProjectTab((tabId) => {
@@ -462,28 +493,28 @@ export function App(): JSX.Element {
             visible={sidebarVisible}
           />
 
-          {activeGlobalTabId && globalTabs.has(activeGlobalTabId) ? (
-            (() => {
-              const tab = globalTabs.get(activeGlobalTabId)!
-              const TabComponent = tab.component as React.ComponentType<Record<string, never>>
-              return (
-                <div className="main-content">
-                  <TabComponent />
-                </div>
-              )
-            })()
-          ) : activeWorkspaceTabId && workspaceTabs.has(activeWorkspaceTabId) ? (
-            (() => {
-              const tab = workspaceTabs.get(activeWorkspaceTabId)!
-              const TabComponent = tab.component as React.ComponentType<Record<string, never>>
-              return (
-                <div className="main-content">
-                  <TabComponent />
-                </div>
-              )
-            })()
-          ) : (
-            <>
+          <div className="app-main-area">
+            {activeGlobalTabId && globalTabs.has(activeGlobalTabId) ? (
+              (() => {
+                const tab = globalTabs.get(activeGlobalTabId)!
+                const TabComponent = tab.component as React.ComponentType<Record<string, never>>
+                return (
+                  <div className="main-content">
+                    <TabComponent />
+                  </div>
+                )
+              })()
+            ) : activeWorkspaceTabId && workspaceTabs.has(activeWorkspaceTabId) ? (
+              (() => {
+                const tab = workspaceTabs.get(activeWorkspaceTabId)!
+                const TabComponent = tab.component as React.ComponentType<Record<string, never>>
+                return (
+                  <div className="main-content">
+                    <TabComponent />
+                  </div>
+                )
+              })()
+            ) : (
               <div className="main-content">
                 {scratchActive ? (
                   <>
@@ -541,22 +572,26 @@ export function App(): JSX.Element {
                   />
                 )}
               </div>
+            )}
 
-              {/* Extension-contributed sidebar panels */}
-              {Array.from(openPanels).map((panelId) => {
-                const panel = sidebarPanels.get(panelId)
-                if (!panel) return null
-                const PanelComponent = panel.component
-                return (
-                  <PanelComponent
-                    key={panelId}
-                    repoRoot={repoRoot}
-                    onClose={() => togglePanel(panelId)}
-                  />
-                )
-              })}
-            </>
-          )}
+            {/* Extension-contributed sidebar panels — hidden when a global tab is active */}
+            {openPanels.size > 0 && !activeGlobalTabId && !activeWorkspaceTabId && (
+              <div className="app-sidebar-panels">
+                {Array.from(openPanels).map((panelId) => {
+                  const panel = sidebarPanels.get(panelId)
+                  if (!panel) return null
+                  const PanelComponent = panel.component
+                  return (
+                    <PanelComponent
+                      key={panelId}
+                      repoRoot={repoRoot}
+                      onClose={() => togglePanel(panelId)}
+                    />
+                  )
+                })}
+              </div>
+            )}
+          </div>
 
           <NotificationPanel />
           {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}

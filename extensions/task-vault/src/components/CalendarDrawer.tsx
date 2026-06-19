@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { useVaultStore } from '../stores/vault.store'
 import { useVaultNavStore } from '../stores/vault-nav.store'
+import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import type { KanbanLane, Task } from '../vault/types'
 
 type DayData = { date: string; status: string; count: number }
@@ -120,8 +121,21 @@ export function CalendarDrawer(): React.JSX.Element {
     }
   }
 
+  function openTaskVault() {
+    useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
+  }
+
+  function handleGoToDay() {
+    if (!selectedDate) return
+    useVaultNavStore.getState().setView('daily')
+    if (selectedDate === todayStr) void loadToday()
+    else void loadDate(selectedDate)
+    openTaskVault()
+  }
+
   function handleTaskClick(task: Task, dateStr: string) {
     useVaultNavStore.getState().navigateToTask(task.id, dateStr)
+    openTaskVault()
   }
 
   const firstDay = new Date(year, month - 1, 1).getDay()
@@ -195,6 +209,13 @@ export function CalendarDrawer(): React.JSX.Element {
               <span className="cal-drawer__day-title">
                 {selectedDate === todayStr ? 'Today' : selectedDate}
               </span>
+              <button
+                className="tv-btn tv-btn--icon"
+                onClick={handleGoToDay}
+                title="Open in Task Vault"
+              >
+                <ExternalLink size={12} />
+              </button>
             </div>
             {loadingDay && <div className="cal-drawer__day-loading">…</div>}
             {!loadingDay && selectedDayTasks.length === 0 && (

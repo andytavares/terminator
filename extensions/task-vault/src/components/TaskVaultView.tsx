@@ -360,7 +360,9 @@ export function TaskVaultView(): React.JSX.Element {
   }, [pendingTaskId, todayLog, isLoading, clearPendingTask])
 
   useEffect(() => {
-    loadToday()
+    const vd = useVaultNavStore.getState().viewingDate
+    if (vd) void loadDate(vd)
+    else loadToday()
     refreshInboxCount()
     void loadContexts()
     void loadSomedayTasks()

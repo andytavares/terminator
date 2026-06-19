@@ -26,8 +26,8 @@ export function LinkedVaultPanel({ targetId }: LinkedVaultPanelProps): React.JSX
         'task-vault:links:get-for-terminator-target',
         { targetId }
       )
-      const data = res as LinkResult
-      setLinks(data ?? { tasks: [], projects: [] })
+      const data = res as LinkResult | null
+      setLinks({ tasks: data?.tasks ?? [], projects: data?.projects ?? [] })
     } finally {
       setIsLoading(false)
     }
