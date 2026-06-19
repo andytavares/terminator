@@ -1,0 +1,24 @@
+extensions/remote-control/src/server/routes/terminal.routes.ts
+  s_691b7cdd284c28::t_53ef402f9aa511 179-180
+  s_691b7cdd284c28::t_5b4962d4fe558d 114-117,145-151,164-165,171
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_691b7cdd284c28::t_4f18d7358c4a0c 354-357,359-360
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_691b7cdd284c28::t_da0229f50e4a79 363-403
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "da1460862d3df7df9db54abebf30c39db4883eef",
+  "prompts": {},
+  "sessions": {
+    "s_691b7cdd284c28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc2f31ca-0e76-4d10-8922-c93237fadd53",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
