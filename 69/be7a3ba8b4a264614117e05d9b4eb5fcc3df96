@@ -1,0 +1,58 @@
+extensions/task-vault/src/components/task-vault.css
+  s_691b7cdd284c28::t_de60e2b42b5d23 6881-6932
+  s_691b7cdd284c28::t_cde8e3e9d04434 7086-7097
+  s_691b7cdd284c28::t_8bb8663d9096bc 1130-1134
+src/main/preload.ts
+  s_691b7cdd284c28::t_53dfc2b1f398cb 152-154
+src/renderer/electron.d.ts
+  s_691b7cdd284c28::t_edaa99aeff2bf7 157
+src/main/index.ts
+  s_691b7cdd284c28::t_b313beb6936c4b 1
+  s_691b7cdd284c28::t_575613bebd5be5 155-156,163-164
+  s_691b7cdd284c28::t_ded75c4c19f363 50-51
+  s_691b7cdd284c28::t_c18f721cb95e27 198-202
+  s_691b7cdd284c28::t_b87e6bfd980459 158-159,165-166
+  s_691b7cdd284c28::t_acbedc62351793 206-213
+extensions/task-vault/src/components/CalendarDrawer.tsx
+  s_691b7cdd284c28::t_089de023093e12 122-125,130-135
+  s_691b7cdd284c28::t_c48443bb126986 224,227-228,232
+  s_691b7cdd284c28::t_01ade94f8f206d 4-5
+src/renderer/styles.css
+  s_691b7cdd284c28::t_ae113a551c40f2 138-145,155-159
+  s_691b7cdd284c28::t_4e2d3a994ddf8b 160,162-164,166
+  s_691b7cdd284c28::t_93f7799337cc1c 161,165,168
+  s_691b7cdd284c28::t_360dd775226b16 167,169
+extensions/remote-control/src/renderer.tsx
+  s_691b7cdd284c28::t_b3211b86885d9e 2,11,13-20
+src/renderer/extensions/registry.ts
+  s_691b7cdd284c28::t_0fbf1b868200cb 13-14
+extensions/task-vault/src/renderer.tsx
+  s_691b7cdd284c28::t_e93d40e548d971 42-43
+  s_691b7cdd284c28::t_bdabc9e2b27256 2
+  s_691b7cdd284c28::t_62d537486ed3bd 11-12,17-27
+  s_691b7cdd284c28::t_2efcced2c2d36c 5
+src/renderer/App.tsx
+  s_691b7cdd284c28::t_8c35f37fc66e92 460,462-464
+  s_691b7cdd284c28::t_bf09d3470043af 341-359
+  s_691b7cdd284c28::t_2d95e5dde3e6e9 360-369
+  s_691b7cdd284c28::t_5b736390d8be44 575-576
+  s_691b7cdd284c28::t_583275e2438207 494-515,573,577-592
+extensions/task-vault/src/components/LinkedVaultPanel.tsx
+  s_691b7cdd284c28::t_80b1abc5e09e7f 29-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "69be7a3ba8b4a264614117e05d9b4eb5fcc3df96",
+  "prompts": {},
+  "sessions": {
+    "s_691b7cdd284c28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc2f31ca-0e76-4d10-8922-c93237fadd53",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
