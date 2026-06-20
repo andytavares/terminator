@@ -1,0 +1,20 @@
+src/renderer/components/sidebar/ProjectRow.tsx
+  s_de21195f19f21c::t_70dfae58b0bcd3 2
+  s_de21195f19f21c::t_c47116d9c83957 126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "06c12a207af1d490bb86497b37e7ea8486e41d26",
+  "prompts": {},
+  "sessions": {
+    "s_de21195f19f21c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0a55e58-1d39-4a1c-9d1f-b42eba2e8ead",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
