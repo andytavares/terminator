@@ -1,5 +1,6 @@
 import React, { useRef, useLayoutEffect, useCallback } from 'react'
 import { useSessionStore } from '../../stores/session.store'
+import { useSettingsStore } from '../../stores/settings.store'
 import './LeafPane.css'
 
 interface Props {
@@ -11,6 +12,7 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const { getTerminalInstance, getFocusedSession, setFocusedSession, clearBellCount, sessions } =
     useSessionStore()
+  const { globalSettings } = useSettingsStore()
   const isFocused = getFocusedSession(projectId) === sessionId
   const session = sessions.get(sessionId)
   const tabTitle = session?.tabTitle ?? sessionId
@@ -31,10 +33,10 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
       setFocusedSession(projectId, sessionId)
       clearBellCount(sessionId)
       const instance = getTerminalInstance(sessionId)
-      instance?.terminal.scrollToBottom()
+      if (globalSettings?.terminal.scrollToBottomOnClick) instance?.terminal.scrollToBottom()
       instance?.terminal.focus()
     },
-    [projectId, sessionId, setFocusedSession, clearBellCount, getTerminalInstance]
+    [projectId, sessionId, setFocusedSession, clearBellCount, getTerminalInstance, globalSettings]
   )
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {

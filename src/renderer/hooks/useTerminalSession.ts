@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { useSessionStore } from '../stores/session.store'
 import { useWorkspaceStore } from '../stores/workspace.store'
 import { useNotificationStore } from '../stores/notification.store'
+import { useSettingsStore } from '../stores/settings.store'
 import { TerminalInstance } from '../components/terminal/TerminalSession'
 import type { PaneSplitDirection } from '../../../shared/types/index'
 
@@ -39,6 +40,7 @@ export function useTerminalSession() {
     getFocusedSession,
     getActiveSessionForProject,
   } = useSessionStore()
+  const { globalSettings } = useSettingsStore()
 
   const createSession = useCallback(
     async function createSession(
@@ -57,9 +59,11 @@ export function useTerminalSession() {
         scrollbackLimit,
         parentSessionId
       )
+      const scrollToBottomOnMount = globalSettings?.terminal.scrollToBottomOnMount ?? false
       const instance = new TerminalInstance(
         sessionId,
         scrollbackLimit,
+        scrollToBottomOnMount,
         makeBellHandler(sessionId, incrementBellCount)
       )
       // Store the instance first, then activate — TerminalPane's effect fires after
@@ -68,7 +72,13 @@ export function useTerminalSession() {
       setActiveSessionForProject(projectId, sessionId)
       return sessionId
     },
-    [storeCreateSession, setTerminalInstance, setActiveSessionForProject, incrementBellCount]
+    [
+      storeCreateSession,
+      setTerminalInstance,
+      setActiveSessionForProject,
+      incrementBellCount,
+      globalSettings,
+    ]
   )
 
   const splitSession = useCallback(
@@ -93,9 +103,11 @@ export function useTerminalSession() {
         scrollbackLimit,
         parentSessionId
       )
+      const scrollToBottomOnMount = globalSettings?.terminal.scrollToBottomOnMount ?? false
       const instance = new TerminalInstance(
         sessionId,
         scrollbackLimit,
+        scrollToBottomOnMount,
         makeBellHandler(sessionId, incrementBellCount)
       )
       setTerminalInstance(sessionId, instance)
@@ -108,6 +120,7 @@ export function useTerminalSession() {
       getFocusedSession,
       getActiveSessionForProject,
       incrementBellCount,
+      globalSettings,
     ]
   )
 

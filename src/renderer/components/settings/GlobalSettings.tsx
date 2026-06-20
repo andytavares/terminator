@@ -10,6 +10,9 @@ export function GlobalSettings(): JSX.Element {
     updateWorktreeBaseDir,
     updateBranchExcludePatterns,
     updateShowMetricsBar,
+    updateScrollToBottomOnClick,
+    updateScrollToBottomOnFocus,
+    updateScrollToBottomOnMount,
   } = useSettingsStore()
 
   if (!globalSettings) return <div>Loading...</div>
@@ -67,6 +70,48 @@ export function GlobalSettings(): JSX.Element {
             }
           }}
         />
+      </div>
+
+      <div className="settings-section__field">
+        <label className="settings-section__label settings-section__label--inline">
+          <input
+            type="checkbox"
+            checked={globalSettings.terminal.scrollToBottomOnClick ?? false}
+            onChange={(e) => void updateScrollToBottomOnClick(e.target.checked)}
+          />
+          Scroll to bottom on click
+        </label>
+        <span className="settings-section__hint">
+          Automatically scrolls to current output when clicking the terminal while viewing history.
+        </span>
+      </div>
+
+      <div className="settings-section__field">
+        <label className="settings-section__label settings-section__label--inline">
+          <input
+            type="checkbox"
+            checked={globalSettings.terminal.scrollToBottomOnFocus ?? false}
+            onChange={(e) => void updateScrollToBottomOnFocus(e.target.checked)}
+          />
+          Scroll to bottom on app focus
+        </label>
+        <span className="settings-section__hint">
+          Scrolls to current output when the app window regains focus.
+        </span>
+      </div>
+
+      <div className="settings-section__field">
+        <label className="settings-section__label settings-section__label--inline">
+          <input
+            type="checkbox"
+            checked={globalSettings.terminal.scrollToBottomOnMount ?? false}
+            onChange={(e) => void updateScrollToBottomOnMount(e.target.checked)}
+          />
+          Scroll to bottom on tab switch
+        </label>
+        <span className="settings-section__hint">
+          Scrolls to current output when switching to a terminal tab.
+        </span>
       </div>
 
       <h3 className="settings-section__title" style={{ marginTop: 20 }}>

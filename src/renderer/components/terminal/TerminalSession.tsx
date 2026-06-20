@@ -62,6 +62,7 @@ export class TerminalInstance {
   private opened = false
   private sessionId: string
   private busyTimer: ReturnType<typeof setTimeout> | null = null
+  private scrollToBottomOnMount: boolean
 
   // The root element xterm renders into — created on first mount(), moved between containers.
   readonly element: HTMLDivElement
@@ -70,8 +71,14 @@ export class TerminalInstance {
   // Snapshot captured in unmount() so Overview can display it after the element is detached.
   lastSnapshot: string | null = null
 
-  constructor(sessionId: string, scrollbackLimit: number, onBell?: () => void) {
+  constructor(
+    sessionId: string,
+    scrollbackLimit: number,
+    scrollToBottomOnMount: boolean,
+    onBell?: () => void
+  ) {
     this.sessionId = sessionId
+    this.scrollToBottomOnMount = scrollToBottomOnMount
     this.terminal = new Terminal({
       scrollback: scrollbackLimit,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
@@ -395,7 +402,7 @@ export class TerminalInstance {
       this.opened = true
     }
     this.fitAddon.fit()
-    this.terminal.scrollToBottom()
+    if (this.scrollToBottomOnMount) this.terminal.scrollToBottom()
     this.terminal.focus()
     this.resizeObserver = new ResizeObserver(() => this.fitAddon.fit())
     this.resizeObserver.observe(container)

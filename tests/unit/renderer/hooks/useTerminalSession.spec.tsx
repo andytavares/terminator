@@ -18,13 +18,32 @@ vi.mock('../../../../src/renderer/stores/notification.store', () => ({
   }),
 }))
 
+vi.mock('../../../../src/renderer/stores/settings.store', () => ({
+  useSettingsStore: vi.fn().mockReturnValue({
+    globalSettings: {
+      terminal: {
+        scrollToBottomOnMount: false,
+        scrollToBottomOnClick: false,
+        scrollToBottomOnFocus: false,
+        scrollbackLimit: 10000,
+        defaultShell: '/bin/zsh',
+      },
+    },
+  }),
+}))
+
 // Track the bell callback so we can invoke it in tests
 let capturedBellCallback: (() => void) | undefined
 
 // Mock TerminalSession to avoid xterm import issues in test environment
 vi.mock('../../../../src/renderer/components/terminal/TerminalSession', () => ({
   TerminalInstance: class MockTerminalInstance {
-    constructor(_sessionId: string, _scrollbackLimit: number, onBell?: () => void) {
+    constructor(
+      _sessionId: string,
+      _scrollbackLimit: number,
+      _scrollToBottomOnMount: boolean,
+      onBell?: () => void
+    ) {
       capturedBellCallback = onBell
     }
   },
@@ -544,6 +563,22 @@ describe('useTerminalSession', () => {
 
       expect(mockAddNotification).not.toHaveBeenCalled()
       expect(mockIncrementBellCount).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('scrollToBottomOnMount fallback', () => {
+    it('createSession falls back to false when globalSettings is null', async () => {
+      const { useSettingsStore } = await import('../../../../src/renderer/stores/settings.store')
+      vi.mocked(useSettingsStore).mockReturnValue({
+        globalSettings: null,
+      } as unknown as ReturnType<typeof useSettingsStore>)
+
+      const { useTerminalSession } = await import(
+        '../../../../src/renderer/hooks/useTerminalSession'
+      )
+      const { result } = renderHook(() => useTerminalSession())
+      await result.current.createSession('proj-1', 'human', 'Terminal', '/cwd', 5000)
+      expect(mockSetTerminalInstance).toHaveBeenCalledWith('session-123', expect.anything())
     })
   })
 })

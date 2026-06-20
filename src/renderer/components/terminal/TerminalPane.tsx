@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useSessionStore } from '../../stores/session.store'
+import { useSettingsStore } from '../../stores/settings.store'
 import type { PaneNode } from '../../../../shared/types/index'
 import { SplitContainer } from './SplitContainer'
 import { LeafPane } from './LeafPane'
@@ -25,6 +26,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
   const activeSessionId = getActiveSessionForProject(projectId)
   const sessions = getSessionsForProject(projectId)
   const layout = getPaneLayout(projectId)
+  const { globalSettings } = useSettingsStore()
 
   // All hooks must run unconditionally before any early return.
   useEffect(() => {
@@ -88,9 +90,10 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
   }, [activeSessionId, getTerminalInstance])
 
   useEffect(() => {
+    if (!globalSettings?.terminal.scrollToBottomOnFocus) return
     window.addEventListener('focus', scrollActiveToBottom)
     return () => window.removeEventListener('focus', scrollActiveToBottom)
-  }, [scrollActiveToBottom])
+  }, [scrollActiveToBottom, globalSettings?.terminal.scrollToBottomOnFocus])
 
   const handleRatioChange = useCallback(
     (splitId: string, ratio: number) => {
@@ -117,7 +120,11 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
 
   function handleMouseDown(e: React.MouseEvent): void {
     if (e.button !== 0) return
-    scrollActiveToBottom()
+    if (activeSessionId) {
+      const instance = getTerminalInstance(activeSessionId)
+      if (globalSettings?.terminal.scrollToBottomOnClick) instance?.terminal.scrollToBottom()
+      instance?.terminal.focus()
+    }
   }
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {

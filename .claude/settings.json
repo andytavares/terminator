@@ -62,6 +62,9 @@
         "hooks": [{ "type": "command", "command": ".claude/hooks/pre-edit-guard.sh" }]
       }
     ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": ".claude/hooks/pre-stop.sh" }] }
+    ],
     "PostCompact": [
       { "hooks": [{ "type": "command", "command": ".claude/hooks/post-compact.sh" }] }
     ],

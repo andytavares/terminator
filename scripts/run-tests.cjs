@@ -11,8 +11,16 @@ const extraArgs = process.argv.slice(2)
 
 execSync('npm rebuild better-sqlite3', { stdio: 'inherit' })
 
-const result = spawnSync('npx', ['vitest', 'run', '--coverage', ...extraArgs], { stdio: 'inherit' })
+let result
+try {
+  result = spawnSync('npx', ['vitest', 'run', '--coverage', ...extraArgs], { stdio: 'inherit' })
+} finally {
+  try {
+    execSync('npx electron-rebuild', { stdio: 'inherit' })
+  } catch (err) {
+    console.error('⚠️  Failed to restore Electron ABI for native modules:', err.message)
+    console.error('    Run: npx electron-rebuild')
+  }
+}
 
-execSync('npx electron-rebuild -f -w better-sqlite3', { stdio: 'inherit' })
-
-process.exit(result.status ?? 1)
+process.exit(result?.status ?? 1)

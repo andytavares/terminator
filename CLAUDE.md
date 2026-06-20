@@ -6,9 +6,29 @@ shell commands, and other important information, read the current plan:
 
 <!-- SPECKIT END -->
 
-# Project Constitution
+# MANDATORY: Follow the Project Constitution — No Exceptions
 
-The full project constitution is at **`.specify/memory/constitution.md`**. It is the authoritative source of all mandatory principles. Read it before starting any work. Key principles with session-level enforcement rules are called out below.
+The constitution at **`.specify/memory/constitution.md`** is the law of this codebase. Every principle is mandatory. There are no exceptions, no "I'll add tests later", no skipping coverage checks because a change "seems simple".
+
+**Before writing a single line of production code:**
+
+1. Run `find-reuse` — do not duplicate existing implementations
+2. Write the failing test first (Red → Green → Refactor)
+3. Every new production file needs a companion spec achieving ≥ 80% coverage
+
+**Before finishing any session:**
+
+- `npm run format` — zero formatting issues
+- `npm run lint` — zero errors (warnings OK)
+- `npm test` — all tests pass, all coverage thresholds ≥ 80%
+- `/google-review` — run the Google eng-practices interactive review; address all BLOCKERs before committing
+- A pre-stop hook enforces format + lint + coverage automatically; if it blocks you, fix the issue rather than looking for a workaround
+
+Ignoring these rules is not a time-saver. It creates commit failures, broken builds, and technical debt that blocks future work.
+
+---
+
+# Project Constitution
 
 ---
 
