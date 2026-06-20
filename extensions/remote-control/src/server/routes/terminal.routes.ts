@@ -49,6 +49,8 @@ export async function registerTerminalRoutes(
   const adoptedSessions = new Set<string>()
   // Cleanup callbacks for adopted session data listeners
   const adoptedSessionDisposers = new Map<string, () => void>()
+  // Cleanup callbacks for adopted session exit listeners
+  const adoptedExitDisposers = new Map<string, () => void>()
 
   app.get('/api/terminals', async () => {
     const remote = Array.from(sessions.values()).map((s) => ({
@@ -107,8 +109,21 @@ export async function registerTerminalRoutes(
     async (request, reply) => {
       const { sessionId } = request.params
       if (!sessions.has(sessionId)) return reply.status(404).send({ error: 'NOT_FOUND' })
-      ptyManager.kill(sessionId)
+      if (!adoptedSessions.has(sessionId)) {
+        ptyManager.kill(sessionId)
+      }
       subscriberManager.destroySession(sessionId)
+      const dataDisposer = adoptedSessionDisposers.get(sessionId)
+      if (dataDisposer) {
+        dataDisposer()
+        adoptedSessionDisposers.delete(sessionId)
+      }
+      const exitDisposer = adoptedExitDisposers.get(sessionId)
+      if (exitDisposer) {
+        exitDisposer()
+        adoptedExitDisposers.delete(sessionId)
+      }
+      adoptedSessions.delete(sessionId)
       sessions.delete(sessionId)
       return { ok: true }
     }
@@ -207,26 +222,33 @@ export async function registerTerminalRoutes(
         // Keep the broadcast callback alive across reconnects — do NOT tie it to ws close.
         if (dispose) adoptedSessionDisposers.set(sessionId, dispose)
         // Clean up when the native PTY exits so we don't list dead sessions.
-        ptyManager.attachOnExit(sessionId, () => {
+        const exitDispose = ptyManager.attachOnExit(sessionId, () => {
           const dataDisposer = adoptedSessionDisposers.get(sessionId)
           if (dataDisposer) {
             dataDisposer()
             adoptedSessionDisposers.delete(sessionId)
           }
+          adoptedExitDisposers.delete(sessionId)
           adoptedSessions.delete(sessionId)
           sessions.delete(sessionId)
           subscriberManager.destroySession(sessionId)
         })
+        if (exitDispose) adoptedExitDisposers.set(sessionId, exitDispose)
       }
 
       const accepted = subscriberManager.addSubscriber(sessionId, ws, getMaxSubscribers())
       if (!accepted) {
         // If we just adopted this session, roll back the adopt to avoid a permanent leak
         if (wasJustAdopted) {
-          const disposer = adoptedSessionDisposers.get(sessionId)
-          if (disposer) {
-            disposer()
+          const dataDisposer = adoptedSessionDisposers.get(sessionId)
+          if (dataDisposer) {
+            dataDisposer()
             adoptedSessionDisposers.delete(sessionId)
+          }
+          const exitDisposer = adoptedExitDisposers.get(sessionId)
+          if (exitDisposer) {
+            exitDisposer()
+            adoptedExitDisposers.delete(sessionId)
           }
           adoptedSessions.delete(sessionId)
           sessions.delete(sessionId)
@@ -281,6 +303,8 @@ export async function registerTerminalRoutes(
       }
       for (const disposer of adoptedSessionDisposers.values()) disposer()
       adoptedSessionDisposers.clear()
+      for (const disposer of adoptedExitDisposers.values()) disposer()
+      adoptedExitDisposers.clear()
       adoptedSessions.clear()
       sessions.clear()
     },

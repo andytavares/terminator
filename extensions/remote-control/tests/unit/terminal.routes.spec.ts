@@ -591,6 +591,62 @@ describe('WS /ws/terminals/:sessionId', () => {
     vi.useRealTimers()
   })
 
+  it('DELETE does not kill adopted session PTY', async () => {
+    const nativeId = 'native-delete-no-kill'
+    mockPtyManager.listSessions.mockReturnValue([{ sessionId: nativeId, cwd: '/native' }])
+
+    const ticketRes = await wsApp.inject({
+      method: 'POST',
+      url: `/api/terminals/${nativeId}/ws-ticket`,
+    })
+    const { ticket } = JSON.parse(ticketRes.body)
+
+    // Adopt the session via WS connect
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`${baseUrl}/ws/terminals/${nativeId}?ticket=${ticket}`)
+      ws.on('open', () => ws.close())
+      ws.on('close', resolve)
+      ws.on('error', reject)
+      setTimeout(() => reject(new Error('timeout')), 2000)
+    })
+    await new Promise<void>((r) => setTimeout(r, 30))
+
+    // DELETE the adopted session — must not kill the native PTY
+    const res = await wsApp.inject({ method: 'DELETE', url: `/api/terminals/${nativeId}` })
+    expect(res.statusCode).toBe(200)
+    expect(mockPtyManager.kill).not.toHaveBeenCalledWith(nativeId)
+  })
+
+  it('exit listener disposer is stored and called on adopt rollback, preventing stacked listeners', async () => {
+    const nativeId = 'native-exit-rollback'
+    const mockExitDispose = vi.fn()
+    mockPtyManager.listSessions.mockReturnValue([{ sessionId: nativeId, cwd: '/native' }])
+    mockPtyManager.attachOnExit.mockReturnValueOnce(mockExitDispose)
+    vi.spyOn(wsSubscriberManager, 'addSubscriber').mockReturnValueOnce(false)
+
+    const ticketRes = await wsApp.inject({
+      method: 'POST',
+      url: `/api/terminals/${nativeId}/ws-ticket`,
+    })
+    const { ticket } = JSON.parse(ticketRes.body)
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`${baseUrl}/ws/terminals/${nativeId}?ticket=${ticket}`)
+      ws.on('open', () =>
+        setTimeout(() => {
+          ws.close()
+          resolve()
+        }, 30)
+      )
+      ws.on('error', reject)
+      setTimeout(() => reject(new Error('timeout')), 2000)
+    })
+    await new Promise<void>((r) => setTimeout(r, 30))
+
+    // Exit disposer must be called during rollback
+    expect(mockExitDispose).toHaveBeenCalled()
+  })
+
   it('forwards messages from primary subscriber to ptyManager', async () => {
     const sessionId = await createSession()
     const ticketRes = await wsApp.inject({
