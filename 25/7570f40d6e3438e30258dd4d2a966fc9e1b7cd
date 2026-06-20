@@ -1,0 +1,20 @@
+src/renderer/components/sidebar/BranchSwitcher.tsx
+  s_7c355cbd25b8e0::t_c40d3ef80e00e9 191
+  s_7c355cbd25b8e0::t_06613f84dab4e2 66-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "257570f40d6e3438e30258dd4d2a966fc9e1b7cd",
+  "prompts": {},
+  "sessions": {
+    "s_7c355cbd25b8e0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec46619e-a4db-4793-a0ec-a6cc1eda0b2e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
