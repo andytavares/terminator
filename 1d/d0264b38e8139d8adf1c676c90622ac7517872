@@ -1,0 +1,19 @@
+src/renderer/components/sidebar/ProjectRow.css
+  s_da066600789312::t_e8eb2d70c9455c 111-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "1dd0264b38e8139d8adf1c676c90622ac7517872",
+  "prompts": {},
+  "sessions": {
+    "s_da066600789312": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b233e45-1b62-483a-8fb7-dc58c7a38797",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
