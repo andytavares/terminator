@@ -1,0 +1,26 @@
+scripts/run-tests.cjs
+  s_7c355cbd25b8e0::t_2ff0270b7ee86d 1-18
+package.json
+  s_7c355cbd25b8e0::t_3f6d58519a130f 21,24
+  s_7c355cbd25b8e0::t_6f080a486989bf 32
+.nvmrc
+  s_7c355cbd25b8e0::t_06983c27203fb3 1
+electron-builder.yml
+  s_7c355cbd25b8e0::t_6b75d194d45329 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "fb5d9cc216d0a33e27f38fd4ade61462381de732",
+  "prompts": {},
+  "sessions": {
+    "s_7c355cbd25b8e0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec46619e-a4db-4793-a0ec-a6cc1eda0b2e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
