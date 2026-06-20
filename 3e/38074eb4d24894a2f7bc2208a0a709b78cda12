@@ -1,0 +1,26 @@
+extensions/remote-control/src/server/routes/terminal.routes.ts
+  s_da066600789312::t_ef932daa6dde14 259-262
+src/renderer/components/sidebar/ProjectRow.css
+  s_da066600789312::t_ffcb98d2c257d6 108,111-123
+  s_da066600789312::t_99639f4c1c61ca 107,109-110,124-125
+tests/unit/renderer-remote/mobile/MobileTerminalList.spec.tsx
+  s_da066600789312::t_c002fdd56e948e 514-546
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_da066600789312::t_5760100cac0d68 532-566
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "3e38074eb4d24894a2f7bc2208a0a709b78cda12",
+  "prompts": {},
+  "sessions": {
+    "s_da066600789312": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b233e45-1b62-483a-8fb7-dc58c7a38797",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
