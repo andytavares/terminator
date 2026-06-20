@@ -56,7 +56,11 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
   useEffect(() => {
     if (!gitRoot || branchMode !== 'worktree') return
     const branch = worktreeIsNewBranch ? newBranchName : selectedBranch
-    if (!branch) return
+    if (!branch) {
+      // Show the base directory so users can see where worktrees go by default
+      setWorktreePath(worktreeBaseDir ?? `${gitRoot}/.worktrees`)
+      return
+    }
     window.electronAPI.git.suggestWorktreePath(gitRoot, branch, worktreeBaseDir).then((r) => {
       setWorktreePath(r.path)
     })
@@ -91,6 +95,11 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
       return
     }
     setError('')
+
+    if (branchMode === 'existing' && hasNonWorktreeProject) {
+      setError('A branch-based project already exists in this workspace')
+      return
+    }
 
     if (!gitRoot || branchMode === 'existing') {
       let branch = selectedBranch
