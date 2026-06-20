@@ -1,0 +1,24 @@
+scripts/run-tests.cjs
+  s_3f518e1d22aaee::t_4da7d1280f334d 21,24,27
+src/renderer/components/terminal/TerminalPane.tsx
+  s_3f518e1d22aaee::t_57709559db6ac7 67-70,72-73
+  s_3f518e1d22aaee::t_21987fdeec416b 98,108-110
+.claude/hooks/pre-stop.sh
+  s_3f518e1d22aaee::t_cde7be77600b43 4-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "dbe54a6c97aa2af0091ebc638c5c495e5e6f92fc",
+  "prompts": {},
+  "sessions": {
+    "s_3f518e1d22aaee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a222a66a-ab28-43ff-b1ab-3415d457d2cd",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
