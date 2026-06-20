@@ -18,13 +18,13 @@ try {
 
 let result
 try {
-  result = spawnSync('vitest', ['run', '--coverage', ...extraArgs], { stdio: 'inherit' })
+  result = spawnSync('npx', ['vitest', 'run', '--coverage', ...extraArgs], { stdio: 'inherit' })
 } finally {
   try {
-    execSync('electron-rebuild', { stdio: 'inherit' })
+    execSync('npx electron-rebuild', { stdio: 'inherit' })
   } catch (err) {
     console.error('⚠️  Failed to restore Electron ABI for native modules:', err.message)
-    console.error('    Run: electron-rebuild')
+    console.error('    Run: npx electron-rebuild')
   }
 }
 

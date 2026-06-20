@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Stop hook: enforces format + lint + patch coverage before Claude finishes a turn.
 # Exit 1 + stdout blocks the stop. Must ALWAYS exit 0 or 1 — never any other code.
-# set -e is intentionally absent: we need to capture exit codes, not abort on them.
+# set -euo pipefail is intentionally absent: we capture individual exit codes so all
+# checks run and are reported together, rather than aborting on the first failure.
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$ROOT" || exit 0
