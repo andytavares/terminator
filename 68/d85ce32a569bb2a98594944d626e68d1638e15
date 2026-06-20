@@ -1,0 +1,21 @@
+extensions/remote-control/src/server/routes/terminal.routes.ts
+  s_da066600789312::t_b8e70897e6cc26 52-53
+  s_da066600789312::t_a5ba3b629ce7ec 112-114,116-120,231,245,252
+  s_da066600789312::t_019c924de1b759 225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "68d85ce32a569bb2a98594944d626e68d1638e15",
+  "prompts": {},
+  "sessions": {
+    "s_da066600789312": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b233e45-1b62-483a-8fb7-dc58c7a38797",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
