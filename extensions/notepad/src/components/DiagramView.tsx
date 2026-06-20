@@ -339,7 +339,6 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
         // Read title/tags from refs at fire time so a rename between schedule and fire is respected
         const fireTitle = latestTitleRef.current
         const fireTags = latestTagsRef.current
-        pendingSaveRef.current = null
         setSaveStatus('saving')
         try {
           await window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.autosave', {
@@ -348,10 +347,12 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
             sceneJson: newSceneJson,
             tags: fireTags,
           })
+          pendingSaveRef.current = null
           setSaveStatus('saved')
         } catch (err) {
           console.error('[notepad] DiagramView: autosave failed', err)
           setSaveStatus('error')
+          // pendingSaveRef is intentionally kept so the unmount flush can retry
         }
       }, AUTOSAVE_DELAY_MS)
     },
@@ -533,8 +534,11 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
       <div
         ref={containerRef}
         className={`diagram-view__canvas${commentMode ? ' diagram-view__canvas--comment-mode' : ''}`}
-        onClick={handleCanvasClick}
       >
+        {/* Transparent overlay in comment mode captures clicks before Excalidraw sees them */}
+        {commentMode && (
+          <div className="diagram-view__comment-intercept" onClick={handleCanvasClick} />
+        )}
         {loaded && (
           <Suspense fallback={<div className="diagram-view__loading">Loading canvas…</div>}>
             <ExcalidrawComponent

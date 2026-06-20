@@ -2304,6 +2304,13 @@
   cursor: crosshair;
 }
 
+.diagram-view__comment-intercept {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  cursor: crosshair;
+}
+
 .diagram-view__canvas > .excalidraw-wrapper,
 .diagram-view__canvas > div:first-child {
   width: 100%;

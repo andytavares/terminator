@@ -333,15 +333,14 @@ export function NoteList(): React.JSX.Element {
   useEffect(() => {
     const previousTags = tagsRef.current
     const tagMap = new Map<string, { id: string; name: string; count: number }>()
-    for (const note of notes) {
-      for (const name of note.tags) {
-        const existing = tagMap.get(name)
-        if (existing) {
-          existing.count++
-        } else {
-          const known = previousTags.find((t) => t.name === name)
-          tagMap.set(name, { id: known?.id ?? `local:${name}`, name, count: 1 })
-        }
+    const allTagSources = [...notes.flatMap((n) => n.tags), ...diagrams.flatMap((d) => d.tags)]
+    for (const name of allTagSources) {
+      const existing = tagMap.get(name)
+      if (existing) {
+        existing.count++
+      } else {
+        const known = previousTags.find((t) => t.name === name)
+        tagMap.set(name, { id: known?.id ?? `local:${name}`, name, count: 1 })
       }
     }
     const derived = Array.from(tagMap.values()).map((t) => ({
@@ -351,7 +350,7 @@ export function NoteList(): React.JSX.Element {
     }))
     tagsRef.current = derived
     setTags(derived)
-  }, [notes])
+  }, [notes, diagrams])
 
   const loadTagIds = useCallback(async () => {
     /* v8 ignore next 3 */
