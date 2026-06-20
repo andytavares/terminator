@@ -118,7 +118,9 @@ export async function registerTerminalRoutes(
     '/api/terminals/:sessionId/resize',
     async (request, reply) => {
       const { sessionId } = request.params
-      if (!sessions.has(sessionId)) return reply.status(404).send({ error: 'NOT_FOUND' })
+      const knownToManager = ptyManager.listSessions().some((s) => s.sessionId === sessionId)
+      if (!sessions.has(sessionId) && !knownToManager)
+        return reply.status(404).send({ error: 'NOT_FOUND' })
       const result = ResizeSchema.safeParse(request.body)
       if (!result.success) {
         return reply.status(400).send({ error: 'VALIDATION_ERROR', message: result.error.message })

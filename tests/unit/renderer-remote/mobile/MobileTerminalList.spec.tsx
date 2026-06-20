@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import React from 'react'
 import type { Workspace } from '../../../../src/renderer-remote/api/remote-client'
@@ -15,6 +15,10 @@ const workspace: Workspace = {
   color: 'blue',
   tags: [],
 }
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('MobileTerminalList', () => {
   it('renders workspace names', async () => {
@@ -427,5 +431,46 @@ describe('MobileTerminalList', () => {
     const menuItems = screen.getAllByText('My Workspace')
     fireEvent.click(menuItems[menuItems.length - 1])
     expect(mockOnAssignWorkspace).toHaveBeenCalledWith('s-assign', 'w1')
+  })
+
+  it('resets longPressFired after blocking a click, so subsequent taps on any terminal work', async () => {
+    vi.useFakeTimers()
+    const wsTerm: TerminalSession = {
+      sessionId: 's-ws',
+      cwd: '/Users/me/projects/myapp',
+      createdAt: '2026-06-19T10:00:00.000Z',
+    }
+    const unassigned: TerminalSession = {
+      sessionId: 's-scratch',
+      cwd: '/tmp/scratch',
+      createdAt: '2026-06-19T10:00:00.000Z',
+    }
+    const { MobileTerminalList } = await import(
+      '../../../../src/renderer-remote/components/MobileTerminalList'
+    )
+    render(
+      <MobileTerminalList
+        workspaces={[workspace]}
+        terminals={[wsTerm, unassigned]}
+        onSelectTerminal={mockOnSelectTerminal}
+        onCreateTerminal={mockOnCreateTerminal}
+        onAssignWorkspace={mockOnAssignWorkspace}
+      />
+    )
+    // Long-press the unassigned terminal to set longPressFired = true
+    fireEvent.touchStart(screen.getByText('scratch'), { touches: [{ clientX: 10, clientY: 10 }] })
+    await act(async () => {
+      vi.advanceTimersByTime(500)
+    })
+    // Click the workspace terminal — blocked by longPressFired, but flag is cleared
+    fireEvent.click(screen.getByText('myapp'))
+    expect(mockOnSelectTerminal).not.toHaveBeenCalled()
+    // Second click should now go through
+    fireEvent.click(screen.getByText('myapp'))
+    expect(mockOnSelectTerminal).toHaveBeenCalledWith({
+      sessionId: 's-ws',
+      cwd: '/Users/me/projects/myapp',
+    })
+    vi.useRealTimers()
   })
 })

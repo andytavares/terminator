@@ -85,11 +85,12 @@ export async function assignTerminalWorkspace(
   sessionId: string,
   workspaceId: string | null
 ): Promise<void> {
-  await apiFetch(`/api/terminals/${sessionId}`, {
+  const res = await apiFetch(`/api/terminals/${sessionId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ workspaceId }),
   })
+  if (!res.ok) throw new Error(`assignTerminalWorkspace failed: ${res.status}`)
 }
 
 export async function listWorkspaces(): Promise<Workspace[]> {

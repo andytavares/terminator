@@ -205,6 +205,18 @@ describe('POST /api/terminals/:sessionId/resize', () => {
     })
     expect(res.statusCode).toBe(404)
   })
+
+  it('resizes an adopted ptyManager session not in the remote sessions map', async () => {
+    const nativeId = 'native-resize-session'
+    mockPtyManager.listSessions.mockReturnValueOnce([{ sessionId: nativeId, cwd: '/native' }])
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/terminals/${nativeId}/resize`,
+      payload: { cols: 100, rows: 30 },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(mockPtyManager.resize).toHaveBeenCalledWith(nativeId, 100, 30)
+  })
 })
 
 describe('POST /api/terminals/:sessionId/ws-ticket', () => {

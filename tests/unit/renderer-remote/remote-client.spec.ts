@@ -178,6 +178,14 @@ describe('assignTerminalWorkspace', () => {
     const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit]
     expect(JSON.parse(opts.body as string)).toEqual({ workspaceId: null })
   })
+
+  it('throws when PATCH response is not ok', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 404 })
+    const { assignTerminalWorkspace } = await import(
+      '../../../src/renderer-remote/api/remote-client'
+    )
+    await expect(assignTerminalWorkspace('s-missing', 'w1')).rejects.toThrow('404')
+  })
 })
 
 describe('Authorization header', () => {

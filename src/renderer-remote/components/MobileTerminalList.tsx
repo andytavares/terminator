@@ -76,7 +76,10 @@ export function MobileTerminalList({
       className="mobile-list__terminal"
       type="button"
       onClick={() => {
-        if (longPressFired.current) return
+        if (longPressFired.current) {
+          longPressFired.current = false
+          return
+        }
         onSelectTerminal({ sessionId: t.sessionId, cwd: t.cwd })
       }}
       onKeyDown={(e) => {

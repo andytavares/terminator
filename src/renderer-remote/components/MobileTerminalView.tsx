@@ -71,6 +71,10 @@ export function MobileTerminalView({ sessionId, cwd, onBack }: Props) {
     const ro = new ResizeObserver(() => fitAddon.fit())
     ro.observe(containerRef.current)
 
+    term.onData((data) => {
+      wsRef.current?.send(data)
+    })
+
     term.onResize(({ cols, rows }) => {
       resizeTerminal(sessionId, cols, rows).catch(() => undefined)
     })
