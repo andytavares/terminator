@@ -9,9 +9,12 @@ const mockSetActiveGlobalTab = vi.fn()
 const mockSetActiveWorkspace = vi.fn()
 const mockSetActiveProject = vi.fn()
 const mockSetScratchActive = vi.fn()
+const mockSetActiveSessionForProject = vi.fn()
 
 vi.mock('../../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: vi.fn(),
+  useSessionStore: Object.assign(vi.fn(), {
+    getState: vi.fn(),
+  }),
 }))
 
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
@@ -94,6 +97,10 @@ beforeEach(() => {
     sessions: new Map(),
     busySessions: new Set(),
   } as unknown as ReturnType<typeof useSessionStore>)
+
+  vi.mocked(useSessionStore).getState = vi.fn().mockReturnValue({
+    setActiveSessionForProject: mockSetActiveSessionForProject,
+  })
 
   vi.mocked(useWorkspaceStore).mockReturnValue({
     workspaces: [],
@@ -440,6 +447,7 @@ describe('OverviewScreen', () => {
       screen.getByTestId('tile-scratch-2').click()
     })
 
+    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'scratch-2')
     expect(mockSetScratchActive).toHaveBeenCalledWith(true)
     expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
     expect(mockSetActiveProject).not.toHaveBeenCalled()

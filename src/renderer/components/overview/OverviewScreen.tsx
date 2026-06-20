@@ -117,6 +117,7 @@ export function OverviewScreen(): JSX.Element {
   function navigate(tile: TileData): void {
     useExtensionRegistry.getState().setActiveGlobalTab(null)
     if (tile.isScratch) {
+      useSessionStore.getState().setActiveSessionForProject(SCRATCH_PROJECT_ID, tile.session.id)
       setScratchActive(true)
       return
     }

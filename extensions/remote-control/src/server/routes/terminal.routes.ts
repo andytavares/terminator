@@ -187,7 +187,8 @@ export async function registerTerminalRoutes(
         return
       }
 
-      if (!sessions.has(sessionId)) {
+      const wasJustAdopted = !sessions.has(sessionId)
+      if (wasJustAdopted) {
         // Adopt an existing ptyManager session on first remote connect
         const existing = ptyManager.listSessions().find((s) => s.sessionId === sessionId)
         if (!existing) {
@@ -208,7 +209,19 @@ export async function registerTerminalRoutes(
       }
 
       const accepted = subscriberManager.addSubscriber(sessionId, ws, getMaxSubscribers())
-      if (!accepted) return
+      if (!accepted) {
+        // If we just adopted this session, roll back the adopt to avoid a permanent leak
+        if (wasJustAdopted) {
+          const disposer = adoptedSessionDisposers.get(sessionId)
+          if (disposer) {
+            disposer()
+            adoptedSessionDisposers.delete(sessionId)
+          }
+          adoptedSessions.delete(sessionId)
+          sessions.delete(sessionId)
+        }
+        return
+      }
 
       // Cancel any pending grace-period teardown — client reconnected in time
       const pending = gracePeriodTimers.get(sessionId)

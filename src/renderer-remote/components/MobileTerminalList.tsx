@@ -19,6 +19,50 @@ interface Props {
   onAssignWorkspace: (sessionId: string, workspaceId: string | null) => void
 }
 
+interface TerminalButtonProps {
+  t: TerminalSession
+  showContextMenu?: boolean
+  longPressFired: React.MutableRefObject<boolean>
+  onSelectTerminal: (t: { sessionId: string; cwd: string }) => void
+  onContextMenu?: (e: React.MouseEvent) => void
+  onTouchStart?: (e: React.TouchEvent) => void
+  onTouchEnd?: () => void
+  onTouchMove?: () => void
+}
+
+function TerminalButton({
+  t,
+  longPressFired,
+  onSelectTerminal,
+  onContextMenu,
+  onTouchStart,
+  onTouchEnd,
+  onTouchMove,
+}: TerminalButtonProps) {
+  return (
+    <button
+      className="mobile-list__terminal"
+      type="button"
+      onClick={() => {
+        if (longPressFired.current) {
+          longPressFired.current = false
+          return
+        }
+        onSelectTerminal({ sessionId: t.sessionId, cwd: t.cwd })
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onSelectTerminal({ sessionId: t.sessionId, cwd: t.cwd })
+      }}
+      onContextMenu={onContextMenu}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+      onTouchMove={onTouchMove}
+    >
+      <span className="mobile-list__terminal-label">{basename(t.cwd)}</span>
+    </button>
+  )
+}
+
 export function MobileTerminalList({
   workspaces,
   terminals,
@@ -64,36 +108,6 @@ export function MobileTerminalList({
 
   const assignedSessionIds = new Set<string>()
 
-  const TerminalButton = ({
-    t,
-    showContextMenu = false,
-  }: {
-    t: TerminalSession
-    showContextMenu?: boolean
-  }) => (
-    <button
-      key={t.sessionId}
-      className="mobile-list__terminal"
-      type="button"
-      onClick={() => {
-        if (longPressFired.current) {
-          longPressFired.current = false
-          return
-        }
-        onSelectTerminal({ sessionId: t.sessionId, cwd: t.cwd })
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onSelectTerminal({ sessionId: t.sessionId, cwd: t.cwd })
-      }}
-      onContextMenu={showContextMenu ? (e) => handleContextMenu(e, t.sessionId) : undefined}
-      onTouchStart={showContextMenu ? (e) => handleTouchStart(e, t.sessionId) : undefined}
-      onTouchEnd={showContextMenu ? handleTouchEnd : undefined}
-      onTouchMove={showContextMenu ? handleTouchMove : undefined}
-    >
-      <span className="mobile-list__terminal-label">{basename(t.cwd)}</span>
-    </button>
-  )
-
   return (
     <div className="mobile-list">
       {workspaces.map((ws) => {
@@ -107,7 +121,12 @@ export function MobileTerminalList({
           <div key={ws.id} className="mobile-list__workspace">
             <p className="mobile-list__workspace-name">{ws.name}</p>
             {wsTerminals.map((t) => (
-              <TerminalButton key={t.sessionId} t={t} />
+              <TerminalButton
+                key={t.sessionId}
+                t={t}
+                longPressFired={longPressFired}
+                onSelectTerminal={onSelectTerminal}
+              />
             ))}
             <button
               className="mobile-list__new-terminal-btn"
@@ -122,7 +141,17 @@ export function MobileTerminalList({
       {terminals
         .filter((t) => !assignedSessionIds.has(t.sessionId))
         .map((t) => (
-          <TerminalButton key={t.sessionId} t={t} showContextMenu />
+          <TerminalButton
+            key={t.sessionId}
+            t={t}
+            showContextMenu
+            longPressFired={longPressFired}
+            onSelectTerminal={onSelectTerminal}
+            onContextMenu={(e) => handleContextMenu(e, t.sessionId)}
+            onTouchStart={(e) => handleTouchStart(e, t.sessionId)}
+            onTouchEnd={handleTouchEnd}
+            onTouchMove={handleTouchMove}
+          />
         ))}
       {contextMenu && (
         <>
