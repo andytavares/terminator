@@ -1,0 +1,20 @@
+src/renderer/components/terminal/TerminalPane.tsx
+  s_3f518e1d22aaee::t_b9f057ef9aecfe 94,104-106
+  s_3f518e1d22aaee::t_c0f3c8c5bc42c8 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "cb9859040e92bcdecce6b3a5e7faa01c4433b1c9",
+  "prompts": {},
+  "sessions": {
+    "s_3f518e1d22aaee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a222a66a-ab28-43ff-b1ab-3415d457d2cd",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
