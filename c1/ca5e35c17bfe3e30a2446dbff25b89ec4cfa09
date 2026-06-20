@@ -1,0 +1,25 @@
+extensions/notepad/src/components/DiagramView.tsx
+  s_04d55e15a03e3c::t_f16d1e9a2ffda3 313-314,321,323,331-336,339-341,347,349,368
+  s_04d55e15a03e3c::t_6c470e8a3c557b 258-259,263-268
+extensions/notepad/src/components/NoteList.tsx
+  s_04d55e15a03e3c::t_1714c34e2d777c 382
+  s_04d55e15a03e3c::t_88849962ad9896 402-405
+  s_04d55e15a03e3c::t_ff11a8bf5238a3 501-503,505-506,508-513,516-517
+  s_04d55e15a03e3c::t_7c73d085260e97 322-325
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "c1ca5e35c17bfe3e30a2446dbff25b89ec4cfa09",
+  "prompts": {},
+  "sessions": {
+    "s_04d55e15a03e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44560d63-490c-4190-b90e-943512b66236",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
