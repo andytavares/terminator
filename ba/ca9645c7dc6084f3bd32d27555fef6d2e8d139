@@ -1,0 +1,40 @@
+extensions/remote-control/src/types.ts
+  s_da066600789312::t_c86548bbf838db 15
+extensions/remote-control/src/server/routes/terminal.routes.ts
+  s_da066600789312::t_108c1512d53e8d 209-219
+tests/unit/renderer-remote/mobile/MobileTerminalList.spec.tsx
+  s_da066600789312::t_3dbba19de6eb7f 436-473
+src/renderer-remote/components/MobileTerminalView.tsx
+  s_da066600789312::t_22aca9715f041b 75
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_da066600789312::t_3e784c394a3139 19
+  s_da066600789312::t_86fb0e6f3515f8 271
+  s_da066600789312::t_285855995da470 495-520,523-531
+  s_da066600789312::t_11583c9b71d671 33
+  s_da066600789312::t_e2f8b70595371f 521-522
+src/main/extensions/api.ts
+  s_da066600789312::t_3049427fb73c5e 555-557
+  s_da066600789312::t_b38a6d66e301e6 123-125
+tests/unit/renderer-remote/mobile/MobileTerminalView.spec.tsx
+  s_da066600789312::t_8aa2c6a4764536 241-257
+src/main/terminal/pty-manager.ts
+  s_da066600789312::t_fe726c4460aeab 108-114
+src/renderer-remote/components/MobileTerminalList.tsx
+  s_da066600789312::t_4e8a8aee9d8b0c 87-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "baca9645c7dc6084f3bd32d27555fef6d2e8d139",
+  "prompts": {},
+  "sessions": {
+    "s_da066600789312": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b233e45-1b62-483a-8fb7-dc58c7a38797",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
