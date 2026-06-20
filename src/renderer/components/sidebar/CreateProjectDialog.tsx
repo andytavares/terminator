@@ -5,7 +5,7 @@ import type { Branch, WorktreeInfo } from '../../../shared/types/index'
 import { BranchSelect } from './BranchSelect'
 import './Dialog.css'
 
-type BranchMode = 'existing' | 'new' | 'worktree'
+type BranchMode = 'existing' | 'worktree'
 
 interface Props {
   workspaceId: string
@@ -15,11 +15,11 @@ interface Props {
 export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Element {
   const [name, setName] = useState('')
   const [nameError, setNameError] = useState('')
-  const [branchMode, setBranchMode] = useState<BranchMode>('existing')
   const [branches, setBranches] = useState<Branch[]>([])
   const [worktrees, setWorktrees] = useState<WorktreeInfo[]>([])
   const [selectedBranch, setSelectedBranch] = useState('')
   const [newBranchName, setNewBranchName] = useState('')
+  const [isNewBranch, setIsNewBranch] = useState(false)
   const [worktreeIsNewBranch, setWorktreeIsNewBranch] = useState(true)
   const [worktreePath, setWorktreePath] = useState('')
   const [gitRoot, setGitRoot] = useState<string | null>(null)
@@ -29,6 +29,12 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
   const { resolveSettings } = useSettingsStore()
   const workspace = workspaces.find((w) => w.id === workspaceId)
   const worktreeBaseDir = resolveSettings(workspaceId).git.worktreeBaseDir || undefined
+  const hasNonWorktreeProject = (projectsByWorkspaceId.get(workspaceId) ?? []).some(
+    (p) => !p.isWorktree
+  )
+  const [branchMode, setBranchMode] = useState<BranchMode>(
+    hasNonWorktreeProject ? 'worktree' : 'existing'
+  )
 
   useEffect(() => {
     if (!workspace?.folderPath) return
@@ -50,7 +56,11 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
   useEffect(() => {
     if (!gitRoot || branchMode !== 'worktree') return
     const branch = worktreeIsNewBranch ? newBranchName : selectedBranch
-    if (!branch) return
+    if (!branch) {
+      // Show the base directory so users can see where worktrees go by default
+      setWorktreePath(worktreeBaseDir ?? `${gitRoot}/.worktrees`)
+      return
+    }
     window.electronAPI.git.suggestWorktreePath(gitRoot, branch, worktreeBaseDir).then((r) => {
       setWorktreePath(r.path)
     })
@@ -86,30 +96,34 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
     }
     setError('')
 
+    if (branchMode === 'existing' && hasNonWorktreeProject) {
+      setError('A branch-based project already exists in this workspace')
+      return
+    }
+
     if (!gitRoot || branchMode === 'existing') {
+      let branch = selectedBranch
+      if (gitRoot && isNewBranch) {
+        const branchTrimmed = newBranchName.trim()
+        if (!branchTrimmed) {
+          setError('Enter a branch name')
+          return
+        }
+        const created = await window.electronAPI.git.createBranch(
+          workspace!.folderPath,
+          branchTrimmed
+        )
+        if ('error' in created) {
+          setError(`Could not create branch: ${created.error}`)
+          return
+        }
+        branch = branchTrimmed
+      }
       const result = await createProject({
         workspaceId,
         name: name.trim(),
-        ...(selectedBranch ? { gitBranch: selectedBranch } : {}),
+        ...(branch ? { gitBranch: branch } : {}),
       })
-      if ('error' in result) {
-        if (result.error === 'DUPLICATE_NAME')
-          setNameError('A project with this name already exists')
-        else setError('Failed to create project')
-        return
-      }
-    } else if (branchMode === 'new') {
-      const branch = newBranchName.trim()
-      if (!branch) {
-        setError('Enter a branch name')
-        return
-      }
-      const created = await window.electronAPI.git.createBranch(workspace!.folderPath, branch)
-      if ('error' in created) {
-        setError(`Could not create branch: ${created.error}`)
-        return
-      }
-      const result = await createProject({ workspaceId, name: name.trim(), gitBranch: branch })
       if ('error' in result) {
         if (result.error === 'DUPLICATE_NAME')
           setNameError('A project with this name already exists')
@@ -150,7 +164,17 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
     onClose()
   }
 
-  const localBranches = branches.filter((b) => !b.isRemote)
+  const defaultBranchName =
+    branches.find((b) => b.name === 'main' && !b.isRemote)?.name ??
+    branches.find((b) => b.name === 'master' && !b.isRemote)?.name ??
+    null
+  const localBranches = branches
+    .filter((b) => !b.isRemote)
+    .sort((a, b) => {
+      if (a.name === defaultBranchName) return -1
+      if (b.name === defaultBranchName) return 1
+      return 0
+    })
   const usedBranchNames = new Set(worktrees.map((w) => w.branch))
   const availableWorktreeBranches = localBranches.filter((b) => !usedBranchNames.has(b.name))
   const worktreeBranchName = worktreeIsNewBranch ? newBranchName : selectedBranch
@@ -182,17 +206,16 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
               <div className="dialog__segment">
                 <button
                   type="button"
-                  className={`dialog__segment-btn${branchMode === 'existing' ? ' dialog__segment-btn--active' : ''}`}
-                  onClick={() => setBranchMode('existing')}
+                  className={`dialog__segment-btn${branchMode === 'existing' ? ' dialog__segment-btn--active' : ''}${hasNonWorktreeProject ? ' dialog__segment-btn--disabled' : ''}`}
+                  onClick={() => !hasNonWorktreeProject && setBranchMode('existing')}
+                  disabled={hasNonWorktreeProject}
+                  title={
+                    hasNonWorktreeProject
+                      ? 'A branch-based project already exists in this workspace'
+                      : undefined
+                  }
                 >
-                  Existing
-                </button>
-                <button
-                  type="button"
-                  className={`dialog__segment-btn${branchMode === 'new' ? ' dialog__segment-btn--active' : ''}`}
-                  onClick={() => setBranchMode('new')}
-                >
-                  New branch
+                  Branch
                 </button>
                 <button
                   type="button"
@@ -210,18 +233,25 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
               <BranchSelect
                 branches={localBranches}
                 value={selectedBranch}
-                onChange={setSelectedBranch}
+                onChange={(b) => {
+                  setIsNewBranch(false)
+                  setSelectedBranch(b)
+                }}
+                newBranchLabel="+ New branch…"
+                onNewBranch={() => setIsNewBranch(true)}
+                isNewSelected={isNewBranch}
               />
             </div>
           )}
 
-          {gitRoot && branchMode === 'new' && (
+          {gitRoot && branchMode === 'existing' && isNewBranch && (
             <div className="dialog__field">
               <input
                 className="dialog__input"
                 value={newBranchName}
                 onChange={(e) => setNewBranchName(sanitizeBranchName(e.target.value))}
                 placeholder="feature/my-feature"
+                autoFocus
               />
             </div>
           )}
