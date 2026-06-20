@@ -1,0 +1,33 @@
+src/renderer/components/overview/OverviewScreen.tsx
+  s_da066600789312::t_44d693cb15d2a2 120
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_da066600789312::t_2f2ffc2fe2f71a 460,490
+  s_da066600789312::t_bb6b362a501b35 457-459,461-486
+extensions/remote-control/src/server/routes/terminal.routes.ts
+  s_da066600789312::t_e2f3cf0de65195 190-191,212-221
+src/renderer-remote/components/MobileTerminalList.tsx
+  s_da066600789312::t_d6dc824ad7b0f2 124-129
+  s_da066600789312::t_83088b5ec0da13 22-65
+  s_da066600789312::t_baeb750cb94e1a 144-154
+tests/unit/renderer/components/OverviewScreen.spec.tsx
+  s_da066600789312::t_1d5611e44eb86e 12
+  s_da066600789312::t_fecb370264c009 15-17
+  s_da066600789312::t_15d1c60b0b314b 101-104
+  s_da066600789312::t_e98b5bbd83a1d0 450
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "2c16f68e85d9b6a5605de3ab943c9fae13359234",
+  "prompts": {},
+  "sessions": {
+    "s_da066600789312": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b233e45-1b62-483a-8fb7-dc58c7a38797",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
