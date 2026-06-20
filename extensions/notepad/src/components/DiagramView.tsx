@@ -248,6 +248,7 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
   } | null>(null)
   const [appState, setAppState] = useState<AppState | null>(null)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle'>('idle')
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const excalidrawApiRef = useRef<{
     getAppState: () => AppState
@@ -270,6 +271,7 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
   useEffect(() => {
     activeIdRef.current = diagramId
     setLoaded(false)
+    setLoadError(null)
     setComments([])
     setPendingPin(null)
     setActiveCommentId(null)
@@ -291,16 +293,21 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
         const diagram = (
           diagramResult as { data?: { title: string; tags: string[]; sceneJson: string } }
         ).data
-        if (diagram) {
-          setTitle(diagram.title)
-          setTags(diagram.tags ?? [])
-          setSceneJson(diagram.sceneJson || '{}')
+        if (!diagram) {
+          setLoadError('Diagram not found.')
+          setLoaded(true)
+          return
         }
+        setTitle(diagram.title)
+        setTags(diagram.tags ?? [])
+        setSceneJson(diagram.sceneJson || '{}')
         const commentData = (commentsResult as { data?: DiagramComment[] }).data ?? []
         setComments(commentData)
         setLoaded(true)
       } catch (err) {
         console.error('[notepad] DiagramView: load failed', err)
+        setLoadError('Failed to load diagram.')
+        setLoaded(true)
       }
     }
     void load()
@@ -539,7 +546,8 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
         {commentMode && (
           <div className="diagram-view__comment-intercept" onClick={handleCanvasClick} />
         )}
-        {loaded && (
+        {loaded && loadError && <div className="diagram-view__load-error">{loadError}</div>}
+        {loaded && !loadError && (
           <Suspense fallback={<div className="diagram-view__loading">Loading canvas…</div>}>
             <ExcalidrawComponent
               key={diagramId}
