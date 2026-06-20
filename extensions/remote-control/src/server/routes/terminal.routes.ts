@@ -45,6 +45,10 @@ export async function registerTerminalRoutes(
   const sessions = new Map<string, TerminalSession>()
   // Manual workspace overrides keyed by sessionId
   const workspaceOverrides = new Map<string, string>()
+  // Sessions adopted from the Electron app — must not be killed on grace-period expiry
+  const adoptedSessions = new Set<string>()
+  // Cleanup callbacks for adopted session data listeners
+  const adoptedSessionDisposers = new Map<string, () => void>()
 
   app.get('/api/terminals', async () => {
     const remote = Array.from(sessions.values()).map((s) => ({
@@ -193,10 +197,12 @@ export async function registerTerminalRoutes(
           cwd: existing.cwd,
           createdAt: new Date().toISOString(),
         })
+        adoptedSessions.add(sessionId)
         const dispose = ptyManager.attachOnData(sessionId, (data) =>
           subscriberManager.broadcast(sessionId, data)
         )
-        if (dispose) ws.once('close', dispose)
+        // Keep the broadcast callback alive across reconnects — do NOT tie it to ws close.
+        if (dispose) adoptedSessionDisposers.set(sessionId, dispose)
       }
 
       const accepted = subscriberManager.addSubscriber(sessionId, ws, getMaxSubscribers())
@@ -224,7 +230,15 @@ export async function registerTerminalRoutes(
           const timer = setTimeout(() => {
             gracePeriodTimers.delete(sessionId)
             if (subscriberManager.getCount(sessionId) === 0 && sessions.has(sessionId)) {
-              ptyManager.kill(sessionId)
+              if (!adoptedSessions.has(sessionId)) {
+                ptyManager.kill(sessionId)
+              }
+              const disposer = adoptedSessionDisposers.get(sessionId)
+              if (disposer) {
+                disposer()
+                adoptedSessionDisposers.delete(sessionId)
+              }
+              adoptedSessions.delete(sessionId)
               sessions.delete(sessionId)
             }
           }, 30_000)
@@ -239,9 +253,14 @@ export async function registerTerminalRoutes(
       for (const timer of gracePeriodTimers.values()) clearTimeout(timer)
       gracePeriodTimers.clear()
       for (const sessionId of sessions.keys()) {
-        ptyManager.kill(sessionId)
+        if (!adoptedSessions.has(sessionId)) {
+          ptyManager.kill(sessionId)
+        }
         subscriberManager.destroySession(sessionId)
       }
+      for (const disposer of adoptedSessionDisposers.values()) disposer()
+      adoptedSessionDisposers.clear()
+      adoptedSessions.clear()
       sessions.clear()
     },
   }

@@ -10,16 +10,26 @@ vi.mock('../../../../src/renderer-remote/api/remote-client', () => ({
   resizeTerminal: mockResizeTerminal,
 }))
 
+// Shared mutable terminal mock — lets tests inspect write/scrollToLine calls and mutate buffer
+const mockTermBuffer = { baseY: 0, length: 100 }
+const mockTerm = {
+  open: vi.fn(),
+  dispose: vi.fn(),
+  loadAddon: vi.fn(),
+  onResize: vi.fn(),
+  focus: vi.fn(),
+  element: null,
+  write: vi.fn((_data: unknown, cb?: () => void) => {
+    cb?.()
+  }),
+  scrollToLine: vi.fn(),
+  rows: 24,
+  buffer: { active: mockTermBuffer },
+}
+
 // Mock xterm — it does not work in jsdom
 vi.mock('@xterm/xterm', () => ({
-  Terminal: vi.fn().mockImplementation(() => ({
-    open: vi.fn(),
-    dispose: vi.fn(),
-    loadAddon: vi.fn(),
-    onResize: vi.fn(),
-    focus: vi.fn(),
-    element: null,
-  })),
+  Terminal: vi.fn().mockImplementation(() => mockTerm),
 }))
 
 vi.mock('@xterm/addon-fit', () => ({
@@ -49,17 +59,26 @@ vi.mock('../../../../src/renderer-remote/components/MobileControlToolbar', () =>
   ),
 }))
 
+// Capture message handlers attached to the WebSocket mock
+let capturedMessageHandler: ((event: MessageEvent) => void) | null = null
+
 // Mock WebSocket with static OPEN constant
 const mockWs = {
   close: vi.fn(),
   readyState: 1, // OPEN
   send: vi.fn(),
+  addEventListener: vi.fn((event: string, handler: (e: MessageEvent) => void) => {
+    if (event === 'message') capturedMessageHandler = handler
+  }),
 }
 const WsMockCtor = vi.fn(() => mockWs) as unknown as typeof WebSocket
 ;(WsMockCtor as unknown as { OPEN: number }).OPEN = 1
 vi.stubGlobal('WebSocket', WsMockCtor)
 
 beforeEach(() => {
+  capturedMessageHandler = null
+  mockTermBuffer.baseY = 76 // default: at bottom (76 + 24 >= 100)
+  mockTermBuffer.length = 100
   mockGetWsTicket.mockResolvedValue('ticket-abc')
   mockWs.close.mockReset()
   vi.clearAllMocks()
@@ -173,5 +192,34 @@ describe('MobileTerminalView', () => {
     rerender(<MobileTerminalView sessionId="s2" cwd="/tmp" onBack={vi.fn()} />)
     await act(async () => {})
     expect(mockWs.close).toHaveBeenCalled()
+  })
+
+  it('writes incoming message data to terminal when at bottom (no scrollToLine)', async () => {
+    mockTermBuffer.baseY = 76 // 76 + 24 >= 100 → at bottom
+    mockGetWsTicket.mockResolvedValue('ticket-abc')
+    const { MobileTerminalView } = await import(
+      '../../../../src/renderer-remote/components/MobileTerminalView'
+    )
+    render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
+    await act(async () => {})
+    expect(capturedMessageHandler).not.toBeNull()
+    capturedMessageHandler!(new MessageEvent('message', { data: 'hello' }))
+    expect(mockTerm.write).toHaveBeenCalledWith('hello', expect.any(Function))
+    expect(mockTerm.scrollToLine).not.toHaveBeenCalled()
+  })
+
+  it('preserves scroll position when not at bottom (calls scrollToLine)', async () => {
+    mockTermBuffer.baseY = 0 // 0 + 24 < 100 → not at bottom
+    mockTermBuffer.length = 100
+    mockGetWsTicket.mockResolvedValue('ticket-abc')
+    const { MobileTerminalView } = await import(
+      '../../../../src/renderer-remote/components/MobileTerminalView'
+    )
+    render(<MobileTerminalView sessionId="s3" cwd="/tmp" onBack={vi.fn()} />)
+    await act(async () => {})
+    expect(capturedMessageHandler).not.toBeNull()
+    capturedMessageHandler!(new MessageEvent('message', { data: 'output' }))
+    expect(mockTerm.write).toHaveBeenCalled()
+    expect(mockTerm.scrollToLine).toHaveBeenCalledWith(0)
   })
 })

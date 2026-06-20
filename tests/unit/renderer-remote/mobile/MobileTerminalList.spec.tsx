@@ -382,6 +382,28 @@ describe('MobileTerminalList', () => {
     vi.useRealTimers()
   })
 
+  it('shows "No workspaces" message in context menu when workspace list is empty', async () => {
+    const unmatched: TerminalSession = {
+      sessionId: 's-noworkspace',
+      cwd: '/tmp/noworkspace',
+      createdAt: '2026-06-19T10:00:00.000Z',
+    }
+    const { MobileTerminalList } = await import(
+      '../../../../src/renderer-remote/components/MobileTerminalList'
+    )
+    render(
+      <MobileTerminalList
+        workspaces={[]}
+        terminals={[unmatched]}
+        onSelectTerminal={mockOnSelectTerminal}
+        onCreateTerminal={mockOnCreateTerminal}
+        onAssignWorkspace={mockOnAssignWorkspace}
+      />
+    )
+    fireEvent.contextMenu(screen.getByText('noworkspace'))
+    expect(screen.getByText('No workspaces')).toBeTruthy()
+  })
+
   it('calls onAssignWorkspace when a workspace is chosen from context menu', async () => {
     const unmatched: TerminalSession = {
       sessionId: 's-assign',

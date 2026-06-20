@@ -179,6 +179,12 @@ button.mobile-list__terminal {
 
 /* ── Context menu ──────────────────────────────────────────────── */
 
+.mobile-context-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+}
+
 .mobile-context-menu {
   position: fixed;
   z-index: 100;

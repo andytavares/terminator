@@ -419,6 +419,56 @@ describe('WS /ws/terminals/:sessionId', () => {
     vi.useRealTimers()
   })
 
+  it('adopts a ptyManager session on first WS connect and calls attachOnData', async () => {
+    const nativeId = 'native-adopt-1'
+    mockPtyManager.listSessions.mockReturnValue([{ sessionId: nativeId, cwd: '/native' }])
+
+    const ticketRes = await wsApp.inject({
+      method: 'POST',
+      url: `/api/terminals/${nativeId}/ws-ticket`,
+    })
+    const { ticket } = JSON.parse(ticketRes.body)
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`${baseUrl}/ws/terminals/${nativeId}?ticket=${ticket}`)
+      ws.on('open', () => {
+        ws.close()
+      })
+      ws.on('close', resolve)
+      ws.on('error', reject)
+      setTimeout(() => reject(new Error('timeout')), 2000)
+    })
+
+    expect(mockPtyManager.attachOnData).toHaveBeenCalledWith(nativeId, expect.any(Function))
+  })
+
+  it('does not kill adopted ptyManager session when grace period expires', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const nativeId = 'native-grace-1'
+    mockPtyManager.listSessions.mockReturnValue([{ sessionId: nativeId, cwd: '/native' }])
+
+    const ticketRes = await wsApp.inject({
+      method: 'POST',
+      url: `/api/terminals/${nativeId}/ws-ticket`,
+    })
+    const { ticket } = JSON.parse(ticketRes.body)
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`${baseUrl}/ws/terminals/${nativeId}?ticket=${ticket}`)
+      ws.on('open', () => setTimeout(() => ws.close(), 20))
+      ws.on('close', resolve)
+      ws.on('error', reject)
+      setTimeout(() => reject(new Error('timeout')), 2000)
+    })
+    await new Promise<void>((r) => setTimeout(r, 50))
+
+    vi.advanceTimersByTime(31_000)
+    await Promise.resolve()
+
+    expect(mockPtyManager.kill).not.toHaveBeenCalledWith(nativeId)
+    vi.useRealTimers()
+  })
+
   it('forwards messages from primary subscriber to ptyManager', async () => {
     const sessionId = await createSession()
     const ticketRes = await wsApp.inject({

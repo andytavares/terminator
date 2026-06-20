@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useRef, useState } from 'react'
 import type { Workspace, TerminalSession } from '../api/remote-client'
 
 function basename(p: string): string {
@@ -29,17 +29,6 @@ export function MobileTerminalList({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
-
-  useEffect(() => {
-    if (!contextMenu) return
-    const close = () => setContextMenu(null)
-    document.addEventListener('click', close)
-    document.addEventListener('touchstart', close, { passive: true })
-    return () => {
-      document.removeEventListener('click', close)
-      document.removeEventListener('touchstart', close)
-    }
-  }, [contextMenu])
 
   const openContextMenu = (sessionId: string, x: number, y: number) => {
     setContextMenu({ sessionId, x, y })
@@ -133,29 +122,32 @@ export function MobileTerminalList({
           <TerminalButton key={t.sessionId} t={t} showContextMenu />
         ))}
       {contextMenu && (
-        <div
-          className="mobile-context-menu"
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <p className="mobile-context-menu__label">Move to workspace</p>
-          {workspaces.map((ws) => (
-            <button
-              key={ws.id}
-              type="button"
-              className="mobile-context-menu__item"
-              onClick={() => {
-                onAssignWorkspace(contextMenu.sessionId, ws.id)
-                setContextMenu(null)
-              }}
-            >
-              {ws.name}
-            </button>
-          ))}
-          {workspaces.length === 0 && (
-            <span className="mobile-context-menu__empty">No workspaces</span>
-          )}
-        </div>
+        <>
+          <div
+            className="mobile-context-menu-backdrop"
+            onClick={() => setContextMenu(null)}
+            onTouchStart={() => setContextMenu(null)}
+          />
+          <div className="mobile-context-menu" style={{ top: contextMenu.y, left: contextMenu.x }}>
+            <p className="mobile-context-menu__label">Move to workspace</p>
+            {workspaces.map((ws) => (
+              <button
+                key={ws.id}
+                type="button"
+                className="mobile-context-menu__item"
+                onClick={() => {
+                  onAssignWorkspace(contextMenu.sessionId, ws.id)
+                  setContextMenu(null)
+                }}
+              >
+                {ws.name}
+              </button>
+            ))}
+            {workspaces.length === 0 && (
+              <span className="mobile-context-menu__empty">No workspaces</span>
+            )}
+          </div>
+        </>
       )}
     </div>
   )
