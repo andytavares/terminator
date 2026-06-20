@@ -20,7 +20,7 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
   useLayoutEffect(() => {
     const instance = getTerminalInstance(sessionId)
     if (!instance || !containerRef.current) return
-    instance.mount(containerRef.current)
+    instance.mount(containerRef.current, globalSettings?.terminal.scrollToBottomOnMount ?? false)
     return () => {
       instance.unmount()
     }

@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # Stop hook: enforces format + lint + patch coverage before Claude finishes a turn.
-# Exit 1 + stdout output blocks the stop and feeds the message back to Claude.
-set -euo pipefail
+# Exit 1 + stdout blocks the stop. Must ALWAYS exit 0 or 1 — never any other code.
+# set -e is intentionally absent: we need to capture exit codes, not abort on them.
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-cd "$ROOT"
+cd "$ROOT" || exit 0
 
 # Only run when TypeScript source files were changed.
-# F04: use -E on the exclusion grep so (spec|test) is treated as alternation, not a literal.
 CHANGED=$(git diff --name-only HEAD 2>/dev/null | grep -E '\.(ts|tsx)$' | grep -vE '\.(spec|test)\.' || true)
 STAGED=$(git diff --cached --name-only 2>/dev/null | grep -E '\.(ts|tsx)$' | grep -vE '\.(spec|test)\.' || true)
 
@@ -17,26 +16,34 @@ fi
 
 FAILURES=""
 
-# 1. Format — F03: capture prettier's output so the failure message names the offending files.
-FORMAT_OUT=$(npm run format:check 2>/dev/null) || {
-  FAILURES="$FAILURES\n  ✗ FORMATTING: run \`npm run format\` to fix\n$FORMAT_OUT"
-}
-
-# 2. Lint — F01: gate on exit code, not grep output. Any non-zero exit is a failure.
-if ! npm run lint 2>/dev/null 1>/dev/null; then
-  FAILURES="$FAILURES\n  ✗ LINT: errors found — run \`npm run lint\` and fix them"
+# 1. Format
+npm run format:check >/dev/null 2>&1
+FORMAT_EXIT=$?
+if [ "$FORMAT_EXIT" -ne 0 ]; then
+  FAILURES="${FAILURES}\n  ✗ FORMATTING: run \`npm run format\` to fix"
 fi
 
-# 3. Patch coverage (only if coverage data exists from the last test run)
+# 2. Lint
+npm run lint >/dev/null 2>&1
+LINT_EXIT=$?
+if [ "$LINT_EXIT" -ne 0 ]; then
+  FAILURES="${FAILURES}\n  ✗ LINT: errors found — run \`npm run lint\` and fix them"
+fi
+
+# 3. Patch coverage
 if [ -f "$ROOT/coverage/coverage-final.json" ]; then
-  if ! node scripts/check-patch-coverage.cjs 2>/dev/null 1>/dev/null; then
-    FAILURES="$FAILURES\n  ✗ COVERAGE: patch coverage below 80% — run \`npm test\` and add tests"
+  node scripts/check-patch-coverage.cjs >/dev/null 2>&1
+  COV_EXIT=$?
+  if [ "$COV_EXIT" -ne 0 ]; then
+    FAILURES="${FAILURES}\n  ✗ COVERAGE: patch coverage below 80% — run \`npm test\` and add tests"
   fi
 else
-  FAILURES="$FAILURES\n  ✗ COVERAGE: no coverage data — run \`npm test\` before finishing"
+  FAILURES="${FAILURES}\n  ✗ COVERAGE: no coverage data — run \`npm test\` before finishing"
 fi
 
 if [ -n "$FAILURES" ]; then
   printf "🚫 Pre-stop checks failed. Fix before finishing:%b\n" "$FAILURES"
   exit 1
 fi
+
+exit 0

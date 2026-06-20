@@ -62,8 +62,6 @@ export class TerminalInstance {
   private opened = false
   private sessionId: string
   private busyTimer: ReturnType<typeof setTimeout> | null = null
-  private scrollToBottomOnMount: boolean
-
   // The root element xterm renders into — created on first mount(), moved between containers.
   readonly element: HTMLDivElement
   // Underline overlay for hovered links — positioned absolutely inside this.element.
@@ -71,14 +69,8 @@ export class TerminalInstance {
   // Snapshot captured in unmount() so Overview can display it after the element is detached.
   lastSnapshot: string | null = null
 
-  constructor(
-    sessionId: string,
-    scrollbackLimit: number,
-    scrollToBottomOnMount: boolean,
-    onBell?: () => void
-  ) {
+  constructor(sessionId: string, scrollbackLimit: number, onBell?: () => void) {
     this.sessionId = sessionId
-    this.scrollToBottomOnMount = scrollToBottomOnMount
     this.terminal = new Terminal({
       scrollback: scrollbackLimit,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
@@ -395,14 +387,14 @@ export class TerminalInstance {
   }
 
   // Call once after the element is in a visible, sized container.
-  mount(container: HTMLElement): void {
+  mount(container: HTMLElement, scrollToBottomOnMount = false): void {
     container.appendChild(this.element)
     if (!this.opened) {
       this.terminal.open(this.element)
       this.opened = true
     }
     this.fitAddon.fit()
-    if (this.scrollToBottomOnMount) this.terminal.scrollToBottom()
+    if (scrollToBottomOnMount) this.terminal.scrollToBottom()
     this.terminal.focus()
     this.resizeObserver = new ResizeObserver(() => this.fitAddon.fit())
     this.resizeObserver.observe(container)

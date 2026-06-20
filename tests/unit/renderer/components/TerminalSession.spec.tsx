@@ -126,11 +126,11 @@ beforeEach(() => {
 
 describe('TerminalInstance', () => {
   it('constructs without throwing', () => {
-    expect(() => new TerminalInstance('ses-1', 1000, false)).not.toThrow()
+    expect(() => new TerminalInstance('ses-1', 1000)).not.toThrow()
   })
 
   it('pastes \\n when Cmd+Enter is pressed via custom key handler', () => {
-    new TerminalInstance('ses-1', 1000, false)
+    new TerminalInstance('ses-1', 1000)
     const instance = vi.mocked(Terminal).mock.results[0].value
     const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
     const mockPreventDefault = vi.fn()
@@ -147,7 +147,7 @@ describe('TerminalInstance', () => {
   })
 
   it('does not intercept non-Cmd+Enter keys', () => {
-    new TerminalInstance('ses-1', 1000, false)
+    new TerminalInstance('ses-1', 1000)
     const instance = vi.mocked(Terminal).mock.results[0].value
     const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
     const result = handler({ metaKey: false, ctrlKey: false, key: 'Enter', type: 'keydown' })
@@ -155,7 +155,7 @@ describe('TerminalInstance', () => {
   })
 
   it('pastes \\n when Shift+Enter is pressed', () => {
-    new TerminalInstance('ses-1', 1000, false)
+    new TerminalInstance('ses-1', 1000)
     const instance = vi.mocked(Terminal).mock.results[0].value
     const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
     const mockPreventDefault = vi.fn()
@@ -173,7 +173,7 @@ describe('TerminalInstance', () => {
   })
 
   it('does not intercept plain Enter without modifiers', () => {
-    new TerminalInstance('ses-1', 1000, false)
+    new TerminalInstance('ses-1', 1000)
     const instance = vi.mocked(Terminal).mock.results[0].value
     const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
     const result = handler({
@@ -188,30 +188,30 @@ describe('TerminalInstance', () => {
   })
 
   it('subscribes to terminal output on construction', () => {
-    new TerminalInstance('ses-1', 1000, false)
+    new TerminalInstance('ses-1', 1000)
     expect(mockOnOutput).toHaveBeenCalledTimes(1)
   })
 
   it('creates a div element on construction', () => {
-    const instance = new TerminalInstance('ses-1', 1000, false)
+    const instance = new TerminalInstance('ses-1', 1000)
     expect(instance.element).toBeInstanceOf(HTMLDivElement)
     expect(instance.element.style.cssText).toContain('width')
   })
 
   it('accepts an optional onBell callback', () => {
     const onBell = vi.fn()
-    const instance = new TerminalInstance('ses-1', 1000, false, onBell)
+    const instance = new TerminalInstance('ses-1', 1000, onBell)
     expect(instance.terminal.onBell).toHaveBeenCalledWith(onBell)
   })
 
   it('does not call onBell setup when callback is not provided', () => {
-    const instance = new TerminalInstance('ses-1', 1000, false)
+    const instance = new TerminalInstance('ses-1', 1000)
     expect(instance.terminal.onBell).not.toHaveBeenCalled()
   })
 
   describe('mount()', () => {
     it('appends element to container and opens terminal', () => {
-      const instance = new TerminalInstance('ses-1', 1000, false)
+      const instance = new TerminalInstance('ses-1', 1000)
       const container = document.createElement('div')
       document.body.appendChild(container)
       instance.mount(container)
@@ -222,7 +222,7 @@ describe('TerminalInstance', () => {
     })
 
     it('does not re-open terminal on second mount', () => {
-      const instance = new TerminalInstance('ses-1', 1000, false)
+      const instance = new TerminalInstance('ses-1', 1000)
       const container = document.createElement('div')
       document.body.appendChild(container)
       instance.mount(container)
@@ -235,7 +235,7 @@ describe('TerminalInstance', () => {
 
   describe('unmount()', () => {
     it('removes element from DOM', () => {
-      const instance = new TerminalInstance('ses-1', 1000, false)
+      const instance = new TerminalInstance('ses-1', 1000)
       const container = document.createElement('div')
       document.body.appendChild(container)
       instance.mount(container)
@@ -245,21 +245,21 @@ describe('TerminalInstance', () => {
     })
 
     it('does not throw when called before mount', () => {
-      const instance = new TerminalInstance('ses-1', 1000, false)
+      const instance = new TerminalInstance('ses-1', 1000)
       expect(() => instance.unmount()).not.toThrow()
     })
   })
 
   describe('dispose()', () => {
     it('unsubscribes from output and disposes terminal', () => {
-      const instance = new TerminalInstance('ses-1', 1000, false)
+      const instance = new TerminalInstance('ses-1', 1000)
       instance.dispose()
       expect(mockUnsubscribe).toHaveBeenCalledTimes(1)
       expect(instance.terminal.dispose).toHaveBeenCalledTimes(1)
     })
 
     it('does not throw when called without mounting first', () => {
-      const instance = new TerminalInstance('ses-1', 1000, false)
+      const instance = new TerminalInstance('ses-1', 1000)
       expect(() => instance.dispose()).not.toThrow()
     })
   })
@@ -267,7 +267,7 @@ describe('TerminalInstance', () => {
   describe('busy/idle tracking', () => {
     it('calls setSessionBusy and schedules setSessionIdle on output', () => {
       vi.useFakeTimers()
-      new TerminalInstance('ses-busy', 1000, false)
+      new TerminalInstance('ses-busy', 1000)
       const outputCallback = mockOnOutput.mock.calls[0][0]
       outputCallback('ses-busy', 'data')
 
@@ -278,7 +278,7 @@ describe('TerminalInstance', () => {
     })
 
     it('ignores output from other sessions', () => {
-      new TerminalInstance('ses-a', 1000, false)
+      new TerminalInstance('ses-a', 1000)
       const outputCallback = mockOnOutput.mock.calls[0][0]
       outputCallback('ses-other', 'data')
       expect(mockSetSessionBusy).not.toHaveBeenCalled()
@@ -287,12 +287,12 @@ describe('TerminalInstance', () => {
 
   describe('captureToDataUrl()', () => {
     it('returns null when terminal has not been opened', () => {
-      const instance = new TerminalInstance('ses-1', 1000, false)
+      const instance = new TerminalInstance('ses-1', 1000)
       expect(instance.captureToDataUrl()).toBeNull()
     })
 
     it('returns null when cols or rows are 0', () => {
-      const instance = new TerminalInstance('ses-1', 1000, false)
+      const instance = new TerminalInstance('ses-1', 1000)
       const container = document.createElement('div')
       document.body.appendChild(container)
       instance.mount(container)
@@ -302,7 +302,7 @@ describe('TerminalInstance', () => {
     })
 
     it('returns a string or null after mount with non-zero cols/rows', () => {
-      const instance = new TerminalInstance('ses-1', 1000, false)
+      const instance = new TerminalInstance('ses-1', 1000)
       const container = document.createElement('div')
       document.body.appendChild(container)
       instance.mount(container)
@@ -328,7 +328,7 @@ describe('TerminalInstance', () => {
           makeMockCell('F', 16, -1, false),
         ],
       ]
-      const instance = new TerminalInstance('ses-draw', 1000, false)
+      const instance = new TerminalInstance('ses-draw', 1000)
       const container = document.createElement('div')
       document.body.appendChild(container)
       instance.mount(container)
@@ -345,7 +345,7 @@ describe('TerminalInstance', () => {
 
   describe('snapshot in unmount()', () => {
     it('stores lastSnapshot on unmount after successful capture', () => {
-      const instance = new TerminalInstance('ses-snap', 1000, false)
+      const instance = new TerminalInstance('ses-snap', 1000)
       const container = document.createElement('div')
       document.body.appendChild(container)
       instance.mount(container)
@@ -357,7 +357,7 @@ describe('TerminalInstance', () => {
     })
 
     it('does not overwrite valid snapshot with null on subsequent unmount', () => {
-      const instance = new TerminalInstance('ses-snap', 1000, false)
+      const instance = new TerminalInstance('ses-snap', 1000)
       instance.lastSnapshot = 'data:image/jpeg;base64,abc'
       // captureToDataUrl will return null (not mounted) — should NOT overwrite lastSnapshot
       instance.unmount()
@@ -368,7 +368,7 @@ describe('TerminalInstance', () => {
   describe('dispose()', () => {
     it('clears busy timer and calls setSessionIdle', () => {
       vi.useFakeTimers()
-      const instance = new TerminalInstance('ses-dispose', 1000, false)
+      const instance = new TerminalInstance('ses-dispose', 1000)
       // Trigger a busy timer
       const outputCallback = mockOnOutput.mock.calls[0][0]
       outputCallback('ses-dispose', 'data')
@@ -382,13 +382,13 @@ describe('TerminalInstance', () => {
 
   describe('mountPreview()', () => {
     it('returns null when terminal has not been opened', () => {
-      const instance = new TerminalInstance('ses-1', 1000, false)
+      const instance = new TerminalInstance('ses-1', 1000)
       const container = document.createElement('div')
       expect(instance.mountPreview(container)).toBeNull()
     })
 
     it('returns null when cols or rows are 0', () => {
-      const instance = new TerminalInstance('ses-1', 1000, false)
+      const instance = new TerminalInstance('ses-1', 1000)
       // terminal mock returns cols=0/rows=0 by default
       const container = document.createElement('div')
       const mountContainer = document.createElement('div')
@@ -401,7 +401,7 @@ describe('TerminalInstance', () => {
     })
 
     it('appends element to the preview container after mount', () => {
-      const instance = new TerminalInstance('ses-1', 1000, false)
+      const instance = new TerminalInstance('ses-1', 1000)
       const mountContainer = document.createElement('div')
       document.body.appendChild(mountContainer)
       instance.mount(mountContainer)
@@ -424,7 +424,7 @@ describe('TerminalInstance', () => {
     })
 
     it('cleanup removes element and restores original cssText', () => {
-      const instance = new TerminalInstance('ses-1', 1000, false)
+      const instance = new TerminalInstance('ses-1', 1000)
       const mountContainer = document.createElement('div')
       document.body.appendChild(mountContainer)
       instance.mount(mountContainer)
@@ -447,7 +447,7 @@ describe('TerminalInstance', () => {
     })
 
     it('sets pointer-events none and transform on the element', () => {
-      const instance = new TerminalInstance('ses-1', 1000, false)
+      const instance = new TerminalInstance('ses-1', 1000)
       const mountContainer = document.createElement('div')
       document.body.appendChild(mountContainer)
       instance.mount(mountContainer)
@@ -470,13 +470,13 @@ describe('TerminalInstance', () => {
 
   describe('link providers (visual decoration)', () => {
     it('registers five link providers on construction (URL, bare, naked, path, quoted-path)', () => {
-      new TerminalInstance('ses-links', 1000, false)
+      new TerminalInstance('ses-links', 1000)
       const instance = vi.mocked(Terminal).mock.results[0].value
       expect(instance.registerLinkProvider).toHaveBeenCalledTimes(5)
     })
 
     function getProvider(lineText: string, providerIndex: number) {
-      new TerminalInstance('ses-links', 1000, false)
+      new TerminalInstance('ses-links', 1000)
       const instance = vi.mocked(Terminal).mock.results[0].value
       Object.defineProperty(instance, 'buffer', {
         value: makeMockBuffer(24, 80, [], lineText),
@@ -515,7 +515,7 @@ describe('TerminalInstance', () => {
     })
 
     it('URL provider returns undefined when line is missing', () => {
-      new TerminalInstance('ses-links', 1000, false)
+      new TerminalInstance('ses-links', 1000)
       const instance = vi.mocked(Terminal).mock.results[0].value
       Object.defineProperty(instance, 'buffer', {
         value: { active: { getLine: () => undefined, viewportY: 0 } },
@@ -565,7 +565,7 @@ describe('TerminalInstance', () => {
     // getBoundingClientRect() returns {left:0,top:0,...} in jsdom, so clientX/Y == relX/Y
 
     function makeInstanceWithLine(lineText: string) {
-      const instance = new TerminalInstance('ses-link', 1000, false)
+      const instance = new TerminalInstance('ses-link', 1000)
       const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
       Object.defineProperty(termMock, 'buffer', {
         value: makeMockBuffer(24, 80, [], lineText, 0),

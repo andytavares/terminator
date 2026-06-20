@@ -9,17 +9,22 @@
 const { execSync, spawnSync } = require('child_process')
 const extraArgs = process.argv.slice(2)
 
-execSync('npm rebuild better-sqlite3', { stdio: 'inherit' })
+try {
+  execSync('npm rebuild better-sqlite3', { stdio: 'inherit' })
+} catch (err) {
+  console.error('Failed to rebuild better-sqlite3 for system Node ABI:', err.message)
+  process.exit(1)
+}
 
 let result
 try {
-  result = spawnSync('npx', ['vitest', 'run', '--coverage', ...extraArgs], { stdio: 'inherit' })
+  result = spawnSync('vitest', ['run', '--coverage', ...extraArgs], { stdio: 'inherit' })
 } finally {
   try {
-    execSync('npx electron-rebuild', { stdio: 'inherit' })
+    execSync('electron-rebuild', { stdio: 'inherit' })
   } catch (err) {
     console.error('⚠️  Failed to restore Electron ABI for native modules:', err.message)
-    console.error('    Run: npx electron-rebuild')
+    console.error('    Run: electron-rebuild')
   }
 }
 

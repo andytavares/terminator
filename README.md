@@ -7,7 +7,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 - **Workspaces & Projects** — Two-level hierarchy. Workspaces map to local directories; Projects hold terminal sessions. Collapsible sidebar with color coding and tag chips.
 - **Persistent terminal sessions** — xterm.js `Terminal` instances are never destroyed on tab switch. Buffer, scroll position, and running process survive navigation.
 - **Theme system** — Dark/light themes switch immediately app-wide via CSS custom properties. Per-workspace theme overrides are supported.
-- **Settings** — Global and per-workspace configuration for theme, scrollback limit, and default shell.
+- **Settings** — Global and per-workspace configuration for theme, scrollback limit, and default shell. Terminal section includes opt-in scroll-to-bottom controls: on click, on app focus, and on tab switch (all off by default so scrollback history is preserved).
 - **Command palette** — `Cmd+P` opens a quick-action palette for common operations.
 - **Extension system** — Extensions install from local directories and contribute settings sections, sidebar items, sidebar panels, global tabs, workspace-scoped tabs (hover-reveal icons in workspace card headers), top-bar menu items, native View menu items, context menu entries, and terminal event hooks without modifying core code. See [Extension Development Guide](docs/EXTENSION-DEVELOPMENT.md).
 - **Git Integration** — Built-in first-party extension: toggleable right sidebar showing live git status, full git view for staging/committing, and PR creation via `gh` CLI. Configurable per-workspace. Auto-refreshes on file changes.

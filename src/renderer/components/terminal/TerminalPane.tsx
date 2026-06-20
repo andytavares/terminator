@@ -26,7 +26,15 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
   const activeSessionId = getActiveSessionForProject(projectId)
   const sessions = getSessionsForProject(projectId)
   const layout = getPaneLayout(projectId)
-  const { globalSettings } = useSettingsStore()
+  const scrollToBottomOnMount = useSettingsStore(
+    (s) => s.globalSettings?.terminal.scrollToBottomOnMount ?? false
+  )
+  const scrollToBottomOnFocus = useSettingsStore(
+    (s) => s.globalSettings?.terminal.scrollToBottomOnFocus ?? false
+  )
+  const scrollToBottomOnClick = useSettingsStore(
+    (s) => s.globalSettings?.terminal.scrollToBottomOnClick ?? false
+  )
 
   // All hooks must run unconditionally before any early return.
   useEffect(() => {
@@ -52,10 +60,12 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
 
     if (nextId && containerRef.current) {
       const next = getTerminalInstance(nextId)
-      next?.mount(containerRef.current)
+      next?.mount(containerRef.current, scrollToBottomOnMount)
     }
 
     prevSessionIdRef.current = nextId
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // scrollToBottomOnMount intentionally excluded: changing the setting should not remount sessions
   }, [activeSessionId, layout, getTerminalInstance])
 
   // Cleanup on unmount — useLayoutEffect so snapshot capture precedes browser layout.
@@ -81,19 +91,19 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, projectId, setFocusedSession, getTerminalInstance])
 
-  const scrollActiveToBottom = useCallback(() => {
+  const handleWindowFocus = useCallback(() => {
+    if (!scrollToBottomOnFocus) return
     if (activeSessionId) {
       const instance = getTerminalInstance(activeSessionId)
       instance?.terminal.scrollToBottom()
       instance?.terminal.focus()
     }
-  }, [activeSessionId, getTerminalInstance])
+  }, [activeSessionId, getTerminalInstance, scrollToBottomOnFocus])
 
   useEffect(() => {
-    if (!globalSettings?.terminal.scrollToBottomOnFocus) return
-    window.addEventListener('focus', scrollActiveToBottom)
-    return () => window.removeEventListener('focus', scrollActiveToBottom)
-  }, [scrollActiveToBottom, globalSettings?.terminal.scrollToBottomOnFocus])
+    window.addEventListener('focus', handleWindowFocus)
+    return () => window.removeEventListener('focus', handleWindowFocus)
+  }, [handleWindowFocus])
 
   const handleRatioChange = useCallback(
     (splitId: string, ratio: number) => {
@@ -122,7 +132,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     if (e.button !== 0) return
     if (activeSessionId) {
       const instance = getTerminalInstance(activeSessionId)
-      if (globalSettings?.terminal.scrollToBottomOnClick) instance?.terminal.scrollToBottom()
+      if (scrollToBottomOnClick) instance?.terminal.scrollToBottom()
       instance?.terminal.focus()
     }
   }
