@@ -1,0 +1,21 @@
+extensions/notepad/src/components/DiagramView.tsx
+  s_04d55e15a03e3c::t_8e1ba8bb64fb5d 565-566
+extensions/notepad/src/components/NoteList.tsx
+  s_04d55e15a03e3c::t_b652f833bb51fd 380
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "95c8c6cb58f5adf29f35e298bf69a349efc122b0",
+  "prompts": {},
+  "sessions": {
+    "s_04d55e15a03e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44560d63-490c-4190-b90e-943512b66236",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
