@@ -1,0 +1,69 @@
+src/renderer-remote/MobileApp.tsx
+  s_da066600789312::t_1cc0e2df8067ae 2-7
+  s_da066600789312::t_e822c9cac27267 45-51
+  s_da066600789312::t_5eb2244005230e 69
+src/renderer-remote/mobile.css
+  s_da066600789312::t_bf901f053badd3 180-227
+  s_da066600789312::t_6001a6365b72e1 74-81
+tests/unit/renderer-remote/mobile/MobileTerminalList.spec.tsx
+  s_da066600789312::t_0c667a8433fa39 9
+  s_da066600789312::t_e4c15a04755b4c 30,51,72,89,105,122,143,167,191,217,242,251-294,296-298,385-407
+  s_da066600789312::t_7c7fb2d29229b2 295
+  s_da066600789312::t_5ee58b023286bb 2
+  s_da066600789312::t_d2a3364275b240 299-384,408
+extensions/remote-control/src/server/routes/terminal.routes.ts
+  s_da066600789312::t_a0edad7dda16b8 26
+  s_da066600789312::t_8b755f7945ddde 36-39,46-65
+  s_da066600789312::t_b2a39b82aa2902 185-199
+  s_da066600789312::t_1a9f0085c43e99 127-148,153-155
+src/main/extensions/api.ts
+  s_da066600789312::t_0dd39980eb7e1d 546-551
+src/renderer-remote/components/MobileTerminalView.tsx
+  s_da066600789312::t_8bc0d123ab5615 39-51
+src/renderer-remote/components/MobileTerminalList.tsx
+  s_da066600789312::t_3e645858c6f8e7 1,8-13,19,27,29-75,78-104,109-111,118,122,133,135-159
+src/renderer-remote/api/remote-client.ts
+  s_da066600789312::t_fa59a10f78ea35 75
+  s_da066600789312::t_185c6faf4af740 84-94
+tests/unit/renderer-remote/mobile/MobileApp.spec.tsx
+  s_da066600789312::t_bb912cc0b99c7d 105-120
+  s_da066600789312::t_f2e9f6927161e1 59
+  s_da066600789312::t_762a32a55a68e0 23,27,34
+  s_da066600789312::t_bc5d5191dc2c3b 9-10,16
+src/renderer-remote/App.tsx
+  s_da066600789312::t_5ce625547513d9 33
+src/main/terminal/pty-manager.ts
+  s_da066600789312::t_e1ad2ee1abc1c1 47
+  s_da066600789312::t_f243671389b912 142
+  s_da066600789312::t_7b67327db34a03 17
+  s_da066600789312::t_43e1d8c6fcb3bc 97-107
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_da066600789312::t_55db684e25ff4e 550-644
+  s_da066600789312::t_589c83b6644d87 234-244
+  s_da066600789312::t_918830cd87ce7d 29-31
+  s_da066600789312::t_a9a0043fcc319c 255-256
+  s_da066600789312::t_c5721318508a7d 17-18
+extensions/remote-control/src/types.ts
+  s_da066600789312::t_7273669e58c317 13-14
+tests/unit/renderer-remote/App.spec.tsx
+  s_da066600789312::t_3e051a73a6d0a9 77
+  s_da066600789312::t_371780a9977eb2 97
+  s_da066600789312::t_5e896b4fc5ae88 98
+  s_da066600789312::t_f8b7252291feb7 64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "9348f8b45b9a7193b2292eed5f530c365c5d5f03",
+  "prompts": {},
+  "sessions": {
+    "s_da066600789312": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b233e45-1b62-483a-8fb7-dc58c7a38797",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
