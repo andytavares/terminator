@@ -236,4 +236,49 @@ describe('PtyManager', () => {
     const mgr = new PtyManager()
     expect(mgr.getPid('nope')).toBeUndefined()
   })
+
+  it('listSessions returns all active sessions with cwd', async () => {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    mgr.spawn('s1', '/home/user', '/bin/sh', 'human', vi.fn(), vi.fn())
+    mgr.spawn('s2', '/tmp', '/bin/sh', 'agent', vi.fn(), vi.fn())
+    const result = mgr.listSessions()
+    expect(result).toHaveLength(2)
+    expect(result).toEqual(
+      expect.arrayContaining([
+        { sessionId: 's1', cwd: '/home/user' },
+        { sessionId: 's2', cwd: '/tmp' },
+      ])
+    )
+  })
+
+  it('listSessions returns empty array when no sessions exist', async () => {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    expect(mgr.listSessions()).toEqual([])
+  })
+
+  it('attachOnData returns a dispose function that detaches the listener', async () => {
+    const onDataCb = vi.fn()
+    let capturedDataCb: ((data: string) => void) | null = null
+    mockPty.onData.mockImplementation((cb: (data: string) => void) => {
+      capturedDataCb = cb
+      return { dispose: vi.fn() }
+    })
+
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    mgr.spawn('s1', '/tmp', '/bin/sh', 'human', vi.fn(), vi.fn())
+
+    const dispose = mgr.attachOnData('s1', onDataCb)
+    expect(dispose).toBeTypeOf('function')
+    expect(capturedDataCb).not.toBeNull()
+  })
+
+  it('attachOnData returns null for unknown sessionId', async () => {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const mgr = new PtyManager()
+    const result = mgr.attachOnData('no-such', vi.fn())
+    expect(result).toBeNull()
+  })
 })

@@ -8,9 +8,13 @@ const mockStopPolling = vi.fn()
 const mockSetActiveGlobalTab = vi.fn()
 const mockSetActiveWorkspace = vi.fn()
 const mockSetActiveProject = vi.fn()
+const mockSetScratchActive = vi.fn()
+const mockSetActiveSessionForProject = vi.fn()
 
 vi.mock('../../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: vi.fn(),
+  useSessionStore: Object.assign(vi.fn(), {
+    getState: vi.fn(),
+  }),
 }))
 
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
@@ -48,6 +52,7 @@ import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.sto
 import { useMetricsStore } from '../../../../src/renderer/stores/metrics.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { OverviewScreen } from '../../../../src/renderer/components/overview/OverviewScreen'
+import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
 
 function makeSession(overrides: Partial<TerminalSession> = {}): TerminalSession {
   return {
@@ -93,9 +98,14 @@ beforeEach(() => {
     busySessions: new Set(),
   } as unknown as ReturnType<typeof useSessionStore>)
 
+  vi.mocked(useSessionStore).getState = vi.fn().mockReturnValue({
+    setActiveSessionForProject: mockSetActiveSessionForProject,
+  })
+
   vi.mocked(useWorkspaceStore).mockReturnValue({
     workspaces: [],
     projectsByWorkspaceId: new Map(),
+    setScratchActive: mockSetScratchActive,
   } as unknown as ReturnType<typeof useWorkspaceStore>)
 
   vi.mocked(useWorkspaceStore).getState = vi.fn().mockReturnValue({
@@ -384,5 +394,62 @@ describe('OverviewScreen', () => {
     // Alpha workspace (ws-a) should come before Beta workspace (ws-b)
     expect(tiles[0].getAttribute('data-testid')).toBe('tile-s-2')
     expect(tiles[1].getAttribute('data-testid')).toBe('tile-s-1')
+  })
+
+  it('renders tile for scratch session without a real project', async () => {
+    const scratchSession = makeSession({
+      id: 'scratch-1',
+      projectId: SCRATCH_PROJECT_ID,
+      tabTitle: 'Scratch',
+    })
+
+    vi.mocked(useSessionStore).mockReturnValue({
+      sessions: new Map([['scratch-1', scratchSession]]),
+      busySessions: new Set(),
+    } as unknown as ReturnType<typeof useSessionStore>)
+
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [],
+      projectsByWorkspaceId: new Map(),
+      setScratchActive: mockSetScratchActive,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+
+    await act(async () => {
+      render(<OverviewScreen />)
+    })
+
+    expect(screen.getByTestId('tile-scratch-1')).toBeTruthy()
+  })
+
+  it('calls setScratchActive when a scratch tile is clicked', async () => {
+    const scratchSession = makeSession({
+      id: 'scratch-2',
+      projectId: SCRATCH_PROJECT_ID,
+      tabTitle: 'Scratch',
+    })
+
+    vi.mocked(useSessionStore).mockReturnValue({
+      sessions: new Map([['scratch-2', scratchSession]]),
+      busySessions: new Set(),
+    } as unknown as ReturnType<typeof useSessionStore>)
+
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [],
+      projectsByWorkspaceId: new Map(),
+      setScratchActive: mockSetScratchActive,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+
+    await act(async () => {
+      render(<OverviewScreen />)
+    })
+
+    await act(async () => {
+      screen.getByTestId('tile-scratch-2').click()
+    })
+
+    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'scratch-2')
+    expect(mockSetScratchActive).toHaveBeenCalledWith(true)
+    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
+    expect(mockSetActiveProject).not.toHaveBeenCalled()
   })
 })

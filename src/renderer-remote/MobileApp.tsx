@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { listWorkspaces, listTerminals, createTerminal } from './api/remote-client'
+import {
+  listWorkspaces,
+  listTerminals,
+  createTerminal,
+  assignTerminalWorkspace,
+} from './api/remote-client'
 import type { Workspace, TerminalSession } from './api/remote-client'
 import { MobileTerminalList } from './components/MobileTerminalList'
 import { MobileTerminalView } from './components/MobileTerminalView'
@@ -37,6 +42,13 @@ export function MobileApp() {
     void workspaceId
   }
 
+  const handleAssignWorkspace = async (sessionId: string, workspaceId: string | null) => {
+    await assignTerminalWorkspace(sessionId, workspaceId).catch(() => undefined)
+    listTerminals()
+      .then(setTerminals)
+      .catch(() => undefined)
+  }
+
   function handleBack() {
     listTerminals()
       .then(setTerminals)
@@ -54,6 +66,7 @@ export function MobileApp() {
       terminals={terminals}
       onSelectTerminal={handleSelectTerminal}
       onCreateTerminal={handleCreateTerminal}
+      onAssignWorkspace={handleAssignWorkspace}
     />
   )
 }

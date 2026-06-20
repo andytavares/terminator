@@ -5,17 +5,38 @@ import { useMetricsStore } from '../../stores/metrics.store'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { SessionTile } from './SessionTile'
 import type { Project, Workspace, TerminalSession } from '../../../../shared/types/index'
+import { SCRATCH_PROJECT_ID } from '../../../shared/types/index'
 import './OverviewScreen.css'
 
 interface TileData {
   session: TerminalSession
   project: Project
   workspace: Workspace
+  isScratch?: boolean
+}
+
+const SCRATCH_WORKSPACE: Workspace = {
+  id: SCRATCH_PROJECT_ID,
+  name: 'Scratch',
+  folderPath: '',
+  color: '#858585',
+  tags: [],
+  createdAt: '',
+  updatedAt: '',
+}
+
+const SCRATCH_PROJECT: Project = {
+  id: SCRATCH_PROJECT_ID,
+  workspaceId: SCRATCH_PROJECT_ID,
+  name: '',
+  isWorktree: false,
+  createdAt: '',
+  updatedAt: '',
 }
 
 export function OverviewScreen(): JSX.Element {
   const { sessions } = useSessionStore()
-  const { workspaces, projectsByWorkspaceId } = useWorkspaceStore()
+  const { workspaces, projectsByWorkspaceId, setScratchActive } = useWorkspaceStore()
   const { processesBySessionId, startPolling, stopPolling } = useMetricsStore()
   const { busySessions } = useSessionStore()
 
@@ -39,6 +60,15 @@ export function OverviewScreen(): JSX.Element {
     const result: TileData[] = []
     for (const session of sessions.values()) {
       if (session.status === 'closed') continue
+      if (session.projectId === SCRATCH_PROJECT_ID) {
+        result.push({
+          session,
+          project: SCRATCH_PROJECT,
+          workspace: SCRATCH_WORKSPACE,
+          isScratch: true,
+        })
+        continue
+      }
       const project = projectById.get(session.projectId)
       if (!project) continue
       const workspace = workspaceById.get(project.workspaceId)
@@ -85,12 +115,17 @@ export function OverviewScreen(): JSX.Element {
   }, [sessionIdsKey])
 
   function navigate(tile: TileData): void {
+    useExtensionRegistry.getState().setActiveGlobalTab(null)
+    if (tile.isScratch) {
+      useSessionStore.getState().setActiveSessionForProject(SCRATCH_PROJECT_ID, tile.session.id)
+      setScratchActive(true)
+      return
+    }
     const { activeWorkspaceId, setActiveWorkspace, setActiveProject } = useWorkspaceStore.getState()
     if (tile.project.workspaceId !== activeWorkspaceId) {
       setActiveWorkspace(tile.project.workspaceId)
     }
     setActiveProject(tile.project.id)
-    useExtensionRegistry.getState().setActiveGlobalTab(null)
   }
 
   return (

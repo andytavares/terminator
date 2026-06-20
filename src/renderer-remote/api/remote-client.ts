@@ -72,12 +72,25 @@ export interface TerminalSession {
   sessionId: string
   cwd: string
   createdAt: string
+  workspaceId?: string
 }
 
 export async function listTerminals(): Promise<TerminalSession[]> {
   const res = await apiFetch('/api/terminals')
   if (!res.ok) throw new Error(`listTerminals failed: ${res.status}`)
   return res.json()
+}
+
+export async function assignTerminalWorkspace(
+  sessionId: string,
+  workspaceId: string | null
+): Promise<void> {
+  const res = await apiFetch(`/api/terminals/${sessionId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ workspaceId }),
+  })
+  if (!res.ok) throw new Error(`assignTerminalWorkspace failed: ${res.status}`)
 }
 
 export async function listWorkspaces(): Promise<Workspace[]> {

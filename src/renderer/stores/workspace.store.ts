@@ -28,6 +28,8 @@ interface WorkspaceState {
   resolveActiveCwd: () => string
   toggleWorkspaceCollapse: (id: string) => void
   setExpandedWorkspaceIds: (ids: Set<string>) => void
+  scratchActive: boolean
+  setScratchActive: (value: boolean) => void
 }
 
 function loadExpandedIds(): Set<string> {
@@ -49,6 +51,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   activeProjectId: null,
   projectsByWorkspaceId: new Map(),
   expandedWorkspaceIds: loadExpandedIds(),
+  scratchActive: false,
+  setScratchActive: (value) =>
+    set(
+      value
+        ? { scratchActive: true, activeWorkspaceId: null, activeProjectId: null }
+        : { scratchActive: false }
+    ),
 
   loadWorkspaces: async () => {
     const result = await window.electronAPI.workspace.list()

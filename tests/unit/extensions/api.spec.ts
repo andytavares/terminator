@@ -391,3 +391,53 @@ describe('api.sidebar.registerGlobalTab', () => {
     ).toThrow('GLOBAL_TAB_ALREADY_REGISTERED')
   })
 })
+
+describe('api.pty.listSessions', () => {
+  it('delegates to ptyManager.listSessions when deps are provided', () => {
+    const mockPtyMgr = {
+      spawn: vi.fn(),
+      write: vi.fn(),
+      resize: vi.fn(),
+      kill: vi.fn(),
+      listSessions: vi.fn(() => [{ sessionId: 's1', cwd: '/tmp' }]),
+      attachOnData: vi.fn(() => () => {}),
+    }
+    const api = createExtensionAPI('test.ext', '0.1.0', {
+      ptyManager: mockPtyMgr as never,
+    })
+    const result = api.pty.listSessions()
+    expect(result).toEqual([{ sessionId: 's1', cwd: '/tmp' }])
+    expect(mockPtyMgr.listSessions).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns empty array when no ptyManager dep is provided', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    expect(api.pty.listSessions()).toEqual([])
+  })
+})
+
+describe('api.pty.attachOnData', () => {
+  it('delegates to ptyManager.attachOnData when deps are provided', () => {
+    const mockDispose = vi.fn()
+    const mockPtyMgr = {
+      spawn: vi.fn(),
+      write: vi.fn(),
+      resize: vi.fn(),
+      kill: vi.fn(),
+      listSessions: vi.fn(() => []),
+      attachOnData: vi.fn(() => mockDispose),
+    }
+    const api = createExtensionAPI('test.ext', '0.1.0', {
+      ptyManager: mockPtyMgr as never,
+    })
+    const onData = vi.fn()
+    const dispose = api.pty.attachOnData('s1', onData)
+    expect(mockPtyMgr.attachOnData).toHaveBeenCalledWith('s1', onData)
+    expect(dispose).toBe(mockDispose)
+  })
+
+  it('returns null when no ptyManager dep is provided', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    expect(api.pty.attachOnData('s1', vi.fn())).toBeNull()
+  })
+})

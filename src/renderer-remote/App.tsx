@@ -30,7 +30,7 @@ export function App(): JSX.Element {
         setLoading(false)
         return
       }
-      const isMobile = window.innerWidth < 768
+      const isMobile = window.innerWidth < 1400
       const ticketEndpoint = isMobile ? '/api/mobile-ticket' : '/api/app-ticket'
       const ticketRes = await fetch(ticketEndpoint, {
         method: 'POST',
