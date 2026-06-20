@@ -6,7 +6,12 @@ vi.mock('../../../../src/renderer/stores/session.store', () => ({
   useSessionStore: vi.fn(),
 }))
 
+vi.mock('../../../../src/renderer/stores/settings.store', () => ({
+  useSettingsStore: vi.fn(),
+}))
+
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
+import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { LeafPane } from '../../../../src/renderer/components/terminal/LeafPane'
 
 const mockGetTerminalInstance = vi.fn()
@@ -28,6 +33,19 @@ function makeInstance() {
   }
 }
 
+function makeSettings(overrides: Record<string, unknown> = {}) {
+  return {
+    globalSettings: {
+      terminal: {
+        scrollToBottomOnMount: false,
+        scrollToBottomOnClick: false,
+        scrollToBottomOnFocus: false,
+        ...overrides,
+      },
+    },
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(useSessionStore).mockReturnValue({
@@ -37,6 +55,9 @@ beforeEach(() => {
     clearBellCount: mockClearBellCount,
     sessions: mockSessions,
   } as unknown as ReturnType<typeof useSessionStore>)
+  vi.mocked(useSettingsStore).mockReturnValue(
+    makeSettings() as unknown as ReturnType<typeof useSettingsStore>
+  )
 
   mockGetTerminalInstance.mockReturnValue(undefined)
   mockGetFocusedSession.mockReturnValue(null)
@@ -140,5 +161,47 @@ describe('LeafPane', () => {
     const { unmount } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     unmount()
     expect(instance.unmount).toHaveBeenCalled()
+  })
+
+  it('passes scrollToBottomOnMount=true to mount when setting is enabled', () => {
+    vi.mocked(useSettingsStore).mockReturnValue(
+      makeSettings({ scrollToBottomOnMount: true }) as unknown as ReturnType<
+        typeof useSettingsStore
+      >
+    )
+    const instance = makeInstance()
+    mockGetTerminalInstance.mockReturnValue(instance)
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    expect(instance.mount).toHaveBeenCalledWith(expect.anything(), true)
+  })
+
+  it('ignores non-left-button mousedown (button !== 0)', () => {
+    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 2 })
+    expect(mockSetFocusedSession).not.toHaveBeenCalled()
+  })
+
+  it('calls scrollToBottom on click when scrollToBottomOnClick is enabled', () => {
+    vi.mocked(useSettingsStore).mockReturnValue(
+      makeSettings({ scrollToBottomOnClick: true }) as unknown as ReturnType<
+        typeof useSettingsStore
+      >
+    )
+    const instance = makeInstance()
+    mockGetTerminalInstance.mockReturnValue(instance)
+    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
+    expect(instance.terminal.scrollToBottom).toHaveBeenCalled()
+  })
+
+  it('does not throw on drop when no terminal instance', () => {
+    mockGetTerminalInstance.mockReturnValue(undefined)
+    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    const file = Object.assign(new File([], 'file.txt'), { path: '/tmp/file.txt' })
+    expect(() =>
+      fireEvent.drop(container.querySelector('.leaf-pane')!, {
+        dataTransfer: { files: [file], types: ['Files'] },
+      })
+    ).not.toThrow()
   })
 })

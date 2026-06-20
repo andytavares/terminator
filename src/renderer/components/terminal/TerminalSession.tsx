@@ -62,7 +62,6 @@ export class TerminalInstance {
   private opened = false
   private sessionId: string
   private busyTimer: ReturnType<typeof setTimeout> | null = null
-
   // The root element xterm renders into — created on first mount(), moved between containers.
   readonly element: HTMLDivElement
   // Underline overlay for hovered links — positioned absolutely inside this.element.
@@ -388,14 +387,14 @@ export class TerminalInstance {
   }
 
   // Call once after the element is in a visible, sized container.
-  mount(container: HTMLElement): void {
+  mount(container: HTMLElement, scrollToBottomOnMount = false): void {
     container.appendChild(this.element)
     if (!this.opened) {
       this.terminal.open(this.element)
       this.opened = true
     }
     this.fitAddon.fit()
-    this.terminal.scrollToBottom()
+    if (scrollToBottomOnMount) this.terminal.scrollToBottom()
     this.terminal.focus()
     this.resizeObserver = new ResizeObserver(() => this.fitAddon.fit())
     this.resizeObserver.observe(container)

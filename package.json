@@ -12,10 +12,10 @@
     "access": "restricted"
   },
   "scripts": {
-    "postinstall": "electron-rebuild -f -w better-sqlite3",
+    "postinstall": "electron-rebuild",
     "build:extensions": "node scripts/build-extensions.cjs",
     "build:remote": "vite build --config vite.config.remote.ts",
-    "dev": "electron-rebuild -f -w better-sqlite3 && npm run build:extensions && npm run build:remote && electron-vite dev",
+    "dev": "electron-rebuild && npm run build:extensions && npm run build:remote && electron-vite dev",
     "build": "npm run build:extensions && npm run build:remote && electron-vite build",
     "preview": "electron-vite preview",
     "test": "node scripts/run-tests.cjs",
@@ -26,10 +26,10 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "rebuild": "electron-rebuild -w better-sqlite3",
+    "rebuild": "electron-rebuild",
     "check-patch-coverage": "node scripts/check-patch-coverage.cjs",
     "create-extension": "node scripts/create-extension.cjs",
-    "package": "electron-rebuild -f -w better-sqlite3 && npm run build:extensions && npm run build:remote && electron-vite build && electron-builder --mac --arm64 --publish never",
+    "package": "electron-rebuild && npm run build:extensions && npm run build:remote && electron-vite build && electron-builder --mac --arm64 --publish never",
     "prepare": "husky"
   },
   "lint-staged": {

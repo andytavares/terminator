@@ -19,7 +19,13 @@ import { useSettingsStore } from '../../../../src/renderer/stores/settings.store
 
 const DEFAULT_SETTINGS = {
   appearance: { theme: 'dark' },
-  terminal: { scrollbackLimit: 10000, defaultShell: '/bin/zsh' },
+  terminal: {
+    scrollbackLimit: 10000,
+    defaultShell: '/bin/zsh',
+    scrollToBottomOnClick: false,
+    scrollToBottomOnFocus: false,
+    scrollToBottomOnMount: false,
+  },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},
   ui: { hasSeenWelcome: false },
@@ -215,6 +221,78 @@ describe('useSettingsStore', () => {
       })
       const stored = useSettingsStore.getState().workspaceSettings.get('ws-1')
       expect(stored).toEqual(wsSettings)
+    })
+  })
+
+  describe('updateScrollToBottomOnClick', () => {
+    it('calls updateGlobal with scrollToBottomOnClick true and updates store', async () => {
+      const updated = {
+        ...DEFAULT_SETTINGS,
+        terminal: { ...DEFAULT_SETTINGS.terminal, scrollToBottomOnClick: true },
+      }
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+      await useSettingsStore.getState().updateScrollToBottomOnClick(true)
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        terminal: { scrollToBottomOnClick: true },
+      })
+      expect(useSettingsStore.getState().globalSettings).toEqual(updated)
+    })
+
+    it('calls updateGlobal with scrollToBottomOnClick false', async () => {
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: DEFAULT_SETTINGS })
+      await useSettingsStore.getState().updateScrollToBottomOnClick(false)
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        terminal: { scrollToBottomOnClick: false },
+      })
+    })
+  })
+
+  describe('updateScrollToBottomOnFocus', () => {
+    it('calls updateGlobal with scrollToBottomOnFocus true and updates store', async () => {
+      const updated = {
+        ...DEFAULT_SETTINGS,
+        terminal: { ...DEFAULT_SETTINGS.terminal, scrollToBottomOnFocus: true },
+      }
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+      await useSettingsStore.getState().updateScrollToBottomOnFocus(true)
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        terminal: { scrollToBottomOnFocus: true },
+      })
+      expect(useSettingsStore.getState().globalSettings).toEqual(updated)
+    })
+
+    it('calls updateGlobal with scrollToBottomOnFocus false', async () => {
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: DEFAULT_SETTINGS })
+      await useSettingsStore.getState().updateScrollToBottomOnFocus(false)
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        terminal: { scrollToBottomOnFocus: false },
+      })
+    })
+  })
+
+  describe('updateScrollToBottomOnMount', () => {
+    it('calls updateGlobal with scrollToBottomOnMount true and updates store', async () => {
+      const updated = {
+        ...DEFAULT_SETTINGS,
+        terminal: { ...DEFAULT_SETTINGS.terminal, scrollToBottomOnMount: true },
+      }
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+      await useSettingsStore.getState().updateScrollToBottomOnMount(true)
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        terminal: { scrollToBottomOnMount: true },
+      })
+      expect(useSettingsStore.getState().globalSettings).toEqual(updated)
+    })
+
+    it('calls updateGlobal with scrollToBottomOnMount false', async () => {
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: DEFAULT_SETTINGS })
+      await useSettingsStore.getState().updateScrollToBottomOnMount(false)
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        terminal: { scrollToBottomOnMount: false },
+      })
     })
   })
 

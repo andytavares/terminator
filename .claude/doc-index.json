@@ -71,7 +71,10 @@
       "title": "IPC Channels Contract (core)",
       "summary": "Core IPC channel specifications: terminal:*, workspace:*, project:*, settings:*, dialog:*, extension:*, fs:*, notification.*.",
       "owners": [],
-      "referenced_code_paths": ["src/main/preload.ts", "src/renderer/electron.d.ts"],
+      "referenced_code_paths": [
+        "src/main/preload.ts",
+        "src/renderer/electron.d.ts"
+      ],
       "last_verified_commit": "3db5814",
       "staleness_score": 0
     },
@@ -95,7 +98,9 @@
       "title": "Contributing Guide",
       "summary": "Development workflow, npm scripts, test coverage requirements, PR checklist.",
       "owners": [],
-      "referenced_code_paths": ["package.json"],
+      "referenced_code_paths": [
+        "package.json"
+      ],
       "last_verified_commit": "3db5814",
       "staleness_score": 0
     },

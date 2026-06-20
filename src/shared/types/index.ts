@@ -79,6 +79,9 @@ export interface GlobalSettings {
   terminal: {
     scrollbackLimit: number
     defaultShell: string
+    scrollToBottomOnClick: boolean
+    scrollToBottomOnFocus: boolean
+    scrollToBottomOnMount: boolean
   }
   git: {
     /** Base directory for new worktrees. Empty string means <repoRoot>/.worktrees. */
