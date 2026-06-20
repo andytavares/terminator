@@ -63,7 +63,20 @@ export function BranchSwitcher({
   function openDropdown(): void {
     if (!triggerRef.current || switching) return
     const rect = triggerRef.current.getBoundingClientRect()
-    setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+    const width = Math.max(rect.width, 220)
+    const DROPDOWN_MAX_H = 320
+    const MARGIN = 8
+
+    const spaceBelow = window.innerHeight - rect.bottom - MARGIN
+    const spaceAbove = rect.top - MARGIN
+    const top =
+      spaceBelow >= DROPDOWN_MAX_H || spaceBelow >= spaceAbove
+        ? rect.bottom + 4
+        : Math.max(rect.top - DROPDOWN_MAX_H - 4, MARGIN)
+
+    const left = Math.min(rect.left, window.innerWidth - width - MARGIN)
+
+    setPos({ top, left: Math.max(left, MARGIN), width })
     setFilter('')
     setOpen(true)
     setTimeout(() => filterRef.current?.focus(), 0)
@@ -175,7 +188,7 @@ export function BranchSwitcher({
           <div
             ref={dropdownRef}
             className="branch-sw__dropdown"
-            style={{ top: pos.top, left: pos.left, width: Math.max(pos.width, 220) }}
+            style={{ top: pos.top, left: pos.left, width: pos.width }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="branch-sw__filter-wrap">
