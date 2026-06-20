@@ -319,6 +319,10 @@ export function NoteList(): React.JSX.Element {
   const { searchQuery, activeTagId, setQuery, setTag } = useFilterStore()
 
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null)
+  const [settledFilter, setSettledFilter] = useState<{
+    query: string
+    tagId: string | null
+  } | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const tagsRef = useRef<Tag[]>([])
   const searchGenRef = useRef(0)
@@ -375,6 +379,7 @@ export function NoteList(): React.JSX.Element {
     /* v8 ignore next */
     if (!searchQuery && !activeTagId) {
       setSearchResults(null)
+      setSettledFilter(null)
       return
     }
     const parts: string[] = []
@@ -394,7 +399,10 @@ export function NoteList(): React.JSX.Element {
       )
       if (gen !== searchGenRef.current) return
       const data = (result as { data?: SearchResult[] }).data
-      if (data) setSearchResults(data)
+      if (data) {
+        setSearchResults(data)
+        setSettledFilter({ query: searchQuery, tagId: activeTagId })
+      }
     }
     void run()
   }, [searchQuery, activeTagId, tags])
@@ -490,17 +498,23 @@ export function NoteList(): React.JSX.Element {
   const activeNotes = allNoteItems.filter((n) => !n.archivedAt)
   const archivedNotes = allNoteItems.filter((n) => n.archivedAt)
 
-  // When a search/tag filter is active, filter diagrams client-side to match
+  // When a search/tag filter is settled (async results returned), filter diagrams
+  // client-side using the same query/tag that generated searchResults, so notes
+  // and diagrams always reflect the same settled filter state.
   const filteredDiagrams = (() => {
-    if (!searchResults) return diagrams
-    const q = searchQuery.toLowerCase()
+    if (!settledFilter) return diagrams
+    const q = settledFilter.query.toLowerCase()
     const activeTagName = (() => {
-      if (!activeTagId) return null
-      const tag = tags.find((t) => t.id === activeTagId)
-      return tag?.name ?? (activeTagId.startsWith('local:') ? activeTagId.slice(6) : null)
+      if (!settledFilter.tagId) return null
+      const tag = tags.find((t) => t.id === settledFilter.tagId)
+      return (
+        tag?.name ??
+        (settledFilter.tagId.startsWith('local:') ? settledFilter.tagId.slice(6) : null)
+      )
     })()
     return diagrams.filter((d) => {
-      const matchesQuery = !q || d.title.toLowerCase().includes(q)
+      const matchesQuery =
+        !q || d.title.toLowerCase().includes(q) || d.tags.some((t) => t.toLowerCase().includes(q))
       const matchesTag = !activeTagName || d.tags.includes(activeTagName)
       return matchesQuery && matchesTag
     })

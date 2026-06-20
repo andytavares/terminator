@@ -255,8 +255,17 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
   } | null>(null)
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingSaveRef = useRef<{ sceneJson: string; title: string; tags: string[] } | null>(null)
+  const latestTitleRef = useRef(title)
+  const latestTagsRef = useRef(tags)
   const containerRef = useRef<HTMLDivElement>(null)
   const activeIdRef = useRef(diagramId)
+
+  useEffect(() => {
+    latestTitleRef.current = title
+  }, [title])
+  useEffect(() => {
+    latestTagsRef.current = tags
+  }, [tags])
 
   useEffect(() => {
     activeIdRef.current = diagramId
@@ -301,16 +310,17 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
         clearTimeout(autosaveTimer.current)
         autosaveTimer.current = null
       }
-      // Flush any pending save so changes aren't lost when switching diagrams
+      // Flush any pending save so changes aren't lost when switching diagrams.
+      // Use latest refs so a pending save picks up any title/tags renamed since scheduling.
       const pending = pendingSaveRef.current
       if (pending) {
         pendingSaveRef.current = null
         void window.electronAPI.extensionBridge
           .invoke('terminator.notepad:diagrams.autosave', {
             id: diagramId,
-            title: pending.title,
+            title: latestTitleRef.current,
             sceneJson: pending.sceneJson,
-            tags: pending.tags,
+            tags: latestTagsRef.current,
           })
           .catch(console.error)
       }
@@ -318,18 +328,25 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
   }, [diagramId])
 
   const scheduleAutosave = useCallback(
-    (newSceneJson: string, newTitle: string, newTags: string[]) => {
-      pendingSaveRef.current = { sceneJson: newSceneJson, title: newTitle, tags: newTags }
+    (newSceneJson: string) => {
+      pendingSaveRef.current = {
+        sceneJson: newSceneJson,
+        title: latestTitleRef.current,
+        tags: latestTagsRef.current,
+      }
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
       autosaveTimer.current = setTimeout(async () => {
+        // Read title/tags from refs at fire time so a rename between schedule and fire is respected
+        const fireTitle = latestTitleRef.current
+        const fireTags = latestTagsRef.current
         pendingSaveRef.current = null
         setSaveStatus('saving')
         try {
           await window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.autosave', {
             id: diagramId,
-            title: newTitle,
+            title: fireTitle,
             sceneJson: newSceneJson,
-            tags: newTags,
+            tags: fireTags,
           })
           setSaveStatus('saved')
         } catch (err) {
@@ -348,7 +365,7 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
       appState: { scrollX: state.scrollX, scrollY: state.scrollY, zoom: state.zoom },
     })
     setSceneJson(newJson)
-    scheduleAutosave(newJson, title, tags)
+    scheduleAutosave(newJson)
   }
 
   async function commitTitleEdit() {
