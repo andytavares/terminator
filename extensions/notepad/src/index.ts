@@ -5,6 +5,8 @@ import { registerNotesIpcHandlers, registerTagsIpcHandlers } from './ipc/notes.i
 import { registerCommentsIpcHandlers } from './ipc/comments.ipc'
 import { registerSearchIpcHandlers } from './ipc/search.ipc'
 import { registerExportIpcHandlers } from './ipc/export.ipc'
+import { registerDiagramsIpcHandlers } from './ipc/diagrams.ipc'
+import { registerDiagramCommentsIpcHandlers } from './ipc/diagram-comments.ipc'
 
 const disposables: Disposable[] = []
 
@@ -33,6 +35,12 @@ export async function activate(api: ExtensionAPI): Promise<void> {
 
   const disposeExport = registerExportIpcHandlers()
   disposables.push({ dispose: disposeExport })
+
+  const disposeDiagrams = registerDiagramsIpcHandlers()
+  disposables.push({ dispose: disposeDiagrams })
+
+  const disposeDiagramComments = registerDiagramCommentsIpcHandlers()
+  disposables.push({ dispose: disposeDiagramComments })
 
   ipcMain.handle('terminator.notepad:db.reinit', async () => {
     try {

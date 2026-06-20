@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { useNotesStore } from '../stores/notes.store'
 import { NoteEditor } from '../editor/NoteEditor'
+import type { DiagramListItem } from '../db/types'
 
 function toFilenameSlug(title: string): string {
   return (
@@ -23,8 +24,58 @@ function deriveTitle(body: string): string {
   return 'Untitled note'
 }
 
+interface TagChipBarProps {
+  tags: string[]
+  tagInput: string
+  tagInputRef: React.RefObject<HTMLInputElement>
+  onTagInput: (val: string) => void
+  onAddTag: (val: string) => void
+  onRemoveTag: (tag: string) => void
+  onTagKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void
+}
+
+function TagChipBar({
+  tags,
+  tagInput,
+  tagInputRef,
+  onTagInput,
+  onAddTag,
+  onRemoveTag,
+  onTagKeyDown,
+}: TagChipBarProps): React.JSX.Element {
+  return (
+    <div className="notepad-quick-create__tags">
+      {tags.map((tag) => (
+        <span key={tag} className="notepad-tag-chip-input__chip">
+          {tag}
+          <button
+            type="button"
+            className="notepad-tag-chip-input__remove"
+            onClick={() => onRemoveTag(tag)}
+            aria-label={`Remove tag ${tag}`}
+          >
+            <X size={10} />
+          </button>
+        </span>
+      ))}
+      <input
+        ref={tagInputRef}
+        className="notepad-quick-create__tag-input"
+        placeholder="# add tag…"
+        value={tagInput}
+        onChange={(e) => onTagInput(e.target.value)}
+        onKeyDown={onTagKeyDown}
+        onBlur={() => {
+          if (tagInput.trim()) onAddTag(tagInput)
+        }}
+      />
+    </div>
+  )
+}
+
 export function QuickCreateOverlay(): React.JSX.Element | null {
-  const { showQuickCreate, setShowQuickCreate, setNotes } = useNotesStore()
+  const { showQuickCreate, setShowQuickCreate, setNotes, setDiagrams } = useNotesStore()
+  const [type, setType] = useState<'note' | 'diagram'>('note')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [tags, setTags] = useState<string[]>([])
@@ -41,13 +92,14 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
     setTags([])
     setTagInput('')
     setSaving(false)
+    setType('note')
     setShowQuickCreate(false)
   }, [setShowQuickCreate])
 
   useEffect(() => {
     if (!showQuickCreate) return
     const t = setTimeout(() => titleRef.current?.focus(), 50)
-    // Load default tags from settings
+    // Load default tags from settings (notes only)
     window.electronAPI.extension
       .getSettingsValues()
       .then((result) => {
@@ -67,7 +119,7 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
     return () => clearTimeout(t)
   }, [showQuickCreate])
 
-  const handleSave = useCallback(async () => {
+  const handleSaveNote = useCallback(async () => {
     if (saving) return
     setSaving(true)
     const resolvedTitle = title.trim() || deriveTitle(body)
@@ -85,10 +137,41 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
       if (Array.isArray(data)) setNotes(data as Parameters<typeof setNotes>[0])
       close()
     } catch (err) {
-      console.error('[notepad] QuickCreateOverlay: save failed', err)
+      console.error('[notepad] QuickCreateOverlay: save note failed', err)
       setSaving(false)
     }
   }, [title, body, tags, saving, close, setNotes])
+
+  const handleSaveDiagram = useCallback(async () => {
+    if (saving) return
+    setSaving(true)
+    const resolvedTitle = title.trim() || 'Untitled diagram'
+    try {
+      const createResult = await window.electronAPI.extensionBridge.invoke(
+        'terminator.notepad:diagrams.create',
+        { title: resolvedTitle, tags }
+      )
+      const created = (createResult as { data?: { id: string } }).data
+      const listResult = await window.electronAPI.extensionBridge.invoke(
+        'terminator.notepad:diagrams.list',
+        { includeArchived: true }
+      )
+      const data = (listResult as { data?: DiagramListItem[] }).data
+      if (Array.isArray(data)) {
+        setDiagrams(data)
+        if (created?.id) useNotesStore.getState().setSelectedDiagram(created.id)
+      }
+      close()
+    } catch (err) {
+      console.error('[notepad] QuickCreateOverlay: save diagram failed', err)
+      setSaving(false)
+    }
+  }, [title, tags, saving, close, setDiagrams])
+
+  const handleSave = useCallback(() => {
+    if (type === 'diagram') return handleSaveDiagram()
+    return handleSaveNote()
+  }, [type, handleSaveNote, handleSaveDiagram])
 
   useEffect(() => {
     if (!showQuickCreate) return
@@ -133,12 +216,32 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
         if (e.target === e.currentTarget) close()
       }}
     >
-      <div className="notepad-quick-create" role="dialog" aria-modal="true" aria-label="New note">
+      <div
+        className="notepad-quick-create"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`New ${type}`}
+      >
         <div className="notepad-quick-create__header">
-          <span className="notepad-quick-create__heading">New note</span>
-          <span className="notepad-quick-create__vault-status">
-            saved to vault · exports as <code>{exportFilename}</code>
-          </span>
+          <div className="notepad-quick-create__type-tabs">
+            <button
+              className={`notepad-quick-create__type-tab${type === 'note' ? ' notepad-quick-create__type-tab--active' : ''}`}
+              onClick={() => setType('note')}
+            >
+              Note
+            </button>
+            <button
+              className={`notepad-quick-create__type-tab${type === 'diagram' ? ' notepad-quick-create__type-tab--active' : ''}`}
+              onClick={() => setType('diagram')}
+            >
+              Diagram
+            </button>
+          </div>
+          {type === 'note' && (
+            <span className="notepad-quick-create__vault-status">
+              saved to vault · exports as <code>{exportFilename}</code>
+            </span>
+          )}
         </div>
         <div className="notepad-quick-create__divider" />
         <input
@@ -149,36 +252,25 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
           onChange={(e) => setTitle(e.target.value)}
         />
         <div className="notepad-quick-create__divider" />
-        <div className="notepad-quick-create__body">
-          <NoteEditor key={showQuickCreate ? 'open' : 'closed'} initialDoc="" onChange={setBody} />
-        </div>
-        <div className="notepad-quick-create__footer">
-          <div className="notepad-quick-create__tags">
-            {tags.map((tag) => (
-              <span key={tag} className="notepad-tag-chip-input__chip">
-                {tag}
-                <button
-                  type="button"
-                  className="notepad-tag-chip-input__remove"
-                  onClick={() => removeTag(tag)}
-                  aria-label={`Remove tag ${tag}`}
-                >
-                  <X size={10} />
-                </button>
-              </span>
-            ))}
-            <input
-              ref={tagInputRef}
-              className="notepad-quick-create__tag-input"
-              placeholder="# add tag…"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={handleTagKeyDown}
-              onBlur={() => {
-                if (tagInput.trim()) addTag(tagInput)
-              }}
+        {type === 'note' && (
+          <div className="notepad-quick-create__body">
+            <NoteEditor
+              key={showQuickCreate ? 'open' : 'closed'}
+              initialDoc=""
+              onChange={setBody}
             />
           </div>
+        )}
+        <div className="notepad-quick-create__footer">
+          <TagChipBar
+            tags={tags}
+            tagInput={tagInput}
+            tagInputRef={tagInputRef}
+            onTagInput={setTagInput}
+            onAddTag={addTag}
+            onRemoveTag={removeTag}
+            onTagKeyDown={handleTagKeyDown}
+          />
           <div className="notepad-quick-create__footer-actions">
             <button className="notepad-quick-create__cancel-link" onClick={close} disabled={saving}>
               cancel <kbd className="notepad-kbd notepad-kbd--inline">Esc</kbd>

@@ -1328,3 +1328,109 @@ Requests a new password hash to be generated and saved; optionally rotates the p
 **Request**: `{ password: string }` — pass empty string to auto-generate a new password
 
 **Response**: `{ password: string } | { error: string }`
+
+---
+
+## Notepad Extension — Diagram Channels
+
+All diagram channels are invoked via `window.electronAPI.extensionBridge.invoke(channel, payload)`.
+
+### `terminator.notepad:diagrams.create`
+
+Creates a new blank diagram.
+
+**Request**: `{ title?: string }`
+
+**Response**: `{ data: { id: string; title: string; createdAt: string } } | { error: string }`
+
+---
+
+### `terminator.notepad:diagrams.list`
+
+Lists diagrams, optionally including archived ones.
+
+**Request**: `{ includeArchived?: boolean }`
+
+**Response**: `{ data: DiagramListItem[] }` where each item is `{ id, title, createdAt, updatedAt, archivedAt, type: 'diagram' }`
+
+---
+
+### `terminator.notepad:diagrams.get`
+
+Returns the full diagram including the Excalidraw scene JSON.
+
+**Request**: `{ id: string }`
+
+**Response**: `{ data: { id, title, sceneJson, createdAt, updatedAt, archivedAt } } | { error: 'DIAGRAM_NOT_FOUND' }`
+
+---
+
+### `terminator.notepad:diagrams.autosave`
+
+Saves updated scene JSON and title (debounced on the renderer side).
+
+**Request**: `{ id: string; title: string; sceneJson: string }`
+
+**Response**: `{ data: { updatedAt: string } } | { error: string }`
+
+---
+
+### `terminator.notepad:diagrams.archive`
+
+Archives a diagram (hides from active list, keeps data).
+
+**Request**: `{ id: string }` **Response**: `{ data: { archivedAt: string } } | { error: string }`
+
+---
+
+### `terminator.notepad:diagrams.restore`
+
+Restores an archived diagram to the active list.
+
+**Request**: `{ id: string }` **Response**: `{ data: { ok: true } } | { error: string }`
+
+---
+
+### `terminator.notepad:diagrams.hardDelete`
+
+Permanently deletes a diagram and all its canvas comments (cascade).
+
+**Request**: `{ id: string }` **Response**: `{ data: { ok: true } } | { error: string }`
+
+---
+
+## Notepad Extension — Diagram Comment Channels
+
+### `terminator.notepad:diagram-comments.create`
+
+Creates a comment pin at a canvas scene coordinate, optionally as a reply.
+
+**Request**: `{ diagramId: string; body: string; sceneX?: number; sceneY?: number; parentId?: string }`
+
+**Response**: `{ data: { id: string; createdAt: string } } | { error: string }`
+
+---
+
+### `terminator.notepad:diagram-comments.list`
+
+Lists open (or all) comment threads for a diagram, with replies nested.
+
+**Request**: `{ diagramId: string; includeResolved?: boolean }`
+
+**Response**: `{ data: DiagramComment[] }` where each root comment has a `replies: DiagramComment[]` array.
+
+---
+
+### `terminator.notepad:diagram-comments.resolve`
+
+Resolves a comment thread (marks the root and all replies as resolved).
+
+**Request**: `{ id: string }` **Response**: `{ data: { ok: true } } | { error: string }`
+
+---
+
+### `terminator.notepad:diagram-comments.delete`
+
+Hard-deletes a single comment (cascade removes children).
+
+**Request**: `{ id: string }` **Response**: `{ data: { ok: true } } | { error: string }`

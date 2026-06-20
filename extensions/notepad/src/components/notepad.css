@@ -641,6 +641,65 @@
   color: var(--tm-text-muted, rgba(255, 255, 255, 0.3));
 }
 
+/* ── Compact edit dialog ────────────────────────────────────────── */
+.notepad-dialog {
+  width: 440px;
+  max-width: calc(100vw - 40px);
+  background: var(--tm-bg-elevated, #18181f);
+  border: 1px solid var(--tm-border, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.notepad-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--tm-border, rgba(255, 255, 255, 0.08));
+}
+
+.notepad-dialog__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tm-text-primary, rgba(255, 255, 255, 0.9));
+}
+
+.notepad-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.notepad-dialog__label {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.notepad-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--tm-border, rgba(255, 255, 255, 0.08));
+}
+
+.notepad-dialog__hint {
+  flex: 1;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.25);
+}
+
 /* ── Quick-create overlay ───────────────────────────────────────── */
 .notepad-overlay-backdrop {
   position: fixed;
@@ -656,7 +715,7 @@
   position: relative;
   width: 680px;
   max-width: calc(100vw - 40px);
-  background: var(--tm-bg-panel, #222);
+  background: var(--tm-bg-elevated, #18181f);
   border: 1px solid var(--tm-border, rgba(255, 255, 255, 0.12));
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
@@ -669,15 +728,48 @@
 
 .notepad-quick-create__header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  padding: 16px 20px 12px;
+  padding: 14px 20px 10px;
 }
 
 .notepad-quick-create__heading {
   font-size: 16px;
   font-weight: 700;
   color: var(--tm-text-primary, rgba(255, 255, 255, 0.9));
+}
+
+.notepad-quick-create__type-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.notepad-quick-create__type-tab {
+  padding: 4px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition:
+    background 100ms,
+    color 100ms;
+}
+
+.notepad-quick-create__type-tab:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.notepad-quick-create__type-tab--active {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .notepad-quick-create__vault-status {
@@ -1055,7 +1147,7 @@
 .notepad-export-dialog {
   width: 560px;
   max-width: calc(100vw - 40px);
-  background: var(--tm-bg-panel, #1c1e2b);
+  background: var(--tm-bg-elevated, #18181f);
   border: 1px solid var(--tm-border, rgba(255, 255, 255, 0.12));
   border-radius: 12px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
@@ -1325,7 +1417,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: var(--tm-bg-panel, #1e2030);
+  background: var(--tm-bg-elevated, #18181f);
   transition:
     border-color 80ms ease,
     box-shadow 80ms ease;
@@ -1728,7 +1820,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: var(--tm-bg-panel, #262626);
+  background: var(--tm-bg-elevated, #18181f);
   border: 1px solid var(--tm-border, rgba(255, 255, 255, 0.18));
   border-radius: 5px;
   color: var(--tm-text-primary, rgba(255, 255, 255, 0.85));
@@ -1771,7 +1863,7 @@
 /* ── Right-click context menu ───────────────────────────────────── */
 .notepad-context-menu {
   min-width: 160px;
-  background: var(--tm-bg-panel, #262626);
+  background: var(--tm-bg-elevated, #18181f);
   border: 1px solid var(--tm-border, rgba(255, 255, 255, 0.12));
   border-radius: 7px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -2081,4 +2173,311 @@
 .notepad-search-overlay__result-time {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.25);
+}
+
+/* ── Diagram row in NoteList ──────────────────────────────────── */
+
+.notepad-note-row--diagram .notepad-note-row__title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.notepad-note-row__diagram-icon {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.notepad-btn-new-diagram {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+}
+
+/* ── DiagramView ─────────────────────────────────────────────── */
+
+.notepad-view__editor--diagram {
+  overflow: hidden;
+}
+
+.diagram-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.diagram-view__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--tm-border, rgba(255, 255, 255, 0.08));
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.diagram-view__title-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.diagram-view__title-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tm-text-primary, rgba(255, 255, 255, 0.9));
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+  font-family: inherit;
+}
+
+.diagram-view__title-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.diagram-view__title-edit-icon {
+  opacity: 0;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.4);
+  transition: opacity 100ms;
+}
+
+.diagram-view__title-btn:hover .diagram-view__title-edit-icon {
+  opacity: 1;
+}
+
+.diagram-view__title-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--tm-accent, #4f8ef7);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tm-text-primary, rgba(255, 255, 255, 0.9));
+  outline: none;
+  font-family: inherit;
+  max-width: 220px;
+}
+
+.diagram-view__tags {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.diagram-view__save-status {
+  font-size: 11px;
+  color: var(--tm-text-muted, rgba(255, 255, 255, 0.4));
+}
+
+.diagram-view__comment-btn--active {
+  background: var(--tm-accent, #4f8ef7) !important;
+  color: #fff !important;
+}
+
+.diagram-view__canvas {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+
+.diagram-view__canvas--comment-mode {
+  cursor: crosshair;
+}
+
+.diagram-view__canvas > .excalidraw-wrapper,
+.diagram-view__canvas > div:first-child {
+  width: 100%;
+  height: 100%;
+}
+
+.diagram-view__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--tm-text-muted, rgba(255, 255, 255, 0.4));
+  font-size: 13px;
+}
+
+/* ── Diagram comment pins ────────────────────────────────────── */
+
+.diagram-comment-pin {
+  position: absolute;
+  z-index: 20;
+  width: 26px;
+  height: 26px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--tm-accent, #4f8ef7);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-4px, -22px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  transition: transform 80ms ease;
+  padding: 0;
+  pointer-events: auto;
+}
+
+.diagram-comment-pin:hover,
+.diagram-comment-pin--active {
+  transform: translate(-4px, -22px) scale(1.15);
+}
+
+.diagram-comment-pin__icon {
+  display: flex;
+  line-height: 0;
+}
+
+.diagram-comment-pin__count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #e05c5c;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+}
+
+/* ── Diagram comment popover ─────────────────────────────────── */
+
+.diagram-comment-popover {
+  position: absolute;
+  z-index: 30;
+  width: 260px;
+  background: var(--tm-bg-elevated, #18181f);
+  border: 1px solid var(--tm-border, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.diagram-comment-popover__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--tm-border, rgba(255, 255, 255, 0.08));
+}
+
+.diagram-comment-popover__title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tm-text-muted, rgba(255, 255, 255, 0.5));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.diagram-comment-popover__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.diagram-comment-popover__resolve {
+  font-size: 11px;
+  color: var(--tm-text-muted, rgba(255, 255, 255, 0.5));
+}
+
+.diagram-comment-popover__delete {
+  font-size: 11px;
+  color: var(--tm-text-muted, rgba(255, 255, 255, 0.5));
+}
+
+.diagram-comment-popover__delete:hover {
+  color: #e05c5c;
+}
+
+.diagram-comment-popover__messages {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.diagram-comment-popover__message {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.diagram-comment-popover__author {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tm-text-muted, rgba(255, 255, 255, 0.5));
+}
+
+.diagram-comment-popover__body {
+  font-size: 12px;
+  color: var(--tm-text-primary, rgba(255, 255, 255, 0.9));
+  margin: 0;
+  line-height: 1.4;
+}
+
+.diagram-comment-popover__reply {
+  padding: 8px 10px;
+  border-top: 1px solid var(--tm-border, rgba(255, 255, 255, 0.08));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diagram-comment-popover__textarea {
+  width: 100%;
+  background: var(--tm-bg-input, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--tm-border, rgba(255, 255, 255, 0.1));
+  border-radius: 4px;
+  color: var(--tm-text-primary, rgba(255, 255, 255, 0.9));
+  font-size: 12px;
+  font-family: inherit;
+  padding: 6px 8px;
+  resize: none;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.diagram-comment-popover__textarea:focus {
+  border-color: var(--tm-accent, #4f8ef7);
+}
+
+.diagram-comment-popover__footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.diagram-comment-popover__send {
+  align-self: flex-end;
 }

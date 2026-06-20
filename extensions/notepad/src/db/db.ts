@@ -148,7 +148,35 @@ function applySchema(db: Database.Database): void {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS diagrams (
+      id          TEXT PRIMARY KEY,
+      title       TEXT NOT NULL DEFAULT 'Untitled diagram',
+      scene_json  TEXT NOT NULL DEFAULT '{}',
+      created_at  TEXT NOT NULL,
+      updated_at  TEXT NOT NULL,
+      archived_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS diagram_comments (
+      id         TEXT PRIMARY KEY,
+      diagram_id TEXT NOT NULL REFERENCES diagrams(id) ON DELETE CASCADE,
+      parent_id  TEXT REFERENCES diagram_comments(id) ON DELETE CASCADE,
+      body       TEXT NOT NULL,
+      author     TEXT NOT NULL DEFAULT 'me',
+      status     TEXT NOT NULL DEFAULT 'open',
+      scene_x    REAL NOT NULL DEFAULT 0,
+      scene_y    REAL NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_diagram_comments_diagram ON diagram_comments(diagram_id, status);
   `)
+
+  // Incremental migration: add tags column to diagrams if missing
+  if (!hasColumn(db, 'diagrams', 'tags')) {
+    db.exec(`ALTER TABLE diagrams ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'`)
+  }
 }
 
 export function insertFts(
