@@ -1,0 +1,34 @@
+src/renderer-remote/components/MobileTerminalList.tsx
+  s_da066600789312::t_a83ee97010122e 24,36,63
+  s_da066600789312::t_17a5f678d8c1a0 153
+tests/unit/renderer-remote/mobile/MobileTerminalList.spec.tsx
+  s_da066600789312::t_f9b00eaba3d426 279
+  s_da066600789312::t_17a00f4f33e25a 79
+  s_da066600789312::t_ef1d90b605d43b 328
+  s_da066600789312::t_2f6913504d9507 380
+  s_da066600789312::t_67910ec804e961 175,177
+  s_da066600789312::t_b2199e2629db7b 437
+  s_da066600789312::t_9c2509bd23e6f0 529
+  s_da066600789312::t_0eac4017c44599 459
+  s_da066600789312::t_f46ee96bb7f549 228-229
+  s_da066600789312::t_f43dc93392fd65 180-207
+  s_da066600789312::t_0951177bc09e92 352
+  s_da066600789312::t_c0f9d6c5c83852 409
+  s_da066600789312::t_0052f037538ae5 490-491
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "ba2bdedde81324532b9cf4f5c87bebd5092d138e",
+  "prompts": {},
+  "sessions": {
+    "s_da066600789312": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b233e45-1b62-483a-8fb7-dc58c7a38797",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
