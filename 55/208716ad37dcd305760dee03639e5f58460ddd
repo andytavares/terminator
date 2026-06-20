@@ -1,0 +1,25 @@
+src/renderer/components/sidebar/CreateProjectDialog.tsx
+  s_da066600789312::t_0661566db99b96 59-63
+  s_da066600789312::t_eb89f9ecede067 99-103
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_da066600789312::t_087c59bb51a434 222,231,233
+  s_da066600789312::t_32e0a6ebf3e3ed 223-227,235,237-241
+  s_da066600789312::t_f4521cfec50778 236
+  s_da066600789312::t_afe3814581f46a 228-230,232,234,242-267
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "55208716ad37dcd305760dee03639e5f58460ddd",
+  "prompts": {},
+  "sessions": {
+    "s_da066600789312": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b233e45-1b62-483a-8fb7-dc58c7a38797",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
