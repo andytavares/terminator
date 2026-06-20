@@ -575,22 +575,27 @@ export function App(): JSX.Element {
             )}
 
             {/* Extension-contributed sidebar panels — hidden when a global tab is active */}
-            {openPanels.size > 0 && !activeGlobalTabId && !activeWorkspaceTabId && (
-              <div className="app-sidebar-panels">
-                {Array.from(openPanels).map((panelId) => {
-                  const panel = sidebarPanels.get(panelId)
-                  if (!panel) return null
-                  const PanelComponent = panel.component
-                  return (
-                    <PanelComponent
-                      key={panelId}
-                      repoRoot={repoRoot}
-                      onClose={() => togglePanel(panelId)}
-                    />
-                  )
-                })}
-              </div>
-            )}
+            {!activeGlobalTabId &&
+              !activeWorkspaceTabId &&
+              (() => {
+                const activePanels = Array.from(openPanels).filter((id) => sidebarPanels.has(id))
+                if (activePanels.length === 0) return null
+                return (
+                  <div className="app-sidebar-panels">
+                    {activePanels.map((panelId) => {
+                      const panel = sidebarPanels.get(panelId)!
+                      const PanelComponent = panel.component
+                      return (
+                        <PanelComponent
+                          key={panelId}
+                          repoRoot={repoRoot}
+                          onClose={() => togglePanel(panelId)}
+                        />
+                      )
+                    })}
+                  </div>
+                )
+              })()}
           </div>
 
           <NotificationPanel />

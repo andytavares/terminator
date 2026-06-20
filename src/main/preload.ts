@@ -118,8 +118,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('extension:toast', listener)
     },
     onTogglePanel: (handler: (panelId: string) => void) => {
-      const listener = (_event: Electron.IpcRendererEvent, payload: { panelId: string }) =>
-        handler(payload.panelId)
+      const listener = (_event: Electron.IpcRendererEvent, panelId: string) => handler(panelId)
       ipcRenderer.on('extension:toggle-panel', listener)
       return () => ipcRenderer.removeListener('extension:toggle-panel', listener)
     },

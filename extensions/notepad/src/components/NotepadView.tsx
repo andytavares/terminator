@@ -7,6 +7,7 @@ import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
 import { NoteList } from './NoteList'
 import { EmptyState } from './EmptyState'
+import { DiagramView } from './DiagramView'
 import { CommentMargin } from './CommentMargin'
 import { CommentComposer } from './CommentComposer'
 import { ExportDialog } from './ExportDialog'
@@ -54,7 +55,8 @@ export function NotepadView(): React.JSX.Element {
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
   const [commentHover, setCommentHover] = useState<{ id: string; top: number } | null>(null)
   const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const { selectedNoteId, notes, setNotes, setShowQuickCreate } = useNotesStore()
+  const { selectedNoteId, selectedDiagramId, notes, setNotes, setDiagrams, setShowQuickCreate } =
+    useNotesStore()
   const {
     bodyDraft,
     isDirty,
@@ -73,24 +75,29 @@ export function NotepadView(): React.JSX.Element {
   const commentPanelRef = useRef<HTMLDivElement>(null)
   const editorWrapRef = useRef<HTMLDivElement>(null)
 
-  // Load note list on mount
+  // Load note + diagram lists on mount
   useEffect(() => {
     async function loadList() {
       try {
-        const result = await window.electronAPI.extensionBridge.invoke(
-          'terminator.notepad:notes.list',
-          { includeArchived: true }
-        )
-        const data = (result as { data?: unknown[] }).data
-        if (Array.isArray(data)) {
-          setNotes(data as Parameters<typeof setNotes>[0])
-        }
+        const [notesResult, diagramsResult] = await Promise.all([
+          window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.list', {
+            includeArchived: true,
+          }),
+          window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.list', {
+            includeArchived: true,
+          }),
+        ])
+        const notesData = (notesResult as { data?: unknown[] }).data
+        if (Array.isArray(notesData)) setNotes(notesData as Parameters<typeof setNotes>[0])
+        const diagramsData = (diagramsResult as { data?: unknown[] }).data
+        if (Array.isArray(diagramsData))
+          setDiagrams(diagramsData as Parameters<typeof setDiagrams>[0])
       } catch (err) {
-        console.error('[notepad] Failed to load note list', err)
+        console.error('[notepad] Failed to load list', err)
       }
     }
     void loadList()
-  }, [setNotes])
+  }, [setNotes, setDiagrams])
 
   // Push-down layout for comment cards
   const computeAnchorTops = useCallback((view: EditorView, commentList: Comment[]) => {
@@ -472,7 +479,8 @@ export function NotepadView(): React.JSX.Element {
     return ''
   }
 
-  if (notes.length === 0) {
+  const { diagrams } = useNotesStore.getState()
+  if (notes.length === 0 && diagrams.length === 0) {
     return (
       <div className="notepad-view notepad-view--empty-screen">
         {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
@@ -489,6 +497,21 @@ export function NotepadView(): React.JSX.Element {
             })
           }
         />
+      </div>
+    )
+  }
+
+  // When a diagram is selected, render the canvas view in place of the editor pane
+  if (selectedDiagramId) {
+    return (
+      <div className="notepad-view">
+        {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
+        <div className="notepad-view__sidebar">
+          <NoteList />
+        </div>
+        <div className="notepad-view__editor notepad-view__editor--diagram">
+          <DiagramView key={selectedDiagramId} diagramId={selectedDiagramId} />
+        </div>
       </div>
     )
   }

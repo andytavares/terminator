@@ -50,6 +50,40 @@ export interface SearchResult {
   archivedAt: string | null
 }
 
+export interface Diagram {
+  id: string
+  title: string
+  tags: string[]
+  sceneJson: string
+  createdAt: string
+  updatedAt: string
+  archivedAt: string | null
+}
+
+export interface DiagramListItem {
+  id: string
+  title: string
+  tags: string[]
+  updatedAt: string
+  createdAt: string
+  archivedAt: string | null
+  type: 'diagram'
+}
+
+export interface DiagramComment {
+  id: string
+  diagramId: string
+  parentId: string | null
+  body: string
+  author: string
+  status: 'open' | 'resolved'
+  sceneX: number
+  sceneY: number
+  createdAt: string
+  updatedAt: string
+  replies: DiagramComment[]
+}
+
 export interface ExportFrontmatter {
   id: string
   title: string
