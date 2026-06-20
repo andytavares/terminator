@@ -34,7 +34,6 @@ export function App(): JSX.Element {
   const [logOpen, setLogOpen] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const [scratchActive, setScratchActive] = useState(false)
   const {
     loadWorkspaces,
     activeWorkspaceId,
@@ -43,6 +42,8 @@ export function App(): JSX.Element {
     setActiveWorkspace,
     projectsByWorkspaceId,
     resolveActiveCwd,
+    scratchActive,
+    setScratchActive,
   } = useWorkspaceStore()
   const { loadSettings, globalSettings, markWelcomeSeen, resolveSettings } = useSettingsStore()
   const { system, enableGlobalMetrics, disableGlobalMetrics } = useMetricsStore()

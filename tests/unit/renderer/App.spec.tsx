@@ -160,6 +160,7 @@ function setupMocks(
     activeProjectId?: string | null
     globalSettings?: Record<string, unknown> | null
     workspaces?: unknown[]
+    scratchActive?: boolean
   } = {}
 ) {
   const {
@@ -167,9 +168,10 @@ function setupMocks(
     activeProjectId = null,
     globalSettings = { appearance: { theme: 'dark' }, ui: { hasSeenWelcome: false } },
     workspaces = [],
+    scratchActive: initialScratchActive = false,
   } = overrides
 
-  vi.mocked(useWorkspaceStore).mockReturnValue({
+  const workspaceState = {
     loadWorkspaces: mockLoadWorkspaces,
     activeWorkspaceId,
     activeProjectId,
@@ -177,7 +179,17 @@ function setupMocks(
     projectsByWorkspaceId: new Map(),
     setActiveWorkspace: vi.fn(),
     resolveActiveCwd: vi.fn().mockReturnValue('~'),
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
+    scratchActive: initialScratchActive,
+    setScratchActive: vi.fn((value: boolean) => {
+      workspaceState.scratchActive = value
+      vi.mocked(useWorkspaceStore).mockReturnValue(
+        workspaceState as unknown as ReturnType<typeof useWorkspaceStore>
+      )
+    }),
+  }
+  vi.mocked(useWorkspaceStore).mockReturnValue(
+    workspaceState as unknown as ReturnType<typeof useWorkspaceStore>
+  )
   vi.mocked(useSettingsStore).mockReturnValue({
     loadSettings: mockLoadSettings,
     globalSettings,
@@ -672,6 +684,8 @@ describe('App', () => {
       projectsByWorkspaceId: new Map(),
       setActiveWorkspace: mockSetActiveWorkspace,
       resolveActiveCwd: vi.fn().mockReturnValue('~'),
+      scratchActive: false,
+      setScratchActive: vi.fn(),
     } as unknown as ReturnType<typeof useWorkspaceStore>)
     render(<App />)
     capturedShortcutCallbacks.onOpenCommandPalette?.()
@@ -845,7 +859,7 @@ describe('App', () => {
       const mockCloseSession = vi.fn().mockResolvedValue(undefined)
       const mockCreateSession = vi.fn().mockResolvedValue('ses-scratch')
       vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
-      setupMocks({ activeProjectId: null, activeWorkspaceId: 'ws-1' })
+      setupMocks({ activeProjectId: null, activeWorkspaceId: 'ws-1', scratchActive: true })
       vi.mocked(useSessionStore).mockReturnValue({
         handleProcessExit: mockHandleProcessExit,
         getSessionsForProject: vi.fn().mockReturnValue([]),
@@ -982,6 +996,7 @@ describe('App', () => {
   it('renders scratch terminal after handleNewScratch resolves', async () => {
     const mockCreateSession = vi.fn().mockResolvedValue('sess-scratch')
     vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+    setupMocks({ scratchActive: true })
     render(<App />)
     capturedShortcutCallbacks.onNewScratch?.()
     await waitFor(() => {

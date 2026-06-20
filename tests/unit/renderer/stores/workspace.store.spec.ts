@@ -315,6 +315,34 @@ describe('useWorkspaceStore', () => {
     })
   })
 
+  describe('setScratchActive', () => {
+    it('sets scratchActive to true and clears active workspace and project', () => {
+      useWorkspaceStore.setState({
+        activeWorkspaceId: 'ws-1',
+        activeProjectId: 'p-1',
+        scratchActive: false,
+      })
+      useWorkspaceStore.getState().setScratchActive(true)
+      const state = useWorkspaceStore.getState()
+      expect(state.scratchActive).toBe(true)
+      expect(state.activeWorkspaceId).toBeNull()
+      expect(state.activeProjectId).toBeNull()
+    })
+
+    it('sets scratchActive to false without changing workspace/project', () => {
+      useWorkspaceStore.setState({
+        activeWorkspaceId: 'ws-1',
+        activeProjectId: 'p-1',
+        scratchActive: true,
+      })
+      useWorkspaceStore.getState().setScratchActive(false)
+      const state = useWorkspaceStore.getState()
+      expect(state.scratchActive).toBe(false)
+      expect(state.activeWorkspaceId).toBe('ws-1')
+      expect(state.activeProjectId).toBe('p-1')
+    })
+  })
+
   describe('resolveActiveCwd', () => {
     beforeEach(() => {
       useWorkspaceStore.setState({
