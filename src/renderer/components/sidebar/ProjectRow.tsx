@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { GitBranch } from 'lucide-react'
+import { GitBranch, FolderGit2 } from 'lucide-react'
 import type { Project } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
@@ -123,7 +123,7 @@ export function ProjectRow({
         draggable
       >
         <span className="project-row__icon">
-          <GitBranch size={12} />
+          {project.isWorktree ? <FolderGit2 size={12} /> : <GitBranch size={12} />}
         </span>
         {renaming ? (
           <input
