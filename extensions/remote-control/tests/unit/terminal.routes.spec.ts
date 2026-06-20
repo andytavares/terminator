@@ -529,6 +529,41 @@ describe('WS /ws/terminals/:sessionId', () => {
     expect(list.find((s) => s.sessionId === nativeId)).toBeUndefined()
   })
 
+  it('keeps adopted session alive (does not remove from list or dispose) after grace period', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const nativeId = 'native-grace-persist'
+    const mockDispose = vi.fn()
+    mockPtyManager.listSessions.mockReturnValue([{ sessionId: nativeId, cwd: '/native' }])
+    mockPtyManager.attachOnData.mockReturnValue(mockDispose)
+
+    const ticketRes = await wsApp.inject({
+      method: 'POST',
+      url: `/api/terminals/${nativeId}/ws-ticket`,
+    })
+    const { ticket } = JSON.parse(ticketRes.body)
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`${baseUrl}/ws/terminals/${nativeId}?ticket=${ticket}`)
+      ws.on('open', () => setTimeout(() => ws.close(), 20))
+      ws.on('close', resolve)
+      ws.on('error', reject)
+      setTimeout(() => reject(new Error('timeout')), 2000)
+    })
+    await new Promise<void>((r) => setTimeout(r, 50))
+
+    vi.advanceTimersByTime(31_000)
+    await Promise.resolve()
+
+    // Broadcast listener must NOT have been torn down
+    expect(mockDispose).not.toHaveBeenCalled()
+    // Session must still appear in GET /api/terminals
+    const listRes = await wsApp.inject({ method: 'GET', url: '/api/terminals' })
+    const list = JSON.parse(listRes.body) as { sessionId: string }[]
+    expect(list.find((s) => s.sessionId === nativeId)).toBeDefined()
+
+    vi.useRealTimers()
+  })
+
   it('does not kill adopted ptyManager session when grace period expires', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const nativeId = 'native-grace-1'

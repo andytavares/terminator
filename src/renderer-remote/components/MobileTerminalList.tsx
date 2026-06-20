@@ -159,11 +159,7 @@ export function MobileTerminalList({
         ))}
       {contextMenu && (
         <>
-          <div
-            className="mobile-context-menu-backdrop"
-            onClick={() => setContextMenu(null)}
-            onTouchStart={() => setContextMenu(null)}
-          />
+          <div className="mobile-context-menu-backdrop" onClick={() => setContextMenu(null)} />
           <div className="mobile-context-menu" style={{ top: contextMenu.y, left: contextMenu.x }}>
             <p className="mobile-context-menu__label">Move to workspace</p>
             {workspaces.map((ws) => (

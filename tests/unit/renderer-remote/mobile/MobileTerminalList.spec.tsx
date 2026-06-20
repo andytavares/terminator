@@ -511,4 +511,37 @@ describe('MobileTerminalList', () => {
     })
     vi.useRealTimers()
   })
+
+  it('backdrop touchStart does not close context menu before menu item click fires', async () => {
+    const unmatched: TerminalSession = {
+      sessionId: 's-backdrop-touch',
+      cwd: '/tmp/backdrop',
+      createdAt: '2026-06-20T10:00:00.000Z',
+    }
+    const { MobileTerminalList } = await import(
+      '../../../../src/renderer-remote/components/MobileTerminalList'
+    )
+    render(
+      <MobileTerminalList
+        workspaces={[workspace]}
+        terminals={[unmatched]}
+        onSelectTerminal={mockOnSelectTerminal}
+        onCreateTerminal={mockOnCreateTerminal}
+        onAssignWorkspace={mockOnAssignWorkspace}
+      />
+    )
+    // Open context menu
+    fireEvent.contextMenu(screen.getByText('backdrop'))
+    expect(screen.getByText('Move to workspace')).toBeTruthy()
+
+    // touchStart on the backdrop should NOT close the menu
+    const backdrop = document.querySelector('.mobile-context-menu-backdrop') as HTMLElement
+    expect(backdrop).not.toBeNull()
+    fireEvent.touchStart(backdrop)
+    expect(screen.queryByText('Move to workspace')).not.toBeNull()
+
+    // click on backdrop closes it
+    fireEvent.click(backdrop)
+    expect(screen.queryByText('Move to workspace')).toBeNull()
+  })
 })

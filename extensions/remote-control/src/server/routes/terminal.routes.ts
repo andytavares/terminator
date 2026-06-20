@@ -256,15 +256,10 @@ export async function registerTerminalRoutes(
           const timer = setTimeout(() => {
             gracePeriodTimers.delete(sessionId)
             if (subscriberManager.getCount(sessionId) === 0 && sessions.has(sessionId)) {
-              if (!adoptedSessions.has(sessionId)) {
-                ptyManager.kill(sessionId)
-              }
-              const disposer = adoptedSessionDisposers.get(sessionId)
-              if (disposer) {
-                disposer()
-                adoptedSessionDisposers.delete(sessionId)
-              }
-              adoptedSessions.delete(sessionId)
+              // Adopted sessions keep running in Electron — skip all teardown here.
+              // The attachOnExit callback cleans up when the native PTY actually exits.
+              if (adoptedSessions.has(sessionId)) return
+              ptyManager.kill(sessionId)
               sessions.delete(sessionId)
             }
           }, 30_000)
