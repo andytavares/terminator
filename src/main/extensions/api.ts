@@ -543,6 +543,12 @@ export function createExtensionAPI(
       kill(sessionId) {
         deps?.ptyManager?.kill(sessionId)
       },
+      listSessions() {
+        return deps?.ptyManager?.listSessions() ?? []
+      },
+      attachOnData(sessionId, onData) {
+        return deps?.ptyManager?.attachOnData(sessionId, onData) ?? null
+      },
     },
     window: {
       openAuxiliary(view: string, params?: Record<string, string>): void {

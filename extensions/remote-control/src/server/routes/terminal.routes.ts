@@ -23,6 +23,7 @@ interface TerminalSession {
   sessionId: string
   cwd: string
   createdAt: string
+  workspaceId?: string
 }
 
 interface TerminalRouteOptions {
@@ -32,14 +33,36 @@ interface TerminalRouteOptions {
   getMaxSubscribers: () => number
 }
 
+const AssignWorkspaceSchema = z.object({
+  workspaceId: z.string().nullable(),
+})
+
 export async function registerTerminalRoutes(
   app: FastifyInstance,
   opts: TerminalRouteOptions
 ): Promise<{ cleanup: () => void }> {
   const { ptyManager, ticketStore, subscriberManager, getMaxSubscribers } = opts
   const sessions = new Map<string, TerminalSession>()
+  // Manual workspace overrides keyed by sessionId
+  const workspaceOverrides = new Map<string, string>()
 
-  app.get('/api/terminals', async () => Array.from(sessions.values()))
+  app.get('/api/terminals', async () => {
+    const remote = Array.from(sessions.values()).map((s) => ({
+      ...s,
+      workspaceId: workspaceOverrides.get(s.sessionId),
+    }))
+    const remoteIds = new Set(remote.map((s) => s.sessionId))
+    const existing = ptyManager
+      .listSessions()
+      .filter((s) => !remoteIds.has(s.sessionId))
+      .map((s) => ({
+        sessionId: s.sessionId,
+        cwd: s.cwd,
+        createdAt: '',
+        workspaceId: workspaceOverrides.get(s.sessionId),
+      }))
+    return [...remote, ...existing]
+  })
 
   app.post('/api/terminals', async (request, reply) => {
     const result = CreateTerminalSchema.safeParse(request.body)
@@ -101,11 +124,35 @@ export async function registerTerminalRoutes(
     }
   )
 
+  app.patch<{ Params: { sessionId: string } }>(
+    '/api/terminals/:sessionId',
+    async (request, reply) => {
+      const { sessionId } = request.params
+      const isRemote = sessions.has(sessionId)
+      const isExisting =
+        !isRemote && ptyManager.listSessions().some((s) => s.sessionId === sessionId)
+      if (!isRemote && !isExisting) return reply.status(404).send({ error: 'NOT_FOUND' })
+      const result = AssignWorkspaceSchema.safeParse(request.body)
+      if (!result.success) {
+        return reply.status(400).send({ error: 'VALIDATION_ERROR', message: result.error.message })
+      }
+      const { workspaceId } = result.data
+      if (workspaceId === null) {
+        workspaceOverrides.delete(sessionId)
+      } else {
+        workspaceOverrides.set(sessionId, workspaceId)
+      }
+      return { ok: true }
+    }
+  )
+
   app.post<{ Params: { sessionId: string } }>(
     '/api/terminals/:sessionId/ws-ticket',
     async (request, reply) => {
       const { sessionId } = request.params
-      if (!sessions.has(sessionId)) return reply.status(404).send({ error: 'NOT_FOUND' })
+      const isKnown =
+        sessions.has(sessionId) || ptyManager.listSessions().some((s) => s.sessionId === sessionId)
+      if (!isKnown) return reply.status(404).send({ error: 'NOT_FOUND' })
       const ticket = ticketStore.createTicket(sessionId, 'terminal')
       return reply.status(201).send({ ticket })
     }
@@ -135,8 +182,21 @@ export async function registerTerminalRoutes(
       }
 
       if (!sessions.has(sessionId)) {
-        ws.close(4002, 'session not found')
-        return
+        // Adopt an existing ptyManager session on first remote connect
+        const existing = ptyManager.listSessions().find((s) => s.sessionId === sessionId)
+        if (!existing) {
+          ws.close(4002, 'session not found')
+          return
+        }
+        sessions.set(sessionId, {
+          sessionId,
+          cwd: existing.cwd,
+          createdAt: new Date().toISOString(),
+        })
+        const dispose = ptyManager.attachOnData(sessionId, (data) =>
+          subscriberManager.broadcast(sessionId, data)
+        )
+        if (dispose) ws.once('close', dispose)
       }
 
       const accepted = subscriberManager.addSubscriber(sessionId, ws, getMaxSubscribers())

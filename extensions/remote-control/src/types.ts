@@ -10,6 +10,8 @@ export interface PtyManagerAPI {
   write(sessionId: string, data: string): void
   resize(sessionId: string, cols: number, rows: number): void
   kill(sessionId: string): void
+  listSessions(): Array<{ sessionId: string; cwd: string }>
+  attachOnData(sessionId: string, onData: (data: string) => void): (() => void) | null
 }
 
 export interface WorkspaceSnapshot {

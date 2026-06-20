@@ -61,6 +61,7 @@ describe('App', () => {
   })
 
   it('stores token in localStorage and redirects on success', async () => {
+    Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true })
     mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({
       status: 201,
       ok: true,
@@ -73,7 +74,7 @@ describe('App', () => {
     expect(localStorage.getItem('remote_token')).toBe('correct')
   })
 
-  it('redirects to /mobile/ when viewport is narrower than 768px', async () => {
+  it('redirects to /mobile/ when viewport is narrower than 1400px', async () => {
     Object.defineProperty(window, 'innerWidth', { value: 375, configurable: true })
     mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({
       status: 201,
@@ -93,8 +94,8 @@ describe('App', () => {
     Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true })
   })
 
-  it('redirects to /app/ when viewport is 768px or wider', async () => {
-    Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true })
+  it('redirects to /app/ when viewport is 1400px or wider', async () => {
+    Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true })
     mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({
       status: 201,
       ok: true,

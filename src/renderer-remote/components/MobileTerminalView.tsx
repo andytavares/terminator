@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { FitAddon } from '@xterm/addon-fit'
-import { AttachAddon } from '@xterm/addon-attach'
 import { useReconnect } from '../hooks/useReconnect'
 import { MobileControlToolbar } from './MobileControlToolbar'
 import { getWsTicket, resizeTerminal } from '../api/remote-client'
@@ -37,8 +36,19 @@ export function MobileTerminalView({ sessionId, cwd, onBack }: Props) {
       wsRef.current = socket
       setWs(socket)
 
-      const attachAddon = new AttachAddon(socket)
-      termRef.current?.loadAddon(attachAddon)
+      socket.addEventListener('message', (event) => {
+        const term = termRef.current
+        if (!term) return
+        const { baseY, length } = term.buffer.active
+        const atBottom = baseY + term.rows >= length
+        const data =
+          typeof event.data === 'string' ? event.data : new Uint8Array(event.data as ArrayBuffer)
+        term.write(data, () => {
+          if (!atBottom) {
+            term.scrollToLine(baseY)
+          }
+        })
+      })
     } catch {
       // Notify the reconnect hook so it enters the retry loop immediately
       onOpenWsFailedRef.current?.()

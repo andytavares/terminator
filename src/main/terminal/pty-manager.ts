@@ -14,6 +14,7 @@ interface ActiveSession {
   pty: pty.IPty
   sessionId: string
   type: 'human' | 'agent'
+  cwd: string
   onDataCallback?: (data: string) => void
   onExitCallback?: (exitCode: number) => void
 }
@@ -43,6 +44,7 @@ export class PtyManager {
       pty: ptyProcess,
       sessionId,
       type,
+      cwd,
       onDataCallback: onData,
       onExitCallback: onExit,
     }
@@ -92,6 +94,17 @@ export class PtyManager {
     return [...this.sessions.keys()]
   }
 
+  listSessions(): Array<{ sessionId: string; cwd: string }> {
+    return [...this.sessions.entries()].map(([id, s]) => ({ sessionId: id, cwd: s.cwd }))
+  }
+
+  attachOnData(sessionId: string, onData: (data: string) => void): (() => void) | null {
+    const session = this.sessions.get(sessionId)
+    if (!session) return null
+    const disposable = session.pty.onData(onData)
+    return () => disposable.dispose()
+  }
+
   getPid(sessionId: string): number | undefined {
     return this.sessions.get(sessionId)?.pty.pid
   }
@@ -126,7 +139,7 @@ export class PtyManager {
       records.push({
         sessionId,
         pid: session.pty.pid,
-        cwd: '',
+        cwd: session.cwd,
         shell: '',
       })
     }

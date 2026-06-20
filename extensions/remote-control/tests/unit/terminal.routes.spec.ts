@@ -14,6 +14,8 @@ const mockPtyManager = {
   kill: vi.fn(),
   resize: vi.fn(),
   getSessionIds: vi.fn(() => []),
+  listSessions: vi.fn(() => [] as Array<{ sessionId: string; cwd: string }>),
+  attachOnData: vi.fn(() => () => {}),
 }
 
 let mockTicketStore: WsTicketStore
@@ -24,6 +26,9 @@ let terminalCleanup: { cleanup: () => void }
 
 beforeEach(async () => {
   vi.resetAllMocks()
+  // After reset, restore defaults that most tests rely on
+  mockPtyManager.listSessions.mockReturnValue([])
+  mockPtyManager.attachOnData.mockReturnValue(() => {})
   mockTicketStore = new WsTicketStore()
   mockSubscriberManager = new WsSubscriberManager()
   app = Fastify({ logger: false })
@@ -226,6 +231,17 @@ describe('POST /api/terminals/:sessionId/ws-ticket', () => {
     })
     expect(res.statusCode).toBe(404)
   })
+
+  it('returns 201 for a ptyManager session not in remote sessions', async () => {
+    mockPtyManager.listSessions.mockReturnValueOnce([{ sessionId: 'native-ws-ticket', cwd: '/n' }])
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/terminals/native-ws-ticket/ws-ticket',
+    })
+    expect(res.statusCode).toBe(201)
+    const body = JSON.parse(res.body)
+    expect(body.ticket).toMatch(/^[0-9a-f]{64}$/)
+  })
 })
 
 describe('WS /ws/terminals/:sessionId', () => {
@@ -236,6 +252,8 @@ describe('WS /ws/terminals/:sessionId', () => {
 
   beforeEach(async () => {
     vi.resetAllMocks()
+    mockPtyManager.listSessions.mockReturnValue([])
+    mockPtyManager.attachOnData.mockReturnValue(() => {})
     wsTicketStore = new WsTicketStore()
     wsSubscriberManager = new WsSubscriberManager()
     wsApp = Fastify({ logger: false })
@@ -528,5 +546,100 @@ describe('GET /api/terminals', () => {
     expect(res.statusCode).toBe(200)
     const sessions = JSON.parse(res.body) as { sessionId: string }[]
     expect(sessions.find((s) => s.sessionId === sessionId)).toBeUndefined()
+  })
+
+  it('includes sessions from ptyManager.listSessions() not already in remote sessions', async () => {
+    mockPtyManager.listSessions.mockReturnValueOnce([{ sessionId: 'native-s1', cwd: '/native' }])
+    const res = await app.inject({ method: 'GET', url: '/api/terminals' })
+    expect(res.statusCode).toBe(200)
+    const sessions = JSON.parse(res.body) as { sessionId: string; cwd: string }[]
+    expect(sessions.find((s) => s.sessionId === 'native-s1')).toBeTruthy()
+    expect(sessions.find((s) => s.sessionId === 'native-s1')?.cwd).toBe('/native')
+  })
+
+  it('does not duplicate sessions that exist in both remote and ptyManager', async () => {
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/terminals',
+      payload: { cwd: '/tmp/dup', type: 'human', tabTitle: 'Dup' },
+    })
+    const { sessionId } = JSON.parse(createRes.body)
+    mockPtyManager.listSessions.mockReturnValueOnce([{ sessionId, cwd: '/tmp/dup' }])
+    const res = await app.inject({ method: 'GET', url: '/api/terminals' })
+    const sessions = JSON.parse(res.body) as { sessionId: string }[]
+    expect(sessions.filter((s) => s.sessionId === sessionId)).toHaveLength(1)
+  })
+})
+
+describe('PATCH /api/terminals/:sessionId', () => {
+  it('assigns a workspaceId override and returns 200', async () => {
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/terminals',
+      payload: { cwd: '/tmp', type: 'human', tabTitle: 'Patch Test' },
+    })
+    const { sessionId } = JSON.parse(createRes.body)
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/terminals/${sessionId}`,
+      payload: { workspaceId: 'ws-1' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body).ok).toBe(true)
+    // workspaceId appears in listing
+    const list = JSON.parse((await app.inject({ method: 'GET', url: '/api/terminals' })).body) as {
+      sessionId: string
+      workspaceId?: string
+    }[]
+    expect(list.find((s) => s.sessionId === sessionId)?.workspaceId).toBe('ws-1')
+  })
+
+  it('clears workspaceId when null is sent', async () => {
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/terminals',
+      payload: { cwd: '/tmp', type: 'human', tabTitle: 'Clear WS' },
+    })
+    const { sessionId } = JSON.parse(createRes.body)
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/terminals/${sessionId}`,
+      payload: { workspaceId: 'ws-1' },
+    })
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/terminals/${sessionId}`,
+      payload: { workspaceId: null },
+    })
+    const list = JSON.parse((await app.inject({ method: 'GET', url: '/api/terminals' })).body) as {
+      sessionId: string
+      workspaceId?: string
+    }[]
+    expect(list.find((s) => s.sessionId === sessionId)?.workspaceId).toBeUndefined()
+  })
+
+  it('returns 404 for unknown session', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/terminals/nonexistent',
+      payload: { workspaceId: 'ws-1' },
+    })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('assigns workspaceId to a ptyManager session not in remote sessions', async () => {
+    mockPtyManager.listSessions.mockReturnValue([{ sessionId: 'native-patch', cwd: '/native' }])
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/terminals/native-patch',
+      payload: { workspaceId: 'ws-2' },
+    })
+    expect(res.statusCode).toBe(200)
+    mockPtyManager.listSessions.mockReturnValue([{ sessionId: 'native-patch', cwd: '/native' }])
+    const list = JSON.parse((await app.inject({ method: 'GET', url: '/api/terminals' })).body) as {
+      sessionId: string
+      workspaceId?: string
+    }[]
+    expect(list.find((s) => s.sessionId === 'native-patch')?.workspaceId).toBe('ws-2')
   })
 })

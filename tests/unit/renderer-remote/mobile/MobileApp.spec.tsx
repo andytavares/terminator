@@ -6,26 +6,32 @@ const mockListWorkspaces = vi.fn()
 const mockListTerminals = vi.fn()
 const mockGetWsTicket = vi.fn()
 
+const mockAssignTerminalWorkspace = vi.fn()
+
 vi.mock('../../../../src/renderer-remote/api/remote-client', () => ({
   listWorkspaces: mockListWorkspaces,
   listTerminals: mockListTerminals,
   getWsTicket: mockGetWsTicket,
   createTerminal: vi.fn(),
+  assignTerminalWorkspace: mockAssignTerminalWorkspace,
 }))
 
 vi.mock('../../../../src/renderer-remote/components/MobileTerminalList', () => ({
   MobileTerminalList: ({
     onSelectTerminal,
     onCreateTerminal,
+    onAssignWorkspace,
   }: {
     onSelectTerminal: (t: { sessionId: string; cwd: string }) => void
     onCreateTerminal: (workspaceId: string, folderPath: string) => void
+    onAssignWorkspace: (sessionId: string, workspaceId: string | null) => void
   }) => (
     <div>
       <button onClick={() => onSelectTerminal({ sessionId: 's1', cwd: '/tmp' })}>
         open terminal
       </button>
       <button onClick={() => onCreateTerminal('w1', '/workspace')}>new terminal</button>
+      <button onClick={() => onAssignWorkspace('s1', 'w1')}>assign workspace</button>
     </div>
   ),
 }))
@@ -50,6 +56,7 @@ beforeEach(() => {
   mockListWorkspaces.mockResolvedValue([])
   mockListTerminals.mockResolvedValue([])
   mockGetWsTicket.mockResolvedValue('ticket-xyz')
+  mockAssignTerminalWorkspace.mockResolvedValue(undefined)
   vi.clearAllMocks()
 })
 
@@ -92,6 +99,22 @@ describe('MobileApp', () => {
     await waitFor(() => {
       expect(mockListWorkspaces).toHaveBeenCalledTimes(1)
       expect(mockListTerminals).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('onAssignWorkspace calls assignTerminalWorkspace and refreshes terminals', async () => {
+    mockListWorkspaces.mockResolvedValue([])
+    mockListTerminals.mockResolvedValue([])
+    mockAssignTerminalWorkspace.mockResolvedValue(undefined)
+    const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
+    render(<MobileApp />)
+    await waitFor(() => screen.getByText('assign workspace'))
+    await act(async () => {
+      fireEvent.click(screen.getByText('assign workspace'))
+    })
+    await waitFor(() => {
+      expect(mockAssignTerminalWorkspace).toHaveBeenCalledWith('s1', 'w1')
+      expect(mockListTerminals).toHaveBeenCalledTimes(2) // once on mount, once after assign
     })
   })
 
