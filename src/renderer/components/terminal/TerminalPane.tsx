@@ -64,8 +64,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     }
 
     prevSessionIdRef.current = nextId
-    // scrollToBottomOnMount intentionally excluded: changing the setting should not remount sessions
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- scrollToBottomOnMount intentionally excluded: changing the setting should not remount sessions
   }, [activeSessionId, layout, getTerminalInstance])
 
   // Cleanup on unmount — useLayoutEffect so snapshot capture precedes browser layout.
@@ -91,7 +90,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, projectId, setFocusedSession, getTerminalInstance])
 
-  const onWindowFocus = useCallback(() => {
+  const scrollTerminalOnWindowFocus = useCallback(() => {
     if (!scrollToBottomOnFocus) return
     if (activeSessionId) {
       const instance = getTerminalInstance(activeSessionId)
@@ -101,9 +100,9 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
   }, [activeSessionId, getTerminalInstance, scrollToBottomOnFocus])
 
   useEffect(() => {
-    window.addEventListener('focus', onWindowFocus)
-    return () => window.removeEventListener('focus', onWindowFocus)
-  }, [onWindowFocus])
+    window.addEventListener('focus', scrollTerminalOnWindowFocus)
+    return () => window.removeEventListener('focus', scrollTerminalOnWindowFocus)
+  }, [scrollTerminalOnWindowFocus])
 
   const handleRatioChange = useCallback(
     (splitId: string, ratio: number) => {
