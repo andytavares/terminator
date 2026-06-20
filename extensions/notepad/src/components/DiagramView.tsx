@@ -254,6 +254,7 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
     getSceneElements: () => unknown[]
   } | null>(null)
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSaveRef = useRef<{ sceneJson: string; title: string; tags: string[] } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const activeIdRef = useRef(diagramId)
 
@@ -296,14 +297,32 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
     void load()
 
     return () => {
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+      if (autosaveTimer.current) {
+        clearTimeout(autosaveTimer.current)
+        autosaveTimer.current = null
+      }
+      // Flush any pending save so changes aren't lost when switching diagrams
+      const pending = pendingSaveRef.current
+      if (pending) {
+        pendingSaveRef.current = null
+        void window.electronAPI.extensionBridge
+          .invoke('terminator.notepad:diagrams.autosave', {
+            id: diagramId,
+            title: pending.title,
+            sceneJson: pending.sceneJson,
+            tags: pending.tags,
+          })
+          .catch(console.error)
+      }
     }
   }, [diagramId])
 
   const scheduleAutosave = useCallback(
     (newSceneJson: string, newTitle: string, newTags: string[]) => {
+      pendingSaveRef.current = { sceneJson: newSceneJson, title: newTitle, tags: newTags }
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
       autosaveTimer.current = setTimeout(async () => {
+        pendingSaveRef.current = null
         setSaveStatus('saving')
         try {
           await window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.autosave', {

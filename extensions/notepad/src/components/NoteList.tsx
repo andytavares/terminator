@@ -426,7 +426,7 @@ export function NoteList(): React.JSX.Element {
       itemId: diagram.id,
       itemType: 'diagram',
       title: diagram.title,
-      tags: [],
+      tags: diagram.tags,
       isArchived: !!diagram.archivedAt,
       x: e.clientX,
       y: e.clientY,
@@ -460,7 +460,8 @@ export function NoteList(): React.JSX.Element {
         : 'terminator.notepad:notes.hardDelete'
     await window.electronAPI.extensionBridge.invoke(channel, { id: itemId }).catch(console.error)
     if (itemType === 'note' && selectedNoteId === itemId) setSelected(null)
-    if (itemType === 'diagram') useNotesStore.getState().setSelectedDiagram(null)
+    if (itemType === 'diagram' && useNotesStore.getState().selectedDiagramId === itemId)
+      useNotesStore.getState().setSelectedDiagram(null)
     await reloadAll()
   }
 
@@ -488,8 +489,25 @@ export function NoteList(): React.JSX.Element {
   const allNoteItems = (searchResults ?? notes) as (NoteListItem | SearchResult)[]
   const activeNotes = allNoteItems.filter((n) => !n.archivedAt)
   const archivedNotes = allNoteItems.filter((n) => n.archivedAt)
-  const activeDiagrams = diagrams.filter((d) => !d.archivedAt)
-  const archivedDiagrams = diagrams.filter((d) => d.archivedAt)
+
+  // When a search/tag filter is active, filter diagrams client-side to match
+  const filteredDiagrams = (() => {
+    if (!searchResults) return diagrams
+    const q = searchQuery.toLowerCase()
+    const activeTagName = (() => {
+      if (!activeTagId) return null
+      const tag = tags.find((t) => t.id === activeTagId)
+      return tag?.name ?? (activeTagId.startsWith('local:') ? activeTagId.slice(6) : null)
+    })()
+    return diagrams.filter((d) => {
+      const matchesQuery = !q || d.title.toLowerCase().includes(q)
+      const matchesTag = !activeTagName || d.tags.includes(activeTagName)
+      return matchesQuery && matchesTag
+    })
+  })()
+
+  const activeDiagrams = filteredDiagrams.filter((d) => !d.archivedAt)
+  const archivedDiagrams = filteredDiagrams.filter((d) => d.archivedAt)
 
   type MixedItem =
     | { kind: 'note'; item: NoteListItem | SearchResult }
