@@ -1,0 +1,75 @@
+src/shared/schemas/settings.schema.ts
+  s_3f518e1d22aaee::t_7e42c66eb3c338 12-14
+  s_3f518e1d22aaee::t_862d3d452179b6 57-63
+.claude/agents/google-code-reviewer.md
+  s_3f518e1d22aaee::t_d6fdb6be24fe33 1-93
+tests/unit/renderer/components/GlobalSettings.spec.tsx
+  s_3f518e1d22aaee::t_cd6b7dea1204bf 15-17,22-28,43-45
+  s_3f518e1d22aaee::t_a8b27efecfb724 133-163
+src/renderer/components/terminal/TerminalSession.tsx
+  s_3f518e1d22aaee::t_985f7748cb4e3d 65
+  s_3f518e1d22aaee::t_e09ccd73af7e34 74-79,81
+  s_3f518e1d22aaee::t_bdbf4b3ab9e70b 405
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_3f518e1d22aaee::t_ffd3ddcd6fba48 129,133,150,158,176,191,196,203,208,214,225,238,248,255,262,270,281,290,295,305,331,348,360,371,385,391,404,427,450,473,479,518,568
+src/shared/types/index.ts
+  s_3f518e1d22aaee::t_3f49423eaaaa9e 82-84
+tests/unit/renderer/hooks/useTerminalSession.spec.tsx
+  s_3f518e1d22aaee::t_f5b88f97c77653 21-34,41-46
+  s_3f518e1d22aaee::t_29d1046e773d99 568-583
+src/renderer/components/terminal/LeafPane.tsx
+  s_3f518e1d22aaee::t_ce79f24a936e07 15
+  s_3f518e1d22aaee::t_12c0062f08c58d 36,39
+  s_3f518e1d22aaee::t_088474cd963152 3
+src/renderer/components/terminal/TerminalPane.tsx
+  s_3f518e1d22aaee::t_b6cf8a3e5202e0 123-127
+  s_3f518e1d22aaee::t_023d71d2afb619 29
+  s_3f518e1d22aaee::t_0020ff618ffe9d 3
+  s_3f518e1d22aaee::t_e34c3b95faf901 93,96
+scripts/run-tests.cjs
+  s_3f518e1d22aaee::t_299847016a318a 19,22
+  s_3f518e1d22aaee::t_f63464c8ab99a9 14-18,20,23-24,26
+  s_3f518e1d22aaee::t_358c82e002c2bb 21
+package.json
+  s_3f518e1d22aaee::t_89c894a16f412f 15,18,29,32
+.claude/commands/google-review.md
+  s_3f518e1d22aaee::t_619d80966da6ef 1-38
+.claude/settings.json
+  s_3f518e1d22aaee::t_e71825ae71eb24 65-67
+src/renderer/stores/settings.store.ts
+  s_3f518e1d22aaee::t_5cc598c7dd2f0a 31-37
+  s_3f518e1d22aaee::t_55aca72260a8a3 14-16
+  s_3f518e1d22aaee::t_39ede54a4b8d6d 122-142
+src/renderer/hooks/useTerminalSession.ts
+  s_3f518e1d22aaee::t_18306c6bece010 62,66,75-79,81
+  s_3f518e1d22aaee::t_f880cd3d43c31a 5
+  s_3f518e1d22aaee::t_1526ffab5dcd71 43
+  s_3f518e1d22aaee::t_47563d39755d31 106,110,123
+src/renderer/components/settings/GlobalSettings.tsx
+  s_3f518e1d22aaee::t_b3981c59fccd23 13-15
+  s_3f518e1d22aaee::t_10238cc3320bc6 75-116
+CLAUDE.md
+  s_3f518e1d22aaee::t_23186ab45bad72 24-25
+  s_3f518e1d22aaee::t_bc1385bcf1938f 9-19,21-23,26-31
+tests/unit/renderer/stores/settings.store.spec.ts
+  s_3f518e1d22aaee::t_24f3e8ac99e4ff 22-28
+  s_3f518e1d22aaee::t_7d254e69609e8c 227-298
+.claude/hooks/pre-stop.sh
+  s_3f518e1d22aaee::t_7a550c69887a46 1-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "a47a978747774598214194a3590a4107cc24a456",
+  "prompts": {},
+  "sessions": {
+    "s_3f518e1d22aaee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a222a66a-ab28-43ff-b1ab-3415d457d2cd",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
