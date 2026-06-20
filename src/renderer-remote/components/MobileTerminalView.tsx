@@ -72,7 +72,7 @@ export function MobileTerminalView({ sessionId, cwd, onBack }: Props) {
     ro.observe(containerRef.current)
 
     term.onData((data) => {
-      wsRef.current?.send(data)
+      if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(data)
     })
 
     term.onResize(({ cols, rows }) => {

@@ -105,6 +105,13 @@ export class PtyManager {
     return () => disposable.dispose()
   }
 
+  attachOnExit(sessionId: string, onExit: (exitCode: number) => void): (() => void) | null {
+    const session = this.sessions.get(sessionId)
+    if (!session) return null
+    const disposable = session.pty.onExit(({ exitCode }) => onExit(exitCode ?? 0))
+    return () => disposable.dispose()
+  }
+
   getPid(sessionId: string): number | undefined {
     return this.sessions.get(sessionId)?.pty.pid
   }

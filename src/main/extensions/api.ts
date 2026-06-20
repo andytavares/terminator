@@ -120,6 +120,9 @@ export interface PtyManagerAPI {
   write(sessionId: string, data: string): void
   resize(sessionId: string, cols: number, rows: number): void
   kill(sessionId: string): void
+  listSessions(): Array<{ sessionId: string; cwd: string }>
+  attachOnData(sessionId: string, onData: (data: string) => void): (() => void) | null
+  attachOnExit(sessionId: string, onExit: (exitCode: number) => void): (() => void) | null
 }
 
 export interface BridgeDeps {
@@ -548,6 +551,9 @@ export function createExtensionAPI(
       },
       attachOnData(sessionId, onData) {
         return deps?.ptyManager?.attachOnData(sessionId, onData) ?? null
+      },
+      attachOnExit(sessionId, onExit) {
+        return deps?.ptyManager?.attachOnExit(sessionId, onExit) ?? null
       },
     },
     window: {

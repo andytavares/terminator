@@ -16,6 +16,7 @@ const mockPtyManager = {
   getSessionIds: vi.fn(() => []),
   listSessions: vi.fn(() => [] as Array<{ sessionId: string; cwd: string }>),
   attachOnData: vi.fn(() => () => {}),
+  attachOnExit: vi.fn(() => () => {}),
 }
 
 let mockTicketStore: WsTicketStore
@@ -29,6 +30,7 @@ beforeEach(async () => {
   // After reset, restore defaults that most tests rely on
   mockPtyManager.listSessions.mockReturnValue([])
   mockPtyManager.attachOnData.mockReturnValue(() => {})
+  mockPtyManager.attachOnExit.mockReturnValue(() => {})
   mockTicketStore = new WsTicketStore()
   mockSubscriberManager = new WsSubscriberManager()
   app = Fastify({ logger: false })
@@ -266,6 +268,7 @@ describe('WS /ws/terminals/:sessionId', () => {
     vi.resetAllMocks()
     mockPtyManager.listSessions.mockReturnValue([])
     mockPtyManager.attachOnData.mockReturnValue(() => {})
+    mockPtyManager.attachOnExit.mockReturnValue(() => {})
     wsTicketStore = new WsTicketStore()
     wsSubscriberManager = new WsSubscriberManager()
     wsApp = Fastify({ logger: false })
@@ -485,6 +488,43 @@ describe('WS /ws/terminals/:sessionId', () => {
     // Session must be rolled back — not in GET /api/terminals
     mockPtyManager.listSessions.mockReturnValueOnce([])
     const listRes = await app.inject({ method: 'GET', url: '/api/terminals' })
+    const list = JSON.parse(listRes.body) as { sessionId: string }[]
+    expect(list.find((s) => s.sessionId === nativeId)).toBeUndefined()
+  })
+
+  it('cleans up adopted session when native PTY exits', async () => {
+    const nativeId = 'native-exit-cleanup'
+    let capturedExitCallback: ((code: number) => void) | null = null
+    mockPtyManager.listSessions.mockReturnValue([{ sessionId: nativeId, cwd: '/native' }])
+    mockPtyManager.attachOnExit.mockImplementation((_id, cb) => {
+      capturedExitCallback = cb
+      return () => {}
+    })
+
+    const ticketRes = await wsApp.inject({
+      method: 'POST',
+      url: `/api/terminals/${nativeId}/ws-ticket`,
+    })
+    const { ticket } = JSON.parse(ticketRes.body)
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`${baseUrl}/ws/terminals/${nativeId}?ticket=${ticket}`)
+      ws.on('open', () => ws.close())
+      ws.on('close', resolve)
+      ws.on('error', reject)
+      setTimeout(() => reject(new Error('timeout')), 2000)
+    })
+    await new Promise<void>((r) => setTimeout(r, 30))
+
+    expect(capturedExitCallback).not.toBeNull()
+
+    // Simulate native PTY exit; also update listSessions to reflect the PTY is gone
+    mockPtyManager.listSessions.mockReturnValue([])
+    capturedExitCallback!(0)
+    await new Promise<void>((r) => setTimeout(r, 10))
+
+    // Session must no longer appear in GET /api/terminals
+    const listRes = await wsApp.inject({ method: 'GET', url: '/api/terminals' })
     const list = JSON.parse(listRes.body) as { sessionId: string }[]
     expect(list.find((s) => s.sessionId === nativeId)).toBeUndefined()
   })

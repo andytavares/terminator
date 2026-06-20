@@ -84,6 +84,10 @@ export function MobileTerminalList({
   }
 
   const handleTouchStart = (e: React.TouchEvent, sessionId: string) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
     longPressFired.current = false
     const touch = e.touches[0]
     longPressTimer.current = setTimeout(() => {

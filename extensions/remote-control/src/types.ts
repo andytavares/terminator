@@ -12,6 +12,7 @@ export interface PtyManagerAPI {
   kill(sessionId: string): void
   listSessions(): Array<{ sessionId: string; cwd: string }>
   attachOnData(sessionId: string, onData: (data: string) => void): (() => void) | null
+  attachOnExit(sessionId: string, onExit: (exitCode: number) => void): (() => void) | null
 }
 
 export interface WorkspaceSnapshot {

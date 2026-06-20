@@ -433,6 +433,44 @@ describe('MobileTerminalList', () => {
     expect(mockOnAssignWorkspace).toHaveBeenCalledWith('s-assign', 'w1')
   })
 
+  it('second touchStart on a different terminal cancels first long-press timer', async () => {
+    vi.useFakeTimers()
+    const termA: TerminalSession = {
+      sessionId: 's-timer-a',
+      cwd: '/tmp/timer-a',
+      createdAt: '2026-06-20T10:00:00.000Z',
+    }
+    const termB: TerminalSession = {
+      sessionId: 's-timer-b',
+      cwd: '/tmp/timer-b',
+      createdAt: '2026-06-20T10:00:00.000Z',
+    }
+    const { MobileTerminalList } = await import(
+      '../../../../src/renderer-remote/components/MobileTerminalList'
+    )
+    render(
+      <MobileTerminalList
+        workspaces={[]}
+        terminals={[termA, termB]}
+        onSelectTerminal={mockOnSelectTerminal}
+        onCreateTerminal={mockOnCreateTerminal}
+        onAssignWorkspace={mockOnAssignWorkspace}
+      />
+    )
+    const btnA = screen.getByText('timer-a').closest('button')!
+    const btnB = screen.getByText('timer-b').closest('button')!
+    // Start long-press on A, then immediately start one on B
+    fireEvent.touchStart(btnA, { touches: [{ clientX: 10, clientY: 10 }] })
+    fireEvent.touchStart(btnB, { touches: [{ clientX: 20, clientY: 20 }] })
+    await act(async () => {
+      vi.advanceTimersByTime(600)
+    })
+    // Only B's context menu should have fired — A's timer was cleared
+    const menus = screen.queryAllByText('Move to workspace')
+    expect(menus).toHaveLength(1)
+    vi.useRealTimers()
+  })
+
   it('resets longPressFired after blocking a click, so subsequent taps on any terminal work', async () => {
     vi.useFakeTimers()
     const wsTerm: TerminalSession = {

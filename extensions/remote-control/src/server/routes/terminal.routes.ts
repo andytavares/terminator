@@ -206,6 +206,17 @@ export async function registerTerminalRoutes(
         )
         // Keep the broadcast callback alive across reconnects — do NOT tie it to ws close.
         if (dispose) adoptedSessionDisposers.set(sessionId, dispose)
+        // Clean up when the native PTY exits so we don't list dead sessions.
+        ptyManager.attachOnExit(sessionId, () => {
+          const dataDisposer = adoptedSessionDisposers.get(sessionId)
+          if (dataDisposer) {
+            dataDisposer()
+            adoptedSessionDisposers.delete(sessionId)
+          }
+          adoptedSessions.delete(sessionId)
+          sessions.delete(sessionId)
+          subscriberManager.destroySession(sessionId)
+        })
       }
 
       const accepted = subscriberManager.addSubscriber(sessionId, ws, getMaxSubscribers())

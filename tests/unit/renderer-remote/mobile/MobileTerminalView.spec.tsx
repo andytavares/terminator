@@ -238,4 +238,21 @@ describe('MobileTerminalView', () => {
     capturedOnDataHandler!('ls\r')
     expect(mockWs.send).toHaveBeenCalledWith('ls\r')
   })
+
+  it('does not send keystroke when WebSocket readyState is not OPEN', async () => {
+    const { MobileTerminalView } = await import(
+      '../../../../src/renderer-remote/components/MobileTerminalView'
+    )
+    render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
+    await act(async () => {})
+    expect(capturedOnDataHandler).not.toBeNull()
+    // Simulate socket not yet open
+    mockWs.readyState = 0 // CONNECTING
+    capturedOnDataHandler!('should not send')
+    expect(mockWs.send).not.toHaveBeenCalled()
+    // Restore OPEN and confirm send works again
+    mockWs.readyState = 1
+    capturedOnDataHandler!('should send')
+    expect(mockWs.send).toHaveBeenCalledWith('should send')
+  })
 })
