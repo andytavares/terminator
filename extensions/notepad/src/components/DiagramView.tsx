@@ -562,6 +562,8 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               excalidrawAPI={(api: any) => {
                 excalidrawApiRef.current = api
+                // Seed appState immediately so pins render before first onChange
+                setAppState(api.getAppState() as AppState)
               }}
             />
           </Suspense>

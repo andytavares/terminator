@@ -377,6 +377,7 @@ export function NoteList(): React.JSX.Element {
   useEffect(() => {
     /* v8 ignore next */
     if (!searchQuery && !activeTagId) {
+      ++searchGenRef.current
       setSearchResults(null)
       setSettledFilter(null)
       return
