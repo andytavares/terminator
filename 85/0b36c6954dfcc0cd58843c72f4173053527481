@@ -1,0 +1,40 @@
+tests/unit/renderer/stores/workspace.store.spec.ts
+  s_da066600789312::t_839c7f9b7fe06d 318-337
+tests/unit/renderer/App.spec.tsx
+  s_da066600789312::t_7b1d18e5f483b6 999
+  s_da066600789312::t_c5884f1e1ba57c 862
+  s_da066600789312::t_16d11c9ed4ff4d 163,171,174,182-192
+  s_da066600789312::t_31a1561ef9278a 687-688
+src/renderer/App.tsx
+  s_da066600789312::t_f1d983ce7cf6cb 45-46
+tests/unit/renderer/components/OverviewScreen.spec.tsx
+  s_da066600789312::t_776ea60bc8cdf3 11
+  s_da066600789312::t_b72e11febd36ec 391-438
+  s_da066600789312::t_1c38a067130941 52
+  s_da066600789312::t_bdcf0f14fb6084 101
+src/renderer/components/overview/OverviewScreen.tsx
+  s_da066600789312::t_1871b633ce2aa5 63-66
+  s_da066600789312::t_c7c00b3210ee86 39
+  s_da066600789312::t_9e0f86ac2f17e1 15-34
+  s_da066600789312::t_1f29ec661cf42e 8
+src/renderer/stores/workspace.store.ts
+  s_da066600789312::t_e837aa3b4f9c1f 55-56
+  s_da066600789312::t_3c7177dc748f6f 31-32
+  s_da066600789312::t_c58469bb0c76af 54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "850b36c6954dfcc0cd58843c72f4173053527481",
+  "prompts": {},
+  "sessions": {
+    "s_da066600789312": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b233e45-1b62-483a-8fb7-dc58c7a38797",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
