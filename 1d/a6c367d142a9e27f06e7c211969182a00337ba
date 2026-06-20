@@ -1,0 +1,38 @@
+tests/unit/renderer-remote/remote-client.spec.ts
+  s_da066600789312::t_990f71466801a7 181-188
+src/renderer-remote/components/MobileTerminalView.tsx
+  s_da066600789312::t_bb933fa204bc24 74-77
+extensions/remote-control/src/server/routes/terminal.routes.ts
+  s_da066600789312::t_1f2e5edcf02c4d 121-122
+src/renderer-remote/components/MobileTerminalList.tsx
+  s_da066600789312::t_c085038d6683de 79-82
+tests/unit/renderer-remote/mobile/MobileTerminalList.spec.tsx
+  s_da066600789312::t_7412e123724ef0 435-461,463-470
+  s_da066600789312::t_efaa7ff803a5d3 1
+  s_da066600789312::t_37f23e9b129e3b 19-22,471
+  s_da066600789312::t_fbc0e7bc47ee5d 462
+tests/unit/renderer-remote/mobile/MobileTerminalView.spec.tsx
+  s_da066600789312::t_29de411577512c 230-240
+  s_da066600789312::t_de7f6d629f8368 84
+  s_da066600789312::t_a6457fb0f3b732 15,21-23
+src/renderer-remote/api/remote-client.ts
+  s_da066600789312::t_4b6c2fffb66196 88,93
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_da066600789312::t_13e134d3b4f1df 208-219
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "1da6c367d142a9e27f06e7c211969182a00337ba",
+  "prompts": {},
+  "sessions": {
+    "s_da066600789312": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b233e45-1b62-483a-8fb7-dc58c7a38797",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
