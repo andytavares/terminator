@@ -1,0 +1,107 @@
+extensions/notepad/src/index.ts
+  s_04d55e15a03e3c::t_049e7d779f6a31 8-9,39-43
+  s_04d55e15a03e3c::t_236947f3cbb6b7 44
+extensions/notepad/src/components/NoteList.tsx
+  s_04d55e15a03e3c::t_049e7d779f6a31 2,6,24-25,261-287,289-290,302,310-316,318,414-415,424-447,450,452,455,457-464,467,469-481,483,487-510,542,551-565,568,574,577-593,637,639,664
+  s_04d55e15a03e3c::t_8b08082a3ff5ff 624-625
+  s_04d55e15a03e3c::t_1e8488eec2154b 661
+  s_04d55e15a03e3c::t_26a42be152c980 644-655
+  s_04d55e15a03e3c::t_bd7b3823d03a26 291-301
+  s_04d55e15a03e3c::t_87fdc9515b68dd 164-173,178,185-187,191-192
+  s_04d55e15a03e3c::t_e8334bfe50d656 100,130-148,152
+  s_04d55e15a03e3c::t_3bc2f50fa519dc 34-35
+  s_04d55e15a03e3c::t_f45b7862db356e 288,303-306
+extensions/notepad/tests/unit/ipc/diagram-comments.ipc.spec.ts
+  s_04d55e15a03e3c::t_2d22b844827dae 1-52,54-64,66-159
+extensions/notepad/src/components/QuickCreateOverlay.tsx
+  s_04d55e15a03e3c::t_7ddd852f5e5f30 6,27-75,77-78,95,102,122,140,145-175,219-224,226-244,255-260,263-273
+extensions/notepad/src/components/DiagramView.tsx
+  s_04d55e15a03e3c::t_3fc2703986d95a 506
+  s_04d55e15a03e3c::t_9cb9370a8a701e 86-92
+  s_04d55e15a03e3c::t_5014cd8f7a5666 332-347
+  s_04d55e15a03e3c::t_3ff5db02b0eb1e 507-510,512,514-517
+  s_04d55e15a03e3c::t_7e073026b9ea7f 422-436
+  s_04d55e15a03e3c::t_a5b29fa939c901 449-465,467-478
+  s_04d55e15a03e3c::t_c08e420b5eaa29 237-239
+  s_04d55e15a03e3c::t_15800d4403f2ca 304,313
+  s_04d55e15a03e3c::t_f715931b0413cc 49-55,57
+  s_04d55e15a03e3c::t_753dafbb2d4478 281-283,286
+  s_04d55e15a03e3c::t_3bf431ec722a4f 533
+  s_04d55e15a03e3c::t_87cdd0b43c2862 43
+  s_04d55e15a03e3c::t_a210d61e4dc729 554
+  s_04d55e15a03e3c::t_745f06a810bd09 1,3-17,19-42,44-48,58-85,93-236,240-243,247-252,254-270,272-280,284-285,287-303,305-312,314-328,330-331,348-421,437-448,479-505,513,518-532,534-553,555-572
+  s_04d55e15a03e3c::t_977a44406a6736 2
+  s_04d55e15a03e3c::t_a14b39802eb00a 18
+extensions/notepad/src/components/NotepadView.tsx
+  s_04d55e15a03e3c::t_049e7d779f6a31 10,58-59,78,82-94,96,100,482-483,504-514
+scripts/check-patch-coverage.cjs
+  s_04d55e15a03e3c::t_dacee2506c1386 39
+extensions/notepad/src/stores/notes.store.ts
+  s_04d55e15a03e3c::t_049e7d779f6a31 2,6,8,13,15,23,25,30-32
+extensions/notepad/src/components/notepad.css
+  s_04d55e15a03e3c::t_1e9f112661535e 1150,1420,1823,1866,2377
+  s_04d55e15a03e3c::t_101476ba4711fa 2412-2420
+  s_04d55e15a03e3c::t_049e7d779f6a31 2177-2220,2222,2270-2272,2281-2283,2285-2376,2378-2411,2421-2483
+  s_04d55e15a03e3c::t_5d9bf38678fe60 648
+  s_04d55e15a03e3c::t_a7d12b7ed757f9 2221,2223-2269,2273-2280,2284
+  s_04d55e15a03e3c::t_c9c764ea0cb8e7 731,733,742-772
+  s_04d55e15a03e3c::t_da86520f0f7a35 718
+  s_04d55e15a03e3c::t_d5541f8aef34c3 644-647,649-702
+src/main/preload.ts
+  s_04d55e15a03e3c::t_b5174a2e7309e5 121
+extensions/notepad/src/ipc/diagram-comments.ipc.ts
+  s_04d55e15a03e3c::t_ea69b1b70fef31 1-158
+package-lock.json
+  s_04d55e15a03e3c::t_ad42d49338d88b 126,2011-2018
+src/renderer/App.tsx
+  s_04d55e15a03e3c::t_f5136414b0fa6b 578-598
+README.md
+  s_04d55e15a03e3c::t_e07920a771a629 17
+extensions/notepad/tests/unit/stores/notes.store.spec.ts
+  s_04d55e15a03e3c::t_f02eac6ad099f8 3,15-23,26-32,64-81
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_04d55e15a03e3c::t_164d6eff3baeab 1331-1436
+extensions/notepad/package.json
+  s_04d55e15a03e3c::t_049e7d779f6a31 7
+extensions/notepad/src/db/types.ts
+  s_04d55e15a03e3c::t_338edf629e88f4 56,66
+  s_04d55e15a03e3c::t_049e7d779f6a31 53-55,57-65,67-86
+electron.vite.config.ts
+  s_04d55e15a03e3c::t_fa2e950da84e9e 32-34
+extensions/notepad/src/db/db.ts
+  s_04d55e15a03e3c::t_f2bccc8f875742 175-179
+  s_04d55e15a03e3c::t_049e7d779f6a31 151-173
+extensions/notepad/src/ipc/diagrams.ipc.ts
+  s_04d55e15a03e3c::t_143631591761e2 122,134
+  s_04d55e15a03e3c::t_81971c78d4986f 41,49,59-65
+  s_04d55e15a03e3c::t_74f903a88d0ef9 1-7,14-20,22-23,26-40,42-43,45-48,50-58,66-80,84-87,89-101,109-120,123-133,151-219
+  s_04d55e15a03e3c::t_d0fb12dd1fe398 44
+  s_04d55e15a03e3c::t_c42d6869b6d5ea 121,135-150
+  s_04d55e15a03e3c::t_3c866352d011c5 8-13,21,24-25
+  s_04d55e15a03e3c::t_542c52968917c2 81-83,88,102-108
+extensions/notepad/tests/unit/ipc/diagrams.ipc.spec.ts
+  s_04d55e15a03e3c::t_fd707b1cb4f31c 213-220
+  s_04d55e15a03e3c::t_8d666f6ba291d7 235-238
+  s_04d55e15a03e3c::t_3c8381dee8dded 140-150
+  s_04d55e15a03e3c::t_7f68398eb4c62e 53-57
+  s_04d55e15a03e3c::t_455a9c0f3ee6b7 11
+  s_04d55e15a03e3c::t_cb8d03cb2a26d8 1-10,12-52,58-96,119-139,151-175,190-212,221-234,239-247
+  s_04d55e15a03e3c::t_bbc919ff4ffc76 97-118
+  s_04d55e15a03e3c::t_23e08d47085253 176-189
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "e05287a83b1ee14a390aace1e905a95140ca2b47",
+  "prompts": {},
+  "sessions": {
+    "s_04d55e15a03e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44560d63-490c-4190-b90e-943512b66236",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
