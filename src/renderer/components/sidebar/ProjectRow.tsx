@@ -142,21 +142,19 @@ export function ProjectRow({
           </span>
         )}
         <div className="project-row__badges">
-          {branchSwitcher
-            ? branchSwitcher
-            : project.gitBranch && (
-                <span
-                  className={`project-row__branch-chip ${
-                    gitConflict ? 'chip-conflict' : gitDirty ? 'chip-dirty' : 'chip-clean'
-                  }`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onBranchBadgeClick?.()
-                  }}
-                >
-                  {project.gitBranch}
-                </span>
-              )}
+          {!branchSwitcher && project.gitBranch && (
+            <span
+              className={`project-row__branch-chip ${
+                gitConflict ? 'chip-conflict' : gitDirty ? 'chip-dirty' : 'chip-clean'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation()
+                onBranchBadgeClick?.()
+              }}
+            >
+              {project.gitBranch}
+            </span>
+          )}
         </div>
         {isBusy && <span className="project-row__busy" />}
         {isExpanded && (
@@ -172,6 +170,12 @@ export function ProjectRow({
           </button>
         )}
       </div>
+
+      {branchSwitcher && (
+        <div className="project-row__branch-row" onClick={(e) => e.stopPropagation()}>
+          {branchSwitcher}
+        </div>
+      )}
 
       {isExpanded &&
         rootSessions.map((session, index) => (

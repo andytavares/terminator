@@ -226,6 +226,16 @@
   color: white;
 }
 
+.dialog__segment-btn--disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.dialog__segment-btn--disabled:hover {
+  background: none;
+  color: var(--text-secondary);
+}
+
 /* ── Hint text ───────────────────────────────────────────────── */
 .dialog__hint {
   display: block;
