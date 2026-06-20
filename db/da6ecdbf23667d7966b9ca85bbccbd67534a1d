@@ -1,0 +1,19 @@
+.claude/hooks/pre-stop.sh
+  s_3f518e1d22aaee::t_a52e02e6297616 4,10-12,20-22,25-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "dbda6ecdbf23667d7966b9ca85bbccbd67534a1d",
+  "prompts": {},
+  "sessions": {
+    "s_3f518e1d22aaee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a222a66a-ab28-43ff-b1ab-3415d457d2cd",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
