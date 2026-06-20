@@ -21,6 +21,7 @@ interface Props {
 
 interface TerminalButtonProps {
   t: TerminalSession
+  label?: string
   showContextMenu?: boolean
   longPressFired: React.MutableRefObject<boolean>
   onSelectTerminal: (t: { sessionId: string; cwd: string }) => void
@@ -32,6 +33,7 @@ interface TerminalButtonProps {
 
 function TerminalButton({
   t,
+  label,
   longPressFired,
   onSelectTerminal,
   onContextMenu,
@@ -58,7 +60,7 @@ function TerminalButton({
       onTouchEnd={onTouchEnd}
       onTouchMove={onTouchMove}
     >
-      <span className="mobile-list__terminal-label">{basename(t.cwd)}</span>
+      <span className="mobile-list__terminal-label">{label ?? basename(t.cwd)}</span>
     </button>
   )
 }
@@ -148,6 +150,7 @@ export function MobileTerminalList({
           <TerminalButton
             key={t.sessionId}
             t={t}
+            label={`Scratch · ${basename(t.cwd)}`}
             showContextMenu
             longPressFired={longPressFired}
             onSelectTerminal={onSelectTerminal}
