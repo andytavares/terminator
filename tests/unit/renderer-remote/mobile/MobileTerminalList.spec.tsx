@@ -76,7 +76,7 @@ describe('MobileTerminalList', () => {
         onAssignWorkspace={mockOnAssignWorkspace}
       />
     )
-    fireEvent.click(screen.getByText('Scratch · myapp'))
+    fireEvent.click(screen.getByText('Scratch 1 · myapp'))
     expect(mockOnSelectTerminal).toHaveBeenCalledWith({ sessionId: 's1', cwd: '/tmp/myapp' })
   })
 
@@ -172,12 +172,12 @@ describe('MobileTerminalList', () => {
       />
     )
     // Should appear in the fallback section, not under the workspace
-    expect(screen.getByText('Scratch · thing')).toBeTruthy()
+    expect(screen.getByText('Scratch 1 · thing')).toBeTruthy()
     // Only one occurrence — not duplicated
-    expect(screen.getAllByText('Scratch · thing')).toHaveLength(1)
+    expect(screen.getAllByText('Scratch 1 · thing')).toHaveLength(1)
   })
 
-  it('labels unassigned terminals with "Scratch · {basename}" prefix', async () => {
+  it('labels unassigned terminals with "Scratch N · {basename}" prefix', async () => {
     const unmatched: TerminalSession = {
       sessionId: 's-scratch-label',
       cwd: '/tmp/my-session',
@@ -200,11 +200,11 @@ describe('MobileTerminalList', () => {
         onAssignWorkspace={mockOnAssignWorkspace}
       />
     )
-    // Unassigned terminal gets "Scratch ·" prefix
-    expect(screen.getByText('Scratch · my-session')).toBeTruthy()
+    // Unassigned terminal gets "Scratch N ·" prefix
+    expect(screen.getByText('Scratch 1 · my-session')).toBeTruthy()
     // Workspace-assigned terminal does NOT get the prefix
     expect(screen.getByText('myapp')).toBeTruthy()
-    expect(screen.queryByText('Scratch · myapp')).toBeNull()
+    expect(screen.queryByText('Scratch 1 · myapp')).toBeNull()
   })
 
   it('shows unmatched terminal in fallback section outside any workspace', async () => {
@@ -225,8 +225,8 @@ describe('MobileTerminalList', () => {
         onAssignWorkspace={mockOnAssignWorkspace}
       />
     )
-    expect(screen.getByText('Scratch · scratch')).toBeTruthy()
-    fireEvent.click(screen.getByText('Scratch · scratch'))
+    expect(screen.getByText('Scratch 1 · scratch')).toBeTruthy()
+    fireEvent.click(screen.getByText('Scratch 1 · scratch'))
     expect(mockOnSelectTerminal).toHaveBeenCalledWith({
       sessionId: 's-global',
       cwd: '/tmp/scratch',
@@ -276,7 +276,7 @@ describe('MobileTerminalList', () => {
         onAssignWorkspace={mockOnAssignWorkspace}
       />
     )
-    fireEvent.keyDown(screen.getByText('Scratch · enter-scratch'), { key: 'Enter' })
+    fireEvent.keyDown(screen.getByText('Scratch 1 · enter-scratch'), { key: 'Enter' })
     expect(mockOnSelectTerminal).toHaveBeenCalledWith({
       sessionId: 's-enter-global',
       cwd: '/tmp/enter-scratch',
@@ -325,7 +325,7 @@ describe('MobileTerminalList', () => {
         onAssignWorkspace={mockOnAssignWorkspace}
       />
     )
-    fireEvent.contextMenu(screen.getByText('Scratch · ctx-scratch'))
+    fireEvent.contextMenu(screen.getByText('Scratch 1 · ctx-scratch'))
     expect(screen.getAllByText('My Workspace').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('Move to workspace')).toBeTruthy()
   })
@@ -349,7 +349,7 @@ describe('MobileTerminalList', () => {
         onAssignWorkspace={mockOnAssignWorkspace}
       />
     )
-    const btn = screen.getByText('Scratch · longpress').closest('button')!
+    const btn = screen.getByText('Scratch 1 · longpress').closest('button')!
     fireEvent.touchStart(btn, { touches: [{ clientX: 50, clientY: 100 }] })
     await act(async () => {
       vi.advanceTimersByTime(600)
@@ -377,7 +377,7 @@ describe('MobileTerminalList', () => {
         onAssignWorkspace={mockOnAssignWorkspace}
       />
     )
-    const btn = screen.getByText('Scratch · touchend').closest('button')!
+    const btn = screen.getByText('Scratch 1 · touchend').closest('button')!
     fireEvent.touchStart(btn, { touches: [{ clientX: 50, clientY: 100 }] })
     fireEvent.touchEnd(btn)
     await act(async () => {
@@ -406,7 +406,7 @@ describe('MobileTerminalList', () => {
         onAssignWorkspace={mockOnAssignWorkspace}
       />
     )
-    const btn = screen.getByText('Scratch · touchmove').closest('button')!
+    const btn = screen.getByText('Scratch 1 · touchmove').closest('button')!
     fireEvent.touchStart(btn, { touches: [{ clientX: 50, clientY: 100 }] })
     fireEvent.touchMove(btn)
     await act(async () => {
@@ -434,7 +434,7 @@ describe('MobileTerminalList', () => {
         onAssignWorkspace={mockOnAssignWorkspace}
       />
     )
-    fireEvent.contextMenu(screen.getByText('Scratch · noworkspace'))
+    fireEvent.contextMenu(screen.getByText('Scratch 1 · noworkspace'))
     expect(screen.getByText('No workspaces')).toBeTruthy()
   })
 
@@ -456,7 +456,7 @@ describe('MobileTerminalList', () => {
         onAssignWorkspace={mockOnAssignWorkspace}
       />
     )
-    fireEvent.contextMenu(screen.getByText('Scratch · assign-scratch'))
+    fireEvent.contextMenu(screen.getByText('Scratch 1 · assign-scratch'))
     // Click the workspace option in the context menu
     const menuItems = screen.getAllByText('My Workspace')
     fireEvent.click(menuItems[menuItems.length - 1])
@@ -487,8 +487,8 @@ describe('MobileTerminalList', () => {
         onAssignWorkspace={mockOnAssignWorkspace}
       />
     )
-    const btnA = screen.getByText('Scratch · timer-a').closest('button')!
-    const btnB = screen.getByText('Scratch · timer-b').closest('button')!
+    const btnA = screen.getByText('Scratch 1 · timer-a').closest('button')!
+    const btnB = screen.getByText('Scratch 2 · timer-b').closest('button')!
     // Start long-press on A, then immediately start one on B
     fireEvent.touchStart(btnA, { touches: [{ clientX: 10, clientY: 10 }] })
     fireEvent.touchStart(btnB, { touches: [{ clientX: 20, clientY: 20 }] })
@@ -526,7 +526,7 @@ describe('MobileTerminalList', () => {
       />
     )
     // Long-press the unassigned terminal to set longPressFired = true
-    fireEvent.touchStart(screen.getByText('Scratch · scratch'), {
+    fireEvent.touchStart(screen.getByText('Scratch 1 · scratch'), {
       touches: [{ clientX: 10, clientY: 10 }],
     })
     await act(async () => {
@@ -563,7 +563,7 @@ describe('MobileTerminalList', () => {
       />
     )
     // Open context menu
-    fireEvent.contextMenu(screen.getByText('Scratch · backdrop'))
+    fireEvent.contextMenu(screen.getByText('Scratch 1 · backdrop'))
     expect(screen.getByText('Move to workspace')).toBeTruthy()
 
     // touchStart on the backdrop should NOT close the menu

@@ -146,11 +146,11 @@ export function MobileTerminalList({
       })}
       {terminals
         .filter((t) => !assignedSessionIds.has(t.sessionId))
-        .map((t) => (
+        .map((t, i) => (
           <TerminalButton
             key={t.sessionId}
             t={t}
-            label={`Scratch · ${basename(t.cwd)}`}
+            label={`Scratch ${i + 1} · ${basename(t.cwd)}`}
             showContextMenu
             longPressFired={longPressFired}
             onSelectTerminal={onSelectTerminal}
