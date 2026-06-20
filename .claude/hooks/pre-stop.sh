@@ -1,45 +1,43 @@
 #!/usr/bin/env bash
-# Stop hook: enforces format + lint + patch coverage before Claude finishes.
-# Non-zero exit blocks the stop and feeds output back to Claude as a new message.
-set -euo pipefail
+# Stop hook: enforces format + lint + patch coverage before Claude finishes a turn.
+# Exit 1 + stdout output blocks the stop and feeds the message back to Claude.
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$ROOT"
 
-# Only run if TypeScript source files were modified (staged or unstaged).
-CHANGED=$(git diff --name-only HEAD 2>/dev/null | grep -E '\.(ts|tsx)$' | grep -v '\.spec\.' | grep -v '\.test\.' || true)
-STAGED=$(git diff --cached --name-only 2>/dev/null | grep -E '\.(ts|tsx)$' | grep -v '\.spec\.' | grep -v '\.test\.' || true)
+# Only run when TypeScript source files were changed.
+CHANGED=$(git diff --name-only HEAD 2>/dev/null | grep -E '\.(ts|tsx)$' | grep -v '\.(spec|test)\.' || true)
+STAGED=$(git diff --cached --name-only 2>/dev/null | grep -E '\.(ts|tsx)$' | grep -v '\.(spec|test)\.' || true)
 
 if [ -z "$CHANGED" ] && [ -z "$STAGED" ]; then
   exit 0
 fi
 
-FAILURES=()
+FAILURES=""
 
 # 1. Format
-if ! npm run format:check --silent 2>/dev/null; then
-  FAILURES+=("FORMATTING: run \`npm run format\` to fix")
+if ! npm run format:check 2>/dev/null 1>/dev/null; then
+  FAILURES="$FAILURES\n  ✗ FORMATTING: run \`npm run format\` to fix"
 fi
 
 # 2. Lint
-if ! npm run lint --silent 2>/dev/null; then
-  FAILURES+=("LINT: run \`npm run lint\` and fix all errors")
-fi
+LINT_OUT=$(npm run lint 2>&1) || {
+  ERRORS=$(echo "$LINT_OUT" | grep -c "error" || true)
+  if [ "$ERRORS" -gt 0 ]; then
+    FAILURES="$FAILURES\n  ✗ LINT: $ERRORS error(s) — run \`npm run lint\` and fix them"
+  fi
+}
 
-# 3. Patch coverage — uses the existing coverage-final.json if present, otherwise runs tests.
-# Running full tests here would be too slow; rely on check-patch-coverage against last run.
+# 3. Patch coverage (only if coverage data exists from the last test run)
 if [ -f "$ROOT/coverage/coverage-final.json" ]; then
-  if ! node scripts/check-patch-coverage.cjs 2>/dev/null; then
-    FAILURES+=("COVERAGE: patch coverage below 80% — run \`npm test\` and add tests for uncovered lines")
+  if ! node scripts/check-patch-coverage.cjs 2>/dev/null 1>/dev/null; then
+    FAILURES="$FAILURES\n  ✗ COVERAGE: patch coverage below 80% — run \`npm test\` and add tests"
   fi
 else
-  FAILURES+=("COVERAGE: no coverage data found — run \`npm test\` before finishing")
+  FAILURES="$FAILURES\n  ✗ COVERAGE: no coverage data — run \`npm test\` before finishing"
 fi
 
-if [ ${#FAILURES[@]} -gt 0 ]; then
-  echo "🚫 Pre-stop checks failed. Fix these before finishing:"
-  for f in "${FAILURES[@]}"; do
-    echo "  ✗ $f"
-  done
+if [ -n "$FAILURES" ]; then
+  printf "🚫 Pre-stop checks failed. Fix before finishing:%b\n" "$FAILURES"
   exit 1
 fi
