@@ -1,10 +1,15 @@
-import { ipcMain } from 'electron'
+import { ipcMain, BrowserWindow, app } from 'electron'
+import { join } from 'path'
 import { z } from 'zod'
-import { getDb, randomUUID } from '../db/db'
+import { randomUUID } from '../db/db'
+import type { ExtensionDB } from '../../../../src/main/db/index'
 
 const VALIDATION_ERROR = { error: 'VALIDATION_ERROR' }
 
-export async function createDiagram(payload: unknown): Promise<Record<string, unknown>> {
+export async function createDiagram(
+  db: ExtensionDB,
+  payload: unknown
+): Promise<Record<string, unknown>> {
   const schema = z
     .object({
       title: z.string().optional(),
@@ -14,43 +19,45 @@ export async function createDiagram(payload: unknown): Promise<Record<string, un
   const parsed = schema.safeParse(payload ?? {})
   if (!parsed.success) return VALIDATION_ERROR
 
-  const db = getDb()
   const id = randomUUID()
   const now = new Date().toISOString()
   const title = parsed.data.title?.trim() || 'Untitled diagram'
   const tags = JSON.stringify(parsed.data.tags ?? [])
 
-  db.prepare(
-    `INSERT INTO diagrams (id, title, tags, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(id, title, tags, '{}', now, now)
+  await db.run(
+    `INSERT INTO diagrams (id, title, tags, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+    [id, title, tags, '{}', now, now]
+  )
 
   return { data: { id, title, createdAt: now } }
 }
 
-export async function listDiagrams(payload: unknown): Promise<Record<string, unknown>> {
+export async function listDiagrams(
+  db: ExtensionDB,
+  payload: unknown
+): Promise<Record<string, unknown>> {
   const schema = z.object({ includeArchived: z.boolean().optional() })
   const parsed = schema.safeParse(payload ?? {})
   if (!parsed.success) return VALIDATION_ERROR
 
   const { includeArchived = false } = parsed.data
-  const db = getDb()
 
   const archivedFilter = includeArchived ? '' : 'AND archived_at IS NULL'
-  const rows = db
-    .prepare(
-      `SELECT id, title, tags, created_at, updated_at, archived_at
-       FROM diagrams
-       WHERE 1=1 ${archivedFilter}
-       ORDER BY updated_at DESC, rowid DESC`
-    )
-    .all() as {
+  const rows = await db.query<{
     id: string
     title: string
     tags: string
     created_at: string
     updated_at: string
     archived_at: string | null
-  }[]
+    sort_order: number
+    folder_id: string | null
+  }>(
+    `SELECT id, title, tags, created_at, updated_at, archived_at, COALESCE(sort_order, 0) AS sort_order, folder_id
+     FROM diagrams
+     WHERE 1=1 ${archivedFilter}
+     ORDER BY COALESCE(sort_order, 0) ASC, updated_at DESC`
+  )
 
   return {
     data: rows.map((r) => ({
@@ -67,31 +74,32 @@ export async function listDiagrams(payload: unknown): Promise<Record<string, unk
       updatedAt: r.updated_at,
       archivedAt: r.archived_at,
       type: 'diagram' as const,
+      sortOrder: r.sort_order ?? 0,
+      folderId: r.folder_id ?? null,
     })),
   }
 }
 
-export async function getDiagram(payload: unknown): Promise<Record<string, unknown>> {
+export async function getDiagram(
+  db: ExtensionDB,
+  payload: unknown
+): Promise<Record<string, unknown>> {
   const schema = z.object({ id: z.string() })
   const parsed = schema.safeParse(payload)
   if (!parsed.success) return VALIDATION_ERROR
 
-  const db = getDb()
-  const row = db
-    .prepare(
-      `SELECT id, title, tags, scene_json, created_at, updated_at, archived_at FROM diagrams WHERE id=?`
-    )
-    .get(parsed.data.id) as
-    | {
-        id: string
-        title: string
-        tags: string
-        scene_json: string
-        created_at: string
-        updated_at: string
-        archived_at: string | null
-      }
-    | undefined
+  const row = await db.get<{
+    id: string
+    title: string
+    tags: string
+    scene_json: string
+    created_at: string
+    updated_at: string
+    archived_at: string | null
+  }>(
+    `SELECT id, title, tags, scene_json, created_at, updated_at, archived_at FROM diagrams WHERE id=?`,
+    [parsed.data.id]
+  )
 
   if (!row) return { error: 'DIAGRAM_NOT_FOUND' }
 
@@ -114,7 +122,10 @@ export async function getDiagram(payload: unknown): Promise<Record<string, unkno
   }
 }
 
-export async function autosaveDiagram(payload: unknown): Promise<Record<string, unknown>> {
+export async function autosaveDiagram(
+  db: ExtensionDB,
+  payload: unknown
+): Promise<Record<string, unknown>> {
   const schema = z.object({
     id: z.string(),
     title: z.string(),
@@ -125,86 +136,138 @@ export async function autosaveDiagram(payload: unknown): Promise<Record<string, 
   if (!parsed.success) return VALIDATION_ERROR
 
   const { id, title, sceneJson } = parsed.data
-  const db = getDb()
   const now = new Date().toISOString()
 
-  const existing = db.prepare('SELECT id FROM diagrams WHERE id=?').get(id)
+  const existing = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [id])
   if (!existing) return { error: 'DIAGRAM_NOT_FOUND' }
 
   const tags = JSON.stringify(parsed.data.tags ?? [])
   if (sceneJson !== undefined) {
-    db.prepare('UPDATE diagrams SET title=?, tags=?, scene_json=?, updated_at=? WHERE id=?').run(
+    await db.run('UPDATE diagrams SET title=?, tags=?, scene_json=?, updated_at=? WHERE id=?', [
       title.trim() || 'Untitled diagram',
       tags,
       sceneJson,
       now,
-      id
-    )
+      id,
+    ])
   } else {
-    db.prepare('UPDATE diagrams SET title=?, tags=?, updated_at=? WHERE id=?').run(
+    await db.run('UPDATE diagrams SET title=?, tags=?, updated_at=? WHERE id=?', [
       title.trim() || 'Untitled diagram',
       tags,
       now,
-      id
-    )
+      id,
+    ])
   }
 
   return { data: { updatedAt: now } }
 }
 
-export async function archiveDiagram(payload: unknown): Promise<Record<string, unknown>> {
+export async function archiveDiagram(
+  db: ExtensionDB,
+  payload: unknown
+): Promise<Record<string, unknown>> {
   const schema = z.object({ id: z.string() })
   const parsed = schema.safeParse(payload)
   if (!parsed.success) return VALIDATION_ERROR
 
-  const db = getDb()
   const archivedAt = new Date().toISOString()
-  const existing = db.prepare('SELECT id FROM diagrams WHERE id=?').get(parsed.data.id)
+  const existing = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [
+    parsed.data.id,
+  ])
   if (!existing) return { error: 'DIAGRAM_NOT_FOUND' }
 
-  db.prepare('UPDATE diagrams SET archived_at=? WHERE id=?').run(archivedAt, parsed.data.id)
+  await db.run('UPDATE diagrams SET archived_at=? WHERE id=?', [archivedAt, parsed.data.id])
   return { data: { archivedAt } }
 }
 
-export async function restoreDiagram(payload: unknown): Promise<Record<string, unknown>> {
+export async function restoreDiagram(
+  db: ExtensionDB,
+  payload: unknown
+): Promise<Record<string, unknown>> {
   const schema = z.object({ id: z.string() })
   const parsed = schema.safeParse(payload)
   if (!parsed.success) return VALIDATION_ERROR
 
-  const db = getDb()
   const now = new Date().toISOString()
-  const existing = db.prepare('SELECT id FROM diagrams WHERE id=?').get(parsed.data.id)
+  const existing = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [
+    parsed.data.id,
+  ])
   if (!existing) return { error: 'DIAGRAM_NOT_FOUND' }
 
-  db.prepare('UPDATE diagrams SET archived_at=NULL, updated_at=? WHERE id=?').run(
+  await db.run('UPDATE diagrams SET archived_at=NULL, updated_at=? WHERE id=?', [
     now,
-    parsed.data.id
-  )
+    parsed.data.id,
+  ])
   return { data: { ok: true } }
 }
 
-export async function hardDeleteDiagram(payload: unknown): Promise<Record<string, unknown>> {
+export async function hardDeleteDiagram(
+  db: ExtensionDB,
+  payload: unknown
+): Promise<Record<string, unknown>> {
   const schema = z.object({ id: z.string() })
   const parsed = schema.safeParse(payload)
   if (!parsed.success) return VALIDATION_ERROR
 
-  const db = getDb()
-  const existing = db.prepare('SELECT id FROM diagrams WHERE id=?').get(parsed.data.id)
+  const existing = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [
+    parsed.data.id,
+  ])
   if (!existing) return { error: 'DIAGRAM_NOT_FOUND' }
 
-  db.prepare('DELETE FROM diagrams WHERE id=?').run(parsed.data.id)
+  await db.run('DELETE FROM diagrams WHERE id=?', [parsed.data.id])
   return { data: { ok: true } }
 }
 
-export function registerDiagramsIpcHandlers(): () => void {
-  ipcMain.handle('terminator.notepad:diagrams.create', (_, payload) => createDiagram(payload))
-  ipcMain.handle('terminator.notepad:diagrams.list', (_, payload) => listDiagrams(payload))
-  ipcMain.handle('terminator.notepad:diagrams.get', (_, payload) => getDiagram(payload))
-  ipcMain.handle('terminator.notepad:diagrams.autosave', (_, payload) => autosaveDiagram(payload))
-  ipcMain.handle('terminator.notepad:diagrams.archive', (_, payload) => archiveDiagram(payload))
-  ipcMain.handle('terminator.notepad:diagrams.restore', (_, payload) => restoreDiagram(payload))
+export async function openDiagramInWindow(
+  _db: ExtensionDB,
+  payload: unknown
+): Promise<Record<string, unknown>> {
+  const schema = z.object({ id: z.string() })
+  const parsed = schema.safeParse(payload)
+  if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+
+  const mainWindow = BrowserWindow.getAllWindows()[0]
+  if (!mainWindow) return { error: 'NO_MAIN_WINDOW' }
+
+  const baseUrl = mainWindow.webContents.getURL()
+  const urlObj = new URL(baseUrl)
+  urlObj.searchParams.set('view', 'notepad-diagram')
+  urlObj.searchParams.set('diagramId', parsed.data.id)
+  const diagramUrl = urlObj.toString()
+
+  const preload = join(app.getAppPath(), 'out', 'preload', 'index.js')
+
+  const win = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    webPreferences: {
+      preload,
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+
+  win
+    .loadURL(diagramUrl)
+    .catch((err) => console.error('[notepad] openDiagramInWindow: failed to load', err))
+
+  return { data: { ok: true } }
+}
+
+export function registerDiagramsIpcHandlers(db: ExtensionDB): () => void {
+  ipcMain.handle('terminator.notepad:diagrams.create', (_, payload) => createDiagram(db, payload))
+  ipcMain.handle('terminator.notepad:diagrams.list', (_, payload) => listDiagrams(db, payload))
+  ipcMain.handle('terminator.notepad:diagrams.get', (_, payload) => getDiagram(db, payload))
+  ipcMain.handle('terminator.notepad:diagrams.autosave', (_, payload) =>
+    autosaveDiagram(db, payload)
+  )
+  ipcMain.handle('terminator.notepad:diagrams.archive', (_, payload) => archiveDiagram(db, payload))
+  ipcMain.handle('terminator.notepad:diagrams.restore', (_, payload) => restoreDiagram(db, payload))
   ipcMain.handle('terminator.notepad:diagrams.hardDelete', (_, payload) =>
-    hardDeleteDiagram(payload)
+    hardDeleteDiagram(db, payload)
+  )
+  ipcMain.handle('terminator.notepad:diagrams.openWindow', (_, payload) =>
+    openDiagramInWindow(db, payload)
   )
 
   return () => {
@@ -215,5 +278,6 @@ export function registerDiagramsIpcHandlers(): () => void {
     ipcMain.removeHandler('terminator.notepad:diagrams.archive')
     ipcMain.removeHandler('terminator.notepad:diagrams.restore')
     ipcMain.removeHandler('terminator.notepad:diagrams.hardDelete')
+    ipcMain.removeHandler('terminator.notepad:diagrams.openWindow')
   }
 }

@@ -55,8 +55,15 @@ export function NotepadView(): React.JSX.Element {
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
   const [commentHover, setCommentHover] = useState<{ id: string; top: number } | null>(null)
   const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const { selectedNoteId, selectedDiagramId, notes, setNotes, setDiagrams, setShowQuickCreate } =
-    useNotesStore()
+  const {
+    selectedNoteId,
+    selectedDiagramId,
+    notes,
+    setNotes,
+    setDiagrams,
+    setFolders,
+    setShowQuickCreate,
+  } = useNotesStore()
   const {
     bodyDraft,
     isDirty,
@@ -75,29 +82,32 @@ export function NotepadView(): React.JSX.Element {
   const commentPanelRef = useRef<HTMLDivElement>(null)
   const editorWrapRef = useRef<HTMLDivElement>(null)
 
-  // Load note + diagram lists on mount
+  // Load note + diagram + folder lists on mount
   useEffect(() => {
     async function loadList() {
       try {
-        const [notesResult, diagramsResult] = await Promise.all([
+        const [notesResult, diagramsResult, foldersResult] = await Promise.all([
           window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.list', {
             includeArchived: true,
           }),
           window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.list', {
             includeArchived: true,
           }),
+          window.electronAPI.extensionBridge.invoke('terminator.notepad:folders.list', {}),
         ])
         const notesData = (notesResult as { data?: unknown[] }).data
         if (Array.isArray(notesData)) setNotes(notesData as Parameters<typeof setNotes>[0])
         const diagramsData = (diagramsResult as { data?: unknown[] }).data
         if (Array.isArray(diagramsData))
           setDiagrams(diagramsData as Parameters<typeof setDiagrams>[0])
+        const foldersData = (foldersResult as { data?: unknown[] }).data
+        if (Array.isArray(foldersData)) setFolders(foldersData as Parameters<typeof setFolders>[0])
       } catch (err) {
         console.error('[notepad] Failed to load list', err)
       }
     }
     void loadList()
-  }, [setNotes, setDiagrams])
+  }, [setNotes, setDiagrams, setFolders])
 
   // Push-down layout for comment cards
   const computeAnchorTops = useCallback((view: EditorView, commentList: Comment[]) => {

@@ -18,6 +18,7 @@ vi.mock('../../../../src/renderer/stores/session.store', () => ({
     getSessionsForProject: vi.fn().mockReturnValue([]),
     getBellCountForProject: vi.fn().mockReturnValue(0),
     isProjectBusy: vi.fn().mockReturnValue(false),
+    isSessionBusy: vi.fn().mockReturnValue(false),
     activeSessionIdByProject: new Map(),
   }),
 }))
@@ -27,6 +28,9 @@ const mockWorkspaceStore = {
   reorderProjects: vi.fn().mockResolvedValue(undefined),
   workspaces: [] as Workspace[],
   updateProjectBranch: vi.fn().mockResolvedValue(undefined),
+  collapsedProjectIds: new Set<string>(),
+  toggleProjectCollapse: vi.fn(),
+  ensureProjectExpanded: vi.fn(),
 }
 
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({

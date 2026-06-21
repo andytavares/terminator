@@ -4,9 +4,7 @@
   "private": true,
   "description": "Markdown Notepad extension for Terminator",
   "dependencies": {
-    "@excalidraw/excalidraw": "^0.17.6",
     "@codemirror/commands": "^6.8.0",
-    "@codemirror/theme-one-dark": "^6.1.2",
     "@codemirror/lang-cpp": "^6.0.3",
     "@codemirror/lang-css": "^6.3.1",
     "@codemirror/lang-html": "^6.4.9",
@@ -20,17 +18,15 @@
     "@codemirror/legacy-modes": "^6.5.3",
     "@codemirror/search": "^6.5.10",
     "@codemirror/state": "^6.5.2",
+    "@codemirror/theme-one-dark": "^6.1.2",
     "@codemirror/view": "^6.36.5",
-    "better-sqlite3": "^12.10.0",
+    "@excalidraw/excalidraw": "^0.17.6",
     "gray-matter": "^4.0.3",
-    "mermaid": "^11.4.1",
     "lucide-react": "^1.16.0",
+    "mermaid": "^11.4.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "zod": "3.23.8",
     "zustand": "4.5.5"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13"
   }
 }

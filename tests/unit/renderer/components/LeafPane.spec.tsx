@@ -6,12 +6,7 @@ vi.mock('../../../../src/renderer/stores/session.store', () => ({
   useSessionStore: vi.fn(),
 }))
 
-vi.mock('../../../../src/renderer/stores/settings.store', () => ({
-  useSettingsStore: vi.fn(),
-}))
-
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
-import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { LeafPane } from '../../../../src/renderer/components/terminal/LeafPane'
 
 const mockGetTerminalInstance = vi.fn()
@@ -21,28 +16,17 @@ const mockClearBellCount = vi.fn()
 const mockTerminalInput = vi.fn()
 const mockSessions = new Map([['sess-1', { id: 'sess-1', tabTitle: 'Terminal 1' }]])
 
-function makeInstance() {
+function makeInstance(overrides: Record<string, unknown> = {}) {
   return {
     mount: vi.fn(),
     unmount: vi.fn(),
+    isAtBottom: false,
     terminal: {
       focus: vi.fn(),
       scrollToBottom: vi.fn(),
       paste: vi.fn(),
     },
-  }
-}
-
-function makeSettings(overrides: Record<string, unknown> = {}) {
-  return {
-    globalSettings: {
-      terminal: {
-        scrollToBottomOnMount: false,
-        scrollToBottomOnClick: false,
-        scrollToBottomOnFocus: false,
-        ...overrides,
-      },
-    },
+    ...overrides,
   }
 }
 
@@ -55,10 +39,6 @@ beforeEach(() => {
     clearBellCount: mockClearBellCount,
     sessions: mockSessions,
   } as unknown as ReturnType<typeof useSessionStore>)
-  vi.mocked(useSettingsStore).mockReturnValue(
-    makeSettings() as unknown as ReturnType<typeof useSettingsStore>
-  )
-
   mockGetTerminalInstance.mockReturnValue(undefined)
   mockGetFocusedSession.mockReturnValue(null)
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
@@ -163,16 +143,12 @@ describe('LeafPane', () => {
     expect(instance.unmount).toHaveBeenCalled()
   })
 
-  it('passes scrollToBottomOnMount=true to mount when setting is enabled', () => {
-    vi.mocked(useSettingsStore).mockReturnValue(
-      makeSettings({ scrollToBottomOnMount: true }) as unknown as ReturnType<
-        typeof useSettingsStore
-      >
-    )
+  it('calls mount with just the container element', () => {
     const instance = makeInstance()
     mockGetTerminalInstance.mockReturnValue(instance)
     render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    expect(instance.mount).toHaveBeenCalledWith(expect.anything(), true)
+    expect(instance.mount).toHaveBeenCalledWith(expect.any(HTMLDivElement))
+    expect(instance.mount).toHaveBeenCalledTimes(1)
   })
 
   it('ignores non-left-button mousedown (button !== 0)', () => {
@@ -181,17 +157,20 @@ describe('LeafPane', () => {
     expect(mockSetFocusedSession).not.toHaveBeenCalled()
   })
 
-  it('calls scrollToBottom on click when scrollToBottomOnClick is enabled', () => {
-    vi.mocked(useSettingsStore).mockReturnValue(
-      makeSettings({ scrollToBottomOnClick: true }) as unknown as ReturnType<
-        typeof useSettingsStore
-      >
-    )
-    const instance = makeInstance()
+  it('scrolls to bottom on click when instance is already at bottom', () => {
+    const instance = makeInstance({ isAtBottom: true })
     mockGetTerminalInstance.mockReturnValue(instance)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
     expect(instance.terminal.scrollToBottom).toHaveBeenCalled()
+  })
+
+  it('does not scroll to bottom on click when not at bottom', () => {
+    const instance = makeInstance({ isAtBottom: false })
+    mockGetTerminalInstance.mockReturnValue(instance)
+    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
+    expect(instance.terminal.scrollToBottom).not.toHaveBeenCalled()
   })
 
   it('does not throw on drop when no terminal instance', () => {

@@ -3,6 +3,7 @@ import { FileText } from 'lucide-react'
 import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
 import { NotepadView } from './components/NotepadView'
 import { NoteWindowView } from './components/NoteWindowView'
+import { DiagramWindowView } from './components/DiagramWindowView'
 import { QuickCreateOverlay } from './components/QuickCreateOverlay'
 import { useNotesStore } from './stores/notes.store'
 
@@ -17,6 +18,7 @@ registry.registerGlobalTab({
 })
 
 registry.registerWindowView('notepad-note', NoteWindowView)
+registry.registerWindowView('notepad-diagram', DiagramWindowView)
 
 // Overlay renders inside the main window — visibility controlled by store
 registry.registerOverlay(QuickCreateOverlay)

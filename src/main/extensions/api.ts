@@ -131,7 +131,10 @@ export interface BridgeDeps {
   eventBus: import('events').EventEmitter
 }
 
+export type { ExtensionDB } from '../db/index.js'
+
 export interface ExtensionAPI {
+  db: import('../db/index.js').ExtensionDB
   readonly app: { readonly version: string }
   log: {
     debug(message: string, ...meta: unknown[]): void
@@ -309,6 +312,7 @@ export interface ExtensionAPIDeps {
   ptyManager?: PtyManagerAPI
   broadcastToWindows?: (channel: string, data: unknown) => void
   bridge?: BridgeDeps
+  db?: import('../db/index.js').ExtensionDB
 }
 
 export function createExtensionAPI(
@@ -326,8 +330,20 @@ export function createExtensionAPI(
 
   const extLogger = makeLogger(extensionId)
 
+  const notReady = (): never => {
+    throw new Error(`Extension "${extensionId}": AppDB not initialized`)
+  }
+  const dbStub: import('../db/index.js').ExtensionDB = {
+    exec: notReady,
+    query: notReady,
+    get: notReady,
+    run: notReady,
+    transaction: notReady,
+  }
+
   return {
     app: { version: appVersion },
+    db: deps?.db ?? dbStub,
     log: extLogger,
     settings: {
       register(schema: ExtensionSettingsSchema): Disposable {

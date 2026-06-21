@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs/promises'
+import type { ExtensionDB } from '../../../../src/main/extensions/api'
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
@@ -38,30 +39,39 @@ vi.mock('gray-matter', () => ({
   })),
 }))
 
-// Mock buildIndex to avoid complex fs setup
 vi.mock('../../src/vault/indexer', () => ({
   buildIndex: vi.fn().mockResolvedValue({ tasks: [], projects: [], inboxCount: 0 }),
   readIndex: vi.fn().mockResolvedValue(null),
   getTaskById: vi.fn().mockReturnValue(null),
 }))
 
-const { mockRun, mockGet, mockAll, mockPrepare } = vi.hoisted(() => {
-  const mockRun = vi.fn()
-  const mockGet = vi.fn()
-  const mockAll = vi.fn().mockReturnValue([])
-  const mockPrepare = vi.fn().mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
-  return { mockRun, mockGet, mockAll, mockPrepare }
-})
 vi.mock('../../src/vault/db', () => ({
-  getDb: vi.fn(() => ({ prepare: mockPrepare })),
   randomUUID: vi.fn(() => 'test-uuid'),
 }))
 
 import { registerVaultIpcHandlers } from '../../src/ipc/vault.ipc'
 
+function createMockDb() {
+  const mockQuery = vi.fn().mockResolvedValue([])
+  const mockGet = vi.fn().mockResolvedValue(undefined)
+  const mockRun = vi.fn().mockResolvedValue(undefined)
+  const db: ExtensionDB = {
+    query: mockQuery,
+    get: mockGet,
+    run: mockRun,
+    exec: vi.fn().mockResolvedValue(undefined),
+    transaction: vi
+      .fn()
+      .mockImplementation(async (fn: (tx: ExtensionDB) => Promise<unknown>) => fn(db)),
+  }
+  return Object.assign(db, { mockQuery, mockGet, mockRun })
+}
+
+let db: ReturnType<typeof createMockDb>
+
 beforeEach(() => {
   vi.clearAllMocks()
-  mockPrepare.mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
+  db = createMockDb()
   vi.mocked(fs.mkdir).mockResolvedValue(undefined)
   vi.mocked(fs.readdir).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof fs.readdir>>)
   vi.mocked(fs.stat).mockResolvedValue({ mtime: new Date() } as unknown as Awaited<
@@ -75,7 +85,7 @@ afterEach(() => {
 
 describe('task-vault:vault:capture IPC handler', () => {
   it('registers the capture handler', () => {
-    registerVaultIpcHandlers()
+    registerVaultIpcHandlers(db)
     const registeredChannels = vi.mocked(mockHandle).mock.calls.map((c) => c[0])
     expect(registeredChannels).toContain('task-vault:vault:capture')
   })
@@ -85,7 +95,7 @@ describe('task-vault:vault:capture IPC handler', () => {
     vi.mocked(mockHandle).mockImplementation((channel, fn) => {
       if (channel === 'task-vault:vault:capture') captureHandler = fn as typeof captureHandler
     })
-    registerVaultIpcHandlers()
+    registerVaultIpcHandlers(db)
     expect(captureHandler).toBeDefined()
 
     const result = await captureHandler!({} as Electron.IpcMainInvokeEvent, { text: '' })
@@ -97,7 +107,7 @@ describe('task-vault:vault:capture IPC handler', () => {
     vi.mocked(mockHandle).mockImplementation((channel, fn) => {
       if (channel === 'task-vault:vault:capture') captureHandler = fn as typeof captureHandler
     })
-    registerVaultIpcHandlers()
+    registerVaultIpcHandlers(db)
 
     const result = await captureHandler!({} as Electron.IpcMainInvokeEvent, { text: '   ' })
     expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
@@ -108,7 +118,7 @@ describe('task-vault:vault:capture IPC handler', () => {
     vi.mocked(mockHandle).mockImplementation((channel, fn) => {
       if (channel === 'task-vault:vault:capture') captureHandler = fn as typeof captureHandler
     })
-    registerVaultIpcHandlers()
+    registerVaultIpcHandlers(db)
 
     const result = await captureHandler!({} as Electron.IpcMainInvokeEvent, { text: 'New task' })
     expect(result).toMatchObject({ taskId: 'test-uuid' })
@@ -119,7 +129,7 @@ describe('task-vault:vault:capture IPC handler', () => {
     vi.mocked(mockHandle).mockImplementation((channel, fn) => {
       if (channel === 'task-vault:vault:capture') captureHandler = fn as typeof captureHandler
     })
-    registerVaultIpcHandlers()
+    registerVaultIpcHandlers(db)
 
     // null payload should fail validation
     const result = await captureHandler!({} as Electron.IpcMainInvokeEvent, null)

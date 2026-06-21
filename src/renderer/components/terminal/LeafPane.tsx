@@ -1,6 +1,5 @@
 import React, { useRef, useLayoutEffect, useCallback } from 'react'
 import { useSessionStore } from '../../stores/session.store'
-import { useSettingsStore } from '../../stores/settings.store'
 import './LeafPane.css'
 
 interface Props {
@@ -12,7 +11,6 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const { getTerminalInstance, getFocusedSession, setFocusedSession, clearBellCount, sessions } =
     useSessionStore()
-  const { globalSettings } = useSettingsStore()
   const isFocused = getFocusedSession(projectId) === sessionId
   const session = sessions.get(sessionId)
   const tabTitle = session?.tabTitle ?? sessionId
@@ -20,7 +18,7 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
   useLayoutEffect(() => {
     const instance = getTerminalInstance(sessionId)
     if (!instance || !containerRef.current) return
-    instance.mount(containerRef.current, globalSettings?.terminal.scrollToBottomOnMount ?? false)
+    instance.mount(containerRef.current)
     return () => {
       instance.unmount()
     }
@@ -33,10 +31,10 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
       setFocusedSession(projectId, sessionId)
       clearBellCount(sessionId)
       const instance = getTerminalInstance(sessionId)
-      if (globalSettings?.terminal.scrollToBottomOnClick) instance?.terminal.scrollToBottom()
+      if (instance?.isAtBottom) instance.terminal.scrollToBottom()
       instance?.terminal.focus()
     },
-    [projectId, sessionId, setFocusedSession, clearBellCount, getTerminalInstance, globalSettings]
+    [projectId, sessionId, setFocusedSession, clearBellCount, getTerminalInstance]
   )
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {

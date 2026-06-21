@@ -62,6 +62,9 @@ export class TerminalInstance {
   private opened = false
   private sessionId: string
   private busyTimer: ReturnType<typeof setTimeout> | null = null
+  private _atBottom = true
+  private _savedViewportY = 0
+
   // The root element xterm renders into — created on first mount(), moved between containers.
   readonly element: HTMLDivElement
   // Underline overlay for hovered links — positioned absolutely inside this.element.
@@ -107,6 +110,14 @@ export class TerminalInstance {
 
     this.terminal.onData((data) => {
       window.electronAPI.terminal.input(sessionId, data)
+      if (!this._atBottom) {
+        this._atBottom = true
+        this.terminal.scrollToBottom()
+      }
+    })
+
+    this.terminal.onScroll((viewportY) => {
+      this._atBottom = viewportY >= this.terminal.buffer.active.baseY
     })
 
     this.terminal.onResize(({ cols, rows }) => {
@@ -387,14 +398,18 @@ export class TerminalInstance {
   }
 
   // Call once after the element is in a visible, sized container.
-  mount(container: HTMLElement, scrollToBottomOnMount = false): void {
+  mount(container: HTMLElement): void {
     container.appendChild(this.element)
     if (!this.opened) {
       this.terminal.open(this.element)
       this.opened = true
     }
     this.fitAddon.fit()
-    if (scrollToBottomOnMount) this.terminal.scrollToBottom()
+    if (this._atBottom) {
+      this.terminal.scrollToBottom()
+    } else {
+      this.terminal.scrollToLine(this._savedViewportY)
+    }
     this.terminal.focus()
     this.resizeObserver = new ResizeObserver(() => this.fitAddon.fit())
     this.resizeObserver.observe(container)
@@ -503,7 +518,13 @@ export class TerminalInstance {
   // Remove from DOM without destroying the xterm instance.
   // Captures a snapshot first so Overview can display it while the terminal is unmounted.
   // Only updates lastSnapshot on success — never overwrites a valid snapshot with null.
+  get isAtBottom(): boolean {
+    return this._atBottom
+  }
+
   unmount(): void {
+    this._savedViewportY = this.terminal.buffer.active.viewportY
+    this._atBottom = this.terminal.buffer.active.viewportY >= this.terminal.buffer.active.baseY
     const snapshot = this.captureToDataUrl()
     if (snapshot !== null) this.lastSnapshot = snapshot
     this.resizeObserver?.disconnect()

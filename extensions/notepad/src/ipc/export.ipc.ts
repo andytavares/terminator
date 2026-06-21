@@ -4,7 +4,8 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import matter from 'gray-matter'
-import { getDb, randomUUID, insertFts } from '../db/db'
+import { randomUUID } from '../db/db'
+import type { ExtensionDB } from '../../../../src/main/db/index'
 
 // ──────────────────────────────────────────────────────────────
 // Pure utilities
@@ -32,6 +33,7 @@ const exportSchema = z.object({
   includeFrontmatter: z.boolean().optional(),
   commentFormat: z.enum(['sidecar', 'inline', 'both', 'none']).optional(),
   overwriteById: z.boolean().optional(),
+  includeDiagrams: z.boolean().optional(),
 })
 
 interface NoteRow {
@@ -41,7 +43,15 @@ interface NoteRow {
   created_at: string
   updated_at: string
   archived_at: string | null
-  rowid: number
+  tags: string | null
+}
+
+interface DiagramRow {
+  id: string
+  title: string
+  scene_json: string
+  created_at: string
+  updated_at: string
   tags: string | null
 }
 
@@ -62,8 +72,9 @@ function buildExistingIdMap(folder: string): Map<string, string> {
 }
 
 export async function exportNotes(
+  db: ExtensionDB,
   payload: unknown
-): Promise<{ data: { exported: number } } | { error: string }> {
+): Promise<{ data: { exported: number; diagrams: number } } | { error: string }> {
   const parsed = exportSchema.safeParse(payload)
   if (!parsed.success) return { error: 'VALIDATION_ERROR' }
 
@@ -74,33 +85,33 @@ export async function exportNotes(
     tagId,
     includeFrontmatter = true,
     overwriteById = true,
+    includeDiagrams = false,
   } = parsed.data
   const resolvedFolder = folder.replace(/^~(?=$|\/)/, os.homedir())
 
-  const db = getDb()
-  let query = `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at, n.rowid,
-                      GROUP_CONCAT(t.name, ',') AS tags
-               FROM notes n
-               LEFT JOIN note_tags nt ON nt.note_id = n.id
-               LEFT JOIN tags t ON t.id = nt.tag_id`
+  // STRING_AGG is Postgres-specific (replaces SQLite GROUP_CONCAT); correct for PGlite.
+  let querySql = `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at,
+                         STRING_AGG(t.name, ',') AS tags
+                  FROM notes n
+                  LEFT JOIN note_tags nt ON nt.note_id = n.id
+                  LEFT JOIN tags t ON t.id = nt.tag_id`
 
   const params: unknown[] = []
 
   if (scope === 'note' && noteId) {
-    query += ' WHERE n.id = ?'
+    querySql += ' WHERE n.id = ?'
     params.push(noteId)
   } else if (scope === 'tag' && tagId) {
-    query += ' WHERE n.id IN (SELECT note_id FROM note_tags WHERE tag_id = ?)'
+    querySql += ' WHERE n.id IN (SELECT note_id FROM note_tags WHERE tag_id = ?)'
     params.push(tagId)
   }
 
-  query += ' GROUP BY n.id ORDER BY n.updated_at DESC'
+  querySql +=
+    ' GROUP BY n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at ORDER BY n.updated_at DESC'
 
-  const notes = db.prepare(query).all(...params) as NoteRow[]
+  const notes = await db.query<NoteRow>(querySql, params)
 
-  // Build map of existing files by id for idempotent re-export
   const existingMap = buildExistingIdMap(resolvedFolder)
-
   fs.mkdirSync(resolvedFolder, { recursive: true })
 
   for (const note of notes) {
@@ -126,7 +137,39 @@ export async function exportNotes(
     fs.writeFileSync(path.join(resolvedFolder, filename), fileContent, 'utf-8')
   }
 
-  return { data: { exported: notes.length } }
+  let diagramsExported = 0
+  if (includeDiagrams && scope === 'all') {
+    const diagrams = await db.query<DiagramRow>(
+      `SELECT id, title, scene_json, created_at, updated_at, tags FROM diagrams WHERE archived_at IS NULL ORDER BY updated_at DESC`
+    )
+    const diagramsFolder = path.join(resolvedFolder, 'diagrams')
+    fs.mkdirSync(diagramsFolder, { recursive: true })
+    for (const d of diagrams) {
+      const slug = toSlug(d.title, d.id)
+      let sceneData: Record<string, unknown> = {}
+      try {
+        sceneData = JSON.parse(d.scene_json || '{}') as Record<string, unknown>
+      } catch {
+        // use empty scene
+      }
+      const excalidrawFile = {
+        type: 'excalidraw',
+        version: 2,
+        source: 'terminator-notepad',
+        elements: (sceneData.elements as unknown[]) ?? [],
+        appState: (sceneData.appState as Record<string, unknown>) ?? {},
+        files: {},
+      }
+      fs.writeFileSync(
+        path.join(diagramsFolder, `${slug}.excalidraw`),
+        JSON.stringify(excalidrawFile, null, 2),
+        'utf-8'
+      )
+      diagramsExported++
+    }
+  }
+
+  return { data: { exported: notes.length, diagrams: diagramsExported } }
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -136,13 +179,13 @@ export async function exportNotes(
 const importSchema = z.object({ folder: z.string() })
 
 export async function importNotes(
+  db: ExtensionDB,
   payload: unknown
 ): Promise<{ data: { imported: number; updated: number; skipped: number } } | { error: string }> {
   const parsed = importSchema.safeParse(payload)
   if (!parsed.success) return { error: 'VALIDATION_ERROR' }
 
   const { folder } = parsed.data
-  const db = getDb()
   let imported = 0
   let updated = 0
   let skipped = 0
@@ -166,67 +209,58 @@ export async function importNotes(
       const createdAt = typeof fm.created === 'string' ? fm.created : now
       const updatedAt = now
 
-      const existing = db.prepare('SELECT rowid FROM notes WHERE id=?').get(id) as
-        | { rowid: number }
-        | undefined
+      const existing = await db.get<{ id: string }>('SELECT id FROM notes WHERE id=?', [id])
 
       if (existing) {
-        db.transaction(() => {
-          db.prepare('UPDATE notes SET title=?, body=?, updated_at=? WHERE id=?').run(
+        await db.transaction(async (tx) => {
+          await tx.run('UPDATE notes SET title=?, body=?, updated_at=? WHERE id=?', [
             title,
             body.trim(),
             updatedAt,
-            id
-          )
-          insertFts(db, existing.rowid, title, body.trim(), tags.join(','))
-          db.prepare('DELETE FROM note_tags WHERE note_id=?').run(id)
+            id,
+          ])
+          await tx.run('DELETE FROM note_tags WHERE note_id=?', [id])
           for (const tagName of tags) {
             const normalized = tagName.toLowerCase().trim()
             if (!normalized) continue
-            let tagRow = db.prepare('SELECT id FROM tags WHERE name=?').get(normalized) as
-              | { id: string }
-              | undefined
+            let tagRow = await tx.get<{ id: string }>('SELECT id FROM tags WHERE name=?', [
+              normalized,
+            ])
             if (!tagRow) {
               const tagId = randomUUID()
-              db.prepare('INSERT INTO tags (id, name) VALUES (?, ?)').run(tagId, normalized)
+              await tx.run('INSERT INTO tags (id, name) VALUES (?, ?)', [tagId, normalized])
               tagRow = { id: tagId }
             }
-            db.prepare('INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?, ?)').run(
-              id,
-              tagRow.id
+            await tx.run(
+              'INSERT INTO note_tags (note_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
+              [id, tagRow.id]
             )
           }
-        })()
+        })
         updated++
       } else {
-        const newId = id
-        db.transaction(() => {
-          db.prepare(
-            'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-          ).run(newId, title, body.trim(), createdAt, updatedAt)
-
+        await db.transaction(async (tx) => {
+          await tx.run(
+            'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+            [id, title, body.trim(), createdAt, updatedAt]
+          )
           for (const tagName of tags) {
             const normalized = tagName.toLowerCase().trim()
             if (!normalized) continue
-            let tagRow = db.prepare('SELECT id FROM tags WHERE name=?').get(normalized) as
-              | { id: string }
-              | undefined
+            let tagRow = await tx.get<{ id: string }>('SELECT id FROM tags WHERE name=?', [
+              normalized,
+            ])
             if (!tagRow) {
               const tagId = randomUUID()
-              db.prepare('INSERT INTO tags (id, name) VALUES (?, ?)').run(tagId, normalized)
+              await tx.run('INSERT INTO tags (id, name) VALUES (?, ?)', [tagId, normalized])
               tagRow = { id: tagId }
             }
-            db.prepare('INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?, ?)').run(
-              newId,
-              tagRow.id
+            await tx.run(
+              'INSERT INTO note_tags (note_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
+              [id, tagRow.id]
             )
           }
-
-          const noteRow = db.prepare('SELECT rowid FROM notes WHERE id=?').get(newId) as {
-            rowid: number
-          }
-          insertFts(db, noteRow.rowid, title, body.trim(), tags.join(','))
-        })()
+        })
         imported++
       }
     } catch {
@@ -241,7 +275,7 @@ export async function importNotes(
 // IPC Registration
 // ──────────────────────────────────────────────────────────────
 
-export function registerExportIpcHandlers(): () => void {
+export function registerExportIpcHandlers(db: ExtensionDB): () => void {
   ipcMain.handle('terminator.notepad:export.pickFolder', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory'],
@@ -250,9 +284,13 @@ export function registerExportIpcHandlers(): () => void {
     return { data: result.filePaths[0] }
   })
 
-  ipcMain.handle('terminator.notepad:export.run', (_evt, payload: unknown) => exportNotes(payload))
+  ipcMain.handle('terminator.notepad:export.run', (_evt, payload: unknown) =>
+    exportNotes(db, payload)
+  )
 
-  ipcMain.handle('terminator.notepad:import.run', (_evt, payload: unknown) => importNotes(payload))
+  ipcMain.handle('terminator.notepad:import.run', (_evt, payload: unknown) =>
+    importNotes(db, payload)
+  )
 
   return () => {
     ipcMain.removeHandler('terminator.notepad:export.pickFolder')

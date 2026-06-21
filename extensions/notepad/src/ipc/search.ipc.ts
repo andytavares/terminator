@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { z } from 'zod'
-import { getDb } from '../db/db'
+import type { ExtensionDB } from '../../../../src/main/db/index'
 import type { SearchResult } from '../db/types'
 
 const searchSchema = z.object({
@@ -18,7 +18,7 @@ interface SearchRow {
 }
 
 function parseTagFilters(query: string): {
-  ftsQuery: string
+  textQuery: string
   includeTags: string[]
   excludeTags: string[]
 } {
@@ -36,7 +36,7 @@ function parseTagFilters(query: string): {
     })
     .trim()
 
-  return { ftsQuery: cleaned, includeTags, excludeTags }
+  return { textQuery: cleaned, includeTags, excludeTags }
 }
 
 function makeSnippet(body: string, query: string): string {
@@ -50,7 +50,6 @@ function makeSnippet(body: string, query: string): string {
 
   if (words.length === 0) return escapeHtml(body.slice(0, 120))
 
-  // Find the earliest match in body to center the snippet window
   const bodyLower = body.toLowerCase()
   let anchorIdx = -1
   for (const word of words) {
@@ -64,7 +63,6 @@ function makeSnippet(body: string, query: string): string {
   const suffix = end < body.length ? '…' : ''
   const slice = body.slice(start, end)
 
-  // Escape HTML then re-apply mark tags for each query word
   let marked = escapeHtml(slice)
   for (const word of words) {
     marked = marked.replace(new RegExp(`(${escapeRegex(word)})`, 'gi'), '<mark>$1</mark>')
@@ -86,22 +84,19 @@ function escapeRegex(s: string): string {
 }
 
 export async function searchNotes(
+  db: ExtensionDB,
   payload: unknown
 ): Promise<{ data: SearchResult[] } | { error: string }> {
   const parsed = searchSchema.safeParse(payload)
   if (!parsed.success) return { error: 'VALIDATION_ERROR' }
 
   const { query, includeArchived = false } = parsed.data
-  const { ftsQuery, includeTags, excludeTags } = parseTagFilters(query)
+  const { textQuery, includeTags, excludeTags } = parseTagFilters(query)
 
-  const db = getDb()
-
-  // Params for JOIN ON clauses (include tags)
   const joinParams: unknown[] = []
-  // Params for WHERE clauses (archived + exclude tags)
   const whereParams: unknown[] = []
-
   const whereConditions: string[] = []
+
   const joinClauses: string[] = [
     `LEFT JOIN note_tags nt_all ON nt_all.note_id = n.id`,
     `LEFT JOIN tags t_all ON t_all.id = nt_all.tag_id`,
@@ -111,7 +106,12 @@ export async function searchNotes(
     whereConditions.push('n.archived_at IS NULL')
   }
 
-  // Include-tag: INNER JOIN filters to notes with all required tags
+  if (textQuery) {
+    // ILIKE replaces FTS5; full sequential scan on large sets — see ADR-019 for upgrade path.
+    whereConditions.push(`(n.title ILIKE ? OR n.body ILIKE ?)`)
+    whereParams.push(`%${textQuery}%`, `%${textQuery}%`)
+  }
+
   for (let i = 0; i < includeTags.length; i++) {
     const na = `nt_inc${i}`
     const ta = `t_inc${i}`
@@ -122,7 +122,6 @@ export async function searchNotes(
     joinParams.push(includeTags[i])
   }
 
-  // Exclude-tag: WHERE NOT EXISTS
   for (const tag of excludeTags) {
     whereConditions.push(
       `NOT EXISTS (SELECT 1 FROM note_tags nx JOIN tags tx ON nx.tag_id = tx.id WHERE nx.note_id = n.id AND LOWER(tx.name) = ?)`
@@ -131,85 +130,34 @@ export async function searchNotes(
   }
 
   const joinSql = joinClauses.join('\n           ')
-  const whereSql = whereConditions.length > 0 ? `AND ${whereConditions.join(' AND ')}` : ''
+  const whereSql = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
 
-  const toResults = (rows: SearchRow[]): SearchResult[] =>
-    rows.map((r) => ({
-      id: r.id,
-      title: r.title,
-      snippet: makeSnippet(r.body, ftsQuery),
-      tags: r.tags ? r.tags.split(',').filter(Boolean) : [],
-      updatedAt: r.updated_at,
-      archivedAt: r.archived_at,
-    }))
+  const rows = await db.query<SearchRow>(
+    `SELECT n.id, n.title, n.body, n.updated_at, n.archived_at,
+            STRING_AGG(t_all.name, ',') AS tags
+     FROM notes n
+     ${joinSql}
+     ${whereSql}
+     GROUP BY n.id, n.title, n.body, n.updated_at, n.archived_at
+     ORDER BY n.updated_at DESC`,
+    [...joinParams, ...whereParams]
+  )
 
-  try {
-    let rows: SearchRow[]
+  const data: SearchResult[] = rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    snippet: makeSnippet(r.body, textQuery),
+    tags: r.tags ? r.tags.split(',').filter(Boolean) : [],
+    updatedAt: r.updated_at,
+    archivedAt: r.archived_at,
+  }))
 
-    if (ftsQuery) {
-      // FTS5 subquery captures rowid + rank; outer query joins notes + tag filters
-      // Param order: joinParams (JOIN ON ?), ftsQuery (subquery MATCH ?), whereParams (NOT EXISTS ?)
-      rows = db
-        .prepare(
-          `SELECT n.id, n.title, n.body, n.updated_at, n.archived_at,
-                  GROUP_CONCAT(t_all.name, ',') AS tags
-           FROM notes n
-           ${joinSql}
-           JOIN (SELECT rowid, rank FROM notes_fts WHERE notes_fts MATCH ?) fts ON fts.rowid = n.rowid
-           WHERE 1=1 ${whereSql}
-           GROUP BY n.id
-           ORDER BY fts.rank`
-        )
-        .all(...joinParams, ftsQuery, ...whereParams) as SearchRow[]
-    } else {
-      const conds = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
-      rows = db
-        .prepare(
-          `SELECT n.id, n.title, n.body, n.updated_at, n.archived_at,
-                  GROUP_CONCAT(t_all.name, ',') AS tags
-           FROM notes n
-           ${joinSql}
-           ${conds}
-           GROUP BY n.id
-           ORDER BY n.updated_at DESC`
-        )
-        .all(...joinParams, ...whereParams) as SearchRow[]
-    }
-
-    return { data: toResults(rows) }
-  } catch {
-    // FTS5 syntax error fallback — plain-text LIKE search, same tag filters as primary query
-    try {
-      const fallbackConditions = [...whereConditions]
-      const fallbackParams: unknown[] = []
-      if (ftsQuery) {
-        fallbackConditions.push(`(n.title LIKE ? OR n.body LIKE ?)`)
-        fallbackParams.push(`%${ftsQuery}%`, `%${ftsQuery}%`)
-      }
-      const fallbackWhere =
-        fallbackConditions.length > 0 ? `WHERE ${fallbackConditions.join(' AND ')}` : ''
-      const rows = db
-        .prepare(
-          `SELECT n.id, n.title, n.body, n.updated_at, n.archived_at,
-                  GROUP_CONCAT(t_all.name, ',') AS tags
-           FROM notes n
-           ${joinSql}
-           ${fallbackWhere}
-           GROUP BY n.id
-           ORDER BY n.updated_at DESC`
-        )
-        .all(...joinParams, ...fallbackParams, ...whereParams) as SearchRow[]
-
-      return { data: toResults(rows) }
-    } catch {
-      return { data: [] }
-    }
-  }
+  return { data }
 }
 
-export function registerSearchIpcHandlers(): () => void {
+export function registerSearchIpcHandlers(db: ExtensionDB): () => void {
   ipcMain.handle('terminator.notepad:search.query', (_evt, payload: unknown) =>
-    searchNotes(payload)
+    searchNotes(db, payload)
   )
 
   return () => {

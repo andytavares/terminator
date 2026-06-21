@@ -40,7 +40,13 @@ export function WorkspaceCard({
     sidebarButtons: s.sidebarButtons,
     workspaceTabs: s.workspaceTabs,
   }))
-  const { deleteWorkspace, resolveActiveCwd } = useWorkspaceStore()
+  const {
+    deleteWorkspace,
+    resolveActiveCwd,
+    collapsedProjectIds,
+    toggleProjectCollapse,
+    ensureProjectExpanded,
+  } = useWorkspaceStore()
   const { resolveSettings } = useSettingsStore()
   const { createSession } = useTerminalSession()
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
@@ -142,9 +148,13 @@ export function WorkspaceCard({
                   project={project}
                   workspaceId={workspace.id}
                   isActive={activeProjectId === project.id}
-                  isExpanded={activeProjectId === project.id}
+                  isExpanded={!collapsedProjectIds.has(project.id)}
+                  onToggleExpand={() => toggleProjectCollapse(project.id)}
                   workspaceColor={workspace.color}
-                  onSelect={() => onSelectProject(project.id)}
+                  onSelect={() => {
+                    ensureProjectExpanded(project.id)
+                    onSelectProject(project.id)
+                  }}
                   onAddSession={() => {
                     const cwd = resolveActiveCwd()
                     const settings = resolveSettings(workspace.id, project.id)

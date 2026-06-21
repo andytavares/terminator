@@ -1,5 +1,5 @@
 import React from 'react'
-import { createRoot } from 'react-dom/client'
+import { createRoot, type Root } from 'react-dom/client'
 import { App } from './App'
 import { ExtensionWindowView } from './ExtensionWindowView'
 import '@fontsource/ibm-plex-sans/400.css'
@@ -35,10 +35,12 @@ if (!el) throw new Error('No #app element')
 
 // Load only the renderers for active extensions before mounting so no
 // extension UI appears for extensions that are not installed.
+let _root: Root | null = null
 initExtensions()
   .catch(() => {})
   .finally(() => {
-    createRoot(el).render(
+    if (!_root) _root = createRoot(el)
+    _root.render(
       <React.StrictMode>
         <Root />
       </React.StrictMode>

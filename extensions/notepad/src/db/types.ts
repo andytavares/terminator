@@ -8,6 +8,13 @@ export interface Note {
   tags: string[]
 }
 
+export interface Folder {
+  id: string
+  name: string
+  sortOrder: number
+  createdAt: string
+}
+
 export interface NoteListItem {
   id: string
   title: string
@@ -16,6 +23,8 @@ export interface NoteListItem {
   archivedAt: string | null
   tags: string[]
   bodyPreview: string
+  sortOrder: number
+  folderId: string | null
 }
 
 export interface Tag {
@@ -68,6 +77,8 @@ export interface DiagramListItem {
   createdAt: string
   archivedAt: string | null
   type: 'diagram'
+  sortOrder: number
+  folderId: string | null
 }
 
 export interface DiagramComment {

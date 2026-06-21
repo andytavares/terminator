@@ -511,41 +511,49 @@ See [ADR-018](adr/018-codemirror6-editor.md) for the editor engine decision.
 ```
 Main process (Node.js)
   └─ extensions/notepad/src/index.ts (activate/deactivate)
-       ├─ SQLite DB (better-sqlite3, WAL mode, FTS5)
-       ├─ registerNotesIpcHandlers()   — notes.create/list/get/autosave/archive/restore/hardDelete
-       ├─ registerTagsIpcHandlers()    — tags.list/rename/delete
+       ├─ PGlite (PostgreSQL) — shared app DB via src/main/db/index.ts (ExtensionDB interface)
+       ├─ registerNotesIpcHandlers()    — notes.create/list/get/autosave/archive/restore/hardDelete/reorder
+       ├─ registerTagsIpcHandlers()     — tags.list/rename/delete
+       ├─ registerFoldersIpcHandlers()  — folders.create/list/rename/delete/move
        ├─ registerCommentsIpcHandlers() — comments.create/reply/update/delete/resolve/updateAnchor/markOrphaned/list
-       ├─ registerSearchIpcHandlers()  — search.query (FTS5 + BM25 ranking)
-       └─ registerExportIpcHandlers()  — export.pickFolder/export.run/import.run
+       ├─ registerSearchIpcHandlers()   — search.query (ILIKE-based full-text search)
+       └─ registerExportIpcHandlers()   — export.pickFolder/export.run/import.run (notes + diagrams)
 
 Renderer process (jsdom + React + CM6)
   └─ extensions/notepad/src/renderer.tsx
        ├─ NotepadView (main 3-pane layout)
-       │    ├─ NoteList (sidebar: search bar, tag sidebar, note rows)
+       │    ├─ NoteList (sidebar: search bar, multi-tag dropdown, folder tree, note/diagram rows)
        │    ├─ NoteEditor (CM6 host: livePreviewPlugin + commentAnchorField)
        │    └─ CommentMargin (right pane: comment cards with anchor status)
        ├─ QuickCreateOverlay (Cmd+Shift+N floating input)
-       └─ ExportDialog (folder picker + scope selector)
+       ├─ ExportDialog (folder picker + scope selector; exports notes and diagrams)
+       └─ DiagramWindowView (pop-out window for focused diagram editing)
 ```
+
+### Database Layer
+
+Notes and diagrams are stored in the **shared PGlite (PostgreSQL-compatible) database** at `<userData>/app.pglite`. The notepad extension never manages its own database file; it receives an `ExtensionDB` instance (defined in `src/main/db/index.ts`) injected into every IPC handler at registration time. `ExtensionDB` wraps PGlite with a SQLite-compatible `?`-placeholder API via a positional converter, and exposes `exec`, `query`, `get`, `run`, and `transaction`. Nested `transaction()` calls automatically demote to PostgreSQL savepoints.
+
+**Legacy migration**: on first launch after upgrading from a better-sqlite3 version, `src/main/db/migrate.ts` reads the old `notepad.db` / `vault.db` files via `sql.js` (WASM) and inserts the rows into PGlite. Migration is idempotent (skipped if the target tables are already populated).
+
+**Search**: full-text search uses `ILIKE` (case-insensitive pattern match) rather than a dedicated FTS5 virtual table. Tag filters are applied in the same query via `EXISTS` subqueries. This simplifies the schema at the cost of FTS5 BM25 ranking — results are returned in `updated_at DESC` order. See [ADR-019](adr/019-ilike-search-over-fts5.md) for the trade-off rationale and the planned `pg_trgm` upgrade path.
 
 ### Data Flow
 
-1. **Note create/autosave**: Renderer → `notes.autosave` IPC → SQLite `notes` table + `notes_fts` FTS5 virtual table (contentless, rowid-linked). Inline `#tag` parsing on autosave reconciles `note_tags` join table.
+1. **Note create/autosave**: Renderer → `notes.autosave` IPC → PGlite `notes` table. Inline `#tag` parsing on autosave reconciles the `note_tags` join table via `reconcileTags()`.
 
-2. **Search**: Renderer → `search.query` IPC → FTS5 `MATCH` with BM25 `rank` subquery; `tag:foo` / `-tag:bar` tokens parsed before FTS5 pass; plain-text LIKE fallback on FTS5 syntax errors.
+2. **Search**: Renderer → `search.query` IPC → `ILIKE '%query%'` across `title` and `body`; `tag:foo` / `-tag:bar` tokens resolved to tag IDs before the main query.
 
-3. **Comment anchoring lifecycle**:
+3. **Folders**: Notes and diagrams each carry a nullable `folder_id` FK. `folders.create/rename/delete` manage the `folders` table; `notes.reorder` and `folders.move` update `sort_order` and `folder_id` respectively using an explicit `{ note: 'notes', diagram: 'diagrams' }` table map (never dynamic string interpolation).
+
+4. **Comment anchoring lifecycle**:
 
    - Text selection → `CommentComposer` → `comments.create` IPC (stores `startOffset`, `endOffset`, `quote`, `prefix`, `suffix`)
    - On note load → `reanchorComment()` tries offset-first, falls back to text-quote search (W3C TextQuoteSelector pattern)
    - CM6 `commentAnchorField` (`StateField<CommentAnchor[]>`) remaps positions via `tr.changes.mapPos()` on every transaction
    - Orphaned anchors (collapsed or not found) surface in the "Orphaned" section of `CommentMargin`
 
-4. **Export/Import**: `export.run` → `gray-matter` YAML frontmatter → `.md` files; re-export matches existing files by frontmatter `id` (idempotent). `import.run` upserts by `id`.
-
-### FTS5 Approach
-
-The `notes_fts` virtual table is contentless (`content=''`). Tokens are stored manually via `insertFts(db, rowid, title, body, tags)` on every create/autosave. Deletions use the FTS5 `delete` command. BM25 ranking is extracted via the hidden `rank` column in a subquery to avoid the "bm25 in the requested context" error when joining with other tables.
+5. **Export/Import**: `export.run` → `gray-matter` YAML frontmatter → `.md` files; diagrams exported as `.excalidraw.json`. Re-export matches existing files by frontmatter `id` (idempotent). `import.run` upserts by `id`. `STRING_AGG` (Postgres) aggregates tags in the export query.
 
 ### New IPC Channels (22 total)
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import type { ExtensionDB } from '../../../../src/main/extensions/api'
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -21,30 +22,51 @@ vi.mock('electron', () => ({
   ),
 }))
 
-const mockRun = vi.fn().mockReturnValue({ changes: 1 })
-const mockAll = vi.fn(() => [])
-// Auto-dismiss queries always return [] by default (no resolved tasks)
-const mockAutoDismissAll = vi.fn(() => [])
+// ── DB mock factory ──────────────────────────────────────────────────────────
 
 /**
- * SQL-aware prepare mock: routes auto-dismiss SELECT queries to a separate mock
- * so they don't interfere with the due/blocked task query expectations.
+ * Routes db.query calls by SQL content:
+ *   - auto-dismiss due: SQL contains "status IN ('done','cancelled','migrated')"
+ *   - auto-dismiss blocked: SQL contains "status != 'blocked'"
+ *   - blocked tasks: SQL contains "status='blocked'"
+ *   - due tasks: all others
  */
-const mockPrepare = vi.fn((sql: string) => {
-  if (
-    (sql as string).includes("AND status IN ('done','cancelled','migrated')") ||
-    (sql as string).includes("AND status != 'blocked'")
-  ) {
-    return { all: mockAutoDismissAll, run: mockRun }
-  }
-  return { all: mockAll, run: mockRun }
-})
-const mockDb = { prepare: mockPrepare }
+function createMockDb() {
+  const mockAll = vi.fn().mockResolvedValue([])
+  const mockBlockedAll = vi.fn().mockResolvedValue([])
+  const mockAutoDismissAll = vi.fn().mockResolvedValue([])
+  const mockRun = vi.fn().mockResolvedValue(undefined)
 
-vi.mock('../../src/vault/db.js', () => ({
-  getDb: () => mockDb,
-  randomUUID: vi.fn(() => 'sched-uuid'),
-}))
+  const db: ExtensionDB = {
+    query: vi.fn().mockImplementation(async (sql: string) => {
+      if (
+        sql.includes("status IN ('done','cancelled','migrated')") ||
+        sql.includes("status != 'blocked'")
+      ) {
+        return mockAutoDismissAll()
+      }
+      if (sql.includes("status='blocked'")) {
+        return mockBlockedAll()
+      }
+      return mockAll()
+    }),
+    get: vi.fn().mockResolvedValue(undefined),
+    run: mockRun,
+    exec: vi.fn().mockResolvedValue(undefined),
+    transaction: vi.fn(),
+  }
+
+  return {
+    db,
+    mockAll,
+    mockBlockedAll,
+    mockAutoDismissAll,
+    mockRun,
+    mockQuery: db.query as ReturnType<typeof vi.fn>,
+  }
+}
+
+type MockDb = ReturnType<typeof createMockDb>
 
 function makeApi(overrides: Record<string, unknown> = {}) {
   return {
@@ -77,11 +99,11 @@ function blockedRow(overrides: Record<string, unknown> = {}) {
   }
 }
 
+let mock: MockDb
+
 beforeEach(() => {
   vi.clearAllMocks()
-  mockAll.mockReturnValue([])
-  mockAutoDismissAll.mockReturnValue([])
-  mockRun.mockReturnValue({ changes: 1 })
+  mock = createMockDb()
   mockNotifIsSupported.mockReturnValue(false)
   vi.useFakeTimers()
 })
@@ -109,26 +131,26 @@ describe('setSchedulerTick / triggerSchedulerTick', () => {
 // ── startTaskScheduler ────────────────────────────────────────────────────────
 
 describe('startTaskScheduler — dispose', () => {
-  it('returns dispose function that clears the interval', () => {
+  it('returns dispose function that clears the interval', async () => {
     vi.spyOn(global, 'setInterval')
     const api = makeApi()
-    const { dispose } = startTaskScheduler(api)
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
     expect(setInterval).toHaveBeenCalled()
-    dispose()
-    // No assertion needed beyond not throwing
+    scheduler.dispose()
   })
 
-  it('returns a tick function', () => {
+  it('returns a tick function', async () => {
     const api = makeApi()
-    const { tick } = startTaskScheduler(api)
-    expect(typeof tick).toBe('function')
-    startTaskScheduler(api).dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    expect(typeof scheduler.tick).toBe('function')
+    scheduler.dispose()
   })
 })
 
 describe('startTaskScheduler — due tasks', () => {
-  it('fires a warning notification for a due open task past alert time', () => {
-    // Set clock so current time is past alert time (09:00)
+  it('fires a warning notification for a due open task past alert time', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({
@@ -136,18 +158,15 @@ describe('startTaskScheduler — due tasks', () => {
     })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    mockAll.mockImplementation((date: string) => {
-      // First call = due tasks query, second = blocked tasks query
-      if (typeof date === 'string' && date.startsWith('2026')) {
-        return [{ id: 't1', text: 'Finish report', due_date: '2026-05-26', metadata: '{}' }]
-      }
-      return []
-    })
+    mock.mockAll.mockResolvedValue([
+      { id: 't1', text: 'Finish report', due_date: '2026-05-26', metadata: '{}' },
+    ])
 
-    const { tick, dispose } = startTaskScheduler(api)
-    // tick is called immediately in startTaskScheduler; call again to confirm dedup
-    tick()
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    // Second tick to confirm dedup
+    await scheduler.tickAsync()
+    scheduler.dispose()
 
     expect(createNotification).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -157,8 +176,7 @@ describe('startTaskScheduler — due tasks', () => {
     )
   })
 
-  it('fires notification on startup even before configured alert time', () => {
-    // Startup bypasses the time gate so users see due tasks immediately on launch
+  it('fires notification on startup even before configured alert time', async () => {
     vi.setSystemTime(new Date('2026-05-26T07:00:00'))
 
     const api = makeApi({
@@ -166,21 +184,20 @@ describe('startTaskScheduler — due tasks', () => {
     })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    mockAll
-      .mockReturnValueOnce([
-        { id: 't1', text: 'Early task', due_date: '2026-05-26', metadata: '{}' },
-      ])
-      .mockReturnValue([])
+    mock.mockAll.mockResolvedValueOnce([
+      { id: 't1', text: 'Early task', due_date: '2026-05-26', metadata: '{}' },
+    ])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     expect(createNotification).toHaveBeenCalledWith(
       expect.objectContaining({ title: expect.stringContaining('Early task') })
     )
   })
 
-  it('does not fire notification on a non-startup tick when current time is before alert time', () => {
+  it('does not fire notification on a non-startup tick when current time is before alert time', async () => {
     vi.setSystemTime(new Date('2026-05-26T08:00:00'))
 
     const api = makeApi({
@@ -189,20 +206,21 @@ describe('startTaskScheduler — due tasks', () => {
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
     // Startup tick sees no tasks; subsequent tick sees a new task before alert time
-    mockAll
-      .mockReturnValueOnce([]) // startup: due tasks empty
-      .mockReturnValueOnce([]) // startup: blocked tasks empty
-      .mockReturnValueOnce([{ id: 't2', text: 'New task', due_date: '2026-05-26', metadata: '{}' }]) // 2nd tick: due
-      .mockReturnValue([])
+    mock.mockAll
+      .mockResolvedValueOnce([]) // startup: due tasks empty
+      .mockResolvedValueOnce([
+        { id: 't2', text: 'New task', due_date: '2026-05-26', metadata: '{}' },
+      ]) // 2nd tick: due
 
-    const { tick, dispose } = startTaskScheduler(api)
-    tick() // non-startup tick — should not fire (before alert time)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    await scheduler.tickAsync() // non-startup tick — should not fire (before alert time)
+    scheduler.dispose()
 
     expect(createNotification).not.toHaveBeenCalled()
   })
 
-  it('fires error notification for overdue tasks (past due date)', () => {
+  it('fires error notification for overdue tasks (past due date)', async () => {
     vi.setSystemTime(new Date('2026-05-26T07:00:00'))
 
     const api = makeApi({
@@ -210,15 +228,13 @@ describe('startTaskScheduler — due tasks', () => {
     })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    // due_date is yesterday — overdue regardless of time
-    mockAll
-      .mockReturnValueOnce([
-        { id: 'od1', text: 'Overdue task', due_date: '2026-05-25', metadata: '{}' },
-      ])
-      .mockReturnValue([])
+    mock.mockAll.mockResolvedValueOnce([
+      { id: 'od1', text: 'Overdue task', due_date: '2026-05-25', metadata: '{}' },
+    ])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     expect(createNotification).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -228,17 +244,18 @@ describe('startTaskScheduler — due tasks', () => {
     )
   })
 
-  it('deduplicates due task notifications within the same day (in-memory)', () => {
+  it('deduplicates due task notifications within the same day (in-memory)', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn((_k: string) => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    mockAll.mockImplementation(() => [{ id: 'dup', text: 'Dup task', metadata: '{}' }])
+    mock.mockAll.mockResolvedValue([{ id: 'dup', text: 'Dup task', metadata: '{}' }])
 
-    const { tick, dispose } = startTaskScheduler(api)
-    tick() // second call
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    await scheduler.tickAsync() // second tick
+    scheduler.dispose()
 
     // Should only fire once despite two ticks (in-memory dedup set)
     const warningCalls = createNotification.mock.calls.filter(
@@ -247,13 +264,12 @@ describe('startTaskScheduler — due tasks', () => {
     expect(warningCalls).toHaveLength(1)
   })
 
-  it('skips notification for tasks already notified in the same session (in-session dedup)', () => {
+  it('skips notification for tasks already notified in the same session (in-session dedup)', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn((_k: string) => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    // Startup tick notifies; second tick should skip (in-session dedup set)
     const row = {
       id: 'already',
       text: 'Already notified',
@@ -261,15 +277,15 @@ describe('startTaskScheduler — due tasks', () => {
       recurrence_notify_at: null,
       metadata: '{}',
     }
-    mockAll
-      .mockReturnValueOnce([row]) // startup tick — notifies and adds to dedup set
-      .mockReturnValueOnce([]) // startup blocked
-      .mockReturnValueOnce([row]) // second tick — should skip
-      .mockReturnValue([])
+    // Startup tick → notifies, second tick → skip (in-session dedup)
+    mock.mockAll
+      .mockResolvedValueOnce([row]) // startup
+      .mockResolvedValueOnce([row]) // second tick
 
-    const { tick, dispose } = startTaskScheduler(api)
-    tick() // second tick
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    await scheduler.tickAsync() // second tick
+    scheduler.dispose()
 
     const warningCalls = createNotification.mock.calls.filter(
       (c) => (c[0] as { type: string }).type === 'warning'
@@ -277,28 +293,27 @@ describe('startTaskScheduler — due tasks', () => {
     expect(warningCalls).toHaveLength(1)
   })
 
-  it('does not write notification_notified_date to task metadata (dedup is in-session only)', () => {
+  it('does not write notification_notified_date to task metadata (dedup is in-session only)', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn((_k: string) => '09:00') } })
 
-    mockAll
-      .mockReturnValueOnce([
-        {
-          id: 'persist',
-          text: 'Persist me',
-          due_date: '2026-05-26',
-          recurrence_notify_at: null,
-          metadata: '{}',
-        },
-      ])
-      .mockReturnValue([])
+    mock.mockAll.mockResolvedValueOnce([
+      {
+        id: 'persist',
+        text: 'Persist me',
+        due_date: '2026-05-26',
+        recurrence_notify_at: null,
+        metadata: '{}',
+      },
+    ])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     // The scheduler must NOT write notification_notified_date to metadata
-    const updateCalls = mockRun.mock.calls.filter((args) => {
+    const updateCalls = mock.mockRun.mock.calls.filter((args) => {
       const metaArg = args[0] as string
       return typeof metaArg === 'string' && metaArg.includes('notification_notified_date')
     })
@@ -307,70 +322,63 @@ describe('startTaskScheduler — due tasks', () => {
 })
 
 describe('startTaskScheduler — auto-dismiss', () => {
-  it('dismisses due notification when task transitions to done', () => {
+  it('dismisses due notification when task transitions to done', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn((_k: string) => '09:00') } })
     const disposeMock = vi.fn()
     vi.spyOn(api.notifications, 'createNotification').mockReturnValue({ dispose: disposeMock })
 
-    // Startup tick: due task fires notification → dueTaskNotifs has 'done-task'
-    // Second tick: auto-dismiss due runs (map non-empty) and finds task resolved
-    mockAll
-      .mockReturnValueOnce([
-        { id: 'done-task', text: 'Will be done', due_date: '2026-05-26', metadata: '{}' },
-      ])
-      .mockReturnValue([]) // blocked tasks (startup) + all subsequent
+    // Startup: due task fires notification → dueTaskNotifs has 'done-task'
+    mock.mockAll.mockResolvedValueOnce([
+      { id: 'done-task', text: 'Will be done', due_date: '2026-05-26', metadata: '{}' },
+    ])
 
-    // Startup auto-dismiss is always skipped (maps empty at that point).
-    // First mockAutoDismissAll call = second tick's auto-dismiss due query.
-    mockAutoDismissAll.mockReturnValueOnce([{ id: 'done-task' }])
+    // Second tick auto-dismiss due query finds task resolved
+    mock.mockAutoDismissAll.mockResolvedValueOnce([{ id: 'done-task' }])
 
-    const { tick, dispose } = startTaskScheduler(api)
-    tick() // second tick — auto-dismiss fires
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    await scheduler.tickAsync() // second tick — auto-dismiss fires
+    scheduler.dispose()
 
     expect(disposeMock).toHaveBeenCalledTimes(1)
   })
 
-  it('dismisses blocked notification when task becomes unblocked', () => {
+  it('dismisses blocked notification when task becomes unblocked', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn((_k: string) => '09:00') } })
     const disposeMock = vi.fn()
     vi.spyOn(api.notifications, 'createNotification').mockReturnValue({ dispose: disposeMock })
 
-    // Startup: no due tasks, one blocked task → notification created → blockedTaskNotifs has 'b1'
-    // Second tick: auto-dismiss blocked runs and finds task is now unblocked
-    mockAll
-      .mockReturnValueOnce([]) // startup due tasks
-      .mockReturnValueOnce([blockedRow()]) // startup blocked tasks → notification fires
-      .mockReturnValue([]) // all subsequent queries
+    // Startup: no due tasks, one blocked task → notification created
+    mock.mockBlockedAll.mockResolvedValueOnce([blockedRow()])
 
-    // Startup auto-dismiss is skipped (maps empty). Second tick runs auto-dismiss blocked.
-    // dueTaskNotifs is empty on second tick so auto-dismiss due is skipped too.
-    // First mockAutoDismissAll call = second tick's auto-dismiss blocked query.
-    mockAutoDismissAll.mockReturnValueOnce([{ id: 'b1' }])
+    // Second tick auto-dismiss blocked finds task unblocked
+    mock.mockAutoDismissAll.mockResolvedValueOnce([{ id: 'b1' }])
 
-    const { tick, dispose } = startTaskScheduler(api)
-    tick()
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    await scheduler.tickAsync() // second tick — auto-dismiss fires
+    scheduler.dispose()
 
     expect(disposeMock).toHaveBeenCalledTimes(1)
   })
 })
 
 describe('startTaskScheduler — blocked tasks', () => {
-  it('fires an info notification when blocked interval has elapsed', () => {
+  it('fires an info notification when blocked interval has elapsed', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    mockAll.mockReturnValueOnce([]).mockReturnValue([blockedRow()])
+    mock.mockBlockedAll.mockResolvedValue([blockedRow()])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     expect(createNotification).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -380,7 +388,7 @@ describe('startTaskScheduler — blocked tasks', () => {
     )
   })
 
-  it('skips blocked task when interval has not yet elapsed', () => {
+  it('skips blocked task when interval has not yet elapsed', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
@@ -391,10 +399,11 @@ describe('startTaskScheduler — blocked tasks', () => {
       updated_at: new Date(Date.now() - 30 * 60_000).toISOString(),
       metadata: JSON.stringify({ blocked_check_interval: '1-hour' }),
     })
-    mockAll.mockReturnValueOnce([]).mockReturnValue([row])
+    mock.mockBlockedAll.mockResolvedValue([row])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     const infoCalls = createNotification.mock.calls.filter(
       (c) => (c[0] as { type: string }).type === 'info'
@@ -402,86 +411,84 @@ describe('startTaskScheduler — blocked tasks', () => {
     expect(infoCalls).toHaveLength(0)
   })
 
-  it('handles invalid metadata JSON gracefully', () => {
+  it('handles invalid metadata JSON gracefully', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    mockAll.mockReturnValueOnce([]).mockReturnValue([blockedRow({ metadata: 'NOT_JSON' })])
+    mock.mockBlockedAll.mockResolvedValue([blockedRow({ metadata: 'NOT_JSON' })])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     expect(createNotification).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }))
   })
 
-  it('skips blocked task with no check interval in metadata', () => {
+  it('skips blocked task with no check interval in metadata', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    mockAll
-      .mockReturnValueOnce([])
-      .mockReturnValue([blockedRow({ metadata: JSON.stringify({ blocked_reason: 'waiting' }) })])
+    mock.mockBlockedAll.mockResolvedValue([
+      blockedRow({ metadata: JSON.stringify({ blocked_reason: 'waiting' }) }),
+    ])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     expect(createNotification).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }))
   })
 
-  it('handles custom ISO datetime interval that has passed', () => {
+  it('handles custom ISO datetime interval that has passed', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    // Custom ISO datetime: 1 hour ago
     const targetTime = new Date(Date.now() - 60_000).toISOString()
-    mockAll.mockReturnValueOnce([]).mockReturnValue([
+    mock.mockBlockedAll.mockResolvedValue([
       blockedRow({
         updated_at: new Date(Date.now() - 2 * 3_600_000).toISOString(),
         metadata: JSON.stringify({ blocked_check_interval: targetTime }),
       }),
     ])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     expect(createNotification).toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }))
   })
 
-  it('skips notification when db is not yet initialized (throws)', () => {
+  it('skips notification when db.query throws', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
 
-    // Override getDb mock to throw for this test
-    mockPrepare.mockImplementationOnce(() => {
-      throw new Error('DB not ready')
-    })
+    mock.mockQuery.mockRejectedValueOnce(new Error('DB not ready'))
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
-    // Should not throw — error is caught in tick
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise // should not throw
+    scheduler.dispose()
   })
 })
 
 describe('broadcast via action handler', () => {
-  it('action handler sends IPC to all windows', () => {
+  it('action handler sends IPC to all windows', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    mockAll
-      .mockReturnValueOnce([{ id: 't-action', text: 'Action task', metadata: '{}' }])
-      .mockReturnValue([])
+    mock.mockAll.mockResolvedValueOnce([{ id: 't-action', text: 'Action task', metadata: '{}' }])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     const call = createNotification.mock.calls[0]?.[0] as {
       actions: Array<{ handler: () => void }>
@@ -512,64 +519,63 @@ describe('startTaskScheduler — per-task recurrence_notify_at', () => {
     }
   }
 
-  it('fires notification when current time >= recurrence_notify_at column value', () => {
+  it('fires notification when current time >= recurrence_notify_at column value', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
     const row = dueTaskRow({ recurrence_notify_at: '10:00' })
-    mockAll.mockReturnValueOnce([row]).mockReturnValue([])
+    mock.mockAll.mockResolvedValueOnce([row])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     expect(createNotification).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'warning', title: expect.stringContaining('Recurring task') })
     )
   })
 
-  it('suppresses notification on non-startup tick when current time < recurrence_notify_at', () => {
+  it('suppresses notification on non-startup tick when current time < recurrence_notify_at', async () => {
     vi.setSystemTime(new Date('2026-05-26T08:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn(() => '07:00') } }) // global alert is past
+
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    // Task has recurrence_notify_at = 09:00 — current time 08:00 should suppress on regular tick
     const row = dueTaskRow({ recurrence_notify_at: '09:00' })
-    // Startup tick sees empty; second tick sees the row
-    mockAll
-      .mockReturnValueOnce([]) // startup due tasks
-      .mockReturnValueOnce([]) // startup blocked tasks
-      .mockReturnValueOnce([row]) // second tick due tasks
-      .mockReturnValue([])
+    // Startup sees empty; second tick sees the row
+    mock.mockAll
+      .mockResolvedValueOnce([]) // startup
+      .mockResolvedValueOnce([row]) // second tick
 
-    const { tick, dispose } = startTaskScheduler(api)
-    tick() // non-startup tick
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    await scheduler.tickAsync() // non-startup tick
+    scheduler.dispose()
 
     expect(createNotification).not.toHaveBeenCalled()
   })
 
-  it('falls back to global alert time when task has no recurrence_time', () => {
+  it('falls back to global alert time when task has no recurrence_time', async () => {
     vi.setSystemTime(new Date('2026-05-26T09:30:00'))
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
     const row = dueTaskRow({ metadata: '{}' })
-    mockAll.mockReturnValueOnce([row]).mockReturnValue([])
+    mock.mockAll.mockResolvedValueOnce([row])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     expect(createNotification).toHaveBeenCalled()
   })
 })
 
 // ── scheduler does NOT spawn recurrences ───────────────────────────────────────
-// Spawn is handled by ensureNextOccurrence called from complete-task and set-recurrence.
-// The scheduler is notification-only.
 
 describe('startTaskScheduler — scheduler never inserts task rows', () => {
   function recurringRow(overrides: Record<string, unknown> = {}) {
@@ -587,7 +593,7 @@ describe('startTaskScheduler — scheduler never inserts task rows', () => {
     }
   }
 
-  it('fires a notification for a recurring task but does NOT insert a new task row', () => {
+  it('fires a notification for a recurring task but does NOT insert a new task row', async () => {
     vi.setSystemTime(new Date('2026-05-26T09:30:00'))
     const createNotification = vi.fn(() => ({ dispose: vi.fn() }))
     const api = makeApi({
@@ -595,23 +601,24 @@ describe('startTaskScheduler — scheduler never inserts task rows', () => {
       notifications: { createNotification },
     })
 
-    mockAll.mockReturnValueOnce([recurringRow()]).mockReturnValue([])
+    mock.mockAll.mockResolvedValueOnce([recurringRow()])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     // Notification fired
     expect(createNotification).toHaveBeenCalled()
 
-    // No INSERT INTO tasks from the scheduler
-    const insertSql = mockPrepare.mock.calls.find(([sql]: [string]) =>
-      (sql as string).startsWith('INSERT INTO tasks')
-    )?.[0] as string | undefined
-    expect(insertSql).toBeUndefined()
+    // No INSERT queries from the scheduler
+    const insertCalls = mock.mockQuery.mock.calls.filter(
+      ([sql]: [string]) => typeof sql === 'string' && sql.toUpperCase().startsWith('INSERT')
+    )
+    expect(insertCalls).toHaveLength(0)
   })
 
-  it('uses recurrence_notify_at column (not meta.recurrence_time) for alert time', () => {
-    vi.setSystemTime(new Date('2026-05-26T08:30:00')) // before 10:00
+  it('uses recurrence_notify_at column (not meta.recurrence_time) for alert time', async () => {
+    vi.setSystemTime(new Date('2026-05-26T08:30:00'))
     const createNotification = vi.fn(() => ({ dispose: vi.fn() }))
     const api = makeApi({
       settings: { get: vi.fn(() => '08:00') }, // global alert is past
@@ -620,15 +627,14 @@ describe('startTaskScheduler — scheduler never inserts task rows', () => {
 
     // recurrence_notify_at = 10:00 — at 08:30 on a non-startup tick, should NOT fire
     const row = recurringRow({ recurrence_notify_at: '10:00' })
-    mockAll
-      .mockReturnValueOnce([]) // startup due tasks
-      .mockReturnValueOnce([]) // startup blocked tasks
-      .mockReturnValueOnce([row]) // second tick due tasks
-      .mockReturnValue([])
+    mock.mockAll
+      .mockResolvedValueOnce([]) // startup
+      .mockResolvedValueOnce([row]) // second tick
 
-    const { tick, dispose } = startTaskScheduler(api)
-    tick() // non-startup tick
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    await scheduler.tickAsync() // non-startup tick
+    scheduler.dispose()
 
     expect(createNotification).not.toHaveBeenCalled()
   })
@@ -637,73 +643,63 @@ describe('startTaskScheduler — scheduler never inserts task rows', () => {
 // ── OS system notifications (Notification.isSupported = true) ─────────────────
 
 describe('startTaskScheduler — OS system notifications', () => {
-  it('shows an OS notification for a due task when Notification.isSupported returns true', () => {
+  it('shows an OS notification for a due task when Notification.isSupported returns true', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
     mockNotifIsSupported.mockReturnValue(true)
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
-    mockAll.mockImplementation((date: string) => {
-      if (typeof date === 'string' && date.startsWith('2026')) {
-        return [
-          {
-            id: 't-os',
-            text: 'OS Due Task',
-            due_date: '2026-05-26',
-            metadata: '{}',
-            recurrence_notify_at: null,
-          },
-        ]
-      }
-      return []
-    })
+    mock.mockAll.mockResolvedValue([
+      {
+        id: 't-os',
+        text: 'OS Due Task',
+        due_date: '2026-05-26',
+        metadata: '{}',
+        recurrence_notify_at: null,
+      },
+    ])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     expect(mockOsNotif.show).toHaveBeenCalled()
   })
 
-  it('OS notification click handler broadcasts navigate-task with source_ref (not due_date)', () => {
+  it('OS notification click handler broadcasts navigate-task with source_ref (not due_date)', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
     mockNotifIsSupported.mockReturnValue(true)
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
-    mockAll.mockImplementation((date: string) => {
-      if (typeof date === 'string' && date.startsWith('2026')) {
-        return [
-          {
-            id: 't-click',
-            text: 'Clickable',
-            due_date: '2026-05-26',
-            source_ref: '2026-05-20', // task lives on an older log, not the due date
-            metadata: '{}',
-            recurrence_notify_at: null,
-          },
-        ]
-      }
-      return []
-    })
+    mock.mockAll.mockResolvedValue([
+      {
+        id: 't-click',
+        text: 'Clickable',
+        due_date: '2026-05-26',
+        source_ref: '2026-05-20',
+        metadata: '{}',
+        recurrence_notify_at: null,
+      },
+    ])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     const clickArgs = mockOsNotif.on.mock.calls.find(([event]: [string]) => event === 'click')
     expect(clickArgs).toBeTruthy()
     clickArgs![1]()
-    // Must navigate to source_ref ('2026-05-20'), not due_date ('2026-05-26')
     expect(mockSend).toHaveBeenCalledWith(
       'task-vault:navigate-task',
       expect.objectContaining({ taskId: 't-click', date: '2026-05-20' })
     )
   })
 
-  it('shows an OS notification for a blocked task when Notification.isSupported returns true', () => {
+  it('shows an OS notification for a blocked task when Notification.isSupported returns true', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
     mockNotifIsSupported.mockReturnValue(true)
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
-    // First mockAll call = due tasks (empty), second = blocked tasks
-    mockAll.mockReturnValueOnce([]).mockReturnValue([
+    mock.mockBlockedAll.mockResolvedValue([
       blockedRow({
         id: 'b-os',
         text: 'OS Blocked Task',
@@ -714,18 +710,19 @@ describe('startTaskScheduler — OS system notifications', () => {
       }),
     ])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     expect(mockOsNotif.show).toHaveBeenCalled()
   })
 
-  it('OS notification click handler for blocked task broadcasts { taskId, date }', () => {
+  it('OS notification click handler for blocked task broadcasts { taskId, date }', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
     mockNotifIsSupported.mockReturnValue(true)
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
-    mockAll.mockReturnValueOnce([]).mockReturnValue([
+    mock.mockBlockedAll.mockResolvedValue([
       blockedRow({
         id: 'b-click',
         source_ref: '2026-05-20',
@@ -733,8 +730,9 @@ describe('startTaskScheduler — OS system notifications', () => {
       }),
     ])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     const clickArgs = mockOsNotif.on.mock.calls.find(([event]: [string]) => event === 'click')
     expect(clickArgs).toBeTruthy()
@@ -745,14 +743,14 @@ describe('startTaskScheduler — OS system notifications', () => {
     )
   })
 
-  it('in-app action handler for blocked task broadcasts { taskId, date }', () => {
+  it('in-app action handler for blocked task broadcasts { taskId, date }', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
     mockNotifIsSupported.mockReturnValue(false)
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
 
-    mockAll.mockReturnValueOnce([]).mockReturnValue([
+    mock.mockBlockedAll.mockResolvedValue([
       blockedRow({
         id: 'b-inapp',
         source_ref: '2026-05-21',
@@ -760,8 +758,9 @@ describe('startTaskScheduler — OS system notifications', () => {
       }),
     ])
 
-    const { dispose } = startTaskScheduler(api)
-    dispose()
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
 
     const call = createNotification.mock.calls[0]?.[0] as {
       actions: Array<{ handler: () => void }>
@@ -778,7 +777,7 @@ describe('startTaskScheduler — OS system notifications', () => {
 // ── midnight dedup reset ──────────────────────────────────────────────────────
 
 describe('startTaskScheduler — midnight dedup reset', () => {
-  it('clears due-task dedup set at midnight and re-fires on next day tick', () => {
+  it('clears due-task dedup set at midnight and re-fires on next day tick', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')
@@ -790,13 +789,14 @@ describe('startTaskScheduler — midnight dedup reset', () => {
       metadata: '{}',
       recurrence_notify_at: null,
     }
-    mockAll.mockReturnValue([dueRow])
+    mock.mockAll.mockResolvedValue([dueRow])
 
-    const { tick, dispose } = startTaskScheduler(api)
-    // Startup fires. Advance past midnight → dedup set clears → fires again.
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    // Advance past midnight → dedup set clears → fires again
     vi.setSystemTime(new Date('2026-05-27T10:00:00'))
-    tick()
-    dispose()
+    await scheduler.tickAsync()
+    scheduler.dispose()
 
     expect(createNotification.mock.calls.length).toBeGreaterThanOrEqual(2)
   })

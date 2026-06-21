@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import Database from 'better-sqlite3'
+import type { ExtensionDB } from '../../../../src/main/extensions/api'
 import { localDate, computeNextDueDate, parseRecurrenceRule } from './recurrence'
 
 type TaskRow = {
@@ -16,62 +16,45 @@ type TaskRow = {
   recurrence_template_id: string | null
   recurrence_notify_at: string | null
   metadata: string
-  // Promoted columns (may be null on older rows before migration)
   recurrence_end_type: string | null
   recurrence_end_date: string | null
   recurrence_end_count: number | null
   recurrence_completed_count: number | null
 }
 
-/**
- * Enforce the invariant: for any recurring task, exactly one status='open' future
- * instance exists in the database. If one already exists, does nothing (idempotent).
- * If none exists and end conditions allow, inserts the next occurrence atomically.
- *
- * Returns the new task ID if an occurrence was created, null otherwise.
- */
-export function ensureNextOccurrence(db: Database.Database, taskId: string): string | null {
-  const task = db
-    .prepare(
-      `SELECT id, text, status, project_id, context, area_id, due_date, source, source_ref,
-              recurrence_rule, recurrence_template_id, recurrence_notify_at, metadata,
-              recurrence_end_type, recurrence_end_date, recurrence_end_count,
-              recurrence_completed_count
-       FROM tasks WHERE id=?`
-    )
-    .get(taskId) as TaskRow | undefined
+export async function ensureNextOccurrence(
+  db: ExtensionDB,
+  taskId: string
+): Promise<string | null> {
+  const task = await db.get<TaskRow>(
+    `SELECT id, text, status, project_id, context, area_id, due_date, source, source_ref,
+            recurrence_rule, recurrence_template_id, recurrence_notify_at, metadata,
+            recurrence_end_type, recurrence_end_date, recurrence_end_count,
+            recurrence_completed_count
+     FROM tasks WHERE id=?`,
+    [taskId]
+  )
 
   if (!task || !task.recurrence_rule || !task.due_date) return null
 
-  // Resolve the canonical template ID: if this task is already an instance, use its
-  // template; otherwise this task IS the template.
   const templateId = task.recurrence_template_id ?? task.id
-
   const today = localDate()
 
-  // Check if a future open instance already exists
-  const existing = db
-    .prepare(
-      `SELECT id FROM tasks
-       WHERE recurrence_template_id=? AND status='open' AND due_date >= ?`
-    )
-    .get(templateId, today) as { id: string } | undefined
+  const existing = await db.get<{ id: string }>(
+    `SELECT id FROM tasks WHERE recurrence_template_id=? AND status='open' AND due_date >= ?`,
+    [templateId, today]
+  )
 
-  if (existing) return null // invariant already satisfied
+  if (existing) return null
 
-  // Parse the rule (throws InvalidRecurrenceRuleError on unknown intervals)
   const rule = parseRecurrenceRule(task.recurrence_rule)
-
-  // Compute next due date from the most recent instance's due date (strict mode)
   const nextDue = computeNextDueDate(task.due_date, rule)
 
-  // Read end conditions from promoted columns (fall back to metadata for legacy rows)
   let endType = task.recurrence_end_type ?? 'none'
   let endDateCol = task.recurrence_end_date ?? null
   let endCountCol = task.recurrence_end_count ?? null
   let spawnCount = task.recurrence_completed_count ?? 0
 
-  // Fall back to metadata if columns are empty (pre-migration rows)
   if (endType === 'none' && task.metadata && task.metadata !== '{}') {
     try {
       const meta = JSON.parse(task.metadata) as Record<string, unknown>
@@ -90,99 +73,87 @@ export function ensureNextOccurrence(db: Database.Database, taskId: string): str
   if (endType === 'on_date') {
     if (endDateCol && nextDue > endDateCol) return null
   } else if (endType === 'after_count') {
-    // Replicate existing boundary: spawnCount + 1 >= endCount means exhausted
     if (endCountCol != null && spawnCount + 1 >= endCountCol) return null
   }
 
   const newId = randomUUID()
   const nowIso = new Date().toISOString()
 
-  const insert = db.transaction(() => {
-    db.prepare(
+  await db.transaction(async (tx) => {
+    await tx.run(
       `INSERT INTO tasks
          (id, text, status, project_id, context, area_id, due_date,
           source, source_ref, recurrence_rule, recurrence_template_id,
           recurrence_notify_at, metadata, terminator_links, created_at, updated_at,
           recurrence_end_type, recurrence_end_date, recurrence_end_count,
           recurrence_completed_count)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
-    ).run(
-      newId,
-      task.text,
-      'open',
-      task.project_id ?? null,
-      task.context ?? null,
-      task.area_id ?? null,
-      nextDue,
-      task.source,
-      // For daily-log tasks, source_ref is the date string that must match the viewed date.
-      // Copy nextDue so the new occurrence appears in the correct day's log.
-      task.source === 'daily' ? nextDue : task.source_ref,
-      task.recurrence_rule,
-      templateId,
-      task.recurrence_notify_at ?? null,
-      '{}',
-      '[]',
-      nowIso,
-      nowIso,
-      endType !== 'none' ? endType : null,
-      endDateCol,
-      endCountCol,
-      spawnCount + 1
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        newId,
+        task.text,
+        'open',
+        task.project_id ?? null,
+        task.context ?? null,
+        task.area_id ?? null,
+        nextDue,
+        task.source,
+        task.source === 'daily' ? nextDue : task.source_ref,
+        task.recurrence_rule,
+        templateId,
+        task.recurrence_notify_at ?? null,
+        '{}',
+        '[]',
+        nowIso,
+        nowIso,
+        endType !== 'none' ? endType : null,
+        endDateCol,
+        endCountCol,
+        spawnCount + 1,
+      ]
     )
   })
 
-  insert()
   return newId
 }
 
-/**
- * On startup, ensure every recurring template task that has no future open instance
- * gets one. Handles the case where the app was closed for one or more days.
- */
-export function backfillRecurringTasks(db: Database.Database): void {
+export async function backfillRecurringTasks(db: ExtensionDB): Promise<void> {
   const today = localDate()
 
-  // Find template tasks (those with a recurrence_rule and no recurrence_template_id)
-  // whose most recent instance is in the past and has no future open instance.
   type TemplateRow = { id: string }
-  const templates = db
-    .prepare(
-      `SELECT t.id FROM tasks t
-       WHERE t.recurrence_rule IS NOT NULL
-         AND t.recurrence_template_id IS NULL
-         AND NOT EXISTS (
-           SELECT 1 FROM tasks i
-           WHERE i.recurrence_template_id = t.id
-             AND i.status = 'open'
-             AND i.due_date >= ?
-         )`
-    )
-    .all(today) as TemplateRow[]
+  const templates = await db.query<TemplateRow>(
+    `SELECT t.id FROM tasks t
+     WHERE t.recurrence_rule IS NOT NULL
+       AND t.recurrence_template_id IS NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM tasks i
+         WHERE i.recurrence_template_id = t.id
+           AND i.status = 'open'
+           AND i.due_date >= ?
+       )`,
+    [today]
+  )
 
   for (const { id } of templates) {
     try {
-      ensureNextOccurrence(db, id)
+      await ensureNextOccurrence(db, id)
     } catch {
       // Skip tasks with invalid recurrence rules rather than crashing startup
     }
   }
 
-  // Also handle self-contained recurring tasks (no instances yet, due in the past)
-  const selfContained = db
-    .prepare(
-      `SELECT id FROM tasks
-       WHERE recurrence_rule IS NOT NULL
-         AND recurrence_template_id IS NULL
-         AND due_date IS NOT NULL
-         AND due_date < ?
-         AND status = 'open'`
-    )
-    .all(today) as TemplateRow[]
+  const selfContained = await db.query<TemplateRow>(
+    `SELECT id FROM tasks
+     WHERE recurrence_rule IS NOT NULL
+       AND recurrence_template_id IS NULL
+       AND due_date IS NOT NULL
+       AND due_date < ?
+       AND status = 'open'`,
+    [today]
+  )
 
   for (const { id } of selfContained) {
     try {
-      ensureNextOccurrence(db, id)
+      await ensureNextOccurrence(db, id)
     } catch {
       // Skip invalid rules
     }

@@ -126,6 +126,7 @@ export function OverviewScreen(): JSX.Element {
       setActiveWorkspace(tile.project.workspaceId)
     }
     setActiveProject(tile.project.id)
+    useSessionStore.getState().setActiveSessionForProject(tile.project.id, tile.session.id)
   }
 
   return (

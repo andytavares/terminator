@@ -45,6 +45,8 @@ vi.mock('xterm', () => {
     onData: vi.fn(),
     onResize: vi.fn(),
     onBell: vi.fn(),
+    onScroll: vi.fn(),
+    scrollToLine: vi.fn(),
     open: vi.fn(),
     focus: vi.fn(),
     write: vi.fn(),

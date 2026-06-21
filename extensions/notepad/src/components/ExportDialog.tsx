@@ -24,17 +24,24 @@ interface ExportDialogProps {
 }
 
 export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.Element {
-  const { notes } = useNotesStore()
+  const { notes, diagrams } = useNotesStore()
   const previewNote = noteId ? notes.find((n) => n.id === noteId) : notes[0]
   const [folder, setFolder] = useState('~/Documents/Terminator Notes')
   const [scope, setScope] = useState<ExportScope>('all')
   const [includeFrontmatter, setIncludeFrontmatter] = useState(true)
   const [commentFormat, setCommentFormat] = useState<CommentFormat>('sidecar')
   const [overwriteById, setOverwriteById] = useState(true)
+  const [includeDiagrams, setIncludeDiagrams] = useState(true)
   const [running, setRunning] = useState(false)
-  const [exportResult, setExportResult] = useState<{ count: number; time: string } | null>(null)
+  const [exportResult, setExportResult] = useState<{
+    notes: number
+    diagrams: number
+    time: string
+  } | null>(null)
 
-  const scopeCount = scope === 'all' ? notes.length : 1
+  const activeDiagrams = diagrams.filter((d) => !d.archivedAt)
+  const scopeCount = scope === 'all' ? notes.filter((n) => !n.archivedAt).length : 1
+  const diagramCount = scope === 'all' && includeDiagrams ? activeDiagrams.length : 0
 
   const pickFolder = useCallback(async () => {
     const result = await window.electronAPI.extensionBridge.invoke(
@@ -59,16 +66,26 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
           includeFrontmatter,
           commentFormat,
           overwriteById,
+          includeDiagrams: scope === 'all' ? includeDiagrams : false,
         }
       )
-      const data = (result as { data?: { exported: number } }).data
+      const data = (result as { data?: { exported: number; diagrams: number } }).data
       const now = new Date()
       const time = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`
-      setExportResult({ count: data?.exported ?? 0, time })
+      setExportResult({ notes: data?.exported ?? 0, diagrams: data?.diagrams ?? 0, time })
     } finally {
       setRunning(false)
     }
-  }, [folder, scope, noteId, running, includeFrontmatter, commentFormat, overwriteById])
+  }, [
+    folder,
+    scope,
+    noteId,
+    running,
+    includeFrontmatter,
+    commentFormat,
+    overwriteById,
+    includeDiagrams,
+  ])
 
   const commentFormatLabels: Record<CommentFormat, string> = {
     sidecar: 'Sidecar JSON',
@@ -125,7 +142,7 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
                 className={`notepad-segmented__btn${scope === 'all' ? ' notepad-segmented__btn--active' : ''}`}
                 onClick={() => setScope('all')}
               >
-                All notes ({notes.length})
+                All notes ({notes.filter((n) => !n.archivedAt).length})
               </button>
               {noteId && (
                 <button
@@ -137,6 +154,25 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
               )}
             </div>
           </div>
+
+          {/* Include diagrams */}
+          {scope === 'all' && (
+            <div className="notepad-export-dialog__toggle-row">
+              <span>
+                Include diagrams{' '}
+                <span className="notepad-export-dialog__toggle-desc">
+                  (saved as .excalidraw files in diagrams/)
+                </span>
+              </span>
+              <button
+                className={`notepad-toggle${includeDiagrams ? ' notepad-toggle--on' : ''}`}
+                onClick={() => setIncludeDiagrams((v) => !v)}
+                role="switch"
+                aria-checked={includeDiagrams}
+                aria-label="Include diagrams"
+              />
+            </div>
+          )}
 
           {/* YAML frontmatter toggle */}
           <div className="notepad-export-dialog__toggle-row">
@@ -206,8 +242,8 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
         <div className="notepad-export-dialog__footer">
           <span className="notepad-export-dialog__footer-meta">
             {exportResult
-              ? `Last export: ${exportResult.time} → ${exportResult.count} files`
-              : `${scopeCount} ${scopeCount === 1 ? 'note' : 'notes'} will be exported`}
+              ? `Last export: ${exportResult.time} → ${exportResult.notes} notes${exportResult.diagrams > 0 ? `, ${exportResult.diagrams} diagrams` : ''}`
+              : `${scopeCount} ${scopeCount === 1 ? 'note' : 'notes'}${diagramCount > 0 ? ` + ${diagramCount} diagrams` : ''} will be exported`}
           </span>
           <button className="notepad-btn-ghost" onClick={onClose}>
             Cancel

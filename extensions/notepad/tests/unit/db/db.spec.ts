@@ -1,190 +1,131 @@
-import { describe, it, expect, afterEach, vi } from 'vitest'
-import * as fs from 'node:fs'
-import * as os from 'node:os'
-import * as path from 'node:path'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { PGlite } from '@electric-sql/pglite'
+import { wrapDb } from '../../../../../src/main/db/index'
 import {
-  initDb,
-  getDb,
-  closeDb,
-  insertFts,
-  deleteFts,
-  reinitDb,
-  repairDb,
-  resetDb,
+  applyNotepadSchema,
+  applyNotepadMigrations,
+  hasColumn,
+  randomUUID,
 } from '../../../src/db/db'
+import type { ExtensionDB } from '../../../../../src/main/db/index'
 
-describe('initDb', () => {
-  let tmpDir: string
+let pg: PGlite
+let db: ExtensionDB
 
-  afterEach(() => {
-    closeDb()
-    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true })
-  })
+beforeEach(async () => {
+  pg = new PGlite()
+  await pg.waitReady
+  db = wrapDb(pg)
+})
 
-  it('creates the notepad.db file in userData', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
-    initDb(tmpDir)
-    expect(fs.existsSync(path.join(tmpDir, 'notepad.db'))).toBe(true)
-  })
+afterEach(async () => {
+  await pg.close()
+})
 
-  it('enables WAL mode', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
-    const db = initDb(tmpDir)
-    const row = db.prepare('PRAGMA journal_mode').get() as { journal_mode: string }
-    expect(row.journal_mode).toBe('wal')
-  })
-
-  it('enables foreign keys', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
-    const db = initDb(tmpDir)
-    const row = db.prepare('PRAGMA foreign_keys').get() as { foreign_keys: number }
-    expect(row.foreign_keys).toBe(1)
-  })
-
-  it('creates all required tables', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
-    const db = initDb(tmpDir)
-    const tables = (
-      db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]
-    ).map((r) => r.name)
+describe('applyNotepadSchema', () => {
+  it('creates all required tables', async () => {
+    await applyNotepadSchema(db)
+    const rows = await db.query<{ table_name: string }>(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`
+    )
+    const tables = rows.map((r) => r.table_name)
     expect(tables).toContain('notes')
     expect(tables).toContain('tags')
     expect(tables).toContain('note_tags')
     expect(tables).toContain('comments')
     expect(tables).toContain('settings')
+    expect(tables).toContain('diagrams')
+    expect(tables).toContain('diagram_comments')
   })
 
-  it('creates the FTS5 virtual table', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
-    const db = initDb(tmpDir)
-    const vtables = (
-      db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]
-    ).map((r) => r.name)
-    expect(vtables).toContain('notes_fts')
-  })
-
-  it('is idempotent — safe to call initDb twice', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
-    initDb(tmpDir)
-    closeDb()
-    expect(() => initDb(tmpDir)).not.toThrow()
-  })
-
-  it('getDb throws if initDb not called', () => {
-    expect(() => getDb()).toThrow('NotepadDB not initialized')
-  })
-
-  it('getDb returns the db after initDb', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
-    initDb(tmpDir)
-    expect(() => getDb()).not.toThrow()
-  })
-
-  it('initDb failure closes db and surfaces real error in subsequent getDb call', () => {
-    // /dev/null is a file, not a dir — mkdirSync will throw ENOTDIR
-    expect(() => initDb('/dev/null/notepad-test')).toThrow()
-    expect(() => getDb()).toThrow('NotepadDB not initialized')
+  it('is idempotent — safe to call twice', async () => {
+    await applyNotepadSchema(db)
+    await expect(applyNotepadSchema(db)).resolves.not.toThrow()
   })
 })
 
-describe('reinitDb', () => {
-  let tmpDir: string
-
-  afterEach(() => {
-    closeDb()
-    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true })
+describe('applyNotepadMigrations', () => {
+  it('is a no-op for new installs (tags already in schema)', async () => {
+    await applyNotepadSchema(db)
+    const before = await hasColumn(db, 'diagrams', 'tags')
+    expect(before).toBe(true)
+    await expect(applyNotepadMigrations(db)).resolves.not.toThrow()
+    const after = await hasColumn(db, 'diagrams', 'tags')
+    expect(after).toBe(true)
   })
 
-  it('closes the existing connection and reopens', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
-    initDb(tmpDir)
-    const db = reinitDb(tmpDir)
-    expect(db).toBeTruthy()
-    expect(() => getDb()).not.toThrow()
-  })
-})
-
-describe('repairDb', () => {
-  let tmpDir: string
-
-  afterEach(() => {
-    closeDb()
-    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true })
-    vi.restoreAllMocks()
+  it('is idempotent — safe to call twice', async () => {
+    await applyNotepadSchema(db)
+    await applyNotepadMigrations(db)
+    await expect(applyNotepadMigrations(db)).resolves.not.toThrow()
   })
 
-  it('runs integrity_check and returns result when db is open', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
-    initDb(tmpDir)
-    const result = repairDb(tmpDir)
-    expect(result.integrity).toBe('ok')
-    expect(() => getDb()).not.toThrow()
+  it('adds tags column to diagrams when missing (old schema)', async () => {
+    // Simulate a pre-tags schema: diagrams without the tags column
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled note', body TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, sort_order REAL NOT NULL DEFAULT 0, folder_id TEXT);
+      CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL);
+      CREATE TABLE IF NOT EXISTS note_tags (note_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (note_id, tag_id));
+      CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, note_id TEXT NOT NULL, parent_id TEXT, body TEXT NOT NULL, author TEXT NOT NULL DEFAULT 'me', status TEXT NOT NULL DEFAULT 'open', start_offset INTEGER, end_offset INTEGER, quote TEXT, prefix TEXT, suffix TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS diagrams (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled diagram', scene_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, sort_order REAL NOT NULL DEFAULT 0, folder_id TEXT);
+    `)
+    expect(await hasColumn(db, 'diagrams', 'tags')).toBe(false)
+    await applyNotepadMigrations(db)
+    expect(await hasColumn(db, 'diagrams', 'tags')).toBe(true)
   })
 
-  it('initializes db when none is open and returns ok', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
-    const result = repairDb(tmpDir)
-    expect(result.integrity).toBe('ok')
-    expect(() => getDb()).not.toThrow()
+  it('adds sort_order to notes when missing', async () => {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled note', body TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, folder_id TEXT);
+      CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL);
+      CREATE TABLE IF NOT EXISTS note_tags (note_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (note_id, tag_id));
+      CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, note_id TEXT NOT NULL, parent_id TEXT, body TEXT NOT NULL, author TEXT NOT NULL DEFAULT 'me', status TEXT NOT NULL DEFAULT 'open', start_offset INTEGER, end_offset INTEGER, quote TEXT, prefix TEXT, suffix TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS diagrams (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled diagram', tags TEXT NOT NULL DEFAULT '[]', scene_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, folder_id TEXT);
+    `)
+    expect(await hasColumn(db, 'notes', 'sort_order')).toBe(false)
+    await applyNotepadMigrations(db)
+    expect(await hasColumn(db, 'notes', 'sort_order')).toBe(true)
+    expect(await hasColumn(db, 'diagrams', 'sort_order')).toBe(true)
   })
 
-  it('swallows VACUUM errors and still reopens db', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
-    initDb(tmpDir)
-    const db = getDb()
-    vi.spyOn(db, 'exec').mockImplementationOnce(() => {
-      throw new Error('VACUUM error')
-    })
-    const result = repairDb(tmpDir)
-    expect(result.integrity).toBe('ok')
-    expect(() => getDb()).not.toThrow()
-  })
-})
-
-describe('resetDb', () => {
-  let tmpDir: string
-
-  afterEach(() => {
-    closeDb()
-    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true })
-    vi.restoreAllMocks()
-  })
-
-  it('deletes the db file and reinitializes', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
-    initDb(tmpDir)
-    const dbPath = path.join(tmpDir, 'notepad.db')
-    expect(fs.existsSync(dbPath)).toBe(true)
-    resetDb(tmpDir)
-    expect(() => getDb()).not.toThrow()
-  })
-
-  it('works when no db file exists yet', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
-    const db = resetDb(tmpDir)
-    expect(db).toBeTruthy()
+  it('adds folder_id to notes and diagrams when missing', async () => {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled note', body TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, sort_order REAL NOT NULL DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL);
+      CREATE TABLE IF NOT EXISTS note_tags (note_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (note_id, tag_id));
+      CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, note_id TEXT NOT NULL, parent_id TEXT, body TEXT NOT NULL, author TEXT NOT NULL DEFAULT 'me', status TEXT NOT NULL DEFAULT 'open', start_offset INTEGER, end_offset INTEGER, quote TEXT, prefix TEXT, suffix TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS diagrams (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled diagram', tags TEXT NOT NULL DEFAULT '[]', scene_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, sort_order REAL NOT NULL DEFAULT 0);
+    `)
+    expect(await hasColumn(db, 'notes', 'folder_id')).toBe(false)
+    expect(await hasColumn(db, 'diagrams', 'folder_id')).toBe(false)
+    await applyNotepadMigrations(db)
+    expect(await hasColumn(db, 'notes', 'folder_id')).toBe(true)
+    expect(await hasColumn(db, 'diagrams', 'folder_id')).toBe(true)
   })
 })
 
-describe('insertFts / deleteFts', () => {
-  let tmpDir: string
-
-  afterEach(() => {
-    closeDb()
-    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true })
+describe('hasColumn', () => {
+  it('returns true for an existing column', async () => {
+    await applyNotepadSchema(db)
+    expect(await hasColumn(db, 'notes', 'title')).toBe(true)
   })
 
-  it('insertFts and deleteFts operate without error', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-test-'))
-    const db = initDb(tmpDir)
+  it('returns false for a non-existent column', async () => {
+    await applyNotepadSchema(db)
+    expect(await hasColumn(db, 'notes', 'nonexistent_col')).toBe(false)
+  })
+})
 
-    // Insert a note first to have a valid rowid
-    db.prepare(
-      `INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?,?,?,?,?)`
-    ).run('n1', 'Test', '# Hello', new Date().toISOString(), new Date().toISOString())
+describe('randomUUID', () => {
+  it('returns a valid UUID string', () => {
+    const id = randomUUID()
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+  })
 
-    const row = db.prepare('SELECT rowid FROM notes WHERE id=?').get('n1') as { rowid: number }
-    expect(() => insertFts(db, row.rowid, 'Test', '# Hello', '')).not.toThrow()
-    expect(() => deleteFts(db, row.rowid)).not.toThrow()
+  it('generates unique values', () => {
+    expect(randomUUID()).not.toBe(randomUUID())
   })
 })

@@ -1,6 +1,35 @@
-import { RangeSetBuilder, StateField, type EditorState } from '@codemirror/state'
-import { Decoration, type DecorationSet, EditorView, WidgetType } from '@codemirror/view'
+import { RangeSetBuilder, StateEffect, StateField, type EditorState } from '@codemirror/state'
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  ViewPlugin,
+  WidgetType,
+} from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
+
+// Track editor focus so cursor-line raw reveal only activates after the user
+// has actually focused the editor (not on initial mount).
+const setEditorFocused = StateEffect.define<boolean>()
+const editorFocusedField = StateField.define<boolean>({
+  create() {
+    return false
+  },
+  update(focused, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setEditorFocused)) return effect.value
+    }
+    return focused
+  },
+})
+/* v8 ignore next 9 */
+const focusTrackPlugin = ViewPlugin.define((view) => ({
+  update(update) {
+    if (update.focusChanged) {
+      view.dispatch({ effects: setEditorFocused.of(view.hasFocus) })
+    }
+  },
+}))
 
 // ── Widgets ──────────────────────────────────────────────────────
 
@@ -169,15 +198,24 @@ class ImageWidget extends WidgetType {
 
 // ── Decoration builder ────────────────────────────────────────────
 
-export function buildDecorations(state: EditorState, selection: { anchor: number }): DecorationSet {
+// focused defaults to true so callers that don't pass it (e.g. tests) get the
+// original cursor-line raw-reveal behaviour.
+export function buildDecorations(
+  state: EditorState,
+  selection: { anchor: number },
+  focused = true
+): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const cursorPos = selection.anchor
   const cursorLine = state.doc.lineAt(cursorPos).number
+  // Reveal raw markdown on the cursor line only when focused & not read-only.
+  // Before the editor gains focus (initial mount) or in read-only mode, render fully.
+  const revealCursorLine = focused && !state.readOnly
 
   syntaxTree(state).iterate({
     enter(node) {
       const lineNum = state.doc.lineAt(node.from).number
-      const onCursorLine = lineNum === cursorLine
+      const onCursorLine = revealCursorLine && lineNum === cursorLine
 
       switch (node.name) {
         case 'ATXHeading1':
@@ -267,8 +305,9 @@ export function buildDecorations(state: EditorState, selection: { anchor: number
         }
 
         case 'FencedCode': {
-          // Show raw fences when cursor is anywhere inside the block
-          const isInBlock = cursorPos >= node.from && cursorPos <= node.to
+          // Show raw fences when cursor is inside the block (focused edit mode only)
+          const isInBlock =
+            focused && !state.readOnly && cursorPos >= node.from && cursorPos <= node.to
           if (!isInBlock) {
             const codeInfoNode = node.node.getChild('CodeInfo')
             const lang = codeInfoNode
@@ -443,15 +482,20 @@ export function buildDecorations(state: EditorState, selection: { anchor: number
 
 // StateField (not ViewPlugin) so that Decoration.replace() across line breaks is allowed.
 // ViewPlugin decorations cannot replace newlines; StateField decorations can.
-export const livePreviewPlugin = StateField.define<DecorationSet>({
+const livePreviewDecorations = StateField.define<DecorationSet>({
   create(state) {
-    return buildDecorations(state, state.selection.main)
+    return buildDecorations(state, state.selection.main, false)
   },
   update(decos, tr) {
-    if (tr.docChanged || tr.selection) {
-      return buildDecorations(tr.state, tr.state.selection.main)
+    const focusChanged = tr.effects.some((e) => e.is(setEditorFocused))
+    if (tr.docChanged || tr.selection || focusChanged) {
+      const focused = tr.state.field(editorFocusedField)
+      return buildDecorations(tr.state, tr.state.selection.main, focused)
     }
     return decos.map(tr.changes)
   },
   provide: (f) => EditorView.decorations.from(f),
 })
+
+// Export as an array so callers add all required extensions at once
+export const livePreviewPlugin = [editorFocusedField, focusTrackPlugin, livePreviewDecorations]

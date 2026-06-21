@@ -1,78 +1,62 @@
-import { app, ipcMain } from 'electron'
+import { ipcMain } from 'electron'
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
-import { initDb, closeDb, reinitDb, repairDb, resetDb } from './db/db'
+import { applyNotepadSchema, applyNotepadMigrations } from './db/db'
 import { registerNotesIpcHandlers, registerTagsIpcHandlers } from './ipc/notes.ipc'
 import { registerCommentsIpcHandlers } from './ipc/comments.ipc'
 import { registerSearchIpcHandlers } from './ipc/search.ipc'
 import { registerExportIpcHandlers } from './ipc/export.ipc'
 import { registerDiagramsIpcHandlers } from './ipc/diagrams.ipc'
 import { registerDiagramCommentsIpcHandlers } from './ipc/diagram-comments.ipc'
+import { registerFoldersIpcHandlers } from './ipc/folders.ipc'
 
 const disposables: Disposable[] = []
 
 export async function activate(api: ExtensionAPI): Promise<void> {
   try {
-    initDb(app.getPath('userData'))
+    await applyNotepadSchema(api.db)
+    await applyNotepadMigrations(api.db)
   } catch (err) {
-    console.error('[notepad] Failed to initialize SQLite DB:', err)
+    console.error('[notepad] Failed to initialize schema:', err)
     api.notifications.showToast(
       'error',
-      'Notepad: database failed to open. Restart the app — if the problem persists, check the logs.'
+      'Notepad: database schema failed to apply. Restart the app — if the problem persists, check the logs.'
     )
   }
 
-  const disposeNotes = registerNotesIpcHandlers()
+  const disposeNotes = registerNotesIpcHandlers(api.db)
   disposables.push({ dispose: disposeNotes })
 
-  const disposeComments = registerCommentsIpcHandlers()
+  const disposeComments = registerCommentsIpcHandlers(api.db)
   disposables.push({ dispose: disposeComments })
 
-  const disposeTags = registerTagsIpcHandlers()
+  const disposeTags = registerTagsIpcHandlers(api.db)
   disposables.push({ dispose: disposeTags })
 
-  const disposeSearch = registerSearchIpcHandlers()
+  const disposeSearch = registerSearchIpcHandlers(api.db)
   disposables.push({ dispose: disposeSearch })
 
-  const disposeExport = registerExportIpcHandlers()
+  const disposeExport = registerExportIpcHandlers(api.db)
   disposables.push({ dispose: disposeExport })
 
-  const disposeDiagrams = registerDiagramsIpcHandlers()
+  const disposeDiagrams = registerDiagramsIpcHandlers(api.db)
   disposables.push({ dispose: disposeDiagrams })
 
-  const disposeDiagramComments = registerDiagramCommentsIpcHandlers()
+  const disposeDiagramComments = registerDiagramCommentsIpcHandlers(api.db)
   disposables.push({ dispose: disposeDiagramComments })
+
+  const disposeFolders = registerFoldersIpcHandlers(api.db)
+  disposables.push({ dispose: disposeFolders })
 
   ipcMain.handle('terminator.notepad:db.reinit', async () => {
     try {
-      reinitDb(app.getPath('userData'))
+      await applyNotepadSchema(api.db)
+      await applyNotepadMigrations(api.db)
       return { data: { ok: true } }
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) }
     }
   })
-  ipcMain.handle('terminator.notepad:db.repair', async () => {
-    try {
-      const result = repairDb(app.getPath('userData'))
-      return { data: result }
-    } catch (err) {
-      return { error: err instanceof Error ? err.message : String(err) }
-    }
-  })
-  ipcMain.handle('terminator.notepad:db.reset', async () => {
-    try {
-      resetDb(app.getPath('userData'))
-      return { data: { ok: true } }
-    } catch (err) {
-      return { error: err instanceof Error ? err.message : String(err) }
-    }
-  })
-  disposables.push({
-    dispose: () => {
-      ipcMain.removeHandler('terminator.notepad:db.reinit')
-      ipcMain.removeHandler('terminator.notepad:db.repair')
-      ipcMain.removeHandler('terminator.notepad:db.reset')
-    },
-  })
+  disposables.push({ dispose: () => ipcMain.removeHandler('terminator.notepad:db.reinit') })
 
   disposables.push(
     api.settings.register({
@@ -110,35 +94,17 @@ export async function activate(api: ExtensionAPI): Promise<void> {
           description: 'Font size in pixels',
           default: 14,
         },
+        'terminator.notepad.db.reinit': {
+          type: 'action',
+          label: 'Re-initialise database',
+          description: 'Re-apply schema and migrations without deleting data',
+          channel: 'terminator.notepad:db.reinit',
+        },
         'terminator.notepad.mcpSidecar': {
           type: 'boolean',
           label: 'Enable MCP sidecar',
           description: 'Let agents read/search notes',
           default: false,
-        },
-        'terminator.notepad.db.reinit': {
-          type: 'action',
-          label: 'Re-initialize',
-          description: 'Close and reopen the database connection. Use if notes stop loading.',
-          channel: 'terminator.notepad:db.reinit',
-          default: null,
-        },
-        'terminator.notepad.db.repair': {
-          type: 'action',
-          label: 'Repair',
-          description: 'Checkpoint WAL and run VACUUM. Fixes fragmentation without data loss.',
-          channel: 'terminator.notepad:db.repair',
-          default: null,
-        },
-        'terminator.notepad.db.reset': {
-          type: 'action',
-          label: 'Reset (delete all data)',
-          description: 'Permanently delete the database and start fresh. All notes will be lost.',
-          channel: 'terminator.notepad:db.reset',
-          danger: true,
-          confirmMessage:
-            'This will permanently delete ALL your notes. This cannot be undone. Continue?',
-          default: null,
         },
       },
     })
@@ -190,5 +156,4 @@ export async function activate(api: ExtensionAPI): Promise<void> {
 export function deactivate(): void {
   for (const d of disposables) d.dispose()
   disposables.length = 0
-  closeDb()
 }

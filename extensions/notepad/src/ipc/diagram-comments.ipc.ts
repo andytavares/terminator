@@ -1,7 +1,8 @@
 import { ipcMain } from 'electron'
 import { z } from 'zod'
-import { getDb, randomUUID } from '../db/db'
+import { randomUUID } from '../db/db'
 import type { DiagramComment } from '../db/types'
+import type { ExtensionDB } from '../../../../src/main/db/index'
 
 const VALIDATION_ERROR = { error: 'VALIDATION_ERROR' }
 
@@ -34,7 +35,10 @@ function mapComment(r: DbDiagramComment, replies: DiagramComment[] = []): Diagra
   }
 }
 
-export async function createDiagramComment(payload: unknown): Promise<Record<string, unknown>> {
+export async function createDiagramComment(
+  db: ExtensionDB,
+  payload: unknown
+): Promise<Record<string, unknown>> {
   const schema = z.object({
     diagramId: z.string(),
     parentId: z.string().optional(),
@@ -45,31 +49,36 @@ export async function createDiagramComment(payload: unknown): Promise<Record<str
   const parsed = schema.safeParse(payload)
   if (!parsed.success) return VALIDATION_ERROR
 
-  const db = getDb()
-  const diagramExists = db.prepare('SELECT id FROM diagrams WHERE id=?').get(parsed.data.diagramId)
+  const diagramExists = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [
+    parsed.data.diagramId,
+  ])
   if (!diagramExists) return { error: 'DIAGRAM_NOT_FOUND' }
 
   const id = randomUUID()
   const now = new Date().toISOString()
 
-  db.prepare(
+  await db.run(
     `INSERT INTO diagram_comments (id, diagram_id, parent_id, body, scene_x, scene_y, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    id,
-    parsed.data.diagramId,
-    parsed.data.parentId ?? null,
-    parsed.data.body,
-    parsed.data.sceneX ?? 0,
-    parsed.data.sceneY ?? 0,
-    now,
-    now
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      parsed.data.diagramId,
+      parsed.data.parentId ?? null,
+      parsed.data.body,
+      parsed.data.sceneX ?? 0,
+      parsed.data.sceneY ?? 0,
+      now,
+      now,
+    ]
   )
 
   return { data: { id, createdAt: now } }
 }
 
-export async function listDiagramComments(payload: unknown): Promise<Record<string, unknown>> {
+export async function listDiagramComments(
+  db: ExtensionDB,
+  payload: unknown
+): Promise<Record<string, unknown>> {
   const schema = z.object({
     diagramId: z.string(),
     includeResolved: z.boolean().optional(),
@@ -78,17 +87,15 @@ export async function listDiagramComments(payload: unknown): Promise<Record<stri
   if (!parsed.success) return VALIDATION_ERROR
 
   const { diagramId, includeResolved = false } = parsed.data
-  const db = getDb()
 
   const statusFilter = includeResolved ? '' : `AND status = 'open'`
-  const rows = db
-    .prepare(
-      `SELECT id, diagram_id, parent_id, body, author, status, scene_x, scene_y, created_at, updated_at
-       FROM diagram_comments
-       WHERE diagram_id=? ${statusFilter}
-       ORDER BY created_at ASC`
-    )
-    .all(diagramId) as DbDiagramComment[]
+  const rows = await db.query<DbDiagramComment>(
+    `SELECT id, diagram_id, parent_id, body, author, status, scene_x, scene_y, created_at, updated_at
+     FROM diagram_comments
+     WHERE diagram_id=? ${statusFilter}
+     ORDER BY created_at ASC`,
+    [diagramId]
+  )
 
   const roots = rows.filter((r) => r.parent_id === null)
   const childMap = new Map<string, DbDiagramComment[]>()
@@ -109,44 +116,51 @@ export async function listDiagramComments(payload: unknown): Promise<Record<stri
   return { data }
 }
 
-export async function resolveDiagramComment(payload: unknown): Promise<Record<string, unknown>> {
+export async function resolveDiagramComment(
+  db: ExtensionDB,
+  payload: unknown
+): Promise<Record<string, unknown>> {
   const schema = z.object({ id: z.string() })
   const parsed = schema.safeParse(payload)
   if (!parsed.success) return VALIDATION_ERROR
 
-  const db = getDb()
   const now = new Date().toISOString()
-  const existing = db.prepare('SELECT id FROM diagram_comments WHERE id=?').get(parsed.data.id)
+  const existing = await db.get<{ id: string }>('SELECT id FROM diagram_comments WHERE id=?', [
+    parsed.data.id,
+  ])
   if (!existing) return { error: 'COMMENT_NOT_FOUND' }
 
-  db.prepare(
-    `UPDATE diagram_comments SET status='resolved', updated_at=? WHERE id=? OR parent_id=?`
-  ).run(now, parsed.data.id, parsed.data.id)
+  await db.run(
+    `UPDATE diagram_comments SET status='resolved', updated_at=? WHERE id=? OR parent_id=?`,
+    [now, parsed.data.id, parsed.data.id]
+  )
   return { data: { ok: true } }
 }
 
-export async function deleteDiagramComment(payload: unknown): Promise<Record<string, unknown>> {
+export async function deleteDiagramComment(
+  db: ExtensionDB,
+  payload: unknown
+): Promise<Record<string, unknown>> {
   const schema = z.object({ id: z.string() })
   const parsed = schema.safeParse(payload)
   if (!parsed.success) return VALIDATION_ERROR
 
-  const db = getDb()
-  db.prepare('DELETE FROM diagram_comments WHERE id=?').run(parsed.data.id)
+  await db.run('DELETE FROM diagram_comments WHERE id=?', [parsed.data.id])
   return { data: { ok: true } }
 }
 
-export function registerDiagramCommentsIpcHandlers(): () => void {
+export function registerDiagramCommentsIpcHandlers(db: ExtensionDB): () => void {
   ipcMain.handle('terminator.notepad:diagram-comments.create', (_, payload) =>
-    createDiagramComment(payload)
+    createDiagramComment(db, payload)
   )
   ipcMain.handle('terminator.notepad:diagram-comments.list', (_, payload) =>
-    listDiagramComments(payload)
+    listDiagramComments(db, payload)
   )
   ipcMain.handle('terminator.notepad:diagram-comments.resolve', (_, payload) =>
-    resolveDiagramComment(payload)
+    resolveDiagramComment(db, payload)
   )
   ipcMain.handle('terminator.notepad:diagram-comments.delete', (_, payload) =>
-    deleteDiagramComment(payload)
+    deleteDiagramComment(db, payload)
   )
 
   return () => {

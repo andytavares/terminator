@@ -1,17 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-
-const { mockRun, mockGet, mockAll, mockPrepare } = vi.hoisted(() => {
-  const mockRun = vi.fn()
-  const mockGet = vi.fn()
-  const mockAll = vi.fn().mockReturnValue([])
-  const mockPrepare = vi.fn().mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
-  return { mockRun, mockGet, mockAll, mockPrepare }
-})
-
-vi.mock('../../src/vault/db', () => ({
-  getDb: vi.fn(() => ({ prepare: mockPrepare })),
-  randomUUID: vi.fn(() => 'test-uuid'),
-}))
+import type { ExtensionDB } from '../../../../src/main/extensions/api'
 
 const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
   mockHandle: vi.fn(),
@@ -22,61 +10,75 @@ vi.mock('electron', () => ({
 }))
 
 import { registerLinksIpcHandlers } from '../../src/ipc/links.ipc'
-import { getDb } from '../../src/vault/db'
 
 const UUID = '550e8400-e29b-41d4-a716-446655440000'
 const TASK_ID = 'task-uuid-1'
 const PROJECT_NAME = 'alpha'
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  mockGet.mockReturnValue(undefined)
-  mockAll.mockReturnValue([])
-  mockPrepare.mockReturnValue({ run: mockRun, get: mockGet, all: mockAll })
-})
+function createMockDb() {
+  const mockQuery = vi.fn().mockResolvedValue([])
+  const mockGet = vi.fn().mockResolvedValue(undefined)
+  const mockRun = vi.fn().mockResolvedValue(undefined)
+  const db: ExtensionDB = {
+    query: mockQuery,
+    get: mockGet,
+    run: mockRun,
+    exec: vi.fn().mockResolvedValue(undefined),
+    transaction: vi
+      .fn()
+      .mockImplementation(async (fn: (tx: ExtensionDB) => Promise<unknown>) => fn(db)),
+  }
+  return Object.assign(db, { mockQuery, mockGet, mockRun })
+}
 
-function getHandler(channel: string) {
+type MockDb = ReturnType<typeof createMockDb>
+let db: MockDb
+
+function getHandler(channel: string): (event: unknown, payload: unknown) => Promise<unknown> {
   let handler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
   vi.mocked(mockHandle).mockImplementation((ch, fn) => {
     if (ch === channel) handler = fn as typeof handler
   })
-  const dispose = registerLinksIpcHandlers()
+  registerLinksIpcHandlers(db)
   if (!handler) throw new Error(`Handler for ${channel} not registered`)
-  return { handler, dispose }
+  return handler
 }
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  db = createMockDb()
+})
 
 describe('task-vault:links:create', () => {
   it('appends terminator link to task via taskId', async () => {
-    mockGet.mockReturnValue({ terminator_links: '[]' })
-    const { handler } = getHandler('task-vault:links:create')
+    db.mockGet.mockResolvedValue({ terminator_links: '[]' })
+    const handler = getHandler('task-vault:links:create')
     const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
     expect(result).toMatchObject({ success: true })
-    expect(mockRun).toHaveBeenCalled()
+    expect(db.mockRun).toHaveBeenCalled()
   })
 
   it('appends terminator link via projectFilePath', async () => {
-    mockGet.mockReturnValue({ terminator_links: '[]' })
-    const { handler } = getHandler('task-vault:links:create')
+    db.mockGet.mockResolvedValue({ terminator_links: '[]' })
+    const handler = getHandler('task-vault:links:create')
     const result = await handler({}, { projectFilePath: PROJECT_NAME, targetId: UUID })
     expect(result).toMatchObject({ success: true })
   })
 
   it('returns NOT_FOUND when task does not exist', async () => {
-    mockGet.mockReturnValue(undefined)
-    const { handler } = getHandler('task-vault:links:create')
+    const handler = getHandler('task-vault:links:create')
     const result = await handler({}, { taskId: 'nonexistent', targetId: UUID })
     expect(result).toMatchObject({ error: 'NOT_FOUND' })
   })
 
   it('returns NOT_FOUND when project does not exist', async () => {
-    mockGet.mockReturnValue(undefined)
-    const { handler } = getHandler('task-vault:links:create')
+    const handler = getHandler('task-vault:links:create')
     const result = await handler({}, { projectFilePath: 'nonexistent', targetId: UUID })
     expect(result).toMatchObject({ error: 'NOT_FOUND' })
   })
 
   it('returns VALIDATION_ERROR for missing targetId', async () => {
-    const { handler } = getHandler('task-vault:links:create')
+    const handler = getHandler('task-vault:links:create')
     const result = await handler({}, { taskId: TASK_ID })
     expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
   })
@@ -84,39 +86,38 @@ describe('task-vault:links:create', () => {
 
 describe('task-vault:links:remove', () => {
   it('removes terminator link from task', async () => {
-    mockGet.mockReturnValue({ terminator_links: JSON.stringify([UUID]) })
-    const { handler } = getHandler('task-vault:links:remove')
+    db.mockGet.mockResolvedValue({ terminator_links: JSON.stringify([UUID]) })
+    const handler = getHandler('task-vault:links:remove')
     const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
     expect(result).toMatchObject({ success: true })
-    expect(mockRun).toHaveBeenCalled()
-    const written = mockRun.mock.calls[0][0] as string
-    expect(written).not.toContain(UUID)
+    expect(db.mockRun).toHaveBeenCalled()
+    // The updated links JSON (first param array item) should not contain UUID
+    const writtenLinks = db.mockRun.mock.calls[0][1][0] as string
+    expect(writtenLinks).not.toContain(UUID)
   })
 
-  it('removes terminator link from project via projectFilePath (lines 130-147)', async () => {
-    mockGet.mockReturnValue({ terminator_links: JSON.stringify([UUID]) })
-    const { handler } = getHandler('task-vault:links:remove')
+  it('removes terminator link from project via projectFilePath', async () => {
+    db.mockGet.mockResolvedValue({ terminator_links: JSON.stringify([UUID]) })
+    const handler = getHandler('task-vault:links:remove')
     const result = await handler({}, { projectFilePath: PROJECT_NAME, targetId: UUID })
     expect(result).toMatchObject({ success: true })
-    expect(mockRun).toHaveBeenCalled()
+    expect(db.mockRun).toHaveBeenCalled()
   })
 
   it('returns NOT_FOUND when project does not exist during remove', async () => {
-    mockGet.mockReturnValue(undefined)
-    const { handler } = getHandler('task-vault:links:remove')
+    const handler = getHandler('task-vault:links:remove')
     const result = await handler({}, { projectFilePath: 'nonexistent-proj', targetId: UUID })
     expect(result).toMatchObject({ error: 'NOT_FOUND' })
   })
 
   it('returns NOT_FOUND when task does not exist', async () => {
-    mockGet.mockReturnValue(undefined)
-    const { handler } = getHandler('task-vault:links:remove')
+    const handler = getHandler('task-vault:links:remove')
     const result = await handler({}, { taskId: 'nonexistent', targetId: UUID })
     expect(result).toMatchObject({ error: 'NOT_FOUND' })
   })
 
   it('returns VALIDATION_ERROR for missing targetId', async () => {
-    const { handler } = getHandler('task-vault:links:remove')
+    const handler = getHandler('task-vault:links:remove')
     const result = await handler({}, { taskId: TASK_ID })
     expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
   })
@@ -143,8 +144,8 @@ describe('task-vault:links:get-for-terminator-target', () => {
   }
 
   it('returns linked tasks and projects for targetId', async () => {
-    mockAll.mockReturnValueOnce([taskRow]).mockReturnValueOnce([])
-    const { handler } = getHandler('task-vault:links:get-for-terminator-target')
+    db.mockQuery.mockResolvedValueOnce([taskRow]).mockResolvedValueOnce([])
+    const handler = getHandler('task-vault:links:get-for-terminator-target')
     const result = (await handler({}, { targetId: UUID })) as {
       tasks: unknown[]
       projects: unknown[]
@@ -154,8 +155,8 @@ describe('task-vault:links:get-for-terminator-target', () => {
   })
 
   it('returns empty when targetId has no links', async () => {
-    mockAll.mockReturnValue([])
-    const { handler } = getHandler('task-vault:links:get-for-terminator-target')
+    db.mockQuery.mockResolvedValue([])
+    const handler = getHandler('task-vault:links:get-for-terminator-target')
     const result = (await handler({}, { targetId: '00000000-0000-0000-0000-000000000000' })) as {
       tasks: unknown[]
       projects: unknown[]
@@ -165,12 +166,12 @@ describe('task-vault:links:get-for-terminator-target', () => {
   })
 
   it('returns VALIDATION_ERROR for missing targetId', async () => {
-    const { handler } = getHandler('task-vault:links:get-for-terminator-target')
+    const handler = getHandler('task-vault:links:get-for-terminator-target')
     const result = await handler({}, {})
     expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
   })
 
-  it('returns linked projects for targetId via rowToProject (line 168-169)', async () => {
+  it('returns linked projects for targetId', async () => {
     const projectRow = {
       id: 'proj-uuid-1',
       name: PROJECT_NAME,
@@ -180,9 +181,8 @@ describe('task-vault:links:get-for-terminator-target', () => {
       terminator_links: JSON.stringify([UUID]),
       updated_at: new Date().toISOString(),
     }
-    // First all() → no tasks, second all() → project rows
-    mockAll.mockReturnValueOnce([]).mockReturnValueOnce([projectRow])
-    const { handler } = getHandler('task-vault:links:get-for-terminator-target')
+    db.mockQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([projectRow])
+    const handler = getHandler('task-vault:links:get-for-terminator-target')
     const result = (await handler({}, { targetId: UUID })) as {
       tasks: unknown[]
       projects: { name: string }[]
@@ -192,48 +192,33 @@ describe('task-vault:links:get-for-terminator-target', () => {
   })
 })
 
-describe('task-vault:links:create error handling (lines 103-105)', () => {
+describe('task-vault:links:create error handling', () => {
   it('returns error string when db throws during task update', async () => {
-    mockGet.mockReturnValue({ terminator_links: '[]' })
-    mockRun.mockImplementation(() => {
-      throw new Error('db write error')
-    })
-    const { handler } = getHandler('task-vault:links:create')
+    db.mockGet.mockResolvedValue({ terminator_links: '[]' })
+    db.mockRun.mockRejectedValueOnce(new Error('db write error'))
+    const handler = getHandler('task-vault:links:create')
     const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
     expect(result).toMatchObject({ error: expect.stringContaining('db write error') })
   })
 })
 
-describe('task-vault:links:remove error handling (lines 145-147)', () => {
+describe('task-vault:links:remove error handling', () => {
   it('returns error string when db throws during task remove', async () => {
-    mockGet.mockReturnValue({ terminator_links: JSON.stringify([UUID]) })
-    mockRun.mockImplementation(() => {
-      throw new Error('db remove error')
-    })
-    const { handler } = getHandler('task-vault:links:remove')
+    db.mockGet.mockResolvedValue({ terminator_links: JSON.stringify([UUID]) })
+    db.mockRun.mockRejectedValueOnce(new Error('db remove error'))
+    const handler = getHandler('task-vault:links:remove')
     const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
     expect(result).toMatchObject({ error: expect.stringContaining('db remove error') })
   })
 })
 
 describe('registerLinksIpcHandlers dispose', () => {
-  it('calls ipcMain.removeHandler for all registered channels (lines 175-178)', () => {
-    const dispose = registerLinksIpcHandlers()
+  it('calls ipcMain.removeHandler for all registered channels', () => {
+    const dispose = registerLinksIpcHandlers(db)
     dispose()
     const removedChannels = vi.mocked(mockRemoveHandler).mock.calls.map((c) => c[0])
     expect(removedChannels).toContain('task-vault:links:create')
     expect(removedChannels).toContain('task-vault:links:remove')
     expect(removedChannels).toContain('task-vault:links:get-for-terminator-target')
-  })
-})
-
-describe('handle() catch — DB not initialized', () => {
-  it('returns { error } from links:create instead of throwing when getDb throws', async () => {
-    vi.mocked(getDb).mockImplementationOnce(() => {
-      throw new Error('VaultDB not initialized')
-    })
-    const { handler } = getHandler('task-vault:links:create')
-    const result = await handler({}, { taskId: 'task-1', targetId: UUID })
-    expect(result).toMatchObject({ error: 'VaultDB not initialized' })
   })
 })

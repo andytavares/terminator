@@ -231,7 +231,7 @@ interface DiagramViewProps {
 }
 
 export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element {
-  const [sceneJson, setSceneJson] = useState<string>('{}')
+  const initialSceneRef = useRef<{ elements?: unknown[]; appState?: unknown }>({})
   const [loaded, setLoaded] = useState(false)
   const [title, setTitle] = useState('Untitled diagram')
   const [tags, setTags] = useState<string[]>([])
@@ -300,7 +300,14 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
         }
         setTitle(diagram.title)
         setTags(diagram.tags ?? [])
-        setSceneJson(diagram.sceneJson || '{}')
+        try {
+          initialSceneRef.current = JSON.parse(diagram.sceneJson || '{}') as {
+            elements?: unknown[]
+            appState?: unknown
+          }
+        } catch {
+          initialSceneRef.current = {}
+        }
         const commentData = (commentsResult as { data?: DiagramComment[] }).data ?? []
         setComments(commentData)
         setLoaded(true)
@@ -366,15 +373,28 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
     [diagramId]
   )
 
-  function handleExcalidrawChange(elements: readonly unknown[], state: AppState) {
-    setAppState(state)
-    const newJson = JSON.stringify({
-      elements,
-      appState: { scrollX: state.scrollX, scrollY: state.scrollY, zoom: state.zoom },
-    })
-    setSceneJson(newJson)
-    scheduleAutosave(newJson)
-  }
+  const handleExcalidrawChange = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (elements: readonly unknown[], state: any) => {
+      setAppState(state as AppState)
+      const newJson = JSON.stringify({
+        elements,
+        appState: { scrollX: state.scrollX, scrollY: state.scrollY, zoom: state.zoom },
+      })
+      scheduleAutosave(newJson)
+    },
+    [scheduleAutosave]
+  )
+
+  const handleExcalidrawAPI = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (api: any) => {
+      if (excalidrawApiRef.current === api) return
+      excalidrawApiRef.current = api
+      setAppState(api.getAppState() as AppState)
+    },
+    []
+  )
 
   async function commitTitleEdit() {
     const trimmed = draftTitle.trim() || 'Untitled diagram'
@@ -480,13 +500,6 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
 
   const activeComment = comments.find((c) => c.id === activeCommentId) ?? null
 
-  let parsedScene: { elements?: unknown[]; appState?: unknown } = {}
-  try {
-    parsedScene = JSON.parse(sceneJson || '{}')
-  } catch {
-    // malformed JSON — start fresh
-  }
-
   return (
     <div className="diagram-view">
       <div className="diagram-view__toolbar">
@@ -554,17 +567,12 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
               theme="dark"
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               initialData={{
-                elements: (parsedScene.elements ?? []) as any,
-                appState: (parsedScene.appState ?? {}) as any,
+                elements: (initialSceneRef.current.elements ?? []) as any,
+                appState: (initialSceneRef.current.appState ?? {}) as any,
                 scrollToContent: true,
               }}
-              onChange={(elements, state) => handleExcalidrawChange(elements, state as AppState)}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              excalidrawAPI={(api: any) => {
-                excalidrawApiRef.current = api
-                // Seed appState immediately so pins render before first onChange
-                setAppState(api.getAppState() as AppState)
-              }}
+              onChange={handleExcalidrawChange}
+              excalidrawAPI={handleExcalidrawAPI}
             />
           </Suspense>
         )}

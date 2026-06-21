@@ -7,6 +7,7 @@ interface WorkspaceState {
   activeProjectId: string | null
   projectsByWorkspaceId: Map<string, Project[]>
   expandedWorkspaceIds: Set<string>
+  collapsedProjectIds: Set<string>
 
   loadWorkspaces: () => Promise<void>
   createWorkspace: (input: unknown) => Promise<{ workspace: Workspace } | { error: string }>
@@ -28,6 +29,8 @@ interface WorkspaceState {
   resolveActiveCwd: () => string
   toggleWorkspaceCollapse: (id: string) => void
   setExpandedWorkspaceIds: (ids: Set<string>) => void
+  toggleProjectCollapse: (id: string) => void
+  ensureProjectExpanded: (id: string) => void
   scratchActive: boolean
   setScratchActive: (value: boolean) => void
 }
@@ -45,12 +48,26 @@ function loadExpandedIds(): Set<string> {
   return new Set()
 }
 
+function loadCollapsedProjectIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem('terminator.project.collapsed')
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown
+      if (Array.isArray(parsed)) return new Set(parsed as string[])
+    }
+  } catch {
+    // ignore
+  }
+  return new Set()
+}
+
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   activeWorkspaceId: null,
   activeProjectId: null,
   projectsByWorkspaceId: new Map(),
   expandedWorkspaceIds: loadExpandedIds(),
+  collapsedProjectIds: loadCollapsedProjectIds(),
   scratchActive: false,
   setScratchActive: (value) =>
     set(
@@ -228,6 +245,32 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       // ignore write failures
     }
     set({ expandedWorkspaceIds: ids })
+  },
+
+  toggleProjectCollapse: (id) => {
+    const current = get().collapsedProjectIds
+    const next = new Set(current)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    try {
+      localStorage.setItem('terminator.project.collapsed', JSON.stringify([...next]))
+    } catch {
+      // ignore
+    }
+    set({ collapsedProjectIds: next })
+  },
+
+  ensureProjectExpanded: (id) => {
+    const current = get().collapsedProjectIds
+    if (!current.has(id)) return
+    const next = new Set(current)
+    next.delete(id)
+    try {
+      localStorage.setItem('terminator.project.collapsed', JSON.stringify([...next]))
+    } catch {
+      // ignore
+    }
+    set({ collapsedProjectIds: next })
   },
 
   resolveActiveCwd: () => {

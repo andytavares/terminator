@@ -74,8 +74,8 @@ function TagChipBar({
 }
 
 export function QuickCreateOverlay(): React.JSX.Element | null {
-  const { showQuickCreate, setShowQuickCreate, setNotes, setDiagrams } = useNotesStore()
-  const [type, setType] = useState<'note' | 'diagram'>('note')
+  const { showQuickCreate, setShowQuickCreate, setNotes, setDiagrams, setFolders } = useNotesStore()
+  const [type, setType] = useState<'note' | 'diagram' | 'folder'>('note')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [tags, setTags] = useState<string[]>([])
@@ -95,6 +95,28 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
     setType('note')
     setShowQuickCreate(false)
   }, [setShowQuickCreate])
+
+  const handleSaveFolder = useCallback(async () => {
+    if (saving) return
+    const folderName = title.trim()
+    if (!folderName) return
+    setSaving(true)
+    try {
+      await window.electronAPI.extensionBridge.invoke('terminator.notepad:folders.create', {
+        name: folderName,
+      })
+      const result = await window.electronAPI.extensionBridge.invoke(
+        'terminator.notepad:folders.list',
+        {}
+      )
+      const data = (result as { data?: unknown[] }).data
+      if (Array.isArray(data)) setFolders(data as Parameters<typeof setFolders>[0])
+      close()
+    } catch (err) {
+      console.error('[notepad] QuickCreateOverlay: save folder failed', err)
+      setSaving(false)
+    }
+  }, [title, saving, close, setFolders])
 
   useEffect(() => {
     if (!showQuickCreate) return
@@ -122,12 +144,16 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
   const handleSaveNote = useCallback(async () => {
     if (saving) return
     setSaving(true)
+    // Flush any uncommitted tag from the input field (onBlur fires before onClick
+    // but React 18 batching means the setTags update may not have applied yet)
+    const pendingTag = tagInput.trim().toLowerCase().replace(/\s+/g, '-')
+    const finalTags = pendingTag && !tags.includes(pendingTag) ? [...tags, pendingTag] : tags
     const resolvedTitle = title.trim() || deriveTitle(body)
     try {
       await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.create', {
         title: resolvedTitle,
         body,
-        tags,
+        tags: finalTags,
       })
       const result = await window.electronAPI.extensionBridge.invoke(
         'terminator.notepad:notes.list',
@@ -140,16 +166,18 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
       console.error('[notepad] QuickCreateOverlay: save note failed', err)
       setSaving(false)
     }
-  }, [title, body, tags, saving, close, setNotes])
+  }, [title, body, tags, tagInput, saving, close, setNotes])
 
   const handleSaveDiagram = useCallback(async () => {
     if (saving) return
     setSaving(true)
+    const pendingTag = tagInput.trim().toLowerCase().replace(/\s+/g, '-')
+    const finalTags = pendingTag && !tags.includes(pendingTag) ? [...tags, pendingTag] : tags
     const resolvedTitle = title.trim() || 'Untitled diagram'
     try {
       const createResult = await window.electronAPI.extensionBridge.invoke(
         'terminator.notepad:diagrams.create',
-        { title: resolvedTitle, tags }
+        { title: resolvedTitle, tags: finalTags }
       )
       const created = (createResult as { data?: { id: string } }).data
       const listResult = await window.electronAPI.extensionBridge.invoke(
@@ -166,12 +194,13 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
       console.error('[notepad] QuickCreateOverlay: save diagram failed', err)
       setSaving(false)
     }
-  }, [title, tags, saving, close, setDiagrams])
+  }, [title, tags, tagInput, saving, close, setDiagrams])
 
   const handleSave = useCallback(() => {
     if (type === 'diagram') return handleSaveDiagram()
+    if (type === 'folder') return handleSaveFolder()
     return handleSaveNote()
-  }, [type, handleSaveNote, handleSaveDiagram])
+  }, [type, handleSaveNote, handleSaveDiagram, handleSaveFolder])
 
   useEffect(() => {
     if (!showQuickCreate) return
@@ -220,7 +249,7 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
         className="notepad-quick-create"
         role="dialog"
         aria-modal="true"
-        aria-label={`New ${type}`}
+        aria-label={type === 'folder' ? 'New folder' : `New ${type}`}
       >
         <div className="notepad-quick-create__header">
           <div className="notepad-quick-create__type-tabs">
@@ -235,6 +264,12 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
               onClick={() => setType('diagram')}
             >
               Diagram
+            </button>
+            <button
+              className={`notepad-quick-create__type-tab${type === 'folder' ? ' notepad-quick-create__type-tab--active' : ''}`}
+              onClick={() => setType('folder')}
+            >
+              Folder
             </button>
           </div>
           {type === 'note' && (
@@ -262,15 +297,17 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
           </div>
         )}
         <div className="notepad-quick-create__footer">
-          <TagChipBar
-            tags={tags}
-            tagInput={tagInput}
-            tagInputRef={tagInputRef}
-            onTagInput={setTagInput}
-            onAddTag={addTag}
-            onRemoveTag={removeTag}
-            onTagKeyDown={handleTagKeyDown}
-          />
+          {type !== 'folder' && (
+            <TagChipBar
+              tags={tags}
+              tagInput={tagInput}
+              tagInputRef={tagInputRef}
+              onTagInput={setTagInput}
+              onAddTag={addTag}
+              onRemoveTag={removeTag}
+              onTagKeyDown={handleTagKeyDown}
+            />
+          )}
           <div className="notepad-quick-create__footer-actions">
             <button className="notepad-quick-create__cancel-link" onClick={close} disabled={saving}>
               cancel <kbd className="notepad-kbd notepad-kbd--inline">Esc</kbd>
