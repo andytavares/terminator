@@ -25,7 +25,6 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
   const activeSessionId = getActiveSessionForProject(projectId)
   const sessions = getSessionsForProject(projectId)
   const layout = getPaneLayout(projectId)
-
   // All hooks must run unconditionally before any early return.
   useEffect(() => {
     if (activeSessionId) clearBellCount(activeSessionId)
@@ -54,6 +53,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     }
 
     prevSessionIdRef.current = nextId
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, layout, getTerminalInstance])
 
   // Cleanup on unmount — useLayoutEffect so snapshot capture precedes browser layout.

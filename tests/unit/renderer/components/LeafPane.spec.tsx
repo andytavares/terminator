@@ -16,15 +16,17 @@ const mockClearBellCount = vi.fn()
 const mockTerminalInput = vi.fn()
 const mockSessions = new Map([['sess-1', { id: 'sess-1', tabTitle: 'Terminal 1' }]])
 
-function makeInstance() {
+function makeInstance(overrides: Record<string, unknown> = {}) {
   return {
     mount: vi.fn(),
     unmount: vi.fn(),
+    isAtBottom: false,
     terminal: {
       focus: vi.fn(),
       scrollToBottom: vi.fn(),
       paste: vi.fn(),
     },
+    ...overrides,
   }
 }
 
@@ -37,7 +39,6 @@ beforeEach(() => {
     clearBellCount: mockClearBellCount,
     sessions: mockSessions,
   } as unknown as ReturnType<typeof useSessionStore>)
-
   mockGetTerminalInstance.mockReturnValue(undefined)
   mockGetFocusedSession.mockReturnValue(null)
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
@@ -140,5 +141,46 @@ describe('LeafPane', () => {
     const { unmount } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     unmount()
     expect(instance.unmount).toHaveBeenCalled()
+  })
+
+  it('calls mount with just the container element', () => {
+    const instance = makeInstance()
+    mockGetTerminalInstance.mockReturnValue(instance)
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    expect(instance.mount).toHaveBeenCalledWith(expect.any(HTMLDivElement))
+    expect(instance.mount).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores non-left-button mousedown (button !== 0)', () => {
+    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 2 })
+    expect(mockSetFocusedSession).not.toHaveBeenCalled()
+  })
+
+  it('scrolls to bottom on click when instance is already at bottom', () => {
+    const instance = makeInstance({ isAtBottom: true })
+    mockGetTerminalInstance.mockReturnValue(instance)
+    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
+    expect(instance.terminal.scrollToBottom).toHaveBeenCalled()
+  })
+
+  it('does not scroll to bottom on click when not at bottom', () => {
+    const instance = makeInstance({ isAtBottom: false })
+    mockGetTerminalInstance.mockReturnValue(instance)
+    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
+    expect(instance.terminal.scrollToBottom).not.toHaveBeenCalled()
+  })
+
+  it('does not throw on drop when no terminal instance', () => {
+    mockGetTerminalInstance.mockReturnValue(undefined)
+    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    const file = Object.assign(new File([], 'file.txt'), { path: '/tmp/file.txt' })
+    expect(() =>
+      fireEvent.drop(container.querySelector('.leaf-pane')!, {
+        dataTransfer: { files: [file], types: ['Files'] },
+      })
+    ).not.toThrow()
   })
 })

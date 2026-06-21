@@ -2,6 +2,7 @@ appId: com.terminator.app
 productName: Terminator
 directories:
   output: dist
+npmRebuild: true
 files:
   - out/**/*
 mac:

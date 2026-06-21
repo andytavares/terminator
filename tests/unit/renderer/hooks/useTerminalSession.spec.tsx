@@ -18,13 +18,31 @@ vi.mock('../../../../src/renderer/stores/notification.store', () => ({
   }),
 }))
 
+vi.mock('../../../../src/renderer/stores/settings.store', () => ({
+  useSettingsStore: vi.fn().mockReturnValue({
+    globalSettings: {
+      terminal: {
+        scrollToBottomOnMount: false,
+        scrollToBottomOnClick: false,
+        scrollToBottomOnFocus: false,
+        scrollbackLimit: 10000,
+        defaultShell: '/bin/zsh',
+      },
+    },
+  }),
+}))
+
 // Track the bell callback so we can invoke it in tests
 let capturedBellCallback: (() => void) | undefined
+
+// Track constructor args so tests can assert on them
+let capturedConstructorArgs: [string, number, (() => void) | undefined] | undefined
 
 // Mock TerminalSession to avoid xterm import issues in test environment
 vi.mock('../../../../src/renderer/components/terminal/TerminalSession', () => ({
   TerminalInstance: class MockTerminalInstance {
-    constructor(_sessionId: string, _scrollbackLimit: number, onBell?: () => void) {
+    constructor(sessionId: string, scrollbackLimit: number, onBell?: () => void) {
+      capturedConstructorArgs = [sessionId, scrollbackLimit, onBell]
       capturedBellCallback = onBell
     }
   },
@@ -37,6 +55,7 @@ const mockIncrementBellCount = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
+  capturedConstructorArgs = undefined
   Object.assign(useNotificationStore, {
     getState: vi.fn().mockReturnValue({ addNotification: mockAddNotification }),
   })
@@ -544,6 +563,22 @@ describe('useTerminalSession', () => {
 
       expect(mockAddNotification).not.toHaveBeenCalled()
       expect(mockIncrementBellCount).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('TerminalInstance constructor', () => {
+    it('createSession constructs TerminalInstance with (sessionId, scrollbackLimit, onBell) — no scroll flag', async () => {
+      capturedConstructorArgs = undefined
+      const { useTerminalSession } = await import(
+        '../../../../src/renderer/hooks/useTerminalSession'
+      )
+      const { result } = renderHook(() => useTerminalSession())
+      await result.current.createSession('proj-1', 'human', 'Terminal', '/cwd', 5000)
+      expect(capturedConstructorArgs).toBeDefined()
+      const [sessionId, scrollbackLimit, onBell] = capturedConstructorArgs!
+      expect(sessionId).toBe('session-123')
+      expect(scrollbackLimit).toBe(5000)
+      expect(typeof onBell).toBe('function')
     })
   })
 })
