@@ -264,6 +264,7 @@ describe('OverviewScreen', () => {
     })
 
     expect(mockSetActiveProject).toHaveBeenCalledWith('proj-1')
+    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('proj-1', 'sess-1')
     expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
   })
 
