@@ -1,0 +1,49 @@
+extensions/task-vault/src/ipc/admin.ipc.ts
+  s_4f574170ff8e4c::t_6b5ece3392607d 44-50
+extensions/notepad/src/ipc/folders.ipc.ts
+  s_4f574170ff8e4c::t_caead944c9d5fb 20-32
+docs/adr/019-ilike-search-over-fts5.md
+  s_4f574170ff8e4c::t_03ef415112bad0 1-50
+docs/ARCHITECTURE.md
+  s_4f574170ff8e4c::t_2a795edc044098 537
+  s_4f574170ff8e4c::t_64305dbf082c2e 539
+extensions/notepad/src/db/db.ts
+  s_4f574170ff8e4c::t_61c79152e3ed91 8
+src/main/db/index.ts
+  s_4f574170ff8e4c::t_ada0644d6e30d2 82-83
+  s_4f574170ff8e4c::t_bd2fad16f4c37a 27-28
+  s_4f574170ff8e4c::t_1c25094f00b45d 46-47
+  s_4f574170ff8e4c::t_903f7be4b37e60 14
+  s_4f574170ff8e4c::t_9008f13da86b45 51
+tests/unit/db/index.spec.ts
+  s_4f574170ff8e4c::t_b9499eb36fb0c8 81-82,85,87-95
+  s_4f574170ff8e4c::t_b76c08bb562e96 106-108,110,115-119,121-123,127-165
+extensions/notepad/src/index.ts
+  s_4f574170ff8e4c::t_1e1fd1330d19d2 97-102
+  s_4f574170ff8e4c::t_aa369220bbc7db 50-60
+  s_4f574170ff8e4c::t_0142205049b4fc 1
+extensions/task-vault/tests/ipc/admin.ipc.spec.ts
+  s_4f574170ff8e4c::t_f95122d8def9b5 73-80
+  s_4f574170ff8e4c::t_b2b2334925371d 116,118,122-132
+  s_4f574170ff8e4c::t_bcf8823f62fcf7 95-102
+extensions/task-vault/src/index.ts
+  s_4f574170ff8e4c::t_e2066148a834b1 99-100,102-105
+extensions/notepad/src/ipc/search.ipc.ts
+  s_4f574170ff8e4c::t_06c5a8e2fde84f 110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "6ebdcd4f534ba5d0d78559c7d48add2c84fb76c0",
+  "prompts": {},
+  "sessions": {
+    "s_4f574170ff8e4c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08f012f4-d02d-4168-b28b-8577b4228a55",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
