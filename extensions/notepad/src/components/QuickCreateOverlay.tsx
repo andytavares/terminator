@@ -144,12 +144,16 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
   const handleSaveNote = useCallback(async () => {
     if (saving) return
     setSaving(true)
+    // Flush any uncommitted tag from the input field (onBlur fires before onClick
+    // but React 18 batching means the setTags update may not have applied yet)
+    const pendingTag = tagInput.trim().toLowerCase().replace(/\s+/g, '-')
+    const finalTags = pendingTag && !tags.includes(pendingTag) ? [...tags, pendingTag] : tags
     const resolvedTitle = title.trim() || deriveTitle(body)
     try {
       await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.create', {
         title: resolvedTitle,
         body,
-        tags,
+        tags: finalTags,
       })
       const result = await window.electronAPI.extensionBridge.invoke(
         'terminator.notepad:notes.list',
@@ -162,16 +166,18 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
       console.error('[notepad] QuickCreateOverlay: save note failed', err)
       setSaving(false)
     }
-  }, [title, body, tags, saving, close, setNotes])
+  }, [title, body, tags, tagInput, saving, close, setNotes])
 
   const handleSaveDiagram = useCallback(async () => {
     if (saving) return
     setSaving(true)
+    const pendingTag = tagInput.trim().toLowerCase().replace(/\s+/g, '-')
+    const finalTags = pendingTag && !tags.includes(pendingTag) ? [...tags, pendingTag] : tags
     const resolvedTitle = title.trim() || 'Untitled diagram'
     try {
       const createResult = await window.electronAPI.extensionBridge.invoke(
         'terminator.notepad:diagrams.create',
-        { title: resolvedTitle, tags }
+        { title: resolvedTitle, tags: finalTags }
       )
       const created = (createResult as { data?: { id: string } }).data
       const listResult = await window.electronAPI.extensionBridge.invoke(
@@ -188,7 +194,7 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
       console.error('[notepad] QuickCreateOverlay: save diagram failed', err)
       setSaving(false)
     }
-  }, [title, tags, saving, close, setDiagrams])
+  }, [title, tags, tagInput, saving, close, setDiagrams])
 
   const handleSave = useCallback(() => {
     if (type === 'diagram') return handleSaveDiagram()
