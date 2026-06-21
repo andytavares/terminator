@@ -46,7 +46,7 @@ export function NotepadView(): React.JSX.Element {
   const [showExport, setShowExport] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [showComments, setShowComments] = useState(true)
-  const [readingMode, setReadingMode] = useState(true)
+  const [readingMode, setReadingMode] = useState(false)
   const [loadedNoteId, setLoadedNoteId] = useState<string | null>(null)
   const [pendingAnchor, setPendingAnchor] = useState<SelectionAnchor | null>(null)
   const [composingAnchor, setComposingAnchor] = useState<SelectionAnchor | null>(null)
@@ -196,8 +196,6 @@ export function NotepadView(): React.JSX.Element {
   useEffect(() => {
     if (!selectedNoteId) return
     activeIdRef.current = selectedNoteId
-    // Reset to read mode when switching notes so the new note opens rendered
-    setReadingMode(true)
     // Clear stale comments immediately so the previous note's anchors don't
     // get applied to the newly mounted editor before the new note loads.
     setComments([])
