@@ -1,0 +1,24 @@
+tests/unit/renderer/components/LeafPane.spec.tsx
+  s_a9b5fcb79d8eb2::t_bf7609fc733639 19,23,29
+  s_a9b5fcb79d8eb2::t_c238da90857c87 146-174,178,185
+src/renderer/components/terminal/TerminalPane.tsx
+  s_a9b5fcb79d8eb2::t_91889baedf24dd 56
+package.json
+  s_a9b5fcb79d8eb2::t_06abb696127e9b 31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "195ac3de9d5fc22f9500e3af620e35a21e9958a5",
+  "prompts": {},
+  "sessions": {
+    "s_a9b5fcb79d8eb2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "475f072c-a51e-4c33-bc3f-7bb2e83c6e86",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
