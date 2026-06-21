@@ -107,6 +107,7 @@ export async function searchNotes(
   }
 
   if (textQuery) {
+    // ILIKE replaces FTS5; full sequential scan on large sets — see ADR-019 for upgrade path.
     whereConditions.push(`(n.title ILIKE ? OR n.body ILIKE ?)`)
     whereParams.push(`%${textQuery}%`, `%${textQuery}%`)
   }

@@ -5,7 +5,7 @@ export { randomUUID }
 
 export async function hasColumn(db: ExtensionDB, table: string, column: string): Promise<boolean> {
   const rows = await db.query<{ column_name: string }>(
-    `SELECT column_name FROM information_schema.columns WHERE table_name = ? AND column_name = ?`,
+    `SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name = ? AND column_name = ?`,
     [table, column]
   )
   return rows.length > 0

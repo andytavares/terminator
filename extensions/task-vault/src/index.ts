@@ -96,11 +96,13 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   })
   ipcMain.handle('task-vault:db.reset', async () => {
     try {
+      // Delete rows in FK-safe order; do not drop tables — the settings table is
+      // shared with other extensions in the unified PGlite database.
       await db.exec(`
-        DROP TABLE IF EXISTS tasks;
-        DROP TABLE IF EXISTS projects;
-        DROP TABLE IF EXISTS areas;
-        DROP TABLE IF EXISTS settings;
+        DELETE FROM tasks;
+        DELETE FROM projects;
+        DELETE FROM areas;
+        DELETE FROM settings;
       `)
       await applyTaskVaultSchema(db)
       await applyTaskVaultMigrations(db)

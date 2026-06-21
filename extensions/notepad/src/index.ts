@@ -1,3 +1,4 @@
+import { ipcMain } from 'electron'
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import { applyNotepadSchema, applyNotepadMigrations } from './db/db'
 import { registerNotesIpcHandlers, registerTagsIpcHandlers } from './ipc/notes.ipc'
@@ -46,6 +47,17 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   const disposeFolders = registerFoldersIpcHandlers(api.db)
   disposables.push({ dispose: disposeFolders })
 
+  ipcMain.handle('terminator.notepad:db.reinit', async () => {
+    try {
+      await applyNotepadSchema(api.db)
+      await applyNotepadMigrations(api.db)
+      return { data: { ok: true } }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  disposables.push({ dispose: () => ipcMain.removeHandler('terminator.notepad:db.reinit') })
+
   disposables.push(
     api.settings.register({
       label: 'Notepad',
@@ -81,6 +93,12 @@ export async function activate(api: ExtensionAPI): Promise<void> {
           label: 'Editor font size',
           description: 'Font size in pixels',
           default: 14,
+        },
+        'terminator.notepad.db.reinit': {
+          type: 'action',
+          label: 'Re-initialise database',
+          description: 'Re-apply schema and migrations without deleting data',
+          channel: 'terminator.notepad:db.reinit',
         },
         'terminator.notepad.mcpSidecar': {
           type: 'boolean',

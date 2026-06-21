@@ -41,8 +41,13 @@ export function registerAdminIpcHandlers(db: ExtensionDB): () => void {
         if (BLOCKED_DDL.test(sql.trim())) {
           return { error: 'DDL statements (DROP, CREATE, ALTER) are not permitted' }
         }
-        const rows = await db.query(sql)
-        return { rows, changes: 0 }
+        const isSelect = /^\s*(select|explain|with\b)/i.test(sql.trim())
+        if (isSelect) {
+          const rows = await db.query(sql)
+          return { rows, changes: 0 }
+        }
+        const changes = await db.run(sql)
+        return { rows: [], changes: changes ?? 0 }
       } catch (err) {
         return { error: String(err) }
       }

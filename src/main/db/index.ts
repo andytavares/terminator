@@ -11,7 +11,7 @@ export interface ExtensionDB {
     sql: string,
     params?: unknown[]
   ): Promise<T | undefined>
-  run(sql: string, params?: unknown[]): Promise<void>
+  run(sql: string, params?: unknown[]): Promise<number>
   transaction<T>(fn: (tx: ExtensionDB) => Promise<T>): Promise<T>
 }
 
@@ -23,6 +23,8 @@ function toPositional(sql: string, params?: unknown[]): [string, unknown[]] {
 }
 
 type PgTx = Parameters<Parameters<PGlite['transaction']>[0]>[0]
+
+let _spCount = 0
 
 function wrapTx(tx: PgTx): ExtensionDB {
   return {
@@ -41,11 +43,12 @@ function wrapTx(tx: PgTx): ExtensionDB {
     },
     async run(sql: string, params?: unknown[]) {
       const [s, p] = toPositional(sql, params)
-      await tx.query(s, p)
+      const result = await tx.query(s, p)
+      return result.affectedRows ?? 0
     },
     async transaction<T>(fn: (tx2: ExtensionDB) => Promise<T>) {
       // PGlite does not support nested BEGIN; demote to a savepoint.
-      const sp = `sp_${Math.random().toString(36).slice(2)}`
+      const sp = `sp_${++_spCount}`
       await tx.exec(`SAVEPOINT ${sp}`)
       try {
         const result = await fn(wrapTx(tx))
@@ -76,7 +79,8 @@ export function wrapDb(db: PGlite): ExtensionDB {
     },
     async run(sql: string, params?: unknown[]) {
       const [s, p] = toPositional(sql, params)
-      await db.query(s, p)
+      const result = await db.query(s, p)
+      return result.affectedRows ?? 0
     },
     async transaction<T>(fn: (tx: ExtensionDB) => Promise<T>) {
       return db.transaction((tx) => fn(wrapTx(tx)))

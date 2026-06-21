@@ -17,15 +17,19 @@ export async function createFolder(
   const now = new Date().toISOString()
   const name = parsed.data.name.trim()
 
-  const maxRow = await db.get<{ max: number | null }>('SELECT MAX(sort_order) AS max FROM folders')
-  const sortOrder = (maxRow?.max ?? -1) + 1
-
-  await db.run('INSERT INTO folders (id, name, sort_order, created_at) VALUES (?, ?, ?, ?)', [
-    id,
-    name,
-    sortOrder,
-    now,
-  ])
+  let sortOrder = 0
+  await db.transaction(async (tx) => {
+    const maxRow = await tx.get<{ max: number | null }>(
+      'SELECT MAX(sort_order) AS max FROM folders'
+    )
+    sortOrder = (maxRow?.max ?? -1) + 1
+    await tx.run('INSERT INTO folders (id, name, sort_order, created_at) VALUES (?, ?, ?, ?)', [
+      id,
+      name,
+      sortOrder,
+      now,
+    ])
+  })
 
   return { data: { id, name, sortOrder, createdAt: now } }
 }

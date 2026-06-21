@@ -70,6 +70,14 @@ describe('registerAdminIpcHandlers', () => {
       }
       expect(result.tables).toEqual(['tasks', 'projects'])
     })
+
+    it('returns error when query throws', async () => {
+      const db = createMockDb()
+      db.mockQuery.mockRejectedValueOnce(new Error('connection lost'))
+      registerAdminIpcHandlers(db)
+      const result = (await getHandler(db, 'task-vault:admin:list-tables')()) as { error: string }
+      expect(result.error).toMatch(/connection lost/)
+    })
   })
 
   describe('table-stats', () => {
@@ -84,6 +92,14 @@ describe('registerAdminIpcHandlers', () => {
       expect(result.stats.tasks).toBe(42)
       expect(result.stats.areas).toBe(5)
     })
+
+    it('returns error when query throws', async () => {
+      const db = createMockDb()
+      db.mockQuery.mockRejectedValueOnce(new Error('pg error'))
+      registerAdminIpcHandlers(db)
+      const result = (await getHandler(db, 'task-vault:admin:table-stats')()) as { error: string }
+      expect(result.error).toMatch(/pg error/)
+    })
   })
 
   describe('run-query', () => {
@@ -97,12 +113,23 @@ describe('registerAdminIpcHandlers', () => {
       expect(result.rows).toHaveLength(1)
     })
 
-    it('returns changes: 0 for write queries', async () => {
+    it('returns changes count for write queries', async () => {
       const db = createMockDb()
-      db.mockQuery.mockResolvedValueOnce([])
+      db.mockRun.mockResolvedValueOnce(3)
       registerAdminIpcHandlers(db)
       const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
         sql: "DELETE FROM tasks WHERE status='cancelled'",
+      })) as { rows: unknown[]; changes: number }
+      expect(result.rows).toHaveLength(0)
+      expect(result.changes).toBe(3)
+    })
+
+    it('returns changes: 0 when no rows affected by write', async () => {
+      const db = createMockDb()
+      db.mockRun.mockResolvedValueOnce(0)
+      registerAdminIpcHandlers(db)
+      const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
+        sql: "UPDATE tasks SET status='open' WHERE 1=0",
       })) as { changes: number }
       expect(result.changes).toBe(0)
     })

@@ -534,9 +534,9 @@ Renderer process (jsdom + React + CM6)
 
 Notes and diagrams are stored in the **shared PGlite (PostgreSQL-compatible) database** at `<userData>/app.pglite`. The notepad extension never manages its own database file; it receives an `ExtensionDB` instance (defined in `src/main/db/index.ts`) injected into every IPC handler at registration time. `ExtensionDB` wraps PGlite with a SQLite-compatible `?`-placeholder API via a positional converter, and exposes `exec`, `query`, `get`, `run`, and `transaction`. Nested `transaction()` calls automatically demote to PostgreSQL savepoints.
 
-**Legacy migration**: on first launch after upgrading from a better-sqlite3 version, `src/main/migration/sqlite-to-pglite.ts` reads the old `notepad.db` / `vault.db` files via `sql.js` (WASM) and inserts the rows into PGlite. Migration is idempotent (skipped if the target tables are already populated).
+**Legacy migration**: on first launch after upgrading from a better-sqlite3 version, `src/main/db/migrate.ts` reads the old `notepad.db` / `vault.db` files via `sql.js` (WASM) and inserts the rows into PGlite. Migration is idempotent (skipped if the target tables are already populated).
 
-**Search**: full-text search uses `ILIKE` (case-insensitive pattern match) rather than a dedicated FTS5 virtual table. Tag filters are applied in the same query via `EXISTS` subqueries. This simplifies the schema at the cost of FTS5 BM25 ranking — results are returned in `updated_at DESC` order.
+**Search**: full-text search uses `ILIKE` (case-insensitive pattern match) rather than a dedicated FTS5 virtual table. Tag filters are applied in the same query via `EXISTS` subqueries. This simplifies the schema at the cost of FTS5 BM25 ranking — results are returned in `updated_at DESC` order. See [ADR-019](adr/019-ilike-search-over-fts5.md) for the trade-off rationale and the planned `pg_trgm` upgrade path.
 
 ### Data Flow
 
