@@ -1,0 +1,41 @@
+README.md
+  s_4f574170ff8e4c::t_f1fb3a4c0fb483 56
+  s_4f574170ff8e4c::t_f5c62cf7c4dd64 17
+  s_4f574170ff8e4c::t_ac431da1fa8e62 78
+extensions/notepad/src/ipc/folders.ipc.ts
+  s_4f574170ff8e4c::t_8fdd8ce64c3e25 110,113
+src/main/db/index.ts
+  s_4f574170ff8e4c::t_f960435ece1f98 47-57
+extensions/notepad/src/components/DiagramWindowView.tsx
+  s_4f574170ff8e4c::t_a715744e98abf7 34
+  s_4f574170ff8e4c::t_8f3423de42754e 6-7,11,13,16,19,25
+extensions/notepad/src/ipc/notes.ipc.ts
+  s_4f574170ff8e4c::t_ef008427a54fdb 373,377
+  s_4f574170ff8e4c::t_395b2adb252673 17
+docs/ARCHITECTURE.md
+  s_4f574170ff8e4c::t_12833d6494e98f 514-517,519-520,525,529-530,533-540,543,545,547-549,556
+extensions/notepad/src/components/NoteList.tsx
+  s_4f574170ff8e4c::t_49331b50ac7ae6 399
+  s_4f574170ff8e4c::t_21162ec5131a8d 1
+  s_4f574170ff8e4c::t_94d97b406a53f6 532,553
+  s_4f574170ff8e4c::t_1065a54215e7ab 11
+  s_4f574170ff8e4c::t_c7c70a2bf801e7 1177
+extensions/notepad/src/ipc/export.ipc.ts
+  s_4f574170ff8e4c::t_2bb5c3bb5d18fe 92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "9361d082f856988388f76c8c1ae9e2e3c784bf11",
+  "prompts": {},
+  "sessions": {
+    "s_4f574170ff8e4c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08f012f4-d02d-4168-b28b-8577b4228a55",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
