@@ -177,7 +177,8 @@ export function buildDecorations(state: EditorState, selection: { anchor: number
   syntaxTree(state).iterate({
     enter(node) {
       const lineNum = state.doc.lineAt(node.from).number
-      const onCursorLine = lineNum === cursorLine
+      // In read-only mode show fully-rendered markdown — no cursor-line raw reveal
+      const onCursorLine = !state.readOnly && lineNum === cursorLine
 
       switch (node.name) {
         case 'ATXHeading1':
@@ -267,8 +268,8 @@ export function buildDecorations(state: EditorState, selection: { anchor: number
         }
 
         case 'FencedCode': {
-          // Show raw fences when cursor is anywhere inside the block
-          const isInBlock = cursorPos >= node.from && cursorPos <= node.to
+          // Show raw fences when cursor is anywhere inside the block (edit mode only)
+          const isInBlock = !state.readOnly && cursorPos >= node.from && cursorPos <= node.to
           if (!isInBlock) {
             const codeInfoNode = node.node.getChild('CodeInfo')
             const lang = codeInfoNode
