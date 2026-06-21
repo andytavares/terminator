@@ -44,8 +44,17 @@ function wrapTx(tx: PgTx): ExtensionDB {
       await tx.query(s, p)
     },
     async transaction<T>(fn: (tx2: ExtensionDB) => Promise<T>) {
-      // Nested transaction — reuse the same tx (pglite handles savepoints)
-      return fn(wrapTx(tx))
+      // PGlite does not support nested BEGIN; demote to a savepoint.
+      const sp = `sp_${Math.random().toString(36).slice(2)}`
+      await tx.exec(`SAVEPOINT ${sp}`)
+      try {
+        const result = await fn(wrapTx(tx))
+        await tx.exec(`RELEASE SAVEPOINT ${sp}`)
+        return result
+      } catch (e) {
+        await tx.exec(`ROLLBACK TO SAVEPOINT ${sp}`)
+        throw e
+      }
     },
   }
 }

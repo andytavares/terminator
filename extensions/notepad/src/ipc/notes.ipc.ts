@@ -14,6 +14,7 @@ function deriveTitle(body: string): string {
   return 'Untitled note'
 }
 
+// Upsert tags and reconcile note_tags; safe to call within an open transaction.
 async function reconcileTags(db: ExtensionDB, noteId: string, tagNames: string[]): Promise<void> {
   const normalized = tagNames.map((t) => t.toLowerCase().trim()).filter(Boolean)
 
@@ -369,10 +370,11 @@ export async function reorderItems(
 
   const { items } = parsed.data
 
+  const TABLE_MAP = { note: 'notes', diagram: 'diagrams' } as const
   await db.transaction(async (tx) => {
     for (let i = 0; i < items.length; i++) {
       const { id, type } = items[i]
-      const table = type === 'diagram' ? 'diagrams' : 'notes'
+      const table = TABLE_MAP[type]
       await tx.run(`UPDATE ${table} SET sort_order = ? WHERE id = ?`, [i, id])
     }
   })

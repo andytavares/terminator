@@ -107,9 +107,10 @@ export async function moveItemsToFolder(
     if (!folderExists) return { error: 'FOLDER_NOT_FOUND' }
   }
 
+  const TABLE_MAP = { note: 'notes', diagram: 'diagrams' } as const
   await db.transaction(async (tx) => {
     for (const { id, type } of items) {
-      const table = type === 'diagram' ? 'diagrams' : 'notes'
+      const table = TABLE_MAP[type]
       await tx.run(`UPDATE ${table} SET folder_id=? WHERE id=?`, [folderId, id])
     }
   })

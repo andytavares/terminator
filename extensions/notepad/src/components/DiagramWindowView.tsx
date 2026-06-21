@@ -2,30 +2,27 @@ import './notepad.css'
 import React, { useEffect, useState } from 'react'
 import { DiagramView } from './DiagramView'
 
-const DIAGRAM_ID = new URLSearchParams(window.location.search).get('diagramId') ?? ''
-
 export function DiagramWindowView(_props: { repoRoot: string | null }): React.JSX.Element {
+  // Read at component init so this component is testable with a mocked location.
+  const diagramId = new URLSearchParams(window.location.search).get('diagramId') ?? ''
   const [title, setTitle] = useState('Diagram')
 
   useEffect(() => {
-    if (!DIAGRAM_ID) return
+    if (!diagramId) return
     window.electronAPI.extensionBridge
-      .invoke('terminator.notepad:diagrams.get', { id: DIAGRAM_ID })
+      .invoke('terminator.notepad:diagrams.get', { id: diagramId })
       .then((result) => {
         const diagram = (result as { data?: { title: string } }).data
-        if (diagram?.title) {
-          setTitle(diagram.title)
-          document.title = diagram.title
-        }
+        if (diagram?.title) setTitle(diagram.title)
       })
       .catch(console.error)
-  }, [])
+  }, [diagramId])
 
   useEffect(() => {
     document.title = title
   }, [title])
 
-  if (!DIAGRAM_ID) {
+  if (!diagramId) {
     return <div className="notepad-window-loading">No diagram ID provided</div>
   }
 
@@ -34,7 +31,7 @@ export function DiagramWindowView(_props: { repoRoot: string | null }): React.JS
       className="notepad-window"
       style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}
     >
-      <DiagramView key={DIAGRAM_ID} diagramId={DIAGRAM_ID} />
+      <DiagramView key={diagramId} diagramId={diagramId} />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   X,
   LayoutTemplate,
@@ -8,6 +8,7 @@ import {
   Tag as TagIcon,
   Check,
 } from 'lucide-react'
+import { ConfirmDialog } from '../../../../src/renderer/components/ConfirmDialog'
 import { useNotesStore } from '../stores/notes.store'
 import { useFilterStore } from '../stores/filter.store'
 import { EmptyState } from './EmptyState'
@@ -395,6 +396,7 @@ export function NoteList(): React.JSX.Element {
   const [folderRenameState, setFolderRenameState] = useState<{ id: string; name: string } | null>(
     null
   )
+  const [folderDeletePending, setFolderDeletePending] = useState<string | null>(null)
 
   // Drag-and-drop state
   const [dragId, setDragId] = useState<string | null>(null)
@@ -527,7 +529,7 @@ export function NoteList(): React.JSX.Element {
     await reloadAll()
   }
 
-  async function reloadAll() {
+  const reloadAll = useCallback(async () => {
     try {
       const [notesResult, diagramsResult, foldersResult] = await Promise.all([
         window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.list', {
@@ -548,7 +550,7 @@ export function NoteList(): React.JSX.Element {
     } catch (err) {
       console.error('[notepad] Failed to reload', err)
     }
-  }
+  }, [setNotes, setDiagrams, setFolders])
 
   // Resolve active tag names for client-side filtering
   const activeTagNames = activeTagIds
@@ -658,10 +660,6 @@ export function NoteList(): React.JSX.Element {
   }
 
   async function handleFolderDelete(folderId: string) {
-    const ok = window.confirm(
-      'Delete this folder? Notes and diagrams inside will be moved to the root.'
-    )
-    if (!ok) return
     await window.electronAPI.extensionBridge
       .invoke('terminator.notepad:folders.delete', { id: folderId })
       .catch(console.error)
@@ -694,96 +692,110 @@ export function NoteList(): React.JSX.Element {
     )
   }
 
-  function makeDragProps(id: string, type: 'note' | 'diagram'): DragProps {
-    return {
-      draggable: searchResults === null,
-      dragOverPosition: dropTarget?.id === id ? (dropTarget.before ? 'before' : 'after') : null,
-      onDragStart(e) {
-        setDragId(id)
-        setDragType(type)
-        e.dataTransfer.effectAllowed = 'move'
-      },
-      onDragOver(e) {
-        e.preventDefault()
-        e.dataTransfer.dropEffect = 'move'
-        const rect = e.currentTarget.getBoundingClientRect()
-        const before = e.clientY < rect.top + rect.height / 2
-        setDropTarget((prev) => (prev?.id === id && prev.before === before ? prev : { id, before }))
-      },
-      onDragLeave() {
-        setDropTarget((prev) => (prev?.id === id ? null : prev))
-      },
-      onDrop(e) {
-        e.preventDefault()
-        e.stopPropagation()
-        if (!dragId || !dragType || !dropTarget) {
-          setDragId(null)
-          setDragType(null)
-          setDropTarget(null)
-          return
-        }
-
-        const draggedEntry = activeItems.find((en) => en.item.id === dragId)
-        const dropEntry = activeItems.find((en) => en.item.id === dropTarget.id)
-
-        const draggedFolderId =
-          draggedEntry && 'folderId' in draggedEntry.item ? draggedEntry.item.folderId : null
-        const dropFolderId =
-          dropEntry && 'folderId' in dropEntry.item ? dropEntry.item.folderId : null
-
-        // Determine the item set to reorder within
-        const sameGroup = draggedFolderId === dropFolderId
-        const baseItems = dropFolderId === null ? rootActiveItems : getItemsInFolder(dropFolderId)
-        const ordered = baseItems.map((en) => ({ id: en.item.id, type: en.kind }))
-
-        // If dragged item is in a different group, inject it into the destination list
-        const fromIdx = ordered.findIndex((i) => i.id === dragId)
-        const dropIdx = ordered.findIndex((i) => i.id === dropTarget.id)
-
-        if (dropIdx === -1) {
-          setDragId(null)
-          setDragType(null)
-          setDropTarget(null)
-          return
-        }
-
-        const newOrder = [...ordered]
-        if (fromIdx !== -1) newOrder.splice(fromIdx, 1)
-        const newDropIdx = newOrder.findIndex((i) => i.id === dropTarget.id)
-        newOrder.splice(dropTarget.before ? newDropIdx : newDropIdx + 1, 0, {
-          id: dragId,
-          type: dragType,
-        })
-
-        setDragId(null)
-        setDragType(null)
-        setDropTarget(null)
-
-        const ops: Promise<unknown>[] = [
-          window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.reorder', {
-            items: newOrder,
-          }),
-        ]
-        if (!sameGroup) {
-          ops.push(
-            window.electronAPI.extensionBridge.invoke('terminator.notepad:folders.move', {
-              items: [{ id: dragId, type: dragType }],
-              folderId: dropFolderId,
-            })
+  const makeDragProps = useCallback(
+    function makeDragProps(id: string, type: 'note' | 'diagram'): DragProps {
+      return {
+        draggable: searchResults === null,
+        dragOverPosition: dropTarget?.id === id ? (dropTarget.before ? 'before' : 'after') : null,
+        onDragStart(e) {
+          setDragId(id)
+          setDragType(type)
+          e.dataTransfer.effectAllowed = 'move'
+        },
+        onDragOver(e) {
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+          const rect = e.currentTarget.getBoundingClientRect()
+          const before = e.clientY < rect.top + rect.height / 2
+          setDropTarget((prev) =>
+            prev?.id === id && prev.before === before ? prev : { id, before }
           )
-        }
-        Promise.all(ops)
-          .then(() => reloadAll())
-          .catch(console.error)
-      },
-      onDragEnd() {
-        setDragId(null)
-        setDragType(null)
-        setDropTarget(null)
-        setFolderDropTarget(null)
-      },
-    }
-  }
+        },
+        onDragLeave() {
+          setDropTarget((prev) => (prev?.id === id ? null : prev))
+        },
+        onDrop(e) {
+          e.preventDefault()
+          e.stopPropagation()
+          if (!dragId || !dragType || !dropTarget) {
+            setDragId(null)
+            setDragType(null)
+            setDropTarget(null)
+            return
+          }
+
+          const draggedEntry = activeItems.find((en) => en.item.id === dragId)
+          const dropEntry = activeItems.find((en) => en.item.id === dropTarget.id)
+
+          const draggedFolderId =
+            draggedEntry && 'folderId' in draggedEntry.item ? draggedEntry.item.folderId : null
+          const dropFolderId =
+            dropEntry && 'folderId' in dropEntry.item ? dropEntry.item.folderId : null
+
+          // Determine the item set to reorder within
+          const sameGroup = draggedFolderId === dropFolderId
+          const baseItems = dropFolderId === null ? rootActiveItems : getItemsInFolder(dropFolderId)
+          const ordered = baseItems.map((en) => ({ id: en.item.id, type: en.kind }))
+
+          // If dragged item is in a different group, inject it into the destination list
+          const fromIdx = ordered.findIndex((i) => i.id === dragId)
+          const dropIdx = ordered.findIndex((i) => i.id === dropTarget.id)
+
+          if (dropIdx === -1) {
+            setDragId(null)
+            setDragType(null)
+            setDropTarget(null)
+            return
+          }
+
+          const newOrder = [...ordered]
+          if (fromIdx !== -1) newOrder.splice(fromIdx, 1)
+          const newDropIdx = newOrder.findIndex((i) => i.id === dropTarget.id)
+          newOrder.splice(dropTarget.before ? newDropIdx : newDropIdx + 1, 0, {
+            id: dragId,
+            type: dragType,
+          })
+
+          setDragId(null)
+          setDragType(null)
+          setDropTarget(null)
+
+          const ops: Promise<unknown>[] = [
+            window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.reorder', {
+              items: newOrder,
+            }),
+          ]
+          if (!sameGroup) {
+            ops.push(
+              window.electronAPI.extensionBridge.invoke('terminator.notepad:folders.move', {
+                items: [{ id: dragId, type: dragType }],
+                folderId: dropFolderId,
+              })
+            )
+          }
+          Promise.all(ops)
+            .then(() => reloadAll())
+            .catch(console.error)
+        },
+        onDragEnd() {
+          setDragId(null)
+          setDragType(null)
+          setDropTarget(null)
+          setFolderDropTarget(null)
+        },
+      }
+    },
+    [
+      searchResults,
+      dropTarget,
+      dragId,
+      dragType,
+      activeItems,
+      rootActiveItems,
+      getItemsInFolder,
+      reloadAll,
+    ]
+  )
 
   function makeFolderDropProps(folderId: string) {
     return {
@@ -1162,7 +1174,7 @@ export function NoteList(): React.JSX.Element {
             onClick={() => {
               const { folderId } = folderContextMenu
               setFolderContextMenu(null)
-              void handleFolderDelete(folderId)
+              setFolderDeletePending(folderId)
             }}
           >
             Delete folder
@@ -1176,6 +1188,21 @@ export function NoteList(): React.JSX.Element {
           state={editModal}
           onClose={() => setEditModal(null)}
           onSaved={() => void reloadAll()}
+        />
+      )}
+
+      {folderDeletePending && (
+        <ConfirmDialog
+          title="Delete folder?"
+          description="Notes and diagrams inside will be moved to the root."
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => {
+            const id = folderDeletePending
+            setFolderDeletePending(null)
+            void handleFolderDelete(id)
+          }}
+          onClose={() => setFolderDeletePending(null)}
         />
       )}
     </div>
