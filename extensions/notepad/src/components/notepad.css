@@ -208,13 +208,109 @@
   flex-shrink: 0;
 }
 
-.notepad-tag-sidebar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 6px 8px;
+.notepad-tag-filter {
+  position: relative;
+  padding: 4px 8px;
   border-bottom: 1px solid var(--tm-border, rgba(255, 255, 255, 0.08));
   flex-shrink: 0;
+}
+
+.notepad-tag-filter__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  color: var(--tm-text-muted, rgba(255, 255, 255, 0.5));
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    background 80ms ease,
+    border-color 80ms ease;
+}
+
+.notepad-tag-filter__btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--tm-text, rgba(255, 255, 255, 0.8));
+}
+
+.notepad-tag-filter__btn--active {
+  background: rgba(79, 142, 247, 0.15);
+  border-color: rgba(79, 142, 247, 0.4);
+  color: var(--tm-accent, #4f8ef7);
+}
+
+.notepad-tag-filter__clear-x {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.6;
+  margin-left: 2px;
+  cursor: pointer;
+}
+
+.notepad-tag-filter__clear-x:hover {
+  opacity: 1;
+}
+
+.notepad-tag-filter__dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 8px;
+  min-width: 180px;
+  background: var(--tm-bg-dropdown, #1e1e2e);
+  border: 1px solid var(--tm-border, rgba(255, 255, 255, 0.12));
+  border-radius: 7px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  z-index: 100;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.notepad-tag-filter__option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--tm-text-muted, rgba(255, 255, 255, 0.6));
+  cursor: pointer;
+  text-align: left;
+}
+
+.notepad-tag-filter__option:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--tm-text, rgba(255, 255, 255, 0.85));
+}
+
+.notepad-tag-filter__option--active {
+  color: var(--tm-text, rgba(255, 255, 255, 0.9));
+}
+
+.notepad-tag-filter__check {
+  width: 12px;
+  display: flex;
+  align-items: center;
+  color: var(--tm-accent, #4f8ef7);
+  flex-shrink: 0;
+}
+
+.notepad-tag-filter__hash {
+  opacity: 0.5;
+}
+
+.notepad-tag-filter__count {
+  margin-left: auto;
+  opacity: 0.4;
+  font-size: 10px;
 }
 
 .notepad-note-list__notes {
@@ -286,6 +382,99 @@
 
 .notepad-note-row--dimmed {
   opacity: 0.55;
+}
+
+.notepad-note-row--drag-over-before {
+  box-shadow: inset 0 2px 0 0 var(--tm-accent, #4f9eff);
+}
+
+.notepad-note-row--drag-over-after {
+  box-shadow: inset 0 -2px 0 0 var(--tm-accent, #4f9eff);
+}
+
+/* ── Folder sections ────────────────────────────────────────────── */
+.notepad-folder-section {
+  border-bottom: 1px solid var(--tm-border, rgba(255, 255, 255, 0.05));
+}
+
+.notepad-folder-header {
+  display: flex;
+  align-items: center;
+}
+
+.notepad-folder-header__toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--tm-text-muted, rgba(255, 255, 255, 0.45));
+  font-size: 11px;
+  font-family: inherit;
+  text-align: left;
+}
+
+.notepad-folder-header__toggle:hover {
+  color: var(--tm-text, rgba(255, 255, 255, 0.85));
+  background: var(--tm-bg-hover, rgba(255, 255, 255, 0.04));
+}
+
+.notepad-folder-header--drop-target .notepad-folder-header__toggle {
+  background: var(--tm-accent-subtle, rgba(79, 158, 255, 0.15));
+  color: var(--tm-accent, #4f9eff);
+  outline: 1px solid var(--tm-accent, #4f9eff);
+  outline-offset: -1px;
+}
+
+.notepad-folder-header__icon {
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.notepad-folder-header__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notepad-folder-header__rename-input {
+  flex: 1;
+  background: var(--tm-bg-input, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--tm-accent, #4f9eff);
+  border-radius: 3px;
+  color: inherit;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 1px 4px;
+  outline: none;
+}
+
+.notepad-folder-header__count {
+  font-size: 10px;
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+.notepad-folder-items {
+  padding-left: 14px;
+}
+
+.notepad-folder-empty {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--tm-text-muted, rgba(255, 255, 255, 0.3));
+  font-style: italic;
+}
+
+/* ── Context menu separator ─────────────────────────────────────── */
+.notepad-context-menu__separator {
+  height: 1px;
+  background: var(--tm-border, rgba(255, 255, 255, 0.08));
+  margin: 2px 0;
 }
 
 /* ── Note row ───────────────────────────────────────────────────── */
@@ -491,15 +680,17 @@
 .notepad-tag-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
   color: var(--tm-text-muted, rgba(255, 255, 255, 0.55));
-  font-size: 12px;
-  padding: 3px 10px;
+  font-size: 11px;
+  padding: 2px 7px;
   cursor: pointer;
   font-family: inherit;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition:
     background 80ms ease,
     border-color 80ms ease;
@@ -713,12 +904,12 @@
 
 .notepad-quick-create {
   position: relative;
-  width: 680px;
+  width: 520px;
   max-width: calc(100vw - 40px);
   background: var(--tm-bg-elevated, #18181f);
   border: 1px solid var(--tm-border, rgba(255, 255, 255, 0.12));
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -730,12 +921,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px 10px;
+  padding: 10px 14px 8px;
 }
 
 .notepad-quick-create__heading {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--tm-text-primary, rgba(255, 255, 255, 0.9));
 }
 
@@ -744,18 +935,18 @@
   align-items: center;
   gap: 2px;
   background: rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
-  padding: 3px;
+  border-radius: 6px;
+  padding: 2px;
 }
 
 .notepad-quick-create__type-tab {
-  padding: 4px 14px;
-  font-size: 13px;
+  padding: 3px 10px;
+  font-size: 12px;
   font-weight: 500;
   font-family: inherit;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
   transition:
@@ -773,7 +964,7 @@
 }
 
 .notepad-quick-create__vault-status {
-  font-size: 12px;
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.4);
 }
 
@@ -796,10 +987,10 @@
   background: transparent;
   border: none;
   outline: none;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   color: rgba(255, 255, 255, 0.9);
-  padding: 12px 20px 8px;
+  padding: 8px 14px 6px;
   font-family: inherit;
 }
 
@@ -813,7 +1004,7 @@
   flex-direction: column;
   gap: 0;
   padding: 0;
-  height: 220px;
+  height: 160px;
   overflow: hidden;
 }
 
@@ -837,7 +1028,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 16px;
+  padding: 8px 12px;
   border-top: 1px solid var(--tm-border, rgba(255, 255, 255, 0.08));
 }
 

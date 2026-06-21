@@ -1,34 +1,30 @@
 import { ipcMain } from 'electron'
-import { getDb } from '../vault/db'
+import type { ExtensionDB } from '../../../../src/main/extensions/api'
 
-// Block DDL to prevent schema corruption
 const BLOCKED_DDL = /^\s*(drop|create|alter)\s/i
 
-export function registerAdminIpcHandlers(): () => void {
-  const listTablesHandler = ipcMain.handle('task-vault:admin:list-tables', () => {
+export function registerAdminIpcHandlers(db: ExtensionDB): () => void {
+  const listTablesHandler = ipcMain.handle('task-vault:admin:list-tables', async () => {
     try {
-      const db = getDb()
-      const rows = db
-        .prepare(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`)
-        .all() as { name: string }[]
-      return { tables: rows.map((r) => r.name) }
+      const rows = await db.query<{ table_name: string }>(
+        `SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name`
+      )
+      return { tables: rows.map((r) => r.table_name) }
     } catch (err) {
       return { error: String(err) }
     }
   })
 
-  const tableStatsHandler = ipcMain.handle('task-vault:admin:table-stats', () => {
+  const tableStatsHandler = ipcMain.handle('task-vault:admin:table-stats', async () => {
     try {
-      const db = getDb()
-      const tables = (
-        db.prepare(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`).all() as {
-          name: string
-        }[]
-      ).map((r) => r.name)
+      const tableRows = await db.query<{ table_name: string }>(
+        `SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name`
+      )
+      const tables = tableRows.map((r) => r.table_name)
       const stats: Record<string, number> = {}
       for (const t of tables) {
-        const row = db.prepare(`SELECT COUNT(*) AS n FROM "${t}"`).get() as { n: number }
-        stats[t] = row.n
+        const row = await db.get<{ n: string }>(`SELECT COUNT(*) AS n FROM "${t}"`)
+        stats[t] = parseInt(row?.n ?? '0', 10)
       }
       return { stats }
     } catch (err) {
@@ -38,21 +34,15 @@ export function registerAdminIpcHandlers(): () => void {
 
   const runQueryHandler = ipcMain.handle(
     'task-vault:admin:run-query',
-    (_event, payload: unknown) => {
+    async (_event, payload: unknown) => {
       try {
         const { sql } = payload as { sql: string }
         if (!sql?.trim()) return { error: 'Empty query' }
         if (BLOCKED_DDL.test(sql.trim())) {
           return { error: 'DDL statements (DROP, CREATE, ALTER) are not permitted' }
         }
-        const db = getDb()
-        const stmt = db.prepare(sql)
-        if (stmt.reader) {
-          const rows = stmt.all() as Record<string, unknown>[]
-          return { rows, changes: 0 }
-        }
-        const result = stmt.run()
-        return { rows: [], changes: result.changes }
+        const rows = await db.query(sql)
+        return { rows, changes: 0 }
       } catch (err) {
         return { error: String(err) }
       }

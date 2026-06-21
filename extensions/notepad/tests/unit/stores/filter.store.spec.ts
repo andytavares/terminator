@@ -4,16 +4,16 @@ import { useFilterStore } from '../../../src/stores/filter.store'
 beforeEach(() => {
   useFilterStore.setState({
     searchQuery: '',
-    activeTagId: null,
+    activeTagIds: [],
     includeArchived: false,
   })
 })
 
 describe('useFilterStore', () => {
-  it('initializes with empty query, no active tag, archived off', () => {
+  it('initializes with empty query, no active tags, archived off', () => {
     const state = useFilterStore.getState()
     expect(state.searchQuery).toBe('')
-    expect(state.activeTagId).toBeNull()
+    expect(state.activeTagIds).toEqual([])
     expect(state.includeArchived).toBe(false)
   })
 
@@ -22,15 +22,28 @@ describe('useFilterStore', () => {
     expect(useFilterStore.getState().searchQuery).toBe('rust lang')
   })
 
-  it('setTag updates activeTagId', () => {
-    useFilterStore.getState().setTag('tag-abc')
-    expect(useFilterStore.getState().activeTagId).toBe('tag-abc')
+  it('toggleTag adds a tag id', () => {
+    useFilterStore.getState().toggleTag('tag-abc')
+    expect(useFilterStore.getState().activeTagIds).toEqual(['tag-abc'])
   })
 
-  it('setTag with null clears activeTagId', () => {
-    useFilterStore.getState().setTag('tag-abc')
-    useFilterStore.getState().setTag(null)
-    expect(useFilterStore.getState().activeTagId).toBeNull()
+  it('toggleTag removes a tag id that is already active', () => {
+    useFilterStore.getState().toggleTag('tag-abc')
+    useFilterStore.getState().toggleTag('tag-abc')
+    expect(useFilterStore.getState().activeTagIds).toEqual([])
+  })
+
+  it('toggleTag supports multiple active tags', () => {
+    useFilterStore.getState().toggleTag('tag-abc')
+    useFilterStore.getState().toggleTag('tag-xyz')
+    expect(useFilterStore.getState().activeTagIds).toEqual(['tag-abc', 'tag-xyz'])
+  })
+
+  it('clearTags empties activeTagIds', () => {
+    useFilterStore.getState().toggleTag('tag-abc')
+    useFilterStore.getState().toggleTag('tag-xyz')
+    useFilterStore.getState().clearTags()
+    expect(useFilterStore.getState().activeTagIds).toEqual([])
   })
 
   it('toggleArchived flips includeArchived', () => {

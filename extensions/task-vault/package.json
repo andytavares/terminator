@@ -5,7 +5,6 @@
   "description": "Task Vault: GTD+BuJo+PARA daily productivity system backed by SQLite",
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.11.0",
-    "better-sqlite3": "^12.10.0",
     "chokidar": "^3.6.0",
     "electron-store": "8.2.0",
     "gray-matter": "^4.0.3",
@@ -15,8 +14,5 @@
     "react-dom": "18.3.1",
     "zod": "3.23.8",
     "zustand": "4.5.5"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13"
   }
 }

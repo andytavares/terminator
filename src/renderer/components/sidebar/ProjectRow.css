@@ -29,6 +29,26 @@
   pointer-events: none;
 }
 
+.project-row__expand-toggle {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 80ms;
+}
+
+.project-row:hover .project-row__expand-toggle {
+  opacity: 1;
+}
+
 .project-row__icon {
   flex-shrink: 0;
   font-size: 10px;

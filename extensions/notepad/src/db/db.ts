@@ -1,113 +1,34 @@
-import Database from 'better-sqlite3'
-import * as fs from 'node:fs'
-import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
+import type { ExtensionDB } from '../../../../src/main/db/index'
 
 export { randomUUID }
 
-let _db: Database.Database | null = null
-let _initError: Error | null = null
-
-export function initDb(userData: string): Database.Database {
-  _initError = null
-  try {
-    fs.mkdirSync(userData, { recursive: true })
-    const dbPath = path.join(userData, 'notepad.db')
-    _db = new Database(dbPath)
-    _db.pragma('journal_mode = WAL')
-    _db.pragma('foreign_keys = ON')
-    applySchema(_db)
-    return _db
-  } catch (err) {
-    if (_db) {
-      try {
-        _db.close()
-      } catch {
-        // ignore close errors during cleanup
-      }
-      _db = null
-    }
-    _initError = err instanceof Error ? err : new Error(String(err))
-    throw _initError
-  }
+export async function hasColumn(db: ExtensionDB, table: string, column: string): Promise<boolean> {
+  const rows = await db.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns WHERE table_name = ? AND column_name = ?`,
+    [table, column]
+  )
+  return rows.length > 0
 }
 
-export function getDb(): Database.Database {
-  if (!_db) {
-    const detail = _initError ? _initError.message : 'call initDb first'
-    throw new Error(`NotepadDB not initialized — ${detail}`)
-  }
-  return _db
-}
+export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS folders (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      sort_order REAL NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
 
-export function closeDb(): void {
-  if (_db) {
-    _db.close()
-    _db = null
-  }
-}
-
-export function reinitDb(userData: string): Database.Database {
-  closeDb()
-  return initDb(userData)
-}
-
-export function repairDb(userData: string): { integrity: string } {
-  if (!_db) {
-    initDb(userData)
-  }
-  const db = getDb()
-  const rows = db.prepare('PRAGMA integrity_check').all() as { integrity_check: string }[]
-  const integrity = rows.map((r) => r.integrity_check).join(', ')
-  try {
-    db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').run()
-  } catch {
-    // ignore — non-fatal
-  }
-  try {
-    db.exec('VACUUM')
-  } catch {
-    // VACUUM can fail on a corrupt DB; that's non-fatal here
-  }
-  closeDb()
-  initDb(userData)
-  return { integrity }
-}
-
-export function resetDb(userData: string): Database.Database {
-  const dbPath = path.join(userData, 'notepad.db')
-  closeDb()
-  const failed: string[] = []
-  for (const suffix of ['', '-wal', '-shm']) {
-    const file = dbPath + suffix
-    if (fs.existsSync(file)) {
-      try {
-        fs.unlinkSync(file)
-      } catch {
-        failed.push(file)
-      }
-    }
-  }
-  if (failed.length > 0) {
-    throw new Error(`Reset incomplete — could not delete: ${failed.join(', ')}`)
-  }
-  return initDb(userData)
-}
-
-export function hasColumn(db: Database.Database, table: string, column: string): boolean {
-  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
-  return cols.some((c) => c.name === column)
-}
-
-function applySchema(db: Database.Database): void {
-  db.exec(`
     CREATE TABLE IF NOT EXISTS notes (
       id          TEXT PRIMARY KEY,
       title       TEXT NOT NULL DEFAULT 'Untitled note',
       body        TEXT NOT NULL DEFAULT '',
       created_at  TEXT NOT NULL,
       updated_at  TEXT NOT NULL,
-      archived_at TEXT
+      archived_at TEXT,
+      sort_order  REAL NOT NULL DEFAULT 0,
+      folder_id   TEXT
     );
 
     CREATE TABLE IF NOT EXISTS tags (
@@ -138,12 +59,6 @@ function applySchema(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_comments_note ON comments(note_id, status);
 
-    CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
-      title, body, tags,
-      content='',
-      tokenize='unicode61'
-    );
-
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -152,10 +67,13 @@ function applySchema(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS diagrams (
       id          TEXT PRIMARY KEY,
       title       TEXT NOT NULL DEFAULT 'Untitled diagram',
+      tags        TEXT NOT NULL DEFAULT '[]',
       scene_json  TEXT NOT NULL DEFAULT '{}',
       created_at  TEXT NOT NULL,
       updated_at  TEXT NOT NULL,
-      archived_at TEXT
+      archived_at TEXT,
+      sort_order  REAL NOT NULL DEFAULT 0,
+      folder_id   TEXT
     );
 
     CREATE TABLE IF NOT EXISTS diagram_comments (
@@ -172,28 +90,33 @@ function applySchema(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_diagram_comments_diagram ON diagram_comments(diagram_id, status);
   `)
+}
 
-  // Incremental migration: add tags column to diagrams if missing
-  if (!hasColumn(db, 'diagrams', 'tags')) {
-    db.exec(`ALTER TABLE diagrams ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'`)
+export async function applyNotepadMigrations(db: ExtensionDB): Promise<void> {
+  const hasTags = await hasColumn(db, 'diagrams', 'tags')
+  if (!hasTags) {
+    await db.exec(`ALTER TABLE diagrams ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'`)
   }
-}
-
-export function insertFts(
-  db: Database.Database,
-  rowid: number,
-  title: string,
-  body: string,
-  tags: string
-): void {
-  db.prepare(`INSERT OR REPLACE INTO notes_fts(rowid, title, body, tags) VALUES (?, ?, ?, ?)`).run(
-    rowid,
-    title,
-    body,
-    tags
-  )
-}
-
-export function deleteFts(db: Database.Database, rowid: number): void {
-  db.prepare(`INSERT INTO notes_fts(notes_fts, rowid) VALUES('delete', ?)`).run(rowid)
+  const hasSortOrderNotes = await hasColumn(db, 'notes', 'sort_order')
+  if (!hasSortOrderNotes) {
+    await db.exec(`ALTER TABLE notes ADD COLUMN sort_order REAL NOT NULL DEFAULT 0`)
+  }
+  const hasSortOrderDiagrams = await hasColumn(db, 'diagrams', 'sort_order')
+  if (!hasSortOrderDiagrams) {
+    await db.exec(`ALTER TABLE diagrams ADD COLUMN sort_order REAL NOT NULL DEFAULT 0`)
+  }
+  await db.exec(`CREATE TABLE IF NOT EXISTS folders (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    sort_order REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  )`)
+  const hasFolderIdNotes = await hasColumn(db, 'notes', 'folder_id')
+  if (!hasFolderIdNotes) {
+    await db.exec(`ALTER TABLE notes ADD COLUMN folder_id TEXT`)
+  }
+  const hasFolderIdDiagrams = await hasColumn(db, 'diagrams', 'folder_id')
+  if (!hasFolderIdDiagrams) {
+    await db.exec(`ALTER TABLE diagrams ADD COLUMN folder_id TEXT`)
+  }
 }

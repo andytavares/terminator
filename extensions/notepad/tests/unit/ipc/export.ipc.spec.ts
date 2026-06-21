@@ -3,6 +3,7 @@ import { ipcMain } from 'electron'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { PGlite } from '@electric-sql/pglite'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
@@ -12,34 +13,38 @@ vi.mock('electron', () => ({
   },
 }))
 
-import { initDb, closeDb, getDb } from '../../../src/db/db'
+import { wrapDb } from '../../../../../src/main/db/index'
+import { applyNotepadSchema } from '../../../src/db/db'
 import {
   toSlug,
   exportNotes,
   importNotes,
   registerExportIpcHandlers,
 } from '../../../src/ipc/export.ipc'
+import type { ExtensionDB } from '../../../../../src/main/db/index'
 
-let tmpDir: string
+let pg: PGlite
+let db: ExtensionDB
 let exportDir: string
 let noteId: string
 
-beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-export-test-'))
+beforeEach(async () => {
+  pg = new PGlite()
+  await pg.waitReady
+  db = wrapDb(pg)
+  await applyNotepadSchema(db)
   exportDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-export-dest-'))
-  initDb(tmpDir)
 
-  const db = getDb()
-  const now = new Date().toISOString()
   noteId = '00000000-0000-0000-0000-000000000001'
-  db.prepare(
-    'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-  ).run(noteId, 'My Test Note', '# Hello\n\nThis is the note body.', now, now)
+  const now = new Date().toISOString()
+  await db.run(
+    'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+    [noteId, 'My Test Note', '# Hello\n\nThis is the note body.', now, now]
+  )
 })
 
-afterEach(() => {
-  closeDb()
-  fs.rmSync(tmpDir, { recursive: true, force: true })
+afterEach(async () => {
+  await pg.close()
   fs.rmSync(exportDir, { recursive: true, force: true })
 })
 
@@ -63,7 +68,7 @@ describe('toSlug', () => {
 
 describe('exportNotes', () => {
   it('writes a .md file with YAML frontmatter for each note', async () => {
-    const result = await exportNotes({ folder: exportDir, scope: 'all' })
+    const result = await exportNotes(db, { folder: exportDir, scope: 'all' })
     expect((result as { data: { exported: number } }).data.exported).toBe(1)
 
     const files = fs.readdirSync(exportDir).filter((f) => f.endsWith('.md'))
@@ -77,21 +82,18 @@ describe('exportNotes', () => {
   })
 
   it('re-export overwrites existing file by id (idempotent)', async () => {
-    await exportNotes({ folder: exportDir, scope: 'all' })
+    await exportNotes(db, { folder: exportDir, scope: 'all' })
     const filesBefore = fs.readdirSync(exportDir).filter((f) => f.endsWith('.md'))
 
-    // Update the note body
-    const db = getDb()
-    db.prepare('UPDATE notes SET body=?, updated_at=? WHERE id=?').run(
+    await db.run('UPDATE notes SET body=?, updated_at=? WHERE id=?', [
       '# Updated\n\nNew content.',
       new Date().toISOString(),
-      noteId
-    )
+      noteId,
+    ])
 
-    await exportNotes({ folder: exportDir, scope: 'all' })
+    await exportNotes(db, { folder: exportDir, scope: 'all' })
     const filesAfter = fs.readdirSync(exportDir).filter((f) => f.endsWith('.md'))
 
-    // Should not create duplicate files
     expect(filesAfter).toHaveLength(filesBefore.length)
 
     const content = fs.readFileSync(path.join(exportDir, filesAfter[0]), 'utf-8')
@@ -99,14 +101,13 @@ describe('exportNotes', () => {
   })
 
   it('exports only the current note when scope is "note"', async () => {
-    // Add a second note
-    const db = getDb()
     const now = new Date().toISOString()
-    db.prepare(
-      'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-    ).run('00000000-0000-0000-0000-000000000002', 'Second Note', 'body', now, now)
+    await db.run(
+      'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+      ['00000000-0000-0000-0000-000000000002', 'Second Note', 'body', now, now]
+    )
 
-    const result = await exportNotes({ folder: exportDir, scope: 'note', noteId })
+    const result = await exportNotes(db, { folder: exportDir, scope: 'note', noteId })
     expect((result as { data: { exported: number } }).data.exported).toBe(1)
 
     const files = fs.readdirSync(exportDir).filter((f) => f.endsWith('.md'))
@@ -114,48 +115,46 @@ describe('exportNotes', () => {
   })
 
   it('exports notes filtered by tag scope', async () => {
-    const db = getDb()
     const tagId = 'tag-00000000-0000-0000-0000-000000000001'
-    db.prepare('INSERT INTO tags (id, name) VALUES (?, ?)').run(tagId, 'work')
-    db.prepare('INSERT INTO note_tags (note_id, tag_id) VALUES (?, ?)').run(noteId, tagId)
+    await db.run('INSERT INTO tags (id, name) VALUES (?, ?)', [tagId, 'work'])
+    await db.run('INSERT INTO note_tags (note_id, tag_id) VALUES (?, ?)', [noteId, tagId])
 
-    const result = await exportNotes({ folder: exportDir, scope: 'tag', tagId })
+    const result = await exportNotes(db, { folder: exportDir, scope: 'tag', tagId })
     expect((result as { data: { exported: number } }).data.exported).toBe(1)
   })
 
-  it('exports note with no tags (null tags row)', async () => {
-    const result = await exportNotes({ folder: exportDir, scope: 'all' })
+  it('exports note with no tags', async () => {
+    const result = await exportNotes(db, { folder: exportDir, scope: 'all' })
     expect((result as { data: { exported: number } }).data.exported).toBe(1)
   })
 
-  it('re-exports to a non-existent target folder (creates it)', async () => {
+  it('creates target folder when it does not exist', async () => {
     const newDir = path.join(exportDir, 'subdir')
-    const result = await exportNotes({ folder: newDir, scope: 'all' })
+    const result = await exportNotes(db, { folder: newDir, scope: 'all' })
     expect((result as { data: { exported: number } }).data.exported).toBe(1)
     expect(fs.existsSync(newDir)).toBe(true)
   })
 
   it('returns error on validation failure', async () => {
-    const result = await exportNotes({ folder: 123 as unknown as string })
+    const result = await exportNotes(db, { folder: 123 as unknown as string })
     expect(result).toHaveProperty('error')
   })
 })
 
 describe('importNotes', () => {
   it('creates a note for each .md file with frontmatter id', async () => {
-    // Create an import source folder with a markdown file
     const importDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-import-src-'))
     const frontmatter = `---\nid: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\ntitle: Imported Note\ntags: []\ncreated: 2026-01-01T00:00:00Z\nupdated: 2026-01-02T00:00:00Z\n---\n\n# Imported\n\nHello from import.`
     fs.writeFileSync(path.join(importDir, 'imported-note-aaaaaaaa.md'), frontmatter)
 
     try {
-      const result = await importNotes({ folder: importDir })
-      expect((result as { data: { imported: number; updated: number } }).data.imported).toBe(1)
+      const result = await importNotes(db, { folder: importDir })
+      expect((result as { data: { imported: number } }).data.imported).toBe(1)
 
-      const db = getDb()
-      const row = db
-        .prepare('SELECT id, title FROM notes WHERE id=?')
-        .get('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee') as { id: string; title: string } | undefined
+      const row = await db.get<{ id: string; title: string }>(
+        'SELECT id, title FROM notes WHERE id=?',
+        ['aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee']
+      )
       expect(row?.title).toBe('Imported Note')
     } finally {
       fs.rmSync(importDir, { recursive: true, force: true })
@@ -163,38 +162,31 @@ describe('importNotes', () => {
   })
 
   it('updates an existing note when frontmatter id matches', async () => {
-    // First export, then re-import with modified content
-    await exportNotes({ folder: exportDir, scope: 'all' })
+    await exportNotes(db, { folder: exportDir, scope: 'all' })
 
-    // Modify the exported file
     const files = fs.readdirSync(exportDir).filter((f) => f.endsWith('.md'))
     const filePath = path.join(exportDir, files[0])
     const content = fs.readFileSync(filePath, 'utf-8')
     fs.writeFileSync(filePath, content.replace('Hello', 'Updated via import'))
 
-    const result = await importNotes({ folder: exportDir })
-    expect((result as { data: { imported: number; updated: number } }).data.updated).toBe(1)
+    const result = await importNotes(db, { folder: exportDir })
+    expect((result as { data: { updated: number } }).data.updated).toBe(1)
 
-    const db = getDb()
-    const row = db.prepare('SELECT body FROM notes WHERE id=?').get(noteId) as
-      | { body: string }
-      | undefined
+    const row = await db.get<{ body: string }>('SELECT body FROM notes WHERE id=?', [noteId])
     expect(row?.body).toContain('Updated via import')
   })
 
   it('creates note with tags and links note_tags rows', async () => {
     const importDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-import-tags-'))
-    const content = `---\nid: cccccccc-dddd-eeee-ffff-000000000001\ntitle: Tagged Note\ntags:\n  - work\n  - project\n---\n\nBody.`
-    fs.writeFileSync(path.join(importDir, 'tagged-note.md'), content)
+    const fc = `---\nid: cccccccc-dddd-eeee-ffff-000000000001\ntitle: Tagged Note\ntags:\n  - work\n  - project\n---\n\nBody.`
+    fs.writeFileSync(path.join(importDir, 'tagged-note.md'), fc)
     try {
-      const result = await importNotes({ folder: importDir })
+      const result = await importNotes(db, { folder: importDir })
       expect((result as { data: { imported: number } }).data.imported).toBe(1)
-      const db = getDb()
-      const tagRows = db
-        .prepare(
-          `SELECT t.name FROM tags t JOIN note_tags nt ON nt.tag_id = t.id WHERE nt.note_id = ?`
-        )
-        .all('cccccccc-dddd-eeee-ffff-000000000001') as { name: string }[]
+      const tagRows = await db.query<{ name: string }>(
+        `SELECT t.name FROM tags t JOIN note_tags nt ON nt.tag_id = t.id WHERE nt.note_id = ?`,
+        ['cccccccc-dddd-eeee-ffff-000000000001']
+      )
       const tagNames = tagRows.map((r) => r.name).sort()
       expect(tagNames).toEqual(['project', 'work'])
     } finally {
@@ -203,21 +195,17 @@ describe('importNotes', () => {
   })
 
   it('updates existing note tags on re-import', async () => {
-    // Export the existing note (no tags), then re-import with tags
-    await exportNotes({ folder: exportDir, scope: 'all' })
+    await exportNotes(db, { folder: exportDir, scope: 'all' })
     const files = fs.readdirSync(exportDir).filter((f) => f.endsWith('.md'))
     const filePath = path.join(exportDir, files[0])
-    // Rewrite the frontmatter to include a tag
     const updatedContent = `---\nid: ${noteId}\ntitle: My Test Note\ntags:\n  - updated-tag\n---\n\n# Hello\n\nUpdated.`
     fs.writeFileSync(filePath, updatedContent)
-    const result = await importNotes({ folder: exportDir })
+    const result = await importNotes(db, { folder: exportDir })
     expect((result as { data: { updated: number } }).data.updated).toBe(1)
-    const db = getDb()
-    const tagRows = db
-      .prepare(
-        `SELECT t.name FROM tags t JOIN note_tags nt ON nt.tag_id = t.id WHERE nt.note_id = ?`
-      )
-      .all(noteId) as { name: string }[]
+    const tagRows = await db.query<{ name: string }>(
+      `SELECT t.name FROM tags t JOIN note_tags nt ON nt.tag_id = t.id WHERE nt.note_id = ?`,
+      [noteId]
+    )
     expect(tagRows.map((r) => r.name)).toContain('updated-tag')
   })
 
@@ -227,9 +215,8 @@ describe('importNotes', () => {
       path.join(importDir, 'no-frontmatter.md'),
       '# Just a heading\n\nNo frontmatter here.'
     )
-
     try {
-      const result = await importNotes({ folder: importDir })
+      const result = await importNotes(db, { folder: importDir })
       const data = (result as { data: { imported: number; skipped: number } }).data
       expect(data.imported).toBe(0)
       expect(data.skipped).toBe(1)
@@ -239,12 +226,12 @@ describe('importNotes', () => {
   })
 
   it('returns error on validation failure', async () => {
-    const result = await importNotes({ folder: 123 as unknown as string })
+    const result = await importNotes(db, { folder: 123 as unknown as string })
     expect(result).toHaveProperty('error')
   })
 
   it('handles import folder that does not exist', async () => {
-    const result = await importNotes({ folder: '/tmp/nonexistent-folder-xyz-12345' })
+    const result = await importNotes(db, { folder: '/tmp/nonexistent-folder-xyz-12345' })
     const data = (result as { data: { imported: number; skipped: number } }).data
     expect(data.imported).toBe(0)
     expect(data.skipped).toBe(0)
@@ -254,7 +241,7 @@ describe('importNotes', () => {
     const importDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-import-nonmd-'))
     fs.writeFileSync(path.join(importDir, 'readme.txt'), 'not a markdown file')
     try {
-      const result = await importNotes({ folder: importDir })
+      const result = await importNotes(db, { folder: importDir })
       const data = (result as { data: { imported: number } }).data
       expect(data.imported).toBe(0)
     } finally {
@@ -264,15 +251,15 @@ describe('importNotes', () => {
 
   it('imports note with missing title and non-array tags (uses defaults)', async () => {
     const importDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-import-defaults-'))
-    const content = `---\nid: bbbbbbbb-cccc-dddd-eeee-ffffffffffff\n---\n\nBody text.`
-    fs.writeFileSync(path.join(importDir, 'no-title.md'), content)
+    const fc = `---\nid: bbbbbbbb-cccc-dddd-eeee-ffffffffffff\n---\n\nBody text.`
+    fs.writeFileSync(path.join(importDir, 'no-title.md'), fc)
     try {
-      const result = await importNotes({ folder: importDir })
+      const result = await importNotes(db, { folder: importDir })
       const data = (result as { data: { imported: number } }).data
       expect(data.imported).toBe(1)
-      const row = getDb()
-        .prepare('SELECT title FROM notes WHERE id=?')
-        .get('bbbbbbbb-cccc-dddd-eeee-ffffffffffff') as { title: string } | undefined
+      const row = await db.get<{ title: string }>('SELECT title FROM notes WHERE id=?', [
+        'bbbbbbbb-cccc-dddd-eeee-ffffffffffff',
+      ])
       expect(row?.title).toBe('Imported note')
     } finally {
       fs.rmSync(importDir, { recursive: true, force: true })
@@ -280,31 +267,76 @@ describe('importNotes', () => {
   })
 })
 
-describe('registerExportIpcHandlers', () => {
-  it('returns a dispose function', () => {
-    const dispose = registerExportIpcHandlers()
-    expect(typeof dispose).toBe('function')
-    dispose()
+describe('exportNotes with includeDiagrams', () => {
+  it('exports diagrams as .excalidraw files in a diagrams/ subfolder', async () => {
+    const now = new Date().toISOString()
+    const diagramId = 'dddddddd-0000-0000-0000-000000000001'
+    const sceneJson = JSON.stringify({
+      elements: [{ type: 'rectangle', id: 'el1' }],
+      appState: { zoom: 1 },
+    })
+    await db.run(
+      'INSERT INTO diagrams (id, title, tags, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [diagramId, 'My Diagram', '[]', sceneJson, now, now]
+    )
+
+    const result = await exportNotes(db, {
+      folder: exportDir,
+      scope: 'all',
+      includeDiagrams: true,
+    })
+    const data = (result as { data: { exported: number; diagrams: number } }).data
+    expect(data.diagrams).toBe(1)
+
+    const diagramsFolder = path.join(exportDir, 'diagrams')
+    const files = fs.readdirSync(diagramsFolder)
+    expect(files.some((f) => f.endsWith('.excalidraw'))).toBe(true)
+
+    const content = JSON.parse(fs.readFileSync(path.join(diagramsFolder, files[0]), 'utf-8')) as {
+      type: string
+      elements: unknown[]
+    }
+    expect(content.type).toBe('excalidraw')
+    expect(content.elements).toHaveLength(1)
+  })
+
+  it('does not export diagrams when includeDiagrams is false', async () => {
+    const result = await exportNotes(db, {
+      folder: exportDir,
+      scope: 'all',
+      includeDiagrams: false,
+    })
+    const data = (result as { data: { diagrams: number } }).data
+    expect(data.diagrams).toBe(0)
+    expect(fs.existsSync(path.join(exportDir, 'diagrams'))).toBe(false)
+  })
+
+  it('does not export diagrams when scope is note', async () => {
+    const result = await exportNotes(db, {
+      folder: exportDir,
+      scope: 'note',
+      noteId,
+      includeDiagrams: true,
+    })
+    const data = (result as { data: { diagrams: number } }).data
+    expect(data.diagrams).toBe(0)
   })
 })
 
-describe('IPC reject — DB not initialized', () => {
-  function getHandler(channel: string) {
-    let handler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
-    vi.mocked(ipcMain.handle).mockImplementation((ch, fn) => {
-      if (ch === channel) handler = fn as typeof handler
-    })
-    registerExportIpcHandlers()
-    vi.mocked(ipcMain.handle).mockReset()
-    if (!handler) throw new Error(`Handler for ${channel} not registered`)
-    return handler
-  }
+describe('registerExportIpcHandlers', () => {
+  it('returns a dispose function', () => {
+    const dispose = registerExportIpcHandlers(db)
+    expect(typeof dispose).toBe('function')
+    dispose()
+  })
 
-  it('rejects from export.run when getDb throws so renderer catch fires', async () => {
-    closeDb()
-    const handler = getHandler('terminator.notepad:export.run')
-    await expect(handler({}, { folder: '/tmp/export-test' })).rejects.toThrow(
-      'NotepadDB not initialized'
+  it('registers IPC channels on setup', () => {
+    vi.mocked(ipcMain.handle).mockClear()
+    const dispose = registerExportIpcHandlers(db)
+    expect(ipcMain.handle).toHaveBeenCalledWith(
+      'terminator.notepad:export.run',
+      expect.any(Function)
     )
+    dispose()
   })
 })

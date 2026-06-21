@@ -1,259 +1,190 @@
-import { describe, it, expect, vi } from 'vitest'
-
-// better-sqlite3 is compiled for Electron's Node.js ABI and cannot load in plain
-// Node.js vitest. We mock the module and use an in-memory store instead.
-vi.mock('better-sqlite3')
-
-// ── Minimal in-memory SQLite-compatible mock ──────────────────────────────────
-
-type Row = Record<string, unknown>
-
-interface MockPrepared {
-  get(...params: unknown[]): Row | undefined
-  all(...params: unknown[]): Row[]
-  run(...params: unknown[]): void
-}
-
-function createMockDb(initialRows: Row[] = []): {
-  db: { prepare: (sql: string) => MockPrepared; transaction: (fn: () => unknown) => () => unknown }
-  rows: Row[]
-} {
-  const rows: Row[] = [...initialRows]
-
-  function matchRows(sql: string, params: unknown[]): Row[] {
-    const lsql = sql.toLowerCase()
-    if (lsql.includes('from tasks where id=?') || lsql.includes('where id=?')) {
-      return rows.filter((r) => r.id === params[0])
-    }
-    if (lsql.includes('recurrence_template_id=? and status=') && lsql.includes('due_date >=')) {
-      return rows.filter(
-        (r) =>
-          r.recurrence_template_id === params[0] &&
-          r.status === 'open' &&
-          (r.due_date as string) >= (params[1] as string)
-      )
-    }
-    if (lsql.includes('recurrence_template_id=?')) {
-      return rows.filter((r) => r.recurrence_template_id === params[0])
-    }
-    if (
-      lsql.includes('recurrence_rule is not null') &&
-      lsql.includes('recurrence_template_id is null')
-    ) {
-      if (lsql.includes('not exists')) {
-        const today = params[0] as string
-        return rows.filter(
-          (r) =>
-            r.recurrence_rule &&
-            !r.recurrence_template_id &&
-            !rows.some(
-              (i) =>
-                i.recurrence_template_id === r.id &&
-                i.status === 'open' &&
-                (i.due_date as string) >= today
-            )
-        )
-      }
-      const today = params[0] as string
-      return rows.filter(
-        (r) =>
-          r.recurrence_rule &&
-          !r.recurrence_template_id &&
-          r.due_date !== null &&
-          (r.due_date as string) < today &&
-          r.status === 'open'
-      )
-    }
-    return []
-  }
-
-  const db = {
-    prepare(sql: string): MockPrepared {
-      return {
-        get(...params: unknown[]): Row | undefined {
-          return matchRows(sql, params)[0]
-        },
-        all(...params: unknown[]): Row[] {
-          return matchRows(sql, params)
-        },
-        run(...params: unknown[]): void {
-          if (sql.toLowerCase().startsWith('insert into tasks')) {
-            // Extract positional values from the INSERT
-            // New column order (after adding recurrence_end_* columns):
-            // 0:id, 1:text, 2:status, 3:project_id, 4:context, 5:area_id, 6:due_date,
-            // 7:source, 8:source_ref, 9:recurrence_rule, 10:recurrence_template_id,
-            // 11:recurrence_notify_at, 12:metadata, 13:terminator_links,
-            // 14:created_at, 15:updated_at,
-            // 16:recurrence_end_type, 17:recurrence_end_date, 18:recurrence_end_count,
-            // 19:recurrence_completed_count
-            const newRow: Row = {
-              id: params[0] as string,
-              text: params[1] as string,
-              status: params[2] as string,
-              project_id: params[3] as string | null,
-              context: params[4] as string | null,
-              area_id: params[5] as string | null,
-              due_date: params[6] as string | null,
-              source: params[7] as string,
-              source_ref: params[8] as string | null,
-              recurrence_rule: params[9] as string | null,
-              recurrence_template_id: params[10] as string | null,
-              recurrence_notify_at: params[11] as string | null,
-              metadata: params[12] as string,
-              terminator_links: params[13] as string,
-              created_at: params[14] as string,
-              updated_at: params[15] as string,
-              recurrence_end_type: params[16] as string | null,
-              recurrence_end_date: params[17] as string | null,
-              recurrence_end_count: params[18] as number | null,
-              recurrence_completed_count: params[19] as number | null,
-            }
-            rows.push(newRow)
-          }
-        },
-      }
-    },
-    transaction(fn: () => unknown) {
-      return () => fn()
-    },
-  }
-  return { db, rows }
-}
-
-function makeTaskRow(overrides: Partial<Row> = {}): Row {
-  return {
-    id: `task-${Math.random().toString(36).slice(2)}`,
-    text: 'Test task',
-    status: 'open',
-    project_id: null,
-    context: null,
-    area_id: null,
-    due_date: null,
-    source: 'daily',
-    source_ref: null,
-    recurrence_rule: null,
-    recurrence_template_id: null,
-    recurrence_notify_at: null,
-    metadata: '{}',
-    terminator_links: '[]',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    recurrence_end_type: null,
-    recurrence_end_date: null,
-    recurrence_end_count: null,
-    recurrence_completed_count: null,
-    ...overrides,
-  }
-}
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
-
-import type Database from 'better-sqlite3'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { PGlite } from '@electric-sql/pglite'
+import { wrapDb } from '../../../../src/main/db/index'
+import { applyTaskVaultSchema, applyTaskVaultMigrations } from '../../src/vault/db'
 import {
   ensureNextOccurrence,
   backfillRecurringTasks,
 } from '../../src/vault/ensure-next-occurrence'
+import type { ExtensionDB } from '../../../../src/main/extensions/api'
+
+let pg: PGlite
+let db: ExtensionDB
+
+beforeEach(async () => {
+  pg = new PGlite()
+  await pg.waitReady
+  db = wrapDb(pg)
+  await applyTaskVaultSchema(db)
+  await applyTaskVaultMigrations(db)
+})
+
+afterEach(async () => {
+  await pg.close()
+})
+
+let _taskCounter = 0
+function makeId(): string {
+  return `task-${++_taskCounter}-${Math.random().toString(36).slice(2)}`
+}
+
+interface TaskInput {
+  id?: string
+  text?: string
+  status?: string
+  project_id?: string | null
+  context?: string | null
+  area_id?: string | null
+  due_date?: string | null
+  source?: string
+  source_ref?: string | null
+  recurrence_rule?: string | null
+  recurrence_template_id?: string | null
+  recurrence_notify_at?: string | null
+  metadata?: string
+  terminator_links?: string
+  recurrence_end_type?: string | null
+  recurrence_end_date?: string | null
+  recurrence_end_count?: number | null
+  recurrence_completed_count?: number | null
+}
+
+async function insertTask(input: TaskInput = {}): Promise<string> {
+  const id = input.id ?? makeId()
+  const now = new Date().toISOString()
+  await db.run(
+    `INSERT INTO tasks
+       (id, text, status, project_id, context, area_id, due_date,
+        source, source_ref, recurrence_rule, recurrence_template_id,
+        recurrence_notify_at, metadata, terminator_links, created_at, updated_at,
+        recurrence_end_type, recurrence_end_date, recurrence_end_count,
+        recurrence_completed_count)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [
+      id,
+      input.text ?? 'Test task',
+      input.status ?? 'open',
+      input.project_id ?? null,
+      input.context ?? null,
+      input.area_id ?? null,
+      input.due_date ?? null,
+      input.source ?? 'daily',
+      input.source_ref ?? null,
+      input.recurrence_rule ?? null,
+      input.recurrence_template_id ?? null,
+      input.recurrence_notify_at ?? null,
+      input.metadata ?? '{}',
+      input.terminator_links ?? '[]',
+      now,
+      now,
+      input.recurrence_end_type ?? null,
+      input.recurrence_end_date ?? null,
+      input.recurrence_end_count ?? null,
+      input.recurrence_completed_count ?? null,
+    ]
+  )
+  return id
+}
 
 describe('ensureNextOccurrence', () => {
-  it('returns null for a non-recurring task', () => {
-    const task = makeTaskRow({ due_date: '2026-01-01' })
-    const { db } = createMockDb([task])
-    expect(ensureNextOccurrence(db as unknown as Database.Database, task.id as string)).toBeNull()
+  it('returns null for a non-recurring task', async () => {
+    const id = await insertTask({ due_date: '2026-01-01' })
+    expect(await ensureNextOccurrence(db, id)).toBeNull()
   })
 
-  it('returns null for a task with no due_date', () => {
-    const task = makeTaskRow({ recurrence_rule: 'daily' })
-    const { db } = createMockDb([task])
-    expect(ensureNextOccurrence(db as unknown as Database.Database, task.id as string)).toBeNull()
+  it('returns null for a task with no due_date', async () => {
+    const id = await insertTask({ recurrence_rule: 'daily' })
+    expect(await ensureNextOccurrence(db, id)).toBeNull()
   })
 
-  it('creates a future instance for a daily recurring task', () => {
-    const task = makeTaskRow({ recurrence_rule: 'daily', due_date: '2099-03-10' })
-    const { db, rows } = createMockDb([task])
-    const newId = ensureNextOccurrence(db as unknown as Database.Database, task.id as string)
+  it('creates a future instance for a daily recurring task', async () => {
+    const id = await insertTask({ recurrence_rule: 'daily', due_date: '2099-03-10' })
+    const newId = await ensureNextOccurrence(db, id)
     expect(newId).toBeTruthy()
-    const newRow = rows.find((r) => r.id === newId)
+    const newRow = await db.get<{
+      due_date: string
+      recurrence_template_id: string
+      recurrence_rule: string
+    }>(`SELECT due_date, recurrence_template_id, recurrence_rule FROM tasks WHERE id=?`, [newId!])
     expect(newRow?.due_date).toBe('2099-03-11')
-    expect(newRow?.recurrence_template_id).toBe(task.id)
+    expect(newRow?.recurrence_template_id).toBe(id)
     expect(newRow?.recurrence_rule).toBe('daily')
   })
 
-  it('inherits source and source_ref from the template task for non-daily sources', () => {
-    const task = makeTaskRow({
+  it('inherits source and source_ref from the template task for non-daily sources', async () => {
+    const id = await insertTask({
       recurrence_rule: 'daily',
       due_date: '2099-03-10',
       source: 'project',
       source_ref: 'my-project',
     })
-    const { db, rows } = createMockDb([task])
-    const newId = ensureNextOccurrence(db as unknown as Database.Database, task.id as string)
+    const newId = await ensureNextOccurrence(db, id)
     expect(newId).toBeTruthy()
-    const newRow = rows.find((r) => r.id === newId)
+    const newRow = await db.get<{ source: string; source_ref: string }>(
+      `SELECT source, source_ref FROM tasks WHERE id=?`,
+      [newId!]
+    )
     expect(newRow?.source).toBe('project')
     expect(newRow?.source_ref).toBe('my-project')
   })
 
-  it('sets source_ref to nextDue for daily-source tasks so the occurrence appears in the correct day log', () => {
-    const task = makeTaskRow({
+  it('sets source_ref to nextDue for daily-source tasks', async () => {
+    const id = await insertTask({
       recurrence_rule: 'daily',
       due_date: '2099-03-10',
       source: 'daily',
       source_ref: '2099-03-10',
     })
-    const { db, rows } = createMockDb([task])
-    const newId = ensureNextOccurrence(db as unknown as Database.Database, task.id as string)
+    const newId = await ensureNextOccurrence(db, id)
     expect(newId).toBeTruthy()
-    const newRow = rows.find((r) => r.id === newId)
+    const newRow = await db.get<{ due_date: string; source: string; source_ref: string }>(
+      `SELECT due_date, source, source_ref FROM tasks WHERE id=?`,
+      [newId!]
+    )
     expect(newRow?.due_date).toBe('2099-03-11')
     expect(newRow?.source).toBe('daily')
-    // source_ref must equal the new due date, not the completed instance's date
     expect(newRow?.source_ref).toBe('2099-03-11')
   })
 
-  it('is idempotent — second call creates no additional instance', () => {
-    const task = makeTaskRow({ recurrence_rule: 'daily', due_date: '2099-03-10' })
-    const { db, rows } = createMockDb([task])
-    ensureNextOccurrence(db as unknown as Database.Database, task.id as string)
-    const secondResult = ensureNextOccurrence(db as unknown as Database.Database, task.id as string)
+  it('is idempotent — second call creates no additional instance', async () => {
+    const id = await insertTask({ recurrence_rule: 'daily', due_date: '2099-03-10' })
+    await ensureNextOccurrence(db, id)
+    const secondResult = await ensureNextOccurrence(db, id)
     expect(secondResult).toBeNull()
-    const instances = rows.filter((r) => r.recurrence_template_id === task.id)
+    const instances = await db.query(`SELECT id FROM tasks WHERE recurrence_template_id=?`, [id])
     expect(instances).toHaveLength(1)
   })
 
-  it('propagates template_id from an instance task', () => {
-    const templateId = `template-${Math.random().toString(36).slice(2)}`
-    const template = makeTaskRow({
-      id: templateId,
-      recurrence_rule: 'daily',
-      due_date: '2099-03-10',
-    })
-    const instance = makeTaskRow({
+  it('propagates template_id from an instance task', async () => {
+    const templateId = await insertTask({ recurrence_rule: 'daily', due_date: '2099-03-10' })
+    const instanceId = await insertTask({
       recurrence_rule: 'daily',
       recurrence_template_id: templateId,
       due_date: '2099-03-11',
       status: 'done',
     })
-    const { db, rows } = createMockDb([template, instance])
-    const newId = ensureNextOccurrence(db as unknown as Database.Database, instance.id as string)
+    const newId = await ensureNextOccurrence(db, instanceId)
     expect(newId).toBeTruthy()
-    const newRow = rows.find((r) => r.id === newId)
+    const newRow = await db.get<{ recurrence_template_id: string }>(
+      `SELECT recurrence_template_id FROM tasks WHERE id=?`,
+      [newId!]
+    )
     expect(newRow?.recurrence_template_id).toBe(templateId)
   })
 
-  it('does not spawn when after_count limit is exhausted (column-based)', () => {
-    const task = makeTaskRow({
+  it('does not spawn when after_count limit is exhausted (column-based)', async () => {
+    const id = await insertTask({
       recurrence_rule: 'daily',
       due_date: '2099-03-10',
       recurrence_end_type: 'after_count',
       recurrence_end_count: 3,
       recurrence_completed_count: 2,
     })
-    const { db } = createMockDb([task])
-    expect(ensureNextOccurrence(db as unknown as Database.Database, task.id as string)).toBeNull()
+    expect(await ensureNextOccurrence(db, id)).toBeNull()
   })
 
-  it('does not spawn when after_count limit is exhausted (metadata fallback)', () => {
-    const task = makeTaskRow({
+  it('does not spawn when after_count limit is exhausted (metadata fallback)', async () => {
+    const id = await insertTask({
       recurrence_rule: 'daily',
       due_date: '2099-03-10',
       metadata: JSON.stringify({
@@ -262,23 +193,21 @@ describe('ensureNextOccurrence', () => {
         recurrence_completed_count: 2,
       }),
     })
-    const { db } = createMockDb([task])
-    expect(ensureNextOccurrence(db as unknown as Database.Database, task.id as string)).toBeNull()
+    expect(await ensureNextOccurrence(db, id)).toBeNull()
   })
 
-  it('does not spawn when on_date end condition has passed (column-based)', () => {
-    const task = makeTaskRow({
+  it('does not spawn when on_date end condition has passed (column-based)', async () => {
+    const id = await insertTask({
       recurrence_rule: 'daily',
       due_date: '2099-03-10',
       recurrence_end_type: 'on_date',
       recurrence_end_date: '2099-03-10', // next would be 2099-03-11 > end date
     })
-    const { db } = createMockDb([task])
-    expect(ensureNextOccurrence(db as unknown as Database.Database, task.id as string)).toBeNull()
+    expect(await ensureNextOccurrence(db, id)).toBeNull()
   })
 
-  it('does not spawn when on_date end condition has passed (metadata fallback)', () => {
-    const task = makeTaskRow({
+  it('does not spawn when on_date end condition has passed (metadata fallback)', async () => {
+    const id = await insertTask({
       recurrence_rule: 'daily',
       due_date: '2099-03-10',
       metadata: JSON.stringify({
@@ -286,59 +215,51 @@ describe('ensureNextOccurrence', () => {
         recurrence_end_date: '2099-03-10', // next would be 2099-03-11 > end date
       }),
     })
-    const { db } = createMockDb([task])
-    expect(ensureNextOccurrence(db as unknown as Database.Database, task.id as string)).toBeNull()
+    expect(await ensureNextOccurrence(db, id)).toBeNull()
   })
 
-  it('still spawns when after_count limit is not yet reached', () => {
-    const task = makeTaskRow({
+  it('still spawns when after_count limit is not yet reached', async () => {
+    const id = await insertTask({
       recurrence_rule: 'daily',
       due_date: '2099-03-10',
       recurrence_end_type: 'after_count',
       recurrence_end_count: 3,
       recurrence_completed_count: 1,
     })
-    const { db } = createMockDb([task])
-    expect(ensureNextOccurrence(db as unknown as Database.Database, task.id as string)).toBeTruthy()
+    expect(await ensureNextOccurrence(db, id)).toBeTruthy()
   })
 })
 
 describe('backfillRecurringTasks', () => {
-  it('creates a future instance for a stale recurring task', () => {
-    // Use a date clearly in the past so the backfill query picks it up
-    const task = makeTaskRow({ recurrence_rule: 'daily', due_date: '2020-01-01' })
-    const { db, rows } = createMockDb([task])
-    backfillRecurringTasks(db as unknown as Database.Database)
-    const instances = rows.filter((r) => r.recurrence_template_id === task.id)
+  it('creates a future instance for a stale recurring task', async () => {
+    const id = await insertTask({ recurrence_rule: 'daily', due_date: '2020-01-01' })
+    await backfillRecurringTasks(db)
+    const instances = await db.query(`SELECT id FROM tasks WHERE recurrence_template_id=?`, [id])
     expect(instances.length).toBeGreaterThan(0)
   })
 
-  it('is idempotent when called twice', () => {
-    const task = makeTaskRow({ recurrence_rule: 'daily', due_date: '2020-01-01' })
-    const { db, rows } = createMockDb([task])
-    backfillRecurringTasks(db as unknown as Database.Database)
-    // After first backfill, the spawned instance has due_date '2020-01-02' (still past).
-    // The self-contained query picks it up and tries to spawn again.
-    // In production with real SQLite the UNIQUE index prevents this; with the mock
-    // we verify the template query (which checks for future instances) returns nothing.
-    // Just verify at least one instance was created.
-    const countAfterFirst = rows.filter((r) => r.recurrence_template_id === task.id).length
+  it('is idempotent when called twice', async () => {
+    const id = await insertTask({ recurrence_rule: 'daily', due_date: '2020-01-01' })
+    await backfillRecurringTasks(db)
+    const countAfterFirst = (
+      await db.query(`SELECT id FROM tasks WHERE recurrence_template_id=?`, [id])
+    ).length
     expect(countAfterFirst).toBeGreaterThan(0)
   })
 
-  it('does not spawn when a future open instance already exists', () => {
-    const task = makeTaskRow({ recurrence_rule: 'daily', due_date: '2020-01-01' })
-    const future = makeTaskRow({
+  it('does not spawn when a future open instance already exists', async () => {
+    const id = await insertTask({ recurrence_rule: 'daily', due_date: '2020-01-01' })
+    const futureId = await insertTask({
       recurrence_rule: 'daily',
-      recurrence_template_id: task.id as string,
+      recurrence_template_id: id,
       due_date: '9999-12-31',
       status: 'open',
     })
-    const { db, rows } = createMockDb([task, future])
-    backfillRecurringTasks(db as unknown as Database.Database)
-    // The template query should not find this task (has future open instance)
-    // The self-contained query also should not find it (status is open but due_date is in past only for template)
-    const instances = rows.filter((r) => r.recurrence_template_id === task.id && r.id !== future.id)
+    await backfillRecurringTasks(db)
+    const instances = await db.query(
+      `SELECT id FROM tasks WHERE recurrence_template_id=? AND id != ?`,
+      [id, futureId]
+    )
     expect(instances).toHaveLength(0)
   })
 })

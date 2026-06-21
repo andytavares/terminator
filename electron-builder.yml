@@ -4,8 +4,6 @@ directories:
   output: dist
 files:
   - out/**/*
-asarUnpack:
-  - '**/*.node'
 mac:
   icon: resources/icon.png
   target:

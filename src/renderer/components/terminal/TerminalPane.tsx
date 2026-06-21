@@ -79,18 +79,18 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, projectId, setFocusedSession, getTerminalInstance])
 
-  const scrollActiveToBottom = useCallback(() => {
-    if (activeSessionId) {
-      const instance = getTerminalInstance(activeSessionId)
-      instance?.terminal.scrollToBottom()
-      instance?.terminal.focus()
-    }
+  const refocusActive = useCallback(() => {
+    if (!activeSessionId) return
+    const instance = getTerminalInstance(activeSessionId)
+    if (!instance) return
+    if (instance.isAtBottom) instance.terminal.scrollToBottom()
+    instance.terminal.focus()
   }, [activeSessionId, getTerminalInstance])
 
   useEffect(() => {
-    window.addEventListener('focus', scrollActiveToBottom)
-    return () => window.removeEventListener('focus', scrollActiveToBottom)
-  }, [scrollActiveToBottom])
+    window.addEventListener('focus', refocusActive)
+    return () => window.removeEventListener('focus', refocusActive)
+  }, [refocusActive])
 
   const handleRatioChange = useCallback(
     (splitId: string, ratio: number) => {
@@ -117,7 +117,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
 
   function handleMouseDown(e: React.MouseEvent): void {
     if (e.button !== 0) return
-    scrollActiveToBottom()
+    refocusActive()
   }
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {

@@ -1399,6 +1399,56 @@ Permanently deletes a diagram and all its canvas comments (cascade).
 
 ---
 
+### `terminator.notepad:notes.reorder`
+
+Sets the display order of notes and diagrams. Accepts the full desired order (active items only); assigns `sort_order = index` to each item. Notes and diagrams are reordered in a single transaction.
+
+**Request**: `{ items: { id: string; type: 'note' | 'diagram' }[] }` **Response**: `{ data: { ok: true } } | { error: string }`
+
+---
+
+## Notepad Extension — Folder Channels
+
+### `terminator.notepad:folders.create`
+
+Creates a new folder. The new folder is appended after all existing folders (sort_order = MAX+1).
+
+**Request**: `{ name: string }` **Response**: `{ data: { id: string; name: string; sortOrder: number; createdAt: string } } | { error: string }`
+
+---
+
+### `terminator.notepad:folders.list`
+
+Lists all folders ordered by sort_order ascending.
+
+**Request**: `{}` **Response**: `{ data: { id: string; name: string; sortOrder: number; createdAt: string }[] }`
+
+---
+
+### `terminator.notepad:folders.rename`
+
+Renames a folder.
+
+**Request**: `{ id: string; name: string }` **Response**: `{ data: { ok: true } } | { error: 'FOLDER_NOT_FOUND' | string }`
+
+---
+
+### `terminator.notepad:folders.delete`
+
+Deletes a folder. Notes and diagrams inside are moved to root (folder_id set to NULL) in the same transaction.
+
+**Request**: `{ id: string }` **Response**: `{ data: { ok: true } } | { error: 'FOLDER_NOT_FOUND' | string }`
+
+---
+
+### `terminator.notepad:folders.move`
+
+Moves one or more notes/diagrams into a folder (or to root when folderId is null).
+
+**Request**: `{ items: { id: string; type: 'note' | 'diagram' }[]; folderId: string | null }` **Response**: `{ data: { ok: true } } | { error: 'FOLDER_NOT_FOUND' | string }`
+
+---
+
 ## Notepad Extension — Diagram Comment Channels
 
 ### `terminator.notepad:diagram-comments.create`

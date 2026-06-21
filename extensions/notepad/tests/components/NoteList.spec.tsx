@@ -22,6 +22,8 @@ const note1: NoteListItem = {
   createdAt: '2026-01-01T00:00:00Z',
   archivedAt: null,
   tags: ['work'],
+  sortOrder: 0,
+  folderId: null,
 }
 
 const note2: NoteListItem = {
@@ -32,6 +34,8 @@ const note2: NoteListItem = {
   createdAt: '2026-01-01T00:00:00Z',
   archivedAt: null,
   tags: [],
+  sortOrder: 1,
+  folderId: null,
 }
 
 describe('NoteList', () => {
@@ -39,7 +43,7 @@ describe('NoteList', () => {
     cleanup()
     mockInvoke.mockClear()
     useNotesStore.setState({ notes: [], selectedNoteId: null, archivedVisible: false })
-    useFilterStore.setState({ searchQuery: '', activeTagId: null, includeArchived: false })
+    useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
   })
 
   it('shows EmptyState when there are no notes', () => {
@@ -73,7 +77,7 @@ describe('NoteList search bar', () => {
     cleanup()
     mockInvoke.mockClear()
     useNotesStore.setState({ notes: [note1, note2], selectedNoteId: null, archivedVisible: false })
-    useFilterStore.setState({ searchQuery: '', activeTagId: null, includeArchived: false })
+    useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
   })
 
   it('renders a search input', () => {
@@ -105,7 +109,7 @@ describe('NoteList search bar', () => {
   })
 })
 
-describe('NoteList tag sidebar', () => {
+describe('NoteList tag filter dropdown', () => {
   const note3: NoteListItem = {
     id: 'n3',
     title: 'Infra Note',
@@ -114,32 +118,61 @@ describe('NoteList tag sidebar', () => {
     createdAt: '2026-01-01T00:00:00Z',
     archivedAt: null,
     tags: ['infra'],
+    sortOrder: 2,
+    folderId: null,
   }
 
   beforeEach(() => {
     cleanup()
     mockInvoke.mockClear()
     useNotesStore.setState({ notes: [note1, note3], selectedNoteId: null, archivedVisible: false })
-    useFilterStore.setState({ searchQuery: '', activeTagId: null, includeArchived: false })
+    useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
   })
 
-  it('renders unique tag names from notes', () => {
+  it('renders a Tags button when notes have tags', () => {
     render(<NoteList />)
-    // Tag may appear in both sidebar chip and note row chip
+    expect(screen.getByText('Tags')).toBeDefined()
+  })
+
+  it('opens dropdown and shows tag names on button click', () => {
+    render(<NoteList />)
+    fireEvent.click(screen.getByText('Tags'))
     expect(screen.getAllByText('work').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('infra').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('clicking a tag sets filter.store activeTagId for that tag', async () => {
-    mockInvoke.mockResolvedValueOnce({ data: [{ id: 'tag-infra', name: 'infra', noteCount: 1 }] })
+  it('clicking a tag in the dropdown adds it to activeTagIds', async () => {
     render(<NoteList />)
-    // Tag chips are buttons; find the one whose text content includes 'infra'
-    const tagBtns = screen.getAllByRole('button').filter((b) => b.textContent?.includes('infra'))
-    const sidebarBtn = tagBtns.find((b) => b.className.includes('notepad-tag-chip'))
-    expect(sidebarBtn).toBeDefined()
+    fireEvent.click(screen.getByText('Tags'))
+    const infraOptions = screen
+      .getAllByRole('button')
+      .filter((b) => b.textContent?.includes('infra'))
+    // The dropdown option is inside the dropdown (not the note row tag)
+    const dropdownOption = infraOptions.find((b) =>
+      b.className.includes('notepad-tag-filter__option')
+    )
+    expect(dropdownOption).toBeDefined()
     await act(async () => {
-      fireEvent.click(sidebarBtn!)
+      fireEvent.click(dropdownOption!)
     })
-    expect(useFilterStore.getState().activeTagId).toBeTruthy()
+    expect(useFilterStore.getState().activeTagIds.length).toBe(1)
+  })
+
+  it('clicking the same tag again removes it from activeTagIds', async () => {
+    render(<NoteList />)
+    fireEvent.click(screen.getByText('Tags'))
+    const infraOptions = screen
+      .getAllByRole('button')
+      .filter((b) => b.textContent?.includes('infra'))
+    const dropdownOption = infraOptions.find((b) =>
+      b.className.includes('notepad-tag-filter__option')
+    )
+    await act(async () => {
+      fireEvent.click(dropdownOption!)
+    })
+    await act(async () => {
+      fireEvent.click(dropdownOption!)
+    })
+    expect(useFilterStore.getState().activeTagIds).toEqual([])
   })
 })

@@ -15,6 +15,8 @@ import { ExtensionHost } from './extensions/extension-host.js'
 import { logger } from './logger.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
+import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
+import { runLegacyMigration } from './db/migrate.js'
 
 // Intercept ipcMain.handle/on to capture handlers into the bridge registry
 // so the remote-control extension bridge can dispatch IPC calls from browser clients.
@@ -234,6 +236,11 @@ function registerDialogHandlers(): void {
 
 app.whenReady().then(async () => {
   logger.info('App ready', { version: app.getVersion() })
+
+  const userData = app.getPath('userData')
+  await initAppDb(userData)
+  await runLegacyMigration(userData, getAppDb())
+
   setupMenu()
   registerWorkspaceHandlers()
   registerTerminalHandlers(ptyManager, () => mainWindow)
@@ -250,6 +257,7 @@ app.whenReady().then(async () => {
 
   extensionHost.setDeps({
     ptyManager,
+    db: getAppDb(),
     broadcastToWindows: (channel, data) => mainWindow?.webContents.send(channel, data),
     bridge: {
       invokeRegistry: ipcInvokeRegistry,
@@ -279,6 +287,7 @@ app.on('before-quit', async (event) => {
   app.isQuitting = true
   await extensionHost.unloadAll()
   await ptyManager.killAll()
+  await closeAppDb()
   app.exit(0)
 })
 

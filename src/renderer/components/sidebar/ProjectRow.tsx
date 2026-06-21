@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { GitBranch, FolderGit2 } from 'lucide-react'
+import { GitBranch, FolderGit2, ChevronRight, ChevronDown } from 'lucide-react'
 import type { Project } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
@@ -16,6 +16,7 @@ interface ProjectRowProps {
   workspaceColor: string
   onSelect: () => void
   onAddSession: () => void
+  onToggleExpand?: () => void
   gitDirty?: boolean
   gitConflict?: boolean
   onBranchBadgeClick?: () => void
@@ -31,6 +32,7 @@ export function ProjectRow({
   workspaceColor,
   onSelect,
   onAddSession,
+  onToggleExpand,
   gitDirty,
   gitConflict,
   onBranchBadgeClick,
@@ -45,8 +47,13 @@ export function ProjectRow({
   const renameRef = useRef<HTMLInputElement>(null)
   const sessionDragIndexRef = useRef<number | null>(null)
   const { deleteProject, renameProject, workspaces } = useWorkspaceStore()
-  const { getSessionsForProject, activeSessionIdByProject, getBellCountForProject, isProjectBusy } =
-    useSessionStore()
+  const {
+    getSessionsForProject,
+    activeSessionIdByProject,
+    getBellCountForProject,
+    isProjectBusy,
+    isSessionBusy,
+  } = useSessionStore()
   const workspace = workspaces.find((w) => w.id === workspaceId)
   const cwd = project.worktreePath ?? workspace?.folderPath ?? ''
   useBranchSync(project, cwd)
@@ -122,6 +129,18 @@ export function ProjectRow({
         onContextMenu={handleContextMenu}
         draggable
       >
+        {sessions.length > 0 && onToggleExpand && (
+          <button
+            className="project-row__expand-toggle"
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleExpand()
+            }}
+            title={isExpanded ? 'Collapse' : 'Expand'}
+          >
+            {isExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+          </button>
+        )}
         <span className="project-row__icon">
           {project.isWorktree ? <FolderGit2 size={12} /> : <GitBranch size={12} />}
         </span>
@@ -213,7 +232,7 @@ export function ProjectRow({
               <SessionRow
                 session={session}
                 isActive={activeSessionId === session.id}
-                isBusy={false}
+                isBusy={isSessionBusy(session.id)}
                 bellCount={getBellCountForProject(project.id)}
                 workspaceColor={workspaceColor}
                 onSelect={() => {
@@ -235,7 +254,7 @@ export function ProjectRow({
                 key={child.id}
                 session={child}
                 isActive={activeSessionId === child.id}
-                isBusy={false}
+                isBusy={isSessionBusy(session.id)}
                 bellCount={getBellCountForProject(project.id)}
                 workspaceColor={workspaceColor}
                 isSubSession

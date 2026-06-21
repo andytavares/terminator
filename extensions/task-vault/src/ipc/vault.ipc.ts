@@ -1,6 +1,7 @@
 import * as path from 'node:path'
 import { ipcMain, Notification } from 'electron'
-import { getDb, randomUUID } from '../vault/db'
+import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import { randomUUID } from '../vault/db'
 import { extractTags, toDisplayName } from '../vault/tags'
 import { localDate as _localDate } from '../vault/recurrence'
 import { ensureNextOccurrence } from '../vault/ensure-next-occurrence'
@@ -38,66 +39,63 @@ function today(): string {
   return localDate()
 }
 
-/** Derive source + source_ref from the filePath the renderer passes for add-task */
 function resolveSource(filePath: string): { source: string; sourceRef: string | null } {
   const normalized = filePath.replace(/\\/g, '/')
-  // daily/YYYY-MM-DD.md
   const dailyMatch = /daily\/(\d{4}-\d{2}-\d{2})\.md$/.exec(normalized)
   if (dailyMatch) return { source: 'daily', sourceRef: dailyMatch[1] }
-  // projects/<name>.md
   const projectMatch = /projects\/(.+)\.md$/.exec(normalized)
   if (projectMatch) return { source: 'project', sourceRef: projectMatch[1] }
-  // areas/<name>.md
   const areaMatch = /areas\/(.+)\.md$/.exec(normalized)
   if (areaMatch) return { source: 'area', sourceRef: areaMatch[1] }
-  // someday.md
   if (normalized.endsWith('someday.md')) return { source: 'someday', sourceRef: null }
   return { source: 'inbox', sourceRef: null }
 }
 
-function resolveProjectAndAreaIds(
-  db: ReturnType<typeof getDb>,
+async function resolveProjectAndAreaIds(
+  db: ExtensionDB,
   project: string | undefined,
   area: string | undefined,
   now: string
-): { projectId: string | null; areaId: string | null } {
+): Promise<{ projectId: string | null; areaId: string | null }> {
   const areaName = area ? toDisplayName(area) : undefined
   const projectName = project ? toDisplayName(project) : undefined
 
   let areaId: string | null = null
   if (areaName) {
-    const existingArea = db.prepare(`SELECT id FROM areas WHERE name=?`).get(areaName) as
-      | { id: string }
-      | undefined
+    const existingArea = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [
+      areaName,
+    ])
     if (existingArea) {
       areaId = existingArea.id
     } else {
       areaId = randomUUID()
-      db.prepare(
-        `INSERT OR IGNORE INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?)`
-      ).run(areaId, areaName, now, now)
+      await db.run(
+        `INSERT INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`,
+        [areaId, areaName, now, now]
+      )
     }
   }
 
   let projectId: string | null = null
   if (projectName) {
-    const existingProject = db.prepare(`SELECT id FROM projects WHERE name=?`).get(projectName) as
-      | { id: string }
-      | undefined
+    const existingProject = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [
+      projectName,
+    ])
     if (existingProject) {
       projectId = existingProject.id
     } else {
       projectId = randomUUID()
-      db.prepare(
-        `INSERT OR IGNORE INTO projects (id,name,status,area_id,created_at,updated_at) VALUES (?,?,?,?,?,?)`
-      ).run(projectId, projectName, 'active', areaId, now, now)
+      await db.run(
+        `INSERT INTO projects (id,name,status,area_id,created_at,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT DO NOTHING`,
+        [projectId, projectName, 'active', areaId, now, now]
+      )
     }
   }
 
   return { projectId, areaId }
 }
 
-export function registerVaultIpcHandlers(): () => void {
+export function registerVaultIpcHandlers(db: ExtensionDB): () => void {
   const handlers: Array<[string, (...args: unknown[]) => unknown]> = []
 
   function handle(
@@ -114,7 +112,6 @@ export function registerVaultIpcHandlers(): () => void {
     handlers.push([channel, fn as (...args: unknown[]) => unknown])
   }
 
-  // ── system-notify ────────────────────────────────────────────────────────────
   handle('task-vault:system-notify', async (_event, payload) => {
     const { title = 'Task Vault', body = '' } = (payload ?? {}) as { title?: string; body?: string }
     if (Notification.isSupported()) {
@@ -122,8 +119,6 @@ export function registerVaultIpcHandlers(): () => void {
     }
     return { ok: true }
   })
-
-  // ── vault:capture ────────────────────────────────────────────────────────────
 
   handle('task-vault:vault:capture', async (_event, payload) => {
     const parsed = CaptureRequestSchema.safeParse(payload)
@@ -136,109 +131,103 @@ export function registerVaultIpcHandlers(): () => void {
     const fullText = tags.length ? `${text} ${tags.join(' ')}` : text
     const extracted = extractTags(fullText)
 
-    const db = getDb()
     const now = new Date().toISOString()
     const id = randomUUID()
-    const { projectId, areaId } = resolveProjectAndAreaIds(
+    const { projectId, areaId } = await resolveProjectAndAreaIds(
       db,
       extracted.project,
       extracted.area,
       now
     )
-    db.prepare(
+    await db.run(
       `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`
-    ).run(
-      id,
-      extracted.text,
-      'open',
-      projectId,
-      extracted.context ?? null,
-      areaId,
-      extracted.dueDate ?? null,
-      'inbox',
-      null,
-      now,
-      now
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        id,
+        extracted.text,
+        'open',
+        projectId,
+        extracted.context ?? null,
+        areaId,
+        extracted.dueDate ?? null,
+        'inbox',
+        null,
+        now,
+        now,
+      ]
     )
     broadcast('task-vault:push:index-updated', {})
     return { taskId: id }
   })
 
-  // ── vault:get-today ──────────────────────────────────────────────────────────
-
   handle('task-vault:vault:get-today', async () => {
     try {
       const date = today()
-      const db = getDb()
       const now = new Date().toISOString()
 
-      // Rollover: move open/in-progress tasks from past daily logs to today
-      const staleRows = db
-        .prepare(
-          `SELECT t.id, t.text, p.name AS project, t.context, a.name AS area, t.due_date, t.project_id, t.area_id, t.source_ref, t.today_since
-           FROM tasks t ${TASK_JOINS}
-           WHERE t.source='daily' AND t.source_ref < ? AND t.source_ref IS NOT NULL
-             AND t.status IN ('open','in-progress','blocked') AND t.parent_id IS NULL
-             AND t.recurrence_rule IS NULL`
-        )
-        .all(date) as Record<string, unknown>[]
+      const staleRows = await db.query<Record<string, unknown>>(
+        `SELECT t.id, t.text, p.name AS project, t.context, a.name AS area, t.due_date, t.project_id, t.area_id, t.source_ref, t.today_since
+         FROM tasks t ${TASK_JOINS}
+         WHERE t.source='daily' AND t.source_ref < ? AND t.source_ref IS NOT NULL
+           AND t.status IN ('open','in-progress','blocked') AND t.parent_id IS NULL
+           AND t.recurrence_rule IS NULL`,
+        [date]
+      )
 
       const rolledOverIds: string[] = []
       if (staleRows.length > 0) {
-        const insertStmt = db.prepare(
-          `INSERT OR IGNORE INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,today_since,created_at,updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
-        )
-        const migrateStmt = db.prepare(
-          `UPDATE tasks SET status='migrated', migrated_to=?, updated_at=? WHERE id=?`
-        )
-        const migrateSubStmt = db.prepare(
-          `UPDATE tasks SET source='daily', source_ref=?, updated_at=? WHERE parent_id=?`
-        )
-        for (const row of staleRows) {
-          const newId = randomUUID()
-          const inheritedTodaySince =
-            (row.today_since as string) || (row.source_ref as string) || date
-          insertStmt.run(
-            newId,
-            row.text,
-            'open',
-            row.project_id ?? null,
-            row.context ?? null,
-            row.area_id ?? null,
-            row.due_date ?? null,
-            'daily',
-            date,
-            inheritedTodaySince,
-            now,
-            now
-          )
-          migrateStmt.run(date, now, row.id)
-          migrateSubStmt.run(date, now, row.id)
-          rolledOverIds.push(newId)
-        }
+        await db.transaction(async (tx) => {
+          for (const row of staleRows) {
+            const newId = randomUUID()
+            const inheritedTodaySince =
+              (row.today_since as string) || (row.source_ref as string) || date
+            await tx.run(
+              `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,today_since,created_at,updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`,
+              [
+                newId,
+                row.text,
+                'open',
+                row.project_id ?? null,
+                row.context ?? null,
+                row.area_id ?? null,
+                row.due_date ?? null,
+                'daily',
+                date,
+                inheritedTodaySince,
+                now,
+                now,
+              ]
+            )
+            await tx.run(
+              `UPDATE tasks SET status='migrated', migrated_to=?, updated_at=? WHERE id=?`,
+              [date, now, row.id as string]
+            )
+            await tx.run(
+              `UPDATE tasks SET source='daily', source_ref=?, updated_at=? WHERE parent_id=?`,
+              [date, now, row.id as string]
+            )
+            rolledOverIds.push(newId)
+          }
+        })
       }
 
-      const taskRows = db
-        .prepare(
-          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
-           WHERE t.source='daily' AND t.source_ref=? AND t.parent_id IS NULL ORDER BY t.sort_order, t.created_at`
-        )
-        .all(date) as Record<string, unknown>[]
+      const taskRows = await db.query<Record<string, unknown>>(
+        `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+         WHERE t.source='daily' AND t.source_ref=? AND t.parent_id IS NULL ORDER BY t.sort_order, t.created_at`,
+        [date]
+      )
       const tasks = taskRows.map(rowToTask)
       for (const task of tasks) {
-        task.subtasks = (
-          db
-            .prepare(
-              `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE t.parent_id=? ORDER BY t.sort_order, t.created_at`
-            )
-            .all(task.id) as Record<string, unknown>[]
-        ).map(rowToTask)
+        const subtaskRows = await db.query<Record<string, unknown>>(
+          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE t.parent_id=? ORDER BY t.sort_order, t.created_at`,
+          [task.id]
+        )
+        task.subtasks = subtaskRows.map(rowToTask)
       }
-      const thresholdRow = db
-        .prepare(`SELECT value FROM settings WHERE key='stale_days_threshold'`)
-        .get() as { value: string } | undefined
+      const thresholdRow = await db.get<{ value: string }>(
+        `SELECT value FROM settings WHERE key='stale_days_threshold'`
+      )
       const staleDaysThreshold = thresholdRow ? parseInt(thresholdRow.value, 10) || 7 : 7
 
       return {
@@ -255,29 +244,23 @@ export function registerVaultIpcHandlers(): () => void {
     }
   })
 
-  // ── vault:get-daily ──────────────────────────────────────────────────────────
-
   handle('task-vault:vault:get-daily', async (_event, payload) => {
     const parsed = GetDailyRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     try {
       const { date } = parsed.data
-      const db = getDb()
-      const taskRows = db
-        .prepare(
-          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
-           WHERE t.source='daily' AND t.source_ref=? AND t.parent_id IS NULL ORDER BY t.sort_order, t.created_at`
-        )
-        .all(date) as Record<string, unknown>[]
+      const taskRows = await db.query<Record<string, unknown>>(
+        `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+         WHERE t.source='daily' AND t.source_ref=? AND t.parent_id IS NULL ORDER BY t.sort_order, t.created_at`,
+        [date]
+      )
       const tasks = taskRows.map(rowToTask)
       for (const task of tasks) {
-        task.subtasks = (
-          db
-            .prepare(
-              `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE t.parent_id=? ORDER BY t.sort_order, t.created_at`
-            )
-            .all(task.id) as Record<string, unknown>[]
-        ).map(rowToTask)
+        const subtaskRows = await db.query<Record<string, unknown>>(
+          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE t.parent_id=? ORDER BY t.sort_order, t.created_at`,
+          [task.id]
+        )
+        task.subtasks = subtaskRows.map(rowToTask)
       }
       return {
         date,
@@ -289,8 +272,6 @@ export function registerVaultIpcHandlers(): () => void {
       return { error: String(err) }
     }
   })
-
-  // ── vault:add-task ───────────────────────────────────────────────────────────
 
   handle('task-vault:vault:add-task', async (_event, payload) => {
     const parsed = AddTaskRequestSchema.safeParse(payload)
@@ -306,70 +287,70 @@ export function registerVaultIpcHandlers(): () => void {
     const extracted = extractTags(fullText)
 
     const { source, sourceRef } = resolveSource(filePath)
-    const db = getDb()
     const now = new Date().toISOString()
     const id = randomUUID()
-    const { projectId, areaId } = resolveProjectAndAreaIds(
+    const { projectId, areaId } = await resolveProjectAndAreaIds(
       db,
       extracted.project,
       extracted.area,
       now
     )
     const todaySinceVal = source === 'daily' ? (sourceRef ?? null) : null
-    db.prepare(
+    await db.run(
       `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,today_since,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
-    ).run(
-      id,
-      extracted.text,
-      'open',
-      projectId,
-      extracted.context ?? null,
-      areaId,
-      extracted.dueDate ?? null,
-      source,
-      sourceRef,
-      todaySinceVal,
-      now,
-      now
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        id,
+        extracted.text,
+        'open',
+        projectId,
+        extracted.context ?? null,
+        areaId,
+        extracted.dueDate ?? null,
+        source,
+        sourceRef,
+        todaySinceVal,
+        now,
+        now,
+      ]
     )
     broadcast('task-vault:push:index-updated', {})
     return { taskId: id }
   })
 
-  // ── vault:complete-task ──────────────────────────────────────────────────────
-
   handle('task-vault:vault:complete-task', async (_event, payload) => {
     const parsed = CompleteTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
-    const db = getDb()
     const now = new Date().toISOString()
     const todayStr = today()
 
-    const taskRow = db.prepare(`SELECT text FROM tasks WHERE id=?`).get(taskId) as
-      | { text: string }
-      | undefined
+    const taskRow = await db.get<{ text: string }>(`SELECT text FROM tasks WHERE id=?`, [taskId])
     const taskText = taskRow?.text ?? ''
 
     try {
       let nextTaskId: string | null = null
-      const completeAndSpawn = db.transaction(() => {
-        const changes = db
-          .prepare(`UPDATE tasks SET status='done', completed_date=?, updated_at=? WHERE id=?`)
-          .run(todayStr, now, taskId)
-        if (changes.changes === 0) throw new Error('STALE_ID')
-        nextTaskId = ensureNextOccurrence(db, taskId)
+      await db.transaction(async (tx) => {
+        const existing = await tx.get<{ id: string }>(`SELECT id FROM tasks WHERE id=?`, [taskId])
+        if (!existing) throw new Error('STALE_ID')
+        await tx.run(`UPDATE tasks SET status='done', completed_date=?, updated_at=? WHERE id=?`, [
+          todayStr,
+          now,
+          taskId,
+        ])
+        nextTaskId = await ensureNextOccurrence(tx, taskId)
       })
-      completeAndSpawn()
 
       if (nextTaskId) {
-        const nextDue = (
-          db.prepare(`SELECT due_date FROM tasks WHERE id=?`).get(nextTaskId) as
-            | { due_date: string }
-            | undefined
-        )?.due_date
-        broadcast('task-vault:recurrence-spawned', { taskId, nextTaskId, nextDue })
+        const nextRow = await db.get<{ due_date: string }>(
+          `SELECT due_date FROM tasks WHERE id=?`,
+          [nextTaskId]
+        )
+        broadcast('task-vault:recurrence-spawned', {
+          taskId,
+          nextTaskId,
+          nextDue: nextRow?.due_date,
+        })
       }
 
       if (Notification.isSupported()) {
@@ -384,48 +365,44 @@ export function registerVaultIpcHandlers(): () => void {
     }
   })
 
-  // ── vault:migrate-task ───────────────────────────────────────────────────────
-
   handle('task-vault:vault:migrate-task', async (_event, payload) => {
     const parsed = MigrateTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, targetDate } = parsed.data
-    const db = getDb()
-    const task = db
-      .prepare(`SELECT t.*, t.project_id, t.area_id FROM tasks t WHERE t.id=?`)
-      .get(taskId) as Record<string, unknown> | undefined
+    const task = await db.get<Record<string, unknown>>(
+      `SELECT t.*, t.project_id, t.area_id FROM tasks t WHERE t.id=?`,
+      [taskId]
+    )
     if (!task) return { error: 'STALE_ID' }
-    // Noop if the task is already on the target date (prevents duplication)
     if ((task.source_ref as string | null) === targetDate) return { newTaskId: taskId, noop: true }
     const now = new Date().toISOString()
     const newId = randomUUID()
     const existingMeta = JSON.parse((task.metadata as string) || '{}') as Record<string, unknown>
     existingMeta.migration_twin_id = newId
-    db.prepare(
-      `UPDATE tasks SET status='migrated', migrated_to=?, metadata=?, updated_at=? WHERE id=?`
-    ).run(targetDate, JSON.stringify(existingMeta), now, taskId)
-    // Preserve original status for the twin (open/in-progress carry over; done/cancelled stay done)
+    await db.run(
+      `UPDATE tasks SET status='migrated', migrated_to=?, metadata=?, updated_at=? WHERE id=?`,
+      [targetDate, JSON.stringify(existingMeta), now, taskId]
+    )
     const originalStatus = task.status as string
     const twinStatus =
       originalStatus === 'done' || originalStatus === 'cancelled' ? originalStatus : 'open'
-    // Create new parent task on target date
-    db.prepare(
+    await db.run(
       `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`
-    ).run(
-      newId,
-      task.text,
-      twinStatus,
-      task.project_id ?? null,
-      task.context ?? null,
-      task.area_id ?? null,
-      task.due_date ?? null,
-      'daily',
-      targetDate,
-      now,
-      now
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        newId,
+        task.text,
+        twinStatus,
+        task.project_id ?? null,
+        task.context ?? null,
+        task.area_id ?? null,
+        task.due_date ?? null,
+        'daily',
+        targetDate,
+        now,
+        now,
+      ]
     )
-    // Migrate subtasks: create twins under the new parent, preserve their statuses
     type SubRow = {
       id: string
       text: string
@@ -433,47 +410,45 @@ export function registerVaultIpcHandlers(): () => void {
       sort_order: number | null
       metadata: string
     }
-    const subtasks = db
-      .prepare(
-        `SELECT id, text, status, sort_order, metadata FROM tasks WHERE parent_id=? ORDER BY sort_order, created_at`
-      )
-      .all(taskId) as SubRow[]
+    const subtasks = await db.query<SubRow>(
+      `SELECT id, text, status, sort_order, metadata FROM tasks WHERE parent_id=? ORDER BY sort_order, created_at`,
+      [taskId]
+    )
     for (const sub of subtasks) {
       const subTwinId = randomUUID()
       const subMeta = JSON.parse(sub.metadata || '{}') as Record<string, unknown>
       subMeta.migration_twin_id = subTwinId
-      db.prepare(
-        `UPDATE tasks SET status='migrated', migrated_to=?, metadata=?, updated_at=? WHERE id=?`
-      ).run(targetDate, JSON.stringify(subMeta), now, sub.id)
+      await db.run(
+        `UPDATE tasks SET status='migrated', migrated_to=?, metadata=?, updated_at=? WHERE id=?`,
+        [targetDate, JSON.stringify(subMeta), now, sub.id]
+      )
       const subTwinStatus =
         sub.status === 'done' || sub.status === 'cancelled' ? sub.status : 'open'
-      db.prepare(
+      await db.run(
         `INSERT INTO tasks (id,text,status,parent_id,sort_order,source,source_ref,created_at,updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?)`
-      ).run(
-        subTwinId,
-        sub.text,
-        subTwinStatus,
-        newId,
-        sub.sort_order ?? null,
-        'daily',
-        targetDate,
-        now,
-        now
+         VALUES (?,?,?,?,?,?,?,?,?)`,
+        [
+          subTwinId,
+          sub.text,
+          subTwinStatus,
+          newId,
+          sub.sort_order ?? null,
+          'daily',
+          targetDate,
+          now,
+          now,
+        ]
       )
     }
     broadcast('task-vault:push:index-updated', {})
     return { newTaskId: newId }
   })
 
-  // ── vault:query ──────────────────────────────────────────────────────────────
-
   handle('task-vault:vault:query', async (_event, payload) => {
     const parsed = QueryRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { status, context, project, area, dueBefore } = parsed.data
 
-    const db = getDb()
     const conditions: string[] = []
     const params: unknown[] = []
 
@@ -500,82 +475,79 @@ export function registerVaultIpcHandlers(): () => void {
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-    const rows = db
-      .prepare(`SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} ${where} ORDER BY t.created_at`)
-      .all(...params) as Record<string, unknown>[]
+    const rows = await db.query<Record<string, unknown>>(
+      `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} ${where} ORDER BY t.created_at`,
+      params
+    )
     return { tasks: rows.map(rowToTask) }
   })
-
-  // ── vault:process-inbox-item ─────────────────────────────────────────────────
 
   handle('task-vault:vault:process-inbox-item', async (_event, payload) => {
     const parsed = ProcessInboxRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, action, destination, newProjectName } = parsed.data
-    const db = getDb()
     const now = new Date().toISOString()
 
-    const task = db.prepare(`SELECT * FROM tasks WHERE id=?`).get(taskId) as
-      | Record<string, unknown>
-      | undefined
+    const task = await db.get<Record<string, unknown>>(`SELECT * FROM tasks WHERE id=?`, [taskId])
     if (!task) return { error: 'STALE_ID' }
 
     if (action === 'trash') {
-      // Soft-delete: archive (cancel) the task rather than permanently deleting it
       const archiveNow = new Date().toISOString()
-      db.prepare(
+      await db.run(
         `WITH RECURSIVE subtree(id) AS (
           SELECT id FROM tasks WHERE id = ?
           UNION ALL
           SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
         )
-        UPDATE tasks SET status='cancelled', updated_at=? WHERE id IN (SELECT id FROM subtree)`
-      ).run(taskId, archiveNow)
+        UPDATE tasks SET status='cancelled', updated_at=? WHERE id IN (SELECT id FROM subtree)`,
+        [taskId, archiveNow]
+      )
       broadcast('task-vault:push:index-updated', {})
       return { success: true }
     }
 
     if (action === 'do-now') {
-      // Move to today's daily log so the task stays visible
       const todayDate = today()
-      db.prepare(
-        `UPDATE tasks SET status='in-progress', source='daily', source_ref=?, updated_at=? WHERE id=?`
-      ).run(todayDate, now, taskId)
-      db.prepare(
-        `UPDATE tasks SET source='daily', source_ref=?, updated_at=? WHERE parent_id=?`
-      ).run(todayDate, now, taskId)
+      await db.run(
+        `UPDATE tasks SET status='in-progress', source='daily', source_ref=?, updated_at=? WHERE id=?`,
+        [todayDate, now, taskId]
+      )
+      await db.run(
+        `UPDATE tasks SET source='daily', source_ref=?, updated_at=? WHERE parent_id=?`,
+        [todayDate, now, taskId]
+      )
       broadcast('task-vault:push:index-updated', {})
       return { success: true }
     }
 
     if (action === 'someday') {
-      db.prepare(
-        `UPDATE tasks SET source='someday', source_ref=NULL, today_since=NULL, updated_at=? WHERE id=?`
-      ).run(now, taskId)
-      // Move subtasks too
-      db.prepare(
-        `UPDATE tasks SET source='someday', source_ref=NULL, today_since=NULL, updated_at=? WHERE parent_id=?`
-      ).run(now, taskId)
+      await db.run(
+        `UPDATE tasks SET source='someday', source_ref=NULL, today_since=NULL, updated_at=? WHERE id=?`,
+        [now, taskId]
+      )
+      await db.run(
+        `UPDATE tasks SET source='someday', source_ref=NULL, today_since=NULL, updated_at=? WHERE parent_id=?`,
+        [now, taskId]
+      )
       broadcast('task-vault:push:index-updated', {})
       return { success: true }
     }
 
     // action === 'file'
-    // Always land in today's daily log (visible in today view).
-    // project_id / area_id carry the destination association for tagging.
     const todayDate = today()
     let areaId: string | null = null
     let projectId: string | null = null
 
     if (newProjectName) {
-      const proj = db.prepare(`SELECT id FROM projects WHERE name=?`).get(newProjectName) as
-        | { id: string }
-        | undefined
+      const proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [
+        newProjectName,
+      ])
       if (!proj) {
         const newId = randomUUID()
-        db.prepare(
-          `INSERT INTO projects (id,name,status,created_at,updated_at) VALUES (?,?,?,?,?)`
-        ).run(newId, newProjectName, 'active', now, now)
+        await db.run(
+          `INSERT INTO projects (id,name,status,created_at,updated_at) VALUES (?,?,?,?,?)`,
+          [newId, newProjectName, 'active', now, now]
+        )
         projectId = newId
       } else {
         projectId = proj.id
@@ -583,202 +555,177 @@ export function registerVaultIpcHandlers(): () => void {
     } else if (destination) {
       const resolved = resolveSource(destination)
       if (resolved.source === 'area' && resolved.sourceRef) {
-        const row = db.prepare(`SELECT id FROM areas WHERE name=?`).get(resolved.sourceRef) as
-          | { id: string }
-          | undefined
+        const row = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [
+          resolved.sourceRef,
+        ])
         areaId = row?.id ?? null
       } else if (resolved.source === 'project' && resolved.sourceRef) {
-        const row = db.prepare(`SELECT id FROM projects WHERE name=?`).get(resolved.sourceRef) as
-          | { id: string }
-          | undefined
+        const row = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [
+          resolved.sourceRef,
+        ])
         projectId = row?.id ?? null
       }
     } else {
       return { error: 'destination required for action: file' }
     }
 
-    db.prepare(
-      `UPDATE tasks SET source='daily', source_ref=?, area_id=?, project_id=?, updated_at=? WHERE id=?`
-    ).run(todayDate, areaId, projectId, now, taskId)
-    db.prepare(
-      `UPDATE tasks SET source='daily', source_ref=?, area_id=?, project_id=?, updated_at=? WHERE parent_id=?`
-    ).run(todayDate, areaId, projectId, now, taskId)
+    await db.run(
+      `UPDATE tasks SET source='daily', source_ref=?, area_id=?, project_id=?, updated_at=? WHERE id=?`,
+      [todayDate, areaId, projectId, now, taskId]
+    )
+    await db.run(
+      `UPDATE tasks SET source='daily', source_ref=?, area_id=?, project_id=?, updated_at=? WHERE parent_id=?`,
+      [todayDate, areaId, projectId, now, taskId]
+    )
 
     broadcast('task-vault:push:index-updated', {})
     return { success: true, newTaskId: taskId }
   })
-
-  // ── vault:edit-task ──────────────────────────────────────────────────────────
 
   handle('task-vault:vault:edit-task', async (_event, payload) => {
     const parsed = EditTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, text } = parsed.data
     const extracted = extractTags(text)
-    const db = getDb()
     const now = new Date().toISOString()
-    const { projectId, areaId } = resolveProjectAndAreaIds(
+    const { projectId, areaId } = await resolveProjectAndAreaIds(
       db,
       extracted.project,
       extracted.area,
       now
     )
-    const changes = db
-      .prepare(
-        `UPDATE tasks SET text=?,project_id=?,context=?,area_id=?,due_date=?,updated_at=? WHERE id=?`
-      )
-      .run(
+    const existing = await db.get<{ id: string }>(`SELECT id FROM tasks WHERE id=?`, [taskId])
+    if (!existing) return { error: 'STALE_ID' }
+    await db.run(
+      `UPDATE tasks SET text=?,project_id=?,context=?,area_id=?,due_date=?,updated_at=? WHERE id=?`,
+      [
         extracted.text,
         projectId,
         extracted.context ?? null,
         areaId,
         extracted.dueDate ?? null,
         now,
-        taskId
-      )
-    if (changes.changes === 0) return { error: 'STALE_ID' }
+        taskId,
+      ]
+    )
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
-
-  // ── vault:delete-task ────────────────────────────────────────────────────────
 
   handle('task-vault:vault:delete-task', async (_event, payload) => {
     const parsed = DeleteTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
-    const db = getDb()
-    const changes = db
-      .prepare(
-        `
-      WITH RECURSIVE subtree(id) AS (
+    const existing = await db.get<{ id: string }>(`SELECT id FROM tasks WHERE id=?`, [taskId])
+    if (!existing) return { error: 'STALE_ID' }
+    await db.run(
+      `WITH RECURSIVE subtree(id) AS (
         SELECT id FROM tasks WHERE id = ?
         UNION ALL
         SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
       )
-      DELETE FROM tasks WHERE id IN (SELECT id FROM subtree)
-    `
-      )
-      .run(taskId)
-    if (changes.changes === 0) return { error: 'STALE_ID' }
+      DELETE FROM tasks WHERE id IN (SELECT id FROM subtree)`,
+      [taskId]
+    )
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
-
-  // ── vault:cancel-task ────────────────────────────────────────────────────────
 
   handle('task-vault:vault:cancel-task', async (_event, payload) => {
     const parsed = CancelTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
-    const db = getDb()
     const now = new Date().toISOString()
-    const changes = db
-      .prepare(`UPDATE tasks SET status='cancelled', updated_at=? WHERE id=?`)
-      .run(now, taskId)
-    if (changes.changes === 0) return { error: 'STALE_ID' }
+    const existing = await db.get<{ id: string }>(`SELECT id FROM tasks WHERE id=?`, [taskId])
+    if (!existing) return { error: 'STALE_ID' }
+    await db.run(`UPDATE tasks SET status='cancelled', updated_at=? WHERE id=?`, [now, taskId])
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
-
-  // ── vault:restore-task ───────────────────────────────────────────────────────
 
   handle('task-vault:vault:restore-task', async (_event, payload) => {
     const parsed = RestoreTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
-    const db = getDb()
     const now = new Date().toISOString()
-    const existing = db.prepare(`SELECT metadata FROM tasks WHERE id=?`).get(taskId) as
-      | { metadata: string }
-      | undefined
+    const existing = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
+      taskId,
+    ])
     if (!existing) return { error: 'STALE_ID' }
     const meta = JSON.parse(existing.metadata || '{}') as Record<string, unknown>
     const twinId = meta.migration_twin_id as string | undefined
     if (twinId) {
-      // Delete all subtasks of the twin, then the twin itself
-      db.prepare(`DELETE FROM tasks WHERE parent_id=?`).run(twinId)
-      db.prepare(`DELETE FROM tasks WHERE id=?`).run(twinId)
+      await db.run(`DELETE FROM tasks WHERE parent_id=?`, [twinId])
+      await db.run(`DELETE FROM tasks WHERE id=?`, [twinId])
       delete meta.migration_twin_id
     }
-    // Restore original subtasks that were migrated alongside this task
-    db.prepare(
-      `UPDATE tasks SET status='open', migrated_to=NULL, metadata=json_remove(metadata, '$.migration_twin_id'), updated_at=? WHERE parent_id=? AND status='migrated'`
-    ).run(now, taskId)
-    // Restore to today's daily log so the task is immediately visible (local date, not UTC)
+    await db.run(
+      `UPDATE tasks SET status='open', migrated_to=NULL, metadata=(metadata::jsonb - 'migration_twin_id')::text, updated_at=? WHERE parent_id=? AND status='migrated'`,
+      [now, taskId]
+    )
     const todayDate = today()
-    const changes = db
-      .prepare(
-        `UPDATE tasks SET status='open', source='daily', source_ref=?, completed_date=NULL, migrated_to=NULL, metadata=?, updated_at=? WHERE id=?`
-      )
-      .run(todayDate, JSON.stringify(meta), now, taskId)
-    if (changes.changes === 0) return { error: 'STALE_ID' }
+    await db.run(
+      `UPDATE tasks SET status='open', source='daily', source_ref=?, completed_date=NULL, migrated_to=NULL, metadata=?, updated_at=? WHERE id=?`,
+      [todayDate, JSON.stringify(meta), now, taskId]
+    )
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
-
-  // ── vault:create-area ────────────────────────────────────────────────────────
 
   handle('task-vault:vault:create-area', async (_event, payload) => {
     const parsed = CreateAreaRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { name } = parsed.data
     const displayName = toDisplayName(name.trim())
-    const db = getDb()
     const now = new Date().toISOString()
-    const existing = db.prepare(`SELECT id FROM areas WHERE name=?`).get(displayName)
+    const existing = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [
+      displayName,
+    ])
     if (existing) return { error: 'AREA_EXISTS' }
-    db.prepare(`INSERT INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?)`).run(
+    await db.run(`INSERT INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?)`, [
       randomUUID(),
       displayName,
       now,
-      now
-    )
+      now,
+    ])
     broadcast('task-vault:push:index-updated', {})
     return { success: true, filePath: displayName }
   })
 
-  // ── vault:rename-area ────────────────────────────────────────────────────────
-
   handle('task-vault:vault:rename-area', async (_event, payload) => {
     const { areaFilePath, newName } = payload as { areaFilePath: string; newName: string }
     if (!areaFilePath || !newName?.trim()) return { error: 'VALIDATION_ERROR' }
-    const db = getDb()
     const now = new Date().toISOString()
-    const area = db.prepare(`SELECT id, name FROM areas WHERE name=?`).get(areaFilePath) as
-      | { id: string; name: string }
-      | undefined
+    const area = await db.get<{ id: string; name: string }>(
+      `SELECT id, name FROM areas WHERE name=?`,
+      [areaFilePath]
+    )
     if (!area) return { error: 'NOT_FOUND' }
-    const existing = db
-      .prepare(`SELECT id FROM areas WHERE name=? AND id != ?`)
-      .get(newName.trim(), area.id)
+    const existing = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=? AND id != ?`, [
+      newName.trim(),
+      area.id,
+    ])
     if (existing) return { error: 'AREA_EXISTS' }
-    db.prepare(`UPDATE areas SET name=?, updated_at=? WHERE id=?`).run(newName.trim(), now, area.id)
+    await db.run(`UPDATE areas SET name=?, updated_at=? WHERE id=?`, [newName.trim(), now, area.id])
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
-
-  // ── vault:archive-area ───────────────────────────────────────────────────────
 
   handle('task-vault:vault:archive-area', async (_event, payload) => {
     const parsed = ArchiveAreaRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { areaName } = parsed.data
-    const db = getDb()
     const now = new Date().toISOString()
 
-    const area = db.prepare(`SELECT id FROM areas WHERE name=?`).get(areaName) as
-      | { id: string }
-      | undefined
+    const area = await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [areaName])
     if (!area) return { error: 'NOT_FOUND' }
 
-    const projectRows = db.prepare(`SELECT id FROM projects WHERE area_id=?`).all(area.id) as {
-      id: string
-    }[]
+    const projectRows = await db.query<{ id: string }>(`SELECT id FROM projects WHERE area_id=?`, [
+      area.id,
+    ])
 
     for (const proj of projectRows) {
-      // Cancel all open tasks in each project (recursive via CTE)
-      db.prepare(
+      await db.run(
         `WITH RECURSIVE subtree(id) AS (
            SELECT id FROM tasks WHERE project_id=? AND parent_id IS NULL
            UNION ALL
@@ -786,25 +733,22 @@ export function registerVaultIpcHandlers(): () => void {
          )
          UPDATE tasks SET status='cancelled', updated_at=?
          WHERE id IN (SELECT id FROM subtree)
-           AND status IN ('open','in-progress','in-review','blocked')`
-      ).run(proj.id, now)
+           AND status IN ('open','in-progress','in-review','blocked')`,
+        [proj.id, now]
+      )
     }
 
-    // Cancel tasks directly in this area (not via a project)
-    db.prepare(
+    await db.run(
       `UPDATE tasks SET status='cancelled', updated_at=?
        WHERE area_id=? AND project_id IS NULL
-         AND status IN ('open','in-progress','in-review','blocked')`
-    ).run(now, area.id)
-
-    // Archive all projects in this area
-    db.prepare(`UPDATE projects SET status='archived', updated_at=? WHERE area_id=?`).run(
-      now,
-      area.id
+         AND status IN ('open','in-progress','in-review','blocked')`,
+      [now, area.id]
     )
-
-    // Archive the area itself
-    db.prepare(`UPDATE areas SET status='archived', updated_at=? WHERE id=?`).run(now, area.id)
+    await db.run(`UPDATE projects SET status='archived', updated_at=? WHERE area_id=?`, [
+      now,
+      area.id,
+    ])
+    await db.run(`UPDATE areas SET status='archived', updated_at=? WHERE id=?`, [now, area.id])
 
     if (Notification.isSupported()) {
       new Notification({ title: 'Area archived', body: areaName, silent: true }).show()
@@ -814,100 +758,82 @@ export function registerVaultIpcHandlers(): () => void {
     return { success: true }
   })
 
-  // ── vault:delete-area ────────────────────────────────────────────────────────
-
   handle('task-vault:vault:delete-area', async (_event, payload) => {
     const parsed = DeleteAreaRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { areaFilePath } = parsed.data
     const areaName = path.basename(areaFilePath, '.md')
-    const db = getDb()
 
-    const area = db.prepare(`SELECT id, status FROM areas WHERE name=?`).get(areaName) as
-      | { id: string; status: string }
-      | undefined
+    const area = await db.get<{ id: string; status: string }>(
+      `SELECT id, status FROM areas WHERE name=?`,
+      [areaName]
+    )
     if (!area) return { error: 'NOT_FOUND' }
     if (area.status !== 'archived') return { error: 'MUST_ARCHIVE_FIRST' }
 
-    const projectRows = db.prepare(`SELECT id FROM projects WHERE area_id=?`).all(area.id) as {
-      id: string
-    }[]
+    const projectRows = await db.query<{ id: string }>(`SELECT id FROM projects WHERE area_id=?`, [
+      area.id,
+    ])
 
     for (const proj of projectRows) {
-      // Delete all tasks in this project (subtasks cascade via parent_id FK)
-      db.prepare(
+      await db.run(
         `WITH RECURSIVE subtree(id) AS (
            SELECT id FROM tasks WHERE project_id=? AND parent_id IS NULL
            UNION ALL
            SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
          )
-         DELETE FROM tasks WHERE id IN (SELECT id FROM subtree)`
-      ).run(proj.id)
+         DELETE FROM tasks WHERE id IN (SELECT id FROM subtree)`,
+        [proj.id]
+      )
     }
 
-    // Delete tasks directly in this area
-    db.prepare(`DELETE FROM tasks WHERE area_id=? AND project_id IS NULL`).run(area.id)
-
-    // Delete all projects in this area
-    db.prepare(`DELETE FROM projects WHERE area_id=?`).run(area.id)
-
-    // Delete the area
-    db.prepare(`DELETE FROM areas WHERE id=?`).run(area.id)
+    await db.run(`DELETE FROM tasks WHERE area_id=? AND project_id IS NULL`, [area.id])
+    await db.run(`DELETE FROM projects WHERE area_id=?`, [area.id])
+    await db.run(`DELETE FROM areas WHERE id=?`, [area.id])
 
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
-
-  // ── vault:restore-area ───────────────────────────────────────────────────────
 
   handle('task-vault:vault:restore-area', async (_event, payload) => {
     const { areaName } = payload as { areaName: string }
     if (!areaName) return { error: 'VALIDATION_ERROR' }
-    const db = getDb()
     const now = new Date().toISOString()
-    const area = db.prepare(`SELECT id, updated_at FROM areas WHERE name=?`).get(areaName) as
-      | { id: string; updated_at: string }
-      | undefined
+    const area = await db.get<{ id: string; updated_at: string }>(
+      `SELECT id, updated_at FROM areas WHERE name=?`,
+      [areaName]
+    )
     if (!area) return { error: 'NOT_FOUND' }
-    // Capture the archive timestamp before overwriting it — used to identify tasks
-    // that were auto-cancelled by this specific archive operation (not user-cancelled beforehand)
     const archivedAt = area.updated_at
-    db.prepare(`UPDATE areas SET status='active', updated_at=? WHERE id=?`).run(now, area.id)
-    db.prepare(
-      `UPDATE projects SET status='active', updated_at=? WHERE area_id=? AND status='archived'`
-    ).run(now, area.id)
-    // Only restore tasks whose updated_at matches the archive timestamp — tasks cancelled
-    // before archival have an earlier updated_at and are intentionally excluded
-    db.prepare(
+    await db.run(`UPDATE areas SET status='active', updated_at=? WHERE id=?`, [now, area.id])
+    await db.run(
+      `UPDATE projects SET status='active', updated_at=? WHERE area_id=? AND status='archived'`,
+      [now, area.id]
+    )
+    await db.run(
       `UPDATE tasks SET status='open', updated_at=?
        WHERE status='cancelled' AND updated_at=?
          AND (area_id=? AND project_id IS NULL
-              OR project_id IN (SELECT id FROM projects WHERE area_id=?))`
-    ).run(now, archivedAt, area.id, area.id)
+              OR project_id IN (SELECT id FROM projects WHERE area_id=?))`,
+      [now, archivedAt, area.id, area.id]
+    )
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
-  // ── vault:get-inbox ──────────────────────────────────────────────────────────
-
   handle('task-vault:vault:get-inbox', async () => {
     try {
-      const db = getDb()
-      const rows = db
-        .prepare(
-          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
-           WHERE t.source='inbox' AND t.status='open' AND t.parent_id IS NULL ORDER BY t.created_at`
-        )
-        .all() as Record<string, unknown>[]
+      const rows = await db.query<Record<string, unknown>>(
+        `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+         WHERE t.source='inbox' AND t.status='open' AND t.parent_id IS NULL ORDER BY t.created_at`
+      )
       const tasks = rows.map(rowToTask)
       for (const task of tasks) {
-        task.subtasks = (
-          db
-            .prepare(
-              `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE t.parent_id=? ORDER BY t.sort_order, t.created_at`
-            )
-            .all(task.id) as Record<string, unknown>[]
-        ).map(rowToTask)
+        const subtaskRows = await db.query<Record<string, unknown>>(
+          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE t.parent_id=? ORDER BY t.sort_order, t.created_at`,
+          [task.id]
+        )
+        task.subtasks = subtaskRows.map(rowToTask)
       }
       return { tasks }
     } catch (err) {
@@ -915,73 +841,67 @@ export function registerVaultIpcHandlers(): () => void {
     }
   })
 
-  // ── vault:list-areas ─────────────────────────────────────────────────────────
-
   handle('task-vault:vault:list-areas', async (_event, payload) => {
     try {
-      const db = getDb()
       const statusFilter = (payload as { status?: string } | undefined)?.status ?? 'active'
-      const areaRows = (
+      const areaRows =
         statusFilter === 'all'
-          ? db.prepare(`SELECT * FROM areas ORDER BY name`).all()
-          : db.prepare(`SELECT * FROM areas WHERE status=? ORDER BY name`).all(statusFilter)
-      ) as Record<string, unknown>[]
+          ? await db.query<Record<string, unknown>>(`SELECT * FROM areas ORDER BY name`)
+          : await db.query<Record<string, unknown>>(
+              `SELECT * FROM areas WHERE status=? ORDER BY name`,
+              [statusFilter]
+            )
       const result: unknown[] = []
 
       for (const a of areaRows) {
         const areaId = a.id as string
         const areaName = a.name as string
-        const taskRows = db
-          .prepare(
-            `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
-             WHERE t.area_id=? AND t.parent_id IS NULL AND t.status NOT IN ('done','cancelled','migrated') ORDER BY t.created_at`
-          )
-          .all(areaId) as Record<string, unknown>[]
+        const taskRows = await db.query<Record<string, unknown>>(
+          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+           WHERE t.area_id=? AND t.parent_id IS NULL AND t.status NOT IN ('done','cancelled','migrated') ORDER BY t.created_at`,
+          [areaId]
+        )
         const tasks = taskRows.map(rowToTask)
-        const projectRows = db
-          .prepare(`SELECT * FROM projects WHERE area_id=? ORDER BY name`)
-          .all(areaId) as Record<string, unknown>[]
-        const projects = projectRows.map((p) => {
-          const nextActionCount = (
-            db
-              .prepare(`SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND status='open'`)
-              .get(p.id) as { c: number }
-          ).c
-          const totalCount = (
-            db
-              .prepare(`SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND parent_id IS NULL`)
-              .get(p.id) as { c: number }
-          ).c
-          const doneCount = (
-            db
-              .prepare(
-                `SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND status IN ('done','cancelled','migrated') AND parent_id IS NULL`
-              )
-              .get(p.id) as { c: number }
-          ).c
-          return {
-            ...rowToProject(p),
-            nextActionCount,
-            isStale: nextActionCount === 0,
-            totalTaskCount: totalCount,
-            doneTaskCount: doneCount,
-          }
-        })
-        // Combined counts: area-direct tasks + tasks from projects in this area
-        const combinedOpenCount = (
-          db
-            .prepare(
-              `SELECT COUNT(DISTINCT t.id) as c FROM tasks t WHERE t.parent_id IS NULL AND t.status='open' AND (t.area_id=? OR t.project_id IN (SELECT id FROM projects WHERE area_id=?))`
+        const projectRows = await db.query<Record<string, unknown>>(
+          `SELECT * FROM projects WHERE area_id=? ORDER BY name`,
+          [areaId]
+        )
+        const projects = await Promise.all(
+          projectRows.map(async (p) => {
+            const ncRow = await db.get<{ c: string }>(
+              `SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND status='open'`,
+              [p.id as string]
             )
-            .get(areaId, areaId) as { c: number }
-        ).c
-        const combinedTotalCount = (
-          db
-            .prepare(
-              `SELECT COUNT(DISTINCT t.id) as c FROM tasks t WHERE t.parent_id IS NULL AND (t.area_id=? OR t.project_id IN (SELECT id FROM projects WHERE area_id=?))`
+            const nextActionCount = Number(ncRow?.c ?? 0)
+            const totalRow = await db.get<{ c: string }>(
+              `SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND parent_id IS NULL`,
+              [p.id as string]
             )
-            .get(areaId, areaId) as { c: number }
-        ).c
+            const totalCount = Number(totalRow?.c ?? 0)
+            const doneRow = await db.get<{ c: string }>(
+              `SELECT COUNT(*) as c FROM tasks WHERE project_id=? AND status IN ('done','cancelled','migrated') AND parent_id IS NULL`,
+              [p.id as string]
+            )
+            const doneCount = Number(doneRow?.c ?? 0)
+            return {
+              ...rowToProject(p),
+              nextActionCount,
+              isStale: nextActionCount === 0,
+              totalTaskCount: totalCount,
+              doneTaskCount: doneCount,
+            }
+          })
+        )
+        const openRow = await db.get<{ c: string }>(
+          `SELECT COUNT(DISTINCT t.id) as c FROM tasks t WHERE t.parent_id IS NULL AND t.status='open' AND (t.area_id=? OR t.project_id IN (SELECT id FROM projects WHERE area_id=?))`,
+          [areaId, areaId]
+        )
+        const combinedOpenCount = Number(openRow?.c ?? 0)
+        const totalRow2 = await db.get<{ c: string }>(
+          `SELECT COUNT(DISTINCT t.id) as c FROM tasks t WHERE t.parent_id IS NULL AND (t.area_id=? OR t.project_id IN (SELECT id FROM projects WHERE area_id=?))`,
+          [areaId, areaId]
+        )
+        const combinedTotalCount = Number(totalRow2?.c ?? 0)
         result.push({
           filePath: areaName,
           name: areaName,
@@ -999,40 +919,32 @@ export function registerVaultIpcHandlers(): () => void {
     }
   })
 
-  // ── projects:get-tasks (also registered here for proximity) ─────────────────
-
   handle('task-vault:projects:get-tasks', async (_event, payload) => {
     const { projectName } = payload as { projectName: string }
     if (!projectName) return { tasks: [] }
-    const db = getDb()
-    const rows = db
-      .prepare(
-        `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE p.name=? ORDER BY t.status, t.created_at`
-      )
-      .all(projectName) as Record<string, unknown>[]
+    const rows = await db.query<Record<string, unknown>>(
+      `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS} WHERE p.name=? ORDER BY t.status, t.created_at`,
+      [projectName]
+    )
     return { tasks: rows.map(rowToTask) }
   })
-
-  // ── vault:list-archive ───────────────────────────────────────────────────────
 
   handle('task-vault:vault:list-archive', async (_event, payload) => {
     const parsed = ListArchiveRequestSchema.safeParse(payload ?? {})
     const days = parsed.success ? (parsed.data.days ?? 30) : 30
     try {
-      const db = getDb()
       const cutoff = localDate(new Date(Date.now() - days * 86400000))
-      const taskRows = db
-        .prepare(
-          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
-           WHERE t.status IN ('done','cancelled','migrated') AND t.updated_at >= ? ORDER BY t.updated_at DESC`
-        )
-        .all(cutoff) as Record<string, unknown>[]
-      const projectRows = db
-        .prepare(`SELECT * FROM projects WHERE status='archived' ORDER BY updated_at DESC`)
-        .all() as Record<string, unknown>[]
-      const areaRows = db
-        .prepare(`SELECT * FROM areas WHERE status='archived' ORDER BY updated_at DESC`)
-        .all() as Record<string, unknown>[]
+      const taskRows = await db.query<Record<string, unknown>>(
+        `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+         WHERE t.status IN ('done','cancelled','migrated') AND t.updated_at >= ? ORDER BY t.updated_at DESC`,
+        [cutoff]
+      )
+      const projectRows = await db.query<Record<string, unknown>>(
+        `SELECT * FROM projects WHERE status='archived' ORDER BY updated_at DESC`
+      )
+      const areaRows = await db.query<Record<string, unknown>>(
+        `SELECT * FROM areas WHERE status='archived' ORDER BY updated_at DESC`
+      )
       const projects = projectRows.map(rowToProject)
       const areas = areaRows.map((a) => ({
         id: a.id as string,
@@ -1045,42 +957,36 @@ export function registerVaultIpcHandlers(): () => void {
     }
   })
 
-  // ── vault:list-someday ───────────────────────────────────────────────────────
-
   handle('task-vault:vault:list-someday', async () => {
     try {
-      const db = getDb()
-      const taskRows = db
-        .prepare(
-          `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
-           WHERE t.source='someday' AND t.status='open' AND t.parent_id IS NULL
-           ORDER BY t.created_at ASC`
-        )
-        .all() as Record<string, unknown>[]
-      const projectRows = db
-        .prepare(`SELECT * FROM projects WHERE status='someday' ORDER BY name ASC`)
-        .all() as Record<string, unknown>[]
+      const taskRows = await db.query<Record<string, unknown>>(
+        `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
+         WHERE t.source='someday' AND t.status='open' AND t.parent_id IS NULL
+         ORDER BY t.created_at ASC`
+      )
+      const projectRows = await db.query<Record<string, unknown>>(
+        `SELECT * FROM projects WHERE status='someday' ORDER BY name ASC`
+      )
       return { tasks: taskRows.map(rowToTask), projects: projectRows.map(rowToProject) }
     } catch (err) {
       return { error: String(err) }
     }
   })
 
-  // ── vault:someday-to-today ───────────────────────────────────────────────────
-
   handle('task-vault:vault:someday-to-today', async (_event, payload) => {
     const { taskId } = payload as { taskId: string }
     if (!taskId) return { error: 'VALIDATION_ERROR' }
     try {
-      const db = getDb()
       const todayDate = today()
       const now = new Date().toISOString()
-      db.prepare(
-        `UPDATE tasks SET source='daily', source_ref=?, status='open', updated_at=? WHERE id=?`
-      ).run(todayDate, now, taskId)
-      db.prepare(
-        `UPDATE tasks SET source='daily', source_ref=?, updated_at=? WHERE parent_id=?`
-      ).run(todayDate, now, taskId)
+      await db.run(
+        `UPDATE tasks SET source='daily', source_ref=?, status='open', updated_at=? WHERE id=?`,
+        [todayDate, now, taskId]
+      )
+      await db.run(
+        `UPDATE tasks SET source='daily', source_ref=?, updated_at=? WHERE parent_id=?`,
+        [todayDate, now, taskId]
+      )
       broadcast('task-vault:push:index-updated', {})
       return { success: true }
     } catch (err) {
@@ -1088,34 +994,30 @@ export function registerVaultIpcHandlers(): () => void {
     }
   })
 
-  // ── vault:add-subtask ────────────────────────────────────────────────────────
-
   handle('task-vault:vault:add-subtask', async (_event, payload) => {
     const { taskId, text } = payload as { taskId: string; text: string }
     if (!taskId || !text) return { error: 'VALIDATION_ERROR' }
-    const db = getDb()
-    const parent = db.prepare(`SELECT source, source_ref FROM tasks WHERE id=?`).get(taskId) as
-      | { source: string; source_ref: string | null }
-      | undefined
+    const parent = await db.get<{ source: string; source_ref: string | null }>(
+      `SELECT source, source_ref FROM tasks WHERE id=?`,
+      [taskId]
+    )
     if (!parent) return { error: 'STALE_ID' }
     const now = new Date().toISOString()
     const newId = randomUUID()
-    db.prepare(
+    await db.run(
       `INSERT INTO tasks (id,text,status,source,source_ref,parent_id,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?)`
-    ).run(newId, text.trim(), 'open', parent.source, parent.source_ref, taskId, now, now)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [newId, text.trim(), 'open', parent.source, parent.source_ref, taskId, now, now]
+    )
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
-  // ── vault:export-json ────────────────────────────────────────────────────────
-
   handle('task-vault:vault:export-json', async () => {
     try {
-      const db = getDb()
-      const tasks = db.prepare(`SELECT * FROM tasks ORDER BY created_at`).all()
-      const projects = db.prepare(`SELECT * FROM projects ORDER BY name`).all()
-      const areas = db.prepare(`SELECT * FROM areas ORDER BY name`).all()
+      const tasks = await db.query(`SELECT * FROM tasks ORDER BY created_at`)
+      const projects = await db.query(`SELECT * FROM projects ORDER BY name`)
+      const areas = await db.query(`SELECT * FROM areas ORDER BY name`)
       return {
         exportedAt: new Date().toISOString(),
         version: 1,
@@ -1128,8 +1030,6 @@ export function registerVaultIpcHandlers(): () => void {
     }
   })
 
-  // ── vault:import-json ────────────────────────────────────────────────────────
-
   handle('task-vault:vault:import-json', async (_event, payload) => {
     try {
       const data = payload as {
@@ -1140,85 +1040,75 @@ export function registerVaultIpcHandlers(): () => void {
       }
       if (!data || typeof data !== 'object') return { error: 'INVALID_PAYLOAD' }
 
-      const db = getDb()
       let imported = 0
 
       if (Array.isArray(data.areas)) {
-        const stmt = db.prepare(
-          `INSERT OR IGNORE INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?)`
-        )
         for (const a of data.areas) {
-          stmt.run(a.id, a.name, a.created_at, a.updated_at ?? a.created_at)
+          await db.run(
+            `INSERT INTO areas (id,name,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`,
+            [a.id, a.name, a.created_at, a.updated_at ?? a.created_at]
+          )
           imported++
         }
       }
       if (Array.isArray(data.projects)) {
-        const stmt = db.prepare(
-          `INSERT OR IGNORE INTO projects (id,name,status,area_id,deadline,outcome,terminator_links,created_at,updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?)`
-        )
         for (const p of data.projects) {
-          const areaId = p.area
-            ? ((
-                db.prepare(`SELECT id FROM areas WHERE name=?`).get(p.area) as
-                  | { id: string }
-                  | undefined
-              )?.id ?? null)
+          const areaRow = p.area
+            ? await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [p.area])
             : null
-          stmt.run(
-            p.id,
-            p.name,
-            p.status ?? 'active',
-            areaId,
-            p.deadline ?? null,
-            p.outcome ?? null,
-            p.terminator_links ?? '[]',
-            p.created_at,
-            p.updated_at
+          const areaId = areaRow?.id ?? null
+          await db.run(
+            `INSERT INTO projects (id,name,status,area_id,deadline,outcome,terminator_links,created_at,updated_at)
+             VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`,
+            [
+              p.id,
+              p.name,
+              p.status ?? 'active',
+              areaId,
+              p.deadline ?? null,
+              p.outcome ?? null,
+              p.terminator_links ?? '[]',
+              p.created_at,
+              p.updated_at,
+            ]
           )
           imported++
         }
       }
       if (Array.isArray(data.tasks)) {
-        const stmt = db.prepare(
-          `INSERT OR IGNORE INTO tasks
-             (id,text,status,project_id,context,area_id,due_date,completed_date,migrated_to,
-              source,source_ref,parent_id,sort_order,metadata,terminator_links,created_at,updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
-        )
         for (const t of data.tasks) {
-          const projectId = t.project
-            ? ((
-                db.prepare(`SELECT id FROM projects WHERE name=?`).get(t.project) as
-                  | { id: string }
-                  | undefined
-              )?.id ?? null)
+          const projRow = t.project
+            ? await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [t.project])
             : null
-          const areaId = t.area
-            ? ((
-                db.prepare(`SELECT id FROM areas WHERE name=?`).get(t.area) as
-                  | { id: string }
-                  | undefined
-              )?.id ?? null)
+          const projectId = projRow?.id ?? null
+          const areaRow = t.area
+            ? await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [t.area])
             : null
-          stmt.run(
-            t.id,
-            t.text,
-            t.status ?? 'open',
-            projectId,
-            t.context ?? null,
-            areaId,
-            t.due_date ?? null,
-            t.completed_date ?? null,
-            t.migrated_to ?? null,
-            t.source ?? 'inbox',
-            t.source_ref ?? null,
-            t.parent_id ?? null,
-            t.sort_order ?? 0,
-            t.metadata ?? '{}',
-            t.terminator_links ?? '[]',
-            t.created_at,
-            t.updated_at
+          const areaId = areaRow?.id ?? null
+          await db.run(
+            `INSERT INTO tasks
+               (id,text,status,project_id,context,area_id,due_date,completed_date,migrated_to,
+                source,source_ref,parent_id,sort_order,metadata,terminator_links,created_at,updated_at)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`,
+            [
+              t.id,
+              t.text,
+              t.status ?? 'open',
+              projectId,
+              t.context ?? null,
+              areaId,
+              t.due_date ?? null,
+              t.completed_date ?? null,
+              t.migrated_to ?? null,
+              t.source ?? 'inbox',
+              t.source_ref ?? null,
+              t.parent_id ?? null,
+              t.sort_order ?? 0,
+              t.metadata ?? '{}',
+              t.terminator_links ?? '[]',
+              t.created_at,
+              t.updated_at,
+            ]
           )
           imported++
         }
@@ -1229,27 +1119,20 @@ export function registerVaultIpcHandlers(): () => void {
     }
   })
 
-  // ── vault:update-project-status ──────────────────────────────────────────────
-
   handle('task-vault:vault:update-project-status', async (_event, payload) => {
     const parsed = UpdateProjectStatusRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { projectFilePath: projectName, status } = parsed.data
-    const db = getDb()
     const now = new Date().toISOString()
 
-    let proj = db.prepare(`SELECT id FROM projects WHERE name=?`).get(projectName) as
-      | { id: string }
-      | undefined
+    let proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [projectName])
     if (!proj) {
-      proj = db.prepare(`SELECT id FROM projects WHERE id=?`).get(projectName) as
-        | { id: string }
-        | undefined
+      proj = await db.get<{ id: string }>(`SELECT id FROM projects WHERE id=?`, [projectName])
     }
     if (!proj) return { error: 'NOT_FOUND' }
 
     if (status === 'archived') {
-      db.prepare(
+      await db.run(
         `WITH RECURSIVE subtree(id) AS (
            SELECT id FROM tasks WHERE project_id=? AND parent_id IS NULL
            UNION ALL
@@ -1257,11 +1140,12 @@ export function registerVaultIpcHandlers(): () => void {
          )
          UPDATE tasks SET status='cancelled', updated_at=?
          WHERE id IN (SELECT id FROM subtree)
-           AND status IN ('open','in-progress','in-review','blocked')`
-      ).run(proj.id, now)
+           AND status IN ('open','in-progress','in-review','blocked')`,
+        [proj.id, now]
+      )
     }
 
-    db.prepare(`UPDATE projects SET status=?, updated_at=? WHERE id=?`).run(status, now, proj.id)
+    await db.run(`UPDATE projects SET status=?, updated_at=? WHERE id=?`, [status, now, proj.id])
     if (status === 'archived') {
       if (Notification.isSupported()) {
         new Notification({ title: 'Project archived', body: projectName, silent: true }).show()
@@ -1272,17 +1156,14 @@ export function registerVaultIpcHandlers(): () => void {
     return { success: true }
   })
 
-  // ── vault:get-task-detail ────────────────────────────────────────────────────
-
   handle('task-vault:vault:get-task-detail', async (_event, payload) => {
     const parsed = GetTaskDetailRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
     try {
-      const db = getDb()
-      const row = db.prepare(`SELECT metadata FROM tasks WHERE id=?`).get(taskId) as
-        | { metadata: string }
-        | undefined
+      const row = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
+        taskId,
+      ])
       if (!row) return { error: 'Task not found' }
       const meta = JSON.parse(row.metadata || '{}') as Record<string, string>
       return {
@@ -1295,141 +1176,115 @@ export function registerVaultIpcHandlers(): () => void {
     }
   })
 
-  // ── vault:save-task-detail ───────────────────────────────────────────────────
-
   handle('task-vault:vault:save-task-detail', async (_event, payload) => {
     const parsed = SaveTaskDetailRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, description, acceptanceCriteria, devHints } = parsed.data
     try {
-      const db = getDb()
-      const row = db.prepare(`SELECT metadata FROM tasks WHERE id=?`).get(taskId) as
-        | { metadata: string }
-        | undefined
+      const row = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
+        taskId,
+      ])
       if (!row) return { error: 'Task not found' }
       const meta = JSON.parse(row.metadata || '{}') as Record<string, string>
       meta.description = description
       meta.acceptance_criteria = acceptanceCriteria
       meta.dev_hints = devHints
-      db.prepare(`UPDATE tasks SET metadata=?, updated_at=? WHERE id=?`).run(
+      await db.run(`UPDATE tasks SET metadata=?, updated_at=? WHERE id=?`, [
         JSON.stringify(meta),
         new Date().toISOString(),
-        taskId
-      )
+        taskId,
+      ])
       return { ok: true }
     } catch (err) {
       return { error: String(err) }
     }
   })
 
-  // ── vault:reopen-task ────────────────────────────────────────────────────────
-  // Sets status back to 'open' in-place (does not move source to inbox).
-  // Used by the daily-log view where the task must stay in the current file.
-
   handle('task-vault:vault:reopen-task', async (_event, payload) => {
     const parsed = RestoreTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
-    const db = getDb()
     const now = new Date().toISOString()
-    const existing = db.prepare(`SELECT metadata FROM tasks WHERE id=?`).get(taskId) as
-      | { metadata: string }
-      | undefined
+    const existing = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
+      taskId,
+    ])
     if (!existing) return { error: 'STALE_ID' }
     const meta = JSON.parse(existing.metadata || '{}') as Record<string, unknown>
     const twinId = meta.migration_twin_id as string | undefined
     if (twinId) {
-      // Delete all subtasks of the twin, then the twin itself
-      db.prepare(`DELETE FROM tasks WHERE parent_id=?`).run(twinId)
-      db.prepare(`DELETE FROM tasks WHERE id=?`).run(twinId)
+      await db.run(`DELETE FROM tasks WHERE parent_id=?`, [twinId])
+      await db.run(`DELETE FROM tasks WHERE id=?`, [twinId])
       delete meta.migration_twin_id
     }
-    // Restore original subtasks that were migrated alongside this task
-    db.prepare(
-      `UPDATE tasks SET status='open', migrated_to=NULL, metadata=json_remove(metadata, '$.migration_twin_id'), updated_at=? WHERE parent_id=? AND status='migrated'`
-    ).run(now, taskId)
-    const changes = db
-      .prepare(
-        `UPDATE tasks SET status='open', completed_date=NULL, migrated_to=NULL, metadata=?, updated_at=? WHERE id=?`
-      )
-      .run(JSON.stringify(meta), now, taskId)
-    if (changes.changes === 0) return { error: 'STALE_ID' }
+    await db.run(
+      `UPDATE tasks SET status='open', migrated_to=NULL, metadata=(metadata::jsonb - 'migration_twin_id')::text, updated_at=? WHERE parent_id=? AND status='migrated'`,
+      [now, taskId]
+    )
+    await db.run(
+      `UPDATE tasks SET status='open', completed_date=NULL, migrated_to=NULL, metadata=?, updated_at=? WHERE id=?`,
+      [JSON.stringify(meta), now, taskId]
+    )
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
-
-  // ── vault:block-task ──────────────────────────────────────────────────────────
 
   handle('task-vault:vault:block-task', async (_event, payload) => {
     const parsed = BlockTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR: ' + parsed.error.message }
     const { taskId, reason, checkInterval } = parsed.data
-    const db = getDb()
     const now = new Date().toISOString()
-    const row = db.prepare(`SELECT metadata FROM tasks WHERE id=?`).get(taskId) as
-      | { metadata: string }
-      | undefined
+    const row = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
+      taskId,
+    ])
     if (!row) return { error: 'STALE_ID' }
     const meta = JSON.parse(row.metadata || '{}') as Record<string, string>
     meta.blocked_reason = reason
     meta.blocked_check_interval = checkInterval
-    const changes = db
-      .prepare(
-        `UPDATE tasks SET status='blocked', metadata=?, blocked_reason=?, blocked_check_interval=?, updated_at=? WHERE id=?`
-      )
-      .run(JSON.stringify(meta), reason, checkInterval, now, taskId)
-    if (changes.changes === 0) return { error: 'STALE_ID' }
+    await db.run(
+      `UPDATE tasks SET status='blocked', metadata=?, blocked_reason=?, blocked_check_interval=?, updated_at=? WHERE id=?`,
+      [JSON.stringify(meta), reason, checkInterval, now, taskId]
+    )
     triggerSchedulerTick()
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
-  // ── vault:unblock-task ────────────────────────────────────────────────────────
-
   handle('task-vault:vault:unblock-task', async (_event, payload) => {
     const parsed = UnblockTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
-    const db = getDb()
     const now = new Date().toISOString()
-    const row = db.prepare(`SELECT metadata FROM tasks WHERE id=?`).get(taskId) as
-      | { metadata: string }
-      | undefined
+    const row = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
+      taskId,
+    ])
     if (!row) return { error: 'STALE_ID' }
     const meta = JSON.parse(row.metadata || '{}') as Record<string, string>
     delete meta.blocked_reason
     delete meta.blocked_check_interval
-    const changes = db
-      .prepare(
-        `UPDATE tasks SET status='open', metadata=?, blocked_reason=NULL, blocked_check_interval=NULL, updated_at=? WHERE id=?`
-      )
-      .run(JSON.stringify(meta), now, taskId)
-    if (changes.changes === 0) return { error: 'STALE_ID' }
+    await db.run(
+      `UPDATE tasks SET status='open', metadata=?, blocked_reason=NULL, blocked_check_interval=NULL, updated_at=? WHERE id=?`,
+      [JSON.stringify(meta), now, taskId]
+    )
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
-
-  // ── vault:set-recurrence ──────────────────────────────────────────────────────
 
   handle('task-vault:vault:set-recurrence', async (_event, payload) => {
     const parsed = SetRecurrenceRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, interval, days, time, endType, endDate, endCount } = parsed.data
-    const db = getDb()
-    const task = db
-      .prepare(`SELECT metadata, due_date, source_ref FROM tasks WHERE id=?`)
-      .get(taskId) as
-      | { metadata: string; due_date: string | null; source_ref: string | null }
-      | undefined
+    const task = await db.get<{
+      metadata: string
+      due_date: string | null
+      source_ref: string | null
+    }>(`SELECT metadata, due_date, source_ref FROM tasks WHERE id=?`, [taskId])
     if (!task) return { error: 'STALE_ID' }
 
-    // Build recurrence_rule column value from interval + days
     let recurrenceRule = interval
     if (interval === 'weekly' && days != null && days.length > 0) {
       recurrenceRule = `weekly:${[...days].sort((a, b) => a - b).join(',')}`
     }
 
-    // Build end-condition metadata (configuration keys remain in metadata)
     let meta: Record<string, unknown> = {}
     try {
       meta = JSON.parse(task.metadata || '{}') as Record<string, unknown>
@@ -1439,9 +1294,7 @@ export function registerVaultIpcHandlers(): () => void {
     meta.recurrence_end_type = endType ?? 'none'
     meta.recurrence_end_date = endType === 'on_date' ? endDate : undefined
     meta.recurrence_end_count = endType === 'after_count' ? endCount : undefined
-    // Reset completion count when recurrence is (re)configured
     meta.recurrence_completed_count = 0
-    // Remove stale metadata-based recurrence keys
     delete meta.recurrence_interval
     delete meta.recurrence_days
     delete meta.recurrence_time
@@ -1449,37 +1302,34 @@ export function registerVaultIpcHandlers(): () => void {
     delete meta.notification_notified_date
 
     const now = new Date().toISOString()
-    // Ensure due_date is set. Daily log tasks have no due_date by default.
     const effectiveDueDate = task.due_date ?? task.source_ref ?? today()
 
     try {
       let nextTaskId: string | null = null
-      const setAndSpawn = db.transaction(() => {
-        // Delete any stale future open instances before resetting the rule
-        db.prepare(
-          `DELETE FROM tasks WHERE recurrence_template_id=? AND status='open' AND due_date > ?`
-        ).run(taskId, today())
-
-        db.prepare(
+      await db.transaction(async (tx) => {
+        await tx.run(
+          `DELETE FROM tasks WHERE recurrence_template_id=? AND status='open' AND due_date > ?`,
+          [taskId, today()]
+        )
+        await tx.run(
           `UPDATE tasks SET recurrence_rule=?, recurrence_notify_at=?, due_date=?, metadata=?,
             recurrence_end_type=?, recurrence_end_date=?, recurrence_end_count=?,
             recurrence_completed_count=0,
-            updated_at=? WHERE id=?`
-        ).run(
-          recurrenceRule,
-          time ?? null,
-          effectiveDueDate,
-          JSON.stringify(meta),
-          endType ?? 'none',
-          endType === 'on_date' ? (endDate ?? null) : null,
-          endType === 'after_count' ? (endCount ?? null) : null,
-          now,
-          taskId
+            updated_at=? WHERE id=?`,
+          [
+            recurrenceRule,
+            time ?? null,
+            effectiveDueDate,
+            JSON.stringify(meta),
+            endType ?? 'none',
+            endType === 'on_date' ? (endDate ?? null) : null,
+            endType === 'after_count' ? (endCount ?? null) : null,
+            now,
+            taskId,
+          ]
         )
-
-        nextTaskId = ensureNextOccurrence(db, taskId)
+        nextTaskId = await ensureNextOccurrence(tx, taskId)
       })
-      setAndSpawn()
 
       if (nextTaskId) {
         broadcast('task-vault:recurrence-spawned', { taskId, nextTaskId })
@@ -1492,16 +1342,13 @@ export function registerVaultIpcHandlers(): () => void {
     }
   })
 
-  // ── vault:clear-recurrence ────────────────────────────────────────────────────
-
   handle('task-vault:vault:clear-recurrence', async (_event, payload) => {
     const parsed = ClearRecurrenceRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
-    const db = getDb()
-    const task = db.prepare(`SELECT metadata FROM tasks WHERE id=?`).get(taskId) as
-      | { metadata: string }
-      | undefined
+    const task = await db.get<{ metadata: string }>(`SELECT metadata FROM tasks WHERE id=?`, [
+      taskId,
+    ])
     if (!task) return { error: 'STALE_ID' }
     let meta: Record<string, unknown> = {}
     try {
@@ -1509,7 +1356,6 @@ export function registerVaultIpcHandlers(): () => void {
     } catch {
       // ignore
     }
-    // Remove all recurrence-related keys from metadata
     delete meta.recurrence_interval
     delete meta.recurrence_days
     delete meta.recurrence_time
@@ -1520,80 +1366,69 @@ export function registerVaultIpcHandlers(): () => void {
     delete meta.recurrence_next_spawned
     delete meta.notification_notified_date
     const now = new Date().toISOString()
-    const clearTx = db.transaction(() => {
-      // Delete all future open instances
-      db.prepare(`DELETE FROM tasks WHERE recurrence_template_id=? AND status='open'`).run(taskId)
-      db.prepare(
+    await db.transaction(async (tx) => {
+      await tx.run(`DELETE FROM tasks WHERE recurrence_template_id=? AND status='open'`, [taskId])
+      await tx.run(
         `UPDATE tasks SET recurrence_rule=NULL, recurrence_notify_at=NULL,
           recurrence_end_type=NULL, recurrence_end_date=NULL, recurrence_end_count=NULL,
-          recurrence_completed_count=NULL, metadata=?, updated_at=? WHERE id=?`
-      ).run(JSON.stringify(meta), now, taskId)
+          recurrence_completed_count=NULL, metadata=?, updated_at=? WHERE id=?`,
+        [JSON.stringify(meta), now, taskId]
+      )
     })
-    clearTx()
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
-
-  // ── vault:reorder-tasks ───────────────────────────────────────────────────────
 
   handle('task-vault:vault:reorder-tasks', async (_event, payload) => {
     const parsed = ReorderTasksRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { orderedIds } = parsed.data
-    const db = getDb()
     const now = new Date().toISOString()
-    const stmt = db.prepare(`UPDATE tasks SET sort_order=?, updated_at=? WHERE id=?`)
-    const updateMany = db.transaction((ids: string[]) => {
-      for (let i = 0; i < ids.length; i++) {
-        stmt.run(i, now, ids[i])
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx.run(`UPDATE tasks SET sort_order=?, updated_at=? WHERE id=?`, [
+          i,
+          now,
+          orderedIds[i],
+        ])
       }
     })
-    updateMany(orderedIds)
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
 
-  // ── vault:get-calendar-month ──────────────────────────────────────────────────
-
   handle('task-vault:vault:get-calendar-month', async (_event, payload) => {
     const { year, month } = payload as { year: number; month: number }
-    const db = getDb()
     const pad = (n: number) => String(n).padStart(2, '0')
     const startDate = `${year}-${pad(month)}-01`
     const endDate = `${year}-${pad(month)}-31`
-    type DayRow = { date: string; status: string; count: number }
-    const rows = db
-      .prepare(
-        `SELECT source_ref AS date, status, COUNT(*) AS count
-         FROM tasks
-         WHERE source='daily' AND source_ref >= ? AND source_ref <= ?
-           AND parent_id IS NULL
-         GROUP BY source_ref, status`
-      )
-      .all(startDate, endDate) as DayRow[]
-    return { days: rows }
+    type DayRow = { date: string; status: string; count: string }
+    const rows = await db.query<DayRow>(
+      `SELECT source_ref AS date, status, COUNT(*) AS count
+       FROM tasks
+       WHERE source='daily' AND source_ref >= ? AND source_ref <= ?
+         AND parent_id IS NULL
+       GROUP BY source_ref, status`,
+      [startDate, endDate]
+    )
+    return { days: rows.map((r) => ({ ...r, count: Number(r.count) })) }
   })
-
-  // ── vault:reset-today-since ──────────────────────────────────────────────────
 
   handle('task-vault:vault:reset-today-since', async (_event, payload) => {
     const { taskId } = payload as { taskId: string }
     if (!taskId) return { error: 'VALIDATION_ERROR' }
-    const db = getDb()
     const now = new Date().toISOString()
-    db.prepare(`UPDATE tasks SET today_since=?, updated_at=? WHERE id=?`).run(today(), now, taskId)
+    await db.run(`UPDATE tasks SET today_since=?, updated_at=? WHERE id=?`, [today(), now, taskId])
     return { success: true }
   })
-
-  // ── settings:set-stale-threshold ────────────────────────────────────────────
 
   handle('task-vault:settings:set-stale-threshold', async (_event, payload) => {
     const { days } = payload as { days: number }
     if (typeof days !== 'number' || days < 1) return { error: 'VALIDATION_ERROR' }
-    const db = getDb()
-    db.prepare(
-      `INSERT OR REPLACE INTO settings (key, value) VALUES ('stale_days_threshold', ?)`
-    ).run(String(days))
+    await db.run(
+      `INSERT INTO settings (key, value) VALUES ('stale_days_threshold', ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [String(days)]
+    )
     return { success: true }
   })
 

@@ -1,22 +1,23 @@
-import { BrowserWindow, app, ipcMain } from 'electron'
-import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
+import { BrowserWindow, ipcMain } from 'electron'
+import type { ExtensionAPI, ExtensionDB, Disposable } from '../../../src/main/extensions/api'
 import { DEFAULT_CAPTURE_HOTKEY } from './constants.js'
 import { registerVaultIpcHandlers } from './ipc/vault.ipc.js'
 import { registerProjectsIpcHandlers } from './ipc/projects.ipc.js'
 import { registerLinksIpcHandlers } from './ipc/links.ipc.js'
 import { registerKanbanIpcHandlers } from './ipc/kanban.ipc.js'
 import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
-import { initDb, closeDb, reinitDb, repairDb, resetDb } from './vault/db.js'
+import { applyTaskVaultSchema, applyTaskVaultMigrations } from './vault/db.js'
+import { backfillRecurringTasks } from './vault/ensure-next-occurrence.js'
 import { startTaskScheduler, setSchedulerTick } from './notifications/task-scheduler.js'
 
 const disposables: Disposable[] = []
 let _api: ExtensionAPI | null = null
 let _schedulerStarted = false
 
-function maybeStartScheduler(): void {
+function maybeStartScheduler(db: ExtensionDB): void {
   if (_schedulerStarted || !_api) return
   try {
-    const scheduler = startTaskScheduler(_api)
+    const scheduler = startTaskScheduler(_api, db)
     _schedulerStarted = true
     disposables.push({ dispose: scheduler.dispose })
     setSchedulerTick(scheduler.tick)
@@ -27,7 +28,8 @@ function maybeStartScheduler(): void {
 
 export async function activate(api: ExtensionAPI): Promise<void> {
   _api = api
-  // Register settings
+  const db: ExtensionDB = api.db
+
   disposables.push(
     api.settings.register({
       label: 'Task Vault',
@@ -63,22 +65,14 @@ export async function activate(api: ExtensionAPI): Promise<void> {
         'terminator.task-vault.db.reinit': {
           type: 'action',
           label: 'Re-initialize',
-          description: 'Close and reopen the database connection. Use if tasks stop loading.',
+          description: 'Re-run schema checks and startup gap-fill. Use if tasks stop loading.',
           channel: 'task-vault:db.reinit',
-          default: null,
-        },
-        'terminator.task-vault.db.repair': {
-          type: 'action',
-          label: 'Repair',
-          description: 'Checkpoint WAL and run VACUUM. Fixes fragmentation without data loss.',
-          channel: 'task-vault:db.repair',
           default: null,
         },
         'terminator.task-vault.db.reset': {
           type: 'action',
           label: 'Reset (delete all data)',
-          description:
-            'Permanently delete the database and start fresh. All tasks and projects will be lost.',
+          description: 'Permanently delete all tasks and projects. This cannot be undone.',
           channel: 'task-vault:db.reset',
           danger: true,
           confirmMessage:
@@ -91,26 +85,26 @@ export async function activate(api: ExtensionAPI): Promise<void> {
 
   ipcMain.handle('task-vault:db.reinit', async () => {
     try {
-      reinitDb(app.getPath('userData'))
-      maybeStartScheduler()
+      await applyTaskVaultSchema(db)
+      await applyTaskVaultMigrations(db)
+      await backfillRecurringTasks(db)
+      maybeStartScheduler(db)
       return { data: { ok: true } }
-    } catch (err) {
-      return { error: err instanceof Error ? err.message : String(err) }
-    }
-  })
-  ipcMain.handle('task-vault:db.repair', async () => {
-    try {
-      const result = repairDb(app.getPath('userData'))
-      maybeStartScheduler()
-      return { data: result }
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) }
     }
   })
   ipcMain.handle('task-vault:db.reset', async () => {
     try {
-      resetDb(app.getPath('userData'))
-      maybeStartScheduler()
+      await db.exec(`
+        DROP TABLE IF EXISTS tasks;
+        DROP TABLE IF EXISTS projects;
+        DROP TABLE IF EXISTS areas;
+        DROP TABLE IF EXISTS settings;
+      `)
+      await applyTaskVaultSchema(db)
+      await applyTaskVaultMigrations(db)
+      maybeStartScheduler(db)
       return { data: { ok: true } }
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) }
@@ -119,42 +113,40 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   disposables.push({
     dispose: () => {
       ipcMain.removeHandler('task-vault:db.reinit')
-      ipcMain.removeHandler('task-vault:db.repair')
       ipcMain.removeHandler('task-vault:db.reset')
     },
   })
 
-  // Register IPC handlers first so they're always available
-  const disposeIpc = registerVaultIpcHandlers()
+  const disposeIpc = registerVaultIpcHandlers(db)
   disposables.push({ dispose: disposeIpc })
-  const disposeProjectsIpc = registerProjectsIpcHandlers()
+  const disposeProjectsIpc = registerProjectsIpcHandlers(db)
   disposables.push({ dispose: disposeProjectsIpc })
-  const disposeLinksIpc = registerLinksIpcHandlers()
+  const disposeLinksIpc = registerLinksIpcHandlers(db)
   disposables.push({ dispose: disposeLinksIpc })
-  const disposeKanbanIpc = registerKanbanIpcHandlers()
+  const disposeKanbanIpc = registerKanbanIpcHandlers(db)
   disposables.push({ dispose: disposeKanbanIpc })
-  const disposeAdminIpc = registerAdminIpcHandlers()
+  const disposeAdminIpc = registerAdminIpcHandlers(db)
   disposables.push({ dispose: disposeAdminIpc })
 
   try {
-    initDb(app.getPath('userData'))
-    maybeStartScheduler()
+    await applyTaskVaultSchema(db)
+    await applyTaskVaultMigrations(db)
+    await backfillRecurringTasks(db)
+    maybeStartScheduler(db)
   } catch (err) {
-    console.error('[task-vault] Failed to initialize SQLite DB:', err)
+    console.error('[task-vault] Failed to initialize schema:', err)
     api.notifications.showToast(
       'error',
-      'Task Vault: database failed to open. Restart the app — if the problem persists, check the logs.'
+      'Task Vault: database schema failed to initialize. Restart the app — if the problem persists, check the logs.'
     )
   }
 
-  // Weekly review nudge
   const reviewDay = parseInt(
     api.settings.get<string>('terminator.task-vault.weeklyReviewDay') ?? '0',
     10
   )
   scheduleWeeklyReviewNudge(api, reviewDay)
 
-  // Register global capture hotkey (fires even when app is minimised or in background).
   try {
     const hotkeyDisposable = api.globalShortcut.register(DEFAULT_CAPTURE_HOTKEY, () => {
       openCaptureOverlay(api)
@@ -202,7 +194,6 @@ function openCaptureOverlay(_api: ExtensionAPI): void {
 }
 
 export async function deactivate(): Promise<void> {
-  closeDb()
   _api = null
   _schedulerStarted = false
   if (reviewNudgeInterval !== null) {
