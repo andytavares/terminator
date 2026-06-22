@@ -1,5 +1,6 @@
 import bcryptjs from 'bcryptjs'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
+import { AuthRateLimiter } from './auth-rate-limiter.js'
 
 // Routes that require DNS rebinding protection (auth-gated or self-auth WebSocket routes)
 const PROTECTED_PREFIXES = ['/api', '/ws']
@@ -30,6 +31,7 @@ export async function registerAuthMiddleware(
   opts: AuthMiddlewareOptions
 ): Promise<void> {
   const { getPasswordHash, hasValidSession } = opts
+  const rateLimiter = new AuthRateLimiter()
 
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
     const isProtected = PROTECTED_PREFIXES.some((p) => request.url.startsWith(p))
@@ -51,8 +53,16 @@ export async function registerAuthMiddleware(
       if (hasValidSession(request.headers.cookie ?? '')) return
     }
 
+    // Brute-force protection: lock out a client after too many failed attempts.
+    // Checked before bcrypt so locked clients can't extend their own lockout.
+    const clientKey = request.ip
+    if (rateLimiter.isLockedOut(clientKey)) {
+      return reply.status(429).send({ error: 'TOO_MANY_REQUESTS' })
+    }
+
     const authHeader = request.headers.authorization
     if (!authHeader?.startsWith('Bearer ')) {
+      rateLimiter.recordFailure(clientKey)
       return reply.status(401).send({ error: 'UNAUTHORIZED' })
     }
 
@@ -63,7 +73,9 @@ export async function registerAuthMiddleware(
     }
     const valid = await bcryptjs.compare(password, hash)
     if (!valid) {
+      rateLimiter.recordFailure(clientKey)
       return reply.status(401).send({ error: 'UNAUTHORIZED' })
     }
+    rateLimiter.recordSuccess(clientKey)
   })
 }
