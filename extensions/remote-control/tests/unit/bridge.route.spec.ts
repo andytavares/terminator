@@ -169,6 +169,24 @@ describe('bridge.route', () => {
       await waitForClose(ws)
     })
 
+    it('defaults to {} when an invoke message omits args', async () => {
+      mockInvokeChannel.mockResolvedValue('ok')
+
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
+      await waitForOpen(ws)
+      ws.send(JSON.stringify({ type: 'invoke', id: 'r0', channel: 'workspace:list' }))
+
+      const msg = await waitForMessage(ws)
+      const parsed = JSON.parse(msg)
+
+      expect(parsed.type).toBe('result')
+      expect(parsed.id).toBe('r0')
+      expect(mockInvokeChannel).toHaveBeenCalledWith('workspace:list', {})
+      ws.close()
+      await waitForClose(ws)
+    })
+
     it('sends result: undefined when invokeChannel returns undefined', async () => {
       mockInvokeChannel.mockResolvedValue(undefined)
 
@@ -223,6 +241,18 @@ describe('bridge.route', () => {
         sessionId: 's1',
         data: 'ls',
       })
+      ws.close()
+      await waitForClose(ws)
+    })
+
+    it('defaults to {} when a send message omits args', async () => {
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
+      await waitForOpen(ws)
+      ws.send(JSON.stringify({ type: 'send', channel: 'terminal:input' }))
+      await new Promise((r) => setTimeout(r, 30))
+
+      expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {})
       ws.close()
       await waitForClose(ws)
     })

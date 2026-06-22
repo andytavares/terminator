@@ -1,33 +1,51 @@
 /* v8 ignore file */
-import { defineConfig } from 'vitest/config'
+import { defineConfig, configDefaults } from 'vitest/config'
 import { resolve } from 'path'
+
+// Tests that require a DOM. vitest 4 removed `environmentMatchGlobs`, so the
+// node/jsdom split is expressed as two projects instead.
+const JSDOM_INCLUDE = [
+  'tests/unit/**/*.spec.tsx',
+  'tests/unit/renderer-remote/**/*.spec.ts',
+  'extensions/*/tests/**/*.spec.tsx',
+]
+
+const NODE_INCLUDE = [
+  'tests/unit/**/*.spec.ts',
+  'tests/unit/**/*.spec.js',
+  'tests/integration/**/*.spec.ts',
+  'tests/integration/**/*.spec.js',
+  'extensions/*/tests/**/*.spec.ts',
+  'extensions/*/tests/**/*.spec.js',
+  'src/main/remote/__tests__/**/*.spec.ts',
+  'src/main/ipc/__tests__/**/*.spec.ts',
+  'src/shared/**/__tests__/**/*.spec.ts',
+]
 
 export default defineConfig({
   test: {
-    include: [
-      'tests/unit/**/*.spec.ts',
-      'tests/unit/**/*.spec.tsx',
-      'tests/unit/**/*.spec.js',
-      'tests/integration/**/*.spec.ts',
-      'tests/integration/**/*.spec.js',
-      'extensions/*/tests/**/*.spec.ts',
-      'extensions/*/tests/**/*.spec.tsx',
-      'extensions/*/tests/**/*.spec.js',
-      'src/main/remote/__tests__/**/*.spec.ts',
-      'src/main/ipc/__tests__/**/*.spec.ts',
-      'src/shared/**/__tests__/**/*.spec.ts',
-    ],
-    environment: 'node',
-    environmentMatchGlobs: [
-      ['tests/unit/**/*.spec.tsx', 'jsdom'],
-      ['tests/unit/renderer-remote/**/*.spec.ts', 'jsdom'],
-      ['tests/unit/renderer-remote/mobile/**/*.spec.ts', 'jsdom'],
-      ['tests/unit/config/**/*.spec.ts', 'node'],
-      ['extensions/*/tests/unit/**/*.spec.tsx', 'jsdom'],
-      ['extensions/*/tests/components/**/*.spec.tsx', 'jsdom'],
-    ],
     globals: true,
     setupFiles: ['tests/setup.ts'],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'node',
+          environment: 'node',
+          include: NODE_INCLUDE,
+          // `.ts` specs under renderer-remote need the DOM — run them in the jsdom project instead.
+          exclude: [...configDefaults.exclude, 'tests/unit/renderer-remote/**/*.spec.ts'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'jsdom',
+          environment: 'jsdom',
+          include: JSDOM_INCLUDE,
+        },
+      },
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
@@ -37,7 +55,6 @@ export default defineConfig({
         'extensions/*/src/**/*.ts',
         'extensions/*/src/**/*.tsx',
         'vite.config.remote.ts',
-        'vitest.workspace.ts',
       ],
       exclude: [
         'vitest.config.ts',

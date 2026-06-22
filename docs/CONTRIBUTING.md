@@ -9,10 +9,9 @@ git clone <repo-url>
 cd terminator
 
 # Install all dependencies (versions are pinned — do not use --legacy-peer-deps without cause)
+# node-pty is NAPI-based (ABI-stable), so its `npm install` build works across
+# Electron versions with no separate rebuild step.
 npm install
-
-# Rebuild node-pty native module for Electron
-npm run rebuild
 ```
 
 **macOS with Python 3.12+**: node-pty's native build requires `setuptools`:

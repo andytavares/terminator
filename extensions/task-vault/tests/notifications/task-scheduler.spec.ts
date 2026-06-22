@@ -15,7 +15,9 @@ const mockWin = { isDestroyed: vi.fn(() => false), webContents: { send: mockSend
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: vi.fn(() => [mockWin]) },
   Notification: Object.assign(
-    vi.fn(() => mockOsNotif),
+    vi.fn(function () {
+      return mockOsNotif
+    }),
     {
       isSupported: mockNotifIsSupported,
     }

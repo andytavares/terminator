@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto'
 import { homedir } from 'os'
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
-import type { SocketStream } from '@fastify/websocket'
+import type WebSocket from 'ws'
 import type { PtyManagerAPI } from '../../types.js'
 import type { WsTicketStore } from '../ws-ticket-store.js'
 import type { WsSubscriberManager } from '../ws-subscriber-manager.js'
@@ -186,10 +186,9 @@ export async function registerTerminalRoutes(
   app.get<{ Params: { sessionId: string }; Querystring: { ticket?: string } }>(
     '/ws/terminals/:sessionId',
     { websocket: true },
-    (connection: SocketStream, request) => {
+    (ws: WebSocket, request) => {
       const { sessionId } = request.params
       const { ticket } = request.query
-      const ws = connection.socket
 
       if (!ticket) {
         ws.close(4001, 'ticket required')

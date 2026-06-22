@@ -16,7 +16,9 @@ const mockBWInstance = vi.hoisted(() => ({
 
 vi.mock('electron', () => ({
   BrowserWindow: Object.assign(
-    vi.fn(() => mockBWInstance),
+    vi.fn(function () {
+      return mockBWInstance
+    }),
     {
       getAllWindows: vi.fn(() => [mockWindow]),
     }
@@ -26,7 +28,9 @@ vi.mock('electron', () => ({
     buildFromTemplate: vi.fn((t) => t),
     setApplicationMenu: vi.fn(),
   },
-  MenuItem: vi.fn().mockImplementation((opts) => opts),
+  MenuItem: vi.fn().mockImplementation(function (opts) {
+    return opts
+  }),
   globalShortcut: {
     register: vi.fn((accel: string, handler: () => void) => {
       registeredGlobalShortcuts.set(accel, handler)

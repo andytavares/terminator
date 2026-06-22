@@ -2,10 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Terminal } from 'xterm'
 import { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
 
-const mockResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  disconnect: vi.fn(),
-}))
+const mockResizeObserver = vi.fn().mockImplementation(function () {
+  return {
+    observe: vi.fn(),
+    disconnect: vi.fn(),
+  }
+})
 vi.stubGlobal('ResizeObserver', mockResizeObserver)
 
 // Mock xterm and its addons
@@ -39,31 +41,35 @@ function makeMockBuffer(
 }
 
 vi.mock('xterm', () => {
-  const Terminal = vi.fn().mockImplementation(() => ({
-    loadAddon: vi.fn(),
-    attachCustomKeyEventHandler: vi.fn(),
-    onData: vi.fn(),
-    onResize: vi.fn(),
-    onBell: vi.fn(),
-    onScroll: vi.fn(),
-    scrollToLine: vi.fn(),
-    open: vi.fn(),
-    focus: vi.fn(),
-    write: vi.fn(),
-    paste: vi.fn(),
-    dispose: vi.fn(),
-    scrollToBottom: vi.fn(),
-    registerLinkProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    buffer: makeMockBuffer(24, 80),
-    options: { theme: null as unknown },
-  }))
+  const Terminal = vi.fn().mockImplementation(function () {
+    return {
+      loadAddon: vi.fn(),
+      attachCustomKeyEventHandler: vi.fn(),
+      onData: vi.fn(),
+      onResize: vi.fn(),
+      onBell: vi.fn(),
+      onScroll: vi.fn(),
+      scrollToLine: vi.fn(),
+      open: vi.fn(),
+      focus: vi.fn(),
+      write: vi.fn(),
+      paste: vi.fn(),
+      dispose: vi.fn(),
+      scrollToBottom: vi.fn(),
+      registerLinkProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      buffer: makeMockBuffer(24, 80),
+      options: { theme: null as unknown },
+    }
+  })
   return { Terminal }
 })
 
 vi.mock('xterm-addon-fit', () => {
-  const FitAddon = vi.fn().mockImplementation(() => ({
-    fit: vi.fn(),
-  }))
+  const FitAddon = vi.fn().mockImplementation(function () {
+    return {
+      fit: vi.fn(),
+    }
+  })
   return { FitAddon }
 })
 
@@ -793,7 +799,7 @@ describe('TerminalInstance', () => {
       mockDisconnect = vi.fn()
       vi.stubGlobal(
         'MutationObserver',
-        vi.fn().mockImplementation((cb: MutationCallback) => {
+        vi.fn().mockImplementation(function (cb: MutationCallback) {
           observerCallback = cb
           return { observe: mockObserve, disconnect: mockDisconnect }
         })

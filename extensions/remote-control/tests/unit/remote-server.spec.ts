@@ -25,7 +25,9 @@ const mockTicketStore = vi.hoisted(() => ({
 }))
 
 vi.mock('../../src/server/ws-ticket-store', () => ({
-  WsTicketStore: vi.fn().mockImplementation(() => mockTicketStore),
+  WsTicketStore: vi.fn().mockImplementation(function () {
+    return mockTicketStore
+  }),
 }))
 
 const mockSubscriberManager = vi.hoisted(() => ({
@@ -40,7 +42,9 @@ const mockSubscriberManager = vi.hoisted(() => ({
 }))
 
 vi.mock('../../src/server/ws-subscriber-manager', () => ({
-  WsSubscriberManager: vi.fn(() => mockSubscriberManager),
+  WsSubscriberManager: vi.fn(function () {
+    return mockSubscriberManager
+  }),
 }))
 
 describe('RemoteServer', () => {

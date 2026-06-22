@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const { mockNotificationShow, MockNotification, mockDockBounce, mockSend } = vi.hoisted(() => {
   const mockNotificationShow = vi.fn()
-  const MockNotification = vi.fn().mockImplementation(() => ({ show: mockNotificationShow }))
+  const MockNotification = vi.fn().mockImplementation(function () {
+    return { show: mockNotificationShow }
+  })
   Object.assign(MockNotification, { isSupported: vi.fn(() => true) })
   const mockDockBounce = vi.fn()
   const mockSend = vi.fn()

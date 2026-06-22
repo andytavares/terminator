@@ -38,18 +38,18 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 
 | Layer                  | Technology                                  |
 | ---------------------- | ------------------------------------------- |
-| Framework              | Electron 34.x                               |
+| Framework              | Electron 42.x                               |
 | Language               | TypeScript 5.x (strict)                     |
 | UI                     | React 18.x + Zustand + Lucide React (icons) |
 | Terminal rendering     | xterm.js 5.x + xterm-addon-fit              |
 | PTY management         | node-pty 1.x (main process only)            |
 | Persistence            | electron-store 8.x                          |
 | Schema validation      | Zod 3.x                                     |
-| Remote server          | Fastify 4.x + @fastify/websocket 8.x        |
+| Remote server          | Fastify 5.x + @fastify/websocket 11.x       |
 | Browser SPA            | xterm.js 6.x (AttachAddon + FitAddon)       |
 | Password hashing       | bcryptjs (work factor 10, async only)       |
-| Build                  | electron-vite 2.x + vite (remote SPA)       |
-| Unit/integration tests | Vitest 2.x                                  |
+| Build                  | electron-vite 5.x + vite 7.x (remote SPA)   |
+| Unit/integration tests | Vitest 4.x                                  |
 | E2E tests              | Playwright 1.x                              |
 | UI font                | IBM Plex Sans (@fontsource)                 |
 
@@ -73,10 +73,8 @@ git clone <repo-url>
 cd terminator
 
 # Install dependencies (all versions pinned)
+# node-pty is NAPI-based (ABI-stable), so no per-Electron rebuild step is needed.
 npm install
-
-# Rebuild native modules (node-pty requires native compilation for Electron)
-npm run rebuild
 
 # Start in development mode (hot-reload via electron-vite)
 npm run dev
@@ -112,7 +110,6 @@ Then open the app normally. You only need to run this once.
 | `npm run format`           | Prettier format                                                  |
 | `npm run format:check`     | Check formatting without writing files (CI)                      |
 | `npm run create-extension` | Scaffold a new extension from template                           |
-| `npm run rebuild`          | Recompile native modules for Electron                            |
 
 ## Project Structure
 

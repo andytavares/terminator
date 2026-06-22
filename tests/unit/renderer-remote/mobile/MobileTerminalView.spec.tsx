@@ -33,20 +33,26 @@ const mockTerm = {
 
 // Mock xterm — it does not work in jsdom
 vi.mock('@xterm/xterm', () => ({
-  Terminal: vi.fn().mockImplementation(() => mockTerm),
+  Terminal: vi.fn().mockImplementation(function () {
+    return mockTerm
+  }),
 }))
 
 vi.mock('@xterm/addon-fit', () => ({
-  FitAddon: vi.fn().mockImplementation(() => ({
-    fit: vi.fn(),
-    activate: vi.fn(),
-  })),
+  FitAddon: vi.fn().mockImplementation(function () {
+    return {
+      fit: vi.fn(),
+      activate: vi.fn(),
+    }
+  }),
 }))
 
 vi.mock('@xterm/addon-attach', () => ({
-  AttachAddon: vi.fn().mockImplementation(() => ({
-    activate: vi.fn(),
-  })),
+  AttachAddon: vi.fn().mockImplementation(function () {
+    return {
+      activate: vi.fn(),
+    }
+  }),
 }))
 
 vi.mock('../../../../src/renderer-remote/hooks/useReconnect', () => ({
@@ -75,7 +81,9 @@ const mockWs = {
     if (event === 'message') capturedMessageHandler = handler
   }),
 }
-const WsMockCtor = vi.fn(() => mockWs) as unknown as typeof WebSocket
+const WsMockCtor = vi.fn(function () {
+  return mockWs
+}) as unknown as typeof WebSocket
 ;(WsMockCtor as unknown as { OPEN: number }).OPEN = 1
 vi.stubGlobal('WebSocket', WsMockCtor)
 

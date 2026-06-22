@@ -8,13 +8,15 @@ const mockClose = vi.fn()
 const mockWaitReady = Promise.resolve()
 
 vi.mock('@electric-sql/pglite', () => ({
-  PGlite: vi.fn().mockImplementation(() => ({
-    query: mockQuery,
-    exec: mockExec,
-    transaction: mockTransaction,
-    close: mockClose,
-    waitReady: mockWaitReady,
-  })),
+  PGlite: vi.fn().mockImplementation(function () {
+    return {
+      query: mockQuery,
+      exec: mockExec,
+      transaction: mockTransaction,
+      close: mockClose,
+      waitReady: mockWaitReady,
+    }
+  }),
 }))
 
 vi.mock('../../src/main/logger', () => ({
