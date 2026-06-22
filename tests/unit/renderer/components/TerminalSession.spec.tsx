@@ -48,14 +48,13 @@ vi.mock('xterm', () => {
       onData: vi.fn(),
       onResize: vi.fn(),
       onBell: vi.fn(),
-      onScroll: vi.fn(),
-      scrollToLine: vi.fn(),
       open: vi.fn(),
       focus: vi.fn(),
       write: vi.fn(),
       paste: vi.fn(),
       dispose: vi.fn(),
       scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
       registerLinkProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       buffer: makeMockBuffer(24, 80),
       options: { theme: null as unknown },
@@ -161,6 +160,36 @@ describe('TerminalInstance', () => {
     const handler = instance.attachCustomKeyEventHandler.mock.calls[0][0]
     const result = handler({ metaKey: false, ctrlKey: false, key: 'Enter', type: 'keydown' })
     expect(result).toBe(true)
+  })
+
+  it('forwards keystrokes to the PTY via onData', () => {
+    new TerminalInstance('ses-data', 1000)
+    const instance = vi.mocked(Terminal).mock.results[0].value
+    const onData = instance.onData.mock.calls[0][0]
+    onData('ls\r')
+    expect(mockInput).toHaveBeenCalledWith('ses-data', 'ls\r')
+  })
+
+  it('forwards terminal resize to the PTY via onResize', () => {
+    new TerminalInstance('ses-resize', 1000)
+    const instance = vi.mocked(Terminal).mock.results[0].value
+    const onResize = instance.onResize.mock.calls[0][0]
+    onResize({ cols: 120, rows: 40 })
+    expect(mockResize).toHaveBeenCalledWith('ses-resize', 120, 40)
+  })
+
+  it('re-pins the viewport to the bottom when mounted (reattach follows output)', () => {
+    const rafSpy = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+      ;(cb as FrameRequestCallback)(0)
+      return 0
+    })
+    const inst = new TerminalInstance('ses-mount', 1000)
+    const term = vi.mocked(Terminal).mock.results[0].value
+    inst.mount(document.createElement('div'))
+    // Nudge then pin to bottom so xterm re-syncs the DOM viewport after reattach.
+    expect(term.scrollLines).toHaveBeenCalledWith(-1)
+    expect(term.scrollToBottom).toHaveBeenCalled()
+    rafSpy.mockRestore()
   })
 
   it('pastes \\n when Shift+Enter is pressed', () => {
@@ -567,6 +596,40 @@ describe('TerminalInstance', () => {
       expect(Array.isArray(result)).toBe(true)
       expect((result as { text: string }[])[0].text).toContain('/Users/foo/bar.ts')
     })
+
+    it('quoted-path provider (index 4) detects the inner path of a quoted string', () => {
+      const provider = getProvider('opened "/Users/foo/bar.ts" successfully', 4)
+      let result: unknown
+      provider.provideLinks(0, (links: unknown) => {
+        result = links
+      })
+      expect(Array.isArray(result)).toBe(true)
+      expect((result as { text: string }[])[0].text).toBe('/Users/foo/bar.ts')
+    })
+
+    it('quoted-path provider returns undefined when the line has no quoted path', () => {
+      const provider = getProvider('no quoted paths on this line', 4)
+      let result: unknown = 'sentinel'
+      provider.provideLinks(0, (links: unknown) => {
+        result = links
+      })
+      expect(result).toBeUndefined()
+    })
+
+    it('quoted-path provider returns undefined when the line is missing', () => {
+      new TerminalInstance('ses-links', 1000)
+      const instance = vi.mocked(Terminal).mock.results[0].value
+      Object.defineProperty(instance, 'buffer', {
+        value: { active: { getLine: () => undefined, viewportY: 0 } },
+        configurable: true,
+      })
+      const provider = instance.registerLinkProvider.mock.calls[4][0]
+      let result: unknown = 'sentinel'
+      provider.provideLinks(0, (links: unknown) => {
+        result = links
+      })
+      expect(result).toBeUndefined()
+    })
   })
 
   describe('link interaction (hover overlay + cmd+click)', () => {
@@ -658,6 +721,16 @@ describe('TerminalInstance', () => {
         document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta', bubbles: true }))
         expect(instance.linkOverlay?.style.display).toBe('none')
       })
+
+      it('shows overlay when cmd is pressed while already hovering a link', () => {
+        const instance = makeInstanceWithLine('https://example.com')
+        // Hover without cmd first to record the position, overlay stays hidden.
+        fire(instance.element, 'mousemove', { clientX: 8, clientY: 0, metaKey: false })
+        expect(instance.linkOverlay?.style.display).toBe('none')
+        // Pressing cmd while hovering re-checks and shows the overlay.
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', bubbles: true }))
+        expect(instance.linkOverlay?.style.display).toBe('block')
+      })
     })
 
     describe('cmd+click mousedown', () => {
@@ -672,6 +745,19 @@ describe('TerminalInstance', () => {
         const instance = makeInstanceWithLine(url)
         fire(instance.element, 'mousedown', { metaKey: true, clientX: 8, clientY: 0 })
         expect(mockOpenExternal).toHaveBeenCalledWith(url)
+      })
+
+      it('opens the inner path of a double-quoted string with a space on cmd+click', () => {
+        // A space means the bare path regex misses it, so the quoted-path hit-test runs.
+        const instance = makeInstanceWithLine('see "/Users/foo bar/x.ts"')
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 6 * 8, clientY: 0 })
+        expect(mockOpenPath).toHaveBeenCalledWith('/Users/foo bar/x.ts')
+      })
+
+      it('opens the inner path of a single-quoted string with a space on cmd+click', () => {
+        const instance = makeInstanceWithLine("see '/Users/foo bar/x.ts'")
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 6 * 8, clientY: 0 })
+        expect(mockOpenPath).toHaveBeenCalledWith('/Users/foo bar/x.ts')
       })
 
       it('does not open URL without metaKey or ctrlKey', () => {

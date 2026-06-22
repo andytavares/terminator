@@ -83,7 +83,6 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     if (!activeSessionId) return
     const instance = getTerminalInstance(activeSessionId)
     if (!instance) return
-    if (instance.isAtBottom) instance.terminal.scrollToBottom()
     instance.terminal.focus()
   }, [activeSessionId, getTerminalInstance])
 

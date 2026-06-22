@@ -20,10 +20,8 @@ function makeInstance(overrides: Record<string, unknown> = {}) {
   return {
     mount: vi.fn(),
     unmount: vi.fn(),
-    isAtBottom: false,
     terminal: {
       focus: vi.fn(),
-      scrollToBottom: vi.fn(),
       paste: vi.fn(),
     },
     ...overrides,
@@ -157,20 +155,12 @@ describe('LeafPane', () => {
     expect(mockSetFocusedSession).not.toHaveBeenCalled()
   })
 
-  it('scrolls to bottom on click when instance is already at bottom', () => {
-    const instance = makeInstance({ isAtBottom: true })
+  it('focuses the terminal on click', () => {
+    const instance = makeInstance()
     mockGetTerminalInstance.mockReturnValue(instance)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
-    expect(instance.terminal.scrollToBottom).toHaveBeenCalled()
-  })
-
-  it('does not scroll to bottom on click when not at bottom', () => {
-    const instance = makeInstance({ isAtBottom: false })
-    mockGetTerminalInstance.mockReturnValue(instance)
-    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
-    expect(instance.terminal.scrollToBottom).not.toHaveBeenCalled()
+    expect(instance.terminal.focus).toHaveBeenCalled()
   })
 
   it('does not throw on drop when no terminal instance', () => {

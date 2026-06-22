@@ -68,8 +68,6 @@ export class TerminalInstance {
   private opened = false
   private sessionId: string
   private busyTimer: ReturnType<typeof setTimeout> | null = null
-  private _atBottom = true
-  private _savedViewportY = 0
 
   // The root element xterm renders into — created on first mount(), moved between containers.
   readonly element: HTMLDivElement
@@ -124,14 +122,6 @@ export class TerminalInstance {
 
     this.terminal.onData((data) => {
       window.electronAPI.terminal.input(sessionId, data)
-      if (!this._atBottom) {
-        this._atBottom = true
-        this.terminal.scrollToBottom()
-      }
-    })
-
-    this.terminal.onScroll((viewportY) => {
-      this._atBottom = viewportY >= this.terminal.buffer.active.baseY
     })
 
     this.terminal.onResize(({ cols, rows }) => {
@@ -178,10 +168,13 @@ export class TerminalInstance {
       if (cachedCellH !== null) return cachedCellH
       const rowsEl = this.terminal.element?.querySelector('.xterm-rows')
       const firstRow = rowsEl?.firstElementChild as HTMLElement | null
+      /* v8 ignore start -- reads the rendered row height from real xterm DOM;
+         jsdom has no rendered rows, so this measurement path can't be exercised */
       if (firstRow) {
         const h = firstRow.getBoundingClientRect().height
         if (h > 0) cachedCellH = h
       }
+      /* v8 ignore stop */
       return cachedCellH ?? lineHeight
     }
 
@@ -419,12 +412,23 @@ export class TerminalInstance {
       this.opened = true
     }
     this.fitAddon.fit()
-    if (this._atBottom) {
-      this.terminal.scrollToBottom()
-    } else {
-      this.terminal.scrollToLine(this._savedViewportY)
-    }
     this.terminal.focus()
+    // Detaching/reattaching the element on tab switch (ADR-004) resets the
+    // scrollable viewport to the top, so re-pin to the latest output once the
+    // reattached element has laid out. While a tab is visible xterm follows
+    // output natively (and honours the user scrolling up) — we only re-establish
+    // "following" when the tab becomes visible again.
+    // Moving the element between containers on tab switch (ADR-004) resets the
+    // DOM viewport's scrollTop to 0 while xterm's internal scroll position is
+    // unchanged — they desync, and scrollToBottom() is a no-op because xterm
+    // already believes it is at the bottom. Nudge the scroll position by one line
+    // (which forces xterm to re-sync the DOM viewport) and then pin to the bottom.
+    // While a tab is visible xterm follows output natively and honours the user
+    // scrolling up; we only re-establish "following" when the tab reappears.
+    requestAnimationFrame(() => {
+      this.terminal.scrollLines(-1)
+      this.terminal.scrollToBottom()
+    })
     this.resizeObserver = new ResizeObserver(() => this.fitAddon.fit())
     this.resizeObserver.observe(container)
   }
@@ -486,7 +490,10 @@ export class TerminalInstance {
     canvas.width = w
     canvas.height = h
     const ctx = canvas.getContext('2d')
+    /* v8 ignore start -- getContext('2d') only returns null in headless/unsupported
+       environments; unreachable in the app and under the jsdom canvas mock */
     if (!ctx) return null
+    /* v8 ignore stop */
 
     ctx.fillStyle = '#1e1e1e'
     ctx.fillRect(0, 0, w, h)
@@ -532,13 +539,7 @@ export class TerminalInstance {
   // Remove from DOM without destroying the xterm instance.
   // Captures a snapshot first so Overview can display it while the terminal is unmounted.
   // Only updates lastSnapshot on success — never overwrites a valid snapshot with null.
-  get isAtBottom(): boolean {
-    return this._atBottom
-  }
-
   unmount(): void {
-    this._savedViewportY = this.terminal.buffer.active.viewportY
-    this._atBottom = this.terminal.buffer.active.viewportY >= this.terminal.buffer.active.baseY
     const snapshot = this.captureToDataUrl()
     if (snapshot !== null) this.lastSnapshot = snapshot
     this.resizeObserver?.disconnect()
