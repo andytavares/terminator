@@ -1,0 +1,29 @@
+docs/adr/017-embedded-http-remote-server.md
+  s_522c6e369b3539::t_266bdfae8993eb 7-8,20,48,54
+  s_522c6e369b3539::t_26529172109e1f 3-4,6,12,26-28,36-42,45-47,49-53,55-57,64
+docs/ARCHITECTURE.md
+  s_522c6e369b3539::t_1ab7bba83b9269 342
+  s_522c6e369b3539::t_e64318c3333897 318,320-321
+  s_522c6e369b3539::t_774d93d7e280a4 3
+  s_522c6e369b3539::t_62fb80231e0b7b 325
+CHANGELOG.md
+  s_522c6e369b3539::t_62ccedeed436aa 14-15
+  s_522c6e369b3539::t_5ae4f660e7e38a 36-37
+  s_522c6e369b3539::t_9ab7178ca9b99d 44-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "dbab66b1d240cac5b8c0d0dd1da35828bce33f5e",
+  "prompts": {},
+  "sessions": {
+    "s_522c6e369b3539": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3891f342-f887-4e5a-8284-75edce24d748",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
