@@ -124,6 +124,13 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-build
+          path: out/
+          retention-days: 1
+
   e2e:
     name: E2E
     needs: build
@@ -143,8 +150,11 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium electron
 
-      - name: Build app
-        run: npm run build
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
+          path: out/
 
       - name: Run E2E suite
         run: npx playwright test
