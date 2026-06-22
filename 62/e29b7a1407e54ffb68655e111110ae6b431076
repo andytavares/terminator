@@ -1,0 +1,21 @@
+src/main/db/index.ts
+  s_e2df897fa0e8a9::t_6c8928875ae233 2-3
+  s_e2df897fa0e8a9::t_2ebb4a96540363 108
+  s_e2df897fa0e8a9::t_b773f8e4f73f37 98-107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "62e29b7a1407e54ffb68655e111110ae6b431076",
+  "prompts": {},
+  "sessions": {
+    "s_e2df897fa0e8a9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4e88e9c8-ca18-41ee-a849-be8abcabf188",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
