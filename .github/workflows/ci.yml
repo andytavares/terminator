@@ -147,8 +147,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright browsers
-        run: npx playwright install chromium electron
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
