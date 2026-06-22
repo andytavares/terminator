@@ -1,20 +1,8 @@
 import React, { useState } from 'react'
 import type { Workspace } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
+import { WORKSPACE_PRESET_COLORS as PRESET_COLORS } from './workspace-colors'
 import './Dialog.css'
-
-const PRESET_COLORS = [
-  '#4A90E2',
-  '#7B68EE',
-  '#50C878',
-  '#FF6B6B',
-  '#FFA500',
-  '#20B2AA',
-  '#FF69B4',
-  '#9370DB',
-  '#3CB371',
-  '#DC143C',
-]
 
 interface Props {
   workspace: Workspace

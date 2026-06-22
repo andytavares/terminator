@@ -156,4 +156,50 @@ describe('CreateWorkspaceDialog', () => {
     fireEvent.click(screen.getByText('Create Workspace').closest('.dialog-overlay')!)
     expect(onClose).toHaveBeenCalled()
   })
+
+  it('surfaces a name error when createWorkspace reports DUPLICATE_NAME', async () => {
+    mockCreateWorkspace.mockResolvedValue({ error: 'DUPLICATE_NAME' })
+    const onClose = vi.fn()
+    render(<CreateWorkspaceDialog onClose={onClose} />)
+    fireEvent.change(screen.getByPlaceholderText('My Workspace'), { target: { value: 'Dupe' } })
+    fireEvent.click(screen.getByText('Create'))
+    await screen.findByText('A workspace with this name already exists')
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a generic error when createWorkspace fails for another reason', async () => {
+    mockCreateWorkspace.mockResolvedValue({ error: 'BACKEND_DOWN' })
+    render(<CreateWorkspaceDialog onClose={vi.fn()} />)
+    fireEvent.change(screen.getByPlaceholderText('My Workspace'), { target: { value: 'WS X' } })
+    fireEvent.click(screen.getByText('Create'))
+    await screen.findByText('Failed to create workspace')
+  })
+
+  it('auto-creates a branch project when the chosen folder is a git repo', async () => {
+    mockCreateWorkspace.mockResolvedValue({ workspace: { id: 'ws-git' } })
+    const currentBranch = vi.fn().mockResolvedValue({ branch: 'develop' })
+    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+      dialog: { openDirectory: mockOpenDirectory },
+      git: {
+        isRepo: vi.fn().mockResolvedValue({ isRepo: true, root: '/repo/root' }),
+        currentBranch,
+      },
+    }
+    const onClose = vi.fn()
+    render(<CreateWorkspaceDialog onClose={onClose} />)
+    fireEvent.change(screen.getByPlaceholderText('My Workspace'), { target: { value: 'Repo WS' } })
+    fireEvent.change(screen.getByPlaceholderText('/path/to/folder'), {
+      target: { value: '/repo/root' },
+    })
+    fireEvent.click(screen.getByText('Create'))
+    await vi.waitFor(() => expect(mockCreateProject).toHaveBeenCalled())
+    expect(mockCreateProject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: 'ws-git',
+        gitBranch: 'develop',
+        worktreePath: '/repo/root',
+      })
+    )
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
+  })
 })
