@@ -1,0 +1,19 @@
+.claude/doc-index.json
+  s_e2df897fa0e8a9::t_02d0c2e658c9bd 123-139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "85b3c33364d9512ff3dd6cbffaad4805dd10e3d7",
+  "prompts": {},
+  "sessions": {
+    "s_e2df897fa0e8a9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4e88e9c8-ca18-41ee-a849-be8abcabf188",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
