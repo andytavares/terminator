@@ -1,0 +1,77 @@
+docs/adr/021-electron-upgrade-blocker.md
+  s_566156474fe79f::t_efe4c8d14fdb2f 12,14,16-20,24,26
+CHANGELOG.md
+  s_566156474fe79f::t_bfdfd4884b68bf 24-34
+extensions/remote-control/tests/unit/bridge.route.spec.ts
+  s_566156474fe79f::t_0123201ca55512 248-259
+  s_566156474fe79f::t_524b75aa7eae62 172-189
+package.json
+  s_566156474fe79f::t_c185a0b7b93dfd 80-84
+  s_566156474fe79f::t_424fbdbd55f2d3 68
+  s_566156474fe79f::t_86a4603f42a7a3 47-48
+  s_566156474fe79f::t_d57d5e5178b15e 73
+  s_566156474fe79f::t_c98dfbbf7f3ea9 93,96-98
+  s_566156474fe79f::t_bcbf9ae1c3e977 56
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_566156474fe79f::t_4bab213dd6e0b3 12-14
+tests/unit/notifications/notification-manager.spec.ts
+  s_566156474fe79f::t_ab5f2dca2cfb44 5-7
+README.md
+  s_566156474fe79f::t_694e60c672a5b4 48,51-52
+  s_566156474fe79f::t_9ab4b397a40811 76
+  s_566156474fe79f::t_45443eed1aae07 41
+docs/ARCHITECTURE.md
+  s_566156474fe79f::t_b9a26763b7800d 3
+extensions/remote-control/tests/unit/remote-server.spec.ts
+  s_566156474fe79f::t_a55f10076ccc9e 28-30
+  s_566156474fe79f::t_debb68f8faf01a 45-47
+extensions/task-vault/package.json
+  s_566156474fe79f::t_05bace331dd17e 11
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_566156474fe79f::t_41a01fb9ff6fd5 802
+  s_566156474fe79f::t_6a9d2d40bede31 44-63
+  s_566156474fe79f::t_06df6490aaa9b5 5-10
+  s_566156474fe79f::t_cc24d06d00d78f 68-72
+tests/unit/renderer-remote/mobile/MobileTerminalView.spec.tsx
+  s_566156474fe79f::t_c8354c71cd7272 84-86
+  s_566156474fe79f::t_8c955aa8b00764 36-38,42-47,51-55
+extensions/speckit-pilot/package.json
+  s_566156474fe79f::t_d53c2c53978e15 7-8
+extensions/notepad/tests/components/NoteEditor.spec.tsx
+  s_566156474fe79f::t_c383fd0b44022e 6
+  s_566156474fe79f::t_26277d2fa8539b 32-40
+extensions/remote-control/package.json
+  s_566156474fe79f::t_723f0b2b2c846e 7-8,10
+tests/unit/extensions/api-v1.2.0.spec.ts
+  s_566156474fe79f::t_62e6fe93dcec79 19-21
+  s_566156474fe79f::t_58db7c704f30ad 31-33
+extensions/task-vault/tests/notifications/task-scheduler.spec.ts
+  s_566156474fe79f::t_0d6a21d2097b82 18-20
+tests/unit/db/index.spec.ts
+  s_566156474fe79f::t_e4bb33339c8c55 11-19
+vitest.config.ts
+  s_566156474fe79f::t_f132fdacc5303b 2,5-24,29-48
+extensions/remote-control/src/server/routes/bridge.route.ts
+  s_566156474fe79f::t_bfd3182b84f46d 26-32,34,36-37,39-42,44-49,51-56,59-62,64-67,69-74,77-80,82-84,87-89,91-97
+extensions/remote-control/src/server/routes/terminal.routes.ts
+  s_566156474fe79f::t_f98d1585f8dd12 5
+  s_566156474fe79f::t_72a3de41b51023 189
+docs/CONTRIBUTING.md
+  s_566156474fe79f::t_761c73f48e3570 12-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "08457b41a0464d53c536a81900106b0e2bbf357a",
+  "prompts": {},
+  "sessions": {
+    "s_566156474fe79f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e0f4e976-4229-40cb-84a6-0c141533d2d0",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
