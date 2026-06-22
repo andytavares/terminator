@@ -1,0 +1,21 @@
+.eslintrc.json
+  s_522c6e369b3539::t_db31a0cd2afce3 29-35
+tests/unit/renderer/extensions/loader.spec.ts
+  s_522c6e369b3539::t_905816cd2bae38 147-167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "58e2a1b27eee9dcf849374ef58c9996514a19d41",
+  "prompts": {},
+  "sessions": {
+    "s_522c6e369b3539": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3891f342-f887-4e5a-8284-75edce24d748",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
