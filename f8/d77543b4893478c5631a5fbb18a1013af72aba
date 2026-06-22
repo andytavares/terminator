@@ -1,0 +1,29 @@
+scripts/check-patch-coverage.cjs
+  s_522c6e369b3539::t_74f7df727f351c 39
+tests/e2e/git-sidebar.spec.ts
+  s_522c6e369b3539::t_c6ca19bdb642d5 56,58
+  s_522c6e369b3539::t_f1b10d77886e34 6-13
+  s_522c6e369b3539::t_55ff57828b8e61 1-5,15-20,22,25-34,36-43,47-48,51-52,54-55,57,59,61,64-68,71-77
+.github/workflows/ci.yml
+  s_522c6e369b3539::t_4342143cc7605c 128,149-161
+vitest.config.ts
+  s_522c6e369b3539::t_700f25e9b906e1 61
+playwright.config.ts
+  s_522c6e369b3539::t_32552b4edbad9e 6-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "f8d77543b4893478c5631a5fbb18a1013af72aba",
+  "prompts": {},
+  "sessions": {
+    "s_522c6e369b3539": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3891f342-f887-4e5a-8284-75edce24d748",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
