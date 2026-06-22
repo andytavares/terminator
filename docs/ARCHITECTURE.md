@@ -281,12 +281,12 @@ When a bell event fires in a backgrounded terminal session, both systems are tri
 
 ## Remote Control Server
 
-When enabled via Settings → Remote Control, Terminator starts an embedded [Fastify](https://fastify.dev/) 4.x HTTP/WebSocket server bound to `127.0.0.1` (never `0.0.0.0`).
+When enabled via Settings → Remote Control, Terminator starts an embedded [Fastify](https://fastify.dev/) 5.x HTTP/WebSocket server. The server binds to `0.0.0.0` so it is reachable directly over the LAN (the `remote:status` payload reports both a `lanUrl` and an optional ngrok `publicUrl`). Access is gated by per-request password/Bearer auth, a `Host`-header check, and single-use tickets — not by the bind address.
 
 ```
 Remote Control Extension (extensions/remote-control/)
 │
-├── RemoteServer (Fastify 4.x, 127.0.0.1 only)
+├── RemoteServer (Fastify 5.x, binds 0.0.0.0 — LAN + ngrok)
 │   ├── GET    /health                         → { ok: true }
 │   ├── GET    /api/workspaces                 → workspace list
 │   ├── GET    /api/projects?workspaceId=      → project list
@@ -297,10 +297,15 @@ Remote Control Extension (extensions/remote-control/)
 │   ├── POST   /api/terminals/:id/ws-ticket    → single-use WS ticket (30s TTL)
 │   ├── GET    /ws/terminals/:id?ticket=       → WebSocket upgrade → PTY fan-out
 │   ├── POST   /api/bridge-ticket              → single-use bridge WS ticket
-│   ├── GET    /api/bridge?ticket=             → WebSocket IPC bridge (invoke/send/subscribe)
+│   ├── GET    /api/bridge?ticket=             → WebSocket IPC bridge (invoke/send/subscribe;
+│   │                                            invoke is rejected unless the channel is
+│   │                                            flagged remote-accessible)
 │   ├── POST   /api/app-ticket                 → single-use ticket to enter /app/
-│   └── GET    /app/?t=<ticket>                → serves full Electron renderer SPA (session-cookie-gated)
-│       Static /app/*                          → 403 unless valid app-session cookie present (8h HttpOnly)
+│   ├── GET    /app/?t=<ticket>                → serves full Electron renderer SPA (session-cookie-gated)
+│   │   Static /app/*                          → 403 unless valid app-session cookie present (8h HttpOnly)
+│   ├── POST   /api/mobile-ticket              → single-use ticket to enter /mobile/
+│   └── GET    /mobile/?t=<ticket>             → serves the mobile remote web client (session-cookie-gated)
+│       Static /mobile/*                       → 403 unless valid mobile-session cookie present (8h HttpOnly)
 │
 ├── WsTicketStore        single-use 64-char hex tokens, 30s TTL, 60s cleanup
 ├── WsSubscriberManager  per-session subscriber sets; first subscriber = primary
@@ -310,15 +315,15 @@ Remote Control Extension (extensions/remote-control/)
 
 **Security constraints**:
 
-- Server binds to `127.0.0.1` only. External clients must reach it via ngrok or LAN (port forwarding).
+- Server binds to `0.0.0.0` so phones/tablets on the same LAN can connect directly; remote (off-LAN) access is via ngrok. Security relies on auth, the `Host`-header check, and tickets rather than the bind address.
 - All routes (except `/health`) require `Authorization: Bearer <password>` validated with `bcryptjs.compare()` (async, work factor 10).
 - `Host` header is checked against `localhost`, `127.0.0.1`, and the ngrok domain.
 - WebSocket upgrade requires a single-use ticket issued by `POST /api/terminals/:id/ws-ticket`; ticket is consumed on first use and expires after 30 s.
 - Input is accepted from the primary subscriber only (first WS client to connect to a session).
-- `/app/*` static assets are gated behind an `app-session` HttpOnly SameSite=Strict cookie (8h TTL) issued when a valid one-time app-ticket (`POST /api/app-ticket`) is consumed at `GET /app/`. Requests to any `/app/*` path without a valid cookie receive `403 FORBIDDEN`.
-- The IPC bridge (`GET /api/bridge`) requires a single-use bridge ticket and lets the browser invoke/send/subscribe to IPC channels on behalf of the browser-side SPA.
+- `/app/*` and `/mobile/*` static assets are each gated behind a dedicated HttpOnly SameSite=Strict cookie (`app-session` / `mobile-session`, 8h TTL) issued when a valid one-time ticket (`POST /api/app-ticket` / `POST /api/mobile-ticket`) is consumed at `GET /app/` / `GET /mobile/`. Requests to those paths without a valid cookie receive `403 FORBIDDEN`. Session tokens carry an expiry and are purged hourly.
+- The IPC bridge (`GET /api/bridge`) requires a single-use bridge ticket and lets the browser invoke/send/subscribe to IPC channels on behalf of the browser-side SPA. `invoke` requests are rejected unless the target channel was registered as remote-accessible (checked via `api.ipc.isRemoteAccessible`).
 
-**Browser login SPA** (`src/renderer-remote/`): A separate Vite build (`npm run build:remote`) produces `out/renderer-remote/` which Fastify serves at `/`. After password authentication the login page calls `POST /api/app-ticket` and redirects to `/app/?t=<ticket>` to load the full Electron renderer bundle.
+**Browser login SPA + mobile client** (`src/renderer-remote/`): A separate Vite build (`npm run build:remote`) produces `out/renderer-remote/` which Fastify serves at `/`. After password authentication the login page either calls `POST /api/app-ticket` and redirects to `/app/?t=<ticket>` to load the full Electron renderer bundle, or calls `POST /api/mobile-ticket` and redirects to `/mobile/?t=<ticket>` to load the touch-optimised mobile client (`mobile.html` from the same renderer-remote output directory).
 
 **Full Electron renderer in browser** (`out/renderer/`): Fastify also serves the regular Electron renderer bundle under `/app/`. A `remote-shim.js` script is injected into `index.html` to polyfill `window.electronAPI` — all IPC calls are forwarded over the bridge WebSocket instead of the Electron `contextBridge`.
 

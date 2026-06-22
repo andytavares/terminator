@@ -1,6 +1,6 @@
 # Task Vault Extension
 
-GTD+BuJo+PARA daily productivity system backed by plain markdown files.
+GTD+BuJo+PARA daily productivity system backed by the shared PGlite (PostgreSQL-compatible) database.
 
 ## Features
 
@@ -13,6 +13,6 @@ GTD+BuJo+PARA daily productivity system backed by plain markdown files.
 
 ## Task ID format
 
-Task IDs are UUIDs assigned at creation and stored in SQLite. IDs are stable across restarts. A `{ error: 'STALE_ID' }` response means the task no longer exists (e.g. it was deleted or migrated).
+Task IDs are UUIDs assigned at creation and stored in the shared PGlite (PostgreSQL-compatible) database. IDs are stable across restarts. A `{ error: 'STALE_ID' }` response means the task no longer exists (e.g. it was deleted or migrated).
 
 See also: `specs/005-task-vault-extension/quickstart.md` for integration scenarios.

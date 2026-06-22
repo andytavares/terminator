@@ -4,15 +4,15 @@
 **Branch**: `005-task-vault-extension`  
 **Supersedes**: original markdown-file architecture described at commit prior to `91f8685`
 
-All entities are stored in a SQLite database at `<vault>/.todo/vault.db`. The markdown-file architecture with `filepath:line` IDs described in earlier drafts of this document has been removed. See ADR-015 and ADR-016 for the formal supersession notices.
+All entities are stored in the shared **PGlite (PostgreSQL-compatible WASM)** application database. The markdown-file architecture with `filepath:line` IDs described in earlier drafts of this document has been removed. See ADR-015 and ADR-016 for the formal supersession notices. The original `better-sqlite3` / `<vault>/.todo/vault.db` storage has since been replaced by the shared PGlite database (see `docs/ARCHITECTURE.md` → Task Vault Extension Architecture).
 
 ---
 
 ## Storage
 
-**Database**: `better-sqlite3`, WAL mode, foreign keys ON.  
-**Location**: `<vault>/.todo/vault.db` (created on first `initDb` call; `<vault>/.todo/` is gitignored).  
-**Initialization**: `initDb(vaultPath)` in `extensions/task-vault/src/vault/db.ts:11` creates the schema and runs additive migrations on every startup.
+**Database**: shared PGlite (PostgreSQL-compatible), accessed through the injected `ExtensionDB` handle (`src/main/db/index.ts`) — not a per-vault file. Foreign keys are enforced by Postgres.  
+**Location**: `<userData>/app.pglite` (the single app-wide database shared by all extensions; legacy `vault.db` rows are migrated in once via `src/main/db/migrate.ts`).  
+**Initialization**: `applyTaskVaultSchema(db)` in `extensions/task-vault/src/vault/db.ts` creates the schema and `applyTaskVaultMigrations(db)` runs additive migrations on every startup. Both receive the shared `ExtensionDB` instance; the extension never opens its own database file.
 
 ---
 
@@ -27,7 +27,7 @@ A single unit of work stored as a row in the `tasks` table.
 interface Task {
   id: string // UUID v4 — stable across sessions and file changes
   filePath: string // Derived at read time: "<source>/<source_ref>"
-  line: number // Legacy field; always 0 for SQLite-backed tasks
+  line: number // Legacy field; always 0 for database-backed tasks
   status: TaskStatus
   text: string
   project?: string // Denormalized tag; also mirrored in project_id FK
@@ -52,7 +52,7 @@ type TaskStatus =
   | 'blocked' // added in recurrence engine rewrite
 ```
 
-**SQL schema** (`extensions/task-vault/src/vault/db.ts:146`):
+**SQL schema** (`applyTaskVaultSchema` / `applyTaskVaultMigrations` in `extensions/task-vault/src/vault/db.ts`; the recurrence columns shown below are added by migration when absent, not in the base `CREATE TABLE`):
 
 ```sql
 CREATE TABLE IF NOT EXISTS tasks (
@@ -305,22 +305,15 @@ interface IcsFeedCache {
 }
 ```
 
-**Cache location**: `<vault>/.todo/ics-cache.json` (unchanged from original spec).  
-**Refresh**: Background polling, default 4-hour interval.
+**Status**: `IcsFeedCache` (`extensions/task-vault/src/vault/types.ts:145`) and the `ics:get-events` request schema (`extensions/task-vault/src/schemas/vault.schema.ts:229`) are defined, but no fetch/cache handler is wired up in the current code — there is no `ics:get-events` handler in `vault.ipc.ts` and no persisted cache. The old `<vault>/.todo/ics-cache.json` location was removed in the PGlite migration and has no replacement yet.
 
 ---
 
-## File Layout
+## Storage Layout
 
-```
-<vault>/                          # User-configured root (default: ~/vault)
-└── .todo/                        # Ephemeral; gitignored
-    ├── vault.db                  # SQLite database (WAL mode) — PRIMARY source of truth
-    ├── ics-cache.json            # ICS feed cache (unchanged)
-    └── config.yaml               # User settings (vault path, hotkey, thresholds)
-```
+All structured data lives in the shared app-wide PGlite database at `<userData>/app.pglite` (tables: `settings`, `tasks`, `projects`, `areas`, `links`). The task-vault extension no longer creates a per-vault `<vault>/.todo/` directory: the former `vault.db`, `config.yaml`, and inline file-based settings have been folded into the shared database — user settings such as `stale_days_threshold` are rows in the `settings` table keyed by `(extension_id, key)`.
 
-The `daily/`, `inbox.md`, `projects/`, `areas/`, and `archive/` directories from the earlier markdown-file spec are no longer used. All data lives in `vault.db`.
+The `daily/`, `inbox.md`, `projects/`, `areas/`, and `archive/` directories from the earlier markdown-file spec are no longer used. All data lives in the shared database.
 
 ---
 

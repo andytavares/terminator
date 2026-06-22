@@ -1,7 +1,7 @@
 # Contract: Extension API
 
-**Version**: 1.4.0  
-**Date**: 2026-06-14  
+**Version**: 1.5.0  
+**Date**: 2026-06-21  
 **Branch**: `001-extension-first-terminal`
 
 This is the public API surface exposed to all Terminator extensions. Extensions receive an `ExtensionAPI` object as the sole argument to their `activate()` function. They MUST NOT import from `src/main/` or any internal module directly.
@@ -10,13 +10,14 @@ This is the public API surface exposed to all Terminator extensions. Extensions 
 
 ## Version History
 
-| Version | Changes                                                                                                                  |
-| ------- | ------------------------------------------------------------------------------------------------------------------------ |
-| 1.0.0   | Initial release: `app`, `log`, `settings`, `sidebar.registerItem`, `contextMenu`, `keyboard`, `terminal`                 |
-| 1.1.0   | Added: `sidebar.registerPanel`, `topBar`, `shell`, `notifications.showToast`, `nativeMenu`, `fs`, `ipc`, `commands`      |
-| 1.2.0   | Added: `sidebar.registerGlobalTab`, `globalShortcut`, `workspace`, `window`, `notifications.createNotification`          |
-| 1.3.0   | Added: `sidebar.registerWorkspaceTab`, `WorkspaceTabRegistration`, `activeWorkspaceTabId` state on the renderer registry |
-| 1.4.0   | Added: `settings.set`, `ipc.invokeChannel`, `ipc.sendChannel`, `ipc.onWindowEvent`, `pty` namespace, `window.broadcast`  |
+| Version | Changes                                                                                                                                                                                                  |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.0   | Initial release: `app`, `log`, `settings`, `sidebar.registerItem`, `contextMenu`, `keyboard`, `terminal`                                                                                                 |
+| 1.1.0   | Added: `sidebar.registerPanel`, `topBar`, `shell`, `notifications.showToast`, `nativeMenu`, `fs`, `ipc`, `commands`                                                                                      |
+| 1.2.0   | Added: `sidebar.registerGlobalTab`, `globalShortcut`, `workspace`, `window`, `notifications.createNotification`                                                                                          |
+| 1.3.0   | Added: `sidebar.registerWorkspaceTab`, `WorkspaceTabRegistration`, `activeWorkspaceTabId` state on the renderer registry                                                                                 |
+| 1.4.0   | Added: `settings.set`, `ipc.invokeChannel`, `ipc.sendChannel`, `ipc.onWindowEvent`, `pty` namespace, `window.broadcast`                                                                                  |
+| 1.5.0   | Added: `db` namespace (shared PGlite), `ipc.isRemoteAccessible`, `pty.listSessions/attachOnData/attachOnExit`, `notifications.createNotification` `targets`, `SettingDefinition` `folder`/`action` types |
 
 ---
 
@@ -40,6 +41,14 @@ export function deactivate?(): void | Promise<void>;
 
 ```typescript
 interface ExtensionAPI {
+  /**
+   * _(v1.5.0)_ Shared application database (PGlite / Postgres-compatible).
+   * Extensions own their tables (prefix table names with the extension id).
+   * Accessing any method before the host injects the DB throws
+   * `Extension "<id>": AppDB not initialized`.
+   */
+  db: ExtensionDB
+
   /**
    * Metadata about the currently running Terminator application.
    */
@@ -199,6 +208,8 @@ interface ExtensionAPI {
       type: ToastType
       title: string
       message?: string
+      /** _(v1.5.0)_ Where to surface the notification. Defaults to all targets. */
+      targets?: Array<'system' | 'center' | 'toast'>
       actions?: Array<{ id: string; label: string; handler: () => void }>
     }): Disposable
   }
@@ -244,6 +255,13 @@ interface ExtensionAPI {
      * main-process EventEmitter bridge. Returns an unsubscribe function.
      */
     onWindowEvent(channel: string, handler: (...args: unknown[]) => void): () => void
+
+    /**
+     * _(v1.5.0)_ Whether a registered channel was flagged remote-accessible
+     * (i.e. exposed to the remote-control browser bridge). Returns false for
+     * unknown channels.
+     */
+    isRemoteAccessible(channel: string): boolean
   }
 
   /**
@@ -281,6 +299,22 @@ interface ExtensionAPI {
     write(sessionId: string, data: string): void
     resize(sessionId: string, cols: number, rows: number): void
     kill(sessionId: string): void
+
+    /** _(v1.5.0)_ List currently-tracked PTY sessions and their working dirs. */
+    listSessions(): Array<{ sessionId: string; cwd: string }>
+
+    /**
+     * _(v1.5.0)_ Attach an extra data listener to an existing session
+     * (e.g. to mirror output to a remote client). Returns a detach function,
+     * or null if the session is unknown.
+     */
+    attachOnData(sessionId: string, onData: (data: string) => void): (() => void) | null
+
+    /**
+     * _(v1.5.0)_ Attach an extra exit listener to an existing session.
+     * Returns a detach function, or null if the session is unknown.
+     */
+    attachOnExit(sessionId: string, onExit: (exitCode: number) => void): (() => void) | null
   }
 
   /**
@@ -317,12 +351,14 @@ interface Disposable {
 interface ExtensionSettingsSchema {
   /** Section label shown in settings panel */
   label: string
+  /** _(v1.5.0)_ Optional section description shown under the label */
+  description?: string
   /** Key-value map of setting definitions */
   properties: Record<string, SettingDefinition>
 }
 
 interface SettingDefinition {
-  type: 'string' | 'number' | 'boolean' | 'enum'
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'folder' | 'action'
   label: string
   description?: string
   default: unknown
@@ -333,6 +369,34 @@ interface SettingDefinition {
   max?: number
   workspaceScoped?: boolean
   secret?: boolean
+  /** _(v1.5.0)_ For type 'action' only: bridge channel invoked when the button is clicked */
+  channel?: string
+  /** _(v1.5.0)_ For type 'action' only: confirmation prompt shown before invoking */
+  confirmMessage?: string
+  /** _(v1.5.0)_ For type 'action' only: render the button as a destructive action */
+  danger?: boolean
+}
+
+// v1.5.0 types
+
+/**
+ * Shared application database handle (PGlite, Postgres-compatible).
+ * `?` placeholders in SQL are rewritten to positional `$1, $2, …` for you.
+ */
+interface ExtensionDB {
+  exec(sql: string): Promise<void>
+  query<T extends Record<string, unknown> = Record<string, unknown>>(
+    sql: string,
+    params?: unknown[]
+  ): Promise<T[]>
+  get<T extends Record<string, unknown> = Record<string, unknown>>(
+    sql: string,
+    params?: unknown[]
+  ): Promise<T | undefined>
+  /** Returns the number of affected rows. */
+  run(sql: string, params?: unknown[]): Promise<number>
+  /** Nested transactions are demoted to savepoints. */
+  transaction<T>(fn: (tx: ExtensionDB) => Promise<T>): Promise<T>
 }
 
 /**
@@ -484,4 +548,4 @@ interface ProjectSnapshot {
 
 4. **Settings key namespacing**: Extension setting keys must be prefixed with the extension ID to avoid collisions (enforced by the host at registration time).
 
-5. **API versioning**: The `ExtensionAPI` interface follows semantic versioning. Breaking changes require a MAJOR version bump and a new ADR. The current version is `1.4.0` (added `settings.set`, `ipc.invokeChannel/sendChannel/onWindowEvent`, `pty` namespace, `window.broadcast`). The renderer-registry surface remains at `1.3.0` — `registerWorkspaceTab` is a renderer-registry-only surface, not exposed via `activate(api)`.
+5. **API versioning**: The `ExtensionAPI` interface follows semantic versioning. Breaking changes require a MAJOR version bump and a new ADR. The current version is `1.5.0` (added `db` namespace, `ipc.isRemoteAccessible`, `pty.listSessions/attachOnData/attachOnExit`, `notifications.createNotification` `targets`, and `folder`/`action` setting types). The renderer-registry surface remains at `1.3.0` — `registerWorkspaceTab` is a renderer-registry-only surface, not exposed via `activate(api)`.
