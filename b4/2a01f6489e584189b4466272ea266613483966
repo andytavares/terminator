@@ -1,0 +1,24 @@
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_199762e7475eba::t_343adf2ce3fa59 162-164,166-169,171
+  s_199762e7475eba::t_497d65c0be38c8 67,71
+src/renderer/components/terminal/TerminalPane.tsx
+  s_199762e7475eba::t_18ec76aba7967d 1
+  s_199762e7475eba::t_bdb7152675819d 41-52,63
+  s_199762e7475eba::t_bb17881a2970b2 53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "b42a01f6489e584189b4466272ea266613483966",
+  "prompts": {},
+  "sessions": {
+    "s_199762e7475eba": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4cb0dd47-e353-4fc3-bb13-93b369ed2a13",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
