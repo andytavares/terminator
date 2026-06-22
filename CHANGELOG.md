@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Spacing token scale (`--space-1` through `--space-12`) in CSS `:root`
 - IPC remote-access allowlist centralised in `src/main/remote/remote-accessible-channels.ts` — a single auditable set that is the entire remote attack surface. The bridge is default-deny across `invoke`, `send`, and `subscribe`; `remote-accessible-channels.spec.ts` asserts the set stays in sync with the channels the `/app/` shim uses, so enforcement and allowlist can never half-ship independently
 - Per-IP failed-auth rate limiting on the remote-control server (`auth-rate-limiter.ts`): 10 failures / 15 min → `429` lockout
+- End-to-end Playwright test (`tests/e2e/remote-app.spec.ts`) that launches the app in an isolated profile, enables remote control, loads `/app/` in a real browser, and asserts the IPC bridge serves a workspace — wired into CI as a new `e2e` job (macos-14). Guards the `/app/` regression class
 - `npm audit --audit-level=high` step in CI lint job
 - `XTERM_THEMES` constant with dark/light palettes; MutationObserver in `TerminalInstance` for live terminal re-theming
 - `(extension_id, key)` composite primary key on `settings` tables in notepad and task-vault extensions (with backfill migration)
