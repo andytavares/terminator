@@ -1,0 +1,21 @@
+tests/e2e/helpers.ts
+  s_522c6e369b3539::t_e6acd196838b87 88-100
+tests/e2e/terminal.spec.ts
+  s_522c6e369b3539::t_0c8f31a43bb4f0 1-17,20,24,27,29-35,37-40,42-44,47-50,53-54,56-58,61-64,66-67,69,72-75,77,80-87,90-95,98-105,108-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "8382fdf2126d15ad1773cc62f28fe6a264448dd3",
+  "prompts": {},
+  "sessions": {
+    "s_522c6e369b3539": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3891f342-f887-4e5a-8284-75edce24d748",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
