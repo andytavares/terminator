@@ -9,13 +9,14 @@ interface BridgeOptions {
   invokeChannel: (channel: string, payload: unknown) => Promise<unknown>
   sendChannel: (channel: string, payload: unknown) => void
   onWindowEvent: (channel: string, handler: (...args: unknown[]) => void) => () => void
+  isRemoteAccessible: (channel: string) => boolean
 }
 
 export async function registerBridgeRoute(
   app: FastifyInstance,
   opts: BridgeOptions
 ): Promise<{ disconnectAll: () => void }> {
-  const { ticketStore, invokeChannel, sendChannel, onWindowEvent } = opts
+  const { ticketStore, invokeChannel, sendChannel, onWindowEvent, isRemoteAccessible } = opts
   const bridgeConnections = new Set<WebSocket>()
 
   app.post('/api/bridge-ticket', async (_request, reply) => {
@@ -73,6 +74,12 @@ export async function registerBridgeRoute(
 
         if (msg.type === 'invoke' && msg.id && msg.channel) {
           const { id, channel, args } = msg
+          if (!isRemoteAccessible(channel)) {
+            if (ws.readyState === ws.OPEN) {
+              ws.send(JSON.stringify({ type: 'error', id, error: 'channel not remote-accessible' }))
+            }
+            return
+          }
           try {
             const result = await invokeChannel(channel, args?.[0] ?? {})
             if (ws.readyState === ws.OPEN) {

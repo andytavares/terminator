@@ -55,6 +55,7 @@ function makeApi() {
       invokeChannel: vi.fn().mockResolvedValue(undefined),
       sendChannel: vi.fn(),
       onWindowEvent: vi.fn().mockReturnValue(vi.fn()),
+      isRemoteAccessible: vi.fn().mockReturnValue(false),
     },
     window: { broadcast: mockBroadcast },
     pty: {},

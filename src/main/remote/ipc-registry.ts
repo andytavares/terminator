@@ -3,5 +3,12 @@
 type IpcHandler = (event: never, payload: unknown) => unknown
 type IpcSendHandler = (event: never, payload: unknown) => void
 
-export const ipcInvokeRegistry = new Map<string, IpcHandler>()
+export type { IpcHandler, IpcSendHandler }
+
+export interface IpcRegistryEntry {
+  handler: IpcHandler
+  remoteAccessible: boolean
+}
+
+export const ipcInvokeRegistry = new Map<string, IpcRegistryEntry>()
 export const ipcSendRegistry = new Map<string, IpcSendHandler>()

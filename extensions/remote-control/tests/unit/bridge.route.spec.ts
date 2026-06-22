@@ -8,6 +8,7 @@ import { WsTicketStore } from '../../src/server/ws-ticket-store'
 let mockInvokeChannel: ReturnType<typeof vi.fn>
 let mockSendChannel: ReturnType<typeof vi.fn>
 let mockOnWindowEvent: ReturnType<typeof vi.fn>
+let mockIsRemoteAccessible: ReturnType<typeof vi.fn>
 
 function waitForClose(ws: WebSocket): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -53,6 +54,7 @@ async function buildBridgeApp(): Promise<{
     invokeChannel: mockInvokeChannel,
     sendChannel: mockSendChannel,
     onWindowEvent: mockOnWindowEvent,
+    isRemoteAccessible: mockIsRemoteAccessible,
   })
   return { app, ticketStore, bridgeCleanup }
 }
@@ -68,6 +70,7 @@ describe('bridge.route', () => {
     mockInvokeChannel = vi.fn().mockResolvedValue(undefined)
     mockSendChannel = vi.fn()
     mockOnWindowEvent = vi.fn().mockReturnValue(vi.fn())
+    mockIsRemoteAccessible = vi.fn().mockReturnValue(true)
     ;({ app, ticketStore, bridgeCleanup } = await buildBridgeApp())
     await app.listen({ port: 0, host: '127.0.0.1' })
     const addr = app.server.address() as { port: number; address: string }
@@ -315,6 +318,67 @@ describe('bridge.route', () => {
       await waitForOpen(ws)
       ws.send('not json at all')
       await new Promise((r) => setTimeout(r, 30))
+      ws.close()
+      await waitForClose(ws)
+    })
+  })
+
+  describe('remote-access allowlist', () => {
+    it('rejects invoke for a non-allowlisted channel with type:error', async () => {
+      mockIsRemoteAccessible.mockReturnValue(false)
+
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
+      await waitForOpen(ws)
+      ws.send(
+        JSON.stringify({ type: 'invoke', id: 'sec1', channel: 'dialog:open-directory', args: [{}] })
+      )
+
+      const msg = await waitForMessage(ws)
+      const parsed = JSON.parse(msg)
+
+      expect(parsed.type).toBe('error')
+      expect(parsed.id).toBe('sec1')
+      expect(parsed.error).toBe('channel not remote-accessible')
+      expect(mockInvokeChannel).not.toHaveBeenCalled()
+      ws.close()
+      await waitForClose(ws)
+    })
+
+    it('executes handler for an allowlisted channel', async () => {
+      mockIsRemoteAccessible.mockImplementation((ch: string) => ch === 'terminal:create')
+      mockInvokeChannel.mockResolvedValue({ sessionId: 's1' })
+
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
+      await waitForOpen(ws)
+      ws.send(
+        JSON.stringify({ type: 'invoke', id: 'sec2', channel: 'terminal:create', args: [{}] })
+      )
+
+      const msg = await waitForMessage(ws)
+      const parsed = JSON.parse(msg)
+
+      expect(parsed.type).toBe('result')
+      expect(parsed.id).toBe('sec2')
+      expect(mockInvokeChannel).toHaveBeenCalledWith('terminal:create', {})
+      ws.close()
+      await waitForClose(ws)
+    })
+
+    it('does not apply allowlist to subscribe or send messages', async () => {
+      mockIsRemoteAccessible.mockReturnValue(false)
+
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
+      await waitForOpen(ws)
+
+      ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
+      ws.send(JSON.stringify({ type: 'send', channel: 'terminal:input', args: [{}] }))
+      await new Promise((r) => setTimeout(r, 30))
+
+      expect(mockOnWindowEvent).toHaveBeenCalledWith('terminal:output', expect.any(Function))
+      expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {})
       ws.close()
       await waitForClose(ws)
     })

@@ -22,12 +22,14 @@ export async function createDiagram(
   const id = randomUUID()
   const now = new Date().toISOString()
   const title = parsed.data.title?.trim() || 'Untitled diagram'
-  const tags = JSON.stringify(parsed.data.tags ?? [])
 
   await db.run(
-    `INSERT INTO diagrams (id, title, tags, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, title, tags, '{}', now, now]
+    `INSERT INTO diagrams (id, title, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+    [id, title, '{}', now, now]
   )
+  for (const tag of parsed.data.tags ?? []) {
+    await db.run(`INSERT INTO diagram_tags (diagram_id, tag) VALUES (?, ?)`, [id, tag])
+  }
 
   return { data: { id, title, createdAt: now } }
 }
@@ -46,30 +48,33 @@ export async function listDiagrams(
   const rows = await db.query<{
     id: string
     title: string
-    tags: string
     created_at: string
     updated_at: string
     archived_at: string | null
     sort_order: number
     folder_id: string | null
   }>(
-    `SELECT id, title, tags, created_at, updated_at, archived_at, COALESCE(sort_order, 0) AS sort_order, folder_id
+    `SELECT id, title, created_at, updated_at, archived_at, COALESCE(sort_order, 0) AS sort_order, folder_id
      FROM diagrams
      WHERE 1=1 ${archivedFilter}
      ORDER BY COALESCE(sort_order, 0) ASC, updated_at DESC`
   )
 
+  const allTagRows = await db.query<{ diagram_id: string; tag: string }>(
+    `SELECT diagram_id, tag FROM diagram_tags ORDER BY tag`
+  )
+  const tagsByDiagramId = new Map<string, string[]>()
+  for (const t of allTagRows) {
+    const arr = tagsByDiagramId.get(t.diagram_id) ?? []
+    arr.push(t.tag)
+    tagsByDiagramId.set(t.diagram_id, arr)
+  }
+
   return {
     data: rows.map((r) => ({
       id: r.id,
       title: r.title,
-      tags: (() => {
-        try {
-          return JSON.parse(r.tags ?? '[]') as string[]
-        } catch {
-          return []
-        }
-      })(),
+      tags: tagsByDiagramId.get(r.id) ?? [],
       createdAt: r.created_at,
       updatedAt: r.updated_at,
       archivedAt: r.archived_at,
@@ -91,29 +96,26 @@ export async function getDiagram(
   const row = await db.get<{
     id: string
     title: string
-    tags: string
     scene_json: string
     created_at: string
     updated_at: string
     archived_at: string | null
-  }>(
-    `SELECT id, title, tags, scene_json, created_at, updated_at, archived_at FROM diagrams WHERE id=?`,
-    [parsed.data.id]
-  )
+  }>(`SELECT id, title, scene_json, created_at, updated_at, archived_at FROM diagrams WHERE id=?`, [
+    parsed.data.id,
+  ])
 
   if (!row) return { error: 'DIAGRAM_NOT_FOUND' }
+
+  const tagRows = await db.query<{ tag: string }>(
+    `SELECT tag FROM diagram_tags WHERE diagram_id=? ORDER BY tag`,
+    [parsed.data.id]
+  )
 
   return {
     data: {
       id: row.id,
       title: row.title,
-      tags: (() => {
-        try {
-          return JSON.parse(row.tags ?? '[]') as string[]
-        } catch {
-          return []
-        }
-      })(),
+      tags: tagRows.map((t) => t.tag),
       sceneJson: row.scene_json,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -141,22 +143,26 @@ export async function autosaveDiagram(
   const existing = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [id])
   if (!existing) return { error: 'DIAGRAM_NOT_FOUND' }
 
-  const tags = JSON.stringify(parsed.data.tags ?? [])
   if (sceneJson !== undefined) {
-    await db.run('UPDATE diagrams SET title=?, tags=?, scene_json=?, updated_at=? WHERE id=?', [
+    await db.run('UPDATE diagrams SET title=?, scene_json=?, updated_at=? WHERE id=?', [
       title.trim() || 'Untitled diagram',
-      tags,
       sceneJson,
       now,
       id,
     ])
   } else {
-    await db.run('UPDATE diagrams SET title=?, tags=?, updated_at=? WHERE id=?', [
+    await db.run('UPDATE diagrams SET title=?, updated_at=? WHERE id=?', [
       title.trim() || 'Untitled diagram',
-      tags,
       now,
       id,
     ])
+  }
+
+  if (parsed.data.tags !== undefined) {
+    await db.run(`DELETE FROM diagram_tags WHERE diagram_id=?`, [id])
+    for (const tag of parsed.data.tags) {
+      await db.run(`INSERT INTO diagram_tags (diagram_id, tag) VALUES (?, ?)`, [id, tag])
+    }
   }
 
   return { data: { updatedAt: now } }

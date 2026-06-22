@@ -45,6 +45,17 @@
   --radius-md: 10px;
   --radius-lg: 16px;
 
+  /* spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
   /* ── Extension Token API (--tm-* published contract) ─────────── */
   --tm-bg-base: var(--bg-base);
   --tm-bg-surface: var(--bg-surface);
@@ -69,6 +80,31 @@
   --tm-radius-lg: var(--radius-lg);
   --tm-font-mono: var(--font-mono);
   --tm-font-ui: var(--font-ui);
+}
+
+/* ── Light Mode Token Overrides ──────────────────────────────── */
+[data-theme='light'] {
+  /* surfaces */
+  --bg-base: #f0f0f5;
+  --bg-surface: #e8e8f0;
+  --bg-elevated: #ffffff;
+  --bg-card: #f5f5fa;
+  --bg-card-hover: #eaeaf5;
+  --bg-input: #ffffff;
+
+  /* text */
+  --text-primary: #1a1a2e;
+  --text-secondary: #555580;
+  --text-muted: #6666a0;
+
+  /* borders */
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.15);
+
+  /* semantic — maintain WCAG AA contrast on light surfaces */
+  --danger: #c0392b;
+  --success: #1a7a3c;
+  --warning: #a85a00;
 }
 
 /* ── Reset ───────────────────────────────────────────────────── */
@@ -99,9 +135,6 @@ button {
 }
 
 /* ── Focus ───────────────────────────────────────────────────── */
-*:focus {
-  outline: none;
-}
 *:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.85);
   outline-offset: 2px;

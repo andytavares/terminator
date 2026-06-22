@@ -108,6 +108,7 @@ export async function closeAppDb(): Promise<void> {
     await _pg.close()
     _pg = null
     _db = null
+    _spCount = 0
   }
 }
 

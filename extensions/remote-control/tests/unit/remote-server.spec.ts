@@ -66,6 +66,7 @@ describe('RemoteServer', () => {
     invokeChannel: vi.fn().mockResolvedValue(undefined),
     sendChannel: vi.fn(),
     onWindowEvent: vi.fn().mockReturnValue(vi.fn()),
+    isRemoteAccessible: vi.fn().mockReturnValue(true),
     onPortInUse: mockOnPortInUse,
   }
 

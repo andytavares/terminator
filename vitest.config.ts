@@ -51,7 +51,6 @@ export default defineConfig({
         'extensions/*/src/components/**',
         'extensions/*/src/mcp/server.ts',
         'extensions/*/src/vault/types.ts',
-        'extensions/*/src/vault/db.ts',
         'extensions/*/src/vault/writer.ts',
         'extensions/*/src/schemas/project.schema.ts',
         'extensions/*/src/types/**',

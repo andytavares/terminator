@@ -3,11 +3,16 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 
-vi.mock('../../../src/main/logger', () => ({
-  makeLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
+const { mockWarn, mockInfo } = vi.hoisted(() => ({
+  mockWarn: vi.fn(),
+  mockInfo: vi.fn(),
 }))
 
-import { runLegacyMigration } from '../../../src/main/db/migrate'
+vi.mock('../../../src/main/logger', () => ({
+  makeLogger: () => ({ debug: vi.fn(), info: mockInfo, warn: mockWarn, error: vi.fn() }),
+}))
+
+import { runLegacyMigration, assertTableAllowed } from '../../../src/main/db/migrate'
 import type { ExtensionDB } from '../../../src/main/db/index'
 
 function makeMockDb(): ExtensionDB {
@@ -38,11 +43,27 @@ async function makeRealSqliteFile(dir: string, filename: string): Promise<string
   return dbPath
 }
 
+describe('assertTableAllowed', () => {
+  it('does not throw for allowed table names', () => {
+    expect(() => assertTableAllowed('notes')).not.toThrow()
+    expect(() => assertTableAllowed('tasks')).not.toThrow()
+    expect(() => assertTableAllowed('settings')).not.toThrow()
+  })
+
+  it('throws for unknown table names before any SQL executes', () => {
+    expect(() => assertTableAllowed('unknown_table')).toThrow(/not in the allowed list/i)
+    expect(() => assertTableAllowed('')).toThrow()
+    expect(() => assertTableAllowed('users; DROP TABLE tasks;--')).toThrow()
+  })
+})
+
 describe('runLegacyMigration', () => {
   let tmpDir: string
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'migrate-test-'))
+    mockWarn.mockClear()
+    mockInfo.mockClear()
   })
 
   afterEach(() => {
@@ -69,7 +90,7 @@ describe('runLegacyMigration', () => {
 
     // db.run should have been called to insert the note row
     expect(db.run).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO notes'),
+      expect.stringContaining('INSERT INTO "notes"'),
       expect.arrayContaining(['n1', 'Hello'])
     )
     // Original file should be renamed to .bak
@@ -105,5 +126,18 @@ describe('runLegacyMigration', () => {
     fs.writeFileSync(dbPath, Buffer.from([0xff, 0xfe, 0x00, 0x01, 0x02, 0x03]))
     const db = makeMockDb()
     await expect(runLegacyMigration(tmpDir, db)).resolves.not.toThrow()
+  })
+
+  it('logs warn per failed row and info with skipped count summary', async () => {
+    await makeRealSqliteFile(tmpDir, 'notepad.db')
+    const db = makeMockDb()
+    ;(db.run as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('FK violation'))
+
+    await runLegacyMigration(tmpDir, db)
+
+    // Should warn for the failed row
+    expect(mockWarn).toHaveBeenCalledWith(expect.stringMatching(/skipped row/i))
+    // Summary info should mention skipped count
+    expect(mockInfo).toHaveBeenCalledWith(expect.stringMatching(/skipped/i))
   })
 })

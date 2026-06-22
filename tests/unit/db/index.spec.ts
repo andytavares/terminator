@@ -172,6 +172,34 @@ describe('AppDB', () => {
     expect(() => getAppDb()).toThrow('AppDB not initialized')
   })
 
+  it('closeAppDb resets _spCount so savepoints restart from sp_1 after re-init', async () => {
+    const fakeTxExec = vi.fn().mockResolvedValue([])
+    const fakeTxQuery = vi.fn().mockResolvedValue({ rows: [], affectedRows: 0 })
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+      return fn({ query: fakeTxQuery, exec: fakeTxExec })
+    })
+    mockClose.mockResolvedValue(undefined)
+    mockQuery.mockResolvedValue({ rows: [{ '?column?': 1 }] })
+
+    await initAppDb('/tmp/test-db')
+    const db1 = getAppDb()
+    await db1.transaction(async (tx) => {
+      await tx.transaction(async () => 'nested1')
+    })
+    await closeAppDb()
+
+    await initAppDb('/tmp/test-db')
+    const db2 = getAppDb()
+    fakeTxExec.mockClear()
+    await db2.transaction(async (tx) => {
+      await tx.transaction(async () => 'nested2')
+    })
+
+    const execCalls = fakeTxExec.mock.calls.map((c) => String(c[0]))
+    // After re-init, savepoint counter should restart from sp_1
+    expect(execCalls.some((s) => s.includes('sp_1'))).toBe(true)
+  })
+
   it('healthCheck returns ok when query succeeds', async () => {
     mockQuery.mockResolvedValue({ rows: [{ '?column?': 1 }] })
     await initAppDb('/tmp/test-db')

@@ -33,6 +33,12 @@
   }
 }
 
+.dialog__description {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
 .dialog__title {
   font-size: 14px;
   font-weight: 600;

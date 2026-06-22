@@ -6,7 +6,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 
 - **Workspaces & Projects** — Two-level hierarchy. Workspaces map to local directories; Projects hold terminal sessions. Collapsible sidebar with color coding and tag chips.
 - **Persistent terminal sessions** — xterm.js `Terminal` instances are never destroyed on tab switch. Buffer, scroll position, and running process survive navigation.
-- **Theme system** — Dark/light themes switch immediately app-wide via CSS custom properties. Per-workspace theme overrides are supported.
+- **Theme system** — Dark/light themes switch immediately app-wide via CSS custom properties (`[data-theme="light"]` token overrides). Terminal colours re-apply live via a `MutationObserver` — no restart needed. Per-workspace theme overrides are supported.
 - **Settings** — Global and per-workspace configuration for theme, scrollback limit, and default shell. Terminal section includes opt-in scroll-to-bottom controls: on click, on app focus, and on tab switch (all off by default so scrollback history is preserved).
 - **Command palette** — `Cmd+P` opens a quick-action palette for common operations.
 - **Extension system** — Extensions install from local directories and contribute settings sections, sidebar items, sidebar panels, global tabs, workspace-scoped tabs (hover-reveal icons in workspace card headers), top-bar menu items, native View menu items, context menu entries, and terminal event hooks without modifying core code. See [Extension Development Guide](docs/EXTENSION-DEVELOPMENT.md).
@@ -38,7 +38,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 
 | Layer                  | Technology                                  |
 | ---------------------- | ------------------------------------------- |
-| Framework              | Electron 30.x                               |
+| Framework              | Electron 34.x                               |
 | Language               | TypeScript 5.x (strict)                     |
 | UI                     | React 18.x + Zustand + Lucide React (icons) |
 | Terminal rendering     | xterm.js 5.x + xterm-addon-fit              |

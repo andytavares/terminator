@@ -17,6 +17,7 @@ interface Props {
 
 export function AboutDialog({ onClose }: Props) {
   const [info, setInfo] = useState<AppInfo | null>(null)
+  const [dbStatus, setDbStatus] = useState<{ ok: boolean; message?: string } | null>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -28,6 +29,10 @@ export function AboutDialog({ onClose }: Props) {
       .getInfo()
       .then(setInfo)
       .catch(() => {})
+    window.electronAPI.db
+      .health()
+      .then(setDbStatus)
+      .catch(() => setDbStatus({ ok: false, message: 'IPC error' }))
   }, [])
 
   useEffect(() => {
@@ -69,6 +74,16 @@ export function AboutDialog({ onClose }: Props) {
           <div className="about-dialog__row">
             <dt>Platform</dt>
             <dd>{info?.platform ?? '—'}</dd>
+          </div>
+          <div className="about-dialog__row">
+            <dt>DB</dt>
+            <dd>
+              {dbStatus === null
+                ? '—'
+                : dbStatus.ok
+                  ? 'OK'
+                  : `Error — ${dbStatus.message ?? 'unknown'}`}
+            </dd>
           </div>
         </dl>
 

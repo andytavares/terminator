@@ -52,7 +52,6 @@ interface DiagramRow {
   scene_json: string
   created_at: string
   updated_at: string
-  tags: string | null
 }
 
 function buildExistingIdMap(folder: string): Map<string, string> {
@@ -140,7 +139,7 @@ export async function exportNotes(
   let diagramsExported = 0
   if (includeDiagrams && scope === 'all') {
     const diagrams = await db.query<DiagramRow>(
-      `SELECT id, title, scene_json, created_at, updated_at, tags FROM diagrams WHERE archived_at IS NULL ORDER BY updated_at DESC`
+      `SELECT id, title, scene_json, created_at, updated_at FROM diagrams WHERE archived_at IS NULL ORDER BY updated_at DESC`
     )
     const diagramsFolder = path.join(resolvedFolder, 'diagrams')
     fs.mkdirSync(diagramsFolder, { recursive: true })

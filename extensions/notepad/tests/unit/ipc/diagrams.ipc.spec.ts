@@ -110,15 +110,15 @@ describe('listDiagrams', () => {
     expect(result).toEqual({ error: 'VALIDATION_ERROR' })
   })
 
-  it('returns empty tags array when tags column has invalid JSON', async () => {
+  it('returns empty tags array when no diagram_tags rows exist for diagram', async () => {
     const now = new Date().toISOString()
     await db.run(
-      `INSERT INTO diagrams (id, title, tags, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
-      ['bad-tags-id', 'Bad Tags', 'NOT_JSON', '{}', now, now]
+      `INSERT INTO diagrams (id, title, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      ['no-tags-id', 'No Tags', '{}', now, now]
     )
     const result = await listDiagrams(db, {})
     const data = (result as { data: { id: string; tags: string[] }[] }).data
-    const row = data.find((d) => d.id === 'bad-tags-id')
+    const row = data.find((d) => d.id === 'no-tags-id')
     expect(row?.tags).toEqual([])
   })
 })
@@ -143,13 +143,13 @@ describe('getDiagram', () => {
     expect(result).toEqual({ error: 'VALIDATION_ERROR' })
   })
 
-  it('returns empty tags array when tags column has invalid JSON', async () => {
+  it('returns empty tags array when no diagram_tags rows exist for diagram', async () => {
     const now = new Date().toISOString()
     await db.run(
-      `INSERT INTO diagrams (id, title, tags, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
-      ['bad-tags-get', 'Bad Tags', 'NOT_JSON', '{}', now, now]
+      `INSERT INTO diagrams (id, title, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      ['no-tags-get', 'No Tags', '{}', now, now]
     )
-    const result = await getDiagram(db, { id: 'bad-tags-get' })
+    const result = await getDiagram(db, { id: 'no-tags-get' })
     const data = (result as { data: { tags: string[] } }).data
     expect(data.tags).toEqual([])
   })
@@ -271,5 +271,58 @@ describe('registerDiagramsIpcHandlers', () => {
     const dispose = registerDiagramsIpcHandlers(db)
     expect(typeof dispose).toBe('function')
     dispose()
+  })
+})
+
+describe('diagram_tags relational storage', () => {
+  it('diagram_tags table exists after schema is applied', async () => {
+    const rows = await db.query<{ table_name: string }>(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name='diagram_tags'`
+    )
+    expect(rows.length).toBe(1)
+  })
+
+  it('createDiagram with tags inserts rows into diagram_tags', async () => {
+    const r = await createDiagram(db, { title: 'Tagged', tags: ['a', 'b'] })
+    const id = (r as { data: { id: string } }).data.id
+    const tagRows = await db.query<{ tag: string }>(
+      `SELECT tag FROM diagram_tags WHERE diagram_id=? ORDER BY tag`,
+      [id]
+    )
+    expect(tagRows.map((t) => t.tag)).toEqual(['a', 'b'])
+  })
+
+  it('listDiagrams returns tags via JOIN from diagram_tags', async () => {
+    const r = await createDiagram(db, { title: 'T', tags: ['x', 'y'] })
+    const id = (r as { data: { id: string } }).data.id
+    const result = await listDiagrams(db, {})
+    const data = (result as { data: { id: string; tags: string[] }[] }).data
+    const d = data.find((item) => item.id === id)
+    expect([...(d?.tags ?? [])].sort()).toEqual(['x', 'y'])
+  })
+
+  it('getDiagram returns tags via JOIN from diagram_tags', async () => {
+    const r = await createDiagram(db, { title: 'D', tags: ['foo'] })
+    const id = (r as { data: { id: string } }).data.id
+    const result = await getDiagram(db, { id })
+    expect((result as { data: { tags: string[] } }).data.tags).toEqual(['foo'])
+  })
+
+  it('autosaveDiagram replaces diagram_tags rows', async () => {
+    const r = await createDiagram(db, { title: 'D', tags: ['old'] })
+    const id = (r as { data: { id: string } }).data.id
+    await autosaveDiagram(db, { id, title: 'D', tags: ['new1', 'new2'] })
+    const tagRows = await db.query<{ tag: string }>(
+      `SELECT tag FROM diagram_tags WHERE diagram_id=? ORDER BY tag`,
+      [id]
+    )
+    expect(tagRows.map((t) => t.tag)).toEqual(['new1', 'new2'])
+  })
+
+  it('listDiagrams returns empty tags when no diagram_tags rows exist', async () => {
+    await createDiagram(db, { title: 'No tags' })
+    const result = await listDiagrams(db, {})
+    const data = (result as { data: { tags: string[] }[] }).data
+    expect(data[0].tags).toEqual([])
   })
 })

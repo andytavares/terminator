@@ -5,6 +5,11 @@ import { useSessionStore } from '../../stores/session.store'
 
 const IDLE_DEBOUNCE_MS = 1500
 
+export const XTERM_THEMES = {
+  dark: { background: '#1e1e1e', foreground: '#cccccc' },
+  light: { background: '#f5f5f5', foreground: '#1a1a1a' },
+} as const
+
 // 16-color ANSI palette matching xterm's default theme
 const ANSI_COLORS = [
   '#000000',
@@ -59,6 +64,7 @@ export class TerminalInstance {
   private outputUnsubscribe: (() => void) | null = null
   private resizeObserver: ResizeObserver | null = null
   private cmdClickCleanup: (() => void) | null = null
+  private themeObserver: MutationObserver | null = null
   private opened = false
   private sessionId: string
   private busyTimer: ReturnType<typeof setTimeout> | null = null
@@ -74,19 +80,27 @@ export class TerminalInstance {
 
   constructor(sessionId: string, scrollbackLimit: number, onBell?: () => void) {
     this.sessionId = sessionId
+    const initialTheme =
+      document.documentElement.dataset.theme === 'light' ? XTERM_THEMES.light : XTERM_THEMES.dark
     this.terminal = new Terminal({
       scrollback: scrollbackLimit,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       fontSize: 13,
       lineHeight: 1.2,
-      theme: {
-        background: '#1e1e1e',
-        foreground: '#cccccc',
-      },
+      theme: initialTheme,
       cursorBlink: true,
     })
     this.fitAddon = new FitAddon()
     this.terminal.loadAddon(this.fitAddon)
+    this.terminal.options.theme = initialTheme
+    this.themeObserver = new MutationObserver(() => {
+      this.terminal.options.theme =
+        document.documentElement.dataset.theme === 'light' ? XTERM_THEMES.light : XTERM_THEMES.dark
+    })
+    this.themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    })
 
     this.element = document.createElement('div')
     this.element.style.cssText = 'width:100%;height:100%;position:relative;'
@@ -537,6 +551,8 @@ export class TerminalInstance {
       clearTimeout(this.busyTimer)
       this.busyTimer = null
     }
+    this.themeObserver?.disconnect()
+    this.themeObserver = null
     this.cmdClickCleanup?.()
     this.cmdClickCleanup = null
     this.linkOverlay = null

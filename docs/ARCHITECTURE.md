@@ -1,6 +1,6 @@
 # Architecture: Terminator
 
-**Version**: 0.1.0 | **Updated**: 2026-05-31
+**Version**: 0.1.64 | **Updated**: 2026-06-21 | **Electron**: 34.5.8 (upgraded from 30.4.0 via node-pty 1.2.x NAPI migration — ADR-021 resolved)
 
 ---
 
@@ -407,13 +407,13 @@ This alias layer allows the core design system to evolve (rename, restructure to
 
 ## Task Vault Extension Architecture
 
-The task-vault extension (`extensions/task-vault/`) implements a GTD+BuJo+PARA productivity system. Markdown files are the human-editable source of truth for daily logs; SQLite (`better-sqlite3`) is the primary datastore for all structured queries and CRUD. Key subsystems:
+The task-vault extension (`extensions/task-vault/`) implements a GTD+BuJo+PARA productivity system. Markdown files are the human-editable source of truth for daily logs; the shared **PGlite (PostgreSQL-compatible WASM)** database is the primary datastore for all structured queries and CRUD. Key subsystems:
 
 ### Vault Layer (`src/vault/`)
 
-- **db.ts** — Initialises the SQLite database at `.todo/vault.db`, applies schema migrations (WAL mode, FK enforcement), and exports `getDb()` / `initDb()` / `closeDb()`. Runs `backfillRecurringTasks` on startup to gap-fill any missing future occurrences. All IPC handlers access data exclusively through this layer.
+- **db.ts** — Defines the `settings`, `tasks`, `projects`, `areas`, and `links` schema via `applyTaskVaultSchema()`, and manages incremental schema upgrades via `applyTaskVaultMigrations()`. All IPC handlers receive the shared `ExtensionDB` instance (injected by the main-process extension API) and access data exclusively through it. Runs `backfillRecurringTasks` on startup to gap-fill any missing future occurrences. **Note**: an upcoming migration will add `extension_id TEXT NOT NULL` to `settings` and enforce `PRIMARY KEY (extension_id, key)` for namespace isolation across extensions.
 - **recurrence.ts** — `RecurrenceRule` discriminated union, `parseRecurrenceRule` (throws `InvalidRecurrenceRuleError` on unknown input), `serializeRecurrenceRule`, and `computeNextDueDate` (strict mode: next date = previous + interval, never completion date). Also exports `localDate()` helper.
-- **ensure-next-occurrence.ts** — `ensureNextOccurrence(db, taskId)`: idempotent function that checks whether a future `status='open'` instance already exists and inserts one if not. `backfillRecurringTasks(db)`: called from `initDb` to handle days the app was closed.
+- **ensure-next-occurrence.ts** — `ensureNextOccurrence(db, taskId)`: idempotent function that checks whether a future `status='open'` instance already exists and inserts one if not. `backfillRecurringTasks(db)`: called at extension startup to handle days the app was closed.
 - **tags.ts** — Utilities for extracting and normalising `@context`, `+project`, `#area`, and `due:` inline tags from task text.
 - **types.ts** — `TaskStatus`, `IndexedTask`, `IndexedProject`, `KanbanConfig`, and other shared TypeScript types used by both the IPC layer and renderer components.
 
@@ -443,7 +443,7 @@ End conditions (`recurrence_end_type`, `recurrence_end_date`, `recurrence_end_co
 
 **Trigger points** (the only places that create new occurrence rows):
 
-1. `initDb` — startup gap-fill via `backfillRecurringTasks`. Handles days the app was closed.
+1. Extension startup — `applyTaskVaultMigrations` runs, then `backfillRecurringTasks`. Handles days the app was closed.
 2. `task-vault:vault:complete-task` IPC handler — completes the current task and calls `ensureNextOccurrence` in the same SQLite transaction.
 3. `task-vault:vault:set-recurrence` IPC handler — sets the rule and immediately materialises the first future instance.
 

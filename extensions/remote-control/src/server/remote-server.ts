@@ -22,6 +22,7 @@ export interface RemoteServerDeps {
   invokeChannel: (channel: string, payload: unknown) => Promise<unknown>
   sendChannel: (channel: string, payload: unknown) => void
   onWindowEvent: (channel: string, handler: (...args: unknown[]) => void) => () => void
+  isRemoteAccessible: (channel: string) => boolean
   onPortInUse: (port: number) => void
 }
 
@@ -225,6 +226,7 @@ export async function createRemoteServer(
     invokeChannel: deps.invokeChannel,
     sendChannel: deps.sendChannel,
     onWindowEvent: deps.onWindowEvent,
+    isRemoteAccessible: deps.isRemoteAccessible,
   })
 
   let listening = false

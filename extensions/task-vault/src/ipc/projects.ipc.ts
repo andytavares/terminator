@@ -106,7 +106,7 @@ export function registerProjectsIpcHandlers(db: ExtensionDB): () => void {
     const completedLastWeek = completedRows.map(rowToTask)
 
     const thresholdRow = await db.get<{ value: string }>(
-      `SELECT value FROM settings WHERE key='stale_days_threshold'`
+      `SELECT value FROM settings WHERE extension_id='task-vault' AND key='stale_days_threshold'`
     )
     const parsedThreshold = thresholdRow?.value ? parseInt(thresholdRow.value, 10) : NaN
     const staleDaysThreshold = Number.isFinite(parsedThreshold) ? parsedThreshold : 7
