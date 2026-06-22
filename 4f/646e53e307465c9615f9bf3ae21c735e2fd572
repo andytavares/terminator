@@ -1,0 +1,52 @@
+docs/ARCHITECTURE.md
+  s_e2df897fa0e8a9::t_db805f24adfd31 289
+  s_e2df897fa0e8a9::t_90e239ca310a22 300-302,304-308
+  s_e2df897fa0e8a9::t_79349546539fea 318,323-324
+  s_e2df897fa0e8a9::t_2ca25041920346 284
+  s_e2df897fa0e8a9::t_d44fc4661fe907 326
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_e2df897fa0e8a9::t_dcf967e65b516c 995-1008
+  s_e2df897fa0e8a9::t_8b8dedbe6315e2 1216-1217,1219-1235
+  s_e2df897fa0e8a9::t_cacfef85a44ef4 1218
+  s_e2df897fa0e8a9::t_1d57df3f5eda0c 600,608-610
+specs/005-task-vault-extension/data-model.md
+  s_e2df897fa0e8a9::t_b24facc163e83c 55
+  s_e2df897fa0e8a9::t_2305f4070792aa 30
+  s_e2df897fa0e8a9::t_1c912e3eb9fea7 7,13-15
+  s_e2df897fa0e8a9::t_197088775e1544 308
+  s_e2df897fa0e8a9::t_9d52927b151a18 312,314,316
+.claude/doc-index.json
+  s_e2df897fa0e8a9::t_b6ccd5af1a5548 26,42,54,60,66,78,93,104,119,151
+docs/adr/017-embedded-http-remote-server.md
+  s_e2df897fa0e8a9::t_3c8f0303edf739 4-6
+extensions/task-vault/README.md
+  s_e2df897fa0e8a9::t_ed154221ccadb2 3
+  s_e2df897fa0e8a9::t_dddeb76cb6634a 16
+electron-builder.yml
+  s_e2df897fa0e8a9::t_732cfb8b4cba13 18
+specs/001-extension-first-terminal/contracts/extension-api.md
+  s_e2df897fa0e8a9::t_22c2a4e52cc9bc 354-355,361,372-399
+  s_e2df897fa0e8a9::t_de19f8fe8e59f6 20
+  s_e2df897fa0e8a9::t_cbf1d0fe97a810 258-264
+  s_e2df897fa0e8a9::t_8dc03cb0b54339 211-212
+  s_e2df897fa0e8a9::t_d626bc01775db4 45-51
+  s_e2df897fa0e8a9::t_3ed3b8862a0f69 551
+  s_e2df897fa0e8a9::t_6c4d2d3af3412b 302-317
+  s_e2df897fa0e8a9::t_3ace87d9d4aed7 3-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "4f646e53e307465c9615f9bf3ae21c735e2fd572",
+  "prompts": {},
+  "sessions": {
+    "s_e2df897fa0e8a9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4e88e9c8-ca18-41ee-a849-be8abcabf188",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
