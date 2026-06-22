@@ -140,7 +140,7 @@
     {
       "path": "docs/adr/017-embedded-http-remote-server.md",
       "title": "ADR-017: Embedded HTTP Server for Remote Browser Access",
-      "summary": "Decision to embed Fastify HTTP+WebSocket server in Electron main process (via remote-control extension). Binds to 127.0.0.1 only, exposed via ngrok. Covers security constraints and test coverage requirement.",
+      "summary": "Decision to embed Fastify HTTP+WebSocket server in Electron main process (via remote-control extension), exposed via ngrok. Bind address superseded by amendment (now 0.0.0.0 for mobile access). Covers security constraints and test coverage requirement.",
       "owners": [],
       "referenced_code_paths": [
         "extensions/remote-control/src/server/remote-server.ts",

@@ -287,6 +287,18 @@ app.whenReady().then(async () => {
   })
 })
 
+// A rejection in the startup chain above (e.g. database or extension init
+// failure) would otherwise leave the process alive with no window ever
+// created — a blank, unquittable app. Surface it loudly and exit instead of
+// bricking silently.
+process.on('unhandledRejection', (reason) => {
+  if (mainWindow) return
+  const message = reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)
+  logger.error('Fatal error during app startup', { message })
+  dialog.showErrorBox('Terminator failed to start', message)
+  app.exit(1)
+})
+
 app.on('before-quit', async (event) => {
   event.preventDefault()
   app.isQuitting = true

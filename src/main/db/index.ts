@@ -1,4 +1,6 @@
 import { PGlite } from '@electric-sql/pglite'
+import { createRequire } from 'node:module'
+import { readFileSync } from 'node:fs'
 import * as path from 'node:path'
 
 export interface ExtensionDB {
@@ -93,7 +95,17 @@ let _db: ExtensionDB | null = null
 
 export async function initAppDb(userData: string): Promise<void> {
   const dbPath = path.join(userData, 'app.pglite')
-  _pg = new PGlite(dbPath)
+  // Pass PGlite's wasm + filesystem bundle explicitly instead of relying on its
+  // own module-relative URL resolution. In the packaged ESM build that
+  // resolution fails to load postgres.data and pg_initdb aborts (blank app).
+  // Reading the files ourselves works in dev and when packaged — Electron
+  // transparently redirects the asar path to the unpacked copy (see asarUnpack
+  // in electron-builder.yml).
+  const require = createRequire(import.meta.url)
+  const distDir = path.dirname(require.resolve('@electric-sql/pglite'))
+  const wasmModule = await WebAssembly.compile(readFileSync(path.join(distDir, 'postgres.wasm')))
+  const fsBundle = new Blob([readFileSync(path.join(distDir, 'postgres.data'))])
+  _pg = new PGlite({ dataDir: dbPath, wasmModule, fsBundle })
   await _pg.waitReady
   _db = wrapDb(_pg)
 }

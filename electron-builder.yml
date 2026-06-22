@@ -5,6 +5,12 @@ directories:
 npmRebuild: true
 files:
   - out/**/*
+# PGlite loads its postgres.wasm / postgres.data from disk relative to the
+# package directory; those assets cannot be read from inside the asar archive,
+# so unpack the package to app.asar.unpacked. Without this the main process
+# rejects in initAppDb() and the window never opens.
+asarUnpack:
+  - '**/node_modules/@electric-sql/pglite/**'
 mac:
   icon: resources/icon.png
   target:
