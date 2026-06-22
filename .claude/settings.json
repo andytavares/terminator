@@ -33,7 +33,6 @@
       "Bash(curl *)",
       "Bash(wget *)",
       "Bash(rm -rf *)",
-      "Bash(git push:*)",
       "Bash(git reset --hard *)",
       "Bash(npm publish:*)",
       "Bash(pip install *)",

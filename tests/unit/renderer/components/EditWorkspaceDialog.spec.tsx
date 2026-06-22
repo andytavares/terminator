@@ -152,4 +152,30 @@ describe('EditWorkspaceDialog', () => {
     fireEvent.click(screen.getByText('Save'))
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
   })
+
+  it('does not call updateWorkspace when submitted with an empty name', async () => {
+    render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
+    fireEvent.change(screen.getByDisplayValue('My Work'), { target: { value: '   ' } })
+    fireEvent.click(screen.getByText('Save'))
+    await screen.findByText('Name is required')
+    expect(mockUpdateWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a name error when updateWorkspace reports DUPLICATE_NAME', async () => {
+    mockUpdateWorkspace.mockResolvedValue({ error: 'DUPLICATE_NAME' })
+    const onClose = vi.fn()
+    render(<EditWorkspaceDialog workspace={ws} onClose={onClose} />)
+    fireEvent.change(screen.getByDisplayValue('My Work'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByText('Save'))
+    await screen.findByText('A workspace with this name already exists')
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a generic error when updateWorkspace fails for another reason', async () => {
+    mockUpdateWorkspace.mockResolvedValue({ error: 'BACKEND_DOWN' })
+    render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
+    fireEvent.change(screen.getByDisplayValue('My Work'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByText('Save'))
+    await screen.findByText('Failed to update workspace')
+  })
 })

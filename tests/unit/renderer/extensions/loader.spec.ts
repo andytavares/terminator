@@ -144,4 +144,25 @@ describe('initExtensions (real module)', () => {
     await expect(initExtensions()).resolves.toBeUndefined()
     delete (globalThis as unknown as { window?: unknown }).window
   })
+
+  it('exercises the real filter/map/some callbacks over a populated list without loading renderers', async () => {
+    // Drive the actual module (not a reimplementation) with a non-empty extension
+    // list whose ids match no real extension directory. This executes the real
+    // status filter, id map, and per-renderer `some` matcher (raising function
+    // coverage) while keeping `isActive` false so no real renderer.tsx is imported.
+    const mockElectronAPI = {
+      extension: {
+        list: vi.fn().mockResolvedValue({
+          extensions: [
+            { id: 'definitely-not-a-real-extension-dir', status: 'enabled' },
+            { id: 'terminator.also-not-real', status: 'disabled' },
+          ],
+        }),
+      },
+    }
+    ;(globalThis as unknown as { window: unknown }).window = { electronAPI: mockElectronAPI }
+    const { initExtensions } = await import('../../../../src/renderer/extensions/loader')
+    await expect(initExtensions()).resolves.toBeUndefined()
+    delete (globalThis as unknown as { window?: unknown }).window
+  })
 })

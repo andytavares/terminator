@@ -70,6 +70,27 @@ describe('auth.middleware', () => {
       expect(res.statusCode).toBe(401)
     })
 
+    it('returns 429 after repeated failed attempts (brute-force lockout)', async () => {
+      const app = await buildApp(hash)
+      // Default limiter allows 10 failures; the 11th attempt from the same client is locked out.
+      for (let i = 0; i < 10; i++) {
+        const r = await app.inject({
+          method: 'GET',
+          url: '/api/protected',
+          headers: { Authorization: 'Bearer wrong-password' },
+        })
+        expect(r.statusCode).toBe(401)
+      }
+      const locked = await app.inject({
+        method: 'GET',
+        url: '/api/protected',
+        headers: { Authorization: 'Bearer correct-password' },
+      })
+      await app.close()
+      expect(locked.statusCode).toBe(429)
+      expect(JSON.parse(locked.body)).toMatchObject({ error: 'TOO_MANY_REQUESTS' })
+    })
+
     it('passes through when password is correct (IP host)', async () => {
       const app = await buildApp(hash)
       const res = await app.inject({

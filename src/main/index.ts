@@ -15,6 +15,7 @@ import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
 import { logger } from './logger.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
+import { REMOTE_ACCESSIBLE_CHANNELS } from './remote/remote-accessible-channels.js'
 import {
   ipcInvokeRegistry,
   ipcSendRegistry,
@@ -32,7 +33,11 @@ const _origOn = ipcMain.on.bind(ipcMain)
 const _origRemoveHandler = ipcMain.removeHandler.bind(ipcMain)
 // @ts-expect-error - patch to intercept all handler registrations
 ipcMain.handle = (channel: string, fn: IpcHandler, opts?: { remoteAccessible?: boolean }) => {
-  ipcInvokeRegistry.set(channel, { handler: fn, remoteAccessible: opts?.remoteAccessible ?? false })
+  // Default the remote-access flag from the central allowlist so the bridge
+  // surface is auditable in one place (remote-accessible-channels.ts). An explicit
+  // opt-in flag at the call site still wins if a future channel needs to override.
+  const remoteAccessible = opts?.remoteAccessible ?? REMOTE_ACCESSIBLE_CHANNELS.has(channel)
+  ipcInvokeRegistry.set(channel, { handler: fn, remoteAccessible })
   return _origHandle(channel, fn)
 }
 // @ts-expect-error - patch to intercept fire-and-forget handlers

@@ -11,10 +11,11 @@
   --bg-card-hover: #22222e;
   --bg-input: #16161c;
 
-  /* text */
+  /* text — WCAG AA on --bg-base #0c0c0f: primary 15.2:1, secondary 6.49:1, muted 5.62:1.
+     Order is primary (brightest) > secondary > muted (dimmest). */
   --text-primary: #e2e2ee;
-  --text-secondary: #7070a0;
-  --text-muted: #7878b0;
+  --text-secondary: #9090c4;
+  --text-muted: #8585b8;
 
   /* borders */
   --border: rgba(255, 255, 255, 0.06);

@@ -20,5 +20,9 @@ coverage/
 extensions/*/src/index.js
 test-report.junit.xml
 
+# Playwright e2e artifacts
+test-results/
+playwright-report/
+
 # Forge install-time rollback snapshots — not product code
 .forge-backups/

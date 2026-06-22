@@ -396,8 +396,27 @@ describe('bridge.route', () => {
       await waitForClose(ws)
     })
 
-    it('does not apply allowlist to subscribe or send messages', async () => {
+    it('rejects subscribe and send for non-allowlisted channels (default-deny)', async () => {
       mockIsRemoteAccessible.mockReturnValue(false)
+
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
+      await waitForOpen(ws)
+
+      ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
+      ws.send(JSON.stringify({ type: 'send', channel: 'terminal:input', args: [{}] }))
+      await new Promise((r) => setTimeout(r, 30))
+
+      expect(mockOnWindowEvent).not.toHaveBeenCalled()
+      expect(mockSendChannel).not.toHaveBeenCalled()
+      ws.close()
+      await waitForClose(ws)
+    })
+
+    it('allows subscribe and send for allowlisted channels', async () => {
+      mockIsRemoteAccessible.mockImplementation((ch: string) =>
+        ['terminal:output', 'terminal:input'].includes(ch)
+      )
 
       const ticket = ticketStore.createTicket('__bridge__', 'bridge')
       const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)

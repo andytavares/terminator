@@ -355,6 +355,17 @@ describe('api.ipc bridge channels', () => {
     eventBus.emit('my:event', 'arg3')
     expect(handler).toHaveBeenCalledTimes(1)
   })
+
+  it('isRemoteAccessible reflects the central allowlist (true for allowlisted, false otherwise)', () => {
+    const bridge = {
+      invokeRegistry: new Map(),
+      sendRegistry: new Map<string, (e: never, p: unknown) => void>(),
+      eventBus: new EventEmitter(),
+    }
+    const api = createExtensionAPI('test.ipc6', '0.1.0', { bridge })
+    expect(api.ipc.isRemoteAccessible('workspace:list')).toBe(true)
+    expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
+  })
 })
 
 // ── pty ──────────────────────────────────────────────────────────────────────
@@ -365,6 +376,9 @@ describe('api.pty', () => {
     write: vi.fn(),
     resize: vi.fn(),
     kill: vi.fn(),
+    listSessions: vi.fn(() => ['s1', 's2']),
+    attachOnData: vi.fn(() => () => {}),
+    attachOnExit: vi.fn(() => () => {}),
   }
 
   describe('with ptyManager', () => {
@@ -400,9 +414,27 @@ describe('api.pty', () => {
       api.pty.kill('s1')
       expect(mockPtyManager.kill).toHaveBeenCalledWith('s1')
     })
+
+    it('listSessions returns the manager session list', () => {
+      const api = createExtensionAPI('test.pty5', '0.1.0', { ptyManager: mockPtyManager })
+      expect(api.pty.listSessions()).toEqual(['s1', 's2'])
+    })
+
+    it('attachOnData/attachOnExit return the manager disposers', () => {
+      const api = createExtensionAPI('test.pty6', '0.1.0', { ptyManager: mockPtyManager })
+      expect(typeof api.pty.attachOnData('s1', vi.fn())).toBe('function')
+      expect(typeof api.pty.attachOnExit('s1', vi.fn())).toBe('function')
+    })
   })
 
   describe('without ptyManager', () => {
+    it('listSessions returns [] and attach* return null', () => {
+      const api = createExtensionAPI('test.pty.nopty5', '0.1.0')
+      expect(api.pty.listSessions()).toEqual([])
+      expect(api.pty.attachOnData('s1', vi.fn())).toBeNull()
+      expect(api.pty.attachOnExit('s1', vi.fn())).toBeNull()
+    })
+
     it('spawn throws PTY access not available', () => {
       const api = createExtensionAPI('test.pty.nopty', '0.1.0')
       expect(() => api.pty.spawn('s1', '/cwd', '/bin/zsh', 'human', vi.fn(), vi.fn())).toThrow(

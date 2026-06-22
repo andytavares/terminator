@@ -1,9 +1,9 @@
 {
   "forge_version": "0.4.0",
-  "installed_from_commit": "ce1cc34",
+  "installed_from_commit": "90e4c90",
   "source_path": "/Users/atavares/repos/forge",
   "last_action": "update",
-  "installed_at": "2026-06-22T02:36:47Z",
+  "installed_at": "2026-06-22T14:13:25Z",
   "managed_files": [
     ".claude/agents/build-detective.md",
     ".claude/agents/change-impact-analyst.md",

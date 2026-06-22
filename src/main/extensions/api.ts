@@ -238,6 +238,7 @@ import {
 } from '../storage/workspace-store.js'
 import { onWorkspaceDelete, onProjectDelete } from './workspace-events.js'
 import { RESERVED_SHORTCUTS } from '../shared/reserved-shortcuts.js'
+import { REMOTE_ACCESSIBLE_CHANNELS } from '../remote/remote-accessible-channels.js'
 
 interface Registry {
   settingsSections: Map<string, ExtensionSettingsSchema>
@@ -531,7 +532,12 @@ export function createExtensionAPI(
         return entry.handler(null as never, payload)
       },
       isRemoteAccessible(channel: string): boolean {
-        return deps?.bridge?.invokeRegistry.get(channel)?.remoteAccessible ?? false
+        // Consult the central allowlist directly rather than the invoke registry:
+        // the bridge also gates `send` and `subscribe`, whose channels (e.g.
+        // terminal:input, terminal:output) are not invoke handlers and so never
+        // appear in the invoke registry. The registry flag is derived from the
+        // same set, so invoke results are identical.
+        return REMOTE_ACCESSIBLE_CHANNELS.has(channel)
       },
       sendChannel(channel: string, payload: unknown): void {
         const handler = deps?.bridge?.sendRegistry.get(channel)

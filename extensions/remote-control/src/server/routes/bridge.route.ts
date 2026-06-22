@@ -57,11 +57,16 @@ export async function registerBridgeRoute(
       }
 
       if (msg.type === 'subscribe' && msg.channel) {
+        // Default-deny: only allowlisted event channels may be subscribed to,
+        // so a bridge client cannot eavesdrop on arbitrary main-process events.
+        if (!isRemoteAccessible(msg.channel)) return
         subscribe(msg.channel)
         return
       }
 
       if (msg.type === 'send' && msg.channel) {
+        // Default-deny: only allowlisted fire-and-forget channels may be driven.
+        if (!isRemoteAccessible(msg.channel)) return
         sendChannel(msg.channel, (msg.args?.[0] ?? {}) as unknown)
         return
       }
