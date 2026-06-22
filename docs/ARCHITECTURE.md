@@ -1,6 +1,6 @@
 # Architecture: Terminator
 
-**Version**: 0.1.64 | **Updated**: 2026-06-21 | **Electron**: 42.4.1 (upgraded from 30.4.0 via node-pty 1.2.x NAPI migration — ADR-021 resolved)
+**Version**: 0.1.68 | **Updated**: 2026-06-22 | **Electron**: 42.4.1 (upgraded from 30.4.0 via node-pty 1.2.x NAPI migration — ADR-021 resolved)
 
 ---
 
@@ -315,13 +315,14 @@ Remote Control Extension (extensions/remote-control/)
 
 **Security constraints**:
 
-- Server binds to `0.0.0.0` so phones/tablets on the same LAN can connect directly; remote (off-LAN) access is via ngrok. Security relies on auth, the `Host`-header check, and tickets rather than the bind address.
+- Server binds to `0.0.0.0` so phones/tablets on the same LAN can connect directly; remote (off-LAN) access is via ngrok. Security relies on auth, the `Host`-header check, per-IP rate limiting, and tickets rather than the bind address. See [ADR-017](adr/017-embedded-http-remote-server.md) § Threat Model & Accepted Risk.
 - All routes (except `/health`) require `Authorization: Bearer <password>` validated with `bcryptjs.compare()` (async, work factor 10).
-- `Host` header is checked against `localhost`, `127.0.0.1`, and the ngrok domain.
+- Failed password attempts are rate-limited per client IP (`auth-rate-limiter.ts`): after 10 failures within 15 minutes the client is locked out (`429`) until the window drains. This is what makes a single shared password tolerable on a `0.0.0.0`-bound listener.
+- `Host` header is checked against `localhost`, `127.0.0.1`, RFC-1918 private ranges, and the ngrok domain.
 - WebSocket upgrade requires a single-use ticket issued by `POST /api/terminals/:id/ws-ticket`; ticket is consumed on first use and expires after 30 s.
 - Input is accepted from the primary subscriber only (first WS client to connect to a session).
 - `/app/*` and `/mobile/*` static assets are each gated behind a dedicated HttpOnly SameSite=Strict cookie (`app-session` / `mobile-session`, 8h TTL) issued when a valid one-time ticket (`POST /api/app-ticket` / `POST /api/mobile-ticket`) is consumed at `GET /app/` / `GET /mobile/`. Requests to those paths without a valid cookie receive `403 FORBIDDEN`. Session tokens carry an expiry and are purged hourly.
-- The IPC bridge (`GET /api/bridge`) requires a single-use bridge ticket and lets the browser invoke/send/subscribe to IPC channels on behalf of the browser-side SPA. `invoke` requests are rejected unless the target channel was registered as remote-accessible (checked via `api.ipc.isRemoteAccessible`).
+- The IPC bridge (`GET /api/bridge`) requires a single-use bridge ticket and lets the browser invoke/send/subscribe to IPC channels on behalf of the browser-side SPA. The bridge is **default-deny across all three message types** (`invoke`, `send`, `subscribe`): a message is rejected unless its channel is in the central allowlist `src/main/remote/remote-accessible-channels.ts` (surfaced to the extension via `api.ipc.isRemoteAccessible`). That file is the single auditable definition of the remote attack surface, and `remote-accessible-channels.spec.ts` asserts it stays in sync with the channels the `/app/` shim actually uses — so the enforcement and the allowlist can never half-ship independently (the prior `/app/` outage).
 
 **Browser login SPA + mobile client** (`src/renderer-remote/`): A separate Vite build (`npm run build:remote`) produces `out/renderer-remote/` which Fastify serves at `/`. After password authentication the login page either calls `POST /api/app-ticket` and redirects to `/app/?t=<ticket>` to load the full Electron renderer bundle, or calls `POST /api/mobile-ticket` and redirects to `/mobile/?t=<ticket>` to load the touch-optimised mobile client (`mobile.html` from the same renderer-remote output directory).
 
@@ -338,6 +339,7 @@ See [ADR-017](adr/017-embedded-http-remote-server.md) for the architectural deci
 - All user input that crosses the IPC boundary is Zod-validated before use.
 - Extensions are loaded via `require()` in the main process — they run with full Node.js privileges. Phase 1 does not sandbox extensions. This is a known limitation documented for Phase 2 consideration (see ADR-002).
 - Reserved keyboard shortcuts are enforced in both preload.ts (renderer guard) and the extension API (main process throw).
+- The remote-control bridge is default-deny: only channels in `src/main/remote/remote-accessible-channels.ts` are reachable from any browser client. Internal channels (`dialog:*`, `remote:*` server controls, `db:health`, all extension-registered handlers) are unreachable remotely by default.
 
 ---
 
