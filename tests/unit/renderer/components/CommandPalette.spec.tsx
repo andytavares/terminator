@@ -158,4 +158,29 @@ describe('CommandPalette', () => {
     await waitFor(() => screen.getByPlaceholderText('Type a command…'))
     expect(screen.getAllByText('App').length).toBeGreaterThan(0)
   })
+
+  it('exposes an accessible combobox/listbox structure', async () => {
+    render(<CommandPalette commands={sampleCommands} onClose={vi.fn()} />)
+    await waitFor(() => screen.getByPlaceholderText('Type a command…'))
+
+    expect(screen.getByRole('dialog', { name: /command palette/i })).toBeTruthy()
+    const input = screen.getByRole('combobox')
+    expect(input.getAttribute('aria-controls')).toBe('cmd-palette-list')
+    expect(input.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('listbox', { name: /commands/i })).toBeTruthy()
+    expect(screen.getAllByRole('option').length).toBeGreaterThan(0)
+  })
+
+  it('moves aria-activedescendant to the focused option as the user arrows down', async () => {
+    render(<CommandPalette commands={sampleCommands} onClose={vi.fn()} />)
+    await waitFor(() => screen.getByPlaceholderText('Type a command…'))
+    const input = screen.getByRole('combobox')
+    expect(input.getAttribute('aria-activedescendant')).toBe('cmd-palette-option-0')
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(input.getAttribute('aria-activedescendant')).toBe('cmd-palette-option-1')
+    const selected = screen
+      .getAllByRole('option')
+      .filter((o) => o.getAttribute('aria-selected') === 'true')
+    expect(selected.length).toBe(1)
+  })
 })

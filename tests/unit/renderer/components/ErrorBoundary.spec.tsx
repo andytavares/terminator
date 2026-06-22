@@ -79,4 +79,21 @@ describe('ErrorBoundary', () => {
     // (they'll throw again, but the boundary resets its state)
     expect(btn).toBeTruthy()
   })
+
+  it('uses theme tokens for ALL fallback colors — no hardcoded hex anywhere (light-mode safe)', () => {
+    const { container } = render(
+      <ErrorBoundary>
+        <ThrowingChild shouldThrow={true} />
+      </ErrorBoundary>
+    )
+    // Scan every element in the fallback subtree, not just the root container —
+    // the message text and recovery button previously kept hardcoded hex that
+    // rendered as dark-theme colors under [data-theme="light"].
+    const all = container.querySelectorAll<HTMLElement>('*')
+    expect(all.length).toBeGreaterThan(0)
+    for (const el of all) {
+      const style = el.getAttribute('style') ?? ''
+      expect(style).not.toMatch(/#[0-9a-fA-F]{3,6}\b/)
+    }
+  })
 })

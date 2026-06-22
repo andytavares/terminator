@@ -118,9 +118,17 @@ export function CommandPalette({ commands, onClose }: Props): JSX.Element {
 
   return (
     <div className="cmd-palette-overlay" onMouseDown={onClose}>
-      <div className="cmd-palette" onMouseDown={(e) => e.stopPropagation()}>
+      <div
+        className="cmd-palette"
+        onMouseDown={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
+      >
         <div className="cmd-palette__input-wrap">
-          <span className="cmd-palette__search-icon">⌕</span>
+          <span className="cmd-palette__search-icon" aria-hidden="true">
+            ⌕
+          </span>
           <input
             ref={inputRef}
             className="cmd-palette__input"
@@ -129,15 +137,32 @@ export function CommandPalette({ commands, onClose }: Props): JSX.Element {
             onChange={(e) => setQuery(e.target.value)}
             autoComplete="off"
             spellCheck={false}
+            role="combobox"
+            aria-label="Type a command"
+            aria-expanded={filtered.length > 0}
+            aria-controls="cmd-palette-list"
+            aria-autocomplete="list"
+            aria-activedescendant={
+              filtered.length > 0 ? `cmd-palette-option-${activeIndex}` : undefined
+            }
           />
           <kbd className="cmd-palette__esc-hint">esc</kbd>
         </div>
 
         {filtered.length > 0 ? (
-          <ul ref={listRef} className="cmd-palette__list">
+          <ul
+            ref={listRef}
+            className="cmd-palette__list"
+            id="cmd-palette-list"
+            role="listbox"
+            aria-label="Commands"
+          >
             {filtered.map((item, i) => (
               <li
                 key={item.id}
+                id={`cmd-palette-option-${i}`}
+                role="option"
+                aria-selected={i === activeIndex}
                 className={`cmd-palette__item${i === activeIndex ? ' cmd-palette__item--active' : ''}`}
                 onMouseEnter={() => setActiveIndex(i)}
                 onMouseDown={(e) => {
