@@ -188,6 +188,9 @@ interface ElectronAPI {
       sessionIds: string[]
     ): Promise<{ data: Array<{ sessionId: string; pid: number }> } | { error: string }>
   }
+  db: {
+    health(): Promise<{ ok: boolean; message?: string }>
+  }
   logger: {
     write(level: string, namespace: string, message: string): void
   }

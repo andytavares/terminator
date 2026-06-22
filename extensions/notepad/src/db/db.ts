@@ -60,20 +60,27 @@ export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_comments_note ON comments(note_id, status);
 
     CREATE TABLE IF NOT EXISTS settings (
-      key   TEXT PRIMARY KEY,
-      value TEXT NOT NULL
+      extension_id TEXT NOT NULL DEFAULT 'notepad',
+      key          TEXT NOT NULL,
+      value        TEXT NOT NULL,
+      PRIMARY KEY (extension_id, key)
     );
 
     CREATE TABLE IF NOT EXISTS diagrams (
       id          TEXT PRIMARY KEY,
       title       TEXT NOT NULL DEFAULT 'Untitled diagram',
-      tags        TEXT NOT NULL DEFAULT '[]',
       scene_json  TEXT NOT NULL DEFAULT '{}',
       created_at  TEXT NOT NULL,
       updated_at  TEXT NOT NULL,
       archived_at TEXT,
       sort_order  REAL NOT NULL DEFAULT 0,
       folder_id   TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS diagram_tags (
+      diagram_id TEXT NOT NULL REFERENCES diagrams(id) ON DELETE CASCADE,
+      tag        TEXT NOT NULL,
+      PRIMARY KEY (diagram_id, tag)
     );
 
     CREATE TABLE IF NOT EXISTS diagram_comments (
@@ -118,5 +125,44 @@ export async function applyNotepadMigrations(db: ExtensionDB): Promise<void> {
   const hasFolderIdDiagrams = await hasColumn(db, 'diagrams', 'folder_id')
   if (!hasFolderIdDiagrams) {
     await db.exec(`ALTER TABLE diagrams ADD COLUMN folder_id TEXT`)
+  }
+  if (!(await hasColumn(db, 'settings', 'extension_id'))) {
+    await db.exec(`
+      CREATE TABLE settings_new (
+        extension_id TEXT NOT NULL DEFAULT 'notepad',
+        key          TEXT NOT NULL,
+        value        TEXT NOT NULL,
+        PRIMARY KEY (extension_id, key)
+      );
+      INSERT INTO settings_new (extension_id, key, value)
+        SELECT 'notepad', key, value FROM settings;
+      DROP TABLE settings;
+      ALTER TABLE settings_new RENAME TO settings;
+    `)
+  }
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS diagram_tags (
+      diagram_id TEXT NOT NULL REFERENCES diagrams(id) ON DELETE CASCADE,
+      tag        TEXT NOT NULL,
+      PRIMARY KEY (diagram_id, tag)
+    )
+  `)
+  if (await hasColumn(db, 'diagrams', 'tags')) {
+    const rows = await db.query<{ id: string; tags: string }>(`SELECT id, tags FROM diagrams`)
+    for (const row of rows) {
+      let parsed: string[] = []
+      try {
+        parsed = JSON.parse(row.tags ?? '[]') as string[]
+      } catch {
+        parsed = []
+      }
+      for (const tag of parsed) {
+        await db.run(
+          `INSERT INTO diagram_tags (diagram_id, tag) VALUES (?, ?) ON CONFLICT DO NOTHING`,
+          [row.id, tag]
+        )
+      }
+    }
+    await db.exec(`ALTER TABLE diagrams DROP COLUMN tags`)
   }
 }

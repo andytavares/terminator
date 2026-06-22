@@ -4,7 +4,7 @@
   "private": true,
   "description": "SpecKit Pilot — Spec-Kit lifecycle orchestration with human-in-the-loop gates",
   "dependencies": {
-    "diff": "5.2.0",
-    "minimatch": "9.0.5"
+    "diff": "5.2.2",
+    "minimatch": "9.0.9"
   }
 }

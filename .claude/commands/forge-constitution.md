@@ -5,7 +5,6 @@ description: Create or update the project constitution — the soul file that en
 1. Check whether `.forge/constitution.md` exists in the repo root.
 
 2. If it **does not exist** — enter the interactive authoring flow:
-
    - Run the `researcher` subagent to scan the repo for signals (README, CLAUDE.md, any ADRs in `docs/`, CONTRIBUTING.md, `.forge/` feature history). Extract implicit principles and draft all six H2 sections.
    - Present each section to the user one at a time in this order: Purpose → Non-negotiables → Architectural principles → Risk posture → Team conventions → Out of scope.
    - For each section show the drafted content and ask: **Accept, Edit, or Skip?**

@@ -40,7 +40,6 @@ Semgrep uses the same `$VAR` / `$...VAR` metavariable syntax.
 ## Output format
 
 For each match, return:
-
 ```
 file:line  — <one-line description of what matched>
 ```
@@ -50,12 +49,10 @@ Group by file. After listing matches, add a one-sentence summary: total match co
 ## When called from find-reuse
 
 The find-reuse skill passes:
-
 - The verb-noun term it already searched with ripgrep
 - The list of file paths ripgrep returned (to avoid re-reporting identical matches)
 
 This skill should:
-
 1. Translate the verb-noun term into 1–2 structural patterns for the primary languages in `stack.json`.
 2. Run ast-grep for each pattern.
 3. Return only matches NOT already in the ripgrep result set (deduplication by `file:line`).

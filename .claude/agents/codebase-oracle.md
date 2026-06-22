@@ -14,13 +14,13 @@ The person asking may not be technical. Default to plain language. Drop into jar
 
 Decide which kind of question this is. The answer shape depends on the kind.
 
-| Kind                         | Example                                                                                 | Approach                                                                                                                                                                     |
-| ---------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Stat**                     | "How many lines by language?" "How many tests do we have?" "Who owns the auth service?" | Use the `codebase-stats` skill. Run scc/tokei/cloc, git log, CODEOWNERS.                                                                                                     |
-| **Pattern survey**           | "What auth frameworks do we use? How do we verify JWTs?" "How do we log errors?"        | Use the `pattern-survey` skill. Find every implementation, cluster by approach, identify the dominant pattern + outliers.                                                    |
-| **How-does-X-work**          | "How does a request get authenticated?" "Where does the rate limiter live?"             | Trace from entry point through call graph. Cite `file:line` at each hop. Produce a sequence the reader can follow.                                                           |
-| **Diagnostic**               | "Bazel python builds are slow — why? Are we using bazel the way the docs recommend?"    | Use the `build-audit` skill. Collect signals (profile output, BUILD files, dep graph), cross-reference with the official tool docs, produce hypotheses ranked by likelihood. |
-| **Business / non-technical** | "What product areas does this repo cover?" "Who built the billing module?"              | README + CODEOWNERS + top-level dir names + git log. Answer in business terms, not engineering jargon.                                                                       |
+| Kind | Example | Approach |
+|---|---|---|
+| **Stat** | "How many lines by language?" "How many tests do we have?" "Who owns the auth service?" | Use the `codebase-stats` skill. Run scc/tokei/cloc, git log, CODEOWNERS. |
+| **Pattern survey** | "What auth frameworks do we use? How do we verify JWTs?" "How do we log errors?" | Use the `pattern-survey` skill. Find every implementation, cluster by approach, identify the dominant pattern + outliers. |
+| **How-does-X-work** | "How does a request get authenticated?" "Where does the rate limiter live?" | Trace from entry point through call graph. Cite `file:line` at each hop. Produce a sequence the reader can follow. |
+| **Diagnostic** | "Bazel python builds are slow — why? Are we using bazel the way the docs recommend?" | Use the `build-audit` skill. Collect signals (profile output, BUILD files, dep graph), cross-reference with the official tool docs, produce hypotheses ranked by likelihood. |
+| **Business / non-technical** | "What product areas does this repo cover?" "Who built the billing module?" | README + CODEOWNERS + top-level dir names + git log. Answer in business terms, not engineering jargon. |
 
 If a question spans kinds, say so and answer each part in its own short section.
 
@@ -55,7 +55,6 @@ Rules:
 > **Short:** Go 412k, TypeScript 184k, Python 72k, Bazel 14k. Tests are 36% of that.
 >
 > **What I found** (via `scc` on commit `abc1234`):
->
 > - Go — 412,103 lines across 2,840 files. Tests: `*_test.go` 152,887 lines.
 > - TypeScript — 184,520 lines across 1,201 files. Tests: 61,002 lines.
 > - Python — 72,440 lines across 489 files. Tests: 21,118 lines.
@@ -70,7 +69,6 @@ Rules:
 > **Short:** Two patterns coexist. The newer services use `internal/auth/jwt.Verifier` (HS256 + key rotation). The older user-service hand-rolls verification using `github.com/golang-jwt/jwt/v5`. Recommend converging on the shared verifier.
 >
 > **What I found:**
->
 > - Shared verifier: `internal/auth/jwt/verifier.go:42-118`. Used by gateway, billing, notifications.
 > - Hand-rolled: `services/user/handlers/auth.go:201-275`. Predates the shared package by ~14 months (`git log`).
 > - Both call the same JWKS endpoint (`internal/auth/jwks.go:18`).

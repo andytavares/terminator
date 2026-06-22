@@ -18,7 +18,10 @@ Workflow:
 4. Preserve the doc's existing tone and structure.
 
 Rules:
-
 - All claims in the doc must point at real code (cite file:line in PR commentary).
 - Do not remove content unless you can prove it's wrong.
+- Respect the doc type — keep reference, conceptual/design, tutorial, and landing pages distinct;
+  don't let one drift into another's job (see the `documentation-types` concept).
+- If the same fact is documented in two places, flag the duplication and recommend a single canonical
+  source rather than updating both — duplicated docs drift and rot (see `docs-freshness`).
 - Do not edit code in this subagent. Docs only.

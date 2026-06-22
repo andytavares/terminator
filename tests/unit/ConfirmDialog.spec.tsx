@@ -58,4 +58,24 @@ describe('ConfirmDialog', () => {
     const cancelBtn = screen.getByRole('button', { name: /cancel/i })
     expect(document.activeElement).toBe(cancelBtn)
   })
+
+  it('dialog root has aria-labelledby pointing to title element', () => {
+    const { container } = render(<ConfirmDialog {...baseProps} />)
+    const dialog = container.querySelector('[role="dialog"]')
+    expect(dialog?.getAttribute('aria-labelledby')).toBe('confirm-dialog-title')
+  })
+
+  it('title element has id="confirm-dialog-title"', () => {
+    const { container } = render(<ConfirmDialog {...baseProps} />)
+    expect(container.querySelector('#confirm-dialog-title')).toBeTruthy()
+  })
+
+  it('description paragraph uses CSS class instead of inline styles', () => {
+    const { container } = render(
+      <ConfirmDialog {...baseProps} description="This will delete all 4 projects." />
+    )
+    const desc = container.querySelector('.dialog__description')
+    expect(desc).toBeTruthy()
+    expect(desc?.getAttribute('style')).toBeFalsy()
+  })
 })

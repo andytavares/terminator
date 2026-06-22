@@ -2,7 +2,7 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/011-remote-control-mobile/plan.md`
+`specs/012-deep-audit-remediation/plan.md`
 
 <!-- SPECKIT END -->
 

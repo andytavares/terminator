@@ -4,13 +4,16 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { AboutDialog } from '../../../../src/renderer/components/AboutDialog'
 
 const mockGetInfo = vi.fn()
+const mockDbHealth = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
   window.electronAPI = {
     app: { getInfo: mockGetInfo },
+    db: { health: mockDbHealth },
   } as unknown as typeof window.electronAPI
 
+  mockDbHealth.mockResolvedValue({ ok: true })
   mockGetInfo.mockResolvedValue({
     appName: 'Terminator',
     version: '1.2.3',

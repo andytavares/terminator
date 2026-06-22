@@ -189,6 +189,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('notifications:push', listener)
     },
   },
+  db: {
+    health: () => ipcRenderer.invoke('db:health'),
+  },
   metrics: {
     getSystem: () => ipcRenderer.invoke('metrics:system'),
     getProcesses: (pids: number[]) => ipcRenderer.invoke('metrics:processes', { pids }),

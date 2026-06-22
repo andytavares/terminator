@@ -126,7 +126,7 @@ export interface PtyManagerAPI {
 }
 
 export interface BridgeDeps {
-  invokeRegistry: Map<string, (event: never, payload: unknown) => unknown>
+  invokeRegistry: Map<string, import('../remote/ipc-registry.js').IpcRegistryEntry>
   sendRegistry: Map<string, (event: never, payload: unknown) => void>
   eventBus: import('events').EventEmitter
 }
@@ -205,6 +205,7 @@ export interface ExtensionAPI {
     invokeChannel(channel: string, payload: unknown): Promise<unknown>
     sendChannel(channel: string, payload: unknown): void
     onWindowEvent(channel: string, handler: (...args: unknown[]) => void): () => void
+    isRemoteAccessible(channel: string): boolean
   }
   terminal: {
     onSessionCreate(handler: (session: Readonly<SessionSnapshot>) => void): Disposable
@@ -525,9 +526,12 @@ export function createExtensionAPI(
         return disposable(() => ipcMain.removeHandler(channel))
       },
       async invokeChannel(channel: string, payload: unknown): Promise<unknown> {
-        const handler = deps?.bridge?.invokeRegistry.get(channel)
-        if (!handler) return undefined
-        return handler(null as never, payload)
+        const entry = deps?.bridge?.invokeRegistry.get(channel)
+        if (!entry) return undefined
+        return entry.handler(null as never, payload)
+      },
+      isRemoteAccessible(channel: string): boolean {
+        return deps?.bridge?.invokeRegistry.get(channel)?.remoteAccessible ?? false
       },
       sendChannel(channel: string, payload: unknown): void {
         const handler = deps?.bridge?.sendRegistry.get(channel)

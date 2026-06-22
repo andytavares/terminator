@@ -4,11 +4,11 @@ Pattern examples for `ast-grep` (and `semgrep` which uses the same metavariable 
 
 ## Metavariables
 
-| Syntax | Matches                                                  |
-| ------ | -------------------------------------------------------- |
+| Syntax | Matches |
+|---|---|
 | `$VAR` | Any single AST node (expression, identifier, type, etc.) |
-| `$$$`  | Any sequence of nodes (zero or more)                     |
-| `$_`   | Any single node, unnamed (throwaway)                     |
+| `$$$` | Any sequence of nodes (zero or more) |
+| `$_` | Any single node, unnamed (throwaway) |
 
 ---
 
@@ -119,13 +119,13 @@ defer $FUNC($$$)
 
 ## Translating find-reuse terms to patterns
 
-| Search term      | Language | Pattern                               |
-| ---------------- | -------- | ------------------------------------- |
-| `parse url`      | js/ts    | `$_.parse($URL)` or `new URL($URL)`   |
-| `format date`    | js/ts    | `$_.format($DATE, $$$)`               |
-| `retry request`  | go       | `for $$${ $$$http.$METHOD($$$) }`     |
-| `validate email` | python   | `re.match($$$, $EMAIL)`               |
-| `open file`      | go       | `os.Open($PATH)`                      |
-| `read json`      | python   | `json.load($$$)` or `json.loads($$$)` |
+| Search term | Language | Pattern |
+|---|---|---|
+| `parse url` | js/ts | `$_.parse($URL)` or `new URL($URL)` |
+| `format date` | js/ts | `$_.format($DATE, $$$)` |
+| `retry request` | go | `for $$${ $$$http.$METHOD($$$) }` |
+| `validate email` | python | `re.match($$$, $EMAIL)` |
+| `open file` | go | `os.Open($PATH)` |
+| `read json` | python | `json.load($$$)` or `json.loads($$$)` |
 
 When in doubt, start with a broad `$FUNC($$$)` pattern and narrow from there.

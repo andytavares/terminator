@@ -170,6 +170,10 @@ export async function activate(api: ExtensionAPI): Promise<void> {
 let reviewNudgeInterval: ReturnType<typeof setInterval> | null = null
 
 function scheduleWeeklyReviewNudge(api: ExtensionAPI, reviewDay: number): void {
+  if (reviewNudgeInterval !== null) {
+    clearInterval(reviewNudgeInterval)
+    reviewNudgeInterval = null
+  }
   function checkAndNudge() {
     const now = new Date()
     if (now.getDay() !== reviewDay) return

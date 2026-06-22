@@ -95,6 +95,7 @@ export function activate(api: ExtensionAPI): void {
           invokeChannel: (ch, payload) => api.ipc.invokeChannel(ch, payload),
           sendChannel: (ch, payload) => api.ipc.sendChannel(ch, payload),
           onWindowEvent: (ch, handler) => api.ipc.onWindowEvent(ch, handler),
+          isRemoteAccessible: (ch) => api.ipc.isRemoteAccessible(ch),
           onPortInUse: (p) =>
             api.window.broadcast('remote:status', {
               error: 'PORT_IN_USE',

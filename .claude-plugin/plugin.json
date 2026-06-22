@@ -1,7 +1,7 @@
 {
   "name": "forge",
   "version": "0.1.0",
-  "description": "Forge — a cookiecutter Claude Code harness for large multi-language codebases. Includes TDD enforcement, canonical-source guarding, find-reuse checks, and doc-sync subagents.",
+  "description": "Forge — a cookiecutter Claude Code harness for large multi-language codebases. Includes TDD enforcement, canonical-source guarding, find-reuse checks, doc-sync subagents, and a Software-Engineering-at-Google discipline layer: large-scale-change and deprecation planning, change-impact analysis, test-quality review, trade-off decision records, and blameless postmortems.",
   "author": "your-org",
   "license": "MIT"
 }

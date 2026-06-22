@@ -2,10 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Terminal } from 'xterm'
 import { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
 
-const mockResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  disconnect: vi.fn(),
-}))
+const mockResizeObserver = vi.fn().mockImplementation(function () {
+  return {
+    observe: vi.fn(),
+    disconnect: vi.fn(),
+  }
+})
 vi.stubGlobal('ResizeObserver', mockResizeObserver)
 
 // Mock xterm and its addons
@@ -39,30 +41,35 @@ function makeMockBuffer(
 }
 
 vi.mock('xterm', () => {
-  const Terminal = vi.fn().mockImplementation(() => ({
-    loadAddon: vi.fn(),
-    attachCustomKeyEventHandler: vi.fn(),
-    onData: vi.fn(),
-    onResize: vi.fn(),
-    onBell: vi.fn(),
-    onScroll: vi.fn(),
-    scrollToLine: vi.fn(),
-    open: vi.fn(),
-    focus: vi.fn(),
-    write: vi.fn(),
-    paste: vi.fn(),
-    dispose: vi.fn(),
-    scrollToBottom: vi.fn(),
-    registerLinkProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    buffer: makeMockBuffer(24, 80),
-  }))
+  const Terminal = vi.fn().mockImplementation(function () {
+    return {
+      loadAddon: vi.fn(),
+      attachCustomKeyEventHandler: vi.fn(),
+      onData: vi.fn(),
+      onResize: vi.fn(),
+      onBell: vi.fn(),
+      onScroll: vi.fn(),
+      scrollToLine: vi.fn(),
+      open: vi.fn(),
+      focus: vi.fn(),
+      write: vi.fn(),
+      paste: vi.fn(),
+      dispose: vi.fn(),
+      scrollToBottom: vi.fn(),
+      registerLinkProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      buffer: makeMockBuffer(24, 80),
+      options: { theme: null as unknown },
+    }
+  })
   return { Terminal }
 })
 
 vi.mock('xterm-addon-fit', () => {
-  const FitAddon = vi.fn().mockImplementation(() => ({
-    fit: vi.fn(),
-  }))
+  const FitAddon = vi.fn().mockImplementation(function () {
+    return {
+      fit: vi.fn(),
+    }
+  })
   return { FitAddon }
 })
 
@@ -779,6 +786,64 @@ describe('TerminalInstance', () => {
         fire(instance.element, 'mousedown', { metaKey: true, clientX: 8, clientY: 0 })
         expect(mockOpenExternal).not.toHaveBeenCalled()
       })
+    })
+  })
+
+  describe('xterm theming', () => {
+    let observerCallback: MutationCallback
+    let mockObserve: ReturnType<typeof vi.fn>
+    let mockDisconnect: ReturnType<typeof vi.fn>
+
+    beforeEach(() => {
+      mockObserve = vi.fn()
+      mockDisconnect = vi.fn()
+      vi.stubGlobal(
+        'MutationObserver',
+        vi.fn().mockImplementation(function (cb: MutationCallback) {
+          observerCallback = cb
+          return { observe: mockObserve, disconnect: mockDisconnect }
+        })
+      )
+      document.documentElement.removeAttribute('data-theme')
+    })
+
+    it('sets dark theme on construction when data-theme is absent', () => {
+      new TerminalInstance('ses-theme', 1000)
+      const terminal = vi.mocked(Terminal).mock.results.at(-1)!.value
+      expect(terminal.options.theme).toMatchObject({ background: expect.any(String) })
+    })
+
+    it('sets light theme on construction when data-theme="light"', () => {
+      document.documentElement.dataset.theme = 'light'
+      new TerminalInstance('ses-theme-light', 1000)
+      const terminal = vi.mocked(Terminal).mock.results.at(-1)!.value
+      const darkTheme = { background: '#1e1e1e' }
+      expect(terminal.options.theme).not.toMatchObject(darkTheme)
+    })
+
+    it('updates terminal theme when MutationObserver fires a data-theme change', () => {
+      new TerminalInstance('ses-obs', 1000)
+      const terminal = vi.mocked(Terminal).mock.results.at(-1)!.value
+      const initialTheme = terminal.options.theme
+
+      document.documentElement.dataset.theme = 'light'
+      observerCallback([], {} as MutationObserver)
+
+      expect(terminal.options.theme).not.toBe(initialTheme)
+    })
+
+    it('attaches MutationObserver on document.documentElement', () => {
+      new TerminalInstance('ses-obs2', 1000)
+      expect(mockObserve).toHaveBeenCalledWith(
+        document.documentElement,
+        expect.objectContaining({ attributes: true, attributeFilter: ['data-theme'] })
+      )
+    })
+
+    it('disconnects MutationObserver on dispose', () => {
+      const instance = new TerminalInstance('ses-obs3', 1000)
+      instance.dispose()
+      expect(mockDisconnect).toHaveBeenCalled()
     })
   })
 })

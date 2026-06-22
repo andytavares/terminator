@@ -33,6 +33,7 @@
       "Bash(curl *)",
       "Bash(wget *)",
       "Bash(rm -rf *)",
+      "Bash(git push:*)",
       "Bash(git reset --hard *)",
       "Bash(npm publish:*)",
       "Bash(pip install *)",
@@ -42,40 +43,35 @@
       "Read(./**/*.pem)",
       "Read(./**/id_rsa)"
     ],
-    "ask": ["Bash(git commit:*)", "Bash(git checkout:*)", "Bash(git branch:*)"]
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(git branch:*)"
+    ]
   },
   "hooks": {
     "SessionStart": [
-      { "hooks": [{ "type": "command", "command": ".claude/hooks/session-start.sh" }] }
+      { "hooks": [ { "type": "command", "command": ".claude/hooks/session-start.sh" } ] }
     ],
     "UserPromptSubmit": [
-      {
-        "hooks": [
-          { "type": "command", "command": ".claude/hooks/prompt-augment.sh" },
-          { "type": "command", "command": ".claude/hooks/speckit-context-inject.sh" }
-        ]
-      }
+      { "hooks": [
+        { "type": "command", "command": ".claude/hooks/prompt-augment.sh" },
+        { "type": "command", "command": ".claude/hooks/prompt-change-mgmt.sh" },
+        { "type": "command", "command": ".claude/hooks/speckit-context-inject.sh" }
+      ]}
     ],
     "PreToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [{ "type": "command", "command": ".claude/hooks/pre-edit-guard.sh" }]
-      }
-    ],
-    "Stop": [
-      { "hooks": [{ "type": "command", "command": ".claude/hooks/pre-stop.sh" }] }
+      { "matcher": "Edit|Write", "hooks": [ { "type": "command", "command": ".claude/hooks/pre-edit-guard.sh" } ] }
     ],
     "PostCompact": [
-      { "hooks": [{ "type": "command", "command": ".claude/hooks/post-compact.sh" }] }
+      { "hooks": [ { "type": "command", "command": ".claude/hooks/post-compact.sh" } ] }
     ],
     "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          { "type": "command", "command": ".claude/hooks/post-edit-format.sh" },
-          { "type": "command", "command": ".claude/hooks/post-edit-doc-mark.sh" }
-        ]
-      }
+      { "matcher": "Edit|Write", "hooks": [
+        { "type": "command", "command": ".claude/hooks/post-edit-format.sh" },
+        { "type": "command", "command": ".claude/hooks/post-edit-doc-mark.sh" },
+        { "type": "command", "command": ".claude/hooks/post-edit-test-smell.sh" }
+      ] }
     ]
   }
 }

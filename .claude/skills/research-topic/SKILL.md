@@ -14,7 +14,6 @@ Produce a structured research document on the given topic. Follow the five phase
 ## Phase 1 — Topic Intake
 
 Parse the input into:
-
 - **Primary question:** What is being investigated and why?
 - **Constraints:** Any stated preferences, existing dependencies, or non-negotiables from the user.
 - **Domain:** Infrastructure, library choice, architecture, developer workflow, etc.
@@ -33,7 +32,6 @@ Before touching the web, scan the repo for existing implementations or evidence 
 4. Call the `find-reuse` skill if the topic implies adding a new capability.
 
 Record every hit as `file:line`. The purpose is to establish:
-
 - What does the codebase already do in this space?
 - What constraints does it impose (languages, frameworks, patterns)?
 - Are there any half-finished attempts that provide context?
@@ -47,7 +45,6 @@ If nothing relevant is found, write "No existing codebase evidence" and continue
 Identify 2–4 concrete candidate options (e.g. different libraries, architectural patterns, or approaches).
 
 For each option:
-
 1. Use WebFetch to retrieve the official documentation from the vendor or governing standards body.
 2. Apply the `canonical-research` sourcing hierarchy: first-party docs win.
 3. If official docs do not cover a candidate, say so explicitly — do not silently fall back to a community source.
@@ -61,13 +58,13 @@ Aim for options that are genuinely distinct — not variants of the same approac
 
 For each option, assess:
 
-| Dimension                   | What to evaluate                                                                                 |
-| --------------------------- | ------------------------------------------------------------------------------------------------ |
-| **Feasibility**             | Can this work given the codebase's languages, dependencies, and conventions? Low / Medium / High |
-| **Complexity**              | Rough implementation effort. Low / Medium / High                                                 |
-| **Official-docs alignment** | Does the vendor recommend this approach for this use case?                                       |
-| **Codebase fit**            | Does it align with patterns found in Phase 2? yes / partial / no                                 |
-| **Key risk**                | Security, maintenance burden, lock-in, or breaking change                                        |
+| Dimension | What to evaluate |
+|---|---|
+| **Feasibility** | Can this work given the codebase's languages, dependencies, and conventions? Low / Medium / High |
+| **Complexity** | Rough implementation effort. Low / Medium / High |
+| **Official-docs alignment** | Does the vendor recommend this approach for this use case? |
+| **Codebase fit** | Does it align with patterns found in Phase 2? yes / partial / no |
+| **Key risk** | Security, maintenance burden, lock-in, or breaking change |
 
 ---
 
@@ -75,8 +72,13 @@ For each option, assess:
 
 Assemble the output using the schema in `references/research-doc-schema.md`.
 
-Rules:
+There are no best practices, only trade-offs (see the `always-be-deciding` and
+`software-engineering-vs-programming` concepts). Frame the recommendation accordingly: name the
+**time/scale horizon** the choice is for (a throwaway script and a 10-year load-bearing service are
+different decisions even with the same options) and whether it's a **one-way or two-way door**. If
+the resulting decision is hard to reverse, record it with the `trade-off-record` skill.
 
+Rules:
 - Every external claim: `Source: <Title> — <URL>` + `Quote: "<verbatim>"` on the next line.
 - Every codebase claim: `file:line` citation inline.
 - Recommendation section must name exactly one option and reference at least one finding from Phase 2.

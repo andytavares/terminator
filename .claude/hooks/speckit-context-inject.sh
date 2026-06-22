@@ -30,8 +30,8 @@ if [ -f "$DOC_INDEX" ]; then
   STALE_COUNT=$(jq '[.entries[] | select(.staleness_score > 0)] | length' "$DOC_INDEX" 2>/dev/null || echo 0)
 fi
 
-# Find latest research brief by mtime. Uses -exec ls -t {} + (POSIX, works on macOS BSD find too).
-LATEST_RESEARCH=$(find "$ROOT/.forge" -name "research.md" 2>/dev/null -exec ls -t {} + 2>/dev/null | head -1 || true)
+# Find latest research brief
+LATEST_RESEARCH=$(find "$ROOT/.forge" -name "research.md" 2>/dev/null | sort | tail -1 || true)
 RESEARCH_LINE=""
 if [ -n "$LATEST_RESEARCH" ]; then
   RESEARCH_LINE=" | Latest research: ${LATEST_RESEARCH#$ROOT/}"

@@ -34,13 +34,17 @@ export function ConfirmDialog({
 
   return (
     <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <div className="dialog__title">{title}</div>
-        {description && (
-          <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 20 }}>
-            {description}
-          </p>
-        )}
+      <div
+        className="dialog"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+      >
+        <div id="confirm-dialog-title" className="dialog__title">
+          {title}
+        </div>
+        {description && <p className="dialog__description">{description}</p>}
         <div className="dialog__actions">
           <button ref={cancelRef} className="dialog__btn-secondary" onClick={onClose}>
             Cancel

@@ -276,8 +276,8 @@ describe('exportNotes with includeDiagrams', () => {
       appState: { zoom: 1 },
     })
     await db.run(
-      'INSERT INTO diagrams (id, title, tags, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [diagramId, 'My Diagram', '[]', sceneJson, now, now]
+      'INSERT INTO diagrams (id, title, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+      [diagramId, 'My Diagram', sceneJson, now, now]
     )
 
     const result = await exportNotes(db, {

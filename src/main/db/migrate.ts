@@ -18,6 +18,14 @@ const NOTEPAD_TABLES = [
   'diagram_comments',
 ] as const
 
+const ALLOWED_TABLES = new Set<string>([...VAULT_TABLES, ...NOTEPAD_TABLES])
+
+export function assertTableAllowed(table: string): void {
+  if (!ALLOWED_TABLES.has(table)) {
+    throw new Error(`Migration: table "${table}" is not in the allowed list`)
+  }
+}
+
 export async function runLegacyMigration(userData: string, db: ExtensionDB): Promise<void> {
   await migrateFile(userData, 'vault.db', VAULT_TABLES, db)
   await migrateFile(userData, 'notepad.db', NOTEPAD_TABLES, db)
@@ -51,31 +59,36 @@ async function migrateFile(
 
     for (const table of tables) {
       try {
+        assertTableAllowed(table)
         // Get column list from old SQLite schema
-        const colRows = sqlite.exec(`PRAGMA table_info(${table})`)
+        const colRows = sqlite.exec(`PRAGMA table_info("${table}")`)
         if (!colRows.length || !colRows[0].values.length) continue
         const cols = colRows[0].values.map((r) => r[1] as string)
 
         // Read all rows
-        const rowResult = sqlite.exec(`SELECT * FROM ${table}`)
+        const rowResult = sqlite.exec(`SELECT * FROM "${table}"`)
         if (!rowResult.length) continue
         const rows = rowResult[0].values
 
         let imported = 0
-        for (const row of rows) {
-          const colList = cols.join(', ')
+        let skipped = 0
+        const total = rows.length
+        for (let rowIndex = 0; rowIndex < total; rowIndex++) {
+          const row = rows[rowIndex]
+          const colList = cols.map((c) => `"${c}"`).join(', ')
           const placeholders = cols.map(() => '?').join(', ')
           try {
             await db.run(
-              `INSERT INTO ${table} (${colList}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`,
+              `INSERT INTO "${table}" (${colList}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`,
               row as unknown[]
             )
             imported++
-          } catch {
-            // Skip rows that fail (schema mismatch, FK violations, etc.)
+          } catch (err) {
+            skipped++
+            log.warn(`Migration: skipped row ${rowIndex} of ${table}: ${String(err)}`)
           }
         }
-        log.info(`  ${table}: imported ${imported}/${rows.length} rows`)
+        log.info(`  ${table}: imported ${imported}/${total} rows; ${skipped} skipped`)
       } catch (err) {
         log.warn(`  ${table}: skipped — ${String(err)}`)
       }

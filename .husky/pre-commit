@@ -1,3 +1,2 @@
-npm rebuild better-sqlite3 --silent
 npx lint-staged
 node scripts/check-patch-coverage.cjs

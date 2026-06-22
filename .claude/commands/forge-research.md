@@ -7,14 +7,12 @@ Research topic: $ARGUMENTS
 1. Scan `.forge/` for existing `NNN-*` directories to determine the next counter. Slugify the first 4–5 words of `$ARGUMENTS` to form the folder name. Create `.forge/NNN-slug/` if it does not already exist. Write the verbatim topic text to `.forge/NNN-slug/topic.md`.
 
 2. Run the `researcher` subagent with the `research-topic` skill for: $ARGUMENTS
-
    - The subagent will scan the codebase, fetch official documentation for 2–4 candidate options, analyse each, and assemble a structured `research.md` using the schema in `.claude/skills/research-topic/references/research-doc-schema.md`.
    - All external claims must follow the `canonical-research` protocol (official docs first, `Source:` + `Quote:` citations required).
 
 3. Write the subagent's output to `.forge/NNN-slug/research.md`.
 
 4. Present the completed document via AskUserQuestion:
-
    - "Accept — research.md is saved. Next step: /forge-tasks NNN to convert to a task list."
    - "Regenerate — Discards this document and re-runs the researcher from scratch."
    - "Extend with more sources — Re-runs Phase 3–5 of the researcher with additional topics or source domains you specify."

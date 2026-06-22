@@ -16,7 +16,9 @@ const mockBWInstance = vi.hoisted(() => ({
 
 vi.mock('electron', () => ({
   BrowserWindow: Object.assign(
-    vi.fn(() => mockBWInstance),
+    vi.fn(function () {
+      return mockBWInstance
+    }),
     {
       getAllWindows: vi.fn(() => [mockWindow]),
     }
@@ -26,7 +28,9 @@ vi.mock('electron', () => ({
     buildFromTemplate: vi.fn((t) => t),
     setApplicationMenu: vi.fn(),
   },
-  MenuItem: vi.fn().mockImplementation((opts) => opts),
+  MenuItem: vi.fn().mockImplementation(function (opts) {
+    return opts
+  }),
   globalShortcut: {
     register: vi.fn((accel: string, handler: () => void) => {
       registeredGlobalShortcuts.set(accel, handler)
@@ -292,7 +296,7 @@ describe('api.ipc bridge channels', () => {
   it('invokeChannel calls the registered handler and returns its result', async () => {
     const handler = vi.fn().mockResolvedValue('result')
     const bridge = {
-      invokeRegistry: new Map<string, (e: never, p: unknown) => unknown>([['my:channel', handler]]),
+      invokeRegistry: new Map([['my:channel', { handler, remoteAccessible: false }]]),
       sendRegistry: new Map<string, (e: never, p: unknown) => void>(),
       eventBus: new EventEmitter(),
     }
@@ -304,7 +308,7 @@ describe('api.ipc bridge channels', () => {
 
   it('invokeChannel returns undefined when channel is not registered', async () => {
     const bridge = {
-      invokeRegistry: new Map<string, (e: never, p: unknown) => unknown>(),
+      invokeRegistry: new Map(),
       sendRegistry: new Map<string, (e: never, p: unknown) => void>(),
       eventBus: new EventEmitter(),
     }
@@ -316,7 +320,7 @@ describe('api.ipc bridge channels', () => {
   it('sendChannel calls the registered handler', () => {
     const handler = vi.fn()
     const bridge = {
-      invokeRegistry: new Map<string, (e: never, p: unknown) => unknown>(),
+      invokeRegistry: new Map(),
       sendRegistry: new Map<string, (e: never, p: unknown) => void>([['my:send', handler]]),
       eventBus: new EventEmitter(),
     }
@@ -327,7 +331,7 @@ describe('api.ipc bridge channels', () => {
 
   it('sendChannel is a no-op when channel is not registered', () => {
     const bridge = {
-      invokeRegistry: new Map<string, (e: never, p: unknown) => unknown>(),
+      invokeRegistry: new Map(),
       sendRegistry: new Map<string, (e: never, p: unknown) => void>(),
       eventBus: new EventEmitter(),
     }
@@ -338,7 +342,7 @@ describe('api.ipc bridge channels', () => {
   it('onWindowEvent subscribes and unsubscribes from the event bus', () => {
     const eventBus = new EventEmitter()
     const bridge = {
-      invokeRegistry: new Map<string, (e: never, p: unknown) => unknown>(),
+      invokeRegistry: new Map(),
       sendRegistry: new Map<string, (e: never, p: unknown) => void>(),
       eventBus,
     }

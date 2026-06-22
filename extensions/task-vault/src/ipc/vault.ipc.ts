@@ -226,7 +226,7 @@ export function registerVaultIpcHandlers(db: ExtensionDB): () => void {
         task.subtasks = subtaskRows.map(rowToTask)
       }
       const thresholdRow = await db.get<{ value: string }>(
-        `SELECT value FROM settings WHERE key='stale_days_threshold'`
+        `SELECT value FROM settings WHERE extension_id='task-vault' AND key='stale_days_threshold'`
       )
       const staleDaysThreshold = thresholdRow ? parseInt(thresholdRow.value, 10) || 7 : 7
 
@@ -1426,7 +1426,7 @@ export function registerVaultIpcHandlers(db: ExtensionDB): () => void {
     const { days } = payload as { days: number }
     if (typeof days !== 'number' || days < 1) return { error: 'VALIDATION_ERROR' }
     await db.run(
-      `INSERT INTO settings (key, value) VALUES ('stale_days_threshold', ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'stale_days_threshold', ?) ON CONFLICT (extension_id, key) DO UPDATE SET value = EXCLUDED.value`,
       [String(days)]
     )
     return { success: true }

@@ -7,7 +7,7 @@ import { DEFAULT_KANBAN_CONFIG } from '../vault/types'
 async function readConfig(db: ExtensionDB): Promise<KanbanConfig> {
   try {
     const row = await db.get<{ value: string }>(
-      `SELECT value FROM settings WHERE key='kanban_config'`
+      `SELECT value FROM settings WHERE extension_id='task-vault' AND key='kanban_config'`
     )
     if (!row) return { ...DEFAULT_KANBAN_CONFIG }
     return JSON.parse(row.value) as KanbanConfig
@@ -18,7 +18,7 @@ async function readConfig(db: ExtensionDB): Promise<KanbanConfig> {
 
 async function writeConfig(db: ExtensionDB, config: KanbanConfig): Promise<void> {
   await db.run(
-    `INSERT INTO settings (key, value) VALUES ('kanban_config', ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'kanban_config', ?) ON CONFLICT (extension_id, key) DO UPDATE SET value = EXCLUDED.value`,
     [JSON.stringify(config)]
   )
 }

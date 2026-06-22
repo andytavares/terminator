@@ -7,6 +7,12 @@ description: Quantitative answers about the repository — lines of code by lang
 
 Authoritative numbers about this repo. Use real tools, not hand-counts.
 
+> **Signal vs. metric (the QUANTS caveat).** A number is only useful paired with the question it
+> answers. Lines of code, commit counts, and test counts are easy to measure and easy to game — they
+> are not productivity, and optimizing them directly produces vanity metrics. Before reporting a
+> count, state what decision or question it informs; if it informs none, say so rather than implying
+> the number means something. See the `quants-framework` concept.
+
 ## Tool preference order
 
 1. **`scc`** — fastest, most accurate. Treats comments and blanks correctly.

@@ -5,7 +5,10 @@ description: How Claude should source external information. Official first-party
 
 # Canonical Research — official docs first
 
-This is the rule, in order:
+Scaling knowledge means establishing a single canonical source for each fact and going to it first,
+rather than relaying second-hand answers (see the `knowledge-sharing-at-scale` and `docs-freshness`
+concepts). For external facts that source is the vendor's official documentation; for facts about
+this repo it's the code itself. This is the rule, in order:
 
 1. **First-party docs win every time.** For "how do I do X in Y", the vendor's official documentation is the only authoritative source. FastAPI question → fastapi.tiangolo.com. Python stdlib → docs.python.org. AWS S3 → docs.aws.amazon.com. Go stdlib → pkg.go.dev. Kubernetes → kubernetes.io/docs.
 

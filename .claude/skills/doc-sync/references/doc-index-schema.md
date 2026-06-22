@@ -9,7 +9,10 @@
       "title": "OAuth flows",
       "summary": "Documents the OAuth 2.1 authorization-code and client-credentials flows used by the API gateway.",
       "owners": ["@auth-team"],
-      "referenced_code_paths": ["services/gateway/auth/oauth.go", "services/gateway/auth/jwt.go"],
+      "referenced_code_paths": [
+        "services/gateway/auth/oauth.go",
+        "services/gateway/auth/jwt.go"
+      ],
       "last_verified_commit": "abc1234",
       "staleness_score": 0
     }

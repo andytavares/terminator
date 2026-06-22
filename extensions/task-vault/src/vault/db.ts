@@ -14,8 +14,10 @@ export async function hasColumn(db: ExtensionDB, table: string, column: string):
 export async function applyTaskVaultSchema(db: ExtensionDB): Promise<void> {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS settings (
-      key   TEXT PRIMARY KEY,
-      value TEXT NOT NULL
+      extension_id TEXT NOT NULL DEFAULT 'task-vault',
+      key          TEXT NOT NULL,
+      value        TEXT NOT NULL,
+      PRIMARY KEY (extension_id, key)
     );
 
     CREATE TABLE IF NOT EXISTS areas (
@@ -130,6 +132,20 @@ export async function applyTaskVaultMigrations(db: ExtensionDB): Promise<void> {
      ON tasks(recurrence_template_id, due_date)
      WHERE recurrence_template_id IS NOT NULL AND due_date IS NOT NULL`
   )
+  if (!(await hasColumn(db, 'settings', 'extension_id'))) {
+    await db.exec(`
+      CREATE TABLE settings_new (
+        extension_id TEXT NOT NULL DEFAULT 'task-vault',
+        key          TEXT NOT NULL,
+        value        TEXT NOT NULL,
+        PRIMARY KEY (extension_id, key)
+      );
+      INSERT INTO settings_new (extension_id, key, value)
+        SELECT 'task-vault', key, value FROM settings;
+      DROP TABLE settings;
+      ALTER TABLE settings_new RENAME TO settings;
+    `)
+  }
 }
 
 async function migrateRecurrenceMetadata(db: ExtensionDB): Promise<void> {

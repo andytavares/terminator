@@ -9,7 +9,9 @@ const mockNotification = { show: vi.fn() }
 vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
   Notification: Object.assign(
-    vi.fn(() => mockNotification),
+    vi.fn(function () {
+      return mockNotification
+    }),
     { isSupported: vi.fn(() => false) }
   ),
 }))

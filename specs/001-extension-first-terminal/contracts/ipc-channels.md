@@ -1484,3 +1484,22 @@ Resolves a comment thread (marks the root and all replies as resolved).
 Hard-deletes a single comment (cascade removes children).
 
 **Request**: `{ id: string }` **Response**: `{ data: { ok: true } } | { error: string }`
+
+---
+
+## Database Health
+
+### `db:health`
+
+Returns the current health status of the shared PGlite database.
+
+**Direction**: renderer → main
+
+**Request**: _(no payload)_
+
+**Response**: `{ ok: boolean; message?: string }`
+
+| Field     | Type      | Description                                        |
+| --------- | --------- | -------------------------------------------------- |
+| `ok`      | `boolean` | `true` if the database is reachable and responsive |
+| `message` | `string?` | Error description if `ok` is `false`               |

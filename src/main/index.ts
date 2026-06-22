@@ -10,25 +10,29 @@ import { registerFsHandlers } from './ipc/fs.ipc.js'
 import { registerLogHandlers } from './ipc/log.ipc.js'
 import { registerNotificationHandlers } from './ipc/notification.ipc.js'
 import { registerMetricsHandlers } from './ipc/metrics.ipc.js'
+import { registerDbIpcHandlers } from './ipc/db.ipc.js'
 import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
 import { logger } from './logger.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
-import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
+import {
+  ipcInvokeRegistry,
+  ipcSendRegistry,
+  type IpcHandler,
+  type IpcSendHandler,
+} from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
 import { runLegacyMigration } from './db/migrate.js'
 
 // Intercept ipcMain.handle/on to capture handlers into the bridge registry
 // so the remote-control extension bridge can dispatch IPC calls from browser clients.
-type IpcHandler = (event: Electron.IpcMainInvokeEvent, payload: unknown) => unknown
-type IpcSendHandler = (event: Electron.IpcMainEvent, payload: unknown) => void
 
 const _origHandle = ipcMain.handle.bind(ipcMain)
 const _origOn = ipcMain.on.bind(ipcMain)
 const _origRemoveHandler = ipcMain.removeHandler.bind(ipcMain)
 // @ts-expect-error - patch to intercept all handler registrations
-ipcMain.handle = (channel: string, fn: IpcHandler) => {
-  ipcInvokeRegistry.set(channel, fn)
+ipcMain.handle = (channel: string, fn: IpcHandler, opts?: { remoteAccessible?: boolean }) => {
+  ipcInvokeRegistry.set(channel, { handler: fn, remoteAccessible: opts?.remoteAccessible ?? false })
   return _origHandle(channel, fn)
 }
 // @ts-expect-error - patch to intercept fire-and-forget handlers
@@ -252,6 +256,7 @@ app.whenReady().then(async () => {
   registerLogHandlers()
   registerNotificationHandlers()
   registerMetricsHandlers(ptyManager)
+  registerDbIpcHandlers()
   registerDialogHandlers()
   registerAppHandlers()
 

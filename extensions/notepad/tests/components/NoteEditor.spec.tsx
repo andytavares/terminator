@@ -3,7 +3,7 @@ import { render } from '@testing-library/react'
 import React from 'react'
 
 vi.mock('@codemirror/view', () => {
-  const EditorView = vi.fn().mockImplementation(({ parent }: { parent: Element }) => {
+  const EditorView = vi.fn().mockImplementation(function ({ parent }: { parent: Element }) {
     const el = document.createElement('div')
     el.className = 'cm-editor'
     parent?.appendChild(el)
@@ -29,11 +29,15 @@ vi.mock('@codemirror/state', () => ({
     create: vi.fn().mockReturnValue({}),
     readOnly: { of: vi.fn(() => ({})) },
   },
-  Compartment: vi.fn().mockImplementation(() => ({
-    of: vi.fn(() => ({})),
-    reconfigure: vi.fn(() => ({})),
-  })),
-  RangeSetBuilder: vi.fn().mockImplementation(() => ({ add: vi.fn(), finish: vi.fn(() => ({})) })),
+  Compartment: vi.fn().mockImplementation(function () {
+    return {
+      of: vi.fn(() => ({})),
+      reconfigure: vi.fn(() => ({})),
+    }
+  }),
+  RangeSetBuilder: vi.fn().mockImplementation(function () {
+    return { add: vi.fn(), finish: vi.fn(() => ({})) }
+  }),
   StateField: { define: vi.fn(() => ({})) },
   StateEffect: { define: vi.fn(() => ({ of: vi.fn() })) },
 }))
