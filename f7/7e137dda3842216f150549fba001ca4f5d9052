@@ -1,0 +1,234 @@
+src/renderer/components/ConfirmDialog.tsx
+  s_566156474fe79f::t_1b6cf28915f390 37-47
+specs/012-deep-audit-remediation/spec.md
+  s_e8f8d1a237c92a::t_beea35f2183398 186
+  s_e8f8d1a237c92a::t_4c44b90c5b84df 268
+  s_e8f8d1a237c92a::t_8b7122186b2dd3 225
+  s_e8f8d1a237c92a::t_e5be0704290d7e 235
+  s_e8f8d1a237c92a::t_048726e0cb7f52 201
+  s_e8f8d1a237c92a::t_c5e921b59c4ef9 253
+  s_e8f8d1a237c92a::t_54463e0f345c1a 197
+  s_e8f8d1a237c92a::t_203a2f55fcdbce 118-119
+  s_e8f8d1a237c92a::t_a67893944d8c12 223
+  s_e8f8d1a237c92a::t_621b114d61808f 240
+  s_e8f8d1a237c92a::t_b55d76a457ed03 187
+  s_e8f8d1a237c92a::t_56a1a197a9fdac 272
+  s_e8f8d1a237c92a::t_71d3737dabbc22 254
+  s_e8f8d1a237c92a::t_52efec91c0103f 255
+  s_e8f8d1a237c92a::t_7ae778f4752faf 258-261
+  s_e8f8d1a237c92a::t_a114841588e306 1-117,120-124,126,128,130-133,135-185,188-193,195-196,198-200,202-222,224,226-234,236-237,239,241-247,264-267,269-271,273
+  s_e8f8d1a237c92a::t_828050f0b0bc69 129,134
+  s_e8f8d1a237c92a::t_f478aa4a380f2f 194
+  s_e8f8d1a237c92a::t_45cd471469e4ec 248-252,257,262-263
+  s_e8f8d1a237c92a::t_4e75835f311a8e 125,127
+  s_e8f8d1a237c92a::t_9554edaf713104 238
+  s_e8f8d1a237c92a::t_1ba4277bd3cc17 256
+extensions/remote-control/tests/unit/remote-server.spec.ts
+  s_566156474fe79f::t_e83818ed878401 69
+extensions/task-vault/src/vault/db.ts
+  s_566156474fe79f::t_2fe0c32c225fa9 17-20
+  s_566156474fe79f::t_63fb28b84ebe2c 135-148
+tests/unit/db/index.spec.ts
+  s_566156474fe79f::t_2e0808e3216cb8 175-202
+extensions/notepad/tests/unit/ipc/export.ipc.spec.ts
+  s_566156474fe79f::t_406d53ac0d8b06 279-280
+src/renderer/components/terminal/TerminalSession.tsx
+  s_566156474fe79f::t_205d6ced58abe7 554-555
+  s_566156474fe79f::t_3c7499934ae1ed 83-84,90,95-103
+  s_566156474fe79f::t_ceed37d9785526 67
+  s_566156474fe79f::t_32cb6278ce67ee 8-12
+extensions/remote-control/src/server/remote-server.ts
+  s_566156474fe79f::t_ee66b9290ffa79 229
+  s_566156474fe79f::t_eb87c832520886 25
+CLAUDE.md
+  s_e8f8d1a237c92a::t_b909f004bc7f3d 5
+extensions/notepad/tests/unit/ipc/diagrams.ipc.spec.ts
+  s_566156474fe79f::t_09234bda6bdd24 146,149-150,152
+  s_566156474fe79f::t_b478da09fbfdda 276-328
+  s_566156474fe79f::t_541598a3275b55 113,116-117,121
+src/main/extensions/api.ts
+  s_566156474fe79f::t_481777c9ee5f4e 529-531
+  s_566156474fe79f::t_f9477ea84bb7cd 208
+  s_566156474fe79f::t_246f71973e8cab 533-534
+  s_566156474fe79f::t_c7d8bbfb99ce3e 129
+CHANGELOG.md
+  s_566156474fe79f::t_1750a2212eaa88 10,28,38
+  s_566156474fe79f::t_d5714e334942d1 19
+  s_566156474fe79f::t_2381c71cbf89a6 25
+  s_566156474fe79f::t_19360eb556fd65 1-9,11-18,20-24,26-27,29-37,39-41
+specs/012-deep-audit-remediation/checklists/requirements.md
+  s_e8f8d1a237c92a::t_692460e13c5330 1-36,38-40
+  s_e8f8d1a237c92a::t_0bc35a43b9e832 41-42,44-48
+  s_566156474fe79f::t_1750a2212eaa88 37,43
+extensions/remote-control/tests/unit/bridge.route.spec.ts
+  s_566156474fe79f::t_0fb0a1ba831b61 11
+  s_566156474fe79f::t_13479ee2bb31dd 73
+  s_566156474fe79f::t_d77bd14349ee80 57
+  s_566156474fe79f::t_2aa1e4e508c944 325-385
+src/renderer/components/ErrorBoundary.tsx
+  s_566156474fe79f::t_68e3c4fe6a0ef8 40-41
+src/renderer/styles.css
+  s_566156474fe79f::t_3b6f3e6178722f 48-58
+  s_566156474fe79f::t_9483fbdfb90291 85-109
+extensions/notepad/src/ipc/diagrams.ipc.ts
+  s_566156474fe79f::t_54e332cba2f38a 57,63-72,77,166
+  s_566156474fe79f::t_288474e45de2c5 109-113,118
+  s_566156474fe79f::t_7ac4e66f09ecfb 147,154,161-165
+  s_566156474fe79f::t_82b3ca5c499341 27-28,30-32
+  s_566156474fe79f::t_1750a2212eaa88 103-105
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_566156474fe79f::t_519174a4dbb010 58
+  s_566156474fe79f::t_5ad055a4ade2d2 785-842
+src/main/ipc/db.ipc.ts
+  s_566156474fe79f::t_b793d1b5c03b1c 1-12
+extensions/notepad/src/db/db.ts
+  s_566156474fe79f::t_daa8799ff0bb32 143-167
+  s_566156474fe79f::t_28243966a9843e 63-66
+  s_566156474fe79f::t_1d1b79ccafa713 80-83
+  s_566156474fe79f::t_97f05a0f67c69c 129-142
+src/main/remote/ipc-registry.ts
+  s_566156474fe79f::t_5837d2b61a2e5d 6-13
+extensions/task-vault/src/index.ts
+  s_566156474fe79f::t_6400d27113111a 173-176
+extensions/notepad/tests/unit/db/db.spec.ts
+  s_566156474fe79f::t_799c89bb6daf3d 38
+  s_566156474fe79f::t_2bfce7ca13e9be 68,79-101,103-109
+  s_566156474fe79f::t_b60c1a21d9a2f9 166-177,188-196,202,208-217
+  s_566156474fe79f::t_1750a2212eaa88 178-187,197-201,203-207
+  s_566156474fe79f::t_f3c0639b9af8ac 49,51,53-59
+src/main/index.ts
+  s_566156474fe79f::t_9369461af9223f 259
+  s_566156474fe79f::t_229828b08978f4 13
+  s_566156474fe79f::t_1750a2212eaa88 18-23
+  s_566156474fe79f::t_70d7b5a4bf6d10 34-35
+src/renderer/components/sidebar/Dialog.css
+  s_566156474fe79f::t_98ef17b7fa2ac6 36-41
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_566156474fe79f::t_af62fe7837d60d 1429
+  s_566156474fe79f::t_bc300e03c463a3 229
+tests/unit/db/migrate.spec.ts
+  s_566156474fe79f::t_707ca5e0a375d5 130-142
+  s_566156474fe79f::t_82d58d56538d0f 46-59
+  s_566156474fe79f::t_45aa60c8e428f4 93
+  s_566156474fe79f::t_5673bc38c6e58c 10,12
+  s_566156474fe79f::t_d4c25c6124ccc7 6-9
+  s_566156474fe79f::t_6555e7848576ed 65-66
+  s_566156474fe79f::t_20faab5bf838e6 15
+tests/unit/main/remote/bridge-event-bus.spec.ts
+  s_566156474fe79f::t_2741fb9a40cb55 1-23
+src/renderer/electron.d.ts
+  s_566156474fe79f::t_87691ed1147589 191-193
+tests/unit/ConfirmDialog.spec.tsx
+  s_566156474fe79f::t_7a27a1e2537ba9 61-80
+docs/ARCHITECTURE.md
+  s_566156474fe79f::t_96ac448091cf5a 446
+  s_566156474fe79f::t_b501fae2ff723e 3
+  s_566156474fe79f::t_8933aae0f83205 410,414
+  s_566156474fe79f::t_ca89d379521374 416
+src/main/remote/__tests__/ipc-registry.spec.ts
+  s_566156474fe79f::t_62973b85181bca 1-20,25-54
+  s_566156474fe79f::t_1750a2212eaa88 21-24
+tests/unit/db/db.ipc.spec.ts
+  s_566156474fe79f::t_f7ea003794b256 3-8
+  s_566156474fe79f::t_f36859a9cc5b92 1-2,9-60
+src/main/preload.ts
+  s_566156474fe79f::t_6ef1769bad20a6 192-194
+specs/012-deep-audit-remediation/plan.md
+  s_566156474fe79f::t_1750a2212eaa88 31-43,120,125,134,143,155,162,169,175,185,201,214,226,232,240,245,254,258,262,279,282-287,293,295,318,322,326,334,341,354-361
+  s_e8f8d1a237c92a::t_1fb782696b00b5 1,3,5,9,11-12,15-25,29-30,44-47,54-63,66,69-108,111-119,121-124,126-133,135-142,144-154,156-161,163-168,170-174,176-184,186-200,202-213,215-225,227-231,233-239,241-244,246-253,255-257,259-261,263-278,280-281,288-292,294,296-315,317,319-321,323-325,327-333,335-340,342-353,362-363,365,367
+  s_e8f8d1a237c92a::t_fa50a2fa990850 2,4,6-8,10,13-14,26-28,48-53,64-65,67-68,109-110,316,364,366
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_566156474fe79f::t_02f2d6f1ca7886 1487-1501
+  s_566156474fe79f::t_1750a2212eaa88 1502-1505
+tests/unit/extensions/api-v1.2.0.spec.ts
+  s_566156474fe79f::t_503eb27a1cc012 295,307,319,330,341
+.github/workflows/ci.yml
+  s_566156474fe79f::t_a3c669f389a9f0 28-30
+.specify/feature.json
+  s_e8f8d1a237c92a::t_fce8804d6f23ec 2
+README.md
+  s_566156474fe79f::t_73585111846f7e 9
+  s_566156474fe79f::t_ddc5439753c225 41
+tests/unit/renderer/components/AboutDialog.spec.tsx
+  s_566156474fe79f::t_486b972e0780e6 7,13,16
+specs/012-deep-audit-remediation/research.md
+  s_e8f8d1a237c92a::t_621062ccfa7888 1-14,16-19,21-34,36-48,50-64,66-76,78-89,91-122
+  s_566156474fe79f::t_1750a2212eaa88 15,20,35,49,65,77,90
+extensions/task-vault/src/ipc/projects.ipc.ts
+  s_566156474fe79f::t_df84bc41476795 109
+specs/012-deep-audit-remediation/contracts/ipc-changes.md
+  s_e8f8d1a237c92a::t_05bb32982f528a 1-17,19-39,41-56
+  s_566156474fe79f::t_1750a2212eaa88 18,40
+specs/012-deep-audit-remediation/tasks.md
+  s_566156474fe79f::t_a4366af80a581a 1-21,23-31,34-44,46-56,62-72,76-86,88-98,100-110,114-124,130-140,143-153,160-170,175-183,205-228,230-286
+  s_566156474fe79f::t_1750a2212eaa88 22,32-33,45,57-61,73-75,87,99,111-113,125-129,141-142,154-159,171-174,184-199
+  s_566156474fe79f::t_bcd8ebeb778ca8 200-204
+  s_566156474fe79f::t_547c413c676a68 229
+extensions/remote-control/tests/unit/extension-index.spec.ts
+  s_566156474fe79f::t_92717a04f6a5bb 58
+src/main/db/index.ts
+  s_566156474fe79f::t_103154fa545872 111
+src/main/db/migrate.ts
+  s_566156474fe79f::t_3bc9da73d275c2 62,64,69,74-78,82,86-88,91
+  s_566156474fe79f::t_e728db4a8167f9 21-28
+docs/adr/020-mcp-sidecar-removal.md
+  s_566156474fe79f::t_1750a2212eaa88 16,23-27
+  s_566156474fe79f::t_c7015a40a46b10 1-15,17-22,28-33
+tests/unit/ErrorBoundary.spec.tsx
+  s_566156474fe79f::t_5b790cd73595ad 1-60
+extensions/task-vault/tests/index.spec.ts
+  s_566156474fe79f::t_d86dbe480d58a1 1-3,6-12,14-17,19,43,63-64
+  s_566156474fe79f::t_640bd41687532c 4-5,13,20-23,26-29,31-32,36,40-42,44
+  s_566156474fe79f::t_f19806ef79ee3f 18,24-25,30,33-35,37-39,45-62
+extensions/notepad/src/ipc/export.ipc.ts
+  s_566156474fe79f::t_1eddcc144528cc 142
+extensions/task-vault/src/ipc/kanban.ipc.ts
+  s_566156474fe79f::t_422676b0d779dd 10
+  s_566156474fe79f::t_67e280a8bcb613 21
+extensions/remote-control/src/index.ts
+  s_566156474fe79f::t_87eae162706c67 98
+extensions/task-vault/tests/vault/db.spec.ts
+  s_566156474fe79f::t_1750a2212eaa88 50-59,69-73,75-79
+  s_566156474fe79f::t_bda69fe400409f 1-49,60-68,74,80-99
+docs/adr/021-electron-upgrade-blocker.md
+  s_566156474fe79f::t_8506c4867b27e3 2,5-7,9,11,13,15,17-19
+  s_566156474fe79f::t_fd7f8545b33abc 1,3-4,8,10,12,14,16,20-22
+src/renderer/components/AboutDialog.tsx
+  s_566156474fe79f::t_bb070141136431 78-87
+  s_566156474fe79f::t_4cf7b4fc03c819 20,32-35
+package.json
+  s_566156474fe79f::t_9bb9d212f2534d 85
+  s_566156474fe79f::t_42866984ff9acd 59
+  s_566156474fe79f::t_6917c969e9c4c1 83
+extensions/remote-control/src/server/routes/bridge.route.ts
+  s_566156474fe79f::t_fb5be9cf365674 19
+  s_566156474fe79f::t_b6179290cfe304 77-82
+  s_566156474fe79f::t_26e38dd958f562 12
+specs/012-deep-audit-remediation/data-model.md
+  s_566156474fe79f::t_1750a2212eaa88 14-17,26,35,46,52,73,83-85
+  s_e8f8d1a237c92a::t_4fa41785ba1309 1-13,18-25,27-34,36-45,47-51,53-72,74-82,86-96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "f77e137dda3842216f150549fba001ca4f5d9052",
+  "prompts": {},
+  "sessions": {
+    "s_566156474fe79f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e0f4e976-4229-40cb-84a6-0c141533d2d0",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_e8f8d1a237c92a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "93b3ba99-b0c7-42bc-a5d5-3e67802da3e1",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
