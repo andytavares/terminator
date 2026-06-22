@@ -1,0 +1,31 @@
+.github/workflows/ci.yml
+  s_522c6e369b3539::t_f54b685f761e47 126-153
+.gitignore
+  s_522c6e369b3539::t_62d577bd885279 23-26
+CHANGELOG.md
+  s_522c6e369b3539::t_bbc0f42f417fbb 16
+tests/e2e/remote-app.spec.ts
+  s_522c6e369b3539::t_765d1356566930 47-49
+  s_522c6e369b3539::t_7eab8e1c4cfc89 93-95
+  s_522c6e369b3539::t_a63f5772435ec2 21,24-30,38
+  s_522c6e369b3539::t_df821730c6ea3a 3-5
+  s_522c6e369b3539::t_42822549f713c0 33
+  s_522c6e369b3539::t_51550e4a5a9b89 1-2,6-20,22-23,31-32,34-37,39-44,46,50,52-92,96-105
+  s_522c6e369b3539::t_6515269b478418 45,51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "39061e3993b75e860a2d6802062dc77e9bed9818",
+  "prompts": {},
+  "sessions": {
+    "s_522c6e369b3539": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3891f342-f887-4e5a-8284-75edce24d748",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
