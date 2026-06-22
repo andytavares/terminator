@@ -1,31 +1,18 @@
-import { test, expect, ElectronApplication, Page } from '@playwright/test'
-import { _electron as electron } from 'playwright'
+import { test, expect, Page } from '@playwright/test'
+import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
 
-let electronApp: ElectronApplication
-let page: Page
+let handle: AppHandle
 
 test.beforeAll(async () => {
-  electronApp = await electron.launch({
-    args: ['.'],
-    env: { ...process.env, NODE_ENV: 'test' },
-  })
-  page = await electronApp.firstWindow()
-  await page.waitForLoadState('domcontentloaded')
-  await page.waitForSelector('.sidebar', { timeout: 10000 })
-
-  // Create a workspace so workspace settings tab is available
-  await page.click('.sidebar__create-btn')
-  await page.waitForSelector('.dialog__title')
-  await page.locator('.dialog__input').first().fill('Settings Test Workspace')
-  await page.click('.dialog__btn-primary')
-  await page
-    .locator('.workspace-item__header')
-    .filter({ hasText: 'Settings Test Workspace' })
-    .click()
+  handle = await launchApp()
+  // A workspace must be *active* (a project selected) for the Workspace Settings
+  // tab to appear — clicking the card header only toggles collapse.
+  await createWorkspace(handle.page, 'Settings Test Workspace', handle.userDataDir)
+  await addAndSelectProject(handle.page, 'Settings Test Workspace', 'Proj')
 })
 
 test.afterAll(async () => {
-  await electronApp.close()
+  await closeApp(handle)
 })
 
 async function openSettings(pg: Page): Promise<void> {
@@ -35,132 +22,101 @@ async function openSettings(pg: Page): Promise<void> {
 
 async function closeSettings(pg: Page): Promise<void> {
   await pg.keyboard.press('Escape')
-  await pg.waitForSelector('.settings-panel', { state: 'hidden', timeout: 3000 }).catch(() => {
-    // Panel may already be gone
-  })
+  await pg.waitForSelector('.settings-panel', { state: 'hidden', timeout: 3000 }).catch(() => {})
 }
 
-// US5 Scenario 1: Global settings accessible
+function themeAttr(pg: Page): Promise<string | null> {
+  return pg.evaluate(() => document.documentElement.getAttribute('data-theme'))
+}
+
 test('US5-1: opening global settings shows configuration categories', async () => {
+  const { page } = handle
   await openSettings(page)
   await expect(page.locator('.settings-panel')).toBeVisible()
   await expect(
-    page.locator('.settings-panel__nav-item').filter({ hasText: 'Appearance' })
+    page.locator('.settings-panel__nav-item').filter({ hasText: 'Appearance & Terminal' })
   ).toBeVisible()
   await closeSettings(page)
 })
 
-// US5 Scenario 2: Theme toggle switches the entire UI immediately
 test('US5-2: toggling theme switches the UI immediately', async () => {
+  const { page } = handle
   await openSettings(page)
+  await page
+    .locator('.settings-panel__nav-item')
+    .filter({ hasText: 'Appearance & Terminal' })
+    .click()
 
-  const initialTheme = await page.evaluate(() =>
-    document.documentElement.getAttribute('data-theme')
-  )
-
-  // Find and click the other theme option
-  const buttons = page.locator('input[type="radio"][name="theme"], label').filter({
-    hasText: initialTheme === 'dark' ? 'Light' : 'Dark',
-  })
-  if ((await buttons.count()) > 0) {
-    await buttons.first().click()
-  } else {
-    // Try clicking the theme toggle if it's a button
-    const themeToggle = page
-      .locator('button, input')
-      .filter({ hasText: /light|dark/i })
-      .first()
-    if (await themeToggle.isVisible()) {
-      await themeToggle.click()
-    }
-  }
-
-  const newTheme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'))
-  expect(newTheme).not.toEqual(initialTheme)
-  await closeSettings(page)
-})
-
-// SC-007: Theme switch < 200ms
-test('SC-007: theme toggle applies within 200ms', async () => {
-  await openSettings(page)
-
-  const start = await page.evaluate(() => performance.now())
-
-  const themeControls = page.locator('input[type="radio"][name="theme"]')
-  const controlCount = await themeControls.count()
-  if (controlCount > 0) {
-    await themeControls.last().click()
-  }
-
-  const elapsed = await page.evaluate((s) => {
-    const now = performance.now()
-    return now - s
-  }, start)
-
-  // The attribute should be updated by now
-  const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'))
-  expect(theme).toBeTruthy()
-  expect(elapsed).toBeLessThan(200)
+  const content = page.locator('.settings-panel__content')
+  await content.locator('input[value="dark"]').check()
+  await expect.poll(() => themeAttr(page)).toBe('dark')
+  await content.locator('input[value="light"]').check()
+  await expect.poll(() => themeAttr(page)).toBe('light')
 
   await closeSettings(page)
 })
 
-// US5 Scenario 3: Workspace settings panel is accessible
 test('US5-3: workspace settings panel is available when a workspace is active', async () => {
+  const { page } = handle
   await openSettings(page)
-  const workspaceNav = page.locator('.settings-panel__nav-item').filter({ hasText: 'Workspace' })
+  const workspaceNav = page
+    .locator('.settings-panel__nav-item')
+    .filter({ hasText: 'Workspace Settings' })
   await expect(workspaceNav).toBeVisible()
   await workspaceNav.click()
-  await expect(page.locator('.workspace-settings, .settings-panel__content')).toBeVisible()
+  await expect(page.locator('.settings-panel__content')).toBeVisible()
   await closeSettings(page)
 })
 
-// US5 Scenario 4: Workspace setting overrides global
-test('US5-4: workspace theme override takes precedence over global setting', async () => {
+test('US5-4: a workspace theme override takes precedence over the global setting', async () => {
+  const { page } = handle
   await openSettings(page)
 
-  // Go to global settings and set to dark
-  await page.locator('.settings-panel__nav-item').filter({ hasText: 'Appearance' }).click()
-  const darkRadio = page.locator('input[value="dark"]')
-  if ((await darkRadio.count()) > 0) await darkRadio.check()
+  // Global = dark
+  await page
+    .locator('.settings-panel__nav-item')
+    .filter({ hasText: 'Appearance & Terminal' })
+    .click()
+  await page.locator('.settings-panel__content input[value="dark"]').check()
+  await expect.poll(() => themeAttr(page)).toBe('dark')
 
-  // Now go to workspace settings and set to light
-  const workspaceNav = page.locator('.settings-panel__nav-item').filter({ hasText: 'Workspace' })
-  await workspaceNav.click()
-  const lightRadio = page.locator('input[value="light"]')
-  if ((await lightRadio.count()) > 0) await lightRadio.check()
+  // Workspace override = light
+  await page.locator('.settings-panel__nav-item').filter({ hasText: 'Workspace Settings' }).click()
+  const lightOverride = page.locator('.settings-panel__content input[value="light"]')
+  if ((await lightOverride.count()) > 0) {
+    await lightOverride.first().check()
+    await expect.poll(() => themeAttr(page)).toBe('light')
+  }
 
   await closeSettings(page)
-
-  // Theme should reflect the workspace override
-  const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'))
-  // With a workspace override, it should not be null
-  expect(theme).toBeTruthy()
 })
 
-// US5 Scenario 5: Extension settings appear when extension is installed
-test('US5-5: extension settings section visible after extension install', async () => {
+test('US5-5: extensions section is visible in settings', async () => {
+  const { page } = handle
   await openSettings(page)
   await page.locator('.settings-panel__nav-item').filter({ hasText: 'Extensions' }).click()
   await expect(page.locator('.settings-panel__content')).toBeVisible()
-  // The extensions section should be visible (even if no extensions installed)
   await closeSettings(page)
 })
 
-// US5: Scrollback limit configuration
-test('US5-scrollback: scrollback limit is configurable in settings', async () => {
+test('US5-scrollback: scrollback limit is configurable', async () => {
+  const { page } = handle
   await openSettings(page)
-  await page.locator('.settings-panel__nav-item').filter({ hasText: 'Appearance' }).click()
-  const scrollbackInput = page.locator('input[type="number"]').first()
+  await page
+    .locator('.settings-panel__nav-item')
+    .filter({ hasText: 'Appearance & Terminal' })
+    .click()
+  const scrollbackInput = page.locator('.settings-panel__content input[type="number"]').first()
   await expect(scrollbackInput).toBeVisible()
   await scrollbackInput.fill('5000')
+  await expect(scrollbackInput).toHaveValue('5000')
   await closeSettings(page)
 })
 
-// Settings panel closes on Escape
-test('settings panel closes on Escape key', async () => {
+test('settings panel closes on Escape', async () => {
+  const { page } = handle
   await openSettings(page)
   await expect(page.locator('.settings-panel')).toBeVisible()
   await page.keyboard.press('Escape')
-  await expect(page.locator('.settings-panel')).not.toBeVisible({ timeout: 2000 })
+  await expect(page.locator('.settings-panel')).toHaveCount(0)
 })

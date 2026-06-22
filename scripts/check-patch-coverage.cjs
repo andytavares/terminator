@@ -36,6 +36,7 @@ const COVERAGE_EXCLUDED_PATTERNS = [
   /src\/shared\/types\//,
   /\.d\.ts$/,
   /vitest\.config\.ts$/, // test runner config, not application code
+  /playwright\.config\.ts$/, // e2e runner config, not application code
   /electron\.vite\.config\.ts$/, // build config, not application code
 ]
 
