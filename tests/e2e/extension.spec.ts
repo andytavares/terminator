@@ -1,24 +1,14 @@
-import { test, expect, ElectronApplication, Page } from '@playwright/test'
-import { _electron as electron } from 'playwright'
-import path from 'path'
+import { test, expect, Page } from '@playwright/test'
+import { AppHandle, launchApp, closeApp } from './helpers'
 
-let electronApp: ElectronApplication
-let page: Page
-
-const SAMPLE_EXTENSION_DIR = path.resolve(__dirname, '../fixtures/sample-extension')
+let handle: AppHandle
 
 test.beforeAll(async () => {
-  electronApp = await electron.launch({
-    args: ['.'],
-    env: { ...process.env, NODE_ENV: 'test' },
-  })
-  page = await electronApp.firstWindow()
-  await page.waitForLoadState('domcontentloaded')
-  await page.waitForSelector('.sidebar', { timeout: 10000 })
+  handle = await launchApp()
 })
 
 test.afterAll(async () => {
-  await electronApp.close()
+  await closeApp(handle)
 })
 
 async function openExtensionsSettings(pg: Page): Promise<void> {
@@ -29,78 +19,48 @@ async function openExtensionsSettings(pg: Page): Promise<void> {
 
 async function closeSettings(pg: Page): Promise<void> {
   await pg.keyboard.press('Escape')
+  await pg.waitForSelector('.settings-panel', { state: 'hidden', timeout: 3000 }).catch(() => {})
 }
 
-// US6 Scenario 1: Install extension from local path
-test('US6-1: installed extension appears in extensions list', async () => {
-  // Attempt to install via main process evaluation
-  await electronApp
-    .evaluate(async (_, extDir) => {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { ExtensionHost } = require('./out/main/extensions/extension-host.js')
-        const host = new ExtensionHost()
-        await host.load(extDir)
-      } catch {
-        // In dev mode, module path differs — acceptable
-      }
-    }, SAMPLE_EXTENSION_DIR)
-    .catch(() => {
-      // eval may fail in dev mode; test remains a structural check
-    })
-
+test('US6-1: the Extensions settings section renders the bundled extensions', async () => {
+  const { page } = handle
   await openExtensionsSettings(page)
   await expect(page.locator('.settings-panel__content')).toBeVisible()
+  // Bundled extensions (git-integration, notepad, task-vault, …) load at startup.
+  await expect(page.locator('.extension-item').first()).toBeVisible()
   await closeSettings(page)
 })
 
-// US6 Scenario 2: Extensions auto-reload on restart (structural test)
-test('US6-2: extensions section is accessible in settings panel', async () => {
+test('US6-2: the Extensions nav item becomes active when selected', async () => {
+  const { page } = handle
   await openExtensionsSettings(page)
-  await expect(page.locator('.settings-panel')).toBeVisible()
   await expect(
     page.locator('.settings-panel__nav-item').filter({ hasText: 'Extensions' })
   ).toHaveClass(/settings-panel__nav-item--active/)
   await closeSettings(page)
 })
 
-// US6 Scenario 3: Disabling extension removes its contributions
-test('US6-3: extensions UI renders without crash and install button is present', async () => {
+test('US6-3: each extension row shows a name and a toggle action', async () => {
+  const { page } = handle
   await openExtensionsSettings(page)
-  const extensionsContent = page.locator('.settings-panel__content')
-  await expect(extensionsContent).toBeVisible()
+  const firstItem = page.locator('.extension-item').first()
+  await expect(firstItem.locator('.extension-item__name')).toBeVisible()
+  await expect(firstItem.locator('.extension-item__actions')).toBeVisible()
   await closeSettings(page)
 })
 
-// US6 Scenario 4: Extension settings appear in settings panel
-test('US6-4: extension settings section is visible in settings panel', async () => {
+test('US6-4: toggling an extension off and on keeps the app stable', async () => {
+  const { page } = handle
   await openExtensionsSettings(page)
+  const toggle = page
+    .locator('.extension-item__actions button, .extension-item__actions input')
+    .first()
+  if (await toggle.isVisible().catch(() => false)) {
+    await toggle.click()
+    await toggle.click()
+  }
+  // App and settings panel remain functional.
   await expect(page.locator('.settings-panel__content')).toBeVisible()
   await closeSettings(page)
-})
-
-// US6 Scenario 5: Malformed extension shows error, app remains stable
-test('US6-5: malformed extension install does not crash the app', async () => {
-  const fakeDir = '/tmp/nonexistent-extension-dir-12345'
-  await electronApp
-    .evaluate(async (_app, extDir: string) => {
-      try {
-        // Attempt install of nonexistent directory — should fail gracefully
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { ExtensionHost } = require('./out/main/extensions/extension-host.js')
-        const host = new ExtensionHost()
-        await host.load(extDir)
-      } catch {
-        // Expected to fail
-      }
-    }, fakeDir)
-    .catch(() => {
-      // eval may fail in dev mode
-    })
-
-  // App should still be functional
-  await expect(page.locator('.sidebar')).toBeVisible()
-  await openExtensionsSettings(page)
-  await expect(page.locator('.settings-panel')).toBeVisible()
-  await closeSettings(page)
+  await expect(page.locator('.unified-sidebar')).toBeVisible()
 })

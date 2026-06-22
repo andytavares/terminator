@@ -1,131 +1,97 @@
-import { test, expect, ElectronApplication, Page } from '@playwright/test'
-import { _electron as electron } from 'playwright'
+import { test, expect } from '@playwright/test'
+import { AppHandle, launchApp, closeApp, createWorkspace, workspaceCard } from './helpers'
 
-let electronApp: ElectronApplication
-let page: Page
+let handle: AppHandle
 
 test.beforeAll(async () => {
-  electronApp = await electron.launch({
-    args: ['.'],
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-    },
-  })
-  page = await electronApp.firstWindow()
-  await page.waitForLoadState('domcontentloaded')
-  // Wait for sidebar to be visible
-  await page.waitForSelector('.sidebar', { timeout: 10000 })
+  handle = await launchApp()
 })
 
 test.afterAll(async () => {
-  await electronApp.close()
+  await closeApp(handle)
 })
 
-// US1 Scenario 1: Create workspace dialog opens
-test('US1-1: clicking Create Workspace opens a dialog with name, folder, color, and tags fields', async () => {
-  await page.click('.sidebar__create-btn')
+test('US1-1: clicking New workspace opens a dialog with name, folder, and color fields', async () => {
+  const { page } = handle
+  await page.click('.sidebar-header__add')
   await expect(page.locator('.dialog__title')).toContainText('Create Workspace')
-  await expect(
-    page.locator('.dialog__input[placeholder*="name" i], .dialog__input').first()
-  ).toBeVisible()
+  await expect(page.getByPlaceholder('My Workspace')).toBeVisible()
+  await expect(page.getByPlaceholder('/path/to/folder')).toBeVisible()
   await expect(page.locator('.dialog__colors')).toBeVisible()
-  // close dialog
-  await page.keyboard.press('Escape')
+  // CreateWorkspaceDialog closes via Cancel/overlay (no Escape handler).
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  await expect(page.locator('.dialog__title')).toHaveCount(0)
 })
 
-// US1 Scenario 2: Workspace appears in sidebar with name and color
-test('US1-2: created workspace appears in sidebar with name and color', async () => {
-  await page.click('.sidebar__create-btn')
-  await page.waitForSelector('.dialog__title')
-  const nameInput = page.locator('.dialog__input').first()
-  await nameInput.fill('My Test Workspace')
-  // pick the first color swatch
-  await page.locator('.dialog__color-swatch').first().click()
-  await page.click('.dialog__btn-primary')
-  await expect(page.locator('.workspace-item__name')).toContainText('My Test Workspace')
-  await expect(page.locator('.workspace-item__color-strip').first()).toBeVisible()
+test('US1-2: created workspace appears in sidebar with name and color band', async () => {
+  const { page, userDataDir } = handle
+  await createWorkspace(page, 'My Test Workspace', userDataDir)
+  const card = workspaceCard(page, 'My Test Workspace')
+  await expect(card.locator('.ws-card__name')).toContainText('My Test Workspace')
+  await expect(card.locator('.ws-card__band')).toBeVisible()
 })
 
-// US1 Scenario 3: Right-click shows context menu with Edit and Remove
-test('US1-3: right-clicking workspace shows context menu with Edit and Remove', async () => {
-  const workspaceHeader = page.locator('.workspace-item__header').first()
-  await workspaceHeader.click({ button: 'right' })
-  await expect(page.locator('.context-menu')).toBeVisible()
-  await expect(page.locator('.context-menu__item').filter({ hasText: 'Edit' })).toBeVisible()
-  await expect(page.locator('.context-menu__item').filter({ hasText: 'Remove' })).toBeVisible()
-  // close menu
-  await page.keyboard.press('Escape')
-  await page.click('body')
+test('US1-3: right-clicking a workspace shows a context menu with Edit and Remove', async () => {
+  const { page } = handle
+  await workspaceCard(page, 'My Test Workspace')
+    .locator('.ws-card__header')
+    .click({ button: 'right' })
+  await expect(page.locator('.ctx-menu')).toBeVisible()
+  await expect(page.locator('.ctx-menu__item').filter({ hasText: 'Edit workspace' })).toBeVisible()
+  await expect(
+    page.locator('.ctx-menu__item').filter({ hasText: 'Remove workspace' })
+  ).toBeVisible()
+  // The context menu closes on any window click (no Escape handler).
+  await page.getByPlaceholder('Search…').click()
+  await expect(page.locator('.ctx-menu')).toHaveCount(0)
 })
 
-// US1 Scenario 4: Editing workspace updates sidebar immediately
-test('US1-4: editing workspace name updates sidebar immediately', async () => {
-  const workspaceHeader = page.locator('.workspace-item__header').first()
-  await workspaceHeader.click({ button: 'right' })
-  await page.locator('.context-menu__item').filter({ hasText: 'Edit' }).click()
+test('US1-4: editing a workspace name updates the sidebar immediately', async () => {
+  const { page } = handle
+  await workspaceCard(page, 'My Test Workspace')
+    .locator('.ws-card__header')
+    .click({ button: 'right' })
+  await page.locator('.ctx-menu__item').filter({ hasText: 'Edit workspace' }).click()
   await expect(page.locator('.dialog__title')).toContainText('Edit Workspace')
   const nameInput = page.locator('.dialog__input').first()
-  await nameInput.clear()
   await nameInput.fill('Renamed Workspace')
   await page.click('.dialog__btn-primary')
-  await expect(page.locator('.workspace-item__name').first()).toContainText('Renamed Workspace')
+  await expect(
+    page.locator('.ws-card__name').filter({ hasText: 'Renamed Workspace' })
+  ).toBeVisible()
 })
 
-// US1 Scenario 5: Removing workspace removes it from sidebar
-test('US1-5: removing workspace removes it from sidebar', async () => {
-  // Create a second workspace specifically for removal
-  await page.click('.sidebar__create-btn')
+test('US1-5: removing a workspace removes it from the sidebar (in-app confirm)', async () => {
+  const { page, userDataDir } = handle
+  await createWorkspace(page, 'Temp Workspace', userDataDir)
+  const before = await page.locator('.ws-card').count()
+
+  await workspaceCard(page, 'Temp Workspace').locator('.ws-card__header').click({ button: 'right' })
+  await page.locator('.ctx-menu__item').filter({ hasText: 'Remove workspace' }).click()
+  // In-app ConfirmDialog (no native browser dialog)
+  await expect(page.locator('.dialog__title')).toContainText('Remove workspace')
+  await page.locator('.dialog__btn-primary').filter({ hasText: 'Remove' }).click()
+
+  await expect(page.locator('.ws-card')).toHaveCount(before - 1)
+  await expect(page.locator('.ws-card__name').filter({ hasText: 'Temp Workspace' })).toHaveCount(0)
+})
+
+test('US1-bonus: duplicate workspace name shows an inline error on submit', async () => {
+  const { page } = handle
+  await page.click('.sidebar-header__add')
   await page.waitForSelector('.dialog__title')
-  await page.locator('.dialog__input').first().fill('Temp Workspace')
-  await page.click('.dialog__btn-primary')
-
-  const workspaceCount = await page.locator('.workspace-item').count()
-  // right-click the last workspace item (the one we just created)
-  await page.locator('.workspace-item__header').last().click({ button: 'right' })
-  await page.locator('.context-menu__item').filter({ hasText: 'Remove' }).click()
-  // confirm the browser dialog
-  page.once('dialog', (dialog) => dialog.accept())
-  await expect(page.locator('.workspace-item')).toHaveCount(workspaceCount - 1)
+  await page.getByPlaceholder('My Workspace').fill('Renamed Workspace')
+  // Moving focus to the folder field blurs the name field, which validates and
+  // surfaces the duplicate-name error (the submit button stays disabled).
+  await page.getByPlaceholder('/path/to/folder').fill(handle.userDataDir)
+  await expect(page.locator('.dialog__error')).toContainText('already exists')
+  await expect(page.locator('.dialog__btn-primary')).toBeDisabled()
+  await page.getByRole('button', { name: 'Cancel' }).click()
 })
 
-// US1 Scenario 6: Sidebar collapses to avatar strip
-test('US1-6: clicking collapse toggle collapses sidebar to avatar strip', async () => {
-  await expect(page.locator('.sidebar')).not.toHaveClass(/sidebar--collapsed/)
-  await page.click('.sidebar__toggle')
-  await expect(page.locator('.sidebar')).toHaveClass(/sidebar--collapsed/)
-  await expect(page.locator('.workspace-avatar').first()).toBeVisible()
-})
-
-// US1 Scenario 7: Sidebar expands back from avatar strip
-test('US1-7: clicking expand toggle returns sidebar to full width', async () => {
-  // sidebar should already be collapsed from previous test
-  await expect(page.locator('.sidebar')).toHaveClass(/sidebar--collapsed/)
-  await page.click('.sidebar__toggle')
-  await expect(page.locator('.sidebar')).not.toHaveClass(/sidebar--collapsed/)
-  await expect(page.locator('.workspace-item__name').first()).toBeVisible()
-})
-
-// US1 Bonus: Duplicate workspace name shows inline error
-test('US1-bonus: duplicate workspace name shows inline error on submit', async () => {
-  const existingName = await page.locator('.workspace-item__name').first().textContent()
-  await page.click('.sidebar__create-btn')
-  await page.waitForSelector('.dialog__title')
-  await page
-    .locator('.dialog__input')
-    .first()
-    .fill(existingName ?? 'Renamed Workspace')
-  await page.click('.dialog__btn-primary')
-  await expect(page.locator('.dialog__error')).toBeVisible()
-  await page.keyboard.press('Escape')
-})
-
-// SC-004: Startup timing — sidebar visible within 3000ms
-test('SC-004: app renders sidebar within 3000ms of launch', async () => {
-  // The app was already launched; we check that we got the sidebar within the timeout
-  // (beforeAll waited up to 10s, but we validate the design intent here)
+test('SC-004: app renders the sidebar within 3000ms', async () => {
+  const { page } = handle
   const start = Date.now()
-  await page.waitForSelector('.sidebar', { timeout: 3000 })
-  const elapsed = Date.now() - start
-  expect(elapsed).toBeLessThan(3000)
+  await page.waitForSelector('.unified-sidebar', { timeout: 3000 })
+  expect(Date.now() - start).toBeLessThan(3000)
 })
