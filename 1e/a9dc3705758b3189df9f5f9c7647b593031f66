@@ -1,0 +1,24 @@
+electron-builder.yml
+  s_e2df897fa0e8a9::t_8ac27488b90d92 8-13
+.claude/doc-index.json
+  s_e2df897fa0e8a9::t_48012c9df846ee 143
+src/main/index.ts
+  s_e2df897fa0e8a9::t_6dd15251154653 290-296
+  s_e2df897fa0e8a9::t_66adaed478e7ad 297-301
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "1ea9dc3705758b3189df9f5f9c7647b593031f66",
+  "prompts": {},
+  "sessions": {
+    "s_e2df897fa0e8a9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4e88e9c8-ca18-41ee-a849-be8abcabf188",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
