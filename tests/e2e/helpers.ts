@@ -85,3 +85,16 @@ export async function addAndSelectProject(
   await expect(row).toBeVisible()
   await row.click()
 }
+
+/** Re-select an existing project (expanding its workspace first if needed). */
+export async function selectProject(
+  page: Page,
+  workspaceName: string,
+  projectName: string
+): Promise<void> {
+  await expandWorkspace(page, workspaceName)
+  await workspaceCard(page, workspaceName)
+    .locator('.project-row')
+    .filter({ hasText: projectName })
+    .click()
+}
