@@ -10,12 +10,10 @@ Given a topic (e.g. "JWT verification", "structured logging", "retry with backof
 ## Procedure
 
 1. **Define the search.** Extract 2-4 keywords from the topic. Include framework-specific terms.
-
    - "JWT verification" → `jwt`, `verify`, `parse`, `validate`, `claim`
    - "Retry with backoff" → `retry`, `backoff`, `exponential`, `attempts`
 
 2. **Cast a wide net.** ripgrep with context, language-aware:
-
    ```
    rg -i -t go -C 2 '<keyword>' --files-with-matches
    ```
@@ -54,7 +52,6 @@ Risks of converging: <list>
 ## Anti-pattern flags
 
 Flag a cluster as a problem if any of the following are true:
-
 - It re-implements something the framework already provides natively.
 - It skips a check the official docs say is required (e.g. JWT `iss` validation).
 - It uses a deprecated API of the library it depends on.

@@ -8,9 +8,9 @@ description: Use whenever Claude is about to add behavior or change behavior in 
 This codebase treats tests as the specification. The harness enforces the sequence:
 
 1. **Plan.** Spawn the `researcher` subagent. Output is a written plan with acceptance criteria. No code.
-2. **Red.** Spawn the `test-author` subagent. It writes tests that match the acceptance criteria and runs them to confirm they fail. No production code at this stage.
+2. **Red.** Spawn the `test-author` subagent. It writes tests that match the acceptance criteria and runs them to confirm they fail. No production code at this stage. Tests follow the Google unit-testing standards (public-API, state-over-interaction, fakes-over-mocks, hermetic, DAMP, one-behavior-per-test) — see the `test-quality-review` skill for the full rubric.
 3. **Green.** Spawn the `implementer` subagent. It writes the minimum code that turns the tests green. No test edits.
-4. **Refactor.** Only after green, propose refactors. Each refactor is followed by a full test re-run.
+4. **Refactor.** Only after green, propose refactors. Each refactor is followed by a full test re-run. Before reporting the change complete, run the `test-quality-review` skill (or the `test-quality-reviewer` subagent) on the new tests.
 
 ## When to skip TDD
 

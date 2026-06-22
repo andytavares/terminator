@@ -5,6 +5,12 @@ description: Detects and applies this repository's existing conventions for file
 
 # Repo conventions
 
+A convention is a style-guide rule, and a style guide is a tool for scaling a codebase, not a matter
+of taste (see the `style-guides-as-scaling-tools` concept). The principles: **a rule must have a
+purpose**, code is **optimized for the reader** (it's read far more often than written), and
+**consistency beats personal preference** — a consistent codebase is one any engineer can move
+through. Prefer rules a formatter/linter can enforce automatically over rules humans must remember.
+
 Before creating any file, do this:
 
 1. Read `.claude/stack.json` for the detected toolchain.

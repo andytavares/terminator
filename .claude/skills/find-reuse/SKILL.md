@@ -12,18 +12,15 @@ Before introducing new code, this skill returns up to 5 existing candidates that
 1. Extract the verb-noun pair from the proposed function (e.g. "parse url", "format date", "retry request").
 
 2. **Text pass** — Run:
-
    ```
    rg -i --type-add 'all:*' -t all "<verb>.*<noun>|<noun>.*<verb>" --files-with-matches | head -50
    ```
-
    Record the matching `file:line` set.
 
 3. **Structural pass** — Run the `ast-search` skill with:
-
    - The verb-noun term
    - The `file:line` set from the text pass (for deduplication)
-
+   
    The ast-search skill reads `ast_search_tool` from `.claude/stack.json`. If `ast_search_tool` is `null`, skip this step and note it in the output.
 
 4. **Merge results** — Combine text-pass and structural-pass matches, deduplicate by `file:line`, and remove false positives (comments, string literals that aren't implementations).
@@ -39,5 +36,10 @@ Before introducing new code, this skill returns up to 5 existing candidates that
 ## When to propose new code
 
 Only if every top candidate has a documented reason it cannot be reused or extended (e.g. "different invariants", "deprecated", "lives in a package this layer cannot depend on"). Vague reasons ("it's not quite right") are not acceptable.
+
+A parallel implementation isn't free even when it looks isolated: every observable behavior of the
+new code becomes something callers will depend on (Hyrum's Law — see the `hyrum-s-law` concept). One
+maintained implementation with a clear contract beats two that drift apart. Prefer extending the
+existing one.
 
 See also: `references/reuse-anti-patterns.md`.

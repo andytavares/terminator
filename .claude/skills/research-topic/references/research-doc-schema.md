@@ -23,7 +23,6 @@ One paragraph. What question is being answered and why it matters. Written for a
 ### 3. Scope
 
 Two sub-lists:
-
 - **In scope:** bullet points of what this research covers
 - **Out of scope:** bullet points of what was explicitly excluded, with a one-phrase reason for each
 
@@ -55,13 +54,13 @@ Quote: "<verbatim sentence from the source>"
 
 ### 6. Comparison Table
 
-| Criterion             | Option 1 | Option 2 | Option N |
-| --------------------- | -------- | -------- | -------- |
-| Official docs quality |          |          |          |
-| Feasibility           |          |          |          |
-| Complexity to adopt   |          |          |          |
-| Codebase fit          |          |          |          |
-| Key risk              |          |          |          |
+| Criterion | Option 1 | Option 2 | Option N |
+|---|---|---|---|
+| Official docs quality | | | |
+| Feasibility | | | |
+| Complexity to adopt | | | |
+| Codebase fit | | | |
+| Key risk | | | |
 
 ### 7. Recommendation
 
@@ -71,13 +70,12 @@ One option, clearly named. Two to four sentences: what to pick, why, and what th
 
 ## Optional Sections
 
-### 8. Open Questions _(optional)_
+### 8. Open Questions *(optional)*
 
 Bulleted list of questions this research could not resolve. Each is a candidate for `/forge-clarify`. Only include if genuine gaps exist.
 
-### 9. Next Steps _(optional)_
+### 9. Next Steps *(optional)*
 
 Suggested follow-on commands, e.g.:
-
 - `/forge-tasks NNN — decompose into implementation tasks`
 - `/forge-clarify NNN — resolve the open questions above`

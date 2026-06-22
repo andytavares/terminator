@@ -6,7 +6,6 @@ description: Interactive, LLM-assisted authoring of .forge/constitution.md — t
 # Project Constitution Skill
 
 ## Purpose
-
 Create or update `.forge/constitution.md`, a soul file that encodes top-level non-negotiables, architectural principles, and project identity. Once written, this file is injected into Claude's context at every session start and after every context compaction.
 
 ## Constitution schema
@@ -32,11 +31,9 @@ Any section body may be `(none)` if intentionally empty, but the heading must al
 ### Create flow (no existing constitution)
 
 1. **Scan the repo for signals.** Run the `researcher` subagent with this prompt:
-
-   > "Scan this repo for implicit project principles. Read: README.md, CLAUDE.md, any files in docs/ matching _ADR_ or _CONTRIBUTING_, and .forge/\*/spec.md files. For each of the six constitution sections (Purpose, Non-negotiables, Architectural principles, Risk posture, Team conventions, Out of scope) — draft one concise entry. Return the six drafts and nothing else."
+   > "Scan this repo for implicit project principles. Read: README.md, CLAUDE.md, any files in docs/ matching *ADR* or *CONTRIBUTING*, and .forge/*/spec.md files. For each of the six constitution sections (Purpose, Non-negotiables, Architectural principles, Risk posture, Team conventions, Out of scope) — draft one concise entry. Return the six drafts and nothing else."
 
 2. **Present each section one at a time.** For each section in schema order:
-
    - Show the section heading and the researcher's draft.
    - Ask: **"Accept, Edit, or Skip? [A/e/s]"**
    - Accept (default): use draft as-is.
@@ -46,7 +43,6 @@ Any section body may be `(none)` if intentionally empty, but the heading must al
 3. **Assemble the file.** After all six sections, render the complete `.forge/constitution.md` content and display it to the user.
 
 4. **Confirm before writing.** Ask: **"Write this to .forge/constitution.md? [Y/n]"**
-
    - Yes (default): write the file. Report the full path.
    - No: discard and exit without writing.
 
