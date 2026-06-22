@@ -58,6 +58,7 @@ export default defineConfig({
       ],
       exclude: [
         'vitest.config.ts',
+        'playwright.config.ts',
         'src/renderer/index.tsx',
         'src/renderer-remote/mobile.main.tsx',
         'src/main/index.ts',
