@@ -1,0 +1,35 @@
+tests/e2e/helpers.ts
+  s_522c6e369b3539::t_668bdd91307453 1-52
+  s_522c6e369b3539::t_9f5fc5b9bbbb58 53-82
+tests/e2e/workspace.spec.ts
+  s_522c6e369b3539::t_45b46ee4dbbf7b 75-76,79
+  s_522c6e369b3539::t_ff71ec0399117d 80
+  s_522c6e369b3539::t_34839687c66e30 49
+  s_522c6e369b3539::t_a6e9f6e2dcdaa6 1-2,4,7,11,14-16,18-19,26-31,34-39,45-46,52-54,59-61,64-67,69-73,83-87
+  s_522c6e369b3539::t_efeb1403b68590 21-23,81
+  s_522c6e369b3539::t_b5ac70e3350b26 40-42
+tests/e2e/settings.spec.ts
+  s_522c6e369b3539::t_965f24933b88e0 2,8-9,11
+  s_522c6e369b3539::t_e6d92bdbd04fec 1,4,7,10,15,25-29,33,37,43,45-48,50-54,60,62-64,67,71-72,75-89,94-95,102-103,105-109,112,116-117,121
+tests/e2e/extension.spec.ts
+  s_522c6e369b3539::t_11c29d4c441b95 1-2,4,7,11,22,25-26,29-30,34-35,43-44,46-48,52-53,55-60
+tests/e2e/project.spec.ts
+  s_522c6e369b3539::t_49c2746b034cfe 39-40
+  s_522c6e369b3539::t_48e3be530050f5 1-9,11-12,15-17,21,24-26,28-29,32-34,36,38,45-49,52-55,57,60-62,64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "15f36dbc415686fd7d2ef168b7d658f6687dc698",
+  "prompts": {},
+  "sessions": {
+    "s_522c6e369b3539": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3891f342-f887-4e5a-8284-75edce24d748",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
