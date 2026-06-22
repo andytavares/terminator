@@ -1,0 +1,32 @@
+tests/unit/renderer/components/ErrorBoundary.spec.tsx
+  s_522c6e369b3539::t_525203215c2da3 82-98
+tests/unit/renderer/design-tokens-contrast.spec.ts
+  s_522c6e369b3539::t_34227f248b67bf 52-55
+  s_522c6e369b3539::t_b5de1121543ac1 46-47
+  s_522c6e369b3539::t_102194a077d2b3 1-45,48-51,56-69
+src/renderer/styles.css
+  s_522c6e369b3539::t_be76658cdb71be 14-15,17-18
+src/renderer/components/CommandPalette.tsx
+  s_522c6e369b3539::t_951993a0737b25 153-159,163-165
+  s_522c6e369b3539::t_5abd6fd63990db 121-127,129-131,140-147
+src/renderer/components/ErrorBoundary.tsx
+  s_522c6e369b3539::t_7817fadc179dc6 50,62-63,65
+tests/unit/renderer/components/CommandPalette.spec.tsx
+  s_522c6e369b3539::t_722809dc7b7a4c 161-185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "93dc77c296ffe397f666ebc1cc65f0f70dc96142",
+  "prompts": {},
+  "sessions": {
+    "s_522c6e369b3539": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3891f342-f887-4e5a-8284-75edce24d748",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
