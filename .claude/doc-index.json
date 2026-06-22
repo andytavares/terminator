@@ -120,6 +120,24 @@
       "staleness_score": 0
     },
     {
+      "path": "specs/010-markdown-notepad/contracts/ipc-channels.md",
+      "title": "Notepad IPC Channels Contract",
+      "summary": "IPC surface for the terminator.notepad extension: notes.*, tags.*, comments.*, search.query, export/import. All handlers return { data } or { error }.",
+      "owners": [],
+      "referenced_code_paths": [
+        "extensions/notepad/src/ipc/notes.ipc.ts",
+        "extensions/notepad/src/ipc/comments.ipc.ts",
+        "extensions/notepad/src/ipc/search.ipc.ts",
+        "extensions/notepad/src/ipc/export.ipc.ts",
+        "extensions/notepad/src/ipc/folders.ipc.ts",
+        "extensions/notepad/src/ipc/diagrams.ipc.ts",
+        "extensions/notepad/src/ipc/diagram-comments.ipc.ts",
+        "extensions/notepad/src/db/db.ts"
+      ],
+      "last_verified_commit": "999ae80",
+      "staleness_score": 0
+    },
+    {
       "path": "docs/adr/017-embedded-http-remote-server.md",
       "title": "ADR-017: Embedded HTTP Server for Remote Browser Access",
       "summary": "Decision to embed Fastify HTTP+WebSocket server in Electron main process (via remote-control extension). Binds to 127.0.0.1 only, exposed via ngrok. Covers security constraints and test coverage requirement.",
