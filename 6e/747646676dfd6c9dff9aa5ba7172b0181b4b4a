@@ -1,0 +1,21 @@
+tests/e2e/extension.spec.ts
+  s_7987f183c53119::t_f87e2cb85723a3 59-60,62-69
+.github/workflows/ci.yml
+  s_7987f183c53119::t_f5037e47230e5c 143-144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "6e747646676dfd6c9dff9aa5ba7172b0181b4b4a",
+  "prompts": {},
+  "sessions": {
+    "s_7987f183c53119": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bca56e69-5ab9-4c54-b260-c2e5b4675fa5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
