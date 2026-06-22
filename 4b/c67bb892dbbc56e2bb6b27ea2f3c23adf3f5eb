@@ -1,0 +1,53 @@
+extensions/remote-control/tests/unit/auth.middleware.spec.ts
+  s_522c6e369b3539::t_6b5fc3faea45fd 73-93
+extensions/remote-control/tests/unit/bridge.route.spec.ts
+  s_522c6e369b3539::t_bd1b223fcf796c 399,410-419
+extensions/remote-control/src/server/auth-rate-limiter.ts
+  s_522c6e369b3539::t_a0347041e54ff7 1-51
+extensions/remote-control/tests/unit/auth-rate-limiter.spec.ts
+  s_522c6e369b3539::t_1081c4e132bd6a 1-5,7-13,15-22,24-41,43-49
+  s_522c6e369b3539::t_c9e993b929ad29 6,14,23,42
+src/main/extensions/api.ts
+  s_522c6e369b3539::t_bbd8cfa5c8e5d7 241
+  s_522c6e369b3539::t_e9f54f6943601b 535-540
+tests/integration/remote-bridge-allowlist.spec.ts
+  s_522c6e369b3539::t_a83f4a32dcc3ad 1-104
+extensions/remote-control/src/server/routes/bridge.route.ts
+  s_522c6e369b3539::t_54ffa74be9bf3d 60-62,68-69
+src/main/remote/__tests__/remote-accessible-channels.spec.ts
+  s_522c6e369b3539::t_5cec6f373e881a 1-44
+src/main/remote/remote-accessible-channels.ts
+  s_522c6e369b3539::t_b4a8aed258b02b 1-106
+src/main/index.ts
+  s_522c6e369b3539::t_886c4ed745a0ad 18
+  s_522c6e369b3539::t_b06e389cb205fb 36-40
+extensions/remote-control/src/server/auth.middleware.ts
+  s_522c6e369b3539::t_f2041cbd523d66 34
+  s_522c6e369b3539::t_ba021c3f8e7d37 3
+  s_522c6e369b3539::t_f25affcf1eca31 56-62,65,76,79
+tests/unit/extensions/api-v1.2.0.spec.ts
+  s_522c6e369b3539::t_f86b44632f657d 379-381
+  s_522c6e369b3539::t_5525346a402f71 358-368
+  s_522c6e369b3539::t_6e0cb1e8749731 417-427,431-437
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "4bc67bb892dbbc56e2bb6b27ea2f3c23adf3f5eb",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_522c6e369b3539": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3891f342-f887-4e5a-8284-75edce24d748",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
