@@ -1,0 +1,27 @@
+tests/unit/renderer/components/EditWorkspaceDialog.spec.tsx
+  s_522c6e369b3539::t_8bf368a0191c0e 155-180
+src/renderer/components/sidebar/EditWorkspaceDialog.tsx
+  s_522c6e369b3539::t_4c591dfff5ad48 4
+tests/unit/renderer/components/CreateWorkspaceDialog.spec.tsx
+  s_522c6e369b3539::t_0dc9657016d7cb 159-200
+src/renderer/components/sidebar/CreateWorkspaceDialog.tsx
+  s_522c6e369b3539::t_705e21da2164ea 3
+src/renderer/components/sidebar/workspace-colors.ts
+  s_522c6e369b3539::t_824ffede755862 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "57c05922dc1fc47d1c24f3106d6572ef7b19f8be",
+  "prompts": {},
+  "sessions": {
+    "s_522c6e369b3539": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3891f342-f887-4e5a-8284-75edce24d748",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
