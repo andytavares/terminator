@@ -23,7 +23,7 @@
         "extensions/remote-control/src/server/remote-server.ts",
         "extensions/remote-control/src/server/routes/bridge.route.ts"
       ],
-      "last_verified_commit": "3db5814",
+      "last_verified_commit": "999ae80",
       "staleness_score": 0
     },
     {
@@ -39,7 +39,7 @@
         "extensions/git-integration/src/index.ts",
         "extensions/git-integration/src/renderer.tsx"
       ],
-      "last_verified_commit": "3db5814",
+      "last_verified_commit": "999ae80",
       "staleness_score": 0
     },
     {
@@ -51,19 +51,19 @@
         "extensions/task-vault/src/vault/types.ts",
         "extensions/task-vault/src/ipc/vault.ipc.ts"
       ],
-      "last_verified_commit": "3db5814",
+      "last_verified_commit": "999ae80",
       "staleness_score": 0
     },
     {
       "path": "specs/001-extension-first-terminal/contracts/extension-api.md",
       "title": "Extension API Contract",
-      "summary": "Full surface of ExtensionAPI passed to activate(api) — all namespaces, method signatures, and version annotations. Also documents renderer-registry-only surfaces (WorkspaceTabRegistration, registerWorkspaceTab, activeWorkspaceTabId) added in v1.3.0. v1.4.0 adds settings.set, ipc.invokeChannel/sendChannel/onWindowEvent, pty namespace, window.broadcast.",
+      "summary": "Full surface of ExtensionAPI passed to activate(api) — all namespaces, method signatures, and version annotations. Also documents renderer-registry-only surfaces (WorkspaceTabRegistration, registerWorkspaceTab, activeWorkspaceTabId) added in v1.3.0. v1.4.0 adds settings.set, ipc.invokeChannel/sendChannel/onWindowEvent, pty namespace, window.broadcast. v1.5.0 adds db namespace (shared PGlite ExtensionDB), ipc.isRemoteAccessible, pty.listSessions/attachOnData/attachOnExit, notifications targets, and folder/action setting types.",
       "owners": [],
       "referenced_code_paths": [
         "src/main/extensions/api.ts",
         "src/renderer/extensions/registry.ts"
       ],
-      "last_verified_commit": "3db5814",
+      "last_verified_commit": "999ae80",
       "staleness_score": 0
     },
     {
@@ -75,7 +75,7 @@
         "src/main/preload.ts",
         "src/renderer/electron.d.ts"
       ],
-      "last_verified_commit": "3db5814",
+      "last_verified_commit": "999ae80",
       "staleness_score": 0
     },
     {
@@ -90,7 +90,7 @@
         "scripts/create-extension.cjs",
         "extensions/git-integration/src/renderer.tsx"
       ],
-      "last_verified_commit": "3db5814",
+      "last_verified_commit": "999ae80",
       "staleness_score": 0
     },
     {
@@ -101,7 +101,7 @@
       "referenced_code_paths": [
         "package.json"
       ],
-      "last_verified_commit": "3db5814",
+      "last_verified_commit": "999ae80",
       "staleness_score": 0
     },
     {
@@ -116,7 +116,7 @@
         "extensions/task-vault/src/vault/ensure-next-occurrence.ts",
         "extensions/task-vault/src/ipc/vault.ipc.ts"
       ],
-      "last_verified_commit": "3db5814",
+      "last_verified_commit": "999ae80",
       "staleness_score": 0
     },
     {
@@ -148,7 +148,7 @@
         "src/main/extensions/extension-host.ts",
         "src/main/index.ts"
       ],
-      "last_verified_commit": "3db5814",
+      "last_verified_commit": "999ae80",
       "staleness_score": 0
     }
   ]

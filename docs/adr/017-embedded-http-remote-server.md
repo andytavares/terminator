@@ -1,7 +1,9 @@
 # ADR-017: Embedded HTTP Server for Remote Browser Access
 
 **Date**: 2026-06-11  
-**Status**: Accepted
+**Status**: Accepted (bind-address constraint amended — see Amendment below)
+
+> **Amendment (2026-06-21):** The server now binds to `0.0.0.0` rather than `127.0.0.1` so that phones and tablets on the same LAN can connect directly (`remote-server.ts` `fastify.listen({ host: '0.0.0.0' })`). The original "localhost-only" reasoning below is retained for historical context, but the operative security posture no longer relies on the bind address. Protection now comes from per-request Bearer-password auth, the `Host`-header check, single-use tickets, session cookies, and the bridge `isRemoteAccessible` allowlist. See the Remote Control section of `docs/ARCHITECTURE.md` for the current model.
 
 ## Decision
 

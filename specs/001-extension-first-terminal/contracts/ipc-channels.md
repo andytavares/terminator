@@ -597,7 +597,7 @@ Returns the settings schemas registered by all active extensions.
     properties: Record<
       string,
       {
-        type: 'string' | 'number' | 'boolean' | 'enum'
+        type: 'string' | 'number' | 'boolean' | 'enum' | 'folder' | 'action'
         label: string
         description?: string
         default: unknown
@@ -605,6 +605,9 @@ Returns the settings schemas registered by all active extensions.
         options?: string[]
         min?: number
         max?: number
+        channel?: string // 'action' type: bridge channel invoked on click
+        confirmMessage?: string // 'action' type: confirmation prompt before invoking
+        danger?: boolean // 'action' type: render as a destructive action
       }
     >
   }>
@@ -989,13 +992,20 @@ Used on queue load to prevent closed/merged PRs from appearing as in-progress or
 
 These channels are sent from the main process menu to the renderer via `webContents.send`.
 
-| Channel                      | Payload | Effect                                               |
-| ---------------------------- | ------- | ---------------------------------------------------- |
-| `menu:open-settings`         | none    | Opens the Settings panel                             |
-| `menu:toggle-sidebar`        | none    | Toggles the Projects Panel sidebar                   |
-| `menu:open-pr-review-window` | none    | Triggers `window:open-pr-review` for active repo     |
-| `menu:close-tab`             | none    | Closes the active terminal tab in the active project |
-| `menu:open-about`            | none    | Opens the About dialog                               |
+| Channel                      | Payload           | Effect                                                                                            |
+| ---------------------------- | ----------------- | ------------------------------------------------------------------------------------------------- |
+| `menu:open-settings`         | none              | Opens the Settings panel                                                                          |
+| `menu:toggle-sidebar`        | none              | Toggles the Projects Panel sidebar                                                                |
+| `menu:open-pr-review-window` | none              | Triggers `window:open-pr-review` for active repo                                                  |
+| `menu:close-tab`             | none              | Closes the active terminal tab in the active project                                              |
+| `menu:open-about`            | none              | Opens the About dialog                                                                            |
+| `extension:toggle-panel`     | `panelId: string` | Toggles an extension panel (e.g. `git-changes`, `task-vault-links`). Sent by the View menu items. |
+
+### `menu:set-panel-checked` (renderer → main, one-way)
+
+Sent by the renderer (`window.electronAPI.menu.notifyPanelState(panelId, open)`) so the main-process View menu keeps its checkbox state in sync with the open/closed state of the Git Changes and Vault Links panels.
+
+**Payload**: `{ panelId: string; open: boolean }`
 
 ### `app:get-info`
 
@@ -1190,15 +1200,39 @@ Calls `ptyManager.getPid(sessionId)` for each ID; sessions without a live PTY ar
 
 ### Channel Summary
 
-| Channel                        | Direction       | Summary                                           |
-| ------------------------------ | --------------- | ------------------------------------------------- |
-| `metrics:system`               | renderer → main | CPU%, memory used/total, network in/out bytes/sec |
-| `metrics:processes`            | renderer → main | Per-PID CPU% and RSS bytes from `ps`              |
-| `metrics:pids`                 | renderer → main | Resolve session UUIDs to live PTY PIDs            |
-| `notifications:list`           | renderer → main | List all in-memory notifications                  |
-| `notifications:dismiss`        | renderer → main | Remove a notification by ID                       |
-| `notifications:trigger-action` | renderer → main | Invoke a stored action callback by ID             |
-| `notifications:push`           | main → renderer | Push a new notification to all windows            |
+| Channel                        | Direction       | Summary                                             |
+| ------------------------------ | --------------- | --------------------------------------------------- |
+| `metrics:system`               | renderer → main | CPU%, memory used/total, network in/out bytes/sec   |
+| `metrics:processes`            | renderer → main | Per-PID CPU% and RSS bytes from `ps`                |
+| `metrics:pids`                 | renderer → main | Resolve session UUIDs to live PTY PIDs              |
+| `notifications:create`         | renderer → main | Create a notification routed to system/center/toast |
+| `notifications:list`           | renderer → main | List all in-memory notifications                    |
+| `notifications:dismiss`        | renderer → main | Remove a notification by ID                         |
+| `notifications:trigger-action` | renderer → main | Invoke a stored action callback by ID               |
+| `notifications:push`           | main → renderer | Push a new notification to all windows              |
+
+---
+
+### `notifications:create`
+
+Creates a notification and routes it to the requested targets. Defaults to all three targets (`['system', 'center', 'toast']`) when `targets` is omitted; the `'system'` target raises a native OS notification.
+
+**Direction**: renderer → main (invoke/handle)
+
+**Request**:
+
+```typescript
+{
+  type: 'info' | 'success' | 'warning' | 'error'
+  title: string
+  message?: string
+  targets?: Array<'system' | 'center' | 'toast'>
+}
+```
+
+**Response**: `{ id: string } | { error: string }`
+
+> `notification.show(title, body)` (legacy preload helper) now forwards to `notifications:create` with `type: 'info'` and `targets: ['system']`.
 
 ---
 
