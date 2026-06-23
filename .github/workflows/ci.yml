@@ -152,6 +152,12 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install chromium
 
+      # The Electron binary restored from the npm cache on macOS arm64 can have
+      # an invalid code signature (dyld errno=85), causing intermittent
+      # "Process failed to launch" failures. Ad-hoc re-sign it before launching.
+      - name: Re-sign Electron (macOS arm64 code-signature workaround)
+        run: codesign --force --deep --sign - node_modules/electron/dist/Electron.app
+
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
