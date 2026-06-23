@@ -31,7 +31,6 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
       setFocusedSession(projectId, sessionId)
       clearBellCount(sessionId)
       const instance = getTerminalInstance(sessionId)
-      if (instance?.isAtBottom) instance.terminal.scrollToBottom()
       instance?.terminal.focus()
     },
     [projectId, sessionId, setFocusedSession, clearBellCount, getTerminalInstance]

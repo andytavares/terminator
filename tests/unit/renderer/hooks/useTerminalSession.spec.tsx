@@ -22,9 +22,6 @@ vi.mock('../../../../src/renderer/stores/settings.store', () => ({
   useSettingsStore: vi.fn().mockReturnValue({
     globalSettings: {
       terminal: {
-        scrollToBottomOnMount: false,
-        scrollToBottomOnClick: false,
-        scrollToBottomOnFocus: false,
         scrollbackLimit: 10000,
         defaultShell: '/bin/zsh',
       },

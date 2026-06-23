@@ -12,9 +12,7 @@ const mockUpdateTheme = vi.fn()
 const mockUpdateScrollback = vi.fn()
 const mockUpdateWorktreeBaseDir = vi.fn()
 const mockUpdateShowMetrics = vi.fn()
-const mockUpdateScrollToBottomOnClick = vi.fn()
-const mockUpdateScrollToBottomOnFocus = vi.fn()
-const mockUpdateScrollToBottomOnMount = vi.fn()
+const mockUpdateBranchExclude = vi.fn()
 const mockUpdateGlobal = vi.fn()
 
 const globalSettings = {
@@ -22,9 +20,6 @@ const globalSettings = {
   terminal: {
     scrollbackLimit: 5000,
     defaultShell: '/bin/zsh',
-    scrollToBottomOnClick: false,
-    scrollToBottomOnFocus: false,
-    scrollToBottomOnMount: false,
   },
   git: { worktreeBaseDir: '' },
   extensions: {},
@@ -40,9 +35,7 @@ beforeEach(() => {
     updateScrollbackLimit: mockUpdateScrollback,
     updateWorktreeBaseDir: mockUpdateWorktreeBaseDir,
     updateShowMetricsBar: mockUpdateShowMetrics,
-    updateScrollToBottomOnClick: mockUpdateScrollToBottomOnClick,
-    updateScrollToBottomOnFocus: mockUpdateScrollToBottomOnFocus,
-    updateScrollToBottomOnMount: mockUpdateScrollToBottomOnMount,
+    updateBranchExcludePatterns: mockUpdateBranchExclude,
   } as unknown as ReturnType<typeof useSettingsStore>)
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     settings: { updateGlobal: mockUpdateGlobal },
@@ -131,34 +124,11 @@ describe('GlobalSettings', () => {
     expect(screen.getByText(/where new git worktrees are created/i)).toBeTruthy()
   })
 
-  it('calls updateScrollToBottomOnClick when checkbox is toggled', () => {
+  it('calls updateBranchExcludePatterns on blur of the patterns textarea', () => {
     render(<GlobalSettings />)
-    const checkbox = screen.getByRole('checkbox', { name: /scroll to bottom on click/i })
-    fireEvent.click(checkbox)
-    expect(mockUpdateScrollToBottomOnClick).toHaveBeenCalledWith(true)
-  })
-
-  it('calls updateScrollToBottomOnFocus when checkbox is toggled', () => {
-    render(<GlobalSettings />)
-    const checkbox = screen.getByRole('checkbox', { name: /scroll to bottom on app focus/i })
-    fireEvent.click(checkbox)
-    expect(mockUpdateScrollToBottomOnFocus).toHaveBeenCalledWith(true)
-  })
-
-  it('calls updateScrollToBottomOnMount when checkbox is toggled', () => {
-    render(<GlobalSettings />)
-    const checkbox = screen.getByRole('checkbox', { name: /scroll to bottom on tab switch/i })
-    fireEvent.click(checkbox)
-    expect(mockUpdateScrollToBottomOnMount).toHaveBeenCalledWith(true)
-  })
-
-  it('renders scroll checkboxes unchecked by default', () => {
-    render(<GlobalSettings />)
-    const clickCheckbox = screen.getByRole('checkbox', { name: /scroll to bottom on click/i })
-    const focusCheckbox = screen.getByRole('checkbox', { name: /scroll to bottom on app focus/i })
-    const mountCheckbox = screen.getByRole('checkbox', { name: /scroll to bottom on tab switch/i })
-    expect((clickCheckbox as HTMLInputElement).checked).toBe(false)
-    expect((focusCheckbox as HTMLInputElement).checked).toBe(false)
-    expect((mountCheckbox as HTMLInputElement).checked).toBe(false)
+    const textarea = screen.getByPlaceholderText(/gh-readonly-queue/i)
+    fireEvent.change(textarea, { target: { value: 'renovate/*\n\n  release/*  ' } })
+    fireEvent.blur(textarea)
+    expect(mockUpdateBranchExclude).toHaveBeenCalledWith(['renovate/*', 'release/*'])
   })
 })

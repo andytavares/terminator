@@ -11,9 +11,6 @@ interface SettingsState {
   updateWorkspaceTheme: (workspaceId: string, theme: 'dark' | 'light') => Promise<void>
   updateScrollbackLimit: (limit: number) => Promise<void>
   updateWorkspaceScrollback: (workspaceId: string, limit: number) => Promise<void>
-  updateScrollToBottomOnClick: (value: boolean) => Promise<void>
-  updateScrollToBottomOnFocus: (value: boolean) => Promise<void>
-  updateScrollToBottomOnMount: (value: boolean) => Promise<void>
   updateWorktreeBaseDir: (dir: string) => Promise<void>
   updateWorkspaceWorktreeBaseDir: (workspaceId: string, dir: string | undefined) => Promise<void>
   updateBranchExcludePatterns: (patterns: string[]) => Promise<void>
@@ -31,9 +28,6 @@ const DEFAULT_SETTINGS: GlobalSettings = {
   terminal: {
     scrollbackLimit: 10000,
     defaultShell: '/bin/zsh',
-    scrollToBottomOnClick: false,
-    scrollToBottomOnFocus: false,
-    scrollToBottomOnMount: false,
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},
@@ -117,27 +111,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       map.set(workspaceId, result.settings)
       return { workspaceSettings: map }
     })
-  },
-
-  updateScrollToBottomOnClick: async (value) => {
-    const result = await window.electronAPI.settings.updateGlobal({
-      terminal: { scrollToBottomOnClick: value },
-    })
-    set({ globalSettings: result.settings })
-  },
-
-  updateScrollToBottomOnFocus: async (value) => {
-    const result = await window.electronAPI.settings.updateGlobal({
-      terminal: { scrollToBottomOnFocus: value },
-    })
-    set({ globalSettings: result.settings })
-  },
-
-  updateScrollToBottomOnMount: async (value) => {
-    const result = await window.electronAPI.settings.updateGlobal({
-      terminal: { scrollToBottomOnMount: value },
-    })
-    set({ globalSettings: result.settings })
   },
 
   updateWorktreeBaseDir: async (dir) => {

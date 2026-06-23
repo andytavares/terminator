@@ -124,6 +124,15 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-build
+          path: |
+            out/
+            extensions/*/src/index.js
+          retention-days: 1
+
   e2e:
     name: E2E
     needs: build
@@ -143,8 +152,19 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install chromium
 
-      - name: Build app
-        run: npm run build
+      # The Electron binary on macOS arm64 can have an invalid code signature
+      # (dyld errno=85), causing intermittent "Process failed to launch"
+      # failures. Force-extract the binary (install.js is idempotent) and
+      # ad-hoc re-sign it before launching the suite.
+      - name: Re-sign Electron (macOS arm64 code-signature workaround)
+        run: |
+          node node_modules/electron/install.js
+          codesign --force --deep --sign - node_modules/electron/dist/Electron.app
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
 
       - name: Run E2E suite
         run: npx playwright test

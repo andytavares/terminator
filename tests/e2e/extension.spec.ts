@@ -56,8 +56,17 @@ test('US6-4: toggling an extension off and on keeps the app stable', async () =>
     .locator('.extension-item__actions button, .extension-item__actions input')
     .first()
   if (await toggle.isVisible().catch(() => false)) {
+    // Each toggle triggers window.location.reload(); wait for the reload to
+    // settle before interacting again.
     await toggle.click()
-    await toggle.click()
+    await page.waitForLoadState('domcontentloaded')
+    await openExtensionsSettings(page)
+    const toggle2 = page
+      .locator('.extension-item__actions button, .extension-item__actions input')
+      .first()
+    await toggle2.click()
+    await page.waitForLoadState('domcontentloaded')
+    await openExtensionsSettings(page)
   }
   // App and settings panel remain functional.
   await expect(page.locator('.settings-panel__content')).toBeVisible()
