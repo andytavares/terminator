@@ -128,7 +128,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-build
-          path: out/
+          path: |
+            out/
+            extensions/*/src/index.js
           retention-days: 1
 
   e2e:
@@ -154,7 +156,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: app-build
-          path: out/
 
       - name: Run E2E suite
         run: npx playwright test
