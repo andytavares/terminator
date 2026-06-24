@@ -1,0 +1,19 @@
+tests/unit/renderer/App.spec.tsx
+  s_b02627c7ff40a0::t_3692571b2c04aa 1213-1239
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "586b3053940a03317ae0c6d44c34ef9fc2c297cf",
+  "prompts": {},
+  "sessions": {
+    "s_b02627c7ff40a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53eccda1-ef12-4288-98d9-eebbc3ea062a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
