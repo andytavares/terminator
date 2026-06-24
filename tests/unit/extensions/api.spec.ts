@@ -51,8 +51,11 @@ vi.mock('../../../src/main/storage/extension-settings-store', () => ({
   getAllExtensionSettings: () => ({ ...mockExtensionStore }),
 }))
 
-import { Menu } from 'electron'
-import { createExtensionAPI, globalRegistry } from '../../../src/main/extensions/api'
+import {
+  createExtensionAPI,
+  globalRegistry,
+  setMenuRebuildCallback,
+} from '../../../src/main/extensions/api'
 import * as shellExecutor from '../../../src/main/shell/shell-executor'
 
 beforeEach(() => {
@@ -172,18 +175,7 @@ describe('api.nativeMenu.addViewMenuItem', () => {
     expect(contrib?.panelId).toBe('my-panel')
   })
 
-  it('rebuildViewMenu populates panelMenuItemIds when a real app menu exists', () => {
-    // Provide a fake app menu with a View submenu so rebuildViewMenu runs past the early return
-    const fakeViewItem = {
-      label: 'View',
-      submenu: {
-        items: [{ id: undefined, label: 'Toggle Sidebar', type: 'normal', click: vi.fn() }],
-      },
-    }
-    const fakeAppMenu = { items: [fakeViewItem] }
-    vi.mocked(Menu.getApplicationMenu).mockReturnValueOnce(fakeAppMenu as never)
-    vi.mocked(Menu.buildFromTemplate).mockReturnValueOnce(fakeAppMenu as never)
-
+  it('rebuildViewMenu populates panelMenuItemIds for contributions with panelId', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
     api.nativeMenu.addViewMenuItem({
       id: 'rebuild-test',
@@ -193,25 +185,26 @@ describe('api.nativeMenu.addViewMenuItem', () => {
       panelId: 'rebuild-panel',
     })
 
-    // rebuildViewMenu is called by addViewMenuItem; with a real menu it should populate panelMenuItemIds
     expect(globalRegistry.panelMenuItemIds.get('rebuild-panel')).toBe('ext-menu-rebuild-test')
   })
 
-  it('rebuildViewMenu handles items without panelId (normal type)', () => {
-    const fakeViewItem = {
-      label: 'View',
-      submenu: { items: [{ id: undefined, label: 'Toggle Sidebar', type: 'normal' }] },
-    }
-    const fakeAppMenu = { items: [fakeViewItem] }
-    vi.mocked(Menu.getApplicationMenu).mockReturnValueOnce(fakeAppMenu as never)
-    vi.mocked(Menu.buildFromTemplate).mockReturnValueOnce(fakeAppMenu as never)
-
+  it('rebuildViewMenu does not add to panelMenuItemIds when panelId is absent', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
-    // No panelId — should not throw and should not add to panelMenuItemIds
     expect(() =>
       api.nativeMenu.addViewMenuItem({ id: 'no-panel', label: 'No Panel', onClick: vi.fn() })
     ).not.toThrow()
     expect(globalRegistry.panelMenuItemIds.has('no-panel')).toBe(false)
+  })
+
+  it('rebuildViewMenu calls the registered menu rebuild callback', () => {
+    const mockRebuild = vi.fn()
+    setMenuRebuildCallback(mockRebuild)
+
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    api.nativeMenu.addViewMenuItem({ id: 'cb-test', label: 'CB Test', onClick: vi.fn() })
+
+    expect(mockRebuild).toHaveBeenCalled()
+    setMenuRebuildCallback(() => {})
   })
 })
 

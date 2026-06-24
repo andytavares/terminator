@@ -24,7 +24,7 @@ import {
 } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
 import { runLegacyMigration } from './db/migrate.js'
-import { globalRegistry } from './extensions/api.js'
+import { globalRegistry, setMenuRebuildCallback } from './extensions/api.js'
 
 // Intercept ipcMain.handle/on to capture handlers into the bridge registry
 // so the remote-control extension bridge can dispatch IPC calls from browser clients.
@@ -214,6 +214,10 @@ function setupMenu(): void {
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
+
+// Wire up api.ts so extension activations can trigger a full menu rebuild
+// from MenuItemConstructorOptions (preserving all accelerators and click handlers).
+setMenuRebuildCallback(setupMenu)
 
 function registerAppHandlers(): void {
   _origOn(

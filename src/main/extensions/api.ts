@@ -222,7 +222,7 @@ export interface ExtensionAPI {
   }
 }
 
-import { BrowserWindow, Menu, ipcMain, globalShortcut as electronGlobalShortcut } from 'electron'
+import { BrowserWindow, ipcMain, globalShortcut as electronGlobalShortcut } from 'electron'
 import { join } from 'path'
 
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
@@ -275,46 +275,29 @@ export const globalRegistry: Registry = {
   sessionCloseHandlers: new Set(),
 }
 
+// Callback set by the main process so api.ts can trigger a full menu rebuild
+// without importing from index.ts (which would create a circular dependency).
+let menuRebuildCallback: (() => void) | null = null
+
+export function setMenuRebuildCallback(fn: () => void): void {
+  menuRebuildCallback = fn
+}
+
 function rebuildViewMenu(): void {
-  try {
-    const appMenu = Menu.getApplicationMenu()
-    if (!appMenu) return
-
-    // Repopulate panelMenuItemIds from current contribution state
-    globalRegistry.panelMenuItemIds.clear()
-    const extContribs = Array.from(globalRegistry.nativeMenuItems.values())
-    const extItems: Electron.MenuItemConstructorOptions[] = extContribs.map((contrib) => {
-      const id = `ext-menu-${contrib.id}`
-      if (contrib.panelId) globalRegistry.panelMenuItemIds.set(contrib.panelId, id)
-      return {
-        id,
-        label: contrib.label,
-        accelerator: contrib.accelerator,
-        type: (contrib.type === 'checkbox' ? 'checkbox' : 'normal') as 'checkbox' | 'normal',
-        checked: false,
-        click: () => contrib.onClick(),
-      }
-    })
-
-    // Rebuild the full application menu, replacing only the View submenu contents.
-    // Non-View top-level items are passed as existing MenuItem objects to preserve their handlers.
-    const newTemplate = appMenu.items.map((topItem) => {
-      if (topItem.label !== 'View' || !topItem.submenu) return topItem
-
-      // Drop previously-injected extension items; keep core items intact.
-      const baseItems = topItem.submenu.items.filter((i) => !i.id?.startsWith('ext-menu-'))
-      const parts: (Electron.MenuItemConstructorOptions | Electron.MenuItem)[] = [...baseItems]
-      if (extItems.length > 0) {
-        parts.push({ type: 'separator' })
-        parts.push(...extItems)
-      }
-      return { label: 'View', submenu: parts }
-    })
-
-    Menu.setApplicationMenu(Menu.buildFromTemplate(newTemplate))
-  } catch {
-    // Menu may not exist in test environments; ignore
+  // Repopulate panelMenuItemIds from current contribution state so that
+  // menu:set-panel-checked IPC can find the correct MenuItem by ID.
+  globalRegistry.panelMenuItemIds.clear()
+  for (const contrib of globalRegistry.nativeMenuItems.values()) {
+    if (contrib.panelId) {
+      globalRegistry.panelMenuItemIds.set(contrib.panelId, `ext-menu-${contrib.id}`)
+    }
   }
+
+  // Delegate the actual Electron menu rebuild to the main process so the full
+  // application menu is always reconstructed from MenuItemConstructorOptions.
+  // Rebuilding from live MenuItem objects (appMenu.items) loses accelerator and
+  // click-handler bindings — the callback avoids that by using the original template.
+  menuRebuildCallback?.()
 }
 
 // Map from view name to open auxiliary BrowserWindow (shared across all extensions)
