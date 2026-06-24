@@ -1210,6 +1210,33 @@ describe('App', () => {
     }))
   })
 
+  it('reopens saved panels from localStorage that are not yet open on mount', async () => {
+    // Covers line 343: `if (!openPanels.has(id)) togglePanel(id)` — true branch
+    const mockTogglePanel = vi.fn()
+    setupMocks({ activeProjectId: 'proj-1' })
+    localStorage.setItem('openPanels', JSON.stringify(['saved-panel']))
+    ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
+      registerGlobalTab: vi.fn(() => vi.fn()),
+      setActiveGlobalTab: vi.fn(),
+      sidebarPanels: new Map(),
+      openPanels: new Set<string>(), // 'saved-panel' is NOT open → triggers togglePanel
+    }))
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      togglePanel: mockTogglePanel,
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    render(<App />)
+    await waitFor(() => {
+      expect(mockTogglePanel).toHaveBeenCalledWith('saved-panel')
+    })
+    localStorage.removeItem('openPanels')
+    ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
+      registerGlobalTab: vi.fn(() => vi.fn()),
+      setActiveGlobalTab: vi.fn(),
+      sidebarPanels: new Map(),
+    }))
+  })
+
   it('does not throw when extensionEvents is null and registered panels are open', async () => {
     // extensionEvents: null + sidebarPanels has entries → covers the null branch of
     // `extensionEvents?.notifyPanelState?.(...)` inside the for loop body
