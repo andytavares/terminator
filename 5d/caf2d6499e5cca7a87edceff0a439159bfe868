@@ -1,0 +1,69 @@
+src/main/extensions/extension-host.ts
+  s_b02627c7ff40a0::t_f5c2bc11bcc89d 66
+  s_b02627c7ff40a0::t_67b29ab9d3ab97 196-202
+  s_b02627c7ff40a0::t_655c7f6b1bfbe4 95-96
+  s_b02627c7ff40a0::t_37712a5ca27104 19
+src/main/extensions/api.ts
+  s_b02627c7ff40a0::t_632bad78b0ceac 250-251,269
+  s_b02627c7ff40a0::t_bc4532a91e0354 49-52
+  s_b02627c7ff40a0::t_e7c944d2adf6de 282-314
+tests/unit/renderer/App.spec.tsx
+  s_b02627c7ff40a0::t_ceb5f022934888 1158-1159
+  s_b02627c7ff40a0::t_78495dbe5c4766 1191,1194-1203
+  s_b02627c7ff40a0::t_0d2fba994c7e22 1213-1234
+  s_b02627c7ff40a0::t_13e6236c1b79fd 1156-1157,1160-1190,1192-1193,1204-1212
+  s_b02627c7ff40a0::t_bb731878133fa9 23
+extensions/task-vault/src/index.ts
+  s_b02627c7ff40a0::t_0a75a5f156b3fb 146-157
+src/renderer/App.tsx
+  s_b02627c7ff40a0::t_9ebc541b674d5e 358-360
+  s_b02627c7ff40a0::t_688b24d27cd726 352-353,355-357
+extensions/git-integration/src/index.ts
+  s_b02627c7ff40a0::t_fc684ab8635f42 92,94-95,97
+extensions/task-vault/src/renderer.tsx
+  s_b02627c7ff40a0::t_a111f45dead383 111-113
+src/renderer/extensions/loader.ts
+  s_b02627c7ff40a0::t_a51a8e8c484880 5,9-10,14,24,26,33-36,38-44
+  s_b02627c7ff40a0::t_716e61f6587646 7,15-21,37,45
+  s_b02627c7ff40a0::t_78d6ce8df4300e 11-13
+tests/unit/extensions/extension-host.spec.ts
+  s_b02627c7ff40a0::t_a150324b6d57dc 236-283
+src/shared/schemas/extension.schema.ts
+  s_b02627c7ff40a0::t_63003284baca0a 15
+src/shared/types/index.ts
+  s_b02627c7ff40a0::t_1be33db7723346 64-65,74
+tests/unit/renderer/extensions/loader.spec.ts
+  s_b02627c7ff40a0::t_0c40b11bde8588 159-160,165,172-174,176
+  s_b02627c7ff40a0::t_2996d450959196 8,94,104-106,114-118,120
+  s_b02627c7ff40a0::t_2449351ac0fab4 22-23,28
+  s_b02627c7ff40a0::t_7377b9f647f1b8 4-5,31-39,41,46,51,56-59,64,69,74,79-82,87,93,95-103,107-113,119,121-132,139-148,150-152,155
+tests/unit/extensions/api.spec.ts
+  s_b02627c7ff40a0::t_4b8a7c9d9737d3 54
+  s_b02627c7ff40a0::t_0d1d879e3a24b6 129-132,159-172
+  s_b02627c7ff40a0::t_816a23dbdb9e64 173-215
+src/main/index.ts
+  s_b02627c7ff40a0::t_972c3dcf872c2a 222-226
+  s_b02627c7ff40a0::t_f881a9318f12a4 260-274
+  s_b02627c7ff40a0::t_27c54adb8a0be5 215
+  s_b02627c7ff40a0::t_b27dea3dcececd 27
+  s_b02627c7ff40a0::t_9e50f794f64875 1
+  s_b02627c7ff40a0::t_80117177ca8492 191
+  s_b02627c7ff40a0::t_a1df7f53d1b177 126-160
+  s_b02627c7ff40a0::t_bd3b9aee08e7ad 302-303
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "5dcaf2d6499e5cca7a87edceff0a439159bfe868",
+  "prompts": {},
+  "sessions": {
+    "s_b02627c7ff40a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53eccda1-ef12-4288-98d9-eebbc3ea062a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
