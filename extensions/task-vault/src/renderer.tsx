@@ -108,6 +108,9 @@ useVaultDataStore.subscribe((state, prevState) => {
 })
 
 void refreshInboxBadge()
+window.electronAPI.extensionBridge.on('task-vault:navigate-task', (payload) => {
+  registry.setActiveGlobalTabWithNavigation('task-vault', payload)
+})
 window.electronAPI.extensionBridge.on('task-vault:push:index-updated', () => {
   void refreshInboxBadge()
 })

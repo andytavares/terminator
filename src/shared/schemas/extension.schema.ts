@@ -12,6 +12,7 @@ export const ExtensionManifestSchema = z.object({
   version: z.string().regex(semverRegex, 'Version must be a valid semver string (X.Y.Z)'),
   description: z.string().min(1),
   main: z.string().min(1),
+  renderer: z.string().optional(),
   minAppVersion: z.string().regex(semverRangeRegex, 'minAppVersion must be a valid semver range'),
 })
 

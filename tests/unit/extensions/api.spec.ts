@@ -51,6 +51,7 @@ vi.mock('../../../src/main/storage/extension-settings-store', () => ({
   getAllExtensionSettings: () => ({ ...mockExtensionStore }),
 }))
 
+import { Menu } from 'electron'
 import { createExtensionAPI, globalRegistry } from '../../../src/main/extensions/api'
 import * as shellExecutor from '../../../src/main/shell/shell-executor'
 
@@ -125,6 +126,10 @@ describe('api.shell.exec', () => {
 })
 
 describe('api.nativeMenu.addViewMenuItem', () => {
+  beforeEach(() => {
+    globalRegistry.panelMenuItemIds.clear()
+  })
+
   it('adds item and returns a disposable', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
     const onClick = vi.fn()
@@ -150,6 +155,63 @@ describe('api.nativeMenu.addViewMenuItem', () => {
 
     disposable.dispose()
     expect(globalRegistry.nativeMenuItems.has('test.ext.nativemenu.item-to-remove')).toBe(false)
+  })
+
+  it('stores panelId and type fields on the contribution', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    api.nativeMenu.addViewMenuItem({
+      id: 'panel-toggle',
+      label: 'Toggle Panel',
+      onClick: vi.fn(),
+      type: 'checkbox',
+      panelId: 'my-panel',
+    })
+
+    const contrib = globalRegistry.nativeMenuItems.get('test.ext.nativemenu.panel-toggle')
+    expect(contrib?.type).toBe('checkbox')
+    expect(contrib?.panelId).toBe('my-panel')
+  })
+
+  it('rebuildViewMenu populates panelMenuItemIds when a real app menu exists', () => {
+    // Provide a fake app menu with a View submenu so rebuildViewMenu runs past the early return
+    const fakeViewItem = {
+      label: 'View',
+      submenu: {
+        items: [{ id: undefined, label: 'Toggle Sidebar', type: 'normal', click: vi.fn() }],
+      },
+    }
+    const fakeAppMenu = { items: [fakeViewItem] }
+    vi.mocked(Menu.getApplicationMenu).mockReturnValueOnce(fakeAppMenu as never)
+    vi.mocked(Menu.buildFromTemplate).mockReturnValueOnce(fakeAppMenu as never)
+
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    api.nativeMenu.addViewMenuItem({
+      id: 'rebuild-test',
+      label: 'Rebuild Test',
+      onClick: vi.fn(),
+      type: 'checkbox',
+      panelId: 'rebuild-panel',
+    })
+
+    // rebuildViewMenu is called by addViewMenuItem; with a real menu it should populate panelMenuItemIds
+    expect(globalRegistry.panelMenuItemIds.get('rebuild-panel')).toBe('ext-menu-rebuild-test')
+  })
+
+  it('rebuildViewMenu handles items without panelId (normal type)', () => {
+    const fakeViewItem = {
+      label: 'View',
+      submenu: { items: [{ id: undefined, label: 'Toggle Sidebar', type: 'normal' }] },
+    }
+    const fakeAppMenu = { items: [fakeViewItem] }
+    vi.mocked(Menu.getApplicationMenu).mockReturnValueOnce(fakeAppMenu as never)
+    vi.mocked(Menu.buildFromTemplate).mockReturnValueOnce(fakeAppMenu as never)
+
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    // No panelId — should not throw and should not add to panelMenuItemIds
+    expect(() =>
+      api.nativeMenu.addViewMenuItem({ id: 'no-panel', label: 'No Panel', onClick: vi.fn() })
+    ).not.toThrow()
+    expect(globalRegistry.panelMenuItemIds.has('no-panel')).toBe(false)
   })
 })
 

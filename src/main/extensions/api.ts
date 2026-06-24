@@ -46,6 +46,10 @@ export interface NativeMenuItemContribution {
   label: string
   onClick(): void
   accelerator?: string
+  /** When set to 'checkbox', renders as a checkable menu item. */
+  type?: 'checkbox'
+  /** Panel ID that this menu item toggles. Used to update the checked state when the panel opens/closes. */
+  panelId?: string
 }
 
 export interface FsChangeEvent {
@@ -218,13 +222,7 @@ export interface ExtensionAPI {
   }
 }
 
-import {
-  BrowserWindow,
-  Menu,
-  MenuItem,
-  ipcMain,
-  globalShortcut as electronGlobalShortcut,
-} from 'electron'
+import { BrowserWindow, Menu, ipcMain, globalShortcut as electronGlobalShortcut } from 'electron'
 import { join } from 'path'
 
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
@@ -249,6 +247,8 @@ interface Registry {
   globalTabs: Map<string, GlobalTabContribution>
   topBarItems: Map<string, TopBarMenuContribution>
   nativeMenuItems: Map<string, NativeMenuItemContribution>
+  /** Maps panel ID → Electron menu item id for checkbox menu items registered by extensions. */
+  panelMenuItemIds: Map<string, string>
   contextMenuItems: Map<string, { target: ContextMenuTarget; item: MenuItemContribution }>
   keyboardHandlers: Map<string, () => void>
   commandContributions: Map<string, CommandContribution>
@@ -266,6 +266,7 @@ export const globalRegistry: Registry = {
   globalTabs: new Map(),
   topBarItems: new Map(),
   nativeMenuItems: new Map(),
+  panelMenuItemIds: new Map(),
   contextMenuItems: new Map(),
   keyboardHandlers: new Map(),
   commandContributions: new Map(),
@@ -278,30 +279,39 @@ function rebuildViewMenu(): void {
   try {
     const appMenu = Menu.getApplicationMenu()
     if (!appMenu) return
-    const viewMenu = appMenu.items.find((item) => item.label === 'View')
-    if (!viewMenu?.submenu) return
 
-    // Collect extension-contributed items
-    const extItems = Array.from(globalRegistry.nativeMenuItems.values()).map(
-      (contrib) =>
-        new MenuItem({
-          label: contrib.label,
-          accelerator: contrib.accelerator,
-          click: () => contrib.onClick(),
-        })
-    )
+    // Repopulate panelMenuItemIds from current contribution state
+    globalRegistry.panelMenuItemIds.clear()
+    const extContribs = Array.from(globalRegistry.nativeMenuItems.values())
+    const extItems: Electron.MenuItemConstructorOptions[] = extContribs.map((contrib) => {
+      const id = `ext-menu-${contrib.id}`
+      if (contrib.panelId) globalRegistry.panelMenuItemIds.set(contrib.panelId, id)
+      return {
+        id,
+        label: contrib.label,
+        accelerator: contrib.accelerator,
+        type: (contrib.type === 'checkbox' ? 'checkbox' : 'normal') as 'checkbox' | 'normal',
+        checked: false,
+        click: () => contrib.onClick(),
+      }
+    })
 
-    // Rebuild submenu: keep non-extension items, append extension items
-    const baseItems = viewMenu.submenu.items.filter((item) => !item.label?.startsWith('[ext]'))
-    const newSubmenu = Menu.buildFromTemplate([
-      ...baseItems.map((item) => item as Electron.MenuItemConstructorOptions),
-      ...(extItems.length > 0 ? [{ type: 'separator' as const }] : []),
-      ...extItems.map((item) => ({ ...item, label: item.label })),
-    ])
-    void newSubmenu
-    // Rebuild the full app menu with the new View submenu items
-    // (In practice, Electron requires full menu rebuild)
-    Menu.setApplicationMenu(appMenu)
+    // Rebuild the full application menu, replacing only the View submenu contents.
+    // Non-View top-level items are passed as existing MenuItem objects to preserve their handlers.
+    const newTemplate = appMenu.items.map((topItem) => {
+      if (topItem.label !== 'View' || !topItem.submenu) return topItem
+
+      // Drop previously-injected extension items; keep core items intact.
+      const baseItems = topItem.submenu.items.filter((i) => !i.id?.startsWith('ext-menu-'))
+      const parts: (Electron.MenuItemConstructorOptions | Electron.MenuItem)[] = [...baseItems]
+      if (extItems.length > 0) {
+        parts.push({ type: 'separator' })
+        parts.push(...extItems)
+      }
+      return { label: 'View', submenu: parts }
+    })
+
+    Menu.setApplicationMenu(Menu.buildFromTemplate(newTemplate))
   } catch {
     // Menu may not exist in test environments; ignore
   }

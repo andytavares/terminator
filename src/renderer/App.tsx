@@ -278,13 +278,6 @@ export function App(): JSX.Element {
     })
   }, [addNotification, addToast])
 
-  // Global handler for extension navigation events — works even when the target tab is unmounted
-  useEffect(() => {
-    return window.electronAPI.extensionBridge.on('task-vault:navigate-task', (payload) => {
-      useExtensionRegistry.getState().setActiveGlobalTabWithNavigation('task-vault', payload)
-    })
-  }, [])
-
   // Deactivate scratch view when a real project is selected
   useEffect(() => {
     if (activeProjectId) setScratchActive(false)
@@ -356,18 +349,15 @@ export function App(): JSX.Element {
     panelsRestored.current = true
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Persist open panels whenever they change (skip until restore has run)
+  // Persist open panels whenever they change (skip localStorage until restore has run),
+  // but always notify the main process of current panel states.
   useEffect(() => {
-    if (!panelsRestored.current) return
-    localStorage.setItem('openPanels', JSON.stringify(Array.from(openPanels)))
-    window.electronAPI.extensionEvents?.notifyPanelState?.(
-      'git-changes',
-      openPanels.has('git-changes')
-    )
-    window.electronAPI.extensionEvents?.notifyPanelState?.(
-      'task-vault-links',
-      openPanels.has('task-vault-links')
-    )
+    if (panelsRestored.current) {
+      localStorage.setItem('openPanels', JSON.stringify(Array.from(openPanels)))
+    }
+    for (const panelId of useExtensionRegistry.getState().sidebarPanels.keys()) {
+      window.electronAPI.extensionEvents?.notifyPanelState?.(panelId, openPanels.has(panelId))
+    }
   }, [openPanels])
 
   useEffect(() => {

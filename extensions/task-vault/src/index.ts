@@ -143,6 +143,18 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     )
   }
 
+  disposables.push(
+    api.nativeMenu.addViewMenuItem({
+      id: 'vault-calendar-toggle',
+      label: 'Toggle Vault Calendar',
+      type: 'checkbox',
+      panelId: 'task-vault-links',
+      onClick: () => {
+        api.window.broadcast('extension:toggle-panel', 'task-vault-links')
+      },
+    })
+  )
+
   const reviewDay = parseInt(
     api.settings.get<string>('terminator.task-vault.weeklyReviewDay') ?? '0',
     10
