@@ -20,6 +20,7 @@ vi.mock('../../../src/renderer/extensions/registry', () => {
   ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
     registerGlobalTab: vi.fn(() => vi.fn()),
     setActiveGlobalTab: vi.fn(),
+    sidebarPanels: new Map(),
   }))
   return { useExtensionRegistry }
 })
@@ -1150,6 +1151,112 @@ describe('App', () => {
     expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
     expect(mockSetActiveWorkspaceTab).toHaveBeenCalledWith(null)
     expect(mockSetActiveProjectTab).toHaveBeenCalledWith(null)
+  })
+
+  it('calls notifyPanelState for each registered panel when openPanels changes', async () => {
+    const mockNotifyPanelState = vi.fn()
+    // setupMocks first so its electronAPI/registry setup happens before our overrides
+    setupMocks({ activeProjectId: 'proj-1' })
+    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
+      extensionEvents: {
+        onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
+        onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
+        onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
+        onToast: vi.fn().mockReturnValue(vi.fn()),
+        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
+        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
+        notifyPanelState: mockNotifyPanelState,
+      },
+      extensionBridge: {
+        on: vi.fn().mockReturnValue(mockUnsubscribe),
+        invoke: vi.fn().mockResolvedValue({}),
+      },
+      notifications: {
+        list: vi.fn().mockResolvedValue([]),
+        dismiss: vi.fn().mockResolvedValue({ ok: true }),
+        onPush: vi.fn().mockReturnValue(mockUnsubscribe),
+      },
+    }
+    // Registry has a registered panel; getState returns a sidebarPanels map with one entry
+    ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
+      registerGlobalTab: vi.fn(() => vi.fn()),
+      setActiveGlobalTab: vi.fn(),
+      sidebarPanels: new Map([['git-changes', {}]]),
+    }))
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      openPanels: new Set(['git-changes']),
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    const { rerender } = render(<App />)
+    await waitFor(() => {
+      expect(mockNotifyPanelState).toHaveBeenCalledWith('git-changes', true)
+    })
+    // After initial mount, panelsRestored.current = true. Change openPanels to trigger
+    // the effect again — this covers the localStorage.setItem branch (panelsRestored = true).
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      openPanels: new Set<string>(),
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    rerender(<App />)
+    await waitFor(() => {
+      expect(mockNotifyPanelState).toHaveBeenCalledWith('git-changes', false)
+    })
+    // Restore the default getState mock
+    ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
+      registerGlobalTab: vi.fn(() => vi.fn()),
+      setActiveGlobalTab: vi.fn(),
+      sidebarPanels: new Map(),
+    }))
+  })
+
+  it('reopens saved panels from localStorage that are not yet open on mount', async () => {
+    // Covers line 343: `if (!openPanels.has(id)) togglePanel(id)` — true branch
+    const mockTogglePanel = vi.fn()
+    setupMocks({ activeProjectId: 'proj-1' })
+    localStorage.setItem('openPanels', JSON.stringify(['saved-panel']))
+    ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
+      registerGlobalTab: vi.fn(() => vi.fn()),
+      setActiveGlobalTab: vi.fn(),
+      sidebarPanels: new Map(),
+      openPanels: new Set<string>(), // 'saved-panel' is NOT open → triggers togglePanel
+    }))
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      togglePanel: mockTogglePanel,
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    render(<App />)
+    await waitFor(() => {
+      expect(mockTogglePanel).toHaveBeenCalledWith('saved-panel')
+    })
+    localStorage.removeItem('openPanels')
+    ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
+      registerGlobalTab: vi.fn(() => vi.fn()),
+      setActiveGlobalTab: vi.fn(),
+      sidebarPanels: new Map(),
+    }))
+  })
+
+  it('does not throw when extensionEvents is null and registered panels are open', async () => {
+    // extensionEvents: null + sidebarPanels has entries → covers the null branch of
+    // `extensionEvents?.notifyPanelState?.(...)` inside the for loop body
+    setupMocks({ activeProjectId: 'proj-1' })
+    // leave electronAPI.extensionEvents as null (set by setupMocks → beforeEach default)
+    ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
+      registerGlobalTab: vi.fn(() => vi.fn()),
+      setActiveGlobalTab: vi.fn(),
+      sidebarPanels: new Map([['git-changes', {}]]),
+    }))
+    vi.mocked(useExtensionRegistry).mockReturnValue({
+      ...defaultExtensionRegistry,
+      openPanels: new Set(['git-changes']),
+    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    expect(() => render(<App />)).not.toThrow()
+    ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
+      registerGlobalTab: vi.fn(() => vi.fn()),
+      setActiveGlobalTab: vi.fn(),
+      sidebarPanels: new Map(),
+    }))
   })
 
   it('reopens saved panels when switching back to Terminal tab', async () => {

@@ -16,6 +16,7 @@ const hostLogger = makeLogger('extension-host')
 
 interface ExtensionRecord extends Extension {
   directoryPath: string
+  rendererRelPath?: string
 }
 
 interface ExtensionStoreSchema {
@@ -62,7 +63,7 @@ export class ExtensionHost {
       return { error: 'INVALID_MANIFEST', message: parsed.error.message }
     }
 
-    const { id, name, version, description, main } = parsed.data
+    const { id, name, version, description, main, renderer } = parsed.data
     const existing = store.get('extensions').find((e) => e.id === id)
     if (existing) {
       hostLogger.warn(`DUPLICATE_ID: extension ${id} is already registered`)
@@ -91,6 +92,8 @@ export class ExtensionHost {
       status: 'enabled',
       installedAt: new Date().toISOString(),
       directoryPath,
+      rendererRelPath: renderer,
+      rendererUrl: renderer ? `ext://${id}/${renderer}` : undefined,
     }
 
     const loadResult = await this.activate(record)
@@ -190,7 +193,14 @@ export class ExtensionHost {
   }
 
   listExtensions(): Extension[] {
-    return store.get('extensions').map(({ directoryPath: _dp, ...ext }) => ext)
+    return store
+      .get('extensions')
+      .map(({ directoryPath: _dp, rendererRelPath: _rrp, ...ext }) => ext)
+  }
+
+  getExtensionDirectory(id: string): string | null {
+    const record = store.get('extensions').find((e) => e.id === id)
+    return record?.directoryPath ?? null
   }
 
   async loadAll(): Promise<void> {

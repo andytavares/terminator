@@ -1,31 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // loader.ts uses import.meta.glob which is a Vite build-time feature.
-// In tests we cannot use the real module as-is, so we test the extracted
-// logic directly by reproducing the initExtensions function with
-// injectable renderers — this ensures we exercise every branch of the
-// actual implementation code.
-
-// Simulate the iterable logic from loader.ts with an injectable renderers map
-async function initExtensionsWithRenderers(
-  renderers: Record<string, () => Promise<unknown>>,
-  listFn: () => Promise<{ extensions: { id: string; status: string }[] }>
-): Promise<void> {
-  const result = await listFn()
-  const activeIds = new Set(
-    result.extensions.filter((e) => e.status === 'enabled').map((e) => e.id)
-  )
-
-  for (const [path, load] of Object.entries(renderers)) {
-    const match = path.match(/extensions\/([^/]+)\/src\/renderer\.tsx/)
-    if (!match) continue
-    const dirName = match[1]
-    const isActive = [...activeIds].some((id) => id === dirName || id.split('.').pop() === dirName)
-    if (isActive) await load()
-  }
-}
+// We test `initExtensions` directly by injecting `renderers` and `dynamicLoader`
+// via the optional parameter object — this exercises all branches of the real function.
 
 const fakeLoad = vi.fn().mockResolvedValue(undefined)
+const fakeDynamicImport = vi.fn().mockResolvedValue(undefined)
 
 const fakeRenderers: Record<string, () => Promise<unknown>> = {
   '../../../extensions/git-integration/src/renderer.tsx': fakeLoad,
@@ -39,130 +19,160 @@ const mockList = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    extension: { list: mockList },
+  ;(globalThis as unknown as Record<string, unknown>).window = {
+    electronAPI: { extension: { list: mockList } },
   }
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  delete (globalThis as unknown as Record<string, unknown>).window
 })
 
-describe('initExtensions logic', () => {
+async function callInit(
+  extensions: { id: string; status: string; rendererUrl?: string }[]
+): Promise<void> {
+  mockList.mockResolvedValue({ extensions })
+  const { initExtensions } = await import('../../../../src/renderer/extensions/loader')
+  return initExtensions({ renderers: fakeRenderers, dynamicLoader: fakeDynamicImport })
+}
+
+describe('initExtensions — bundled extension loading', () => {
   it('calls list to get active extensions', async () => {
-    mockList.mockResolvedValue({ extensions: [] })
-    await initExtensionsWithRenderers(fakeRenderers, mockList)
+    await callInit([])
     expect(mockList).toHaveBeenCalledTimes(1)
   })
 
   it('loads renderer for enabled extension matching directory name exactly', async () => {
-    mockList.mockResolvedValue({
-      extensions: [{ id: 'git-integration', status: 'enabled' }],
-    })
-    await initExtensionsWithRenderers(fakeRenderers, mockList)
+    await callInit([{ id: 'git-integration', status: 'enabled' }])
     expect(fakeLoad).toHaveBeenCalledTimes(1)
   })
 
   it('loads renderer for enabled extension matched by last dot-segment of id', async () => {
-    mockList.mockResolvedValue({
-      extensions: [{ id: 'terminator.task-vault', status: 'enabled' }],
-    })
-    await initExtensionsWithRenderers(fakeRenderers, mockList)
+    await callInit([{ id: 'terminator.task-vault', status: 'enabled' }])
     expect(fakeLoad).toHaveBeenCalledTimes(1)
   })
 
   it('loads multiple renderers when multiple extensions are enabled', async () => {
-    mockList.mockResolvedValue({
-      extensions: [
-        { id: 'git-integration', status: 'enabled' },
-        { id: 'task-vault', status: 'enabled' },
-      ],
-    })
-    await initExtensionsWithRenderers(fakeRenderers, mockList)
+    await callInit([
+      { id: 'git-integration', status: 'enabled' },
+      { id: 'task-vault', status: 'enabled' },
+    ])
     expect(fakeLoad).toHaveBeenCalledTimes(2)
   })
 
   it('does not load renderer for disabled extension', async () => {
-    mockList.mockResolvedValue({
-      extensions: [{ id: 'git-integration', status: 'disabled' }],
-    })
-    await initExtensionsWithRenderers(fakeRenderers, mockList)
+    await callInit([{ id: 'git-integration', status: 'disabled' }])
     expect(fakeLoad).not.toHaveBeenCalled()
   })
 
   it('does not load renderer when no extensions are active', async () => {
-    mockList.mockResolvedValue({ extensions: [] })
-    await initExtensionsWithRenderers(fakeRenderers, mockList)
+    await callInit([])
     expect(fakeLoad).not.toHaveBeenCalled()
   })
 
   it('does not load renderer for an extension id that does not match any directory', async () => {
-    mockList.mockResolvedValue({
-      extensions: [{ id: 'nonexistent-extension', status: 'enabled' }],
-    })
-    await initExtensionsWithRenderers(fakeRenderers, mockList)
+    await callInit([{ id: 'nonexistent-extension', status: 'enabled' }])
     expect(fakeLoad).not.toHaveBeenCalled()
   })
 
   it('loads all enabled renderers and skips disabled ones', async () => {
-    mockList.mockResolvedValue({
-      extensions: [
-        { id: 'git-integration', status: 'enabled' },
-        { id: 'speckit-pilot', status: 'disabled' },
-      ],
-    })
-    await initExtensionsWithRenderers(fakeRenderers, mockList)
+    await callInit([
+      { id: 'git-integration', status: 'enabled' },
+      { id: 'speckit-pilot', status: 'disabled' },
+    ])
     expect(fakeLoad).toHaveBeenCalledTimes(1)
   })
 
   it('skips entries whose path does not match the expected renderer pattern', async () => {
-    mockList.mockResolvedValue({
-      extensions: [{ id: 'no-match', status: 'enabled' }],
-    })
+    await callInit([{ id: 'no-match', status: 'enabled' }])
     // The no-match entry uses renderer.js (not renderer.tsx), so regex won't match
-    await initExtensionsWithRenderers(fakeRenderers, mockList)
     expect(fakeLoad).not.toHaveBeenCalled()
   })
 })
 
-// Also test the actual module import to get line coverage on the module-level code
-// (the `import.meta.glob` call and the exported function declaration)
+describe('initExtensions — external extension loading', () => {
+  it('dynamically imports external extension renderer when rendererUrl is set', async () => {
+    await callInit([
+      {
+        id: 'com.example.my-plugin',
+        status: 'enabled',
+        rendererUrl: 'ext://com.example.my-plugin/dist/renderer.js',
+      },
+    ])
+    expect(fakeLoad).not.toHaveBeenCalled()
+    expect(fakeDynamicImport).toHaveBeenCalledWith('ext://com.example.my-plugin/dist/renderer.js')
+  })
+
+  it('does not dynamically import bundled extensions even if they have rendererUrl', async () => {
+    await callInit([
+      {
+        id: 'git-integration',
+        status: 'enabled',
+        rendererUrl: 'ext://git-integration/dist/renderer.js',
+      },
+    ])
+    expect(fakeLoad).toHaveBeenCalledTimes(1)
+    expect(fakeDynamicImport).not.toHaveBeenCalled()
+  })
+
+  it('skips external extension with no rendererUrl', async () => {
+    await callInit([{ id: 'com.example.no-renderer', status: 'enabled' }])
+    expect(fakeDynamicImport).not.toHaveBeenCalled()
+  })
+
+  it('loads multiple external renderers', async () => {
+    await callInit([
+      { id: 'com.a', status: 'enabled', rendererUrl: 'ext://com.a/renderer.js' },
+      { id: 'com.b', status: 'enabled', rendererUrl: 'ext://com.b/renderer.js' },
+    ])
+    expect(fakeDynamicImport).toHaveBeenCalledTimes(2)
+  })
+})
+
+// Test the real module import + the window exposure global
 describe('initExtensions (real module)', () => {
   it('exports an initExtensions function', async () => {
-    // The module uses import.meta.glob which Vite provides — in Vitest this is
-    // stubbed automatically when the module is imported. We verify the export exists.
     const mod = await import('../../../../src/renderer/extensions/loader')
     expect(typeof mod.initExtensions).toBe('function')
   })
 
+  it('sets __terminatorRegistry on window when window is defined', async () => {
+    vi.resetModules()
+    const fakeWindow: Record<string, unknown> = {}
+    ;(globalThis as unknown as { window: unknown }).window = fakeWindow
+    await import('../../../../src/renderer/extensions/loader')
+    expect(fakeWindow.__terminatorRegistry).toBeDefined()
+    delete (globalThis as unknown as { window?: unknown }).window
+    vi.resetModules()
+  })
+
   it('can be called with electronAPI returning empty list', async () => {
-    // In Node environment, window is not defined — provide it via globalThis
-    const mockElectronAPI = { extension: { list: vi.fn().mockResolvedValue({ extensions: [] }) } }
+    const mockElectronAPI = {
+      extension: { list: vi.fn().mockResolvedValue({ extensions: [] }) },
+    }
     ;(globalThis as unknown as { window: unknown }).window = { electronAPI: mockElectronAPI }
     const { initExtensions } = await import('../../../../src/renderer/extensions/loader')
-    // Should not throw even if renderers glob returns empty in test environment
-    await expect(initExtensions()).resolves.toBeUndefined()
+    await expect(initExtensions({ renderers: {}, dynamicLoader: vi.fn() })).resolves.toBeUndefined()
     delete (globalThis as unknown as { window?: unknown }).window
   })
 
-  it('exercises the real filter/map/some callbacks over a populated list without loading renderers', async () => {
-    // Drive the actual module (not a reimplementation) with a non-empty extension
-    // list whose ids match no real extension directory. This executes the real
-    // status filter, id map, and per-renderer `some` matcher (raising function
-    // coverage) while keeping `isActive` false so no real renderer.tsx is imported.
+  it('default dynamicLoader is invoked for external extensions', async () => {
+    vi.resetModules()
     const mockElectronAPI = {
       extension: {
         list: vi.fn().mockResolvedValue({
           extensions: [
-            { id: 'definitely-not-a-real-extension-dir', status: 'enabled' },
-            { id: 'terminator.also-not-real', status: 'disabled' },
+            { id: 'com.ext.test', status: 'enabled', rendererUrl: 'ext://com.ext.test/r.js' },
           ],
         }),
       },
     }
     ;(globalThis as unknown as { window: unknown }).window = { electronAPI: mockElectronAPI }
     const { initExtensions } = await import('../../../../src/renderer/extensions/loader')
-    await expect(initExtensions()).resolves.toBeUndefined()
+    // No dynamicLoader injected — the default (url => import(url)) is used.
+    // It will reject in Node since ext:// is not a resolvable module specifier.
+    await expect(initExtensions({ renderers: {} })).rejects.toBeDefined()
     delete (globalThis as unknown as { window?: unknown }).window
+    vi.resetModules()
   })
 })

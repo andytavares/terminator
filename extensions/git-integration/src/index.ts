@@ -86,23 +86,15 @@ export function activate(api: ExtensionAPI): void {
     })
   )
 
-  try {
-    disposables.push(
-      api.keyboard.register('CmdOrCtrl+Shift+G', () => {
-        api.notifications.showToast('info', 'Toggle git sidebar')
-      })
-    )
-  } catch {
-    // Shortcut may already be registered
-  }
-
   disposables.push(
     api.nativeMenu.addViewMenuItem({
       id: 'git-sidebar-toggle',
-      label: 'Toggle Git Sidebar',
+      label: 'Toggle Git Changes',
       accelerator: 'CmdOrCtrl+Shift+G',
+      type: 'checkbox',
+      panelId: 'git-changes',
       onClick: () => {
-        api.notifications.showToast('info', 'Toggle git sidebar')
+        api.window.broadcast('extension:toggle-panel', 'git-changes')
       },
     })
   )

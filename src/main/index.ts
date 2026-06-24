@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, MenuItem, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell, net, session } from 'electron'
 import { join } from 'path'
 import { registerWorkspaceHandlers } from './ipc/workspace.ipc.js'
 import { registerTerminalHandlers } from './ipc/terminal.ipc.js'
@@ -24,6 +24,7 @@ import {
 } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
 import { runLegacyMigration } from './db/migrate.js'
+import { globalRegistry } from './extensions/api.js'
 
 // Intercept ipcMain.handle/on to capture handlers into the bridge registry
 // so the remote-control extension bridge can dispatch IPC calls from browser clients.
@@ -58,8 +59,6 @@ declare module 'electron' {
 }
 
 let mainWindow: BrowserWindow | null = null
-let gitChangesMenuItem: MenuItem | null = null
-let vaultLinksMenuItem: MenuItem | null = null
 const ptyManager = new PtyManager()
 const extensionHost = new ExtensionHost()
 
@@ -124,6 +123,41 @@ function openAbout(): void {
   mainWindow?.webContents.send('menu:open-about')
 }
 
+function buildViewSubmenu(): Electron.MenuItemConstructorOptions[] {
+  const base: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: 'Toggle Sidebar',
+      accelerator: 'CmdOrCtrl+B',
+      click: () => mainWindow?.webContents.send('menu:toggle-sidebar'),
+    },
+    { type: 'separator' },
+  ]
+
+  const extItems = Array.from(globalRegistry.nativeMenuItems.values()).map((contrib) => {
+    const id = `ext-menu-${contrib.id}`
+    if (contrib.panelId) globalRegistry.panelMenuItemIds.set(contrib.panelId, id)
+    return {
+      id,
+      label: contrib.label,
+      accelerator: contrib.accelerator,
+      type: (contrib.type === 'checkbox' ? 'checkbox' : 'normal') as 'checkbox' | 'normal',
+      checked: false,
+      click: () => contrib.onClick(),
+    } as Electron.MenuItemConstructorOptions
+  })
+
+  const tail: Electron.MenuItemConstructorOptions[] = [
+    ...(extItems.length > 0 ? [{ type: 'separator' as const }] : []),
+    {
+      label: 'Open Settings',
+      accelerator: 'CmdOrCtrl+,',
+      click: () => mainWindow?.webContents.send('menu:open-settings'),
+    },
+  ]
+
+  return [...base, ...extItems, ...tail]
+}
+
 function setupMenu(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     ...(process.platform === 'darwin'
@@ -154,33 +188,7 @@ function setupMenu(): void {
     },
     {
       label: 'View',
-      submenu: [
-        {
-          label: 'Toggle Sidebar',
-          accelerator: 'CmdOrCtrl+B',
-          click: () => mainWindow?.webContents.send('menu:toggle-sidebar'),
-        },
-        { type: 'separator' },
-        {
-          label: 'Toggle Git Changes',
-          type: 'checkbox',
-          checked: false,
-          accelerator: 'CmdOrCtrl+Shift+G',
-          click: () => mainWindow?.webContents.send('extension:toggle-panel', 'git-changes'),
-        },
-        {
-          label: 'Toggle Vault Links',
-          type: 'checkbox',
-          checked: false,
-          click: () => mainWindow?.webContents.send('extension:toggle-panel', 'task-vault-links'),
-        },
-        { type: 'separator' },
-        {
-          label: 'Open Settings',
-          accelerator: 'CmdOrCtrl+,',
-          click: () => mainWindow?.webContents.send('menu:open-settings'),
-        },
-      ],
+      submenu: buildViewSubmenu(),
     },
     {
       label: 'Window',
@@ -204,19 +212,18 @@ function setupMenu(): void {
       ],
     },
   ]
-  const menu = Menu.buildFromTemplate(template)
-  Menu.setApplicationMenu(menu)
-  const viewSubmenu = menu.items.find((i) => i.label === 'View')?.submenu
-  gitChangesMenuItem = viewSubmenu?.items.find((i) => i.label === 'Toggle Git Changes') ?? null
-  vaultLinksMenuItem = viewSubmenu?.items.find((i) => i.label === 'Toggle Vault Links') ?? null
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
 function registerAppHandlers(): void {
   _origOn(
     'menu:set-panel-checked',
     (_event, { panelId, open }: { panelId: string; open: boolean }) => {
-      if (panelId === 'git-changes' && gitChangesMenuItem) gitChangesMenuItem.checked = open
-      if (panelId === 'task-vault-links' && vaultLinksMenuItem) vaultLinksMenuItem.checked = open
+      const menuItemId = globalRegistry.panelMenuItemIds.get(panelId)
+      if (menuItemId) {
+        const menuItem = Menu.getApplicationMenu()?.getMenuItemById(menuItemId)
+        if (menuItem) menuItem.checked = open
+      }
     }
   )
 
@@ -250,7 +257,21 @@ app.whenReady().then(async () => {
   await initAppDb(userData)
   await runLegacyMigration(userData, getAppDb())
 
-  setupMenu()
+  // Serve external extension renderer files via a custom protocol.
+  // Only files within the extension's registered directory are accessible.
+  session.defaultSession.protocol.handle('ext', (request) => {
+    const url = new URL(request.url)
+    const extensionId = url.hostname
+    const relPath = url.pathname.slice(1) // strip leading /
+    const dir = extensionHost.getExtensionDirectory(extensionId)
+    if (!dir || !relPath) return new Response('Not found', { status: 404 })
+    const fullPath = join(dir, relPath).replace(/\\/g, '/')
+    if (!fullPath.startsWith(dir.replace(/\\/g, '/'))) {
+      return new Response('Forbidden', { status: 403 })
+    }
+    return net.fetch(`file://${fullPath}`)
+  })
+
   registerWorkspaceHandlers()
   registerTerminalHandlers(ptyManager, () => mainWindow)
   registerSettingsHandlers()
@@ -278,6 +299,8 @@ app.whenReady().then(async () => {
 
   await extensionHost.loadAll()
   await extensionHost.loadBundledExtensions(join(__dirname, '../../extensions'))
+  // Build menu after extensions load so extension-contributed items are included from the start
+  setupMenu()
 
   // Window is created after extensions load so the renderer can immediately
   // query the active extension list and only mount the correct renderers.

@@ -61,6 +61,8 @@ export interface Extension {
   status: ExtensionStatus
   installedAt: string
   errorMessage?: string
+  /** ext:// URL for the extension's renderer entry point, if the manifest declares one. */
+  rendererUrl?: string
 }
 
 export interface ExtensionManifest {
@@ -69,6 +71,7 @@ export interface ExtensionManifest {
   version: string
   description: string
   main: string
+  renderer?: string
   minAppVersion: string
 }
 

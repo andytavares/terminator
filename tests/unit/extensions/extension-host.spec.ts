@@ -233,6 +233,54 @@ describe('ExtensionHost', () => {
     // Reload finds the record (so no NOT_FOUND) but activation fails → error
     expect('error' in result).toBe(true)
   })
+
+  it('getExtensionDirectory returns null for unknown extension', async () => {
+    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+    const host = new ExtensionHost()
+    expect(host.getExtensionDirectory('unknown.ext')).toBeNull()
+  })
+
+  it('getExtensionDirectory returns the directory path for a stored extension', async () => {
+    storeData.extensions = [
+      {
+        id: 'com.dirtest',
+        name: 'Dir Test',
+        version: '1.0.0',
+        description: '',
+        entryPoint: '/stored/ext/main.js',
+        status: 'enabled',
+        installedAt: new Date().toISOString(),
+        directoryPath: '/stored/ext',
+      },
+    ]
+    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+    const host = new ExtensionHost()
+    expect(host.getExtensionDirectory('com.dirtest')).toBe('/stored/ext')
+  })
+
+  it('listExtensions strips directoryPath and rendererRelPath from returned records', async () => {
+    storeData.extensions = [
+      {
+        id: 'com.strip',
+        name: 'Strip Test',
+        version: '1.0.0',
+        description: '',
+        entryPoint: '/strip/main.js',
+        status: 'enabled',
+        installedAt: new Date().toISOString(),
+        directoryPath: '/strip',
+        rendererRelPath: 'dist/renderer.js',
+        rendererUrl: 'ext://com.strip/dist/renderer.js',
+      },
+    ]
+    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+    const host = new ExtensionHost()
+    const list = host.listExtensions()
+    expect(list).toHaveLength(1)
+    expect('directoryPath' in list[0]).toBe(false)
+    expect('rendererRelPath' in list[0]).toBe(false)
+    expect(list[0].rendererUrl).toBe('ext://com.strip/dist/renderer.js')
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
