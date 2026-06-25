@@ -275,12 +275,15 @@ app.whenReady().then(async () => {
   await initAppDb(userData)
   await runLegacyMigration(userData, getAppDb())
 
-  // Serve external extension renderer files via a custom protocol.
+  // Serve extension renderer files via ext://<id>/<relPath>.
   // Only files within the extension's registered directory are accessible.
-  session.defaultSession.protocol.handle('ext', async (request) => {
+  // Extension WebContentsViews use the 'ext-views' in-memory partition to
+  // avoid service-worker storage conflicts with the main window session.
+  // Both sessions need the handler registered.
+  const handleExtProtocol = async (request: Request): Promise<Response> => {
     const url = new URL(request.url)
     const extensionId = url.hostname
-    const relPath = url.pathname.slice(1) // strip leading /
+    const relPath = url.pathname.slice(1)
     const dir = extensionHost.getExtensionDirectory(extensionId)
     if (!dir || !relPath) return new Response('Not found', { status: 404 })
     const fullPath = join(dir, relPath).replace(/\\/g, '/')
@@ -299,7 +302,10 @@ app.whenReady().then(async () => {
       headers[key] = value
     })
     return new Response(res.body, { status: res.status, headers })
-  })
+  }
+
+  session.defaultSession.protocol.handle('ext', handleExtProtocol)
+  session.fromPartition('ext-views').protocol.handle('ext', handleExtProtocol)
 
   registerWorkspaceHandlers()
   registerTerminalHandlers(ptyManager, () => mainWindow)

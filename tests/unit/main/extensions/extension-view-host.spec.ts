@@ -24,7 +24,7 @@ vi.mock('electron', () => ({
     setBounds = mockSetBounds
     setVisible = mockSetVisible
   },
-  session: { defaultSession: mockDefaultSession },
+  session: { defaultSession: mockDefaultSession, fromPartition: () => mockDefaultSession },
 }))
 
 vi.mock('../../src/main/logger.js', () => ({
@@ -78,7 +78,7 @@ describe('ExtensionViewHost', () => {
     expect(host.hasView('com.test.ext', 'main')).toBe(true)
   })
 
-  it('createView passes session.defaultSession so the ext:// protocol is accessible', async () => {
+  it('createView uses the ext-views partition so ext:// protocol is accessible', async () => {
     capturedWebContentsViewArgs.length = 0
     await host.createView(makeExt(), 'main')
     expect(capturedWebContentsViewArgs[0]).toEqual(

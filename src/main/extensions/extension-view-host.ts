@@ -1,4 +1,4 @@
-import { WebContentsView, session } from 'electron'
+import { WebContentsView, session as electronSession } from 'electron'
 import type { BrowserWindow } from 'electron'
 import type { Extension } from '../../shared/types/index.js'
 import { makeLogger } from '../logger.js'
@@ -30,7 +30,9 @@ export class ExtensionViewHost {
     if (!ext.rendererUrl) return
 
     const url = buildUrl(ext.rendererUrl, viewParam)
-    const view = new WebContentsView({ webPreferences: { session: session.defaultSession } })
+    const view = new WebContentsView({
+      webPreferences: { session: electronSession.fromPartition('ext-views') },
+    })
 
     view.webContents.on('did-finish-load', () => {
       this.mainWindow.webContents.send('extension:panel-loaded', { id: ext.id, viewParam })
