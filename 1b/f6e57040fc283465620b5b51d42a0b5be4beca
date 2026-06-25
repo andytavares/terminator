@@ -1,0 +1,26 @@
+tests/e2e/git-sidebar.spec.ts
+  s_c06f550cdc90ca::t_c25fff527d8baf 54-59,67
+src/renderer/components/ExtensionPanelPortal.tsx
+  s_c06f550cdc90ca::t_272e4f8c2c6e3b 41-46
+src/renderer/extensions/loader.ts
+  s_c06f550cdc90ca::t_1377075df3c743 75-85
+tests/unit/renderer/extensions/loader.spec.ts
+  s_c06f550cdc90ca::t_570fddb73223a8 12-13,21-22
+  s_c06f550cdc90ca::t_2690e686a0a2b3 235-287
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.13",
+  "base_commit_sha": "1bf6e57040fc283465620b5b51d42a0b5be4beca",
+  "prompts": {},
+  "sessions": {
+    "s_c06f550cdc90ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f5bf6aa-b73c-4774-890d-64fd28e48d41",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
