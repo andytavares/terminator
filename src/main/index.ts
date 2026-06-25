@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell, net, session } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell, net, session, protocol } from 'electron'
 import { join } from 'path'
 import { registerWorkspaceHandlers } from './ipc/workspace.ipc.js'
 import { registerTerminalHandlers } from './ipc/terminal.ipc.js'
@@ -258,6 +258,15 @@ function registerDialogHandlers(): void {
     return { filePath: result.filePaths[0] }
   })
 }
+
+// Must be called before app.ready so Chromium treats ext:// as a secure standard
+// origin — without this, service worker storage and fetch() fail inside WebContentsViews.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'ext',
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+  },
+])
 
 app.whenReady().then(async () => {
   logger.info('App ready', { version: app.getVersion() })
