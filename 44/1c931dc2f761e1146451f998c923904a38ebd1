@@ -1,0 +1,29 @@
+src/renderer/components/ExtensionPanelPortal.tsx
+  s_c06f550cdc90ca::t_6decda429509e9 54
+src/main/extensions/extension-view-host.ts
+  s_c06f550cdc90ca::t_0f34401d8586c9 8-45
+  s_c06f550cdc90ca::t_a707ebd46ce2b3 83
+tests/unit/main/extensions/extension-view-host.spec.ts
+  s_c06f550cdc90ca::t_51aa6054c40638 32
+tests/unit/extensions/extension-view-host.spec.ts
+  s_c06f550cdc90ca::t_7cfb32b2ba6903 94-107
+  s_c06f550cdc90ca::t_0350f367b57247 26
+src/renderer/components/terminal/TerminalPane.css
+  s_c06f550cdc90ca::t_2b7d11e9d07ab1 25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.13",
+  "base_commit_sha": "441c931dc2f761e1146451f998c923904a38ebd1",
+  "prompts": {},
+  "sessions": {
+    "s_c06f550cdc90ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f5bf6aa-b73c-4774-890d-64fd28e48d41",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
