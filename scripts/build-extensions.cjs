@@ -3,6 +3,7 @@
 const { build } = require('esbuild')
 const { resolve } = require('path')
 const { readdirSync, existsSync } = require('fs')
+const { execSync } = require('child_process')
 
 const root = resolve(__dirname, '..')
 const extensionsDir = resolve(root, 'extensions')
@@ -37,6 +38,12 @@ async function buildExtension(name) {
     ],
     logLevel: 'info',
   })
+
+  // Build the renderer (webview bundle) when a vite renderer config is present.
+  if (existsSync(resolve(extDir, 'vite.renderer.config.ts'))) {
+    console.log(`Building renderer for ${name}...`)
+    execSync('npm run build:renderer', { cwd: extDir, stdio: 'inherit' })
+  }
 }
 
 async function main() {

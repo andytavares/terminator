@@ -278,7 +278,13 @@ app.whenReady().then(async () => {
     if (!fullPath.startsWith(dir.replace(/\\/g, '/'))) {
       return new Response('Forbidden', { status: 403 })
     }
-    const res = await net.fetch(`file://${fullPath}`)
+    let res: Response
+    try {
+      res = await net.fetch(`file://${fullPath}`)
+    } catch {
+      return new Response(`Not found: ${relPath}`, { status: 404 })
+    }
+    if (!res.ok) return new Response(`Not found: ${relPath}`, { status: res.status })
     const headers: Record<string, string> = { 'Cache-Control': 'no-store', Pragma: 'no-cache' }
     res.headers.forEach((value, key) => {
       headers[key] = value
