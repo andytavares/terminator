@@ -26,7 +26,17 @@ export function ExtensionPanelPortal({ extensionId, viewParam, isActive }: Props
     const observer = new ResizeObserver(sendBounds)
 
     observer.observe(el)
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      // Hide the WebContentsView when this portal unmounts so it doesn't
+      // intercept pointer/drag events while the panel is closed.
+      window.electronAPI?.extension?.updatePanelBounds({
+        extensionId,
+        viewParam,
+        bounds: { x: 0, y: 0, width: 0, height: 0 },
+        visible: false,
+      })
+    }
   }, [extensionId, viewParam, isActive])
 
   useEffect(() => {

@@ -134,4 +134,15 @@ describe('ExtensionPanelPortal', () => {
     unmount()
     expect(mockDisconnect).toHaveBeenCalled()
   })
+
+  it('sends visible: false on unmount to release pointer event capture', () => {
+    const { unmount } = render(
+      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
+    )
+    mockUpdatePanelBounds.mockClear()
+    unmount()
+    expect(mockUpdatePanelBounds).toHaveBeenCalledWith(
+      expect.objectContaining({ visible: false, extensionId: 'com.test.ext', viewParam: 'main' })
+    )
+  })
 })

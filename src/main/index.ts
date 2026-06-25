@@ -162,7 +162,7 @@ function buildViewSubmenu(): Electron.MenuItemConstructorOptions[] {
     {
       label: 'Open Extension DevTools',
       accelerator: 'CmdOrCtrl+Shift+I',
-      click: () => viewHost?.openDevToolsForVisible(),
+      click: () => viewHost?.openDevToolsForAll(),
     },
   ]
 

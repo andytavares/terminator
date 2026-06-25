@@ -115,12 +115,10 @@ export class ExtensionViewHost {
     }
   }
 
-  openDevToolsForVisible(): void {
+  openDevToolsForAll(): void {
     for (const entries of this.views.values()) {
       for (const { view } of entries) {
-        if (view.getVisible()) {
-          view.webContents.openDevTools()
-        }
+        view.webContents.openDevTools({ mode: 'detach' })
       }
     }
   }

@@ -168,25 +168,16 @@ describe('ExtensionViewHost', () => {
     })
   })
 
-  describe('openDevToolsForVisible', () => {
-    it('opens devtools on visible views', async () => {
+  describe('openDevToolsForAll', () => {
+    it('opens detached devtools on all views', async () => {
       const ext = makeExt()
       await host.createView(ext, 'main')
-      createdViews[0].getVisible.mockReturnValue(true)
-      host.openDevToolsForVisible()
-      expect(createdViews[0].webContents.openDevTools).toHaveBeenCalled()
-    })
-
-    it('does not open devtools on hidden views', async () => {
-      const ext = makeExt()
-      await host.createView(ext, 'main')
-      createdViews[0].getVisible.mockReturnValue(false)
-      host.openDevToolsForVisible()
-      expect(createdViews[0].webContents.openDevTools).not.toHaveBeenCalled()
+      host.openDevToolsForAll()
+      expect(createdViews[0].webContents.openDevTools).toHaveBeenCalledWith({ mode: 'detach' })
     })
 
     it('is a no-op when no views exist', () => {
-      expect(() => host.openDevToolsForVisible()).not.toThrow()
+      expect(() => host.openDevToolsForAll()).not.toThrow()
     })
   })
 
