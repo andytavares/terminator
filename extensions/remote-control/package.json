@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "description": "Remote Control extension for Terminator — embedded HTTP server + ngrok tunnel",
+  "scripts": {
+    "build:renderer": "vite build --config vite.renderer.config.ts"
+  },
   "dependencies": {
     "@fastify/static": "^9.1.3",
     "@fastify/websocket": "^11.2.0",

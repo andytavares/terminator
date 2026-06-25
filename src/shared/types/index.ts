@@ -52,6 +52,22 @@ export interface TerminalSession {
 
 export type ExtensionStatus = 'enabled' | 'disabled' | 'error'
 
+export interface ExtensionSurfaceContribution {
+  label: string
+  icon?: string
+  view?: string
+  defaultOpen?: boolean
+}
+
+export interface ExtensionContributes {
+  globalTab?: ExtensionSurfaceContribution
+  workspaceTab?: ExtensionSurfaceContribution
+  projectTab?: ExtensionSurfaceContribution
+  sidebarPanel?: ExtensionSurfaceContribution
+  windowViews?: Array<{ id: string; view: string }>
+  commands?: Array<{ id: string; label: string; shortcut?: string; description?: string }>
+}
+
 export interface Extension {
   id: string
   name: string
@@ -63,6 +79,8 @@ export interface Extension {
   errorMessage?: string
   /** ext:// URL for the extension's renderer entry point, if the manifest declares one. */
   rendererUrl?: string
+  /** Parsed contributes block from manifest.json, if present. */
+  contributes?: ExtensionContributes
 }
 
 export interface ExtensionManifest {

@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "SpecKit Pilot — Spec-Kit lifecycle orchestration with human-in-the-loop gates",
+  "scripts": {
+    "build:renderer": "vite build --config vite.renderer.config.ts"
+  },
   "dependencies": {
     "diff": "5.2.2",
     "minimatch": "9.0.9"

@@ -1537,3 +1537,88 @@ Returns the current health status of the shared PGlite database.
 | --------- | --------- | -------------------------------------------------- |
 | `ok`      | `boolean` | `true` if the database is reachable and responsive |
 | `message` | `string?` | Error description if `ok` is `false`               |
+
+---
+
+## Extension Webview Channels (v2.0.0)
+
+These channels coordinate between the host renderer, the main process `ExtensionViewHost`, and isolated extension `WebContentsView` contexts.
+
+### `extension:update-panel-bounds`
+
+Reports the current layout bounds of an `ExtensionPanelPortal` placeholder so the main process can position the corresponding `WebContentsView`.
+
+**Direction**: renderer → main (invoke)
+
+**Request**:
+
+```typescript
+{
+  extensionId: string
+  viewParam: string
+  bounds: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  visible: boolean
+  dpr: number // device pixel ratio
+}
+```
+
+**Response**: `void`
+
+---
+
+### `extension:panel-loaded`
+
+Push event sent by the main process when a `WebContentsView` has finished loading its initial page.
+
+**Direction**: main → renderer (push)
+
+**Payload**: `{ id: string }` — extension ID
+
+---
+
+### `extension:renderer-reload`
+
+Push event sent by the main process after a successful `extension:reload` call. The host renderer's `ExtensionPanelPortal` remounts the view, triggering a fresh `WebContentsView` load.
+
+**Direction**: main → renderer (push)
+
+**Payload**: `{ id: string }` — extension ID
+
+---
+
+### `workspace:changed`
+
+Push event broadcast to all active extension `WebContentsView` instances when the active workspace or project changes.
+
+**Direction**: main → webview (extensionBridge push)
+
+**Payload**: `{ repoRoot?: string | null }`
+
+---
+
+### `workspace:get-active`
+
+Allows an extension webview to query the current active workspace context on demand.
+
+**Direction**: webview → main (extensionBridge invoke)
+
+**Request**: _(no payload)_
+
+**Response**: `{ workspaceId: string | null; projectId: string | null; repoRoot: string | null }`
+
+---
+
+### `ext:command:<id>`
+
+Push event broadcast to an extension's webview when a keyboard shortcut declared in `manifest.contributes.commands` fires. `<id>` is the command ID from the manifest.
+
+**Direction**: main → webview (extensionBridge push)
+
+**Payload**: _(none)_
+
+**Example**: `ext:command:notepad:quick-create`, `ext:command:task-vault:capture-to-inbox`

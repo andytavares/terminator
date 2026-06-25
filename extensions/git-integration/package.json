@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "Git & GitHub integration extension for Terminator",
+  "scripts": {
+    "build:renderer": "vite build --config vite.renderer.config.ts"
+  },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.5",
     "@codemirror/theme-one-dark": "^6.1.3",

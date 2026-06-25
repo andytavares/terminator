@@ -4,5 +4,25 @@
   "version": "0.1.0",
   "description": "Markdown notepad with live preview, margin comments, tags, and full-text search.",
   "main": "src/index.js",
-  "minAppVersion": "0.1.0"
+  "renderer": "dist/index.html",
+  "minAppVersion": "0.1.0",
+  "contributes": {
+    "globalTab": {
+      "label": "Notes",
+      "icon": "file",
+      "view": "main"
+    },
+    "windowViews": [
+      { "id": "notepad-note", "view": "note" },
+      { "id": "notepad-diagram", "view": "diagram" }
+    ],
+    "commands": [
+      {
+        "id": "notepad:quick-create",
+        "label": "New Note",
+        "shortcut": "CmdOrCtrl+Shift+N",
+        "description": "Open quick-create overlay"
+      }
+    ]
+  }
 }

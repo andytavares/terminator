@@ -63,7 +63,7 @@ export class ExtensionHost {
       return { error: 'INVALID_MANIFEST', message: parsed.error.message }
     }
 
-    const { id, name, version, description, main, renderer } = parsed.data
+    const { id, name, version, description, main, renderer, contributes } = parsed.data
     const existing = store.get('extensions').find((e) => e.id === id)
     if (existing) {
       hostLogger.warn(`DUPLICATE_ID: extension ${id} is already registered`)
@@ -94,6 +94,7 @@ export class ExtensionHost {
       directoryPath,
       rendererRelPath: renderer,
       rendererUrl: renderer ? `ext://${id}/${renderer}` : undefined,
+      contributes,
     }
 
     const loadResult = await this.activate(record)
@@ -196,6 +197,11 @@ export class ExtensionHost {
     return store
       .get('extensions')
       .map(({ directoryPath: _dp, rendererRelPath: _rrp, ...ext }) => ext)
+  }
+
+  getExtensionContributes(id: string) {
+    const record = store.get('extensions').find((e) => e.id === id)
+    return record?.contributes ?? null
   }
 
   getExtensionDirectory(id: string): string | null {

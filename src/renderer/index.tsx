@@ -1,5 +1,5 @@
 import React from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import { ExtensionWindowView } from './ExtensionWindowView'
 import '@fontsource/ibm-plex-sans/400.css'
@@ -33,16 +33,13 @@ function Root(): JSX.Element {
 const el = document.getElementById('app')
 if (!el) throw new Error('No #app element')
 
-// Load only the renderers for active extensions before mounting so no
-// extension UI appears for extensions that are not installed.
-let _root: Root | null = null
-initExtensions()
-  .catch(() => {})
-  .finally(() => {
-    if (!_root) _root = createRoot(el)
-    _root.render(
-      <React.StrictMode>
-        <Root />
-      </React.StrictMode>
-    )
-  })
+const root = createRoot(el)
+root.render(
+  <React.StrictMode>
+    <Root />
+  </React.StrictMode>
+)
+
+// Register extension UI contributions after the app is mounted so that
+// a hung or slow IPC call never prevents the app from rendering.
+initExtensions().catch(() => {})

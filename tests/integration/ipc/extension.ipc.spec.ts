@@ -208,6 +208,33 @@ describe('extension IPC handlers', () => {
       const result = (await handler({}, { id: 'missing' })) as { error: string }
       expect(result.error).toBe('NOT_FOUND')
     })
+
+    it('calls broadcast with extension:renderer-reload on successful reload', async () => {
+      const broadcast = vi.fn()
+      vi.clearAllMocks()
+      registerExtensionHandlers(
+        mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
+        broadcast
+      )
+      const ext = { id: 'com.test', status: 'enabled' }
+      mockExtensionHost.reload.mockResolvedValue({ extension: ext })
+      const handler = captureHandle('extension:reload')
+      await handler({}, { id: 'com.test' })
+      expect(broadcast).toHaveBeenCalledWith('extension:renderer-reload', { id: 'com.test' })
+    })
+
+    it('does not call broadcast when reload fails', async () => {
+      const broadcast = vi.fn()
+      vi.clearAllMocks()
+      registerExtensionHandlers(
+        mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
+        broadcast
+      )
+      mockExtensionHost.reload.mockResolvedValue({ error: 'NOT_FOUND' })
+      const handler = captureHandle('extension:reload')
+      await handler({}, { id: 'missing' })
+      expect(broadcast).not.toHaveBeenCalled()
+    })
   })
 
   describe('extension:get-settings-schemas', () => {

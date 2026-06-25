@@ -240,6 +240,55 @@ Security constraints: command allowlist `['git', 'gh']`, CWD pinned to project r
 
 Extensions cannot claim: `Cmd+1–9`, `Cmd++/-`, `Cmd+Left/Right`, `Cmd+T`, `Cmd+W`, `Cmd+,`. Attempting to register these throws synchronously from `keyboard.register()`.
 
+### Webview Renderer System (v2.0.0)
+
+Extension UIs run in isolated Electron `WebContentsView` instances — separate browser contexts completely isolated from the host renderer. This eliminates the dual-React-instance problem and decouples extension rendering from the core app build.
+
+```
+Host Renderer (React)
+│
+├─ ExtensionPanelPortal (layout placeholder)
+│    │  reports bounds via extension:update-panel-bounds IPC
+│    ▼
+│  ExtensionViewHost (Main Process)
+│    │  creates / positions WebContentsView over placeholder bounds
+│    ▼
+│  WebContentsView (isolated browser context)
+│    │  loads ext://extension-id/dist/index.html
+│    │  has its own preload (dist-electron/preload/webview.js)
+│    ▼
+│  Extension Renderer (any framework, any React version)
+│    │  window.electronAPI.extensionBridge.invoke(channel, payload)
+│    │  window.electronAPI.extensionBridge.on(channel, handler)
+```
+
+**Key properties:**
+
+- Extension bundle is never imported into the host renderer — complete isolation.
+- Extensions can use any React version, any framework, any bundler.
+- `ext://` protocol serves files from the extension directory with `Cache-Control: no-store`.
+- Reload (no app rebuild): `extension:renderer-reload` push event triggers webview remount.
+- Workspace context passed as URL params: `?view=VALUE&repoRoot=PATH`.
+- Live workspace updates via `extensionBridge.on('workspace:changed', handler)`.
+
+**Manifest `contributes`** — the only mechanism for declaring UI surfaces:
+
+```json
+{
+  "renderer": "dist/index.html",
+  "contributes": {
+    "globalTab": { "label": "My Tool", "icon": "wrench", "view": "main" },
+    "sidebarPanel": { "label": "Panel", "defaultOpen": false, "view": "sidebar" },
+    "projectTab": { "label": "Proj", "view": "project" },
+    "workspaceTab": { "label": "WS", "icon": "layers", "view": "workspace" },
+    "windowViews": [{ "id": "my-detail", "view": "detail" }],
+    "commands": [{ "id": "my-ext:action", "label": "Do Thing", "shortcut": "CmdOrCtrl+Shift+M" }]
+  }
+}
+```
+
+See [ADR-022](adr/022-webview-isolated-extension-renderer.md) for the full decision record.
+
 ### Contribution rendering
 
 The renderer queries contributions via IPC on mount:

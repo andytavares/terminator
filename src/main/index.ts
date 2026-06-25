@@ -13,6 +13,7 @@ import { registerMetricsHandlers } from './ipc/metrics.ipc.js'
 import { registerDbIpcHandlers } from './ipc/db.ipc.js'
 import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
+import { ExtensionViewHost } from './extensions/extension-view-host.js'
 import { logger } from './logger.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { REMOTE_ACCESSIBLE_CHANNELS } from './remote/remote-accessible-channels.js'
@@ -59,6 +60,7 @@ declare module 'electron' {
 }
 
 let mainWindow: BrowserWindow | null = null
+let viewHost: ExtensionViewHost | null = null
 const ptyManager = new PtyManager()
 const extensionHost = new ExtensionHost()
 
@@ -70,8 +72,11 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       preload: join(__dirname, '../preload/index.js'),
+      webviewTag: true,
     },
   })
+
+  viewHost = new ExtensionViewHost(mainWindow)
 
   if (process.env.NODE_ENV === 'development' || process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] || 'http://localhost:5173')
@@ -263,7 +268,7 @@ app.whenReady().then(async () => {
 
   // Serve external extension renderer files via a custom protocol.
   // Only files within the extension's registered directory are accessible.
-  session.defaultSession.protocol.handle('ext', (request) => {
+  session.defaultSession.protocol.handle('ext', async (request) => {
     const url = new URL(request.url)
     const extensionId = url.hostname
     const relPath = url.pathname.slice(1) // strip leading /
@@ -273,13 +278,35 @@ app.whenReady().then(async () => {
     if (!fullPath.startsWith(dir.replace(/\\/g, '/'))) {
       return new Response('Forbidden', { status: 403 })
     }
-    return net.fetch(`file://${fullPath}`)
+    const res = await net.fetch(`file://${fullPath}`)
+    const headers: Record<string, string> = { 'Cache-Control': 'no-store', Pragma: 'no-cache' }
+    res.headers.forEach((value, key) => {
+      headers[key] = value
+    })
+    return new Response(res.body, { status: res.status, headers })
   })
 
   registerWorkspaceHandlers()
   registerTerminalHandlers(ptyManager, () => mainWindow)
   registerSettingsHandlers()
-  registerExtensionHandlers(extensionHost)
+  registerExtensionHandlers(extensionHost, (channel, data) =>
+    viewHost?.broadcastToAll(channel, data)
+  )
+
+  ipcMain.handle(
+    'extension:update-panel-bounds',
+    async (_event, { extensionId, viewParam, bounds, visible, dpr }) => {
+      if (viewHost && !viewHost.hasView(extensionId, viewParam)) {
+        const ext = extensionHost.listExtensions().find((e) => e.id === extensionId)
+        if (ext) await viewHost.createView(ext, viewParam)
+      }
+      viewHost?.handleBoundsUpdate(extensionId, viewParam, bounds, visible, dpr)
+    }
+  )
+
+  ipcMain.on('workspace:active-changed', (_event, data) => {
+    viewHost?.broadcastToAll('workspace:changed', data)
+  })
   registerGitHandlers()
   registerShellHandlers()
   registerFsHandlers(() => mainWindow)

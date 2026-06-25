@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "Markdown Notepad extension for Terminator",
+  "scripts": {
+    "build:renderer": "vite build --config vite.renderer.config.ts"
+  },
   "dependencies": {
     "@codemirror/commands": "^6.8.0",
     "@codemirror/lang-cpp": "^6.0.3",

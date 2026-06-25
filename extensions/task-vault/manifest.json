@@ -4,5 +4,27 @@
   "version": "0.1.0",
   "description": "GTD+BuJo+PARA daily productivity system backed by plain markdown files. Includes MCP server for agent access.",
   "main": "src/index.js",
-  "minAppVersion": "0.1.0"
+  "renderer": "dist/index.html",
+  "minAppVersion": "0.1.0",
+  "contributes": {
+    "globalTab": {
+      "label": "Task Vault",
+      "icon": "zap",
+      "view": "main"
+    },
+    "sidebarPanel": {
+      "label": "Vault Calendar",
+      "icon": "calendar",
+      "defaultOpen": false,
+      "view": "calendar"
+    },
+    "commands": [
+      {
+        "id": "task-vault:capture-to-inbox",
+        "label": "Task Vault: Capture to Inbox",
+        "shortcut": "CommandOrControl+Shift+O",
+        "description": "Quick-capture a task to the vault inbox"
+      }
+    ]
+  }
 }

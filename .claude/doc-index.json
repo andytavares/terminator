@@ -24,7 +24,7 @@
         "extensions/remote-control/src/server/routes/bridge.route.ts"
       ],
       "last_verified_commit": "999ae80",
-      "staleness_score": 12
+      "staleness_score": 16
     },
     {
       "path": "README.md",
@@ -76,7 +76,7 @@
         "src/renderer/electron.d.ts"
       ],
       "last_verified_commit": "999ae80",
-      "staleness_score": 0
+      "staleness_score": 6
     },
     {
       "path": "docs/EXTENSION-DEVELOPMENT.md",
@@ -149,7 +149,7 @@
         "src/main/index.ts"
       ],
       "last_verified_commit": "999ae80",
-      "staleness_score": 18
+      "staleness_score": 30
     }
   ]
 }

@@ -1,0 +1,7 @@
+{
+  "name": "@terminator/extension-sdk",
+  "version": "1.0.0",
+  "description": "Type definitions for building Terminator extensions",
+  "types": "types/index.d.ts",
+  "license": "MIT"
+}

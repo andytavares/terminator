@@ -16,7 +16,29 @@ import {
 import { removeWorktree } from '../git/git-service.js'
 import { emitWorkspaceDelete, emitProjectDelete } from '../extensions/workspace-events.js'
 
+interface ActiveWorkspaceContext {
+  workspaceId: string | null
+  projectId: string | null
+  repoRoot: string | null
+}
+
+let activeContext: ActiveWorkspaceContext = {
+  workspaceId: null,
+  projectId: null,
+  repoRoot: null,
+}
+
+export function setActiveWorkspaceContext(ctx: ActiveWorkspaceContext): void {
+  activeContext = ctx
+}
+
+export function getActiveWorkspaceContext(): ActiveWorkspaceContext {
+  return activeContext
+}
+
 export function registerWorkspaceHandlers(): void {
+  ipcMain.handle('workspace:get-active', () => activeContext)
+
   ipcMain.handle('workspace:list', () => {
     return { workspaces: listWorkspaces() }
   })
