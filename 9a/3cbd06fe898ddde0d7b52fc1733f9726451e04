@@ -1,0 +1,29 @@
+extensions/task-vault/tests/renderer/main.spec.tsx
+  s_c06f550cdc90ca::t_6babb5d4e6642b 7-8
+  s_c06f550cdc90ca::t_330df18473cfa9 19,26
+  s_c06f550cdc90ca::t_c7857ca1e00b87 1-6,9-18,20-25,27-28
+extensions/git-integration/tests/unit/renderer/main.spec.tsx
+  s_c06f550cdc90ca::t_b496bfeb0ad09c 1-29
+extensions/remote-control/tests/unit/renderer/main.spec.tsx
+  s_c06f550cdc90ca::t_11d83e48826ecf 1-27
+extensions/notepad/tests/unit/renderer/main.spec.tsx
+  s_c06f550cdc90ca::t_8ff8498cbb8eb8 1-28
+extensions/speckit-pilot/tests/unit/renderer/main.spec.tsx
+  s_c06f550cdc90ca::t_3e1bfc3947a62a 1-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.13",
+  "base_commit_sha": "9a3cbd06fe898ddde0d7b52fc1733f9726451e04",
+  "prompts": {},
+  "sessions": {
+    "s_c06f550cdc90ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f5bf6aa-b73c-4774-890d-64fd28e48d41",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
