@@ -14,17 +14,16 @@ export function ExtensionPanelPortal({ extensionId, viewParam, isActive }: Props
     const el = containerRef.current
     if (!el) return
 
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[0]?.contentRect
-      if (!rect) return
+    const sendBounds = () => {
+      const rect = el.getBoundingClientRect()
       window.electronAPI.extension.updatePanelBounds({
         extensionId,
         viewParam,
-        bounds: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        bounds: { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
         visible: isActive,
-        dpr: window.devicePixelRatio,
       })
-    })
+    }
+    const observer = new ResizeObserver(sendBounds)
 
     observer.observe(el)
     return () => observer.disconnect()

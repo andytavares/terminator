@@ -78,19 +78,19 @@ export class ExtensionViewHost {
     extensionId: string,
     viewParam: string,
     bounds: BoundsRect,
-    visible: boolean,
-    dpr: number
+    visible: boolean
   ): void {
     const entries = this.views.get(extensionId)
     if (!entries) return
     const entry = entries.find((e) => e.viewParam === viewParam)
     if (!entry) return
 
+    // setBounds uses logical pixels (CSS px) — no DPR scaling needed.
     entry.view.setBounds({
-      x: Math.round(bounds.x * dpr),
-      y: Math.round(bounds.y * dpr),
-      width: Math.round(bounds.width * dpr),
-      height: Math.round(bounds.height * dpr),
+      x: Math.round(bounds.x),
+      y: Math.round(bounds.y),
+      width: Math.round(bounds.width),
+      height: Math.round(bounds.height),
     })
     entry.view.setVisible(visible)
   }

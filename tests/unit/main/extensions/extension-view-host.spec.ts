@@ -139,31 +139,19 @@ describe('ExtensionViewHost', () => {
 
   it('handleBoundsUpdate sets bounds and visibility on the matching view', async () => {
     await host.createView(makeExt(), 'main')
-    host.handleBoundsUpdate(
-      'com.test.ext',
-      'main',
-      { x: 10, y: 20, width: 400, height: 300 },
-      true,
-      2
-    )
-    expect(mockSetBounds).toHaveBeenCalledWith({ x: 20, y: 40, width: 800, height: 600 })
+    host.handleBoundsUpdate('com.test.ext', 'main', { x: 10, y: 20, width: 400, height: 300 }, true)
+    expect(mockSetBounds).toHaveBeenCalledWith({ x: 10, y: 20, width: 400, height: 300 })
     expect(mockSetVisible).toHaveBeenCalledWith(true)
   })
 
   it('handleBoundsUpdate sets visible: false when not visible', async () => {
     await host.createView(makeExt(), 'main')
-    host.handleBoundsUpdate(
-      'com.test.ext',
-      'main',
-      { x: 0, y: 0, width: 100, height: 100 },
-      false,
-      1
-    )
+    host.handleBoundsUpdate('com.test.ext', 'main', { x: 0, y: 0, width: 100, height: 100 }, false)
     expect(mockSetVisible).toHaveBeenCalledWith(false)
   })
 
   it('handleBoundsUpdate is a no-op for unknown extension', () => {
-    host.handleBoundsUpdate('com.unknown', 'main', { x: 0, y: 0, width: 100, height: 100 }, true, 1)
+    host.handleBoundsUpdate('com.unknown', 'main', { x: 0, y: 0, width: 100, height: 100 }, true)
     expect(mockSetBounds).not.toHaveBeenCalled()
   })
 
@@ -173,8 +161,7 @@ describe('ExtensionViewHost', () => {
       'com.test.ext',
       'sidebar',
       { x: 0, y: 0, width: 100, height: 100 },
-      true,
-      1
+      true
     )
     expect(mockSetBounds).not.toHaveBeenCalled()
   })

@@ -119,22 +119,22 @@ describe('ExtensionViewHost', () => {
   })
 
   describe('handleBoundsUpdate', () => {
-    it('calls setBounds with dpr-scaled bounds', async () => {
+    it('calls setBounds with logical pixel bounds (no DPR scaling)', async () => {
       const ext = makeExt()
       await host.createView(ext, 'main')
-      host.handleBoundsUpdate(ext.id, 'main', { x: 10, y: 20, width: 400, height: 600 }, true, 2)
+      host.handleBoundsUpdate(ext.id, 'main', { x: 10, y: 20, width: 400, height: 600 }, true)
       expect(createdViews[0].setBounds).toHaveBeenCalledWith({
-        x: 20,
-        y: 40,
-        width: 800,
-        height: 1200,
+        x: 10,
+        y: 20,
+        width: 400,
+        height: 600,
       })
     })
 
     it('calls setVisible with the visible flag', async () => {
       const ext = makeExt()
       await host.createView(ext, 'main')
-      host.handleBoundsUpdate(ext.id, 'main', { x: 0, y: 0, width: 100, height: 100 }, false, 1)
+      host.handleBoundsUpdate(ext.id, 'main', { x: 0, y: 0, width: 100, height: 100 }, false)
       expect(createdViews[0].setVisible).toHaveBeenCalledWith(false)
     })
   })

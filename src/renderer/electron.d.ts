@@ -147,7 +147,6 @@ interface ElectronAPI {
       viewParam: string
       bounds: { x: number; y: number; width: number; height: number }
       visible: boolean
-      dpr: number
     }): Promise<void>
   }
   keyboard: {

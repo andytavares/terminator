@@ -23,22 +23,9 @@ vi.stubGlobal(
 
 import { ExtensionPanelPortal } from '../../../../src/renderer/components/ExtensionPanelPortal.js'
 
-function makeEntry(rect: {
-  x: number
-  y: number
-  width: number
-  height: number
-}): ResizeObserverEntry {
-  return {
-    contentRect: rect,
-    target: document.createElement('div'),
-  } as unknown as ResizeObserverEntry
-}
-
 describe('ExtensionPanelPortal', () => {
   let panelLoadedHandler: ((id: string) => void) | null = null
   const originalElectronAPI = (window as unknown as Record<string, unknown>).electronAPI
-  const originalDpr = window.devicePixelRatio
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -50,7 +37,18 @@ describe('ExtensionPanelPortal', () => {
         panelLoadedHandler = null
       }
     })
-    Object.defineProperty(window, 'devicePixelRatio', { value: 2, configurable: true })
+    // Mock getBoundingClientRect to return a controlled rect
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      left: 10,
+      top: 20,
+      width: 400,
+      height: 300,
+      right: 410,
+      bottom: 320,
+      x: 10,
+      y: 20,
+      toJSON: () => ({}),
+    } as DOMRect)
     Object.defineProperty(window, 'electronAPI', {
       value: {
         extension: { updatePanelBounds: mockUpdatePanelBounds },
@@ -63,7 +61,7 @@ describe('ExtensionPanelPortal', () => {
 
   afterEach(() => {
     capturedResizeCallback = null
-    Object.defineProperty(window, 'devicePixelRatio', { value: originalDpr, configurable: true })
+    vi.restoreAllMocks()
     Object.defineProperty(window, 'electronAPI', {
       value: originalElectronAPI,
       configurable: true,
@@ -76,24 +74,23 @@ describe('ExtensionPanelPortal', () => {
     expect(mockObserve).toHaveBeenCalledWith(expect.any(HTMLElement))
   })
 
-  it('fires updatePanelBounds when ResizeObserver fires', () => {
+  it('fires updatePanelBounds using getBoundingClientRect when ResizeObserver fires', () => {
     render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
     act(() => {
-      capturedResizeCallback?.([makeEntry({ x: 10, y: 20, width: 400, height: 300 })])
+      capturedResizeCallback?.([])
     })
     expect(mockUpdatePanelBounds).toHaveBeenCalledWith({
       extensionId: 'com.test.ext',
       viewParam: 'main',
       bounds: { x: 10, y: 20, width: 400, height: 300 },
       visible: true,
-      dpr: 2,
     })
   })
 
   it('sends visible: false when isActive is false', () => {
     render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={false} />)
     act(() => {
-      capturedResizeCallback?.([makeEntry({ x: 0, y: 0, width: 400, height: 300 })])
+      capturedResizeCallback?.([])
     })
     expect(mockUpdatePanelBounds).toHaveBeenCalledWith(expect.objectContaining({ visible: false }))
   })
@@ -136,26 +133,5 @@ describe('ExtensionPanelPortal', () => {
     )
     unmount()
     expect(mockDisconnect).toHaveBeenCalled()
-  })
-
-  it('does not call updatePanelBounds when ResizeObserver fires with empty entries', () => {
-    render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
-    act(() => {
-      capturedResizeCallback?.([])
-    })
-    expect(mockUpdatePanelBounds).not.toHaveBeenCalled()
-  })
-
-  it('does not call updatePanelBounds when entry contentRect is undefined', () => {
-    render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
-    act(() => {
-      capturedResizeCallback?.([
-        {
-          contentRect: undefined,
-          target: document.createElement('div'),
-        } as unknown as ResizeObserverEntry,
-      ])
-    })
-    expect(mockUpdatePanelBounds).not.toHaveBeenCalled()
   })
 })

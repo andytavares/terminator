@@ -316,12 +316,12 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(
     'extension:update-panel-bounds',
-    async (_event, { extensionId, viewParam, bounds, visible, dpr }) => {
+    async (_event, { extensionId, viewParam, bounds, visible }) => {
       if (viewHost && !viewHost.hasView(extensionId, viewParam)) {
         const ext = extensionHost.listExtensions().find((e) => e.id === extensionId)
         if (ext) await viewHost.createView(ext, viewParam)
       }
-      viewHost?.handleBoundsUpdate(extensionId, viewParam, bounds, visible, dpr)
+      viewHost?.handleBoundsUpdate(extensionId, viewParam, bounds, visible)
     }
   )
 
