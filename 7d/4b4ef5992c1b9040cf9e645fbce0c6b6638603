@@ -1,0 +1,22 @@
+scripts/build-extensions.cjs
+  s_c06f550cdc90ca::t_66d4b6edc64070 41-46
+  s_c06f550cdc90ca::t_3e91c4aadff5fe 6
+src/main/index.ts
+  s_c06f550cdc90ca::t_3c3ed4b1e6c63a 281-287
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.13",
+  "base_commit_sha": "7d4b4ef5992c1b9040cf9e645fbce0c6b6638603",
+  "prompts": {},
+  "sessions": {
+    "s_c06f550cdc90ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f5bf6aa-b73c-4774-890d-64fd28e48d41",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
