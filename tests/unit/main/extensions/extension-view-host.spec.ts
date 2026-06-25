@@ -15,14 +15,24 @@ const { mockDefaultSession, capturedWebContentsViewArgs } = vi.hoisted(() => ({
   capturedWebContentsViewArgs: [] as unknown[],
 }))
 
+const mockGetVisible = vi.fn().mockReturnValue(true)
+const mockOpenDevTools = vi.fn()
+
 vi.mock('electron', () => ({
   WebContentsView: class {
     constructor(...args: unknown[]) {
       capturedWebContentsViewArgs.push(args[0])
     }
-    webContents = { send: mockSend, on: mockOn, loadURL: mockLoadURL, reload: mockReload }
+    webContents = {
+      send: mockSend,
+      on: mockOn,
+      loadURL: mockLoadURL,
+      reload: mockReload,
+      openDevTools: mockOpenDevTools,
+    }
     setBounds = mockSetBounds
     setVisible = mockSetVisible
+    getVisible = mockGetVisible
   },
   session: { defaultSession: mockDefaultSession, fromPartition: () => mockDefaultSession },
 }))

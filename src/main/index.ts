@@ -158,6 +158,12 @@ function buildViewSubmenu(): Electron.MenuItemConstructorOptions[] {
       accelerator: 'CmdOrCtrl+,',
       click: () => mainWindow?.webContents.send('menu:open-settings'),
     },
+    { type: 'separator' },
+    {
+      label: 'Open Extension DevTools',
+      accelerator: 'CmdOrCtrl+Shift+I',
+      click: () => viewHost?.openDevToolsForVisible(),
+    },
   ]
 
   return [...base, ...extItems, ...tail]

@@ -22,9 +22,11 @@ vi.mock('electron', () => ({
       send: vi.fn(),
       reload: vi.fn(),
       on: vi.fn(),
+      openDevTools: vi.fn(),
     }
     setBounds = vi.fn()
     setVisible = vi.fn()
+    getVisible = vi.fn().mockReturnValue(true)
     constructor() {
       createdViews.push(this as never)
     }
@@ -163,6 +165,28 @@ describe('ExtensionViewHost', () => {
       expect(createdViews[0].webContents.send).toHaveBeenCalledWith('workspace:changed', {
         workspaceId: 'w1',
       })
+    })
+  })
+
+  describe('openDevToolsForVisible', () => {
+    it('opens devtools on visible views', async () => {
+      const ext = makeExt()
+      await host.createView(ext, 'main')
+      createdViews[0].getVisible.mockReturnValue(true)
+      host.openDevToolsForVisible()
+      expect(createdViews[0].webContents.openDevTools).toHaveBeenCalled()
+    })
+
+    it('does not open devtools on hidden views', async () => {
+      const ext = makeExt()
+      await host.createView(ext, 'main')
+      createdViews[0].getVisible.mockReturnValue(false)
+      host.openDevToolsForVisible()
+      expect(createdViews[0].webContents.openDevTools).not.toHaveBeenCalled()
+    })
+
+    it('is a no-op when no views exist', () => {
+      expect(() => host.openDevToolsForVisible()).not.toThrow()
     })
   })
 

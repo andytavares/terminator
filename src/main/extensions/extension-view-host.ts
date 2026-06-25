@@ -114,6 +114,16 @@ export class ExtensionViewHost {
       view.webContents.send(channel, data)
     }
   }
+
+  openDevToolsForVisible(): void {
+    for (const entries of this.views.values()) {
+      for (const { view } of entries) {
+        if (view.getVisible()) {
+          view.webContents.openDevTools()
+        }
+      }
+    }
+  }
 }
 
 function buildUrl(rendererUrl: string, viewParam: string): string {
