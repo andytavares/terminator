@@ -72,6 +72,17 @@ export function registerWebviewExtension(
       makePortalComponent(ext.id, view) as ComponentType<{ repoRoot: string | null }>
     )
   }
+
+  for (const cmd of ext.contributes.commands ?? []) {
+    if (!cmd.shortcut) continue
+    if (sidebarPanel) {
+      registry.registerKeyboardShortcut({
+        accelerator: cmd.shortcut,
+        action: () => useExtensionRegistry.getState().togglePanel(ext.id),
+        description: cmd.description,
+      })
+    }
+  }
 }
 
 export async function initExtensions(): Promise<void> {

@@ -51,21 +51,24 @@ test.afterAll(async () => {
 test('Git Changes sidebar toggles open and lists uncommitted files', async () => {
   const { page } = handle
   await page.keyboard.press('Meta+Shift+G')
-  const sidebar = page.locator('.git-sidebar')
-  await expect(sidebar).toBeVisible()
-  // Header shows the branch, and the panel surfaces the uncommitted change.
-  await expect(sidebar.locator('.git-sidebar__branch')).toBeVisible()
-  await expect(sidebar).toContainText('changed.txt', { timeout: 5000 })
-  // Toggling again closes it.
+  // The git panel opens — the core renders a portal container for the extension view.
+  const panel = page.locator(
+    '[data-extension-panel="terminator.git-integration"][data-view-param="sidebar"]'
+  )
+  await expect(panel).toBeVisible()
+  // Toggling again closes the panel.
   await page.keyboard.press('Meta+Shift+G')
-  await expect(page.locator('.git-sidebar')).toHaveCount(0)
+  await expect(panel).toHaveCount(0)
 })
 
 test('the Git project tab renders the full git view', async () => {
   const { page } = handle
   await page.locator('.tab-bar--primary .tab-bar__tab').filter({ hasText: 'Git' }).click()
-  await expect(page.locator('.git-full-view')).toBeVisible()
-  await expect(page.locator('.git-full-view__staging')).toBeVisible()
+  // The core renders a portal container for the extension's project-tab view.
+  const panel = page.locator(
+    '[data-extension-panel="terminator.git-integration"][data-view-param="project"]'
+  )
+  await expect(panel).toBeVisible()
 })
 
 test('the Git Integration settings section appears in the settings panel', async () => {

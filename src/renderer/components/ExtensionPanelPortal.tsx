@@ -38,7 +38,12 @@ export function ExtensionPanelPortal({ extensionId, viewParam, isActive }: Props
   }, [extensionId])
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div
+      ref={containerRef}
+      data-extension-panel={extensionId}
+      data-view-param={viewParam}
+      style={{ width: '100%', height: '100%', position: 'relative' }}
+    >
       {loading && (
         <div
           data-testid="extension-loading"

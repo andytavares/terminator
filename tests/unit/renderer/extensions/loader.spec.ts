@@ -9,6 +9,8 @@ const mockRegisterWorkspaceTab = vi.fn()
 const mockRegisterProjectTab = vi.fn()
 const mockRegisterSidebarPanel = vi.fn()
 const mockRegisterWindowView = vi.fn()
+const mockRegisterKeyboardShortcut = vi.fn()
+const mockTogglePanel = vi.fn()
 
 const mockRegistry = {
   registerGlobalTab: mockRegisterGlobalTab,
@@ -16,6 +18,8 @@ const mockRegistry = {
   registerProjectTab: mockRegisterProjectTab,
   registerSidebarPanel: mockRegisterSidebarPanel,
   registerWindowView: mockRegisterWindowView,
+  registerKeyboardShortcut: mockRegisterKeyboardShortcut,
+  togglePanel: mockTogglePanel,
 }
 
 vi.mock('../../../../src/renderer/extensions/registry', () => ({
@@ -225,6 +229,59 @@ describe('registerWebviewExtension — default view params', () => {
     expect(mockRegisterSidebarPanel).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'com.test.ext' })
     )
+  })
+})
+
+describe('registerWebviewExtension — commands / keyboard shortcuts', () => {
+  it('registers a keyboard shortcut when contributes.commands has a shortcut and a sidebarPanel', async () => {
+    const { registerWebviewExtension } = await import(
+      '../../../../src/renderer/extensions/loader.js'
+    )
+    registerWebviewExtension(
+      makeExt({
+        id: 'com.test.ext',
+        contributes: {
+          sidebarPanel: { label: 'Panel', view: 'sidebar' },
+          commands: [{ id: 'ext:toggle', label: 'Toggle', shortcut: 'CmdOrCtrl+Shift+G' }],
+        },
+      }),
+      mockRegistry as never
+    )
+    expect(mockRegisterKeyboardShortcut).toHaveBeenCalledWith(
+      expect.objectContaining({ accelerator: 'CmdOrCtrl+Shift+G' })
+    )
+  })
+
+  it('does not register a keyboard shortcut when the command has no shortcut', async () => {
+    const { registerWebviewExtension } = await import(
+      '../../../../src/renderer/extensions/loader.js'
+    )
+    registerWebviewExtension(
+      makeExt({
+        contributes: {
+          sidebarPanel: { label: 'Panel' },
+          commands: [{ id: 'ext:action', label: 'Action' }],
+        },
+      }),
+      mockRegistry as never
+    )
+    expect(mockRegisterKeyboardShortcut).not.toHaveBeenCalled()
+  })
+
+  it('does not register a keyboard shortcut when there is no sidebarPanel', async () => {
+    const { registerWebviewExtension } = await import(
+      '../../../../src/renderer/extensions/loader.js'
+    )
+    registerWebviewExtension(
+      makeExt({
+        contributes: {
+          globalTab: { label: 'Tab' },
+          commands: [{ id: 'ext:action', label: 'Action', shortcut: 'CmdOrCtrl+X' }],
+        },
+      }),
+      mockRegistry as never
+    )
+    expect(mockRegisterKeyboardShortcut).not.toHaveBeenCalled()
   })
 })
 
