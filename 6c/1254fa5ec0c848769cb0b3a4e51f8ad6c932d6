@@ -1,0 +1,273 @@
+specs/013-webview-extension-system/data-model.md
+  s_c06f550cdc90ca::t_3da6b09de9d9a5 144,146,155-159
+  s_c06f550cdc90ca::t_cb67a1e6218ef5 1-11,25-28,30-79,81-93,95-110,114-129,131-135,137-143,145,147,166-180,184,188-194,201,217-221
+  s_c06f550cdc90ca::t_8728d59631c0cc 12-24,29,80,94,111-113,130,136,148-154,160-165,181-183,185-187,195-200,202-216,222-229
+tests/unit/schemas/extension-contributes.spec.ts
+  s_c06f550cdc90ca::t_d1b6e42ab7523e 1-111
+tests/unit/renderer/extensions/loader.spec.ts
+  s_c06f550cdc90ca::t_e112817ce7a166 248-249
+  s_c06f550cdc90ca::t_229958189a6c01 4,6-11,13-18,22-26,28-30,32-33,46-56,60-61,65,71,73-76,78-80,83,85-88,90-92,95-104,107,110-111,114-116,119,122-128,131-133,136,138-142,145,147,149,231-237,251-256,258-261
+  s_c06f550cdc90ca::t_429e601aa17a2d 59,62,137
+  s_c06f550cdc90ca::t_3912cc28654cca 153-164,167-175,178-188,191-230
+  s_c06f550cdc90ca::t_3246b47f0fb4db 21,27,31
+  s_c06f550cdc90ca::t_4d9e7cedd7fb6a 238-247,250
+  s_c06f550cdc90ca::t_eb9362cfa0de1e 1,3
+extensions/remote-control/vite.renderer.config.ts
+  s_c06f550cdc90ca::t_3be9eca878398e 1-15
+packages/extension-sdk/tsconfig.json
+  s_c06f550cdc90ca::t_bd9ff90c2da065 1-11
+CLAUDE.md
+  s_c06f550cdc90ca::t_ac91019e64e000 5
+src/shared/types/index.ts
+  s_c06f550cdc90ca::t_b1c35f5c4a12c0 55-70,82-83
+tests/unit/main/preload-webview.spec.ts
+  s_c06f550cdc90ca::t_a16ca690a36077 1-71
+extensions/notepad/manifest.json
+  s_c06f550cdc90ca::t_a3882bd9fcc075 7-27
+extensions/speckit-pilot/tests/unit/renderer/App.spec.tsx
+  s_c06f550cdc90ca::t_1dfbf823934a33 1-39
+docs/EXTENSION-DEVELOPMENT.md
+  s_c06f550cdc90ca::t_adb5482ca4815a 53-62,72-73,75
+  s_c06f550cdc90ca::t_5361da8cf87e81 852-855,889-896,955
+  s_c06f550cdc90ca::t_59acd908b53ad7 803-851,856-888,897-954,956-958
+  s_c06f550cdc90ca::t_0dc51b71851887 5
+  s_c06f550cdc90ca::t_b95090c42704fe 82
+specs/013-webview-extension-system/contracts/webview-api.md
+  s_c06f550cdc90ca::t_614726d93c9068 1-19,21-23,25-27,29-31,33-39,41-43,45-47,49-55,57-59,61-63,65-67,69-75,77-79,81-83,85-87,89-97,99-101,103-106,108-114,116-118,120-126,128-130,132-140,142-144,146-152,154-156,158-160,162-168,170-188,195-208
+  s_c06f550cdc90ca::t_8728d59631c0cc 20,24,28,32,40,44,48,56,60,64,68,76,80,84,88,98,102,107,115,119,127,131,141,145,153,157,161,169,189-194
+src/main/preload.ts
+  s_c06f550cdc90ca::t_c537d9bb9b1358 57
+  s_c06f550cdc90ca::t_bd990cbd1ed538 2-22
+  s_c06f550cdc90ca::t_59194314628c6b 182-193
+  s_c06f550cdc90ca::t_a47d0ee935c790 113-119
+src/main/extensions/extension-view-host.ts
+  s_c06f550cdc90ca::t_86858b87500555 97-100
+  s_c06f550cdc90ca::t_2f31c4e1d4e64c 1-96,101-114
+extensions/notepad/tests/unit/renderer/App.spec.tsx
+  s_c06f550cdc90ca::t_4e5755805296e7 1-17,23-83,88-89,91-97,102-111
+  s_c06f550cdc90ca::t_2d7bb2bb611400 90,101
+  s_c06f550cdc90ca::t_6f1dbed2aaa3d0 18-22
+  s_c06f550cdc90ca::t_8728d59631c0cc 84-87,98-100
+extensions/git-integration/manifest.json
+  s_c06f550cdc90ca::t_8728d59631c0cc 24
+  s_c06f550cdc90ca::t_1b1a27221f71f6 7-23,25-33
+extensions/remote-control/src/renderer/App.tsx
+  s_c06f550cdc90ca::t_8728d59631c0cc 8-11
+  s_c06f550cdc90ca::t_463b4ba4fab24a 1-7,12-16
+extensions/task-vault/src/renderer/App.tsx
+  s_c06f550cdc90ca::t_d755560a55de60 1-28
+src/shared/schemas/extension.schema.ts
+  s_c06f550cdc90ca::t_9b8e27ac8cb70a 6-18,20-38,50
+  s_c06f550cdc90ca::t_8728d59631c0cc 19
+packages/extension-sdk/README.md
+  s_c06f550cdc90ca::t_5361da8cf87e81 80-87,123
+  s_c06f550cdc90ca::t_6d0aca9c2be52b 1-79,88-122,124-137
+specs/013-webview-extension-system/research.md
+  s_c06f550cdc90ca::t_c68e3050540b50 38,40,44-46,48,52,54,58-61,63-64,67,69,73-78
+  s_c06f550cdc90ca::t_ca8157f797aec0 106,108,110,114,116,118,120-126,128,130-133,136
+  s_c06f550cdc90ca::t_3ef86410adb2b9 1-7,9,11-12,19,24,35-37,39,41-42,47,49-51,53,55-56,62,65-66,68,70-71,79-86,88-96,98-105,107,109,111-113,115,117,129,134-135,137-144,146-151,153,155,158,160,171-178,180,182,184-189,191-196,198-205,207-221
+  s_c06f550cdc90ca::t_ee47983882bd98 152,154,156,159,179,181,183
+  s_c06f550cdc90ca::t_8728d59631c0cc 13-14,25,31,43,57,72,87,97,119,127,145,157,161-170,190,197,206
+  s_c06f550cdc90ca::t_3a0e5e736d69db 222
+  s_c06f550cdc90ca::t_1a9d651be5b13d 8,10,15-18,20-23,26-30,32-34
+extensions/notepad/index.html
+  s_c06f550cdc90ca::t_3d0ed42665a778 1-12
+src/main/preload-webview.ts
+  s_c06f550cdc90ca::t_9288f4b2f3b001 154-165
+  s_c06f550cdc90ca::t_86b04fab3fb40e 1,23-153,166-216
+  s_c06f550cdc90ca::t_4b0f71965d7672 2-22
+specs/013-webview-extension-system/contracts/manifest.md
+  s_c06f550cdc90ca::t_8728d59631c0cc 44,63-72,82-86,92-96,102-105,111-115,121-124,130-135,138,140-142
+  s_c06f550cdc90ca::t_c5689321aee7b2 1-43,45-62,73-81,87-91,97-101,106-110,116-120,125-129,136-137,139,143-201
+specs/013-webview-extension-system/plan.md
+  s_c06f550cdc90ca::t_8728d59631c0cc 24-32,137,153,156,161,170,177,184,250
+  s_c06f550cdc90ca::t_527a2c347563a6 1,3-4,8,12-20,39-48,51,54-119,121-136,138-152,154-155,157-160,162-169,171-176,178-183,185-193,195,197,199,201-249,251-255
+  s_c06f550cdc90ca::t_fc83a3c03f0d3e 2,5-7,9-11,21-23,33-38,49-50,52-53,120,194,196,198,200
+electron.vite.config.ts
+  s_c06f550cdc90ca::t_5252769fe1440c 22
+docs/adr/022-webview-isolated-extension-renderer.md
+  s_c06f550cdc90ca::t_5361da8cf87e81 56,63
+  s_c06f550cdc90ca::t_6124a75e334b35 1-55,57-62,64-76
+src/main/extensions/extension-host.ts
+  s_c06f550cdc90ca::t_4f5ab228ce0362 202-206
+  s_c06f550cdc90ca::t_ee3cd357f9f16c 66
+  s_c06f550cdc90ca::t_bed9bc5a40e505 97
+extensions/git-integration/index.html
+  s_c06f550cdc90ca::t_58d7fcf49060d6 1-12
+extensions/remote-control/src/renderer/main.tsx
+  s_c06f550cdc90ca::t_b693901a5f3ce6 1-7
+extensions/notepad/package.json
+  s_c06f550cdc90ca::t_8adcae678032fc 6-8
+tests/unit/extensions/extension-view-host.spec.ts
+  s_c06f550cdc90ca::t_04d929c70c3274 18,32-34
+  s_c06f550cdc90ca::t_9ace2f50e60634 63,69,76,83,91
+  s_c06f550cdc90ca::t_5da62142c28951 141-156
+  s_c06f550cdc90ca::t_8728d59631c0cc 4-16,84-87,125-130,162-164,170-177
+  s_c06f550cdc90ca::t_0be16267c8ee12 1-3,35,38-55,57-62,66-68,71-75,78-82,88-90,93-100,102,104-115,117-124,131-136,138-140,157-161,165-169,178-179,183-184,187-189
+  s_c06f550cdc90ca::t_89cdc2a15d26be 17,19-31,36-37,56,64-65,70,77,92,101,103,116,137,180-182,185-186
+tests/unit/renderer/extensions/icon-from-name.spec.ts
+  s_c06f550cdc90ca::t_51da9dcfbe70bc 1-4,6-35
+packages/extension-sdk/types/api.d.ts
+  s_c06f550cdc90ca::t_f0f449cb047d98 1-213
+extensions/git-integration/tests/unit/renderer/App.spec.tsx
+  s_c06f550cdc90ca::t_6302ce5e79d529 1-103
+extensions/task-vault/manifest.json
+  s_c06f550cdc90ca::t_dcfa115389cbcd 7-29
+extensions/speckit-pilot/vite.renderer.config.ts
+  s_c06f550cdc90ca::t_2787d6eb932169 1-13
+src/main/index.ts
+  s_c06f550cdc90ca::t_4f28da5e55ed28 16
+  s_c06f550cdc90ca::t_a42a984c2b481f 281,286
+  s_c06f550cdc90ca::t_3ae461219ade9c 63
+  s_c06f550cdc90ca::t_bc87b99259ca7e 295-297,303-309
+  s_c06f550cdc90ca::t_8728d59631c0cc 282-285,292-294
+  s_c06f550cdc90ca::t_f6c80962457b4b 75,79
+  s_c06f550cdc90ca::t_cc5e92edbfcc44 271
+  s_c06f550cdc90ca::t_3abbe83531c08a 298-302
+docs/ARCHITECTURE.md
+  s_c06f550cdc90ca::t_5f4300a8490e75 243-265,267-291
+  s_c06f550cdc90ca::t_5361da8cf87e81 266
+src/renderer/index.tsx
+  s_c06f550cdc90ca::t_51cda2b32fcdff 2
+  s_c06f550cdc90ca::t_0db8b5f8bf8beb 36-45
+tests/unit/renderer/components/ExtensionPanelPortal.spec.tsx
+  s_c06f550cdc90ca::t_85325197c46ebd 40-41,53-61,66-71,79
+  s_c06f550cdc90ca::t_72e382afcd1687 1-12,21,23-25,32-39,42-48,52,62-65,72-78,80-97,99-116,120-126,130-139,161
+  s_c06f550cdc90ca::t_8728d59631c0cc 13-20,22,26-31,49-51,98,117-119,127-129
+  s_c06f550cdc90ca::t_d3980f5120281d 140-160
+extensions/git-integration/package.json
+  s_c06f550cdc90ca::t_3c0cf046dbf91a 6-8
+extensions/remote-control/package.json
+  s_c06f550cdc90ca::t_c33720d7a1301a 6-8
+specs/013-webview-extension-system/spec.md
+  s_c06f550cdc90ca::t_bc348356dd7840 130
+  s_c06f550cdc90ca::t_31ba0f325822c4 93
+  s_c06f550cdc90ca::t_062cf7088ba4c0 136
+  s_c06f550cdc90ca::t_23793cd029dc18 1-92,94-124,126-129,131-135,137-145,148-174,186-187,189-195
+  s_c06f550cdc90ca::t_8e2293f1c099d1 181
+  s_c06f550cdc90ca::t_65c9b915d942d0 125
+  s_c06f550cdc90ca::t_9700e2cfebcf8f 188
+  s_c06f550cdc90ca::t_70a768e99439c9 180
+  s_c06f550cdc90ca::t_a9b45a4ad77ec5 182
+  s_c06f550cdc90ca::t_4a3114dfaed938 175-179,183-185
+  s_c06f550cdc90ca::t_bfdd31e6075bc4 146-147
+extensions/speckit-pilot/src/renderer/App.tsx
+  s_c06f550cdc90ca::t_3f21746f307fe4 1-7
+extensions/task-vault/package.json
+  s_c06f550cdc90ca::t_956e8e84475747 6-8
+extensions/speckit-pilot/src/renderer/main.tsx
+  s_c06f550cdc90ca::t_91f1108df6f265 1-7
+.specify/feature.json
+  s_c06f550cdc90ca::t_ce4798d5846d68 2
+README.md
+  s_c06f550cdc90ca::t_675721e41d3550 12
+extensions/speckit-pilot/package.json
+  s_c06f550cdc90ca::t_8fac5e1669bfca 6-8
+packages/extension-sdk/types/renderer.d.ts
+  s_c06f550cdc90ca::t_d6ff90ab5486fe 1-50,56,61-187
+  s_c06f550cdc90ca::t_5361da8cf87e81 51-55,57-60
+specs/013-webview-extension-system/checklists/requirements.md
+  s_c06f550cdc90ca::t_09f0cfa9056f85 1-34
+tests/unit/renderer/icon-from-name.spec.tsx
+  s_c06f550cdc90ca::t_a06dc6ee74b490 1-49
+extensions/git-integration/src/renderer/main.tsx
+  s_c06f550cdc90ca::t_a1fc7d80b14e93 1-9
+extensions/task-vault/index.html
+  s_c06f550cdc90ca::t_cca67896f208a6 1-12
+extensions/task-vault/tests/renderer/App.spec.tsx
+  s_c06f550cdc90ca::t_d212a1c041e65e 1,3-89
+  s_c06f550cdc90ca::t_aea7db18f85041 2
+specs/013-webview-extension-system/quickstart.md
+  s_c06f550cdc90ca::t_0b1c2420e84558 1-10,12-71,73-98,100-139,147-152,159-165,171-176,178-186,188,190,195-202,204-224,226-236,238-279,281-292,294-308,310-326,328-366
+  s_c06f550cdc90ca::t_8728d59631c0cc 11,72,99,140-146,153-158,166-170,177,187,189,191-194,203,225,237,280,293,309,327
+src/renderer/components/ExtensionPanelPortal.tsx
+  s_c06f550cdc90ca::t_ece7e47d10e7bb 1-58
+scripts/check-patch-coverage.cjs
+  s_c06f550cdc90ca::t_3e9fc379df55b1 27-30
+extensions/remote-control/index.html
+  s_c06f550cdc90ca::t_eb7eb349c61070 1-12
+extensions/git-integration/vite.renderer.config.ts
+  s_c06f550cdc90ca::t_56577511da4ddb 1-15
+src/renderer/extensions/icon-from-name.ts
+  s_c06f550cdc90ca::t_4e46c367d5c66d 1-58
+extensions/speckit-pilot/index.html
+  s_c06f550cdc90ca::t_8d618713b16634 1-12
+extensions/task-vault/src/renderer/main.tsx
+  s_c06f550cdc90ca::t_d95dab4133aea5 1-8
+specs/001-extension-first-terminal/contracts/extension-api.md
+  s_c06f550cdc90ca::t_5361da8cf87e81 23,566-569,590-594
+  s_c06f550cdc90ca::t_d1214e84eef420 3-5,9-10
+  s_c06f550cdc90ca::t_f70a0d917611ab 554-565,570-589,595-613
+src/main/ipc/workspace.ipc.ts
+  s_c06f550cdc90ca::t_c64e1d399a9cc1 19-38,40-41
+extensions/notepad/vite.renderer.config.ts
+  s_c06f550cdc90ca::t_e5db2f1a735640 1-15
+extensions/notepad/src/renderer/main.tsx
+  s_c06f550cdc90ca::t_ed3f6e4c4aafd5 1-8
+tests/unit/main/extensions/extension-view-host.spec.ts
+  s_c06f550cdc90ca::t_5c9f8ea8f2b8d3 1-13,19-174
+  s_c06f550cdc90ca::t_7ea5dd939d2e6b 14-18
+src/renderer/electron.d.ts
+  s_c06f550cdc90ca::t_cc23cc74e3026d 145-151
+  s_c06f550cdc90ca::t_7381304871167f 165-166
+extensions/remote-control/manifest.json
+  s_c06f550cdc90ca::t_2e375fbad73a9f 7-15
+extensions/notepad/src/renderer/App.tsx
+  s_c06f550cdc90ca::t_8728d59631c0cc 13-14
+  s_c06f550cdc90ca::t_62aee23fb7c6d8 1,6,10,17,31
+  s_c06f550cdc90ca::t_5536d1f708fce0 2-5,7-9,11-12,15-16,18-30,32-34
+packages/extension-sdk/package.json
+  s_c06f550cdc90ca::t_9e245f910b81f3 1-7
+packages/extension-sdk/types/index.d.ts
+  s_c06f550cdc90ca::t_4ae6ae218a825c 1-32
+extensions/remote-control/tests/unit/renderer/App.spec.tsx
+  s_c06f550cdc90ca::t_8728d59631c0cc 44-46
+  s_c06f550cdc90ca::t_1dfb071292846a 1-43,47-58
+specs/001-extension-first-terminal/contracts/ipc-channels.md
+  s_c06f550cdc90ca::t_34a127c8e08924 1540-1553,1555-1558,1565,1567-1624
+  s_c06f550cdc90ca::t_5361da8cf87e81 1554,1559-1564,1566
+tests/integration/ipc/extension.ipc.spec.ts
+  s_c06f550cdc90ca::t_1e8992b658d48a 211-237
+src/renderer/extensions/loader.ts
+  s_c06f550cdc90ca::t_337515d0fbfa2e 4-6
+  s_c06f550cdc90ca::t_ee31c91ba36199 77,83
+  s_c06f550cdc90ca::t_da3bb45f43bc56 1-2,8-33,35-54,56-74,80
+extensions/speckit-pilot/manifest.json
+  s_c06f550cdc90ca::t_f94fff5ebf5d27 7-14
+extensions/git-integration/src/renderer/App.tsx
+  s_c06f550cdc90ca::t_8728d59631c0cc 12,15-18
+  s_c06f550cdc90ca::t_8bede2f0709c50 1-11,13-14,19-29
+src/main/ipc/extension.ipc.ts
+  s_c06f550cdc90ca::t_afef822cc118f6 34-38
+  s_c06f550cdc90ca::t_af6a8517193cd5 9-12
+extensions/task-vault/vite.renderer.config.ts
+  s_c06f550cdc90ca::t_7973473c3cfd1d 1-13
+specs/013-webview-extension-system/tasks.md
+  s_c06f550cdc90ca::t_fac862cc405c72 78-83,87-92,96-101,105-110,114-119,123
+  s_c06f550cdc90ca::t_a433ef7964a5e4 135-140
+  s_c06f550cdc90ca::t_15f3610bd8c2ff 1-21,25-35,45-55,65-77,84-86,93-95,102-104,111-113,120-122,124-134,141-149,158-163,168-250
+  s_c06f550cdc90ca::t_8728d59631c0cc 22-24,36-44,56-64
+  s_c06f550cdc90ca::t_6c7572bb7c0b42 150-157
+  s_c06f550cdc90ca::t_1fcf20b93cf915 164-167
+tests/integration/ipc/workspace.ipc.spec.ts
+  s_c06f550cdc90ca::t_7cc241dd0036db 27-31,33
+  s_c06f550cdc90ca::t_01046c32cd7b0a 253-279
+  s_c06f550cdc90ca::t_8193fae79786ea 34-38
+  s_c06f550cdc90ca::t_827fc6da788d55 172,181-252
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.13",
+  "base_commit_sha": "6c1254fa5ec0c848769cb0b3a4e51f8ad6c932d6",
+  "prompts": {},
+  "sessions": {
+    "s_c06f550cdc90ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f5bf6aa-b73c-4774-890d-64fd28e48d41",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
