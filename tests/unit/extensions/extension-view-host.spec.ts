@@ -29,6 +29,7 @@ vi.mock('electron', () => ({
       createdViews.push(this as never)
     }
   },
+  session: { defaultSession: {} },
 }))
 
 import { ExtensionViewHost } from '../../../src/main/extensions/extension-view-host.js'

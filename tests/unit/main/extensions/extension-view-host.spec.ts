@@ -10,12 +10,21 @@ const mockSetVisible = vi.fn()
 const mockAddChildView = vi.fn()
 const mockRemoveChildView = vi.fn()
 
+const { mockDefaultSession, capturedWebContentsViewArgs } = vi.hoisted(() => ({
+  mockDefaultSession: { id: 'default' } as unknown,
+  capturedWebContentsViewArgs: [] as unknown[],
+}))
+
 vi.mock('electron', () => ({
   WebContentsView: class {
+    constructor(...args: unknown[]) {
+      capturedWebContentsViewArgs.push(args[0])
+    }
     webContents = { send: mockSend, on: mockOn, loadURL: mockLoadURL, reload: mockReload }
     setBounds = mockSetBounds
     setVisible = mockSetVisible
   },
+  session: { defaultSession: mockDefaultSession },
 }))
 
 vi.mock('../../src/main/logger.js', () => ({
@@ -67,6 +76,16 @@ describe('ExtensionViewHost', () => {
     await host.createView(makeExt(), 'main')
     expect(mockAddChildView).toHaveBeenCalled()
     expect(host.hasView('com.test.ext', 'main')).toBe(true)
+  })
+
+  it('createView passes session.defaultSession so the ext:// protocol is accessible', async () => {
+    capturedWebContentsViewArgs.length = 0
+    await host.createView(makeExt(), 'main')
+    expect(capturedWebContentsViewArgs[0]).toEqual(
+      expect.objectContaining({
+        webPreferences: expect.objectContaining({ session: mockDefaultSession }),
+      })
+    )
   })
 
   it('createView passes viewParam as ?view= query param', async () => {
