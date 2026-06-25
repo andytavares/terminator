@@ -65,7 +65,7 @@ describe('ExtensionViewHost', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mainWindow = makeMainWindow()
-    host = new ExtensionViewHost(mainWindow as never)
+    host = new ExtensionViewHost(mainWindow as never, '/fake/preload/webview.js')
   })
 
   it('hasView returns false before any view is created', () => {
@@ -78,12 +78,17 @@ describe('ExtensionViewHost', () => {
     expect(host.hasView('com.test.ext', 'main')).toBe(true)
   })
 
-  it('createView uses the ext-views partition so ext:// protocol is accessible', async () => {
+  it('createView uses ext-views partition with preload and context isolation', async () => {
     capturedWebContentsViewArgs.length = 0
     await host.createView(makeExt(), 'main')
     expect(capturedWebContentsViewArgs[0]).toEqual(
       expect.objectContaining({
-        webPreferences: expect.objectContaining({ session: mockDefaultSession }),
+        webPreferences: expect.objectContaining({
+          session: mockDefaultSession,
+          preload: '/fake/preload/webview.js',
+          contextIsolation: true,
+          nodeIntegration: false,
+        }),
       })
     )
   })

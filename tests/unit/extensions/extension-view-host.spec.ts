@@ -56,7 +56,7 @@ describe('ExtensionViewHost', () => {
   beforeEach(() => {
     createdViews.length = 0
     vi.clearAllMocks()
-    host = new ExtensionViewHost(mockWindow as never)
+    host = new ExtensionViewHost(mockWindow as never, '/fake/preload/webview.js')
   })
 
   describe('createView', () => {

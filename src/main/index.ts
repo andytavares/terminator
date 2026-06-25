@@ -76,7 +76,7 @@ function createWindow(): void {
     },
   })
 
-  viewHost = new ExtensionViewHost(mainWindow)
+  viewHost = new ExtensionViewHost(mainWindow, join(__dirname, '../preload/webview.js'))
 
   if (process.env.NODE_ENV === 'development' || process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] || 'http://localhost:5173')

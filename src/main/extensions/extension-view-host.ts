@@ -21,9 +21,11 @@ interface ViewEntry {
 export class ExtensionViewHost {
   private views = new Map<string, ViewEntry[]>()
   private mainWindow: BrowserWindow
+  private preloadPath: string
 
-  constructor(mainWindow: BrowserWindow) {
+  constructor(mainWindow: BrowserWindow, preloadPath: string) {
     this.mainWindow = mainWindow
+    this.preloadPath = preloadPath
   }
 
   async createView(ext: Extension, viewParam: string): Promise<void> {
@@ -31,7 +33,12 @@ export class ExtensionViewHost {
 
     const url = buildUrl(ext.rendererUrl, viewParam)
     const view = new WebContentsView({
-      webPreferences: { session: electronSession.fromPartition('ext-views') },
+      webPreferences: {
+        session: electronSession.fromPartition('ext-views'),
+        preload: this.preloadPath,
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
     })
 
     view.webContents.on('did-finish-load', () => {
