@@ -23,6 +23,7 @@ vi.mock('electron', () => ({
       reload: vi.fn(),
       on: vi.fn(),
       openDevTools: vi.fn(),
+      insertCSS: vi.fn().mockResolvedValue(undefined),
     }
     setBounds = vi.fn()
     setVisible = vi.fn()
@@ -88,6 +89,20 @@ describe('ExtensionViewHost', () => {
         'did-finish-load',
         expect.any(Function)
       )
+    })
+
+    it('injects design token CSS and signals panel-loaded on did-finish-load', async () => {
+      await host.createView(makeExt(), 'main')
+      const [, finishLoadCb] = (createdViews[0].webContents.on as ReturnType<typeof vi.fn>).mock
+        .calls[0] as [string, () => void]
+      finishLoadCb()
+      expect(createdViews[0].webContents.insertCSS).toHaveBeenCalledWith(
+        expect.stringContaining('--tm-bg-base')
+      )
+      expect(mockWindow.webContents.send).toHaveBeenCalledWith('extension:panel-loaded', {
+        id: 'com.test.ext',
+        viewParam: 'main',
+      })
     })
 
     it('does nothing if rendererUrl is absent', async () => {

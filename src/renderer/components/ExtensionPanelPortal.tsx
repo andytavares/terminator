@@ -51,7 +51,7 @@ export function ExtensionPanelPortal({ extensionId, viewParam, isActive }: Props
       ref={containerRef}
       data-extension-panel={extensionId}
       data-view-param={viewParam}
-      style={{ width: '100%', height: '100%', position: 'relative' }}
+      style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}
     >
       {loading && (
         <div

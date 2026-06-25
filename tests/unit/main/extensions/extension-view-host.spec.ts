@@ -29,6 +29,7 @@ vi.mock('electron', () => ({
       loadURL: mockLoadURL,
       reload: mockReload,
       openDevTools: mockOpenDevTools,
+      insertCSS: vi.fn().mockResolvedValue(undefined),
     }
     setBounds = mockSetBounds
     setVisible = mockSetVisible

@@ -5,6 +5,44 @@ import { makeLogger } from '../logger.js'
 
 const logger = makeLogger('extension-view-host')
 
+// Injected into every extension WebContentsView so --tm-* CSS variables are defined.
+// Extensions use these to match the app's dark theme without sharing the main renderer context.
+const EXTENSION_BASE_CSS = `
+:root {
+  --tm-bg-base: #0c0c0f;
+  --tm-bg-surface: #111116;
+  --tm-bg-elevated: #18181f;
+  --tm-bg-card: #1c1c25;
+  --tm-bg-card-hover: #22222e;
+  --tm-bg-input: #16161c;
+  --tm-text-primary: #e2e2ee;
+  --tm-text-secondary: #9090c4;
+  --tm-text-muted: #8585b8;
+  --tm-border: rgba(255,255,255,0.06);
+  --tm-border-strong: rgba(255,255,255,0.12);
+  --tm-accent: #5c6bc0;
+  --tm-accent-dim: rgba(92,107,192,0.18);
+  --tm-accent-glow: rgba(92,107,192,0.35);
+  --tm-danger: #e05c5c;
+  --tm-success: #4ade80;
+  --tm-warning: #facc15;
+  --tm-radius-xs: 4px;
+  --tm-radius-sm: 6px;
+  --tm-radius-md: 10px;
+  --tm-radius-lg: 16px;
+  --tm-font-mono: 'IBM Plex Mono','JetBrains Mono','Fira Code','Courier New',monospace;
+  --tm-font-ui: 'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; margin: 0; padding: 0;
+  background: var(--tm-bg-base);
+  color: var(--tm-text-primary);
+  font-family: var(--tm-font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+`
+
 interface BoundsRect {
   x: number
   y: number
@@ -42,6 +80,7 @@ export class ExtensionViewHost {
     })
 
     view.webContents.on('did-finish-load', () => {
+      view.webContents.insertCSS(EXTENSION_BASE_CSS).catch(() => {})
       this.mainWindow.webContents.send('extension:panel-loaded', { id: ext.id, viewParam })
     })
 

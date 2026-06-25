@@ -22,7 +22,7 @@
 .terminal-pane__container {
   width: 100%;
   height: 100%;
-  padding: 6px;
+  padding: 6px 12px;
 }
 
 .terminal-pane__container .xterm {
