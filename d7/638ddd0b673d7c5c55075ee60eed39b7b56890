@@ -1,0 +1,38 @@
+tests/unit/extensions/extension-view-host.spec.ts
+  s_c06f550cdc90ca::t_117b3c82ca0e56 171-172,175-176,180
+tests/unit/renderer/components/ExtensionPanelPortal.spec.tsx
+  s_c06f550cdc90ca::t_d355d34abc7a19 137-147
+extensions/notepad/vite.renderer.config.ts
+  s_c06f550cdc90ca::t_46f9bc1faa74cb 7
+extensions/task-vault/vite.renderer.config.ts
+  s_c06f550cdc90ca::t_46f9bc1faa74cb 7
+extensions/remote-control/vite.renderer.config.ts
+  s_c06f550cdc90ca::t_46f9bc1faa74cb 7
+extensions/speckit-pilot/vite.renderer.config.ts
+  s_c06f550cdc90ca::t_46f9bc1faa74cb 7
+extensions/git-integration/vite.renderer.config.ts
+  s_c06f550cdc90ca::t_46f9bc1faa74cb 7
+src/renderer/components/ExtensionPanelPortal.tsx
+  s_c06f550cdc90ca::t_7341e1d5423e2e 29-32,34-39
+  s_c06f550cdc90ca::t_2981d8d701f159 33
+src/main/extensions/extension-view-host.ts
+  s_c06f550cdc90ca::t_3827122fd4cf05 118,121
+src/main/index.ts
+  s_c06f550cdc90ca::t_26b104a6840fbf 165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.13",
+  "base_commit_sha": "d7638ddd0b673d7c5c55075ee60eed39b7b56890",
+  "prompts": {},
+  "sessions": {
+    "s_c06f550cdc90ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f5bf6aa-b73c-4774-890d-64fd28e48d41",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
