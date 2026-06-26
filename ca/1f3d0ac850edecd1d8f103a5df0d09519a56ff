@@ -1,0 +1,20 @@
+README.md
+  s_aea7dd3aabcb2b::t_43589d6891895f 10
+  s_aea7dd3aabcb2b::t_e6db8beb5bd968 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "ca1f3d0ac850edecd1d8f103a5df0d09519a56ff",
+  "prompts": {},
+  "sessions": {
+    "s_aea7dd3aabcb2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0943ecf4-f5a9-4197-aa13-ac7d22d12fa5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
