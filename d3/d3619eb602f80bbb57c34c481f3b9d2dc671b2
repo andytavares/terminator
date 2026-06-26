@@ -1,0 +1,195 @@
+src/renderer/components/ConfirmDialog.tsx
+  s_ee942c2ab9199c::t_8ca5b5cfc1ad6d 22
+  s_ee942c2ab9199c::t_8d865700747b56 2
+extensions/git-integration/src/index.ts
+  s_ee942c2ab9199c::t_ceb51d2ee1a5a1 95,97
+src/renderer/components/CommandPalette.tsx
+  s_ee942c2ab9199c::t_8b6b9c33073d07 3
+  s_ee942c2ab9199c::t_310e2d3517178f 41
+extensions/task-vault/manifest.json
+  s_c06f550cdc90ca::t_30e4c081cb41e7 12
+extensions/task-vault/src/renderer/App.tsx
+  s_ee942c2ab9199c::t_bc6fc2e2bc16db 19-23
+src/main/preload.ts
+  s_ee942c2ab9199c::t_205182400572e2 1
+  s_ee942c2ab9199c::t_914df084076878 118
+  s_ee942c2ab9199c::t_93448766c15268 244
+src/renderer/components/sidebar/CreateWorkspaceDialog.tsx
+  s_ee942c2ab9199c::t_263738c8fab5de 12
+  s_ee942c2ab9199c::t_f3fe8de953bf4a 4
+tests/unit/extensions/extension-host.spec.ts
+  s_ee942c2ab9199c::t_0ab5cb469ece3d 707-747
+extensions/task-vault/src/index.ts
+  s_ee942c2ab9199c::t_5547260bd521ae 151,153
+src/main/index.ts
+  s_ee942c2ab9199c::t_b844b1163e1c89 323-327,330-334,337-340,342-364,366
+  s_ee942c2ab9199c::t_0f827a434f2c56 328-329
+tests/unit/renderer/components/AboutDialog.spec.tsx
+  s_ee942c2ab9199c::t_7366b80e120cf0 87-118
+src/renderer/electron.d.ts
+  s_ee942c2ab9199c::t_dad1fe31690ca1 150
+  s_ee942c2ab9199c::t_6d3451e8b1b327 206
+src/renderer/components/AboutDialog.tsx
+  s_ee942c2ab9199c::t_9918b98dda8647 2
+  s_ee942c2ab9199c::t_5672a998e8d344 20
+src/renderer/extensions/loader.ts
+  s_ee942c2ab9199c::t_715b7f1a17ab3f 11,13-18
+  s_ee942c2ab9199c::t_6706649443d81b 12
+  s_ee942c2ab9199c::t_5c28b677ee2b75 35
+tests/unit/db/index.spec.ts
+  s_ee942c2ab9199c::t_f7a348f6d6e53d 35
+  s_ee942c2ab9199c::t_159a0494b859ef 250-252
+  s_ee942c2ab9199c::t_4f24c62db9da8c 233-238
+  s_ee942c2ab9199c::t_a41086c35f2fbe 46,239-249,253-264
+  s_ee942c2ab9199c::t_3c54aed9189fe3 26-30
+  s_ee942c2ab9199c::t_cb8a1fa3317969 31-32,34,265
+  s_ee942c2ab9199c::t_7a633546631949 33
+  s_ee942c2ab9199c::t_fd208eb273ef81 36-38
+  s_ee942c2ab9199c::t_58bce9cafd1ea5 266-267
+extensions/remote-control/src/renderer/main.tsx
+  s_ee942c2ab9199c::t_b5af5157f8f545 3
+extensions/task-vault/tests/utils/notify.spec.ts
+  s_ee942c2ab9199c::t_ffac255c5e3e90 18,20,22-23,27-32,35,37,39,41
+src/renderer/components/terminal/TerminalPane.tsx
+  s_ee942c2ab9199c::t_ea441b66f605cd 132
+src/main/extensions/api.ts
+  s_ee942c2ab9199c::t_6ef0af518398c9 602-606
+  s_ee942c2ab9199c::t_6e8fae3c91cf59 226
+  s_ee942c2ab9199c::t_f5ad77004f3837 601,607-609,611-616
+  s_ee942c2ab9199c::t_db19599b0030a1 317-318
+src/renderer/components/terminal/TerminalPane.css
+  s_ee942c2ab9199c::t_b4fe7402c659ef 29
+src/main/db/index.ts
+  s_2bad2a4641265b::t_e8d6d04510dad6 96-102,108,112-113,116-118,122,131-147
+  s_2bad2a4641265b::t_7424f50e95951f 3
+  s_2bad2a4641265b::t_d6f57762c382c0 103-107,109-111,121,123-128
+  s_ee942c2ab9199c::t_23da14babc11b3 114-115
+extensions/remote-control/src/components/RemoteControlSettings.tsx
+  s_c06f550cdc90ca::t_b4c04c432d579b 124-126
+  s_c06f550cdc90ca::t_53ab451061ed8f 344-346
+tests/unit/main/extensions/extension-view-host.spec.ts
+  s_ee942c2ab9199c::t_5ee75371c5e94f 155-156
+  s_ee942c2ab9199c::t_c1ef38dc0ce074 56
+  s_ee942c2ab9199c::t_159a0494b859ef 225
+  s_ee942c2ab9199c::t_d0ae38a346f82f 198-206,208-224,226-243
+  s_ee942c2ab9199c::t_3210e9b55f2b8d 207
+  s_ee942c2ab9199c::t_830b847e5a323a 244-246
+extensions/remote-control/src/renderer/styles.css
+  s_ee942c2ab9199c::t_d31352ecca9d7d 1-105
+src/renderer/components/sidebar/EditWorkspaceDialog.tsx
+  s_ee942c2ab9199c::t_e737455950a872 14
+  s_ee942c2ab9199c::t_50fe8eb78f8e44 5
+tests/unit/extensions/extension-view-host.spec.ts
+  s_ee942c2ab9199c::t_8f2a67dfecb02b 41-45
+  s_ee942c2ab9199c::t_30a50ed9b75f86 147,151-152
+src/renderer/components/sidebar/MoveSessionDialog.tsx
+  s_ee942c2ab9199c::t_0dd58d90fea5f7 19
+  s_ee942c2ab9199c::t_d26af6acdfdd88 6
+src/renderer/components/settings/SettingsPanel.tsx
+  s_ee942c2ab9199c::t_54cec3e78c23bd 6,16
+src/renderer/components/sidebar/WorkspaceCard.css
+  s_ee942c2ab9199c::t_aed0e279bab19c 67
+extensions/remote-control/manifest.json
+  s_c06f550cdc90ca::t_2048592631f8fc 12
+src/renderer/components/sidebar/CreateProjectDialog.tsx
+  s_ee942c2ab9199c::t_dc1a56d8623946 17
+  s_ee942c2ab9199c::t_3e3502b219c932 6
+src/renderer/components/ExtensionPanelPortal.tsx
+  s_ee942c2ab9199c::t_dacabcf4dd4d38 2
+  s_ee942c2ab9199c::t_d353990f6b340d 27-32,36-41
+  s_ee942c2ab9199c::t_4bca2d971f18f6 42
+  s_ee942c2ab9199c::t_83961aeb387d0b 71
+  s_ee942c2ab9199c::t_b139e8a9b44b1e 17
+  s_ee942c2ab9199c::t_d0b61eb43fbcac 8,11-16,43,49-56,59-60,68
+src/renderer/components/sidebar/SidebarHeader.css
+  s_ee942c2ab9199c::t_e38d508216aef5 113
+  s_ee942c2ab9199c::t_cb11463e60b039 79
+  s_ee942c2ab9199c::t_d8abbe76d69612 155
+src/main/extensions/extension-host.ts
+  s_ee942c2ab9199c::t_298f67dab8301c 246-252
+  s_ee942c2ab9199c::t_4caeba198a65c4 266
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_ee942c2ab9199c::t_652a2c38dcf5c5 384-434,438-459
+  s_ee942c2ab9199c::t_159a0494b859ef 435-437
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_ee942c2ab9199c::t_a38e0d4e75ffee 2
+  s_ee942c2ab9199c::t_024ea61be4e5de 116-123
+extensions/task-vault/src/utils/notify.ts
+  s_ee942c2ab9199c::t_e81479dadf800d 7
+  s_ee942c2ab9199c::t_22dcf376901369 3
+  s_ee942c2ab9199c::t_97df41af094c66 9
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_ee942c2ab9199c::t_159a0494b859ef 828-829,836,843-844
+  s_ee942c2ab9199c::t_76f56793dc8027 115-121
+  s_ee942c2ab9199c::t_2077c81dccb3ef 826,834-835,837-838
+  s_ee942c2ab9199c::t_b4396584b75330 732-760,762-782,784-789,795-825,827,830-833,839-842,845-883
+  s_ee942c2ab9199c::t_67576a0ae48e58 761,783,790-794
+  s_ee942c2ab9199c::t_d6d749e52d2681 884-886
+.claude/doc-index.json
+  s_ee942c2ab9199c::t_868ee64029a7d1 27,43,55,67,79,94,120,152
+tests/unit/renderer/components/ExtensionPanelPortal.spec.tsx
+  s_ee942c2ab9199c::t_94529e4c73ba32 89
+  s_ee942c2ab9199c::t_09533908e65cbb 77,82-83,87
+extensions/speckit-pilot/src/renderer/App.tsx
+  s_ee942c2ab9199c::t_90e45d25928210 1,5-15
+src/renderer/stores/modal.store.ts
+  s_ee942c2ab9199c::t_904393fce17bfa 1,15-23
+  s_ee942c2ab9199c::t_4ac75289477081 2-14
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_ee942c2ab9199c::t_1a76728f144a6e 87
+src/renderer/extensions/registry.ts
+  s_ee942c2ab9199c::t_c9e1ece848d04a 21
+src/renderer/App.tsx
+  s_ee942c2ab9199c::t_07e5e0e8dde4a0 501,504
+extensions/speckit-pilot/tests/unit/renderer/App.spec.tsx
+  s_ee942c2ab9199c::t_e9db895600d666 2,20-29,32
+electron-builder.yml
+  s_2bad2a4641265b::t_e910dcff55dc58 8-15,17-18
+extensions/git-integration/src/components/git-integration.css
+  s_ee942c2ab9199c::t_ec11e14a1f7a67 6-7
+src/main/extensions/extension-view-host.ts
+  s_ee942c2ab9199c::t_ce8388665e0fe7 44
+  s_ee942c2ab9199c::t_d646c74b68c5af 71,74,87-90,102-105
+  s_ee942c2ab9199c::t_b4138cbff932d7 143-148
+  s_ee942c2ab9199c::t_cbf111e864ac00 181,184
+  s_ee942c2ab9199c::t_d5ec21edfe652d 10
+  s_ee942c2ab9199c::t_85291d1f2c8089 58
+  s_ee942c2ab9199c::t_5364425141c7ec 129-130,137-141
+  s_ee942c2ab9199c::t_58af613a83953f 142
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_ee942c2ab9199c::t_4446cf25c2599d 1498,1500,1502-1505,1512,1517,1521-1524
+  s_ee942c2ab9199c::t_ce386897ddfa05 9,18-19,21-22
+  s_ee942c2ab9199c::t_fdc1ef37c173c1 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "d3d3619eb602f80bbb57c34c481f3b9d2dc671b2",
+  "prompts": {},
+  "sessions": {
+    "s_2bad2a4641265b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "531317af-b4bb-42c9-9e79-47db79c43cbd",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_c06f550cdc90ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f5bf6aa-b73c-4774-890d-64fd28e48d41",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_ee942c2ab9199c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0cdbedfe-b891-429c-9d97-62967cf7ba29",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
