@@ -238,6 +238,8 @@ function openCaptureOverlay(api: ExtensionAPI): void {
   }
   // Activate the global tab — this creates the WebContentsView if it doesn't exist yet.
   api.window.broadcast('extension:activate-global-tab', 'terminator.task-vault')
+  // Transfer keyboard focus to the task-vault WebContentsView so Escape works immediately.
+  api.window.focusSelf('main')
   // Set pending flag so the renderer shows the modal on first load.
   // Auto-expire after 5 s so a late manual panel open doesn't surprise the user.
   _pendingCapture = true

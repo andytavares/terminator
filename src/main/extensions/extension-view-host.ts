@@ -105,6 +105,11 @@ export class ExtensionViewHost {
     ])
   }
 
+  focusView(extensionId: string, viewParam: string): void {
+    const entry = this.views.get(extensionId)?.find((e) => e.viewParam === viewParam)
+    entry?.view.webContents.focus()
+  }
+
   destroyAllViews(extensionId: string): void {
     const entries = this.views.get(extensionId)
     if (!entries) return

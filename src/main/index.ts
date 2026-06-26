@@ -389,6 +389,7 @@ app.whenReady().then(async () => {
     ptyManager,
     db: getAppDb(),
     broadcastToWindows: (channel, data) => mainWindow?.webContents.send(channel, data),
+    focusExtensionView: (extId, viewParam) => viewHost?.focusView(extId, viewParam),
     bridge: {
       invokeRegistry: ipcInvokeRegistry,
       sendRegistry: ipcSendRegistry,
