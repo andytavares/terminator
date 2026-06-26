@@ -1,0 +1,37 @@
+extensions/task-vault/tests/renderer/App.spec.tsx
+  s_aea7dd3aabcb2b::t_5a57488f32dca7 36,38
+  s_aea7dd3aabcb2b::t_ee234d0b0ce784 3,8
+  s_aea7dd3aabcb2b::t_39db9606b35498 88-104
+extensions/notepad/src/renderer/App.tsx
+  s_aea7dd3aabcb2b::t_293a71743470a7 19-28
+extensions/task-vault/src/renderer/App.tsx
+  s_aea7dd3aabcb2b::t_728b3dd5f66545 28-37
+extensions/notepad/src/index.ts
+  s_aea7dd3aabcb2b::t_61da7fa249698a 139-151,154,156-165
+  s_aea7dd3aabcb2b::t_e286dad01b5124 13-14
+  s_aea7dd3aabcb2b::t_42889e74b6533f 209-213
+extensions/task-vault/src/index.ts
+  s_aea7dd3aabcb2b::t_629e2f4088910f 16-17
+  s_aea7dd3aabcb2b::t_9dc2f394a8698f 177-189
+  s_aea7dd3aabcb2b::t_12f1fdf1d79386 254-258
+  s_aea7dd3aabcb2b::t_6fc162de2881a9 230-231,239-248
+extensions/notepad/tests/unit/renderer/App.spec.tsx
+  s_aea7dd3aabcb2b::t_381d051c5efa73 113-129
+  s_aea7dd3aabcb2b::t_5461ce866391e6 25,39,41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "85f6336683dea10c72d23b39e7859586c85f2944",
+  "prompts": {},
+  "sessions": {
+    "s_aea7dd3aabcb2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0943ecf4-f5a9-4197-aa13-ac7d22d12fa5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
