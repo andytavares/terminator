@@ -1,0 +1,19 @@
+tests/e2e/extension.spec.ts
+  s_aea7dd3aabcb2b::t_6f84e77bb2fdc4 63,70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "0cdec76848fc94d826f682d40395335ce81d3a17",
+  "prompts": {},
+  "sessions": {
+    "s_aea7dd3aabcb2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0943ecf4-f5a9-4197-aa13-ac7d22d12fa5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
