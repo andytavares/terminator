@@ -1,0 +1,39 @@
+extensions/notepad/src/index.ts
+  s_aea7dd3aabcb2b::t_b168f8789c9a09 44-67
+extensions/notepad/tests/unit/renderer/App.spec.tsx
+  s_aea7dd3aabcb2b::t_f0913ce3b527df 80,85,95
+extensions/task-vault/src/renderer/App.tsx
+  s_aea7dd3aabcb2b::t_3406f547c1547d 22-23
+extensions/notepad/tests/unit/ipc/diagrams.ipc.spec.ts
+  s_aea7dd3aabcb2b::t_5520113e298855 275-279,281-289
+  s_aea7dd3aabcb2b::t_db35708024fab3 280
+  s_aea7dd3aabcb2b::t_904a135a7b6aaf 290-293
+extensions/task-vault/tests/renderer/App.spec.tsx
+  s_aea7dd3aabcb2b::t_3406f547c1547d 65
+extensions/notepad/src/ipc/diagrams.ipc.ts
+  s_aea7dd3aabcb2b::t_7aee98f3f8e56e 1
+extensions/notepad/src/renderer/App.tsx
+  s_aea7dd3aabcb2b::t_c3ac9fd24c4bb3 13
+extensions/notepad/tests/unit/ipc/notes.ipc.spec.ts
+  s_aea7dd3aabcb2b::t_da8523633756c6 450-453,455-469,471-475
+  s_aea7dd3aabcb2b::t_8341eb4f3a0d99 454,470
+  s_aea7dd3aabcb2b::t_2840112c739620 476-480
+extensions/notepad/src/ipc/notes.ipc.ts
+  s_aea7dd3aabcb2b::t_a42aa87c354554 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "2cce655c982b7bf918a04cc621a19079b65ad514",
+  "prompts": {},
+  "sessions": {
+    "s_aea7dd3aabcb2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0943ecf4-f5a9-4197-aa13-ac7d22d12fa5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
