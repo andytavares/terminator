@@ -43,14 +43,14 @@ export function CaptureModal(): React.JSX.Element | null {
     if (!showCaptureModal) return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        // Let SmartTaskInput close its own dropdown first via stopPropagation;
-        // only close the modal if no inline dropdown is open.
+        // SmartTaskInput closes its own dropdown first; only close the modal once it's gone.
         const openDropdown = document.querySelector('.smart-input__dropdown')
         if (!openDropdown) close()
       }
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
+    // Capture phase ensures Escape reaches us even if a child calls stopPropagation.
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
   }, [showCaptureModal, close])
 
   if (!showCaptureModal) return null

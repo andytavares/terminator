@@ -205,15 +205,12 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
   useEffect(() => {
     if (!showQuickCreate) return
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        close()
-        return
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void handleSave()
+      if (e.key === 'Escape') close()
     }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [showQuickCreate, close, handleSave])
+    // Capture phase so CodeMirror's internal stopPropagation can't block Escape.
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => document.removeEventListener('keydown', onKeyDown, true)
+  }, [showQuickCreate, close])
 
   function addTag(raw: string) {
     const trimmed = raw.trim().toLowerCase().replace(/\s+/g, '-')
@@ -285,6 +282,12 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
           placeholder="Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              void handleSave()
+            }
+          }}
         />
         <div className="notepad-quick-create__divider" />
         {type === 'note' && (
@@ -321,7 +324,7 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
                 'Saving…'
               ) : (
                 <>
-                  Save <kbd className="notepad-kbd notepad-kbd--inline">⌘↵</kbd>
+                  Save <kbd className="notepad-kbd notepad-kbd--inline">↵</kbd>
                 </>
               )}
             </button>
