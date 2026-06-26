@@ -1,0 +1,19 @@
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_aea7dd3aabcb2b::t_a63f663b0e287c 45,47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "0bfa0a06efdfe911371284b747d6b9b8c23b771e",
+  "prompts": {},
+  "sessions": {
+    "s_aea7dd3aabcb2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0943ecf4-f5a9-4197-aa13-ac7d22d12fa5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
