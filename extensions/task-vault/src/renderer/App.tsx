@@ -19,9 +19,8 @@ export function App(): JSX.Element {
   const { setShowCaptureModal } = useVaultNavStore()
 
   useEffect(() => {
-    const off = window.electronAPI.extensionBridge.on(
-      'ext:command:task-vault:capture-to-inbox',
-      () => setShowCaptureModal(true)
+    const off = window.electronAPI.extensionBridge.on('task-vault:push:open-capture', () =>
+      setShowCaptureModal(true)
     )
     return off
   }, [setShowCaptureModal])

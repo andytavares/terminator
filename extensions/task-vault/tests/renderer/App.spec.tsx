@@ -62,10 +62,7 @@ describe('task-vault renderer App', () => {
     setSearch({})
     const { App } = await import('../../src/renderer/App')
     render(<App />)
-    expect(mockOn).toHaveBeenCalledWith(
-      'ext:command:task-vault:capture-to-inbox',
-      expect.any(Function)
-    )
+    expect(mockOn).toHaveBeenCalledWith('task-vault:push:open-capture', expect.any(Function))
   })
 
   it('calls setShowCaptureModal(true) when capture command fires', async () => {

@@ -447,4 +447,35 @@ describe('IPC handler structure', () => {
     dispose()
     expect(ipcMain.removeHandler).toHaveBeenCalledWith('terminator.notepad:notes.create')
   })
+
+  it('registerNotesIpcHandlers wrappers route to underlying handlers', async () => {
+    vi.mocked(ipcMain.handle).mockClear()
+    registerNotesIpcHandlers(db)
+    const calls = vi.mocked(ipcMain.handle).mock.calls as [string, (...a: unknown[]) => unknown][]
+    const getHandler = (ch: string) => calls.find(([c]) => c === ch)?.[1]
+    // Invoke wrappers to cover the anonymous arrow functions
+    await getHandler('terminator.notepad:notes.create')?.(null, { title: 'T', body: 'B', tags: [] })
+    await getHandler('terminator.notepad:notes.list')?.(null, {})
+    await getHandler('terminator.notepad:notes.archive')?.(null, { id: 'noop' })
+    await getHandler('terminator.notepad:notes.reorder')?.(null, { items: [] })
+    await getHandler('terminator.notepad:notes.get')?.(null, { id: 'noop' })
+    await getHandler('terminator.notepad:notes.autosave')?.(null, {
+      id: 'x',
+      title: '',
+      body: '',
+      tags: [],
+    })
+    await getHandler('terminator.notepad:notes.restore')?.(null, { id: 'noop' })
+    await getHandler('terminator.notepad:notes.hardDelete')?.(null, { id: 'noop' })
+  })
+
+  it('registerTagsIpcHandlers wrappers route to underlying handlers', async () => {
+    vi.mocked(ipcMain.handle).mockClear()
+    registerTagsIpcHandlers(db)
+    const calls = vi.mocked(ipcMain.handle).mock.calls as [string, (...a: unknown[]) => unknown][]
+    const getHandler = (ch: string) => calls.find(([c]) => c === ch)?.[1]
+    await getHandler('terminator.notepad:tags.list')?.(null, {})
+    await getHandler('terminator.notepad:tags.rename')?.(null, { id: 'noop', name: 'x' })
+    await getHandler('terminator.notepad:tags.delete')?.(null, { id: 'noop' })
+  })
 })

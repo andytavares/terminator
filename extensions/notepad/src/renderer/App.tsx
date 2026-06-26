@@ -10,7 +10,7 @@ export function App(): JSX.Element {
   const { setShowQuickCreate } = useNotesStore()
 
   useEffect(() => {
-    const off = window.electronAPI.extensionBridge.on('ext:command:notepad:quick-create', () =>
+    const off = window.electronAPI.extensionBridge.on('terminator.notepad:ui.openQuickCreate', () =>
       setShowQuickCreate(true)
     )
     return off

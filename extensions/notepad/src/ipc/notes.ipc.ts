@@ -1,5 +1,4 @@
-import { ipcMain, BrowserWindow, app } from 'electron'
-import { join } from 'path'
+import { ipcMain } from 'electron'
 import { z } from 'zod'
 import { randomUUID } from '../db/db'
 import type { ExtensionDB } from '../../../../src/main/db/index'
@@ -264,42 +263,6 @@ export async function hardDeleteNote(
   return { data: { ok: true } }
 }
 
-export async function openNoteInWindow(
-  _db: ExtensionDB,
-  payload: unknown
-): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string() })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return VALIDATION_ERROR
-
-  const mainWindow = BrowserWindow.getAllWindows()[0]
-  if (!mainWindow) return { error: 'NO_MAIN_WINDOW' }
-
-  const baseUrl = mainWindow.webContents.getURL()
-  const urlObj = new URL(baseUrl)
-  urlObj.searchParams.set('view', 'notepad-note')
-  urlObj.searchParams.set('noteId', parsed.data.id)
-  const noteUrl = urlObj.toString()
-
-  const preload = join(app.getAppPath(), 'out', 'preload', 'index.js')
-
-  const win = new BrowserWindow({
-    width: 900,
-    height: 700,
-    webPreferences: {
-      preload,
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  })
-
-  win
-    .loadURL(noteUrl)
-    .catch((err) => console.error('[notepad] openNoteInWindow: failed to load', err))
-
-  return { data: { ok: true } }
-}
-
 // ---- Tags IPC handlers ----
 
 export async function listTags(
@@ -392,9 +355,6 @@ export function registerNotesIpcHandlers(db: ExtensionDB): () => void {
   ipcMain.handle('terminator.notepad:notes.archive', (_, payload) => archiveNote(db, payload))
   ipcMain.handle('terminator.notepad:notes.restore', (_, payload) => restoreNote(db, payload))
   ipcMain.handle('terminator.notepad:notes.hardDelete', (_, payload) => hardDeleteNote(db, payload))
-  ipcMain.handle('terminator.notepad:notes.openWindow', (_, payload) =>
-    openNoteInWindow(db, payload)
-  )
   ipcMain.handle('terminator.notepad:notes.reorder', (_, payload) => reorderItems(db, payload))
 
   return () => {
@@ -405,7 +365,6 @@ export function registerNotesIpcHandlers(db: ExtensionDB): () => void {
     ipcMain.removeHandler('terminator.notepad:notes.archive')
     ipcMain.removeHandler('terminator.notepad:notes.restore')
     ipcMain.removeHandler('terminator.notepad:notes.hardDelete')
-    ipcMain.removeHandler('terminator.notepad:notes.openWindow')
     ipcMain.removeHandler('terminator.notepad:notes.reorder')
   }
 }

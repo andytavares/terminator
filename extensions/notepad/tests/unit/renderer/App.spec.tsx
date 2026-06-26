@@ -77,12 +77,12 @@ describe('notepad renderer App', () => {
     expect(screen.getByTestId('diagram-window-view')).toBeDefined()
   })
 
-  it('subscribes to ext:command:notepad:quick-create on mount', async () => {
+  it('subscribes to terminator.notepad:ui.openQuickCreate on mount', async () => {
     setView('main')
     const { App } = await import('../../../src/renderer/App')
     render(<App />)
     expect(mockBridgeOn).toHaveBeenCalledWith(
-      'ext:command:notepad:quick-create',
+      'terminator.notepad:ui.openQuickCreate',
       expect.any(Function)
     )
   })
@@ -92,7 +92,7 @@ describe('notepad renderer App', () => {
     const { App } = await import('../../../src/renderer/App')
     render(<App />)
     const handler = mockBridgeOn.mock.calls.find(
-      ([ch]) => ch === 'ext:command:notepad:quick-create'
+      ([ch]) => ch === 'terminator.notepad:ui.openQuickCreate'
     )?.[1]
     expect(handler).toBeDefined()
     act(() => {

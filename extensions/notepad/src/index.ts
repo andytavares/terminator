@@ -41,6 +41,30 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   const disposeDiagrams = registerDiagramsIpcHandlers(api.db)
   disposables.push({ dispose: disposeDiagrams })
 
+  // Open note/diagram in a dedicated auxiliary window using the extension's own renderer.
+  // Using api.window.openAuxiliary ensures the extension renderer URL (ext://terminator.notepad/…)
+  // is loaded rather than the main app URL — which would trigger ExtensionPanelPortal and
+  // wrongly attach the WebContentsView to the main window.
+  disposables.push(
+    api.ipc.registerHandler('terminator.notepad:notes.openWindow', (payload) => {
+      const { id } = (payload ?? {}) as { id?: string }
+      if (!id) return { error: 'VALIDATION_ERROR' }
+      // Unique key per note so each note gets its own window; passing view:'note' in params
+      // overrides the view key that openAuxiliary would derive from the first argument.
+      api.window.openAuxiliary(`notepad-note-${id}`, { view: 'note', noteId: id })
+      return { data: { ok: true } }
+    })
+  )
+
+  disposables.push(
+    api.ipc.registerHandler('terminator.notepad:diagrams.openWindow', (payload) => {
+      const { id } = (payload ?? {}) as { id?: string }
+      if (!id) return { error: 'VALIDATION_ERROR' }
+      api.window.openAuxiliary(`notepad-diagram-${id}`, { view: 'diagram', diagramId: id })
+      return { data: { ok: true } }
+    })
+  )
+
   const disposeDiagramComments = registerDiagramCommentsIpcHandlers(api.db)
   disposables.push({ dispose: disposeDiagramComments })
 
