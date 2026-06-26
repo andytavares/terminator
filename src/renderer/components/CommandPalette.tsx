@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import type { CommandRegistration } from '../extensions/registry'
+import { useModalEffect } from '../stores/modal.store'
 import './CommandPalette.css'
 
 interface ExtensionCommand {
@@ -37,6 +38,7 @@ function fuzzyMatch(query: string, text: string): boolean {
 }
 
 export function CommandPalette({ commands, onClose }: Props): JSX.Element {
+  useModalEffect()
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const [extensionCommands, setExtensionCommands] = useState<ExtensionCommand[]>([])

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useModalEffect } from '../stores/modal.store'
 import './sidebar/Dialog.css'
 
 interface ConfirmDialogProps {
@@ -18,6 +19,7 @@ export function ConfirmDialog({
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
+  useModalEffect()
   const cancelRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {

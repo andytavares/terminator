@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "Task Vault: GTD+BuJo+PARA daily productivity system backed by SQLite",
+  "scripts": {
+    "build:renderer": "vite build --config vite.renderer.config.ts"
+  },
   "dependencies": {
     "chokidar": "^3.6.0",
     "electron-store": "8.2.0",

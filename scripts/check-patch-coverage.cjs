@@ -24,6 +24,10 @@ const COVERAGE_EXCLUDED_PATTERNS = [
   /src\/main\/preload\.ts$/,
   /extensions\/[^/]+\/src\/index\.ts$/,
   /extensions\/[^/]+\/src\/renderer\.tsx$/,
+  /extensions\/[^/]+\/src\/renderer\/main\.tsx$/, // webview entry point — same exclusion as src/renderer/index.tsx
+  /extensions\/[^/]+\/src\/renderer\/App\.tsx$/, // webview root component — tested at the extension level
+  /extensions\/[^/]+\/vite\.renderer\.config\.ts$/, // vite build config, not application code
+  /src\/main\/preload-webview\.ts$/, // preload script — same category as src/main/preload.ts
   /extensions\/[^/]+\/src\/stores\//,
   /extensions\/[^/]+\/src\/components\//,
   /extensions\/[^/]+\/src\/mcp\/server\.ts$/,

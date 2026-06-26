@@ -4,5 +4,13 @@
   "version": "1.0.0",
   "description": "Access Terminator terminals from any browser via a local server and ngrok tunnel.",
   "main": "src/index.js",
-  "minAppVersion": "0.1.0"
+  "renderer": "dist/index.html",
+  "minAppVersion": "0.1.0",
+  "contributes": {
+    "globalTab": {
+      "label": "Remote Control",
+      "icon": "wifi",
+      "view": "main"
+    }
+  }
 }

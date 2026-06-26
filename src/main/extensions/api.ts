@@ -222,7 +222,8 @@ export interface ExtensionAPI {
   }
 }
 
-import { BrowserWindow, Menu, ipcMain, globalShortcut as electronGlobalShortcut } from 'electron'
+import { BrowserWindow, ipcMain, globalShortcut as electronGlobalShortcut } from 'electron'
+import { EXTENSION_BASE_CSS } from './extension-view-host.js'
 import { join } from 'path'
 
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
@@ -275,46 +276,29 @@ export const globalRegistry: Registry = {
   sessionCloseHandlers: new Set(),
 }
 
+// Callback set by the main process so api.ts can trigger a full menu rebuild
+// without importing from index.ts (which would create a circular dependency).
+let menuRebuildCallback: (() => void) | null = null
+
+export function setMenuRebuildCallback(fn: () => void): void {
+  menuRebuildCallback = fn
+}
+
 function rebuildViewMenu(): void {
-  try {
-    const appMenu = Menu.getApplicationMenu()
-    if (!appMenu) return
-
-    // Repopulate panelMenuItemIds from current contribution state
-    globalRegistry.panelMenuItemIds.clear()
-    const extContribs = Array.from(globalRegistry.nativeMenuItems.values())
-    const extItems: Electron.MenuItemConstructorOptions[] = extContribs.map((contrib) => {
-      const id = `ext-menu-${contrib.id}`
-      if (contrib.panelId) globalRegistry.panelMenuItemIds.set(contrib.panelId, id)
-      return {
-        id,
-        label: contrib.label,
-        accelerator: contrib.accelerator,
-        type: (contrib.type === 'checkbox' ? 'checkbox' : 'normal') as 'checkbox' | 'normal',
-        checked: false,
-        click: () => contrib.onClick(),
-      }
-    })
-
-    // Rebuild the full application menu, replacing only the View submenu contents.
-    // Non-View top-level items are passed as existing MenuItem objects to preserve their handlers.
-    const newTemplate = appMenu.items.map((topItem) => {
-      if (topItem.label !== 'View' || !topItem.submenu) return topItem
-
-      // Drop previously-injected extension items; keep core items intact.
-      const baseItems = topItem.submenu.items.filter((i) => !i.id?.startsWith('ext-menu-'))
-      const parts: (Electron.MenuItemConstructorOptions | Electron.MenuItem)[] = [...baseItems]
-      if (extItems.length > 0) {
-        parts.push({ type: 'separator' })
-        parts.push(...extItems)
-      }
-      return { label: 'View', submenu: parts }
-    })
-
-    Menu.setApplicationMenu(Menu.buildFromTemplate(newTemplate))
-  } catch {
-    // Menu may not exist in test environments; ignore
+  // Repopulate panelMenuItemIds from current contribution state so that
+  // menu:set-panel-checked IPC can find the correct MenuItem by ID.
+  globalRegistry.panelMenuItemIds.clear()
+  for (const contrib of globalRegistry.nativeMenuItems.values()) {
+    if (contrib.panelId) {
+      globalRegistry.panelMenuItemIds.set(contrib.panelId, `ext-menu-${contrib.id}`)
+    }
   }
+
+  // Delegate the actual Electron menu rebuild to the main process so the full
+  // application menu is always reconstructed from MenuItemConstructorOptions.
+  // Rebuilding from live MenuItem objects (appMenu.items) loses accelerator and
+  // click-handler bindings — the callback avoids that by using the original template.
+  menuRebuildCallback?.()
 }
 
 // Map from view name to open auxiliary BrowserWindow (shared across all extensions)
@@ -330,7 +314,8 @@ export interface ExtensionAPIDeps {
 export function createExtensionAPI(
   extensionId: string,
   appVersion: string,
-  deps?: ExtensionAPIDeps
+  deps?: ExtensionAPIDeps,
+  rendererUrl?: string
 ): ExtensionAPI {
   const disposables: Disposable[] = []
 
@@ -542,12 +527,12 @@ export function createExtensionAPI(
         return entry.handler(null as never, payload)
       },
       isRemoteAccessible(channel: string): boolean {
-        // Consult the central allowlist directly rather than the invoke registry:
-        // the bridge also gates `send` and `subscribe`, whose channels (e.g.
-        // terminal:input, terminal:output) are not invoke handlers and so never
-        // appear in the invoke registry. The registry flag is derived from the
-        // same set, so invoke results are identical.
-        return REMOTE_ACCESSIBLE_CHANNELS.has(channel)
+        if (REMOTE_ACCESSIBLE_CHANNELS.has(channel)) return true
+        // Any channel registered in the invokeRegistry but not in the core allowlist is
+        // extension-owned and safe to expose. Core channels not in REMOTE_ACCESSIBLE_CHANNELS
+        // (db:health, dialog:open-directory, shell:open-external, workspace:get-active) are
+        // never invoked via the bridge by the shim — they're handled in-shim or unused remotely.
+        return deps?.bridge?.invokeRegistry.has(channel) ?? false
       },
       sendChannel(channel: string, payload: unknown): void {
         const handler = deps?.bridge?.sendRegistry.get(channel)
@@ -613,11 +598,22 @@ export function createExtensionAPI(
           auxiliaryWindows.delete(view)
         })
         const query: Record<string, string> = { view, ...params }
-        const devUrl = process.env['ELECTRON_RENDERER_URL']
-        if (devUrl) {
-          win.loadURL(`${devUrl}?${new URLSearchParams(query).toString()}`)
+        if (rendererUrl) {
+          // Load the extension's own renderer directly so it handles the view param natively,
+          // without needing to create a WebContentsView inside the auxiliary window.
+          win.webContents.on('did-finish-load', () => {
+            win.webContents.insertCSS(EXTENSION_BASE_CSS).catch(() => {})
+          })
+          const url = new URL(rendererUrl)
+          for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v)
+          win.loadURL(url.toString())
         } else {
-          win.loadFile(join(__dirname, '../renderer/index.html'), { query })
+          const devUrl = process.env['ELECTRON_RENDERER_URL']
+          if (devUrl) {
+            win.loadURL(`${devUrl}?${new URLSearchParams(query).toString()}`)
+          } else {
+            win.loadFile(join(__dirname, '../renderer/index.html'), { query })
+          }
         }
       },
       broadcast(channel: string, data: unknown): void {

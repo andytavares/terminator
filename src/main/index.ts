@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell, net, session } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell, net, session, protocol } from 'electron'
 import { join } from 'path'
 import { registerWorkspaceHandlers } from './ipc/workspace.ipc.js'
 import { registerTerminalHandlers } from './ipc/terminal.ipc.js'
@@ -13,6 +13,7 @@ import { registerMetricsHandlers } from './ipc/metrics.ipc.js'
 import { registerDbIpcHandlers } from './ipc/db.ipc.js'
 import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
+import { ExtensionViewHost } from './extensions/extension-view-host.js'
 import { logger } from './logger.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { REMOTE_ACCESSIBLE_CHANNELS } from './remote/remote-accessible-channels.js'
@@ -24,7 +25,7 @@ import {
 } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
 import { runLegacyMigration } from './db/migrate.js'
-import { globalRegistry } from './extensions/api.js'
+import { globalRegistry, setMenuRebuildCallback } from './extensions/api.js'
 
 // Intercept ipcMain.handle/on to capture handlers into the bridge registry
 // so the remote-control extension bridge can dispatch IPC calls from browser clients.
@@ -59,6 +60,7 @@ declare module 'electron' {
 }
 
 let mainWindow: BrowserWindow | null = null
+let viewHost: ExtensionViewHost | null = null
 const ptyManager = new PtyManager()
 const extensionHost = new ExtensionHost()
 
@@ -70,8 +72,11 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       preload: join(__dirname, '../preload/index.js'),
+      webviewTag: true,
     },
   })
+
+  viewHost = new ExtensionViewHost(mainWindow, join(__dirname, '../preload/webview.js'))
 
   if (process.env.NODE_ENV === 'development' || process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] || 'http://localhost:5173')
@@ -84,6 +89,11 @@ function createWindow(): void {
   mainWindow.webContents.send = (channel: string, ...args: unknown[]) => {
     _origSend(channel, ...args)
     bridgeEventBus.emit(channel, ...args)
+    // Relay to extension WebContentsViews so extension renderers receive push events
+    // (terminal: is high-frequency; workspace:changed is relayed separately below)
+    if (!channel.startsWith('terminal:') && channel !== 'workspace:changed') {
+      viewHost?.broadcastToAll(channel, args[0] as unknown)
+    }
   }
 
   // Redirect external http(s) link clicks and window.open() calls to the system browser.
@@ -153,6 +163,12 @@ function buildViewSubmenu(): Electron.MenuItemConstructorOptions[] {
       accelerator: 'CmdOrCtrl+,',
       click: () => mainWindow?.webContents.send('menu:open-settings'),
     },
+    { type: 'separator' },
+    {
+      label: 'Open Extension DevTools',
+      accelerator: 'CmdOrCtrl+Shift+I',
+      click: () => viewHost?.openDevToolsForAll(),
+    },
   ]
 
   return [...base, ...extItems, ...tail]
@@ -215,6 +231,10 @@ function setupMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
+// Wire up api.ts so extension activations can trigger a full menu rebuild
+// from MenuItemConstructorOptions (preserving all accelerators and click handlers).
+setMenuRebuildCallback(setupMenu)
+
 function registerAppHandlers(): void {
   _origOn(
     'menu:set-panel-checked',
@@ -250,6 +270,15 @@ function registerDialogHandlers(): void {
   })
 }
 
+// Must be called before app.ready so Chromium treats ext:// as a secure standard
+// origin — without this, service worker storage and fetch() fail inside WebContentsViews.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'ext',
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+  },
+])
+
 app.whenReady().then(async () => {
   logger.info('App ready', { version: app.getVersion() })
 
@@ -257,25 +286,95 @@ app.whenReady().then(async () => {
   await initAppDb(userData)
   await runLegacyMigration(userData, getAppDb())
 
-  // Serve external extension renderer files via a custom protocol.
+  // Serve extension renderer files via ext://<id>/<relPath>.
   // Only files within the extension's registered directory are accessible.
-  session.defaultSession.protocol.handle('ext', (request) => {
+  // Extension WebContentsViews use the 'ext-views' in-memory partition to
+  // avoid service-worker storage conflicts with the main window session.
+  // Both sessions need the handler registered.
+  const handleExtProtocol = async (request: Request): Promise<Response> => {
     const url = new URL(request.url)
     const extensionId = url.hostname
-    const relPath = url.pathname.slice(1) // strip leading /
+    const relPath = url.pathname.slice(1)
     const dir = extensionHost.getExtensionDirectory(extensionId)
     if (!dir || !relPath) return new Response('Not found', { status: 404 })
     const fullPath = join(dir, relPath).replace(/\\/g, '/')
     if (!fullPath.startsWith(dir.replace(/\\/g, '/'))) {
       return new Response('Forbidden', { status: 403 })
     }
-    return net.fetch(`file://${fullPath}`)
-  })
+    let res: Response
+    try {
+      res = await net.fetch(`file://${fullPath}`)
+    } catch {
+      return new Response(`Not found: ${relPath}`, { status: 404 })
+    }
+    if (!res.ok) return new Response(`Not found: ${relPath}`, { status: res.status })
+    const headers: Record<string, string> = { 'Cache-Control': 'no-store', Pragma: 'no-cache' }
+    res.headers.forEach((value, key) => {
+      headers[key] = value
+    })
+    return new Response(res.body, { status: res.status, headers })
+  }
+
+  session.defaultSession.protocol.handle('ext', handleExtProtocol)
+  session.fromPartition('ext-views').protocol.handle('ext', handleExtProtocol)
 
   registerWorkspaceHandlers()
   registerTerminalHandlers(ptyManager, () => mainWindow)
   registerSettingsHandlers()
-  registerExtensionHandlers(extensionHost)
+  registerExtensionHandlers(extensionHost, (channel, data) =>
+    viewHost?.broadcastToAll(channel, data)
+  )
+
+  // Track the latest bounds per view so we apply them after async createView finishes,
+  // not the potentially-stale bounds from the call that triggered creation.
+  const latestBoundsMap = new Map<
+    string,
+    {
+      bounds: { x: number; y: number; width: number; height: number }
+      visible: boolean
+      repoRoot?: string | null
+    }
+  >()
+  const creatingViews = new Set<string>()
+
+  ipcMain.handle(
+    'extension:update-panel-bounds',
+    async (_event, { extensionId, viewParam, bounds, visible, repoRoot }) => {
+      const viewKey = `${extensionId}:${viewParam}`
+      latestBoundsMap.set(viewKey, { bounds, visible, repoRoot })
+
+      if (viewHost && !viewHost.hasView(extensionId, viewParam)) {
+        if (!creatingViews.has(viewKey)) {
+          creatingViews.add(viewKey)
+          try {
+            const ext = extensionHost.listExtensions().find((e) => e.id === extensionId)
+            if (ext) await viewHost.createView(ext, viewParam, repoRoot)
+            // Apply the LATEST bounds received during async creation, not the stale initial ones.
+            const latest = latestBoundsMap.get(viewKey)
+            if (latest) {
+              viewHost?.handleBoundsUpdate(
+                extensionId,
+                viewParam,
+                latest.bounds,
+                latest.visible,
+                latest.repoRoot
+              )
+            }
+          } finally {
+            creatingViews.delete(viewKey)
+          }
+        }
+        // Skip the handleBoundsUpdate below while view is being created; it will
+        // be called above with the latest bounds once creation completes.
+        return
+      }
+      viewHost?.handleBoundsUpdate(extensionId, viewParam, bounds, visible, repoRoot)
+    }
+  )
+
+  ipcMain.on('workspace:active-changed', (_event, data) => {
+    viewHost?.broadcastToAll('workspace:changed', data)
+  })
   registerGitHandlers()
   registerShellHandlers()
   registerFsHandlers(() => mainWindow)

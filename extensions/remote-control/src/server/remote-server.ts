@@ -1,9 +1,9 @@
 import Fastify, { type FastifyInstance } from 'fastify'
 import websocketPlugin from '@fastify/websocket'
 import staticPlugin from '@fastify/static'
-import { join, resolve } from 'path'
+import { join, resolve, dirname } from 'path'
 import { randomBytes } from 'crypto'
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, existsSync, readdirSync } from 'fs'
 import { app as electronApp } from 'electron'
 import type { PtyManagerAPI, WorkspaceSnapshot, ProjectSnapshot } from '../types.js'
 import { registerHealthRoute } from './routes/health.route.js'
@@ -13,6 +13,46 @@ import { registerAuthMiddleware } from './auth.middleware.js'
 import { registerBridgeRoute } from './routes/bridge.route.js'
 import { WsTicketStore } from './ws-ticket-store.js'
 import { WsSubscriberManager } from './ws-subscriber-manager.js'
+
+// CSS injected into every extension iframe so --tm-* variables and layout are defined.
+// Mirrors the EXTENSION_BASE_CSS in src/main/extensions/extension-view-host.ts —
+// keep in sync if the design tokens change.
+const EXTENSION_BASE_CSS = `
+:root {
+  --tm-bg-base: #0c0c0f;
+  --tm-bg-surface: #111116;
+  --tm-bg-elevated: #18181f;
+  --tm-bg-card: #1c1c25;
+  --tm-bg-card-hover: #22222e;
+  --tm-bg-input: #16161c;
+  --tm-text-primary: #e2e2ee;
+  --tm-text-secondary: #9090c4;
+  --tm-text-muted: #8585b8;
+  --tm-border: rgba(255,255,255,0.06);
+  --tm-border-strong: rgba(255,255,255,0.12);
+  --tm-accent: #5c6bc0;
+  --tm-accent-dim: rgba(92,107,192,0.18);
+  --tm-accent-glow: rgba(92,107,192,0.35);
+  --tm-danger: #e05c5c;
+  --tm-success: #4ade80;
+  --tm-warning: #facc15;
+  --tm-radius-xs: 4px;
+  --tm-radius-sm: 6px;
+  --tm-radius-md: 10px;
+  --tm-radius-lg: 16px;
+  --tm-font-mono: 'IBM Plex Mono','JetBrains Mono','Fira Code','Courier New',monospace;
+  --tm-font-ui: 'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; margin: 0; padding: 0;
+  background: var(--tm-bg-base);
+  color: var(--tm-text-primary);
+  font-family: var(--tm-font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+#app { width: 100%; height: 100%; display: flex; flex-direction: column; }
+`
 
 export interface RemoteServerDeps {
   getPasswordHash: () => string
@@ -61,6 +101,42 @@ function getRendererDir(): string {
     resolve(__dirname, '..', '..', '..', '..', 'out', 'renderer'),
   ]
   return candidates.find(existsSync) ?? candidates[0]
+}
+
+function getExtensionRendererDirs(): Array<{ id: string; dir: string; rendererRelPath: string }> {
+  const results: Array<{ id: string; dir: string; rendererRelPath: string }> = []
+  const candidates = [
+    join(electronApp.getAppPath(), 'extensions'),
+    resolve(__dirname, '..', '..', '..', '..', 'extensions'),
+  ]
+  const extensionsRoot = candidates.find(existsSync)
+  if (!extensionsRoot) return results
+
+  let entries: string[]
+  try {
+    entries = readdirSync(extensionsRoot)
+  } catch {
+    return results
+  }
+
+  for (const name of entries) {
+    const manifestPath = join(extensionsRoot, name, 'manifest.json')
+    if (!existsSync(manifestPath)) continue
+    try {
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+        id?: string
+        renderer?: string
+      }
+      if (!manifest.id || !manifest.renderer) continue
+      const rendererDir = join(extensionsRoot, name, dirname(manifest.renderer))
+      if (existsSync(rendererDir)) {
+        results.push({ id: manifest.id, dir: rendererDir, rendererRelPath: manifest.renderer })
+      }
+    } catch {
+      // skip malformed manifests
+    }
+  }
+  return results
 }
 
 export async function createRemoteServer(
@@ -128,6 +204,8 @@ export async function createRemoteServer(
         return reply.status(403).send({ error: 'FORBIDDEN' })
       }
     }
+    // /ext/* serves extension static assets (JS/HTML/CSS). No cookie gate here —
+    // the extension bundle has no user data; auth happens via the bridge WebSocket.
   })
 
   await fastify.register(websocketPlugin)
@@ -137,6 +215,29 @@ export async function createRemoteServer(
 
   const rendererDir = getRendererDir()
   await fastify.register(staticPlugin, { root: rendererDir, prefix: '/app', decorateReply: false })
+
+  // Serve each installed extension's renderer under /ext/<extensionId>/
+  const extensionDirs = getExtensionRendererDirs()
+  for (const { id, dir } of extensionDirs) {
+    await fastify.register(staticPlugin, {
+      root: dir,
+      prefix: `/ext/${id}`,
+      decorateReply: false,
+    })
+    // Serve index.html with the shim + base CSS injected (provides --tm-* variables and #app height)
+    fastify.get(`/ext/${id}/`, async (_request, reply) => {
+      const shimTag = '<script type="module" src="/remote-shim.js"></script>'
+      const styleTag = `<style>${EXTENSION_BASE_CSS}</style>`
+      try {
+        let html = readFileSync(join(dir, 'index.html'), 'utf8')
+        html = html.replace(/<head[^>]*>/i, (m) => `${m}\n    ${shimTag}\n    ${styleTag}`)
+        return reply.type('text/html').send(html)
+      } catch {
+        return reply.status(503).send(`Extension renderer not built for ${id}`)
+      }
+    })
+  }
+
   // Mobile static assets share the same renderer-remote output directory
   await fastify.register(staticPlugin, {
     root: loginStaticDir,
@@ -165,7 +266,7 @@ export async function createRemoteServer(
     const shimTag = '<script type="module" src="/remote-shim.js"></script>'
     try {
       let html = readFileSync(join(rendererDir, 'index.html'), 'utf8')
-      html = html.replace('<head>', `<head>\n    ${shimTag}`)
+      html = html.replace(/<head[^>]*>/i, (m) => `${m}\n    ${shimTag}`)
       return reply.type('text/html').send(html)
     } catch {
       return reply.status(503).send('Renderer not built. Run: npm run build')

@@ -142,6 +142,13 @@ interface ElectronAPI {
       }>
     }>
     executeCommand(key: string): void
+    updatePanelBounds(payload: {
+      extensionId: string
+      viewParam: string
+      bounds: { x: number; y: number; width: number; height: number }
+      visible: boolean
+      repoRoot?: string | null
+    }): Promise<void>
   }
   keyboard: {
     isReserved(accelerator: string): boolean
@@ -155,6 +162,8 @@ interface ElectronAPI {
     onMenuCloseTab(handler: () => void): () => void
     onMenuOpenAbout(handler: () => void): () => void
     notifyPanelState(panelId: string, open: boolean): void
+    onExtensionPanelLoaded(handler: (id: string) => void): () => void
+    onExtensionRendererReload(handler: (id: string) => void): () => void
   }
   app: {
     getInfo(): Promise<{
@@ -194,6 +203,7 @@ interface ElectronAPI {
   logger: {
     write(level: string, namespace: string, message: string): void
   }
+  getFilePath(file: File): string
   extensionBridge: {
     invoke(channel: string, payload?: unknown): Promise<unknown>
     on(channel: string, handler: (data: unknown) => void): () => void

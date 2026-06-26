@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useModalEffect } from '../stores/modal.store'
 import './sidebar/Dialog.css'
 import './AboutDialog.css'
 
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function AboutDialog({ onClose }: Props) {
+  useModalEffect()
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [dbStatus, setDbStatus] = useState<{ ok: boolean; message?: string } | null>(null)
   const closeRef = useRef<HTMLButtonElement>(null)

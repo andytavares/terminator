@@ -1,6 +1,6 @@
 import { PGlite } from '@electric-sql/pglite'
 import { createRequire } from 'node:module'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync, unlinkSync, renameSync } from 'node:fs'
 import * as path from 'node:path'
 
 export interface ExtensionDB {
@@ -93,20 +93,67 @@ export function wrapDb(db: PGlite): ExtensionDB {
 let _pg: PGlite | null = null
 let _db: ExtensionDB | null = null
 
+async function tryInitPGlite(
+  dbPath: string,
+  wasmModule: WebAssembly.Module,
+  fsBundle: Blob
+): Promise<PGlite> {
+  // Remove stale PostgreSQL lock files left by a previous unclean exit.
+  for (const name of ['postmaster.pid', '.s.PGSQL.5432.lock.out', '.s.PGSQL.5432']) {
+    const p = path.join(dbPath, name)
+    if (existsSync(p)) {
+      try {
+        unlinkSync(p)
+      } catch {
+        // best-effort
+      }
+    }
+  }
+  const pg = new PGlite({ dataDir: dbPath, wasmModule, fsBundle })
+  await pg.waitReady
+  // Probe the catalog — pg_attribute corruption surfaces here, not at waitReady.
+  await pg.query('SELECT 1 FROM information_schema.columns LIMIT 1')
+  // Probe each user table to force PGLite to build relation caches.
+  // pg_attribute corruption on a specific table only surfaces at this point,
+  // not during the information_schema probe above.
+  const tables = await pg.query<{ tablename: string }>(
+    `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`
+  )
+  for (const { tablename } of tables.rows) {
+    await pg.query(`SELECT 1 FROM "${tablename}" LIMIT 0`)
+  }
+  return pg
+}
+
 export async function initAppDb(userData: string): Promise<void> {
   const dbPath = path.join(userData, 'app.pglite')
-  // Pass PGlite's wasm + filesystem bundle explicitly instead of relying on its
-  // own module-relative URL resolution. In the packaged ESM build that
-  // resolution fails to load postgres.data and pg_initdb aborts (blank app).
-  // Reading the files ourselves works in dev and when packaged — Electron
-  // transparently redirects the asar path to the unpacked copy (see asarUnpack
-  // in electron-builder.yml).
-  const require = createRequire(import.meta.url)
-  const distDir = path.dirname(require.resolve('@electric-sql/pglite'))
+
+  // Pass PGlite's wasm + filesystem bundle explicitly. Only the two binary
+  // files are in app.asar.unpacked (see asarUnpack in electron-builder.yml);
+  // Electron's asar fs interception redirects readFileSync on the virtual asar
+  // path to the real unpacked file. All pglite JS remains inside the asar so
+  // ESM dynamic imports (e.g. import("./fs/nodefs.js")) resolve correctly.
+  const req = createRequire(import.meta.url)
+  const distDir = path.dirname(req.resolve('@electric-sql/pglite'))
   const wasmModule = await WebAssembly.compile(readFileSync(path.join(distDir, 'postgres.wasm')))
   const fsBundle = new Blob([readFileSync(path.join(distDir, 'postgres.data'))])
-  _pg = new PGlite({ dataDir: dbPath, wasmModule, fsBundle })
-  await _pg.waitReady
+
+  try {
+    _pg = await tryInitPGlite(dbPath, wasmModule, fsBundle)
+  } catch {
+    // Existing database is corrupt. Back it up and start fresh.
+    if (existsSync(dbPath)) {
+      const backup = `${dbPath}.corrupt-backup-${Math.floor(Date.now() / 1000)}`
+      try {
+        renameSync(dbPath, backup)
+      } catch {
+        // Rename failed (e.g. cross-device); proceed without backup — fresh
+        // init will overwrite whatever is there.
+      }
+    }
+    _pg = await tryInitPGlite(dbPath, wasmModule, fsBundle)
+  }
+
   _db = wrapDb(_pg)
 }
 

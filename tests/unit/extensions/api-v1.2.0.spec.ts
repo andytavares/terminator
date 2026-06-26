@@ -356,15 +356,51 @@ describe('api.ipc bridge channels', () => {
     expect(handler).toHaveBeenCalledTimes(1)
   })
 
-  it('isRemoteAccessible reflects the central allowlist (true for allowlisted, false otherwise)', () => {
-    const bridge = {
-      invokeRegistry: new Map(),
-      sendRegistry: new Map<string, (e: never, p: unknown) => void>(),
-      eventBus: new EventEmitter(),
-    }
-    const api = createExtensionAPI('test.ipc6', '0.1.0', { bridge })
+  it('isRemoteAccessible: true for allowlisted core channels', () => {
+    const api = createExtensionAPI('test.ipc6', '0.1.0', {})
     expect(api.ipc.isRemoteAccessible('workspace:list')).toBe(true)
+  })
+
+  it('isRemoteAccessible: false for channels with no registered handler and not in allowlist', () => {
+    // No bridge provided → invokeRegistry check returns false
+    const api = createExtensionAPI('test.ipc6', '0.1.0', {})
     expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
+    expect(api.ipc.isRemoteAccessible('no-such-channel')).toBe(false)
+  })
+
+  it('isRemoteAccessible: true for extension channels registered in invokeRegistry', () => {
+    // Dot-prefixed channels (notepad) and short-prefixed channels (task-vault) both work
+    // as long as they have a registered handler in invokeRegistry
+    const invokeRegistry = new Map([
+      ['terminator.notepad:notes.list', { handler: vi.fn(), remoteAccessible: false }],
+      ['task-vault:vault:get-today', { handler: vi.fn(), remoteAccessible: false }],
+    ])
+    const eventBus = new EventEmitter()
+    const api = createExtensionAPI('test.ipc6', '0.1.0', {
+      bridge: { invokeRegistry, sendRegistry: new Map(), eventBus },
+    })
+    expect(api.ipc.isRemoteAccessible('terminator.notepad:notes.list')).toBe(true)
+    expect(api.ipc.isRemoteAccessible('task-vault:vault:get-today')).toBe(true)
+    // channels not in registry remain blocked even with a bridge
+    expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
+  })
+
+  it('isRemoteAccessible: any channel in invokeRegistry is accessible (design intent — all registered channels are extension-owned or explicitly allowlisted)', () => {
+    // This is the regression test for the registry-based design: the `remoteAccessible` flag
+    // on registry entries is intentionally ignored. Access is gated by registry presence only,
+    // so adding a channel to the registry (which only extensions do at runtime) makes it
+    // accessible. Core non-allowlist channels (shell:open-external, dialog:open-directory)
+    // are never invoked via the bridge in practice — the shim handles them locally.
+    const invokeRegistry = new Map([
+      ['dialog:open-directory', { handler: vi.fn(), remoteAccessible: false }],
+    ])
+    const eventBus = new EventEmitter()
+    const api = createExtensionAPI('test.ipc6', '0.1.0', {
+      bridge: { invokeRegistry, sendRegistry: new Map(), eventBus },
+    })
+    // The remoteAccessible flag is NOT checked — registry presence is sufficient.
+    // If this assertion changes to false, the extension channel access design has regressed.
+    expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(true)
   })
 })
 

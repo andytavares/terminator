@@ -12,10 +12,11 @@
     "access": "restricted"
   },
   "scripts": {
+    "clean": "rm -rf out/main out/preload out/renderer out/renderer-remote",
     "build:extensions": "node scripts/build-extensions.cjs",
     "build:remote": "vite build --config vite.config.remote.ts",
     "dev": "npm run build:extensions && npm run build:remote && electron-vite dev",
-    "build": "npm run build:extensions && npm run build:remote && electron-vite build",
+    "build": "npm run clean && npm run build:extensions && npm run build:remote && electron-vite build",
     "preview": "electron-vite preview",
     "test": "vitest run --coverage",
     "test:watch": "vitest",

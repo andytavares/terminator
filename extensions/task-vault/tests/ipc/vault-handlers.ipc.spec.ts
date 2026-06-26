@@ -6,6 +6,7 @@ const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
   mockRemoveHandler: vi.fn(),
 }))
 const mockNotification = { show: vi.fn() }
+const mockWebContentsSend = vi.fn()
 vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
   Notification: Object.assign(
@@ -14,6 +15,11 @@ vi.mock('electron', () => ({
     }),
     { isSupported: vi.fn(() => false) }
   ),
+  BrowserWindow: {
+    getAllWindows: vi.fn(() => [
+      { isDestroyed: () => false, webContents: { send: mockWebContentsSend } },
+    ]),
+  },
 }))
 
 vi.mock('../../src/vault/db', () => ({
@@ -1489,25 +1495,33 @@ describe('registerVaultIpcHandlers dispose', () => {
 // ── system-notify ─────────────────────────────────────────────────────────────
 
 describe('task-vault:system-notify', () => {
-  it('returns { ok: true } and skips Notification when isSupported is false', async () => {
+  it('returns { ok: true } and broadcasts extension:toast to all windows', async () => {
     const handler = getHandler('task-vault:system-notify')
-    const result = await handler({}, { title: 'Test', body: 'Hello' })
+    const result = await handler({}, { title: 'Test', body: 'Hello', type: 'info' })
     expect(result).toEqual({ ok: true })
+    expect(mockWebContentsSend).toHaveBeenCalledWith('extension:toast', {
+      type: 'info',
+      message: 'Hello',
+    })
   })
 
   it('shows a native Notification when isSupported is true', async () => {
     const { Notification: MockNotif } = await import('electron')
     vi.mocked(MockNotif.isSupported).mockReturnValueOnce(true)
     const handler = getHandler('task-vault:system-notify')
-    await handler({}, { title: 'Task Vault', body: 'Done' })
+    await handler({}, { title: 'Task Vault', body: 'Done', type: 'success' })
     expect(MockNotif).toHaveBeenCalledWith({ title: 'Task Vault', body: 'Done', silent: true })
     expect(mockNotification.show).toHaveBeenCalled()
   })
 
-  it('uses default title and empty body when payload omits them', async () => {
+  it('uses default title, empty body, and info type when payload omits them', async () => {
     const handler = getHandler('task-vault:system-notify')
     const result = await handler({}, {})
     expect(result).toEqual({ ok: true })
+    expect(mockWebContentsSend).toHaveBeenCalledWith('extension:toast', {
+      type: 'info',
+      message: '',
+    })
   })
 })
 

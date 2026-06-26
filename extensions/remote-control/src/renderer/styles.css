@@ -1,0 +1,105 @@
+/* Design tokens that match the main app's --bg-* / --text-* / --accent variables,
+   mapped from the --tm-* variables injected by EXTENSION_BASE_CSS. */
+:root {
+  --bg-input: var(--tm-bg-input);
+  --bg-card: var(--tm-bg-card);
+  --bg-card-hover: var(--tm-bg-card-hover);
+  --bg-elevated: var(--tm-bg-elevated);
+  --text-primary: var(--tm-text-primary);
+  --text-secondary: var(--tm-text-secondary);
+  --text-muted: var(--tm-text-muted);
+  --border: var(--tm-border);
+  --border-strong: var(--tm-border-strong);
+  --accent: var(--tm-accent);
+  --danger: var(--tm-danger);
+  --font-ui: var(--tm-font-ui);
+  --font-mono: var(--tm-font-mono);
+  --radius-sm: var(--tm-radius-sm);
+  --radius-md: var(--tm-radius-md);
+}
+
+/* ── Settings section ─────────────────────────────────────────── */
+.settings-section__title {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.settings-section__field {
+  margin-bottom: 16px;
+}
+
+.settings-section__label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.settings-section__label--inline {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-primary);
+}
+
+.settings-section__input {
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  width: 200px;
+  transition: border-color 0.15s;
+}
+
+.settings-section__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.settings-section__btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-size: 11px;
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+  cursor: pointer;
+  margin-bottom: 12px;
+  transition:
+    background 0.1s,
+    border-color 0.1s;
+}
+
+.settings-section__btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent);
+}
+
+.settings-section__hint {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.settings-section__hint code {
+  font-family: var(--font-mono);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+}

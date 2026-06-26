@@ -129,7 +129,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     const instance = getTerminalInstance(activeSessionId)
     if (!instance) return
     const paths = Array.from(e.dataTransfer.files)
-      .map((f) => (f as unknown as { path: string }).path)
+      .map((f) => window.electronAPI.getFilePath(f))
       .filter(Boolean)
       .map((p) => (/\s/.test(p) ? `'${p.replace(/'/g, "'\\''")}'` : p))
       .join(' ')

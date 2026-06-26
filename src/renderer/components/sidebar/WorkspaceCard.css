@@ -64,6 +64,7 @@
   height: 20px;
   background: transparent;
   border: none;
+  outline: none;
   border-radius: var(--radius-xs);
   color: var(--text-muted);
   cursor: pointer;

@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, cleanup } from '@testing-library/react'
+import { render, screen, waitFor, cleanup, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 const mockInvoke = vi.fn()
@@ -34,9 +34,16 @@ vi.mock('../../src/stores/vault-nav.store', () => ({
   },
 }))
 
+// Track registered extensionBridge.on handlers so tests can trigger them
+const bridgeHandlers = new Map<string, (data: unknown) => void>()
+const mockOn = vi.fn((channel: string, handler: (data: unknown) => void) => {
+  bridgeHandlers.set(channel, handler)
+  return () => bridgeHandlers.delete(channel)
+})
+
 Object.defineProperty(window, 'electronAPI', {
   value: {
-    extensionBridge: { invoke: mockInvoke, on: vi.fn(() => vi.fn()) },
+    extensionBridge: { invoke: mockInvoke, on: mockOn },
   },
   writable: true,
   configurable: true,
@@ -46,6 +53,7 @@ vi.mock('../../src/components/task-vault.css', () => ({}))
 
 afterEach(() => {
   cleanup()
+  bridgeHandlers.clear()
   vi.clearAllMocks()
 })
 
@@ -111,7 +119,7 @@ describe('CalendarDrawer', () => {
     })
   })
 
-  it('calls navigateToTask when a task in the day panel is clicked', async () => {
+  it('invokes task-vault:open-panel with taskId when a task in the day panel is clicked', async () => {
     const user = userEvent.setup()
     const today = new Date()
     const pad = (n: number) => String(n).padStart(2, '0')
@@ -136,12 +144,13 @@ describe('CalendarDrawer', () => {
     })
 
     await renderDrawer()
-    await waitFor(() => screen.getByTitle(todayStr))
-    await user.click(screen.getByTitle(todayStr))
     await waitFor(() => screen.getByText('My task'))
     await user.click(screen.getByText('My task'))
 
-    expect(mockNavigateToTask).toHaveBeenCalledWith('task-abc', todayStr)
+    expect(mockInvoke).toHaveBeenCalledWith('task-vault:open-panel', {
+      date: todayStr,
+      taskId: 'task-abc',
+    })
   })
 
   it('navigates to previous month on prev button click', async () => {
@@ -150,7 +159,8 @@ describe('CalendarDrawer', () => {
     await waitFor(() => screen.getByTitle('Previous month'))
     await user.click(screen.getByTitle('Previous month'))
 
-    expect(mockInvoke).toHaveBeenCalledTimes(2) // initial mount + after prev
+    // 1: get-calendar-month on mount, 2: get-daily for today on mount, 3: get-calendar-month after prev
+    expect(mockInvoke).toHaveBeenCalledTimes(3)
   })
 
   it('navigates to next month on next button click', async () => {
@@ -159,6 +169,50 @@ describe('CalendarDrawer', () => {
     await waitFor(() => screen.getByTitle('Next month'))
     await user.click(screen.getByTitle('Next month'))
 
-    expect(mockInvoke).toHaveBeenCalledTimes(2) // initial mount + after next
+    // 1: get-calendar-month on mount, 2: get-daily for today on mount, 3: get-calendar-month after next
+    expect(mockInvoke).toHaveBeenCalledTimes(3)
+  })
+
+  it('refreshes task list when task-vault:push:index-updated fires', async () => {
+    const today = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+
+    mockInvoke.mockImplementation((channel: string) => {
+      if (channel === 'task-vault:vault:get-calendar-month') return Promise.resolve({ days: [] })
+      if (channel === 'task-vault:vault:get-daily')
+        return Promise.resolve({
+          tasks: [
+            { id: 't1', text: 'Updated task', status: 'open', metadata: {}, terminatorLinks: [] },
+          ],
+        })
+      return Promise.resolve({})
+    })
+
+    await renderDrawer()
+    await waitFor(() => screen.getByText('Updated task'))
+
+    // Simulate a task update broadcast
+    mockInvoke.mockImplementation((channel: string) => {
+      if (channel === 'task-vault:vault:get-calendar-month') return Promise.resolve({ days: [] })
+      if (channel === 'task-vault:vault:get-daily')
+        return Promise.resolve({
+          tasks: [
+            { id: 't1', text: 'Reopened task', status: 'open', metadata: {}, terminatorLinks: [] },
+          ],
+        })
+      return Promise.resolve({})
+    })
+
+    await act(async () => {
+      bridgeHandlers.get('task-vault:push:index-updated')?.({})
+      await Promise.resolve()
+    })
+
+    await waitFor(() => expect(screen.getByText('Reopened task')).toBeTruthy())
+    expect(screen.queryByText('Updated task')).toBeNull()
+
+    // Also verify today's date is still selected (selected-date not reset)
+    expect(screen.getByTitle(todayStr)).toBeTruthy()
   })
 })

@@ -1,5 +1,25 @@
-import { contextBridge, ipcRenderer } from 'electron'
-import { RESERVED_SHORTCUTS } from './shared/reserved-shortcuts.js'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
+
+// Inlined to keep the preload self-contained (no shared Rollup chunks that
+// Electron's sandboxed require cannot resolve).
+const RESERVED_SHORTCUTS = new Set([
+  'CmdOrCtrl+1',
+  'CmdOrCtrl+2',
+  'CmdOrCtrl+3',
+  'CmdOrCtrl+4',
+  'CmdOrCtrl+5',
+  'CmdOrCtrl+6',
+  'CmdOrCtrl+7',
+  'CmdOrCtrl+8',
+  'CmdOrCtrl+9',
+  'CmdOrCtrl+=',
+  'CmdOrCtrl+-',
+  'CmdOrCtrl+Left',
+  'CmdOrCtrl+Right',
+  'CmdOrCtrl+T',
+  'CmdOrCtrl+W',
+  'CmdOrCtrl+,',
+])
 
 contextBridge.exposeInMainWorld('electronAPI', {
   terminal: {
@@ -34,6 +54,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     update: (payload: unknown) => ipcRenderer.invoke('workspace:update', payload),
     delete: (id: string) => ipcRenderer.invoke('workspace:delete', { id }),
     reorder: (ids: string[]) => ipcRenderer.invoke('workspace:reorder', { ids }),
+    getActive: () => ipcRenderer.invoke('workspace:get-active'),
   },
   project: {
     list: (workspaceId: string) => ipcRenderer.invoke('project:list', { workspaceId }),
@@ -89,6 +110,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.send('extension:context-menu-click', { target, itemId, targetId }),
     getCommands: () => ipcRenderer.invoke('extension:get-commands'),
     executeCommand: (key: string) => ipcRenderer.send('extension:execute-command', { key }),
+    updatePanelBounds: (payload: {
+      extensionId: string
+      viewParam: string
+      bounds: { x: number; y: number; width: number; height: number }
+      visible: boolean
+      repoRoot?: string | null
+    }) => ipcRenderer.invoke('extension:update-panel-bounds', payload),
   },
   keyboard: {
     isReserved: (accelerator: string) => RESERVED_SHORTCUTS.has(accelerator),
@@ -151,6 +179,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     notifyPanelState: (panelId: string, open: boolean) => {
       ipcRenderer.send('menu:set-panel-checked', { panelId, open })
     },
+    onExtensionPanelLoaded: (handler: (id: string) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: { id: string }) =>
+        handler(payload.id)
+      ipcRenderer.on('extension:panel-loaded', listener)
+      return () => ipcRenderer.removeListener('extension:panel-loaded', listener)
+    },
+    onExtensionRendererReload: (handler: (id: string) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: { id: string }) =>
+        handler(payload.id)
+      ipcRenderer.on('extension:renderer-reload', listener)
+      return () => ipcRenderer.removeListener('extension:renderer-reload', listener)
+    },
   },
   app: {
     getInfo: () => ipcRenderer.invoke('app:get-info'),
@@ -201,4 +241,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     write: (level: string, namespace: string, message: string) =>
       ipcRenderer.send('log:write', { level, namespace, message }),
   },
+  getFilePath: (file: File): string => webUtils.getPathForFile(file),
 })

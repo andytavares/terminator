@@ -41,6 +41,8 @@ ignore:
   - 'src/main/preload.ts'
   - 'extensions/*/src/index.ts'
   - 'extensions/*/src/renderer.tsx'
+  - 'extensions/*/vite.renderer.config.ts'
+  - 'src/main/preload-webview.ts'
   - '.github/**'
   - '.claude/**'
   - '.specify/**'

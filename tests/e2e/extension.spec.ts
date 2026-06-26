@@ -60,12 +60,14 @@ test('US6-4: toggling an extension off and on keeps the app stable', async () =>
     // settle before interacting again.
     await toggle.click()
     await page.waitForLoadState('domcontentloaded')
+    await page.waitForSelector('.unified-sidebar', { timeout: 15000 })
     await openExtensionsSettings(page)
     const toggle2 = page
       .locator('.extension-item__actions button, .extension-item__actions input')
       .first()
     await toggle2.click()
     await page.waitForLoadState('domcontentloaded')
+    await page.waitForSelector('.unified-sidebar', { timeout: 15000 })
     await openExtensionsSettings(page)
   }
   // App and settings panel remain functional.

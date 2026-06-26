@@ -24,8 +24,18 @@ vi.mock('../../../src/main/git/git-service', () => ({
   removeWorktree: vi.fn(),
 }))
 
+vi.mock('../../../src/main/extensions/workspace-events', () => ({
+  emitWorkspaceDelete: vi.fn(),
+  emitProjectDelete: vi.fn(),
+}))
+
 import * as store from '../../../src/main/storage/workspace-store'
-import { registerWorkspaceHandlers } from '../../../src/main/ipc/workspace.ipc'
+import * as gitService from '../../../src/main/git/git-service'
+import {
+  registerWorkspaceHandlers,
+  setActiveWorkspaceContext,
+  getActiveWorkspaceContext,
+} from '../../../src/main/ipc/workspace.ipc'
 
 function captureHandler(channel: string): (event: unknown, payload?: unknown) => unknown {
   const calls = vi.mocked(ipcMain.handle).mock.calls
@@ -159,7 +169,7 @@ describe('workspace IPC handlers', () => {
   })
 
   describe('project:delete', () => {
-    it('calls deleteProject with the id', async () => {
+    it('calls deleteProject when project is not found', async () => {
       vi.mocked(store.getProjectById).mockReturnValue(undefined)
       vi.mocked(store.deleteProject).mockReturnValue(
         undefined as unknown as ReturnType<typeof store.deleteWorkspace>
@@ -168,5 +178,104 @@ describe('workspace IPC handlers', () => {
       await handler({}, { id: 'p1' })
       expect(store.deleteProject).toHaveBeenCalledWith('p1')
     })
+
+    it('calls deleteProject when project is not a worktree', async () => {
+      vi.mocked(store.getProjectById).mockReturnValue({
+        id: 'p1',
+        isWorktree: false,
+        worktreePath: null,
+      } as unknown as ReturnType<typeof store.getProjectById>)
+      vi.mocked(store.deleteProject).mockReturnValue(
+        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
+      )
+      const handler = captureHandler('project:delete')
+      await handler({}, { id: 'p1' })
+      expect(store.deleteProject).toHaveBeenCalledWith('p1')
+      expect(gitService.removeWorktree).not.toHaveBeenCalled()
+    })
+
+    it('removes worktree before deletion when project is a worktree and workspace has folderPath', async () => {
+      vi.mocked(store.getProjectById).mockReturnValue({
+        id: 'p1',
+        isWorktree: true,
+        worktreePath: '/repo/branches/feat',
+        workspaceId: 'ws-1',
+      } as unknown as ReturnType<typeof store.getProjectById>)
+      vi.mocked(store.listWorkspaces).mockReturnValue([
+        { id: 'ws-1', folderPath: '/repo' },
+      ] as unknown as ReturnType<typeof store.listWorkspaces>)
+      vi.mocked(store.deleteProject).mockReturnValue(
+        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
+      )
+      vi.mocked(gitService.removeWorktree).mockResolvedValue(undefined as never)
+      const handler = captureHandler('project:delete')
+      await handler({}, { id: 'p1' })
+      expect(gitService.removeWorktree).toHaveBeenCalledWith('/repo', '/repo/branches/feat')
+      expect(store.deleteProject).toHaveBeenCalledWith('p1')
+    })
+
+    it('proceeds with deletion even if worktree removal throws', async () => {
+      vi.mocked(store.getProjectById).mockReturnValue({
+        id: 'p1',
+        isWorktree: true,
+        worktreePath: '/repo/branches/feat',
+        workspaceId: 'ws-1',
+      } as unknown as ReturnType<typeof store.getProjectById>)
+      vi.mocked(store.listWorkspaces).mockReturnValue([
+        { id: 'ws-1', folderPath: '/repo' },
+      ] as unknown as ReturnType<typeof store.listWorkspaces>)
+      vi.mocked(store.deleteProject).mockReturnValue(
+        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
+      )
+      vi.mocked(gitService.removeWorktree).mockRejectedValue(new Error('worktree error'))
+      const handler = captureHandler('project:delete')
+      await handler({}, { id: 'p1' })
+      expect(store.deleteProject).toHaveBeenCalledWith('p1')
+    })
+
+    it('skips worktree removal when workspace has no folderPath', async () => {
+      vi.mocked(store.getProjectById).mockReturnValue({
+        id: 'p1',
+        isWorktree: true,
+        worktreePath: '/repo/branches/feat',
+        workspaceId: 'ws-1',
+      } as unknown as ReturnType<typeof store.getProjectById>)
+      vi.mocked(store.listWorkspaces).mockReturnValue([
+        { id: 'ws-1', folderPath: undefined },
+      ] as unknown as ReturnType<typeof store.listWorkspaces>)
+      vi.mocked(store.deleteProject).mockReturnValue(
+        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
+      )
+      const handler = captureHandler('project:delete')
+      await handler({}, { id: 'p1' })
+      expect(gitService.removeWorktree).not.toHaveBeenCalled()
+      expect(store.deleteProject).toHaveBeenCalledWith('p1')
+    })
+  })
+
+  describe('workspace:get-active', () => {
+    it('returns the active context', () => {
+      setActiveWorkspaceContext({ workspaceId: 'ws-1', projectId: 'p-1', repoRoot: '/repo' })
+      const handler = captureHandler('workspace:get-active')
+      const result = handler({})
+      expect(result).toEqual({ workspaceId: 'ws-1', projectId: 'p-1', repoRoot: '/repo' })
+    })
+  })
+})
+
+describe('setActiveWorkspaceContext / getActiveWorkspaceContext', () => {
+  it('stores and retrieves the active context', () => {
+    setActiveWorkspaceContext({ workspaceId: 'ws-2', projectId: null, repoRoot: null })
+    expect(getActiveWorkspaceContext()).toEqual({
+      workspaceId: 'ws-2',
+      projectId: null,
+      repoRoot: null,
+    })
+  })
+
+  it('overwrites a previous context', () => {
+    setActiveWorkspaceContext({ workspaceId: 'ws-1', projectId: 'p-1', repoRoot: '/a' })
+    setActiveWorkspaceContext({ workspaceId: 'ws-2', projectId: 'p-2', repoRoot: '/b' })
+    expect(getActiveWorkspaceContext().workspaceId).toBe('ws-2')
   })
 })

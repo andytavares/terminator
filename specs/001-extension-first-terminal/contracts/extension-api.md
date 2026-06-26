@@ -1,10 +1,12 @@
 # Contract: Extension API
 
-**Version**: 1.5.0  
-**Date**: 2026-06-21  
-**Branch**: `001-extension-first-terminal`
+**Version**: 2.0.0  
+**Date**: 2026-06-24  
+**Branch**: `eextension`
 
 This is the public API surface exposed to all Terminator extensions. Extensions receive an `ExtensionAPI` object as the sole argument to their `activate()` function. They MUST NOT import from `src/main/` or any internal module directly.
+
+Extension UI (renderer) runs in an isolated `WebContentsView` and communicates via `window.electronAPI` (webview preload). See the [Webview Renderer API](#webview-renderer-api) section below.
 
 ---
 
@@ -18,6 +20,7 @@ This is the public API surface exposed to all Terminator extensions. Extensions 
 | 1.3.0   | Added: `sidebar.registerWorkspaceTab`, `WorkspaceTabRegistration`, `activeWorkspaceTabId` state on the renderer registry                                                                                 |
 | 1.4.0   | Added: `settings.set`, `ipc.invokeChannel`, `ipc.sendChannel`, `ipc.onWindowEvent`, `pty` namespace, `window.broadcast`                                                                                  |
 | 1.5.0   | Added: `db` namespace (shared PGlite), `ipc.isRemoteAccessible`, `pty.listSessions/attachOnData/attachOnExit`, `notifications.createNotification` `targets`, `SettingDefinition` `folder`/`action` types |
+| 2.0.0   | Added: webview renderer isolation model, `manifest.contributes`, `extensionBridge` IPC channels, `workspace:changed` push event, `extension:renderer-reload` push event, `@terminator/extension-sdk`     |
 
 ---
 
@@ -548,4 +551,63 @@ interface ProjectSnapshot {
 
 4. **Settings key namespacing**: Extension setting keys must be prefixed with the extension ID to avoid collisions (enforced by the host at registration time).
 
-5. **API versioning**: The `ExtensionAPI` interface follows semantic versioning. Breaking changes require a MAJOR version bump and a new ADR. The current version is `1.5.0` (added `db` namespace, `ipc.isRemoteAccessible`, `pty.listSessions/attachOnData/attachOnExit`, `notifications.createNotification` `targets`, and `folder`/`action` setting types). The renderer-registry surface remains at `1.3.0` — `registerWorkspaceTab` is a renderer-registry-only surface, not exposed via `activate(api)`.
+5. **API versioning**: The `ExtensionAPI` interface follows semantic versioning. Breaking changes require a MAJOR version bump and a new ADR. The current version is `2.0.0` (webview renderer isolation model — see ADR-022).
+
+---
+
+## Webview Renderer API
+
+Extension renderer UIs run in isolated `WebContentsView` contexts. The webview preload (`dist-electron/preload/webview.js`) exposes `window.electronAPI` with the same shape as the host renderer's preload. Extension UIs are completely isolated — they cannot import from or share state with the host renderer.
+
+### Context injection via URL params
+
+When the core app creates a `WebContentsView` for an extension surface, it passes context as URL query parameters:
+
+| Param      | Description                                                    |
+| ---------- | -------------------------------------------------------------- |
+| `view`     | The surface view identifier from `manifest.contributes.*.view` |
+| `repoRoot` | Active project repo root path (may be empty string)            |
+
+Example URL: `ext://com.example.my-ext/dist/index.html?view=main&repoRoot=%2Fpath%2Fto%2Frepo`
+
+### `extensionBridge` — Extension-owned IPC
+
+Extensions communicate with their own main-process handlers via `extensionBridge`:
+
+```typescript
+// Invoke a registered handler (returns Promise)
+const result = await window.electronAPI.extensionBridge.invoke('my-ext:action', payload)
+
+// Subscribe to push events from the main process
+const off = window.electronAPI.extensionBridge.on('my-ext:push:update', (data) => {
+  // handle update
+})
+off() // unsubscribe
+```
+
+### Push events
+
+| Channel                     | Direction      | Payload                         | Description                                                |
+| --------------------------- | -------------- | ------------------------------- | ---------------------------------------------------------- |
+| `workspace:changed`         | main → webview | `{ repoRoot?: string \| null }` | Active workspace/project changed                           |
+| `extension:renderer-reload` | main → webview | _(none)_                        | Extension reloaded; webview remounts                       |
+| `ext:command:<id>`          | main → webview | _(none)_                        | Keyboard shortcut declared in `contributes.commands` fired |
+
+### `manifest.contributes`
+
+The only mechanism for declaring UI surfaces. Processed at extension load time by `initExtensions()` in the renderer.
+
+```typescript
+interface ExtensionContributes {
+  globalTab?: { label: string; icon?: string; view?: string }
+  workspaceTab?: { label: string; icon?: string; view?: string }
+  projectTab?: { label: string; view?: string }
+  sidebarPanel?: { label: string; icon?: string; defaultOpen?: boolean; view?: string }
+  windowViews?: Array<{ id: string; view: string }>
+  commands?: Array<{ id: string; label: string; shortcut?: string; description?: string }>
+}
+```
+
+### Type definitions
+
+Install `@terminator/extension-sdk` (from `packages/extension-sdk/`) for full TypeScript types on both the main-process `ExtensionAPI` and the renderer-side `window.electronAPI`.

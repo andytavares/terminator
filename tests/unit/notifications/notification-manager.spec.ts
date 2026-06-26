@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockNotificationShow, MockNotification, mockDockBounce, mockSend } = vi.hoisted(() => {
-  const mockNotificationShow = vi.fn()
-  const MockNotification = vi.fn().mockImplementation(function () {
-    return { show: mockNotificationShow }
+const { mockNotificationShow, mockNotificationOn, MockNotification, mockDockBounce, mockSend } =
+  vi.hoisted(() => {
+    const mockNotificationShow = vi.fn()
+    const mockNotificationOn = vi.fn()
+    const MockNotification = vi.fn().mockImplementation(function () {
+      return { show: mockNotificationShow, on: mockNotificationOn }
+    })
+    Object.assign(MockNotification, { isSupported: vi.fn(() => true) })
+    const mockDockBounce = vi.fn()
+    const mockSend = vi.fn()
+    return { mockNotificationShow, mockNotificationOn, MockNotification, mockDockBounce, mockSend }
   })
-  Object.assign(MockNotification, { isSupported: vi.fn(() => true) })
-  const mockDockBounce = vi.fn()
-  const mockSend = vi.fn()
-  return { mockNotificationShow, MockNotification, mockDockBounce, mockSend }
-})
 
 const mockWin = { isDestroyed: vi.fn(() => false), webContents: { send: mockSend } }
 const mockDestroyedWin = { isDestroyed: vi.fn(() => true), webContents: { send: mockSend } }
@@ -83,12 +85,17 @@ describe('NotificationManager.create — targets', () => {
     expect(mockNotificationShow).not.toHaveBeenCalled()
   })
 
-  it('bounces dock on macOS when system notification fires', () => {
+  it('bounces dock critically on macOS when system notification fires', () => {
     const originalPlatform = process.platform
     Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
     notificationManager.create({ type: 'info', title: 'Bounce', targets: ['system'] })
-    expect(mockDockBounce).toHaveBeenCalledWith('informational')
+    expect(mockDockBounce).toHaveBeenCalledWith('critical')
     Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+  })
+
+  it('registers a failed handler on the system notification', () => {
+    notificationManager.create({ type: 'info', title: 'Sys', targets: ['system'] })
+    expect(mockNotificationOn).toHaveBeenCalledWith('failed', expect.any(Function))
   })
 })
 

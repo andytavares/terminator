@@ -3,6 +3,7 @@ import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
 import { SCRATCH_PROJECT_ID } from '../../../shared/types/index'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
+import { useModalEffect } from '../../stores/modal.store'
 import './Dialog.css'
 import './MoveSessionDialog.css'
 
@@ -15,6 +16,7 @@ interface Props {
 type SubView = null | { type: 'new-project'; workspaceId: string } | { type: 'new-workspace' }
 
 export function MoveSessionDialog({ sessionId, onClose, onMoved }: Props): JSX.Element {
+  useModalEffect()
   const {
     workspaces,
     projectsByWorkspaceId,

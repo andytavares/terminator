@@ -381,4 +381,80 @@ describe('CreateProjectDialog', () => {
       expect(mockCreateProject).toHaveBeenCalledWith(expect.objectContaining({ gitBranch: 'main' }))
     )
   })
+
+  it('shows error when createBranch fails', async () => {
+    setupGitWorkspace()
+    ;(
+      window.electronAPI as unknown as { git: { createBranch: ReturnType<typeof vi.fn> } }
+    ).git.createBranch.mockResolvedValue({ error: 'already exists' })
+    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
+    await vi.waitFor(() => screen.getByRole('button', { name: 'Branch' }))
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My Project' } })
+    fireEvent.click(screen.getByText('main'))
+    fireEvent.click(screen.getByText('+ New branch…'))
+    fireEvent.change(screen.getByPlaceholderText('feature/my-feature'), {
+      target: { value: 'feature/bad' },
+    })
+    fireEvent.click(screen.getByText('Create'))
+    await vi.waitFor(() =>
+      expect(screen.getByText('Could not create branch: already exists')).toBeTruthy()
+    )
+  })
+
+  it('shows name error when createProject returns DUPLICATE_NAME', async () => {
+    mockCreateProject.mockResolvedValue({ error: 'DUPLICATE_NAME' })
+    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My Project' } })
+    fireEvent.click(screen.getByText('Create'))
+    await vi.waitFor(() =>
+      expect(screen.getByText('A project with this name already exists')).toBeTruthy()
+    )
+  })
+
+  it('shows generic error when createProject returns other error', async () => {
+    mockCreateProject.mockResolvedValue({ error: 'DB_ERROR' })
+    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My Project' } })
+    fireEvent.click(screen.getByText('Create'))
+    await vi.waitFor(() => expect(screen.getByText('Failed to create project')).toBeTruthy())
+  })
+
+  it('shows error when createWorktree fails', async () => {
+    setupGitWorkspace()
+    ;(
+      window.electronAPI as unknown as { git: { createWorktree: ReturnType<typeof vi.fn> } }
+    ).git.createWorktree.mockResolvedValue({ error: 'no space' })
+    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
+    await vi.waitFor(() => screen.getByText('Worktree'))
+    fireEvent.click(screen.getByText('Worktree'))
+    await vi.waitFor(() => screen.getByText('Worktree path'))
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My Project' } })
+    const inputs = screen.getAllByRole('textbox')
+    fireEvent.change(inputs[inputs.length - 2], { target: { value: 'feature/wt' } })
+    fireEvent.click(screen.getByText('Create'))
+    await vi.waitFor(() => expect(screen.getByText('Worktree error: no space')).toBeTruthy())
+  })
+
+  it('shows empty branch name error in worktree mode', async () => {
+    setupGitWorkspace()
+    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
+    await vi.waitFor(() => screen.getByText('Worktree'))
+    fireEvent.click(screen.getByText('Worktree'))
+    await vi.waitFor(() => screen.getByText('Worktree path'))
+    // Switch away from new-branch to an existing branch then clear (so branch = '')
+    const triggers = screen.getAllByRole('button')
+    const branchTrigger = triggers.find((b) => b.textContent?.includes('+ New branch'))!
+    fireEvent.click(branchTrigger)
+    fireEvent.click(screen.getByText('main'))
+    // Now switch back to new-branch so worktreeIsNewBranch = true, newBranchName = ''
+    await vi.waitFor(() => screen.getByText('main'))
+    fireEvent.click(screen.getByText('main'))
+    fireEvent.click(screen.getAllByText('+ New branch…')[0])
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'My Project' } })
+    // Ensure new branch name input is empty then submit
+    const newBranchInput = screen.getByPlaceholderText('feature/my-feature')
+    fireEvent.change(newBranchInput, { target: { value: '' } })
+    fireEvent.click(screen.getByText('Create'))
+    await vi.waitFor(() => expect(screen.getByText('Select or enter a branch name')).toBeTruthy())
+  })
 })

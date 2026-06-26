@@ -2,7 +2,7 @@
 
 Extensions let you add functionality to Terminator without touching its core code. They contribute to the application through the `ExtensionAPI` — a stable, versioned interface. This guide covers everything you need to write, test, and distribute an extension.
 
-**Current API version**: 1.3.0 (renderer registry)
+**Current API version**: 2.0.0 (webview renderer isolation — see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
 
 ---
 
@@ -50,8 +50,16 @@ my-extension/
   "name": "My Extension",
   "version": "1.0.0",
   "description": "A short description of what this extension does.",
-  "main": "src/index.ts",
-  "minAppVersion": "0.1.0"
+  "main": "dist/main.cjs",
+  "renderer": "dist/index.html",
+  "minAppVersion": "0.1.0",
+  "contributes": {
+    "globalTab": {
+      "label": "My Extension",
+      "icon": "wrench",
+      "view": "main"
+    }
+  }
 }
 ```
 
@@ -61,15 +69,17 @@ my-extension/
 | `name`          | Yes      | Human-readable name shown in the Extensions panel                         |
 | `version`       | Yes      | Semver string (`X.Y.Z`)                                                   |
 | `description`   | Yes      | Shown in the Extensions panel                                             |
-| `main`          | Yes      | Relative path to the entry point                                          |
+| `main`          | Yes      | Relative path to the compiled main-process entry (CommonJS)               |
+| `renderer`      | No       | Relative path to the webview HTML entry (`dist/index.html`)               |
 | `minAppVersion` | Yes      | Minimum Terminator version required (semver, e.g. `0.1.0`)                |
+| `contributes`   | No       | UI surface declarations (see [Renderer UI](#renderer-ui) section)         |
 
 ### Entry Point
 
 The entry point must export an `activate` function and may export `deactivate`:
 
 ```typescript
-import type { ExtensionAPI } from '../../src/main/extensions/api'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 const disposables: Array<{ dispose(): void }> = []
 
@@ -790,3 +800,159 @@ registry.registerKeyboardShortcut({
 ### MCP Sidecar Pattern
 
 Extensions can ship a standalone MCP stdio server. See ADR-013. The server reads `TASK_VAULT_PATH` from environment and registers tools via `@modelcontextprotocol/sdk`. Users configure it in their MCP client (Claude Desktop, etc.) pointing to the compiled `src/mcp/server.js` within the extension directory.
+
+---
+
+## Renderer UI
+
+Extension UIs run in isolated `WebContentsView` contexts — completely separate from the host renderer. Your extension's `dist/index.html` loads with its own browser process and has `window.electronAPI` injected by a dedicated preload.
+
+### Why isolation matters
+
+- Extensions bundle their own React/framework — no version conflicts with the host.
+- Your renderer cannot crash the host app.
+- No rebuild of the core app ever required when you update extension UI.
+
+### Getting started
+
+Install the SDK for full TypeScript types:
+
+```bash
+npm install --save-dev @terminator/extension-sdk
+```
+
+Create `src/renderer/App.tsx`:
+
+```tsx
+import React from 'react'
+
+export function App(): JSX.Element {
+  const view = new URLSearchParams(window.location.search).get('view')
+  // Route based on ?view= param from manifest.contributes.*.view
+  return <div>Hello from {view} view</div>
+}
+```
+
+Create `src/renderer/main.tsx`:
+
+```tsx
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import { App } from './App'
+
+const el = document.getElementById('app')!
+createRoot(el).render(<App />)
+```
+
+Create `index.html`:
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>My Extension</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/renderer/main.tsx"></script>
+  </body>
+</html>
+```
+
+Create `vite.renderer.config.ts`:
+
+```typescript
+import { resolve } from 'path'
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  root: resolve(__dirname),
+  plugins: [react()],
+  build: {
+    outDir: resolve(__dirname, 'dist'),
+    emptyOutDir: false,
+    rollupOptions: { input: resolve(__dirname, 'index.html') },
+  },
+})
+```
+
+Add to `package.json`:
+
+```json
+{ "scripts": { "build:renderer": "vite build --config vite.renderer.config.ts" } }
+```
+
+### `manifest.contributes` reference
+
+| Key            | Type                                            | Description                                  |
+| -------------- | ----------------------------------------------- | -------------------------------------------- |
+| `globalTab`    | `{ label, icon?, view? }`                       | Top-level tab in the global tab bar          |
+| `workspaceTab` | `{ label, icon?, view? }`                       | Tab scoped to the active workspace           |
+| `projectTab`   | `{ label, view? }`                              | Tab scoped to a project                      |
+| `sidebarPanel` | `{ label, icon?, defaultOpen?, view? }`         | Collapsible sidebar panel                    |
+| `windowViews`  | `Array<{ id: string; view: string }>`           | Auxiliary window views                       |
+| `commands`     | `Array<{ id, label, shortcut?, description? }>` | Keyboard shortcuts / command palette entries |
+
+The `view` string is passed as `?view=VALUE` in the webview URL. One `index.html` serves all surfaces.
+
+### Receiving workspace context
+
+URL params on mount:
+
+```typescript
+const view = new URLSearchParams(window.location.search).get('view')
+const repoRoot = new URLSearchParams(window.location.search).get('repoRoot')
+```
+
+Subscribe to live updates:
+
+```typescript
+useEffect(() => {
+  return window.electronAPI.extensionBridge.on('workspace:changed', (data) => {
+    const { repoRoot } = data as { repoRoot?: string | null }
+    setRepoRoot(repoRoot ?? null)
+  })
+}, [])
+```
+
+### Commands and keyboard shortcuts
+
+Commands declared in `contributes.commands` are registered by the core app. When a shortcut fires, the core broadcasts `ext:command:<id>` to the extension's webview:
+
+```typescript
+useEffect(() => {
+  return window.electronAPI.extensionBridge.on('ext:command:my-ext:action', () => {
+    // Handle command
+  })
+}, [])
+```
+
+### Calling extension IPC handlers
+
+```typescript
+const result = await window.electronAPI.extensionBridge.invoke('my-ext:my-handler', payload)
+```
+
+---
+
+## Migration Guide: v1 → v2
+
+If you have an existing extension using the `renderer.tsx` + registry import pattern:
+
+1. **Create** `src/renderer/App.tsx` — render your existing components, route by `?view=` param.
+2. **Create** `src/renderer/main.tsx` and `index.html` — standard Vite entry.
+3. **Create** `vite.renderer.config.ts` and add `"build:renderer"` to `package.json`.
+4. **Update** `manifest.json` — add `"renderer": "dist/index.html"` and `"contributes": { ... }`.
+5. **Run** `npm run build:renderer` to verify `dist/index.html` is produced.
+6. **Delete** `src/renderer.tsx` (old bundled renderer).
+7. **Replace** `useExtensionRegistry` imports in renderer code with `window.electronAPI.extensionBridge` calls.
+8. **Replace** registry keyboard shortcuts with `contributes.commands` entries in the manifest.
+9. **Replace** overlay components with `extensionBridge.on('ext:command:<id>', ...)` handlers.
+
+Key behavioural differences in the webview model:
+
+- `registry.setActiveGlobalTab()` — not available. Navigation between extension surfaces uses URL params.
+- `registry.updateGlobalTab(..., { badge })` — not available. Badge updates require a separate IPC mechanism if needed.
+- Core store imports (`useWorkspaceStore`, etc.) — not available. Use `extensionBridge` and URL params instead.

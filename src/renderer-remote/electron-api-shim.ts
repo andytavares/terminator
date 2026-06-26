@@ -213,6 +213,8 @@
         fire('extension:context-menu-click', { target, itemId, targetId }),
       getCommands: () => invoke('extension:get-commands'),
       executeCommand: (key: string) => fire('extension:execute-command', { key }),
+      // No-op in remote mode: WebContentsView positioning is an Electron-only concept
+      updatePanelBounds: () => {},
     },
     keyboard: {
       isReserved: () => false,

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync, existsSync } from 'fs'
 
 vi.mock('bcryptjs', () => ({
   default: {
@@ -10,7 +10,12 @@ vi.mock('bcryptjs', () => ({
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>()
-  return { ...actual, readFileSync: vi.fn(actual.readFileSync), existsSync: vi.fn(() => false) }
+  return {
+    ...actual,
+    readFileSync: vi.fn(actual.readFileSync),
+    existsSync: vi.fn(() => false),
+    readdirSync: vi.fn(actual.readdirSync),
+  }
 })
 
 vi.mock('electron', () => ({
@@ -367,6 +372,82 @@ describe('RemoteServer', () => {
         headers: { cookie: token },
       })
       expect(assetResp.statusCode).not.toBe(403)
+    })
+  })
+
+  describe('/ext/* extension routes', () => {
+    const EXTENSION_ID = 'com.terminator.task-vault'
+    const EXT_ROOT = '/mock/app/extensions'
+    const EXT_DIR = `${EXT_ROOT}/task-vault`
+    const MANIFEST = JSON.stringify({ id: EXTENSION_ID, renderer: 'dist/index.html' })
+    const INDEX_HTML = '<html><head></head><body>task-vault</body></html>'
+
+    let extServer: Awaited<
+      ReturnType<typeof import('../../src/server/remote-server').createRemoteServer>
+    >
+
+    beforeEach(async () => {
+      // Simulate an extension with a built renderer
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const path = String(p)
+        return (
+          path === EXT_ROOT ||
+          path === `${EXT_DIR}/manifest.json` ||
+          path === `${EXT_DIR}/dist` ||
+          path === '/mock/app/out/renderer'
+        )
+      })
+      vi.mocked(readdirSync).mockReturnValue(['task-vault'] as unknown as ReturnType<
+        typeof readdirSync
+      >)
+      vi.mocked(readFileSync).mockImplementation((p) => {
+        const path = String(p)
+        if (path === `${EXT_DIR}/manifest.json`) return MANIFEST
+        if (path === `${EXT_DIR}/dist/index.html`) return INDEX_HTML
+        if (path === '/mock/app/out/renderer/index.html') return '<html><head></head></html>'
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+      })
+
+      const { createRemoteServer } = await import('../../src/server/remote-server')
+      extServer = await createRemoteServer({
+        port: 7685,
+        ptyManager: mockPtyManager as never,
+        deps: mockDeps,
+      })
+    })
+
+    afterEach(() => {
+      vi.mocked(existsSync).mockImplementation(() => false)
+      vi.mocked(readdirSync).mockReset()
+      vi.mocked(readFileSync).mockReset()
+    })
+
+    it('GET /ext/<id>/ is publicly accessible (no session gate on extension statics)', async () => {
+      const res = await extServer.inject({ method: 'GET', url: `/ext/${EXTENSION_ID}/` })
+      // No 403 — extension static assets have no session gate
+      expect(res.statusCode).not.toBe(403)
+    })
+
+    it('GET /ext/<id>/ returns 200 with shim and base CSS injected when renderer is built', async () => {
+      const res = await extServer.inject({ method: 'GET', url: `/ext/${EXTENSION_ID}/` })
+      expect(res.statusCode).toBe(200)
+      expect(res.headers['content-type']).toContain('text/html')
+      expect(res.body).toContain('remote-shim.js')
+      expect(res.body).toContain('--tm-bg-base')
+      expect(res.body).toContain('<head>')
+    })
+
+    it('GET /ext/<id>/ returns 503 when renderer is not built', async () => {
+      // Override: extension index.html is missing
+      vi.mocked(readFileSync).mockImplementation((p) => {
+        const path = String(p)
+        if (path === `${EXT_DIR}/manifest.json`) return MANIFEST
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+      })
+
+      const res = await extServer.inject({ method: 'GET', url: `/ext/${EXTENSION_ID}/` })
+      expect(res.statusCode).toBe(503)
+      expect(res.body).toContain(EXTENSION_ID)
     })
   })
 

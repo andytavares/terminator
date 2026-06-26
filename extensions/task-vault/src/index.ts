@@ -144,13 +144,24 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   }
 
   disposables.push(
+    api.ipc.registerHandler('task-vault:open-panel', (data) => {
+      const { date, taskId } = (data ?? {}) as { date?: string; taskId?: string }
+      api.window.broadcast('extension:activate-global-tab', 'task-vault')
+      if (date ?? taskId) {
+        api.window.broadcast('task-vault:navigate', { date, taskId })
+      }
+      return { ok: true }
+    })
+  )
+
+  disposables.push(
     api.nativeMenu.addViewMenuItem({
       id: 'vault-calendar-toggle',
       label: 'Toggle Vault Calendar',
       type: 'checkbox',
-      panelId: 'task-vault-links',
+      panelId: 'terminator.task-vault',
       onClick: () => {
-        api.window.broadcast('extension:toggle-panel', 'task-vault-links')
+        api.window.broadcast('extension:toggle-panel', 'terminator.task-vault')
       },
     })
   )

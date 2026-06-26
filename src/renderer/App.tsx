@@ -421,6 +421,12 @@ export function App(): JSX.Element {
   }, [])
 
   useEffect(() => {
+    return window.electronAPI.extensionBridge.on('extension:activate-global-tab', (tabId) => {
+      if (typeof tabId === 'string') setActiveGlobalTab(tabId)
+    })
+  }, [setActiveGlobalTab])
+
+  useEffect(() => {
     const unsubLog = window.electronAPI.extensionBridge.on('log:push', (data) => {
       const { level, message } = data as { level: 'info' | 'warn' | 'error'; message: string }
       useLogStore.getState().addEntry(level, message)
@@ -498,10 +504,10 @@ export function App(): JSX.Element {
             ) : activeWorkspaceTabId && workspaceTabs.has(activeWorkspaceTabId) ? (
               (() => {
                 const tab = workspaceTabs.get(activeWorkspaceTabId)!
-                const TabComponent = tab.component as React.ComponentType<Record<string, never>>
+                const TabComponent = tab.component
                 return (
                   <div className="main-content">
-                    <TabComponent />
+                    <TabComponent repoRoot={repoRoot} />
                   </div>
                 )
               })()

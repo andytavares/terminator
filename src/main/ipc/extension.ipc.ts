@@ -6,7 +6,10 @@ import {
   setExtensionSetting,
 } from '../storage/extension-settings-store.js'
 
-export function registerExtensionHandlers(extensionHost: ExtensionHost): void {
+export function registerExtensionHandlers(
+  extensionHost: ExtensionHost,
+  broadcast?: (channel: string, data: unknown) => void
+): void {
   ipcMain.handle('extension:list', () => {
     return { extensions: extensionHost.listExtensions() }
   })
@@ -28,7 +31,11 @@ export function registerExtensionHandlers(extensionHost: ExtensionHost): void {
   })
 
   ipcMain.handle('extension:reload', async (_event, { id }) => {
-    return extensionHost.reload(id)
+    const result = await extensionHost.reload(id)
+    if (!('error' in result)) {
+      broadcast?.('extension:renderer-reload', { id })
+    }
+    return result
   })
 
   ipcMain.handle('extension:get-settings-schemas', () => {

@@ -1,96 +1,72 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const mockAddToast = vi.fn()
-const mockAddNotification = vi.fn()
-const mockInvoke = vi.fn().mockResolvedValue({ ok: true })
-
-vi.mock('../../../../src/renderer/stores/toast.store', () => ({
-  useToastStore: {
-    getState: () => ({ addToast: mockAddToast }),
-  },
+// Mock the toast store before importing notify
+vi.mock('../../src/stores/extension-toast.store', () => ({
+  addExtensionToast: vi.fn(),
 }))
 
-vi.mock('../../../../src/renderer/stores/notification.store', () => ({
-  useNotificationStore: {
-    getState: () => ({ addNotification: mockAddNotification }),
-  },
-}))
+const mockCreate = vi.fn().mockResolvedValue({ id: 'notif-1' })
 
-vi.stubGlobal('window', {
-  electronAPI: {
-    extensionBridge: { invoke: mockInvoke },
+Object.defineProperty(globalThis, 'window', {
+  value: {
+    electronAPI: {
+      notifications: { create: mockCreate },
+    },
   },
+  writable: true,
+  configurable: true,
 })
 
 import { notify } from '../../src/utils/notify'
+import { addExtensionToast } from '../../src/stores/extension-toast.store'
+
+const mockAddToast = vi.mocked(addExtensionToast)
 
 beforeEach(() => {
   vi.clearAllMocks()
 })
 
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
 describe('notify', () => {
-  it('calls addToast with type and message', () => {
+  it('adds a local toast with the correct type and message', () => {
     notify('success', 'Task done')
-    expect(mockAddToast).toHaveBeenCalledWith({
-      type: 'success',
-      message: 'Task done',
-      onClick: undefined,
-    })
+    expect(mockAddToast).toHaveBeenCalledWith('success', 'Task done', { onClick: undefined })
   })
 
-  it('passes onClick to addToast when provided', () => {
-    const onClick = vi.fn()
-    notify('info', 'Hello', { onClick })
-    expect(mockAddToast).toHaveBeenCalledWith({ type: 'info', message: 'Hello', onClick })
-  })
-
-  it('calls addNotification with correct shape', () => {
-    notify('success', 'Task done')
-    expect(mockAddNotification).toHaveBeenCalledOnce()
-    const arg = mockAddNotification.mock.calls[0][0]
-    expect(arg.type).toBe('success')
-    expect(arg.title).toBe('Task Vault')
-    expect(arg.message).toBe('Task done')
-    expect(arg.source).toBe('task-vault')
-    expect(typeof arg.id).toBe('string')
-    expect(typeof arg.timestamp).toBe('number')
-    expect(arg.onClick).toBeUndefined()
-  })
-
-  it('passes onClick to addNotification when provided', () => {
-    const onClick = vi.fn()
-    notify('error', 'Failed', { onClick })
-    const arg = mockAddNotification.mock.calls[0][0]
-    expect(arg.onClick).toBe(onClick)
-  })
-
-  it('generates unique ids across calls', () => {
-    notify('info', 'A')
-    notify('info', 'B')
-    const id1 = mockAddNotification.mock.calls[0][0].id
-    const id2 = mockAddNotification.mock.calls[1][0].id
-    expect(id1).not.toBe(id2)
-  })
-
-  it('invokes system-notify IPC with title and body', () => {
-    notify('warning', 'Blocked task')
-    expect(mockInvoke).toHaveBeenCalledWith('task-vault:system-notify', {
-      title: 'Task Vault',
-      body: 'Blocked task',
-    })
-  })
-
-  it('swallows IPC errors silently', async () => {
-    mockInvoke.mockRejectedValueOnce(new Error('IPC failure'))
-    expect(() => notify('error', 'Oops')).not.toThrow()
-    await new Promise((r) => setTimeout(r, 0))
-  })
-
-  it('forwards all toast types to addNotification', () => {
+  it('forwards all toast types to the local store', () => {
     const types = ['success', 'error', 'warning', 'info'] as const
     types.forEach((type) => notify(type, type))
     types.forEach((type, i) => {
-      expect(mockAddNotification.mock.calls[i][0].type).toBe(type)
+      expect(mockAddToast.mock.calls[i][0]).toBe(type)
     })
+  })
+
+  it('passes onClick through to the toast store', () => {
+    const onClick = vi.fn()
+    notify('info', 'Hello', { onClick })
+    expect(mockAddToast).toHaveBeenCalledWith('info', 'Hello', { onClick })
+  })
+
+  it('does not throw when called without options', () => {
+    expect(() => notify('error', 'Oops')).not.toThrow()
+  })
+
+  it('creates a notification center + system notification via electronAPI', () => {
+    notify('warning', 'Task overdue')
+    expect(mockCreate).toHaveBeenCalledWith({
+      type: 'warning',
+      title: 'Task overdue',
+      targets: ['center', 'system'],
+    })
+  })
+
+  it('does not throw when electronAPI.notifications is unavailable', () => {
+    const orig = window.electronAPI
+    ;(window as unknown as Record<string, unknown>).electronAPI = undefined
+    expect(() => notify('info', 'Oops')).not.toThrow()
+    ;(window as unknown as Record<string, unknown>).electronAPI = orig
   })
 })
