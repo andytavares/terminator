@@ -294,9 +294,23 @@ export class TerminalInstance {
         const top = rowEl
           ? rowEl.getBoundingClientRect().bottom - elRect.top - 1
           : (viewportRow + 1) * getCellH() - 1
-        overlay.style.left = `${match.index * charW}px`
+        /* v8 ignore start -- reads actual cell dimensions from xterm DOM/canvas;
+           jsdom has no rendered rows or canvas so these branches can't be exercised */
+        // Derive actual cell width from the xterm canvas (cols × cellW in CSS px).
+        // measureText() returns a float; xterm rounds internally, causing drift over
+        // many columns. Reading from the canvas gives the true rendered cell width.
+        const xtermCanvas = this.terminal.element?.querySelector(
+          'canvas'
+        ) as HTMLCanvasElement | null
+        const cols = this.terminal.cols
+        const actualCellW =
+          xtermCanvas && cols > 0 ? xtermCanvas.getBoundingClientRect().width / cols : charW
+        // Account for any horizontal offset of the xterm text area relative to this.element.
+        const xBase = rowsEl ? rowsEl.getBoundingClientRect().left - elRect.left : 0
+        /* v8 ignore stop */
+        overlay.style.left = `${xBase + match.index * actualCellW}px`
         overlay.style.top = `${top}px`
-        overlay.style.width = `${match.length * charW}px`
+        overlay.style.width = `${match.length * actualCellW}px`
         overlay.style.display = 'block'
         this.terminal.element?.classList.add('xterm-cursor-pointer')
       } else {

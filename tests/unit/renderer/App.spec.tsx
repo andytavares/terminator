@@ -596,7 +596,7 @@ describe('App', () => {
     expect(screen.getByTestId('global-tab-content')).toBeTruthy()
   })
 
-  it('calls togglePanel for each open panel when workspace changes', async () => {
+  it('does not close open panels when workspace changes', async () => {
     const mockTogglePanel = vi.fn()
     vi.mocked(useExtensionRegistry).mockReturnValue({
       ...defaultExtensionRegistry,
@@ -605,7 +605,6 @@ describe('App', () => {
     } as unknown as ReturnType<typeof useExtensionRegistry>)
     setupMocks({ activeWorkspaceId: 'ws-1' })
     const { rerender } = render(<App />)
-    // Switch to a different workspace — should trigger the close-panels effect
     setupMocks({ activeWorkspaceId: 'ws-2' })
     vi.mocked(useExtensionRegistry).mockReturnValue({
       ...defaultExtensionRegistry,
@@ -613,7 +612,7 @@ describe('App', () => {
       togglePanel: mockTogglePanel,
     } as unknown as ReturnType<typeof useExtensionRegistry>)
     rerender(<App />)
-    expect(mockTogglePanel).toHaveBeenCalledWith('panel-a')
+    expect(mockTogglePanel).not.toHaveBeenCalledWith('panel-a')
   })
 
   it('calls onSelectProjectTab extensionEvent to set active tab', () => {

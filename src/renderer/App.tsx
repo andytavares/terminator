@@ -385,16 +385,6 @@ export function App(): JSX.Element {
   // Snapshot of panels that were open before switching to an extension tab
   const savedPanelsRef = useRef<Set<string>>(new Set())
 
-  // Close all open panels when switching workspaces
-  const prevWorkspaceIdRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (prevWorkspaceIdRef.current !== null && prevWorkspaceIdRef.current !== activeWorkspaceId) {
-      openPanelsRef.current.forEach((panelId) => togglePanel(panelId))
-      savedPanelsRef.current = new Set()
-    }
-    prevWorkspaceIdRef.current = activeWorkspaceId
-  }, [activeWorkspaceId, togglePanel])
-
   useEffect(() => {
     if (activeProjectTabId !== null) {
       // Switching into an extension tab — save open panels then close them
