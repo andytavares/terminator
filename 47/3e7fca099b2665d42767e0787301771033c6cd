@@ -1,0 +1,138 @@
+extensions/task-vault/src/components/task-vault.css
+  s_aea7dd3aabcb2b::t_8bb8212583eb15 7658-7751
+extensions/task-vault/src/index.ts
+  s_aea7dd3aabcb2b::t_9135d4de8d12a5 147-156
+  s_aea7dd3aabcb2b::t_2ddce5321a72b2 146
+src/main/notifications/notification-manager.ts
+  s_aea7dd3aabcb2b::t_cd3ab5bf601d9e 53-57,59
+package.json
+  s_aea7dd3aabcb2b::t_5c2945f0165419 15,19
+tests/unit/extensions/api-v1.2.0.spec.ts
+  s_aea7dd3aabcb2b::t_54478cc20847a8 359-360,362-363,366,369-370,382
+  s_aea7dd3aabcb2b::t_64c42af72002ac 364-365,368,371-381,383-384
+  s_aea7dd3aabcb2b::t_2e5aa4ae47bced 367
+extensions/task-vault/src/renderer/App.tsx
+  s_aea7dd3aabcb2b::t_46ac8ba398beae 4,6-15,29-40,45,54
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_aea7dd3aabcb2b::t_861ebcb8bfd0a6 364-365,369-373,381-391
+  s_aea7dd3aabcb2b::t_21b8dacc4e94ff 362-363,366-368,374-380,392
+extensions/notepad/src/db/db.ts
+  s_aea7dd3aabcb2b::t_283a3aa83499ae 130-143
+  s_aea7dd3aabcb2b::t_f9e0a5792da1ed 153-167,169-170
+src/main/index.ts
+  s_aea7dd3aabcb2b::t_6ba3b852048218 92-96
+src/renderer/components/NotificationPanel.tsx
+  s_aea7dd3aabcb2b::t_11f94ba0bcfa91 114-116
+  s_aea7dd3aabcb2b::t_4875d00afd2f5e 126,128,158,166-170
+  s_aea7dd3aabcb2b::t_b68f54b51e40ea 5
+  s_aea7dd3aabcb2b::t_d356eaca8a03c1 171
+extensions/task-vault/tests/utils/notify.spec.ts
+  s_aea7dd3aabcb2b::t_a1268fc72bb59d 1,3-6,21-23,29-32,34,36,39,43,47,49-50,53
+  s_aea7dd3aabcb2b::t_36dc1d88aeb05d 8-14,16-17,55-70
+tests/unit/db/index.spec.ts
+  s_aea7dd3aabcb2b::t_e3fc71254a3af4 245-257
+extensions/task-vault/tests/components/CalendarDrawer.spec.tsx
+  s_aea7dd3aabcb2b::t_0e950c02584328 3,37-43,46
+  s_aea7dd3aabcb2b::t_ec5c0d1a322037 56
+  s_aea7dd3aabcb2b::t_792ba09b49fdfc 122,150-153
+  s_aea7dd3aabcb2b::t_1f1fd8d094099b 162-163,172-173
+  s_aea7dd3aabcb2b::t_9c1cfbc7c0ee3e 175-185,187-200,202-216
+  s_aea7dd3aabcb2b::t_df09cefb29b270 174
+  s_aea7dd3aabcb2b::t_5a7d39aad73611 186
+  s_aea7dd3aabcb2b::t_5b3a862dc8a43a 201
+extensions/remote-control/tests/unit/remote-server.spec.ts
+  s_aea7dd3aabcb2b::t_9bb5b6bb369837 425,427-428,432,440,444,448
+  s_aea7dd3aabcb2b::t_63476a07e37d7e 2,13-18
+  s_aea7dd3aabcb2b::t_807b6a12952da5 378-424,426,429-430,433-435,437-439,441-443,445-447,449-453
+  s_aea7dd3aabcb2b::t_9bacbff213f7dc 431,436
+extensions/task-vault/tests/stores/extension-toast.store.spec.ts
+  s_aea7dd3aabcb2b::t_af14e9af6b8801 1-18,20-61,63-71
+  s_aea7dd3aabcb2b::t_fb7ffac60ff861 19
+  s_aea7dd3aabcb2b::t_6e5859d0b677ce 62
+src/renderer-remote/electron-api-shim.ts
+  s_aea7dd3aabcb2b::t_804fffbdfd2b6d 216-217
+extensions/task-vault/tests/stores/vault-nav.store.spec.ts
+  s_aea7dd3aabcb2b::t_f74f63e59b799e 12
+  s_aea7dd3aabcb2b::t_fb95802918f43d 76-90
+tests/unit/renderer/components/NotificationPanel.spec.tsx
+  s_aea7dd3aabcb2b::t_bca4f7b98c23c3 19-22
+  s_aea7dd3aabcb2b::t_d20cd98adc2657 195-249
+src/main/db/index.ts
+  s_aea7dd3aabcb2b::t_71b705d16e818e 116-124
+tests/unit/renderer/components/ExtensionPanelPortal.spec.tsx
+  s_aea7dd3aabcb2b::t_4c07c4c44500b0 151
+  s_aea7dd3aabcb2b::t_fac3826f0a3c97 152-194,196-198,201-213
+  s_aea7dd3aabcb2b::t_821435e31a8ba5 214
+  s_aea7dd3aabcb2b::t_87c341b1beaf0d 195,199-200
+extensions/task-vault/src/stores/extension-toast.store.ts
+  s_aea7dd3aabcb2b::t_b4996623993559 1-44
+extensions/task-vault/src/stores/vault-nav.store.ts
+  s_aea7dd3aabcb2b::t_347e219eb0fd70 48-49
+  s_aea7dd3aabcb2b::t_84f9fdb35dfc8f 12,20,30
+src/renderer/components/ExtensionPanelPortal.tsx
+  s_aea7dd3aabcb2b::t_d7b004bd4afd84 22,27-30,32-38
+  s_aea7dd3aabcb2b::t_ce47b8eec02c72 94-97
+  s_aea7dd3aabcb2b::t_5adbf8c4fe290b 83
+  s_aea7dd3aabcb2b::t_7ff60da4e12d0b 60
+  s_aea7dd3aabcb2b::t_e3aa919c89c0a9 11-21,23-26,31,39-42,128-134
+src/renderer/App.tsx
+  s_aea7dd3aabcb2b::t_d0c5699a11d781 424-428
+  s_aea7dd3aabcb2b::t_e84f444cf6b3a6 423
+extensions/task-vault/src/components/CalendarDrawer.tsx
+  s_aea7dd3aabcb2b::t_cb634120ac4201 154-159,163,167
+  s_aea7dd3aabcb2b::t_68f85e52ae4571 1
+  s_aea7dd3aabcb2b::t_4ec18981382efb 235
+  s_aea7dd3aabcb2b::t_c9d26d49d404e6 63-67,75-97
+  s_aea7dd3aabcb2b::t_675d9672504f33 60,62,73-74,98
+  s_aea7dd3aabcb2b::t_115fc62a702d80 99
+  s_aea7dd3aabcb2b::t_15863bc41e1088 236-238
+tests/unit/notifications/notification-manager.spec.ts
+  s_aea7dd3aabcb2b::t_8671d71635db9b 11-13
+  s_aea7dd3aabcb2b::t_a9fb2369ddc9bc 10
+  s_aea7dd3aabcb2b::t_c366bc62805f4d 3-9
+  s_aea7dd3aabcb2b::t_34b14a7a6a3b80 88,92,95-98
+  s_aea7dd3aabcb2b::t_e448ca1760842b 99
+src/main/extensions/api.ts
+  s_aea7dd3aabcb2b::t_c15ba02c65972a 531-535
+  s_aea7dd3aabcb2b::t_9bd47dd2b8a247 530
+extensions/remote-control/src/server/remote-server.ts
+  s_aea7dd3aabcb2b::t_bfc47c93b4971d 106-141
+  s_aea7dd3aabcb2b::t_e779f1adb74ae1 227,230,233
+  s_aea7dd3aabcb2b::t_c64e6bf663e631 207-208
+  s_aea7dd3aabcb2b::t_991ef00c793afe 218-226,228-229,231-232,234-240
+  s_aea7dd3aabcb2b::t_9dfc8475b09520 4,6
+  s_aea7dd3aabcb2b::t_cf069d635d125b 17-56
+extensions/task-vault/src/utils/notify.ts
+  s_aea7dd3aabcb2b::t_7005701f3fa548 1-3,9-10
+  s_aea7dd3aabcb2b::t_f6300df32c661b 11-13,15-18
+  s_aea7dd3aabcb2b::t_9782a9a6dd5f2b 14
+extensions/task-vault/src/components/ExtensionToastContainer.tsx
+  s_aea7dd3aabcb2b::t_27cb734821f1db 1-40
+tests/unit/renderer-remote/electron-api-shim.spec.ts
+  s_aea7dd3aabcb2b::t_13e3c5e11e98d2 134-155
+  s_aea7dd3aabcb2b::t_7823c9747c0c6d 673-686
+  s_aea7dd3aabcb2b::t_93958bb74066db 782-835
+  s_aea7dd3aabcb2b::t_dd52cb7b8344dd 99-117,119-120,122,128,157,159-171
+  s_aea7dd3aabcb2b::t_f6991a0c2da75d 653-666
+  s_aea7dd3aabcb2b::t_58fc3b4a4ebd4e 118,123-127,130-131
+  s_aea7dd3aabcb2b::t_ac37d539c8730a 121,129,132-133,156,158
+  s_aea7dd3aabcb2b::t_5692f1ce0312bc 494-503
+.claude/doc-index.json
+  s_aea7dd3aabcb2b::t_8a13d8b2636d89 27,43,67,94,105,138,152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "473e7fca099b2665d42767e0787301771033c6cd",
+  "prompts": {},
+  "sessions": {
+    "s_aea7dd3aabcb2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0943ecf4-f5a9-4197-aa13-ac7d22d12fa5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
