@@ -74,16 +74,19 @@ describe('ExtensionPanelPortal', () => {
     expect(mockObserve).toHaveBeenCalledWith(expect.any(HTMLElement))
   })
 
-  it('fires updatePanelBounds using getBoundingClientRect when ResizeObserver fires', () => {
+  it('fires updatePanelBounds using window dimensions when ResizeObserver fires', () => {
     render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
     act(() => {
       capturedResizeCallback?.([])
     })
+    // width = window.innerWidth - rect.left = 1024 - 10 = 1014
+    // height = window.innerHeight - rect.top = 768 - 20 = 748
     expect(mockUpdatePanelBounds).toHaveBeenCalledWith({
       extensionId: 'com.test.ext',
       viewParam: 'main',
-      bounds: { x: 10, y: 20, width: 400, height: 300 },
+      bounds: { x: 10, y: 20, width: 1014, height: 748 },
       visible: true,
+      repoRoot: null,
     })
   })
 

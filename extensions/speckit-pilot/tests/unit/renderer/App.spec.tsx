@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
 vi.mock('../../../src/components/SpecKitPilotView', () => ({
@@ -17,8 +17,19 @@ function setSearch(params: Record<string, string>): void {
   })
 }
 
+const mockBridgeOn = vi.fn(() => () => {})
+
+beforeEach(() => {
+  Object.defineProperty(window, 'electronAPI', {
+    value: { extensionBridge: { on: mockBridgeOn } },
+    configurable: true,
+    writable: true,
+  })
+})
+
 afterEach(() => {
   vi.resetModules()
+  vi.restoreAllMocks()
 })
 
 describe('speckit-pilot renderer App', () => {

@@ -3,6 +3,7 @@ import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSettingsStore } from '../../stores/settings.store'
 import type { Branch, WorktreeInfo } from '../../../shared/types/index'
 import { BranchSelect } from './BranchSelect'
+import { useModalEffect } from '../../stores/modal.store'
 import './Dialog.css'
 
 type BranchMode = 'existing' | 'worktree'
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Element {
+  useModalEffect()
   const [name, setName] = useState('')
   const [nameError, setNameError] = useState('')
   const [branches, setBranches] = useState<Branch[]>([])

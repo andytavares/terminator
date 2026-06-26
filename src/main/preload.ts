@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 // Inlined to keep the preload self-contained (no shared Rollup chunks that
 // Electron's sandboxed require cannot resolve).
@@ -115,7 +115,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       viewParam: string
       bounds: { x: number; y: number; width: number; height: number }
       visible: boolean
-      dpr: number
+      repoRoot?: string | null
     }) => ipcRenderer.invoke('extension:update-panel-bounds', payload),
   },
   keyboard: {
@@ -241,4 +241,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     write: (level: string, namespace: string, message: string) =>
       ipcRenderer.send('log:write', { level, namespace, message }),
   },
+  getFilePath: (file: File): string => webUtils.getPathForFile(file),
 })

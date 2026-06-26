@@ -1,5 +1,5 @@
 import * as path from 'node:path'
-import { ipcMain, Notification } from 'electron'
+import { ipcMain, Notification, BrowserWindow } from 'electron'
 import type { ExtensionDB } from '../../../../src/main/extensions/api'
 import { randomUUID } from '../vault/db'
 import { extractTags, toDisplayName } from '../vault/tags'
@@ -113,7 +113,14 @@ export function registerVaultIpcHandlers(db: ExtensionDB): () => void {
   }
 
   handle('task-vault:system-notify', async (_event, payload) => {
-    const { title = 'Task Vault', body = '' } = (payload ?? {}) as { title?: string; body?: string }
+    const {
+      title = 'Task Vault',
+      body = '',
+      type = 'info',
+    } = (payload ?? {}) as { title?: string; body?: string; type?: string }
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('extension:toast', { type, message: body })
+    }
     if (Notification.isSupported()) {
       new Notification({ title, body, silent: true }).show()
     }

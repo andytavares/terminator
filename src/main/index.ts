@@ -320,14 +320,50 @@ app.whenReady().then(async () => {
     viewHost?.broadcastToAll(channel, data)
   )
 
+  // Track the latest bounds per view so we apply them after async createView finishes,
+  // not the potentially-stale bounds from the call that triggered creation.
+  const latestBoundsMap = new Map<
+    string,
+    {
+      bounds: { x: number; y: number; width: number; height: number }
+      visible: boolean
+      repoRoot?: string | null
+    }
+  >()
+  const creatingViews = new Set<string>()
+
   ipcMain.handle(
     'extension:update-panel-bounds',
-    async (_event, { extensionId, viewParam, bounds, visible }) => {
+    async (_event, { extensionId, viewParam, bounds, visible, repoRoot }) => {
+      const viewKey = `${extensionId}:${viewParam}`
+      latestBoundsMap.set(viewKey, { bounds, visible, repoRoot })
+
       if (viewHost && !viewHost.hasView(extensionId, viewParam)) {
-        const ext = extensionHost.listExtensions().find((e) => e.id === extensionId)
-        if (ext) await viewHost.createView(ext, viewParam)
+        if (!creatingViews.has(viewKey)) {
+          creatingViews.add(viewKey)
+          try {
+            const ext = extensionHost.listExtensions().find((e) => e.id === extensionId)
+            if (ext) await viewHost.createView(ext, viewParam, repoRoot)
+            // Apply the LATEST bounds received during async creation, not the stale initial ones.
+            const latest = latestBoundsMap.get(viewKey)
+            if (latest) {
+              viewHost?.handleBoundsUpdate(
+                extensionId,
+                viewParam,
+                latest.bounds,
+                latest.visible,
+                latest.repoRoot
+              )
+            }
+          } finally {
+            creatingViews.delete(viewKey)
+          }
+        }
+        // Skip the handleBoundsUpdate below while view is being created; it will
+        // be called above with the latest bounds once creation completes.
+        return
       }
-      viewHost?.handleBoundsUpdate(extensionId, viewParam, bounds, visible)
+      viewHost?.handleBoundsUpdate(extensionId, viewParam, bounds, visible, repoRoot)
     }
   )
 

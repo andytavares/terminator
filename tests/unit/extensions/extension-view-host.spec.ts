@@ -38,7 +38,11 @@ vi.mock('electron', () => ({
 import { ExtensionViewHost } from '../../../src/main/extensions/extension-view-host.js'
 
 const mockContentView = { addChildView: vi.fn(), removeChildView: vi.fn() }
-const mockWindow = { contentView: mockContentView, webContents: { send: vi.fn() } }
+const mockWindow = {
+  contentView: mockContentView,
+  webContents: { send: vi.fn() },
+  getContentBounds: vi.fn().mockReturnValue({ x: 0, y: 0, width: 1280, height: 800 }),
+}
 
 const makeExt = (overrides: Partial<Extension> = {}): Extension => ({
   id: 'com.test.ext',
@@ -140,11 +144,12 @@ describe('ExtensionViewHost', () => {
       const ext = makeExt()
       await host.createView(ext, 'main')
       host.handleBoundsUpdate(ext.id, 'main', { x: 10, y: 20, width: 400, height: 600 }, true)
+      // width = winW(1280) - x(10) = 1270; height = winH(800) - y(20) = 780
       expect(createdViews[0].setBounds).toHaveBeenCalledWith({
         x: 10,
         y: 20,
-        width: 400,
-        height: 600,
+        width: 1270,
+        height: 780,
       })
     })
 

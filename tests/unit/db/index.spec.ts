@@ -23,11 +23,27 @@ vi.mock('../../src/main/logger', () => ({
   makeLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }))
 
+const { mockExistsSync, mockUnlinkSync, mockRenameSync } = vi.hoisted(() => ({
+  mockExistsSync: vi.fn().mockReturnValue(false),
+  mockUnlinkSync: vi.fn(),
+  mockRenameSync: vi.fn(),
+}))
+vi.mock('node:fs', async (importOriginal) => {
+  const original = await importOriginal<typeof import('node:fs')>()
+  return {
+    ...original,
+    existsSync: mockExistsSync,
+    unlinkSync: mockUnlinkSync,
+    renameSync: mockRenameSync,
+  }
+})
+
 import { initAppDb, getAppDb, closeAppDb, healthCheck } from '../../../src/main/db/index'
 
 describe('AppDB', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockExistsSync.mockReturnValue(false)
   })
 
   afterEach(async () => {
@@ -213,5 +229,40 @@ describe('AppDB', () => {
     const result = await healthCheck()
     expect(result.ok).toBe(false)
     expect(result.message).toMatch(/not initialized/)
+  })
+
+  it('initAppDb retries with fresh db when catalog probe fails on first init', async () => {
+    // First call: catalog probe rejects (simulates pg_attribute corruption).
+    // Second call: succeeds on the fresh database.
+    mockQuery
+      .mockRejectedValueOnce(new Error('pg_attribute catalog is missing 4 attribute(s)'))
+      .mockResolvedValue({ rows: [] })
+    await initAppDb('/tmp/test-db-corrupt')
+    const db = getAppDb()
+    expect(db).toBeDefined()
+  })
+
+  it('initAppDb removes stale lock files when existsSync returns true', async () => {
+    mockExistsSync.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [] })
+    await initAppDb('/tmp/test-db-lockfile')
+    expect(mockUnlinkSync).toHaveBeenCalled()
+  })
+
+  it('initAppDb backs up corrupt db dir before retrying when it exists', async () => {
+    // existsSync: return false for lockfiles, true for the db dir on backup check
+    mockExistsSync.mockImplementation((p: string) => p.includes('test-db-backup'))
+    mockQuery.mockRejectedValueOnce(new Error('corrupt')).mockResolvedValue({ rows: [] })
+    await initAppDb('/tmp/test-db-backup')
+    // renameSync is called to move the corrupt dir aside
+    expect(mockRenameSync).toHaveBeenCalled()
+  })
+
+  it('db.run returns affectedRows ?? 0 when affectedRows is undefined', async () => {
+    mockQuery.mockResolvedValue({ rows: [] })
+    await initAppDb('/tmp/test-db-run0')
+    const db = getAppDb()
+    const count = await db.run('DELETE FROM foo WHERE 1=0')
+    expect(count).toBe(0)
   })
 })

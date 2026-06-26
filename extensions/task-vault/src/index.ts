@@ -148,9 +148,9 @@ export async function activate(api: ExtensionAPI): Promise<void> {
       id: 'vault-calendar-toggle',
       label: 'Toggle Vault Calendar',
       type: 'checkbox',
-      panelId: 'task-vault-links',
+      panelId: 'terminator.task-vault',
       onClick: () => {
-        api.window.broadcast('extension:toggle-panel', 'task-vault-links')
+        api.window.broadcast('extension:toggle-panel', 'terminator.task-vault')
       },
     })
   )

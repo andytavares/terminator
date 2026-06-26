@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import type { Workspace } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { WORKSPACE_PRESET_COLORS as PRESET_COLORS } from './workspace-colors'
+import { useModalEffect } from '../../stores/modal.store'
 import './Dialog.css'
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function EditWorkspaceDialog({ workspace, onClose }: Props): JSX.Element {
+  useModalEffect()
   const [name, setName] = useState(workspace.name)
   const [folderPath, setFolderPath] = useState(workspace.folderPath)
   const [color, setColor] = useState(workspace.color)

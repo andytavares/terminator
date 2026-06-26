@@ -8,9 +8,14 @@ import type { Extension } from '../../shared/types/index'
 function makePortalComponent(
   extensionId: string,
   viewParam: string
-): ComponentType<Record<string, never>> {
-  return function ExtensionPortalComponent() {
-    return React.createElement(ExtensionPanelPortal, { extensionId, viewParam, isActive: true })
+): ComponentType<{ repoRoot?: string | null }> {
+  return function ExtensionPortalComponent({ repoRoot }: { repoRoot?: string | null } = {}) {
+    return React.createElement(ExtensionPanelPortal, {
+      extensionId,
+      viewParam,
+      isActive: true,
+      repoRoot,
+    })
   }
 }
 
@@ -27,7 +32,7 @@ export function registerWebviewExtension(
       id: ext.id,
       label: globalTab.label,
       icon: globalTab.icon ? iconFromName(globalTab.icon) : undefined,
-      component: makePortalComponent(ext.id, viewParam),
+      component: makePortalComponent(ext.id, viewParam) as ComponentType<Record<string, never>>,
       sortOrder: 1,
     })
   }

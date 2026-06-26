@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 
 interface RemoteStatus {
   enabled?: boolean
@@ -12,7 +11,6 @@ interface RemoteStatus {
 }
 
 export function RemoteControlSettings(): React.JSX.Element {
-  const { addToast } = useToastStore()
   const [status, setStatus] = useState<RemoteStatus>({})
   const [enabled, setEnabled] = useState(false)
   const [port, setPort] = useState(7681)
@@ -123,9 +121,9 @@ export function RemoteControlSettings(): React.JSX.Element {
             const val = parseInt(e.target.value, 10)
             if (val >= 1 && val <= 20) {
               setMaxSubscribers(val)
-              void window.electronAPI.extensionBridge
-                .invoke('remote:update-max-subscribers', { maxSubscribers: val })
-                .then(() => addToast({ type: 'success', message: 'Max viewers saved' }))
+              void window.electronAPI.extensionBridge.invoke('remote:update-max-subscribers', {
+                maxSubscribers: val,
+              })
             }
           }}
         />
@@ -167,7 +165,6 @@ export function RemoteControlSettings(): React.JSX.Element {
                   style={{ marginBottom: 0, flexShrink: 0 }}
                   onClick={() => {
                     void navigator.clipboard.writeText(status.publicUrl!)
-                    addToast({ type: 'success', message: 'Public URL copied' })
                   }}
                 >
                   Copy
@@ -194,7 +191,6 @@ export function RemoteControlSettings(): React.JSX.Element {
                   style={{ marginBottom: 0, flexShrink: 0 }}
                   onClick={() => {
                     void navigator.clipboard.writeText('brew install ngrok')
-                    addToast({ type: 'success', message: 'Install command copied' })
                   }}
                 >
                   Copy
@@ -244,7 +240,6 @@ export function RemoteControlSettings(): React.JSX.Element {
                       style={{ marginBottom: 0, flexShrink: 0 }}
                       onClick={() => {
                         void navigator.clipboard.writeText(status.lanUrl!)
-                        addToast({ type: 'success', message: 'LAN URL copied' })
                       }}
                     >
                       Copy
@@ -256,9 +251,6 @@ export function RemoteControlSettings(): React.JSX.Element {
                         void window.electronAPI.extensionBridge
                           .invoke('remote:caddyfile', { port })
                           .then((caddyfile) => navigator.clipboard.writeText(caddyfile as string))
-                          .then(() =>
-                            addToast({ type: 'success', message: 'Caddyfile copied to clipboard' })
-                          )
                       }}
                     >
                       Copy Caddyfile
@@ -297,7 +289,6 @@ export function RemoteControlSettings(): React.JSX.Element {
                     .then((res) => {
                       const r = res as { password?: string }
                       if (r?.password) setPasswordInput(r.password)
-                      addToast({ type: 'success', message: 'Password saved' })
                     })
                 }}
                 placeholder="Enter a password or generate one"
@@ -315,7 +306,6 @@ export function RemoteControlSettings(): React.JSX.Element {
                 style={{ marginBottom: 0, flexShrink: 0 }}
                 onClick={() => {
                   void navigator.clipboard.writeText(passwordInput)
-                  addToast({ type: 'success', message: 'Password copied' })
                 }}
               >
                 Copy
@@ -329,7 +319,6 @@ export function RemoteControlSettings(): React.JSX.Element {
                     .then((res) => {
                       const r = res as { password?: string }
                       if (r?.password) setPasswordInput(r.password)
-                      addToast({ type: 'success', message: 'New password generated' })
                     })
                 }}
               >
@@ -352,11 +341,9 @@ export function RemoteControlSettings(): React.JSX.Element {
             value={ngrokTokenInput}
             onChange={(e) => setNgrokTokenInput(e.target.value)}
             onBlur={() => {
-              void window.electronAPI.extensionBridge
-                .invoke('remote:update-ngrok-token', { ngrokAuthToken: ngrokTokenInput.trim() })
-                .then(() =>
-                  addToast({ type: 'success', message: 'ngrok token saved — re-enable to apply' })
-                )
+              void window.electronAPI.extensionBridge.invoke('remote:update-ngrok-token', {
+                ngrokAuthToken: ngrokTokenInput.trim(),
+              })
             }}
             placeholder="Paste your ngrok auth token"
             style={{ flex: 1 }}

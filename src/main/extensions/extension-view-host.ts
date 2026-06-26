@@ -7,7 +7,7 @@ const logger = makeLogger('extension-view-host')
 
 // Injected into every extension WebContentsView so --tm-* CSS variables are defined.
 // Extensions use these to match the app's dark theme without sharing the main renderer context.
-const EXTENSION_BASE_CSS = `
+export const EXTENSION_BASE_CSS = `
 :root {
   --tm-bg-base: #0c0c0f;
   --tm-bg-surface: #111116;
@@ -41,6 +41,7 @@ html, body {
   font-family: var(--tm-font-ui);
   -webkit-font-smoothing: antialiased;
 }
+#app { width: 100%; height: 100%; display: flex; flex-direction: column; }
 `
 
 interface BoundsRect {
@@ -54,6 +55,7 @@ interface ViewEntry {
   view: InstanceType<typeof WebContentsView>
   extensionId: string
   viewParam: string
+  lastRepoRoot: string | null
 }
 
 export class ExtensionViewHost {
@@ -66,10 +68,10 @@ export class ExtensionViewHost {
     this.preloadPath = preloadPath
   }
 
-  async createView(ext: Extension, viewParam: string): Promise<void> {
+  async createView(ext: Extension, viewParam: string, repoRoot?: string | null): Promise<void> {
     if (!ext.rendererUrl) return
 
-    const url = buildUrl(ext.rendererUrl, viewParam)
+    const url = buildUrl(ext.rendererUrl, viewParam, repoRoot)
     const view = new WebContentsView({
       webPreferences: {
         session: electronSession.fromPartition('ext-views'),
@@ -82,6 +84,10 @@ export class ExtensionViewHost {
     view.webContents.on('did-finish-load', () => {
       view.webContents.insertCSS(EXTENSION_BASE_CSS).catch(() => {})
       this.mainWindow.webContents.send('extension:panel-loaded', { id: ext.id, viewParam })
+      // Send current workspace context so extension doesn't need to wait for a change event.
+      if (repoRoot != null) {
+        view.webContents.send('workspace:changed', { repoRoot })
+      }
     })
 
     try {
@@ -93,7 +99,10 @@ export class ExtensionViewHost {
     this.mainWindow.contentView.addChildView(view)
 
     const existing = this.views.get(ext.id) ?? []
-    this.views.set(ext.id, [...existing, { view, extensionId: ext.id, viewParam }])
+    this.views.set(ext.id, [
+      ...existing,
+      { view, extensionId: ext.id, viewParam, lastRepoRoot: repoRoot ?? null },
+    ])
   }
 
   destroyAllViews(extensionId: string): void {
@@ -117,20 +126,26 @@ export class ExtensionViewHost {
     extensionId: string,
     viewParam: string,
     bounds: BoundsRect,
-    visible: boolean
+    visible: boolean,
+    repoRoot?: string | null
   ): void {
     const entries = this.views.get(extensionId)
     if (!entries) return
     const entry = entries.find((e) => e.viewParam === viewParam)
     if (!entry) return
 
-    // setBounds uses logical pixels (CSS px) — no DPR scaling needed.
-    entry.view.setBounds({
-      x: Math.round(bounds.x),
-      y: Math.round(bounds.y),
-      width: Math.round(bounds.width),
-      height: Math.round(bounds.height),
-    })
+    // Broadcast workspace context if repoRoot changed (and view is visible).
+    if (visible && repoRoot != null && repoRoot !== entry.lastRepoRoot) {
+      entry.lastRepoRoot = repoRoot
+      entry.view.webContents.send('workspace:changed', { repoRoot })
+    }
+
+    // Use the window's authoritative content size so the view always fills to
+    // the right/bottom edge regardless of what the renderer measured.
+    const { width: winW, height: winH } = this.mainWindow.getContentBounds()
+    const x = Math.round(bounds.x)
+    const y = Math.round(bounds.y)
+    entry.view.setBounds({ x, y, width: winW - x, height: winH - y })
     entry.view.setVisible(visible)
   }
 
@@ -163,8 +178,9 @@ export class ExtensionViewHost {
   }
 }
 
-function buildUrl(rendererUrl: string, viewParam: string): string {
+function buildUrl(rendererUrl: string, viewParam: string, repoRoot?: string | null): string {
   const url = new URL(rendererUrl)
   if (viewParam) url.searchParams.set('view', viewParam)
+  if (repoRoot) url.searchParams.set('repoRoot', repoRoot)
   return url.toString()
 }

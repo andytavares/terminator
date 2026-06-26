@@ -84,6 +84,7 @@ beforeEach(() => {
   mockGetPaneLayout.mockReturnValue(null)
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     terminal: { input: mockTerminalInput },
+    getFilePath: (f: File) => (f as unknown as { path: string }).path,
   }
 })
 

@@ -243,7 +243,13 @@ export class ExtensionHost {
       } catch {
         // fall through and let load() report the invalid manifest
       }
-      if (extensionId && this.loaded.has(extensionId)) continue
+      // Skip if already loaded or already registered in the store (avoids DUPLICATE_ID noise
+      // when an extension failed to activate during loadAll but is still persisted in the store).
+      if (
+        extensionId &&
+        (this.loaded.has(extensionId) || store.get('extensions').some((e) => e.id === extensionId))
+      )
+        continue
       await this.load(dirPath)
     }
   }
@@ -257,7 +263,7 @@ export class ExtensionHost {
         activate?: (api: unknown) => void | Promise<void>
         deactivate?: () => void | Promise<void>
       }
-      const api = createExtensionAPI(record.id, app.getVersion(), this.deps)
+      const api = createExtensionAPI(record.id, app.getVersion(), this.deps, record.rendererUrl)
       await mod.activate?.(api)
       this.loaded.set(record.id, { record, disposables: [], module: mod })
       return { ok: true }

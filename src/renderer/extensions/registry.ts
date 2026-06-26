@@ -18,8 +18,7 @@ export interface WorkspaceTabRegistration {
   id: string
   label: string
   icon?: ReactNode
-  /** Component reads active workspace from useWorkspaceStore internally. */
-  component: ComponentType<Record<string, never>>
+  component: ComponentType<{ repoRoot?: string | null }>
 }
 
 export interface SidebarPanelRegistration {

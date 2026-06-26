@@ -9,7 +9,7 @@
   "contributes": {
     "globalTab": {
       "label": "Task Vault",
-      "icon": "zap",
+      "icon": "calendar",
       "view": "main"
     },
     "sidebarPanel": {

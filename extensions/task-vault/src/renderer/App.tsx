@@ -16,7 +16,11 @@ export function App(): JSX.Element {
   }, [setShowCaptureModal])
 
   if (view === 'calendar') {
-    return <CalendarDrawer />
+    return (
+      <div className="vault-cal-panel" style={{ width: '100%', borderLeft: 'none' }}>
+        <CalendarDrawer />
+      </div>
+    )
   }
 
   return (

@@ -53,6 +53,7 @@ function makeMainWindow() {
   return {
     webContents: { send: mockSend },
     contentView: { addChildView: mockAddChildView, removeChildView: mockRemoveChildView },
+    getContentBounds: vi.fn().mockReturnValue({ x: 0, y: 0, width: 1280, height: 800 }),
   } as unknown as Parameters<typeof ExtensionViewHost>[0]
 }
 
@@ -151,7 +152,8 @@ describe('ExtensionViewHost', () => {
   it('handleBoundsUpdate sets bounds and visibility on the matching view', async () => {
     await host.createView(makeExt(), 'main')
     host.handleBoundsUpdate('com.test.ext', 'main', { x: 10, y: 20, width: 400, height: 300 }, true)
-    expect(mockSetBounds).toHaveBeenCalledWith({ x: 10, y: 20, width: 400, height: 300 })
+    // width = winW(1280) - x(10) = 1270; height = winH(800) - y(20) = 780
+    expect(mockSetBounds).toHaveBeenCalledWith({ x: 10, y: 20, width: 1270, height: 780 })
     expect(mockSetVisible).toHaveBeenCalledWith(true)
   })
 
@@ -192,5 +194,60 @@ describe('ExtensionViewHost', () => {
   it('broadcastToExtension is a no-op for unknown extension', () => {
     host.broadcastToExtension('com.unknown', 'test:event', {})
     expect(mockSend).not.toHaveBeenCalled()
+  })
+
+  it('did-finish-load callback sends panel-loaded and workspace:changed when repoRoot provided', async () => {
+    let finishLoadCb: (() => void) | undefined
+    mockOn.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'did-finish-load') finishLoadCb = cb
+    })
+    await host.createView(makeExt(), 'main', '/repo/root')
+    expect(finishLoadCb).toBeDefined()
+    finishLoadCb!()
+    expect(mockSend).toHaveBeenCalledWith('extension:panel-loaded', {
+      id: 'com.test.ext',
+      viewParam: 'main',
+    })
+    expect(mockSend).toHaveBeenCalledWith('workspace:changed', { repoRoot: '/repo/root' })
+  })
+
+  it('did-finish-load callback skips workspace:changed when repoRoot is null', async () => {
+    let finishLoadCb: (() => void) | undefined
+    mockOn.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'did-finish-load') finishLoadCb = cb
+    })
+    await host.createView(makeExt(), 'main', null)
+    finishLoadCb?.()
+    const workspaceCalls = mockSend.mock.calls.filter(([ch]) => ch === 'workspace:changed')
+    expect(workspaceCalls).toHaveLength(0)
+  })
+
+  it('handleBoundsUpdate broadcasts workspace:changed when repoRoot changes', async () => {
+    await host.createView(makeExt(), 'main', '/old-root')
+    vi.clearAllMocks()
+    host.handleBoundsUpdate(
+      'com.test.ext',
+      'main',
+      { x: 0, y: 0, width: 100, height: 100 },
+      true,
+      '/new-root'
+    )
+    expect(mockSend).toHaveBeenCalledWith('workspace:changed', { repoRoot: '/new-root' })
+  })
+
+  it('createView includes repoRoot in URL when provided', async () => {
+    await host.createView(makeExt(), 'main', '/my/repo')
+    expect(mockLoadURL).toHaveBeenCalledWith(expect.stringContaining('repoRoot='))
+  })
+
+  it('createView URL omits repoRoot when not provided', async () => {
+    await host.createView(makeExt(), 'sidebar')
+    expect(mockLoadURL).toHaveBeenCalledWith(expect.not.stringContaining('repoRoot='))
+  })
+
+  it('openDevToolsForAll calls openDevTools on all views', async () => {
+    await host.createView(makeExt(), 'main')
+    host.openDevToolsForAll()
+    expect(mockOpenDevTools).toHaveBeenCalledWith({ mode: 'detach' })
   })
 })

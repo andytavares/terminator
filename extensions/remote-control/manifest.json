@@ -9,7 +9,7 @@
   "contributes": {
     "globalTab": {
       "label": "Remote Control",
-      "icon": "globe",
+      "icon": "wifi",
       "view": "main"
     }
   }

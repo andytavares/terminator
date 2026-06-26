@@ -3,6 +3,7 @@ import { GlobalSettings } from './GlobalSettings'
 import { WorkspaceSettings } from './WorkspaceSettings'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useToastStore } from '../../stores/toast.store'
+import { useModalEffect } from '../../stores/modal.store'
 import './SettingsPanel.css'
 
 type Section = 'global' | 'workspace' | 'extensions'
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function SettingsPanel({ onClose }: Props): JSX.Element {
+  useModalEffect()
   const [section, setSection] = useState<Section>('global')
   const { activeWorkspaceId } = useWorkspaceStore()
 

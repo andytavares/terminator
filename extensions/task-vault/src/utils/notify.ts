@@ -1,26 +1,11 @@
-import { useToastStore } from '../../../../src/renderer/stores/toast.store'
-import { useNotificationStore } from '../../../../src/renderer/stores/notification.store'
-
 type ToastType = 'success' | 'error' | 'warning' | 'info'
 
-interface NotifyOptions {
+export interface NotifyOptions {
   onClick?: () => void
 }
 
-export function notify(type: ToastType, message: string, opts?: NotifyOptions): void {
-  useToastStore.getState().addToast({ type, message, onClick: opts?.onClick })
-
-  useNotificationStore.getState().addNotification({
-    id: `task-vault-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    type,
-    title: 'Task Vault',
-    message,
-    timestamp: Date.now(),
-    source: 'task-vault',
-    onClick: opts?.onClick,
-  })
-
+export function notify(type: ToastType, message: string, _opts?: NotifyOptions): void {
   window.electronAPI.extensionBridge
-    .invoke('task-vault:system-notify', { title: 'Task Vault', body: message })
+    .invoke('task-vault:system-notify', { type, title: 'Task Vault', body: message })
     .catch(() => {})
 }

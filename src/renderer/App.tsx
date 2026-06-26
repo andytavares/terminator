@@ -498,10 +498,10 @@ export function App(): JSX.Element {
             ) : activeWorkspaceTabId && workspaceTabs.has(activeWorkspaceTabId) ? (
               (() => {
                 const tab = workspaceTabs.get(activeWorkspaceTabId)!
-                const TabComponent = tab.component as React.ComponentType<Record<string, never>>
+                const TabComponent = tab.component
                 return (
                   <div className="main-content">
-                    <TabComponent />
+                    <TabComponent repoRoot={repoRoot} />
                   </div>
                 )
               })()

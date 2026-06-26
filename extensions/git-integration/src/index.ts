@@ -92,9 +92,9 @@ export function activate(api: ExtensionAPI): void {
       label: 'Toggle Git Changes',
       accelerator: 'CmdOrCtrl+Shift+G',
       type: 'checkbox',
-      panelId: 'git-changes',
+      panelId: 'terminator.git-integration',
       onClick: () => {
-        api.window.broadcast('extension:toggle-panel', 'git-changes')
+        api.window.broadcast('extension:toggle-panel', 'terminator.git-integration')
       },
     })
   )

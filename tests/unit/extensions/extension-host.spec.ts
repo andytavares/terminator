@@ -704,6 +704,47 @@ describe('ExtensionHost – successful load paths (real temp extensions)', () =>
     expect(host.listExtensions()).toHaveLength(0)
   })
 
+  it('loadBundledExtensions() skips extensions already in the store (avoids DUPLICATE_ID when activation failed)', async () => {
+    const bundledDir = join(os.tmpdir(), `bundled-store-skip-${Date.now()}`)
+    const extDir = join(bundledDir, 'com.store.skip.test')
+    mkdirSync(extDir, { recursive: true })
+    writeFileSync(
+      join(extDir, 'manifest.json'),
+      JSON.stringify({
+        id: 'com.store.skip.test',
+        name: 'StoreSkip',
+        version: '1.0.0',
+        description: 'Store skip test',
+        main: 'main.js',
+        minAppVersion: '0.0.1',
+      })
+    )
+    writeFileSync(join(extDir, 'main.js'), 'module.exports = { activate: () => {} }')
+    tmpDirs.push(bundledDir)
+
+    storeData.extensions = [
+      {
+        id: 'com.store.skip.test',
+        name: 'StoreSkip',
+        version: '1.0.0',
+        description: 'Store skip test',
+        status: 'enabled',
+        installedAt: new Date().toISOString(),
+        entryPoint: join(extDir, 'main.js'),
+        directoryPath: extDir,
+      },
+    ]
+
+    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+    const host = new ExtensionHost()
+    // Extension is NOT in this.loaded (simulates activation failure during loadAll)
+    // but IS in the store — loadBundledExtensions must skip it to avoid DUPLICATE_ID
+    await host.loadBundledExtensions(bundledDir)
+    // Still just the pre-existing store entry, not a duplicate
+    expect(host.listExtensions()).toHaveLength(1)
+    expect(host.listExtensions()[0].id).toBe('com.store.skip.test')
+  })
+
   it('unload() calls deactivate on a successfully loaded extension', async () => {
     const dir = makeExtDir('com.unload.deact', '0.0.1')
     tmpDirs.push(dir)

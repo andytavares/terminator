@@ -84,4 +84,36 @@ describe('AboutDialog', () => {
     expect(mockGetInfo).toHaveBeenCalledTimes(1)
     await waitFor(() => screen.getByText('Terminator'))
   })
+
+  it('swallows getInfo rejection silently', async () => {
+    mockGetInfo.mockRejectedValue(new Error('IPC gone'))
+    expect(() => render(<AboutDialog onClose={vi.fn()} />)).not.toThrow()
+    await new Promise((r) => setTimeout(r, 0))
+  })
+
+  it('shows DB error with message when health returns ok:false', async () => {
+    mockDbHealth.mockResolvedValue({ ok: false, message: 'disk full' })
+    render(<AboutDialog onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('Error — disk full')).toBeTruthy())
+  })
+
+  it('shows DB error with "unknown" when health returns ok:false without message', async () => {
+    mockDbHealth.mockResolvedValue({ ok: false })
+    render(<AboutDialog onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('Error — unknown')).toBeTruthy())
+  })
+
+  it('shows IPC error when db.health rejects', async () => {
+    mockDbHealth.mockRejectedValue(new Error('IPC failed'))
+    render(<AboutDialog onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('Error — IPC error')).toBeTruthy())
+  })
+
+  it('does not close when non-Escape key is pressed', async () => {
+    const onClose = vi.fn()
+    render(<AboutDialog onClose={onClose} />)
+    await waitFor(() => screen.getByRole('dialog'))
+    fireEvent.keyDown(document, { key: 'Enter' })
+    expect(onClose).not.toHaveBeenCalled()
+  })
 })

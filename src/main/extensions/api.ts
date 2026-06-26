@@ -223,6 +223,7 @@ export interface ExtensionAPI {
 }
 
 import { BrowserWindow, ipcMain, globalShortcut as electronGlobalShortcut } from 'electron'
+import { EXTENSION_BASE_CSS } from './extension-view-host.js'
 import { join } from 'path'
 
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
@@ -313,7 +314,8 @@ export interface ExtensionAPIDeps {
 export function createExtensionAPI(
   extensionId: string,
   appVersion: string,
-  deps?: ExtensionAPIDeps
+  deps?: ExtensionAPIDeps,
+  rendererUrl?: string
 ): ExtensionAPI {
   const disposables: Disposable[] = []
 
@@ -596,11 +598,22 @@ export function createExtensionAPI(
           auxiliaryWindows.delete(view)
         })
         const query: Record<string, string> = { view, ...params }
-        const devUrl = process.env['ELECTRON_RENDERER_URL']
-        if (devUrl) {
-          win.loadURL(`${devUrl}?${new URLSearchParams(query).toString()}`)
+        if (rendererUrl) {
+          // Load the extension's own renderer directly so it handles the view param natively,
+          // without needing to create a WebContentsView inside the auxiliary window.
+          win.webContents.on('did-finish-load', () => {
+            win.webContents.insertCSS(EXTENSION_BASE_CSS).catch(() => {})
+          })
+          const url = new URL(rendererUrl)
+          for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v)
+          win.loadURL(url.toString())
         } else {
-          win.loadFile(join(__dirname, '../renderer/index.html'), { query })
+          const devUrl = process.env['ELECTRON_RENDERER_URL']
+          if (devUrl) {
+            win.loadURL(`${devUrl}?${new URLSearchParams(query).toString()}`)
+          } else {
+            win.loadFile(join(__dirname, '../renderer/index.html'), { query })
+          }
         }
       },
       broadcast(channel: string, data: unknown): void {

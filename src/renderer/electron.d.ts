@@ -147,6 +147,7 @@ interface ElectronAPI {
       viewParam: string
       bounds: { x: number; y: number; width: number; height: number }
       visible: boolean
+      repoRoot?: string | null
     }): Promise<void>
   }
   keyboard: {
@@ -202,6 +203,7 @@ interface ElectronAPI {
   logger: {
     write(level: string, namespace: string, message: string): void
   }
+  getFilePath(file: File): string
   extensionBridge: {
     invoke(channel: string, payload?: unknown): Promise<unknown>
     on(channel: string, handler: (data: unknown) => void): () => void
