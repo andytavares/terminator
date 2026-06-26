@@ -356,14 +356,32 @@ describe('api.ipc bridge channels', () => {
     expect(handler).toHaveBeenCalledTimes(1)
   })
 
-  it('isRemoteAccessible reflects the central allowlist (true for allowlisted, false otherwise)', () => {
-    const bridge = {
-      invokeRegistry: new Map(),
-      sendRegistry: new Map<string, (e: never, p: unknown) => void>(),
-      eventBus: new EventEmitter(),
-    }
-    const api = createExtensionAPI('test.ipc6', '0.1.0', { bridge })
+  it('isRemoteAccessible: true for allowlisted core channels', () => {
+    const api = createExtensionAPI('test.ipc6', '0.1.0', {})
     expect(api.ipc.isRemoteAccessible('workspace:list')).toBe(true)
+  })
+
+  it('isRemoteAccessible: false for channels with no registered handler and not in allowlist', () => {
+    // No bridge provided → invokeRegistry check returns false
+    const api = createExtensionAPI('test.ipc6', '0.1.0', {})
+    expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
+    expect(api.ipc.isRemoteAccessible('no-such-channel')).toBe(false)
+  })
+
+  it('isRemoteAccessible: true for extension channels registered in invokeRegistry', () => {
+    // Dot-prefixed channels (notepad) and short-prefixed channels (task-vault) both work
+    // as long as they have a registered handler in invokeRegistry
+    const invokeRegistry = new Map([
+      ['terminator.notepad:notes.list', { handler: vi.fn(), remoteAccessible: false }],
+      ['task-vault:vault:get-today', { handler: vi.fn(), remoteAccessible: false }],
+    ])
+    const eventBus = new EventEmitter()
+    const api = createExtensionAPI('test.ipc6', '0.1.0', {
+      bridge: { invokeRegistry, sendRegistry: new Map(), eventBus },
+    })
+    expect(api.ipc.isRemoteAccessible('terminator.notepad:notes.list')).toBe(true)
+    expect(api.ipc.isRemoteAccessible('task-vault:vault:get-today')).toBe(true)
+    // channels not in registry remain blocked even with a bridge
     expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
   })
 })

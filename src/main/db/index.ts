@@ -113,6 +113,15 @@ async function tryInitPGlite(
   await pg.waitReady
   // Probe the catalog — pg_attribute corruption surfaces here, not at waitReady.
   await pg.query('SELECT 1 FROM information_schema.columns LIMIT 1')
+  // Probe each user table to force PGLite to build relation caches.
+  // pg_attribute corruption on a specific table only surfaces at this point,
+  // not during the information_schema probe above.
+  const tables = await pg.query<{ tablename: string }>(
+    `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`
+  )
+  for (const { tablename } of tables.rows) {
+    await pg.query(`SELECT 1 FROM "${tablename}" LIMIT 0`)
+  }
   return pg
 }
 

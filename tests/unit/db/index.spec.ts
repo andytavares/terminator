@@ -242,6 +242,19 @@ describe('AppDB', () => {
     expect(db).toBeDefined()
   })
 
+  it('initAppDb retries when a user-table probe fails after the initial catalog probe passes', async () => {
+    // Simulates: initial information_schema probe passes, pg_tables query returns
+    // a user table, then probing that table throws pg_attribute corruption.
+    // The retry path should back up and reinit successfully.
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] }) // information_schema probe
+      .mockResolvedValueOnce({ rows: [{ tablename: 'diagrams' }] }) // pg_tables list
+      .mockRejectedValueOnce(new Error('pg_attribute catalog is missing 4 attribute(s)')) // table probe
+      .mockResolvedValue({ rows: [] }) // fresh DB succeeds
+    await initAppDb('/tmp/test-db-user-table-corrupt')
+    expect(getAppDb()).toBeDefined()
+  })
+
   it('initAppDb removes stale lock files when existsSync returns true', async () => {
     mockExistsSync.mockReturnValue(true)
     mockQuery.mockResolvedValue({ rows: [] })

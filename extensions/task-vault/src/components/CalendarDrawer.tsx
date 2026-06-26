@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { useVaultStore } from '../stores/vault.store'
-import { useVaultNavStore } from '../stores/vault-nav.store'
-import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import type { KanbanLane, Task } from '../vault/types'
 
 type DayData = { date: string; status: string; count: number }
@@ -59,13 +57,45 @@ export function CalendarDrawer(): React.JSX.Element {
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth() + 1)
   const [dayMap, setDayMap] = useState<DayMap>(new Map())
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr)
   const [selectedDayTasks, setSelectedDayTasks] = useState<Task[]>([])
-  const [loadingDay, setLoadingDay] = useState(false)
+  const [loadingDay, setLoadingDay] = useState(true)
+  const selectedDateRef = useRef(selectedDate)
+
+  useEffect(() => {
+    selectedDateRef.current = selectedDate
+  }, [selectedDate])
 
   useEffect(() => {
     void loadMonth()
   }, [year, month, calendarRefreshKey])
+
+  useEffect(() => {
+    void handleDayClick(todayStr)
+  }, [])
+
+  // Refresh month dots AND selected-day task list whenever any task changes.
+  // This covers both the embedded drawer (same WebContentsView as TaskVaultView)
+  // and the standalone calendar panel (separate WebContentsView with its own store).
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on('task-vault:push:index-updated', () => {
+      void loadMonth()
+      const date = selectedDateRef.current
+      void (async () => {
+        try {
+          const result = await window.electronAPI.extensionBridge.invoke(
+            'task-vault:vault:get-daily',
+            { date }
+          )
+          if (result && typeof result === 'object' && 'tasks' in result) {
+            setSelectedDayTasks((result as { tasks: Task[] }).tasks)
+          }
+        } catch {
+          // non-critical
+        }
+      })()
+    })
+  }, [])
 
   async function loadMonth() {
     try {
@@ -121,21 +151,20 @@ export function CalendarDrawer(): React.JSX.Element {
     }
   }
 
-  function openTaskVault() {
-    useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
+  async function openTaskVaultAtDate(date: string, taskId?: string) {
+    try {
+      await window.electronAPI.extensionBridge.invoke('task-vault:open-panel', { date, taskId })
+    } catch {
+      // non-critical
+    }
   }
 
   function handleGoToDay() {
-    if (!selectedDate) return
-    useVaultNavStore.getState().setView('daily')
-    if (selectedDate === todayStr) void loadToday()
-    else void loadDate(selectedDate)
-    openTaskVault()
+    void openTaskVaultAtDate(selectedDate)
   }
 
   function handleTaskClick(task: Task, dateStr: string) {
-    useVaultNavStore.getState().navigateToTask(task.id, dateStr)
-    openTaskVault()
+    void openTaskVaultAtDate(dateStr, task.id)
   }
 
   const firstDay = new Date(year, month - 1, 1).getDay()
@@ -203,39 +232,37 @@ export function CalendarDrawer(): React.JSX.Element {
           })}
         </div>
 
-        {selectedDate && (
-          <div className="cal-drawer__day-panel">
-            <div className="cal-drawer__day-header">
-              <span className="cal-drawer__day-title">
-                {selectedDate === todayStr ? 'Today' : selectedDate}
-              </span>
-              <button
-                className="tv-btn tv-btn--icon"
-                onClick={handleGoToDay}
-                title="Open in Task Vault"
-              >
-                <ExternalLink size={12} />
-              </button>
-            </div>
-            {loadingDay && <div className="cal-drawer__day-loading">…</div>}
-            {!loadingDay && selectedDayTasks.length === 0 && (
-              <div className="cal-drawer__day-empty">No tasks</div>
-            )}
-            {!loadingDay &&
-              selectedDayTasks.map((task) => (
-                <button
-                  key={task.id}
-                  className={`cal-drawer__day-task cal-drawer__day-task--${task.status}`}
-                  onClick={() => handleTaskClick(task, selectedDate!)}
-                  title={task.text}
-                >
-                  <span className="cal-drawer__day-task-dot" />
-                  <span className="cal-drawer__day-task-text">{task.text}</span>
-                  {task.dueDate && <span className="cal-drawer__day-task-due">{task.dueDate}</span>}
-                </button>
-              ))}
+        <div className="cal-drawer__day-panel">
+          <div className="cal-drawer__day-header">
+            <span className="cal-drawer__day-title">
+              {selectedDate === todayStr ? 'Today' : selectedDate}
+            </span>
+            <button
+              className="tv-btn tv-btn--icon"
+              onClick={handleGoToDay}
+              title="Open in Task Vault"
+            >
+              <ExternalLink size={12} />
+            </button>
           </div>
-        )}
+          {loadingDay && <div className="cal-drawer__day-loading">…</div>}
+          {!loadingDay && selectedDayTasks.length === 0 && (
+            <div className="cal-drawer__day-empty">No tasks</div>
+          )}
+          {!loadingDay &&
+            selectedDayTasks.map((task) => (
+              <button
+                key={task.id}
+                className={`cal-drawer__day-task cal-drawer__day-task--${task.status}`}
+                onClick={() => handleTaskClick(task, selectedDate)}
+                title={task.text}
+              >
+                <span className="cal-drawer__day-task-dot" />
+                <span className="cal-drawer__day-task-text">{task.text}</span>
+                {task.dueDate && <span className="cal-drawer__day-task-due">{task.dueDate}</span>}
+              </button>
+            ))}
+        </div>
       </div>
     </div>
   )

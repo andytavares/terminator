@@ -16,7 +16,10 @@ const mockDismiss = vi.fn().mockResolvedValue({ ok: true })
   },
 }
 
-import { NotificationPanel } from '../../../../src/renderer/components/NotificationPanel'
+import {
+  NotificationPanel,
+  BellButton,
+} from '../../../../src/renderer/components/NotificationPanel'
 
 function makeNotif(overrides: Partial<SerializedNotification> = {}): Notification {
   return {
@@ -188,5 +191,60 @@ describe('NotificationPanel', () => {
     render(<NotificationPanel />)
     fireEvent.click(screen.getByText('Test notification'))
     expect(useNotificationStore.getState().panelOpen).toBe(true)
+  })
+
+  it('renders relative time: just now for fresh timestamp', () => {
+    const n = makeNotif({ timestamp: Date.now() })
+    useNotificationStore.setState({ notifications: [n], panelOpen: true })
+    render(<NotificationPanel />)
+    expect(screen.getByText('just now')).toBeTruthy()
+  })
+
+  it('renders relative time: minutes ago', () => {
+    const n = makeNotif({ timestamp: Date.now() - 2 * 60 * 1000 })
+    useNotificationStore.setState({ notifications: [n], panelOpen: true })
+    render(<NotificationPanel />)
+    expect(screen.getByText('2m ago')).toBeTruthy()
+  })
+
+  it('renders relative time: hours ago', () => {
+    const n = makeNotif({ timestamp: Date.now() - 2 * 3600 * 1000 })
+    useNotificationStore.setState({ notifications: [n], panelOpen: true })
+    render(<NotificationPanel />)
+    expect(screen.getByText('2h ago')).toBeTruthy()
+  })
+
+  it('renders relative time: days ago', () => {
+    const n = makeNotif({ timestamp: Date.now() - 2 * 86400 * 1000 })
+    useNotificationStore.setState({ notifications: [n], panelOpen: true })
+    render(<NotificationPanel />)
+    expect(screen.getByText('2d ago')).toBeTruthy()
+  })
+})
+
+describe('BellButton', () => {
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('renders without active class when unreadCount is 0', () => {
+    render(<BellButton unreadCount={0} onClick={vi.fn()} />)
+    const btn = screen.getByTitle('Notifications')
+    expect(btn.className).not.toContain('notif-bell--active')
+    expect(btn.getAttribute('aria-label')).toBe('Notifications')
+  })
+
+  it('renders with active class and unread label when unreadCount > 0', () => {
+    render(<BellButton unreadCount={3} onClick={vi.fn()} />)
+    const btn = screen.getByTitle('Notifications')
+    expect(btn.className).toContain('notif-bell--active')
+    expect(btn.getAttribute('aria-label')).toBe('Notifications (3 unread)')
+  })
+
+  it('calls onClick when clicked', () => {
+    const onClick = vi.fn()
+    render(<BellButton unreadCount={0} onClick={onClick} />)
+    fireEvent.click(screen.getByTitle('Notifications'))
+    expect(onClick).toHaveBeenCalled()
   })
 })

@@ -9,6 +9,7 @@ interface VaultNavStore {
   pendingTaskId: string | null
   viewingDate: string | null
   showCaptureModal: boolean
+  skipNextVisibilityReset: boolean
   setView: (view: VaultView) => void
   setShowCaptureModal: (show: boolean) => void
   setViewingDate: (date: string | null) => void
@@ -16,6 +17,7 @@ interface VaultNavStore {
   navToProject: (name: string) => void
   navigateToTask: (taskId: string, date?: string) => void
   clearPendingTask: () => void
+  setSkipNextVisibilityReset: (v: boolean) => void
 }
 
 export const useVaultNavStore = create<VaultNavStore>((set) => ({
@@ -25,6 +27,7 @@ export const useVaultNavStore = create<VaultNavStore>((set) => ({
   pendingTaskId: null,
   viewingDate: null,
   showCaptureModal: false,
+  skipNextVisibilityReset: false,
 
   setView: (view: VaultView) => set({ activeView: view }),
 
@@ -42,4 +45,6 @@ export const useVaultNavStore = create<VaultNavStore>((set) => ({
     set({ activeView: 'daily', pendingTaskId: taskId, viewingDate: date ?? null }),
 
   clearPendingTask: () => set({ pendingTaskId: null }),
+
+  setSkipNextVisibilityReset: (v: boolean) => set({ skipNextVisibilityReset: v }),
 }))

@@ -2,6 +2,7 @@ import React, { useEffect, useCallback } from 'react'
 import { Bell, Info, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
 import { useNotificationStore, type Notification } from '../stores/notification.store'
 import { AlertBadge } from './AlertBadge'
+import { useModalEffect } from '../stores/modal.store'
 import './NotificationPanel.css'
 
 function TypeIcon({ type }: { type: string }): JSX.Element {
@@ -110,12 +111,9 @@ export function BellButton({
   )
 }
 
-export function NotificationPanel(): JSX.Element | null {
-  const { panelOpen, closePanel, notifications, markAllRead, clearAll } = useNotificationStore()
-
-  function handleNavigate(): void {
-    closePanel()
-  }
+function NotificationPanelInner(): JSX.Element {
+  useModalEffect()
+  const { closePanel, notifications, markAllRead, clearAll } = useNotificationStore()
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent): void => {
@@ -125,13 +123,9 @@ export function NotificationPanel(): JSX.Element | null {
   )
 
   useEffect(() => {
-    if (panelOpen) {
-      document.addEventListener('keydown', handleKeyDown)
-    }
+    document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [panelOpen, handleKeyDown])
-
-  if (!panelOpen) return null
+  }, [handleKeyDown])
 
   return (
     <>
@@ -161,11 +155,17 @@ export function NotificationPanel(): JSX.Element | null {
             </div>
           ) : (
             notifications.map((n) => (
-              <NotificationItem key={n.id} notification={n} onNavigate={handleNavigate} />
+              <NotificationItem key={n.id} notification={n} onNavigate={closePanel} />
             ))
           )}
         </div>
       </div>
     </>
   )
+}
+
+export function NotificationPanel(): JSX.Element | null {
+  const panelOpen = useNotificationStore((s) => s.panelOpen)
+  if (!panelOpen) return null
+  return <NotificationPanelInner />
 }

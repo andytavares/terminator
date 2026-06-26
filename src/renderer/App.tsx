@@ -421,6 +421,12 @@ export function App(): JSX.Element {
   }, [])
 
   useEffect(() => {
+    return window.electronAPI.extensionBridge.on('extension:activate-global-tab', (tabId) => {
+      if (typeof tabId === 'string') setActiveGlobalTab(tabId)
+    })
+  }, [setActiveGlobalTab])
+
+  useEffect(() => {
     const unsubLog = window.electronAPI.extensionBridge.on('log:push', (data) => {
       const { level, message } = data as { level: 'info' | 'warn' | 'error'; message: string }
       useLogStore.getState().addEntry(level, message)

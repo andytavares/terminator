@@ -8,7 +8,38 @@ interface Props {
   repoRoot?: string | null
 }
 
-export function ExtensionPanelPortal({
+// True only in the real Electron renderer — the remote shim does not expose this.
+function isElectronLocal(): boolean {
+  return typeof window.electronAPI?.extensionEvents?.onExtensionPanelLoaded === 'function'
+}
+
+function RemoteIframe({ extensionId, viewParam, repoRoot, isActive }: Props): JSX.Element {
+  const params = new URLSearchParams({ viewParam })
+  if (repoRoot) params.set('repoRoot', repoRoot)
+  const src = `/ext/${extensionId}/?${params.toString()}`
+
+  return (
+    <div
+      data-extension-panel={extensionId}
+      data-view-param={viewParam}
+      style={{
+        flex: 1,
+        minHeight: 0,
+        minWidth: 0,
+        display: isActive ? 'flex' : 'none',
+        flexDirection: 'column',
+      }}
+    >
+      <iframe
+        src={src}
+        style={{ flex: 1, border: 'none', width: '100%', minHeight: 0 }}
+        allow="clipboard-read; clipboard-write"
+      />
+    </div>
+  )
+}
+
+function LocalWebContentsPortal({
   extensionId,
   viewParam,
   isActive,
@@ -24,13 +55,9 @@ export function ExtensionPanelPortal({
 
     const sendBounds = () => {
       const rect = el.getBoundingClientRect()
-      // Use window dimensions for width/height rather than rect.width/height.
-      // The flex layout can report an intermediate (too-small) rect during
-      // transitions; anchoring from rect.left to window.innerWidth ensures the
-      // WebContentsView always covers the full available area.
       const x = Math.round(rect.left)
       const y = Math.round(rect.top)
-      window.electronAPI.extension.updatePanelBounds({
+      window.electronAPI?.extension?.updatePanelBounds?.({
         extensionId,
         viewParam,
         bounds: {
@@ -44,23 +71,16 @@ export function ExtensionPanelPortal({
       })
     }
     const observer = new ResizeObserver(sendBounds)
-
     observer.observe(el)
-    // Explicit initial call so bounds are sent even if the element size doesn't
-    // change between React commits (ResizeObserver fires async; this is sync).
     sendBounds()
     window.addEventListener('resize', sendBounds)
-    // Re-send after the sidebar CSS transition (200ms) to pick up the final
-    // layout after any width animation.
     const timer = setTimeout(sendBounds, 250)
 
     return () => {
       observer.disconnect()
       window.removeEventListener('resize', sendBounds)
       clearTimeout(timer)
-      // Hide the WebContentsView when this portal unmounts so it doesn't
-      // intercept pointer/drag events while the panel is closed.
-      window.electronAPI?.extension?.updatePanelBounds({
+      window.electronAPI?.extension?.updatePanelBounds?.({
         extensionId,
         viewParam,
         bounds: { x: 0, y: 0, width: 0, height: 0 },
@@ -71,6 +91,10 @@ export function ExtensionPanelPortal({
   }, [extensionId, viewParam, isActive, repoRoot, modalOpen])
 
   useEffect(() => {
+    if (typeof window.electronAPI?.extensionEvents?.onExtensionPanelLoaded !== 'function') {
+      setLoading(false)
+      return
+    }
     const unsubscribe = window.electronAPI.extensionEvents.onExtensionPanelLoaded((id: string) => {
       if (id === extensionId) setLoading(false)
     })
@@ -100,4 +124,11 @@ export function ExtensionPanelPortal({
       )}
     </div>
   )
+}
+
+export function ExtensionPanelPortal(props: Props): JSX.Element {
+  if (isElectronLocal()) {
+    return <LocalWebContentsPortal {...props} />
+  }
+  return <RemoteIframe {...props} />
 }

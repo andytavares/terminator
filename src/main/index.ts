@@ -89,6 +89,11 @@ function createWindow(): void {
   mainWindow.webContents.send = (channel: string, ...args: unknown[]) => {
     _origSend(channel, ...args)
     bridgeEventBus.emit(channel, ...args)
+    // Relay to extension WebContentsViews so extension renderers receive push events
+    // (terminal: is high-frequency; workspace:changed is relayed separately below)
+    if (!channel.startsWith('terminal:') && channel !== 'workspace:changed') {
+      viewHost?.broadcastToAll(channel, args[0] as unknown)
+    }
   }
 
   // Redirect external http(s) link clicks and window.open() calls to the system browser.

@@ -96,6 +96,79 @@ describe('electron-api-shim bootstrap', () => {
   })
 })
 
+describe('electron-api-shim connection edge cases', () => {
+  it('sends Authorization header when remote_token is in localStorage', async () => {
+    localStorage.setItem('remote_token', 'secret')
+    await loadShim()
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/bridge-ticket',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer secret' }),
+      })
+    )
+  })
+
+  it('omits Authorization header when remote_token is not in localStorage', async () => {
+    // localStorage is cleared in beforeEach, so remote_token is absent
+    await loadShim()
+    const callHeaders = (mockFetch.mock.calls[0][1] as { headers: Record<string, string> }).headers
+    expect(callHeaders).not.toHaveProperty('Authorization')
+  })
+
+  it('does not open WebSocket when bridge-ticket returns 401', async () => {
+    vi.resetModules()
+    MockWebSocket.instances = []
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
+    global.fetch = mockFetch
+    // Stub out location.replace so jsdom doesn't throw
+    Object.defineProperty(window, 'location', {
+      value: { ...window.location, replace: vi.fn() },
+      writable: true,
+    })
+    await import('../../../src/renderer-remote/electron-api-shim')
+    await new Promise((r) => setTimeout(r, 10))
+    // No WebSocket should be created — the shim returned early after redirect
+    expect(MockWebSocket.instances).toHaveLength(0)
+  })
+
+  it('does not open WebSocket when bridge-ticket returns a non-401 error (retry scheduled)', async () => {
+    vi.resetModules()
+    MockWebSocket.instances = []
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 503 })
+    global.fetch = mockFetch
+    await import('../../../src/renderer-remote/electron-api-shim')
+    await new Promise((r) => setTimeout(r, 10))
+    // Retry is scheduled but not yet fired — no WebSocket yet
+    expect(MockWebSocket.instances).toHaveLength(0)
+  })
+
+  it('does not open WebSocket when fetch itself throws (retry scheduled)', async () => {
+    vi.resetModules()
+    MockWebSocket.instances = []
+    mockFetch.mockRejectedValueOnce(new Error('network error'))
+    global.fetch = mockFetch
+    await import('../../../src/renderer-remote/electron-api-shim')
+    await new Promise((r) => setTimeout(r, 10))
+    // Retry is scheduled but not yet fired — no WebSocket yet
+    expect(MockWebSocket.instances).toHaveLength(0)
+  })
+
+  it('rejects pending invokes on ws.onclose', async () => {
+    const { ws } = await loadShim()
+    const api: API = (window as API).electronAPI
+    const p = (api as API).workspace.list() as Promise<unknown>
+    ws.onclose?.()
+    await expect(p).rejects.toThrow('bridge disconnected')
+  })
+
+  it('closes WebSocket on ws.onerror', async () => {
+    const { ws } = await loadShim()
+    const closeSpy = vi.spyOn(ws, 'close')
+    ws.onerror?.()
+    expect(closeSpy).toHaveBeenCalled()
+  })
+})
+
 describe('electron-api-shim message dispatch', () => {
   it('resolves pending invoke on result message', async () => {
     const { api, ws } = await loadShim()
@@ -418,6 +491,16 @@ describe('electron-api-shim other APIs', () => {
     expect(hasMsg(ws, 'fs:changed')).toBe(true)
   })
 
+  it('fs.onChanged dispatches first arg when event fires', async () => {
+    const { api, ws } = await loadShim()
+    const handler = vi.fn()
+    api.fs.onChanged(handler)
+    ws.onmessage?.({
+      data: JSON.stringify({ type: 'event', channel: 'fs:changed', args: [{ path: '/foo' }] }),
+    })
+    expect(handler).toHaveBeenCalledWith({ path: '/foo' })
+  })
+
   it('app.getInfo invokes app:get-info', async () => {
     const { api, ws } = await loadShim()
     void api.app.getInfo()
@@ -567,10 +650,38 @@ describe('electron-api-shim other APIs', () => {
     expect(hasMsg(ws, 'extension:execute-command')).toBe(true)
   })
 
+  it('extension.updatePanelBounds is a no-op function (WebContentsView not available in remote mode)', async () => {
+    const { api } = await loadShim()
+    expect(typeof api.extension.updatePanelBounds).toBe('function')
+    expect(() =>
+      api.extension.updatePanelBounds({
+        extensionId: 'test',
+        viewParam: 'main',
+        bounds: { x: 0, y: 0, width: 0, height: 0 },
+        visible: false,
+        repoRoot: null,
+      })
+    ).not.toThrow()
+  })
+
   it('extensionEvents.onToast subscribes to extension:toast', async () => {
     const { api, ws } = await loadShim()
     api.extensionEvents.onToast(vi.fn())
     expect(hasMsg(ws, 'extension:toast')).toBe(true)
+  })
+
+  it('extensionEvents.onToast dispatches toast payload when event fires', async () => {
+    const { api, ws } = await loadShim()
+    const handler = vi.fn()
+    api.extensionEvents.onToast(handler)
+    ws.onmessage?.({
+      data: JSON.stringify({
+        type: 'event',
+        channel: 'extension:toast',
+        args: [{ type: 'success', message: 'done' }],
+      }),
+    })
+    expect(handler).toHaveBeenCalledWith({ type: 'success', message: 'done' })
   })
 
   it('extensionEvents.onTogglePanel subscribes to extension:toggle-panel', async () => {
@@ -667,5 +778,59 @@ describe('electron-api-shim other APIs', () => {
       }),
     })
     expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('extensionEvents.onMenuOpenSettings dispatches void when event fires', async () => {
+    const { api, ws } = await loadShim()
+    const handler = vi.fn()
+    api.extensionEvents.onMenuOpenSettings(handler)
+    ws.onmessage?.({
+      data: JSON.stringify({ type: 'event', channel: 'menu:open-settings', args: [] }),
+    })
+    expect(handler).toHaveBeenCalledWith(undefined)
+  })
+
+  it('extensionEvents.onMenuToggleSidebar dispatches void when event fires', async () => {
+    const { api, ws } = await loadShim()
+    const handler = vi.fn()
+    api.extensionEvents.onMenuToggleSidebar(handler)
+    ws.onmessage?.({
+      data: JSON.stringify({ type: 'event', channel: 'menu:toggle-sidebar', args: [] }),
+    })
+    expect(handler).toHaveBeenCalledWith(undefined)
+  })
+
+  it('extensionEvents.onMenuCloseTab dispatches void when event fires', async () => {
+    const { api, ws } = await loadShim()
+    const handler = vi.fn()
+    api.extensionEvents.onMenuCloseTab(handler)
+    ws.onmessage?.({
+      data: JSON.stringify({ type: 'event', channel: 'menu:close-tab', args: [] }),
+    })
+    expect(handler).toHaveBeenCalledWith(undefined)
+  })
+
+  it('extensionEvents.onMenuOpenAbout dispatches void when event fires', async () => {
+    const { api, ws } = await loadShim()
+    const handler = vi.fn()
+    api.extensionEvents.onMenuOpenAbout(handler)
+    ws.onmessage?.({
+      data: JSON.stringify({ type: 'event', channel: 'menu:open-about', args: [] }),
+    })
+    expect(handler).toHaveBeenCalledWith(undefined)
+  })
+
+  it('notifications.onPush dispatches first arg when event fires', async () => {
+    const { api, ws } = await loadShim()
+    const handler = vi.fn()
+    api.notifications.onPush(handler)
+    ws.onmessage?.({
+      data: JSON.stringify({
+        type: 'event',
+        channel: 'notifications:push',
+        args: [{ id: 'n1', title: 'pushed' }],
+      }),
+    })
+    expect(handler).toHaveBeenCalledWith({ id: 'n1', title: 'pushed' })
   })
 })

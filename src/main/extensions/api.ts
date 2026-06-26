@@ -527,12 +527,12 @@ export function createExtensionAPI(
         return entry.handler(null as never, payload)
       },
       isRemoteAccessible(channel: string): boolean {
-        // Consult the central allowlist directly rather than the invoke registry:
-        // the bridge also gates `send` and `subscribe`, whose channels (e.g.
-        // terminal:input, terminal:output) are not invoke handlers and so never
-        // appear in the invoke registry. The registry flag is derived from the
-        // same set, so invoke results are identical.
-        return REMOTE_ACCESSIBLE_CHANNELS.has(channel)
+        if (REMOTE_ACCESSIBLE_CHANNELS.has(channel)) return true
+        // Any channel registered in the invokeRegistry but not in the core allowlist is
+        // extension-owned and safe to expose. Core channels not in REMOTE_ACCESSIBLE_CHANNELS
+        // (db:health, dialog:open-directory, shell:open-external, workspace:get-active) are
+        // never invoked via the bridge by the shim — they're handled in-shim or unused remotely.
+        return deps?.bridge?.invokeRegistry.has(channel) ?? false
       },
       sendChannel(channel: string, payload: unknown): void {
         const handler = deps?.bridge?.sendRegistry.get(channel)

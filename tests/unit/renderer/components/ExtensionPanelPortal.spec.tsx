@@ -148,4 +148,68 @@ describe('ExtensionPanelPortal', () => {
       expect.objectContaining({ visible: false, extensionId: 'com.test.ext', viewParam: 'main' })
     )
   })
+
+  describe('remote/browser mode (onExtensionPanelLoaded absent)', () => {
+    beforeEach(() => {
+      Object.defineProperty(window, 'electronAPI', {
+        value: {
+          extension: { updatePanelBounds: () => {} },
+          extensionEvents: {}, // onExtensionPanelLoaded missing → remote mode
+        },
+        configurable: true,
+        writable: true,
+      })
+    })
+
+    it('renders an iframe instead of a WebContentsView portal', () => {
+      const { container } = render(
+        <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
+      )
+      const iframe = container.querySelector('iframe')
+      expect(iframe).toBeTruthy()
+      expect(container.querySelector('[data-testid="extension-loading"]')).toBeNull()
+    })
+
+    it('iframe src points to /ext/<extensionId>/ with viewParam', () => {
+      const { container } = render(
+        <ExtensionPanelPortal extensionId="com.test.ext" viewParam="pr-review" isActive={true} />
+      )
+      const iframe = container.querySelector('iframe') as HTMLIFrameElement
+      expect(iframe.src).toContain('/ext/com.test.ext/')
+      expect(iframe.src).toContain('viewParam=pr-review')
+    })
+
+    it('iframe includes repoRoot in query params when provided', () => {
+      const { container } = render(
+        <ExtensionPanelPortal
+          extensionId="com.test.ext"
+          viewParam="main"
+          isActive={true}
+          repoRoot="/home/user/repo"
+        />
+      )
+      const iframe = container.querySelector('iframe') as HTMLIFrameElement
+      expect(iframe.src).toContain('repoRoot=%2Fhome%2Fuser%2Frepo')
+    })
+
+    it('wrapper div is hidden when isActive is false', () => {
+      const { container } = render(
+        <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={false} />
+      )
+      const wrapper = container.querySelector('[data-extension-panel]') as HTMLElement
+      expect(wrapper.style.display).toBe('none')
+    })
+
+    it('does not throw on unmount', () => {
+      const { unmount } = render(
+        <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
+      )
+      expect(() => unmount()).not.toThrow()
+    })
+
+    it('does not call updatePanelBounds (no WebContentsView to position)', () => {
+      render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
+      expect(mockUpdatePanelBounds).not.toHaveBeenCalled()
+    })
+  })
 })

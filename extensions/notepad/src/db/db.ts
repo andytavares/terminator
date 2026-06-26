@@ -127,18 +127,20 @@ export async function applyNotepadMigrations(db: ExtensionDB): Promise<void> {
     await db.exec(`ALTER TABLE diagrams ADD COLUMN folder_id TEXT`)
   }
   if (!(await hasColumn(db, 'settings', 'extension_id'))) {
-    await db.exec(`
-      CREATE TABLE settings_new (
-        extension_id TEXT NOT NULL DEFAULT 'notepad',
-        key          TEXT NOT NULL,
-        value        TEXT NOT NULL,
-        PRIMARY KEY (extension_id, key)
-      );
-      INSERT INTO settings_new (extension_id, key, value)
-        SELECT 'notepad', key, value FROM settings;
-      DROP TABLE settings;
-      ALTER TABLE settings_new RENAME TO settings;
-    `)
+    await db.transaction(async (tx) => {
+      await tx.exec(`
+        CREATE TABLE settings_new (
+          extension_id TEXT NOT NULL DEFAULT 'notepad',
+          key          TEXT NOT NULL,
+          value        TEXT NOT NULL,
+          PRIMARY KEY (extension_id, key)
+        );
+        INSERT INTO settings_new (extension_id, key, value)
+          SELECT 'notepad', key, value FROM settings;
+        DROP TABLE settings;
+        ALTER TABLE settings_new RENAME TO settings;
+      `)
+    })
   }
   await db.exec(`
     CREATE TABLE IF NOT EXISTS diagram_tags (
@@ -148,21 +150,23 @@ export async function applyNotepadMigrations(db: ExtensionDB): Promise<void> {
     )
   `)
   if (await hasColumn(db, 'diagrams', 'tags')) {
-    const rows = await db.query<{ id: string; tags: string }>(`SELECT id, tags FROM diagrams`)
-    for (const row of rows) {
-      let parsed: string[] = []
-      try {
-        parsed = JSON.parse(row.tags ?? '[]') as string[]
-      } catch {
-        parsed = []
+    await db.transaction(async (tx) => {
+      const rows = await tx.query<{ id: string; tags: string }>(`SELECT id, tags FROM diagrams`)
+      for (const row of rows) {
+        let parsed: string[] = []
+        try {
+          parsed = JSON.parse(row.tags ?? '[]') as string[]
+        } catch {
+          parsed = []
+        }
+        for (const tag of parsed) {
+          await tx.run(
+            `INSERT INTO diagram_tags (diagram_id, tag) VALUES (?, ?) ON CONFLICT DO NOTHING`,
+            [row.id, tag]
+          )
+        }
       }
-      for (const tag of parsed) {
-        await db.run(
-          `INSERT INTO diagram_tags (diagram_id, tag) VALUES (?, ?) ON CONFLICT DO NOTHING`,
-          [row.id, tag]
-        )
-      }
-    }
-    await db.exec(`ALTER TABLE diagrams DROP COLUMN tags`)
+      await tx.exec(`ALTER TABLE diagrams DROP COLUMN tags`)
+    })
   }
 }

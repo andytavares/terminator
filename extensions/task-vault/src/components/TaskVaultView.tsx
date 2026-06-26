@@ -359,6 +359,37 @@ export function TaskVaultView(): React.JSX.Element {
     // If still loading: wait for todayLog to update with the correct date's data
   }, [pendingTaskId, todayLog, isLoading, clearPendingTask])
 
+  // Reset to today whenever the vault panel becomes visible from hidden.
+  // This ensures "open vault" always lands on today, while in-session navigation is preserved.
+  // skipNextVisibilityReset suppresses this reset when navigation from the calendar panel
+  // has already set the target date before the panel becomes visible.
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState !== 'visible') return
+      const store = useVaultNavStore.getState()
+      if (store.skipNextVisibilityReset) {
+        store.setSkipNextVisibilityReset(false)
+        return
+      }
+      useVaultNavStore.getState().setView('daily')
+      useVaultNavStore.getState().setViewingDate(null)
+      void loadToday()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [loadToday])
+
+  // Handle navigation from the in-app calendar sidebar / standalone calendar panel.
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on('task-vault:navigate', (data) => {
+      const { date, taskId } = (data ?? {}) as { date?: string; taskId?: string }
+      useVaultNavStore.getState().setSkipNextVisibilityReset(true)
+      if (date) void loadDate(date)
+      else void loadToday()
+      if (taskId) useVaultNavStore.getState().navigateToTask(taskId, date)
+    })
+  }, [loadDate, loadToday])
+
   useEffect(() => {
     const vd = useVaultNavStore.getState().viewingDate
     if (vd) void loadDate(vd)

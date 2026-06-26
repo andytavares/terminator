@@ -50,9 +50,13 @@ class NotificationManager {
     const persistent = targets.includes('center') || targets.includes('toast')
 
     if (targets.includes('system') && Notification.isSupported()) {
-      new Notification({ title: opts.title, body: opts.message ?? '' }).show()
+      const notif = new Notification({ title: opts.title, body: opts.message ?? '' })
+      notif.on('failed', (_e, error) => {
+        console.warn('[notifications] system notification failed:', error)
+      })
+      notif.show()
       if (process.platform === 'darwin' && app.dock) {
-        app.dock.bounce('informational')
+        app.dock.bounce('critical')
       }
     }
 

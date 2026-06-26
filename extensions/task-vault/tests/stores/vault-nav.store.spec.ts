@@ -9,6 +9,7 @@ function resetStore() {
     pendingTaskId: null,
     viewingDate: null,
     showCaptureModal: false,
+    skipNextVisibilityReset: false,
   })
 }
 
@@ -71,5 +72,20 @@ describe('useVaultNavStore', () => {
     useVaultNavStore.setState({ pendingTaskId: 'task-123' })
     useVaultNavStore.getState().clearPendingTask()
     expect(useVaultNavStore.getState().pendingTaskId).toBeNull()
+  })
+
+  it('skipNextVisibilityReset defaults to false', () => {
+    expect(useVaultNavStore.getState().skipNextVisibilityReset).toBe(false)
+  })
+
+  it('setSkipNextVisibilityReset sets the flag to true', () => {
+    useVaultNavStore.getState().setSkipNextVisibilityReset(true)
+    expect(useVaultNavStore.getState().skipNextVisibilityReset).toBe(true)
+  })
+
+  it('setSkipNextVisibilityReset sets the flag back to false', () => {
+    useVaultNavStore.setState({ skipNextVisibilityReset: true })
+    useVaultNavStore.getState().setSkipNextVisibilityReset(false)
+    expect(useVaultNavStore.getState().skipNextVisibilityReset).toBe(false)
   })
 })
