@@ -1,0 +1,23 @@
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_aea7dd3aabcb2b::t_230614dacefefd 46,51-53
+extensions/notepad/src/components/QuickCreateOverlay.tsx
+  s_aea7dd3aabcb2b::t_fb3d7c6a889840 327
+  s_aea7dd3aabcb2b::t_bac12d52767256 285-290
+  s_aea7dd3aabcb2b::t_f9f85b46105181 208,210-213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "c00c48530bf5632a66d5c83e1079ff69b923396b",
+  "prompts": {},
+  "sessions": {
+    "s_aea7dd3aabcb2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0943ecf4-f5a9-4197-aa13-ac7d22d12fa5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
