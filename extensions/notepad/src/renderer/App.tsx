@@ -16,6 +16,16 @@ export function App(): JSX.Element {
     return off
   }, [setShowQuickCreate])
 
+  // On first mount, check whether the shortcut fired before this view existed.
+  useEffect(() => {
+    window.electronAPI.extensionBridge
+      .invoke('terminator.notepad:ui.consumePendingQuickCreate')
+      .then((result: unknown) => {
+        if ((result as { data?: { pending?: boolean } }).data?.pending) setShowQuickCreate(true)
+      })
+      .catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   let content: React.ReactElement
   if (view === 'note') {
     content = <NoteWindowView />

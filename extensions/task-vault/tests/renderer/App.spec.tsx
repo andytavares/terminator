@@ -1,10 +1,11 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 
 const mockSetShowCaptureModal = vi.fn()
 const mockSetView = vi.fn()
 const mockOn = vi.fn(() => vi.fn())
+const mockInvoke = vi.fn()
 
 vi.mock('../../src/components/TaskVaultView', () => ({
   TaskVaultView: () => <div data-testid="task-vault-view" />,
@@ -32,8 +33,9 @@ function setSearch(params: Record<string, string>): void {
 }
 
 beforeEach(() => {
+  mockInvoke.mockResolvedValue({ data: { pending: false } })
   window.electronAPI = {
-    extensionBridge: { on: mockOn },
+    extensionBridge: { on: mockOn, invoke: mockInvoke },
   } as unknown as typeof window.electronAPI
 })
 
@@ -82,5 +84,22 @@ describe('task-vault renderer App', () => {
     const { unmount } = render(<App />)
     unmount()
     expect(unsubscribe).toHaveBeenCalled()
+  })
+
+  it('invokes consumePendingCapture on mount', async () => {
+    setSearch({})
+    const { App } = await import('../../src/renderer/App')
+    render(<App />)
+    await act(async () => {})
+    expect(mockInvoke).toHaveBeenCalledWith('task-vault:ui.consumePendingCapture')
+  })
+
+  it('calls setShowCaptureModal(true) when pending flag is set', async () => {
+    mockInvoke.mockResolvedValue({ data: { pending: true } })
+    setSearch({})
+    const { App } = await import('../../src/renderer/App')
+    render(<App />)
+    await act(async () => {})
+    expect(mockSetShowCaptureModal).toHaveBeenCalledWith(true)
   })
 })

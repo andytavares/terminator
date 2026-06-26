@@ -10,6 +10,8 @@ import { registerDiagramCommentsIpcHandlers } from './ipc/diagram-comments.ipc'
 import { registerFoldersIpcHandlers } from './ipc/folders.ipc'
 
 const disposables: Disposable[] = []
+let _pendingQuickCreate = false
+let _pendingQuickCreateTimer: ReturnType<typeof setTimeout> | null = null
 
 export async function activate(api: ExtensionAPI): Promise<void> {
   try {
@@ -134,9 +136,33 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     })
   )
 
+  // Renderer calls this on mount to pick up a quick-create triggered before the view existed.
+  disposables.push(
+    api.ipc.registerHandler('terminator.notepad:ui.consumePendingQuickCreate', () => {
+      const pending = _pendingQuickCreate
+      _pendingQuickCreate = false
+      if (_pendingQuickCreateTimer !== null) {
+        clearTimeout(_pendingQuickCreateTimer)
+        _pendingQuickCreateTimer = null
+      }
+      return { data: { pending } }
+    })
+  )
+
   try {
     const shortcutDisposable = api.globalShortcut.register('CommandOrControl+Shift+N', () => {
+      // Broadcast to any already-running extension view immediately.
       api.window.broadcast('terminator.notepad:ui.openQuickCreate', {})
+      // Activate the notepad tab — this creates the WebContentsView if it doesn't exist yet.
+      api.window.broadcast('extension:activate-global-tab', 'terminator.notepad')
+      // Set pending flag so the renderer shows the overlay on first load.
+      // Auto-expire after 5 s so a late manual panel open doesn't surprise the user.
+      _pendingQuickCreate = true
+      if (_pendingQuickCreateTimer !== null) clearTimeout(_pendingQuickCreateTimer)
+      _pendingQuickCreateTimer = setTimeout(() => {
+        _pendingQuickCreate = false
+        _pendingQuickCreateTimer = null
+      }, 5000)
     })
     disposables.push(shortcutDisposable)
   } catch {
@@ -180,4 +206,9 @@ export async function activate(api: ExtensionAPI): Promise<void> {
 export function deactivate(): void {
   for (const d of disposables) d.dispose()
   disposables.length = 0
+  _pendingQuickCreate = false
+  if (_pendingQuickCreateTimer !== null) {
+    clearTimeout(_pendingQuickCreateTimer)
+    _pendingQuickCreateTimer = null
+  }
 }

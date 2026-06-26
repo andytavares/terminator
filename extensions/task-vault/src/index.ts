@@ -13,6 +13,8 @@ import { startTaskScheduler, setSchedulerTick } from './notifications/task-sched
 const disposables: Disposable[] = []
 let _api: ExtensionAPI | null = null
 let _schedulerStarted = false
+let _pendingCapture = false
+let _pendingCaptureTimer: ReturnType<typeof setTimeout> | null = null
 
 function maybeStartScheduler(db: ExtensionDB): void {
   if (_schedulerStarted || !_api) return
@@ -172,6 +174,19 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   )
   scheduleWeeklyReviewNudge(api, reviewDay)
 
+  // Renderer calls this on mount to pick up a capture triggered before the view existed.
+  disposables.push(
+    api.ipc.registerHandler('task-vault:ui.consumePendingCapture', () => {
+      const pending = _pendingCapture
+      _pendingCapture = false
+      if (_pendingCaptureTimer !== null) {
+        clearTimeout(_pendingCaptureTimer)
+        _pendingCaptureTimer = null
+      }
+      return { data: { pending } }
+    })
+  )
+
   try {
     const hotkeyDisposable = api.globalShortcut.register(DEFAULT_CAPTURE_HOTKEY, () => {
       openCaptureOverlay(api)
@@ -212,7 +227,8 @@ function scheduleWeeklyReviewNudge(api: ExtensionAPI, reviewDay: number): void {
   )
 }
 
-function openCaptureOverlay(_api: ExtensionAPI): void {
+function openCaptureOverlay(api: ExtensionAPI): void {
+  // Broadcast to any already-running extension view immediately.
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed()) continue
     if (win.isMinimized()) win.restore()
@@ -220,11 +236,26 @@ function openCaptureOverlay(_api: ExtensionAPI): void {
     win.focus()
     win.webContents.send('task-vault:push:open-capture')
   }
+  // Activate the global tab — this creates the WebContentsView if it doesn't exist yet.
+  api.window.broadcast('extension:activate-global-tab', 'terminator.task-vault')
+  // Set pending flag so the renderer shows the modal on first load.
+  // Auto-expire after 5 s so a late manual panel open doesn't surprise the user.
+  _pendingCapture = true
+  if (_pendingCaptureTimer !== null) clearTimeout(_pendingCaptureTimer)
+  _pendingCaptureTimer = setTimeout(() => {
+    _pendingCapture = false
+    _pendingCaptureTimer = null
+  }, 5000)
 }
 
 export async function deactivate(): Promise<void> {
   _api = null
   _schedulerStarted = false
+  _pendingCapture = false
+  if (_pendingCaptureTimer !== null) {
+    clearTimeout(_pendingCaptureTimer)
+    _pendingCaptureTimer = null
+  }
   if (reviewNudgeInterval !== null) {
     clearInterval(reviewNudgeInterval)
     reviewNudgeInterval = null
