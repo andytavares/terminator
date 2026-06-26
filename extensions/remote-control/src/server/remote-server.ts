@@ -230,7 +230,7 @@ export async function createRemoteServer(
       const styleTag = `<style>${EXTENSION_BASE_CSS}</style>`
       try {
         let html = readFileSync(join(dir, 'index.html'), 'utf8')
-        html = html.replace('<head>', `<head>\n    ${shimTag}\n    ${styleTag}`)
+        html = html.replace(/<head[^>]*>/i, (m) => `${m}\n    ${shimTag}\n    ${styleTag}`)
         return reply.type('text/html').send(html)
       } catch {
         return reply.status(503).send(`Extension renderer not built for ${id}`)
@@ -266,7 +266,7 @@ export async function createRemoteServer(
     const shimTag = '<script type="module" src="/remote-shim.js"></script>'
     try {
       let html = readFileSync(join(rendererDir, 'index.html'), 'utf8')
-      html = html.replace('<head>', `<head>\n    ${shimTag}`)
+      html = html.replace(/<head[^>]*>/i, (m) => `${m}\n    ${shimTag}`)
       return reply.type('text/html').send(html)
     } catch {
       return reply.status(503).send('Renderer not built. Run: npm run build')

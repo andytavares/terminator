@@ -384,6 +384,24 @@ describe('api.ipc bridge channels', () => {
     // channels not in registry remain blocked even with a bridge
     expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
   })
+
+  it('isRemoteAccessible: any channel in invokeRegistry is accessible (design intent — all registered channels are extension-owned or explicitly allowlisted)', () => {
+    // This is the regression test for the registry-based design: the `remoteAccessible` flag
+    // on registry entries is intentionally ignored. Access is gated by registry presence only,
+    // so adding a channel to the registry (which only extensions do at runtime) makes it
+    // accessible. Core non-allowlist channels (shell:open-external, dialog:open-directory)
+    // are never invoked via the bridge in practice — the shim handles them locally.
+    const invokeRegistry = new Map([
+      ['dialog:open-directory', { handler: vi.fn(), remoteAccessible: false }],
+    ])
+    const eventBus = new EventEmitter()
+    const api = createExtensionAPI('test.ipc6', '0.1.0', {
+      bridge: { invokeRegistry, sendRegistry: new Map(), eventBus },
+    })
+    // The remoteAccessible flag is NOT checked — registry presence is sufficient.
+    // If this assertion changes to false, the extension channel access design has regressed.
+    expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(true)
+  })
 })
 
 // ── pty ──────────────────────────────────────────────────────────────────────

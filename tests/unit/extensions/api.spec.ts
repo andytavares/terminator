@@ -133,6 +133,10 @@ describe('api.nativeMenu.addViewMenuItem', () => {
     globalRegistry.panelMenuItemIds.clear()
   })
 
+  afterEach(() => {
+    setMenuRebuildCallback(() => {})
+  })
+
   it('adds item and returns a disposable', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
     const onClick = vi.fn()
@@ -204,7 +208,6 @@ describe('api.nativeMenu.addViewMenuItem', () => {
     api.nativeMenu.addViewMenuItem({ id: 'cb-test', label: 'CB Test', onClick: vi.fn() })
 
     expect(mockRebuild).toHaveBeenCalled()
-    setMenuRebuildCallback(() => {})
   })
 })
 
