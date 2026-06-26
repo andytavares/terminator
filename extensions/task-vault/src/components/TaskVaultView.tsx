@@ -42,13 +42,9 @@ export function CaptureModal(): React.JSX.Element | null {
   useEffect(() => {
     if (!showCaptureModal) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        // SmartTaskInput closes its own dropdown first; only close the modal once it's gone.
-        const openDropdown = document.querySelector('.smart-input__dropdown')
-        if (!openDropdown) close()
-      }
+      if (e.key === 'Escape') close()
     }
-    // Capture phase ensures Escape reaches us even if a child calls stopPropagation.
+    // Capture phase: fires before any child (SmartTaskInput, date picker) can stopPropagation.
     document.addEventListener('keydown', onKey, true)
     return () => document.removeEventListener('keydown', onKey, true)
   }, [showCaptureModal, close])
