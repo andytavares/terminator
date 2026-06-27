@@ -1,0 +1,19 @@
+conflict-test.md
+  s_8a7d1faa46510b::t_88ad6d220fb305 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "133958037cb1d98da0f3238d6ef1f87bed663955",
+  "prompts": {},
+  "sessions": {
+    "s_8a7d1faa46510b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82826409-eca5-4986-bedb-fb632716642c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
