@@ -281,6 +281,13 @@ export function PrReviewView({
           {pr.isDraft && <span className="pr-draft-badge">Draft</span>} {pr.title}
         </span>
         <div className="pr-review-topbar-actions">
+          <button
+            className={`pr-focus-mode-btn${focusMode ? ' pr-focus-mode-btn--active' : ''}`}
+            onClick={() => setFocusMode((v) => !v)}
+            title="Focus mode — show only medium/high risk files"
+          >
+            {focusMode ? 'All files' : 'Focus mode'}
+          </button>
           {onShowOverview && (
             <button
               className="pr-review-overview-btn"
@@ -324,13 +331,6 @@ export function PrReviewView({
             Large PR — {totalLoc.toLocaleString()} LOC, estimated {estimatedReviewMinutes} min to
             review. Consider requesting it be split.
           </span>
-          <button
-            className={`pr-large-pr-banner__focus${focusMode ? ' pr-large-pr-banner__focus--active' : ''}`}
-            onClick={() => setFocusMode((v) => !v)}
-            title="Focus mode — show only medium/high risk files"
-          >
-            {focusMode ? 'All files' : 'Focus mode'}
-          </button>
           <button
             className="pr-large-pr-banner__dismiss"
             onClick={() => setLargePrDismissed(true)}
@@ -401,7 +401,6 @@ export function PrReviewView({
           <ReviewSubmitPanel
             repoRoot={repoRoot}
             prNumber={pr.number}
-            commitId={pr.headSHA}
             onClose={() => setShowSubmit(false)}
           />
         </div>

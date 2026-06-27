@@ -63,8 +63,8 @@ function LocalWebContentsPortal({
         bounds: {
           x,
           y,
-          width: Math.round(window.innerWidth - x),
-          height: Math.round(window.innerHeight - y),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
         },
         visible: isActive && !modalOpen,
         repoRoot,

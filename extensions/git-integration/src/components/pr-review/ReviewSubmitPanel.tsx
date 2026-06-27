@@ -4,13 +4,12 @@ import { githubAPI } from '../../api/github'
 interface Props {
   repoRoot: string
   prNumber: number
-  commitId: string
   onClose: () => void
 }
 
 type ReviewEvent = 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT'
 
-export function ReviewSubmitPanel({ repoRoot, prNumber, commitId, onClose }: Props) {
+export function ReviewSubmitPanel({ repoRoot, prNumber, onClose }: Props) {
   const [event, setEvent] = useState<ReviewEvent>('COMMENT')
   const [body, setBody] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -24,7 +23,6 @@ export function ReviewSubmitPanel({ repoRoot, prNumber, commitId, onClose }: Pro
       const result = await githubAPI.prReviewSubmit({
         repoRoot,
         prNumber,
-        commitId,
         event,
         body,
       })

@@ -51,6 +51,19 @@
   white-space: nowrap;
 }
 
+.scratch-section__rename-input {
+  flex: 1;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 4px;
+  outline: none;
+  min-width: 0;
+}
+
 .scratch-section__add {
   display: flex;
   align-items: center;

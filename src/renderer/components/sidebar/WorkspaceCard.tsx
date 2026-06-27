@@ -110,7 +110,14 @@ export function WorkspaceCard({
           <span className="ws-card__chevron">
             {isCollapsed ? <ChevronRight size={10} /> : <ChevronDown size={10} />}
           </span>
-          <span className="ws-card__name">{workspace.name}</span>
+          <div className="ws-card__name-row">
+            <span className="ws-card__name">{workspace.name}</span>
+            {workspace.tags.map((tag) => (
+              <span key={tag} className="ws-card__tag">
+                {tag}
+              </span>
+            ))}
+          </div>
           {workspaceTabs.size > 0 && (
             <div className="ws-card__ws-tabs" onClick={(e) => e.stopPropagation()}>
               {Array.from(workspaceTabs.values()).map((tab) => (

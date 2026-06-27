@@ -40,7 +40,7 @@
         "extensions/git-integration/src/renderer.tsx"
       ],
       "last_verified_commit": "999ae80",
-      "staleness_score": 8
+      "staleness_score": 10
     },
     {
       "path": "extensions/task-vault/README.md",

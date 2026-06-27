@@ -19,6 +19,7 @@ vi.mock('fs/promises', () => ({ readFile: vi.fn().mockRejectedValue(new Error('n
 
 // ── import after mocks ────────────────────────────────────────────────────────
 
+import { readFile } from 'fs/promises'
 import { registerGithubHandlers } from '../../src/ipc/github.ipc'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -33,6 +34,17 @@ function captureHandlers(): Record<string, Handler> {
       handlers[channel] = handler as Handler
     },
     { getGhPath: () => '', getToken: () => '' }
+  )
+  return handlers
+}
+
+function captureHandlersWithToken(token: string): Record<string, Handler> {
+  const handlers: Record<string, Handler> = {}
+  registerGithubHandlers(
+    (channel, handler) => {
+      handlers[channel] = handler as Handler
+    },
+    { getGhPath: () => '', getToken: () => token }
   )
   return handlers
 }
@@ -416,6 +428,72 @@ describe('github:pr-review-detail', () => {
     expect(result.pr.approvals).toHaveLength(1)
     expect(result.pr.approvals[0].author).toBe('bob')
   })
+
+  it('lintStatus is unknown for a lint check with a non-blocking-but-unrecognized conclusion', async () => {
+    // STARTUP_FAILURE is not in FAILURE/ERROR/TIMED_OUT/ACTION_REQUIRED, not in PENDING set,
+    // not SUCCESS, and not in NON_BLOCKING (SKIPPED/NEUTRAL/CANCELLED/STALE).
+    // This hits the final `return 'unknown'` (line 901) in mapCheckStatus.
+    mockPrDetail({
+      ...PR_META,
+      statusCheckRollup: [{ name: 'eslint lint check', conclusion: 'STARTUP_FAILURE' }],
+    })
+
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { lintStatus: string } }
+
+    expect(result.pr.lintStatus).toBe('unknown')
+  })
+
+  it('maps mergeStateStatus CONFLICTING to dirty', async () => {
+    mockPrDetail({
+      ...PR_META,
+      mergeStateStatus: 'CONFLICTING',
+      statusCheckRollup: [{ name: 'ci', conclusion: 'SUCCESS' }],
+    })
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { mergeStateStatus: string } }
+    expect(result.pr.mergeStateStatus).toBe('dirty')
+  })
+
+  it('maps unknown mergeStateStatus to unknown', async () => {
+    mockPrDetail({
+      ...PR_META,
+      mergeStateStatus: 'TOTALLY_UNKNOWN_STATE',
+      statusCheckRollup: [{ name: 'ci', conclusion: 'SUCCESS' }],
+    })
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { mergeStateStatus: string } }
+    expect(result.pr.mergeStateStatus).toBe('unknown')
+  })
+
+  it('exercises computeCoChangeAffinityFromGit when PR has 2+ files', async () => {
+    const twoFiles = [
+      { filename: 'src/foo.ts', additions: 3, deletions: 1, patch: '@@ -1 +1 @@' },
+      { filename: 'src/bar.ts', additions: 1, deletions: 0, patch: '@@ -1 +1 @@' },
+    ]
+    // mockPrDetail uses 5 gh calls (ownerAndName + meta + files + reviews + reviewers)
+    mockPrDetail(
+      { ...PR_META, statusCheckRollup: [{ name: 'ci', conclusion: 'SUCCESS' }] },
+      twoFiles
+    )
+    // 6th call: git log --name-only for co-change affinity (fired when filePaths.length >= 2)
+    // Provide a commit that touched both files so the prFilesInCommit.length >= 2 branch is hit
+    const gitHash = 'a'.repeat(40)
+    mockGitSuccess(`${gitHash}\nsrc/foo.ts\nsrc/bar.ts\n`)
+
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { chapters: unknown[] } }
+    // chapters should be built (non-empty because we have 2 files)
+    expect(result.pr.chapters).toBeDefined()
+  })
 })
 
 describe('github:pr-file-diff', () => {
@@ -640,6 +718,105 @@ describe('github:list-open-prs', () => {
     })) as { prs: unknown[]; hasMore: boolean }
     expect(result.hasMore).toBe(false)
   })
+
+  it('normalizes GQL nodes with optional fields when response contains PRs', async () => {
+    mockGitSuccess(JSON.stringify(REPO_VIEW))
+    const gqlResponse = {
+      data: {
+        repository: {
+          pullRequests: {
+            pageInfo: { endCursor: null, hasNextPage: false },
+            nodes: [
+              {
+                number: 7,
+                title: 'Test PR',
+                isDraft: false,
+                additions: 10,
+                deletions: 5,
+                changedFiles: 2,
+                createdAt: '2025-06-01T00:00:00Z',
+                headRefName: 'feat/test',
+                baseRefName: 'main',
+                mergeStateStatus: 'CLEAN',
+                author: { login: 'alice', avatarUrl: 'https://example.com/alice.png' },
+                // Optional fields present:
+                assignees: { nodes: [{ login: 'reviewer1' }] },
+                latestReviews: {
+                  nodes: [
+                    {
+                      author: { login: 'bob', avatarUrl: '' },
+                      state: 'APPROVED',
+                      submittedAt: '2025-06-02T00:00:00Z',
+                    },
+                  ],
+                },
+                reviewRequests: {
+                  nodes: [{ requestedReviewer: { login: 'carol', avatarUrl: '' } }],
+                },
+                commits: {
+                  nodes: [
+                    {
+                      commit: {
+                        statusCheckRollup: {
+                          contexts: {
+                            nodes: [{ name: 'CI', conclusion: 'SUCCESS', status: 'COMPLETED' }],
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      },
+    }
+    mockGitSuccess(JSON.stringify(gqlResponse))
+
+    const result = (await handlers['github:list-open-prs']({
+      repoRoot: '/repo',
+    })) as { prs: Array<{ number: number; requestedReviewers: string[] }> }
+    expect(result.prs).toHaveLength(1)
+    expect(result.prs[0].number).toBe(7)
+    expect(result.prs[0].requestedReviewers).toContain('carol')
+  })
+
+  it('normalizes GQL nodes when optional fields are absent', async () => {
+    mockGitSuccess(JSON.stringify(REPO_VIEW))
+    const gqlResponse = {
+      data: {
+        repository: {
+          pullRequests: {
+            pageInfo: { endCursor: null, hasNextPage: false },
+            nodes: [
+              {
+                number: 8,
+                title: 'Minimal PR',
+                isDraft: false,
+                additions: 0,
+                deletions: 0,
+                changedFiles: 0,
+                createdAt: '2025-06-01T00:00:00Z',
+                headRefName: 'fix/minor',
+                baseRefName: 'main',
+                mergeStateStatus: 'CLEAN',
+                author: { login: 'alice', avatarUrl: '' },
+                // Optional fields ABSENT (undefined paths in normalizeGraphQLNode)
+              },
+            ],
+          },
+        },
+      },
+    }
+    mockGitSuccess(JSON.stringify(gqlResponse))
+
+    const result = (await handlers['github:list-open-prs']({
+      repoRoot: '/repo',
+    })) as { prs: Array<{ number: number }> }
+    expect(result.prs).toHaveLength(1)
+    expect(result.prs[0].number).toBe(8)
+  })
 })
 
 describe('github:file-metrics', () => {
@@ -694,6 +871,52 @@ describe('github:file-metrics', () => {
       path: 'src/foo.ts',
     })) as { error: string }
     expect(result.error).toBeDefined()
+  })
+
+  it('reads coveragePct from Istanbul coverage-summary.json when present', async () => {
+    const summary = { 'src/foo.ts': { lines: { pct: 87.5 } } }
+    vi.mocked(readFile).mockResolvedValueOnce(JSON.stringify(summary) as unknown as Buffer)
+    mockGitSuccess('abc1234 fix\n') // churn
+    mockGitSuccess('') // importers
+    mockGitSuccess('') // test file check
+
+    const result = (await handlers['github:file-metrics']({
+      repoRoot: '/repo',
+      path: 'src/foo.ts',
+    })) as Record<string, unknown>
+    expect(result.patchCoverage).toBe(88)
+  })
+
+  it('reads coveragePct from lcov.info when coverage-summary.json is absent', async () => {
+    vi.mocked(readFile)
+      .mockRejectedValueOnce(new Error('no summary')) // coverage-summary.json fails
+      .mockResolvedValueOnce(
+        // lcov.info succeeds
+        'SF:src/foo.ts\nLF:100\nLH:75\nend_of_record\n' as unknown as Buffer
+      )
+    mockGitSuccess('') // churn
+    mockGitSuccess('') // importers
+    mockGitSuccess('') // test file check
+
+    const result = (await handlers['github:file-metrics']({
+      repoRoot: '/repo',
+      path: 'src/foo.ts',
+    })) as Record<string, unknown>
+    expect(result.patchCoverage).toBe(75)
+  })
+
+  it('uses partial key match in coverage-summary.json', async () => {
+    const summary = { '/absolute/path/src/foo.ts': { lines: { pct: 60 } } }
+    vi.mocked(readFile).mockResolvedValueOnce(JSON.stringify(summary) as unknown as Buffer)
+    mockGitSuccess('') // churn
+    mockGitSuccess('') // importers
+    mockGitSuccess('') // test file check
+
+    const result = (await handlers['github:file-metrics']({
+      repoRoot: '/repo',
+      path: 'src/foo.ts',
+    })) as Record<string, unknown>
+    expect(result.patchCoverage).toBe(60)
   })
 })
 
@@ -887,12 +1110,12 @@ describe('github:pr-review-submit', () => {
   })
 
   it('submits an APPROVE review and returns reviewId', async () => {
+    mockGitSuccess(JSON.stringify({ owner: { login: 'owner' }, name: 'repo' }))
     mockGitSuccess(JSON.stringify({ id: 999 }))
 
     const result = (await handlers['github:pr-review-submit']({
       repoRoot: '/repo',
       prNumber: 6,
-      commitId: 'abc123',
       event: 'APPROVE',
       body: 'LGTM!',
     })) as { reviewId: number }
@@ -905,7 +1128,6 @@ describe('github:pr-review-submit', () => {
     const result = (await handlers['github:pr-review-submit']({
       repoRoot: '/repo',
       prNumber: 6,
-      commitId: 'abc123',
       event: 'COMMENT',
       body: '',
     })) as { error: string }
@@ -1344,5 +1566,156 @@ describe('github:pr-update-branch', () => {
       prNumber: 6,
     })) as { error: string }
     expect(result.error).toContain('merge conflict')
+  })
+})
+
+describe('github:current-user', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
+    const result = (await handlers['github:current-user']({})) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns login on success', async () => {
+    mockGitSuccess('alice\n')
+    const result = (await handlers['github:current-user']({ repoRoot: '/repo' })) as {
+      login: string
+    }
+    expect(result.login).toBe('alice')
+  })
+
+  it('returns error string on failure', async () => {
+    mockGitFailure('not authenticated')
+    const result = (await handlers['github:current-user']({ repoRoot: '/repo' })) as {
+      error: string
+    }
+    expect(result.error).toContain('not authenticated')
+  })
+
+  it('passes GH_TOKEN env var to gh when a token is configured', async () => {
+    const handlersWithToken = captureHandlersWithToken('my-secret-token')
+    mockGitSuccess('alice\n')
+    await handlersWithToken['github:current-user']({ repoRoot: '/repo' })
+    const callOpts = mockExecFile.mock.calls[0][2] as { env?: Record<string, string> }
+    expect(callOpts.env?.GH_TOKEN).toBe('my-secret-token')
+  })
+
+  it('treats a stderr-only response (no stdout) as an error', async () => {
+    // Exercises the `if (stderr && !stdout) throw new Error(stderr)` branch in runGh
+    mockExecFile.mockImplementationOnce(
+      (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
+        cb(null, { stdout: '', stderr: 'gh: command not found' })
+    )
+    const result = (await handlers['github:current-user']({ repoRoot: '/repo' })) as {
+      error: string
+    }
+    expect(result.error).toContain('gh: command not found')
+  })
+
+  it('retries without token when token is set but gh returns auth error', async () => {
+    const handlersWithToken = captureHandlersWithToken('expired-token')
+    // First call with token → auth error
+    mockGitFailure('You need to run: gh auth login')
+    // Second call (retry without token) → success
+    mockGitSuccess('bob\n')
+    const result = (await handlersWithToken['github:current-user']({ repoRoot: '/repo' })) as {
+      login: string
+    }
+    expect(result.login).toBe('bob')
+    // Second call must have no GH_TOKEN env var
+    const retryOpts = mockExecFile.mock.calls[1][2] as { env?: unknown }
+    expect(retryOpts.env).toBeUndefined()
+  })
+
+  it('throws when retry response is stderr-only (covers retry stderr branch)', async () => {
+    const handlersWithToken = captureHandlersWithToken('expired-token')
+    // First call → auth error triggers retry
+    mockGitFailure('You need to run: gh auth login')
+    // Retry → stderr only, no stdout → runGh throws
+    mockExecFile.mockImplementationOnce(
+      (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
+        cb(null, { stdout: '', stderr: 'connection refused' })
+    )
+    const result = (await handlersWithToken['github:current-user']({ repoRoot: '/repo' })) as {
+      error: string
+    }
+    expect(result.error).toContain('connection refused')
+  })
+})
+
+describe('github:file-cochange', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('returns VALIDATION_ERROR for missing repoRoot', async () => {
+    const result = (await handlers['github:file-cochange']({ files: ['a.ts'] })) as {
+      error: string
+    }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns VALIDATION_ERROR for empty files array', async () => {
+    const result = (await handlers['github:file-cochange']({
+      repoRoot: '/repo',
+      files: [],
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns affinity map on success', async () => {
+    // computeCoChangeAffinityFromGit calls git log — mock empty output (no cochange history)
+    mockGitSuccess('')
+    const result = (await handlers['github:file-cochange']({
+      repoRoot: '/repo',
+      files: ['src/foo.ts'],
+    })) as { affinity: Record<string, number> }
+    expect(result.affinity).toBeDefined()
+    expect(typeof result.affinity).toBe('object')
+  })
+})
+
+describe('github:save-active-review and github:active-reviews-for-repo', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it('github:save-active-review returns VALIDATION_ERROR for missing repoRoot', async () => {
+    const result = (await handlers['github:save-active-review']({ pr: { number: 1 } })) as {
+      error: string
+    }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('github:save-active-review stores and returns ok:true', async () => {
+    const result = (await handlers['github:save-active-review']({
+      repoRoot: '/repo',
+      pr: { number: 42 },
+    })) as { ok: boolean }
+    expect(result.ok).toBe(true)
+  })
+
+  it('github:active-reviews-for-repo returns VALIDATION_ERROR for missing repoRoot', async () => {
+    const result = (await handlers['github:active-reviews-for-repo']({})) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('github:active-reviews-for-repo returns prs array for valid repoRoot', async () => {
+    const result = (await handlers['github:active-reviews-for-repo']({
+      repoRoot: '/repo',
+    })) as { prs: unknown[] }
+    expect(Array.isArray(result.prs)).toBe(true)
   })
 })

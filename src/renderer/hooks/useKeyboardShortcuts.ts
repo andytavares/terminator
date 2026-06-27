@@ -54,6 +54,7 @@ export function useKeyboardShortcuts({
       const idx = workspaces.findIndex((w) => w.id === activeWorkspaceId)
       const next = (idx + delta + workspaces.length) % workspaces.length
       setActiveWorkspace(workspaces[next].id)
+      setExpandedWorkspaceIds(new Set([workspaces[next].id]))
     }
 
     function cycleTab(projectId: string, delta: number): void {

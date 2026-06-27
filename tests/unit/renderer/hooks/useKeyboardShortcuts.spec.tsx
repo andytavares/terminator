@@ -224,6 +224,64 @@ describe('useKeyboardShortcuts', () => {
     expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('proj-1', 's1')
   })
 
+  it('calls onToggleOverview when Cmd+Shift+I is pressed', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onToggleOverview = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onToggleOverview }))
+    pressKey('i', { metaKey: true, shiftKey: true })
+    expect(onToggleOverview).toHaveBeenCalled()
+  })
+
+  it('calls onNewScratch when Cmd+Shift+T is pressed', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onNewScratch = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onNewScratch }))
+    pressKey('t', { metaKey: true, shiftKey: true })
+    expect(onNewScratch).toHaveBeenCalled()
+  })
+
+  it('Cmd+= also calls setExpandedWorkspaceIds on the cycled workspace', async () => {
+    const mockSetExpanded = vi.fn()
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [workspace1, workspace2],
+      activeWorkspaceId: 'ws-1',
+      setActiveWorkspace: mockSetActiveWorkspace,
+      activeProjectId: null,
+      resolveActiveCwd: vi.fn().mockReturnValue('/workspace/path'),
+      setExpandedWorkspaceIds: mockSetExpanded,
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('=', { metaKey: true })
+    expect(mockSetExpanded).toHaveBeenCalledWith(new Set(['ws-2']))
+  })
+
+  it('cycleWorkspace does nothing when workspaces list is empty', async () => {
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [],
+      activeWorkspaceId: null,
+      setActiveWorkspace: mockSetActiveWorkspace,
+      activeProjectId: null,
+      resolveActiveCwd: vi.fn().mockReturnValue('/'),
+      setExpandedWorkspaceIds: vi.fn(),
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('=', { metaKey: true })
+    expect(mockSetActiveWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('Cmd+D does not crash when splitSession rejects', async () => {
+    mockSplitSession.mockRejectedValueOnce(new Error('split failed'))
+    setupMocks({ activeProjectId: 'proj-1' })
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts())
+    // Should not throw — the .catch handler swallows and calls addToast
+    pressKey('d', { metaKey: true })
+    await new Promise((r) => setTimeout(r, 10))
+    expect(mockSplitSession).toHaveBeenCalled()
+  })
+
   it('removes keydown listener on unmount', async () => {
     const useKeyboardShortcuts = await importHook()
     const onOpenSettings = vi.fn()

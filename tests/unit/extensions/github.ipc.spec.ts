@@ -455,12 +455,13 @@ describe('github:pr-comment-reply', () => {
 
 // ─── github:pr-review-submit ──────────────────────────────────────────────────
 
+const OWNER_REPO_MOCK = JSON.stringify({ owner: { login: 'test-owner' }, name: 'test-repo' })
+
 describe('github:pr-review-submit', () => {
   it('returns VALIDATION_ERROR for invalid event', async () => {
     const result = (await getHandler('github:pr-review-submit')({
       repoRoot: '/repo',
       prNumber: 42,
-      commitId: 'abc',
       event: 'MERGE',
       body: '',
     })) as { error: string }
@@ -468,11 +469,12 @@ describe('github:pr-review-submit', () => {
   })
 
   it('returns reviewId on success', async () => {
-    mockResolve(JSON.stringify({ id: 9999 }))
+    customMock()
+      .mockResolvedValueOnce({ stdout: OWNER_REPO_MOCK, stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify({ id: 9999 }), stderr: '' })
     const result = (await getHandler('github:pr-review-submit')({
       repoRoot: '/repo',
       prNumber: 42,
-      commitId: 'abc1234',
       event: 'APPROVE',
       body: 'LGTM!',
     })) as { reviewId: number }
@@ -481,11 +483,12 @@ describe('github:pr-review-submit', () => {
 
   it('accepts all valid event types', async () => {
     for (const event of ['APPROVE', 'REQUEST_CHANGES', 'COMMENT'] as const) {
-      mockResolve(JSON.stringify({ id: 1 }))
+      customMock()
+        .mockResolvedValueOnce({ stdout: OWNER_REPO_MOCK, stderr: '' })
+        .mockResolvedValueOnce({ stdout: JSON.stringify({ id: 1 }), stderr: '' })
       const result = (await getHandler('github:pr-review-submit')({
         repoRoot: '/repo',
         prNumber: 42,
-        commitId: 'abc',
         event,
         body: '',
       })) as { reviewId: number }
@@ -494,11 +497,10 @@ describe('github:pr-review-submit', () => {
   })
 
   it('returns error string on gh failure', async () => {
-    mockReject('forbidden')
+    customMock().mockRejectedValueOnce(new Error('forbidden'))
     const result = (await getHandler('github:pr-review-submit')({
       repoRoot: '/repo',
       prNumber: 42,
-      commitId: 'abc',
       event: 'APPROVE',
       body: '',
     })) as { error: string }

@@ -680,21 +680,19 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
     const schema = z.object({
       repoRoot: z.string().min(1),
       prNumber: z.number().int().positive(),
-      commitId: z.string().min(1),
       event: z.enum(['APPROVE', 'REQUEST_CHANGES', 'COMMENT']),
       body: z.string(),
     })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { repoRoot, prNumber, commitId, event, body } = parsed.data
+    const { repoRoot, prNumber, event, body } = parsed.data
     try {
+      const { owner, repo } = await getRepoOwnerAndName(repoRoot, opts)
       const raw = await gh(repoRoot, [
         'api',
-        `repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
+        `repos/${owner}/${repo}/pulls/${prNumber}/reviews`,
         '--method',
         'POST',
-        '--field',
-        `commit_id=${commitId}`,
         '--field',
         `event=${event}`,
         '--field',

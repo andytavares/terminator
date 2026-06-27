@@ -19,7 +19,6 @@ describe('ReviewSubmitPanel', () => {
   const defaultProps = {
     repoRoot: '/repo',
     prNumber: 42,
-    commitId: 'abc123',
     onClose: vi.fn(),
   }
 
@@ -118,7 +117,6 @@ describe('ReviewSubmitPanel', () => {
       expect(mockPrReviewSubmit).toHaveBeenCalledWith({
         repoRoot: '/repo',
         prNumber: 42,
-        commitId: 'abc123',
         event: 'COMMENT',
         body: 'LGTM',
       })

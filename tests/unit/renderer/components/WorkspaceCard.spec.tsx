@@ -270,4 +270,68 @@ describe('WorkspaceCard', () => {
     fireEvent.dragEnd(projectWrappers[0])
     expect(container.querySelector('.proj-dnd-target')).toBeNull()
   })
+
+  it('renders tag chips when workspace has tags', () => {
+    const workspaceWithTags = { ...makeWorkspace(), tags: ['frontend', 'urgent'] }
+    render(<WorkspaceCard {...defaultProps} workspace={workspaceWithTags} />)
+    expect(screen.getByText('frontend')).toBeTruthy()
+    expect(screen.getByText('urgent')).toBeTruthy()
+  })
+
+  it('renders no tag chips when workspace has no tags', () => {
+    render(<WorkspaceCard {...defaultProps} />)
+    const tags = document.querySelectorAll('.ws-card__tag')
+    expect(tags.length).toBe(0)
+  })
+
+  it('renders workspace tab buttons when workspaceTabs is non-empty', () => {
+    const tabMap = new Map([['git', { id: 'git', label: 'Git', icon: null }]])
+    vi.mocked(useExtensionRegistry).mockImplementation(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ((selector: any) => {
+        const state = { sidebarButtons: [], workspaceTabs: tabMap }
+        return typeof selector === 'function' ? selector(state) : state
+      }) as unknown as typeof useExtensionRegistry
+    )
+    render(
+      <WorkspaceCard {...defaultProps} onSelectWorkspaceTab={vi.fn()} activeWorkspaceTabId={null} />
+    )
+    expect(document.querySelector('.ws-card__ws-tab')).toBeTruthy()
+  })
+
+  it('calls onSelectWorkspaceTab when a workspace tab button is clicked', () => {
+    const tabMap = new Map([['git', { id: 'git', label: 'Git', icon: null }]])
+    vi.mocked(useExtensionRegistry).mockImplementation(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ((selector: any) => {
+        const state = { sidebarButtons: [], workspaceTabs: tabMap }
+        return typeof selector === 'function' ? selector(state) : state
+      }) as unknown as typeof useExtensionRegistry
+    )
+    const mockSelectTab = vi.fn()
+    render(
+      <WorkspaceCard
+        {...defaultProps}
+        onSelectWorkspaceTab={mockSelectTab}
+        activeWorkspaceTabId={null}
+      />
+    )
+    fireEvent.click(document.querySelector('.ws-card__ws-tab')!)
+    expect(mockSelectTab).toHaveBeenCalledWith('ws-1', 'git')
+  })
+
+  it('applies active class to the active workspace tab', () => {
+    const tabMap = new Map([['git', { id: 'git', label: 'Git', icon: null }]])
+    vi.mocked(useExtensionRegistry).mockImplementation(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ((selector: any) => {
+        const state = { sidebarButtons: [], workspaceTabs: tabMap }
+        return typeof selector === 'function' ? selector(state) : state
+      }) as unknown as typeof useExtensionRegistry
+    )
+    render(
+      <WorkspaceCard {...defaultProps} onSelectWorkspaceTab={vi.fn()} activeWorkspaceTabId="git" />
+    )
+    expect(document.querySelector('.ws-card__ws-tab--active')).toBeTruthy()
+  })
 })

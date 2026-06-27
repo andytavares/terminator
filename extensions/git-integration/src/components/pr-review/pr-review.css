@@ -2322,6 +2322,29 @@
 
 /* ─── Overview button in review topbar ────────────────────────────────────── */
 
+.pr-focus-mode-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--tm-text-muted);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+.pr-focus-mode-btn:hover {
+  color: var(--tm-accent);
+  border-color: var(--tm-accent);
+}
+.pr-focus-mode-btn--active {
+  background: color-mix(in srgb, var(--tm-accent) 15%, transparent);
+  color: var(--tm-accent);
+  border-color: var(--tm-accent);
+}
+
 .pr-review-overview-btn {
   background: none;
   border: 1px solid rgba(255, 255, 255, 0.12);
