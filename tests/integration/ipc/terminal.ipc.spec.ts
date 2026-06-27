@@ -247,32 +247,6 @@ describe('terminal IPC handlers', () => {
     })
   })
 
-  describe('getSessionMeta', () => {
-    it('returns undefined for unknown session', async () => {
-      const { getSessionMeta } = await import('../../../src/main/ipc/terminal.ipc')
-      expect(getSessionMeta('nonexistent')).toBeUndefined()
-    })
-
-    it('returns metadata for a created session', async () => {
-      const created = (await handlerMap['terminal:create'](
-        {},
-        {
-          projectId: '550e8400-e29b-41d4-a716-446655440020',
-          type: 'human',
-          tabTitle: 'Meta Shell',
-          cwd: '/tmp',
-        }
-      )) as { sessionId: string }
-      const { getSessionMeta } = await import('../../../src/main/ipc/terminal.ipc')
-      const meta = getSessionMeta(created.sessionId)
-      expect(meta).toMatchObject({
-        projectId: '550e8400-e29b-41d4-a716-446655440020',
-        tabTitle: 'Meta Shell',
-        type: 'human',
-      })
-    })
-  })
-
   describe('terminal:list-sessions', () => {
     it('returns empty array when no sessions have been created', async () => {
       const result = await handlerMap['terminal:list-sessions']({}, undefined)

@@ -219,7 +219,7 @@ export function KanbanBoard({ onConfigChange }: KanbanBoardProps) {
 
   const visibleTasks = useMemo(() => {
     if (selectedContexts.length === 0) return tasks
-    return tasks.filter((t) => !t.context || selectedContexts.includes(t.context))
+    return tasks.filter((t) => selectedContexts.includes(t.context ?? ''))
   }, [tasks, selectedContexts])
 
   const loadConfig = useCallback(async () => {

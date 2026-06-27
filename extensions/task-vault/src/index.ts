@@ -7,7 +7,6 @@ import { registerLinksIpcHandlers } from './ipc/links.ipc.js'
 import { registerKanbanIpcHandlers } from './ipc/kanban.ipc.js'
 import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
 import { applyTaskVaultSchema, applyTaskVaultMigrations } from './vault/db.js'
-import { getSessionMeta } from '../../../src/main/ipc/terminal.ipc.js'
 import { backfillRecurringTasks } from './vault/ensure-next-occurrence.js'
 import { startTaskScheduler, setSchedulerTick } from './notifications/task-scheduler.js'
 
@@ -148,14 +147,12 @@ export async function activate(api: ExtensionAPI): Promise<void> {
 
   disposables.push(
     api.ipc.registerHandler('task-vault:navigate-to-terminal', (data) => {
-      const { sessionId } = (data ?? {}) as { sessionId?: string }
-      if (!sessionId) return { ok: false, error: 'missing sessionId' }
-      const meta = getSessionMeta(sessionId)
-      if (!meta) return { ok: false, error: 'session not found' }
-      api.window.broadcast('terminal:navigate-to-session', {
-        sessionId: meta.sessionId,
-        projectId: meta.projectId,
-      })
+      const { sessionId, projectId } = (data ?? {}) as {
+        sessionId?: string
+        projectId?: string
+      }
+      if (!sessionId || !projectId) return { ok: false, error: 'missing sessionId or projectId' }
+      api.window.broadcast('terminal:navigate-to-session', { sessionId, projectId })
       return { ok: true }
     })
   )

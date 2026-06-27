@@ -1005,11 +1005,21 @@ function TaskRow({
                         title="Jump to linked terminal"
                         onClick={() => {
                           const sessionId = task.terminatorLinks[0]
-                          if (sessionId) {
-                            void window.electronAPI.extensionBridge
-                              .invoke('task-vault:navigate-to-terminal', { sessionId })
-                              .catch(() => {})
-                          }
+                          if (!sessionId) return
+                          void window.electronAPI.terminal
+                            .listSessions?.()
+                            .then((sessions) => {
+                              if (!Array.isArray(sessions)) return
+                              const meta = (
+                                sessions as Array<{ sessionId: string; projectId: string }>
+                              ).find((s) => s.sessionId === sessionId)
+                              if (!meta) return
+                              return window.electronAPI.extensionBridge.invoke(
+                                'task-vault:navigate-to-terminal',
+                                { sessionId: meta.sessionId, projectId: meta.projectId }
+                              )
+                            })
+                            .catch(() => {})
                         }}
                       >
                         <Zap size={13} />
@@ -1475,7 +1485,7 @@ export function DailyLog({
   }
 
   const matchesContext = (t: IndexedTask) =>
-    selectedContexts.length === 0 || !t.context || selectedContexts.includes(t.context)
+    selectedContexts.length === 0 || selectedContexts.includes(t.context ?? '')
 
   const rolledOverSet = new Set(rolledOverTaskIds)
   const rawTodayTasks = log.tasks.filter((t) => !rolledOverSet.has(t.id) && matchesContext(t))
