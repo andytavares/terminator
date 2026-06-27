@@ -1,0 +1,31 @@
+extensions/task-vault/src/index.ts
+  s_aea7dd3aabcb2b::t_f1a53652388d1c 10
+  s_aea7dd3aabcb2b::t_e32ec4290d6e3e 149-162
+tests/integration/ipc/terminal.ipc.spec.ts
+  s_aea7dd3aabcb2b::t_98743a1ec7bb36 250-275
+extensions/task-vault/src/components/KanbanBoard.tsx
+  s_aea7dd3aabcb2b::t_a422e6cc02e292 218
+src/renderer/App.tsx
+  s_aea7dd3aabcb2b::t_75634879b914ac 420-434
+  s_aea7dd3aabcb2b::t_997cdccd8e43dd 419
+extensions/task-vault/src/components/DailyLog.tsx
+  s_aea7dd3aabcb2b::t_44eda6ad7f390d 1007-1012
+src/main/ipc/terminal.ipc.ts
+  s_aea7dd3aabcb2b::t_8bf5a4527e5a4b 38-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "0978eeac6a28c5f00cf6a7d35548669d89fec16a",
+  "prompts": {},
+  "sessions": {
+    "s_aea7dd3aabcb2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0943ecf4-f5a9-4197-aa13-ac7d22d12fa5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
