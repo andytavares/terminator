@@ -1,0 +1,33 @@
+tests/unit/renderer/App.spec.tsx
+  s_8a7d1faa46510b::t_c0a7b9529057d7 95-111
+  s_8a7d1faa46510b::t_07bae86a797723 1282-1347,1349-1364,1367-1370,1372-1375
+  s_8a7d1faa46510b::t_f82181f78442bd 1348,1365-1366,1371
+  s_8a7d1faa46510b::t_2347b76f259666 34
+tests/unit/extensions/api-v1.2.0.spec.ts
+  s_8a7d1faa46510b::t_00ee7189efd40e 14
+  s_8a7d1faa46510b::t_2fdd118c9852f9 547-582
+tests/unit/renderer/components/GlobalSettings.spec.tsx
+  s_8a7d1faa46510b::t_3194e336b026fa 17
+  s_8a7d1faa46510b::t_899e5525271de5 40
+  s_8a7d1faa46510b::t_11274252213f8f 136-142
+tests/unit/renderer/stores/settings.store.spec.ts
+  s_8a7d1faa46510b::t_37d7b0d9f44e02 247-275
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_8a7d1faa46510b::t_e6dc28638449ad 476-485
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "df748393117e26041039b0346528d644b12322c4",
+  "prompts": {},
+  "sessions": {
+    "s_8a7d1faa46510b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82826409-eca5-4986-bedb-fb632716642c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
