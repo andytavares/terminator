@@ -1,0 +1,22 @@
+conflict-test.md
+  s_8a7d1faa46510b::t_86fa083f57095a 3-4,6,8-46
+  s_8a7d1faa46510b::t_fa4aa3a34cd669 47
+conflict-add-add.md
+  s_8a7d1faa46510b::t_e241ded3cdfaf2 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "dbc92d945d2c03d91dad11ea684935362ec5e2dc",
+  "prompts": {},
+  "sessions": {
+    "s_8a7d1faa46510b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82826409-eca5-4986-bedb-fb632716642c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
