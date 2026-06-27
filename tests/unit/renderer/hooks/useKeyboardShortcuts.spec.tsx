@@ -473,5 +473,15 @@ describe('useKeyboardShortcuts', () => {
       pressKey('t', { metaKey: true })
       expect(mockCreateSession).not.toHaveBeenCalled()
     })
+
+    it('Cmd+T calls onNewTab when provided instead of creating a session directly', async () => {
+      const mockOnNewTab = vi.fn()
+      setupMocks({ activeProjectId: 'proj-1' })
+      const useKeyboardShortcuts = await importHook()
+      renderHook(() => useKeyboardShortcuts({ scratchProjectId: null, onNewTab: mockOnNewTab }))
+      pressKey('t', { metaKey: true })
+      expect(mockOnNewTab).toHaveBeenCalled()
+      expect(mockCreateSession).not.toHaveBeenCalled()
+    })
   })
 })

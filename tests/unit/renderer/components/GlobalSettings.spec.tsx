@@ -14,6 +14,7 @@ const mockUpdateWorktreeBaseDir = vi.fn()
 const mockUpdateShowMetrics = vi.fn()
 const mockUpdateBranchExclude = vi.fn()
 const mockUpdateGlobal = vi.fn()
+const mockUpdatePromptForName = vi.fn()
 
 const globalSettings = {
   appearance: { theme: 'dark' as const },
@@ -36,6 +37,7 @@ beforeEach(() => {
     updateWorktreeBaseDir: mockUpdateWorktreeBaseDir,
     updateShowMetricsBar: mockUpdateShowMetrics,
     updateBranchExcludePatterns: mockUpdateBranchExclude,
+    updatePromptForName: mockUpdatePromptForName,
   } as unknown as ReturnType<typeof useSettingsStore>)
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     settings: { updateGlobal: mockUpdateGlobal },
@@ -130,5 +132,12 @@ describe('GlobalSettings', () => {
     fireEvent.change(textarea, { target: { value: 'renovate/*\n\n  release/*  ' } })
     fireEvent.blur(textarea)
     expect(mockUpdateBranchExclude).toHaveBeenCalledWith(['renovate/*', 'release/*'])
+  })
+
+  it('calls updatePromptForName when prompt-for-name checkbox is toggled', () => {
+    render(<GlobalSettings />)
+    const checkbox = screen.getByRole('checkbox', { name: /prompt for session name/i })
+    fireEvent.click(checkbox)
+    expect(mockUpdatePromptForName).toHaveBeenCalledWith(true)
   })
 })
