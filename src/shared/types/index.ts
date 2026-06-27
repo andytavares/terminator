@@ -100,6 +100,7 @@ export interface GlobalSettings {
   terminal: {
     scrollbackLimit: number
     defaultShell: string
+    promptForName: boolean
   }
   git: {
     /** Base directory for new worktrees. Empty string means <repoRoot>/.worktrees. */

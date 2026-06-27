@@ -76,7 +76,7 @@ beforeEach(() => {
     return Promise.resolve({})
   })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke: mockInvoke },
+    extensionBridge: { invoke: mockInvoke, on: vi.fn().mockReturnValue(() => {}) },
   }
 })
 

@@ -219,6 +219,7 @@ export interface ExtensionAPI {
   window: {
     openAuxiliary(view: string, params?: Record<string, string>): void
     broadcast(channel: string, data: unknown): void
+    focusSelf(viewParam?: string): void
   }
 }
 
@@ -307,6 +308,7 @@ const auxiliaryWindows = new Map<string, BrowserWindow>()
 export interface ExtensionAPIDeps {
   ptyManager?: PtyManagerAPI
   broadcastToWindows?: (channel: string, data: unknown) => void
+  focusExtensionView?: (extensionId: string, viewParam: string) => void
   bridge?: BridgeDeps
   db?: import('../db/index.js').ExtensionDB
 }
@@ -624,6 +626,9 @@ export function createExtensionAPI(
             if (!win.isDestroyed()) win.webContents.send(channel, data)
           }
         }
+      },
+      focusSelf(viewParam = 'main'): void {
+        deps?.focusExtensionView?.(extensionId, viewParam)
       },
     },
   }

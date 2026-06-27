@@ -1,5 +1,4 @@
-import { ipcMain, BrowserWindow, app } from 'electron'
-import { join } from 'path'
+import { ipcMain } from 'electron'
 import { z } from 'zod'
 import { randomUUID } from '../db/db'
 import type { ExtensionDB } from '../../../../src/main/db/index'
@@ -224,42 +223,6 @@ export async function hardDeleteDiagram(
   return { data: { ok: true } }
 }
 
-export async function openDiagramInWindow(
-  _db: ExtensionDB,
-  payload: unknown
-): Promise<Record<string, unknown>> {
-  const schema = z.object({ id: z.string() })
-  const parsed = schema.safeParse(payload)
-  if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-
-  const mainWindow = BrowserWindow.getAllWindows()[0]
-  if (!mainWindow) return { error: 'NO_MAIN_WINDOW' }
-
-  const baseUrl = mainWindow.webContents.getURL()
-  const urlObj = new URL(baseUrl)
-  urlObj.searchParams.set('view', 'notepad-diagram')
-  urlObj.searchParams.set('diagramId', parsed.data.id)
-  const diagramUrl = urlObj.toString()
-
-  const preload = join(app.getAppPath(), 'out', 'preload', 'index.js')
-
-  const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    webPreferences: {
-      preload,
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  })
-
-  win
-    .loadURL(diagramUrl)
-    .catch((err) => console.error('[notepad] openDiagramInWindow: failed to load', err))
-
-  return { data: { ok: true } }
-}
-
 export function registerDiagramsIpcHandlers(db: ExtensionDB): () => void {
   ipcMain.handle('terminator.notepad:diagrams.create', (_, payload) => createDiagram(db, payload))
   ipcMain.handle('terminator.notepad:diagrams.list', (_, payload) => listDiagrams(db, payload))
@@ -272,10 +235,6 @@ export function registerDiagramsIpcHandlers(db: ExtensionDB): () => void {
   ipcMain.handle('terminator.notepad:diagrams.hardDelete', (_, payload) =>
     hardDeleteDiagram(db, payload)
   )
-  ipcMain.handle('terminator.notepad:diagrams.openWindow', (_, payload) =>
-    openDiagramInWindow(db, payload)
-  )
-
   return () => {
     ipcMain.removeHandler('terminator.notepad:diagrams.create')
     ipcMain.removeHandler('terminator.notepad:diagrams.list')
@@ -284,6 +243,5 @@ export function registerDiagramsIpcHandlers(db: ExtensionDB): () => void {
     ipcMain.removeHandler('terminator.notepad:diagrams.archive')
     ipcMain.removeHandler('terminator.notepad:diagrams.restore')
     ipcMain.removeHandler('terminator.notepad:diagrams.hardDelete')
-    ipcMain.removeHandler('terminator.notepad:diagrams.openWindow')
   }
 }

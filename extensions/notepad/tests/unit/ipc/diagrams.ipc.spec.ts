@@ -272,6 +272,25 @@ describe('registerDiagramsIpcHandlers', () => {
     expect(typeof dispose).toBe('function')
     dispose()
   })
+
+  it('wrappers route to underlying handlers', async () => {
+    const { ipcMain } = await import('electron')
+    vi.mocked(ipcMain.handle).mockClear()
+    registerDiagramsIpcHandlers(db)
+    const calls = vi.mocked(ipcMain.handle).mock.calls as [string, (...a: unknown[]) => unknown][]
+    const getHandler = (ch: string) => calls.find(([c]) => c === ch)?.[1]
+    await getHandler('terminator.notepad:diagrams.create')?.(null, { title: 'T' })
+    await getHandler('terminator.notepad:diagrams.list')?.(null, {})
+    await getHandler('terminator.notepad:diagrams.get')?.(null, { id: 'noop' })
+    await getHandler('terminator.notepad:diagrams.autosave')?.(null, {
+      id: 'noop',
+      title: 'X',
+      sceneJson: '{}',
+    })
+    await getHandler('terminator.notepad:diagrams.archive')?.(null, { id: 'noop' })
+    await getHandler('terminator.notepad:diagrams.restore')?.(null, { id: 'noop' })
+    await getHandler('terminator.notepad:diagrams.hardDelete')?.(null, { id: 'noop' })
+  })
 })
 
 describe('diagram_tags relational storage', () => {

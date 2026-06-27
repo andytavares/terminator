@@ -215,14 +215,11 @@ export function KanbanBoard({ onConfigChange }: KanbanBoardProps) {
   const [selectedTaskText, setSelectedTaskText] = useState('')
   const draggingTaskId = useRef<string | null>(null)
 
-  const selectedContexts = useVaultStore((s) => s.selectedContexts)
-  const setKanbanLanes = useVaultStore((s) => s.setKanbanLanes)
-  const loadToday = useVaultStore((s) => s.loadToday)
-  const tickCalendar = useVaultStore((s) => s.tickCalendar)
+  const { selectedContexts, setKanbanLanes, loadToday, tickCalendar } = useVaultStore()
 
   const visibleTasks = useMemo(() => {
     if (selectedContexts.length === 0) return tasks
-    return tasks.filter((t) => !t.context || selectedContexts.includes(t.context))
+    return tasks.filter((t) => selectedContexts.includes(t.context ?? ''))
   }, [tasks, selectedContexts])
 
   const loadConfig = useCallback(async () => {

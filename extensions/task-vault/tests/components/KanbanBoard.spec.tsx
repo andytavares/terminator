@@ -192,17 +192,17 @@ describe('KanbanBoard', () => {
     })
   })
 
-  it('hides tasks not matching selected context from store (but shows no-context tasks)', async () => {
+  it('shows only tasks with matching context when filter is active', async () => {
     mockSelectedContexts = ['computer']
     render(<KanbanBoard />)
     await waitFor(() => {
       expect(screen.getByText('Write tests')).toBeTruthy()
       expect(screen.getByText('Deploy app')).toBeTruthy()
-      // task-4 has no context — always shown
-      expect(screen.getByText('Archive docs')).toBeTruthy()
     })
     // task-3 has context 'work', not 'computer' — hidden
     expect(screen.queryByText('Review PR')).toBeNull()
+    // task-4 has no context — hidden when filter is active
+    expect(screen.queryByText('Archive docs')).toBeNull()
   })
 
   it('shows error when list-tasks fails', async () => {

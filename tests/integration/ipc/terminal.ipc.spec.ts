@@ -132,6 +132,33 @@ describe('terminal IPC handlers', () => {
       const result = await handlerMap['terminal:create']({}, payload)
       expect(result).toHaveProperty('sessionId')
     })
+
+    it('expands ~ to home directory', async () => {
+      const result = await handlerMap['terminal:create'](
+        {},
+        {
+          projectId: '550e8400-e29b-41d4-a716-446655440006',
+          type: 'human',
+          tabTitle: 'Home Shell',
+          cwd: '~',
+        }
+      )
+      expect(result).toHaveProperty('sessionId')
+    })
+
+    it('uses explicit shell when provided', async () => {
+      const result = await handlerMap['terminal:create'](
+        {},
+        {
+          projectId: '550e8400-e29b-41d4-a716-446655440007',
+          type: 'human',
+          tabTitle: 'Bash',
+          cwd: '/tmp',
+          shell: '/bin/bash',
+        }
+      )
+      expect(result).toHaveProperty('sessionId')
+    })
   })
 
   describe('terminal:close', () => {
@@ -217,6 +244,112 @@ describe('terminal IPC handlers', () => {
     it('returns a cleanedCount result', async () => {
       const result = await handlerMap['terminal:cleanup-orphans']({}, undefined)
       expect(result).toMatchObject({ cleanedCount: expect.any(Number) })
+    })
+  })
+
+  describe('terminal:list-sessions', () => {
+    it('returns empty array when no sessions have been created', async () => {
+      const result = await handlerMap['terminal:list-sessions']({}, undefined)
+      expect(result).toEqual([])
+    })
+
+    it('returns created sessions with projectId, tabTitle, and type', async () => {
+      await handlerMap['terminal:create'](
+        {},
+        {
+          projectId: '550e8400-e29b-41d4-a716-446655440010',
+          type: 'human',
+          tabTitle: 'My Shell',
+          cwd: '/tmp',
+        }
+      )
+      const result = await handlerMap['terminal:list-sessions']({}, undefined)
+      expect(result).toHaveLength(1)
+      expect((result as Array<Record<string, unknown>>)[0]).toMatchObject({
+        projectId: '550e8400-e29b-41d4-a716-446655440010',
+        tabTitle: 'My Shell',
+        type: 'human',
+      })
+    })
+
+    it('does not include closed sessions', async () => {
+      const created = (await handlerMap['terminal:create'](
+        {},
+        {
+          projectId: '550e8400-e29b-41d4-a716-446655440011',
+          type: 'human',
+          tabTitle: 'Temp',
+          cwd: '/tmp',
+        }
+      )) as { sessionId: string }
+
+      await handlerMap['terminal:close']({}, { sessionId: created.sessionId })
+
+      const result = await handlerMap['terminal:list-sessions']({}, undefined)
+      expect(result).toEqual([])
+    })
+
+    it('skips send when window is destroyed', async () => {
+      const mockSend = vi.fn()
+      const destroyedWin = { isDestroyed: () => true, webContents: { send: mockSend } }
+      const { registerTerminalHandlers: reg } = await import('../../../src/main/ipc/terminal.ipc')
+      reg(ptyManager, () => destroyedWin as never)
+
+      await handlerMap['terminal:create'](
+        {},
+        {
+          projectId: '550e8400-e29b-41d4-a716-446655440013',
+          type: 'human',
+          tabTitle: 'Destroyed',
+          cwd: '/tmp',
+        }
+      )
+      const onDataH = mockPty.onData.mock.calls.at(-1)?.[0] as (d: string) => void
+      onDataH?.('data')
+      expect(mockSend).not.toHaveBeenCalled()
+    })
+
+    it('removes session from registry when PTY process exits', async () => {
+      // Re-register with a mock window so the output/exit callbacks execute fully
+      const mockSend = vi.fn()
+      const mockWin = { isDestroyed: () => false, webContents: { send: mockSend } }
+      const { registerTerminalHandlers: reg } = await import('../../../src/main/ipc/terminal.ipc')
+      reg(ptyManager, () => mockWin as never)
+
+      await handlerMap['terminal:create'](
+        {},
+        {
+          projectId: '550e8400-e29b-41d4-a716-446655440012',
+          type: 'human',
+          tabTitle: 'Exiting',
+          cwd: '/tmp',
+        }
+      )
+
+      // Trigger the onData callback (covers the data→send path)
+      const onDataHandler = mockPty.onData.mock.calls.at(-1)?.[0] as (d: string) => void
+      onDataHandler?.('hello')
+      expect(mockSend).toHaveBeenCalledWith(
+        'terminal:output',
+        expect.objectContaining({ data: 'hello' })
+      )
+
+      // Trigger the onExit callback (covers registry cleanup + exit send path)
+      const onExitWrapper = mockPty.onExit.mock.calls.at(-1)?.[0] as (e: {
+        exitCode: number
+      }) => void
+      onExitWrapper?.({ exitCode: 0 })
+      expect(mockSend).toHaveBeenCalledWith(
+        'terminal:process-exit',
+        expect.objectContaining({ exitCode: 0 })
+      )
+
+      const result = await handlerMap['terminal:list-sessions']({}, undefined)
+      expect(
+        (result as unknown[]).every(
+          (s: unknown) => (s as Record<string, unknown>).tabTitle !== 'Exiting'
+        )
+      ).toBe(true)
     })
   })
 })

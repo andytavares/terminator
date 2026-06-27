@@ -4,13 +4,13 @@ import { githubAPI } from '../../api/github'
 interface Props {
   repoRoot: string
   prNumber: number
-  commitId: string
+  isOwnPr?: boolean
   onClose: () => void
 }
 
 type ReviewEvent = 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT'
 
-export function ReviewSubmitPanel({ repoRoot, prNumber, commitId, onClose }: Props) {
+export function ReviewSubmitPanel({ repoRoot, prNumber, isOwnPr, onClose }: Props) {
   const [event, setEvent] = useState<ReviewEvent>('COMMENT')
   const [body, setBody] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -18,20 +18,23 @@ export function ReviewSubmitPanel({ repoRoot, prNumber, commitId, onClose }: Pro
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async () => {
+    if (event !== 'APPROVE' && !body.trim()) {
+      setError('A comment body is required for this review type.')
+      return
+    }
     setSubmitting(true)
     setError(null)
     try {
       const result = await githubAPI.prReviewSubmit({
         repoRoot,
         prNumber,
-        commitId,
         event,
         body,
       })
       if ('error' in result) throw new Error((result as { error: string }).error)
       setSubmitted(true)
     } catch (e) {
-      setError(String(e))
+      setError(String(e).replace(/^Error:\s*/, ''))
     } finally {
       setSubmitting(false)
     }
@@ -50,6 +53,11 @@ export function ReviewSubmitPanel({ repoRoot, prNumber, commitId, onClose }: Pro
     <div className="review-submit-panel">
       <h2 className="review-submit-heading">Submit review</h2>
 
+      {isOwnPr && (
+        <p className="review-submit-own-pr-notice">
+          You cannot approve or request changes on your own pull request.
+        </p>
+      )}
       <div className="review-submit-options" role="radiogroup" aria-label="Review outcome">
         {(
           [
@@ -57,21 +65,25 @@ export function ReviewSubmitPanel({ repoRoot, prNumber, commitId, onClose }: Pro
             ['REQUEST_CHANGES', 'Request changes'],
             ['COMMENT', 'Comment'],
           ] as const
-        ).map(([val, label]) => (
-          <label
-            key={val}
-            className={`review-submit-option review-submit-option--${val.toLowerCase().replace('_', '-')}${event === val ? ' review-submit-option--selected' : ''}`}
-          >
-            <input
-              type="radio"
-              name="review-event"
-              value={val}
-              checked={event === val}
-              onChange={() => setEvent(val)}
-            />
-            {label}
-          </label>
-        ))}
+        ).map(([val, label]) => {
+          const blocked = isOwnPr && (val === 'APPROVE' || val === 'REQUEST_CHANGES')
+          return (
+            <label
+              key={val}
+              className={`review-submit-option review-submit-option--${val.toLowerCase().replace('_', '-')}${event === val ? ' review-submit-option--selected' : ''}${blocked ? ' review-submit-option--disabled' : ''}`}
+            >
+              <input
+                type="radio"
+                name="review-event"
+                value={val}
+                checked={event === val}
+                disabled={blocked}
+                onChange={() => !blocked && setEvent(val)}
+              />
+              {label}
+            </label>
+          )
+        })}
       </div>
 
       <textarea

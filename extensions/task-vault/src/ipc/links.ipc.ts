@@ -36,10 +36,9 @@ export function registerLinksIpcHandlers(db: ExtensionDB): () => void {
           [taskId]
         )
         if (!task) return { error: 'NOT_FOUND' }
-        const links: string[] = JSON.parse(task.terminator_links || '[]')
-        if (!links.includes(targetId)) links.push(targetId)
+        // Replace all existing links — a task links to exactly one terminal at a time.
         await db.run(`UPDATE tasks SET terminator_links=?, updated_at=? WHERE id=?`, [
-          JSON.stringify(links),
+          JSON.stringify([targetId]),
           now,
           taskId,
         ])

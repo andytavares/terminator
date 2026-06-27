@@ -33,6 +33,9 @@ interface ElectronAPI {
     closeAll(): Promise<{ terminatedCount: number }>
     cleanupOrphans(): Promise<{ cleanedCount: number }>
     onProcessExit(handler: (sessionId: string, exitCode: number) => void): () => void
+    listSessions(): Promise<
+      Array<{ sessionId: string; projectId: string; tabTitle: string; type: string }>
+    >
   }
   workspace: {
     list(): Promise<{ workspaces: Workspace[] }>
@@ -149,6 +152,7 @@ interface ElectronAPI {
       visible: boolean
       repoRoot?: string | null
     }): Promise<void>
+    setBottomInset(inset: number): void
   }
   keyboard: {
     isReserved(accelerator: string): boolean

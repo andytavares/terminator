@@ -26,6 +26,15 @@ const TerminalResizeSchema = z.object({
   rows: z.number().int().positive(),
 })
 
+interface ActiveSessionMeta {
+  sessionId: string
+  projectId: string
+  tabTitle: string
+  type: 'human' | 'agent'
+}
+
+const activeSessionRegistry = new Map<string, ActiveSessionMeta>()
+
 export function registerTerminalHandlers(
   ptyManager: PtyManager,
   getWindow: () => BrowserWindow | null
@@ -36,11 +45,13 @@ export function registerTerminalHandlers(
       return { error: 'VALIDATION_ERROR', message: parsed.error.message }
     }
 
-    const { type, cwd, shell } = parsed.data
+    const { projectId, tabTitle, type, cwd, shell } = parsed.data
     const globalSettings = getGlobalSettings()
     const defaultShell = shell ?? globalSettings.terminal.defaultShell
     const sessionId = randomUUID()
     const resolvedCwd = cwd === '~' ? homedir() : cwd
+
+    activeSessionRegistry.set(sessionId, { sessionId, projectId, tabTitle, type })
 
     ptyManager.spawn(
       sessionId,
@@ -52,6 +63,7 @@ export function registerTerminalHandlers(
         if (win && !win.isDestroyed()) win.webContents.send('terminal:output', { sessionId, data })
       },
       (exitCode) => {
+        activeSessionRegistry.delete(sessionId)
         const win = getWindow()
         if (win && !win.isDestroyed())
           win.webContents.send('terminal:process-exit', { sessionId, exitCode })
@@ -61,7 +73,12 @@ export function registerTerminalHandlers(
     return { sessionId }
   })
 
+  ipcMain.handle('terminal:list-sessions', () => {
+    return Array.from(activeSessionRegistry.values())
+  })
+
   ipcMain.handle('terminal:close', (_event, { sessionId }) => {
+    activeSessionRegistry.delete(sessionId)
     ptyManager.kill(sessionId)
     return { success: true }
   })

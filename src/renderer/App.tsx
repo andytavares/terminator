@@ -24,6 +24,7 @@ import { OverviewScreen } from './components/overview/OverviewScreen'
 import { MetricsBar } from './components/overview/MetricsBar'
 import { useMetricsStore } from './stores/metrics.store'
 import { AboutDialog } from './components/AboutDialog'
+import { NameTerminalDialog } from './components/NameTerminalDialog'
 import { SCRATCH_PROJECT_ID } from '../shared/types/index'
 
 installLogInterceptor()
@@ -31,6 +32,12 @@ installLogInterceptor()
 export function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [pendingCreate, setPendingCreate] = useState<{
+    projectId: string
+    cwd: string
+    scrollbackLimit: number
+    defaultName: string
+  } | null>(null)
   const [logOpen, setLogOpen] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -90,28 +97,32 @@ export function App(): JSX.Element {
   const repoRoot = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? null
 
   const handleOpenSettings = useCallback(() => setSettingsOpen(true), [])
-  const handleToggleLog = useCallback(() => setLogOpen((v) => !v), [])
+  const setLogOpenWithInset = useCallback((open: boolean) => {
+    setLogOpen(open)
+    window.electronAPI.extension.setBottomInset(open ? 280 : 0)
+  }, [])
+  const handleToggleLog = useCallback(
+    () => setLogOpenWithInset(!logOpen),
+    [logOpen, setLogOpenWithInset]
+  )
   const handleOpenCommandPalette = useCallback(() => setPaletteOpen(true), [])
   const handleToggleOverview = useCallback(() => {
     setActiveGlobalTab(activeGlobalTabId === 'core.overview' ? null : 'core.overview')
   }, [activeGlobalTabId, setActiveGlobalTab])
 
   const handleNewTab = useCallback(() => {
-    if (scratchActive) {
-      const settings = resolveSettings(activeWorkspaceId)
-      void createSession(
-        SCRATCH_PROJECT_ID,
-        'human',
-        '',
-        resolveActiveCwd(),
-        settings.terminal.scrollbackLimit
-      )
-      return
-    }
-    if (!activeProjectId) return
+    const projectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
+    if (!projectId) return
     const settings = resolveSettings(activeWorkspaceId)
     const cwd = resolveActiveCwd()
-    void createSession(activeProjectId, 'human', '', cwd, settings.terminal.scrollbackLimit)
+    const scrollbackLimit = settings.terminal.scrollbackLimit
+    if (settings.terminal.promptForName) {
+      const { terminalCountByProject } = useSessionStore.getState()
+      const next = (terminalCountByProject.get(projectId) ?? 0) + 1
+      setPendingCreate({ projectId, cwd, scrollbackLimit, defaultName: `Terminal ${next}` })
+    } else {
+      void createSession(projectId, 'human', '', cwd, scrollbackLimit)
+    }
   }, [
     scratchActive,
     activeProjectId,
@@ -137,6 +148,7 @@ export function App(): JSX.Element {
     onOpenCommandPalette: handleOpenCommandPalette,
     onToggleOverview: handleToggleOverview,
     onNewScratch: handleNewScratch,
+    onNewTab: handleNewTab,
     scratchProjectId: scratchActive ? SCRATCH_PROJECT_ID : null,
   })
 
@@ -160,7 +172,7 @@ export function App(): JSX.Element {
         label: 'Toggle Log Window',
         shortcut: '⌘⇧L',
         category: 'App',
-        action: () => setLogOpen((v) => !v),
+        action: () => setLogOpenWithInset(!logOpen),
       },
       {
         id: 'core.toggle-overview',
@@ -385,16 +397,6 @@ export function App(): JSX.Element {
   // Snapshot of panels that were open before switching to an extension tab
   const savedPanelsRef = useRef<Set<string>>(new Set())
 
-  // Close all open panels when switching workspaces
-  const prevWorkspaceIdRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (prevWorkspaceIdRef.current !== null && prevWorkspaceIdRef.current !== activeWorkspaceId) {
-      openPanelsRef.current.forEach((panelId) => togglePanel(panelId))
-      savedPanelsRef.current = new Set()
-    }
-    prevWorkspaceIdRef.current = activeWorkspaceId
-  }, [activeWorkspaceId, togglePanel])
-
   useEffect(() => {
     if (activeProjectTabId !== null) {
       // Switching into an extension tab — save open panels then close them
@@ -423,6 +425,22 @@ export function App(): JSX.Element {
   useEffect(() => {
     return window.electronAPI.extensionBridge.on('extension:activate-global-tab', (tabId) => {
       if (typeof tabId === 'string') setActiveGlobalTab(tabId)
+    })
+  }, [setActiveGlobalTab])
+
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on('terminal:navigate-to-session', (data) => {
+      const { sessionId, projectId } = data as { sessionId: string; projectId: string }
+      setActiveGlobalTab(null)
+      const { projectsByWorkspaceId } = useWorkspaceStore.getState()
+      for (const [wsId, projects] of projectsByWorkspaceId) {
+        if (projects.some((p) => p.id === projectId)) {
+          useWorkspaceStore.getState().setActiveWorkspace(wsId)
+          break
+        }
+      }
+      useWorkspaceStore.getState().setActiveProject(projectId)
+      useSessionStore.getState().setActiveSessionForProject(projectId, sessionId)
     })
   }, [setActiveGlobalTab])
 
@@ -598,7 +616,18 @@ export function App(): JSX.Element {
           <NotificationPanel />
           {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
           {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
-          {logOpen && <LogWindow onClose={() => setLogOpen(false)} />}
+          {pendingCreate && (
+            <NameTerminalDialog
+              defaultName={pendingCreate.defaultName}
+              onConfirm={(name) => {
+                const { projectId, cwd, scrollbackLimit } = pendingCreate
+                setPendingCreate(null)
+                void createSession(projectId, 'human', name, cwd, scrollbackLimit)
+              }}
+              onCancel={() => setPendingCreate(null)}
+            />
+          )}
+          {logOpen && <LogWindow onClose={() => setLogOpenWithInset(false)} />}
           {paletteOpen && (
             <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />
           )}

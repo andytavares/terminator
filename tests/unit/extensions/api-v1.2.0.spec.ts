@@ -11,7 +11,7 @@ const mockBWInstance = vi.hoisted(() => ({
   on: vi.fn(),
   loadURL: vi.fn(),
   loadFile: vi.fn(),
-  webContents: { send: vi.fn() },
+  webContents: { send: vi.fn(), on: vi.fn(), insertCSS: vi.fn().mockResolvedValue(undefined) },
 }))
 
 vi.mock('electron', () => ({
@@ -543,5 +543,41 @@ describe('api.window.openAuxiliary', () => {
     mockBWInstance.isDestroyed.mockReturnValueOnce(true)
     api.window.openAuxiliary('test-view-new-3')
     expect(BrowserWindow).toHaveBeenCalled()
+  })
+
+  it('loads the rendererUrl directly when provided, appending query params', () => {
+    const rendererUrl = 'ext://com.test.ext/index.html'
+    const api = createExtensionAPI('test.aux-url', '0.1.0', undefined, rendererUrl)
+    api.window.openAuxiliary('my-view', { extra: 'val' })
+    expect(mockBWInstance.loadURL).toHaveBeenCalledWith(expect.stringContaining('ext://'))
+    expect(mockBWInstance.loadURL).toHaveBeenCalledWith(expect.stringContaining('view=my-view'))
+    expect(mockBWInstance.loadURL).toHaveBeenCalledWith(expect.stringContaining('extra=val'))
+  })
+})
+
+// ── window.focusSelf ──────────────────────────────────────────────────────────
+
+describe('api.window.focusSelf', () => {
+  it('calls deps.focusExtensionView with the extensionId and viewParam', () => {
+    const mockFocusExtensionView = vi.fn()
+    const api = createExtensionAPI('test.focus', '0.1.0', {
+      focusExtensionView: mockFocusExtensionView,
+    })
+    api.window.focusSelf('sidebar')
+    expect(mockFocusExtensionView).toHaveBeenCalledWith('test.focus', 'sidebar')
+  })
+
+  it('uses "main" as the default viewParam', () => {
+    const mockFocusExtensionView = vi.fn()
+    const api = createExtensionAPI('test.focus2', '0.1.0', {
+      focusExtensionView: mockFocusExtensionView,
+    })
+    api.window.focusSelf()
+    expect(mockFocusExtensionView).toHaveBeenCalledWith('test.focus2', 'main')
+  })
+
+  it('is a no-op when focusExtensionView is not provided', () => {
+    const api = createExtensionAPI('test.focus3', '0.1.0')
+    expect(() => api.window.focusSelf()).not.toThrow()
   })
 })

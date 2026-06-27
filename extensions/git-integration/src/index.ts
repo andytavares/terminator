@@ -20,6 +20,16 @@ export function activate(api: ExtensionAPI): void {
     getToken: () => api.settings.get<string>('terminator.git-integration.git.githubToken') ?? '',
   })
 
+  // Cross-iframe broadcast: any extension view can invoke this to open the
+  // merge-flow view in the GitFullView iframe (which lives in a separate iframe context).
+  disposables.push(
+    api.ipc.registerHandler('git:request-merge-flow', (payload) => {
+      const { repoRoot } = (payload ?? {}) as { repoRoot?: string }
+      api.window.broadcast('git:merge-flow-open', { repoRoot: repoRoot ?? '' })
+      return { ok: true }
+    })
+  )
+
   disposables.push(
     api.settings.register({
       label: 'Git Integration',

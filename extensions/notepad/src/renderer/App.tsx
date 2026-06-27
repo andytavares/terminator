@@ -10,11 +10,21 @@ export function App(): JSX.Element {
   const { setShowQuickCreate } = useNotesStore()
 
   useEffect(() => {
-    const off = window.electronAPI.extensionBridge.on('ext:command:notepad:quick-create', () =>
+    const off = window.electronAPI.extensionBridge.on('terminator.notepad:ui.openQuickCreate', () =>
       setShowQuickCreate(true)
     )
     return off
   }, [setShowQuickCreate])
+
+  // On first mount, check whether the shortcut fired before this view existed.
+  useEffect(() => {
+    window.electronAPI.extensionBridge
+      .invoke('terminator.notepad:ui.consumePendingQuickCreate')
+      .then((result: unknown) => {
+        if ((result as { data?: { pending?: boolean } }).data?.pending) setShowQuickCreate(true)
+      })
+      .catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   let content: React.ReactElement
   if (view === 'note') {

@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   terminal: {
     create: (payload: unknown) => ipcRenderer.invoke('terminal:create', payload),
     close: (sessionId: string) => ipcRenderer.invoke('terminal:close', { sessionId }),
+    listSessions: () => ipcRenderer.invoke('terminal:list-sessions'),
     input: (sessionId: string, data: string) =>
       ipcRenderer.send('terminal:input', { sessionId, data }),
     resize: (sessionId: string, cols: number, rows: number) =>

@@ -31,6 +31,7 @@ type ShortcutCallbacks = {
   onOpenCommandPalette?: () => void
   onToggleOverview?: () => void
   onNewScratch?: () => void
+  onNewTab?: () => void
 }
 let capturedShortcutCallbacks: ShortcutCallbacks = {}
 vi.mock('../../../src/renderer/hooks/useKeyboardShortcuts', () => ({
@@ -88,6 +89,23 @@ vi.mock('../../../src/renderer/components/AboutDialog', () => ({
   AboutDialog: ({ onClose }: { onClose: () => void }) => (
     <div data-testid="about-dialog">
       <button onClick={onClose}>Close About</button>
+    </div>
+  ),
+}))
+vi.mock('../../../src/renderer/components/NameTerminalDialog', () => ({
+  NameTerminalDialog: ({
+    defaultName,
+    onConfirm,
+    onCancel,
+  }: {
+    defaultName: string
+    onConfirm: (name: string) => void
+    onCancel: () => void
+  }) => (
+    <div data-testid="name-terminal-dialog">
+      <span data-testid="name-terminal-default">{defaultName}</span>
+      <button onClick={() => onConfirm('My Terminal')}>Confirm</button>
+      <button onClick={onCancel}>Cancel Dialog</button>
     </div>
   ),
 }))
@@ -235,6 +253,9 @@ beforeEach(() => {
     extensionBridge: {
       on: vi.fn().mockReturnValue(mockUnsubscribe),
       invoke: vi.fn().mockResolvedValue({}),
+    },
+    extension: {
+      setBottomInset: vi.fn(),
     },
   }
   setupMocks()
@@ -596,7 +617,7 @@ describe('App', () => {
     expect(screen.getByTestId('global-tab-content')).toBeTruthy()
   })
 
-  it('calls togglePanel for each open panel when workspace changes', async () => {
+  it('does not close open panels when workspace changes', async () => {
     const mockTogglePanel = vi.fn()
     vi.mocked(useExtensionRegistry).mockReturnValue({
       ...defaultExtensionRegistry,
@@ -605,7 +626,6 @@ describe('App', () => {
     } as unknown as ReturnType<typeof useExtensionRegistry>)
     setupMocks({ activeWorkspaceId: 'ws-1' })
     const { rerender } = render(<App />)
-    // Switch to a different workspace — should trigger the close-panels effect
     setupMocks({ activeWorkspaceId: 'ws-2' })
     vi.mocked(useExtensionRegistry).mockReturnValue({
       ...defaultExtensionRegistry,
@@ -613,7 +633,7 @@ describe('App', () => {
       togglePanel: mockTogglePanel,
     } as unknown as ReturnType<typeof useExtensionRegistry>)
     rerender(<App />)
-    expect(mockTogglePanel).toHaveBeenCalledWith('panel-a')
+    expect(mockTogglePanel).not.toHaveBeenCalledWith('panel-a')
   })
 
   it('calls onSelectProjectTab extensionEvent to set active tab', () => {
@@ -1257,6 +1277,100 @@ describe('App', () => {
       setActiveGlobalTab: vi.fn(),
       sidebarPanels: new Map(),
     }))
+  })
+
+  describe('handleNewTab', () => {
+    it('does nothing when there is no active project and scratchActive is false', () => {
+      const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
+      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      setupMocks({ activeProjectId: null, scratchActive: false })
+      render(<App />)
+      capturedShortcutCallbacks.onNewTab?.()
+      expect(mockCreateSession).not.toHaveBeenCalled()
+    })
+
+    it('calls createSession when promptForName is false and a project is active', () => {
+      const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
+      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+      // Default resolveSettings returns { terminal: { scrollbackLimit: 5000 } } — no promptForName
+      render(<App />)
+      capturedShortcutCallbacks.onNewTab?.()
+      expect(mockCreateSession).toHaveBeenCalledWith('proj-1', 'human', '', '~', 5000)
+    })
+
+    it('shows NameTerminalDialog when promptForName is true', async () => {
+      const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
+      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+      vi.mocked(useSettingsStore).mockReturnValue({
+        loadSettings: mockLoadSettings,
+        globalSettings: { appearance: { theme: 'dark' }, ui: { hasSeenWelcome: true } },
+        markWelcomeSeen: mockMarkWelcomeSeen,
+        resolveSettings: vi
+          .fn()
+          .mockReturnValue({ terminal: { scrollbackLimit: 5000, promptForName: true } }),
+      } as unknown as ReturnType<typeof useSettingsStore>)
+      ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
+        terminalCountByProject: new Map([['proj-1', 2]]),
+        setActiveSessionForProject: vi.fn(),
+      })
+      render(<App />)
+      capturedShortcutCallbacks.onNewTab?.()
+      await waitFor(() => expect(screen.getByTestId('name-terminal-dialog')).toBeTruthy())
+      expect(screen.getByTestId('name-terminal-default').textContent).toBe('Terminal 3')
+    })
+
+    it('NameTerminalDialog onConfirm calls createSession and closes dialog', async () => {
+      const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
+      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+      vi.mocked(useSettingsStore).mockReturnValue({
+        loadSettings: mockLoadSettings,
+        globalSettings: { appearance: { theme: 'dark' }, ui: { hasSeenWelcome: true } },
+        markWelcomeSeen: mockMarkWelcomeSeen,
+        resolveSettings: vi
+          .fn()
+          .mockReturnValue({ terminal: { scrollbackLimit: 5000, promptForName: true } }),
+      } as unknown as ReturnType<typeof useSettingsStore>)
+      ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
+        terminalCountByProject: new Map(),
+        setActiveSessionForProject: vi.fn(),
+      })
+      render(<App />)
+      capturedShortcutCallbacks.onNewTab?.()
+      await waitFor(() => screen.getByTestId('name-terminal-dialog'))
+      fireEvent.click(screen.getByText('Confirm'))
+      await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
+      expect(mockCreateSession).toHaveBeenCalledWith('proj-1', 'human', 'My Terminal', '~', 5000)
+    })
+
+    it('NameTerminalDialog onCancel closes dialog without creating a named session', async () => {
+      const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
+      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+      vi.mocked(useSettingsStore).mockReturnValue({
+        loadSettings: mockLoadSettings,
+        globalSettings: { appearance: { theme: 'dark' }, ui: { hasSeenWelcome: true } },
+        markWelcomeSeen: mockMarkWelcomeSeen,
+        resolveSettings: vi
+          .fn()
+          .mockReturnValue({ terminal: { scrollbackLimit: 5000, promptForName: true } }),
+      } as unknown as ReturnType<typeof useSettingsStore>)
+      ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
+        terminalCountByProject: new Map(),
+        setActiveSessionForProject: vi.fn(),
+      })
+      render(<App />)
+      // clear auto-session-creation calls that fire on mount
+      mockCreateSession.mockClear()
+      capturedShortcutCallbacks.onNewTab?.()
+      await waitFor(() => screen.getByTestId('name-terminal-dialog'))
+      fireEvent.click(screen.getByText('Cancel Dialog'))
+      await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
+      // After cancel, no new session should be created
+      expect(mockCreateSession).not.toHaveBeenCalled()
+    })
   })
 
   it('reopens saved panels when switching back to Terminal tab', async () => {

@@ -19,12 +19,21 @@ export function App(): JSX.Element {
   const { setShowCaptureModal } = useVaultNavStore()
 
   useEffect(() => {
-    const off = window.electronAPI.extensionBridge.on(
-      'ext:command:task-vault:capture-to-inbox',
-      () => setShowCaptureModal(true)
+    const off = window.electronAPI.extensionBridge.on('task-vault:push:open-capture', () =>
+      setShowCaptureModal(true)
     )
     return off
   }, [setShowCaptureModal])
+
+  // On first mount, check whether the shortcut fired before this view existed.
+  useEffect(() => {
+    window.electronAPI.extensionBridge
+      .invoke('task-vault:ui.consumePendingCapture')
+      .then((result: unknown) => {
+        if ((result as { data?: { pending?: boolean } }).data?.pending) setShowCaptureModal(true)
+      })
+      .catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Show local toasts for scheduler notifications (due tasks, blocked tasks, etc.)
   useEffect(() => {

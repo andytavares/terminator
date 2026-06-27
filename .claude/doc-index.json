@@ -24,7 +24,7 @@
         "extensions/remote-control/src/server/routes/bridge.route.ts"
       ],
       "last_verified_commit": "999ae80",
-      "staleness_score": 39
+      "staleness_score": 48
     },
     {
       "path": "README.md",
@@ -40,7 +40,7 @@
         "extensions/git-integration/src/renderer.tsx"
       ],
       "last_verified_commit": "999ae80",
-      "staleness_score": 8
+      "staleness_score": 23
     },
     {
       "path": "extensions/task-vault/README.md",
@@ -64,7 +64,7 @@
         "src/renderer/extensions/registry.ts"
       ],
       "last_verified_commit": "999ae80",
-      "staleness_score": 17
+      "staleness_score": 20
     },
     {
       "path": "specs/001-extension-first-terminal/contracts/ipc-channels.md",
@@ -76,7 +76,7 @@
         "src/renderer/electron.d.ts"
       ],
       "last_verified_commit": "999ae80",
-      "staleness_score": 12
+      "staleness_score": 15
     },
     {
       "path": "docs/EXTENSION-DEVELOPMENT.md",
@@ -91,7 +91,7 @@
         "extensions/git-integration/src/renderer.tsx"
       ],
       "last_verified_commit": "999ae80",
-      "staleness_score": 18
+      "staleness_score": 21
     },
     {
       "path": "docs/CONTRIBUTING.md",
@@ -135,7 +135,7 @@
         "extensions/notepad/src/db/db.ts"
       ],
       "last_verified_commit": "999ae80",
-      "staleness_score": 2
+      "staleness_score": 10
     },
     {
       "path": "docs/adr/017-embedded-http-remote-server.md",
@@ -149,7 +149,7 @@
         "src/main/index.ts"
       ],
       "last_verified_commit": "999ae80",
-      "staleness_score": 50
+      "staleness_score": 55
     }
   ]
 }

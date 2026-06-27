@@ -23,8 +23,6 @@ import {
 } from 'lucide-react'
 import type { DailyLog as DailyLogData, IndexedTask } from '../vault/types'
 import { SmartTaskInput } from './SmartTaskInput'
-import { useSessionStore } from '../../../../src/renderer/stores/session.store'
-import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { notify } from '../utils/notify'
 import { useVaultNavStore } from '../stores/vault-nav.store'
@@ -89,26 +87,46 @@ function SessionPicker({
   onSelect,
   onClose,
 }: {
-  onSelect: (id: string) => void
+  onSelect: (session: { sessionId: string; projectId: string }) => void
   onClose: () => void
 }): React.JSX.Element {
-  const sessions = useSessionStore((s) => Array.from(s.sessions.values()))
-  const activeSessions = sessions.filter((s) => s.status !== 'closed')
-  const workspaces = useWorkspaceStore((s) => s.workspaces)
-  const projectsByWs = useWorkspaceStore((s) => s.projectsByWorkspaceId)
+  const [activeSessions, setActiveSessions] = useState<
+    Array<{ sessionId: string; projectId: string; tabTitle: string }>
+  >([])
+  const [projectLabels, setProjectLabels] = useState<
+    Map<string, { wsName: string; projName: string }>
+  >(new Map())
 
-  function sessionLabel(s: { id: string; tabTitle?: string; projectId: string }): string {
-    let project: { name: string; workspaceId: string } | undefined
-    for (const [, projects] of projectsByWs) {
-      project = projects.find((p) => p.id === s.projectId)
-      if (project) break
+  useEffect(() => {
+    async function load() {
+      const [sessions, wsResult] = await Promise.all([
+        window.electronAPI.terminal.listSessions?.() ?? Promise.resolve([]),
+        window.electronAPI.workspace.list(),
+      ])
+      if (Array.isArray(sessions)) setActiveSessions(sessions)
+
+      const workspaces = wsResult.workspaces ?? []
+      const labels = new Map<string, { wsName: string; projName: string }>()
+      await Promise.all(
+        workspaces.map(async (ws) => {
+          const { projects } = await window.electronAPI.project.list(ws.id)
+          for (const p of projects) {
+            labels.set(p.id, { wsName: ws.name, projName: p.name })
+          }
+        })
+      )
+      setProjectLabels(labels)
     }
-    const workspace = project ? workspaces.find((w) => w.id === project!.workspaceId) : undefined
+    void load()
+  }, [])
+
+  function sessionLabel(s: { sessionId: string; tabTitle: string; projectId: string }): string {
+    const ctx = projectLabels.get(s.projectId)
     const parts: string[] = []
-    if (workspace) parts.push(workspace.name)
-    if (project) parts.push(project.name)
+    if (ctx?.wsName) parts.push(ctx.wsName)
+    if (ctx?.projName) parts.push(ctx.projName)
     if (s.tabTitle) parts.push(s.tabTitle)
-    return parts.length ? parts.join(' › ') : s.id.slice(0, 8)
+    return parts.length ? parts.join(' › ') : s.sessionId.slice(0, 8)
   }
 
   if (activeSessions.length === 0) {
@@ -126,7 +144,8 @@ function SessionPicker({
     <span className="daily-log__link-picker">
       <select
         onChange={(e) => {
-          if (e.target.value) onSelect(e.target.value)
+          const s = activeSessions.find((a) => a.sessionId === e.target.value)
+          if (s) onSelect({ sessionId: s.sessionId, projectId: s.projectId })
         }}
         defaultValue=""
       >
@@ -134,7 +153,7 @@ function SessionPicker({
           Select a terminal session…
         </option>
         {activeSessions.map((s) => (
-          <option key={s.id} value={s.id}>
+          <option key={s.sessionId} value={s.sessionId}>
             {sessionLabel(s)}
           </option>
         ))}
@@ -730,6 +749,9 @@ function TaskRow({
   const [editText, setEditText] = useState('')
   const [linking, setLinking] = useState(false)
   const [linked, setLinked] = useState(task.terminatorLinks.length > 0)
+  const [linkedSessionId, setLinkedSessionId] = useState<string | null>(
+    task.terminatorLinks[0] ?? null
+  )
   const [blockModalOpen, setBlockModalOpen] = useState(false)
   const [recurrenceModalOpen, setRecurrenceModalOpen] = useState(false)
   const [addingSubtask, setAddingSubtask] = useState(false)
@@ -739,6 +761,7 @@ function TaskRow({
 
   useEffect(() => {
     setLinked(task.terminatorLinks.length > 0)
+    if (task.terminatorLinks[0]) setLinkedSessionId(task.terminatorLinks[0])
   }, [task.terminatorLinks])
 
   useEffect(() => {
@@ -786,13 +809,20 @@ function TaskRow({
     setMigrateDate('')
   }
 
-  async function handleLinkSession(sessionId: string) {
-    await window.electronAPI.extensionBridge.invoke('task-vault:links:create', {
+  async function handleLinkSession(session: { sessionId: string; projectId: string }) {
+    const result = await window.electronAPI.extensionBridge.invoke('task-vault:links:create', {
       taskId: task.id,
-      targetId: sessionId,
+      targetId: session.sessionId,
     })
+    if (result && typeof result === 'object' && 'error' in result) {
+      notify('error', `Could not save terminal link: ${(result as { error: string }).error}`)
+      setLinking(false)
+      return
+    }
+    setLinkedSessionId(session.sessionId)
     setLinked(true)
     setLinking(false)
+    await onRefresh()
   }
 
   async function handleRestore() {
@@ -998,7 +1028,33 @@ function TaskRow({
                         className="tv-btn tv-btn--outline tv-btn--action-icon"
                         title="Jump to linked terminal"
                         onClick={() => {
-                          useExtensionRegistry.getState().setActiveGlobalTab(null)
+                          const sessionId = linkedSessionId
+                          if (!sessionId) {
+                            setLinking(true)
+                            return
+                          }
+                          void window.electronAPI.terminal
+                            .listSessions?.()
+                            .then((sessions) => {
+                              if (!Array.isArray(sessions)) {
+                                setLinking(true)
+                                return
+                              }
+                              const meta = (
+                                sessions as Array<{ sessionId: string; projectId: string }>
+                              ).find((s) => s.sessionId === sessionId)
+                              if (!meta) {
+                                setLinking(true)
+                                return
+                              }
+                              return window.electronAPI.extensionBridge.invoke(
+                                'task-vault:navigate-to-terminal',
+                                { sessionId: meta.sessionId, projectId: meta.projectId }
+                              )
+                            })
+                            .catch(() => {
+                              setLinking(true)
+                            })
                         }}
                       >
                         <Zap size={13} />
@@ -1184,8 +1240,8 @@ function TaskRow({
 
           {linking && (
             <SessionPicker
-              onSelect={(sessionId) => {
-                void handleLinkSession(sessionId)
+              onSelect={(session) => {
+                void handleLinkSession(session)
               }}
               onClose={() => setLinking(false)}
             />
@@ -1464,7 +1520,7 @@ export function DailyLog({
   }
 
   const matchesContext = (t: IndexedTask) =>
-    selectedContexts.length === 0 || !t.context || selectedContexts.includes(t.context)
+    selectedContexts.length === 0 || selectedContexts.includes(t.context ?? '')
 
   const rolledOverSet = new Set(rolledOverTaskIds)
   const rawTodayTasks = log.tasks.filter((t) => !rolledOverSet.has(t.id) && matchesContext(t))

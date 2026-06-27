@@ -372,6 +372,10 @@ app.whenReady().then(async () => {
     }
   )
 
+  ipcMain.on('extension:set-bottom-inset', (_event, { inset }: { inset: number }) => {
+    viewHost?.setBottomInset(inset)
+  })
+
   ipcMain.on('workspace:active-changed', (_event, data) => {
     viewHost?.broadcastToAll('workspace:changed', data)
   })
@@ -388,7 +392,11 @@ app.whenReady().then(async () => {
   extensionHost.setDeps({
     ptyManager,
     db: getAppDb(),
-    broadcastToWindows: (channel, data) => mainWindow?.webContents.send(channel, data),
+    broadcastToWindows: (channel, data) => {
+      mainWindow?.webContents.send(channel, data)
+      viewHost?.broadcastToAll(channel, data)
+    },
+    focusExtensionView: (extId, viewParam) => viewHost?.focusView(extId, viewParam),
     bridge: {
       invokeRegistry: ipcInvokeRegistry,
       sendRegistry: ipcSendRegistry,

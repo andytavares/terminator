@@ -10,6 +10,7 @@ export function GlobalSettings(): JSX.Element {
     updateWorktreeBaseDir,
     updateBranchExcludePatterns,
     updateShowMetricsBar,
+    updatePromptForName,
   } = useSettingsStore()
 
   if (!globalSettings) return <div>Loading...</div>
@@ -67,6 +68,21 @@ export function GlobalSettings(): JSX.Element {
             }
           }}
         />
+      </div>
+
+      <div className="settings-section__field">
+        <label className="settings-section__label settings-section__label--inline">
+          <input
+            type="checkbox"
+            checked={globalSettings.terminal.promptForName ?? false}
+            onChange={(e) => void updatePromptForName(e.target.checked)}
+          />
+          Prompt for session name on creation
+        </label>
+        <span className="settings-section__hint">
+          When enabled, you are asked to name each new terminal before it opens. Leave blank to use
+          the default &ldquo;Terminal N&rdquo; name.
+        </span>
       </div>
 
       <h3 className="settings-section__title" style={{ marginTop: 20 }}>

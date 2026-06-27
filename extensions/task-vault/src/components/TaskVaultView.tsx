@@ -42,15 +42,11 @@ export function CaptureModal(): React.JSX.Element | null {
   useEffect(() => {
     if (!showCaptureModal) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        // Let SmartTaskInput close its own dropdown first via stopPropagation;
-        // only close the modal if no inline dropdown is open.
-        const openDropdown = document.querySelector('.smart-input__dropdown')
-        if (!openDropdown) close()
-      }
+      if (e.key === 'Escape') close()
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
+    // Capture phase: fires before any child (SmartTaskInput, date picker) can stopPropagation.
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
   }, [showCaptureModal, close])
 
   if (!showCaptureModal) return null
@@ -388,6 +384,27 @@ export function TaskVaultView(): React.JSX.Element {
       else void loadToday()
       if (taskId) useVaultNavStore.getState().navigateToTask(taskId, date)
     })
+  }, [loadDate, loadToday])
+
+  // Cold-start: if this view mounted because of a calendar navigation (before the
+  // WebContentsView existed), the broadcast was lost — pop the pending nav from main.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const nav = await window.electronAPI.extensionBridge.invoke(
+          'task-vault:pop-pending-navigation',
+          null
+        )
+        if (!nav || typeof nav !== 'object') return
+        const { date, taskId } = nav as { date?: string; taskId?: string }
+        useVaultNavStore.getState().setSkipNextVisibilityReset(true)
+        if (date) void loadDate(date)
+        else void loadToday()
+        if (taskId) useVaultNavStore.getState().navigateToTask(taskId, date)
+      } catch {
+        // non-critical
+      }
+    })()
   }, [loadDate, loadToday])
 
   useEffect(() => {

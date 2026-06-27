@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS = {
   terminal: {
     scrollbackLimit: 10000,
     defaultShell: '/bin/zsh',
+    promptForName: false,
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},
@@ -240,6 +241,35 @@ describe('useSettingsStore', () => {
       await useSettingsStore.getState().updateShowMetricsBar(false)
       expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
         ui: { showMetricsBar: false },
+      })
+    })
+  })
+
+  describe('updatePromptForName', () => {
+    it('calls updateGlobal with promptForName true and updates store', async () => {
+      const updated = {
+        ...DEFAULT_SETTINGS,
+        terminal: { ...DEFAULT_SETTINGS.terminal, promptForName: true },
+      }
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+      await useSettingsStore.getState().updatePromptForName(true)
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        terminal: { promptForName: true },
+      })
+      expect(useSettingsStore.getState().globalSettings?.terminal?.promptForName).toBe(true)
+    })
+
+    it('calls updateGlobal with promptForName false', async () => {
+      const updated = {
+        ...DEFAULT_SETTINGS,
+        terminal: { ...DEFAULT_SETTINGS.terminal, promptForName: false },
+      }
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+      await useSettingsStore.getState().updatePromptForName(false)
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        terminal: { promptForName: false },
       })
     })
   })
