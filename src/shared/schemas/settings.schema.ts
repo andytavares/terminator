@@ -9,6 +9,7 @@ export const GlobalSettingsSchema = z.object({
   terminal: z.object({
     scrollbackLimit: z.number().int().min(1000).max(100000),
     defaultShell: z.string().min(1),
+    promptForName: z.boolean().default(false),
   }),
   git: z.object({
     worktreeBaseDir: z.string(),
@@ -54,6 +55,7 @@ export const DEFAULT_GLOBAL_SETTINGS = {
   terminal: {
     scrollbackLimit: 10000,
     defaultShell: process.env.SHELL || '/bin/zsh',
+    promptForName: false,
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},

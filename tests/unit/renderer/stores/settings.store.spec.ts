@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS = {
   terminal: {
     scrollbackLimit: 10000,
     defaultShell: '/bin/zsh',
+    promptForName: false,
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},

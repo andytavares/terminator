@@ -1009,17 +1009,25 @@ function TaskRow({
                           void window.electronAPI.terminal
                             .listSessions?.()
                             .then((sessions) => {
-                              if (!Array.isArray(sessions)) return
+                              if (!Array.isArray(sessions)) {
+                                setLinking(true)
+                                return
+                              }
                               const meta = (
                                 sessions as Array<{ sessionId: string; projectId: string }>
                               ).find((s) => s.sessionId === sessionId)
-                              if (!meta) return
+                              if (!meta) {
+                                setLinking(true)
+                                return
+                              }
                               return window.electronAPI.extensionBridge.invoke(
                                 'task-vault:navigate-to-terminal',
                                 { sessionId: meta.sessionId, projectId: meta.projectId }
                               )
                             })
-                            .catch(() => {})
+                            .catch(() => {
+                              setLinking(true)
+                            })
                         }}
                       >
                         <Zap size={13} />

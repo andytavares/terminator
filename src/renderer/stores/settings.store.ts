@@ -20,6 +20,7 @@ interface SettingsState {
   ) => Promise<void>
   markWelcomeSeen: () => Promise<void>
   updateShowMetricsBar: (show: boolean) => Promise<void>
+  updatePromptForName: (enabled: boolean) => Promise<void>
   resolveSettings: (workspaceId?: string | null) => GlobalSettings
 }
 
@@ -28,6 +29,7 @@ const DEFAULT_SETTINGS: GlobalSettings = {
   terminal: {
     scrollbackLimit: 10000,
     defaultShell: '/bin/zsh',
+    promptForName: false,
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},
@@ -154,6 +156,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   updateShowMetricsBar: async (show) => {
     const result = await window.electronAPI.settings.updateGlobal({ ui: { showMetricsBar: show } })
+    set({ globalSettings: result.settings })
+  },
+
+  updatePromptForName: async (enabled) => {
+    const result = await window.electronAPI.settings.updateGlobal({
+      terminal: { promptForName: enabled },
+    })
     set({ globalSettings: result.settings })
   },
 

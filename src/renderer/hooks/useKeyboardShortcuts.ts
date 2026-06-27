@@ -12,6 +12,7 @@ interface Options {
   onOpenCommandPalette?: () => void
   onToggleOverview?: () => void
   onNewScratch?: () => void
+  onNewTab?: () => void
   /** When scratch mode is active, pass SCRATCH_PROJECT_ID here so all terminal shortcuts work. */
   scratchProjectId?: string | null
 }
@@ -22,6 +23,7 @@ export function useKeyboardShortcuts({
   onOpenCommandPalette,
   onToggleOverview,
   onNewScratch,
+  onNewTab,
   scratchProjectId,
 }: Options = {}): void {
   const {
@@ -167,7 +169,9 @@ export function useKeyboardShortcuts({
       // Cmd+T: new tab
       if (isMeta && e.key === 't') {
         e.preventDefault()
-        if (effectiveProjectId) {
+        if (onNewTab) {
+          onNewTab()
+        } else if (effectiveProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
           const cwd = resolveActiveCwd()
           createSession(

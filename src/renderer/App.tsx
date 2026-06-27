@@ -24,6 +24,7 @@ import { OverviewScreen } from './components/overview/OverviewScreen'
 import { MetricsBar } from './components/overview/MetricsBar'
 import { useMetricsStore } from './stores/metrics.store'
 import { AboutDialog } from './components/AboutDialog'
+import { NameTerminalDialog } from './components/NameTerminalDialog'
 import { SCRATCH_PROJECT_ID } from '../shared/types/index'
 
 installLogInterceptor()
@@ -31,6 +32,12 @@ installLogInterceptor()
 export function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [pendingCreate, setPendingCreate] = useState<{
+    projectId: string
+    cwd: string
+    scrollbackLimit: number
+    defaultName: string
+  } | null>(null)
   const [logOpen, setLogOpen] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -97,21 +104,18 @@ export function App(): JSX.Element {
   }, [activeGlobalTabId, setActiveGlobalTab])
 
   const handleNewTab = useCallback(() => {
-    if (scratchActive) {
-      const settings = resolveSettings(activeWorkspaceId)
-      void createSession(
-        SCRATCH_PROJECT_ID,
-        'human',
-        '',
-        resolveActiveCwd(),
-        settings.terminal.scrollbackLimit
-      )
-      return
-    }
-    if (!activeProjectId) return
+    const projectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
+    if (!projectId) return
     const settings = resolveSettings(activeWorkspaceId)
     const cwd = resolveActiveCwd()
-    void createSession(activeProjectId, 'human', '', cwd, settings.terminal.scrollbackLimit)
+    const scrollbackLimit = settings.terminal.scrollbackLimit
+    if (settings.terminal.promptForName) {
+      const { terminalCountByProject } = useSessionStore.getState()
+      const next = (terminalCountByProject.get(projectId) ?? 0) + 1
+      setPendingCreate({ projectId, cwd, scrollbackLimit, defaultName: `Terminal ${next}` })
+    } else {
+      void createSession(projectId, 'human', '', cwd, scrollbackLimit)
+    }
   }, [
     scratchActive,
     activeProjectId,
@@ -137,6 +141,7 @@ export function App(): JSX.Element {
     onOpenCommandPalette: handleOpenCommandPalette,
     onToggleOverview: handleToggleOverview,
     onNewScratch: handleNewScratch,
+    onNewTab: handleNewTab,
     scratchProjectId: scratchActive ? SCRATCH_PROJECT_ID : null,
   })
 
@@ -604,6 +609,17 @@ export function App(): JSX.Element {
           <NotificationPanel />
           {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
           {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
+          {pendingCreate && (
+            <NameTerminalDialog
+              defaultName={pendingCreate.defaultName}
+              onConfirm={(name) => {
+                const { projectId, cwd, scrollbackLimit } = pendingCreate
+                setPendingCreate(null)
+                void createSession(projectId, 'human', name, cwd, scrollbackLimit)
+              }}
+              onCancel={() => setPendingCreate(null)}
+            />
+          )}
           {logOpen && <LogWindow onClose={() => setLogOpen(false)} />}
           {paletteOpen && (
             <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />
