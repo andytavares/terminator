@@ -13,7 +13,7 @@ interface Props {
   onClose: () => void
 }
 
-export function GitSidebarPanel({ repoRoot, onClose }: Props): JSX.Element {
+export function GitSidebarPanel({ repoRoot, onClose: _onClose }: Props): JSX.Element {
   useGitStatus(repoRoot)
   const { status, setSelectedFile, setDiff, setView } = useGitStore()
   const { setActiveProjectTab } = useExtensionRegistry()
@@ -121,9 +121,6 @@ export function GitSidebarPanel({ repoRoot, onClose }: Props): JSX.Element {
         ) : (
           <span className="git-sidebar__branch">Git</span>
         )}
-        <button className="git-sidebar__close-btn" onClick={onClose} title="Close">
-          ×
-        </button>
       </div>
 
       {status?.hasConflicts && (

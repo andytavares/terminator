@@ -145,12 +145,13 @@ export class ExtensionViewHost {
       entry.view.webContents.send('workspace:changed', { repoRoot })
     }
 
-    // Use the window's authoritative content size so the view always fills to
-    // the right/bottom edge regardless of what the renderer measured.
-    const { width: winW, height: winH } = this.mainWindow.getContentBounds()
+    // Use the window's authoritative width so the view always fills to the right
+    // edge. Use the renderer-reported height so stacked panels share vertical space
+    // rather than each filling to the bottom of the window.
+    const { width: winW } = this.mainWindow.getContentBounds()
     const x = Math.round(bounds.x)
     const y = Math.round(bounds.y)
-    entry.view.setBounds({ x, y, width: winW - x, height: winH - y })
+    entry.view.setBounds({ x, y, width: winW - x, height: Math.round(bounds.height) })
     entry.view.setVisible(visible)
   }
 

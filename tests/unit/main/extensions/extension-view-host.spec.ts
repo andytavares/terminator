@@ -152,8 +152,8 @@ describe('ExtensionViewHost', () => {
   it('handleBoundsUpdate sets bounds and visibility on the matching view', async () => {
     await host.createView(makeExt(), 'main')
     host.handleBoundsUpdate('com.test.ext', 'main', { x: 10, y: 20, width: 400, height: 300 }, true)
-    // width = winW(1280) - x(10) = 1270; height = winH(800) - y(20) = 780
-    expect(mockSetBounds).toHaveBeenCalledWith({ x: 10, y: 20, width: 1270, height: 780 })
+    // width = winW(1280) - x(10) = 1270; height = bounds.height(300) (renderer-reported)
+    expect(mockSetBounds).toHaveBeenCalledWith({ x: 10, y: 20, width: 1270, height: 300 })
     expect(mockSetVisible).toHaveBeenCalledWith(true)
   })
 

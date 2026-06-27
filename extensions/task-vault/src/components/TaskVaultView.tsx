@@ -386,6 +386,27 @@ export function TaskVaultView(): React.JSX.Element {
     })
   }, [loadDate, loadToday])
 
+  // Cold-start: if this view mounted because of a calendar navigation (before the
+  // WebContentsView existed), the broadcast was lost — pop the pending nav from main.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const nav = await window.electronAPI.extensionBridge.invoke(
+          'task-vault:pop-pending-navigation',
+          null
+        )
+        if (!nav || typeof nav !== 'object') return
+        const { date, taskId } = nav as { date?: string; taskId?: string }
+        useVaultNavStore.getState().setSkipNextVisibilityReset(true)
+        if (date) void loadDate(date)
+        else void loadToday()
+        if (taskId) useVaultNavStore.getState().navigateToTask(taskId, date)
+      } catch {
+        // non-critical
+      }
+    })()
+  }, [loadDate, loadToday])
+
   useEffect(() => {
     const vd = useVaultNavStore.getState().viewingDate
     if (vd) void loadDate(vd)

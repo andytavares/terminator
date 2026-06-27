@@ -145,14 +145,26 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     )
   }
 
+  // Pending navigation from CalendarDrawer — consumed by TaskVaultView on cold-start mount.
+  let pendingNavigation: { date?: string; taskId?: string } | null = null
+
   disposables.push(
     api.ipc.registerHandler('task-vault:open-panel', (data) => {
       const { date, taskId } = (data ?? {}) as { date?: string; taskId?: string }
-      api.window.broadcast('extension:activate-global-tab', 'task-vault')
+      api.window.broadcast('extension:activate-global-tab', 'terminator.task-vault')
       if (date ?? taskId) {
+        pendingNavigation = { date, taskId }
         api.window.broadcast('task-vault:navigate', { date, taskId })
       }
       return { ok: true }
+    })
+  )
+
+  disposables.push(
+    api.ipc.registerHandler('task-vault:pop-pending-navigation', () => {
+      const nav = pendingNavigation
+      pendingNavigation = null
+      return nav
     })
   )
 
