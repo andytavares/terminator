@@ -16,7 +16,6 @@ import {
 import type { IndexedProject, IndexedTask } from '../vault/types'
 import { useVaultStore } from '../stores/vault.store'
 import { SmartTaskInput } from './SmartTaskInput'
-import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 
 interface AreaOption {
@@ -123,12 +122,20 @@ function AreaCombobox({
 function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element {
   const [linking, setLinking] = useState(false)
   const [linked, setLinked] = useState(false)
-  const sessions = useSessionStore((s) => Array.from(s.sessions.values()))
-  const activeSessions = sessions.filter((s) => s.status !== 'closed')
+  const [activeSessions, setActiveSessions] = useState<
+    Array<{ sessionId: string; projectId: string; tabTitle: string }>
+  >([])
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const projectsByWs = useWorkspaceStore((s) => s.projectsByWorkspaceId)
 
-  function sessionLabel(s: { id: string; tabTitle?: string; projectId: string }): string {
+  useEffect(() => {
+    if (!linking) return
+    void window.electronAPI.terminal.listSessions?.().then((result) => {
+      if (Array.isArray(result)) setActiveSessions(result)
+    })
+  }, [linking])
+
+  function sessionLabel(s: { sessionId: string; tabTitle: string; projectId: string }): string {
     let project: { name: string; workspaceId: string } | undefined
     for (const [, projects] of projectsByWs) {
       project = projects.find((p) => p.id === s.projectId)
@@ -139,7 +146,7 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
     if (workspace) parts.push(workspace.name)
     if (project) parts.push(project.name)
     if (s.tabTitle) parts.push(s.tabTitle)
-    return parts.length ? parts.join(' › ') : s.id.slice(0, 8)
+    return parts.length ? parts.join(' › ') : s.sessionId.slice(0, 8)
   }
 
   async function handleSelect(sessionId: string) {
@@ -186,7 +193,7 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
           Select terminal…
         </option>
         {activeSessions.map((s) => (
-          <option key={s.id} value={s.id}>
+          <option key={s.sessionId} value={s.sessionId}>
             {sessionLabel(s)}
           </option>
         ))}

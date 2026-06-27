@@ -23,7 +23,6 @@ import {
 } from 'lucide-react'
 import type { DailyLog as DailyLogData, IndexedTask } from '../vault/types'
 import { SmartTaskInput } from './SmartTaskInput'
-import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { notify } from '../utils/notify'
@@ -92,12 +91,19 @@ function SessionPicker({
   onSelect: (id: string) => void
   onClose: () => void
 }): React.JSX.Element {
-  const sessions = useSessionStore((s) => Array.from(s.sessions.values()))
-  const activeSessions = sessions.filter((s) => s.status !== 'closed')
+  const [activeSessions, setActiveSessions] = useState<
+    Array<{ sessionId: string; projectId: string; tabTitle: string }>
+  >([])
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const projectsByWs = useWorkspaceStore((s) => s.projectsByWorkspaceId)
 
-  function sessionLabel(s: { id: string; tabTitle?: string; projectId: string }): string {
+  useEffect(() => {
+    void window.electronAPI.terminal.listSessions?.().then((result) => {
+      if (Array.isArray(result)) setActiveSessions(result)
+    })
+  }, [])
+
+  function sessionLabel(s: { sessionId: string; tabTitle: string; projectId: string }): string {
     let project: { name: string; workspaceId: string } | undefined
     for (const [, projects] of projectsByWs) {
       project = projects.find((p) => p.id === s.projectId)
@@ -108,7 +114,7 @@ function SessionPicker({
     if (workspace) parts.push(workspace.name)
     if (project) parts.push(project.name)
     if (s.tabTitle) parts.push(s.tabTitle)
-    return parts.length ? parts.join(' › ') : s.id.slice(0, 8)
+    return parts.length ? parts.join(' › ') : s.sessionId.slice(0, 8)
   }
 
   if (activeSessions.length === 0) {
@@ -134,7 +140,7 @@ function SessionPicker({
           Select a terminal session…
         </option>
         {activeSessions.map((s) => (
-          <option key={s.id} value={s.id}>
+          <option key={s.sessionId} value={s.sessionId}>
             {sessionLabel(s)}
           </option>
         ))}
