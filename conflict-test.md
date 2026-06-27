@@ -12,6 +12,9 @@ The PR branch has the correct fix. The reviewer should choose the incoming chang
 timeout = 30000
 retry_count = 5
 endpoint = "/api/v2/current"
+timeout = 5000
+retry_count = 3
+endpoint = "/api/v1/legacy"
 
 ---
 
@@ -32,8 +35,8 @@ keep all entries from both sides.
 
 features:
 
-- offline_mode
-- keyboard_shortcuts
+- dark_mode
+- auto_save
 
 ---
 
@@ -42,6 +45,9 @@ features:
 The common ancestor (main) had version 1. Both branches independently updated the
 same block: branch-a to version 2, branch-b to version 3. Neither is a clear winner.
 
+version = "2.0.0-branch-a"
+changelog = "Bumped to 2.0 with performance improvements"
+author = "Team A"
 version = "3.0.0-branch-b"
 changelog = "Major rewrite with new architecture"
 author = "Team B"

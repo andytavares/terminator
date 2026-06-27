@@ -1,8 +1,8 @@
-# Add/Add Conflict — Branch B Version
+# Add/Add Conflict — Branch A Version
 
 Both branches created this file at the same path with different content.
-Branch B's version: focuses on the new authentication flow.
+Branch A's version: focuses on the legacy session management system.
 
-auth_provider = "oauth2"
-token_ttl = 3600
-scopes = ["read", "write", "admin"]
+auth_provider = "session_cookie"
+token_ttl = 86400
+scopes = ["read", "write", "test"]
