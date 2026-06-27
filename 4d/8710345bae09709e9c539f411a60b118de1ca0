@@ -1,0 +1,48 @@
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_aea7dd3aabcb2b::t_37eda9e4fa6546 172-174
+  s_aea7dd3aabcb2b::t_f0736d939a8925 15,26
+src/renderer/stores/settings.store.ts
+  s_aea7dd3aabcb2b::t_09c9a4a8dd450a 162-168
+  s_aea7dd3aabcb2b::t_4ebaa71a885db1 23
+  s_aea7dd3aabcb2b::t_a1a7389a767595 32
+tests/unit/renderer/components/NameTerminalDialog.spec.tsx
+  s_aea7dd3aabcb2b::t_cd3f4529309324 1-72,79-86
+  s_aea7dd3aabcb2b::t_2594e671261057 73-78
+src/shared/schemas/settings.schema.ts
+  s_aea7dd3aabcb2b::t_7f6d27c3971f7b 58
+  s_aea7dd3aabcb2b::t_bc1f07c12a9d06 12
+src/shared/types/index.ts
+  s_aea7dd3aabcb2b::t_2839d86aceb21f 103
+src/renderer/components/NameTerminalDialog.tsx
+  s_aea7dd3aabcb2b::t_108a0c617f16c5 1,14,30,51-52
+  s_aea7dd3aabcb2b::t_17f3fc7cdc22a8 2-13,15-29,31-50,53-66
+extensions/task-vault/src/components/DailyLog.tsx
+  s_aea7dd3aabcb2b::t_95bc7b9ff70071 1012-1015,1019-1022,1028-1030
+src/renderer/App.tsx
+  s_aea7dd3aabcb2b::t_60f00e30f968f4 144
+  s_aea7dd3aabcb2b::t_a3b3f6464eeee3 27
+  s_aea7dd3aabcb2b::t_085d41138ab28d 612-622
+  s_aea7dd3aabcb2b::t_a30a70b213c348 107-108,111-118
+  s_aea7dd3aabcb2b::t_c92dc9bd1cbf5d 35-40
+tests/unit/renderer/stores/settings.store.spec.ts
+  s_aea7dd3aabcb2b::t_a4e5022ddf00d4 25
+src/renderer/components/settings/GlobalSettings.tsx
+  s_aea7dd3aabcb2b::t_9e537fde7b5bec 73-87
+  s_aea7dd3aabcb2b::t_e1beb3401efa41 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "4d8710345bae09709e9c539f411a60b118de1ca0",
+  "prompts": {},
+  "sessions": {
+    "s_aea7dd3aabcb2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0943ecf4-f5a9-4197-aa13-ac7d22d12fa5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
