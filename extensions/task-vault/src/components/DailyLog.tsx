@@ -1004,7 +1004,12 @@ function TaskRow({
                         className="tv-btn tv-btn--outline tv-btn--action-icon"
                         title="Jump to linked terminal"
                         onClick={() => {
-                          useExtensionRegistry.getState().setActiveGlobalTab(null)
+                          const sessionId = task.terminatorLinks[0]
+                          if (sessionId) {
+                            void window.electronAPI.extensionBridge
+                              .invoke('task-vault:navigate-to-terminal', { sessionId })
+                              .catch(() => {})
+                          }
                         }}
                       >
                         <Zap size={13} />

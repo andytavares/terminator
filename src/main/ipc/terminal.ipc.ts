@@ -35,6 +35,10 @@ interface ActiveSessionMeta {
 
 const activeSessionRegistry = new Map<string, ActiveSessionMeta>()
 
+export function getSessionMeta(sessionId: string): ActiveSessionMeta | undefined {
+  return activeSessionRegistry.get(sessionId)
+}
+
 export function registerTerminalHandlers(
   ptyManager: PtyManager,
   getWindow: () => BrowserWindow | null

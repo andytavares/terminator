@@ -417,6 +417,22 @@ export function App(): JSX.Element {
   }, [setActiveGlobalTab])
 
   useEffect(() => {
+    return window.electronAPI.extensionBridge.on('terminal:navigate-to-session', (data) => {
+      const { sessionId, projectId } = data as { sessionId: string; projectId: string }
+      setActiveGlobalTab(null)
+      const { projectsByWorkspaceId } = useWorkspaceStore.getState()
+      for (const [wsId, projects] of projectsByWorkspaceId) {
+        if (projects.some((p) => p.id === projectId)) {
+          useWorkspaceStore.getState().setActiveWorkspace(wsId)
+          break
+        }
+      }
+      useWorkspaceStore.getState().setActiveProject(projectId)
+      useSessionStore.getState().setActiveSessionForProject(projectId, sessionId)
+    })
+  }, [setActiveGlobalTab])
+
+  useEffect(() => {
     const unsubLog = window.electronAPI.extensionBridge.on('log:push', (data) => {
       const { level, message } = data as { level: 'info' | 'warn' | 'error'; message: string }
       useLogStore.getState().addEntry(level, message)

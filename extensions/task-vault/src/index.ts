@@ -7,6 +7,7 @@ import { registerLinksIpcHandlers } from './ipc/links.ipc.js'
 import { registerKanbanIpcHandlers } from './ipc/kanban.ipc.js'
 import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
 import { applyTaskVaultSchema, applyTaskVaultMigrations } from './vault/db.js'
+import { getSessionMeta } from '../../../src/main/ipc/terminal.ipc.js'
 import { backfillRecurringTasks } from './vault/ensure-next-occurrence.js'
 import { startTaskScheduler, setSchedulerTick } from './notifications/task-scheduler.js'
 
@@ -144,6 +145,20 @@ export async function activate(api: ExtensionAPI): Promise<void> {
       'Task Vault: database schema failed to initialize. Restart the app — if the problem persists, check the logs.'
     )
   }
+
+  disposables.push(
+    api.ipc.registerHandler('task-vault:navigate-to-terminal', (data) => {
+      const { sessionId } = (data ?? {}) as { sessionId?: string }
+      if (!sessionId) return { ok: false, error: 'missing sessionId' }
+      const meta = getSessionMeta(sessionId)
+      if (!meta) return { ok: false, error: 'session not found' }
+      api.window.broadcast('terminal:navigate-to-session', {
+        sessionId: meta.sessionId,
+        projectId: meta.projectId,
+      })
+      return { ok: true }
+    })
+  )
 
   // Pending navigation from CalendarDrawer — consumed by TaskVaultView on cold-start mount.
   let pendingNavigation: { date?: string; taskId?: string } | null = null
