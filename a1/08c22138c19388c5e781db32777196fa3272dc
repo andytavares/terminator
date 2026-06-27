@@ -1,0 +1,30 @@
+tests/unit/extensions/extension-view-host.spec.ts
+  s_aea7dd3aabcb2b::t_d854d0a4c86e99 147,152
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_aea7dd3aabcb2b::t_cb1f4aba21ce4b 389-409
+extensions/git-integration/src/components/GitSidebarPanel.tsx
+  s_aea7dd3aabcb2b::t_6463d23126a498 16
+src/main/extensions/extension-view-host.ts
+  s_aea7dd3aabcb2b::t_3afdc4164cc7e9 148-151,154
+extensions/task-vault/src/index.ts
+  s_aea7dd3aabcb2b::t_b667214aed90a7 148-150,154,156,163-167
+  s_aea7dd3aabcb2b::t_91ee456abb8660 168-170
+tests/unit/main/extensions/extension-view-host.spec.ts
+  s_aea7dd3aabcb2b::t_3b54f4b58fdf32 155-156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "a108c22138c19388c5e781db32777196fa3272dc",
+  "prompts": {},
+  "sessions": {
+    "s_aea7dd3aabcb2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0943ecf4-f5a9-4197-aa13-ac7d22d12fa5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
