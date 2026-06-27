@@ -1,0 +1,21 @@
+conflict-delete-modify.md
+  s_8a7d1faa46510b::t_ef870ac9251d6c 1-10
+conflict-test.md
+  s_8a7d1faa46510b::t_3b95336d09356e 15-17,38-39,48-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "c884b69f0b57aecd42133bbb7efd7c2242c16767",
+  "prompts": {},
+  "sessions": {
+    "s_8a7d1faa46510b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82826409-eca5-4986-bedb-fb632716642c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
