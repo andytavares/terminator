@@ -1,0 +1,70 @@
+extensions/git-integration/src/components/pr-review/PrReviewView.tsx
+  s_aea7dd3aabcb2b::t_51ca8d2343f90c 284-290
+src/renderer/components/sidebar/ScratchSection.tsx
+  s_aea7dd3aabcb2b::t_fe85f6d249d1e3 1,3-4,20-52,57,61-62,65-83,89-144
+tests/unit/extensions/github.ipc.spec.ts
+  s_aea7dd3aabcb2b::t_021ab179bbebcf 458-459,472-474,486-488,500
+extensions/git-integration/src/components/pr-review/ReviewSubmitPanel.tsx
+  s_aea7dd3aabcb2b::t_450cc88e0afcae 12
+tests/unit/renderer/components/ExtensionPanelPortal.spec.tsx
+  s_aea7dd3aabcb2b::t_563c87dd4918d7 77,82,86
+src/renderer/components/sidebar/WorkspaceCard.css
+  s_aea7dd3aabcb2b::t_87b1927708bccf 49-50
+  s_aea7dd3aabcb2b::t_31f8786b3a121c 51,53-77
+  s_aea7dd3aabcb2b::t_4785e63f8f70e6 52
+tests/unit/renderer/components/WorkspaceCard.spec.tsx
+  s_aea7dd3aabcb2b::t_f7724a0c74def4 273-336
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_aea7dd3aabcb2b::t_da3fda90eb1cd3 2325-2347
+extensions/git-integration/tests/unit/github-ipc.spec.ts
+  s_aea7dd3aabcb2b::t_a8b515d598aeb3 875-889,891-903,905
+  s_aea7dd3aabcb2b::t_a0f2f2bbd89244 431-449,451-458,460-465
+  s_aea7dd3aabcb2b::t_857084b71601a0 890
+  s_aea7dd3aabcb2b::t_55185740b1f6fd 486,489,491-494,805,808,810-813,815,817-819,906,909,911-914,918-920,1571-1584,1635-1706
+  s_aea7dd3aabcb2b::t_25533e2345cecb 1594-1605
+  s_aea7dd3aabcb2b::t_c5a39947d3d053 41-51
+  s_aea7dd3aabcb2b::t_abef33cb293421 1620-1634
+  s_aea7dd3aabcb2b::t_c95c9e57d4fb42 904
+  s_aea7dd3aabcb2b::t_e34cb8537876f3 450,459
+  s_aea7dd3aabcb2b::t_740f1fbd3d1806 1585-1592
+  s_aea7dd3aabcb2b::t_23febe54398e4b 721-804
+  s_aea7dd3aabcb2b::t_eee2456f22c3a5 22
+  s_aea7dd3aabcb2b::t_3b5652ea78af4b 1593,1606-1619
+  s_aea7dd3aabcb2b::t_c924135cd6dff9 466-485
+  s_aea7dd3aabcb2b::t_0de2a5a230c479 487-488,490,495-496,806-807,809,814,816,907-908,910,915-917,1113,1707-1721
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_aea7dd3aabcb2b::t_4055fa349a1aaf 57
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_aea7dd3aabcb2b::t_f7ff67428261eb 227-273,275-278,280-284
+  s_aea7dd3aabcb2b::t_c50551962559d9 274,279
+tests/unit/renderer/components/ScratchSection.spec.tsx
+  s_aea7dd3aabcb2b::t_3f5e950dfd2898 3
+  s_aea7dd3aabcb2b::t_2aa115af00d88f 4,8-21,37-39
+  s_aea7dd3aabcb2b::t_1b005281d5446a 107-264,268-285
+  s_aea7dd3aabcb2b::t_0cc13b4a6a94e7 265-267
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_aea7dd3aabcb2b::t_b97c3a4501caca 690,693
+  s_aea7dd3aabcb2b::t_4b0f3fd178a472 688
+src/renderer/components/ExtensionPanelPortal.tsx
+  s_aea7dd3aabcb2b::t_236455f6b84333 66-67
+src/renderer/components/sidebar/WorkspaceCard.tsx
+  s_aea7dd3aabcb2b::t_b9f1934c439d66 113-120
+src/renderer/components/sidebar/ScratchSection.css
+  s_aea7dd3aabcb2b::t_52aaf8a4bcb55c 54-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "8f39a42bd24322556b2e2ca1c745fa2c29cfafb6",
+  "prompts": {},
+  "sessions": {
+    "s_aea7dd3aabcb2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0943ecf4-f5a9-4197-aa13-ac7d22d12fa5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
