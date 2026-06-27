@@ -9,6 +9,9 @@ Each section represents a different conflict scenario.
 
 The PR branch has the correct fix. The reviewer should choose the incoming change.
 
+timeout = 30000
+retry_count = 5
+endpoint = "/api/v2/current"
 timeout = 5000
 retry_count = 3
 endpoint = "/api/v1/legacy"
@@ -19,9 +22,9 @@ endpoint = "/api/v1/legacy"
 
 The base branch has the correct value. The reviewer should keep the current version.
 
-max_connections = 100
-pool_size = 10
-log_level = "info"
+max_connections = 999
+pool_size = 50
+log_level = "debug"
 
 ---
 
@@ -45,3 +48,6 @@ same block: branch-a to version 2, branch-b to version 3. Neither is a clear win
 version = "2.0.0-branch-a"
 changelog = "Bumped to 2.0 with performance improvements"
 author = "Team A"
+version = "3.0.0-branch-b"
+changelog = "Major rewrite with new architecture"
+author = "Team B"

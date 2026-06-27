@@ -5,4 +5,4 @@ Branch A's version: focuses on the legacy session management system.
 
 auth_provider = "session_cookie"
 token_ttl = 86400
-scopes = ["read", "write"]
+scopes = ["read", "write", "test"]
