@@ -1,0 +1,130 @@
+extensions/git-integration/tests/unit/ReviewSubmitPanel.spec.tsx
+  s_8a7d1faa46510b::t_9a05647407da1a 75-76,86,97,107,114-120
+  s_8a7d1faa46510b::t_431b8274797fc7 121-122
+src/main/preload.ts
+  s_8a7d1faa46510b::t_7d6dedbceec88d 120
+extensions/task-vault/src/ipc/links.ipc.ts
+  s_8a7d1faa46510b::t_edb1e1c9d82838 39,41
+extensions/git-integration/tests/unit/GitFullView.spec.tsx
+  s_8a7d1faa46510b::t_6bb9e9223bd27d 79
+extensions/task-vault/src/components/DailyLog.tsx
+  s_8a7d1faa46510b::t_729ed186300fc2 822
+  s_8a7d1faa46510b::t_0f6192295e52e5 96,101-120,124,126-127
+  s_8a7d1faa46510b::t_1bd3570f37035d 813,817-821,825
+  s_8a7d1faa46510b::t_01b9841c32d330 1031-1032,1034-1035
+  s_8a7d1faa46510b::t_4141aaac33ba13 812,815
+  s_8a7d1faa46510b::t_3f537606acab51 1243-1244
+  s_8a7d1faa46510b::t_4aaa421e51dd3a 90
+  s_8a7d1faa46510b::t_0f942e39bacc51 764
+  s_8a7d1faa46510b::t_0a30dece276fe6 147-148
+  s_8a7d1faa46510b::t_e3fb481779dc58 752-754
+  s_8a7d1faa46510b::t_5f6dd6e355c28f 97-98
+  s_8a7d1faa46510b::t_7e88a5acbfe7a5 1033
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_8a7d1faa46510b::t_75299a1145b31a 571-587,589-597
+  s_8a7d1faa46510b::t_90cbd27eb34d47 730,733-745
+  s_8a7d1faa46510b::t_0a06a91b6c92ec 709,714,716-721,725,731-732,746-751
+  s_8a7d1faa46510b::t_7717516688f4c1 726-729
+tests/unit/main/extensions/extension-view-host.spec.ts
+  s_8a7d1faa46510b::t_5ea3d73e6d2149 20,33
+  s_8a7d1faa46510b::t_3b86b975b27936 255-284
+extensions/git-integration/src/components/pr-review/PrReviewTab.tsx
+  s_8a7d1faa46510b::t_69ef8f9243293e 208,210-211,222
+  s_8a7d1faa46510b::t_c2974759608f80 7
+  s_8a7d1faa46510b::t_af9891c65d978d 43
+  s_8a7d1faa46510b::t_65a45e3188f505 209
+extensions/git-integration/tests/unit/GitSidebarPanel.spec.tsx
+  s_8a7d1faa46510b::t_72ecb10111ae06 71,79
+  s_8a7d1faa46510b::t_99bce1e8dccfd5 19-25
+specs/001-extension-first-terminal/.pilot/state.json
+  s_aea7dd3aabcb2b::t_fc5070086fa18e 130-143
+  s_aea7dd3aabcb2b::t_c83e9cc214e355 127-129
+extensions/git-integration/tests/unit/PrOverviewPanel.spec.tsx
+  s_8a7d1faa46510b::t_02066dd45bac75 515-516,524,535
+src/renderer/App.tsx
+  s_8a7d1faa46510b::t_1aea36ec827cab 102
+  s_8a7d1faa46510b::t_7c02dc4a48e6c9 175
+  s_8a7d1faa46510b::t_17179c0f82c122 630
+  s_8a7d1faa46510b::t_c81e7ddd20ad6e 100-101,103-107
+extensions/task-vault/tests/ipc/links.ipc.spec.ts
+  s_8a7d1faa46510b::t_aaa00a127323a2 206-213
+  s_8a7d1faa46510b::t_4d90e370068247 53-55,59-61
+  s_8a7d1faa46510b::t_8ccd5c902704e4 226-234
+extensions/git-integration/src/components/pr-review/ReviewSubmitPanel.tsx
+  s_8a7d1faa46510b::t_976f28528ebaef 56-60,68-86
+  s_8a7d1faa46510b::t_eb15c6a1cc9856 7,13
+  s_8a7d1faa46510b::t_6c2ffb80474379 21-24,37
+src/renderer/electron.d.ts
+  s_8a7d1faa46510b::t_a841e83ebde3ae 155
+extensions/git-integration/src/components/pr-review/ReviewQueue.tsx
+  s_8a7d1faa46510b::t_1a9ed51b284a15 73-89,95-96,102-103,111-119
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_8a7d1faa46510b::t_466665819e8757 1805-1820
+extensions/git-integration/src/index.ts
+  s_8a7d1faa46510b::t_aaff26b261fe07 23-32
+src/main/extensions/extension-view-host.ts
+  s_8a7d1faa46510b::t_c58bbf96f7fe63 107-112,114
+  s_8a7d1faa46510b::t_f8cfb66d2453f2 158-165,168-170,174-183
+  s_8a7d1faa46510b::t_46b91161316a12 59-60,67
+  s_8a7d1faa46510b::t_9b4638001e3747 113
+  s_8a7d1faa46510b::t_feb8788e261ecb 184
+extensions/git-integration/src/components/pr-review/PrOverviewPanel.tsx
+  s_8a7d1faa46510b::t_9b820075d16025 37
+  s_8a7d1faa46510b::t_fdf6d2613b70d0 491
+  s_8a7d1faa46510b::t_4c4e1b23551ac2 19
+  s_8a7d1faa46510b::t_f85c807d914d94 119,133,137,142-143
+  s_8a7d1faa46510b::t_e3734daff61ebb 141
+  s_8a7d1faa46510b::t_970d25e84e65af 50
+src/main/index.ts
+  s_8a7d1faa46510b::t_8740428de2b189 375-378
+  s_8a7d1faa46510b::t_c44e95a7a71397 395-398
+extensions/git-integration/src/components/pr-review/PrReviewView.tsx
+  s_8a7d1faa46510b::t_bd5fbafa4b119c 405
+  s_8a7d1faa46510b::t_9ef39749c0fe19 40
+extensions/git-integration/src/components/GitFullView.tsx
+  s_8a7d1faa46510b::t_2ddca01d7fca17 53-60
+  s_8a7d1faa46510b::t_67a2a03e1161a0 1
+extensions/git-integration/src/components/GitSidebarPanel.tsx
+  s_8a7d1faa46510b::t_b5673562d97d54 18
+  s_8a7d1faa46510b::t_71ca09f2b9ea44 129-131
+src/renderer/components/LogWindow.css
+  s_8a7d1faa46510b::t_2f09812a84e0f1 11
+tests/unit/renderer/App.spec.tsx
+  s_8a7d1faa46510b::t_0a8827305ea87a 239-241
+extensions/git-integration/tests/unit/github-ipc.spec.ts
+  s_8a7d1faa46510b::t_3f170b3359051a 1155-1170
+  s_8a7d1faa46510b::t_5fe5a4a5fa6b42 77-83
+  s_8a7d1faa46510b::t_153d3b3743c361 1817-1829
+  s_8a7d1faa46510b::t_db57bd44f1a6ce 1521,1802-1816,1830-1864
+  s_8a7d1faa46510b::t_b330249065f50b 42-52
+  s_8a7d1faa46510b::t_6bbfea93a2e1cb 1719-1729
+  s_8a7d1faa46510b::t_155da2acf756a3 23
+  s_8a7d1faa46510b::t_d45205a930aaa3 1476,1478,1491-1520
+  s_8a7d1faa46510b::t_41c4c42af7caed 1522
+.claude/doc-index.json
+  s_8a7d1faa46510b::t_8449bdcf4894da 27,43,79,152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "100651f249bdbaa7fd4e63d6a0c47c095d5358dc",
+  "prompts": {},
+  "sessions": {
+    "s_8a7d1faa46510b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82826409-eca5-4986-bedb-fb632716642c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_aea7dd3aabcb2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0943ecf4-f5a9-4197-aa13-ac7d22d12fa5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
