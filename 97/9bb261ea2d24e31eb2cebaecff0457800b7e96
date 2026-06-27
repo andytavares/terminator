@@ -1,0 +1,26 @@
+extensions/task-vault/tests/components/KanbanBoard.spec.tsx
+  s_aea7dd3aabcb2b::t_aa90c48b10cbe0 195,204-205
+extensions/task-vault/src/components/DailyLog.tsx
+  s_aea7dd3aabcb2b::t_83f2dfa2d4fd48 1488
+  s_aea7dd3aabcb2b::t_099b4fa4a97cc5 1008-1022
+extensions/task-vault/src/index.ts
+  s_aea7dd3aabcb2b::t_f70bf8a9cdcebc 150-155
+extensions/task-vault/src/components/KanbanBoard.tsx
+  s_aea7dd3aabcb2b::t_ac7e9b6051dd31 222
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "979bb261ea2d24e31eb2cebaecff0457800b7e96",
+  "prompts": {},
+  "sessions": {
+    "s_aea7dd3aabcb2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0943ecf4-f5a9-4197-aa13-ac7d22d12fa5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
