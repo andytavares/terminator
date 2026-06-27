@@ -17,6 +17,7 @@ const { mockDefaultSession, capturedWebContentsViewArgs } = vi.hoisted(() => ({
 
 const mockGetVisible = vi.fn().mockReturnValue(true)
 const mockOpenDevTools = vi.fn()
+const mockFocus = vi.fn()
 
 vi.mock('electron', () => ({
   WebContentsView: class {
@@ -29,6 +30,7 @@ vi.mock('electron', () => ({
       loadURL: mockLoadURL,
       reload: mockReload,
       openDevTools: mockOpenDevTools,
+      focus: mockFocus,
       insertCSS: vi.fn().mockResolvedValue(undefined),
     }
     setBounds = mockSetBounds
@@ -249,5 +251,35 @@ describe('ExtensionViewHost', () => {
     await host.createView(makeExt(), 'main')
     host.openDevToolsForAll()
     expect(mockOpenDevTools).toHaveBeenCalledWith({ mode: 'detach' })
+  })
+
+  it('focusView calls focus on the matching view webContents', async () => {
+    await host.createView(makeExt(), 'main')
+    host.focusView('com.test.ext', 'main')
+    expect(mockFocus).toHaveBeenCalled()
+  })
+
+  it('focusView is a no-op for unknown extensionId', () => {
+    host.focusView('com.unknown', 'main')
+    expect(mockFocus).not.toHaveBeenCalled()
+  })
+
+  it('setBottomInset re-applies bounds with reduced height for all views that have stored bounds', async () => {
+    await host.createView(makeExt(), 'main')
+    // Store bounds: window is 1280x800, view at y=10, height=700
+    host.handleBoundsUpdate('com.test.ext', 'main', { x: 0, y: 10, width: 100, height: 700 }, true)
+    vi.clearAllMocks()
+
+    // After applying a 280px inset: maxH = 800 - 10 - 280 = 510, height = min(700, 510) = 510
+    host.setBottomInset(280)
+    expect(mockSetBounds).toHaveBeenCalledWith({ x: 0, y: 10, width: 1280, height: 510 })
+    expect(mockSetVisible).toHaveBeenCalledWith(true)
+  })
+
+  it('setBottomInset skips views that have no stored bounds yet', async () => {
+    await host.createView(makeExt(), 'main')
+    // No handleBoundsUpdate call — lastBounds is null
+    host.setBottomInset(280)
+    expect(mockSetBounds).not.toHaveBeenCalled()
   })
 })

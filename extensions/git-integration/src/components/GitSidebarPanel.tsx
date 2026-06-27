@@ -15,7 +15,7 @@ interface Props {
 
 export function GitSidebarPanel({ repoRoot, onClose: _onClose }: Props): JSX.Element {
   useGitStatus(repoRoot)
-  const { status, setSelectedFile, setDiff, setView } = useGitStore()
+  const { status, setSelectedFile, setDiff } = useGitStore()
   const { setActiveProjectTab } = useExtensionRegistry()
 
   const [commitMessage, setCommitMessage] = useState('')
@@ -126,7 +126,9 @@ export function GitSidebarPanel({ repoRoot, onClose: _onClose }: Props): JSX.Ele
       {status?.hasConflicts && (
         <button
           className="git-sidebar__resolve-conflicts-btn"
-          onClick={() => setView('merge-flow')}
+          onClick={() =>
+            void window.electronAPI.extensionBridge.invoke('git:request-merge-flow', { repoRoot })
+          }
           data-testid="resolve-conflicts-btn"
         >
           Resolve conflicts →

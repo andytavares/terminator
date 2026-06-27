@@ -568,15 +568,33 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { repoRoot, prNumber } = parsed.data
     try {
-      const raw = await gh(repoRoot, [
-        'api',
-        `repos/{owner}/{repo}/issues/${prNumber}/comments`,
-        '--paginate',
-        '--jq',
-        '[.[] | {id,user,body,created_at,updated_at}]',
+      // Fetch issue comments and PR review bodies in parallel.
+      // Review body comments (submitted via "Submit review" → COMMENT/APPROVE/REQUEST_CHANGES)
+      // live at /pulls/{n}/reviews, not /issues/{n}/comments, so they must be merged separately.
+      const [issueRaw, reviewsRaw] = await Promise.all([
+        gh(repoRoot, [
+          'api',
+          `repos/{owner}/{repo}/issues/${prNumber}/comments`,
+          '--paginate',
+          '--jq',
+          '[.[] | {id,user,body,created_at,updated_at}]',
+        ]),
+        gh(repoRoot, [
+          'api',
+          `repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
+          '--jq',
+          '[.[] | select(.body != null and .body != "") | {id,user,body,submitted_at}]',
+        ]).catch(() => '[]'),
       ])
-      const items = JSON.parse(raw) as unknown[]
-      const comments: IssueComment[] = items.map(mapIssueComment)
+      const issueItems = JSON.parse(issueRaw) as unknown[]
+      const reviewItems = (JSON.parse(reviewsRaw) as unknown[]).map((r) => {
+        const obj = r as Record<string, unknown>
+        // Map review fields to the IssueComment shape (use submitted_at for both timestamps).
+        return { ...obj, created_at: obj.submitted_at, updated_at: obj.submitted_at }
+      })
+      const comments: IssueComment[] = [...issueItems, ...reviewItems]
+        .map(mapIssueComment)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
       return { comments }
     } catch (e) {
       return catchError(e)
@@ -688,19 +706,49 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
     const { repoRoot, prNumber, event, body } = parsed.data
     try {
       const { owner, repo } = await getRepoOwnerAndName(repoRoot, opts)
-      const raw = await gh(repoRoot, [
+      const args = [
         'api',
         `repos/${owner}/${repo}/pulls/${prNumber}/reviews`,
         '--method',
         'POST',
-        '--field',
+        '--raw-field',
         `event=${event}`,
-        '--field',
-        `body=${body}`,
-      ])
+      ]
+      // Only include body if non-empty; GitHub rejects empty string body for some events.
+      if (body.trim()) {
+        args.push('--raw-field', `body=${body}`)
+      }
+      const raw = await gh(repoRoot, args)
       const data = JSON.parse(raw) as Record<string, unknown>
       return { reviewId: Number(data.id) }
     } catch (e) {
+      const err = e as { stderr?: string; stdout?: string; message?: string }
+      // gh api writes the GitHub JSON error body to stdout on failure;
+      // stderr only gets the short "gh: Unprocessable Entity (HTTP 422)" summary.
+      // Check stdout first so we get the specific error message, not the opaque HTTP status.
+      const ghOutput = (err.stdout ?? err.stderr ?? '').trim()
+      const jsonMatch = ghOutput.match(/\{[\s\S]*?\}/)
+      if (jsonMatch) {
+        try {
+          const apiErr = JSON.parse(jsonMatch[0]) as {
+            message?: string
+            errors?: Array<string | { message?: string }>
+          }
+          // Prefer the specific error item over the generic HTTP status message.
+          const firstError = apiErr.errors?.[0]
+          const specific =
+            typeof firstError === 'string'
+              ? firstError
+              : typeof firstError === 'object'
+                ? firstError.message
+                : undefined
+          const msg = specific ?? apiErr.message
+          if (msg) return { error: msg }
+        } catch {
+          // ignore JSON parse failure
+        }
+      }
+      if (ghOutput) return { error: ghOutput }
       return { error: String(e) }
     }
   })

@@ -4,6 +4,7 @@ import { usePrReviewStore } from '../../stores/pr-review.store'
 import { ReviewQueue } from './ReviewQueue'
 import { PrReviewView } from './PrReviewView'
 import { PrOverviewPanel } from './PrOverviewPanel'
+import { MergeFlowView } from '../merge-flow/MergeFlowView'
 import {
   useLoadPrQueue,
   useLoadPrDetail,
@@ -39,6 +40,7 @@ export function PrReviewTab({ repoRoot }: Props) {
   const [isPoppedOut, setIsPoppedOut] = useState(isPopoutWindow)
   const [showOverview, setShowOverview] = useState(false)
   const [activeQueuePr, setActiveQueuePr] = useState<ReviewQueuePR | null>(null)
+  const [mergeFlowWorktree, setMergeFlowWorktree] = useState<string | null>(null)
 
   useEffect(() => {
     if (isPopoutWindow) return
@@ -203,6 +205,10 @@ export function PrReviewTab({ repoRoot }: Props) {
     )
   }
 
+  if (mergeFlowWorktree) {
+    return <MergeFlowView repoRoot={mergeFlowWorktree} onExit={() => setMergeFlowWorktree(null)} />
+  }
+
   if (activePr && showOverview) {
     return (
       <PrOverviewPanel
@@ -213,6 +219,7 @@ export function PrReviewTab({ repoRoot }: Props) {
         onClose={handleClosePr}
         onRefresh={handleRefreshPr}
         onPopOut={isPoppedOut ? undefined : handlePopOut}
+        onStartMergeFlow={(worktreePath) => setMergeFlowWorktree(worktreePath)}
       />
     )
   }

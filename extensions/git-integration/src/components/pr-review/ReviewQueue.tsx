@@ -70,39 +70,53 @@ export function ReviewQueue({
   const now = Date.now()
   const staleMs = STALE_DAYS * 24 * 60 * 60 * 1000
 
-  // In-progress PRs always appear at the top regardless of active filter
-  const inProgress = prQueue.filter(
-    (p) => p.sessionStatus === 'in-progress' || p.sessionStatus === 'paused'
-  )
-  const inProgressNumbers = new Set(inProgress.map((p) => p.number))
-
-  // PRs where current user is a requested reviewer or assignee (not already in-progress)
-  const needsMyReview = currentUserLogin
-    ? prQueue.filter(
-        (p) =>
-          !inProgressNumbers.has(p.number) &&
-          (p.requestedReviewers?.includes(currentUserLogin) ||
-            p.assigneeLogins?.includes(currentUserLogin))
-      )
-    : []
-  const needsMyReviewNumbers = new Set(needsMyReview.map((p) => p.number))
-
-  const filtered = prQueue.filter((pr) => {
-    // Already shown in the in-progress or needs-my-review sections
-    if (inProgressNumbers.has(pr.number)) return false
-    if (needsMyReviewNumbers.has(pr.number)) return false
+  function matchesFilter(pr: (typeof prQueue)[number]): boolean {
     switch (activeFilter) {
       case 'high-risk':
         return pr.riskLevel === 'high'
       case 'quick-wins':
         return pr.riskLevel === 'low' && pr.additions + pr.deletions <= 100
       case 'in-progress':
-        return false // already captured above
+        // Only the dedicated in-progress section shows these; hide from all other sections.
+        return false
       case 'stale':
         return now - new Date(pr.openedAt).getTime() > staleMs
       default:
         return true
     }
+  }
+
+  // In-progress PRs always appear at the top regardless of active filter.
+  const inProgress = prQueue.filter(
+    (p) => p.sessionStatus === 'in-progress' || p.sessionStatus === 'paused'
+  )
+  const inProgressNumbers = new Set(inProgress.map((p) => p.number))
+
+  // PRs where current user is a requested reviewer or assignee — filtered by active filter
+  // so pills actually affect this section too.
+  const needsMyReview = currentUserLogin
+    ? prQueue.filter(
+        (p) =>
+          !inProgressNumbers.has(p.number) &&
+          (p.requestedReviewers?.includes(currentUserLogin) ||
+            p.assigneeLogins?.includes(currentUserLogin)) &&
+          matchesFilter(p)
+      )
+    : []
+  const needsMyReviewNumbers = new Set(needsMyReview.map((p) => p.number))
+
+  const filtered = prQueue.filter((pr) => {
+    if (inProgressNumbers.has(pr.number)) return false
+    if (needsMyReviewNumbers.has(pr.number)) return false
+    // Exclude needsMyReview PRs that were hidden by the filter (they shouldn't fall through).
+    if (
+      currentUserLogin &&
+      (pr.requestedReviewers?.includes(currentUserLogin) ||
+        pr.assigneeLogins?.includes(currentUserLogin)) &&
+      !inProgressNumbers.has(pr.number)
+    )
+      return false
+    return matchesFilter(pr)
   })
 
   const readFirst = filtered.filter((p) => p.riskLevel === 'high')

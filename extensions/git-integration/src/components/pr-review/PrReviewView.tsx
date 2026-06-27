@@ -37,6 +37,7 @@ export function PrReviewView({
     fileOrderOverrides,
     markFileViewed,
     setPaused,
+    currentUserLogin,
   } = usePrReviewStore()
 
   const loadInlineComments = useLoadInlineComments(repoRoot)
@@ -401,6 +402,7 @@ export function PrReviewView({
           <ReviewSubmitPanel
             repoRoot={repoRoot}
             prNumber={pr.number}
+            isOwnPr={!!currentUserLogin && currentUserLogin === pr.author}
             onClose={() => setShowSubmit(false)}
           />
         </div>

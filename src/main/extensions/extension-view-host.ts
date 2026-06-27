@@ -56,12 +56,15 @@ interface ViewEntry {
   extensionId: string
   viewParam: string
   lastRepoRoot: string | null
+  lastBounds: BoundsRect | null
+  lastVisible: boolean
 }
 
 export class ExtensionViewHost {
   private views = new Map<string, ViewEntry[]>()
   private mainWindow: BrowserWindow
   private preloadPath: string
+  private bottomInset = 0
 
   constructor(mainWindow: BrowserWindow, preloadPath: string) {
     this.mainWindow = mainWindow
@@ -101,7 +104,14 @@ export class ExtensionViewHost {
     const existing = this.views.get(ext.id) ?? []
     this.views.set(ext.id, [
       ...existing,
-      { view, extensionId: ext.id, viewParam, lastRepoRoot: repoRoot ?? null },
+      {
+        view,
+        extensionId: ext.id,
+        viewParam,
+        lastRepoRoot: repoRoot ?? null,
+        lastBounds: null,
+        lastVisible: false,
+      },
     ])
   }
 
@@ -145,14 +155,31 @@ export class ExtensionViewHost {
       entry.view.webContents.send('workspace:changed', { repoRoot })
     }
 
-    // Use the window's authoritative width so the view always fills to the right
-    // edge. Use the renderer-reported height so stacked panels share vertical space
-    // rather than each filling to the bottom of the window.
-    const { width: winW } = this.mainWindow.getContentBounds()
+    entry.lastBounds = bounds
+    entry.lastVisible = visible
+
+    this.applyBounds(entry, bounds, visible)
+  }
+
+  private applyBounds(entry: ViewEntry, bounds: BoundsRect, visible: boolean): void {
+    const { width: winW, height: winH } = this.mainWindow.getContentBounds()
     const x = Math.round(bounds.x)
     const y = Math.round(bounds.y)
-    entry.view.setBounds({ x, y, width: winW - x, height: Math.round(bounds.height) })
+    const maxH = winH - y - this.bottomInset
+    const height = Math.min(Math.round(bounds.height), Math.max(0, maxH))
+    entry.view.setBounds({ x, y, width: winW - x, height })
     entry.view.setVisible(visible)
+  }
+
+  setBottomInset(inset: number): void {
+    this.bottomInset = Math.max(0, inset)
+    for (const entries of this.views.values()) {
+      for (const entry of entries) {
+        if (entry.lastBounds && entry.lastVisible) {
+          this.applyBounds(entry, entry.lastBounds, entry.lastVisible)
+        }
+      }
+    }
   }
 
   broadcastToAll(channel: string, data: unknown): void {

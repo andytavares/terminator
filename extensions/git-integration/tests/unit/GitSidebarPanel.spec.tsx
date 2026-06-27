@@ -16,6 +16,13 @@ import { useGitStore } from '../../src/stores/git.store'
 import { GitSidebarPanel } from '../../src/components/GitSidebarPanel'
 
 const mockUseGitStore = vi.mocked(useGitStore)
+const mockBridgeInvoke = vi.fn().mockResolvedValue({ ok: true })
+
+beforeEach(() => {
+  ;(window as unknown as Record<string, unknown>).electronAPI = {
+    extensionBridge: { invoke: mockBridgeInvoke },
+  }
+})
 
 describe('GitSidebarPanel — loading state', () => {
   beforeEach(() => {
@@ -24,8 +31,6 @@ describe('GitSidebarPanel — loading state', () => {
       status: null,
       setSelectedFile: vi.fn(),
       setDiff: vi.fn(),
-      view: 'default',
-      setView: vi.fn(),
     } as ReturnType<typeof useGitStore>)
   })
 
@@ -48,8 +53,6 @@ describe('GitSidebarPanel — resolve conflicts button', () => {
       status: { branch: 'main', files: [], hasConflicts: true, truncated: false },
       setSelectedFile: vi.fn(),
       setDiff: vi.fn(),
-      view: 'default',
-      setView: vi.fn(),
     } as ReturnType<typeof useGitStore>)
     render(<GitSidebarPanel repoRoot="/repo" onClose={vi.fn()} />)
     expect(screen.getByTestId('resolve-conflicts-btn')).toBeTruthy()
@@ -60,24 +63,19 @@ describe('GitSidebarPanel — resolve conflicts button', () => {
       status: { branch: 'main', files: [], hasConflicts: false, truncated: false },
       setSelectedFile: vi.fn(),
       setDiff: vi.fn(),
-      view: 'default',
-      setView: vi.fn(),
     } as ReturnType<typeof useGitStore>)
     render(<GitSidebarPanel repoRoot="/repo" onClose={vi.fn()} />)
     expect(screen.queryByTestId('resolve-conflicts-btn')).toBeNull()
   })
 
-  it('calls setView with merge-flow when resolve button clicked', () => {
-    const mockSetView = vi.fn()
+  it('invokes git:request-merge-flow via extensionBridge when resolve button clicked', () => {
     mockUseGitStore.mockReturnValue({
       status: { branch: 'main', files: [], hasConflicts: true, truncated: false },
       setSelectedFile: vi.fn(),
       setDiff: vi.fn(),
-      view: 'default',
-      setView: mockSetView,
     } as ReturnType<typeof useGitStore>)
     render(<GitSidebarPanel repoRoot="/repo" onClose={vi.fn()} />)
     fireEvent.click(screen.getByTestId('resolve-conflicts-btn'))
-    expect(mockSetView).toHaveBeenCalledWith('merge-flow')
+    expect(mockBridgeInvoke).toHaveBeenCalledWith('git:request-merge-flow', { repoRoot: '/repo' })
   })
 })

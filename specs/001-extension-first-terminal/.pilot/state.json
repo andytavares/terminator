@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "featureDir": "/Users/atavares/repos/terminator/specs/001-extension-first-terminal",
+  "phases": {
+    "constitution": {
+      "id": "constitution",
+      "status": "approved",
+      "approvedHash": null,
+      "approvedAt": "2026-06-26T23:11:09.769Z",
+      "approvedBy": "user",
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": []
+    },
+    "specify": {
+      "id": "specify",
+      "status": "approved",
+      "approvedHash": null,
+      "approvedAt": "2026-06-26T23:11:11.786Z",
+      "approvedBy": "user",
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": []
+    },
+    "clarify": {
+      "id": "clarify",
+      "status": "approved",
+      "approvedHash": null,
+      "approvedAt": "2026-06-26T23:11:13.298Z",
+      "approvedBy": "user",
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": []
+    },
+    "plan": {
+      "id": "plan",
+      "status": "approved",
+      "approvedHash": null,
+      "approvedAt": "2026-06-26T23:11:14.855Z",
+      "approvedBy": "user",
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": []
+    },
+    "checklist": {
+      "id": "checklist",
+      "status": "skipped",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": []
+    },
+    "tasks": {
+      "id": "tasks",
+      "status": "approved",
+      "approvedHash": null,
+      "approvedAt": "2026-06-26T23:11:19.371Z",
+      "approvedBy": "user",
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": []
+    },
+    "analyze": {
+      "id": "analyze",
+      "status": "approved",
+      "approvedHash": null,
+      "approvedAt": "2026-06-26T23:11:22.080Z",
+      "approvedBy": "user",
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": []
+    },
+    "implement": {
+      "id": "implement",
+      "status": "approved",
+      "approvedHash": null,
+      "approvedAt": "2026-06-26T23:11:23.831Z",
+      "approvedBy": "user",
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": []
+    }
+  },
+  "settings": {
+    "defaultModel": "claude-opus-4-6",
+    "phaseGates": {
+      "constitution": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "specify": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "clarify": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "plan": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "checklist": {
+        "required": false,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "tasks": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "analyze": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "implement": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": true
+      }
+    },
+    "disallowedPaths": [".env*", "secrets/**", "*.pem", "*.key"],
+    "maxFilesPerImplementRun": 25,
+    "maxTokensPerCommand": 50000,
+    "commandTimeoutMs": 300000,
+    "requireCleanTreeForImplement": true,
+    "createCheckpointBeforeImplement": true,
+    "runConsolePosition": "bottom",
+    "reviewerIdentity": "git",
+    "customReviewerName": null,
+    "branchConvention": "sequential",
+    "customBranchPattern": null,
+    "openSidebarOnStart": true
+  }
+}

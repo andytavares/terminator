@@ -20,6 +20,7 @@ vi.mock('fs/promises', () => ({ readFile: vi.fn().mockRejectedValue(new Error('n
 // ── import after mocks ────────────────────────────────────────────────────────
 
 import { readFile } from 'fs/promises'
+import ElectronStore from 'electron-store'
 import { registerGithubHandlers } from '../../src/ipc/github.ipc'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -34,6 +35,17 @@ function captureHandlers(): Record<string, Handler> {
       handlers[channel] = handler as Handler
     },
     { getGhPath: () => '', getToken: () => '' }
+  )
+  return handlers
+}
+
+function captureHandlersWithGhPath(ghPath: string): Record<string, Handler> {
+  const handlers: Record<string, Handler> = {}
+  registerGithubHandlers(
+    (channel, handler) => {
+      handlers[channel] = handler as Handler
+    },
+    { getGhPath: () => ghPath, getToken: () => '' }
   )
   return handlers
 }
@@ -59,6 +71,13 @@ function mockGitSuccess(stdout: string) {
 function mockGitFailure(message: string) {
   mockExecFile.mockImplementationOnce(
     (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) => cb(new Error(message))
+  )
+}
+
+function mockGitFailureWithStdout(message: string, stdout: string) {
+  mockExecFile.mockImplementationOnce(
+    (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
+      cb(Object.assign(new Error(message), { stdout, stderr: '' }))
   )
 }
 
@@ -1133,6 +1152,22 @@ describe('github:pr-review-submit', () => {
     })) as { error: string }
     expect(result.error).toContain('permission denied')
   })
+
+  it('extracts string error from JSON stdout errors array (covers 731T, 740T branches)', async () => {
+    const errBody = JSON.stringify({
+      message: 'Validation Failed',
+      errors: ['Cannot approve your own pull request'],
+    })
+    mockGitSuccess(JSON.stringify({ owner: { login: 'owner' }, name: 'repo' }))
+    mockGitFailureWithStdout('Unprocessable Entity (HTTP 422)', errBody)
+    const result = (await handlers['github:pr-review-submit']({
+      repoRoot: '/repo',
+      prNumber: 6,
+      event: 'APPROVE',
+      body: 'LGTM',
+    })) as { error: string }
+    expect(result.error).toBe('Cannot approve your own pull request')
+  })
 })
 
 describe('github:sessions-for-repo and github:session-get/set', () => {
@@ -1438,7 +1473,9 @@ describe('github:pr-issue-comments', () => {
         updated_at: '2025-01-01T00:00:00Z',
       },
     ]
+    // First call: issue comments. Second call: review bodies (empty here).
     mockGitSuccess(JSON.stringify(raw))
+    mockGitSuccess('[]')
 
     const result = (await handlers['github:pr-issue-comments']({
       repoRoot: '/repo',
@@ -1449,6 +1486,38 @@ describe('github:pr-issue-comments', () => {
     expect(result.comments[0].id).toBe(1)
     expect(result.comments[0].author).toBe('alice')
     expect(result.comments[0].body).toBe('Looks good')
+  })
+
+  it('includes PR review body comments merged with issue comments', async () => {
+    const issueComments = [
+      {
+        id: 1,
+        user: { login: 'alice', avatar_url: '' },
+        body: 'Issue comment',
+        created_at: '2025-01-02T00:00:00Z',
+        updated_at: '2025-01-02T00:00:00Z',
+      },
+    ]
+    const reviewBodies = [
+      {
+        id: 2,
+        user: { login: 'bob', avatar_url: '' },
+        body: 'Review body comment',
+        submitted_at: '2025-01-01T00:00:00Z',
+      },
+    ]
+    mockGitSuccess(JSON.stringify(issueComments))
+    mockGitSuccess(JSON.stringify(reviewBodies))
+
+    const result = (await handlers['github:pr-issue-comments']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { comments: Array<{ id: number; author: string; body: string }> }
+
+    expect(result.comments).toHaveLength(2)
+    // sorted by createdAt — review body (Jan 1) before issue comment (Jan 2)
+    expect(result.comments[0].body).toBe('Review body comment')
+    expect(result.comments[1].body).toBe('Issue comment')
   })
 
   it('returns error string when gh fails', async () => {
@@ -1647,6 +1716,17 @@ describe('github:current-user', () => {
     }
     expect(result.error).toContain('connection refused')
   })
+
+  it('uses a non-empty configured gh path directly (covers resolveGh early-return branch)', async () => {
+    const handlersWithPath = captureHandlersWithGhPath('/usr/local/bin/gh')
+    mockGitSuccess('carol\n')
+    const result = (await handlersWithPath['github:current-user']({ repoRoot: '/repo' })) as {
+      login: string
+    }
+    expect(result.login).toBe('carol')
+    // The first execFile call must have received the configured path as the command
+    expect(mockExecFile.mock.calls[0][0]).toBe('/usr/local/bin/gh')
+  })
 })
 
 describe('github:file-cochange', () => {
@@ -1717,5 +1797,68 @@ describe('github:save-active-review and github:active-reviews-for-repo', () => {
       repoRoot: '/repo',
     })) as { prs: unknown[] }
     expect(Array.isArray(result.prs)).toBe(true)
+  })
+})
+
+describe('github:remove-active-review — store side-effects', () => {
+  let handlers: Record<string, Handler>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('deletes matching session-store keys when a session key shares the repoRoot+prNumber prefix', async () => {
+    // Make set/delete functional so the store records the session
+    vi.spyOn(ElectronStore.prototype, 'set').mockImplementation(function (
+      this: { store: Record<string, unknown> },
+      key: string,
+      value: unknown
+    ) {
+      this.store[key] = value
+    })
+    const deleteSpy = vi.spyOn(ElectronStore.prototype, 'delete').mockImplementation(function (
+      this: { store: Record<string, unknown> },
+      key: string
+    ) {
+      delete this.store[key]
+    })
+
+    const validSession = {
+      repoRoot: '/repo',
+      prNumber: 42,
+      headSHA: 'abc123',
+      currentChapterId: null,
+      currentFilePath: null,
+      viewedFiles: [],
+      fileOrderOverrides: {},
+      scrollPosition: null,
+      pausedAt: null,
+      lastAccessedAt: '2026-01-01T00:00:00Z',
+    }
+    await handlers['github:session-set']({ key: '/repo:::42:::abc123', session: validSession })
+
+    const result = (await handlers['github:remove-active-review']({
+      repoRoot: '/repo',
+      prNumber: 42,
+    })) as { ok: boolean }
+    expect(result.ok).toBe(true)
+    // Verify sessionStore.delete was called for the matching session key (line 842)
+    expect(deleteSpy).toHaveBeenCalledWith('/repo:::42:::abc123')
+  })
+
+  it('returns { error } when activeReviewStore.delete throws (line 846)', async () => {
+    vi.spyOn(ElectronStore.prototype, 'delete').mockImplementationOnce(() => {
+      throw new Error('store write failed')
+    })
+    const result = (await handlers['github:remove-active-review']({
+      repoRoot: '/repo',
+      prNumber: 42,
+    })) as { error: string }
+    expect(result.error).toContain('store write failed')
   })
 })

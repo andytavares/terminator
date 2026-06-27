@@ -236,6 +236,9 @@ beforeEach(() => {
       on: vi.fn().mockReturnValue(mockUnsubscribe),
       invoke: vi.fn().mockResolvedValue({}),
     },
+    extension: {
+      setBottomInset: vi.fn(),
+    },
   }
   setupMocks()
 })

@@ -1,13 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Eye } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
-import { useGitStore } from '../../stores/git.store'
-import { useExtensionRegistry } from '../../../../../src/renderer/extensions/registry'
 import { useLoadIssueComments } from '../../hooks/usePrReview'
 import { githubAPI } from '../../api/github'
 import { mergeFlowAPI } from '../../api/merge-flow'
-import { useToastStore } from '../../../../../src/renderer/stores/toast.store'
-import { useWorkspaceStore } from '../../../../../src/renderer/stores/workspace.store'
 import { StatusChecksBar } from './StatusChecksBar'
 import { RichContent } from './RichContent'
 import type { PrReviewDetail, IssueComment } from '../../schemas/pr-review.schema'
@@ -20,6 +16,7 @@ interface Props {
   onClose: () => void
   onRefresh?: () => Promise<void>
   onPopOut?: () => void
+  onStartMergeFlow?: (worktreePath: string) => void
 }
 
 const CI_LABEL: Record<PrReviewDetail['ciStatus'], string> = {
@@ -37,12 +34,9 @@ export function PrOverviewPanel({
   onClose,
   onRefresh,
   onPopOut,
+  onStartMergeFlow,
 }: Props) {
   const { viewedFiles, issueComments, currentUserLogin } = usePrReviewStore()
-  const { setView } = useGitStore()
-  const { setActiveProjectTab } = useExtensionRegistry()
-  const { addToast } = useToastStore()
-  const { activeWorkspaceId, createProject, setActiveProject } = useWorkspaceStore()
   const loadIssueComments = useLoadIssueComments(repoRoot)
   const [commentBody, setCommentBody] = useState('')
   const [commentTab, setCommentTab] = useState<'write' | 'preview'>('write')
@@ -53,6 +47,7 @@ export function PrOverviewPanel({
   const [updatingBranch, setUpdatingBranch] = useState(false)
   const [updateBranchError, setUpdateBranchError] = useState<string | null>(null)
   const [preparingMerge, setPreparingMerge] = useState(false)
+  const [mergeError, setMergeError] = useState<string | null>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
 
   const handleRefresh = async () => {
@@ -120,19 +115,14 @@ export function PrOverviewPanel({
   }
 
   const handleResolveConflicts = async () => {
-    if (!activeWorkspaceId) {
-      addToast({ type: 'error', message: 'No active workspace — open a project first.' })
-      return
-    }
     setPreparingMerge(true)
+    setMergeError(null)
     try {
-      // Get a safe path for the new worktree
       const { path: worktreePath } = await window.electronAPI.git.suggestWorktreePath(
         repoRoot,
         pr.headRefName
       )
 
-      // Create the worktree + run git merge to produce conflict markers
       const mergeResult = await mergeFlowAPI.preparePrWorktree(
         repoRoot,
         worktreePath,
@@ -140,38 +130,17 @@ export function PrOverviewPanel({
         pr.baseRefName
       )
       if ('error' in mergeResult) {
-        addToast({ type: 'error', message: `Could not prepare merge: ${mergeResult.error}` })
+        setMergeError(`Could not prepare merge: ${mergeResult.error}`)
         return
       }
       if (!mergeResult.hasConflicts) {
-        addToast({
-          type: 'error',
-          message: 'No conflicts found after merge — the PR may already be clean.',
-        })
+        setMergeError('No conflicts found — the PR may already be clean.')
         return
       }
 
-      // Register the worktree as a project so it shows in the sidebar
-      const shortName = pr.headRefName.split('/').pop() ?? pr.headRefName
-      const projectResult = await createProject({
-        workspaceId: activeWorkspaceId,
-        name: `${shortName} (conflicts)`,
-        worktreePath,
-        gitBranch: pr.headRefName,
-        isWorktree: true,
-      })
-      if ('error' in projectResult) {
-        addToast({
-          type: 'error',
-          message: `Could not add conflict project: ${(projectResult as { error: string }).error}`,
-        })
-        return
-      }
-
-      // Switch to the new project and open the conflict resolver
-      setActiveProject(projectResult.project.id)
-      setView('merge-flow')
-      setActiveProjectTab('git')
+      onStartMergeFlow?.(worktreePath)
+    } catch (e) {
+      setMergeError(String(e))
     } finally {
       setPreparingMerge(false)
     }
@@ -519,6 +488,7 @@ export function PrOverviewPanel({
       {/* CTA */}
       <div className="pr-overview-cta">
         {updateBranchError && <p className="pr-update-branch-error">{updateBranchError}</p>}
+        {mergeError && <p className="pr-update-branch-error">{mergeError}</p>}
         {pr.mergeStateStatus === 'behind' && (
           <button
             className="pr-overview-update-branch-btn"

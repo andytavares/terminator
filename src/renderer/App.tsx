@@ -97,7 +97,14 @@ export function App(): JSX.Element {
   const repoRoot = activeProject?.worktreePath ?? activeWorkspace?.folderPath ?? null
 
   const handleOpenSettings = useCallback(() => setSettingsOpen(true), [])
-  const handleToggleLog = useCallback(() => setLogOpen((v) => !v), [])
+  const setLogOpenWithInset = useCallback((open: boolean) => {
+    setLogOpen(open)
+    window.electronAPI.extension.setBottomInset(open ? 280 : 0)
+  }, [])
+  const handleToggleLog = useCallback(
+    () => setLogOpenWithInset(!logOpen),
+    [logOpen, setLogOpenWithInset]
+  )
   const handleOpenCommandPalette = useCallback(() => setPaletteOpen(true), [])
   const handleToggleOverview = useCallback(() => {
     setActiveGlobalTab(activeGlobalTabId === 'core.overview' ? null : 'core.overview')
@@ -165,7 +172,7 @@ export function App(): JSX.Element {
         label: 'Toggle Log Window',
         shortcut: '⌘⇧L',
         category: 'App',
-        action: () => setLogOpen((v) => !v),
+        action: () => setLogOpenWithInset(!logOpen),
       },
       {
         id: 'core.toggle-overview',
@@ -620,7 +627,7 @@ export function App(): JSX.Element {
               onCancel={() => setPendingCreate(null)}
             />
           )}
-          {logOpen && <LogWindow onClose={() => setLogOpen(false)} />}
+          {logOpen && <LogWindow onClose={() => setLogOpenWithInset(false)} />}
           {paletteOpen && (
             <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />
           )}

@@ -50,12 +50,15 @@ beforeEach(() => {
 })
 
 describe('task-vault:links:create', () => {
-  it('appends terminator link to task via taskId', async () => {
-    db.mockGet.mockResolvedValue({ terminator_links: '[]' })
+  it('replaces all existing terminator links with the new one for taskId', async () => {
+    const OLD_UUID = 'aaaaaaaa-0000-0000-0000-000000000000'
+    db.mockGet.mockResolvedValue({ terminator_links: JSON.stringify([OLD_UUID]) })
     const handler = getHandler('task-vault:links:create')
     const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
     expect(result).toMatchObject({ success: true })
-    expect(db.mockRun).toHaveBeenCalled()
+    const writtenLinks = db.mockRun.mock.calls[0][1][0] as string
+    expect(JSON.parse(writtenLinks)).toEqual([UUID])
+    expect(writtenLinks).not.toContain(OLD_UUID)
   })
 
   it('appends terminator link via projectFilePath', async () => {
@@ -200,6 +203,14 @@ describe('task-vault:links:create error handling', () => {
     const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
     expect(result).toMatchObject({ error: expect.stringContaining('db write error') })
   })
+
+  it('returns String(err) when db throws a non-Error value', async () => {
+    db.mockGet.mockResolvedValue({ terminator_links: '[]' })
+    db.mockRun.mockRejectedValueOnce('raw string error')
+    const handler = getHandler('task-vault:links:create')
+    const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
+    expect(result).toMatchObject({ error: 'raw string error' })
+  })
 })
 
 describe('task-vault:links:remove error handling', () => {
@@ -209,6 +220,15 @@ describe('task-vault:links:remove error handling', () => {
     const handler = getHandler('task-vault:links:remove')
     const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
     expect(result).toMatchObject({ error: expect.stringContaining('db remove error') })
+  })
+})
+
+describe('task-vault:links:get-for-terminator-target error handling', () => {
+  it('returns String(err) via outer handle catch when db.query throws a non-Error value', async () => {
+    db.mockQuery.mockRejectedValueOnce('db gone')
+    const handler = getHandler('task-vault:links:get-for-terminator-target')
+    const result = await handler({}, { targetId: UUID })
+    expect(result).toMatchObject({ error: 'db gone' })
   })
 })
 

@@ -72,6 +72,8 @@ describe('ReviewSubmitPanel', () => {
   it('shows success state after successful submission', async () => {
     mockPrReviewSubmit.mockResolvedValue({ success: true })
     render(<ReviewSubmitPanel {...defaultProps} />)
+    // Switch to APPROVE so no body is required
+    fireEvent.click(screen.getByText('Approve').closest('label')!)
     const submitBtn = screen.getByRole('button', { name: 'Submit review' })
     fireEvent.click(submitBtn)
     await waitFor(() => expect(screen.getByText('Review submitted successfully.')).toBeTruthy())
@@ -81,6 +83,7 @@ describe('ReviewSubmitPanel', () => {
     mockPrReviewSubmit.mockResolvedValue({ success: true })
     const onClose = vi.fn()
     render(<ReviewSubmitPanel {...defaultProps} onClose={onClose} />)
+    fireEvent.click(screen.getByText('Approve').closest('label')!)
     const submitBtn = screen.getByRole('button', { name: 'Submit review' })
     fireEvent.click(submitBtn)
     await waitFor(() => screen.getByText('Close'))
@@ -91,6 +94,7 @@ describe('ReviewSubmitPanel', () => {
   it('shows error when submission fails', async () => {
     mockPrReviewSubmit.mockRejectedValue(new Error('API error'))
     render(<ReviewSubmitPanel {...defaultProps} />)
+    fireEvent.click(screen.getByText('Approve').closest('label')!)
     const submitBtn = screen.getByRole('button', { name: 'Submit review' })
     fireEvent.click(submitBtn)
     await waitFor(() => screen.getByText(/API error/))
@@ -100,10 +104,20 @@ describe('ReviewSubmitPanel', () => {
   it('shows error when result contains error field', async () => {
     mockPrReviewSubmit.mockResolvedValue({ error: 'UNAUTHORIZED' })
     render(<ReviewSubmitPanel {...defaultProps} />)
+    fireEvent.click(screen.getByText('Approve').closest('label')!)
     const submitBtn = screen.getByRole('button', { name: 'Submit review' })
     fireEvent.click(submitBtn)
     await waitFor(() => screen.getByText(/UNAUTHORIZED/))
     expect(screen.getByText(/UNAUTHORIZED/)).toBeTruthy()
+  })
+
+  it('shows validation error when submitting COMMENT with empty body', async () => {
+    render(<ReviewSubmitPanel {...defaultProps} />)
+    // COMMENT is the default event
+    const submitBtn = screen.getByRole('button', { name: 'Submit review' })
+    fireEvent.click(submitBtn)
+    await waitFor(() => screen.getByText(/A comment body is required/))
+    expect(mockPrReviewSubmit).not.toHaveBeenCalled()
   })
 
   it('calls prReviewSubmit with correct args', async () => {

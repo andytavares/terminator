@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
 import './git-integration.css'
 import { useGitStore } from '../stores/git.store'
 import { useGitStatus } from '../hooks/useGitStatus'
@@ -49,6 +49,14 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const selectedDiff: FileDiff | null = selectedFile ? (diffCache.get(selectedFile) ?? null) : null
+
+  // Listen for cross-iframe broadcast (from sidebar or PR review) requesting merge-flow view.
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on('git:merge-flow-open', (data) => {
+      const { repoRoot: targetRoot } = (data ?? {}) as { repoRoot?: string }
+      if (!targetRoot || targetRoot === repoRoot) setView('merge-flow')
+    })
+  }, [repoRoot, setView])
 
   const handleFileSelect = useCallback(
     async (path: string, staged: boolean) => {

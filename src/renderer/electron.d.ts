@@ -152,6 +152,7 @@ interface ElectronAPI {
       visible: boolean
       repoRoot?: string | null
     }): Promise<void>
+    setBottomInset(inset: number): void
   }
   keyboard: {
     isReserved(accelerator: string): boolean

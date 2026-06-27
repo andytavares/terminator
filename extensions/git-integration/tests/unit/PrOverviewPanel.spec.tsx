@@ -512,7 +512,8 @@ describe('PrOverviewPanel', () => {
     expect(screen.queryByText(/Resolve conflicts/i)).toBeNull()
   })
 
-  it('resolve conflicts button creates worktree project then switches to merge-flow view', async () => {
+  it('resolve conflicts button prepares worktree then calls onStartMergeFlow', async () => {
+    const onStartMergeFlow = vi.fn()
     render(
       <PrOverviewPanel
         repoRoot="/repo"
@@ -520,6 +521,7 @@ describe('PrOverviewPanel', () => {
         sessionStatus="not-started"
         onStartReview={vi.fn()}
         onClose={vi.fn()}
+        onStartMergeFlow={onStartMergeFlow}
       />
     )
     fireEvent.click(screen.getByText(/Resolve conflicts/i))
@@ -530,12 +532,7 @@ describe('PrOverviewPanel', () => {
         basePr.headRefName,
         basePr.baseRefName
       )
-      expect(mockCreateProject).toHaveBeenCalledWith(
-        expect.objectContaining({ workspaceId: 'ws-1', isWorktree: true })
-      )
-      expect(mockSetActiveProject).toHaveBeenCalledWith('proj-conflict')
-      expect(mockSetView).toHaveBeenCalledWith('merge-flow')
-      expect(mockSetActiveProjectTab).toHaveBeenCalledWith('git')
+      expect(onStartMergeFlow).toHaveBeenCalledWith('/tmp/worktree/branch')
     })
   })
 

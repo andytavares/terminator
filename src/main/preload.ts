@@ -117,6 +117,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       visible: boolean
       repoRoot?: string | null
     }) => ipcRenderer.invoke('extension:update-panel-bounds', payload),
+    setBottomInset: (inset: number) => ipcRenderer.send('extension:set-bottom-inset', { inset }),
   },
   keyboard: {
     isReserved: (accelerator: string) => RESERVED_SHORTCUTS.has(accelerator),
