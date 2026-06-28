@@ -55,6 +55,13 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 
 Extension dependencies (not part of the core app): `@electric-sql/pglite`, `sql.js`, `@modelcontextprotocol/sdk`, `chokidar`, `gray-matter`, `node-ical` — declared in each extension's own `package.json`.
 
+## Documentation
+
+- **[User Guide](docs/user-guide/USER-GUIDE.md)** — End-to-end walkthrough of every feature and extension, with screenshots.
+- **[Architecture](docs/ARCHITECTURE.md)** — Process model, IPC, extension system deep-dive.
+- **[Extension Development Guide](docs/EXTENSION-DEVELOPMENT.md)** — Building extensions with the Extension SDK.
+- **[Contributing](docs/CONTRIBUTING.md)** — Development setup, conventions, PR process.
+
 ## Prerequisites
 
 - **Node.js 20 LTS or newer** (Node.js 24 confirmed working). Use [nvm](https://github.com/nvm-sh/nvm).
