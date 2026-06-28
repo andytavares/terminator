@@ -2,8 +2,31 @@ import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import { BrowserWindow } from 'electron'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import type { Feature, HistoryEntry, PhaseId, PilotState } from './types/speckit.types.js'
+import type {
+  Feature,
+  HistoryEntry,
+  JiraCreds,
+  PhaseId,
+  PilotState,
+  TicketRef,
+} from './types/speckit.types.js'
 import { PHASE_ORDER, DEFAULT_SETTINGS } from './types/speckit.types.js'
+import {
+  setLinearKey,
+  getLinearKey,
+  setJiraCredentials,
+  getJiraCredentials,
+} from './api/credentials.js'
+import {
+  fetchAssignedTickets as fetchLinearTickets,
+  postComment as postLinearComment,
+} from './api/linear.js'
+import {
+  fetchAssignedTickets as fetchJiraTickets,
+  postComment as postJiraComment,
+} from './api/jira.js'
+import { createAgentRunner } from './runner/agent-runner.js'
+import type { RunnerHandle } from './runner/agent-runner.js'
 
 const disposables: Disposable[] = []
 
@@ -12,6 +35,9 @@ const activeSessions: Map<string, { id: string; name: string }> = new Map()
 
 // Active implement run registry: featureDir → runId
 const activeRuns: Map<string, string> = new Map()
+
+// Active agent runner handles: featureDir → RunnerHandle
+const activeRunnerHandles: Map<string, RunnerHandle> = new Map()
 
 async function appendHistory(featureDir: string, entry: HistoryEntry): Promise<void> {
   const pilotDir = path.join(featureDir, '.pilot')
@@ -355,9 +381,13 @@ export function activate(api: ExtensionAPI): void {
 
   // speckit:checkpoint-create — create a git checkpoint commit before implement run
   reg(api, 'speckit:checkpoint-create', async (payload: unknown) => {
-    const { featureDir, repoRoot } = payload as { featureDir: string; repoRoot?: string }
+    const { featureDir, repoRoot, worktreePath } = payload as {
+      featureDir: string
+      repoRoot?: string
+      worktreePath?: string
+    }
     if (!featureDir) return { error: 'featureDir required' }
-    const cwd = repoRoot || featureDir
+    const cwd = worktreePath ?? repoRoot ?? featureDir
     try {
       const { exec } = await import('node:child_process')
       const { promisify } = await import('node:util')
@@ -466,6 +496,448 @@ export function activate(api: ExtensionAPI): void {
       await fs.promises.mkdir(path.dirname(filePath), { recursive: true })
       await fs.promises.writeFile(filePath, content, 'utf-8')
       return { ok: true }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:ticket-list — fetch tickets from Linear and/or Jira in parallel
+  reg(api, 'speckit:ticket-list', async () => {
+    try {
+      const [linearKey, jiraCreds] = await Promise.all([getLinearKey(), getJiraCredentials()])
+      const fetches: Promise<unknown[]>[] = []
+      if (linearKey) fetches.push(fetchLinearTickets(linearKey).catch(() => []))
+      if (jiraCreds) fetches.push(fetchJiraTickets(jiraCreds).catch(() => []))
+      if (fetches.length === 0) return { tickets: [] }
+      const results = await Promise.all(fetches)
+      const tickets = results.flat()
+      return { tickets }
+    } catch (err) {
+      api.notifications.showToast('error', `Could not fetch tickets: ${String(err)}`)
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:credentials-set — store Linear or Jira credentials
+  reg(api, 'speckit:credentials-set', async (payload: unknown) => {
+    const p = payload as { source: 'linear' | 'jira'; apiKey?: string } & Partial<JiraCreds>
+    try {
+      if (p.source === 'linear' && p.apiKey) {
+        await setLinearKey(p.apiKey)
+      } else if (p.source === 'jira') {
+        await setJiraCredentials({
+          domain: p.domain ?? '',
+          email: p.email ?? '',
+          apiToken: p.apiToken ?? '',
+          jql: p.jql ?? '',
+        })
+      } else {
+        return { error: 'source and credentials required' }
+      }
+      return { ok: true }
+    } catch (err) {
+      api.notifications.showToast('error', `Could not save credentials: ${String(err)}`)
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:credentials-status — return connection status only, never raw credentials
+  reg(api, 'speckit:credentials-status', async (payload: unknown) => {
+    const { source } = payload as { source: 'linear' | 'jira' }
+    try {
+      if (source === 'linear') {
+        const key = await getLinearKey()
+        return { connected: key !== null }
+      } else if (source === 'jira') {
+        const creds = await getJiraCredentials()
+        if (!creds) return { connected: false }
+        return { connected: true, domain: creds.domain, email: creds.email }
+      }
+      return { connected: false }
+    } catch (err) {
+      return { connected: false, error: String(err) }
+    }
+  })
+
+  // speckit:dispatch — create feature dir, init state v2, start agent on constitution phase
+  reg(api, 'speckit:dispatch', async (payload: unknown) => {
+    const { ticket, workspacePath, autonomyLevel } = payload as {
+      ticket: TicketRef
+      workspacePath: string
+      autonomyLevel?: 'guided' | 'standard' | 'fast'
+    }
+    if (!ticket || !workspacePath) return { error: 'ticket and workspacePath required' }
+
+    try {
+      // Determine next sequential feature number
+      const specsDir = path.join(workspacePath, 'specs')
+      await fs.promises.mkdir(specsDir, { recursive: true })
+      const existing = await fs.promises.readdir(specsDir).catch(() => [])
+      const nums = existing
+        .map((d) => parseInt(d.split('-')[0] ?? '0', 10))
+        .filter((n) => !isNaN(n))
+      const nextNum = nums.length > 0 ? Math.max(...nums) + 1 : 1
+      const slug = ticket.key.toLowerCase().replace(/[^a-z0-9]/g, '-')
+      const featureDirName = `${String(nextNum).padStart(3, '0')}-${slug}`
+      const featureDir = path.join(specsDir, featureDirName)
+      await fs.promises.mkdir(featureDir, { recursive: true })
+
+      // Write ticket reference file
+      await fs.promises.writeFile(
+        path.join(featureDir, 'ticket.md'),
+        `# Ticket: ${ticket.key}\n\n**Title:** ${ticket.title}\n**Source:** ${ticket.source}\n**URL:** ${ticket.sourceUrl}\n`,
+        'utf-8'
+      )
+
+      // Check if another run is already active
+      const alreadyActive = Array.from(activeRunnerHandles.keys()).length > 0
+      const branchName = `feature/${slug}`
+      const worktreePath = path.join(workspacePath, '.wt', slug)
+
+      // Create initial state v2
+      const state = {
+        version: 2 as const,
+        featureDir,
+        ticket,
+        run: {
+          status: 'pending' as const,
+          startedAt: new Date().toISOString(),
+          completedAt: null,
+          autonomyLevel: autonomyLevel ?? 'standard',
+        },
+        queuePosition: alreadyActive ? ('pending' as const) : ('active' as const),
+        worktreePath,
+        branchName,
+        prUrl: null,
+        phases: (() => {
+          const phases: PilotState['phases'] = {} as PilotState['phases']
+          for (const id of PHASE_ORDER) {
+            phases[id] = {
+              id,
+              status: id === 'constitution' ? 'ready' : 'locked',
+              approvedHash: null,
+              approvedAt: null,
+              approvedBy: null,
+              lastRunId: null,
+              lastRunAt: null,
+              artifactPaths: [],
+              feedback: null,
+              batchIndex: null,
+            }
+          }
+          return phases
+        })(),
+        settings: DEFAULT_SETTINGS,
+      } satisfies PilotState
+
+      const pilotDir = path.join(featureDir, '.pilot')
+      await fs.promises.mkdir(pilotDir, { recursive: true })
+      const stateFile = path.join(pilotDir, 'state.json')
+      const tmp = `${stateFile}.tmp`
+      await fs.promises.writeFile(tmp, JSON.stringify(state, null, 2), 'utf-8')
+      await fs.promises.rename(tmp, stateFile)
+
+      if (alreadyActive) {
+        return { featureDir, queued: true }
+      }
+
+      // Create git worktree
+      await api.shell.exec({
+        command: 'git',
+        args: ['worktree', 'add', worktreePath, '-b', branchName],
+        cwd: workspacePath,
+      })
+
+      // Start agent runner on constitution phase
+      const runner = createAgentRunner(api)
+      const handle = runner.startPhaseRunner({
+        featureDir,
+        worktreePath,
+        phaseCommand: 'Read and affirm the project constitution',
+        phase: 'constitution',
+      })
+      activeRunnerHandles.set(featureDir, handle)
+
+      api.window.broadcast('speckit:dispatch-started', { featureDir, branchName })
+      return { featureDir, queued: false }
+    } catch (err) {
+      api.notifications.showToast('error', `Dispatch failed: ${String(err)}`)
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:run-cancel — stop runner, remove worktree, update state
+  reg(api, 'speckit:run-cancel', async (payload: unknown) => {
+    const { featureDir, workspacePath } = payload as { featureDir: string; workspacePath: string }
+    if (!featureDir) return { error: 'featureDir required' }
+
+    try {
+      const handle = activeRunnerHandles.get(featureDir)
+      if (handle) {
+        handle.stop()
+        activeRunnerHandles.delete(featureDir)
+      }
+
+      const state = await readPilotState(featureDir)
+      if (state?.worktreePath) {
+        await api.shell
+          .exec({
+            command: 'git',
+            args: ['worktree', 'remove', state.worktreePath, '--force'],
+            cwd: workspacePath ?? path.dirname(path.dirname(featureDir)),
+          })
+          .catch(() => {})
+      }
+
+      if (state) {
+        state.run = state.run
+          ? { ...state.run, status: 'cancelled', completedAt: new Date().toISOString() }
+          : null
+        state.queuePosition = null
+        await writePilotState(featureDir, state)
+        await appendHistory(featureDir, {
+          ts: new Date().toISOString(),
+          actor: 'user',
+          action: 'run_cancelled',
+          phase: 'constitution',
+        })
+        broadcastStateChanged(state)
+      }
+
+      return { ok: true }
+    } catch (err) {
+      api.notifications.showToast('error', `Cancel failed: ${String(err)}`)
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:open-pr — run gh pr create, write prUrl to state, comment on ticket
+  reg(api, 'speckit:open-pr', async (payload: unknown) => {
+    const { featureDir, workspacePath, title, baseBranch } = payload as {
+      featureDir: string
+      workspacePath: string
+      title: string
+      baseBranch?: string
+    }
+    if (!featureDir || !workspacePath) return { error: 'featureDir and workspacePath required' }
+
+    try {
+      const state = await readPilotState(featureDir)
+      if (!state) return { error: 'No pilot state found' }
+      const worktreePath = state.worktreePath
+      if (!worktreePath) return { error: 'No worktree path in state' }
+
+      // Verify gh auth
+      const authCheck = await api.shell.exec({
+        command: 'gh',
+        args: ['auth', 'status'],
+        cwd: worktreePath,
+      })
+      if (authCheck.exitCode !== 0) return { error: 'gh auth not configured' }
+
+      // Build PR body with traceability block
+      const ticketUrl = state.ticket?.sourceUrl ?? ''
+      const specRelPath = path.relative(workspacePath, path.join(featureDir, 'spec.md'))
+      const planRelPath = path.relative(workspacePath, path.join(featureDir, 'plan.md'))
+      const prBody = [
+        `<!-- Ticket: ${ticketUrl} -->`,
+        `<!-- Spec: ${specRelPath} -->`,
+        `<!-- Plan: ${planRelPath} -->`,
+        '',
+        state.ticket ? `**Ticket:** [${state.ticket.key}](${ticketUrl})` : '',
+        `**Spec:** [${specRelPath}](${specRelPath})`,
+        `**Plan:** [${planRelPath}](${planRelPath})`,
+      ]
+        .filter(Boolean)
+        .join('\n')
+
+      const result = await api.shell.exec({
+        command: 'gh',
+        args: ['pr', 'create', '--title', title, '--body', prBody, '--base', baseBranch ?? 'main'],
+        cwd: worktreePath,
+      })
+
+      if (result.exitCode !== 0) return { error: result.stderr || 'gh pr create failed' }
+
+      const prUrl = result.stdout.trim()
+      state.prUrl = prUrl
+      await writePilotState(featureDir, state)
+      await appendHistory(featureDir, {
+        ts: new Date().toISOString(),
+        actor: 'user',
+        action: 'pr_opened',
+        phase: 'open-pr',
+        note: prUrl,
+      })
+
+      // Write status back to tracker if configured
+      if (state.settings.writeStatusBackOnPrOpen && state.ticket) {
+        const ticket = state.ticket
+        if (ticket.source === 'linear') {
+          const key = await getLinearKey()
+          if (key) await postLinearComment(key, ticket.key, `PR opened: ${prUrl}`).catch(() => {})
+        } else if (ticket.source === 'jira') {
+          const creds = await getJiraCredentials()
+          if (creds) await postJiraComment(creds, ticket.key, `PR opened: ${prUrl}`).catch(() => {})
+        }
+      }
+
+      // Remove worktree
+      await api.shell
+        .exec({
+          command: 'git',
+          args: ['worktree', 'remove', worktreePath, '--force'],
+          cwd: workspacePath,
+        })
+        .catch(() => {})
+
+      broadcastStateChanged(state)
+      return { prUrl }
+    } catch (err) {
+      api.notifications.showToast('error', `Open PR failed: ${String(err)}`)
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:checkin-decision — batch check-in: continue/pause/split
+  reg(api, 'speckit:checkin-decision', async (payload: unknown) => {
+    const { featureDir, decision, batchIndex } = payload as {
+      featureDir?: string
+      decision: 'continue' | 'pause' | 'split'
+      batchIndex?: number
+    }
+    if (!featureDir) return { error: 'featureDir required' }
+
+    try {
+      const handle = activeRunnerHandles.get(featureDir)
+      if (handle) {
+        handle.stop()
+        activeRunnerHandles.delete(featureDir)
+      }
+
+      const state = await readPilotState(featureDir)
+      if (!state) return { error: 'No pilot state found' }
+
+      if (decision === 'continue') {
+        const nextBatch = (batchIndex ?? 0) + 1
+        const runner = createAgentRunner(api)
+        const newHandle = runner.startPhaseRunner({
+          featureDir,
+          worktreePath: state.worktreePath ?? featureDir,
+          phaseCommand: `Continue implementation batch ${nextBatch}`,
+          phase: 'implement',
+          batchIndex: nextBatch,
+        })
+        activeRunnerHandles.set(featureDir, newHandle)
+        return { ok: true }
+      }
+
+      if (decision === 'pause') {
+        const ps = state.phases['implement']
+        if (ps) ps.batchIndex = batchIndex ?? null
+        await writePilotState(featureDir, state)
+        api.window.broadcast('speckit:state-changed', { state })
+        return { ok: true }
+      }
+
+      if (decision === 'split') {
+        const ps = state.phases['implement']
+        if (ps) {
+          ps.status = 'approved'
+          ps.batchIndex = batchIndex ?? null
+        }
+        await writePilotState(featureDir, state)
+        await appendHistory(featureDir, {
+          ts: new Date().toISOString(),
+          actor: 'user',
+          action: 'approved',
+          phase: 'implement',
+          note: `split at batch ${batchIndex}`,
+        })
+        api.window.broadcast('speckit:state-changed', { state })
+        return { ok: true }
+      }
+
+      return { error: 'Unknown decision' }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:self-review-read — read .pilot/self-review.json
+  reg(api, 'speckit:self-review-read', async (payload: unknown) => {
+    const { featureDir } = payload as { featureDir?: string }
+    if (!featureDir) return { error: 'featureDir required' }
+    const filePath = path.join(featureDir, '.pilot', 'self-review.json')
+    try {
+      const raw = await fs.promises.readFile(filePath, 'utf-8')
+      return { result: JSON.parse(raw) }
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code === 'ENOENT') return { notFound: true, error: 'self-review.json not found' }
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:phase-request-changes — store feedback, set phase to ready, re-run with note
+  reg(api, 'speckit:phase-request-changes', async (payload: unknown) => {
+    const { featureDir, phase, note } = payload as {
+      featureDir: string
+      phase: PhaseId
+      note: string
+    }
+    if (!featureDir || !phase) return { error: 'featureDir and phase required' }
+    try {
+      let state = await readPilotState(featureDir)
+      if (!state) state = createPilotState(featureDir)
+      const ps = state.phases[phase]
+      if (!ps) return { error: `Unknown phase: ${phase}` }
+      ps.feedback = note
+      ps.status = 'ready'
+      await writePilotState(featureDir, state)
+      await appendHistory(featureDir, {
+        ts: new Date().toISOString(),
+        actor: 'user',
+        action: 'request_changes',
+        phase,
+        note,
+      })
+      const runner = createAgentRunner(api)
+      const handle = runner.startPhaseRunner({
+        featureDir,
+        worktreePath: state.worktreePath ?? featureDir,
+        phaseCommand: `Re-run ${phase}`,
+        phase,
+        feedbackNote: note,
+      })
+      activeRunnerHandles.set(featureDir, handle)
+      api.window.broadcast('speckit:state-changed', { state })
+      return { state }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:phase-comment — append an audit note without triggering re-run
+  reg(api, 'speckit:phase-comment', async (payload: unknown) => {
+    const { featureDir, phase, note } = payload as {
+      featureDir: string
+      phase: PhaseId
+      note: string
+    }
+    if (!featureDir || !phase) return { error: 'featureDir and phase required' }
+    try {
+      const state = await readPilotState(featureDir)
+      if (!state) return { error: 'No pilot state found' }
+      await appendHistory(featureDir, {
+        ts: new Date().toISOString(),
+        actor: 'user',
+        action: 'comment',
+        phase,
+        note,
+      })
+      api.window.broadcast('speckit:state-changed', { state })
+      return { ok: true, state }
     } catch (err) {
       return { error: String(err) }
     }

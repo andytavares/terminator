@@ -1,4 +1,12 @@
-import type { Feature, HistoryEntry, PhaseId, PilotState } from './speckit.types.js'
+import type {
+  Feature,
+  HistoryEntry,
+  PhaseId,
+  PilotState,
+  SelfReviewResult,
+  Ticket,
+  TicketRef,
+} from './speckit.types.js'
 
 export interface SpeckitAPI {
   featureList(payload: { repoRoot: string }): Promise<{ features: Feature[] } | { error: string }>
@@ -61,7 +69,54 @@ export interface SpeckitAPI {
     phase: PhaseId
     note?: string
   }): Promise<{ state: PilotState } | { error: string }>
+  ticketList(): Promise<{ tickets: Ticket[] } | { error: string }>
+  credentialsSet(
+    payload:
+      | { source: 'linear'; apiKey: string }
+      | { source: 'jira'; domain: string; email: string; apiToken: string; jql: string }
+  ): Promise<{ ok: true } | { error: string }>
+  credentialsStatus(payload: {
+    source: 'linear' | 'jira'
+  }): Promise<{ connected: boolean; email?: string; domain?: string } | { error: string }>
+  dispatch(payload: {
+    ticket: TicketRef
+    workspacePath: string
+    autonomyLevel?: 'guided' | 'standard' | 'fast'
+  }): Promise<{ featureDir: string; queued: boolean } | { error: string }>
+  runCancel(payload: {
+    featureDir: string
+    workspacePath: string
+  }): Promise<{ ok: true } | { error: string }>
+  openPr(payload: {
+    featureDir: string
+    workspacePath: string
+    title: string
+    baseBranch?: string
+  }): Promise<{ prUrl: string } | { error: string }>
+  checkinDecision(payload: {
+    featureDir: string
+    decision: 'continue' | 'pause' | 'split'
+    batchIndex?: number
+  }): Promise<{ ok: true } | { error: string }>
+  selfReviewRead(payload: {
+    featureDir: string
+  }): Promise<{ result: SelfReviewResult } | { notFound: true; error: string } | { error: string }>
+  phaseRequestChanges(payload: {
+    featureDir: string
+    phase: PhaseId
+    note: string
+  }): Promise<{ state: PilotState } | { error: string }>
+  phaseComment(payload: {
+    featureDir: string
+    phase: PhaseId
+    note: string
+  }): Promise<{ ok: true; state: PilotState } | { error: string }>
   onStateChanged(handler: (data: unknown) => void): () => void
+  onRunOutput(handler: (data: { featureDir: string; line: string; ts: string }) => void): () => void
+  onDispatchStarted(handler: (data: { featureDir: string; branchName: string }) => void): () => void
+  onCheckinReady(
+    handler: (data: { featureDir: string; batchIndex: number; diffSummary: string }) => void
+  ): () => void
 }
 
 export function getSpeckitAPI(): SpeckitAPI {
@@ -123,6 +178,45 @@ export function getSpeckitAPI(): SpeckitAPI {
       bridge.invoke('speckit:phase-unskip', payload) as Promise<
         { state: PilotState } | { error: string }
       >,
+    ticketList: () =>
+      bridge.invoke('speckit:ticket-list', {}) as Promise<
+        { tickets: Ticket[] } | { error: string }
+      >,
+    credentialsSet: (payload) =>
+      bridge.invoke('speckit:credentials-set', payload) as Promise<
+        { ok: true } | { error: string }
+      >,
+    credentialsStatus: (payload) =>
+      bridge.invoke('speckit:credentials-status', payload) as Promise<
+        { connected: boolean; email?: string; domain?: string } | { error: string }
+      >,
+    dispatch: (payload) =>
+      bridge.invoke('speckit:dispatch', payload) as Promise<
+        { featureDir: string; queued: boolean } | { error: string }
+      >,
+    runCancel: (payload) =>
+      bridge.invoke('speckit:run-cancel', payload) as Promise<{ ok: true } | { error: string }>,
+    openPr: (payload) =>
+      bridge.invoke('speckit:open-pr', payload) as Promise<{ prUrl: string } | { error: string }>,
+    checkinDecision: (payload) =>
+      bridge.invoke('speckit:checkin-decision', payload) as Promise<
+        { ok: true } | { error: string }
+      >,
+    selfReviewRead: (payload) =>
+      bridge.invoke('speckit:self-review-read', payload) as Promise<
+        { result: SelfReviewResult } | { notFound: true; error: string } | { error: string }
+      >,
+    phaseRequestChanges: (payload) =>
+      bridge.invoke('speckit:phase-request-changes', payload) as Promise<
+        { state: PilotState } | { error: string }
+      >,
+    phaseComment: (payload) =>
+      bridge.invoke('speckit:phase-comment', payload) as Promise<
+        { ok: true; state: PilotState } | { error: string }
+      >,
     onStateChanged: (handler) => bridge.on('speckit:state-changed', handler),
+    onRunOutput: (handler) => bridge.on('speckit:run-output', handler),
+    onDispatchStarted: (handler) => bridge.on('speckit:dispatch-started', handler),
+    onCheckinReady: (handler) => bridge.on('speckit:checkin-ready', handler),
   }
 }

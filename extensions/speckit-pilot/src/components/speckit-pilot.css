@@ -808,6 +808,49 @@
   border: 1px solid rgba(92, 107, 192, 0.3);
 }
 
+.sk-badge--accent {
+  background: var(--tm-accent);
+  color: #fff;
+}
+
+/* ── Source badges (Linear / Jira brand colors) ──────────────── */
+
+.sk-source-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #fff;
+}
+
+.sk-source-badge--linear {
+  background: #5e6ad2;
+}
+
+.sk-source-badge--jira {
+  background: #0052cc;
+}
+
+/* ── Filter pills ────────────────────────────────────────────── */
+
+.sk-pill {
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 400;
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  border: 1px solid var(--tm-border);
+  cursor: pointer;
+}
+
+.sk-pill--active {
+  background: var(--tm-accent);
+  color: #fff;
+  border-color: transparent;
+  font-weight: 600;
+}
+
 /* ── Approval panel ──────────────────────────────────────────── */
 
 .sk-approval {
@@ -1911,4 +1954,114 @@
   background: color-mix(in srgb, var(--tm-accent) 15%, transparent);
   color: var(--tm-accent);
   border-radius: 4px;
+}
+
+/* ── Ticket body markdown renderer ────────────────────────────── */
+
+.sk-ticket-body {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--tm-text-primary);
+  word-break: break-word;
+}
+
+.sk-ticket-body h1,
+.sk-ticket-body h2,
+.sk-ticket-body h3,
+.sk-ticket-body h4 {
+  color: var(--tm-text-primary);
+  font-weight: 600;
+  margin: 16px 0 6px;
+  line-height: 1.3;
+}
+
+.sk-ticket-body h1 {
+  font-size: 16px;
+}
+.sk-ticket-body h2 {
+  font-size: 14px;
+}
+.sk-ticket-body h3 {
+  font-size: 13px;
+}
+.sk-ticket-body h4 {
+  font-size: 12px;
+}
+
+.sk-ticket-body p {
+  margin: 0 0 10px;
+}
+
+.sk-ticket-body ul,
+.sk-ticket-body ol {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.sk-ticket-body li {
+  margin-bottom: 4px;
+}
+
+.sk-ticket-body code {
+  font-family: var(--tm-font-mono);
+  font-size: 12px;
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--tm-text-primary);
+}
+
+.sk-ticket-body pre {
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 0 0 10px;
+}
+
+.sk-ticket-body pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+}
+
+.sk-ticket-body blockquote {
+  border-left: 3px solid var(--tm-border-strong);
+  margin: 0 0 10px;
+  padding: 4px 12px;
+  color: var(--tm-text-secondary);
+}
+
+.sk-ticket-body a {
+  color: var(--tm-accent);
+  text-decoration: underline;
+}
+
+.sk-ticket-body hr {
+  border: none;
+  border-top: 1px solid var(--tm-border);
+  margin: 14px 0;
+}
+
+.sk-ticket-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.sk-ticket-body th,
+.sk-ticket-body td {
+  padding: 6px 10px;
+  border: 1px solid var(--tm-border);
+  text-align: left;
+}
+
+.sk-ticket-body th {
+  background: var(--tm-bg-elevated);
+  font-weight: 600;
+  color: var(--tm-text-secondary);
 }
