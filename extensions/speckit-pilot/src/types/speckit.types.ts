@@ -7,6 +7,8 @@ export type PhaseId =
   | 'tasks'
   | 'analyze'
   | 'implement'
+  | 'self-review'
+  | 'open-pr'
 
 export type PhaseStatus =
   | 'locked'
@@ -19,6 +21,8 @@ export type PhaseStatus =
   | 'failed'
   | 'skipped'
 
+export type AutonomyLevel = 'guided' | 'standard' | 'fast'
+
 export interface PhaseState {
   id: PhaseId
   status: PhaseStatus
@@ -28,6 +32,8 @@ export interface PhaseState {
   lastRunId: string | null
   lastRunAt: string | null
   artifactPaths: string[]
+  feedback: string | null
+  batchIndex: number | null
 }
 
 export interface PhaseGateConfig {
@@ -36,8 +42,65 @@ export interface PhaseGateConfig {
   perFileConfirm: boolean
 }
 
+export interface LinearSettings {
+  teamFilter?: string
+}
+
+export interface JiraSettings {
+  domain: string
+  email: string
+  jql: string
+}
+
+export interface JiraCreds {
+  domain: string
+  email: string
+  apiToken: string
+  jql: string
+}
+
+export interface Ticket {
+  source: 'linear' | 'jira'
+  key: string
+  sourceUrl: string
+  title: string
+  body?: string
+  bodyFormat?: 'markdown' | 'html'
+  acceptanceCriteria?: string[]
+  priority?: string
+  size?: string
+  runRef?: string | null
+}
+
+export interface TicketRef {
+  source: 'linear' | 'jira'
+  key: string
+  sourceUrl: string
+  title: string
+}
+
+export interface RunMeta {
+  status: 'running' | 'completed' | 'failed' | 'cancelled'
+  startedAt: string
+  completedAt: string | null
+  autonomyLevel: AutonomyLevel
+}
+
+export interface SelfReviewResult {
+  format: { passed: boolean; output: string }
+  lint: { passed: boolean; errorCount: number; warningCount: number; output: string }
+  coverage: { passed: boolean; percentage: number; output: string }
+  googleReview: { passed: boolean; blockerCount: number; output: string }
+  summary: string
+}
+
 export interface PilotSettings {
   defaultModel: string
+  defaultAutonomy: AutonomyLevel
+  batchCheckinsEnabled: boolean
+  writeStatusBackOnPrOpen: boolean
+  linear: LinearSettings | null
+  jira: JiraSettings | null
   phaseGates: Record<PhaseId, PhaseGateConfig>
   disallowedPaths: string[]
   maxFilesPerImplementRun: number
@@ -54,8 +117,14 @@ export interface PilotSettings {
 }
 
 export interface PilotState {
-  version: 1
+  version: 2
   featureDir: string
+  ticket: TicketRef | null
+  run: RunMeta | null
+  queuePosition: 'active' | 'pending' | null
+  worktreePath: string | null
+  branchName: string | null
+  prUrl: string | null
   phases: Record<PhaseId, PhaseState>
   settings: PilotSettings
 }
@@ -76,6 +145,11 @@ export interface HistoryEntry {
     | 'unskipped'
     | 'file_approved'
     | 'file_skipped'
+    | 'request_changes'
+    | 'run_cancelled'
+    | 'pr_opened'
+    | 'comment'
+    | 'artifact_modified'
   phase: PhaseId
   runId?: string
   hash?: string
@@ -120,6 +194,8 @@ export const PHASE_ORDER: PhaseId[] = [
   'tasks',
   'analyze',
   'implement',
+  'self-review',
+  'open-pr',
 ]
 
 export const DEFAULT_PHASE_GATE: PhaseGateConfig = {
@@ -130,6 +206,11 @@ export const DEFAULT_PHASE_GATE: PhaseGateConfig = {
 
 export const DEFAULT_SETTINGS: PilotSettings = {
   defaultModel: 'claude-opus-4-6',
+  defaultAutonomy: 'standard',
+  batchCheckinsEnabled: true,
+  writeStatusBackOnPrOpen: false,
+  linear: null,
+  jira: null,
   phaseGates: Object.fromEntries(
     PHASE_ORDER.map((id) => [
       id,
@@ -137,7 +218,9 @@ export const DEFAULT_SETTINGS: PilotSettings = {
         ? { required: true, autoApprove: false, perFileConfirm: true }
         : id === 'checklist'
           ? { required: false, autoApprove: false, perFileConfirm: false }
-          : { ...DEFAULT_PHASE_GATE },
+          : id === 'self-review' || id === 'open-pr'
+            ? { required: true, autoApprove: false, perFileConfirm: false }
+            : { ...DEFAULT_PHASE_GATE },
     ])
   ) as Record<PhaseId, PhaseGateConfig>,
   disallowedPaths: ['.env*', 'secrets/**', '*.pem', '*.key'],

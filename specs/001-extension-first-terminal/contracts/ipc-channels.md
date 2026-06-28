@@ -1050,19 +1050,44 @@ Pushes the current branch to its configured remote. Runs `git push` with no argu
 All channels below are registered by the `speckit-pilot` extension via `api.ipc.registerHandler` and accessed
 through the generic `extensionBridge.invoke()` in the renderer (the core app has no knowledge of these channels).
 
-| Channel                 | Direction       | Summary                                                                                 |
-| ----------------------- | --------------- | --------------------------------------------------------------------------------------- |
-| `speckit:feature-list`  | renderer → main | Scan `specs/` for feature dirs containing `spec.md`; return `Feature[]`                 |
-| `speckit:pilot-state`   | renderer → main | Load `.pilot/state.json` for a feature dir; returns `{ state }` or `{ notFound: true }` |
-| `speckit:phase-approve` | renderer → main | Mark a phase approved in `.pilot/state.json`; broadcast state-changed                   |
-| `speckit:phase-revoke`  | renderer → main | Revoke approval; reset phase to `ready`                                                 |
-| `speckit:file-write`    | renderer → main | Write arbitrary file content (for markdown editor saves)                                |
+### Invoke Channels (renderer → main)
+
+| Channel                           | Summary                                                                                                     |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `speckit:feature-list`            | Scan `specs/` for feature dirs containing `spec.md`; return `Feature[]`                                     |
+| `speckit:pilot-state`             | Load `.pilot/state.json` for a feature dir; returns `{ state }` or `{ notFound: true }`                     |
+| `speckit:phase-approve`           | Mark a phase approved in `.pilot/state.json`; broadcast `speckit:state-changed`                             |
+| `speckit:phase-revoke`            | Revoke approval; reset phase to `ready`; broadcast `speckit:state-changed`                                  |
+| `speckit:phase-request-changes`   | Record feedback note, set status to `ready`, re-queue runner; broadcast `speckit:state-changed`             |
+| `speckit:phase-comment`           | Append `comment` history entry (no re-run); broadcast `speckit:state-changed`                               |
+| `speckit:phase-reject`            | Reject phase with reason                                                                                    |
+| `speckit:phase-skip`              | Skip optional phase                                                                                         |
+| `speckit:phase-unskip`            | Un-skip a previously skipped phase                                                                          |
+| `speckit:file-write`              | Write arbitrary file content (for inline markdown editor saves)                                             |
+| `speckit:artifact-read`           | Read current and approved artifact content from disk                                                        |
+| `speckit:ticket-list`             | Fetch tickets from connected sources (Linear, Jira)                                                         |
+| `speckit:dispatch`                | Create/resume a feature run for a ticket; returns `{ featureDir, queued }`                                  |
+| `speckit:run-cancel`              | Cancel the active run for a feature dir                                                                     |
+| `speckit:open-pr`                 | Open a GitHub PR for a completed feature; returns `{ prUrl }`                                               |
+| `speckit:credentials-set`         | Store Linear or Jira API credentials in the main-process secrets store (credentials never sent to renderer) |
+| `speckit:credentials-status`      | Returns `{ connected: boolean }` ONLY — credentials are never exposed to the renderer                       |
+| `speckit:self-review-read`        | Read `.pilot/self-review.json`; returns `{ result: SelfReviewResult }` or `{ notFound: true }`              |
+| `speckit:checkin-decision`        | Act on a batch check-in: `continue` (next batch), `pause`, or `split` (approve at boundary)                 |
+| `speckit:history-load`            | Load `.pilot/history.json` for a feature dir                                                                |
+| `speckit:check-artifacts`         | Check which artifact files exist on disk for a feature dir                                                  |
+| `speckit:implement-stop`          | Stop the active phase runner subprocess                                                                     |
+| `speckit:checkpoint-create`       | Create a git commit checkpoint before an implement run                                                      |
+| `speckit:implement-file-decision` | Approve or skip a pending file write during implement phase                                                 |
+| `speckit:session-list`            | List available Claude session IDs                                                                           |
 
 ### Push Events (main → renderer)
 
-| Event                   | Payload                 | Trigger                            |
-| ----------------------- | ----------------------- | ---------------------------------- |
-| `speckit:state-changed` | `{ state: PilotState }` | Phase approve/revoke updates state |
+| Event                      | Payload                                                           | Trigger                                                  |
+| -------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------- |
+| `speckit:state-changed`    | `{ state: PilotState }`                                           | Any phase state mutation                                 |
+| `speckit:run-output`       | `{ featureDir: string; line: string; ts: string }`                | Subprocess stdout/stderr line                            |
+| `speckit:dispatch-started` | `{ featureDir: string; branchName: string }`                      | After dispatch creates/resumes a feature run             |
+| `speckit:checkin-ready`    | `{ featureDir: string; batchIndex: number; diffSummary: string }` | Agent runner exits implement phase with `batchIndex` set |
 
 ---
 

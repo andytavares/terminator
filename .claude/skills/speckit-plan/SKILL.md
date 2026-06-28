@@ -1,14 +1,15 @@
 ---
-name: 'speckit-plan'
-description: 'Execute the implementation planning workflow using the plan template to generate design artifacts.'
-argument-hint: 'Optional guidance for the planning phase'
-compatibility: 'Requires spec-kit project structure with .specify/ directory'
+name: "speckit-plan"
+description: "Execute the implementation planning workflow using the plan template to generate design artifacts."
+argument-hint: "Optional guidance for the planning phase"
+compatibility: "Requires spec-kit project structure with .specify/ directory"
 metadata:
-  author: 'github-spec-kit'
-  source: 'templates/commands/plan.md'
+  author: "github-spec-kit"
+  source: "templates/commands/plan.md"
 user-invocable: true
 disable-model-invocation: false
 ---
+
 
 ## User Input
 
@@ -21,7 +22,6 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before planning)**:
-
 - Check if `.specify/extensions.yml` exists in the project root.
 - If it exists, read it and look for entries under the `hooks.before_plan` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
@@ -31,9 +31,7 @@ You **MUST** consider the user input before proceeding (if not empty).
   - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
 - When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.
 - For each executable hook, output the following based on its `optional` flag:
-
   - **Optional hook** (`optional: true`):
-
     ```
     ## Extension Hooks
 
@@ -44,9 +42,7 @@ You **MUST** consider the user input before proceeding (if not empty).
     Prompt: {prompt}
     To execute: `/{command}`
     ```
-
   - **Mandatory hook** (`optional: false`):
-
     ```
     ## Extension Hooks
 
@@ -56,7 +52,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
     Wait for the result of the hook command before proceeding to the Outline.
     ```
-
+    After emitting the block above you MUST actually invoke the hook and wait for it to finish before continuing. Run it the same way you would run the command yourself in this agent/session (the invocation may differ from the literal `{command}` id shown above, e.g. a skills-mode agent runs it as `/skill:speckit-...` or `$speckit-...`). Emitting the block alone does not run the hook.
 - If no hooks are registered or `.specify/extensions.yml` does not exist, skip silently
 
 ## Outline
@@ -79,7 +75,6 @@ You **MUST** consider the user input before proceeding (if not empty).
 **You MUST complete this section before reporting completion to the user.**
 
 Check if `.specify/extensions.yml` exists in the project root.
-
 - If it does not exist, or no hooks are registered under `hooks.after_plan`, skip to the Completion Report.
 - If it exists, read it and look for entries under the `hooks.after_plan` key.
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue to the Completion Report.
@@ -89,9 +84,7 @@ Check if `.specify/extensions.yml` exists in the project root.
   - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
 - When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.
 - For each executable hook, output the following based on its `optional` flag:
-
   - **Mandatory hook** (`optional: false`) — **You MUST emit `EXECUTE_COMMAND:` for each mandatory hook**:
-
     ```
     ## Extension Hooks
 
@@ -99,9 +92,8 @@ Check if `.specify/extensions.yml` exists in the project root.
     Executing: `/{command}`
     EXECUTE_COMMAND: {command}
     ```
-
+    After emitting the block above you MUST actually invoke the hook and wait for it to finish before continuing. Run it the same way you would run the command yourself in this agent/session (the invocation may differ from the literal `{command}` id shown above, e.g. a skills-mode agent runs it as `/skill:speckit-...` or `$speckit-...`). Emitting the block alone does not run the hook.
   - **Optional hook** (`optional: true`):
-
     ```
     ## Extension Hooks
 
@@ -122,7 +114,6 @@ Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generate
 ### Phase 0: Outline & Research
 
 1. **Extract unknowns from Technical Context** above:
-
    - For each NEEDS CLARIFICATION → research task
    - For each dependency → best practices task
    - For each integration → patterns task
@@ -148,22 +139,27 @@ Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generate
 **Prerequisites:** `research.md` complete
 
 1. **Extract entities from feature spec** → `data-model.md`:
-
    - Entity name, fields, relationships
    - Validation rules from requirements
    - State transitions if applicable
 
 2. **Define interface contracts** (if project has external interfaces) → `/contracts/`:
-
    - Identify what interfaces the project exposes to users or other systems
    - Document the contract format appropriate for the project type
    - Examples: public APIs for libraries, command schemas for CLI tools, endpoints for web services, grammars for parsers, UI contracts for applications
    - Skip if project is purely internal (build scripts, one-off tools, etc.)
 
-3. **Agent context update**:
+3. **Create quickstart validation guide** → `quickstart.md`:
+   - Document runnable validation scenarios that prove the feature works end-to-end
+   - Include prerequisites, setup commands, test/run commands, and expected outcomes
+   - Use links or references to contracts and data model details instead of duplicating them
+   - Do not include full implementation code, model/service/controller bodies, migrations, or complete test suites
+   - Keep this artifact as a validation/run guide; implementation details belong in `tasks.md` and the implementation phase
+
+4. **Agent context update**:
    - Update the plan reference between the `<!-- SPECKIT START -->` and `<!-- SPECKIT END -->` markers in `CLAUDE.md` to point to the plan file created in step 1 (the IMPL_PLAN path)
 
-**Output**: data-model.md, /contracts/\*, quickstart.md, updated agent context file
+**Output**: data-model.md, /contracts/*, quickstart.md, updated agent context file
 
 ## Key rules
 

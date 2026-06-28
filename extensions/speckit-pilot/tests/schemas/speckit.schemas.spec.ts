@@ -19,8 +19,14 @@ import { DEFAULT_SETTINGS, PHASE_ORDER } from '../../src/types/speckit.types.js'
 
 function makeMinimalPilotState() {
   return {
-    version: 1 as const,
+    version: 2 as const,
     featureDir: 'specs/test-feature',
+    ticket: null,
+    run: null,
+    queuePosition: null,
+    worktreePath: null,
+    branchName: null,
+    prUrl: null,
     phases: Object.fromEntries(
       PHASE_ORDER.map((id, idx) => [
         id,
@@ -33,6 +39,8 @@ function makeMinimalPilotState() {
           lastRunId: null,
           lastRunAt: null,
           artifactPaths: [],
+          feedback: null,
+          batchIndex: null,
         },
       ])
     ),
@@ -46,8 +54,8 @@ describe('PilotStateSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('rejects version !== 1', () => {
-    const state = { ...makeMinimalPilotState(), version: 2 }
+  it('rejects version !== 2', () => {
+    const state = { ...makeMinimalPilotState(), version: 1 }
     expect(PilotStateSchema.safeParse(state).success).toBe(false)
   })
 

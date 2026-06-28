@@ -4,6 +4,7 @@ import {
   isUpstreamApproved,
   computeStalePhases,
   applyHashVerification,
+  shouldAutoApprove,
   InvalidTransitionError,
 } from '../../src/state/phase-state-machine.js'
 import type { PhaseState, PilotState } from '../../src/types/speckit.types.js'
@@ -22,6 +23,8 @@ function makePhaseState(
     lastRunId: null,
     lastRunAt: null,
     artifactPaths: [],
+    feedback: null,
+    batchIndex: null,
   }
 }
 
@@ -37,12 +40,62 @@ function makePilotState(overrides: Partial<Record<string, Partial<PhaseState>>> 
   ) as PilotState['phases']
 
   return {
-    version: 1,
+    version: 2,
     featureDir: 'specs/test',
+    ticket: null,
+    run: null,
+    queuePosition: null,
+    worktreePath: null,
+    branchName: null,
+    prUrl: null,
     phases,
     settings: DEFAULT_SETTINGS,
   }
 }
+
+describe('PHASE_ORDER', () => {
+  it('contains exactly 10 phases', () => {
+    expect(PHASE_ORDER).toHaveLength(10)
+  })
+
+  it('includes self-review as phase 9', () => {
+    expect(PHASE_ORDER[8]).toBe('self-review')
+  })
+
+  it('includes open-pr as phase 10', () => {
+    expect(PHASE_ORDER[9]).toBe('open-pr')
+  })
+})
+
+describe('shouldAutoApprove()', () => {
+  const fastGate = { required: true, autoApprove: true, perFileConfirm: false }
+  const offGate = { required: true, autoApprove: false, perFileConfirm: false }
+
+  it('returns false for self-review even when autonomy=fast and autoApprove=true', () => {
+    expect(shouldAutoApprove('self-review', 'fast', fastGate)).toBe(false)
+  })
+
+  it('returns false for open-pr even when autonomy=fast and autoApprove=true', () => {
+    expect(shouldAutoApprove('open-pr', 'fast', fastGate)).toBe(false)
+  })
+
+  it('returns true for specify when autonomy=fast and gate.autoApprove=true', () => {
+    expect(shouldAutoApprove('specify', 'fast', fastGate)).toBe(true)
+  })
+
+  it('returns false for specify when autonomy=fast but gate.autoApprove=false', () => {
+    expect(shouldAutoApprove('specify', 'fast', offGate)).toBe(false)
+  })
+
+  it('returns false for specify when autonomy=guided even if gate.autoApprove=true', () => {
+    expect(shouldAutoApprove('specify', 'guided', fastGate)).toBe(false)
+  })
+
+  it('returns false for implement (perFileConfirm gate) even in fast autonomy', () => {
+    const implementGate = { required: true, autoApprove: false, perFileConfirm: true }
+    expect(shouldAutoApprove('implement', 'fast', implementGate)).toBe(false)
+  })
+})
 
 describe('transition()', () => {
   it('locked → ready on upstream_approved', () => {
@@ -123,6 +176,30 @@ describe('transition()', () => {
     expect(result.status).toBe('running')
     expect(result).not.toBe(ps)
   })
+
+  it('self-review transitions: locked → ready → running → awaiting_review → approved', () => {
+    let ps = makePhaseState('locked', 'self-review')
+    ps = transition(ps, 'upstream_approved')
+    expect(ps.status).toBe('ready')
+    ps = transition(ps, 'run_triggered')
+    expect(ps.status).toBe('running')
+    ps = transition(ps, 'artifact_detected')
+    expect(ps.status).toBe('awaiting_review')
+    ps = transition(ps, 'approved')
+    expect(ps.status).toBe('approved')
+  })
+
+  it('open-pr transitions: locked → ready → running → awaiting_review → approved', () => {
+    let ps = makePhaseState('locked', 'open-pr')
+    ps = transition(ps, 'upstream_approved')
+    expect(ps.status).toBe('ready')
+    ps = transition(ps, 'run_triggered')
+    expect(ps.status).toBe('running')
+    ps = transition(ps, 'artifact_detected')
+    expect(ps.status).toBe('awaiting_review')
+    ps = transition(ps, 'approved')
+    expect(ps.status).toBe('approved')
+  })
 })
 
 describe('isUpstreamApproved()', () => {
@@ -145,6 +222,21 @@ describe('isUpstreamApproved()', () => {
     const state = makePilotState({ tasks: { status: 'ready' } })
     expect(isUpstreamApproved(state, 'checklist')).toBe(true)
   })
+
+  it('self-review requires implement to be approved', () => {
+    const state = makePilotState({ implement: { status: 'ready' } })
+    expect(isUpstreamApproved(state, 'self-review')).toBe(false)
+  })
+
+  it('self-review unlocked when implement is approved', () => {
+    const state = makePilotState({ implement: { status: 'approved', approvedHash: 'xyz' } })
+    expect(isUpstreamApproved(state, 'self-review')).toBe(true)
+  })
+
+  it('open-pr requires self-review to be approved', () => {
+    const state = makePilotState({ 'self-review': { status: 'ready' } })
+    expect(isUpstreamApproved(state, 'open-pr')).toBe(false)
+  })
 })
 
 describe('computeStalePhases()', () => {
@@ -166,9 +258,20 @@ describe('computeStalePhases()', () => {
     expect(computeStalePhases(state, 'constitution')).toEqual([])
   })
 
-  it('returns empty array for implement (last phase)', () => {
+  it('returns empty array for open-pr (last phase)', () => {
     const state = makePilotState()
-    expect(computeStalePhases(state, 'implement')).toEqual([])
+    expect(computeStalePhases(state, 'open-pr')).toEqual([])
+  })
+
+  it('revoke on implement marks self-review and open-pr stale if approved', () => {
+    const state = makePilotState({
+      implement: { status: 'approved', approvedHash: 'aaa' },
+      'self-review': { status: 'approved', approvedHash: 'bbb' },
+      'open-pr': { status: 'approved', approvedHash: 'ccc' },
+    })
+    const stale = computeStalePhases(state, 'implement')
+    expect(stale).toContain('self-review')
+    expect(stale).toContain('open-pr')
   })
 })
 
@@ -198,7 +301,7 @@ describe('applyHashVerification()', () => {
     const updated = applyHashVerification(state, {
       '.specify/memory/constitution.md': 'aaaa1234',
     })
-    expect(updated).toBe(state) // same reference = no change
+    expect(updated).toBe(state)
   })
 
   it('marks phase stale when file is missing (null hash)', () => {

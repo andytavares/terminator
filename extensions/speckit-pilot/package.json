@@ -7,7 +7,9 @@
     "build:renderer": "vite build --config vite.renderer.config.ts"
   },
   "dependencies": {
+    "@linear/sdk": "27.0.0",
     "diff": "5.2.2",
+    "marked": "^15.0.12",
     "minimatch": "9.0.9"
   }
 }

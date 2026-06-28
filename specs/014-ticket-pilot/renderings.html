@@ -1,0 +1,2433 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SpecKit Pilot — Autonomous Ticket→PR Renderings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --tm-bg-base: #0c0c0f;
+        --tm-bg-surface: #111116;
+        --tm-bg-elevated: #18181f;
+        --tm-bg-card: #1c1c25;
+        --tm-bg-card-hover: #22222e;
+        --tm-bg-input: #16161c;
+        --tm-text-primary: #e2e2ee;
+        --tm-text-secondary: #7070a0;
+        --tm-text-muted: #3a3a5a;
+        --tm-border: rgba(255, 255, 255, 0.06);
+        --tm-border-strong: rgba(255, 255, 255, 0.12);
+        --tm-accent: #5c6bc0;
+        --tm-accent-dim: rgba(92, 107, 192, 0.18);
+        --tm-accent-glow: rgba(92, 107, 192, 0.35);
+        --tm-danger: #e05c5c;
+        --tm-success: #4ade80;
+        --tm-warning: #facc15;
+        --tm-radius-xs: 4px;
+        --tm-radius-sm: 6px;
+        --tm-radius-md: 10px;
+        --tm-radius-lg: 16px;
+        --tm-font-ui: 'IBM Plex Sans', system-ui, sans-serif;
+        --tm-font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+        --linear: #5e6ad2;
+        --jira: #2684ff;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--tm-bg-base);
+        color: var(--tm-text-primary);
+        font-family: var(--tm-font-ui);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        padding: 40px 20px 80px;
+      }
+      .page {
+        max-width: 1080px;
+        margin: 0 auto;
+      }
+      code {
+        font-family: var(--tm-font-mono);
+        font-size: 0.9em;
+      }
+      .doc-head {
+        margin-bottom: 30px;
+      }
+      .doc-head h1 {
+        font-size: 30px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .doc-head .sub {
+        color: var(--tm-text-secondary);
+        font-size: 15px;
+        margin-top: 8px;
+        max-width: 780px;
+      }
+      .pill-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 16px;
+        flex-wrap: wrap;
+      }
+      .pill {
+        font-size: 12px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: var(--tm-bg-card);
+        border: 1px solid var(--tm-border-strong);
+        color: var(--tm-text-secondary);
+      }
+      .pill b {
+        color: var(--tm-text-primary);
+        font-weight: 600;
+      }
+      .reuse-note {
+        margin-top: 18px;
+        background: var(--tm-bg-card);
+        border: 1px solid var(--tm-border);
+        border-left: 3px solid var(--tm-accent);
+        border-radius: var(--tm-radius-sm);
+        padding: 12px 16px;
+        font-size: 13px;
+        color: var(--tm-text-secondary);
+      }
+      .reuse-note b {
+        color: var(--tm-text-primary);
+      }
+      .legend {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+        font-size: 11.5px;
+        color: var(--tm-text-secondary);
+      }
+      .legend span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .legend i {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        display: block;
+      }
+
+      .scene {
+        margin-top: 50px;
+      }
+      .scene-label {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .scene-num {
+        font-family: var(--tm-font-mono);
+        font-size: 13px;
+        color: var(--tm-accent);
+        border: 1px solid var(--tm-accent-dim);
+        background: var(--tm-accent-dim);
+        padding: 2px 8px;
+        border-radius: var(--tm-radius-xs);
+      }
+      .scene-label h2 {
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .scene-label .tag-new {
+        font-size: 10px;
+        color: var(--tm-success);
+        border: 1px solid rgba(74, 222, 128, 0.4);
+        background: rgba(74, 222, 128, 0.1);
+        padding: 2px 6px;
+        border-radius: 999px;
+      }
+      .scene-label .tag-reuse {
+        font-size: 10px;
+        color: var(--tm-accent);
+        border: 1px solid var(--tm-accent);
+        background: var(--tm-accent-dim);
+        padding: 2px 6px;
+        border-radius: 999px;
+      }
+      .scene-label p {
+        color: var(--tm-text-secondary);
+        font-size: 13px;
+        margin-left: auto;
+        max-width: 440px;
+        text-align: right;
+      }
+
+      .win {
+        border: 1px solid var(--tm-border-strong);
+        border-radius: var(--tm-radius-lg);
+        overflow: hidden;
+        background: var(--tm-bg-base);
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+      }
+      .titlebar {
+        height: 38px;
+        background: var(--tm-bg-surface);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--tm-border);
+      }
+      .traffic {
+        display: flex;
+        gap: 7px;
+      }
+      .traffic i {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        display: block;
+      }
+      .traffic .r {
+        background: #ff5f57;
+      }
+      .traffic .y {
+        background: #febc2e;
+      }
+      .traffic .g {
+        background: #28c840;
+      }
+      .titlebar .wtitle {
+        font-size: 12px;
+        color: var(--tm-text-secondary);
+        margin-left: 6px;
+        font-family: var(--tm-font-mono);
+      }
+      .titlebar .tbtab {
+        margin-left: 14px;
+        font-size: 12px;
+        color: var(--tm-text-secondary);
+        padding: 3px 10px;
+        border-radius: var(--tm-radius-sm);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .titlebar .tbtab.on {
+        color: var(--tm-text-primary);
+        background: var(--tm-bg-card);
+        border: 1px solid var(--tm-border);
+      }
+      .body {
+        display: flex;
+        min-height: 520px;
+      }
+
+      .rail {
+        width: 54px;
+        background: var(--tm-bg-surface);
+        border-right: 1px solid var(--tm-border);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 12px 0;
+        gap: 10px;
+      }
+      .rail .ws {
+        width: 34px;
+        height: 34px;
+        border-radius: var(--tm-radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 13px;
+        color: #fff;
+        position: relative;
+      }
+      .rail .ws.active::before {
+        content: '';
+        position: absolute;
+        left: -12px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 3px;
+        height: 20px;
+        border-radius: 2px;
+        background: var(--tm-accent);
+      }
+      .rail .ws.active {
+        box-shadow: 0 0 0 2px var(--tm-accent-glow);
+      }
+
+      .sidebar {
+        width: 200px;
+        background: var(--tm-bg-surface);
+        border-right: 1px solid var(--tm-border);
+        padding: 14px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .ws-card {
+        background: var(--tm-bg-card);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-md);
+        padding: 10px;
+        margin-bottom: 8px;
+      }
+      .ws-card .wc-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .ws-card .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--tm-accent);
+      }
+      .ws-card .wc-name {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .ws-card .wc-meta {
+        font-size: 11px;
+        color: var(--tm-text-muted);
+        margin-top: 8px;
+        font-family: var(--tm-font-mono);
+      }
+      .side-label {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--tm-text-muted);
+        margin: 10px 4px 4px;
+      }
+      .side-row {
+        font-size: 12.5px;
+        color: var(--tm-text-secondary);
+        padding: 6px 8px;
+        border-radius: var(--tm-radius-sm);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .side-row.sel {
+        background: var(--tm-accent-dim);
+        color: var(--tm-text-primary);
+      }
+      .side-row .sq {
+        width: 7px;
+        height: 7px;
+        border-radius: 2px;
+        background: var(--tm-text-muted);
+      }
+      .proj-tabs {
+        display: flex;
+        gap: 4px;
+        margin: 2px 0 6px;
+      }
+      .proj-tab {
+        font-size: 11.5px;
+        padding: 5px 10px;
+        border-radius: var(--tm-radius-sm);
+        color: var(--tm-text-secondary);
+        border: 1px solid transparent;
+      }
+      .proj-tab.on {
+        background: var(--tm-bg-card);
+        border-color: var(--tm-border);
+        color: var(--tm-text-primary);
+      }
+
+      .main {
+        flex: 1;
+        background: var(--tm-bg-base);
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .main-head {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--tm-border);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .main-head h3 {
+        font-size: 15px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .main-head .spacer {
+        flex: 1;
+      }
+      .search {
+        background: var(--tm-bg-input);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-sm);
+        font-size: 12px;
+        color: var(--tm-text-secondary);
+        padding: 6px 10px;
+        width: 200px;
+      }
+      .content {
+        padding: 18px 20px;
+        overflow: auto;
+        flex: 1;
+      }
+
+      .subnav {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 16px;
+        border-bottom: 1px solid var(--tm-border);
+        padding-bottom: 0;
+      }
+      .subnav span {
+        font-size: 12.5px;
+        padding: 7px 12px;
+        color: var(--tm-text-secondary);
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+      }
+      .subnav span.on {
+        color: var(--tm-text-primary);
+        border-bottom-color: var(--tm-accent);
+        font-weight: 600;
+      }
+      .subnav .cnt {
+        color: var(--tm-text-muted);
+        margin-left: 4px;
+        font-size: 11px;
+      }
+
+      .filters {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+      }
+      .fp {
+        font-size: 12px;
+        padding: 5px 11px;
+        border-radius: 999px;
+        background: var(--tm-bg-card);
+        border: 1px solid var(--tm-border);
+        color: var(--tm-text-secondary);
+      }
+      .fp.active {
+        background: var(--tm-accent-dim);
+        border-color: var(--tm-accent);
+        color: var(--tm-text-primary);
+      }
+      .fp .cnt {
+        color: var(--tm-text-muted);
+        margin-left: 5px;
+      }
+
+      .tlist {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .ticket {
+        background: var(--tm-bg-card);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-md);
+        padding: 12px 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .ticket.sel {
+        border-color: var(--tm-accent);
+        box-shadow: 0 0 0 1px var(--tm-accent-dim);
+      }
+      .src {
+        font-family: var(--tm-font-mono);
+        font-size: 10.5px;
+        font-weight: 600;
+        padding: 3px 7px;
+        border-radius: var(--tm-radius-xs);
+        color: #fff;
+        white-space: nowrap;
+      }
+      .src.linear {
+        background: var(--linear);
+      }
+      .src.jira {
+        background: var(--jira);
+      }
+      .tkey {
+        font-family: var(--tm-font-mono);
+        font-size: 12px;
+        color: var(--tm-text-secondary);
+        width: 74px;
+        flex: none;
+      }
+      .ttitle {
+        font-size: 13.5px;
+        font-weight: 500;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tmeta {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex: none;
+      }
+      .tag {
+        font-size: 10.5px;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: var(--tm-bg-elevated);
+        border: 1px solid var(--tm-border);
+        color: var(--tm-text-secondary);
+      }
+      .tag.p1 {
+        color: var(--tm-danger);
+        border-color: rgba(224, 92, 92, 0.4);
+      }
+      .tag.big {
+        color: var(--tm-warning);
+        border-color: rgba(250, 204, 21, 0.4);
+      }
+      .est {
+        font-family: var(--tm-font-mono);
+        font-size: 11px;
+        color: var(--tm-text-muted);
+        width: 30px;
+        text-align: right;
+      }
+      .runbadge {
+        font-size: 10.5px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        background: var(--tm-accent-dim);
+        color: #aab4ec;
+        border: 1px solid var(--tm-accent);
+      }
+      .runbadge .b {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--tm-accent);
+      }
+      .feat-row {
+        background: var(--tm-bg-surface);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-md);
+        padding: 11px 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .feat-row .fk {
+        font-family: var(--tm-font-mono);
+        font-size: 12px;
+        color: var(--tm-text-muted);
+      }
+      .miniphases {
+        display: flex;
+        gap: 3px;
+        margin-left: auto;
+      }
+      .miniphases i {
+        width: 13px;
+        height: 6px;
+        border-radius: 2px;
+        background: var(--tm-bg-input);
+        display: block;
+      }
+      .miniphases i.done {
+        background: var(--tm-success);
+      }
+      .miniphases i.active {
+        background: var(--tm-accent);
+      }
+      .miniphases i.review {
+        background: var(--tm-warning);
+      }
+
+      .btn {
+        font-size: 12.5px;
+        font-weight: 600;
+        padding: 7px 14px;
+        border-radius: var(--tm-radius-sm);
+        border: 1px solid var(--tm-border-strong);
+        background: var(--tm-bg-card);
+        color: var(--tm-text-primary);
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .btn.primary {
+        background: var(--tm-accent);
+        border-color: var(--tm-accent);
+        color: #fff;
+        box-shadow: 0 2px 14px var(--tm-accent-glow);
+      }
+      .btn.ghost {
+        background: transparent;
+      }
+      .btn.ok {
+        color: #0c1f12;
+        background: var(--tm-success);
+        border-color: var(--tm-success);
+      }
+      .btn.sm {
+        font-size: 11.5px;
+        padding: 5px 10px;
+      }
+
+      .split {
+        display: flex;
+        gap: 16px;
+      }
+      .detail {
+        flex: 1;
+        background: var(--tm-bg-card);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-md);
+        padding: 18px;
+      }
+      .detail h4 {
+        font-size: 17px;
+        font-weight: 600;
+        margin: 6px 0 4px;
+      }
+      .detail .desc {
+        font-size: 13px;
+        color: var(--tm-text-secondary);
+        margin-top: 10px;
+      }
+      .detail .desc p {
+        margin-bottom: 9px;
+      }
+      .ac {
+        margin-top: 12px;
+        background: var(--tm-bg-elevated);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-sm);
+        padding: 12px;
+      }
+      .ac .ac-l {
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--tm-text-muted);
+        margin-bottom: 7px;
+      }
+      .ac ul {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .ac li {
+        font-size: 12.5px;
+        color: var(--tm-text-primary);
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .ac li::before {
+        content: '';
+        width: 14px;
+        height: 14px;
+        border: 1.5px solid var(--tm-text-muted);
+        border-radius: 3px;
+        margin-top: 1px;
+        flex: none;
+      }
+
+      .sheet {
+        width: 330px;
+        flex: none;
+        background: var(--tm-bg-elevated);
+        border: 1px solid var(--tm-border-strong);
+        border-radius: var(--tm-radius-md);
+        padding: 16px;
+        align-self: flex-start;
+      }
+      .sheet h5 {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .sheet .creates {
+        font-size: 11.5px;
+        color: var(--tm-text-secondary);
+        background: var(--tm-bg-card);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-sm);
+        padding: 8px 10px;
+        margin-bottom: 14px;
+        font-family: var(--tm-font-mono);
+      }
+      .sheet .creates b {
+        color: var(--tm-success);
+      }
+      .field {
+        margin-bottom: 14px;
+      }
+      .field .fl {
+        font-size: 11px;
+        color: var(--tm-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 6px;
+      }
+      .seg {
+        display: flex;
+        background: var(--tm-bg-input);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-sm);
+        padding: 3px;
+        gap: 3px;
+      }
+      .seg span {
+        flex: 1;
+        text-align: center;
+        font-size: 11.5px;
+        padding: 5px;
+        border-radius: var(--tm-radius-xs);
+        color: var(--tm-text-secondary);
+      }
+      .seg span.on {
+        background: var(--tm-accent);
+        color: #fff;
+        font-weight: 600;
+      }
+      .gatelist {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: none;
+      }
+      .gaterow {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 11.5px;
+        color: var(--tm-text-secondary);
+      }
+      .toggle {
+        width: 28px;
+        height: 16px;
+        border-radius: 999px;
+        background: var(--tm-bg-input);
+        border: 1px solid var(--tm-border);
+        position: relative;
+        flex: none;
+      }
+      .toggle.on {
+        background: var(--tm-accent);
+        border-color: var(--tm-accent);
+      }
+      .toggle i {
+        position: absolute;
+        top: 1px;
+        left: 1px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #fff;
+      }
+      .toggle.on i {
+        left: 13px;
+      }
+      .toggle.lock {
+        opacity: 0.55;
+      }
+      .toggle.opt {
+        opacity: 0.45;
+      }
+      .lockicon {
+        margin-left: auto;
+        font-size: 9.5px;
+        color: var(--tm-text-muted);
+      }
+
+      /* 10-phase rail */
+      .runtop {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        margin-bottom: 16px;
+      }
+      .runtop .rt-title {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .runtop .rt-sub {
+        font-size: 11px;
+        color: var(--tm-text-muted);
+        font-family: var(--tm-font-mono);
+        margin-top: 2px;
+      }
+      .runtop .auto {
+        margin-left: auto;
+        font-size: 11px;
+        color: var(--tm-text-secondary);
+        background: var(--tm-bg-card);
+        border: 1px solid var(--tm-border);
+        padding: 5px 10px;
+        border-radius: 999px;
+      }
+
+      .rail-phases {
+        display: flex;
+        align-items: flex-start;
+        background: var(--tm-bg-surface);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-md);
+        padding: 13px 12px;
+        margin-bottom: 18px;
+      }
+      .ph {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        flex: 1;
+        position: relative;
+        min-width: 0;
+      }
+      .ph .pn {
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1.5px solid var(--tm-border-strong);
+        background: var(--tm-bg-card);
+        color: var(--tm-text-muted);
+        z-index: 1;
+      }
+      .ph .pl {
+        font-size: 9.5px;
+        color: var(--tm-text-muted);
+        text-align: center;
+        line-height: 1.2;
+      }
+      .ph.done .pn {
+        background: var(--tm-success);
+        border-color: var(--tm-success);
+        color: #0c1f12;
+      }
+      .ph.done .pl {
+        color: var(--tm-text-secondary);
+      }
+      .ph.active .pn {
+        background: var(--tm-accent);
+        border-color: var(--tm-accent);
+        color: #fff;
+        box-shadow: 0 0 0 3px var(--tm-accent-glow);
+      }
+      .ph.active .pl {
+        color: var(--tm-text-primary);
+        font-weight: 600;
+      }
+      .ph.review .pn {
+        background: var(--tm-warning);
+        border-color: var(--tm-warning);
+        color: #1c1700;
+      }
+      .ph.review .pl {
+        color: var(--tm-text-primary);
+        font-weight: 600;
+      }
+      .ph.opt .pn {
+        border-style: dashed;
+      }
+      .ph .conn {
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        width: 100%;
+        height: 2px;
+        background: var(--tm-border-strong);
+        z-index: 0;
+      }
+      .ph.done .conn {
+        background: var(--tm-success);
+      }
+      .ph .nf {
+        font-size: 8px;
+        color: var(--tm-success);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+
+      .console {
+        background: #08080b;
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-md);
+        font-family: var(--tm-font-mono);
+        font-size: 11.5px;
+        padding: 14px 16px;
+        color: #9fa3c4;
+        line-height: 1.85;
+      }
+      .console .c-acc {
+        color: #aab4ec;
+      }
+      .console .ok {
+        color: var(--tm-success);
+      }
+      .console .warn {
+        color: var(--tm-warning);
+      }
+      .console .dim {
+        color: var(--tm-text-muted);
+      }
+      .console .file {
+        color: #8fb9e9;
+      }
+      .console .cur {
+        color: var(--tm-text-primary);
+      }
+      .console .blink {
+        display: inline-block;
+        width: 7px;
+        height: 14px;
+        background: var(--tm-accent);
+        vertical-align: middle;
+        margin-left: 2px;
+      }
+      .collapse {
+        margin-top: 12px;
+        font-size: 11.5px;
+        color: var(--tm-text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        border-top: 1px solid var(--tm-border);
+        padding-top: 11px;
+      }
+
+      .gate {
+        background: var(--tm-bg-card);
+        border: 1px solid var(--tm-warning);
+        border-radius: var(--tm-radius-md);
+        overflow: hidden;
+        box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.12);
+      }
+      .gate-head {
+        background: rgba(250, 204, 21, 0.08);
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid var(--tm-border);
+      }
+      .gate-head .gh-t {
+        font-size: 13.5px;
+        font-weight: 600;
+      }
+      .gate-head .gh-s {
+        font-size: 11px;
+        color: var(--tm-warning);
+        font-family: var(--tm-font-mono);
+        margin-left: auto;
+      }
+      .gate-body {
+        padding: 16px;
+      }
+      .artifact {
+        background: #0a0a0d;
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-sm);
+        font-family: var(--tm-font-mono);
+        font-size: 11.5px;
+        color: #9fa3c4;
+        padding: 14px 16px;
+        line-height: 1.8;
+        margin-bottom: 12px;
+      }
+      .artifact .h1 {
+        color: var(--tm-text-primary);
+        font-weight: 600;
+      }
+      .artifact .add {
+        color: var(--tm-success);
+        background: rgba(74, 222, 128, 0.08);
+        display: block;
+      }
+      .artifact .ref {
+        color: #aab4ec;
+      }
+      .artifact .dim {
+        color: var(--tm-text-muted);
+      }
+      .gate-actions {
+        display: flex;
+        gap: 9px;
+        margin-top: 14px;
+        align-items: center;
+      }
+      .gate-actions .right {
+        margin-left: auto;
+        display: flex;
+        gap: 9px;
+      }
+      .fb-input {
+        background: var(--tm-bg-input);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-sm);
+        padding: 10px 12px;
+        font-size: 12.5px;
+        color: var(--tm-text-secondary);
+        margin-top: 4px;
+      }
+
+      /* kanban */
+      .kanban {
+        display: flex;
+        gap: 12px;
+      }
+      .kcol {
+        flex: 1;
+        background: var(--tm-bg-surface);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-md);
+        padding: 10px;
+      }
+      .kcol h6 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--tm-text-secondary);
+        margin-bottom: 9px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .kcol h6 .kc {
+        color: var(--tm-text-muted);
+      }
+      .kcard {
+        background: var(--tm-bg-card);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-sm);
+        padding: 9px 10px;
+        margin-bottom: 7px;
+      }
+      .kcard .kt {
+        font-size: 11.5px;
+        color: var(--tm-text-primary);
+      }
+      .kcard .ki {
+        font-family: var(--tm-font-mono);
+        font-size: 10px;
+        color: var(--tm-text-muted);
+        margin-bottom: 4px;
+      }
+      .kcard.run {
+        border-color: var(--tm-accent);
+        box-shadow: 0 0 0 1px var(--tm-accent-dim);
+      }
+      .kcard.done {
+        opacity: 0.65;
+      }
+      .checkin {
+        margin-top: 16px;
+        background: var(--tm-bg-card);
+        border: 1px dashed var(--tm-accent);
+        border-radius: var(--tm-radius-md);
+        padding: 15px;
+      }
+      .checkin .ci-h {
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-bottom: 8px;
+      }
+      .checkin .ci-b {
+        font-size: 12.5px;
+        color: var(--tm-text-secondary);
+        margin-bottom: 13px;
+      }
+
+      .qgates {
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+      }
+      .qg {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--tm-bg-elevated);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-sm);
+        padding: 11px 14px;
+      }
+      .qg .qi {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        flex: none;
+      }
+      .qg.pass .qi {
+        background: rgba(74, 222, 128, 0.15);
+        color: var(--tm-success);
+      }
+      .qg.warnq .qi {
+        background: rgba(250, 204, 21, 0.15);
+        color: var(--tm-warning);
+      }
+      .qg .qn {
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .qg .qd {
+        font-size: 11.5px;
+        color: var(--tm-text-muted);
+        font-family: var(--tm-font-mono);
+        margin-left: auto;
+      }
+      .qg .qbar {
+        width: 120px;
+        height: 6px;
+        border-radius: 3px;
+        background: var(--tm-bg-input);
+        overflow: hidden;
+        flex: none;
+      }
+      .qg .qbar i {
+        display: block;
+        height: 100%;
+        background: var(--tm-success);
+      }
+      .summary-card {
+        background: var(--tm-bg-elevated);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-sm);
+        padding: 14px;
+      }
+      .summary-card h6 {
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 9px;
+      }
+      .summary-card .row {
+        font-size: 12.5px;
+        color: var(--tm-text-secondary);
+        margin-bottom: 7px;
+        display: flex;
+        gap: 9px;
+      }
+      .summary-card .row .k {
+        color: var(--tm-text-muted);
+        width: 84px;
+        flex: none;
+        font-size: 11.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding-top: 1px;
+      }
+      .summary-card .row b {
+        color: var(--tm-text-primary);
+        font-weight: 500;
+      }
+
+      .pr {
+        background: var(--tm-bg-card);
+        border: 1px solid var(--tm-success);
+        border-radius: var(--tm-radius-md);
+        overflow: hidden;
+        box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.12);
+      }
+      .pr-head {
+        background: rgba(74, 222, 128, 0.07);
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        border-bottom: 1px solid var(--tm-border);
+      }
+      .pr-head .pr-ic {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--tm-success);
+        color: #0c1f12;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .pr-head .pr-t {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .pr-body {
+        padding: 16px;
+      }
+      .pr-row {
+        display: flex;
+        gap: 10px;
+        font-size: 12.5px;
+        color: var(--tm-text-secondary);
+        margin-bottom: 9px;
+        align-items: center;
+      }
+      .pr-row .k {
+        color: var(--tm-text-muted);
+        width: 96px;
+        flex: none;
+        font-size: 11.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .stat-add {
+        color: var(--tm-success);
+        font-family: var(--tm-font-mono);
+      }
+      .stat-del {
+        color: var(--tm-danger);
+        font-family: var(--tm-font-mono);
+      }
+      .pr-desc {
+        background: #08080b;
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-sm);
+        font-family: var(--tm-font-mono);
+        font-size: 11.5px;
+        color: #9fa3c4;
+        padding: 13px 15px;
+        margin: 12px 0;
+        line-height: 1.8;
+      }
+      .pr-desc .h {
+        color: var(--tm-text-primary);
+      }
+      .pr-desc .chk {
+        color: var(--tm-success);
+      }
+      .pr-desc .ref {
+        color: #aab4ec;
+      }
+
+      .set-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .set-sec {
+        background: var(--tm-bg-card);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-md);
+        padding: 16px;
+      }
+      .set-sec h5 {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .set-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 9px 0;
+        border-top: 1px solid var(--tm-border);
+      }
+      .set-row:first-of-type {
+        border-top: none;
+      }
+      .set-row .sr-l {
+        font-size: 12.5px;
+      }
+      .set-row .sr-d {
+        font-size: 11px;
+        color: var(--tm-text-muted);
+        margin-top: 2px;
+      }
+      .set-row .sr-c {
+        margin-left: auto;
+      }
+      .conn-badge {
+        font-size: 11px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .conn-badge.ok {
+        background: rgba(74, 222, 128, 0.12);
+        color: var(--tm-success);
+        border: 1px solid rgba(74, 222, 128, 0.3);
+      }
+      .conn-badge .b {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .gaterow2 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11.5px;
+        color: var(--tm-text-secondary);
+        padding: 5px 0;
+      }
+      .selectish {
+        background: var(--tm-bg-input);
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-sm);
+        padding: 7px 10px;
+        font-size: 12px;
+        color: var(--tm-text-primary);
+        font-family: var(--tm-font-mono);
+        display: flex;
+        align-items: center;
+      }
+      .selectish .car {
+        margin-left: auto;
+        color: var(--tm-text-muted);
+      }
+      .fchip {
+        font-family: var(--tm-font-mono);
+        font-size: 11px;
+        background: var(--tm-bg-card);
+        border: 1px solid var(--tm-border);
+        padding: 3px 8px;
+        border-radius: var(--tm-radius-xs);
+        color: var(--tm-text-secondary);
+      }
+
+      .caption {
+        font-size: 12px;
+        color: var(--tm-text-muted);
+        margin-top: 12px;
+        padding-left: 2px;
+      }
+      .caption b {
+        color: var(--tm-text-secondary);
+      }
+      .footer {
+        margin-top: 60px;
+        text-align: center;
+        font-size: 12px;
+        color: var(--tm-text-muted);
+        border-top: 1px solid var(--tm-border);
+        padding-top: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="doc-head">
+        <h1>SpecKit Pilot — Autonomous Ticket → PR</h1>
+        <div class="sub">
+          A revamp of the existing SpecKit Pilot extension. The spec-kit lifecycle stays as the
+          orchestration backbone; we add a ticket front-door that seeds Specify, an autonomous agent
+          runner that executes each phase, and two new tail phases — Self-Review and Open PR.
+        </div>
+        <div class="pill-row">
+          <span class="pill"><b>Extension:</b> terminator.speckit-pilot</span>
+          <span class="pill"><b>Surface:</b> project tab (unchanged)</span>
+          <span class="pill"><b>Runtime:</b> Claude Agent SDK runner</span>
+          <span class="pill"><b>Phases:</b> 8 spec-kit + 2 new</span>
+        </div>
+        <div class="reuse-note">
+          <b>Spec Kit is the orchestration layer.</b> The SDD cycle it already runs —
+          <code>/speckit-specify → clarify → plan → checklist → tasks → analyze → implement</code>,
+          with its artifacts and review gates — is the engine that drives every run. This product
+          wraps that engine in the new flow and layout below: a ticket front-door that seeds
+          <code>specify</code>, an agent runner that drives each spec-kit command, human gates
+          between phases, and two tail phases (Self-Review, Open PR). The old SpecKit Pilot UI is
+          fully replaced. <b>Green = new capability.</b>
+        </div>
+        <div class="legend">
+          <span><i style="background: var(--tm-success)"></i>done / approved</span>
+          <span><i style="background: var(--tm-accent)"></i>agent running</span>
+          <span><i style="background: var(--tm-warning)"></i>awaiting your review (gate)</span>
+          <span
+            ><i
+              style="background: var(--tm-bg-input); border: 1px solid var(--tm-border-strong)"
+            ></i
+            >locked / pending</span
+          >
+        </div>
+      </div>
+
+      <!-- SCENE 1 -->
+      <div class="scene">
+        <div class="scene-label">
+          <span class="scene-num">01</span>
+          <h2>SpecKit tab — Tickets &amp; Features</h2>
+          <span class="tag-new">NEW: Tickets view</span>
+          <p>
+            The existing project tab gains a Tickets sub-view that pulls Linear/Jira. Existing
+            spec-kit features still live alongside.
+          </p>
+        </div>
+        <div class="win">
+          <div class="titlebar">
+            <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+            <span class="wtitle">terminator — payments-api</span>
+            <span class="tbtab on">◳ SpecKit</span>
+          </div>
+          <div class="body">
+            <div class="rail">
+              <div class="ws active" style="background: #5c6bc0">PA</div>
+              <div class="ws" style="background: #3a7d5d">WB</div>
+            </div>
+            <div class="sidebar">
+              <div class="ws-card">
+                <div class="wc-head">
+                  <span class="dot"></span><span class="wc-name">payments-api</span>
+                </div>
+                <div class="wc-meta">~/repos/payments-api · main</div>
+              </div>
+              <div class="side-label">Project · charges-service</div>
+              <div class="proj-tabs">
+                <span class="proj-tab">Terminal</span><span class="proj-tab on">SpecKit</span>
+              </div>
+              <div class="side-label">SpecKit Pilot</div>
+              <div class="side-row sel">
+                <span class="sq" style="background: var(--tm-accent)"></span>Tickets
+                <span
+                  style="
+                    margin-left: auto;
+                    font-family: var(--tm-font-mono);
+                    color: var(--tm-accent);
+                  "
+                  >9</span
+                >
+              </div>
+              <div class="side-row">
+                <span class="sq"></span>Features
+                <span
+                  style="
+                    margin-left: auto;
+                    font-family: var(--tm-font-mono);
+                    color: var(--tm-text-muted);
+                  "
+                  >14</span
+                >
+              </div>
+              <div class="side-row">
+                <span class="sq"></span>Active runs
+                <span
+                  style="
+                    margin-left: auto;
+                    font-family: var(--tm-font-mono);
+                    color: var(--tm-accent);
+                  "
+                  >2</span
+                >
+              </div>
+              <div class="side-row"><span class="sq"></span>History</div>
+            </div>
+            <div class="main">
+              <div class="main-head">
+                <h3>◳ SpecKit Pilot</h3>
+                <div class="spacer"></div>
+                <input class="search" value="🔍  Search…" />
+              </div>
+              <div class="content">
+                <div class="subnav">
+                  <span class="on">Tickets <span class="cnt">9</span></span>
+                  <span>Features <span class="cnt">14</span></span>
+                  <span>Active runs <span class="cnt">2</span></span>
+                </div>
+                <div class="filters">
+                  <span class="fp active">Assigned to me <span class="cnt">9</span></span>
+                  <span class="fp">Linear <span class="cnt">6</span></span>
+                  <span class="fp">Jira <span class="cnt">3</span></span>
+                  <span class="fp">Not yet dispatched <span class="cnt">7</span></span>
+                </div>
+                <div class="tlist">
+                  <div class="ticket sel">
+                    <span class="src linear">LINEAR</span><span class="tkey">ENG-482</span>
+                    <span class="ttitle">Fix race condition in terminal session reattach</span>
+                    <span class="tmeta"
+                      ><span class="tag p1">P1 · Bug</span><span class="tag">2 pts</span></span
+                    ><span class="est">S</span>
+                  </div>
+                  <div class="ticket">
+                    <span class="src jira">JIRA</span><span class="tkey">PAY-1192</span>
+                    <span class="ttitle">Add idempotency key validation to /charges endpoint</span>
+                    <span class="tmeta"
+                      ><span class="tag">Feature</span><span class="tag">3 pts</span></span
+                    ><span class="est">M</span>
+                  </div>
+                  <div class="ticket">
+                    <span class="src linear">LINEAR</span><span class="tkey">ENG-455</span>
+                    <span class="ttitle">Migrate auth to new token service</span>
+                    <span class="tmeta"
+                      ><span class="tag big">Epic · Large</span
+                      ><span class="tag">13 pts</span></span
+                    ><span class="est">XL</span>
+                  </div>
+                  <div class="ticket">
+                    <span class="src linear">LINEAR</span><span class="tkey">ENG-491</span>
+                    <span class="ttitle">Refactor retry backoff into shared util</span>
+                    <span class="tmeta"
+                      ><span class="runbadge"
+                        ><span class="b"></span>specs/013 · Implement running</span
+                      ></span
+                    ><span class="est">M</span>
+                  </div>
+                  <div class="ticket">
+                    <span class="src jira">JIRA</span><span class="tkey">PAY-1205</span>
+                    <span class="ttitle">Webhook signature verification 500 on empty body</span>
+                    <span class="tmeta"
+                      ><span
+                        class="runbadge"
+                        style="
+                          background: rgba(250, 204, 21, 0.12);
+                          color: var(--tm-warning);
+                          border-color: rgba(250, 204, 21, 0.4);
+                        "
+                        ><span class="b" style="background: var(--tm-warning)"></span>specs/012 ·
+                        Specify · review</span
+                      ></span
+                    ><span class="est">S</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="caption">
+          Dispatched tickets show the <b>spec-kit feature dir</b> they created and their live phase,
+          so a ticket and its spec-kit run are one object. Undispatched tickets are the front-door
+          to a new run.
+        </div>
+      </div>
+
+      <!-- SCENE 2 -->
+      <div class="scene">
+        <div class="scene-label">
+          <span class="scene-num">02</span>
+          <h2>Dispatch a ticket → seeds Specify</h2>
+          <span class="tag-new">NEW: dispatch</span>
+          <p>
+            Dispatch creates the next <code>specs/NNN-slug/</code> dir, drops a ticket seed, and
+            runs Constitution + Specify. Gates map to the existing <code>phaseGates</code> settings.
+          </p>
+        </div>
+        <div class="win">
+          <div class="titlebar">
+            <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+            <span class="wtitle">terminator — payments-api</span>
+            <span class="tbtab on">◳ SpecKit</span>
+          </div>
+          <div class="body">
+            <div class="main" style="border: none">
+              <div class="main-head">
+                <h3>
+                  ← ENG-482
+                  <span style="color: var(--tm-text-muted); font-weight: 400"
+                    >Fix race condition in session reattach</span
+                  >
+                </h3>
+                <div class="spacer"></div>
+                <span class="src linear">LINEAR</span>
+              </div>
+              <div class="content">
+                <div class="split">
+                  <div class="detail">
+                    <div style="display: flex; gap: 8px; align-items: center">
+                      <span class="tag p1">P1 · Bug</span><span class="tag">2 pts</span
+                      ><span class="tag">team: Platform</span>
+                    </div>
+                    <h4>Fix race condition in terminal session reattach</h4>
+                    <div class="desc">
+                      <p>
+                        When two reattach events fire within ~50ms (fast tab switching), the PTY
+                        buffer occasionally double-binds and the terminal renders duplicated output.
+                        Intermittent but reproducible under load.
+                      </p>
+                      <p>Likely an unguarded reattach in <code>SessionManager.reattach()</code>.</p>
+                    </div>
+                    <div class="ac">
+                      <div class="ac-l">Acceptance criteria → becomes spec.md</div>
+                      <ul>
+                        <li>Reattach is idempotent under concurrent calls</li>
+                        <li>No duplicated PTY output under the load repro</li>
+                        <li>Regression test covers the concurrent path</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div class="sheet">
+                    <h5>⚡ Dispatch to agent</h5>
+                    <div class="creates">
+                      creates <b>specs/015-fix-reattach-race/</b><br /><span
+                        style="color: var(--tm-text-muted)"
+                        >ticket.md → /specify → spec.md</span
+                      >
+                    </div>
+                    <div class="field">
+                      <div class="fl">Autonomy level</div>
+                      <div class="seg">
+                        <span>Guided</span><span class="on">Standard</span><span>Fast</span>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <div class="fl">Phase gates (spec-kit lifecycle)</div>
+                      <div class="gatelist">
+                        <div class="gaterow">
+                          <span class="toggle on lock"><i></i></span>Constitution<span
+                            class="lockicon"
+                            >auto</span
+                          >
+                        </div>
+                        <div class="gaterow">
+                          <span class="toggle on"><i></i></span>Specify
+                        </div>
+                        <div class="gaterow">
+                          <span class="toggle"><i></i></span>Clarify
+                        </div>
+                        <div class="gaterow">
+                          <span class="toggle on"><i></i></span>Plan
+                        </div>
+                        <div class="gaterow">
+                          <span class="toggle opt"><i></i></span>Checklist<span class="lockicon"
+                            >optional</span
+                          >
+                        </div>
+                        <div class="gaterow">
+                          <span class="toggle on"><i></i></span>Tasks
+                        </div>
+                        <div class="gaterow">
+                          <span class="toggle"><i></i></span>Analyze
+                        </div>
+                        <div class="gaterow">
+                          <span class="toggle on"><i></i></span>Implement<span class="lockicon"
+                            >per-file</span
+                          >
+                        </div>
+                        <div class="gaterow">
+                          <span class="toggle on lock"><i></i></span>Self-Review<span
+                            class="lockicon"
+                            >🔒</span
+                          >
+                        </div>
+                        <div class="gaterow">
+                          <span class="toggle on lock"><i></i></span>Open PR<span class="lockicon"
+                            >🔒</span
+                          >
+                        </div>
+                      </div>
+                    </div>
+                    <button class="btn primary" style="width: 100%; justify-content: center">
+                      ⚡ Start run
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="caption">
+          Gate defaults come straight from <code>DEFAULT_SETTINGS.phaseGates</code> — Checklist
+          optional, Implement per-file confirm. The two new tail gates are locked on. "Standard"
+          just flips <code>required</code> for the middle phases.
+        </div>
+      </div>
+
+      <!-- SCENE 3 -->
+      <div class="scene">
+        <div class="scene-label">
+          <span class="scene-num">03</span>
+          <h2>Run dashboard — the spec-kit phase rail</h2>
+          <span class="tag-new">NEW layout</span>
+          <p>
+            All 10 phases on one rail (redesigned). The agent runner executes
+            <code>/plan</code> headless; the reused artifact watcher moves it to review when
+            <code>plan.md</code> lands.
+          </p>
+        </div>
+        <div class="win">
+          <div class="titlebar">
+            <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+            <span class="wtitle">terminator — payments-api · specs/015 · run #a91f</span>
+            <span class="tbtab on">◳ SpecKit</span>
+          </div>
+          <div class="body">
+            <div class="main" style="border: none">
+              <div class="content" style="padding-top: 18px">
+                <div class="runtop">
+                  <span class="src linear">LINEAR</span>
+                  <div>
+                    <div class="rt-title">ENG-482 · specs/015-fix-reattach-race</div>
+                    <div class="rt-sub">worktree .wt/015 · branch fix/eng-482-reattach-race</div>
+                  </div>
+                  <span class="auto">Autonomy: Standard</span>
+                </div>
+                <div class="rail-phases">
+                  <div class="ph done">
+                    <div class="conn"></div>
+                    <div class="pn">✓</div>
+                    <div class="pl">Const.</div>
+                  </div>
+                  <div class="ph done">
+                    <div class="conn"></div>
+                    <div class="pn">✓</div>
+                    <div class="pl">Specify</div>
+                  </div>
+                  <div class="ph done">
+                    <div class="conn"></div>
+                    <div class="pn">✓</div>
+                    <div class="pl">Clarify</div>
+                  </div>
+                  <div class="ph active">
+                    <div class="conn"></div>
+                    <div class="pn">4</div>
+                    <div class="pl">Plan</div>
+                  </div>
+                  <div class="ph opt">
+                    <div class="conn"></div>
+                    <div class="pn">5</div>
+                    <div class="pl">Checklist</div>
+                  </div>
+                  <div class="ph">
+                    <div class="conn"></div>
+                    <div class="pn">6</div>
+                    <div class="pl">Tasks</div>
+                  </div>
+                  <div class="ph">
+                    <div class="conn"></div>
+                    <div class="pn">7</div>
+                    <div class="pl">Analyze</div>
+                  </div>
+                  <div class="ph">
+                    <div class="conn"></div>
+                    <div class="pn">8</div>
+                    <div class="pl">Implement</div>
+                  </div>
+                  <div class="ph">
+                    <div class="conn"></div>
+                    <div class="pn">9</div>
+                    <div class="pl">Self-Review</div>
+                    <div class="nf">NEW</div>
+                  </div>
+                  <div class="ph">
+                    <div class="pn">10</div>
+                    <div class="pl">Open PR</div>
+                    <div class="nf">NEW</div>
+                  </div>
+                </div>
+                <div class="console">
+                  <div class="ln">
+                    <span class="dim">14:21:02</span> <span class="c-acc">runner</span> phase=plan ·
+                    launching agent (claude, worktree .wt/015)
+                  </div>
+                  <div class="ln">
+                    <span class="dim">14:21:03</span> injected: constitution.md · spec.md ·
+                    CLAUDE.md
+                  </div>
+                  <div class="ln">
+                    <span class="dim">14:21:04</span> <span class="cur">/plan</span>
+                    <span class="dim">— derive design from approved spec</span>
+                  </div>
+                  <div class="ln">
+                    <span class="dim">14:21:11</span> read
+                    <span class="file">src/main/terminal/SessionManager.ts</span>
+                  </div>
+                  <div class="ln">
+                    <span class="dim">14:21:18</span> write
+                    <span class="file">specs/015-fix-reattach-race/plan.md</span>
+                    <span class="dim">— async-mutex approach + test plan</span>
+                  </div>
+                  <div class="ln">
+                    <span class="ok"> ✓ plan.md written</span>
+                    <span class="dim">→ artifact_detected → awaiting_review</span
+                    ><span class="blink"></span>
+                  </div>
+                </div>
+                <div class="collapse">
+                  ▾ Run console (streaming) &nbsp;·&nbsp;
+                  <span style="color: var(--tm-text-muted)">collapse to summary</span> &nbsp;·&nbsp;
+                  <span style="margin-left: auto; color: var(--tm-text-muted)"
+                    >runner only produces artifacts — the state machine owns status</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="caption">
+          New UI, reused logic: the runner produces the phase artifact then yields, and the
+          <b>reused</b> <code>checkArtifacts</code> + file-watcher fires
+          <code>artifact_detected</code> to open the gate — the same backend signal that fires when
+          you run <code>/plan</code> by hand.
+        </div>
+      </div>
+
+      <!-- SCENE 4 -->
+      <div class="scene">
+        <div class="scene-label">
+          <span class="scene-num">04</span>
+          <h2>Approval gate — Specify (spec.md)</h2>
+          <span class="tag-new">NEW layout</span>
+          <p>
+            The agent-generated <code>spec.md</code> is reviewed in the new gate panel. Approve /
+            Reject / Revoke / Edit map to the reused state-machine transitions, now applied to agent
+            output.
+          </p>
+        </div>
+        <div class="win">
+          <div class="titlebar">
+            <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+            <span class="wtitle">terminator — payments-api · specs/015 · run #a91f</span>
+            <span class="tbtab on">◳ SpecKit</span>
+          </div>
+          <div class="body">
+            <div class="main" style="border: none">
+              <div class="content" style="padding-top: 18px">
+                <div class="rail-phases" style="margin-bottom: 16px">
+                  <div class="ph done">
+                    <div class="conn"></div>
+                    <div class="pn">✓</div>
+                    <div class="pl">Const.</div>
+                  </div>
+                  <div class="ph review">
+                    <div class="conn"></div>
+                    <div class="pn">!</div>
+                    <div class="pl">Specify</div>
+                  </div>
+                  <div class="ph">
+                    <div class="conn"></div>
+                    <div class="pn">3</div>
+                    <div class="pl">Clarify</div>
+                  </div>
+                  <div class="ph">
+                    <div class="conn"></div>
+                    <div class="pn">4</div>
+                    <div class="pl">Plan</div>
+                  </div>
+                  <div class="ph opt">
+                    <div class="conn"></div>
+                    <div class="pn">5</div>
+                    <div class="pl">Checklist</div>
+                  </div>
+                  <div class="ph">
+                    <div class="conn"></div>
+                    <div class="pn">6</div>
+                    <div class="pl">Tasks</div>
+                  </div>
+                  <div class="ph">
+                    <div class="conn"></div>
+                    <div class="pn">7</div>
+                    <div class="pl">Analyze</div>
+                  </div>
+                  <div class="ph">
+                    <div class="conn"></div>
+                    <div class="pn">8</div>
+                    <div class="pl">Implement</div>
+                  </div>
+                  <div class="ph">
+                    <div class="conn"></div>
+                    <div class="pn">9</div>
+                    <div class="pl">Self-Rev</div>
+                  </div>
+                  <div class="ph">
+                    <div class="pn">10</div>
+                    <div class="pl">PR</div>
+                  </div>
+                </div>
+                <div class="gate">
+                  <div class="gate-head">
+                    <span style="color: var(--tm-warning)">⏸</span
+                    ><span class="gh-t">spec.md ready for your review</span
+                    ><span class="gh-s">awaiting_review · generated from ENG-482</span>
+                  </div>
+                  <div class="gate-body">
+                    <div class="artifact">
+                      <span class="h1"># Fix race condition in session reattach</span><br /><br />
+                      <span class="h1">## Problem</span><br />
+                      Concurrent <span class="ref">reattach()</span> calls within one tick
+                      double-bind the PTY,<br />
+                      producing duplicated terminal output under load.<br /><br />
+                      <span class="h1">## Acceptance criteria</span><br />
+                      <span class="add">+ Reattach is idempotent under concurrent calls</span>
+                      <span class="add">+ No duplicated PTY output under N=50 load repro</span>
+                      <span class="add">+ Regression test covers the concurrent reattach path</span
+                      ><br />
+                      <span class="h1">## Out of scope</span>
+                      <span class="dim">— PTY allocation, tab lifecycle</span>
+                    </div>
+                    <div class="fb-input">
+                      💬 also call out the timeout path — reattach after a dead PTY shouldn't hang…
+                    </div>
+                    <div class="gate-actions">
+                      <button class="btn ghost sm">✎ Edit spec.md</button>
+                      <button class="btn ghost sm">⎘ Diff vs HEAD</button>
+                      <div class="right">
+                        <button class="btn sm">↩ Reject &amp; re-run</button>
+                        <button class="btn ok sm">✓ Approve → Clarify</button>
+                      </div>
+                    </div>
+                    <div class="collapse">
+                      ▸ View agent run log (18 lines) &nbsp;·&nbsp;
+                      <span style="color: var(--tm-text-muted)"
+                        >history.jsonl: run_complete · awaiting approval</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="caption">
+          The actions are the same reused transitions: Reject deletes <code>spec.md</code> and
+          resets to <code>ready</code>; inline edit marks it <code>modified</code> → re-review;
+          revoking an upstream phase marks this one <code>stale</code>. New presentation, proven
+          backend behavior.
+        </div>
+      </div>
+
+      <!-- SCENE 5 -->
+      <div class="scene">
+        <div class="scene-label">
+          <span class="scene-num">05</span>
+          <h2>Implement — tasks.md kanban &amp; batch check-in</h2>
+          <span class="tag-new">NEW layout</span>
+          <p>
+            Redesigned board. Large tickets run Implement in task batches grouped by
+            <code>tasks.md</code> sections; the agent stops at each batch boundary for a check-in.
+          </p>
+        </div>
+        <div class="win">
+          <div class="titlebar">
+            <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+            <span class="wtitle">terminator — payments-api · specs/016 · run #b7c2</span>
+            <span class="tbtab on">◳ SpecKit</span>
+          </div>
+          <div class="body">
+            <div class="main" style="border: none">
+              <div class="content" style="padding-top: 18px">
+                <div class="runtop">
+                  <span class="src linear">LINEAR</span>
+                  <div>
+                    <div class="rt-title">
+                      ENG-455 · Migrate auth to new token service
+                      <span class="tag big" style="margin-left: 6px">Large · 13 pts</span>
+                    </div>
+                    <div class="rt-sub">Implement · batch 1 of 3 (tasks.md sections)</div>
+                  </div>
+                  <span class="auto">Autonomy: Guided</span>
+                </div>
+                <div class="kanban">
+                  <div class="kcol">
+                    <h6>Todo <span class="kc">5</span></h6>
+                    <div class="kcard">
+                      <div class="ki">T009 · §M2</div>
+                      <div class="kt">Swap auth middleware to token client</div>
+                    </div>
+                    <div class="kcard">
+                      <div class="ki">T010 · §M2</div>
+                      <div class="kt">Wire feature flag default</div>
+                    </div>
+                    <div class="kcard">
+                      <div class="ki">T013 · §M3</div>
+                      <div class="kt">Migrate legacy sessions</div>
+                    </div>
+                  </div>
+                  <div class="kcol">
+                    <h6>In progress <span class="kc">1</span></h6>
+                    <div class="kcard run">
+                      <div class="ki">T008 · §M1</div>
+                      <div class="kt">TokenClient retry + backoff</div>
+                      <div
+                        style="
+                          font-size: 10px;
+                          color: var(--tm-accent);
+                          margin-top: 5px;
+                          font-family: var(--tm-font-mono);
+                        "
+                      >
+                        agent · writing test
+                      </div>
+                    </div>
+                  </div>
+                  <div class="kcol">
+                    <h6>In review <span class="kc">0</span></h6>
+                  </div>
+                  <div class="kcol">
+                    <h6>Done <span class="kc">7</span></h6>
+                    <div class="kcard done">
+                      <div class="ki">T001–T007 · §M1</div>
+                      <div class="kt">TokenClient core + 24 tests</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="checkin">
+                  <div class="ci-h">🚩 Check-in — Batch 1 (§M1 Token client) nearly complete</div>
+                  <div class="ci-b">
+                    7 of 8 tasks done, 24 tests passing, coverage 91%. The client is behind a
+                    feature flag and not yet in the request path. I'll finish T008, then stop before
+                    Batch 2 (§M2, middleware swap) — which touches live auth. Review the partial
+                    diff first?
+                  </div>
+                  <div class="gate-actions">
+                    <button class="btn ghost sm">⎘ Partial diff (+214 −31)</button>
+                    <button class="btn ghost sm">↪ Split §M2–M3 to follow-up ticket</button>
+                    <div class="right">
+                      <button class="btn sm">⏸ Pause</button
+                      ><button class="btn ok sm">▸ Continue to Batch 2</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="caption">
+          No new concept for large work — <code>tasks.md</code> already chunks the feature, and the
+          kanban already exists. The check-in is just a <b>batch-level gate</b> at a section
+          boundary, keeping each reviewed diff small.
+        </div>
+      </div>
+
+      <!-- SCENE 6 -->
+      <div class="scene">
+        <div class="scene-label">
+          <span class="scene-num">06</span>
+          <h2>Self-Review — constitution gates</h2>
+          <span class="tag-new">NEW phase</span>
+          <p>
+            New phase 9. The agent runs the same bar a human clears: format, lint, coverage ≥80%,
+            and <code>/google-review</code>. Real numbers, not a checkmark.
+          </p>
+        </div>
+        <div class="win">
+          <div class="titlebar">
+            <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+            <span class="wtitle">terminator — payments-api · specs/015 · run #a91f</span>
+            <span class="tbtab on">◳ SpecKit</span>
+          </div>
+          <div class="body">
+            <div class="main" style="border: none">
+              <div class="content" style="padding-top: 18px">
+                <div class="rail-phases" style="margin-bottom: 16px">
+                  <div class="ph done">
+                    <div class="conn"></div>
+                    <div class="pn">✓</div>
+                    <div class="pl">Const.</div>
+                  </div>
+                  <div class="ph done">
+                    <div class="conn"></div>
+                    <div class="pn">✓</div>
+                    <div class="pl">Specify</div>
+                  </div>
+                  <div class="ph done">
+                    <div class="conn"></div>
+                    <div class="pn">✓</div>
+                    <div class="pl">Clarify</div>
+                  </div>
+                  <div class="ph done">
+                    <div class="conn"></div>
+                    <div class="pn">✓</div>
+                    <div class="pl">Plan</div>
+                  </div>
+                  <div class="ph done opt">
+                    <div class="conn"></div>
+                    <div class="pn">✓</div>
+                    <div class="pl">Checklist</div>
+                  </div>
+                  <div class="ph done">
+                    <div class="conn"></div>
+                    <div class="pn">✓</div>
+                    <div class="pl">Tasks</div>
+                  </div>
+                  <div class="ph done">
+                    <div class="conn"></div>
+                    <div class="pn">✓</div>
+                    <div class="pl">Analyze</div>
+                  </div>
+                  <div class="ph done">
+                    <div class="conn"></div>
+                    <div class="pn">✓</div>
+                    <div class="pl">Implement</div>
+                  </div>
+                  <div class="ph review">
+                    <div class="conn"></div>
+                    <div class="pn">!</div>
+                    <div class="pl">Self-Rev</div>
+                  </div>
+                  <div class="ph">
+                    <div class="pn">10</div>
+                    <div class="pl">PR</div>
+                  </div>
+                </div>
+                <div class="gate">
+                  <div class="gate-head">
+                    <span style="color: var(--tm-warning)">⏸</span
+                    ><span class="gh-t">Self-review complete — quality gates</span
+                    ><span class="gh-s">awaiting_review</span>
+                  </div>
+                  <div class="gate-body">
+                    <div class="qgates">
+                      <div class="qg pass">
+                        <span class="qi">✓</span><span class="qn">Format</span
+                        ><span class="qd">npm run format · 0 issues</span>
+                      </div>
+                      <div class="qg pass">
+                        <span class="qi">✓</span><span class="qn">Lint</span
+                        ><span class="qd">0 errors · 2 warnings</span>
+                      </div>
+                      <div class="qg pass">
+                        <span class="qi">✓</span><span class="qn">Tests</span
+                        ><span class="qd">vitest · 7 new · 412 passing</span>
+                      </div>
+                      <div class="qg pass">
+                        <span class="qi">✓</span><span class="qn">Coverage</span>
+                        <div class="qbar"><i style="width: 88%"></i></div>
+                        <span class="qd">88% · gate ≥80% ✓</span>
+                      </div>
+                      <div class="qg warnq">
+                        <span class="qi">!</span><span class="qn">/google-review</span
+                        ><span class="qd">0 BLOCKERs · 1 nit (addressed)</span>
+                      </div>
+                    </div>
+                    <div class="summary-card" style="margin-top: 14px">
+                      <h6>Agent review summary</h6>
+                      <div class="row">
+                        <span class="k">Changes</span
+                        ><b
+                          >Per-session reattach mutex; reusable lock helper; releases via
+                          try/finally on the error path (per your spec feedback on the timeout
+                          case).</b
+                        >
+                      </div>
+                      <div class="row">
+                        <span class="k">Flagged</span
+                        ><b
+                          >2 lint warnings pre-existing in <code>async-lock.ts</code>, out of scope
+                          — surfaced, not silenced.</b
+                        >
+                      </div>
+                    </div>
+                    <div class="gate-actions">
+                      <button class="btn ghost sm">⎘ Full diff</button>
+                      <div class="right">
+                        <button class="btn sm">↩ Back to Implement</button
+                        ><button class="btn ok sm">✓ Approve → Open PR</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="caption">
+          Surfacing the actual coverage %, lint count, and <code>/google-review</code> BLOCKER count
+          is deliberate — a bare green checkmark invites rubber-stamping. This gate can never be
+          auto-approved into a PR.
+        </div>
+      </div>
+
+      <!-- SCENE 7 -->
+      <div class="scene">
+        <div class="scene-label">
+          <span class="scene-num">07</span>
+          <h2>Open PR — seat PR &amp; hand-off</h2>
+          <span class="tag-new">NEW phase</span>
+          <p>
+            New phase 10. <code>gh pr create</code>, link the PR to the ticket and the generating
+            <code>spec.md</code>/<code>plan.md</code>, write back to Linear, hand to Code Reviews.
+          </p>
+        </div>
+        <div class="win">
+          <div class="titlebar">
+            <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+            <span class="wtitle">terminator — payments-api · specs/015 · run #a91f</span>
+            <span class="tbtab on">◳ SpecKit</span>
+          </div>
+          <div class="body">
+            <div class="main" style="border: none">
+              <div class="content" style="padding-top: 18px">
+                <div class="pr">
+                  <div class="pr-head">
+                    <span class="pr-ic">✓</span>
+                    <div class="pr-t">Pull request opened — ready for your review</div>
+                    <span
+                      style="
+                        margin-left: auto;
+                        font-family: var(--tm-font-mono);
+                        font-size: 12px;
+                        color: var(--tm-text-secondary);
+                      "
+                      >#1284</span
+                    >
+                  </div>
+                  <div class="pr-body">
+                    <div class="pr-row">
+                      <span class="k">Title</span
+                      ><b style="color: var(--tm-text-primary)"
+                        >fix(terminal): serialize concurrent session reattach (ENG-482)</b
+                      >
+                    </div>
+                    <div class="pr-row">
+                      <span class="k">Branch</span>fix/eng-482-reattach-race → main
+                    </div>
+                    <div class="pr-row">
+                      <span class="k">Changes</span><span class="stat-add">+24</span>
+                      <span class="stat-del">−4</span> · 3 files · 7 tests
+                    </div>
+                    <div class="pr-row">
+                      <span class="k">Traceable</span
+                      ><span class="src linear" style="font-size: 9.5px">LINEAR</span> ENG-482
+                      &nbsp;·&nbsp; <code>specs/015-fix-reattach-race/spec.md</code>
+                    </div>
+                    <div class="pr-row">
+                      <span class="k">Write-back</span>Linear comment posted · status →
+                      <b style="color: var(--tm-text-primary)">In Review</b>
+                    </div>
+                    <div class="pr-desc">
+                      <span class="h">## Summary</span><br />
+                      Guards <span class="ref">SessionManager.reattach()</span> with a per-session
+                      async mutex.<br />
+                      Lock releases via try/finally; dead-PTY reattach no longer hangs.<br /><br />
+                      <span class="h">## Testing</span><br />
+                      <span class="chk">[x]</span> Concurrent-reattach idempotency ·
+                      <span class="chk">[x]</span> Load repro N=50<br />
+                      <span class="chk">[x]</span> Coverage 88% · lint clean · /google-review 0
+                      blockers<br /><br />
+                      <span class="ref">Closes ENG-482</span> · spec: specs/015 · 🤖 SpecKit Pilot
+                    </div>
+                    <div class="gate-actions">
+                      <button class="btn ghost sm">↗ GitHub</button
+                      ><button class="btn ghost sm">▸ Next ticket</button>
+                      <div class="right">
+                        <button class="btn primary sm">◈ Open in Code Reviews</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="caption">
+          The PR back-references the <b>spec and plan that produced it</b> — a reviewer can trace
+          code → tasks → plan → spec → ticket. "Open in Code Reviews" routes to the existing
+          PR-review surface; SpecKit Pilot never builds a second one.
+        </div>
+      </div>
+
+      <!-- SCENE 8 -->
+      <div class="scene">
+        <div class="scene-label">
+          <span class="scene-num">08</span>
+          <h2>Settings — integrations &amp; gate defaults</h2>
+          <span class="tag-new">NEW layout</span>
+          <p>
+            Adds Linear/Jira credentials and autonomy presets to the existing settings page. Gate
+            defaults still map to <code>phaseGates</code>.
+          </p>
+        </div>
+        <div class="win">
+          <div class="titlebar">
+            <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+            <span class="wtitle">terminator — SpecKit Pilot Settings</span>
+            <span class="tbtab on">⚙ SpecKit</span>
+          </div>
+          <div class="body">
+            <div class="main" style="border: none">
+              <div class="content" style="padding-top: 18px">
+                <div class="set-grid">
+                  <div class="set-sec">
+                    <h5>
+                      🔌 Ticket integrations
+                      <span class="nf" style="font-size: 9px; color: var(--tm-success)">NEW</span>
+                    </h5>
+                    <div class="set-row">
+                      <div>
+                        <div class="sr-l">
+                          <span class="src linear" style="font-size: 9.5px">LINEAR</span> Personal
+                          API key
+                        </div>
+                        <div class="sr-d">Tickets assigned to me · teams: Platform</div>
+                      </div>
+                      <div class="sr-c">
+                        <span class="conn-badge ok"><span class="b"></span>Connected</span>
+                      </div>
+                    </div>
+                    <div class="set-row">
+                      <div>
+                        <div class="sr-l">
+                          <span class="src jira" style="font-size: 9.5px">JIRA</span> API token +
+                          email
+                        </div>
+                        <div class="sr-d">Jira Cloud · JQL: project = PAY AND assignee = me</div>
+                      </div>
+                      <div class="sr-c">
+                        <span class="conn-badge ok"><span class="b"></span>Connected</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="set-sec">
+                    <h5>
+                      ⚡ Autonomy &amp; phase gates
+                      <span style="font-size: 10px; color: var(--tm-text-muted); font-weight: 400"
+                        >· workspace-scoped</span
+                      >
+                    </h5>
+                    <div class="set-row">
+                      <div>
+                        <div class="sr-l">Default autonomy</div>
+                        <div class="sr-d">Sets which phaseGates are required for new runs</div>
+                      </div>
+                      <div class="sr-c">
+                        <div class="seg" style="width: 200px">
+                          <span>Guided</span><span class="on">Standard</span><span>Fast</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="set-row">
+                      <div style="flex: 1">
+                        <div class="sr-l">Required gates</div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px">
+                          <span class="gaterow2"
+                            ><span class="toggle on lock"><i></i></span>Constitution</span
+                          >
+                          <span class="gaterow2"
+                            ><span class="toggle on"><i></i></span>Specify</span
+                          >
+                          <span class="gaterow2"
+                            ><span class="toggle"><i></i></span>Clarify</span
+                          >
+                          <span class="gaterow2"
+                            ><span class="toggle on"><i></i></span>Plan</span
+                          >
+                          <span class="gaterow2"
+                            ><span class="toggle opt"><i></i></span>Checklist</span
+                          >
+                          <span class="gaterow2"
+                            ><span class="toggle on"><i></i></span>Tasks</span
+                          >
+                          <span class="gaterow2"
+                            ><span class="toggle"><i></i></span>Analyze</span
+                          >
+                          <span class="gaterow2"
+                            ><span class="toggle on"><i></i></span>Implement</span
+                          >
+                          <span class="gaterow2"
+                            ><span class="toggle on lock"><i></i></span>Self-Review 🔒</span
+                          >
+                          <span class="gaterow2"
+                            ><span class="toggle on lock"><i></i></span>Open PR 🔒</span
+                          >
+                        </div>
+                      </div>
+                    </div>
+                    <div class="set-row">
+                      <div>
+                        <div class="sr-l">Batch check-ins during Implement</div>
+                        <div class="sr-d">
+                          Stop at tasks.md section boundaries on large features
+                        </div>
+                      </div>
+                      <div class="sr-c">
+                        <span class="toggle on"><i></i></span>
+                      </div>
+                    </div>
+                    <div class="set-row">
+                      <div><div class="sr-l">Write status back to tracker on PR open</div></div>
+                      <div class="sr-c">
+                        <span class="toggle on"><i></i></span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="set-sec">
+                    <h5>
+                      🤖 Agent runner
+                      <span class="nf" style="font-size: 9px; color: var(--tm-success)">NEW</span>
+                    </h5>
+                    <div class="set-row">
+                      <div>
+                        <div class="sr-l">Model</div>
+                        <div class="sr-d">DEFAULT_SETTINGS.defaultModel</div>
+                      </div>
+                      <div class="sr-c selectish" style="width: 200px">
+                        claude-opus-4-6 <span class="car">▾</span>
+                      </div>
+                    </div>
+                    <div class="set-row">
+                      <div>
+                        <div class="sr-l">Isolation</div>
+                        <div class="sr-d">Implement+ run in a git worktree</div>
+                      </div>
+                      <div class="sr-c selectish" style="width: 160px">
+                        worktree <span class="car">▾</span>
+                      </div>
+                    </div>
+                    <div class="set-row">
+                      <div>
+                        <div class="sr-l">Disallowed paths</div>
+                        <div class="sr-d">Existing PilotSettings.disallowedPaths</div>
+                      </div>
+                      <div class="sr-c">
+                        <span class="fchip">.env*</span> <span class="fchip">secrets/**</span>
+                        <span class="fchip">*.pem</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="caption">
+          Credentials live in the main process (<code>electron-store</code>, keychain-backed), never
+          in the repo or the isolated webview. The Linear/Jira SDKs go in
+          <code>extensions/speckit-pilot/package.json</code>, not the root — per the extension
+          constitution.
+        </div>
+      </div>
+
+      <div class="footer">
+        SpecKit Pilot — autonomous ticket→PR revamp · renderings paired with
+        <code>specs/004-speckit-pilot-extension/autonomous-revamp-prd.md</code><br />
+        Phase rail, approval/diff panel, tasks.md kanban, and history log are existing surfaces.
+        Ticket view, agent runner, Self-Review &amp; Open PR are new.
+      </div>
+    </div>
+  </body>
+</html>

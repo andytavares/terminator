@@ -614,3 +614,75 @@ Notes and diagrams are stored in the **shared PGlite (PostgreSQL-compatible) dat
 ### New IPC Channels (22 total)
 
 Documented in `specs/010-markdown-notepad/contracts/ipc-channels.md` and typed in `src/renderer/electron.d.ts`.
+
+---
+
+## SpecKit Pilot Extension (`extensions/speckit-pilot/`)
+
+SpecKit Pilot automates the software engineering lifecycle from ticket to PR. It orchestrates a 10-phase pipeline using Claude Code as an autonomous agent subprocess.
+
+### 10-Phase Lifecycle
+
+```
+constitution → specify → clarify → plan → checklist → tasks → analyze → implement → self-review → open-pr
+```
+
+Each phase has a `PhaseState` (status: `locked | ready | running | awaiting_review | approved | stale | modified | failed | skipped`) persisted to `.pilot/state.json` inside the feature directory.
+
+### Main-Process Architecture (`extensions/speckit-pilot/src/index.ts`)
+
+```
+activate(api)
+  ├─ IPC handlers (via api.ipc.registerHandler)
+  │    ├─ speckit:dispatch          → create worktree, branch, start phase runner
+  │    ├─ speckit:pilot-state       → read .pilot/state.json
+  │    ├─ speckit:phase-approve     → persist approval, start next phase runner
+  │    ├─ speckit:phase-request-changes → record feedback, re-queue runner
+  │    ├─ speckit:phase-comment     → append history entry (no re-run)
+  │    ├─ speckit:phase-revoke      → reset approved → ready
+  │    ├─ speckit:checkin-decision  → batch continue / pause / split
+  │    ├─ speckit:self-review-read  → read .pilot/self-review.json
+  │    ├─ speckit:credentials-set   → store Linear/Jira keys in main-process secrets store
+  │    ├─ speckit:credentials-status → return { connected: boolean } ONLY
+  │    ├─ speckit:ticket-list       → fetch from Linear/Jira APIs
+  │    └─ speckit:open-pr           → run gh pr create subprocess
+  │
+  └─ AgentRunner (src/runner/agent-runner.ts)
+       ├─ Spawns claude --headless --print <command> as a child process
+       ├─ Streams stdout lines → broadcasts speckit:run-output push event
+       ├─ On exit: broadcasts speckit:run-phase-complete (or speckit:checkin-ready for batch implement)
+       └─ self-review phase uses: npm run format && npm run lint && npx vitest run --coverage && claude --headless --print /google-review
+```
+
+### Renderer Architecture (`extensions/speckit-pilot/src/renderer/`)
+
+```
+App.tsx  (4-tab sub-nav: Tickets / Features / Active runs / History + Settings icon)
+  ├─ TicketsView    — Linear/Jira ticket list with dispatch → DispatchSheet
+  ├─ FeaturesView   — feature dirs with mini 10-dot phase rail per row
+  ├─ RunDashboard   — live run view: PhaseRail + RunConsole + gate panels
+  │    ├─ GatePanel      — generic phase gate (approve / request-changes / revoke / comment / inline-edit)
+  │    ├─ SelfReviewGate — format+lint+coverage+google-review quality summary gate
+  │    ├─ OpenPrGate     — PR title input + gh pr create trigger
+  │    └─ BatchCheckIn   — implement batch boundary: continue / pause / split / redirect
+  ├─ HistoryView    — completed-run table (ticket, feature, PR URL, status, timestamp)
+  └─ SettingsView   — 3 sections: Ticket integrations / Autonomy & gates / Agent runner
+```
+
+### Security Constraints
+
+- Credentials (Linear API key, Jira token) are stored in the main-process secrets store and **never cross the IPC boundary** to the renderer. `speckit:credentials-status` returns `{ connected: boolean }` only.
+- The extension never force-pushes, modifies `main`, or merges PRs automatically.
+- All `speckit:*` IPC channels are extension-owned (not core channels). The core app has no knowledge of them.
+
+### State Persistence
+
+All state lives in `.pilot/` inside the feature directory (a subdirectory of `specs/`):
+
+- `.pilot/state.json` — `PilotState` v2 (phases, ticket ref, run meta, settings)
+- `.pilot/history.json` — append-only audit log of all phase events
+- `.pilot/self-review.json` — last self-review result (format/lint/coverage/google-review)
+
+### ADR
+
+See [ADR-007: agent-runner-subprocess](adr/007-agent-runner-subprocess.md) for the decision to spawn Claude Code as a child process rather than using the Anthropic API directly.

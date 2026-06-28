@@ -1,4 +1,11 @@
-import type { PhaseId, PhaseStatus, PhaseState, PilotState } from '../types/speckit.types.js'
+import type {
+  PhaseId,
+  PhaseStatus,
+  PhaseState,
+  PhaseGateConfig,
+  PilotState,
+  AutonomyLevel,
+} from '../types/speckit.types.js'
 import { PHASE_ORDER } from '../types/speckit.types.js'
 
 type PhaseEvent =
@@ -64,6 +71,20 @@ export function transition(phaseState: PhaseState, event: PhaseEvent): PhaseStat
   return { ...phaseState, status: next }
 }
 
+/**
+ * Returns true when a phase should be auto-approved based on the autonomy level and gate config.
+ * Self-Review and Open PR are NEVER auto-approved regardless of autonomy or gate config.
+ */
+export function shouldAutoApprove(
+  phase: PhaseId,
+  autonomy: AutonomyLevel,
+  gate: PhaseGateConfig
+): boolean {
+  if (phase === 'self-review' || phase === 'open-pr') return false
+  if (autonomy === 'guided') return false
+  return gate.autoApprove
+}
+
 export function isUpstreamApproved(state: PilotState, phase: PhaseId): boolean {
   const idx = PHASE_ORDER.indexOf(phase)
   if (idx <= 0) return true // constitution has no upstream
@@ -109,7 +130,6 @@ export function applyHashVerification(
     for (const artifactPath of phaseState.artifactPaths) {
       const diskHash = diskHashes[artifactPath]
       if (diskHash === null) {
-        // File missing — mark stale
         phaseState.status = 'stale'
         changed = true
         break
