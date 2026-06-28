@@ -1,0 +1,22 @@
+docs/user-guide/USER-GUIDE.md
+  s_5a885387c9bd40::t_60866dbfc98ef6 1-509
+  s_5a885387c9bd40::t_fe8118aad3de38 510
+README.md
+  s_5a885387c9bd40::t_a3f0ae43bcab4e 58-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "dc41eaf597b7a419b41f249097dc07c35b4315db",
+  "prompts": {},
+  "sessions": {
+    "s_5a885387c9bd40": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1261b89d-707f-42ce-9855-bfcd9631c220",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
