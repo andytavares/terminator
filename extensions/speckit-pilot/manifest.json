@@ -7,8 +7,9 @@
   "renderer": "dist/index.html",
   "minAppVersion": "0.1.0",
   "contributes": {
-    "projectTab": {
+    "workspaceTab": {
       "label": "SpecKit",
+      "icon": "brain",
       "view": "main"
     }
   }

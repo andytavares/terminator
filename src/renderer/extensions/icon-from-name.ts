@@ -22,6 +22,7 @@ import {
   Calendar,
   Wifi,
   Check,
+  Brain,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -48,6 +49,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   calendar: Calendar,
   wifi: Wifi,
   check: Check,
+  brain: Brain,
 }
 
 export const CURATED_ICON_NAMES = Object.keys(ICON_MAP) as ReadonlyArray<string>

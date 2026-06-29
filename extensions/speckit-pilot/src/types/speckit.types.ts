@@ -185,6 +185,19 @@ export interface Feature {
   lastModified: number
 }
 
+export const PHASE_LABELS: Record<PhaseId, string> = {
+  constitution: 'Constitution',
+  specify: 'Specify',
+  clarify: 'Clarify',
+  plan: 'Plan',
+  checklist: 'Checklist',
+  tasks: 'Tasks',
+  analyze: 'Analyze',
+  implement: 'Implement',
+  'self-review': 'Self-review',
+  'open-pr': 'Open PR',
+}
+
 export const PHASE_ORDER: PhaseId[] = [
   'constitution',
   'specify',

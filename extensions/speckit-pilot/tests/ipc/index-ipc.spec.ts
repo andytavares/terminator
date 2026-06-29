@@ -32,6 +32,7 @@ vi.mock('node:fs', () => ({
     rename: vi.fn().mockResolvedValue(undefined),
     readFile: vi.fn().mockResolvedValue(''),
     appendFile: vi.fn().mockResolvedValue(undefined),
+    copyFile: vi.fn().mockResolvedValue(undefined),
     stat: vi.fn().mockResolvedValue({ mtimeMs: Date.now() }),
     unlink: vi.fn().mockResolvedValue(undefined),
   },
@@ -145,6 +146,13 @@ function buildMockApi(): {
       onSessionCreate: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       onSessionClose: vi.fn().mockReturnValue({ dispose: vi.fn() }),
     },
+    workspace: {
+      list: vi.fn().mockReturnValue([]),
+      listProjects: vi.fn().mockReturnValue([]),
+      deleteProject: vi.fn(),
+      onDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      onProjectDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+    },
     app: { version: '0.0.0-test' },
   } as unknown as Partial<ExtensionAPI>
 
@@ -182,6 +190,7 @@ beforeEach(() => {
   vi.mocked(nodefs.promises.rename).mockResolvedValue(undefined)
   vi.mocked(nodefs.promises.readFile).mockResolvedValue('')
   vi.mocked(nodefs.promises.appendFile).mockResolvedValue(undefined)
+  vi.mocked(nodefs.promises.copyFile).mockResolvedValue(undefined)
   // Reset agent runner mock
   vi.mocked(agentRunnerMod.createAgentRunner).mockReturnValue({
     startPhaseRunner: vi.fn().mockReturnValue({ stop: vi.fn() }),
@@ -332,6 +341,19 @@ describe('speckit:dispatch', () => {
     expect(result.error).toBeDefined()
   })
 
+  it('returns error when git worktree add fails', async () => {
+    vi.mocked(sharedApi.shell.exec).mockResolvedValue({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'fatal: branch already exists',
+      timedOut: false,
+    })
+    const handler = getSharedHandler('speckit:dispatch')!
+    const result = (await handler({ ticket, workspacePath })) as { error?: string }
+    expect(result.error).toContain('worktree')
+    expect(agentRunnerMod.createAgentRunner).not.toHaveBeenCalled()
+  })
+
   it('creates feature dir, writes ticket.md, starts agent runner, returns featureDir', async () => {
     vi.mocked(sharedApi.shell.exec).mockResolvedValue({
       exitCode: 0,
@@ -364,7 +386,7 @@ describe('speckit:dispatch', () => {
     expect(agentRunnerMod.createAgentRunner).toHaveBeenCalled()
   })
 
-  it('returns queued:true and skips worktree creation when another run is already active', async () => {
+  it('allows parallel dispatch — second run starts immediately alongside the first', async () => {
     vi.mocked(sharedApi.shell.exec).mockResolvedValue({
       exitCode: 0,
       stdout: '',
@@ -372,30 +394,27 @@ describe('speckit:dispatch', () => {
       timedOut: false,
     })
     const handler = getSharedHandler('speckit:dispatch')!
-    // First dispatch — activates a runner
-    await handler({ ticket, workspacePath })
+    // First dispatch
+    const result1 = (await handler({ ticket, workspacePath })) as {
+      queued?: boolean
+      featureDir?: string
+    }
+    expect(result1.queued).toBe(false)
+    expect(result1.featureDir).toBeDefined()
+
     vi.mocked(nodefs.promises.readdir).mockResolvedValue(['001-eng-42'] as unknown as string[])
-    vi.clearAllMocks()
-    vi.mocked(nodefs.promises.mkdir).mockResolvedValue(undefined)
-    vi.mocked(nodefs.promises.readdir).mockResolvedValue(['001-eng-42'] as unknown as string[])
-    vi.mocked(nodefs.promises.writeFile).mockResolvedValue(undefined)
-    vi.mocked(nodefs.promises.rename).mockResolvedValue(undefined)
-    vi.mocked(nodefs.promises.appendFile).mockResolvedValue(undefined)
-    vi.mocked(sharedApi.shell.exec).mockResolvedValue({
-      exitCode: 0,
-      stdout: '',
-      stderr: '',
-      timedOut: false,
-    })
     vi.mocked(agentRunnerMod.createAgentRunner).mockReturnValue({
       startPhaseRunner: vi.fn().mockReturnValue({ stop: vi.fn() }),
     })
-    // Second dispatch while first is active — should queue
+
+    // Second dispatch — should also start immediately, not queue
     const result2 = (await handler({
       ticket: { ...ticket, key: 'ENG-43', title: 'Other' },
       workspacePath,
-    })) as { queued?: boolean }
-    expect(result2.queued).toBe(true)
+    })) as { queued?: boolean; featureDir?: string }
+    expect(result2.queued).toBe(false)
+    expect(result2.featureDir).toBeDefined()
+    expect(result2.featureDir).not.toBe(result1.featureDir)
   })
 })
 
@@ -439,7 +458,9 @@ describe('speckit:run-cancel', () => {
     })
 
     const handler = getSharedHandler('speckit:run-cancel')!
-    const result = (await handler({ featureDir, workspacePath })) as { ok?: boolean }
+    const result = (await handler({ featureDir, workspacePath, deleteWorktree: true })) as {
+      ok?: boolean
+    }
 
     expect(result.ok).toBe(true)
     const shellCalls = vi.mocked(sharedApi.shell.exec).mock.calls

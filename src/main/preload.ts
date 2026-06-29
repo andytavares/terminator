@@ -65,6 +65,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     rename: (id: string, name: string) => ipcRenderer.invoke('project:rename', { id, name }),
     reorder: (workspaceId: string, ids: string[]) =>
       ipcRenderer.invoke('project:reorder', { workspaceId, ids }),
+    onAdded: (handler: (project: unknown) => void) => {
+      const listener = (_: Electron.IpcRendererEvent, project: unknown) => handler(project)
+      ipcRenderer.on('workspace:project-added', listener)
+      return () => ipcRenderer.removeListener('workspace:project-added', listener)
+    },
+    onRemoved: (handler: (id: string) => void) => {
+      const listener = (_: Electron.IpcRendererEvent, payload: { id: string }) =>
+        handler(payload.id)
+      ipcRenderer.on('workspace:project-removed', listener)
+      return () => ipcRenderer.removeListener('workspace:project-removed', listener)
+    },
   },
   git: {
     isRepo: (path: string) => ipcRenderer.invoke('git:is-repo', { path }),

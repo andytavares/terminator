@@ -333,6 +333,36 @@ Returns all projects for a given workspace.
 
 ---
 
+### `workspace:project-added`
+
+Push event sent by the main process after a successful `project:create` call. The renderer's workspace store subscribes to keep the sidebar in sync without requiring a full reload.
+
+**Direction**: main → renderer (push via `webContents.send`)
+
+**Payload**:
+
+```typescript
+Project // full project object as returned by createProject
+```
+
+---
+
+### `workspace:project-removed`
+
+Push event sent by the main process after a successful `project:delete` call, and by extensions that delete projects via `api.workspace.deleteProject`. The renderer's workspace store removes the project from the sidebar immediately.
+
+**Direction**: main → renderer (push via `webContents.send`)
+
+**Payload**:
+
+```typescript
+{
+  id: string
+}
+```
+
+---
+
 ### `project:rename`
 
 Renames a project. Returns an error if the project is not found or if another project in the same workspace already has that name.

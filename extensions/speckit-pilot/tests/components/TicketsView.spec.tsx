@@ -21,6 +21,13 @@ describe('TicketsView', () => {
     vi.clearAllMocks()
     mockCredentialsStatus.mockResolvedValue({ connected: false })
     mockTicketList.mockResolvedValue({ tickets: [] })
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      git: {
+        listBranches: vi.fn().mockResolvedValue({
+          branches: [{ name: 'main', isCurrent: true, isRemote: false }],
+        }),
+      },
+    }
   })
 
   it('renders empty state when no credentials configured', async () => {

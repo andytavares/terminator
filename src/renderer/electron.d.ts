@@ -51,6 +51,8 @@ interface ElectronAPI {
     updateBranch(id: string, gitBranch: string): Promise<{ project: Project } | { error: string }>
     rename(id: string, name: string): Promise<{ project: Project } | { error: string }>
     reorder(workspaceId: string, ids: string[]): Promise<{ success: boolean }>
+    onAdded(handler: (project: Project) => void): () => void
+    onRemoved(handler: (id: string) => void): () => void
   }
   git: {
     isRepo(path: string): Promise<{ isRepo: boolean; root?: string }>

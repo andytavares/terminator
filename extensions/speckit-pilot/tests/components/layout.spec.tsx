@@ -4,9 +4,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
-import type { PilotState } from '../../src/types/speckit.types.js'
-import { PHASE_ORDER, DEFAULT_SETTINGS } from '../../src/types/speckit.types.js'
-import type { PhaseId, PhaseState } from '../../src/types/speckit.types.js'
 
 const mockFeatureList = vi.fn()
 const mockPilotState = vi.fn()
@@ -24,7 +21,7 @@ vi.mock('../../src/types/electron.js', () => ({
     credentialsStatus: mockCredentialsStatus,
     credentialsSet: mockCredentialsSet,
     ticketList: mockTicketList,
-    onStateChanged: mockOnStateChanged,
+    onStateChanged: () => mockOnStateChanged(),
     onRunOutput: mockOnRunOutput,
     onCheckinReady: mockOnCheckinReady,
     dispatch: vi.fn().mockResolvedValue({ featureDir: '/repo/specs/001', queued: false }),
@@ -41,48 +38,12 @@ vi.mock('../../src/types/electron.js', () => ({
   }),
 }))
 
-function makePhases(): Record<PhaseId, PhaseState> {
-  return Object.fromEntries(
-    PHASE_ORDER.map((id) => [
-      id,
-      {
-        id,
-        status: 'locked' as const,
-        approvedHash: null,
-        approvedAt: null,
-        approvedBy: null,
-        lastRunId: null,
-        lastRunAt: null,
-        artifactPaths: [],
-        feedback: null,
-        batchIndex: null,
-      },
-    ])
-  ) as Record<PhaseId, PhaseState>
-}
-
-function makeState(overrides?: Partial<PilotState>): PilotState {
-  return {
-    version: 2,
-    featureDir: '/repo/specs/001-eng-1',
-    ticket: { source: 'linear', key: 'ENG-1', title: 'Build it', sourceUrl: 'https://l/1' },
-    run: null,
-    queuePosition: null,
-    worktreePath: null,
-    branchName: 'feature/eng-1',
-    prUrl: null,
-    phases: makePhases(),
-    settings: DEFAULT_SETTINGS,
-    ...overrides,
-  } as PilotState
-}
-
 const mockExtensionBridgeOn = vi.fn().mockReturnValue(vi.fn())
 
 beforeEach(() => {
   vi.clearAllMocks()
   mockFeatureList.mockResolvedValue({ features: [] })
-  mockPilotState.mockResolvedValue({ state: makeState() })
+  mockPilotState.mockResolvedValue({ notFound: true })
   mockCredentialsStatus.mockResolvedValue({ connected: false })
   mockCredentialsSet.mockResolvedValue({ ok: true })
   mockTicketList.mockResolvedValue({ tickets: [] })
@@ -96,6 +57,12 @@ beforeEach(() => {
         on: mockExtensionBridgeOn,
         invoke: vi.fn().mockResolvedValue({}),
       },
+      workspace: {
+        list: vi.fn().mockResolvedValue({ workspaces: [] }),
+      },
+      project: {
+        create: vi.fn().mockResolvedValue({ project: {} }),
+      },
     },
     writable: true,
     configurable: true,
@@ -106,7 +73,7 @@ beforeEach(() => {
 describe('FeaturesView', () => {
   it('renders "No features" when feature list is empty', async () => {
     const { FeaturesView } = await import('../../src/components/FeaturesView.js')
-    render(<FeaturesView workspacePath="/repo" />)
+    render(<FeaturesView workspacePath="/repo" onSelect={() => {}} />)
     await waitFor(() => {
       expect(screen.getByText(/no features/i)).toBeTruthy()
     })
@@ -124,7 +91,7 @@ describe('FeaturesView', () => {
       ],
     })
     const { FeaturesView } = await import('../../src/components/FeaturesView.js')
-    render(<FeaturesView workspacePath="/repo" />)
+    render(<FeaturesView workspacePath="/repo" onSelect={() => {}} />)
     await waitFor(() => {
       expect(screen.getByText(/001-build-auth/)).toBeTruthy()
     })
@@ -142,7 +109,7 @@ describe('FeaturesView', () => {
       ],
     })
     const { FeaturesView } = await import('../../src/components/FeaturesView.js')
-    render(<FeaturesView workspacePath="/repo" />)
+    render(<FeaturesView workspacePath="/repo" onSelect={() => {}} />)
     await waitFor(() => expect(screen.getByText(/001-test/)).toBeTruthy())
     const dots = screen.getAllByRole('listitem')
     expect(dots.length).toBeGreaterThanOrEqual(10)
@@ -453,6 +420,16 @@ describe('App sub-nav', () => {
     fireEvent.click(screen.getByRole('button', { name: /settings/i }))
     await waitFor(() => {
       expect(screen.getByText(/ticket integrations/i)).toBeTruthy()
+    })
+  })
+
+  it('shows ActiveRunsView empty state when Active runs tab is clicked with no active runs', async () => {
+    const { App } = await import('../../src/renderer/App.js')
+    render(<App />)
+    await waitFor(() => screen.getByRole('button', { name: /active runs/i }))
+    fireEvent.click(screen.getByRole('button', { name: /active runs/i }))
+    await waitFor(() => {
+      expect(screen.getByText(/no active runs/i)).toBeTruthy()
     })
   })
 })

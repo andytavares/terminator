@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Play } from 'lucide-react'
 import type { AutonomyLevel, TicketRef } from '../types/speckit.types.js'
 import { PHASE_ORDER } from '../types/speckit.types.js'
@@ -17,17 +17,46 @@ interface DispatchSheetProps {
   onDispatched?: (featureDir: string) => void
 }
 
+function detectDefaultBranch(branches: string[]): string {
+  if (branches.includes('main')) return 'main'
+  if (branches.includes('master')) return 'master'
+  return branches[0] ?? 'main'
+}
+
 export function DispatchSheet({ ticket, workspacePath, onDispatched }: DispatchSheetProps) {
   const [autonomy, setAutonomy] = useState<AutonomyLevel>('standard')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [branches, setBranches] = useState<string[]>([])
+  const [baseBranch, setBaseBranch] = useState<string>('')
+
+  useEffect(() => {
+    if (!workspacePath) return
+    window.electronAPI.git
+      .listBranches(workspacePath)
+      .then((result) => {
+        if ('branches' in result) {
+          const names = (result.branches as Array<{ name: string; isRemote: boolean }>)
+            .filter((b) => !b.isRemote)
+            .map((b) => b.name)
+          setBranches(names)
+          setBaseBranch((prev) => prev || detectDefaultBranch(names))
+        }
+      })
+      .catch((err: unknown) => console.warn('[DispatchSheet] listBranches failed:', err))
+  }, [workspacePath])
 
   async function handleStartRun() {
     setLoading(true)
     setError(null)
     try {
       const api = getSpeckitAPI()
-      const result = await api.dispatch({ ticket, workspacePath, autonomyLevel: autonomy })
+      const result = await api.dispatch({
+        ticket,
+        workspacePath,
+        autonomyLevel: autonomy,
+        baseBranch: baseBranch || undefined,
+      })
       if ('error' in result) {
         setError(result.error)
       } else {
@@ -54,6 +83,41 @@ export function DispatchSheet({ ticket, workspacePath, onDispatched }: DispatchS
           {ticket.key}
         </div>
         <div style={{ fontSize: 13, color: 'var(--tm-text-secondary)' }}>{ticket.title}</div>
+      </div>
+
+      {/* Base branch */}
+      <div>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 500,
+            marginBottom: 6,
+            color: 'var(--tm-text-secondary)',
+          }}
+        >
+          Base branch
+        </div>
+        <select
+          value={baseBranch}
+          onChange={(e) => setBaseBranch(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '5px 8px',
+            fontSize: 12,
+            background: 'var(--tm-surface, #111827)',
+            color: 'var(--tm-text-primary)',
+            border: '1px solid var(--tm-border, #374151)',
+            borderRadius: 6,
+            cursor: 'pointer',
+          }}
+        >
+          {branches.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+          {branches.length === 0 && baseBranch && <option value={baseBranch}>{baseBranch}</option>}
+        </select>
       </div>
 
       {/* Autonomy control */}

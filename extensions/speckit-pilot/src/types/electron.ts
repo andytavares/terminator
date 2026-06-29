@@ -82,11 +82,13 @@ export interface SpeckitAPI {
     ticket: TicketRef
     workspacePath: string
     autonomyLevel?: 'guided' | 'standard' | 'fast'
+    baseBranch?: string
   }): Promise<{ featureDir: string; queued: boolean } | { error: string }>
   runCancel(payload: {
     featureDir: string
     workspacePath: string
-  }): Promise<{ ok: true } | { error: string }>
+    deleteWorktree?: boolean
+  }): Promise<{ ok: true; state?: PilotState } | { error: string }>
   openPr(payload: {
     featureDir: string
     workspacePath: string
@@ -112,8 +114,12 @@ export interface SpeckitAPI {
     note: string
   }): Promise<{ ok: true; state: PilotState } | { error: string }>
   onStateChanged(handler: (data: unknown) => void): () => void
-  onRunOutput(handler: (data: { featureDir: string; line: string; ts: string }) => void): () => void
-  onDispatchStarted(handler: (data: { featureDir: string; branchName: string }) => void): () => void
+  onRunOutput(
+    handler: (data: { featureDir: string; phase?: string; line: string; ts: string }) => void
+  ): () => void
+  onDispatchStarted(
+    handler: (data: { featureDir: string; branchName: string; worktreePath?: string }) => void
+  ): () => void
   onCheckinReady(
     handler: (data: { featureDir: string; batchIndex: number; diffSummary: string }) => void
   ): () => void
@@ -195,7 +201,9 @@ export function getSpeckitAPI(): SpeckitAPI {
         { featureDir: string; queued: boolean } | { error: string }
       >,
     runCancel: (payload) =>
-      bridge.invoke('speckit:run-cancel', payload) as Promise<{ ok: true } | { error: string }>,
+      bridge.invoke('speckit:run-cancel', payload) as Promise<
+        { ok: true; state?: PilotState } | { error: string }
+      >,
     openPr: (payload) =>
       bridge.invoke('speckit:open-pr', payload) as Promise<{ prUrl: string } | { error: string }>,
     checkinDecision: (payload) =>
@@ -216,7 +224,8 @@ export function getSpeckitAPI(): SpeckitAPI {
       >,
     onStateChanged: (handler) => bridge.on('speckit:state-changed', handler),
     onRunOutput: (handler) => bridge.on('speckit:run-output', handler),
-    onDispatchStarted: (handler) => bridge.on('speckit:dispatch-started', handler),
+    onDispatchStarted: (handler) =>
+      bridge.on('speckit:dispatch-started', handler as (data: unknown) => void),
     onCheckinReady: (handler) => bridge.on('speckit:checkin-ready', handler),
   }
 }
