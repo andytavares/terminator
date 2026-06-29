@@ -134,6 +134,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       set((s) => {
         const map = new Map(s.projectsByWorkspaceId)
         const existing = map.get(project.workspaceId) ?? []
+        if (existing.some((p) => p.id === project.id)) return s
         map.set(project.workspaceId, [...existing, project])
         return { projectsByWorkspaceId: map }
       })

@@ -236,6 +236,15 @@ describe('useWorkspaceStore', () => {
       await useWorkspaceStore.getState().createProject({ workspaceId: 'ws-1', name: 'Dup' })
       expect(useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1')).toHaveLength(1)
     })
+
+    it('does not add duplicate when push event already added the project', async () => {
+      // Simulates the race where workspace:project-added push event fires before
+      // the ipcRenderer.invoke response resolves, so onAdded adds the project first.
+      useWorkspaceStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1, proj2]]]) })
+      mockElectronAPI.project.create.mockResolvedValue({ project: proj2 })
+      await useWorkspaceStore.getState().createProject({ workspaceId: 'ws-1', name: 'Project 2' })
+      expect(useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1')).toHaveLength(2)
+    })
   })
 
   describe('updateProjectBranch', () => {
@@ -626,6 +635,116 @@ describe('workspace.store — localStorage initialisation', () => {
     )
     expect(freshStore.getState().collapsedProjectIds.has('p-1')).toBe(true)
     delete localStorageStore['terminator.project.collapsed']
+    vi.resetModules()
+  })
+})
+
+// Push-subscriber tests — require a fresh module load with onAdded/onRemoved in the mock
+describe('workspace.store — push event subscribers', () => {
+  it('onAdded adds a new project to the store', async () => {
+    let capturedOnAdded: ((p: unknown) => void) | null = null
+    window.electronAPI = {
+      ...mockElectronAPI,
+      project: {
+        ...mockElectronAPI.project,
+        onAdded: (cb: (p: unknown) => void) => {
+          capturedOnAdded = cb
+          return () => {}
+        },
+        onRemoved: () => () => {},
+      },
+    } as unknown as typeof window.electronAPI
+
+    vi.resetModules()
+    const { useWorkspaceStore: freshStore } = await import(
+      '../../../../src/renderer/stores/workspace.store'
+    )
+    freshStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
+    capturedOnAdded!(proj2)
+    expect(freshStore.getState().projectsByWorkspaceId.get('ws-1')).toHaveLength(2)
+
+    window.electronAPI = { ...mockElectronAPI } as unknown as typeof window.electronAPI
+    vi.resetModules()
+  })
+
+  it('onAdded skips project that already exists (dedup guard)', async () => {
+    let capturedOnAdded: ((p: unknown) => void) | null = null
+    window.electronAPI = {
+      ...mockElectronAPI,
+      project: {
+        ...mockElectronAPI.project,
+        onAdded: (cb: (p: unknown) => void) => {
+          capturedOnAdded = cb
+          return () => {}
+        },
+        onRemoved: () => () => {},
+      },
+    } as unknown as typeof window.electronAPI
+
+    vi.resetModules()
+    const { useWorkspaceStore: freshStore } = await import(
+      '../../../../src/renderer/stores/workspace.store'
+    )
+    freshStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
+    capturedOnAdded!(proj1)
+    expect(freshStore.getState().projectsByWorkspaceId.get('ws-1')).toHaveLength(1)
+
+    window.electronAPI = { ...mockElectronAPI } as unknown as typeof window.electronAPI
+    vi.resetModules()
+  })
+
+  it('onRemoved removes project from the store', async () => {
+    let capturedOnRemoved: ((id: string) => void) | null = null
+    window.electronAPI = {
+      ...mockElectronAPI,
+      project: {
+        ...mockElectronAPI.project,
+        onAdded: () => () => {},
+        onRemoved: (cb: (id: string) => void) => {
+          capturedOnRemoved = cb
+          return () => {}
+        },
+      },
+    } as unknown as typeof window.electronAPI
+
+    vi.resetModules()
+    const { useWorkspaceStore: freshStore } = await import(
+      '../../../../src/renderer/stores/workspace.store'
+    )
+    freshStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1, proj2]]]) })
+    capturedOnRemoved!('p-1')
+    expect(freshStore.getState().projectsByWorkspaceId.get('ws-1')).toEqual([proj2])
+
+    window.electronAPI = { ...mockElectronAPI } as unknown as typeof window.electronAPI
+    vi.resetModules()
+  })
+
+  it('onRemoved clears activeProjectId when removed project was active', async () => {
+    let capturedOnRemoved: ((id: string) => void) | null = null
+    window.electronAPI = {
+      ...mockElectronAPI,
+      project: {
+        ...mockElectronAPI.project,
+        onAdded: () => () => {},
+        onRemoved: (cb: (id: string) => void) => {
+          capturedOnRemoved = cb
+          return () => {}
+        },
+      },
+    } as unknown as typeof window.electronAPI
+
+    vi.resetModules()
+    const { useWorkspaceStore: freshStore } = await import(
+      '../../../../src/renderer/stores/workspace.store'
+    )
+    freshStore.setState({
+      projectsByWorkspaceId: new Map([['ws-1', [proj1]]]),
+      activeProjectId: 'p-1',
+    })
+    capturedOnRemoved!('p-1')
+    expect(freshStore.getState().activeProjectId).toBeNull()
+
+    window.electronAPI = { ...mockElectronAPI } as unknown as typeof window.electronAPI
     vi.resetModules()
   })
 })
