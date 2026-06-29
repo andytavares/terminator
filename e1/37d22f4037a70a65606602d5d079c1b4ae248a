@@ -1,0 +1,24 @@
+tests/unit/renderer/stores/workspace.store.spec.ts
+  s_b1cd5ca012a97b::t_4b01031e810f7a 239-247
+  s_b1cd5ca012a97b::t_509a8a5d25988a 641-750
+src/renderer/stores/workspace.store.ts
+  s_b1cd5ca012a97b::t_45b4f71c8f1627 137
+.claude/doc-index.json
+  s_b1cd5ca012a97b::t_4400068c030541 27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "e137d22f4037a70a65606602d5d079c1b4ae248a",
+  "prompts": {},
+  "sessions": {
+    "s_b1cd5ca012a97b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "705d6d53-a807-4eb4-ac94-41d59d6622c2",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
