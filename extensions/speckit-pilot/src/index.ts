@@ -1,5 +1,4 @@
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
-import { BrowserWindow } from 'electron'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type {
@@ -11,6 +10,19 @@ import type {
   TicketRef,
 } from './types/speckit.types.js'
 import { PHASE_ORDER, DEFAULT_SETTINGS } from './types/speckit.types.js'
+
+const PHASE_COMMANDS: Record<PhaseId, string> = {
+  constitution: 'Read and affirm the project constitution',
+  specify: 'Write a detailed feature specification in spec.md based on the ticket in ticket.md',
+  clarify: 'Review spec.md, identify and resolve open questions and ambiguities, update spec.md',
+  plan: 'Create a detailed technical implementation plan in plan.md based on spec.md',
+  checklist: 'Generate an implementation checklist from plan.md, save to checklists/',
+  tasks: 'Break the checklist into granular file-level tasks, save to tasks.md',
+  analyze: 'Analyze existing codebase patterns relevant to tasks.md and document findings',
+  implement: 'Implement the tasks described in tasks.md according to the plan',
+  'self-review': '', // handled by SELF_REVIEW_CMD in agent-runner; not dispatched as a prompt
+  'open-pr': '', // not auto-started; triggered explicitly by user action
+}
 import {
   setLinearKey,
   getLinearKey,
@@ -135,9 +147,41 @@ function createPilotState(featureDir: string): PilotState {
   return { version: 1, featureDir, phases, settings: DEFAULT_SETTINGS }
 }
 
-function broadcastStateChanged(state: PilotState) {
-  for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send('speckit:state-changed', { state })
+function makePhaseCallbacks(
+  api: ExtensionAPI,
+  featureDir: string,
+  phase: PhaseId,
+  batchIndex?: number
+) {
+  return {
+    onStart: async () => {
+      const state = await readPilotState(featureDir)
+      if (!state) return
+      const ps = state.phases[phase]
+      if (ps) {
+        ps.status = 'running'
+        ps.lastRunAt = new Date().toISOString()
+      }
+      if (state.run) state.run.status = 'running'
+      await writePilotState(featureDir, state)
+      api.window.broadcast('speckit:state-changed', { state })
+    },
+    onComplete: async (exitCode: number) => {
+      // Batch implement phases emit checkin-ready — phase stays running until user decides
+      if (phase === 'implement' && batchIndex !== undefined) return
+      const state = await readPilotState(featureDir)
+      if (!state) return
+      const ps = state.phases[phase]
+      if (ps) ps.status = exitCode === 0 ? 'awaiting_review' : 'ready'
+      await writePilotState(featureDir, state)
+      await appendHistory(featureDir, {
+        ts: new Date().toISOString(),
+        actor: 'agent',
+        action: exitCode === 0 ? 'run_complete' : 'run_failed',
+        phase,
+      })
+      api.window.broadcast('speckit:state-changed', { state })
+    },
   }
 }
 
@@ -234,7 +278,27 @@ export function activate(api: ExtensionAPI): void {
       phase,
       note,
     })
-    broadcastStateChanged(state)
+    api.window.broadcast('speckit:state-changed', { state })
+
+    // Auto-start the next phase if the run is still active
+    const nextPhaseId = PHASE_ORDER[idx + 1]
+    if (nextPhaseId && nextPhaseId !== 'open-pr' && state.run?.status !== 'cancelled') {
+      const nextPs = state.phases[nextPhaseId]
+      if (nextPs && (nextPs.status === 'locked' || nextPs.status === 'ready')) {
+        nextPs.status = 'ready'
+        await writePilotState(featureDir, state)
+        const runner = createAgentRunner(api)
+        const handle = runner.startPhaseRunner({
+          featureDir,
+          worktreePath: state.worktreePath ?? featureDir,
+          phaseCommand: PHASE_COMMANDS[nextPhaseId],
+          phase: nextPhaseId,
+          ...makePhaseCallbacks(api, featureDir, nextPhaseId),
+        })
+        activeRunnerHandles.set(featureDir, handle)
+      }
+    }
+
     return { state }
   })
 
@@ -270,7 +334,7 @@ export function activate(api: ExtensionAPI): void {
       phase,
       note: reason,
     })
-    broadcastStateChanged(state)
+    api.window.broadcast('speckit:state-changed', { state })
     return { state }
   })
 
@@ -306,7 +370,7 @@ export function activate(api: ExtensionAPI): void {
       phase,
       note,
     })
-    broadcastStateChanged(state)
+    api.window.broadcast('speckit:state-changed', { state })
     return { state }
   })
 
@@ -372,7 +436,7 @@ export function activate(api: ExtensionAPI): void {
             phase,
             note: 'stopped by user',
           })
-          broadcastStateChanged(state)
+          api.window.broadcast('speckit:state-changed', { state })
         }
       }
     }
@@ -429,7 +493,7 @@ export function activate(api: ExtensionAPI): void {
       phase,
       note,
     })
-    broadcastStateChanged(state)
+    api.window.broadcast('speckit:state-changed', { state })
     return { state }
   })
 
@@ -454,7 +518,7 @@ export function activate(api: ExtensionAPI): void {
       phase,
       note,
     })
-    broadcastStateChanged(state)
+    api.window.broadcast('speckit:state-changed', { state })
     return { state }
   })
 
@@ -561,10 +625,11 @@ export function activate(api: ExtensionAPI): void {
 
   // speckit:dispatch — create feature dir, init state v2, start agent on constitution phase
   reg(api, 'speckit:dispatch', async (payload: unknown) => {
-    const { ticket, workspacePath, autonomyLevel } = payload as {
+    const { ticket, workspacePath, autonomyLevel, baseBranch } = payload as {
       ticket: TicketRef
       workspacePath: string
       autonomyLevel?: 'guided' | 'standard' | 'fast'
+      baseBranch?: string
     }
     if (!ticket || !workspacePath) return { error: 'ticket and workspacePath required' }
 
@@ -589,10 +654,11 @@ export function activate(api: ExtensionAPI): void {
         'utf-8'
       )
 
-      // Check if another run is already active
-      const alreadyActive = Array.from(activeRunnerHandles.keys()).length > 0
       const branchName = `feature/${slug}`
-      const worktreePath = path.join(workspacePath, '.wt', slug)
+      const worktreeRoot =
+        (api.settings.get<string>('terminator.speckit-pilot.worktreeRoot') || '').trim() ||
+        path.join(workspacePath, '.wt')
+      const worktreePath = path.join(worktreeRoot, slug)
 
       // Create initial state v2
       const state = {
@@ -600,12 +666,12 @@ export function activate(api: ExtensionAPI): void {
         featureDir,
         ticket,
         run: {
-          status: 'pending' as const,
+          status: 'running' as const,
           startedAt: new Date().toISOString(),
           completedAt: null,
           autonomyLevel: autonomyLevel ?? 'standard',
         },
-        queuePosition: alreadyActive ? ('pending' as const) : ('active' as const),
+        queuePosition: 'active' as const,
         worktreePath,
         branchName,
         prUrl: null,
@@ -637,16 +703,25 @@ export function activate(api: ExtensionAPI): void {
       await fs.promises.writeFile(tmp, JSON.stringify(state, null, 2), 'utf-8')
       await fs.promises.rename(tmp, stateFile)
 
-      if (alreadyActive) {
-        return { featureDir, queued: true }
-      }
-
-      // Create git worktree
-      await api.shell.exec({
+      // Create git worktree branching from baseBranch (or HEAD if not specified)
+      const worktreeArgs = ['worktree', 'add', worktreePath, '-b', branchName]
+      if (baseBranch) worktreeArgs.push(baseBranch)
+      const worktreeResult = await api.shell.exec({
         command: 'git',
-        args: ['worktree', 'add', worktreePath, '-b', branchName],
+        args: worktreeArgs,
         cwd: workspacePath,
       })
+      if (worktreeResult.exitCode !== 0) {
+        return {
+          error: `Could not create worktree: ${worktreeResult.stderr || worktreeResult.stdout}`,
+        }
+      }
+
+      // Copy ticket.md into the worktree so phase prompts can reference it by relative path
+      await fs.promises.copyFile(
+        path.join(featureDir, 'ticket.md'),
+        path.join(worktreePath, 'ticket.md')
+      )
 
       // Start agent runner on constitution phase
       const runner = createAgentRunner(api)
@@ -655,10 +730,11 @@ export function activate(api: ExtensionAPI): void {
         worktreePath,
         phaseCommand: 'Read and affirm the project constitution',
         phase: 'constitution',
+        ...makePhaseCallbacks(api, featureDir, 'constitution'),
       })
       activeRunnerHandles.set(featureDir, handle)
 
-      api.window.broadcast('speckit:dispatch-started', { featureDir, branchName })
+      api.window.broadcast('speckit:dispatch-started', { featureDir, branchName, worktreePath })
       return { featureDir, queued: false }
     } catch (err) {
       api.notifications.showToast('error', `Dispatch failed: ${String(err)}`)
@@ -666,9 +742,13 @@ export function activate(api: ExtensionAPI): void {
     }
   })
 
-  // speckit:run-cancel — stop runner, remove worktree, update state
+  // speckit:run-cancel — stop runner, optionally remove worktree+branch, update state
   reg(api, 'speckit:run-cancel', async (payload: unknown) => {
-    const { featureDir, workspacePath } = payload as { featureDir: string; workspacePath: string }
+    const { featureDir, workspacePath, deleteWorktree } = payload as {
+      featureDir: string
+      workspacePath: string
+      deleteWorktree?: boolean
+    }
     if (!featureDir) return { error: 'featureDir required' }
 
     try {
@@ -679,14 +759,34 @@ export function activate(api: ExtensionAPI): void {
       }
 
       const state = await readPilotState(featureDir)
-      if (state?.worktreePath) {
+      if (deleteWorktree && state?.worktreePath) {
+        const cwd = workspacePath ?? path.dirname(path.dirname(featureDir))
         await api.shell
           .exec({
             command: 'git',
             args: ['worktree', 'remove', state.worktreePath, '--force'],
-            cwd: workspacePath ?? path.dirname(path.dirname(featureDir)),
+            cwd,
           })
           .catch(() => {})
+        if (state.branchName) {
+          await api.shell
+            .exec({ command: 'git', args: ['branch', '-D', state.branchName], cwd })
+            .catch(() => {})
+        }
+
+        // Remove the corresponding workspace project (matched by branch name)
+        if (state.branchName) {
+          const workspace = api.workspace.list().find((w) => w.folderPath === workspacePath)
+          if (workspace) {
+            const project = api.workspace
+              .listProjects(workspace.id)
+              .find((p) => p.name === state.branchName)
+            if (project) {
+              api.workspace.deleteProject(project.id)
+              api.window.broadcast('workspace:project-removed', { id: project.id })
+            }
+          }
+        }
       }
 
       if (state) {
@@ -701,7 +801,8 @@ export function activate(api: ExtensionAPI): void {
           action: 'run_cancelled',
           phase: 'constitution',
         })
-        broadcastStateChanged(state)
+        api.window.broadcast('speckit:state-changed', { state })
+        return { ok: true, state }
       }
 
       return { ok: true }
@@ -791,7 +892,7 @@ export function activate(api: ExtensionAPI): void {
         })
         .catch(() => {})
 
-      broadcastStateChanged(state)
+      api.window.broadcast('speckit:state-changed', { state })
       return { prUrl }
     } catch (err) {
       api.notifications.showToast('error', `Open PR failed: ${String(err)}`)
@@ -827,6 +928,7 @@ export function activate(api: ExtensionAPI): void {
           phaseCommand: `Continue implementation batch ${nextBatch}`,
           phase: 'implement',
           batchIndex: nextBatch,
+          ...makePhaseCallbacks(api, featureDir, 'implement', nextBatch),
         })
         activeRunnerHandles.set(featureDir, newHandle)
         return { ok: true }
@@ -906,9 +1008,10 @@ export function activate(api: ExtensionAPI): void {
       const handle = runner.startPhaseRunner({
         featureDir,
         worktreePath: state.worktreePath ?? featureDir,
-        phaseCommand: `Re-run ${phase}`,
+        phaseCommand: PHASE_COMMANDS[phase],
         phase,
         feedbackNote: note,
+        ...makePhaseCallbacks(api, featureDir, phase),
       })
       activeRunnerHandles.set(featureDir, handle)
       api.window.broadcast('speckit:state-changed', { state })
@@ -968,6 +1071,11 @@ export function activate(api: ExtensionAPI): void {
           label: 'Enable SpecKit Pilot',
           default: true,
           workspaceScoped: true,
+        },
+        'terminator.speckit-pilot.worktreeRoot': {
+          type: 'string',
+          label: 'Worktree root directory (leave empty to use .wt/ inside workspace)',
+          default: '',
         },
       },
     })

@@ -281,3 +281,33 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     return project?.worktreePath ?? workspace?.folderPath ?? '~'
   },
 }))
+
+// Subscribe to push notifications from the main process so the sidebar
+// updates immediately when any caller (including extensions) creates a project.
+if (typeof window !== 'undefined' && window.electronAPI?.project?.onAdded) {
+  window.electronAPI.project.onAdded((project) => {
+    useWorkspaceStore.setState((s) => {
+      const map = new Map(s.projectsByWorkspaceId)
+      const existing = map.get(project.workspaceId) ?? []
+      if (existing.some((p) => p.id === project.id)) return s
+      map.set(project.workspaceId, [...existing, project])
+      return { projectsByWorkspaceId: map }
+    })
+  })
+}
+
+if (typeof window !== 'undefined' && window.electronAPI?.project?.onRemoved) {
+  window.electronAPI.project.onRemoved((id) => {
+    useWorkspaceStore.setState((s) => {
+      const map = new Map(s.projectsByWorkspaceId)
+      for (const [wsId, projects] of map) {
+        map.set(
+          wsId,
+          projects.filter((p) => p.id !== id)
+        )
+      }
+      const activeProjectId = s.activeProjectId === id ? null : s.activeProjectId
+      return { projectsByWorkspaceId: map, activeProjectId }
+    })
+  })
+}

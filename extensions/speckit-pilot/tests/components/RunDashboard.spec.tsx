@@ -12,6 +12,8 @@ const mockPhaseRequestChanges = vi.fn()
 const mockPhaseComment = vi.fn()
 const mockFileWrite = vi.fn()
 const mockArtifactRead = vi.fn()
+const mockRunCancel = vi.fn()
+const mockHistoryLoad = vi.fn()
 
 vi.mock('../../src/types/electron.js', () => ({
   getSpeckitAPI: () => ({
@@ -25,6 +27,8 @@ vi.mock('../../src/types/electron.js', () => ({
     phaseComment: mockPhaseComment,
     fileWrite: mockFileWrite,
     artifactRead: mockArtifactRead,
+    historyLoad: mockHistoryLoad,
+    runCancel: mockRunCancel,
     selfReviewRead: vi.fn().mockResolvedValue({ notFound: true, error: 'no self-review' }),
     openPr: vi.fn().mockResolvedValue({ prUrl: 'https://github.com/owner/repo/pull/1' }),
     onCheckinReady: vi.fn().mockReturnValue(vi.fn()),
@@ -93,6 +97,8 @@ describe('RunDashboard', () => {
     mockFileWrite.mockResolvedValue({ ok: true })
     mockArtifactRead.mockResolvedValue({ current: null, approved: null })
     mockPilotState.mockResolvedValue({ state: makeState() })
+    mockRunCancel.mockResolvedValue({ ok: true })
+    mockHistoryLoad.mockResolvedValue({ entries: [] })
   })
 
   it('renders PhaseRail with 10 nodes', async () => {
@@ -136,5 +142,69 @@ describe('RunDashboard', () => {
   it('subscribes to onStateChanged on mount', async () => {
     render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
     await waitFor(() => expect(mockOnStateChanged).toHaveBeenCalledOnce())
+  })
+
+  it('shows Stop button when run status is running', async () => {
+    mockPilotState.mockResolvedValue({
+      state: makeState({
+        run: {
+          status: 'running',
+          startedAt: '2026-01-01T00:00:00Z',
+          completedAt: null,
+          autonomyLevel: 'standard',
+        },
+      }),
+    })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /stop run/i })).toBeTruthy()
+    })
+  })
+
+  it('does not show Stop button when run is not active', async () => {
+    mockPilotState.mockResolvedValue({ state: makeState({ run: null }) })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /stop run/i })).toBeNull()
+    })
+  })
+
+  it('calls runCancel when Stop button is clicked', async () => {
+    const { fireEvent } = await import('@testing-library/react')
+    mockPilotState.mockResolvedValue({ state: makeState() })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /stop run/i })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: /stop run/i }))
+    await waitFor(() => {
+      expect(mockRunCancel).toHaveBeenCalledWith({
+        featureDir: '/repo/specs/001',
+        workspacePath: '/repo',
+        deleteWorktree: false,
+      })
+    })
+  })
+
+  it('renders back button when onBack prop is provided', async () => {
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" onBack={() => {}} />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /back to runs list/i })).toBeTruthy()
+    })
+  })
+
+  it('does not render back button when onBack prop is omitted', async () => {
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    await waitFor(() => expect(mockOnStateChanged).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: /back to runs list/i })).toBeNull()
+  })
+
+  it('calls onBack when back button is clicked', async () => {
+    const { fireEvent } = await import('@testing-library/react')
+    const onBack = vi.fn()
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" onBack={onBack} />)
+    await waitFor(() => screen.getByRole('button', { name: /back to runs list/i }))
+    fireEvent.click(screen.getByRole('button', { name: /back to runs list/i }))
+    expect(onBack).toHaveBeenCalledOnce()
   })
 })

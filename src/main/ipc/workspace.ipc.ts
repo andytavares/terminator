@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import {
   listWorkspaces,
   createWorkspace,
@@ -66,7 +66,13 @@ export function registerWorkspaceHandlers(): void {
   })
 
   ipcMain.handle('project:create', (_event, payload) => {
-    return createProject(payload)
+    const result = createProject(payload)
+    if ('project' in result) {
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send('workspace:project-added', result.project)
+      })
+    }
+    return result
   })
 
   ipcMain.handle('project:update-branch', (_event, payload) => {
@@ -95,6 +101,9 @@ export function registerWorkspaceHandlers(): void {
     }
     const result = deleteProject(id)
     emitProjectDelete(id)
+    BrowserWindow.getAllWindows().forEach((win) => {
+      win.webContents.send('workspace:project-removed', { id })
+    })
     return result
   })
 }

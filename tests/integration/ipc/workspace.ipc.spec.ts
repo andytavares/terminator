@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ipcMain } from 'electron'
 
+const mockWebContentsSend = vi.fn()
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn() },
+  BrowserWindow: {
+    getAllWindows: vi.fn(() => [{ webContents: { send: mockWebContentsSend } }]),
+  },
 }))
 
 vi.mock('../../../src/main/storage/workspace-store', () => ({
@@ -123,13 +127,35 @@ describe('workspace IPC handlers', () => {
 
   describe('project:create', () => {
     it('calls createProject with payload and returns result', () => {
-      const project = { id: 'p2', name: 'MyProject' }
+      const project = { id: 'p2', workspaceId: 'ws-1', name: 'MyProject' }
       vi.mocked(store.createProject).mockReturnValue({ project } as unknown as ReturnType<
         typeof store.createProject
       >)
       const handler = captureHandler('project:create')
       const result = handler({}, { workspaceId: 'ws-1', name: 'MyProject' })
       expect(result).toEqual({ project })
+    })
+
+    it('broadcasts workspace:project-added to all BrowserWindows on success', () => {
+      const project = { id: 'p2', workspaceId: 'ws-1', name: 'MyProject' }
+      vi.mocked(store.createProject).mockReturnValue({ project } as unknown as ReturnType<
+        typeof store.createProject
+      >)
+      const handler = captureHandler('project:create')
+      handler({}, { workspaceId: 'ws-1', name: 'MyProject' })
+      expect(mockWebContentsSend).toHaveBeenCalledWith('workspace:project-added', project)
+    })
+
+    it('does not broadcast when createProject returns an error', () => {
+      vi.mocked(store.createProject).mockReturnValue({
+        error: 'DUPLICATE_NAME',
+      } as unknown as ReturnType<typeof store.createProject>)
+      const handler = captureHandler('project:create')
+      handler({}, { workspaceId: 'ws-1', name: 'Dup' })
+      expect(mockWebContentsSend).not.toHaveBeenCalledWith(
+        'workspace:project-added',
+        expect.anything()
+      )
     })
   })
 
@@ -250,6 +276,16 @@ describe('workspace IPC handlers', () => {
       await handler({}, { id: 'p1' })
       expect(gitService.removeWorktree).not.toHaveBeenCalled()
       expect(store.deleteProject).toHaveBeenCalledWith('p1')
+    })
+
+    it('broadcasts workspace:project-removed to all BrowserWindows after deletion', async () => {
+      vi.mocked(store.getProjectById).mockReturnValue(undefined)
+      vi.mocked(store.deleteProject).mockReturnValue(
+        undefined as unknown as ReturnType<typeof store.deleteWorkspace>
+      )
+      const handler = captureHandler('project:delete')
+      await handler({}, { id: 'p-del' })
+      expect(mockWebContentsSend).toHaveBeenCalledWith('workspace:project-removed', { id: 'p-del' })
     })
   })
 

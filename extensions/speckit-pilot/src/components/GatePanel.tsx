@@ -8,6 +8,7 @@ interface GatePanelProps {
   phaseState: PhaseState
   artifactContent: string | null
   stalePhases?: PhaseId[]
+  comments?: Array<{ note: string; ts: string }>
   onApprove(): Promise<void> | void
   onRequestChanges(note: string): Promise<void> | void
   onRevoke?(): Promise<void> | void
@@ -25,6 +26,7 @@ export function GatePanel({
   onComment,
   onInlineEdit,
   stalePhases,
+  comments,
 }: GatePanelProps) {
   const [activePanel, setActivePanel] = useState<ActivePanel>('none')
   const [feedbackNote, setFeedbackNote] = useState('')
@@ -152,10 +154,19 @@ export function GatePanel({
             }}
           />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={handleSaveEdit} disabled={submitting} style={{ flex: 1 }}>
+            <button
+              onClick={handleSaveEdit}
+              disabled={submitting}
+              className="sk-btn sk-btn--primary"
+              style={{ flex: 1 }}
+            >
               {submitting ? 'Saving…' : 'Save'}
             </button>
-            <button onClick={() => setActivePanel('none')} style={{ flex: 1 }}>
+            <button
+              onClick={() => setActivePanel('none')}
+              className="sk-btn sk-btn--secondary"
+              style={{ flex: 1 }}
+            >
               Cancel
             </button>
           </div>
@@ -187,6 +198,7 @@ export function GatePanel({
             <button
               onClick={handleSubmitFeedback}
               disabled={submitting || !feedbackNote.trim()}
+              className="sk-btn sk-btn--primary"
               style={{ flex: 1 }}
             >
               {submitting ? 'Submitting…' : 'Submit'}
@@ -196,6 +208,7 @@ export function GatePanel({
                 setActivePanel('none')
                 setFeedbackNote('')
               }}
+              className="sk-btn sk-btn--secondary"
               style={{ flex: 1 }}
             >
               Cancel
@@ -229,6 +242,7 @@ export function GatePanel({
             <button
               onClick={handleSubmitComment}
               disabled={submitting || !commentNote.trim()}
+              className="sk-btn sk-btn--primary"
               style={{ flex: 1 }}
             >
               {submitting ? 'Posting…' : 'Post comment'}
@@ -238,11 +252,39 @@ export function GatePanel({
                 setActivePanel('none')
                 setCommentNote('')
               }}
+              className="sk-btn sk-btn--secondary"
               style={{ flex: 1 }}
             >
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Comment thread */}
+      {comments && comments.length > 0 && activePanel === 'none' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--tm-text-secondary)' }}>
+            Comments
+          </div>
+          {comments.map((c, i) => (
+            <div
+              key={i}
+              style={{
+                padding: '6px 10px',
+                background: 'var(--tm-surface, #111827)',
+                borderRadius: 6,
+                fontSize: 12,
+              }}
+            >
+              <div style={{ color: 'var(--tm-text-secondary)', fontSize: 10, marginBottom: 2 }}>
+                {new Date(c.ts).toLocaleString()}
+              </div>
+              <div style={{ color: 'var(--tm-text-primary)', whiteSpace: 'pre-wrap' }}>
+                {c.note}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -253,6 +295,7 @@ export function GatePanel({
             <button
               onClick={handleApprove}
               disabled={approving}
+              className="sk-btn sk-btn--primary"
               style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
               aria-label="Approve"
             >
@@ -261,6 +304,7 @@ export function GatePanel({
             </button>
             <button
               onClick={() => setActivePanel('request-changes')}
+              className="sk-btn sk-btn--secondary"
               style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
               aria-label="Request changes"
             >
@@ -274,6 +318,7 @@ export function GatePanel({
                 onClick={() => {
                   void onRevoke()
                 }}
+                className="sk-btn sk-btn--danger-outline"
                 style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 aria-label="Revoke"
               >
@@ -284,6 +329,7 @@ export function GatePanel({
             {onComment && (
               <button
                 onClick={() => setActivePanel('comment')}
+                className="sk-btn sk-btn--ghost"
                 style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 aria-label="Comment"
               >
@@ -294,6 +340,7 @@ export function GatePanel({
             {onInlineEdit && artifactContent !== null && (
               <button
                 onClick={openInlineEdit}
+                className="sk-btn sk-btn--ghost"
                 style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 aria-label="Edit"
               >

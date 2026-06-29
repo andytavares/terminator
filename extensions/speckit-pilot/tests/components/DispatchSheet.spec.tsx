@@ -10,6 +10,14 @@ vi.mock('../../src/types/electron.js', () => ({
   }),
 }))
 
+const mockListBranches = vi.fn()
+
+beforeEach(() => {
+  ;(window as unknown as Record<string, unknown>).electronAPI = {
+    git: { listBranches: mockListBranches },
+  }
+})
+
 import { DispatchSheet } from '../../src/components/DispatchSheet.js'
 import type { TicketRef } from '../../src/types/speckit.types.js'
 
@@ -24,6 +32,12 @@ describe('DispatchSheet', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockDispatch.mockResolvedValue({ featureDir: '/repo/specs/001-eng-42', queued: false })
+    mockListBranches.mockResolvedValue({
+      branches: [
+        { name: 'main', isCurrent: true, isRemote: false },
+        { name: 'develop', isCurrent: false, isRemote: false },
+      ],
+    })
   })
 
   it('renders Guided autonomy option', () => {
@@ -64,6 +78,19 @@ describe('DispatchSheet', () => {
   it('renders Start run button', () => {
     render(<DispatchSheet ticket={ticket} workspacePath="/repo" />)
     expect(screen.getByRole('button', { name: /start run/i })).toBeTruthy()
+  })
+
+  it('renders base branch selector', async () => {
+    render(<DispatchSheet ticket={ticket} workspacePath="/repo" />)
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeTruthy())
+  })
+
+  it('defaults base branch to main when available', async () => {
+    render(<DispatchSheet ticket={ticket} workspacePath="/repo" />)
+    await waitFor(() => {
+      const select = screen.getByRole('combobox') as HTMLSelectElement
+      expect(select.value).toBe('main')
+    })
   })
 
   it('calls dispatch with ticket and Standard autonomy on Start run click', async () => {

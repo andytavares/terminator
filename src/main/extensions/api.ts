@@ -162,6 +162,7 @@ export interface ExtensionAPI {
   workspace: {
     list(): WorkspaceSnapshot[]
     listProjects(workspaceId: string): ProjectSnapshot[]
+    deleteProject(projectId: string): void
     onDelete(handler: (workspaceId: string) => void): Disposable
     onProjectDelete(handler: (projectId: string) => void): Disposable
   }
@@ -235,6 +236,7 @@ import { makeLogger } from '../logger.js'
 import {
   listWorkspaces,
   listProjects as listProjectsFromStore,
+  deleteProject as deleteProjectFromStore,
 } from '../storage/workspace-store.js'
 import { onWorkspaceDelete, onProjectDelete } from './workspace-events.js'
 import { RESERVED_SHORTCUTS } from '../shared/reserved-shortcuts.js'
@@ -413,6 +415,9 @@ export function createExtensionAPI(
           workspaceId: wsId,
           name,
         }))
+      },
+      deleteProject(projectId: string): void {
+        deleteProjectFromStore(projectId)
       },
       onDelete(handler: (workspaceId: string) => void): Disposable {
         const unsub = onWorkspaceDelete(handler)
