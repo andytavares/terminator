@@ -1,0 +1,33 @@
+extensions/notepad/src/components/DiagramView.tsx
+  s_1f8449bdf94e02::t_76a94dccfed69a 352-353
+  s_1f8449bdf94e02::t_2997924fc4b958 388-395
+  s_1f8449bdf94e02::t_c15408bfc761a8 282-285,287-300,317-319
+  s_1f8449bdf94e02::t_5e3e325c35d442 4
+  s_1f8449bdf94e02::t_e07ffd8e15ebfa 320
+extensions/notepad/src/stores/notes.store.ts
+  s_1f8449bdf94e02::t_87b168f7d82624 13-16,25-36,48-49,58-64
+extensions/notepad/tests/unit/stores/notes.store.spec.ts
+  s_1f8449bdf94e02::t_e4e40dade5127b 94-140
+  s_1f8449bdf94e02::t_4d87db94163a23 29,33-34
+  s_1f8449bdf94e02::t_af158c5c0bbffd 141-142
+extensions/notepad/src/components/NotepadView.tsx
+  s_1f8449bdf94e02::t_c5bba834975ea1 205-214,221,223-226
+  s_1f8449bdf94e02::t_e02330caa9ed6d 294-296
+  s_1f8449bdf94e02::t_7d9f0d7c85aff4 338-345
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "6f63aca1ae4c3fe96b644f42dcfa3c812886164d",
+  "prompts": {},
+  "sessions": {
+    "s_1f8449bdf94e02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9752e483-6c64-4c3f-90de-71cda60faa71",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
