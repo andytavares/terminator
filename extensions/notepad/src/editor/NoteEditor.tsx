@@ -265,17 +265,6 @@ export function NoteEditor({
 
   useEffect(() => {
     const view = viewRef.current
-    /* v8 ignore next */
-    if (!view) return
-    const current = view.state.doc.toString()
-    /* v8 ignore next 3 */
-    if (current !== initialDoc) {
-      view.dispatch({ changes: { from: 0, to: current.length, insert: initialDoc } })
-    }
-  }, [initialDoc])
-
-  useEffect(() => {
-    const view = viewRef.current
     /* v8 ignore next 3 */
     if (!view) return
     view.dispatch({

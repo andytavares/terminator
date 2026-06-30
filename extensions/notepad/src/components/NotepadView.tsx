@@ -202,18 +202,28 @@ export function NotepadView(): React.JSX.Element {
 
     async function loadNoteAndComments() {
       try {
-        const [noteResult, commentsResult] = await Promise.all([
-          window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.get', {
-            id: selectedNoteId,
-          }),
+        // Use the in-session body cache when available so content is never lost
+        // due to a race between a cleanup flush and this DB read.
+        const cachedBody = useNotesStore.getState().bodyCache[selectedNoteId!]
+
+        const [bodyResult, commentsResult] = await Promise.all([
+          cachedBody !== undefined
+            ? Promise.resolve({ data: { body: cachedBody } })
+            : window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.get', {
+                id: selectedNoteId,
+              }),
           window.electronAPI.extensionBridge.invoke('terminator.notepad:comments.list', {
             noteId: selectedNoteId,
             includeResolved: true,
           }),
         ])
 
-        const note = (noteResult as { data?: { body: string } }).data
+        const note = (bodyResult as { data?: { body: string } }).data
         if (!note || activeIdRef.current !== selectedNoteId) return
+        // Populate the cache on first DB fetch so future navigate-backs skip the round-trip
+        if (cachedBody === undefined) {
+          useNotesStore.getState().setBodyCache(selectedNoteId!, note.body)
+        }
         setActiveNote(selectedNoteId, note.body)
         setLoadedNoteId(selectedNoteId)
 
@@ -281,6 +291,9 @@ export function NotepadView(): React.JSX.Element {
           clearTimeout(autosaveTimer.current)
           autosaveTimer.current = null
         }
+        // Cache the body optimistically so navigate-back never reads stale DB data
+        // even if this fire-and-forget flush races with the next notes.get call.
+        useNotesStore.getState().setBodyCache(selectedNoteId, bodyDraft)
         const n = useNotesStore.getState().notes.find((x) => x.id === selectedNoteId)
         const headingMatch = /^#{1,6}\s+(.+)/m.exec(bodyDraft)
         const firstLine = bodyDraft.split('\n').find((l) => l.trim().length > 0)
@@ -322,6 +335,14 @@ export function NotepadView(): React.JSX.Element {
             tags: note?.tags ?? [],
           })
           markSaved()
+          // Keep the sidebar and body cache in sync so navigate-back never loses content
+          const savedAt = new Date().toISOString()
+          useNotesStore.getState().patchNote(selectedNoteId, {
+            title: derivedTitle,
+            updatedAt: savedAt,
+            bodyPreview: newBody.slice(0, 120),
+          })
+          useNotesStore.getState().setBodyCache(selectedNoteId, newBody)
 
           // Re-check anchors after save against the live editor body, not the
           // stale newBody captured at debounce time — the user may have typed
