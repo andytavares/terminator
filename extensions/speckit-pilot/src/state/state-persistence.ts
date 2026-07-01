@@ -1,8 +1,15 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import type { PilotState, PhaseId, HistoryEntry } from '../types/speckit.types.js'
-import { PHASE_ORDER, DEFAULT_SETTINGS } from '../types/speckit.types.js'
+import type {
+  PilotState,
+  PhaseId,
+  HistoryEntry,
+  CardBrief,
+  CardComment,
+} from '../types/speckit.types.js'
+import { PHASE_ORDER, DEFAULT_SETTINGS, createDefaultBrief } from '../types/speckit.types.js'
 import { PilotStateAnyVersionSchema } from '../schemas/speckit.schemas.js'
+import { deriveStage } from './derive-stage.js'
 
 function pilotDir(featureDir: string): string {
   return path.join(featureDir, '.pilot')
@@ -16,32 +23,56 @@ function historyPath(featureDir: string): string {
   return path.join(pilotDir(featureDir), 'history.jsonl')
 }
 
+function cardPath(featureDir: string): string {
+  return path.join(pilotDir(featureDir), 'card.json')
+}
+
+function commentsPath(featureDir: string): string {
+  return path.join(pilotDir(featureDir), 'comments.jsonl')
+}
+
 export async function ensurePilotDir(featureDir: string): Promise<void> {
   await fs.mkdir(pilotDir(featureDir), { recursive: true })
 }
 
-/** Migrate a v1 state to v2 by adding null defaults for new fields. */
-function migrateToV2(raw: unknown): PilotState {
-  const v1 = raw as {
-    version: 1
-    featureDir: string
-    phases: PilotState['phases']
-    settings: PilotState['settings']
-  }
+/** Shape shared by v1/v2 states before v3's card/stage fields were added. */
+interface PreV3State {
+  version: 1 | 2
+  featureDir: string
+  ticket?: PilotState['ticket']
+  run?: PilotState['run']
+  queuePosition?: PilotState['queuePosition']
+  worktreePath?: PilotState['worktreePath']
+  branchName?: PilotState['branchName']
+  prUrl?: PilotState['prUrl']
+  phases: PilotState['phases']
+  settings: PilotState['settings']
+}
+
+/**
+ * Migrate a v1 or v2 state up to v3: synthesize a card brief, derive the stage,
+ * and default any missing settings. Pure with respect to the input object.
+ */
+function migrateToV3(raw: PreV3State): PilotState {
+  const ticket = raw.ticket ?? null
+  const run = raw.run ?? null
+  const phases = raw.phases
+  const title = ticket?.title ?? path.basename(raw.featureDir)
+  const card: CardBrief = createDefaultBrief(title, ticket?.source ?? 'native')
+  const settings = { ...DEFAULT_SETTINGS, ...raw.settings }
   return {
-    version: 2,
-    featureDir: v1.featureDir,
-    ticket: null,
-    run: null,
-    queuePosition: null,
-    worktreePath: null,
-    branchName: null,
-    prUrl: null,
-    phases: v1.phases,
-    settings: {
-      ...DEFAULT_SETTINGS,
-      ...v1.settings,
-    },
+    version: 3,
+    featureDir: raw.featureDir,
+    card,
+    stage: deriveStage(phases, run),
+    ticket,
+    run,
+    queuePosition: raw.queuePosition ?? null,
+    worktreePath: raw.worktreePath ?? null,
+    branchName: raw.branchName ?? null,
+    prUrl: raw.prUrl ?? null,
+    phases,
+    settings,
   }
 }
 
@@ -53,11 +84,67 @@ export async function readState(featureDir: string): Promise<PilotState | null> 
     const result = PilotStateAnyVersionSchema.safeParse(parsed)
     if (!result.success) return null
     const data = result.data
-    if (data.version === 1) return migrateToV2(data)
-    return data as PilotState
+    if (data.version === 3) return data as PilotState
+    return migrateToV3(data as PreV3State)
   } catch {
     return null
   }
+}
+
+export async function readCard(featureDir: string): Promise<CardBrief | null> {
+  try {
+    const raw = await fs.readFile(cardPath(featureDir), 'utf-8')
+    return JSON.parse(raw) as CardBrief
+  } catch {
+    return null
+  }
+}
+
+export async function writeCard(featureDir: string, card: CardBrief): Promise<void> {
+  await ensurePilotDir(featureDir)
+  const p = cardPath(featureDir)
+  const tmp = `${p}.tmp`
+  await fs.writeFile(tmp, JSON.stringify(card, null, 2), 'utf-8')
+  await fs.rename(tmp, p)
+}
+
+export async function appendComment(featureDir: string, comment: CardComment): Promise<void> {
+  await ensurePilotDir(featureDir)
+  await fs.appendFile(commentsPath(featureDir), JSON.stringify(comment) + '\n', 'utf-8')
+}
+
+export async function readComments(featureDir: string): Promise<CardComment[]> {
+  try {
+    const raw = await fs.readFile(commentsPath(featureDir), 'utf-8')
+    return raw
+      .split('\n')
+      .filter((line) => line.trim().length > 0)
+      .map((line) => JSON.parse(line) as CardComment)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Collect your not-yet-applied comments, mark them applied to the given run, and
+ * return their concatenated bodies (or null if none) so a phase run can be steered.
+ */
+export async function consumePendingComments(
+  featureDir: string,
+  runId: string
+): Promise<string | null> {
+  const comments = await readComments(featureDir)
+  const pending = comments.filter((c) => c.author === 'you' && !c.appliedToRunId)
+  if (pending.length === 0) return null
+  const updated = comments.map((c) =>
+    c.author === 'you' && !c.appliedToRunId ? { ...c, appliedToRunId: runId } : c
+  )
+  await fs.writeFile(
+    commentsPath(featureDir),
+    updated.map((c) => JSON.stringify(c)).join('\n') + '\n',
+    'utf-8'
+  )
+  return pending.map((c) => c.body).join('\n')
 }
 
 export async function writeState(featureDir: string, state: PilotState): Promise<void> {
@@ -77,6 +164,7 @@ export async function appendHistory(featureDir: string, entry: HistoryEntry): Pr
 export function createInitialState(
   featureDir: string,
   overrides?: {
+    card?: CardBrief
     ticket?: PilotState['ticket']
     run?: PilotState['run']
     queuePosition?: PilotState['queuePosition']
@@ -102,11 +190,19 @@ export function createInitialState(
     ])
   ) as Record<PhaseId, import('../types/speckit.types.js').PhaseState>
 
+  const run = overrides?.run ?? null
+  const ticket = overrides?.ticket ?? null
+  const card =
+    overrides?.card ??
+    createDefaultBrief(ticket?.title ?? path.basename(featureDir), ticket?.source ?? 'native')
+
   return {
-    version: 2,
+    version: 3,
     featureDir,
-    ticket: overrides?.ticket ?? null,
-    run: overrides?.run ?? null,
+    card,
+    stage: deriveStage(phases, run),
+    ticket,
+    run,
     queuePosition: overrides?.queuePosition ?? null,
     worktreePath: overrides?.worktreePath ?? null,
     branchName: overrides?.branchName ?? null,

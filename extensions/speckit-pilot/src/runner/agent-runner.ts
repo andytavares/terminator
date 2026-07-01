@@ -1,6 +1,47 @@
 import { spawn } from 'node:child_process'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { PhaseId } from '../types/speckit.types.js'
+
+/** Absolute path to a phase's persisted output log. */
+export function phaseLogPath(featureDir: string, phase: PhaseId): string {
+  return path.join(featureDir, '.pilot', 'logs', `${phase}.log`)
+}
+
+/**
+ * Delete persisted phase logs older than the retention window (best-effort).
+ * Returns the number of log files removed.
+ */
+export async function pruneOldLogs(
+  featureDir: string,
+  retentionDays: number,
+  now: number = Date.now()
+): Promise<number> {
+  const logsDir = path.join(featureDir, '.pilot', 'logs')
+  const cutoff = now - Math.max(1, retentionDays) * 24 * 60 * 60 * 1000
+  let removed = 0
+  let entries: string[]
+  try {
+    entries = await fs.promises.readdir(logsDir)
+  } catch {
+    return 0
+  }
+  for (const name of entries) {
+    if (!name.endsWith('.log')) continue
+    const file = path.join(logsDir, name)
+    try {
+      const stat = await fs.promises.stat(file)
+      if (stat.mtimeMs < cutoff) {
+        await fs.promises.unlink(file)
+        removed++
+      }
+    } catch {
+      // ignore unreadable entries
+    }
+  }
+  return removed
+}
 
 export interface RunnerHandle {
   stop(): void
@@ -69,11 +110,30 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
 
       const outputBuffer: string[] = []
 
+      // Persist output so it can be reviewed after the run finishes.
+      let logStream: fs.WriteStream | null = null
+      try {
+        const logPath = phaseLogPath(featureDir, phase)
+        fs.mkdirSync(path.dirname(logPath), { recursive: true })
+        logStream = fs.createWriteStream(logPath, { flags: 'a' })
+        logStream.write(`\n=== run ${new Date().toISOString()} — ${phase} ===\n`)
+      } catch {
+        logStream = null
+      }
+      const persist = (line: string) => {
+        try {
+          logStream?.write(line + '\n')
+        } catch {
+          // best-effort logging; never break the run
+        }
+      }
+
       const handleData = (data: Buffer | string) => {
         const text = typeof data === 'string' ? data : data.toString()
         outputBuffer.push(text)
         for (const line of text.split('\n')) {
           if (line) {
+            persist(line)
             api.window.broadcast('speckit:run-output', {
               featureDir,
               phase,
@@ -88,10 +148,14 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
       child.stderr?.on('data', (data: Buffer | string) => {
         // Collect stderr separately; only surface on error to avoid duplicating
         // output that claude --print writes to both stdout and stderr.
-        outputBuffer.push(typeof data === 'string' ? data : data.toString())
+        const text = typeof data === 'string' ? data : data.toString()
+        outputBuffer.push(text)
+        persist(text.replace(/\n$/, ''))
       })
 
       child.on('error', (err) => {
+        persist(`[runner error] ${err.message}`)
+        logStream?.end()
         api.window.broadcast('speckit:run-output', {
           featureDir,
           phase,
@@ -104,6 +168,7 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
 
       child.on('close', (exitCode) => {
         const code = exitCode ?? 0
+        logStream?.end()
         if (onComplete) void Promise.resolve(onComplete(code))
         if (phase === 'implement' && batchIndex !== undefined) {
           api.window.broadcast('speckit:checkin-ready', {

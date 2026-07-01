@@ -2,6 +2,9 @@ import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type {
+  CardBrief,
+  CardComment,
+  CardSummary,
   Feature,
   HistoryEntry,
   JiraCreds,
@@ -9,7 +12,22 @@ import type {
   PilotState,
   TicketRef,
 } from './types/speckit.types.js'
-import { PHASE_ORDER, DEFAULT_SETTINGS } from './types/speckit.types.js'
+import { PHASE_ORDER, STAGE_ORDER, createDefaultBrief } from './types/speckit.types.js'
+import {
+  readState as readMigratedState,
+  readCard,
+  writeCard,
+  appendComment,
+  readComments,
+  consumePendingComments,
+  createInitialState,
+} from './state/state-persistence.js'
+import { buildCardSummary } from './state/card-summary.js'
+import { deriveStage } from './state/derive-stage.js'
+import { shouldQueue, orderPending } from './state/run-queue.js'
+import { parseRgLines, searchFiles } from './utils/knowledge-search.js'
+import { parseGitLog, artifactSpecs, buildArtifactRef } from './state/artifact-list.js'
+import type { ArtifactRef, BoardStage } from './types/speckit.types.js'
 
 const PHASE_COMMANDS: Record<PhaseId, string> = {
   constitution: 'Read and affirm the project constitution',
@@ -26,6 +44,8 @@ const PHASE_COMMANDS: Record<PhaseId, string> = {
 import {
   setLinearKey,
   getLinearKey,
+  getLinearEmail,
+  setLinearEmail,
   setJiraCredentials,
   getJiraCredentials,
 } from './api/credentials.js'
@@ -37,7 +57,7 @@ import {
   fetchAssignedTickets as fetchJiraTickets,
   postComment as postJiraComment,
 } from './api/jira.js'
-import { createAgentRunner } from './runner/agent-runner.js'
+import { createAgentRunner, phaseLogPath, pruneOldLogs } from './runner/agent-runner.js'
 import type { RunnerHandle } from './runner/agent-runner.js'
 
 const disposables: Disposable[] = []
@@ -108,6 +128,43 @@ async function listFeatures(repoRoot: string): Promise<Feature[]> {
   return features
 }
 
+// Scan specs/ for card dirs — any dir with a pilot state, card brief, or spec.md.
+// Unlike listFeatures, this includes backlog cards that have no spec.md yet.
+async function listCardDirs(repoRoot: string): Promise<string[]> {
+  const specsDir = path.join(repoRoot, 'specs')
+  let entries: string[] = []
+  try {
+    entries = await fs.promises.readdir(specsDir)
+  } catch {
+    return []
+  }
+  const dirs: string[] = []
+  for (const name of entries.sort()) {
+    const dir = path.join(specsDir, name)
+    try {
+      const stat = await fs.promises.stat(dir)
+      if (!stat.isDirectory()) continue
+    } catch {
+      continue
+    }
+    const candidates = [
+      path.join(dir, '.pilot', 'state.json'),
+      path.join(dir, '.pilot', 'card.json'),
+      path.join(dir, 'spec.md'),
+    ]
+    for (const c of candidates) {
+      try {
+        await fs.promises.access(c)
+        dirs.push(dir)
+        break
+      } catch {
+        // keep checking
+      }
+    }
+  }
+  return dirs
+}
+
 // Read pilot state from .pilot/state.json inside featureDir
 async function readPilotState(featureDir: string): Promise<PilotState | null> {
   const stateFile = path.join(featureDir, '.pilot', 'state.json')
@@ -129,22 +186,9 @@ async function writePilotState(featureDir: string, state: PilotState): Promise<v
   await fs.promises.rename(tmp, stateFile)
 }
 
-// Create initial pilot state derived from file existence
+// Create initial pilot state for a feature dir (v3, backlog card).
 function createPilotState(featureDir: string): PilotState {
-  const phases: PilotState['phases'] = {} as PilotState['phases']
-  for (const id of PHASE_ORDER) {
-    phases[id] = {
-      id,
-      status: 'locked',
-      approvedHash: null,
-      approvedAt: null,
-      approvedBy: null,
-      lastRunId: null,
-      lastRunAt: null,
-      artifactPaths: [],
-    }
-  }
-  return { version: 1, featureDir, phases, settings: DEFAULT_SETTINGS }
+  return createInitialState(featureDir)
 }
 
 function makePhaseCallbacks(
@@ -163,6 +207,8 @@ function makePhaseCallbacks(
         ps.lastRunAt = new Date().toISOString()
       }
       if (state.run) state.run.status = 'running'
+      // While a run is active, the board column tracks phase progress automatically.
+      state.stage = deriveStage(state.phases, state.run)
       await writePilotState(featureDir, state)
       api.window.broadcast('speckit:state-changed', { state })
     },
@@ -173,6 +219,7 @@ function makePhaseCallbacks(
       if (!state) return
       const ps = state.phases[phase]
       if (ps) ps.status = exitCode === 0 ? 'awaiting_review' : 'ready'
+      state.stage = deriveStage(state.phases, state.run)
       await writePilotState(featureDir, state)
       await appendHistory(featureDir, {
         ts: new Date().toISOString(),
@@ -182,6 +229,196 @@ function makePhaseCallbacks(
       })
       api.window.broadcast('speckit:state-changed', { state })
     },
+  }
+}
+
+function getMaxConcurrent(api: ExtensionAPI): number {
+  const v = api.settings.get<number>('terminator.speckit-pilot.maxConcurrentRuns')
+  return typeof v === 'number' && v >= 1 ? Math.floor(v) : 3
+}
+
+function getLogRetentionDays(api: ExtensionAPI): number {
+  const v = api.settings.get<number>('terminator.speckit-pilot.logRetentionDays')
+  return typeof v === 'number' && v >= 1 ? Math.floor(v) : 30
+}
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fs.promises.access(p)
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Count cards currently occupying a run slot (active + running, incl. awaiting review).
+async function countActiveRuns(workspacePath: string): Promise<number> {
+  const dirs = await listCardDirs(workspacePath)
+  let n = 0
+  for (const dir of dirs) {
+    const s = await readMigratedState(dir)
+    if (s && s.queuePosition === 'active' && s.run && s.run.status === 'running') n++
+  }
+  return n
+}
+
+// Create a git worktree for a card; returns its path + branch name.
+async function createWorktree(
+  api: ExtensionAPI,
+  featureDir: string,
+  workspacePath: string,
+  baseBranch?: string
+): Promise<{ worktreePath: string; branchName: string }> {
+  const slug = path.basename(featureDir).replace(/^\d+-/, '') || path.basename(featureDir)
+  const branchName = `feature/${slug}`
+  const worktreeRoot =
+    (api.settings.get<string>('terminator.speckit-pilot.worktreeRoot') || '').trim() ||
+    path.join(workspacePath, '.wt')
+  const worktreePath = path.join(worktreeRoot, slug)
+  const args = ['worktree', 'add', worktreePath, '-b', branchName]
+  if (baseBranch) args.push(baseBranch)
+  const res = await api.shell.exec({ command: 'git', args, cwd: workspacePath })
+  if (res.exitCode !== 0) throw new Error(res.stderr || res.stdout || 'git worktree add failed')
+  return { worktreePath, branchName }
+}
+
+// The first phase that still needs to run (skip already-skipped/approved phases).
+function firstRunnablePhase(state: PilotState): PhaseId {
+  return (
+    PHASE_ORDER.find((id) => {
+      const s = state.phases[id]?.status
+      return s !== 'skipped' && s !== 'approved'
+    }) ?? 'specify'
+  )
+}
+
+// Start the given phase's runner for a card, steering with any pending comments.
+async function startRunAt(
+  api: ExtensionAPI,
+  featureDir: string,
+  worktreePath: string,
+  phase: PhaseId
+): Promise<void> {
+  const runId = `run-${Date.now()}`
+  const feedbackNote = (await consumePendingComments(featureDir, runId)) ?? undefined
+  const runner = createAgentRunner(api)
+  const handle = runner.startPhaseRunner({
+    featureDir,
+    worktreePath,
+    phaseCommand: PHASE_COMMANDS[phase],
+    phase,
+    feedbackNote,
+    ...makePhaseCallbacks(api, featureDir, phase),
+  })
+  activeRunnerHandles.set(featureDir, handle)
+}
+
+// Prepare a card's phases for a run, honoring the "skip Constitution" setting.
+function primePhasesForRun(state: PilotState): void {
+  const constitution = state.phases['constitution']
+  const specify = state.phases['specify']
+  if (!constitution) return
+  const runConstitution = state.settings.runConstitutionPhase
+  if (!runConstitution && constitution.status !== 'approved') {
+    constitution.status = 'skipped'
+    if (specify && specify.status === 'locked') specify.status = 'ready'
+  } else if (runConstitution && constitution.status === 'locked') {
+    constitution.status = 'ready'
+  }
+}
+
+// Hand a backlog card off to an agent: start now if under the cap, else queue it.
+async function handoffCard(
+  api: ExtensionAPI,
+  featureDir: string,
+  workspacePath: string,
+  baseBranch?: string
+): Promise<{ ok: true; dispatched: true; queued: boolean } | { error: string; message?: string }> {
+  const state = await readMigratedState(featureDir)
+  if (!state) return { error: 'No card state found' }
+  const card = await readCard(featureDir)
+  const title = card?.title ?? state.card.title
+  if (!title || title.trim().length === 0) {
+    return { error: 'VALIDATION_ERROR', message: 'A card needs a title before handoff' }
+  }
+  const now = new Date().toISOString()
+  state.run = {
+    status: 'running',
+    startedAt: now,
+    completedAt: null,
+    autonomyLevel: state.run?.autonomyLevel ?? state.settings.defaultAutonomy ?? 'standard',
+  }
+  primePhasesForRun(state)
+
+  const cap = getMaxConcurrent(api)
+  const active = await countActiveRuns(workspacePath)
+  if (shouldQueue(active, cap)) {
+    state.queuePosition = 'pending'
+    state.stage = deriveStage(state.phases, state.run)
+    await writePilotState(featureDir, state)
+    api.window.broadcast('speckit:state-changed', { state })
+    return { ok: true, dispatched: true, queued: true }
+  }
+
+  // Reuse an existing worktree (e.g. resuming a card that was already started);
+  // only create one when it's missing.
+  let worktreePath = state.worktreePath
+  let branchName = state.branchName
+  const existingUsable = worktreePath ? await pathExists(worktreePath) : false
+  if (!existingUsable) {
+    const created = await createWorktree(api, featureDir, workspacePath, baseBranch)
+    worktreePath = created.worktreePath
+    branchName = created.branchName
+  }
+  if (!worktreePath) return { error: 'Could not resolve a worktree for the card' }
+  state.worktreePath = worktreePath
+  state.branchName = branchName
+  state.queuePosition = 'active'
+  state.stage = deriveStage(state.phases, state.run)
+  await writePilotState(featureDir, state)
+  await startRunAt(api, featureDir, worktreePath, firstRunnablePhase(state))
+  api.window.broadcast('speckit:dispatch-started', { featureDir, branchName, worktreePath })
+  api.window.broadcast('speckit:state-changed', { state })
+  return { ok: true, dispatched: true, queued: false }
+}
+
+// Start queued (pending) cards while there is spare capacity.
+async function advanceQueue(api: ExtensionAPI, workspacePath: string): Promise<void> {
+  const cap = getMaxConcurrent(api)
+  const dirs = await listCardDirs(workspacePath)
+  const pending: PilotState[] = []
+  for (const dir of dirs) {
+    const s = await readMigratedState(dir)
+    if (s && s.queuePosition === 'pending') pending.push(s)
+  }
+  const ordered = orderPending(
+    pending.map((s) => ({
+      featureDir: s.featureDir,
+      startedAt: s.run?.startedAt ?? null,
+      state: s,
+    }))
+  )
+  for (const item of ordered) {
+    const active = await countActiveRuns(workspacePath)
+    if (shouldQueue(active, cap)) break
+    const s = item.state
+    try {
+      const { worktreePath, branchName } = await createWorktree(api, s.featureDir, workspacePath)
+      s.worktreePath = worktreePath
+      s.branchName = branchName
+      s.queuePosition = 'active'
+      s.stage = deriveStage(s.phases, s.run)
+      await writePilotState(s.featureDir, s)
+      await startRunAt(api, s.featureDir, worktreePath, firstRunnablePhase(s))
+      api.window.broadcast('speckit:dispatch-started', {
+        featureDir: s.featureDir,
+        branchName,
+        worktreePath,
+      })
+      api.window.broadcast('speckit:state-changed', { state: s })
+    } catch (err) {
+      api.notifications.showToast('error', `Could not start queued card: ${String(err)}`)
+    }
   }
 }
 
@@ -229,6 +466,323 @@ export function activate(api: ExtensionAPI): void {
     return { features }
   })
 
+  // speckit:card-list — board data: every card with brief + derived stage + phase summary
+  reg(api, 'speckit:card-list', async (payload: unknown) => {
+    const { repoRoot } = payload as { repoRoot: string }
+    if (!repoRoot) return { error: 'repoRoot required' }
+    const dirs = await listCardDirs(repoRoot)
+    const retentionDays = getLogRetentionDays(api)
+    const cards: CardSummary[] = []
+    for (const dir of dirs) {
+      void pruneOldLogs(dir, retentionDays).catch(() => {})
+      const state = await readMigratedState(dir)
+      if (!state) continue
+      const card = await readCard(dir)
+      cards.push(buildCardSummary(state, card))
+    }
+    return { cards }
+  })
+
+  // speckit:card-create — create a native (or ticket-seeded) card in the backlog
+  reg(api, 'speckit:card-create', async (payload: unknown) => {
+    const { repoRoot, brief, ticket } = payload as {
+      repoRoot: string
+      brief: Partial<CardBrief> & { title: string }
+      ticket?: TicketRef
+    }
+    if (!repoRoot) return { error: 'repoRoot required' }
+    if (!brief || !brief.title || brief.title.trim().length === 0) {
+      return { error: 'VALIDATION_ERROR', message: 'A card needs a title' }
+    }
+    try {
+      const specsDir = path.join(repoRoot, 'specs')
+      await fs.promises.mkdir(specsDir, { recursive: true })
+      const existing = await fs.promises.readdir(specsDir).catch(() => [])
+      const nums = existing
+        .map((d) => parseInt(d.split('-')[0] ?? '0', 10))
+        .filter((n) => !isNaN(n))
+      const nextNum = nums.length > 0 ? Math.max(...nums) + 1 : 1
+      const slugBase = (ticket?.key ?? brief.title).toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      const slug = slugBase.replace(/^-|-$/g, '') || 'card'
+      const featureDirName = `${String(nextNum).padStart(3, '0')}-${slug}`
+      const featureDir = path.join(specsDir, featureDirName)
+      await fs.promises.mkdir(featureDir, { recursive: true })
+
+      const card: CardBrief = {
+        ...createDefaultBrief(brief.title, brief.source ?? ticket?.source ?? 'native'),
+        ...brief,
+        title: brief.title,
+      }
+      await writeCard(featureDir, card)
+      const state = createInitialState(featureDir, { card, ticket: ticket ?? null })
+      await writePilotState(featureDir, state)
+      api.window.broadcast('speckit:state-changed', { state })
+      return { featureDir }
+    } catch (err) {
+      api.notifications.showToast('error', `Could not create card: ${String(err)}`)
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:card-update — edit a card's brief
+  reg(api, 'speckit:card-update', async (payload: unknown) => {
+    const { featureDir, brief } = payload as { featureDir: string; brief: Partial<CardBrief> }
+    if (!featureDir) return { error: 'featureDir required' }
+    if (brief.title !== undefined && brief.title.trim().length === 0) {
+      return { error: 'VALIDATION_ERROR', message: 'Title cannot be empty' }
+    }
+    try {
+      const existing = (await readCard(featureDir)) ?? createDefaultBrief(path.basename(featureDir))
+      const updated: CardBrief = { ...existing, ...brief }
+      await writeCard(featureDir, updated)
+      const state = await readMigratedState(featureDir)
+      if (state) {
+        state.card = updated
+        await writePilotState(featureDir, state)
+        api.window.broadcast('speckit:state-changed', { state })
+      }
+      return { ok: true }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:card-comment — append a comment; queued to steer the next phase run
+  reg(api, 'speckit:card-comment', async (payload: unknown) => {
+    const { featureDir, body } = payload as { featureDir: string; body: string }
+    if (!featureDir) return { error: 'featureDir required' }
+    if (!body || body.trim().length === 0) {
+      return { error: 'VALIDATION_ERROR', message: 'Comment cannot be empty' }
+    }
+    try {
+      const comment: CardComment = {
+        id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        author: 'you',
+        body,
+        ts: new Date().toISOString(),
+        appliedToRunId: null,
+      }
+      await appendComment(featureDir, comment)
+      const state = await readMigratedState(featureDir)
+      if (state) api.window.broadcast('speckit:state-changed', { state })
+      return { comment }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:run-output-read — load persisted output for a phase (review past runs)
+  reg(api, 'speckit:run-output-read', async (payload: unknown) => {
+    const { featureDir, phase } = payload as { featureDir: string; phase: PhaseId }
+    if (!featureDir || !phase) return { error: 'featureDir and phase required' }
+    try {
+      const raw = await fs.promises.readFile(phaseLogPath(featureDir, phase), 'utf-8')
+      const lines = raw.split('\n').filter((l) => l.length > 0)
+      return { lines }
+    } catch {
+      return { lines: [] }
+    }
+  })
+
+  // speckit:comment-list — load a card's comments
+  reg(api, 'speckit:comment-list', async (payload: unknown) => {
+    const { featureDir } = payload as { featureDir: string }
+    if (!featureDir) return { error: 'featureDir required' }
+    const comments = await readComments(featureDir)
+    return { comments }
+  })
+
+  // speckit:card-move — user-driven board organization. Sets the card's stage; it
+  // never starts a run. Dropping an active card onto Backlog parks (stops) its run.
+  reg(api, 'speckit:card-move', async (payload: unknown) => {
+    const { featureDir, workspacePath, toStage } = payload as {
+      featureDir: string
+      workspacePath: string
+      toStage: BoardStage
+    }
+    if (!featureDir || !workspacePath) return { error: 'featureDir and workspacePath required' }
+    if (!STAGE_ORDER.includes(toStage)) {
+      return { error: 'VALIDATION_ERROR', message: `Unknown stage: ${toStage}` }
+    }
+    try {
+      const state = await readMigratedState(featureDir)
+      if (!state) return { error: 'No card state found' }
+
+      const runActive = state.run != null && state.run.status === 'running'
+      // Parking an in-flight run: stop it, drop the worktree, free the slot.
+      if (toStage === 'backlog' && runActive) {
+        const handle = activeRunnerHandles.get(featureDir)
+        if (handle) {
+          handle.stop()
+          activeRunnerHandles.delete(featureDir)
+        }
+        if (state.worktreePath) {
+          await api.shell
+            .exec({
+              command: 'git',
+              args: ['worktree', 'remove', state.worktreePath, '--force'],
+              cwd: workspacePath,
+            })
+            .catch(() => {})
+          if (state.branchName) {
+            await api.shell
+              .exec({
+                command: 'git',
+                args: ['branch', '-D', state.branchName],
+                cwd: workspacePath,
+              })
+              .catch(() => {})
+          }
+        }
+        state.run = { ...state.run!, status: 'cancelled', completedAt: new Date().toISOString() }
+        state.queuePosition = null
+        state.worktreePath = null
+        state.branchName = null
+        await appendHistory(featureDir, {
+          ts: new Date().toISOString(),
+          actor: 'user',
+          action: 'run_cancelled',
+          phase: 'constitution',
+          note: 'parked to backlog',
+        })
+      }
+
+      state.stage = toStage
+      await writePilotState(featureDir, state)
+      api.window.broadcast('speckit:state-changed', { state })
+      if (toStage === 'backlog' && runActive) await advanceQueue(api, workspacePath)
+      return { ok: true }
+    } catch (err) {
+      api.notifications.showToast('error', `Could not move card: ${String(err)}`)
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:card-handoff — explicit "start" action: run the card through the pipeline
+  reg(api, 'speckit:card-handoff', async (payload: unknown) => {
+    const { featureDir, workspacePath, baseBranch } = payload as {
+      featureDir: string
+      workspacePath: string
+      baseBranch?: string
+    }
+    if (!featureDir || !workspacePath) return { error: 'featureDir and workspacePath required' }
+    try {
+      return await handoffCard(api, featureDir, workspacePath, baseBranch)
+    } catch (err) {
+      api.notifications.showToast('error', `Handoff failed: ${String(err)}`)
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:artifact-list — enumerate a card's artifacts with git revision history
+  reg(api, 'speckit:artifact-list', async (payload: unknown) => {
+    const { featureDir } = payload as { featureDir: string }
+    if (!featureDir) return { error: 'featureDir required' }
+    try {
+      const state = await readMigratedState(featureDir)
+      const cwd = state?.worktreePath ?? path.dirname(path.dirname(featureDir))
+      const artifacts: ArtifactRef[] = []
+      for (const spec of artifactSpecs()) {
+        if (spec.relPath === null) {
+          artifacts.push(
+            buildArtifactRef(spec, { exists: false, revisions: [], prUrl: state?.prUrl })
+          )
+          continue
+        }
+        const absPath = path.join(featureDir, spec.relPath)
+        let exists = false
+        try {
+          await fs.promises.access(absPath)
+          exists = true
+        } catch {
+          exists = false
+        }
+        let revisions: ReturnType<typeof parseGitLog> = []
+        if (exists) {
+          try {
+            const rel = path.relative(cwd, absPath)
+            const res = await api.shell.exec({
+              command: 'git',
+              args: ['log', '--pretty=format:%h%x09%cI%x09%s', '--', rel],
+              cwd,
+            })
+            if (res.exitCode === 0) revisions = parseGitLog(res.stdout)
+          } catch {
+            revisions = []
+          }
+        }
+        artifacts.push(buildArtifactRef(spec, { exists, revisions }))
+      }
+      return { artifacts }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:knowledge-search — keyword search across repo markdown + card briefs/specs
+  reg(api, 'speckit:knowledge-search', async (payload: unknown) => {
+    const { repoRoot, query } = payload as { repoRoot: string; query: string }
+    if (!repoRoot || !query) return { error: 'repoRoot and query required' }
+    try {
+      const res = await api.shell.exec({
+        command: 'rg',
+        args: [
+          '--line-number',
+          '--no-heading',
+          '--color',
+          'never',
+          '--glob',
+          '*.md',
+          '--',
+          query,
+          '.',
+        ],
+        cwd: repoRoot,
+      })
+      // rg exit 0 = matches, 1 = no matches (both authoritative)
+      if (res.exitCode === 0 || res.exitCode === 1) {
+        return { results: parseRgLines(res.stdout) }
+      }
+    } catch {
+      // rg unavailable — fall through to fs scan
+    }
+    // Fallback: scan markdown under specs/ and docs/ plus README.md
+    const files: { file: string; content: string }[] = []
+    const roots = ['specs', 'docs']
+    async function walk(rel: string): Promise<void> {
+      const abs = path.join(repoRoot, rel)
+      let entries: fs.Dirent[] = []
+      try {
+        entries = await fs.promises.readdir(abs, { withFileTypes: true })
+      } catch {
+        return
+      }
+      for (const e of entries) {
+        const childRel = path.join(rel, e.name)
+        if (e.isDirectory()) {
+          await walk(childRel)
+        } else if (e.name.endsWith('.md')) {
+          try {
+            files.push({
+              file: childRel,
+              content: await fs.promises.readFile(path.join(repoRoot, childRel), 'utf-8'),
+            })
+          } catch {
+            // skip unreadable
+          }
+        }
+      }
+    }
+    for (const r of roots) await walk(r)
+    try {
+      const readme = await fs.promises.readFile(path.join(repoRoot, 'README.md'), 'utf-8')
+      files.push({ file: 'README.md', content: readme })
+    } catch {
+      // no README
+    }
+    return { results: searchFiles(files, query) }
+  })
+
   // speckit:check-artifacts — which phase artifact files exist?
   reg(api, 'speckit:check-artifacts', async (payload: unknown) => {
     const { featureDir, repoRoot } = payload as { featureDir: string; repoRoot: string }
@@ -270,6 +824,9 @@ export function activate(api: ExtensionAPI): void {
         downstream.status = 'stale'
       }
     }
+    if (state.run && state.run.status === 'running') {
+      state.stage = deriveStage(state.phases, state.run)
+    }
     await writePilotState(featureDir, state)
     await appendHistory(featureDir, {
       ts: new Date().toISOString(),
@@ -287,12 +844,14 @@ export function activate(api: ExtensionAPI): void {
       if (nextPs && (nextPs.status === 'locked' || nextPs.status === 'ready')) {
         nextPs.status = 'ready'
         await writePilotState(featureDir, state)
+        const steer = (await consumePendingComments(featureDir, `run-${Date.now()}`)) ?? undefined
         const runner = createAgentRunner(api)
         const handle = runner.startPhaseRunner({
           featureDir,
           worktreePath: state.worktreePath ?? featureDir,
           phaseCommand: PHASE_COMMANDS[nextPhaseId],
           phase: nextPhaseId,
+          feedbackNote: steer,
           ...makePhaseCallbacks(api, featureDir, nextPhaseId),
         })
         activeRunnerHandles.set(featureDir, handle)
@@ -374,28 +933,42 @@ export function activate(api: ExtensionAPI): void {
     return { state }
   })
 
-  // speckit:artifact-read — read current file + last approved (via git) for diff
+  // speckit:artifact-read — read current file + last approved (via git) for diff.
+  // When `commit` is given, `current` is that revision's content (git show <commit>:path).
   reg(api, 'speckit:artifact-read', async (payload: unknown) => {
-    const { filePath, featureDir, repoRoot } = payload as {
+    const { filePath, featureDir, repoRoot, commit } = payload as {
       filePath: string
       featureDir?: string
       repoRoot?: string
+      commit?: string
     }
     if (!filePath) return { error: 'filePath required' }
-    let current: string | null = null
-    try {
-      current = await fs.promises.readFile(filePath, 'utf-8')
-    } catch {
-      current = null
-    }
-    // Try to get approved version from git
-    let approved: string | null = null
     const cwd = repoRoot || featureDir || path.dirname(filePath)
+    const { exec } = await import('node:child_process')
+    const { promisify } = await import('node:util')
+    const execAsync = promisify(exec)
+    const relPath = path.relative(cwd, filePath)
+
+    let current: string | null = null
+    if (commit) {
+      // Read a specific historical revision of the file.
+      try {
+        const result = await execAsync(`git show ${commit}:${relPath}`, { cwd })
+        current = result.stdout
+      } catch {
+        current = null
+      }
+    } else {
+      try {
+        current = await fs.promises.readFile(filePath, 'utf-8')
+      } catch {
+        current = null
+      }
+    }
+
+    // Try to get approved (HEAD) version from git
+    let approved: string | null = null
     try {
-      const { exec } = await import('node:child_process')
-      const { promisify } = await import('node:util')
-      const execAsync = promisify(exec)
-      const relPath = path.relative(cwd, filePath)
       const result = await execAsync(`git show HEAD:${relPath}`, { cwd })
       approved = result.stdout
     } catch {
@@ -568,9 +1141,13 @@ export function activate(api: ExtensionAPI): void {
   // speckit:ticket-list — fetch tickets from Linear and/or Jira in parallel
   reg(api, 'speckit:ticket-list', async () => {
     try {
-      const [linearKey, jiraCreds] = await Promise.all([getLinearKey(), getJiraCredentials()])
+      const [linearKey, linearEmail, jiraCreds] = await Promise.all([
+        getLinearKey(),
+        getLinearEmail(),
+        getJiraCredentials(),
+      ])
       const fetches: Promise<unknown[]>[] = []
-      if (linearKey) fetches.push(fetchLinearTickets(linearKey).catch(() => []))
+      if (linearKey) fetches.push(fetchLinearTickets(linearKey, linearEmail).catch(() => []))
       if (jiraCreds) fetches.push(fetchJiraTickets(jiraCreds).catch(() => []))
       if (fetches.length === 0) return { tickets: [] }
       const results = await Promise.all(fetches)
@@ -586,8 +1163,13 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'speckit:credentials-set', async (payload: unknown) => {
     const p = payload as { source: 'linear' | 'jira'; apiKey?: string } & Partial<JiraCreds>
     try {
-      if (p.source === 'linear' && p.apiKey) {
-        await setLinearKey(p.apiKey)
+      if (p.source === 'linear') {
+        if (p.apiKey) {
+          await setLinearKey(p.apiKey, p.email)
+        } else {
+          // Update just the lookup email without touching the stored key
+          await setLinearEmail(p.email ?? '')
+        }
       } else if (p.source === 'jira') {
         await setJiraCredentials({
           domain: p.domain ?? '',
@@ -610,8 +1192,8 @@ export function activate(api: ExtensionAPI): void {
     const { source } = payload as { source: 'linear' | 'jira' }
     try {
       if (source === 'linear') {
-        const key = await getLinearKey()
-        return { connected: key !== null }
+        const [key, email] = await Promise.all([getLinearKey(), getLinearEmail()])
+        return { connected: key !== null, email: email ?? undefined }
       } else if (source === 'jira') {
         const creds = await getJiraCredentials()
         if (!creds) return { connected: false }
@@ -660,41 +1242,20 @@ export function activate(api: ExtensionAPI): void {
         path.join(workspacePath, '.wt')
       const worktreePath = path.join(worktreeRoot, slug)
 
-      // Create initial state v2
-      const state = {
-        version: 2 as const,
-        featureDir,
+      // Create initial state v3 (constitution ready, active run, ticket-seeded card)
+      const state = createInitialState(featureDir, {
+        card: createDefaultBrief(ticket.title, ticket.source),
         ticket,
         run: {
-          status: 'running' as const,
+          status: 'running',
           startedAt: new Date().toISOString(),
           completedAt: null,
           autonomyLevel: autonomyLevel ?? 'standard',
         },
-        queuePosition: 'active' as const,
+        queuePosition: 'active',
         worktreePath,
         branchName,
-        prUrl: null,
-        phases: (() => {
-          const phases: PilotState['phases'] = {} as PilotState['phases']
-          for (const id of PHASE_ORDER) {
-            phases[id] = {
-              id,
-              status: id === 'constitution' ? 'ready' : 'locked',
-              approvedHash: null,
-              approvedAt: null,
-              approvedBy: null,
-              lastRunId: null,
-              lastRunAt: null,
-              artifactPaths: [],
-              feedback: null,
-              batchIndex: null,
-            }
-          }
-          return phases
-        })(),
-        settings: DEFAULT_SETTINGS,
-      } satisfies PilotState
+      })
 
       const pilotDir = path.join(featureDir, '.pilot')
       await fs.promises.mkdir(pilotDir, { recursive: true })
@@ -723,18 +1284,14 @@ export function activate(api: ExtensionAPI): void {
         path.join(worktreePath, 'ticket.md')
       )
 
-      // Start agent runner on constitution phase
-      const runner = createAgentRunner(api)
-      const handle = runner.startPhaseRunner({
-        featureDir,
-        worktreePath,
-        phaseCommand: 'Read and affirm the project constitution',
-        phase: 'constitution',
-        ...makePhaseCallbacks(api, featureDir, 'constitution'),
-      })
-      activeRunnerHandles.set(featureDir, handle)
+      // Prime phases (honor skip-Constitution) and start at the first runnable phase
+      primePhasesForRun(state)
+      state.stage = deriveStage(state.phases, state.run)
+      await writePilotState(featureDir, state)
+      await startRunAt(api, featureDir, worktreePath, firstRunnablePhase(state))
 
       api.window.broadcast('speckit:dispatch-started', { featureDir, branchName, worktreePath })
+      api.window.broadcast('speckit:state-changed', { state })
       return { featureDir, queued: false }
     } catch (err) {
       api.notifications.showToast('error', `Dispatch failed: ${String(err)}`)
@@ -802,9 +1359,11 @@ export function activate(api: ExtensionAPI): void {
           phase: 'constitution',
         })
         api.window.broadcast('speckit:state-changed', { state })
+        if (workspacePath) await advanceQueue(api, workspacePath)
         return { ok: true, state }
       }
 
+      if (workspacePath) await advanceQueue(api, workspacePath)
       return { ok: true }
     } catch (err) {
       api.notifications.showToast('error', `Cancel failed: ${String(err)}`)
@@ -892,7 +1451,15 @@ export function activate(api: ExtensionAPI): void {
         })
         .catch(() => {})
 
+      // Run completed — free the slot and start any queued card
+      state.run = state.run
+        ? { ...state.run, status: 'completed', completedAt: new Date().toISOString() }
+        : state.run
+      state.queuePosition = null
+      await writePilotState(featureDir, state)
+
       api.window.broadcast('speckit:state-changed', { state })
+      await advanceQueue(api, workspacePath)
       return { prUrl }
     } catch (err) {
       api.notifications.showToast('error', `Open PR failed: ${String(err)}`)
@@ -1076,6 +1643,16 @@ export function activate(api: ExtensionAPI): void {
           type: 'string',
           label: 'Worktree root directory (leave empty to use .wt/ inside workspace)',
           default: '',
+        },
+        'terminator.speckit-pilot.maxConcurrentRuns': {
+          type: 'number',
+          label: 'Maximum cards running in parallel',
+          default: 3,
+        },
+        'terminator.speckit-pilot.logRetentionDays': {
+          type: 'number',
+          label: 'Days to keep persisted step logs',
+          default: 30,
         },
       },
     })

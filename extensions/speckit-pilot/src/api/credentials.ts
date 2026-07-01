@@ -5,6 +5,7 @@ import type { JiraCreds } from '../types/speckit.types.js'
 
 interface CredsFile {
   linearKey?: string
+  linearEmail?: string
   jiraCreds?: {
     domain: string
     email: string
@@ -45,9 +46,10 @@ function decrypt(encoded: string): string {
   return safeStorage.decryptString(buf)
 }
 
-export async function setLinearKey(key: string): Promise<void> {
+export async function setLinearKey(key: string, email?: string): Promise<void> {
   const creds = await readCredsFile()
   creds.linearKey = encrypt(key)
+  if (email !== undefined) creds.linearEmail = email.trim() || undefined
   await writeCredsFile(creds)
 }
 
@@ -55,6 +57,17 @@ export async function getLinearKey(): Promise<string | null> {
   const creds = await readCredsFile()
   if (!creds.linearKey) return null
   return decrypt(creds.linearKey)
+}
+
+export async function getLinearEmail(): Promise<string | null> {
+  const creds = await readCredsFile()
+  return creds.linearEmail ?? null
+}
+
+export async function setLinearEmail(email: string): Promise<void> {
+  const creds = await readCredsFile()
+  creds.linearEmail = email.trim() || undefined
+  await writeCredsFile(creds)
 }
 
 export async function setJiraCredentials(jiraCreds: JiraCreds): Promise<void> {

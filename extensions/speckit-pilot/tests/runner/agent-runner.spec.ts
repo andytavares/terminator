@@ -636,3 +636,35 @@ describe('startPhaseRunner — self-review mode', () => {
     expect(completeBroadcast![1]).toMatchObject({ phase: 'self-review', featureDir: '/specs/feat' })
   })
 })
+
+describe('pruneOldLogs', () => {
+  it('deletes logs older than the retention window and keeps recent ones', async () => {
+    const fsp = await import('node:fs/promises')
+    const os = await import('node:os')
+    const nodePath = await import('node:path')
+    const { pruneOldLogs } = await import('../../src/runner/agent-runner.js')
+
+    const dir = await fsp.mkdtemp(nodePath.join(os.tmpdir(), 'sk-logs-'))
+    const logsDir = nodePath.join(dir, '.pilot', 'logs')
+    await fsp.mkdir(logsDir, { recursive: true })
+    const oldLog = nodePath.join(logsDir, 'specify.log')
+    const newLog = nodePath.join(logsDir, 'plan.log')
+    await fsp.writeFile(oldLog, 'old')
+    await fsp.writeFile(newLog, 'new')
+    // Backdate the old log 40 days
+    const old = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000)
+    await fsp.utimes(oldLog, old, old)
+
+    const removed = await pruneOldLogs(dir, 30)
+    expect(removed).toBe(1)
+    await expect(fsp.access(oldLog)).rejects.toBeTruthy()
+    await expect(fsp.access(newLog)).resolves.toBeUndefined()
+
+    await fsp.rm(dir, { recursive: true, force: true })
+  })
+
+  it('returns 0 when there is no logs directory', async () => {
+    const { pruneOldLogs } = await import('../../src/runner/agent-runner.js')
+    expect(await pruneOldLogs('/no/such/dir/xyz', 30)).toBe(0)
+  })
+})

@@ -27,7 +27,7 @@ async function makeTempFeatureDir(): Promise<{ dir: string; cleanup: () => Promi
 describe('createInitialState()', () => {
   it('creates state with constitution as ready and all others locked', () => {
     const state = createInitialState('specs/test')
-    expect(state.version).toBe(2)
+    expect(state.version).toBe(3)
     expect(state.featureDir).toBe('specs/test')
     expect(state.phases['constitution'].status).toBe('ready')
     for (const id of PHASE_ORDER.slice(1)) {
@@ -71,7 +71,7 @@ describe('speckit:initialize handler logic (via state-persistence)', () => {
 
     const loaded = await readState(dir)
     expect(loaded).not.toBeNull()
-    expect(loaded?.version).toBe(2)
+    expect(loaded?.version).toBe(3)
   })
 
   it('round-trips state through writeState/readState', async () => {

@@ -2,7 +2,7 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at `specs/015-speckit-pilot-revamp/plan.md`
+at `specs/016-speckit-pilot-board/plan.md`
 
 <!-- SPECKIT END -->
 

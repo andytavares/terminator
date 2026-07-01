@@ -52,6 +52,7 @@ export function SettingsView() {
 
   // Linear form state
   const [linearKey, setLinearKey] = useState('')
+  const [linearEmail, setLinearEmail] = useState('')
   const [linearKeyVisible, setLinearKeyVisible] = useState(false)
   const [linearSaving, setLinearSaving] = useState(false)
   const [linearError, setLinearError] = useState<string | null>(null)
@@ -78,20 +79,23 @@ export function SettingsView() {
           linear: 'connected' in lin ? lin.connected : false,
           jira: 'connected' in jir ? jir.connected : false,
         })
+        if ('email' in lin && lin.email) setLinearEmail(lin.email)
       })
       .catch(() => {})
       .finally(() => setConnLoading(false))
   }, [])
 
   async function saveLinear() {
-    if (!linearKey.trim()) return
+    // Allow saving the email alone (to update it) once a key is already stored.
+    if (!linearKey.trim() && !connection.linear) return
     setLinearSaving(true)
     setLinearError(null)
     setLinearSaved(false)
     try {
       const result = await getSpeckitAPI().credentialsSet({
         source: 'linear',
-        apiKey: linearKey.trim(),
+        apiKey: linearKey.trim() || undefined,
+        email: linearEmail.trim() || undefined,
       })
       if ('error' in result) {
         setLinearError(result.error)
@@ -345,11 +349,29 @@ export function SettingsView() {
                     {linearKeyVisible ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
+                <label
+                  style={{ ...s.fieldLabel, display: 'block', marginTop: 10 }}
+                  htmlFor="linear-email"
+                >
+                  Your Linear email
+                </label>
+                <input
+                  id="linear-email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={linearEmail}
+                  onChange={(e) => setLinearEmail(e.target.value)}
+                  style={s.input}
+                  aria-label="Linear user email"
+                />
+                <div style={{ fontSize: 11, color: 'var(--tm-text-secondary)', marginTop: 4 }}>
+                  Used to look up your assigned issues. Leave blank to use the API key's own user.
+                </div>
               </div>
               <button
                 style={s.saveBtn}
                 onClick={saveLinear}
-                disabled={linearSaving || !linearKey.trim()}
+                disabled={linearSaving || (!linearKey.trim() && !connection.linear)}
                 aria-label="Save Linear credentials"
               >
                 <Save size={13} />
@@ -460,6 +482,66 @@ export function SettingsView() {
       {/* ─── Section 2: Autonomy & gates ─── */}
       <div style={s.section}>
         <div style={s.label}>Autonomy &amp; gates</div>
+
+        {/* Max concurrent runs */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ ...s.fieldLabel, display: 'block', marginBottom: 6 }}>
+            Maximum cards running in parallel
+          </label>
+          <input
+            type="number"
+            min={1}
+            aria-label="Maximum cards running in parallel"
+            value={settings.maxConcurrentRuns}
+            onChange={(e) => {
+              const n = Math.max(1, Math.floor(Number(e.target.value) || 1))
+              updateSettings({ maxConcurrentRuns: n })
+              try {
+                ;(
+                  window as unknown as {
+                    electronAPI?: { settings?: { set?: (k: string, v: unknown) => void } }
+                  }
+                ).electronAPI?.settings?.set?.('terminator.speckit-pilot.maxConcurrentRuns', n)
+              } catch {
+                // core settings bridge unavailable — localStorage value still persists
+              }
+            }}
+            style={{ width: 80 }}
+          />
+          <div style={{ fontSize: 11, color: 'var(--tm-text-secondary)', marginTop: 5 }}>
+            How many cards agents may work at once; extra hand-offs wait for a free slot.
+          </div>
+        </div>
+
+        {/* Log retention */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ ...s.fieldLabel, display: 'block', marginBottom: 6 }}>
+            Keep step logs for (days)
+          </label>
+          <input
+            type="number"
+            min={1}
+            aria-label="Days to keep persisted step logs"
+            value={settings.logRetentionDays}
+            onChange={(e) => {
+              const n = Math.max(1, Math.floor(Number(e.target.value) || 1))
+              updateSettings({ logRetentionDays: n })
+              try {
+                ;(
+                  window as unknown as {
+                    electronAPI?: { settings?: { set?: (k: string, v: unknown) => void } }
+                  }
+                ).electronAPI?.settings?.set?.('terminator.speckit-pilot.logRetentionDays', n)
+              } catch {
+                // core settings bridge unavailable — localStorage value still persists
+              }
+            }}
+            style={{ width: 80 }}
+          />
+          <div style={{ fontSize: 11, color: 'var(--tm-text-secondary)', marginTop: 5 }}>
+            Persisted step output older than this is deleted automatically.
+          </div>
+        </div>
 
         {/* Default autonomy */}
         <div style={{ marginBottom: 16 }}>
@@ -595,6 +677,17 @@ export function SettingsView() {
               label="Write status back to tracker when PR opens"
             />
             <span>Write status back to tracker on PR open</span>
+          </div>
+          <div style={s.toggle}>
+            <Toggle
+              checked={settings.runConstitutionPhase}
+              onChange={(v) => updateSettings({ runConstitutionPhase: v })}
+              label="Run the Constitution phase for each card"
+            />
+            <span>Run the Constitution phase for each card</span>
+            <span style={{ fontSize: 11, color: 'var(--tm-text-secondary)' }}>
+              Off by default — the project already has a ratified constitution spec-kit respects
+            </span>
           </div>
         </div>
       </div>

@@ -1,6 +1,12 @@
 import type {
+  ArtifactRef,
+  BoardStage,
+  CardBrief,
+  CardComment,
+  CardSummary,
   Feature,
   HistoryEntry,
+  KnowledgeRef,
   PhaseId,
   PilotState,
   SelfReviewResult,
@@ -40,6 +46,7 @@ export interface SpeckitAPI {
     filePath: string
     featureDir?: string
     repoRoot?: string
+    commit?: string
   }): Promise<{ current: string | null; approved: string | null } | { error: string }>
   historyLoad(payload: {
     featureDir: string
@@ -72,7 +79,7 @@ export interface SpeckitAPI {
   ticketList(): Promise<{ tickets: Ticket[] } | { error: string }>
   credentialsSet(
     payload:
-      | { source: 'linear'; apiKey: string }
+      | { source: 'linear'; apiKey?: string; email?: string }
       | { source: 'jira'; domain: string; email: string; apiToken: string; jql: string }
   ): Promise<{ ok: true } | { error: string }>
   credentialsStatus(payload: {
@@ -113,6 +120,44 @@ export interface SpeckitAPI {
     phase: PhaseId
     note: string
   }): Promise<{ ok: true; state: PilotState } | { error: string }>
+  cardList(payload: { repoRoot: string }): Promise<{ cards: CardSummary[] } | { error: string }>
+  cardCreate(payload: {
+    repoRoot: string
+    brief: Partial<CardBrief> & { title: string }
+    ticket?: TicketRef
+  }): Promise<{ featureDir: string } | { error: string; message?: string }>
+  cardUpdate(payload: {
+    featureDir: string
+    brief: Partial<CardBrief>
+  }): Promise<{ ok: true } | { error: string; message?: string }>
+  cardMove(payload: {
+    featureDir: string
+    workspacePath: string
+    toStage: BoardStage
+  }): Promise<{ ok: true } | { error: string; message?: string }>
+  cardHandoff(payload: {
+    featureDir: string
+    workspacePath: string
+    baseBranch?: string
+  }): Promise<{ ok: true; dispatched: true; queued: boolean } | { error: string; message?: string }>
+  cardComment(payload: {
+    featureDir: string
+    body: string
+  }): Promise<{ comment: CardComment } | { error: string; message?: string }>
+  commentList(payload: {
+    featureDir: string
+  }): Promise<{ comments: CardComment[] } | { error: string }>
+  runOutputRead(payload: {
+    featureDir: string
+    phase: PhaseId
+  }): Promise<{ lines: string[] } | { error: string }>
+  artifactList(payload: {
+    featureDir: string
+  }): Promise<{ artifacts: ArtifactRef[] } | { error: string }>
+  knowledgeSearch(payload: {
+    repoRoot: string
+    query: string
+  }): Promise<{ results: KnowledgeRef[] } | { error: string }>
   onStateChanged(handler: (data: unknown) => void): () => void
   onRunOutput(
     handler: (data: { featureDir: string; phase?: string; line: string; ts: string }) => void
@@ -221,6 +266,46 @@ export function getSpeckitAPI(): SpeckitAPI {
     phaseComment: (payload) =>
       bridge.invoke('speckit:phase-comment', payload) as Promise<
         { ok: true; state: PilotState } | { error: string }
+      >,
+    cardList: (payload) =>
+      bridge.invoke('speckit:card-list', payload) as Promise<
+        { cards: CardSummary[] } | { error: string }
+      >,
+    cardCreate: (payload) =>
+      bridge.invoke('speckit:card-create', payload) as Promise<
+        { featureDir: string } | { error: string; message?: string }
+      >,
+    cardUpdate: (payload) =>
+      bridge.invoke('speckit:card-update', payload) as Promise<
+        { ok: true } | { error: string; message?: string }
+      >,
+    cardMove: (payload) =>
+      bridge.invoke('speckit:card-move', payload) as Promise<
+        { ok: true } | { error: string; message?: string }
+      >,
+    cardHandoff: (payload) =>
+      bridge.invoke('speckit:card-handoff', payload) as Promise<
+        { ok: true; dispatched: true; queued: boolean } | { error: string; message?: string }
+      >,
+    cardComment: (payload) =>
+      bridge.invoke('speckit:card-comment', payload) as Promise<
+        { comment: CardComment } | { error: string; message?: string }
+      >,
+    commentList: (payload) =>
+      bridge.invoke('speckit:comment-list', payload) as Promise<
+        { comments: CardComment[] } | { error: string }
+      >,
+    runOutputRead: (payload) =>
+      bridge.invoke('speckit:run-output-read', payload) as Promise<
+        { lines: string[] } | { error: string }
+      >,
+    artifactList: (payload) =>
+      bridge.invoke('speckit:artifact-list', payload) as Promise<
+        { artifacts: ArtifactRef[] } | { error: string }
+      >,
+    knowledgeSearch: (payload) =>
+      bridge.invoke('speckit:knowledge-search', payload) as Promise<
+        { results: KnowledgeRef[] } | { error: string }
       >,
     onStateChanged: (handler) => bridge.on('speckit:state-changed', handler),
     onRunOutput: (handler) => bridge.on('speckit:run-output', handler),

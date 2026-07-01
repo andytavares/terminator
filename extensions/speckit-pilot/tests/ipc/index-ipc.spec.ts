@@ -33,8 +33,9 @@ vi.mock('node:fs', () => ({
     readFile: vi.fn().mockResolvedValue(''),
     appendFile: vi.fn().mockResolvedValue(undefined),
     copyFile: vi.fn().mockResolvedValue(undefined),
-    stat: vi.fn().mockResolvedValue({ mtimeMs: Date.now() }),
+    stat: vi.fn().mockResolvedValue({ mtimeMs: Date.now(), isDirectory: () => true }),
     unlink: vi.fn().mockResolvedValue(undefined),
+    access: vi.fn().mockResolvedValue(undefined),
   },
 }))
 
@@ -42,6 +43,8 @@ vi.mock('node:fs', () => ({
 vi.mock('../../src/api/credentials.js', () => ({
   setLinearKey: vi.fn(),
   getLinearKey: vi.fn(),
+  getLinearEmail: vi.fn(),
+  setLinearEmail: vi.fn(),
   setJiraCredentials: vi.fn(),
   getJiraCredentials: vi.fn(),
 }))
@@ -64,13 +67,26 @@ vi.mock('../../src/runner/agent-runner.js', () => ({
   createAgentRunner: vi.fn().mockReturnValue({
     startPhaseRunner: vi.fn().mockReturnValue({ stop: vi.fn() }),
   }),
+  phaseLogPath: vi.fn((dir: string, phase: string) => `${dir}/.pilot/logs/${phase}.log`),
+  pruneOldLogs: vi.fn().mockResolvedValue(0),
 }))
 
 // --- mock state persistence ---
 vi.mock('../../src/state/state-persistence.js', () => ({
-  createInitialState: vi.fn().mockImplementation((featureDir: string) => ({
-    version: 2,
+  createInitialState: vi.fn().mockImplementation((featureDir: string, overrides?: unknown) => ({
+    version: 3,
     featureDir,
+    card: (overrides as { card?: unknown } | undefined)?.card ?? {
+      title: 'Card',
+      type: 'feature',
+      scope: '',
+      checklist: [],
+      attachments: [],
+      knowledgeRefs: [],
+      source: 'native',
+      createdAt: '2026-06-30T00:00:00.000Z',
+    },
+    stage: 'backlog',
     ticket: null,
     run: null,
     queuePosition: null,
@@ -82,6 +98,11 @@ vi.mock('../../src/state/state-persistence.js', () => ({
   })),
   writeState: vi.fn(),
   readState: vi.fn(),
+  readCard: vi.fn().mockResolvedValue(null),
+  writeCard: vi.fn().mockResolvedValue(undefined),
+  appendComment: vi.fn().mockResolvedValue(undefined),
+  readComments: vi.fn().mockResolvedValue([]),
+  consumePendingComments: vi.fn().mockResolvedValue(null),
   appendHistory: vi.fn(),
   ensurePilotDir: vi.fn(),
 }))
@@ -91,6 +112,62 @@ import * as linear from '../../src/api/linear.js'
 import * as jira from '../../src/api/jira.js'
 import * as nodefs from 'node:fs'
 import * as agentRunnerMod from '../../src/runner/agent-runner.js'
+import * as persistence from '../../src/state/state-persistence.js'
+
+function makeState(featureDir: string, over: Record<string, unknown> = {}) {
+  const phases = Object.fromEntries(
+    [
+      'constitution',
+      'specify',
+      'clarify',
+      'plan',
+      'checklist',
+      'tasks',
+      'analyze',
+      'implement',
+      'self-review',
+      'open-pr',
+    ].map((id, idx) => [
+      id,
+      {
+        id,
+        status: idx === 0 ? 'ready' : 'locked',
+        approvedHash: null,
+        approvedAt: null,
+        approvedBy: null,
+        lastRunId: null,
+        lastRunAt: null,
+        artifactPaths: [],
+        feedback: null,
+        batchIndex: null,
+      },
+    ])
+  )
+  return {
+    version: 3,
+    featureDir,
+    card: {
+      title: 'Card',
+      type: 'feature',
+      scope: '',
+      checklist: [],
+      attachments: [],
+      knowledgeRefs: [],
+      source: 'native',
+      createdAt: '2026-06-30T00:00:00.000Z',
+    },
+    stage: 'backlog',
+    ticket: null,
+    run: null,
+    queuePosition: null,
+    worktreePath: null,
+    branchName: null,
+    prUrl: null,
+    phases,
+    settings: { maxConcurrentRuns: 3 },
+    ...over,
+  }
+}
 
 // Build mock API and capture registered IPC handlers
 function buildMockApi(): {
@@ -178,6 +255,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   // Reset mock defaults after clearAllMocks
   vi.mocked(credentials.getLinearKey).mockResolvedValue(null)
+  vi.mocked(credentials.getLinearEmail).mockResolvedValue(null)
   vi.mocked(credentials.getJiraCredentials).mockResolvedValue(null)
   vi.mocked(credentials.setLinearKey).mockResolvedValue(undefined)
   vi.mocked(credentials.setJiraCredentials).mockResolvedValue(undefined)
@@ -194,6 +272,407 @@ beforeEach(() => {
   // Reset agent runner mock
   vi.mocked(agentRunnerMod.createAgentRunner).mockReturnValue({
     startPhaseRunner: vi.fn().mockReturnValue({ stop: vi.fn() }),
+  })
+  // Reset persistence mock defaults
+  vi.mocked(persistence.readState).mockResolvedValue(null)
+  vi.mocked(persistence.readCard).mockResolvedValue(null)
+  vi.mocked(persistence.writeCard).mockResolvedValue(undefined)
+  vi.mocked(persistence.appendComment).mockResolvedValue(undefined)
+  vi.mocked(persistence.readComments).mockResolvedValue([])
+  vi.mocked(persistence.consumePendingComments).mockResolvedValue(null)
+  // Reset extension settings mock so a prior test's implementation does not leak
+  vi.mocked(sharedApi.settings.get).mockReturnValue(undefined as never)
+})
+
+describe('speckit:card-list', () => {
+  it('registers the handler', () => {
+    expect(getSharedHandler('speckit:card-list')).toBeDefined()
+  })
+
+  it('requires repoRoot', async () => {
+    const handler = getSharedHandler('speckit:card-list')!
+    expect(await handler({})).toEqual({ error: 'repoRoot required' })
+  })
+
+  it('returns a card summary for each card dir', async () => {
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue(['016-demo'] as unknown as ReturnType<
+      typeof nodefs.promises.readdir
+    > extends Promise<infer T>
+      ? T
+      : never)
+    vi.mocked(persistence.readState).mockResolvedValue(makeState('/repo/specs/016-demo') as never)
+    const handler = getSharedHandler('speckit:card-list')!
+    const result = (await handler({ repoRoot: '/repo' })) as { cards: unknown[] }
+    expect(result.cards).toHaveLength(1)
+    expect((result.cards[0] as { stage: string }).stage).toBe('backlog')
+  })
+})
+
+describe('speckit:card-create', () => {
+  it('rejects an empty title with VALIDATION_ERROR', async () => {
+    const handler = getSharedHandler('speckit:card-create')!
+    const result = (await handler({ repoRoot: '/repo', brief: { title: '  ' } })) as {
+      error: string
+    }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('creates a backlog card and returns its featureDir', async () => {
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    const handler = getSharedHandler('speckit:card-create')!
+    const result = (await handler({
+      repoRoot: '/repo',
+      brief: { title: 'New card', type: 'bug' },
+    })) as { featureDir: string }
+    expect(result.featureDir).toContain('specs/001-')
+    expect(persistence.writeCard).toHaveBeenCalled()
+  })
+})
+
+describe('speckit:card-update', () => {
+  it('requires featureDir', async () => {
+    const handler = getSharedHandler('speckit:card-update')!
+    expect(await handler({ brief: {} })).toEqual({ error: 'featureDir required' })
+  })
+
+  it('rejects clearing the title', async () => {
+    const handler = getSharedHandler('speckit:card-update')!
+    const result = (await handler({ featureDir: '/repo/specs/x', brief: { title: '' } })) as {
+      error: string
+    }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('writes the merged brief', async () => {
+    vi.mocked(persistence.readCard).mockResolvedValue({
+      title: 'Old',
+      type: 'feature',
+      scope: '',
+      checklist: [],
+      attachments: [],
+      knowledgeRefs: [],
+      source: 'native',
+      createdAt: 'x',
+    })
+    vi.mocked(persistence.readState).mockResolvedValue(makeState('/repo/specs/x') as never)
+    const handler = getSharedHandler('speckit:card-update')!
+    const result = (await handler({
+      featureDir: '/repo/specs/x',
+      brief: { scope: 'Updated scope' },
+    })) as { ok: boolean }
+    expect(result.ok).toBe(true)
+    expect(persistence.writeCard).toHaveBeenCalledWith(
+      '/repo/specs/x',
+      expect.objectContaining({ scope: 'Updated scope', title: 'Old' })
+    )
+  })
+})
+
+describe('speckit:card-comment and comment-list', () => {
+  it('rejects an empty comment', async () => {
+    const handler = getSharedHandler('speckit:card-comment')!
+    const result = (await handler({ featureDir: '/repo/specs/x', body: '' })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('appends a comment authored by you', async () => {
+    const handler = getSharedHandler('speckit:card-comment')!
+    const result = (await handler({ featureDir: '/repo/specs/x', body: 'Use the util' })) as {
+      comment: { author: string; body: string }
+    }
+    expect(result.comment.author).toBe('you')
+    expect(result.comment.body).toBe('Use the util')
+    expect(persistence.appendComment).toHaveBeenCalled()
+  })
+
+  it('lists comments', async () => {
+    vi.mocked(persistence.readComments).mockResolvedValue([
+      { id: 'c1', author: 'you', body: 'hi', ts: 'x' },
+    ])
+    const handler = getSharedHandler('speckit:comment-list')!
+    const result = (await handler({ featureDir: '/repo/specs/x' })) as { comments: unknown[] }
+    expect(result.comments).toHaveLength(1)
+  })
+})
+
+describe('speckit:run-output-read', () => {
+  it('returns persisted log lines for a phase', async () => {
+    vi.mocked(nodefs.promises.readFile).mockResolvedValue('line one\nline two\n' as never)
+    const handler = getSharedHandler('speckit:run-output-read')!
+    const result = (await handler({ featureDir: '/repo/specs/x', phase: 'specify' })) as {
+      lines: string[]
+    }
+    expect(result.lines).toEqual(['line one', 'line two'])
+  })
+
+  it('returns an empty list when no log exists', async () => {
+    vi.mocked(nodefs.promises.readFile).mockRejectedValue(new Error('ENOENT'))
+    const handler = getSharedHandler('speckit:run-output-read')!
+    const result = (await handler({ featureDir: '/repo/specs/x', phase: 'plan' })) as {
+      lines: string[]
+    }
+    expect(result.lines).toEqual([])
+  })
+})
+
+describe('speckit:card-move', () => {
+  it('rejects an unknown stage', async () => {
+    const handler = getSharedHandler('speckit:card-move')!
+    const result = (await handler({
+      featureDir: '/repo/specs/x',
+      workspacePath: '/repo',
+      toStage: 'nope',
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+
+  it('sets the stage to any target without starting a run', async () => {
+    vi.mocked(persistence.readState).mockResolvedValue(makeState('/repo/specs/x') as never)
+    const handler = getSharedHandler('speckit:card-move')!
+    const result = (await handler({
+      featureDir: '/repo/specs/x',
+      workspacePath: '/repo',
+      toStage: 'done',
+    })) as { ok: boolean }
+    expect(result.ok).toBe(true)
+    const broadcast = vi
+      .mocked(sharedApi.window.broadcast)
+      .mock.calls.filter((c) => c[0] === 'speckit:state-changed')
+      .at(-1)?.[1] as { state: { stage: string } }
+    expect(broadcast.state.stage).toBe('done')
+    expect(sharedApi.shell.exec).not.toHaveBeenCalled()
+  })
+
+  it('parks a running card dropped on backlog (stops the run)', async () => {
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    vi.mocked(persistence.readState).mockResolvedValue(
+      makeState('/repo/specs/x', {
+        queuePosition: 'active',
+        worktreePath: '/repo/.wt/x',
+        branchName: 'feature/x',
+        run: { status: 'running', startedAt: 't', completedAt: null, autonomyLevel: 'standard' },
+      }) as never
+    )
+    const handler = getSharedHandler('speckit:card-move')!
+    const result = (await handler({
+      featureDir: '/repo/specs/x',
+      workspacePath: '/repo',
+      toStage: 'backlog',
+    })) as { ok: boolean }
+    expect(result.ok).toBe(true)
+    expect(sharedApi.shell.exec).toHaveBeenCalledWith(
+      expect.objectContaining({ args: expect.arrayContaining(['worktree', 'remove']) })
+    )
+    const broadcast = vi
+      .mocked(sharedApi.window.broadcast)
+      .mock.calls.filter((c) => c[0] === 'speckit:state-changed')
+      .at(-1)?.[1] as { state: { stage: string; run: { status: string } } }
+    expect(broadcast.state.stage).toBe('backlog')
+    expect(broadcast.state.run.status).toBe('cancelled')
+  })
+})
+
+describe('speckit:card-handoff', () => {
+  it('starts a backlog card immediately when under the cap', async () => {
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    vi.mocked(persistence.readState).mockResolvedValue(makeState('/repo/specs/x') as never)
+    vi.mocked(persistence.readCard).mockResolvedValue({
+      title: 'Ready card',
+      type: 'feature',
+      scope: '',
+      checklist: [],
+      attachments: [],
+      knowledgeRefs: [],
+      source: 'native',
+      createdAt: 'x',
+    })
+    const handler = getSharedHandler('speckit:card-handoff')!
+    const result = (await handler({
+      featureDir: '/repo/specs/x',
+      workspacePath: '/repo',
+    })) as { ok: boolean; queued: boolean }
+    expect(result.ok).toBe(true)
+    expect(result.queued).toBe(false)
+    expect(sharedApi.shell.exec).toHaveBeenCalled()
+  })
+
+  it('passes the chosen base branch to git worktree add', async () => {
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    vi.mocked(persistence.readState).mockResolvedValue(makeState('/repo/specs/x') as never)
+    vi.mocked(persistence.readCard).mockResolvedValue({
+      title: 'Ready',
+      type: 'feature',
+      scope: '',
+      checklist: [],
+      attachments: [],
+      knowledgeRefs: [],
+      source: 'native',
+      createdAt: 'x',
+    })
+    const handler = getSharedHandler('speckit:card-handoff')!
+    await handler({ featureDir: '/repo/specs/x', workspacePath: '/repo', baseBranch: 'develop' })
+    expect(sharedApi.shell.exec).toHaveBeenCalledWith(
+      expect.objectContaining({ args: expect.arrayContaining(['worktree', 'add', 'develop']) })
+    )
+  })
+
+  it('reuses an existing worktree instead of recreating it', async () => {
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    vi.mocked(nodefs.promises.access).mockResolvedValue(undefined) // worktree path exists
+    vi.mocked(persistence.readState).mockResolvedValue(
+      makeState('/repo/specs/x', {
+        worktreePath: '/repo/.wt/x',
+        branchName: 'feature/x',
+      }) as never
+    )
+    vi.mocked(persistence.readCard).mockResolvedValue({
+      title: 'Ready',
+      type: 'feature',
+      scope: '',
+      checklist: [],
+      attachments: [],
+      knowledgeRefs: [],
+      source: 'native',
+      createdAt: 'x',
+    })
+    const handler = getSharedHandler('speckit:card-handoff')!
+    const result = (await handler({ featureDir: '/repo/specs/x', workspacePath: '/repo' })) as {
+      ok: boolean
+    }
+    expect(result.ok).toBe(true)
+    // no `git worktree add` because the existing worktree is reused
+    const addCalls = vi
+      .mocked(sharedApi.shell.exec)
+      .mock.calls.filter((c) => (c[0] as { args?: string[] }).args?.includes('add'))
+    expect(addCalls).toHaveLength(0)
+  })
+
+  it('queues when the cap is already reached', async () => {
+    vi.mocked(sharedApi.settings.get).mockImplementation(
+      (key: string) => (key.endsWith('maxConcurrentRuns') ? 2 : undefined) as never
+    )
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue(['a', 'b'] as never)
+    vi.mocked(persistence.readState).mockImplementation((dir: string) => {
+      if (dir.endsWith('/x')) return Promise.resolve(makeState('/repo/specs/x') as never)
+      return Promise.resolve(
+        makeState(dir, {
+          queuePosition: 'active',
+          run: { status: 'running', startedAt: 't', completedAt: null, autonomyLevel: 'standard' },
+        }) as never
+      )
+    })
+    vi.mocked(persistence.readCard).mockResolvedValue({
+      title: 'Waiter',
+      type: 'feature',
+      scope: '',
+      checklist: [],
+      attachments: [],
+      knowledgeRefs: [],
+      source: 'native',
+      createdAt: 'x',
+    })
+    const handler = getSharedHandler('speckit:card-handoff')!
+    const result = (await handler({
+      featureDir: '/repo/specs/x',
+      workspacePath: '/repo',
+    })) as { ok: boolean; queued: boolean }
+    expect(result.ok).toBe(true)
+    expect(result.queued).toBe(true)
+  })
+
+  it('rejects handoff of a card with no title', async () => {
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    vi.mocked(persistence.readState).mockResolvedValue(
+      makeState('/repo/specs/x', {
+        card: {
+          title: '  ',
+          type: 'feature',
+          scope: '',
+          checklist: [],
+          attachments: [],
+          knowledgeRefs: [],
+          source: 'native',
+          createdAt: 'x',
+        },
+      }) as never
+    )
+    vi.mocked(persistence.readCard).mockResolvedValue(null)
+    const handler = getSharedHandler('speckit:card-handoff')!
+    const result = (await handler({
+      featureDir: '/repo/specs/x',
+      workspacePath: '/repo',
+    })) as { error: string }
+    expect(result.error).toBe('VALIDATION_ERROR')
+  })
+})
+
+describe('speckit:artifact-list', () => {
+  it('requires featureDir', async () => {
+    const handler = getSharedHandler('speckit:artifact-list')!
+    expect(await handler({})).toEqual({ error: 'featureDir required' })
+  })
+
+  it('lists the known artifacts with pr existence from prUrl', async () => {
+    vi.mocked(persistence.readState).mockResolvedValue(
+      makeState('/repo/specs/x', { prUrl: 'https://github.com/a/b/pull/7' }) as never
+    )
+    vi.mocked(nodefs.promises.access).mockResolvedValue(undefined)
+    vi.mocked(sharedApi.shell.exec).mockResolvedValue({
+      exitCode: 0,
+      stdout: 'abc\t2026-06-30T00:00:00Z\tAdd spec',
+      stderr: '',
+      timedOut: false,
+    })
+    const handler = getSharedHandler('speckit:artifact-list')!
+    const result = (await handler({ featureDir: '/repo/specs/x' })) as {
+      artifacts: { kind: string; exists: boolean; revisions: unknown[] }[]
+    }
+    expect(result.artifacts).toHaveLength(7)
+    const pr = result.artifacts.find((a) => a.kind === 'pr')!
+    expect(pr.exists).toBe(true)
+    const spec = result.artifacts.find((a) => a.kind === 'spec')!
+    expect(spec.exists).toBe(true)
+    expect(spec.revisions).toHaveLength(1)
+  })
+})
+
+describe('speckit:knowledge-search', () => {
+  it('requires repoRoot and query', async () => {
+    const handler = getSharedHandler('speckit:knowledge-search')!
+    expect(await handler({ repoRoot: '/repo' })).toEqual({
+      error: 'repoRoot and query required',
+    })
+  })
+
+  it('parses ripgrep matches', async () => {
+    vi.mocked(sharedApi.shell.exec).mockResolvedValue({
+      exitCode: 0,
+      stdout: 'docs/A.md:5:auth token here',
+      stderr: '',
+      timedOut: false,
+    })
+    const handler = getSharedHandler('speckit:knowledge-search')!
+    const result = (await handler({ repoRoot: '/repo', query: 'auth' })) as {
+      results: { file: string; line: number }[]
+    }
+    expect(result.results).toEqual([{ file: 'docs/A.md', line: 5, snippet: 'auth token here' }])
+  })
+
+  it('falls back to an fs scan when ripgrep is unavailable', async () => {
+    vi.mocked(sharedApi.shell.exec).mockRejectedValue(new Error('rg: command not found'))
+    vi.mocked(nodefs.promises.readdir).mockImplementation((p: string) => {
+      if (String(p).endsWith('/docs')) {
+        return Promise.resolve([{ name: 'A.md', isDirectory: () => false }] as never)
+      }
+      return Promise.resolve([] as never)
+    })
+    vi.mocked(nodefs.promises.readFile).mockResolvedValue('line one\nhas AUTH here' as never)
+    const handler = getSharedHandler('speckit:knowledge-search')!
+    const result = (await handler({ repoRoot: '/repo', query: 'auth' })) as {
+      results: { file: string; line: number }[]
+    }
+    expect(result.results.length).toBeGreaterThanOrEqual(1)
+    expect(result.results[0].line).toBe(2)
   })
 })
 
@@ -261,8 +740,15 @@ describe('speckit:credentials-set', () => {
 
   it('delegates to setLinearKey when source is linear', async () => {
     const handler = getSharedHandler('speckit:credentials-set')!
-    await handler({ source: 'linear', apiKey: 'my-linear-key' })
-    expect(credentials.setLinearKey).toHaveBeenCalledWith('my-linear-key')
+    await handler({ source: 'linear', apiKey: 'my-linear-key', email: 'me@example.com' })
+    expect(credentials.setLinearKey).toHaveBeenCalledWith('my-linear-key', 'me@example.com')
+  })
+
+  it('updates only the email when no api key is provided', async () => {
+    const handler = getSharedHandler('speckit:credentials-set')!
+    await handler({ source: 'linear', email: 'me@example.com' })
+    expect(credentials.setLinearEmail).toHaveBeenCalledWith('me@example.com')
+    expect(credentials.setLinearKey).not.toHaveBeenCalled()
   })
 
   it('delegates to setJiraCredentials when source is jira', async () => {
@@ -305,6 +791,14 @@ describe('speckit:credentials-status', () => {
     const handler = getSharedHandler('speckit:credentials-status')!
     const result = (await handler({ source: 'linear' })) as { connected: boolean }
     expect(result.connected).toBe(false)
+  })
+
+  it('returns the stored Linear lookup email so the form can prefill it', async () => {
+    vi.mocked(credentials.getLinearKey).mockResolvedValue('key')
+    vi.mocked(credentials.getLinearEmail).mockResolvedValue('me@example.com')
+    const handler = getSharedHandler('speckit:credentials-status')!
+    const result = (await handler({ source: 'linear' })) as { email?: string }
+    expect(result.email).toBe('me@example.com')
   })
 
   it('returns { connected: true } when Jira credentials exist — never the apiToken', async () => {

@@ -19,6 +19,8 @@ vi.mock('node:fs/promises')
 import {
   setLinearKey,
   getLinearKey,
+  getLinearEmail,
+  setLinearEmail,
   setJiraCredentials,
   getJiraCredentials,
 } from '../../src/api/credentials.js'
@@ -64,6 +66,61 @@ describe('setLinearKey / getLinearKey', () => {
     vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify({}) as unknown as Uint8Array)
     const result = await getLinearKey()
     expect(result).toBeNull()
+  })
+
+  it('stores the Linear lookup email (in plain text) and reads it back', async () => {
+    vi.mocked(fs.readFile).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+    vi.mocked(fs.writeFile).mockResolvedValue(undefined)
+    vi.mocked(fs.rename).mockResolvedValue(undefined)
+    await setLinearKey('lin-secret', 'me@example.com')
+    const written = vi.mocked(fs.writeFile).mock.calls[0][1] as string
+    expect(JSON.parse(written).linearEmail).toBe('me@example.com')
+
+    vi.mocked(fs.readFile).mockResolvedValue(
+      JSON.stringify({ linearEmail: 'me@example.com' }) as unknown as Uint8Array
+    )
+    expect(await getLinearEmail()).toBe('me@example.com')
+  })
+
+  it('returns null Linear email when none stored', async () => {
+    vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify({}) as unknown as Uint8Array)
+    expect(await getLinearEmail()).toBeNull()
+  })
+
+  it('leaves the email untouched when setLinearKey is called without one', async () => {
+    vi.mocked(fs.readFile).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+    vi.mocked(fs.writeFile).mockResolvedValue(undefined)
+    vi.mocked(fs.rename).mockResolvedValue(undefined)
+    await setLinearKey('key-only')
+    const written = JSON.parse(vi.mocked(fs.writeFile).mock.calls[0][1] as string)
+    expect(written.linearEmail).toBeUndefined()
+  })
+
+  it('clears the email when an empty string is provided', async () => {
+    vi.mocked(fs.readFile).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+    vi.mocked(fs.writeFile).mockResolvedValue(undefined)
+    vi.mocked(fs.rename).mockResolvedValue(undefined)
+    await setLinearKey('key', '   ')
+    const afterKey = JSON.parse(vi.mocked(fs.writeFile).mock.calls[0][1] as string)
+    expect(afterKey.linearEmail).toBeUndefined()
+
+    vi.mocked(fs.writeFile).mockClear()
+    await setLinearEmail('')
+    const afterEmail = JSON.parse(vi.mocked(fs.writeFile).mock.calls[0][1] as string)
+    expect(afterEmail.linearEmail).toBeUndefined()
+  })
+
+  it('setLinearEmail updates the email without touching the stored key', async () => {
+    const existing = Buffer.from('lin-secret-encrypted').toString('base64')
+    vi.mocked(fs.readFile).mockResolvedValue(
+      JSON.stringify({ linearKey: existing }) as unknown as Uint8Array
+    )
+    vi.mocked(fs.writeFile).mockResolvedValue(undefined)
+    vi.mocked(fs.rename).mockResolvedValue(undefined)
+    await setLinearEmail('new@example.com')
+    const written = JSON.parse(vi.mocked(fs.writeFile).mock.calls[0][1] as string)
+    expect(written.linearEmail).toBe('new@example.com')
+    expect(written.linearKey).toBe(existing) // key preserved
   })
 })
 

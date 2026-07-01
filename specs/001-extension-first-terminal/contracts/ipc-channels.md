@@ -1109,6 +1109,14 @@ through the generic `extensionBridge.invoke()` in the renderer (the core app has
 | `speckit:checkpoint-create`       | Create a git commit checkpoint before an implement run                                                      |
 | `speckit:implement-file-decision` | Approve or skip a pending file write during implement phase                                                 |
 | `speckit:session-list`            | List available Claude session IDs                                                                           |
+| `speckit:card-list`               | Board data: every card as `CardSummary` (brief + derived `stage` + phase summary + run status)              |
+| `speckit:card-create`             | Create a native or ticket-seeded card in the backlog; returns `{ featureDir }` or `{ error, message }`      |
+| `speckit:card-update`             | Edit a card's brief (`.pilot/card.json`); returns `{ ok }` or `{ error: 'VALIDATION_ERROR' }`               |
+| `speckit:card-move`               | Start a backlog card (Backlog→Spec handoff) or park an active card (→Backlog); enforces the concurrency cap |
+| `speckit:card-comment`            | Append a comment to `.pilot/comments.jsonl`; steers the agent's next phase run                              |
+| `speckit:comment-list`            | Load a card's comments from `.pilot/comments.jsonl`                                                         |
+| `speckit:artifact-list`           | List a card's artifacts (spec/plan/tasks/checklist/self-review/diff/pr) with git revision history           |
+| `speckit:knowledge-search`        | Keyword search across repo markdown + briefs (rg with fs fallback); returns `{ results: KnowledgeRef[] }`   |
 
 ### Push Events (main → renderer)
 
