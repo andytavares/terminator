@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { MessageSquarePlus, X, Check, Trash2, Pencil } from 'lucide-react'
 import type { DiagramComment } from '../db/types'
+import { useNotesStore } from '../stores/notes.store'
 
 // Lazy-load Excalidraw so it doesn't bloat the main bundle
 const ExcalidrawComponent = lazy(async () => {
@@ -278,10 +279,25 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
 
     async function load() {
       try {
+        // Use the in-session scene cache when available so content is never lost
+        // due to a race between a cleanup flush and this DB read.
+        const cachedScene = useNotesStore.getState().diagramCache[diagramId]
+
         const [diagramResult, commentsResult] = await Promise.all([
-          window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.get', {
-            id: diagramId,
-          }),
+          cachedScene !== undefined
+            ? Promise.resolve({
+                data: {
+                  // Title and tags come from the always-up-to-date diagrams list
+                  ...(useNotesStore.getState().diagrams.find((d) => d.id === diagramId) ?? {
+                    title: '',
+                    tags: [],
+                  }),
+                  sceneJson: cachedScene,
+                },
+              })
+            : window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.get', {
+                id: diagramId,
+              }),
           window.electronAPI.extensionBridge.invoke('terminator.notepad:diagram-comments.list', {
             diagramId,
             includeResolved: false,
@@ -297,6 +313,10 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
           setLoadError('Diagram not found.')
           setLoaded(true)
           return
+        }
+        // Populate the cache on first DB fetch so future navigate-backs skip the round-trip
+        if (cachedScene === undefined) {
+          useNotesStore.getState().setDiagramCache(diagramId, diagram.sceneJson)
         }
         setTitle(diagram.title)
         setTags(diagram.tags ?? [])
@@ -329,6 +349,8 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
       const pending = pendingSaveRef.current
       if (pending) {
         pendingSaveRef.current = null
+        // Cache optimistically so navigate-back never reads stale DB data
+        useNotesStore.getState().setDiagramCache(diagramId, pending.sceneJson)
         void window.electronAPI.extensionBridge
           .invoke('terminator.notepad:diagrams.autosave', {
             id: diagramId,
@@ -363,6 +385,14 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
           })
           pendingSaveRef.current = null
           setSaveStatus('saved')
+          // Keep sidebar in sync and cache the scene for instant navigate-back
+          const savedAt = new Date().toISOString()
+          useNotesStore.getState().patchDiagram(diagramId, {
+            title: fireTitle,
+            updatedAt: savedAt,
+            tags: fireTags,
+          })
+          useNotesStore.getState().setDiagramCache(diagramId, newSceneJson)
         } catch (err) {
           console.error('[notepad] DiagramView: autosave failed', err)
           setSaveStatus('error')
