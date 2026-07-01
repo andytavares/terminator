@@ -99,6 +99,25 @@ describe('GatePanel', () => {
     expect(screen.getByRole('button', { name: /request changes/i })).toBeTruthy()
   })
 
+  it('frames the gate as "Answer questions" for the clarify phase', async () => {
+    const onRequestChanges = vi.fn().mockResolvedValue(undefined)
+    render(
+      <GatePanel
+        featureDir="/repo/specs/001"
+        phase="clarify"
+        phaseState={makePhaseState()}
+        artifactContent="Q1: what auth method?"
+        onApprove={noop}
+        onRequestChanges={onRequestChanges}
+      />
+    )
+    const answerBtn = screen.getByRole('button', { name: /answer questions/i })
+    fireEvent.click(answerBtn)
+    fireEvent.change(screen.getByLabelText('Answers'), { target: { value: 'Use OAuth' } })
+    fireEvent.click(screen.getByText(/submit answers & re-run/i))
+    await waitFor(() => expect(onRequestChanges).toHaveBeenCalledWith('Use OAuth'))
+  })
+
   it('shows feedback textarea when Request changes is clicked', () => {
     render(
       <GatePanel

@@ -619,7 +619,15 @@ Documented in `specs/010-markdown-notepad/contracts/ipc-channels.md` and typed i
 
 ## SpecKit Pilot Extension (`extensions/speckit-pilot/`)
 
-SpecKit Pilot automates the software engineering lifecycle from ticket to PR. It orchestrates a 10-phase pipeline using Claude Code as an autonomous agent subprocess.
+SpecKit Pilot is a Quill-style **workflow board** for controlling feature implementation end-to-end when offloading to agents. The home surface is a kanban board of six stage columns (Backlog → Spec → Plan → Implement → In Review → Done); each unit of work is a **card**. A card is a feature dir (`specs/NNN-slug/`) with a brief (`.pilot/card.json`); handing it off runs the 10-phase Spec-Kit pipeline using Claude Code as an autonomous agent subprocess in an isolated git worktree.
+
+### Card model & board stages
+
+A card unifies the former feature/ticket/run notions (see [ADR-010](adr/010-speckit-card-model.md)). `PilotState` is **v3**: it adds `card: CardBrief` and `stage: BoardStage`. A card can exist in **Backlog** with a brief and no run. The board stage is **derived** from phase progress by the pure `deriveStage(phases, run)` in `src/state/derive-stage.ts` (Backlog = no run; Spec = constitution/specify/clarify; Plan = plan/checklist; Implement = tasks/analyze/implement; In Review = self-review/open-pr; Done = PR opened or run completed). A v2→v3 migration synthesizes the brief and derives the stage on read.
+
+### Parallel runs
+
+Multiple cards run concurrently, each in its own worktree, up to a configurable `maxConcurrentRuns` cap (default 3; see [ADR-011](adr/011-speckit-parallel-runs.md)). Hand-off counts active run slots from persisted state; over the cap, a card is set `queuePosition: 'pending'` and started automatically by `advanceQueue` when a slot frees (run cancelled, parked to Backlog, or PR opened).
 
 ### 10-Phase Lifecycle
 
@@ -645,7 +653,15 @@ activate(api)
   │    ├─ speckit:credentials-set   → store Linear/Jira keys in main-process secrets store
   │    ├─ speckit:credentials-status → return { connected: boolean } ONLY
   │    ├─ speckit:ticket-list       → fetch from Linear/Jira APIs
-  │    └─ speckit:open-pr           → run gh pr create subprocess
+  │    ├─ speckit:open-pr           → run gh pr create subprocess
+  │    ├─ speckit:card-list         → board data: CardSummary[] (brief + derived stage + phase summary)
+  │    ├─ speckit:card-create       → create a native/ticket-seeded card in the backlog
+  │    ├─ speckit:card-update       → edit a card's brief (.pilot/card.json)
+  │    ├─ speckit:card-move         → Backlog→Spec handoff or park →Backlog (enforces concurrency cap)
+  │    ├─ speckit:card-comment      → append steering comment (.pilot/comments.jsonl)
+  │    ├─ speckit:comment-list      → load a card's comments
+  │    ├─ speckit:artifact-list     → artifacts + git revision history
+  │    └─ speckit:knowledge-search  → keyword search over repo markdown + briefs (rg, fs fallback)
   │
   └─ AgentRunner (src/runner/agent-runner.ts)
        ├─ Spawns claude --headless --print <command> as a child process
@@ -657,17 +673,26 @@ activate(api)
 ### Renderer Architecture (`extensions/speckit-pilot/src/renderer/`)
 
 ```
-App.tsx  (4-tab sub-nav: Tickets / Features / Active runs / History + Settings icon)
-  ├─ TicketsView    — Linear/Jira ticket list with dispatch → DispatchSheet
-  ├─ FeaturesView   — feature dirs with mini 10-dot phase rail per row
-  ├─ RunDashboard   — live run view: PhaseRail + RunConsole + gate panels
-  │    ├─ GatePanel      — generic phase gate (approve / request-changes / revoke / comment / inline-edit)
-  │    ├─ SelfReviewGate — format+lint+coverage+google-review quality summary gate
-  │    ├─ OpenPrGate     — PR title input + gh pr create trigger
-  │    └─ BatchCheckIn   — implement batch boundary: continue / pause / split / redirect
-  ├─ HistoryView    — completed-run table (ticket, feature, PR URL, status, timestamp)
-  └─ SettingsView   — 3 sections: Ticket integrations / Autonomy & gates / Agent runner
+App.tsx  (board home + header: KnowledgeSearch / Import ticket / Settings)
+  ├─ BoardView       — six stage columns (@dnd-kit); buckets CardSummary[] by derived stage
+  │    └─ CardTile        — type badge, title, scope, compact phase rail, run-status chip
+  ├─ CardDetail      — slide-over drawer with tabs:
+  │    ├─ Brief          — CardBriefEditor (title/type/scope/checklist) → card-update / card-create
+  │    ├─ Phases         — RunDashboard (backlog card shows "Hand off to agent" CTA)
+  │    │    ├─ GatePanel      — generic phase gate (approve / request-changes / revoke / comment / inline-edit)
+  │    │    ├─ SelfReviewGate — format+lint+coverage+google-review quality summary gate
+  │    │    ├─ OpenPrGate     — PR title input + gh pr create trigger
+  │    │    └─ BatchCheckIn   — implement batch boundary: continue / pause / split / redirect
+  │    ├─ Activity       — ActivityFeed: comments + audit log, composer (steers next phase)
+  │    └─ Artifacts      — ArtifactsPanel: artifacts + revision history + diff/markdown viewer
+  ├─ ImportTicketModal — Linear/Jira assigned issues → create a backlog card
+  ├─ KnowledgeSearch — keyword search; attach a result to a card brief
+  └─ SettingsView    — integrations / autonomy & gates (incl. maxConcurrentRuns) / agent runner
 ```
+
+Drag/drop and stage-bucketing logic is factored into pure, unit-tested helpers
+(`src/components/board-util.ts` — `bucketCards`, `resolveDrop`; `src/state/run-queue.ts`
+— `shouldQueue`, `orderPending`, `classifyMove`).
 
 ### Security Constraints
 
@@ -679,10 +704,14 @@ App.tsx  (4-tab sub-nav: Tickets / Features / Active runs / History + Settings i
 
 All state lives in `.pilot/` inside the feature directory (a subdirectory of `specs/`):
 
-- `.pilot/state.json` — `PilotState` v2 (phases, ticket ref, run meta, settings)
-- `.pilot/history.json` — append-only audit log of all phase events
+- `.pilot/state.json` — `PilotState` v3 (card brief, stage, phases, ticket ref, run meta, settings)
+- `.pilot/card.json` — the card brief (title/type/scope/checklist/attachments/knowledge refs)
+- `.pilot/comments.jsonl` — append-only steering comments (feed the agent's next phase run)
+- `.pilot/history.jsonl` — append-only audit log of all phase events
 - `.pilot/self-review.json` — last self-review result (format/lint/coverage/google-review)
 
-### ADR
+### ADRs
 
-See [ADR-007: agent-runner-subprocess](adr/007-agent-runner-subprocess.md) for the decision to spawn Claude Code as a child process rather than using the Anthropic API directly.
+- [ADR-007: agent-runner-subprocess](adr/007-agent-runner-subprocess.md) — spawn Claude Code as a child process rather than using the Anthropic API directly.
+- [ADR-010: card model](adr/010-speckit-card-model.md) — a card unifies feature dir, ticket, and run; `PilotState` v3.
+- [ADR-011: parallel runs](adr/011-speckit-parallel-runs.md) — concurrency cap replaces the single-active-run queue.

@@ -41,6 +41,43 @@ const JiraSettingsSchema = z.object({
   jql: z.string(),
 })
 
+export const BoardStageSchema = z.enum(['backlog', 'in-progress', 'in-review', 'done'])
+
+export const CardTypeSchema = z.enum(['feature', 'bug', 'chore', 'spike'])
+
+export const CardSourceSchema = z.enum(['native', 'linear', 'jira'])
+
+export const ChecklistItemSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  done: z.boolean(),
+})
+
+export const KnowledgeRefSchema = z.object({
+  file: z.string(),
+  line: z.number().int(),
+  snippet: z.string(),
+})
+
+export const CardBriefSchema = z.object({
+  title: z.string(),
+  type: CardTypeSchema.default('feature'),
+  scope: z.string().default(''),
+  checklist: z.array(ChecklistItemSchema).default([]),
+  attachments: z.array(z.string()).default([]),
+  knowledgeRefs: z.array(KnowledgeRefSchema).default([]),
+  source: CardSourceSchema.default('native'),
+  createdAt: z.string(),
+})
+
+export const CardCommentSchema = z.object({
+  id: z.string(),
+  author: z.enum(['you', 'agent']),
+  body: z.string(),
+  ts: z.string(),
+  appliedToRunId: z.string().nullable().optional(),
+})
+
 const PilotSettingsSchema = z.object({
   defaultModel: z.string(),
   defaultAutonomy: z.enum(['guided', 'standard', 'fast']).default('standard'),
@@ -61,6 +98,9 @@ const PilotSettingsSchema = z.object({
   branchConvention: z.enum(['sequential', 'feature-slash', 'custom']),
   customBranchPattern: z.string().nullable(),
   openSidebarOnStart: z.boolean(),
+  maxConcurrentRuns: z.number().int().positive().default(3),
+  runConstitutionPhase: z.boolean().default(false),
+  logRetentionDays: z.number().int().positive().default(30),
 })
 
 const PhaseStateSchema = z.object({
@@ -90,8 +130,24 @@ const TicketRefSchema = z.object({
   title: z.string(),
 })
 
-// v2 schema — new canonical schema
+// v3 schema — current canonical schema (adds card + stage)
 export const PilotStateSchema = z.object({
+  version: z.literal(3),
+  featureDir: z.string(),
+  card: CardBriefSchema,
+  stage: BoardStageSchema,
+  ticket: TicketRefSchema.nullable().default(null),
+  run: RunMetaSchema.nullable().default(null),
+  queuePosition: z.enum(['active', 'pending']).nullable().default(null),
+  worktreePath: z.string().nullable().default(null),
+  branchName: z.string().nullable().default(null),
+  prUrl: z.string().nullable().default(null),
+  phases: z.record(PhaseIdSchema, PhaseStateSchema),
+  settings: PilotSettingsSchema,
+})
+
+// v2 schema — read-only, used for migration
+const PilotStateV2Schema = z.object({
   version: z.literal(2),
   featureDir: z.string(),
   ticket: TicketRefSchema.nullable().default(null),
@@ -112,8 +168,12 @@ const PilotStateV1Schema = z.object({
   settings: PilotSettingsSchema,
 })
 
-// Lenient reader that accepts v1 or v2 and normalises to v2 shape
-export const PilotStateAnyVersionSchema = z.union([PilotStateSchema, PilotStateV1Schema])
+// Lenient reader that accepts v1, v2, or v3; persistence normalises to v3 shape
+export const PilotStateAnyVersionSchema = z.union([
+  PilotStateSchema,
+  PilotStateV2Schema,
+  PilotStateV1Schema,
+])
 
 // IPC payload schemas
 
@@ -248,4 +308,55 @@ export const OpenPrPayloadSchema = z.object({
 
 export const SelfReviewReadPayloadSchema = z.object({
   featureDir: z.string().min(1),
+})
+
+// --- Board / card payload schemas ---
+
+const CardBriefInputSchema = z.object({
+  title: z.string(),
+  type: CardTypeSchema.optional(),
+  scope: z.string().optional(),
+  checklist: z.array(ChecklistItemSchema).optional(),
+  attachments: z.array(z.string()).optional(),
+  knowledgeRefs: z.array(KnowledgeRefSchema).optional(),
+  source: CardSourceSchema.optional(),
+})
+
+export const CardListPayloadSchema = z.object({
+  repoRoot: z.string().min(1),
+})
+
+export const CardCreatePayloadSchema = z.object({
+  repoRoot: z.string().min(1),
+  brief: CardBriefInputSchema,
+  ticket: TicketRefSchema.optional(),
+})
+
+export const CardUpdatePayloadSchema = z.object({
+  featureDir: z.string().min(1),
+  brief: CardBriefInputSchema.partial(),
+})
+
+export const CardMovePayloadSchema = z.object({
+  featureDir: z.string().min(1),
+  workspacePath: z.string().min(1),
+  toStage: BoardStageSchema,
+})
+
+export const CardCommentPayloadSchema = z.object({
+  featureDir: z.string().min(1),
+  body: z.string().min(1),
+})
+
+export const CommentListPayloadSchema = z.object({
+  featureDir: z.string().min(1),
+})
+
+export const ArtifactListPayloadSchema = z.object({
+  featureDir: z.string().min(1),
+})
+
+export const KnowledgeSearchPayloadSchema = z.object({
+  repoRoot: z.string().min(1),
+  query: z.string().min(1),
 })

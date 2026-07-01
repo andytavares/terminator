@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Ticket } from '../../src/types/speckit.types.js'
 
 const mockAssignedIssues = vi.fn()
+const mockIssues = vi.fn()
 const mockCreateComment = vi.fn()
 
 const MOCK_ISSUES_NODES = [
@@ -25,11 +26,13 @@ vi.mock('@linear/sdk', () => {
     LinearClient: class {
       readonly viewer: Promise<unknown>
       readonly createComment: typeof mockCreateComment
+      readonly issues: typeof mockIssues
 
       constructor() {
         this.viewer = Promise.resolve({
           assignedIssues: mockAssignedIssues,
         })
+        this.issues = mockIssues
         this.createComment = mockCreateComment
       }
     },
@@ -43,8 +46,28 @@ async function loadLinear() {
 describe('fetchAssignedTickets', () => {
   beforeEach(() => {
     vi.resetModules()
+    mockAssignedIssues.mockReset()
+    mockIssues.mockReset()
     mockAssignedIssues.mockResolvedValue({ nodes: MOCK_ISSUES_NODES })
+    mockIssues.mockResolvedValue({ nodes: MOCK_ISSUES_NODES })
     mockCreateComment.mockResolvedValue({ comment: { id: 'cmt-1' } })
+  })
+
+  it('looks up issues by assignee email when an email is provided', async () => {
+    const { fetchAssignedTickets } = await import('../../src/api/linear.js')
+    const tickets = await fetchAssignedTickets('key', 'me@example.com')
+    expect(mockIssues).toHaveBeenCalledWith({
+      filter: { assignee: { email: { eq: 'me@example.com' } } },
+    })
+    expect(mockAssignedIssues).not.toHaveBeenCalled()
+    expect(tickets).toHaveLength(2)
+  })
+
+  it('uses the viewer assigned issues when no email is provided', async () => {
+    const { fetchAssignedTickets } = await import('../../src/api/linear.js')
+    await fetchAssignedTickets('key')
+    expect(mockAssignedIssues).toHaveBeenCalled()
+    expect(mockIssues).not.toHaveBeenCalled()
   })
 
   it('exports fetchAssignedTickets', async () => {
@@ -126,7 +149,7 @@ describe('withRetry integration', () => {
     })
 
     const { fetchAssignedTickets } = await import('../../src/api/linear.js')
-    const tickets = await fetchAssignedTickets('key', { maxAttempts: 2, baseDelayMs: 1 })
+    const tickets = await fetchAssignedTickets('key', null, { maxAttempts: 2, baseDelayMs: 1 })
     expect(tickets).toEqual([])
     expect(callCount).toBe(2)
   })

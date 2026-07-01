@@ -23,6 +23,84 @@ export type PhaseStatus =
 
 export type AutonomyLevel = 'guided' | 'standard' | 'fast'
 
+export type BoardStage = 'backlog' | 'in-progress' | 'in-review' | 'done'
+
+export const STAGE_ORDER: BoardStage[] = ['backlog', 'in-progress', 'in-review', 'done']
+
+export type CardType = 'feature' | 'bug' | 'chore' | 'spike'
+
+export type CardSource = 'native' | 'linear' | 'jira'
+
+export interface ChecklistItem {
+  id: string
+  text: string
+  done: boolean
+}
+
+export interface KnowledgeRef {
+  file: string
+  line: number
+  snippet: string
+}
+
+export interface CardBrief {
+  title: string
+  type: CardType
+  scope: string
+  checklist: ChecklistItem[]
+  attachments: string[]
+  knowledgeRefs: KnowledgeRef[]
+  source: CardSource
+  createdAt: string
+}
+
+export interface CardComment {
+  id: string
+  author: 'you' | 'agent'
+  body: string
+  ts: string
+  appliedToRunId?: string | null
+}
+
+export interface ArtifactRevision {
+  commit: string
+  ts: string
+  subject: string
+}
+
+export type ArtifactKind = 'spec' | 'plan' | 'tasks' | 'checklist' | 'self-review' | 'diff' | 'pr'
+
+export interface ArtifactRef {
+  kind: ArtifactKind
+  path: string | null
+  label: string
+  exists: boolean
+  revisions: ArtifactRevision[]
+  prUrl?: string | null
+}
+
+export type CardRunStatus =
+  | 'none'
+  | 'waiting'
+  | 'running'
+  | 'awaiting_review'
+  | 'failed'
+  | 'completed'
+
+export interface CardSummary {
+  featureDir: string
+  title: string
+  type: CardType
+  scopeLine: string
+  source: CardSource
+  sourceUrl: string | null
+  sourceKey: string | null
+  stage: BoardStage
+  runStatus: CardRunStatus
+  phaseSummary: { done: number; total: number; awaitingReview: boolean }
+  prUrl: string | null
+}
+
 export interface PhaseState {
   id: PhaseId
   status: PhaseStatus
@@ -114,11 +192,19 @@ export interface PilotSettings {
   branchConvention: 'sequential' | 'feature-slash' | 'custom'
   customBranchPattern: string | null
   openSidebarOnStart: boolean
+  maxConcurrentRuns: number
+  // The project already has a ratified constitution that spec-kit respects, so the
+  // per-card Constitution phase is skipped by default. Set true to run it each card.
+  runConstitutionPhase: boolean
+  // Persisted step logs older than this many days are pruned. Default 30.
+  logRetentionDays: number
 }
 
 export interface PilotState {
-  version: 2
+  version: 3
   featureDir: string
+  card: CardBrief
+  stage: BoardStage
   ticket: TicketRef | null
   run: RunMeta | null
   queuePosition: 'active' | 'pending' | null
@@ -248,4 +334,21 @@ export const DEFAULT_SETTINGS: PilotSettings = {
   branchConvention: 'sequential',
   customBranchPattern: null,
   openSidebarOnStart: true,
+  maxConcurrentRuns: 3,
+  runConstitutionPhase: false,
+  logRetentionDays: 30,
+}
+
+/** A card with no run started yet defaults to this brief when created empty. */
+export function createDefaultBrief(title: string, source: CardSource = 'native'): CardBrief {
+  return {
+    title,
+    type: 'feature',
+    scope: '',
+    checklist: [],
+    attachments: [],
+    knowledgeRefs: [],
+    source,
+    createdAt: new Date().toISOString(),
+  }
 }

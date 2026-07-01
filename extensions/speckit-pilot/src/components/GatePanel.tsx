@@ -19,6 +19,7 @@ interface GatePanelProps {
 type ActivePanel = 'none' | 'request-changes' | 'comment' | 'inline-edit'
 
 export function GatePanel({
+  phase,
   artifactContent,
   onApprove,
   onRequestChanges,
@@ -28,6 +29,8 @@ export function GatePanel({
   stalePhases,
   comments,
 }: GatePanelProps) {
+  // Clarify and Analyze surface questions the agent needs the user to answer.
+  const isQuestionPhase = phase === 'clarify' || phase === 'analyze'
   const [activePanel, setActivePanel] = useState<ActivePanel>('none')
   const [feedbackNote, setFeedbackNote] = useState('')
   const [commentNote, setCommentNote] = useState('')
@@ -176,10 +179,21 @@ export function GatePanel({
       {/* Request-changes form */}
       {activePanel === 'request-changes' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {isQuestionPhase && (
+            <div style={{ fontSize: 12, color: 'var(--tm-text-secondary)' }}>
+              Answer the agent&apos;s questions below. Your answers are fed back into the {phase}{' '}
+              step when it re-runs.
+            </div>
+          )}
           <textarea
+            aria-label={isQuestionPhase ? 'Answers' : 'Requested changes'}
             value={feedbackNote}
             onChange={(e) => setFeedbackNote(e.target.value)}
-            placeholder="Describe what needs to change…"
+            placeholder={
+              isQuestionPhase
+                ? 'Type your answers to the questions…'
+                : 'Describe what needs to change…'
+            }
             rows={4}
             style={{
               width: '100%',
@@ -201,7 +215,7 @@ export function GatePanel({
               className="sk-btn sk-btn--primary"
               style={{ flex: 1 }}
             >
-              {submitting ? 'Submitting…' : 'Submit'}
+              {submitting ? 'Submitting…' : isQuestionPhase ? 'Submit answers & re-run' : 'Submit'}
             </button>
             <button
               onClick={() => {
@@ -306,10 +320,10 @@ export function GatePanel({
               onClick={() => setActivePanel('request-changes')}
               className="sk-btn sk-btn--secondary"
               style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
-              aria-label="Request changes"
+              aria-label={isQuestionPhase ? 'Answer questions' : 'Request changes'}
             >
               <RotateCcw size={14} />
-              Request changes
+              {isQuestionPhase ? 'Answer questions' : 'Request changes'}
             </button>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>

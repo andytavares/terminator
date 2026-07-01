@@ -46,6 +46,7 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
   const [stopping, setStopping] = useState(false)
   const unsubRef = useRef<Array<() => void>>([])
   const emittedOutputKeysRef = useRef<Set<string>>(new Set())
+  const loadedLogsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     emittedOutputKeysRef.current = new Set()
@@ -174,6 +175,22 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
   const activePhase = state ? findRunningPhase(state) : undefined
   const isRunActive = state?.run?.status === 'running'
   const displayPhase = viewingPhase ?? activePhase
+
+  // Load persisted output for a phase being reviewed (not the live-streaming one).
+  useEffect(() => {
+    if (!displayPhase || displayPhase === activePhase) return
+    if (loadedLogsRef.current.has(displayPhase)) return
+    loadedLogsRef.current.add(displayPhase)
+    const ph = displayPhase
+    void getSpeckitAPI()
+      .runOutputRead({ featureDir, phase: ph })
+      .then((r) => {
+        if ('lines' in r && r.lines.length > 0) {
+          setLinesByPhase((prev) => (prev[ph]?.length ? prev : { ...prev, [ph]: r.lines }))
+        }
+      })
+      .catch(() => {})
+  }, [displayPhase, activePhase, featureDir])
   // When no specific phase is selected and no phase is running yet (brief gap),
   // show all accumulated output so lines from the new phase aren't hidden.
   const displayLines = displayPhase

@@ -14,13 +14,20 @@ import {
   ImplementFileDecisionPayloadSchema,
   ImplementStopPayloadSchema,
   CheckpointCreatePayloadSchema,
+  CardBriefSchema,
+  CardCommentSchema,
+  CardCreatePayloadSchema,
+  CardMovePayloadSchema,
+  KnowledgeSearchPayloadSchema,
 } from '../../src/schemas/speckit.schemas.js'
-import { DEFAULT_SETTINGS, PHASE_ORDER } from '../../src/types/speckit.types.js'
+import { DEFAULT_SETTINGS, PHASE_ORDER, createDefaultBrief } from '../../src/types/speckit.types.js'
 
 function makeMinimalPilotState() {
   return {
-    version: 2 as const,
+    version: 3 as const,
     featureDir: 'specs/test-feature',
+    card: createDefaultBrief('Test feature'),
+    stage: 'backlog' as const,
     ticket: null,
     run: null,
     queuePosition: null,
@@ -54,8 +61,8 @@ describe('PilotStateSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('rejects version !== 2', () => {
-    const state = { ...makeMinimalPilotState(), version: 1 }
+  it('rejects version !== 3', () => {
+    const state = { ...makeMinimalPilotState(), version: 2 }
     expect(PilotStateSchema.safeParse(state).success).toBe(false)
   })
 
@@ -277,5 +284,88 @@ describe('CheckpointCreatePayloadSchema', () => {
     expect(
       CheckpointCreatePayloadSchema.safeParse({ featureDir: 'specs/001', repoRoot: '' }).success
     ).toBe(false)
+  })
+})
+
+describe('CardBriefSchema', () => {
+  it('applies defaults for optional fields', () => {
+    const result = CardBriefSchema.safeParse({ title: 'A', createdAt: '2026-06-30T00:00:00.000Z' })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.type).toBe('feature')
+      expect(result.data.source).toBe('native')
+      expect(result.data.checklist).toEqual([])
+    }
+  })
+
+  it('rejects an invalid card type', () => {
+    expect(CardBriefSchema.safeParse({ title: 'A', type: 'epic', createdAt: 'x' }).success).toBe(
+      false
+    )
+  })
+})
+
+describe('CardCommentSchema', () => {
+  it('accepts a valid comment', () => {
+    expect(
+      CardCommentSchema.safeParse({ id: 'c1', author: 'you', body: 'hi', ts: 'x' }).success
+    ).toBe(true)
+  })
+
+  it('rejects an unknown author', () => {
+    expect(
+      CardCommentSchema.safeParse({ id: 'c1', author: 'robot', body: 'hi', ts: 'x' }).success
+    ).toBe(false)
+  })
+})
+
+describe('CardCreatePayloadSchema', () => {
+  it('accepts a native brief', () => {
+    expect(
+      CardCreatePayloadSchema.safeParse({
+        repoRoot: '/repo',
+        brief: { title: 'New card' },
+      }).success
+    ).toBe(true)
+  })
+
+  it('rejects a missing repoRoot', () => {
+    expect(CardCreatePayloadSchema.safeParse({ brief: { title: 'x' } }).success).toBe(false)
+  })
+})
+
+describe('CardMovePayloadSchema', () => {
+  it('accepts a valid stage move', () => {
+    expect(
+      CardMovePayloadSchema.safeParse({
+        featureDir: 'specs/001',
+        workspacePath: '/repo',
+        toStage: 'in-progress',
+      }).success
+    ).toBe(true)
+  })
+
+  it('rejects an invalid stage', () => {
+    expect(
+      CardMovePayloadSchema.safeParse({
+        featureDir: 'specs/001',
+        workspacePath: '/repo',
+        toStage: 'nope',
+      }).success
+    ).toBe(false)
+  })
+})
+
+describe('KnowledgeSearchPayloadSchema', () => {
+  it('accepts a valid query', () => {
+    expect(
+      KnowledgeSearchPayloadSchema.safeParse({ repoRoot: '/repo', query: 'auth' }).success
+    ).toBe(true)
+  })
+
+  it('rejects an empty query', () => {
+    expect(KnowledgeSearchPayloadSchema.safeParse({ repoRoot: '/repo', query: '' }).success).toBe(
+      false
+    )
   })
 })
