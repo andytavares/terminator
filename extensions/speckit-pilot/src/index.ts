@@ -27,6 +27,7 @@ import { deriveStage } from './state/derive-stage.js'
 import { shouldQueue, orderPending } from './state/run-queue.js'
 import { parseRgLines, searchFiles } from './utils/knowledge-search.js'
 import { parseGitLog, artifactSpecs, buildArtifactRef } from './state/artifact-list.js'
+import { buildTicketMarkdown } from './state/ticket-markdown.js'
 import type { ArtifactRef, BoardStage } from './types/speckit.types.js'
 
 const PHASE_COMMANDS: Record<PhaseId, string> = {
@@ -282,6 +283,21 @@ async function createWorktree(
   return { worktreePath, branchName }
 }
 
+// Materialize the card's ticket content into the worktree so the `specify`
+// phase prompt can read it from ticket.md (see PHASE_COMMANDS.specify). Without
+// this the agent has no ticket to work from and stops to ask for a source.
+async function writeWorktreeTicket(
+  worktreePath: string,
+  card: CardBrief | null,
+  ticket: TicketRef | null
+): Promise<void> {
+  await fs.promises.writeFile(
+    path.join(worktreePath, 'ticket.md'),
+    buildTicketMarkdown(card, ticket),
+    'utf-8'
+  )
+}
+
 // The first phase that still needs to run (skip already-skipped/approved phases).
 function firstRunnablePhase(state: PilotState): PhaseId {
   return (
@@ -376,6 +392,7 @@ async function handoffCard(
   state.queuePosition = 'active'
   state.stage = deriveStage(state.phases, state.run)
   await writePilotState(featureDir, state)
+  await writeWorktreeTicket(worktreePath, card, state.ticket)
   await startRunAt(api, featureDir, worktreePath, firstRunnablePhase(state))
   api.window.broadcast('speckit:dispatch-started', { featureDir, branchName, worktreePath })
   api.window.broadcast('speckit:state-changed', { state })
@@ -409,6 +426,8 @@ async function advanceQueue(api: ExtensionAPI, workspacePath: string): Promise<v
       s.queuePosition = 'active'
       s.stage = deriveStage(s.phases, s.run)
       await writePilotState(s.featureDir, s)
+      const qCard = (await readCard(s.featureDir)) ?? s.card
+      await writeWorktreeTicket(worktreePath, qCard, s.ticket)
       await startRunAt(api, s.featureDir, worktreePath, firstRunnablePhase(s))
       api.window.broadcast('speckit:dispatch-started', {
         featureDir: s.featureDir,
@@ -1229,10 +1248,11 @@ export function activate(api: ExtensionAPI): void {
       const featureDir = path.join(specsDir, featureDirName)
       await fs.promises.mkdir(featureDir, { recursive: true })
 
-      // Write ticket reference file
+      // Write ticket reference file (shared format with the card-handoff path)
+      const dispatchCard = createDefaultBrief(ticket.title, ticket.source)
       await fs.promises.writeFile(
         path.join(featureDir, 'ticket.md'),
-        `# Ticket: ${ticket.key}\n\n**Title:** ${ticket.title}\n**Source:** ${ticket.source}\n**URL:** ${ticket.sourceUrl}\n`,
+        buildTicketMarkdown(dispatchCard, ticket),
         'utf-8'
       )
 
@@ -1244,7 +1264,7 @@ export function activate(api: ExtensionAPI): void {
 
       // Create initial state v3 (constitution ready, active run, ticket-seeded card)
       const state = createInitialState(featureDir, {
-        card: createDefaultBrief(ticket.title, ticket.source),
+        card: dispatchCard,
         ticket,
         run: {
           status: 'running',

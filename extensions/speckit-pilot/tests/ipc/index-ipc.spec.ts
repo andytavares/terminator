@@ -604,6 +604,44 @@ describe('speckit:card-handoff', () => {
     })) as { error: string }
     expect(result.error).toBe('VALIDATION_ERROR')
   })
+
+  it('writes a content-rich ticket.md into the worktree before the run starts', async () => {
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    vi.mocked(persistence.readState).mockResolvedValue(
+      makeState('/repo/specs/x', {
+        ticket: {
+          source: 'linear',
+          key: 'TAV-11',
+          sourceUrl: 'https://linear.app/x/issue/TAV-11',
+          title: 'Auto-load tickets on open',
+        },
+      }) as never
+    )
+    vi.mocked(persistence.readCard).mockResolvedValue({
+      title: 'Auto-load tickets on open',
+      type: 'feature',
+      scope: 'The board should pull assigned tickets on open.',
+      checklist: [{ id: '1', text: 'Fetches on open', done: false }],
+      attachments: [],
+      knowledgeRefs: [],
+      source: 'linear',
+      createdAt: 'x',
+    })
+    const handler = getSharedHandler('speckit:card-handoff')!
+    await handler({ featureDir: '/repo/specs/x', workspacePath: '/repo' })
+
+    const ticketMdCall = vi
+      .mocked(nodefs.promises.writeFile)
+      .mock.calls.find(([p]) => String(p).endsWith('ticket.md'))
+    expect(ticketMdCall).toBeDefined()
+    // written into the worktree, not the specs dir
+    expect(String(ticketMdCall![0])).toContain('.wt')
+    // and it carries the actual ticket content, not just metadata
+    const body = String(ticketMdCall![1])
+    expect(body).toContain('The board should pull assigned tickets on open.')
+    expect(body).toContain('- [ ] Fetches on open')
+    expect(body).toContain('TAV-11')
+  })
 })
 
 describe('speckit:artifact-list', () => {
