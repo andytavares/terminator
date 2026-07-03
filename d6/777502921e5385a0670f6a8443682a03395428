@@ -1,0 +1,44 @@
+src/main/extensions/api.ts
+  s_63a16748f3dd55::t_ec56ef32473af7 380-382
+  s_63a16748f3dd55::t_8a2f88d26708c5 242
+  s_63a16748f3dd55::t_a4d5955b13abff 377-379,383-384
+  s_63a16748f3dd55::t_a92b7774c602c2 153-159
+  s_63a16748f3dd55::t_8eb7f48fc5c0f8 385
+extensions/speckit-pilot/tests/ipc/index-ipc.spec.ts
+  s_63a16748f3dd55::t_71ead89746306b 221
+  s_63a16748f3dd55::t_dcbf9d0b9f476d 286-288
+  s_63a16748f3dd55::t_721cb8783dd0ba 503-529
+  s_63a16748f3dd55::t_62afe59b9087c3 668-669
+specs/001-extension-first-terminal/contracts/extension-api.md
+  s_63a16748f3dd55::t_3fcb9a4873e3f5 24
+  s_63a16748f3dd55::t_de53677c24fddf 98-106
+tests/unit/extensions/api.spec.ts
+  s_63a16748f3dd55::t_43b94e15dd4a8b 54-60,64-69
+  s_63a16748f3dd55::t_445d7321162c23 86-124
+  s_63a16748f3dd55::t_ec56ef32473af7 61-63
+  s_63a16748f3dd55::t_2952bbf4addb4d 125-126
+extensions/speckit-pilot/src/index.ts
+  s_63a16748f3dd55::t_8d98c17a604c97 1260-1262
+  s_63a16748f3dd55::t_9fd8a8b8ca5a43 275-277
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "d6777502921e5385a0670f6a8443682a03395428",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_63a16748f3dd55": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c9544678-a1a3-4fea-9b89-c0b6b321ed74",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
