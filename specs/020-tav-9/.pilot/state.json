@@ -1,18 +1,23 @@
 {
   "version": 3,
-  "featureDir": "/Users/atavares/repos/terminator/specs/006-mergeflow-conflict-resolver",
+  "featureDir": "/Users/atavares/repos/terminator/specs/020-tav-9",
   "card": {
-    "title": "006-mergeflow-conflict-resolver",
+    "title": "High-risk filter in PR list never flags large changes",
     "type": "feature",
-    "scope": "",
+    "scope": "# Summary\n\nThe \"high risk\" filter in the PR list never flags large changes — even PRs with thousands of lines changed are not marked high risk.\n\n# Steps to Reproduce\n\n1. Open the PR list.\n2. Apply / view the high-risk filter.\n3. Observe a PR with a very large diff (thousands of lines changed).\n\nExpected: Large/high-impact PRs are flagged as high risk and surfaced by the high-risk filter.\nActual: No PRs get flagged as high risk, even ones with thousands of lines changed.\n\n# Acceptance Criteria\n\n- [ ] PRs with large diffs (e.g. thousands of lines) are flagged as high risk\n- [ ] The high-risk filter surfaces those PRs\n- [ ] The risk score/field is populated and the size threshold is correct\n- [ ] Tests cover risk classification at boundary change sizes (just below / just above the threshold)\n\n# Dev Hints\n\n* Likely a broken risk-scoring calculation or filter predicate. Verify: is the risk field populated at all? Is the change-size threshold ever met? Is the filter comparing against the correct value?",
     "checklist": [],
     "attachments": [],
     "knowledgeRefs": [],
-    "source": "native",
-    "createdAt": "2026-07-01T01:41:51.852Z"
+    "source": "linear",
+    "createdAt": "2026-07-03T14:35:34.353Z"
   },
-  "stage": "done",
-  "ticket": null,
+  "stage": "backlog",
+  "ticket": {
+    "source": "linear",
+    "key": "TAV-9",
+    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-9/high-risk-filter-in-pr-list-never-flags-large-changes",
+    "title": "High-risk filter in PR list never flags large changes"
+  },
   "run": null,
   "queuePosition": null,
   "worktreePath": null,
@@ -21,61 +26,67 @@
   "phases": {
     "constitution": {
       "id": "constitution",
-      "status": "approved",
-      "approvedHash": null,
-      "approvedAt": "2026-05-25T16:10:36.072Z",
-      "approvedBy": "user",
-      "lastRunId": null,
-      "lastRunAt": null,
-      "artifactPaths": [],
-      "feedback": null,
-      "batchIndex": null
-    },
-    "specify": {
-      "id": "specify",
-      "status": "approved",
-      "approvedHash": null,
-      "approvedAt": "2026-05-25T16:35:22.718Z",
-      "approvedBy": "user",
-      "lastRunId": null,
-      "lastRunAt": null,
-      "artifactPaths": [],
-      "feedback": null,
-      "batchIndex": null
-    },
-    "clarify": {
-      "id": "clarify",
-      "status": "approved",
-      "approvedHash": null,
-      "approvedAt": "2026-05-25T16:35:24.090Z",
-      "approvedBy": "user",
-      "lastRunId": null,
-      "lastRunAt": null,
-      "artifactPaths": [],
-      "feedback": null,
-      "batchIndex": null
-    },
-    "plan": {
-      "id": "plan",
-      "status": "approved",
-      "approvedHash": null,
-      "approvedAt": "2026-05-25T16:35:55.677Z",
-      "approvedBy": "user",
-      "lastRunId": null,
-      "lastRunAt": null,
-      "artifactPaths": [],
-      "feedback": null,
-      "batchIndex": null
-    },
-    "checklist": {
-      "id": "checklist",
-      "status": "skipped",
+      "status": "ready",
       "approvedHash": null,
       "approvedAt": null,
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": [],
+      "artifactPaths": [".specify/memory/constitution.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "specify": {
+      "id": "specify",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/spec.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "clarify": {
+      "id": "clarify",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/spec.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "plan": {
+      "id": "plan",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [
+        "/Users/atavares/repos/terminator/specs/020-tav-9/plan.md",
+        "/Users/atavares/repos/terminator/specs/020-tav-9/research.md",
+        "/Users/atavares/repos/terminator/specs/020-tav-9/data-model.md"
+      ],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "checklist": {
+      "id": "checklist",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [
+        "/Users/atavares/repos/terminator/specs/020-tav-9/checklists/requirements.md"
+      ],
       "feedback": null,
       "batchIndex": null
     },
@@ -87,7 +98,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": [],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/tasks.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -105,6 +116,30 @@
     },
     "implement": {
       "id": "implement",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "self-review": {
+      "id": "self-review",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/.pilot/self-review.json"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "open-pr": {
+      "id": "open-pr",
       "status": "locked",
       "approvedHash": null,
       "approvedAt": null,
@@ -163,6 +198,16 @@
         "required": true,
         "autoApprove": false,
         "perFileConfirm": true
+      },
+      "self-review": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "open-pr": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
       }
     },
     "disallowedPaths": [".env*", "secrets/**", "*.pem", "*.key"],
@@ -177,6 +222,8 @@
     "branchConvention": "sequential",
     "customBranchPattern": null,
     "openSidebarOnStart": true,
-    "maxConcurrentRuns": 3
+    "maxConcurrentRuns": 3,
+    "runConstitutionPhase": false,
+    "logRetentionDays": 30
   }
 }

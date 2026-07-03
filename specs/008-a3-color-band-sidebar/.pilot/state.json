@@ -1,6 +1,23 @@
 {
-  "version": 1,
+  "version": 3,
   "featureDir": "/Users/atavares/repos/terminator/specs/008-a3-color-band-sidebar",
+  "card": {
+    "title": "008-a3-color-band-sidebar",
+    "type": "feature",
+    "scope": "",
+    "checklist": [],
+    "attachments": [],
+    "knowledgeRefs": [],
+    "source": "native",
+    "createdAt": "2026-07-01T01:41:54.896Z"
+  },
+  "stage": "done",
+  "ticket": null,
+  "run": null,
+  "queuePosition": null,
+  "worktreePath": null,
+  "branchName": null,
+  "prUrl": null,
   "phases": {
     "constitution": {
       "id": "constitution",
@@ -10,7 +27,9 @@
       "approvedBy": "user",
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": []
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
     },
     "specify": {
       "id": "specify",
@@ -20,7 +39,9 @@
       "approvedBy": "user",
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": []
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
     },
     "clarify": {
       "id": "clarify",
@@ -30,7 +51,9 @@
       "approvedBy": "user",
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": []
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
     },
     "plan": {
       "id": "plan",
@@ -40,7 +63,9 @@
       "approvedBy": "user",
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": []
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
     },
     "checklist": {
       "id": "checklist",
@@ -50,7 +75,9 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": []
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
     },
     "tasks": {
       "id": "tasks",
@@ -60,7 +87,9 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": []
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
     },
     "analyze": {
       "id": "analyze",
@@ -70,7 +99,9 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": []
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
     },
     "implement": {
       "id": "implement",
@@ -80,11 +111,18 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": []
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
     }
   },
   "settings": {
     "defaultModel": "claude-opus-4-6",
+    "defaultAutonomy": "standard",
+    "batchCheckinsEnabled": true,
+    "writeStatusBackOnPrOpen": false,
+    "linear": null,
+    "jira": null,
     "phaseGates": {
       "constitution": {
         "required": true,
@@ -138,6 +176,7 @@
     "customReviewerName": null,
     "branchConvention": "sequential",
     "customBranchPattern": null,
-    "openSidebarOnStart": true
+    "openSidebarOnStart": true,
+    "maxConcurrentRuns": 3
   }
 }

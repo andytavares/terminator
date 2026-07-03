@@ -26,9 +26,34 @@ export async function launchApp(): Promise<AppHandle> {
   return { app, page, userDataDir }
 }
 
+// How long to wait for a graceful Electron shutdown before force-killing. A
+// healthy app closes in well under a second; this is only a guard against a
+// hang. Kept well below Playwright's 30s hook timeout so a stuck close can
+// never blow the afterAll hook (which cascades into a worker-teardown timeout
+// and fails the whole job as a non-test error).
+const GRACEFUL_CLOSE_MS = 5000
+
 export async function closeApp(handle: AppHandle | undefined): Promise<void> {
   if (!handle) return
-  await handle.app.close()
+  // Capture the OS process up front: once app.close() resolves, Playwright
+  // tears down its internal handle and app.process() would throw.
+  const proc = handle.app.process()
+  // Bound the graceful close: a lingering PTY, git watcher, or extension host
+  // can keep the process alive so app.close() never resolves. Race it against a
+  // timeout, then force-kill whatever is left. The .catch keeps a close() that
+  // loses the race from surfacing as an unhandled rejection after the SIGKILL.
+  const closed = handle.app.close().catch(() => {})
+  await Promise.race([
+    closed,
+    new Promise<void>((resolve) => setTimeout(resolve, GRACEFUL_CLOSE_MS)),
+  ])
+  if (proc.exitCode === null && !proc.killed) {
+    try {
+      proc.kill('SIGKILL')
+    } catch {
+      // Process already exited between the check and the kill — nothing to do.
+    }
+  }
   if (handle.userDataDir) rmSync(handle.userDataDir, { recursive: true, force: true })
 }
 

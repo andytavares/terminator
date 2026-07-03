@@ -1,6 +1,23 @@
 {
-  "version": 1,
+  "version": 3,
   "featureDir": "specs/004-speckit-pilot-extension",
+  "card": {
+    "title": "004-speckit-pilot-extension",
+    "type": "feature",
+    "scope": "",
+    "checklist": [],
+    "attachments": [],
+    "knowledgeRefs": [],
+    "source": "native",
+    "createdAt": "2026-07-01T01:41:46.116Z"
+  },
+  "stage": "done",
+  "ticket": null,
+  "run": null,
+  "queuePosition": null,
+  "worktreePath": null,
+  "branchName": null,
+  "prUrl": null,
   "phases": {
     "constitution": {
       "id": "constitution",
@@ -10,7 +27,9 @@
       "approvedBy": "user",
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": [".specify/memory/constitution.md"]
+      "artifactPaths": [".specify/memory/constitution.md"],
+      "feedback": null,
+      "batchIndex": null
     },
     "specify": {
       "id": "specify",
@@ -20,7 +39,9 @@
       "approvedBy": "user",
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["specs/004-speckit-pilot-extension/spec.md"]
+      "artifactPaths": ["specs/004-speckit-pilot-extension/spec.md"],
+      "feedback": null,
+      "batchIndex": null
     },
     "clarify": {
       "id": "clarify",
@@ -30,7 +51,9 @@
       "approvedBy": "user",
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["specs/004-speckit-pilot-extension/spec.md"]
+      "artifactPaths": ["specs/004-speckit-pilot-extension/spec.md"],
+      "feedback": null,
+      "batchIndex": null
     },
     "plan": {
       "id": "plan",
@@ -44,7 +67,9 @@
         "specs/004-speckit-pilot-extension/plan.md",
         "specs/004-speckit-pilot-extension/research.md",
         "specs/004-speckit-pilot-extension/data-model.md"
-      ]
+      ],
+      "feedback": null,
+      "batchIndex": null
     },
     "checklist": {
       "id": "checklist",
@@ -54,7 +79,9 @@
       "approvedBy": "user",
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["specs/004-speckit-pilot-extension/checklists/requirements.md"]
+      "artifactPaths": ["specs/004-speckit-pilot-extension/checklists/requirements.md"],
+      "feedback": null,
+      "batchIndex": null
     },
     "tasks": {
       "id": "tasks",
@@ -64,7 +91,9 @@
       "approvedBy": "user",
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["specs/004-speckit-pilot-extension/tasks.md"]
+      "artifactPaths": ["specs/004-speckit-pilot-extension/tasks.md"],
+      "feedback": null,
+      "batchIndex": null
     },
     "analyze": {
       "id": "analyze",
@@ -74,7 +103,9 @@
       "approvedBy": "user",
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": []
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
     },
     "implement": {
       "id": "implement",
@@ -84,11 +115,18 @@
       "approvedBy": "user",
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": []
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
     }
   },
   "settings": {
     "defaultModel": "claude-opus-4-6",
+    "defaultAutonomy": "standard",
+    "batchCheckinsEnabled": true,
+    "writeStatusBackOnPrOpen": false,
+    "linear": null,
+    "jira": null,
     "phaseGates": {
       "constitution": {
         "required": true,
@@ -142,6 +180,7 @@
     "customReviewerName": null,
     "branchConvention": "sequential",
     "customBranchPattern": null,
-    "openSidebarOnStart": true
+    "openSidebarOnStart": true,
+    "maxConcurrentRuns": 3
   }
 }
