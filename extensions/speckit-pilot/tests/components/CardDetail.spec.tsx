@@ -102,8 +102,8 @@ describe('CardDetail', () => {
     render(<CardDetail featureDir="/repo/specs/x" workspacePath="/repo" onClose={vi.fn()} />)
     await waitFor(() => screen.getByRole('heading', { name: 'My Card' }))
     fireEvent.click(screen.getByRole('button', { name: 'Phases' }))
-    const toggle = await screen.findByText(/Quick fix/)
-    fireEvent.click(toggle.previousSibling as HTMLInputElement)
+    await screen.findByText(/Quick fix/)
+    fireEvent.click(screen.getByRole('checkbox'))
     fireEvent.click(screen.getByText('Hand off to agent'))
     await waitFor(() =>
       expect(mockCardHandoff).toHaveBeenCalledWith(expect.objectContaining({ mode: 'quick' }))

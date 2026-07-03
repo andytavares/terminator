@@ -8,9 +8,24 @@
 
 interface StreamJsonEvent {
   type?: string
+  session_id?: string
   event?: {
     type?: string
     delta?: { type?: string; text?: string }
+  }
+}
+
+// Extract the Claude Code session id from a stream-json line, if present. The
+// `system`/`init` and final `result` events carry `session_id`; capturing it
+// lets the pilot resume the conversation to answer the model's questions.
+export function sessionIdFromStreamJsonLine(jsonLine: string): string | null {
+  const trimmed = jsonLine.trim()
+  if (!trimmed) return null
+  try {
+    const evt = JSON.parse(trimmed) as StreamJsonEvent
+    return typeof evt.session_id === 'string' && evt.session_id ? evt.session_id : null
+  } catch {
+    return null
   }
 }
 

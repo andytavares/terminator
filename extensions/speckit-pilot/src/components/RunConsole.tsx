@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { PHASE_LABELS } from '../types/speckit.types.js'
 import { renderMarkdown } from '../utils/markdown.js'
+import { getSpeckitAPI } from '../types/electron.js'
 
 interface RunConsoleProps {
   featureDir: string
@@ -10,9 +11,20 @@ interface RunConsoleProps {
 
 type RenderMode = 'text' | 'markdown'
 
-export function RunConsole({ lines = [], phase }: RunConsoleProps) {
+export function RunConsole({ featureDir, lines = [], phase }: RunConsoleProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [mode, setMode] = useState<RenderMode>('text')
+  const [reply, setReply] = useState('')
+  const [sending, setSending] = useState(false)
+
+  const sendReply = async () => {
+    const text = reply.trim()
+    if (!text || sending) return
+    setSending(true)
+    setReply('')
+    await getSpeckitAPI().runReply({ featureDir, text })
+    setSending(false)
+  }
 
   useEffect(() => {
     if (bottomRef.current && typeof bottomRef.current.scrollIntoView === 'function') {
@@ -97,6 +109,30 @@ export function RunConsole({ lines = [], phase }: RunConsoleProps) {
           <div ref={bottomRef} />
         </pre>
       )}
+
+      <form
+        className="sk-console-reply"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void sendReply()
+        }}
+      >
+        <input
+          type="text"
+          aria-label="Reply to the agent"
+          placeholder="Reply to the agent…"
+          value={reply}
+          onChange={(e) => setReply(e.target.value)}
+          disabled={sending}
+        />
+        <button
+          type="submit"
+          className="sk-btn sk-btn--primary"
+          disabled={sending || reply.trim().length === 0}
+        >
+          Send
+        </button>
+      </form>
     </div>
   )
 }

@@ -110,6 +110,27 @@ describe('startPhaseRunner', () => {
     expect(opts?.cwd).toBe(worktreePath)
   })
 
+  // The native /speckit-* skills resolve their feature dir from these env vars,
+  // so they operate on the pilot's dir regardless of the worktree's branch name.
+  it('exports SPECIFY_FEATURE(_DIRECTORY) pointing at the feature dir', async () => {
+    const { child } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    const runner = createAgentRunner(api)
+    runner.startPhaseRunner({
+      featureDir: '/repo/specs/017-tav-11',
+      worktreePath: '/repo/.worktrees/tav-11',
+      phaseCommand: '/speckit-specify x',
+      phase: 'specify',
+    })
+
+    const opts = vi.mocked(spawn).mock.calls[0][2] as { env?: Record<string, string> }
+    expect(opts.env?.SPECIFY_FEATURE).toBe('017-tav-11')
+    expect(opts.env?.SPECIFY_FEATURE_DIRECTORY).toBe('specs/017-tav-11')
+  })
+
   // A claude phase streams `--output-format stream-json`; the runner extracts
   // assistant text deltas and broadcasts them line by line as they arrive.
   const delta = (text: string) =>
@@ -303,6 +324,32 @@ describe('startPhaseRunner', () => {
 
     const spawnArgs = (vi.mocked(spawn).mock.calls[0][1] as string[]).join(' ')
     expect(spawnArgs).toContain('--permission-mode bypassPermissions')
+  })
+
+  it('resumes the session when replying and captures the session id', async () => {
+    const { child, emitStdout } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    const runner = createAgentRunner(api)
+    const onSession = vi.fn()
+    runner.startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: 'my answer',
+      phase: 'clarify',
+      resumeSessionId: 'sess-123',
+      onSession,
+    })
+
+    const spawnArgs = (vi.mocked(spawn).mock.calls[0][1] as string[]).join(' ')
+    expect(spawnArgs).toContain('--resume')
+    expect(spawnArgs).toContain('sess-123')
+
+    // session id surfaced from the stream
+    emitStdout(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-999' }) + '\n')
+    expect(onSession).toHaveBeenCalledWith('sess-999')
   })
 
   it('bypasses permission prompts for the self-review google-review step', async () => {

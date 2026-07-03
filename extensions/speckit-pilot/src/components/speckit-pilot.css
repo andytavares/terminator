@@ -2533,19 +2533,112 @@
   align-items: center;
 }
 
+/* Compact "start this card" panel on the Phases tab. */
+.sk-startcard {
+  max-width: 440px;
+  margin: 20px auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border);
+  border-radius: 10px;
+}
+
+.sk-startcard__status {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tm-text-secondary);
+}
+
+.sk-startcard .sk-field {
+  max-width: none;
+}
+
+.sk-startcard__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Two-line checkbox row: title + muted hint. */
+.sk-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+/* The card-detail form rule forces inputs to width:100%; keep checkboxes native
+   so the toggle text sits right next to the box instead of being pushed off. */
+.sk-card-detail input[type='checkbox'] {
+  width: auto;
+  padding: 0;
+  border-radius: 0;
+}
+
+.sk-toggle input[type='checkbox'] {
+  margin-top: 2px;
+  cursor: pointer;
+  flex: none;
+}
+
+.sk-toggle__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.35;
+}
+
+.sk-toggle__text strong {
+  font-size: 13px;
+  color: var(--tm-text-primary);
+}
+
+.sk-toggle__hint {
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+}
+
 .sk-reset {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   justify-content: center;
-  padding: 12px 30px 24px;
-  border-top: 1px solid var(--tm-border);
+  max-width: 440px;
+  margin: 12px auto 4px;
+  padding-top: 12px;
 }
 
 .sk-reset__warn {
   font-size: 12px;
   color: var(--tm-text-secondary);
+}
+
+/* Chat reply row under the run console. */
+.sk-console-reply {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--tm-surface, #111827);
+  border-top: 1px solid var(--tm-border, #374151);
+}
+
+.sk-console-reply input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-primary);
+}
+
+.sk-console-reply .sk-btn {
+  flex: none;
 }
 
 /* ─── Detail-view form controls: inherit the dark theme (fix white inputs) ─── */

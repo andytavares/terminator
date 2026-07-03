@@ -366,6 +366,10 @@ Click the **SpecKit** tab in the content area tab bar.
 6. The **Self-review** gate runs `format + lint + coverage + /google-review` and summarises the quality report.
 7. The **Open PR** gate prompts for a PR title before pushing.
 
+Each SpecKit-mode phase invokes the project's native SpecKit skill (`/speckit-specify`, `/speckit-plan`, `/speckit-tasks`, …) rather than a freeform prompt, so artifacts land in the right feature directory and the agent doesn't wander. This requires the SpecKit Claude skills to be installed (`.claude/skills/speckit-*`, via the `specify` CLI) and reachable in the run's worktree.
+
+**Answering the agent.** If a phase asks a question (e.g. during `/speckit-clarify`), type your answer in the reply box under the run console and click **Send** — the pilot resumes that Claude session with your message and streams the response back into the same console.
+
 State is persisted to `.pilot/state.json` inside each feature directory; audit log in `.pilot/history.json`.
 
 ---

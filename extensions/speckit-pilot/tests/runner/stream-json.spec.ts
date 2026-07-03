@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { textFromStreamJsonLine } from '../../src/runner/stream-json.js'
+import {
+  textFromStreamJsonLine,
+  sessionIdFromStreamJsonLine,
+} from '../../src/runner/stream-json.js'
 
 // Event shapes below are copied from real Claude Code CLI v2.1.199
 // `--output-format stream-json --include-partial-messages` output.
@@ -46,5 +49,23 @@ describe('textFromStreamJsonLine', () => {
 
   it('returns empty string for an unparseable (partial) JSON line', () => {
     expect(textFromStreamJsonLine('{"type":"stream_event","eve')).toBe('')
+  })
+})
+
+describe('sessionIdFromStreamJsonLine', () => {
+  it('extracts session_id from the system init event', () => {
+    const line = JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-abc' })
+    expect(sessionIdFromStreamJsonLine(line)).toBe('sess-abc')
+  })
+
+  it('extracts session_id from the final result event', () => {
+    const line = JSON.stringify({ type: 'result', session_id: 'sess-xyz' })
+    expect(sessionIdFromStreamJsonLine(line)).toBe('sess-xyz')
+  })
+
+  it('returns null for events without a session id and for unparseable lines', () => {
+    expect(sessionIdFromStreamJsonLine(JSON.stringify({ type: 'stream_event' }))).toBeNull()
+    expect(sessionIdFromStreamJsonLine('{"type":"resu')).toBeNull()
+    expect(sessionIdFromStreamJsonLine('')).toBeNull()
   })
 })

@@ -158,6 +158,7 @@ export interface SpeckitAPI {
     featureDir: string
     phase: PhaseId
   }): Promise<{ lines: string[] } | { error: string }>
+  runReply(payload: { featureDir: string; text: string }): Promise<{ ok: true } | { error: string }>
   artifactList(payload: {
     featureDir: string
   }): Promise<{ artifacts: ArtifactRef[] } | { error: string }>
@@ -310,6 +311,8 @@ export function getSpeckitAPI(): SpeckitAPI {
       bridge.invoke('speckit:run-output-read', payload) as Promise<
         { lines: string[] } | { error: string }
       >,
+    runReply: (payload) =>
+      bridge.invoke('speckit:run-reply', payload) as Promise<{ ok: true } | { error: string }>,
     artifactList: (payload) =>
       bridge.invoke('speckit:artifact-list', payload) as Promise<
         { artifacts: ArtifactRef[] } | { error: string }
