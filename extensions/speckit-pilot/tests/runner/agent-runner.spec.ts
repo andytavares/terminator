@@ -110,7 +110,15 @@ describe('startPhaseRunner', () => {
     expect(opts?.cwd).toBe(worktreePath)
   })
 
-  it('broadcasts each line of stdout output via api.window.broadcast', async () => {
+  // A claude phase streams `--output-format stream-json`; the runner extracts
+  // assistant text deltas and broadcasts them line by line as they arrive.
+  const delta = (text: string) =>
+    JSON.stringify({
+      type: 'stream_event',
+      event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } },
+    }) + '\n'
+
+  it('broadcasts assistant text from stream-json output, one line at a time', async () => {
     const { child, emitStdout } = makeMockChild()
     vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
 
@@ -125,7 +133,8 @@ describe('startPhaseRunner', () => {
       phase: 'tasks',
     })
 
-    emitStdout('line one\nline two\n')
+    // A display line only completes once its trailing newline arrives.
+    emitStdout(delta('line one\nline two\n'))
 
     expect(api.window.broadcast).toHaveBeenCalledWith(
       'speckit:run-output',
@@ -135,6 +144,77 @@ describe('startPhaseRunner', () => {
       'speckit:run-output',
       expect.objectContaining({ featureDir: '/specs/feat', line: 'line two' })
     )
+  })
+
+  it('streams a line in real time: a line is emitted before the run completes', async () => {
+    const { child, emitStdout } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    const runner = createAgentRunner(api)
+    runner.startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: 'Write spec',
+      phase: 'specify',
+    })
+
+    // A completed line arrives across two deltas, no close() yet.
+    emitStdout(delta('partial '))
+    emitStdout(delta('rest of line\n'))
+
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'speckit:run-output',
+      expect.objectContaining({ line: 'partial rest of line' })
+    )
+  })
+
+  it('reassembles a stream-json event split across stdout chunks', async () => {
+    const { child, emitStdout } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    const runner = createAgentRunner(api)
+    runner.startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: 'Plan',
+      phase: 'plan',
+    })
+
+    const evt = delta('hello\n')
+    emitStdout(evt.slice(0, 20))
+    emitStdout(evt.slice(20))
+
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'speckit:run-output',
+      expect.objectContaining({ line: 'hello' })
+    )
+  })
+
+  it('ignores non-text stream-json events (system, result)', async () => {
+    const { child, emitStdout } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    const runner = createAgentRunner(api)
+    runner.startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: 'Analyze',
+      phase: 'analyze',
+    })
+
+    emitStdout(JSON.stringify({ type: 'system', subtype: 'init' }) + '\n')
+    emitStdout(JSON.stringify({ type: 'result', subtype: 'success', result: 'done' }) + '\n')
+
+    const outputCalls = vi
+      .mocked(api.window.broadcast)
+      .mock.calls.filter((c) => c[0] === 'speckit:run-output')
+    expect(outputCalls).toHaveLength(0)
   })
 
   it('broadcasts each output line with a ts timestamp', async () => {
@@ -152,10 +232,57 @@ describe('startPhaseRunner', () => {
       phase: 'analyze',
     })
 
-    emitStdout('output line')
+    emitStdout(delta('output line\n'))
 
-    const call = vi.mocked(api.window.broadcast).mock.calls[0]
+    const call = vi
+      .mocked(api.window.broadcast)
+      .mock.calls.find((c) => c[0] === 'speckit:run-output')!
     expect(call[1]).toMatchObject({ ts: expect.any(String) })
+  })
+
+  it('self-review streams its shell output as plain text (not stream-json)', async () => {
+    const { child, emitStdout } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    const runner = createAgentRunner(api)
+    runner.startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: '',
+      phase: 'self-review',
+    })
+
+    emitStdout('> vitest run\n PASS tests\n')
+
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'speckit:run-output',
+      expect.objectContaining({ line: '> vitest run' })
+    )
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'speckit:run-output',
+      expect.objectContaining({ line: ' PASS tests' })
+    )
+  })
+
+  it('uses stream-json flags for claude phases', async () => {
+    const { child } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    const runner = createAgentRunner(api)
+    runner.startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: 'Write spec',
+      phase: 'specify',
+    })
+
+    const spawnArgs = (vi.mocked(spawn).mock.calls[0][1] as string[]).join(' ')
+    expect(spawnArgs).toContain('--output-format stream-json')
+    expect(spawnArgs).toContain('--include-partial-messages')
   })
 
   it('broadcasts speckit:run-phase-complete on exit', async () => {
