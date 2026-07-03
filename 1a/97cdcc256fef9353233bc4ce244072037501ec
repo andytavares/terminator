@@ -1,0 +1,110 @@
+extensions/speckit-pilot/src/runner/agent-runner.ts
+  s_ad1c1cb1c68933::t_7a028b1133b227 110-114
+  s_ad1c1cb1c68933::t_800773641d2070 70
+extensions/speckit-pilot/src/components/ImportTicketModal.tsx
+  s_ad1c1cb1c68933::t_8093b4e5a30c9b 35
+docs/adr/007-agent-runner-subprocess.md
+  s_ad1c1cb1c68933::t_fa085ea4d0635b 11
+  s_ad1c1cb1c68933::t_38d67039981a6b 27-28
+extensions/speckit-pilot/tests/components/CardDetail.spec.tsx
+  s_ad1c1cb1c68933::t_12980b67b2fd27 41
+  s_ad1c1cb1c68933::t_9d3920eead55ac 26-31
+  s_ad1c1cb1c68933::t_9b17be3fb22734 79
+  s_ad1c1cb1c68933::t_d66cbfd58130eb 96
+  s_ad1c1cb1c68933::t_c2e94388bfc533 98-99,101-134
+  s_ad1c1cb1c68933::t_05aa4f0cf43cdb 9,19
+  s_ad1c1cb1c68933::t_187388a94b29e5 97
+  s_ad1c1cb1c68933::t_87ae2768dfa249 100
+extensions/speckit-pilot/src/types/electron.ts
+  s_ad1c1cb1c68933::t_9911212f4ebe1d 12
+  s_ad1c1cb1c68933::t_399d574792fe5d 144,146-149
+  s_ad1c1cb1c68933::t_9bbb2f4142414d 94
+  s_ad1c1cb1c68933::t_5863c74dce1572 297-300
+docs/user-guide/USER-GUIDE.md
+  s_ad1c1cb1c68933::t_30106a30db3f25 338-345
+  s_ad1c1cb1c68933::t_418aa00f9a501b 354
+  s_ad1c1cb1c68933::t_2ceb738281b173 352-353,355-357
+extensions/speckit-pilot/tests/ipc/index-ipc.spec.ts
+  s_ad1c1cb1c68933::t_b752ac449d37f6 581-586,598-600
+  s_ad1c1cb1c68933::t_c7cd128aeec19e 749-773,777-820
+  s_ad1c1cb1c68933::t_2ceb738281b173 774-776
+  s_ad1c1cb1c68933::t_2bea402ca97f38 540-580,587-597,601-602
+  s_ad1c1cb1c68933::t_42d34a3b1a9bb4 38
+  s_ad1c1cb1c68933::t_cadc64a2ff7741 206-215
+extensions/speckit-pilot/src/state/state-persistence.ts
+  s_ad1c1cb1c68933::t_c28bdd8108facf 68
+  s_ad1c1cb1c68933::t_ee1d0cbad2754f 206
+  s_ad1c1cb1c68933::t_85a4d14419c1a5 174
+extensions/speckit-pilot/src/schemas/speckit.schemas.ts
+  s_ad1c1cb1c68933::t_06bcb6e4c33293 131
+  s_ad1c1cb1c68933::t_ebe647286a9c79 140
+extensions/speckit-pilot/tests/ipc/phase4-ipc.spec.ts
+  s_ad1c1cb1c68933::t_935b976e7e92c9 122
+  s_ad1c1cb1c68933::t_6489819c6bd425 98-106
+extensions/speckit-pilot/src/index.ts
+  s_ad1c1cb1c68933::t_5f06e854b0409c 506
+  s_ad1c1cb1c68933::t_ee8a2d80ef625a 1388
+  s_ad1c1cb1c68933::t_4eadd34327ca0e 1726,1730
+  s_ad1c1cb1c68933::t_4a9b8acab31108 1815
+  s_ad1c1cb1c68933::t_ac6be8480e9d7e 470-471,480
+  s_ad1c1cb1c68933::t_869b3200b99b00 517
+  s_ad1c1cb1c68933::t_ea54915608206c 1530-1578,1582-1608
+  s_ad1c1cb1c68933::t_d0733ac8afcc28 421-422,430,438-439,441-452
+  s_ad1c1cb1c68933::t_e7b53525bad02f 994,998
+  s_ad1c1cb1c68933::t_8bc86a1e97c04f 51-63
+  s_ad1c1cb1c68933::t_b71f775d947a97 285-343,348,352,357-363,369-389
+  s_ad1c1cb1c68933::t_c8d9de8f2cb4d3 544-549
+  s_ad1c1cb1c68933::t_91ceb61cee83b8 999
+  s_ad1c1cb1c68933::t_dc99a27ea9fc2a 1417-1425
+  s_ad1c1cb1c68933::t_7cce57cd9339e9 1447
+  s_ad1c1cb1c68933::t_5db4feec5a9b37 13,16-21
+  s_ad1c1cb1c68933::t_2ceb738281b173 1579-1581
+  s_ad1c1cb1c68933::t_be4d2f263f70a0 557
+  s_ad1c1cb1c68933::t_25fad32b16c56b 1357,1362
+  s_ad1c1cb1c68933::t_35431c72ddcc70 1398
+  s_ad1c1cb1c68933::t_4e5c376b1d0980 1810,1814
+  s_ad1c1cb1c68933::t_daeffda16b7500 808,812,816
+  s_ad1c1cb1c68933::t_3db25c0dd81b3f 390
+extensions/speckit-pilot/tests/runner/agent-runner.spec.ts
+  s_ad1c1cb1c68933::t_aad25c48b292b1 288-325
+extensions/speckit-pilot/src/types/speckit.types.ts
+  s_ad1c1cb1c68933::t_3a8b0432e1ee2d 312-316
+  s_ad1c1cb1c68933::t_266a78eaea7702 155-156,164-166
+  s_ad1c1cb1c68933::t_f3e0d6ce2428d2 247
+  s_ad1c1cb1c68933::t_17588d4ad39ec7 26-29
+  s_ad1c1cb1c68933::t_1798b62939de98 217-218
+docs/adr/012-speckit-run-modes-and-reset.md
+  s_ad1c1cb1c68933::t_0a4a29bac95dcb 1-50
+extensions/speckit-pilot/src/api/linear.ts
+  s_ad1c1cb1c68933::t_0e3d32090cfeab 27-29
+extensions/speckit-pilot/src/components/speckit-pilot.css
+  s_ad1c1cb1c68933::t_2b3a84875d06ab 2536-2550
+extensions/speckit-pilot/src/components/CardDetail.tsx
+  s_ad1c1cb1c68933::t_1e359aedef751b 153
+  s_ad1c1cb1c68933::t_2693b2fd973e45 34-37
+  s_ad1c1cb1c68933::t_bb26214199d892 29-30
+  s_ad1c1cb1c68933::t_82a7afad887ecc 81,84-90
+  s_ad1c1cb1c68933::t_b50af25c2638ab 154-160,166-192
+  s_ad1c1cb1c68933::t_213a6e1793059f 193-194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "1a97cdcc256fef9353233bc4ce244072037501ec",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_ad1c1cb1c68933": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d399ce2d-7453-4705-8e7e-744524ffebd3",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
