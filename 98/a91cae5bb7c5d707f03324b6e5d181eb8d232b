@@ -1,0 +1,36 @@
+extensions/speckit-pilot/tests/runner/stream-json.spec.ts
+  s_63a16748f3dd55::t_920f8027187b4d 1-10,16-32,38-50
+  s_63a16748f3dd55::t_af199e49e84a08 11-15,33-37
+extensions/speckit-pilot/src/runner/stream-json.ts
+  s_63a16748f3dd55::t_65b86e6650c045 1-34
+extensions/speckit-pilot/src/runner/agent-runner.ts
+  s_63a16748f3dd55::t_786477de0923da 200
+  s_63a16748f3dd55::t_79a0d1dd97b053 6
+  s_63a16748f3dd55::t_dcfd06e5e94012 98-102,110
+  s_63a16748f3dd55::t_b36145003662d4 214
+  s_63a16748f3dd55::t_80322246ca5b9c 137-178,181-185
+extensions/speckit-pilot/tests/runner/agent-runner.spec.ts
+  s_63a16748f3dd55::t_aa794a8fecb546 113-121,136-137,149-219,235,237-239,243-286
+  s_63a16748f3dd55::t_a9ca0379a4e22c 287
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "98a91cae5bb7c5d707f03324b6e5d181eb8d232b",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_63a16748f3dd55": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c9544678-a1a3-4fea-9b89-c0b6b321ed74",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
