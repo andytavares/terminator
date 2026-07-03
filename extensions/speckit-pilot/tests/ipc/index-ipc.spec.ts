@@ -747,6 +747,29 @@ describe('speckit:card-handoff', () => {
     expect(body).toContain('TAV-11')
   })
 
+  it('speckit mode invokes the native /speckit-specify skill with the card title', async () => {
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    vi.mocked(persistence.readState).mockResolvedValue(
+      makeState('/repo/specs/x', { card: { title: 'Auto-load tickets', type: 'feature' } }) as never
+    )
+    vi.mocked(persistence.readCard).mockResolvedValue(null)
+    const mockStartPhaseRunner = vi.fn().mockReturnValue({ stop: vi.fn() })
+    vi.mocked(agentRunnerMod.createAgentRunner).mockReturnValue({
+      startPhaseRunner: mockStartPhaseRunner,
+    })
+
+    const handler = getSharedHandler('speckit:card-handoff')!
+    await handler({ featureDir: '/repo/specs/x', workspacePath: '/repo' })
+
+    const runnerCall = mockStartPhaseRunner.mock.calls[0][0] as {
+      phase: string
+      phaseCommand: string
+    }
+    expect(runnerCall.phase).toBe('specify')
+    expect(runnerCall.phaseCommand).toContain('/speckit-specify')
+    expect(runnerCall.phaseCommand).toContain('Auto-load tickets')
+  })
+
   it('quick mode skips the SpecKit phases and starts at plan from the ticket', async () => {
     vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
     vi.mocked(persistence.readState).mockResolvedValue(makeState('/repo/specs/x') as never)
@@ -817,6 +840,54 @@ describe('speckit:card-reset', () => {
     const rmCalls = vi.mocked(nodefs.promises.rm).mock.calls.map(([p]) => String(p))
     expect(rmCalls.some((p) => p.endsWith('/logs'))).toBe(true)
     expect(rmCalls.some((p) => p.endsWith('history.jsonl'))).toBe(true)
+  })
+})
+
+describe('speckit:run-reply', () => {
+  it('errors when there is no active conversation to reply to', async () => {
+    const handler = getSharedHandler('speckit:run-reply')!
+    const result = (await handler({ featureDir: '/repo/specs/never-run', text: 'hi' })) as {
+      error?: string
+    }
+    expect(result.error).toBeDefined()
+  })
+
+  it('resumes the captured session with the reply text', async () => {
+    // A runner whose startPhaseRunner surfaces a session id, mirroring a real run.
+    const startPhaseRunner = vi.fn((opts: { onSession?: (s: string) => void }) => {
+      opts.onSession?.('sess-1')
+      return { stop: vi.fn() }
+    })
+    vi.mocked(agentRunnerMod.createAgentRunner).mockReturnValue({ startPhaseRunner })
+
+    // 1) run a phase so the session id gets captured
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    vi.mocked(persistence.readState).mockResolvedValue(
+      makeState('/repo/specs/x', { worktreePath: '/repo/.worktrees/x' }) as never
+    )
+    vi.mocked(persistence.readCard).mockResolvedValue(null)
+    await getSharedHandler('speckit:card-handoff')!({
+      featureDir: '/repo/specs/x',
+      workspacePath: '/repo',
+    })
+
+    // 2) reply — resumes that session
+    vi.mocked(nodefs.promises.readFile).mockResolvedValue(
+      JSON.stringify(makeState('/repo/specs/x', { worktreePath: '/repo/.worktrees/x' }))
+    )
+    const result = (await getSharedHandler('speckit:run-reply')!({
+      featureDir: '/repo/specs/x',
+      text: 'use the existing helper',
+    })) as { ok?: boolean; error?: string }
+
+    expect(result.error).toBeUndefined()
+    expect(result.ok).toBe(true)
+    const replyCall = startPhaseRunner.mock.calls.at(-1)![0] as {
+      resumeSessionId?: string
+      phaseCommand?: string
+    }
+    expect(replyCall.resumeSessionId).toBe('sess-1')
+    expect(replyCall.phaseCommand).toBe('use the existing helper')
   })
 })
 

@@ -32,6 +32,7 @@ function makeMockChild() {
   return {
     child,
     emitStdout: (data: string) => stdoutHandlers.forEach((cb) => cb(Buffer.from(data))),
+    emitStderr: (data: string) => stderrHandlers.forEach((cb) => cb(Buffer.from(data))),
     emitClose: (code: number) => closeHandlers.forEach((cb) => cb(code)),
   }
 }
@@ -108,6 +109,27 @@ describe('startPhaseRunner', () => {
 
     const opts = vi.mocked(spawn).mock.calls[0][2] as { cwd?: string }
     expect(opts?.cwd).toBe(worktreePath)
+  })
+
+  // The native /speckit-* skills resolve their feature dir from these env vars,
+  // so they operate on the pilot's dir regardless of the worktree's branch name.
+  it('exports SPECIFY_FEATURE(_DIRECTORY) pointing at the feature dir', async () => {
+    const { child } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    const runner = createAgentRunner(api)
+    runner.startPhaseRunner({
+      featureDir: '/repo/specs/017-tav-11',
+      worktreePath: '/repo/.worktrees/tav-11',
+      phaseCommand: '/speckit-specify x',
+      phase: 'specify',
+    })
+
+    const opts = vi.mocked(spawn).mock.calls[0][2] as { env?: Record<string, string> }
+    expect(opts.env?.SPECIFY_FEATURE).toBe('017-tav-11')
+    expect(opts.env?.SPECIFY_FEATURE_DIRECTORY).toBe('specs/017-tav-11')
   })
 
   // A claude phase streams `--output-format stream-json`; the runner extracts
@@ -211,9 +233,12 @@ describe('startPhaseRunner', () => {
     emitStdout(JSON.stringify({ type: 'system', subtype: 'init' }) + '\n')
     emitStdout(JSON.stringify({ type: 'result', subtype: 'success', result: 'done' }) + '\n')
 
+    // System/result events contribute no assistant text. The start banner and
+    // control lines (▶ · ⚠) are the only broadcasts, so exclude those.
     const outputCalls = vi
       .mocked(api.window.broadcast)
       .mock.calls.filter((c) => c[0] === 'speckit:run-output')
+      .filter((c) => !/^[▶·⚠]/.test((c[1] as { line: string }).line))
     expect(outputCalls).toHaveLength(0)
   })
 
@@ -303,6 +328,71 @@ describe('startPhaseRunner', () => {
 
     const spawnArgs = (vi.mocked(spawn).mock.calls[0][1] as string[]).join(' ')
     expect(spawnArgs).toContain('--permission-mode bypassPermissions')
+  })
+
+  it('resumes the session when replying and captures the session id', async () => {
+    const { child, emitStdout } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    const runner = createAgentRunner(api)
+    const onSession = vi.fn()
+    runner.startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: 'my answer',
+      phase: 'clarify',
+      resumeSessionId: 'sess-123',
+      onSession,
+    })
+
+    const spawnArgs = (vi.mocked(spawn).mock.calls[0][1] as string[]).join(' ')
+    expect(spawnArgs).toContain('--resume')
+    expect(spawnArgs).toContain('sess-123')
+
+    // session id surfaced from the stream
+    emitStdout(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-999' }) + '\n')
+    expect(onSession).toHaveBeenCalledWith('sess-999')
+  })
+
+  it('emits a start banner immediately so the console is never silent', async () => {
+    const { child } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    createAgentRunner(api).startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: '/speckit-specify x',
+      phase: 'specify',
+    })
+
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'speckit:run-output',
+      expect.objectContaining({ line: '▶ specify: /speckit-specify x' })
+    )
+  })
+
+  it('streams stderr to the console so failures are visible', async () => {
+    const { child, emitStderr } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    createAgentRunner(api).startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: '/speckit-plan',
+      phase: 'plan',
+    })
+
+    emitStderr('zsh: command not found: claude\n')
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'speckit:run-output',
+      expect.objectContaining({ line: '⚠ zsh: command not found: claude' })
+    )
   })
 
   it('bypasses permission prompts for the self-review google-review step', async () => {
@@ -554,7 +644,7 @@ describe('startPhaseRunner', () => {
     )
   })
 
-  it('collects stderr output without broadcasting per-line', async () => {
+  it('buffers partial stderr (no newline) until a line completes', async () => {
     const stderrHandlers: ((data: Buffer | string) => void)[] = []
     const stderrChild = {
       stdout: { on: vi.fn() },
@@ -579,13 +669,22 @@ describe('startPhaseRunner', () => {
       phase: 'specify',
     })
 
+    // Neither chunk ends in a newline, so nothing should be surfaced yet.
     stderrHandlers.forEach((cb) => cb(Buffer.from('some stderr')))
     stderrHandlers.forEach((cb) => cb('stderr as string'))
 
-    const outputBroadcasts = vi
+    const stderrBroadcasts = vi
       .mocked(api.window.broadcast)
       .mock.calls.filter(([ch]) => ch === 'speckit:run-output')
-    expect(outputBroadcasts).toHaveLength(0)
+      .filter(([, p]) => (p as { line: string }).line.startsWith('⚠'))
+    expect(stderrBroadcasts).toHaveLength(0)
+
+    // A newline flushes the buffered line, prefixed with ⚠.
+    stderrHandlers.forEach((cb) => cb('!\n'))
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'speckit:run-output',
+      expect.objectContaining({ line: '⚠ some stderrstderr as string!' })
+    )
   })
 })
 

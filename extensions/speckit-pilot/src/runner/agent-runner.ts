@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { PhaseId } from '../types/speckit.types.js'
-import { textFromStreamJsonLine } from './stream-json.js'
+import { sessionIdFromStreamJsonLine, textFromStreamJsonLine } from './stream-json.js'
 
 /** Absolute path to a phase's persisted output log. */
 export function phaseLogPath(featureDir: string, phase: PhaseId): string {
@@ -55,8 +55,15 @@ export interface StartPhaseRunnerOpts {
   phase: PhaseId
   feedbackNote?: string
   batchIndex?: number
+  // When set, resume the given Claude session instead of starting fresh — used
+  // to answer the model's questions from the run console (the reply is
+  // `phaseCommand`).
+  resumeSessionId?: string
   onStart?: () => void | Promise<void>
   onComplete?: (exitCode: number) => void | Promise<void>
+  // Fires with the Claude session id as soon as it's known, so the pilot can
+  // resume the conversation later.
+  onSession?: (sessionId: string) => void
 }
 
 export interface AgentRunner {
@@ -84,14 +91,26 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
         phase,
         feedbackNote,
         batchIndex,
+        resumeSessionId,
         onStart,
         onComplete,
+        onSession,
       } = opts
 
       const shellBin = process.env.SHELL ?? '/bin/sh'
+      // Point the native `/speckit-*` skills at this card's feature directory so
+      // they operate on the right spec/plan/tasks files regardless of the git
+      // branch name (SpecKit's common.sh honors these over branch inference).
+      // The dir is relative to the worktree cwd, matching SpecKit's own
+      // `specs/<slug>` convention.
+      const featureSlug = path.basename(featureDir)
       const spawnOpts = {
         cwd: worktreePath,
-        env: process.env as Record<string, string>,
+        env: {
+          ...process.env,
+          SPECIFY_FEATURE: featureSlug,
+          SPECIFY_FEATURE_DIRECTORY: path.join('specs', featureSlug),
+        } as Record<string, string>,
         stdio: ['ignore', 'pipe', 'pipe'] as const,
       }
 
@@ -107,11 +126,14 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
         const prompt = feedbackNote
           ? `${phaseCommand}\n\nFeedback from reviewer:\n${feedbackNote}`
           : phaseCommand
+        // A reply resumes the existing conversation so the model has full context
+        // for the answer; a fresh phase run starts a new session.
+        const resumeFlag = resumeSessionId ? `--resume ${shellQuote(resumeSessionId)} ` : ''
         // Phases run headless in the card's isolated worktree, so bypass
         // permission prompts — a spawned `--print` process has no interactive
         // channel to approve tool calls, and without this every Write/Edit/Bash
         // stalls forever (see ADR-007).
-        cmd = `claude --print --permission-mode bypassPermissions --output-format stream-json --verbose --include-partial-messages ${shellQuote(prompt)}`
+        cmd = `claude --print ${resumeFlag}--permission-mode bypassPermissions --output-format stream-json --verbose --include-partial-messages ${shellQuote(prompt)}`
       }
 
       const child = spawn(shellBin, ['-l', '-c', cmd], spawnOpts)
@@ -149,16 +171,31 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
         })
       }
 
+      // Show immediate activity so the console isn't a silent "Waiting for
+      // output…" while the agent boots (it can be seconds before the first
+      // assistant token, and longer if it's stuck).
+      emitLine(`▶ ${phase}${phaseCommand ? `: ${phaseCommand}` : ''}`)
+
       // Two-level line buffering for stream-json: stdout chunks can split a JSON
       // event, and a display line can span several text deltas.
       let jsonlBuffer = ''
       let displayBuffer = ''
 
+      let sessionCaptured = false
       const handleStreamJson = (text: string) => {
         jsonlBuffer += text
         const jsonLines = jsonlBuffer.split('\n')
         jsonlBuffer = jsonLines.pop() ?? ''
         for (const jline of jsonLines) {
+          if (!sessionCaptured) {
+            const sid = sessionIdFromStreamJsonLine(jline)
+            if (sid) {
+              sessionCaptured = true
+              onSession?.(sid)
+              // Confirm the agent actually launched, before any assistant text.
+              emitLine(`· session ${sid.slice(0, 8)} started`)
+            }
+          }
           const chunk = textFromStreamJsonLine(jline)
           if (!chunk) continue
           displayBuffer += chunk
@@ -192,12 +229,27 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
       }
 
       child.stdout?.on('data', handleData)
+      // In stream-json mode stdout is pure JSON, so stderr carries only
+      // diagnostics (command-not-found, rate-limit notices, node errors). Stream
+      // it to the console so a stalled or failed run is visible instead of a
+      // silent "Waiting for output…".
+      let stderrBuffer = ''
       child.stderr?.on('data', (data: Buffer | string) => {
-        // Collect stderr separately; only surface on error to avoid duplicating
-        // output that claude --print writes to both stdout and stderr.
         const text = typeof data === 'string' ? data : data.toString()
         outputBuffer.push(text)
-        persist(text.replace(/\n$/, ''))
+        stderrBuffer += text
+        const lines = stderrBuffer.split('\n')
+        stderrBuffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.trim()) continue
+          persist(line)
+          api.window.broadcast('speckit:run-output', {
+            featureDir,
+            phase,
+            line: `⚠ ${line}`,
+            ts: new Date().toISOString(),
+          })
+        }
       })
 
       child.on('error', (err) => {

@@ -36,30 +36,45 @@ import { parseGitLog, artifactSpecs, buildArtifactRef } from './state/artifact-l
 import { buildTicketMarkdown } from './state/ticket-markdown.js'
 import type { ArtifactRef, BoardStage } from './types/speckit.types.js'
 
+// SpecKit-mode phases invoke the project's native `/speckit-*` skills rather
+// than freeform prose. The skills already encode feature-dir placement, template
+// resolution, and stop conditions — which is what keeps runs from wandering
+// (writing spec.md at the repo root, asking where files go, etc.). They resolve
+// the correct feature directory from the SPECIFY_FEATURE_DIRECTORY env var the
+// runner sets, independent of the branch name. `${DESCRIPTION}` is substituted
+// with the card title for /speckit-specify.
 const PHASE_COMMANDS: Record<PhaseId, string> = {
-  constitution: 'Read and affirm the project constitution',
-  specify: 'Write a detailed feature specification in spec.md based on the ticket in ticket.md',
-  clarify: 'Review spec.md, identify and resolve open questions and ambiguities, update spec.md',
-  plan: 'Create a detailed technical implementation plan in plan.md based on spec.md',
-  checklist: 'Generate an implementation checklist from plan.md, save to checklists/',
-  tasks: 'Break the checklist into granular file-level tasks, save to tasks.md',
-  analyze: 'Analyze existing codebase patterns relevant to tasks.md and document findings',
-  implement: 'Implement the tasks described in tasks.md according to the plan',
+  constitution: '/speckit-constitution',
+  specify: '/speckit-specify Based on the ticket in ticket.md: ${DESCRIPTION}',
+  clarify: '/speckit-clarify',
+  plan: '/speckit-plan',
+  checklist: '/speckit-checklist',
+  tasks: '/speckit-tasks',
+  analyze: '/speckit-analyze',
+  implement: '/speckit-implement',
   'self-review': '', // handled by SELF_REVIEW_CMD in agent-runner; not dispatched as a prompt
   'open-pr': '', // not auto-started; triggered explicitly by user action
 }
 
-// Quick-fix runs skip specify/tasks, so plan and implement work straight from
-// the ticket/plan instead of spec.md/tasks.md.
+// Quick-fix runs skip specify/tasks (so there is no spec.md/tasks.md for the
+// native plan/implement skills to read), so they use direct prose prompts that
+// work straight from the ticket/plan.
 const QUICK_PHASE_COMMANDS: Partial<Record<PhaseId, string>> = {
   plan: 'Create a concise technical implementation plan in plan.md based on the ticket in ticket.md',
   implement: 'Implement the change described in plan.md',
 }
 
-// The prompt for a phase, honoring the card's run mode.
-function phaseCommandFor(phase: PhaseId, mode: RunMode): string {
+// The prompt for a phase, honoring the card's run mode. `description` seeds
+// /speckit-specify with the card title.
+function phaseCommandFor(phase: PhaseId, mode: RunMode, description = ''): string {
   if (mode === 'quick') return QUICK_PHASE_COMMANDS[phase] ?? PHASE_COMMANDS[phase]
-  return PHASE_COMMANDS[phase]
+  return PHASE_COMMANDS[phase].replace('${DESCRIPTION}', description || 'the assigned ticket')
+}
+
+// Card title, tolerant of pre-v3 states read raw (which have no `card` field).
+function cardTitleOf(state: PilotState): string {
+  const card = state.card as CardBrief | undefined
+  return card?.title ?? state.ticket?.title ?? ''
 }
 import {
   setLinearKey,
@@ -90,6 +105,10 @@ const activeRuns: Map<string, string> = new Map()
 
 // Active agent runner handles: featureDir → RunnerHandle
 const activeRunnerHandles: Map<string, RunnerHandle> = new Map()
+
+// Latest Claude session id per card, so the run console can resume the
+// conversation to answer the model's questions. featureDir → sessionId
+const phaseSessionIds: Map<string, string> = new Map()
 
 async function appendHistory(featureDir: string, entry: HistoryEntry): Promise<void> {
   const pilotDir = path.join(featureDir, '.pilot')
@@ -218,6 +237,10 @@ function makePhaseCallbacks(
   batchIndex?: number
 ) {
   return {
+    onSession: (sessionId: string) => {
+      phaseSessionIds.set(featureDir, sessionId)
+      api.window.broadcast('speckit:run-session', { featureDir, phase, sessionId })
+    },
     onStart: async () => {
       const state = await readPilotState(featureDir)
       if (!state) return
@@ -419,7 +442,8 @@ async function startRunAt(
   featureDir: string,
   worktreePath: string,
   phase: PhaseId,
-  mode: RunMode = 'speckit'
+  mode: RunMode = 'speckit',
+  description = ''
 ): Promise<void> {
   const runId = `run-${Date.now()}`
   const feedbackNote = (await consumePendingComments(featureDir, runId)) ?? undefined
@@ -427,7 +451,7 @@ async function startRunAt(
   const handle = runner.startPhaseRunner({
     featureDir,
     worktreePath,
-    phaseCommand: phaseCommandFor(phase, mode),
+    phaseCommand: phaseCommandFor(phase, mode, description),
     phase,
     feedbackNote,
     ...makePhaseCallbacks(api, featureDir, phase),
@@ -514,7 +538,14 @@ async function handoffCard(
   state.stage = deriveStage(state.phases, state.run)
   await writePilotState(featureDir, state)
   await writeWorktreeTicket(worktreePath, card, state.ticket)
-  await startRunAt(api, featureDir, worktreePath, firstRunnablePhase(state), state.mode)
+  await startRunAt(
+    api,
+    featureDir,
+    worktreePath,
+    firstRunnablePhase(state),
+    state.mode,
+    state.card.title
+  )
   api.window.broadcast('speckit:dispatch-started', { featureDir, branchName, worktreePath })
   api.window.broadcast('speckit:state-changed', { state })
   return { ok: true, dispatched: true, queued: false }
@@ -554,7 +585,7 @@ async function advanceQueue(api: ExtensionAPI, workspacePath: string): Promise<v
       await writePilotState(s.featureDir, s)
       const qCard = (await readCard(s.featureDir)) ?? s.card
       await writeWorktreeTicket(worktreePath, qCard, s.ticket)
-      await startRunAt(api, s.featureDir, worktreePath, firstRunnablePhase(s), s.mode)
+      await startRunAt(api, s.featureDir, worktreePath, firstRunnablePhase(s), s.mode, s.card.title)
       api.window.broadcast('speckit:dispatch-started', {
         featureDir: s.featureDir,
         branchName,
@@ -996,7 +1027,7 @@ export function activate(api: ExtensionAPI): void {
         const handle = runner.startPhaseRunner({
           featureDir,
           worktreePath,
-          phaseCommand: phaseCommandFor(nextPhaseId, state.mode),
+          phaseCommand: phaseCommandFor(nextPhaseId, state.mode, cardTitleOf(state)),
           phase: nextPhaseId,
           feedbackNote: steer,
           ...makePhaseCallbacks(api, featureDir, nextPhaseId),
@@ -1444,7 +1475,14 @@ export function activate(api: ExtensionAPI): void {
       primePhasesForRun(state)
       state.stage = deriveStage(state.phases, state.run)
       await writePilotState(featureDir, state)
-      await startRunAt(api, featureDir, worktreePath, firstRunnablePhase(state), state.mode)
+      await startRunAt(
+        api,
+        featureDir,
+        worktreePath,
+        firstRunnablePhase(state),
+        state.mode,
+        state.card.title
+      )
 
       api.window.broadcast('speckit:dispatch-started', { featureDir, branchName, worktreePath })
       api.window.broadcast('speckit:state-changed', { state })
@@ -1604,6 +1642,56 @@ export function activate(api: ExtensionAPI): void {
       api.notifications.showToast('error', `Reset failed: ${String(err)}`)
       return { error: String(err) }
     }
+  })
+
+  // speckit:run-reply — answer the model's question from the run console by
+  // resuming the last Claude session with the user's text. Output streams back
+  // into the same phase console.
+  reg(api, 'speckit:run-reply', async (payload: unknown) => {
+    const { featureDir, text } = payload as { featureDir?: string; text?: string }
+    if (!featureDir || !text || !text.trim()) return { error: 'featureDir and text required' }
+
+    const sessionId = phaseSessionIds.get(featureDir)
+    if (!sessionId) {
+      return { error: 'No active conversation to reply to yet — run a phase first.' }
+    }
+    const state = await readPilotState(featureDir)
+    if (!state) return { error: 'No pilot state found' }
+    const worktreePath = await ensureWorktreePath(api, featureDir, state)
+
+    // Reply against whichever phase is live (running or awaiting review).
+    const phase =
+      PHASE_ORDER.find((p) => {
+        const s = state.phases[p]?.status
+        return s === 'running' || s === 'awaiting_review'
+      }) ?? firstRunnablePhase(state)
+
+    // Echo the user's message into the console so the exchange reads as a chat.
+    api.window.broadcast('speckit:run-output', {
+      featureDir,
+      phase,
+      line: `🧑 ${text}`,
+      ts: new Date().toISOString(),
+    })
+
+    // Stop any still-running phase process before resuming the conversation.
+    const existing = activeRunnerHandles.get(featureDir)
+    if (existing) {
+      existing.stop()
+      activeRunnerHandles.delete(featureDir)
+    }
+
+    const runner = createAgentRunner(api)
+    const handle = runner.startPhaseRunner({
+      featureDir,
+      worktreePath,
+      phaseCommand: text,
+      phase,
+      resumeSessionId: sessionId,
+      ...makePhaseCallbacks(api, featureDir, phase),
+    })
+    activeRunnerHandles.set(featureDir, handle)
+    return { ok: true }
   })
 
   // speckit:open-pr — run gh pr create, write prUrl to state, comment on ticket
@@ -1812,7 +1900,7 @@ export function activate(api: ExtensionAPI): void {
       const handle = runner.startPhaseRunner({
         featureDir,
         worktreePath,
-        phaseCommand: phaseCommandFor(phase, state.mode),
+        phaseCommand: phaseCommandFor(phase, state.mode, cardTitleOf(state)),
         phase,
         feedbackNote: note,
         ...makePhaseCallbacks(api, featureDir, phase),

@@ -127,14 +127,14 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
         {tab === 'phases' && (
           <>
             {canHandoff && (
-              <div className="sk-handoff">
-                <p>
+              <div className="sk-startcard">
+                <p className="sk-startcard__status">
                   {hasRun
                     ? 'This card is not currently running.'
                     : 'This card has not been started yet.'}
                 </p>
                 {!state?.worktreePath && (
-                  <label className="sk-field" style={{ maxWidth: 320 }}>
+                  <label className="sk-field">
                     <span>Base branch</span>
                     <select
                       aria-label="Base branch"
@@ -150,17 +150,24 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
                     </select>
                   </label>
                 )}
-                <label className="sk-checkbox-label">
+                <label className="sk-toggle">
                   <input
                     type="checkbox"
                     checked={quickMode}
                     onChange={(e) => setQuickMode(e.target.checked)}
                   />
-                  <span>Quick fix — plan → implement → review (skip full SpecKit)</span>
+                  <span className="sk-toggle__text">
+                    <strong>Quick fix</strong>
+                    <span className="sk-toggle__hint">
+                      plan → implement → review · skips full SpecKit
+                    </span>
+                  </span>
                 </label>
-                <button type="button" className="sk-btn sk-btn--primary" onClick={handoff}>
-                  {hasRun ? 'Resume / re-run with agent' : 'Hand off to agent'}
-                </button>
+                <div className="sk-startcard__actions">
+                  <button type="button" className="sk-btn sk-btn--primary" onClick={handoff}>
+                    {hasRun ? 'Resume / re-run' : 'Hand off to agent'}
+                  </button>
+                </div>
               </div>
             )}
             {hasRun && (
@@ -168,14 +175,14 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
                 {confirmingReset ? (
                   <>
                     <span className="sk-reset__warn">
-                      Delete this run&apos;s worktree, branch, and entire history, and start over?
+                      Delete this run&apos;s worktree, branch, and history?
                     </span>
                     <button type="button" className="sk-btn sk-btn--danger" onClick={reset}>
                       Reset everything
                     </button>
                     <button
                       type="button"
-                      className="sk-btn"
+                      className="sk-btn sk-btn--ghost"
                       onClick={() => setConfirmingReset(false)}
                     >
                       Cancel

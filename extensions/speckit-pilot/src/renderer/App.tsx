@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Settings, Download, X } from 'lucide-react'
 import { BoardView } from '../components/BoardView.js'
 import { CardDetail } from '../components/CardDetail.js'
@@ -16,6 +16,13 @@ export function App(): JSX.Element {
   )
   const [overlay, setOverlay] = useState<Overlay>('none')
   const [openCardDir, setOpenCardDir] = useState<string | null>(null)
+  // Keep the latest repoRoot readable from the dispatch-started listener, which
+  // is subscribed once — without this it captures a stale (often null) repoRoot
+  // and silently skips mirroring the worktree into the sidebar.
+  const repoRootRef = useRef<string | null>(repoRoot)
+  useEffect(() => {
+    repoRootRef.current = repoRoot
+  }, [repoRoot])
 
   // Workspace switch
   useEffect(() => {
@@ -27,7 +34,7 @@ export function App(): JSX.Element {
     })
   }, [])
 
-  // Mirror dispatched worktrees into the workspace project list (unchanged behavior)
+  // Mirror dispatched worktrees into the workspace project list.
   useEffect(() => {
     return window.electronAPI.extensionBridge.on('speckit:dispatch-started', (data: unknown) => {
       const d = data as { branchName?: string; worktreePath?: string }
@@ -37,11 +44,12 @@ export function App(): JSX.Element {
 
   async function createWorktreeProject(branchName: string, worktreePath: string) {
     try {
-      if (!repoRoot) return
+      const root = repoRootRef.current
+      if (!root) return
       const listResult = (await window.electronAPI.workspace.list()) as {
         workspaces: Array<{ id: string; folderPath: string }>
       }
-      const workspace = listResult.workspaces.find((w) => w.folderPath === repoRoot)
+      const workspace = listResult.workspaces.find((w) => w.folderPath === root)
       if (!workspace) return
       await window.electronAPI.project.create({
         workspaceId: workspace.id,
