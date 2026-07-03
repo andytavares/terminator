@@ -1,0 +1,32 @@
+extensions/speckit-pilot/tests/runner/agent-runner.spec.ts
+  s_ad1c1cb1c68933::t_c430d2f89dd0e3 35
+  s_ad1c1cb1c68933::t_997f138d696e8f 647
+  s_ad1c1cb1c68933::t_5b6ea3012c339a 359-397
+  s_ad1c1cb1c68933::t_2a72d6ddad403c 672,676,679-687
+  s_ad1c1cb1c68933::t_d5954ecae5fda3 236-237,241
+extensions/speckit-pilot/src/runner/agent-runner.ts
+  s_ad1c1cb1c68933::t_47603c96a89a7f 232-236,240-252
+  s_ad1c1cb1c68933::t_28acf836edc00e 174-178
+  s_ad1c1cb1c68933::t_9c250c6d7fab56 195-196
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "ec05c6b3a886a4d66a2ad403783e60923b980057",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_ad1c1cb1c68933": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d399ce2d-7453-4705-8e7e-744524ffebd3",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
