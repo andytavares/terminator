@@ -1,0 +1,77 @@
+extensions/speckit-pilot/src/index.ts
+  s_63a16748f3dd55::t_b9483131b6cbdd 429-430
+  s_63a16748f3dd55::t_cf6969a29c356f 1251-1252,1255,1267
+  s_63a16748f3dd55::t_ed2f830035093c 30
+  s_63a16748f3dd55::t_1c4eb9a229f462 286-300
+  s_63a16748f3dd55::t_e97a460b51a23a 395
+extensions/speckit-pilot/src/state/ticket-markdown.ts
+  s_63a16748f3dd55::t_86496fa6cfd660 17-22
+  s_63a16748f3dd55::t_1c965e434dc1d0 1-16,23-40
+specs/018-tav-10/.pilot/card.json
+  s_63a16748f3dd55::t_86496fa6cfd660 10
+  s_63a16748f3dd55::t_ac3397fd6a6830 1-9
+.claude/settings.json
+  h_16ba00fe96244d 2
+specs/017-tav-11/.pilot/card.json
+  s_63a16748f3dd55::t_86496fa6cfd660 10
+  s_63a16748f3dd55::t_b232efc9bb62e1 1-9
+specs/019-tav-11/.pilot/card.json
+  s_63a16748f3dd55::t_86496fa6cfd660 10
+  s_63a16748f3dd55::t_5e24962cff105f 1-9
+.claude/launch.json
+  h_16ba00fe96244d 2
+package.json
+  h_16ba00fe96244d 18
+extensions/speckit-pilot/tests/ipc/index-ipc.spec.ts
+  s_63a16748f3dd55::t_268cd04f72cf7c 607-644
+extensions/speckit-pilot/tests/state/ticket-markdown.spec.ts
+  s_63a16748f3dd55::t_1a265153baacdc 1-70
+specs/018-tav-10/.pilot/state.json
+  s_63a16748f3dd55::t_86496fa6cfd660 35-231
+  s_63a16748f3dd55::t_e4402191859361 1-34
+specs/017-tav-11/.pilot/state.json
+  s_63a16748f3dd55::t_86496fa6cfd660 40-236
+  s_63a16748f3dd55::t_98e2a9174eaea0 1-39
+specs/019-tav-11/.pilot/state.json
+  s_63a16748f3dd55::t_86496fa6cfd660 35-231
+  s_63a16748f3dd55::t_782fcb81de889b 1-34
+specs/020-tav-9/.pilot/card.json
+  s_63a16748f3dd55::t_86496fa6cfd660 10
+  s_63a16748f3dd55::t_825548eb03bd31 1-9
+CLAUDE.md
+  h_16ba00fe96244d 3
+specs/020-tav-9/.pilot/state.json
+  s_63a16748f3dd55::t_86496fa6cfd660 35-229
+  s_63a16748f3dd55::t_d7076304c86bf9 2-34
+specs/017-tav-11/.pilot/history.jsonl
+  s_c5e97be89c874f::t_9eb219e1d801a4 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "8c29cfb904b1516a990f4de65d9056f081b2e31a",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_63a16748f3dd55": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c9544678-a1a3-4fea-9b89-c0b6b321ed74",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_c5e97be89c874f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2e81a6f-ee1c-474d-bdbc-00dafcdb3e34",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
