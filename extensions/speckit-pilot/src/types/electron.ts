@@ -9,6 +9,7 @@ import type {
   KnowledgeRef,
   PhaseId,
   PilotState,
+  RunMode,
   SelfReviewResult,
   Ticket,
   TicketRef,
@@ -90,6 +91,7 @@ export interface SpeckitAPI {
     workspacePath: string
     autonomyLevel?: 'guided' | 'standard' | 'fast'
     baseBranch?: string
+    mode?: RunMode
   }): Promise<{ featureDir: string; queued: boolean } | { error: string }>
   runCancel(payload: {
     featureDir: string
@@ -139,7 +141,12 @@ export interface SpeckitAPI {
     featureDir: string
     workspacePath: string
     baseBranch?: string
+    mode?: RunMode
   }): Promise<{ ok: true; dispatched: true; queued: boolean } | { error: string; message?: string }>
+  cardReset(payload: {
+    featureDir: string
+    workspacePath?: string
+  }): Promise<{ ok: true; state: PilotState } | { error: string }>
   cardComment(payload: {
     featureDir: string
     body: string
@@ -286,6 +293,10 @@ export function getSpeckitAPI(): SpeckitAPI {
     cardHandoff: (payload) =>
       bridge.invoke('speckit:card-handoff', payload) as Promise<
         { ok: true; dispatched: true; queued: boolean } | { error: string; message?: string }
+      >,
+    cardReset: (payload) =>
+      bridge.invoke('speckit:card-reset', payload) as Promise<
+        { ok: true; state: PilotState } | { error: string }
       >,
     cardComment: (payload) =>
       bridge.invoke('speckit:card-comment', payload) as Promise<

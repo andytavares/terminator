@@ -6,6 +6,7 @@ import { createInitialState } from '../../src/state/state-persistence.js'
 const mockPilotState = vi.fn()
 const mockCardUpdate = vi.fn()
 const mockCardHandoff = vi.fn()
+const mockCardReset = vi.fn()
 const mockCommentList = vi.fn().mockResolvedValue({ comments: [] })
 const mockHistoryLoad = vi.fn().mockResolvedValue({ entries: [] })
 const mockArtifactList = vi.fn().mockResolvedValue({ artifacts: [] })
@@ -15,10 +16,17 @@ vi.mock('../../src/types/electron.js', () => ({
     pilotState: mockPilotState,
     cardUpdate: mockCardUpdate,
     cardHandoff: mockCardHandoff,
+    cardReset: mockCardReset,
     commentList: mockCommentList,
     historyLoad: mockHistoryLoad,
     artifactList: mockArtifactList,
   }),
+}))
+
+// RunDashboard subscribes to live run events via its own API surface; stub it so
+// these tests focus on CardDetail's handoff/reset controls.
+vi.mock('../../src/components/RunDashboard.js', () => ({
+  RunDashboard: () => null,
 }))
 
 import { CardDetail } from '../../src/components/CardDetail.js'
@@ -30,6 +38,7 @@ describe('CardDetail', () => {
     mockHistoryLoad.mockResolvedValue({ entries: [] })
     mockArtifactList.mockResolvedValue({ artifacts: [] })
     mockCardHandoff.mockResolvedValue({ ok: true, dispatched: true, queued: false })
+    mockCardReset.mockResolvedValue({ ok: true, state: createInitialState('/repo/specs/x') })
     mockCardUpdate.mockResolvedValue({ ok: true })
     const state = createInitialState('/repo/specs/x')
     state.card.title = 'My Card'
@@ -67,6 +76,7 @@ describe('CardDetail', () => {
         featureDir: '/repo/specs/x',
         workspacePath: '/repo',
         baseBranch: 'main',
+        mode: 'speckit',
       })
     )
   })
@@ -83,6 +93,45 @@ describe('CardDetail', () => {
         featureDir: '/repo/specs/x',
         workspacePath: '/repo',
         baseBranch: 'dev',
+        mode: 'speckit',
+      })
+    )
+  })
+
+  it('hands off in quick mode when the Quick fix toggle is checked', async () => {
+    render(<CardDetail featureDir="/repo/specs/x" workspacePath="/repo" onClose={vi.fn()} />)
+    await waitFor(() => screen.getByRole('heading', { name: 'My Card' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Phases' }))
+    const toggle = await screen.findByText(/Quick fix/)
+    fireEvent.click(toggle.previousSibling as HTMLInputElement)
+    fireEvent.click(screen.getByText('Hand off to agent'))
+    await waitFor(() =>
+      expect(mockCardHandoff).toHaveBeenCalledWith(expect.objectContaining({ mode: 'quick' }))
+    )
+  })
+
+  it('confirms then resets a card that has a run', async () => {
+    const state = createInitialState('/repo/specs/x')
+    state.card.title = 'My Card'
+    state.run = {
+      status: 'running',
+      startedAt: 't',
+      completedAt: null,
+      autonomyLevel: 'standard',
+    }
+    mockPilotState.mockResolvedValue({ state })
+
+    render(<CardDetail featureDir="/repo/specs/x" workspacePath="/repo" onClose={vi.fn()} />)
+    await waitFor(() => screen.getByRole('heading', { name: 'My Card' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Phases' }))
+    // First click reveals the confirm; the destructive action is gated behind it.
+    fireEvent.click(await screen.findByText('Reset / start over'))
+    expect(mockCardReset).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('Reset everything'))
+    await waitFor(() =>
+      expect(mockCardReset).toHaveBeenCalledWith({
+        featureDir: '/repo/specs/x',
+        workspacePath: '/repo',
       })
     )
   })

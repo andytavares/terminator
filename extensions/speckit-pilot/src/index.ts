@@ -10,9 +10,15 @@ import type {
   JiraCreds,
   PhaseId,
   PilotState,
+  RunMode,
   TicketRef,
 } from './types/speckit.types.js'
-import { PHASE_ORDER, STAGE_ORDER, createDefaultBrief } from './types/speckit.types.js'
+import {
+  PHASE_ORDER,
+  QUICK_PHASES,
+  STAGE_ORDER,
+  createDefaultBrief,
+} from './types/speckit.types.js'
 import {
   readState as readMigratedState,
   readCard,
@@ -41,6 +47,19 @@ const PHASE_COMMANDS: Record<PhaseId, string> = {
   implement: 'Implement the tasks described in tasks.md according to the plan',
   'self-review': '', // handled by SELF_REVIEW_CMD in agent-runner; not dispatched as a prompt
   'open-pr': '', // not auto-started; triggered explicitly by user action
+}
+
+// Quick-fix runs skip specify/tasks, so plan and implement work straight from
+// the ticket/plan instead of spec.md/tasks.md.
+const QUICK_PHASE_COMMANDS: Partial<Record<PhaseId, string>> = {
+  plan: 'Create a concise technical implementation plan in plan.md based on the ticket in ticket.md',
+  implement: 'Implement the change described in plan.md',
+}
+
+// The prompt for a phase, honoring the card's run mode.
+function phaseCommandFor(phase: PhaseId, mode: RunMode): string {
+  if (mode === 'quick') return QUICK_PHASE_COMMANDS[phase] ?? PHASE_COMMANDS[phase]
+  return PHASE_COMMANDS[phase]
 }
 import {
   setLinearKey,
@@ -263,24 +282,110 @@ async function countActiveRuns(workspacePath: string): Promise<number> {
   return n
 }
 
-// Create a git worktree for a card; returns its path + branch name.
+// Lowercase, hyphen-separated slug (trimmed of leading/trailing/ repeated
+// hyphens, capped so branch names stay readable).
+function kebabCase(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+    .replace(/-+$/g, '')
+}
+
+// The committer's git user.name as a slug, for the fallback branch prefix.
+async function gitUsername(api: ExtensionAPI, cwd: string): Promise<string> {
+  try {
+    const res = await api.shell.exec({ command: 'git', args: ['config', 'user.name'], cwd })
+    const name = kebabCase(res.stdout.trim())
+    if (name) return name
+  } catch {
+    // fall through to a generic prefix
+  }
+  return 'user'
+}
+
+// Decide the branch name for a card's worktree. Prefer the tracker's suggested
+// VCS branch (Linear provides one per issue); otherwise
+// <username>/<ticket-key>-<kebab-title>; fall back to feature/<slug> for native
+// cards that have no ticket.
+async function resolveBranchName(
+  api: ExtensionAPI,
+  featureDir: string,
+  workspacePath: string,
+  ticket: TicketRef | null
+): Promise<string> {
+  if (ticket?.branchName) return ticket.branchName
+  if (ticket?.key) {
+    const username = await gitUsername(api, workspacePath)
+    return `${username}/${ticket.key.toLowerCase()}-${kebabCase(ticket.title)}`
+  }
+  const slug = path.basename(featureDir).replace(/^\d+-/, '') || path.basename(featureDir)
+  return `feature/${slug}`
+}
+
+// True when a local git branch already exists.
+async function branchExists(
+  api: ExtensionAPI,
+  workspacePath: string,
+  branchName: string
+): Promise<boolean> {
+  const res = await api.shell.exec({
+    command: 'git',
+    args: ['rev-parse', '--verify', '--quiet', `refs/heads/${branchName}`],
+    cwd: workspacePath,
+  })
+  return res.exitCode === 0
+}
+
+// Create a git worktree for a card; returns its path + branch name. Reuses an
+// existing branch (e.g. when recreating a removed worktree) instead of failing
+// on `-b`.
 async function createWorktree(
   api: ExtensionAPI,
   featureDir: string,
   workspacePath: string,
+  ticket: TicketRef | null,
   baseBranch?: string
 ): Promise<{ worktreePath: string; branchName: string }> {
   const slug = path.basename(featureDir).replace(/^\d+-/, '') || path.basename(featureDir)
-  const branchName = `feature/${slug}`
+  const branchName = await resolveBranchName(api, featureDir, workspacePath, ticket)
   // Respect the core app's worktree location setting (workspace override →
   // global → <repo>/.worktrees) instead of a private directory.
   const worktreeRoot = api.settings.resolveWorktreeBaseDir(workspacePath)
   const worktreePath = path.join(worktreeRoot, slug)
-  const args = ['worktree', 'add', worktreePath, '-b', branchName]
-  if (baseBranch) args.push(baseBranch)
+  const args = ['worktree', 'add', worktreePath]
+  if (await branchExists(api, workspacePath, branchName)) {
+    args.push(branchName)
+  } else {
+    args.push('-b', branchName)
+    if (baseBranch) args.push(baseBranch)
+  }
   const res = await api.shell.exec({ command: 'git', args, cwd: workspacePath })
   if (res.exitCode !== 0) throw new Error(res.stderr || res.stdout || 'git worktree add failed')
   return { worktreePath, branchName }
+}
+
+// Guarantee a card runs in its own worktree, never the main checkout. Returns
+// the existing worktree when present, otherwise creates one and persists it to
+// state. Every phase runner must resolve its cwd through this.
+async function ensureWorktreePath(
+  api: ExtensionAPI,
+  featureDir: string,
+  state: PilotState
+): Promise<string> {
+  if (state.worktreePath && (await pathExists(state.worktreePath))) return state.worktreePath
+  const workspacePath = path.dirname(path.dirname(featureDir))
+  const { worktreePath, branchName } = await createWorktree(
+    api,
+    featureDir,
+    workspacePath,
+    state.ticket
+  )
+  state.worktreePath = worktreePath
+  state.branchName = branchName
+  await writePilotState(featureDir, state)
+  return worktreePath
 }
 
 // Materialize the card's ticket content into the worktree so the `specify`
@@ -313,7 +418,8 @@ async function startRunAt(
   api: ExtensionAPI,
   featureDir: string,
   worktreePath: string,
-  phase: PhaseId
+  phase: PhaseId,
+  mode: RunMode = 'speckit'
 ): Promise<void> {
   const runId = `run-${Date.now()}`
   const feedbackNote = (await consumePendingComments(featureDir, runId)) ?? undefined
@@ -321,7 +427,7 @@ async function startRunAt(
   const handle = runner.startPhaseRunner({
     featureDir,
     worktreePath,
-    phaseCommand: PHASE_COMMANDS[phase],
+    phaseCommand: phaseCommandFor(phase, mode),
     phase,
     feedbackNote,
     ...makePhaseCallbacks(api, featureDir, phase),
@@ -329,8 +435,21 @@ async function startRunAt(
   activeRunnerHandles.set(featureDir, handle)
 }
 
-// Prepare a card's phases for a run, honoring the "skip Constitution" setting.
+// Prepare a card's phases for a run. Quick-fix cards skip every phase outside
+// QUICK_PHASES; SpecKit cards honor the "skip Constitution" setting.
 function primePhasesForRun(state: PilotState): void {
+  if (state.mode === 'quick') {
+    for (const id of PHASE_ORDER) {
+      const ps = state.phases[id]
+      if (!ps || ps.status === 'approved') continue
+      if (QUICK_PHASES.includes(id)) {
+        if (id === 'plan' && ps.status === 'locked') ps.status = 'ready'
+      } else {
+        ps.status = 'skipped'
+      }
+    }
+    return
+  }
   const constitution = state.phases['constitution']
   const specify = state.phases['specify']
   if (!constitution) return
@@ -348,7 +467,8 @@ async function handoffCard(
   api: ExtensionAPI,
   featureDir: string,
   workspacePath: string,
-  baseBranch?: string
+  baseBranch?: string,
+  mode?: RunMode
 ): Promise<{ ok: true; dispatched: true; queued: boolean } | { error: string; message?: string }> {
   const state = await readMigratedState(featureDir)
   if (!state) return { error: 'No card state found' }
@@ -357,6 +477,7 @@ async function handoffCard(
   if (!title || title.trim().length === 0) {
     return { error: 'VALIDATION_ERROR', message: 'A card needs a title before handoff' }
   }
+  if (mode) state.mode = mode
   const now = new Date().toISOString()
   state.run = {
     status: 'running',
@@ -382,7 +503,7 @@ async function handoffCard(
   let branchName = state.branchName
   const existingUsable = worktreePath ? await pathExists(worktreePath) : false
   if (!existingUsable) {
-    const created = await createWorktree(api, featureDir, workspacePath, baseBranch)
+    const created = await createWorktree(api, featureDir, workspacePath, state.ticket, baseBranch)
     worktreePath = created.worktreePath
     branchName = created.branchName
   }
@@ -393,7 +514,7 @@ async function handoffCard(
   state.stage = deriveStage(state.phases, state.run)
   await writePilotState(featureDir, state)
   await writeWorktreeTicket(worktreePath, card, state.ticket)
-  await startRunAt(api, featureDir, worktreePath, firstRunnablePhase(state))
+  await startRunAt(api, featureDir, worktreePath, firstRunnablePhase(state), state.mode)
   api.window.broadcast('speckit:dispatch-started', { featureDir, branchName, worktreePath })
   api.window.broadcast('speckit:state-changed', { state })
   return { ok: true, dispatched: true, queued: false }
@@ -420,7 +541,12 @@ async function advanceQueue(api: ExtensionAPI, workspacePath: string): Promise<v
     if (shouldQueue(active, cap)) break
     const s = item.state
     try {
-      const { worktreePath, branchName } = await createWorktree(api, s.featureDir, workspacePath)
+      const { worktreePath, branchName } = await createWorktree(
+        api,
+        s.featureDir,
+        workspacePath,
+        s.ticket
+      )
       s.worktreePath = worktreePath
       s.branchName = branchName
       s.queuePosition = 'active'
@@ -428,7 +554,7 @@ async function advanceQueue(api: ExtensionAPI, workspacePath: string): Promise<v
       await writePilotState(s.featureDir, s)
       const qCard = (await readCard(s.featureDir)) ?? s.card
       await writeWorktreeTicket(worktreePath, qCard, s.ticket)
-      await startRunAt(api, s.featureDir, worktreePath, firstRunnablePhase(s))
+      await startRunAt(api, s.featureDir, worktreePath, firstRunnablePhase(s), s.mode)
       api.window.broadcast('speckit:dispatch-started', {
         featureDir: s.featureDir,
         branchName,
@@ -679,14 +805,15 @@ export function activate(api: ExtensionAPI): void {
 
   // speckit:card-handoff — explicit "start" action: run the card through the pipeline
   reg(api, 'speckit:card-handoff', async (payload: unknown) => {
-    const { featureDir, workspacePath, baseBranch } = payload as {
+    const { featureDir, workspacePath, baseBranch, mode } = payload as {
       featureDir: string
       workspacePath: string
       baseBranch?: string
+      mode?: RunMode
     }
     if (!featureDir || !workspacePath) return { error: 'featureDir and workspacePath required' }
     try {
-      return await handoffCard(api, featureDir, workspacePath, baseBranch)
+      return await handoffCard(api, featureDir, workspacePath, baseBranch, mode)
     } catch (err) {
       api.notifications.showToast('error', `Handoff failed: ${String(err)}`)
       return { error: String(err) }
@@ -864,11 +991,12 @@ export function activate(api: ExtensionAPI): void {
         nextPs.status = 'ready'
         await writePilotState(featureDir, state)
         const steer = (await consumePendingComments(featureDir, `run-${Date.now()}`)) ?? undefined
+        const worktreePath = await ensureWorktreePath(api, featureDir, state)
         const runner = createAgentRunner(api)
         const handle = runner.startPhaseRunner({
           featureDir,
-          worktreePath: state.worktreePath ?? featureDir,
-          phaseCommand: PHASE_COMMANDS[nextPhaseId],
+          worktreePath,
+          phaseCommand: phaseCommandFor(nextPhaseId, state.mode),
           phase: nextPhaseId,
           feedbackNote: steer,
           ...makePhaseCallbacks(api, featureDir, nextPhaseId),
@@ -1226,11 +1354,12 @@ export function activate(api: ExtensionAPI): void {
 
   // speckit:dispatch — create feature dir, init state v2, start agent on constitution phase
   reg(api, 'speckit:dispatch', async (payload: unknown) => {
-    const { ticket, workspacePath, autonomyLevel, baseBranch } = payload as {
+    const { ticket, workspacePath, autonomyLevel, baseBranch, mode } = payload as {
       ticket: TicketRef
       workspacePath: string
       autonomyLevel?: 'guided' | 'standard' | 'fast'
       baseBranch?: string
+      mode?: RunMode
     }
     if (!ticket || !workspacePath) return { error: 'ticket and workspacePath required' }
 
@@ -1256,7 +1385,7 @@ export function activate(api: ExtensionAPI): void {
         'utf-8'
       )
 
-      const branchName = `feature/${slug}`
+      const branchName = await resolveBranchName(api, featureDir, workspacePath, ticket)
       // Respect the core app's worktree location setting (workspace override →
       // global → <repo>/.worktrees) instead of a private directory.
       const worktreeRoot = api.settings.resolveWorktreeBaseDir(workspacePath)
@@ -1266,6 +1395,7 @@ export function activate(api: ExtensionAPI): void {
       const state = createInitialState(featureDir, {
         card: dispatchCard,
         ticket,
+        mode: mode ?? 'speckit',
         run: {
           status: 'running',
           startedAt: new Date().toISOString(),
@@ -1284,9 +1414,15 @@ export function activate(api: ExtensionAPI): void {
       await fs.promises.writeFile(tmp, JSON.stringify(state, null, 2), 'utf-8')
       await fs.promises.rename(tmp, stateFile)
 
-      // Create git worktree branching from baseBranch (or HEAD if not specified)
-      const worktreeArgs = ['worktree', 'add', worktreePath, '-b', branchName]
-      if (baseBranch) worktreeArgs.push(baseBranch)
+      // Create git worktree branching from baseBranch (or HEAD if not specified),
+      // reusing the branch if it already exists.
+      const worktreeArgs = ['worktree', 'add', worktreePath]
+      if (await branchExists(api, workspacePath, branchName)) {
+        worktreeArgs.push(branchName)
+      } else {
+        worktreeArgs.push('-b', branchName)
+        if (baseBranch) worktreeArgs.push(baseBranch)
+      }
       const worktreeResult = await api.shell.exec({
         command: 'git',
         args: worktreeArgs,
@@ -1308,7 +1444,7 @@ export function activate(api: ExtensionAPI): void {
       primePhasesForRun(state)
       state.stage = deriveStage(state.phases, state.run)
       await writePilotState(featureDir, state)
-      await startRunAt(api, featureDir, worktreePath, firstRunnablePhase(state))
+      await startRunAt(api, featureDir, worktreePath, firstRunnablePhase(state), state.mode)
 
       api.window.broadcast('speckit:dispatch-started', { featureDir, branchName, worktreePath })
       api.window.broadcast('speckit:state-changed', { state })
@@ -1387,6 +1523,85 @@ export function activate(api: ExtensionAPI): void {
       return { ok: true }
     } catch (err) {
       api.notifications.showToast('error', `Cancel failed: ${String(err)}`)
+      return { error: String(err) }
+    }
+  })
+
+  // speckit:card-reset — wipe a card's entire run so it can start over. Stops the
+  // runner, removes the worktree + branch, deletes .pilot logs/history/self-review,
+  // and resets phases/run to the initial state. The card brief, ticket, mode, and
+  // settings are preserved so the card can be re-dispatched cleanly.
+  reg(api, 'speckit:card-reset', async (payload: unknown) => {
+    const { featureDir, workspacePath } = payload as {
+      featureDir: string
+      workspacePath?: string
+    }
+    if (!featureDir) return { error: 'featureDir required' }
+
+    try {
+      const handle = activeRunnerHandles.get(featureDir)
+      if (handle) {
+        handle.stop()
+        activeRunnerHandles.delete(featureDir)
+      }
+
+      const prev = await readPilotState(featureDir)
+      const cwd = workspacePath ?? path.dirname(path.dirname(featureDir))
+
+      // Tear down the worktree + branch (best-effort; a manually deleted worktree
+      // must not block the reset).
+      if (prev?.worktreePath) {
+        await api.shell
+          .exec({ command: 'git', args: ['worktree', 'remove', prev.worktreePath, '--force'], cwd })
+          .catch(() => {})
+      }
+      if (prev?.branchName) {
+        await api.shell
+          .exec({ command: 'git', args: ['branch', '-D', prev.branchName], cwd })
+          .catch(() => {})
+        // Drop the mirrored workspace project (matched by branch name).
+        const workspace = workspacePath
+          ? api.workspace.list().find((w) => w.folderPath === workspacePath)
+          : undefined
+        if (workspace) {
+          const project = api.workspace
+            .listProjects(workspace.id)
+            .find((p) => p.name === prev.branchName)
+          if (project) {
+            api.workspace.deleteProject(project.id)
+            api.window.broadcast('workspace:project-removed', { id: project.id })
+          }
+        }
+      }
+
+      // Wipe the run history: logs, history.jsonl, self-review, pending comments.
+      const pilotDir = path.join(featureDir, '.pilot')
+      await fs.promises
+        .rm(path.join(pilotDir, 'logs'), { recursive: true, force: true })
+        .catch(() => {})
+      for (const f of ['history.jsonl', 'self-review.json', 'comments.jsonl']) {
+        await fs.promises.rm(path.join(pilotDir, f), { force: true }).catch(() => {})
+      }
+
+      // Rebuild a fresh initial state, preserving the card brief, ticket, and mode.
+      const card = (await readCard(featureDir)) ?? prev?.card
+      const state = createInitialState(featureDir, {
+        card: card ?? undefined,
+        ticket: prev?.ticket ?? null,
+        mode: prev?.mode ?? 'speckit',
+      })
+      await writePilotState(featureDir, state)
+      await appendHistory(featureDir, {
+        ts: new Date().toISOString(),
+        actor: 'user',
+        action: 'reset',
+        phase: firstRunnablePhase(state),
+      })
+      api.window.broadcast('speckit:state-changed', { state })
+      if (workspacePath) await advanceQueue(api, workspacePath)
+      return { ok: true, state }
+    } catch (err) {
+      api.notifications.showToast('error', `Reset failed: ${String(err)}`)
       return { error: String(err) }
     }
   })
@@ -1508,10 +1723,11 @@ export function activate(api: ExtensionAPI): void {
 
       if (decision === 'continue') {
         const nextBatch = (batchIndex ?? 0) + 1
+        const worktreePath = await ensureWorktreePath(api, featureDir, state)
         const runner = createAgentRunner(api)
         const newHandle = runner.startPhaseRunner({
           featureDir,
-          worktreePath: state.worktreePath ?? featureDir,
+          worktreePath,
           phaseCommand: `Continue implementation batch ${nextBatch}`,
           phase: 'implement',
           batchIndex: nextBatch,
@@ -1591,11 +1807,12 @@ export function activate(api: ExtensionAPI): void {
         phase,
         note,
       })
+      const worktreePath = await ensureWorktreePath(api, featureDir, state)
       const runner = createAgentRunner(api)
       const handle = runner.startPhaseRunner({
         featureDir,
-        worktreePath: state.worktreePath ?? featureDir,
-        phaseCommand: PHASE_COMMANDS[phase],
+        worktreePath,
+        phaseCommand: phaseCommandFor(phase, state.mode),
         phase,
         feedbackNote: note,
         ...makePhaseCallbacks(api, featureDir, phase),

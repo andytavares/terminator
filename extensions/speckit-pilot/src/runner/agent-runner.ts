@@ -67,7 +67,7 @@ const SELF_REVIEW_CMD = [
   'npm run format',
   'npm run lint',
   'npx vitest run --coverage',
-  'claude --print /google-review',
+  'claude --print --permission-mode bypassPermissions /google-review',
 ].join(' && ')
 
 function shellQuote(s: string): string {
@@ -107,7 +107,11 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
         const prompt = feedbackNote
           ? `${phaseCommand}\n\nFeedback from reviewer:\n${feedbackNote}`
           : phaseCommand
-        cmd = `claude --print --output-format stream-json --verbose --include-partial-messages ${shellQuote(prompt)}`
+        // Phases run headless in the card's isolated worktree, so bypass
+        // permission prompts — a spawned `--print` process has no interactive
+        // channel to approve tool calls, and without this every Write/Edit/Bash
+        // stalls forever (see ADR-007).
+        cmd = `claude --print --permission-mode bypassPermissions --output-format stream-json --verbose --include-partial-messages ${shellQuote(prompt)}`
       }
 
       const child = spawn(shellBin, ['-l', '-c', cmd], spawnOpts)

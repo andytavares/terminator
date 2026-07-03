@@ -128,6 +128,7 @@ const TicketRefSchema = z.object({
   key: z.string(),
   sourceUrl: z.string(),
   title: z.string(),
+  branchName: z.string().nullable().optional(),
 })
 
 // v3 schema — current canonical schema (adds card + stage)
@@ -136,6 +137,7 @@ export const PilotStateSchema = z.object({
   featureDir: z.string(),
   card: CardBriefSchema,
   stage: BoardStageSchema,
+  mode: z.enum(['speckit', 'quick']).default('speckit'),
   ticket: TicketRefSchema.nullable().default(null),
   run: RunMetaSchema.nullable().default(null),
   queuePosition: z.enum(['active', 'pending']).nullable().default(null),

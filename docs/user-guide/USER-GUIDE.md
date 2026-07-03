@@ -335,18 +335,26 @@ Constitution → Specify → Clarify → Plan → Checklist → Tasks → Analyz
 
 Claude Code runs autonomously as a subprocess per phase; **human approval gates** protect every phase boundary.
 
+For small changes you can flip a card to **Quick fix** at hand-off, which skips the upfront spec/analysis phases and runs a short pipeline instead:
+
+```
+Plan → Implement → Self-review → Open PR
+```
+
+Each run happens in the card's own git **worktree** on a dedicated branch (the Linear-suggested branch name when the card came from a Linear ticket, otherwise `<git-username>/<ticket-key>-<kebab-title>`), so the base branch is never touched. If a run goes sideways, **Reset / start over** on the card removes the worktree + branch, wipes the run history, and returns the card to a clean, re-dispatchable state (the brief and ticket are kept).
+
 ### Opening SpecKit Pilot
 
 Click the **SpecKit** tab in the content area tab bar.
 
 ### 4-tab UI
 
-| Tab             | Contents                                                                 |
-| --------------- | ------------------------------------------------------------------------ |
-| **Tickets**     | Linear and Jira ticket queue; select a ticket to start a new feature run |
-| **Features**    | All features with their current phase shown in a mini phase-rail per row |
-| **Active runs** | Live view of the currently executing phase with output streaming         |
-| **History**     | Completed and failed runs with full audit log                            |
+| Tab             | Contents                                                                                                                                                                         |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tickets**     | Linear and Jira ticket queue; select a ticket to start a new feature run. Hand-off offers a **Quick fix** toggle (short plan→implement→review pipeline) and a base-branch picker |
+| **Features**    | All features with their current phase shown in a mini phase-rail per row                                                                                                         |
+| **Active runs** | Live view of the currently executing phase with output streaming                                                                                                                 |
+| **History**     | Completed and failed runs with full audit log                                                                                                                                    |
 
 ### Workflow
 

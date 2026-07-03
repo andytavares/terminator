@@ -24,6 +24,9 @@ export async function fetchAssignedTickets(
     body: issue.description ?? '',
     bodyFormat: 'markdown' as const,
     acceptanceCriteria: [],
+    // Linear generates a VCS branch name per issue (e.g. andrew/tav-11-title);
+    // prefer it when creating the card's worktree branch.
+    branchName: issue.branchName ?? null,
   }))
 }
 

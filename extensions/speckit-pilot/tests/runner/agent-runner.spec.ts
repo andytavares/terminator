@@ -285,6 +285,44 @@ describe('startPhaseRunner', () => {
     expect(spawnArgs).toContain('--include-partial-messages')
   })
 
+  // A spawned `--print` process has no interactive channel to approve tool
+  // calls, so without a bypass every Write/Edit/Bash stalls forever.
+  it('bypasses permission prompts for claude phases', async () => {
+    const { child } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    const runner = createAgentRunner(api)
+    runner.startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: 'Write spec',
+      phase: 'specify',
+    })
+
+    const spawnArgs = (vi.mocked(spawn).mock.calls[0][1] as string[]).join(' ')
+    expect(spawnArgs).toContain('--permission-mode bypassPermissions')
+  })
+
+  it('bypasses permission prompts for the self-review google-review step', async () => {
+    const { child } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    const runner = createAgentRunner(api)
+    runner.startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: '',
+      phase: 'self-review',
+    })
+
+    const spawnArgs = (vi.mocked(spawn).mock.calls[0][1] as string[]).join(' ')
+    expect(spawnArgs).toContain('claude --print --permission-mode bypassPermissions /google-review')
+  })
+
   it('broadcasts speckit:run-phase-complete on exit', async () => {
     const { child, emitClose } = makeMockChild()
     vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)

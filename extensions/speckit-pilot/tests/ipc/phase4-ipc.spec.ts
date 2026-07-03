@@ -95,7 +95,15 @@ function buildMockApi(): {
       focusSelf: vi.fn(),
     },
     shell: {
-      exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false }),
+      // The branch-existence probe reports "absent" so worktree creation takes
+      // the `-b` new-branch path; every other git command succeeds.
+      exec: vi.fn().mockImplementation((opts: { args?: string[] }) => {
+        const args = opts?.args ?? []
+        if (args.includes('rev-parse') && args.includes('--verify')) {
+          return Promise.resolve({ exitCode: 1, stdout: '', stderr: '', timedOut: false })
+        }
+        return Promise.resolve({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
+      }),
     },
     notifications: {
       showToast: vi.fn(),
@@ -111,6 +119,7 @@ function buildMockApi(): {
       register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       get: vi.fn(),
       set: vi.fn(),
+      resolveWorktreeBaseDir: vi.fn((workspacePath: string) => `${workspacePath}/.worktrees`),
     },
     terminal: {
       onSessionCreate: vi.fn().mockReturnValue({ dispose: vi.fn() }),
