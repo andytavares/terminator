@@ -9,10 +9,42 @@
 interface StreamJsonEvent {
   type?: string
   session_id?: string
+  subtype?: string
+  is_error?: boolean
+  result?: string
   event?: {
     type?: string
     delta?: { type?: string; text?: string }
+    content_block?: { type?: string; name?: string }
   }
+}
+
+// A short activity note for non-text events, so the console shows the agent
+// working (tool calls) or failing (errors) between assistant messages instead of
+// looking dead. Returns null for events that shouldn't be shown.
+export function noteFromStreamJsonLine(jsonLine: string): string | null {
+  const trimmed = jsonLine.trim()
+  if (!trimmed) return null
+  let evt: StreamJsonEvent
+  try {
+    evt = JSON.parse(trimmed) as StreamJsonEvent
+  } catch {
+    return null
+  }
+  // A tool call is starting — show which tool.
+  if (
+    evt.type === 'stream_event' &&
+    evt.event?.type === 'content_block_start' &&
+    evt.event.content_block?.type === 'tool_use' &&
+    evt.event.content_block.name
+  ) {
+    return `🔧 ${evt.event.content_block.name}`
+  }
+  // The run ended in an error (e.g. rate limit, out of credits, max turns).
+  if (evt.type === 'result' && (evt.is_error || (evt.subtype && evt.subtype !== 'success'))) {
+    return `⚠ ${evt.result || evt.subtype || 'run ended with an error'}`
+  }
+  return null
 }
 
 // Extract the Claude Code session id from a stream-json line, if present. The
