@@ -218,6 +218,7 @@ function buildMockApi(): {
       register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       get: vi.fn(),
       set: vi.fn(),
+      resolveWorktreeBaseDir: vi.fn((workspacePath: string) => `${workspacePath}/.worktrees`),
     },
     terminal: {
       onSessionCreate: vi.fn().mockReturnValue({ dispose: vi.fn() }),
@@ -282,6 +283,9 @@ beforeEach(() => {
   vi.mocked(persistence.consumePendingComments).mockResolvedValue(null)
   // Reset extension settings mock so a prior test's implementation does not leak
   vi.mocked(sharedApi.settings.get).mockReturnValue(undefined as never)
+  vi.mocked(sharedApi.settings.resolveWorktreeBaseDir).mockImplementation(
+    (workspacePath: string) => `${workspacePath}/.worktrees`
+  )
 })
 
 describe('speckit:card-list', () => {
@@ -496,6 +500,33 @@ describe('speckit:card-handoff', () => {
     expect(sharedApi.shell.exec).toHaveBeenCalled()
   })
 
+  it('creates the worktree under the resolved base dir (respects the core setting, not .wt)', async () => {
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    vi.mocked(persistence.readState).mockResolvedValue(makeState('/repo/specs/x') as never)
+    vi.mocked(persistence.readCard).mockResolvedValue({
+      title: 'Ready card',
+      type: 'feature',
+      scope: '',
+      checklist: [],
+      attachments: [],
+      knowledgeRefs: [],
+      source: 'native',
+      createdAt: 'x',
+    })
+    vi.mocked(sharedApi.settings.resolveWorktreeBaseDir).mockReturnValue('/custom/worktrees')
+
+    const handler = getSharedHandler('speckit:card-handoff')!
+    await handler({ featureDir: '/repo/specs/x', workspacePath: '/repo' })
+
+    expect(sharedApi.settings.resolveWorktreeBaseDir).toHaveBeenCalledWith('/repo')
+    const addCall = vi
+      .mocked(sharedApi.shell.exec)
+      .mock.calls.find((c) => (c[0] as { args?: string[] }).args?.includes('add'))
+    expect(addCall).toBeDefined()
+    expect((addCall![0] as { args: string[] }).args).toContain('/custom/worktrees/x')
+    expect(JSON.stringify((addCall![0] as { args: string[] }).args)).not.toContain('.wt')
+  })
+
   it('passes the chosen base branch to git worktree add', async () => {
     vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
     vi.mocked(persistence.readState).mockResolvedValue(makeState('/repo/specs/x') as never)
@@ -634,8 +665,8 @@ describe('speckit:card-handoff', () => {
       .mocked(nodefs.promises.writeFile)
       .mock.calls.find(([p]) => String(p).endsWith('ticket.md'))
     expect(ticketMdCall).toBeDefined()
-    // written into the worktree, not the specs dir
-    expect(String(ticketMdCall![0])).toContain('.wt')
+    // written into the worktree (resolved base dir), not the specs dir
+    expect(String(ticketMdCall![0])).toContain('.worktrees')
     // and it carries the actual ticket content, not just metadata
     const body = String(ticketMdCall![1])
     expect(body).toContain('The board should pull assigned tickets on open.')

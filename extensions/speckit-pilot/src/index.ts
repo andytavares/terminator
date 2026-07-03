@@ -272,9 +272,9 @@ async function createWorktree(
 ): Promise<{ worktreePath: string; branchName: string }> {
   const slug = path.basename(featureDir).replace(/^\d+-/, '') || path.basename(featureDir)
   const branchName = `feature/${slug}`
-  const worktreeRoot =
-    (api.settings.get<string>('terminator.speckit-pilot.worktreeRoot') || '').trim() ||
-    path.join(workspacePath, '.wt')
+  // Respect the core app's worktree location setting (workspace override →
+  // global → <repo>/.worktrees) instead of a private directory.
+  const worktreeRoot = api.settings.resolveWorktreeBaseDir(workspacePath)
   const worktreePath = path.join(worktreeRoot, slug)
   const args = ['worktree', 'add', worktreePath, '-b', branchName]
   if (baseBranch) args.push(baseBranch)
@@ -1257,9 +1257,9 @@ export function activate(api: ExtensionAPI): void {
       )
 
       const branchName = `feature/${slug}`
-      const worktreeRoot =
-        (api.settings.get<string>('terminator.speckit-pilot.worktreeRoot') || '').trim() ||
-        path.join(workspacePath, '.wt')
+      // Respect the core app's worktree location setting (workspace override →
+      // global → <repo>/.worktrees) instead of a private directory.
+      const worktreeRoot = api.settings.resolveWorktreeBaseDir(workspacePath)
       const worktreePath = path.join(worktreeRoot, slug)
 
       // Create initial state v3 (constitution ready, active run, ticket-seeded card)
@@ -1658,11 +1658,6 @@ export function activate(api: ExtensionAPI): void {
           label: 'Enable SpecKit Pilot',
           default: true,
           workspaceScoped: true,
-        },
-        'terminator.speckit-pilot.worktreeRoot': {
-          type: 'string',
-          label: 'Worktree root directory (leave empty to use .wt/ inside workspace)',
-          default: '',
         },
         'terminator.speckit-pilot.maxConcurrentRuns': {
           type: 'number',

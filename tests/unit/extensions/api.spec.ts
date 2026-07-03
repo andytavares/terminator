@@ -51,6 +51,22 @@ vi.mock('../../../src/main/storage/extension-settings-store', () => ({
   getAllExtensionSettings: () => ({ ...mockExtensionStore }),
 }))
 
+const mockGetGlobalSettings = vi.fn()
+const mockGetWorkspaceSettings = vi.fn()
+vi.mock('../../../src/main/storage/settings-store', () => ({
+  getGlobalSettings: () => mockGetGlobalSettings(),
+  getWorkspaceSettings: (id: string) => mockGetWorkspaceSettings(id),
+}))
+
+const mockListWorkspaces = vi.fn(
+  () => [] as Array<{ id: string; name: string; folderPath: string }>
+)
+vi.mock('../../../src/main/storage/workspace-store', () => ({
+  listWorkspaces: () => mockListWorkspaces(),
+  listProjects: () => [],
+  deleteProject: vi.fn(),
+}))
+
 import {
   createExtensionAPI,
   globalRegistry,
@@ -65,6 +81,47 @@ beforeEach(() => {
   globalRegistry.topBarItems.clear()
   globalRegistry.nativeMenuItems.clear()
   globalRegistry.settingsSections.clear()
+})
+
+describe('api.settings.resolveWorktreeBaseDir', () => {
+  beforeEach(() => {
+    mockGetGlobalSettings.mockReturnValue({ git: { worktreeBaseDir: '' } })
+    mockGetWorkspaceSettings.mockReturnValue({ workspaceId: 'w1', overrides: {}, extensions: {} })
+    mockListWorkspaces.mockReturnValue([{ id: 'w1', name: 'WS', folderPath: '/repo' }])
+  })
+
+  it('defaults to <workspacePath>/.worktrees when nothing is configured', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    expect(api.settings.resolveWorktreeBaseDir('/repo')).toBe('/repo/.worktrees')
+  })
+
+  it('uses the global git.worktreeBaseDir setting when set', () => {
+    mockGetGlobalSettings.mockReturnValue({ git: { worktreeBaseDir: '/global/wt' } })
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    expect(api.settings.resolveWorktreeBaseDir('/repo')).toBe('/global/wt')
+  })
+
+  it('prefers a workspace override over the global setting', () => {
+    mockGetGlobalSettings.mockReturnValue({ git: { worktreeBaseDir: '/global/wt' } })
+    mockGetWorkspaceSettings.mockReturnValue({
+      workspaceId: 'w1',
+      overrides: { git: { worktreeBaseDir: '/ws/override' } },
+      extensions: {},
+    })
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    expect(api.settings.resolveWorktreeBaseDir('/repo')).toBe('/ws/override')
+  })
+
+  it('falls back to the default when the workspace path matches no known workspace', () => {
+    mockListWorkspaces.mockReturnValue([])
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    expect(api.settings.resolveWorktreeBaseDir('/unknown')).toBe('/unknown/.worktrees')
+  })
+
+  it('never returns the legacy .wt directory', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    expect(api.settings.resolveWorktreeBaseDir('/repo')).not.toContain('.wt/')
+  })
 })
 
 describe('api.notifications.showToast', () => {
