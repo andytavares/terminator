@@ -1,0 +1,76 @@
+extensions/speckit-pilot/src/components/RunConsole.tsx
+  s_ad1c1cb1c68933::t_046666ad8fad50 112-135
+  s_ad1c1cb1c68933::t_7b967373f2a00d 4,14,17-27
+extensions/speckit-pilot/tests/runner/stream-json.spec.ts
+  s_ad1c1cb1c68933::t_60aa4cc26073a3 54-71
+  s_ad1c1cb1c68933::t_f94dcefffa8c28 2-5
+extensions/speckit-pilot/src/renderer/App.tsx
+  s_ad1c1cb1c68933::t_9e22d35e7332a3 19-25,37,47-48,52
+  s_ad1c1cb1c68933::t_f3c057b2a40d2f 1
+extensions/speckit-pilot/tests/components/CardDetail.spec.tsx
+  s_ad1c1cb1c68933::t_52509ddb6e10ac 105-106
+docs/adr/013-speckit-native-skills-and-reply.md
+  s_ad1c1cb1c68933::t_9c1605a0613a0a 1-61
+extensions/speckit-pilot/src/components/CardDetail.tsx
+  s_ad1c1cb1c68933::t_3cf5fecc533de9 130-131,137,153,159-164,166-170,178,185
+extensions/speckit-pilot/src/index.ts
+  s_ad1c1cb1c68933::t_bdd53472003adc 1903
+  s_ad1c1cb1c68933::t_dc7410e2b83e53 1478-1485
+  s_ad1c1cb1c68933::t_ba939e1bbf5496 109-112
+  s_ad1c1cb1c68933::t_26fbd80198bc71 1030
+  s_ad1c1cb1c68933::t_68da8fec56194d 445-446,454
+  s_ad1c1cb1c68933::t_b91066b3971966 588
+  s_ad1c1cb1c68933::t_098213f28607b4 1647-1696
+  s_ad1c1cb1c68933::t_a16ba874e3c973 541-548
+  s_ad1c1cb1c68933::t_c417e8172139ab 39-45,47-54,59-61,67-69,71
+  s_ad1c1cb1c68933::t_249d2b6e094797 240-243
+  s_ad1c1cb1c68933::t_76c046ea7b6480 73-77
+  s_ad1c1cb1c68933::t_dd9e98507f4ec3 72
+extensions/speckit-pilot/tests/runner/agent-runner.spec.ts
+  s_ad1c1cb1c68933::t_9cea77d06f4734 329-354
+  s_ad1c1cb1c68933::t_1bf4e96ece95c7 113-133
+extensions/speckit-pilot/src/runner/stream-json.ts
+  s_ad1c1cb1c68933::t_b9845228568c75 11,18-28
+  s_ad1c1cb1c68933::t_0499db37e83806 29-31
+extensions/speckit-pilot/src/types/electron.ts
+  s_ad1c1cb1c68933::t_902b5b3d322c3a 161
+  s_ad1c1cb1c68933::t_7351bb27ee333f 314-315
+extensions/speckit-pilot/tests/ipc/index-ipc.spec.ts
+  s_ad1c1cb1c68933::t_d0c1c50cdbd5d4 750-763,768-772
+  s_ad1c1cb1c68933::t_902b5b3d322c3a 764-767
+  s_ad1c1cb1c68933::t_fd74312ac3a57b 846-893
+docs/user-guide/USER-GUIDE.md
+  s_ad1c1cb1c68933::t_453943fc1c37e9 369-372
+extensions/speckit-pilot/src/runner/agent-runner.ts
+  s_ad1c1cb1c68933::t_944183976201a6 6
+  s_ad1c1cb1c68933::t_7aa574c3cc02ba 94,97
+  s_ad1c1cb1c68933::t_2d6200341a30d6 58-61,64-66
+  s_ad1c1cb1c68933::t_c7e9d293f372e3 101-106,109-113
+  s_ad1c1cb1c68933::t_9e2dad17475a1f 129-131,136
+  s_ad1c1cb1c68933::t_07503b3fbe6f72 179,185-191
+extensions/speckit-pilot/src/components/speckit-pilot.css
+  s_ad1c1cb1c68933::t_a38a510847fa52 2620-2643
+  s_ad1c1cb1c68933::t_cbcc4238130d8a 2536-2572,2581-2603,2610-2612
+  s_ad1c1cb1c68933::t_62b9bcbad7ac2f 2573-2580
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "921adfc07000c0ffe88ad8eece51347e5fcfc07c",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_ad1c1cb1c68933": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d399ce2d-7453-4705-8e7e-744524ffebd3",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
