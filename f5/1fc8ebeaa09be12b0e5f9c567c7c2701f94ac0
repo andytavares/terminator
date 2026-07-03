@@ -1,0 +1,12 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f51fc8ebeaa09be12b0e5f9c567c7c2701f94ac0",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
