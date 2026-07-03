@@ -171,6 +171,11 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
         })
       }
 
+      // Show immediate activity so the console isn't a silent "Waiting for
+      // output…" while the agent boots (it can be seconds before the first
+      // assistant token, and longer if it's stuck).
+      emitLine(`▶ ${phase}${phaseCommand ? `: ${phaseCommand}` : ''}`)
+
       // Two-level line buffering for stream-json: stdout chunks can split a JSON
       // event, and a display line can span several text deltas.
       let jsonlBuffer = ''
@@ -187,6 +192,8 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
             if (sid) {
               sessionCaptured = true
               onSession?.(sid)
+              // Confirm the agent actually launched, before any assistant text.
+              emitLine(`· session ${sid.slice(0, 8)} started`)
             }
           }
           const chunk = textFromStreamJsonLine(jline)
@@ -222,12 +229,27 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
       }
 
       child.stdout?.on('data', handleData)
+      // In stream-json mode stdout is pure JSON, so stderr carries only
+      // diagnostics (command-not-found, rate-limit notices, node errors). Stream
+      // it to the console so a stalled or failed run is visible instead of a
+      // silent "Waiting for output…".
+      let stderrBuffer = ''
       child.stderr?.on('data', (data: Buffer | string) => {
-        // Collect stderr separately; only surface on error to avoid duplicating
-        // output that claude --print writes to both stdout and stderr.
         const text = typeof data === 'string' ? data : data.toString()
         outputBuffer.push(text)
-        persist(text.replace(/\n$/, ''))
+        stderrBuffer += text
+        const lines = stderrBuffer.split('\n')
+        stderrBuffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.trim()) continue
+          persist(line)
+          api.window.broadcast('speckit:run-output', {
+            featureDir,
+            phase,
+            line: `⚠ ${line}`,
+            ts: new Date().toISOString(),
+          })
+        }
       })
 
       child.on('error', (err) => {
