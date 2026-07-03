@@ -23,6 +23,10 @@ export type PhaseStatus =
 
 export type AutonomyLevel = 'guided' | 'standard' | 'fast'
 
+// A card runs through either the full SpecKit pipeline or a short quick-fix
+// pipeline (plan → implement → review) for small changes.
+export type RunMode = 'speckit' | 'quick'
+
 export type BoardStage = 'backlog' | 'in-progress' | 'in-review' | 'done'
 
 export const STAGE_ORDER: BoardStage[] = ['backlog', 'in-progress', 'in-review', 'done']
@@ -148,6 +152,8 @@ export interface Ticket {
   priority?: string
   size?: string
   runRef?: string | null
+  // The tracker's suggested VCS branch name (Linear provides one per issue).
+  branchName?: string | null
 }
 
 export interface TicketRef {
@@ -155,6 +161,9 @@ export interface TicketRef {
   key: string
   sourceUrl: string
   title: string
+  // The tracker's suggested VCS branch name, carried through so worktree
+  // creation can reuse it instead of inventing a branch name.
+  branchName?: string | null
 }
 
 export interface RunMeta {
@@ -205,6 +214,8 @@ export interface PilotState {
   featureDir: string
   card: CardBrief
   stage: BoardStage
+  // Which pipeline this card runs through (defaults to full SpecKit).
+  mode: RunMode
   ticket: TicketRef | null
   run: RunMeta | null
   queuePosition: 'active' | 'pending' | null
@@ -233,6 +244,7 @@ export interface HistoryEntry {
     | 'file_skipped'
     | 'request_changes'
     | 'run_cancelled'
+    | 'reset'
     | 'pr_opened'
     | 'comment'
     | 'artifact_modified'
@@ -296,6 +308,11 @@ export const PHASE_ORDER: PhaseId[] = [
   'self-review',
   'open-pr',
 ]
+
+// Quick-fix runs skip the upfront spec/analysis phases: just plan the change,
+// implement it, run the review gate, then open the PR. Any phase not listed here
+// is marked 'skipped' when a card runs in quick mode.
+export const QUICK_PHASES: PhaseId[] = ['plan', 'implement', 'self-review', 'open-pr']
 
 export const DEFAULT_PHASE_GATE: PhaseGateConfig = {
   required: true,

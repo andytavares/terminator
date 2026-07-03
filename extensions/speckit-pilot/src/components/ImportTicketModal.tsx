@@ -32,6 +32,7 @@ export function ImportTicketModal({ repoRoot, onClose, onImported }: ImportTicke
         key: ticket.key,
         sourceUrl: ticket.sourceUrl,
         title: ticket.title,
+        branchName: ticket.branchName ?? null,
       },
     })
     if ('featureDir' in result) onImported(result.featureDir)

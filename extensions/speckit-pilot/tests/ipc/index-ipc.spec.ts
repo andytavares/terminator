@@ -35,6 +35,7 @@ vi.mock('node:fs', () => ({
     copyFile: vi.fn().mockResolvedValue(undefined),
     stat: vi.fn().mockResolvedValue({ mtimeMs: Date.now(), isDirectory: () => true }),
     unlink: vi.fn().mockResolvedValue(undefined),
+    rm: vi.fn().mockResolvedValue(undefined),
     access: vi.fn().mockResolvedValue(undefined),
   },
 }))
@@ -202,7 +203,16 @@ function buildMockApi(): {
       focusSelf: vi.fn(),
     },
     shell: {
-      exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false }),
+      // Default: the branch-existence probe (`git rev-parse --verify`) reports
+      // "absent" (exitCode 1) so worktree creation takes the `-b` new-branch
+      // path; every other git command succeeds.
+      exec: vi.fn().mockImplementation((opts: { args?: string[] }) => {
+        const args = opts?.args ?? []
+        if (args.includes('rev-parse') && args.includes('--verify')) {
+          return Promise.resolve({ exitCode: 1, stdout: '', stderr: '', timedOut: false })
+        }
+        return Promise.resolve({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
+      }),
     },
     notifications: {
       showToast: vi.fn(),
@@ -218,6 +228,7 @@ function buildMockApi(): {
       register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       get: vi.fn(),
       set: vi.fn(),
+      resolveWorktreeBaseDir: vi.fn((workspacePath: string) => `${workspacePath}/.worktrees`),
     },
     terminal: {
       onSessionCreate: vi.fn().mockReturnValue({ dispose: vi.fn() }),
@@ -282,6 +293,9 @@ beforeEach(() => {
   vi.mocked(persistence.consumePendingComments).mockResolvedValue(null)
   // Reset extension settings mock so a prior test's implementation does not leak
   vi.mocked(sharedApi.settings.get).mockReturnValue(undefined as never)
+  vi.mocked(sharedApi.settings.resolveWorktreeBaseDir).mockImplementation(
+    (workspacePath: string) => `${workspacePath}/.worktrees`
+  )
 })
 
 describe('speckit:card-list', () => {
@@ -496,6 +510,96 @@ describe('speckit:card-handoff', () => {
     expect(sharedApi.shell.exec).toHaveBeenCalled()
   })
 
+  it('creates the worktree under the resolved base dir (respects the core setting, not .wt)', async () => {
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    vi.mocked(persistence.readState).mockResolvedValue(makeState('/repo/specs/x') as never)
+    vi.mocked(persistence.readCard).mockResolvedValue({
+      title: 'Ready card',
+      type: 'feature',
+      scope: '',
+      checklist: [],
+      attachments: [],
+      knowledgeRefs: [],
+      source: 'native',
+      createdAt: 'x',
+    })
+    vi.mocked(sharedApi.settings.resolveWorktreeBaseDir).mockReturnValue('/custom/worktrees')
+
+    const handler = getSharedHandler('speckit:card-handoff')!
+    await handler({ featureDir: '/repo/specs/x', workspacePath: '/repo' })
+
+    expect(sharedApi.settings.resolveWorktreeBaseDir).toHaveBeenCalledWith('/repo')
+    const addCall = vi
+      .mocked(sharedApi.shell.exec)
+      .mock.calls.find((c) => (c[0] as { args?: string[] }).args?.includes('add'))
+    expect(addCall).toBeDefined()
+    expect((addCall![0] as { args: string[] }).args).toContain('/custom/worktrees/x')
+    expect(JSON.stringify((addCall![0] as { args: string[] }).args)).not.toContain('.wt')
+  })
+
+  it('uses the Linear-provided branch name when the ticket carries one', async () => {
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    vi.mocked(persistence.readState).mockResolvedValue(
+      makeState('/repo/specs/x', {
+        ticket: {
+          source: 'linear',
+          key: 'TAV-11',
+          sourceUrl: 'https://linear.app/x',
+          title: 'Auto-load assigned tickets',
+          branchName: 'andrew/tav-11-auto-load-assigned-tickets',
+        },
+      }) as never
+    )
+    vi.mocked(persistence.readCard).mockResolvedValue(null)
+    const handler = getSharedHandler('speckit:card-handoff')!
+    await handler({ featureDir: '/repo/specs/x', workspacePath: '/repo' })
+    const addCall = vi
+      .mocked(sharedApi.shell.exec)
+      .mock.calls.find((c) => (c[0] as { args?: string[] }).args?.includes('add'))
+    expect((addCall![0] as { args: string[] }).args).toContain(
+      'andrew/tav-11-auto-load-assigned-tickets'
+    )
+  })
+
+  it('builds <username>/<key>-<kebab-title> when the ticket has no branch name', async () => {
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    vi.mocked(persistence.readState).mockResolvedValue(
+      makeState('/repo/specs/x', {
+        ticket: {
+          source: 'jira',
+          key: 'ENG-42',
+          sourceUrl: 'https://jira/x',
+          title: 'Fix the Thing!',
+        },
+      }) as never
+    )
+    vi.mocked(persistence.readCard).mockResolvedValue(null)
+    // git config user.name → the branch prefix
+    vi.mocked(sharedApi.shell.exec).mockImplementation((opts: { args?: string[] }) => {
+      const args = opts?.args ?? []
+      if (args.includes('config') && args.includes('user.name')) {
+        return Promise.resolve({
+          exitCode: 0,
+          stdout: 'Andrew Tavares\n',
+          stderr: '',
+          timedOut: false,
+        })
+      }
+      if (args.includes('rev-parse') && args.includes('--verify')) {
+        return Promise.resolve({ exitCode: 1, stdout: '', stderr: '', timedOut: false })
+      }
+      return Promise.resolve({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
+    })
+    const handler = getSharedHandler('speckit:card-handoff')!
+    await handler({ featureDir: '/repo/specs/x', workspacePath: '/repo' })
+    const addCall = vi
+      .mocked(sharedApi.shell.exec)
+      .mock.calls.find((c) => (c[0] as { args?: string[] }).args?.includes('add'))
+    expect((addCall![0] as { args: string[] }).args).toContain(
+      'andrew-tavares/eng-42-fix-the-thing'
+    )
+  })
+
   it('passes the chosen base branch to git worktree add', async () => {
     vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
     vi.mocked(persistence.readState).mockResolvedValue(makeState('/repo/specs/x') as never)
@@ -634,13 +738,85 @@ describe('speckit:card-handoff', () => {
       .mocked(nodefs.promises.writeFile)
       .mock.calls.find(([p]) => String(p).endsWith('ticket.md'))
     expect(ticketMdCall).toBeDefined()
-    // written into the worktree, not the specs dir
-    expect(String(ticketMdCall![0])).toContain('.wt')
+    // written into the worktree (resolved base dir), not the specs dir
+    expect(String(ticketMdCall![0])).toContain('.worktrees')
     // and it carries the actual ticket content, not just metadata
     const body = String(ticketMdCall![1])
     expect(body).toContain('The board should pull assigned tickets on open.')
     expect(body).toContain('- [ ] Fetches on open')
     expect(body).toContain('TAV-11')
+  })
+
+  it('quick mode skips the SpecKit phases and starts at plan from the ticket', async () => {
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    vi.mocked(persistence.readState).mockResolvedValue(makeState('/repo/specs/x') as never)
+    vi.mocked(persistence.readCard).mockResolvedValue(null)
+    const mockStartPhaseRunner = vi.fn().mockReturnValue({ stop: vi.fn() })
+    vi.mocked(agentRunnerMod.createAgentRunner).mockReturnValue({
+      startPhaseRunner: mockStartPhaseRunner,
+    })
+
+    const handler = getSharedHandler('speckit:card-handoff')!
+    await handler({ featureDir: '/repo/specs/x', workspacePath: '/repo', mode: 'quick' })
+
+    // Run begins at plan, using the ticket-based quick prompt (no spec.md upstream)
+    const runnerCall = mockStartPhaseRunner.mock.calls[0][0] as {
+      phase: string
+      phaseCommand: string
+    }
+    expect(runnerCall.phase).toBe('plan')
+    expect(runnerCall.phaseCommand).toContain('ticket.md')
+
+    // Persisted/broadcast state marks the skipped phases and keeps mode
+    const stateChange = vi
+      .mocked(sharedApi.window.broadcast)
+      .mock.calls.find((c) => c[0] === 'speckit:state-changed')
+    const state = (
+      stateChange![1] as { state: { mode: string; phases: Record<string, { status: string }> } }
+    ).state
+    expect(state.mode).toBe('quick')
+    expect(state.phases['specify'].status).toBe('skipped')
+    expect(state.phases['analyze'].status).toBe('skipped')
+    expect(state.phases['plan'].status).toBe('ready')
+  })
+})
+
+describe('speckit:card-reset', () => {
+  it('requires featureDir', async () => {
+    const handler = getSharedHandler('speckit:card-reset')!
+    const result = (await handler({})) as { error?: string }
+    expect(result.error).toBeDefined()
+  })
+
+  it('tears down the worktree + branch and wipes the run history', async () => {
+    // readPilotState reads state.json via raw fs.readFile
+    vi.mocked(nodefs.promises.readFile).mockResolvedValue(
+      JSON.stringify({
+        ...makeState('/repo/specs/x'),
+        worktreePath: '/repo/.worktrees/x',
+        branchName: 'feature/x',
+        run: { status: 'running', startedAt: 't', completedAt: null, autonomyLevel: 'standard' },
+      })
+    )
+    const handler = getSharedHandler('speckit:card-reset')!
+    const result = (await handler({
+      featureDir: '/repo/specs/x',
+      workspacePath: '/repo',
+    })) as { ok?: boolean; error?: string }
+
+    expect(result.error).toBeUndefined()
+    expect(result.ok).toBe(true)
+    // worktree removed and branch deleted
+    expect(sharedApi.shell.exec).toHaveBeenCalledWith(
+      expect.objectContaining({ args: expect.arrayContaining(['worktree', 'remove']) })
+    )
+    expect(sharedApi.shell.exec).toHaveBeenCalledWith(
+      expect.objectContaining({ args: expect.arrayContaining(['branch', '-D', 'feature/x']) })
+    )
+    // logs dir + history/self-review/comments removed
+    const rmCalls = vi.mocked(nodefs.promises.rm).mock.calls.map(([p]) => String(p))
+    expect(rmCalls.some((p) => p.endsWith('/logs'))).toBe(true)
+    expect(rmCalls.some((p) => p.endsWith('history.jsonl'))).toBe(true)
   })
 })
 

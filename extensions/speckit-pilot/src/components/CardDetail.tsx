@@ -26,10 +26,15 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
   const [state, setState] = useState<PilotState | null>(null)
   const [branches, setBranches] = useState<string[]>([])
   const [baseBranch, setBaseBranch] = useState<string>('')
+  const [quickMode, setQuickMode] = useState(false)
+  const [confirmingReset, setConfirmingReset] = useState(false)
 
   const load = useCallback(async () => {
     const result = await getSpeckitAPI().pilotState({ featureDir })
-    if ('state' in result) setState(result.state)
+    if ('state' in result) {
+      setState(result.state)
+      setQuickMode(result.state.mode === 'quick')
+    }
   }, [featureDir])
 
   useEffect(() => {
@@ -73,9 +78,16 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
       featureDir,
       workspacePath,
       baseBranch: baseBranch || undefined,
+      mode: quickMode ? 'quick' : 'speckit',
     })
     void load()
-  }, [featureDir, workspacePath, baseBranch, load])
+  }, [featureDir, workspacePath, baseBranch, quickMode, load])
+
+  const reset = useCallback(async () => {
+    setConfirmingReset(false)
+    await getSpeckitAPI().cardReset({ featureDir, workspacePath })
+    void load()
+  }, [featureDir, workspacePath, load])
 
   // "Actively running" means a phase is genuinely in progress — not just a stale
   // run flag (e.g. after a reload the in-memory runner is gone). Base the handoff
@@ -138,9 +150,46 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
                     </select>
                   </label>
                 )}
+                <label className="sk-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={quickMode}
+                    onChange={(e) => setQuickMode(e.target.checked)}
+                  />
+                  <span>Quick fix — plan → implement → review (skip full SpecKit)</span>
+                </label>
                 <button type="button" className="sk-btn sk-btn--primary" onClick={handoff}>
                   {hasRun ? 'Resume / re-run with agent' : 'Hand off to agent'}
                 </button>
+              </div>
+            )}
+            {hasRun && (
+              <div className="sk-reset">
+                {confirmingReset ? (
+                  <>
+                    <span className="sk-reset__warn">
+                      Delete this run&apos;s worktree, branch, and entire history, and start over?
+                    </span>
+                    <button type="button" className="sk-btn sk-btn--danger" onClick={reset}>
+                      Reset everything
+                    </button>
+                    <button
+                      type="button"
+                      className="sk-btn"
+                      onClick={() => setConfirmingReset(false)}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="sk-btn sk-btn--ghost"
+                    onClick={() => setConfirmingReset(true)}
+                  >
+                    Reset / start over
+                  </button>
+                )}
               </div>
             )}
             {hasRun && <RunDashboard featureDir={featureDir} workspacePath={workspacePath} />}

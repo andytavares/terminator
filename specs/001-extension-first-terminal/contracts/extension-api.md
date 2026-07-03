@@ -21,6 +21,7 @@ Extension UI (renderer) runs in an isolated `WebContentsView` and communicates v
 | 1.4.0   | Added: `settings.set`, `ipc.invokeChannel`, `ipc.sendChannel`, `ipc.onWindowEvent`, `pty` namespace, `window.broadcast`                                                                                  |
 | 1.5.0   | Added: `db` namespace (shared PGlite), `ipc.isRemoteAccessible`, `pty.listSessions/attachOnData/attachOnExit`, `notifications.createNotification` `targets`, `SettingDefinition` `folder`/`action` types |
 | 2.0.0   | Added: webview renderer isolation model, `manifest.contributes`, `extensionBridge` IPC channels, `workspace:changed` push event, `extension:renderer-reload` push event, `@terminator/extension-sdk`     |
+| 2.1.0   | Added: `settings.resolveWorktreeBaseDir` (respects the core `git.worktreeBaseDir` setting + workspace overrides)                                                                                         |
 
 ---
 
@@ -94,6 +95,15 @@ interface ExtensionAPI {
      * Written to extension-settings-store; readable by all instances of this extension.
      */
     set(key: string, value: unknown): void
+
+    /**
+     * _(v2.1.0)_ The resolved worktree base directory for a workspace, matching
+     * how the core app decides where git worktrees go: a workspace-specific
+     * override wins, then the global `git.worktreeBaseDir` setting, then the
+     * default `<workspacePath>/.worktrees`. Lets extensions that create git
+     * worktrees honor the user's configured location instead of a private dir.
+     */
+    resolveWorktreeBaseDir(workspacePath: string): string
   }
 
   /**

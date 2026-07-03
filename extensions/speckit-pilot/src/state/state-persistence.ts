@@ -65,6 +65,7 @@ function migrateToV3(raw: PreV3State): PilotState {
     featureDir: raw.featureDir,
     card,
     stage: deriveStage(phases, run),
+    mode: 'speckit',
     ticket,
     run,
     queuePosition: raw.queuePosition ?? null,
@@ -170,6 +171,7 @@ export function createInitialState(
     queuePosition?: PilotState['queuePosition']
     worktreePath?: PilotState['worktreePath']
     branchName?: PilotState['branchName']
+    mode?: PilotState['mode']
   }
 ): PilotState {
   const phases = Object.fromEntries(
@@ -201,6 +203,7 @@ export function createInitialState(
     featureDir,
     card,
     stage: deriveStage(phases, run),
+    mode: overrides?.mode ?? 'speckit',
     ticket,
     run,
     queuePosition: overrides?.queuePosition ?? null,

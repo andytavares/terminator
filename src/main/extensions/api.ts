@@ -150,6 +150,13 @@ export interface ExtensionAPI {
     register(schema: ExtensionSettingsSchema): Disposable
     get<T>(key: string): T | undefined
     set(key: string, value: unknown): void
+    /**
+     * The resolved worktree base directory for a workspace, matching how the
+     * core app decides where git worktrees go: a workspace-specific override
+     * wins, then the global `git.worktreeBaseDir` setting, then the default
+     * `<workspacePath>/.worktrees`. Always returns an absolute-style path.
+     */
+    resolveWorktreeBaseDir(workspacePath: string): string
   }
   sidebar: {
     registerItem(item: SidebarContribution): Disposable
@@ -232,6 +239,7 @@ import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
 import { fsWatcherService } from '../fs/fs-watcher.js'
 import { notificationManager } from '../notifications/notification-manager.js'
 import { getExtensionSetting, setExtensionSetting } from '../storage/extension-settings-store.js'
+import { getGlobalSettings, getWorkspaceSettings } from '../storage/settings-store.js'
 import { makeLogger } from '../logger.js'
 import {
   listWorkspaces,
@@ -365,6 +373,15 @@ export function createExtensionAPI(
       },
       set(key: string, value: unknown): void {
         setExtensionSetting(key, value)
+      },
+      resolveWorktreeBaseDir(workspacePath: string): string {
+        const globalDir = getGlobalSettings().git?.worktreeBaseDir ?? ''
+        const ws = listWorkspaces().find((w) => w.folderPath === workspacePath)
+        const overrideDir = ws
+          ? (getWorkspaceSettings(ws.id).overrides?.git?.worktreeBaseDir ?? '')
+          : ''
+        const base = (overrideDir || globalDir).trim()
+        return base.length > 0 ? base : join(workspacePath, '.worktrees')
       },
     },
     sidebar: {

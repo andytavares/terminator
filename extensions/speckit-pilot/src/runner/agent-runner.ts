@@ -3,6 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { PhaseId } from '../types/speckit.types.js'
+import { textFromStreamJsonLine } from './stream-json.js'
 
 /** Absolute path to a phase's persisted output log. */
 export function phaseLogPath(featureDir: string, phase: PhaseId): string {
@@ -66,7 +67,7 @@ const SELF_REVIEW_CMD = [
   'npm run format',
   'npm run lint',
   'npx vitest run --coverage',
-  'claude --print /google-review',
+  'claude --print --permission-mode bypassPermissions /google-review',
 ].join(' && ')
 
 function shellQuote(s: string): string {
@@ -94,6 +95,11 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
         stdio: ['ignore', 'pipe', 'pipe'] as const,
       }
 
+      // Self-review runs a shell chain (npm/vitest/google-review) whose stdout is
+      // already plain, line-buffered text. Every other phase runs claude in
+      // stream-json mode so its assistant output streams to the console in real
+      // time instead of arriving in one chunk when --print buffers to the end.
+      const streaming = phase !== 'self-review'
       let cmd: string
       if (phase === 'self-review') {
         cmd = SELF_REVIEW_CMD
@@ -101,7 +107,11 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
         const prompt = feedbackNote
           ? `${phaseCommand}\n\nFeedback from reviewer:\n${feedbackNote}`
           : phaseCommand
-        cmd = `claude --print ${shellQuote(prompt)}`
+        // Phases run headless in the card's isolated worktree, so bypass
+        // permission prompts — a spawned `--print` process has no interactive
+        // channel to approve tool calls, and without this every Write/Edit/Bash
+        // stalls forever (see ADR-007).
+        cmd = `claude --print --permission-mode bypassPermissions --output-format stream-json --verbose --include-partial-messages ${shellQuote(prompt)}`
       }
 
       const child = spawn(shellBin, ['-l', '-c', cmd], spawnOpts)
@@ -128,18 +138,55 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
         }
       }
 
+      const emitLine = (line: string) => {
+        outputBuffer.push(line + '\n')
+        persist(line)
+        api.window.broadcast('speckit:run-output', {
+          featureDir,
+          phase,
+          line,
+          ts: new Date().toISOString(),
+        })
+      }
+
+      // Two-level line buffering for stream-json: stdout chunks can split a JSON
+      // event, and a display line can span several text deltas.
+      let jsonlBuffer = ''
+      let displayBuffer = ''
+
+      const handleStreamJson = (text: string) => {
+        jsonlBuffer += text
+        const jsonLines = jsonlBuffer.split('\n')
+        jsonlBuffer = jsonLines.pop() ?? ''
+        for (const jline of jsonLines) {
+          const chunk = textFromStreamJsonLine(jline)
+          if (!chunk) continue
+          displayBuffer += chunk
+          const displayLines = displayBuffer.split('\n')
+          displayBuffer = displayLines.pop() ?? ''
+          for (const dline of displayLines) emitLine(dline)
+        }
+      }
+
+      // Emit any buffered trailing text (a final line with no terminating newline).
+      const flushStreamJson = () => {
+        if (jsonlBuffer.trim()) {
+          displayBuffer += textFromStreamJsonLine(jsonlBuffer)
+          jsonlBuffer = ''
+        }
+        if (displayBuffer.length > 0) {
+          emitLine(displayBuffer)
+          displayBuffer = ''
+        }
+      }
+
       const handleData = (data: Buffer | string) => {
         const text = typeof data === 'string' ? data : data.toString()
-        outputBuffer.push(text)
-        for (const line of text.split('\n')) {
-          if (line) {
-            persist(line)
-            api.window.broadcast('speckit:run-output', {
-              featureDir,
-              phase,
-              line,
-              ts: new Date().toISOString(),
-            })
+        if (streaming) {
+          handleStreamJson(text)
+        } else {
+          for (const line of text.split('\n')) {
+            if (line) emitLine(line)
           }
         }
       }
@@ -154,6 +201,7 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
       })
 
       child.on('error', (err) => {
+        flushStreamJson()
         persist(`[runner error] ${err.message}`)
         logStream?.end()
         api.window.broadcast('speckit:run-output', {
@@ -167,6 +215,7 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
       })
 
       child.on('close', (exitCode) => {
+        flushStreamJson()
         const code = exitCode ?? 0
         logStream?.end()
         if (onComplete) void Promise.resolve(onComplete(code))

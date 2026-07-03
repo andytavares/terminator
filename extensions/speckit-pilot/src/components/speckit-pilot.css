@@ -2533,6 +2533,21 @@
   align-items: center;
 }
 
+.sk-reset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 30px 24px;
+  border-top: 1px solid var(--tm-border);
+}
+
+.sk-reset__warn {
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+}
+
 /* ─── Detail-view form controls: inherit the dark theme (fix white inputs) ─── */
 .sk-card-detail input,
 .sk-card-detail textarea,
