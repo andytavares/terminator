@@ -6,3 +6,6 @@
 {"ts":"2026-06-26T23:11:19.372Z","actor":"user","action":"approved","phase":"tasks"}
 {"ts":"2026-06-26T23:11:22.081Z","actor":"user","action":"approved","phase":"analyze"}
 {"ts":"2026-06-26T23:11:23.833Z","actor":"user","action":"approved","phase":"implement"}
+{"ts":"2026-07-01T01:35:06.569Z","actor":"user","action":"run_cancelled","phase":"constitution","note":"parked to backlog"}
+{"ts":"2026-07-01T01:35:12.169Z","actor":"user","action":"run_cancelled","phase":"constitution","note":"parked to backlog"}
+{"ts":"2026-07-01T01:35:33.997Z","actor":"user","action":"run_cancelled","phase":"constitution","note":"parked to backlog"}
