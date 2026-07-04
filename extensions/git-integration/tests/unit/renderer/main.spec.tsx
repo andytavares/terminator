@@ -5,7 +5,7 @@ const mockCreateRoot = vi.fn(() => ({ render: mockRender }))
 
 vi.mock('react-dom/client', () => ({ createRoot: mockCreateRoot }))
 vi.mock('../../../src/renderer/App', () => ({ App: () => null }))
-vi.mock('highlight.js/styles/atom-one-dark.css', () => ({}))
+vi.mock('../../../src/components/syntax-theme.css', () => ({}))
 vi.mock('../../../src/components/git-integration.css', () => ({}))
 
 describe('git-integration renderer main', () => {

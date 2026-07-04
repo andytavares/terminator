@@ -617,6 +617,25 @@ Extensions MUST use only `--tm-*` CSS custom properties for colors, typography, 
 | `--tm-success`     | `#4ade80`               | Success states                            |
 | `--tm-warning`     | `#facc15`               | Warning / caution states                  |
 
+### Diff / Syntax Highlighting
+
+WCAG AA verified (≥4.5:1) against both `--tm-bg-base` and the diff-added/removed
+tinted backgrounds, in both themes. Use these instead of hardcoding diff or
+syntax colors — see `tests/unit/renderer/diff-syntax-contrast.spec.ts`.
+
+| Token                   | Default                  | Usage                        |
+| ----------------------- | ------------------------ | ---------------------------- |
+| `--tm-diff-added-bg`    | `rgba(152,195,121,0.12)` | Added diff-line background   |
+| `--tm-diff-removed-bg`  | `rgba(224,108,117,0.12)` | Removed diff-line background |
+| `--tm-syntax-comment`   | `#8585b8`                | Code comments                |
+| `--tm-syntax-keyword`   | `#cf9ee8`                | Keywords / control flow      |
+| `--tm-syntax-string`    | `#4ade80`                | Strings, additions           |
+| `--tm-syntax-tag`       | `#e05c5c`                | Tags, selectors, deletions   |
+| `--tm-syntax-literal`   | `#6cc9d9`                | Literals (booleans, etc.)    |
+| `--tm-syntax-number`    | `#e0a361`                | Numbers, attributes, types   |
+| `--tm-syntax-title`     | `#7fb8f0`                | Titles, links, meta          |
+| `--tm-syntax-attribute` | `#e2c07e`                | Built-ins, class names       |
+
 ### Spacing / Shape
 
 | Token            | Default | Usage                              |
@@ -637,17 +656,17 @@ Extensions MUST use only `--tm-*` CSS custom properties for colors, typography, 
 
 If your extension was written before this contract existed, use this table:
 
-| Old (remove)                         | New (use instead)        |
-| ------------------------------------ | ------------------------ |
-| `var(--color-bg, #161b22)`           | `var(--tm-bg-surface)`   |
-| `var(--color-bg-secondary, #1a1a1a)` | `var(--tm-bg-base)`      |
-| `var(--color-text, #e6edf3)`         | `var(--tm-text-primary)` |
-| `var(--color-text-muted, #8b949e)`   | `var(--tm-text-muted)`   |
-| `var(--color-border, #333)`          | `var(--tm-border)`       |
-| `var(--color-accent, #58a6ff)`       | `var(--tm-accent)`       |
-| `#98c379` (green)                    | `var(--tm-success)`      |
-| `#e06c75` (red)                      | `var(--tm-danger)`       |
-| `#d19a66` (orange)                   | `var(--tm-warning)`      |
+| Old (remove)                             | New (use instead)         |
+| ---------------------------------------- | ------------------------- |
+| `var(--color-bg, #161b22)`               | `var(--tm-bg-surface)`    |
+| `var(--color-bg-secondary, #1a1a1a)`     | `var(--tm-bg-base)`       |
+| `var(--color-text, #e6edf3)`             | `var(--tm-text-primary)`  |
+| `var(--color-text-muted, #8b949e)`       | `var(--tm-text-muted)`    |
+| `var(--color-border, #333)`              | `var(--tm-border)`        |
+| `var(--color-accent, #58a6ff)`           | `var(--tm-accent)`        |
+| `#98c379` (green, atom-one-dark string)  | `var(--tm-syntax-string)` |
+| `#e06c75` (red, atom-one-dark tag)       | `var(--tm-syntax-tag)`    |
+| `#d19a66` (orange, atom-one-dark number) | `var(--tm-syntax-number)` |
 
 Full contract reference: [`specs/003-pr-review/contracts/extension-token-api.md`](../specs/003-pr-review/contracts/extension-token-api.md)
 

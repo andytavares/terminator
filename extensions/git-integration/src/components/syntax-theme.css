@@ -1,0 +1,82 @@
+/* First-party syntax highlighting theme for highlight.js (TAV-8).
+   Replaces the bundled `atom-one-dark` theme, whose colors were fixed for a
+   dark background and failed WCAG AA once rendered on the light theme (and,
+   for comments, even on the dark theme) — see
+   tests/unit/renderer/diff-syntax-contrast.spec.ts. Colors come from the
+   --tm-syntax-* design tokens, which are verified against both the plain
+   code background and the diff-added/removed line tints, in both themes. */
+
+.hljs {
+  color: var(--tm-text-primary);
+  background: transparent;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--tm-syntax-comment);
+  font-style: italic;
+}
+
+.hljs-doctag,
+.hljs-keyword,
+.hljs-formula {
+  color: var(--tm-syntax-keyword);
+}
+
+.hljs-section,
+.hljs-name,
+.hljs-selector-tag,
+.hljs-deletion,
+.hljs-subst {
+  color: var(--tm-syntax-tag);
+}
+
+.hljs-literal {
+  color: var(--tm-syntax-literal);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta .hljs-string {
+  color: var(--tm-syntax-string);
+}
+
+.hljs-attr,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-type,
+.hljs-selector-class,
+.hljs-selector-attr,
+.hljs-selector-pseudo,
+.hljs-number {
+  color: var(--tm-syntax-number);
+}
+
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link,
+.hljs-meta,
+.hljs-selector-id,
+.hljs-title {
+  color: var(--tm-syntax-title);
+}
+
+.hljs-built_in,
+.hljs-title.class_,
+.hljs-class .hljs-title {
+  color: var(--tm-syntax-attribute);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 700;
+}
+
+.hljs-link {
+  text-decoration: underline;
+}

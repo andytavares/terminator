@@ -32,6 +32,23 @@
   --warning: #facc15;
   --agent-clr: #8b5cf6;
 
+  /* diff highlight backgrounds — added/removed line tints. Opacity is low enough
+     that every text/syntax token below keeps WCAG AA (>=4.5:1) once composited
+     over --bg-base, in both themes (see tests/unit/renderer/diff-syntax-contrast.spec.ts). */
+  --diff-added-bg: rgba(152, 195, 121, 0.12);
+  --diff-removed-bg: rgba(224, 108, 117, 0.12);
+
+  /* syntax highlighting — WCAG AA verified against --bg-base and against
+     --diff-added-bg / --diff-removed-bg composited over --bg-base. */
+  --syntax-comment: #8585b8;
+  --syntax-keyword: #cf9ee8;
+  --syntax-string: #4ade80;
+  --syntax-tag: #e05c5c;
+  --syntax-literal: #6cc9d9;
+  --syntax-number: #e0a361;
+  --syntax-title: #7fb8f0;
+  --syntax-attribute: #e2c07e;
+
   /* spacing */
   --sidebar-w: 260px;
   --sidebar-min-w: 200px;
@@ -75,6 +92,16 @@
   --tm-danger: var(--danger);
   --tm-success: var(--success);
   --tm-warning: var(--warning);
+  --tm-diff-added-bg: var(--diff-added-bg);
+  --tm-diff-removed-bg: var(--diff-removed-bg);
+  --tm-syntax-comment: var(--syntax-comment);
+  --tm-syntax-keyword: var(--syntax-keyword);
+  --tm-syntax-string: var(--syntax-string);
+  --tm-syntax-tag: var(--syntax-tag);
+  --tm-syntax-literal: var(--syntax-literal);
+  --tm-syntax-number: var(--syntax-number);
+  --tm-syntax-title: var(--syntax-title);
+  --tm-syntax-attribute: var(--syntax-attribute);
   --tm-radius-xs: var(--radius-xs);
   --tm-radius-sm: var(--radius-sm);
   --tm-radius-md: var(--radius-md);
@@ -96,16 +123,30 @@
   /* text */
   --text-primary: #1a1a2e;
   --text-secondary: #555580;
-  --text-muted: #6666a0;
+  /* darkened from #6666a0 (TAV-8): the lighter value dropped below AA once
+     composited under the diff-added/removed tints — see contrast spec. */
+  --text-muted: #5c5c94;
 
   /* borders */
   --border: rgba(0, 0, 0, 0.08);
   --border-strong: rgba(0, 0, 0, 0.15);
 
-  /* semantic — maintain WCAG AA contrast on light surfaces */
-  --danger: #c0392b;
-  --success: #1a7a3c;
+  /* semantic — maintain WCAG AA contrast on light surfaces, including once
+     composited under the same-hue diff-added/removed tints (TAV-8). */
+  --danger: #962d20;
+  --success: #0f5c2a;
   --warning: #a85a00;
+
+  /* syntax highlighting — light-theme equivalents, WCAG AA verified against
+     --bg-base and against the diff tints composited over it. */
+  --syntax-comment: #5c5c94;
+  --syntax-keyword: #8a3fa8;
+  --syntax-string: #0f5c2a;
+  --syntax-tag: #962d20;
+  --syntax-literal: #0e6e7a;
+  --syntax-number: #8a5417;
+  --syntax-title: #1d5fa8;
+  --syntax-attribute: #7a5c12;
 }
 
 /* ── Reset ───────────────────────────────────────────────────── */

@@ -1,9 +1,8 @@
 /* MergeFlow — conflict resolver styles */
-@import 'highlight.js/styles/atom-one-dark.css';
 
-/* Override hljs background so our diff/panel backgrounds take precedence */
+/* hljs syntax colors come from ../syntax-theme.css (imported once in
+   renderer/main.tsx); tighten padding so it sits flush in our diff/panel layout. */
 .hljs {
-  background: transparent !important;
   padding: 0 !important;
 }
 
@@ -692,7 +691,6 @@
   padding-right: 8px;
   padding-left: 4px;
   color: var(--tm-text-muted);
-  opacity: 0.5;
   user-select: none;
   font-size: 0.75rem;
   line-height: 1.5;
@@ -718,7 +716,6 @@
 /* Line type variants */
 .conflict-line--context {
   color: var(--tm-text-muted);
-  opacity: 0.7;
 }
 
 .conflict-line--context .conflict-line__num {
@@ -730,8 +727,7 @@
 }
 
 .conflict-line--ours-added {
-  /* #4ade80 success green */
-  background: rgba(74, 222, 128, 0.12);
+  background: var(--tm-diff-added-bg);
   color: var(--tm-text-primary);
 }
 
@@ -758,11 +754,9 @@
 }
 
 .conflict-line--removed {
-  /* #e05c5c danger red */
-  background: rgba(224, 92, 92, 0.1);
+  background: var(--tm-diff-removed-bg);
   color: var(--tm-text-muted);
   text-decoration: line-through;
-  opacity: 0.6;
 }
 
 .conflict-line--removed .conflict-line__num {
