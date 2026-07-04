@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import { mergeFlowAPI } from '../../api/merge-flow'
-import { useToastStore } from '../../../../../src/renderer/stores/toast.store'
+import { notificationsAPI } from '../../api/notifications'
 import { ConflictHub } from './ConflictHub'
 import { ConflictResolver } from './ConflictResolver'
 import { CompletionScreen } from './CompletionScreen'
@@ -19,7 +19,6 @@ export function MergeFlowView({ repoRoot, onExit }: Props) {
   const setLoading = useMergeFlowStore((s) => s.setLoading)
   const setError = useMergeFlowStore((s) => s.setError)
   const clearSession = useMergeFlowStore((s) => s.clearSession)
-  const { addToast } = useToastStore()
 
   const [activeFileIndex, setActiveFileIndexLocal] = useState<number>(-1)
   const [isComplete, setIsComplete] = useState(false)
@@ -44,12 +43,12 @@ export function MergeFlowView({ repoRoot, onExit }: Props) {
         // No valid persisted session — build a fresh one from the actual conflict state
         const result = await mergeFlowAPI.listConflicts(repoRoot)
         if ('error' in result) {
-          addToast({ type: 'error', message: `Could not load conflicts: ${result.error}` })
+          void notificationsAPI.notify('error', 'Could not load conflicts', result.error)
           onExit()
           return
         }
         if (result.files.length === 0) {
-          addToast({ type: 'info', message: 'No merge conflicts found.' })
+          void notificationsAPI.notify('info', 'No merge conflicts found.')
           onExit()
           return
         }
@@ -57,7 +56,7 @@ export function MergeFlowView({ repoRoot, onExit }: Props) {
         void mergeFlowAPI.persistSession(repoRoot, result)
       } catch (e) {
         setError(String(e))
-        addToast({ type: 'error', message: `Could not open conflict resolver: ${String(e)}` })
+        void notificationsAPI.notify('error', 'Could not open conflict resolver', String(e))
         onExit()
       } finally {
         setLoading(false)
@@ -79,7 +78,7 @@ export function MergeFlowView({ repoRoot, onExit }: Props) {
         }))
       )
       if ('error' in result) {
-        addToast({ type: 'error', message: `Could not reset: ${result.error}` })
+        void notificationsAPI.notify('error', 'Could not reset', result.error)
         return
       }
       clearSession()
@@ -89,14 +88,14 @@ export function MergeFlowView({ repoRoot, onExit }: Props) {
       setLoading(true)
       const fresh = await mergeFlowAPI.listConflicts(repoRoot)
       if ('error' in fresh) {
-        addToast({ type: 'error', message: `Could not reload conflicts: ${fresh.error}` })
+        void notificationsAPI.notify('error', 'Could not reload conflicts', fresh.error)
         onExit()
         return
       }
       startSession(fresh)
       void mergeFlowAPI.persistSession(repoRoot, fresh)
     } catch (e) {
-      addToast({ type: 'error', message: `Start over failed: ${String(e)}` })
+      void notificationsAPI.notify('error', 'Start over failed', String(e))
     } finally {
       setLoading(false)
     }

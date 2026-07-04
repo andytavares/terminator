@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import { mergeFlowAPI } from '../../api/merge-flow'
-import { useToastStore } from '../../../../../src/renderer/stores/toast.store'
+import { notificationsAPI } from '../../api/notifications'
 import type { ConflictFile } from '../../schemas/merge-flow.schema'
 
 interface Props {
@@ -68,7 +68,6 @@ function getLangBadge(filePath: string): { label: string; bg: string } {
 export function CompletionScreen({ repoRoot, onBack, onExit }: Props) {
   const session = useMergeFlowStore((s) => s.session)
   const clearSession = useMergeFlowStore((s) => s.clearSession)
-  const { addToast } = useToastStore()
 
   const theirsBranch = session?.theirsBranch
   const oursBranch = session?.oursBranch
@@ -94,20 +93,21 @@ export function CompletionScreen({ repoRoot, onBack, onExit }: Props) {
       const resolvedPaths = session.files.map((f) => f.filePath)
       const result = await mergeFlowAPI.mergeCommit(repoRoot, resolvedPaths, commitMessage)
       if ('error' in result) {
-        addToast({ type: 'error', message: `Commit failed: ${result.error}` })
+        void notificationsAPI.notify('error', 'Commit failed', result.error)
         return
       }
       if (result.pushError) {
-        addToast({
-          type: 'warning',
-          message: `Committed but push failed — push manually: ${result.pushError}`,
-        })
+        void notificationsAPI.notify(
+          'warning',
+          'Committed but push failed',
+          `Push manually: ${result.pushError}`
+        )
       }
       await mergeFlowAPI.clearSession(repoRoot)
       clearSession()
       onExit()
     } catch (e) {
-      addToast({ type: 'error', message: `Commit failed: ${String(e)}` })
+      void notificationsAPI.notify('error', 'Commit failed', String(e))
     } finally {
       setIsCommitting(false)
     }

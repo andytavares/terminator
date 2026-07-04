@@ -6,7 +6,7 @@ function stripConflictMarkers(text: string): string {
 }
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import { mergeFlowAPI } from '../../api/merge-flow'
-import { useToastStore } from '../../../../../src/renderer/stores/toast.store'
+import { notificationsAPI } from '../../api/notifications'
 import { ConflictHeader } from './ConflictHeader'
 import { ConflictPanel } from './ConflictPanel'
 import { ResultPreviewStrip } from './ResultPreviewStrip'
@@ -34,7 +34,6 @@ export function ConflictResolver({ repoRoot, onBack, onComplete, onStartOver, on
   const confirmDecision = useMergeFlowStore((s) => s.confirmDecision)
   const undoLastDecision = useMergeFlowStore((s) => s.undoLastDecision)
   const undoStackLength = useMergeFlowStore((s) => s._undoStack.length)
-  const { addToast } = useToastStore()
 
   const [manualMode, setManualMode] = React.useState(false)
   const [manualSuggestedText, setManualSuggestedText] = React.useState<string | null>(null)
@@ -72,7 +71,7 @@ export function ConflictResolver({ repoRoot, onBack, onComplete, onStartOver, on
           activeBlock.originalConflictText
         )
         if ('error' in result) {
-          addToast({ type: 'error', message: `Could not resolve conflict: ${result.error}` })
+          void notificationsAPI.notify('error', 'Could not resolve conflict', result.error)
           return
         }
         confirmDecision(activeBlock.blockId, {
@@ -93,10 +92,10 @@ export function ConflictResolver({ repoRoot, onBack, onComplete, onStartOver, on
         // can continue reviewing — setPendingResolution will be cleared below
         setPendingResolution(null)
       } catch (e) {
-        addToast({ type: 'error', message: `Could not resolve conflict: ${String(e)}` })
+        void notificationsAPI.notify('error', 'Could not resolve conflict', String(e))
       }
     },
-    [activeBlock, session, repoRoot, confirmDecision, goToNextBlock, onComplete, addToast]
+    [activeBlock, session, repoRoot, confirmDecision, goToNextBlock, onComplete]
   )
 
   const handleUndo = useCallback(async () => {
@@ -110,12 +109,12 @@ export function ConflictResolver({ repoRoot, onBack, onComplete, onStartOver, on
         decision.originalConflictText
       )
       if ('error' in result) {
-        addToast({ type: 'error', message: `Could not undo: ${result.error}` })
+        void notificationsAPI.notify('error', 'Could not undo', result.error)
       }
     } catch (e) {
-      addToast({ type: 'error', message: `Could not undo: ${String(e)}` })
+      void notificationsAPI.notify('error', 'Could not undo', String(e))
     }
-  }, [undoLastDecision, repoRoot, addToast])
+  }, [undoLastDecision, repoRoot])
 
   useEffect(() => {
     const noModal = !isKeepBothOpen && !manualMode

@@ -14,8 +14,8 @@ vi.mock('../../src/api/merge-flow', () => ({
   },
 }))
 
-vi.mock('../../../../src/renderer/stores/toast.store', () => ({
-  useToastStore: () => ({ addToast: vi.fn() }),
+vi.mock('../../src/api/notifications', () => ({
+  notificationsAPI: { notify: vi.fn() },
 }))
 
 let mockStoreState: Record<string, unknown> = {}
