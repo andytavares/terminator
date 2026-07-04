@@ -129,7 +129,9 @@ describe('WeeklyReviewStepStaleTasks', () => {
       <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
     )
     fireEvent.click(screen.getByRole('button', { name: /backlog/i }))
-    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('error', expect.any(String)))
+    await waitFor(() =>
+      expect(mockNotify).toHaveBeenCalledWith('error', expect.any(String), 'staleTaskBacklogFailed')
+    )
     expect(screen.getByText('Backlog fail task')).toBeTruthy()
   })
 
@@ -140,7 +142,9 @@ describe('WeeklyReviewStepStaleTasks', () => {
       <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
     )
     fireEvent.click(screen.getByRole('button', { name: /delete/i }))
-    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('error', expect.any(String)))
+    await waitFor(() =>
+      expect(mockNotify).toHaveBeenCalledWith('error', expect.any(String), 'staleTaskDeleteFailed')
+    )
     expect(screen.getByText('Delete fail task')).toBeTruthy()
   })
 
@@ -151,7 +155,9 @@ describe('WeeklyReviewStepStaleTasks', () => {
       <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
     )
     fireEvent.click(screen.getByRole('button', { name: /keep/i }))
-    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('error', expect.any(String)))
+    await waitFor(() =>
+      expect(mockNotify).toHaveBeenCalledWith('error', expect.any(String), 'staleTaskResetFailed')
+    )
     expect(screen.getByText('Keep fail task')).toBeTruthy()
   })
 })

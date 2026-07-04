@@ -143,6 +143,7 @@ export function startTaskScheduler(
         const notif = api.notifications.createNotification({
           type: isOverdue ? 'error' : 'warning',
           title: notifTitle,
+          key: 'dueTaskReminder',
           actions: [
             {
               id: 'open',
@@ -201,6 +202,7 @@ export function startTaskScheduler(
           type: 'info',
           title: blockedTitle,
           message: meta.blocked_reason ?? undefined,
+          key: 'blockedTaskCheckin',
           actions: [
             {
               id: 'open',

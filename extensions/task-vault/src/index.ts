@@ -9,6 +9,55 @@ import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
 import { applyTaskVaultSchema, applyTaskVaultMigrations } from './vault/db.js'
 import { backfillRecurringTasks } from './vault/ensure-next-occurrence.js'
 import { startTaskScheduler, setSchedulerTick } from './notifications/task-scheduler.js'
+import type { SettingDefinition } from '../../../src/main/extensions/api'
+
+// Every notification kind task-vault ever raises, so the user can independently
+// choose its delivery target(s) (system/in-app/toast) in this extension's own
+// settings — core never knows these keys exist (Extension Isolation).
+const NOTIFICATION_KEYS: { key: string; label: string }[] = [
+  { key: 'schemaInitFailed', label: 'Database schema failed to initialize' },
+  { key: 'globalShortcutTaken', label: 'Global capture shortcut unavailable' },
+  { key: 'weeklyReviewReady', label: 'Weekly review ready' },
+  { key: 'taskCompleted', label: 'Task completed' },
+  { key: 'taskMigrated', label: 'Task migrated' },
+  { key: 'taskArchived', label: 'Task archived (cancelled)' },
+  { key: 'taskReopened', label: 'Task reopened' },
+  { key: 'taskBlocked', label: 'Task blocked' },
+  { key: 'taskUnblocked', label: 'Task unblocked' },
+  { key: 'taskMovedToBacklog', label: 'Task moved to backlog' },
+  { key: 'areaArchived', label: 'Area archived' },
+  { key: 'projectArchived', label: 'Project archived' },
+  { key: 'dueTaskReminder', label: 'Due / overdue task reminder' },
+  { key: 'blockedTaskCheckin', label: 'Blocked task check-in' },
+  { key: 'recurrenceSet', label: 'Recurrence set' },
+  { key: 'recurrenceRemoved', label: 'Recurrence removed' },
+  { key: 'staleTaskBacklogFailed', label: 'Stale task: move to backlog failed' },
+  { key: 'staleTaskDeleteFailed', label: 'Stale task: delete failed' },
+  { key: 'staleTaskResetFailed', label: 'Stale task: reset failed' },
+  { key: 'terminalLinkSaveFailed', label: 'Terminal link save failed' },
+]
+
+function buildNotificationSettingProperties(): Record<string, SettingDefinition> {
+  const properties: Record<string, SettingDefinition> = {}
+  for (const { key, label } of NOTIFICATION_KEYS) {
+    properties[`terminator.task-vault.notify.${key}.system`] = {
+      type: 'boolean',
+      label: `${label} → System notification`,
+      default: true,
+    }
+    properties[`terminator.task-vault.notify.${key}.center`] = {
+      type: 'boolean',
+      label: `${label} → In-app notification center`,
+      default: true,
+    }
+    properties[`terminator.task-vault.notify.${key}.toast`] = {
+      type: 'boolean',
+      label: `${label} → Toast`,
+      default: true,
+    }
+  }
+  return properties
+}
 
 const disposables: Disposable[] = []
 let _api: ExtensionAPI | null = null
@@ -81,6 +130,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
             'This will permanently delete ALL your tasks and projects. This cannot be undone. Continue?',
           default: null,
         },
+        ...buildNotificationSettingProperties(),
       },
     })
   )
@@ -141,7 +191,8 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     console.error('[task-vault] Failed to initialize schema:', err)
     api.notifications.showToast(
       'error',
-      'Task Vault: database schema failed to initialize. Restart the app — if the problem persists, check the logs.'
+      'Task Vault: database schema failed to initialize. Restart the app — if the problem persists, check the logs.',
+      'schemaInitFailed'
     )
   }
 
@@ -224,7 +275,8 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     )
     api.notifications.showToast(
       'warning',
-      `Task Vault: global shortcut "${DEFAULT_CAPTURE_HOTKEY}" is in use by another app.`
+      `Task Vault: global shortcut "${DEFAULT_CAPTURE_HOTKEY}" is in use by another app.`,
+      'globalShortcutTaken'
     )
   }
 }
@@ -239,7 +291,11 @@ function scheduleWeeklyReviewNudge(api: ExtensionAPI, reviewDay: number): void {
   function checkAndNudge() {
     const now = new Date()
     if (now.getDay() !== reviewDay) return
-    api.notifications.showToast('info', 'Weekly review is ready — open Task Vault to start')
+    api.notifications.showToast(
+      'info',
+      'Weekly review is ready — open Task Vault to start',
+      'weeklyReviewReady'
+    )
   }
 
   checkAndNudge()

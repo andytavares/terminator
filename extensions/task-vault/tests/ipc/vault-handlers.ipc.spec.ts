@@ -164,6 +164,7 @@ describe('task-vault:vault:complete-task', () => {
       type: 'success',
       title: 'Task completed',
       message: 'Test task',
+      key: 'taskCompleted',
     })
   })
 })
@@ -1505,6 +1506,7 @@ describe('task-vault:vault:archive-area notification', () => {
       type: 'info',
       title: 'Area archived',
       message: 'Work',
+      key: 'areaArchived',
     })
   })
 })
@@ -1518,6 +1520,7 @@ describe('task-vault:vault:update-project-status notification when archiving', (
       type: 'info',
       title: 'Project archived',
       message: 'Alpha',
+      key: 'projectArchived',
     })
   })
 

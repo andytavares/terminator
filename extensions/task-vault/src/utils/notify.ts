@@ -6,7 +6,13 @@ export interface NotifyOptions {
   onClick?: () => void
 }
 
-export function notify(type: ToastType, message: string, opts?: NotifyOptions): void {
+/**
+ * `key` identifies this specific notification kind (e.g. 'taskCompleted'),
+ * unique within task-vault, so the user can configure its delivery target(s)
+ * independently of every other task-vault notification (Settings →
+ * Task Vault → Configure).
+ */
+export function notify(type: ToastType, message: string, key: string, opts?: NotifyOptions): void {
   // Local, same-webview toast: the only way to get a clickable affordance,
   // since an onClick handler can't cross IPC to the main-process dispatcher.
   addExtensionToast(type, message, { onClick: opts?.onClick })
@@ -17,5 +23,6 @@ export function notify(type: ToastType, message: string, opts?: NotifyOptions): 
     type,
     title: message,
     source: 'terminator.task-vault',
+    key,
   })
 }

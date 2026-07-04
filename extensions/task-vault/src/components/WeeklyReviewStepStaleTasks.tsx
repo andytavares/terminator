@@ -25,7 +25,7 @@ export function WeeklyReviewStepStaleTasks({
       { taskId, action: 'someday' }
     )
     if (result && 'error' in result) {
-      notify('error', `Could not move to backlog: ${result.error}`)
+      notify('error', `Could not move to backlog: ${result.error}`, 'staleTaskBacklogFailed')
       return
     }
     remove(taskId)
@@ -36,7 +36,7 @@ export function WeeklyReviewStepStaleTasks({
       taskId,
     })
     if (result && 'error' in result) {
-      notify('error', `Could not delete task: ${result.error}`)
+      notify('error', `Could not delete task: ${result.error}`, 'staleTaskDeleteFailed')
       return
     }
     remove(taskId)
@@ -48,7 +48,7 @@ export function WeeklyReviewStepStaleTasks({
       { taskId }
     )
     if (result && 'error' in result) {
-      notify('error', `Could not reset task: ${result.error}`)
+      notify('error', `Could not reset task: ${result.error}`, 'staleTaskResetFailed')
       return
     }
     remove(taskId)
