@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import type { Branch, Project } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
-import { useToastStore } from '../../stores/toast.store'
 import { useSettingsStore } from '../../stores/settings.store'
+import { dispatchNotification } from '../../lib/notifications'
 import './BranchSwitcher.css'
 
 interface Props {
@@ -49,7 +49,6 @@ export function BranchSwitcher({
   const [switching, setSwitching] = useState(false)
   const [filter, setFilter] = useState('')
   const { updateProjectBranch } = useWorkspaceStore()
-  const { addToast } = useToastStore()
   const { resolveSettings } = useSettingsStore()
   const excludePatterns = resolveSettings(workspaceId).git.branchExcludePatterns ?? []
   const excludePatternsKey = excludePatterns.join('\n')
@@ -141,7 +140,11 @@ export function BranchSwitcher({
       const checkoutCwd = project.isWorktree ? cwd : workspaceFolderPath
       const result = await window.electronAPI.git.checkout(checkoutCwd, branch)
       if ('error' in result) {
-        addToast({ type: 'error', message: `Could not switch to "${branch}": ${result.error}` })
+        dispatchNotification({
+          type: 'error',
+          title: 'Branch switch failed',
+          message: `Could not switch to "${branch}": ${result.error}`,
+        })
       } else {
         await updateProjectBranch(project.id, branch)
         // Update sibling non-worktree projects that share the same repo
@@ -155,9 +158,10 @@ export function BranchSwitcher({
         }
       }
     } catch (err) {
-      addToast({
+      dispatchNotification({
         type: 'error',
-        message: `Branch switch failed: ${err instanceof Error ? err.message : String(err)}`,
+        title: 'Branch switch failed',
+        message: err instanceof Error ? err.message : String(err),
       })
     } finally {
       setSwitching(false)

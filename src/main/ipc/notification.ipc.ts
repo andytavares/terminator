@@ -2,13 +2,11 @@ import { ipcMain } from 'electron'
 import { z } from 'zod'
 import { notificationManager } from '../notifications/notification-manager'
 
-const NotificationTargetSchema = z.enum(['system', 'center', 'toast'])
-
 const CreateSchema = z.object({
   type: z.enum(['info', 'success', 'warning', 'error']),
   title: z.string().min(1),
   message: z.string().optional(),
-  targets: z.array(NotificationTargetSchema).optional(),
+  source: z.string().optional(),
 })
 
 const DismissSchema = z.object({ id: z.string().min(1) })

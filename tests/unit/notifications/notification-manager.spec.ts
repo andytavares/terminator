@@ -16,6 +16,8 @@ const { mockNotificationShow, mockNotificationOn, MockNotification, mockDockBoun
 const mockWin = { isDestroyed: vi.fn(() => false), webContents: { send: mockSend } }
 const mockDestroyedWin = { isDestroyed: vi.fn(() => true), webContents: { send: mockSend } }
 
+const mockGetGlobalSettings = vi.hoisted(() => vi.fn())
+
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: vi.fn(() => [mockWin]) },
   Notification: MockNotification,
@@ -26,8 +28,28 @@ vi.mock('crypto', () => ({
   randomUUID: vi.fn(() => 'test-uuid'),
 }))
 
+vi.mock('../../../src/main/storage/settings-store', () => ({
+  getGlobalSettings: mockGetGlobalSettings,
+}))
+
 import { notificationManager } from '../../../src/main/notifications/notification-manager'
 import { BrowserWindow } from 'electron'
+
+function withDefaultTargets(...defaultTargets: Array<'system' | 'center' | 'toast'>): void {
+  mockGetGlobalSettings.mockReturnValue({
+    notifications: { defaultTargets, extensionOverrides: {} },
+  })
+}
+
+function withExtensionOverride(
+  extensionId: string,
+  overrideTargets: Array<'system' | 'center' | 'toast'>,
+  defaultTargets: Array<'system' | 'center' | 'toast'> = ['toast']
+): void {
+  mockGetGlobalSettings.mockReturnValue({
+    notifications: { defaultTargets, extensionOverrides: { [extensionId]: overrideTargets } },
+  })
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -35,44 +57,85 @@ beforeEach(() => {
     typeof BrowserWindow.getAllWindows
   >)
   MockNotification.isSupported.mockReturnValue(true)
+  withDefaultTargets('system', 'center', 'toast')
 })
 
-describe('NotificationManager.create — targets', () => {
-  it('defaults to all three targets', () => {
+describe('NotificationManager.create — settings-driven target resolution', () => {
+  it('resolves the global default targets when the caller has no source', () => {
+    withDefaultTargets('toast')
     notificationManager.create({ type: 'info', title: 'Hello' })
-    expect(MockNotification).toHaveBeenCalled()
+    expect(MockNotification).not.toHaveBeenCalled()
     expect(mockSend).toHaveBeenCalledWith(
       'notifications:push',
-      expect.objectContaining({ targets: ['system', 'center', 'toast'] })
+      expect.objectContaining({ targets: ['toast'] })
     )
   })
 
-  it('fires system notification when targets includes system', () => {
-    notificationManager.create({ type: 'info', title: 'Sys', targets: ['system'] })
+  it('prefers a per-extension override over the global default', () => {
+    withExtensionOverride('terminator.git-integration', ['system'])
+    notificationManager.create({
+      type: 'info',
+      title: 'From extension',
+      source: 'terminator.git-integration',
+    })
+    expect(MockNotification).toHaveBeenCalled()
+    expect(mockSend).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the global default for a source with no override', () => {
+    withExtensionOverride('terminator.git-integration', ['system'], ['toast'])
+    notificationManager.create({
+      type: 'info',
+      title: 'From other ext',
+      source: 'terminator.other',
+    })
+    expect(MockNotification).not.toHaveBeenCalled()
+    expect(mockSend).toHaveBeenCalledWith(
+      'notifications:push',
+      expect.objectContaining({ targets: ['toast'] })
+    )
+  })
+
+  it('force-includes toast for an error even when settings omit it', () => {
+    withDefaultTargets('system')
+    notificationManager.create({ type: 'error', title: 'Uh oh' })
+    expect(mockSend).toHaveBeenCalledWith(
+      'notifications:push',
+      expect.objectContaining({ targets: ['system', 'toast'] })
+    )
+  })
+
+  it('fires system notification when resolved targets include system', () => {
+    withDefaultTargets('system')
+    notificationManager.create({ type: 'info', title: 'Sys' })
     expect(MockNotification).toHaveBeenCalledWith({ title: 'Sys', body: '' })
     expect(mockNotificationShow).toHaveBeenCalled()
   })
 
-  it('does not fire system notification when targets omits system', () => {
-    notificationManager.create({ type: 'info', title: 'No sys', targets: ['center', 'toast'] })
+  it('does not fire system notification when resolved targets omit system', () => {
+    withDefaultTargets('center', 'toast')
+    notificationManager.create({ type: 'info', title: 'No sys' })
     expect(MockNotification).not.toHaveBeenCalled()
   })
 
-  it('does not broadcast when targets is only system', () => {
-    notificationManager.create({ type: 'info', title: 'Only sys', targets: ['system'] })
+  it('does not broadcast when resolved targets is only system', () => {
+    withDefaultTargets('system')
+    notificationManager.create({ type: 'info', title: 'Only sys' })
     expect(mockSend).not.toHaveBeenCalled()
   })
 
-  it('broadcasts when targets includes center', () => {
-    notificationManager.create({ type: 'info', title: 'Center only', targets: ['center'] })
+  it('broadcasts when resolved targets includes center', () => {
+    withDefaultTargets('center')
+    notificationManager.create({ type: 'info', title: 'Center only' })
     expect(mockSend).toHaveBeenCalledWith(
       'notifications:push',
       expect.objectContaining({ targets: ['center'] })
     )
   })
 
-  it('broadcasts when targets includes toast', () => {
-    notificationManager.create({ type: 'info', title: 'Toast only', targets: ['toast'] })
+  it('broadcasts when resolved targets includes toast', () => {
+    withDefaultTargets('toast')
+    notificationManager.create({ type: 'info', title: 'Toast only' })
     expect(mockSend).toHaveBeenCalledWith(
       'notifications:push',
       expect.objectContaining({ targets: ['toast'] })
@@ -80,22 +143,45 @@ describe('NotificationManager.create — targets', () => {
   })
 
   it('skips system notification when not supported', () => {
+    withDefaultTargets('system')
     MockNotification.isSupported.mockReturnValue(false)
     notificationManager.create({ type: 'info', title: 'No support' })
     expect(mockNotificationShow).not.toHaveBeenCalled()
   })
 
   it('bounces dock critically on macOS when system notification fires', () => {
+    withDefaultTargets('system')
     const originalPlatform = process.platform
     Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    notificationManager.create({ type: 'info', title: 'Bounce', targets: ['system'] })
+    notificationManager.create({ type: 'info', title: 'Bounce' })
     expect(mockDockBounce).toHaveBeenCalledWith('critical')
     Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
   })
 
   it('registers a failed handler on the system notification', () => {
-    notificationManager.create({ type: 'info', title: 'Sys', targets: ['system'] })
+    withDefaultTargets('system')
+    notificationManager.create({ type: 'info', title: 'Sys' })
     expect(mockNotificationOn).toHaveBeenCalledWith('failed', expect.any(Function))
+  })
+
+  it('wires the first action handler to the system notification click event', () => {
+    withDefaultTargets('system')
+    const handler = vi.fn()
+    notificationManager.create({
+      type: 'info',
+      title: 'Clickable',
+      actions: [{ id: 'open', label: 'Open', handler }],
+    })
+    expect(mockNotificationOn).toHaveBeenCalledWith('click', expect.any(Function))
+    const clickHandler = mockNotificationOn.mock.calls.find((c) => c[0] === 'click')![1]
+    clickHandler()
+    expect(handler).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not wire a click handler when there are no actions', () => {
+    withDefaultTargets('system')
+    notificationManager.create({ type: 'info', title: 'No actions' })
+    expect(mockNotificationOn).not.toHaveBeenCalledWith('click', expect.any(Function))
   })
 })
 
@@ -109,10 +195,11 @@ describe('NotificationManager.create — broadcast', () => {
   })
 
   it('skips destroyed windows during broadcast', () => {
+    withDefaultTargets('center')
     vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([
       mockDestroyedWin,
     ] as unknown as ReturnType<typeof BrowserWindow.getAllWindows>)
-    notificationManager.create({ type: 'info', title: 'Skip me', targets: ['center'] })
+    notificationManager.create({ type: 'info', title: 'Skip me' })
     expect(mockSend).not.toHaveBeenCalled()
   })
 
@@ -156,18 +243,21 @@ describe('NotificationManager.list', () => {
   })
 
   it('does not store system-only notifications in the list', () => {
-    notificationManager.create({ type: 'info', title: 'Bell', targets: ['system'] })
+    withDefaultTargets('system')
+    notificationManager.create({ type: 'info', title: 'Bell' })
     const list = notificationManager.list()
     expect(list.some((n) => n.title === 'Bell')).toBe(false)
   })
 
   it('stores a center-only notification in the list', () => {
-    notificationManager.create({ type: 'info', title: 'Center', targets: ['center'] })
+    withDefaultTargets('center')
+    notificationManager.create({ type: 'info', title: 'Center' })
     expect(notificationManager.list().some((n) => n.title === 'Center')).toBe(true)
   })
 
   it('stores a toast-only notification in the list', () => {
-    notificationManager.create({ type: 'info', title: 'Toast', targets: ['toast'] })
+    withDefaultTargets('toast')
+    notificationManager.create({ type: 'info', title: 'Toast' })
     expect(notificationManager.list().some((n) => n.title === 'Toast')).toBe(true)
   })
 })

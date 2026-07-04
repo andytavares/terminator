@@ -121,7 +121,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     },
   })
 
-  const disposeIpc = registerVaultIpcHandlers(db)
+  const disposeIpc = registerVaultIpcHandlers(api, db)
   disposables.push({ dispose: disposeIpc })
   const disposeProjectsIpc = registerProjectsIpcHandlers(db)
   disposables.push({ dispose: disposeProjectsIpc })

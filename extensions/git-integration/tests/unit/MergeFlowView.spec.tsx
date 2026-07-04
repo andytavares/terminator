@@ -24,8 +24,8 @@ vi.mock('../../src/stores/merge-flow.store', () => ({
   },
 }))
 
-vi.mock('../../../../src/renderer/stores/toast.store', () => ({
-  useToastStore: () => ({ addToast: vi.fn() }),
+vi.mock('../../src/api/notifications', () => ({
+  notificationsAPI: { notify: vi.fn() },
 }))
 
 vi.mock('../../src/components/merge-flow/ConflictHub', () => ({

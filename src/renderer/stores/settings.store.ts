@@ -1,5 +1,9 @@
 import { create } from 'zustand'
-import type { GlobalSettings, WorkspaceSettings } from '../../shared/types/index'
+import type {
+  GlobalSettings,
+  NotificationTarget,
+  WorkspaceSettings,
+} from '../../shared/types/index'
 
 interface SettingsState {
   globalSettings: GlobalSettings | null
@@ -21,6 +25,11 @@ interface SettingsState {
   markWelcomeSeen: () => Promise<void>
   updateShowMetricsBar: (show: boolean) => Promise<void>
   updatePromptForName: (enabled: boolean) => Promise<void>
+  updateNotificationDefaultTargets: (targets: NotificationTarget[]) => Promise<void>
+  updateNotificationExtensionOverride: (
+    extensionId: string,
+    targets: NotificationTarget[]
+  ) => Promise<void>
   resolveSettings: (workspaceId?: string | null) => GlobalSettings
 }
 
@@ -34,6 +43,7 @@ const DEFAULT_SETTINGS: GlobalSettings = {
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},
   ui: { hasSeenWelcome: false },
+  notifications: { defaultTargets: ['system', 'center', 'toast'], extensionOverrides: {} },
 }
 
 function mergeSettings(
@@ -47,6 +57,7 @@ function mergeSettings(
     appearance: { ...DEFAULT_SETTINGS.appearance, ...global.appearance },
     terminal: { ...DEFAULT_SETTINGS.terminal, ...global.terminal },
     git: { ...DEFAULT_SETTINGS.git, ...global.git },
+    notifications: { ...DEFAULT_SETTINGS.notifications, ...global.notifications },
   }
   if (!workspace?.overrides) return g
   return {
@@ -162,6 +173,20 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   updatePromptForName: async (enabled) => {
     const result = await window.electronAPI.settings.updateGlobal({
       terminal: { promptForName: enabled },
+    })
+    set({ globalSettings: result.settings })
+  },
+
+  updateNotificationDefaultTargets: async (targets) => {
+    const result = await window.electronAPI.settings.updateGlobal({
+      notifications: { defaultTargets: targets },
+    })
+    set({ globalSettings: result.settings })
+  },
+
+  updateNotificationExtensionOverride: async (extensionId, targets) => {
+    const result = await window.electronAPI.settings.updateGlobal({
+      notifications: { extensionOverrides: { [extensionId]: targets } },
     })
     set({ globalSettings: result.settings })
   },

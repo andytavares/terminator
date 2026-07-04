@@ -311,8 +311,6 @@ if (result.exitCode !== 0) {
 
 ### `api.notifications` — Toasts _(v1.1.0)_
 
-Display a toast notification using the application's standard feedback system.
-
 ```typescript
 api.notifications.showToast('info', 'Checking git status...')
 api.notifications.showToast('success', 'Committed 3 files')
@@ -321,6 +319,15 @@ api.notifications.showToast('error', 'Could not create pull request')
 ```
 
 Available types: `'info'` | `'success'` | `'warning'` | `'error'`
+
+`showToast` and `createNotification` resolve identically: the actual delivery
+target(s) (toast, in-app notification center, OS system notification) are
+never decided by the extension — they're resolved from the user's global
+notification settings, with an optional per-extension override taking
+precedence (Settings → Notifications). Despite the name, `showToast` is not
+guaranteed to produce only a toast; treat both as "notify the user" and don't
+assume a specific delivery mechanism. Errors always include a toast
+regardless of configuration.
 
 ---
 

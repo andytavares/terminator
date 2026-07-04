@@ -15,6 +15,7 @@ import { useTerminalSession } from './hooks/useTerminalSession'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { installLogInterceptor, useLogStore } from './stores/log.store'
 import { useToastStore } from './stores/toast.store'
+import { dispatchNotification } from './lib/notifications'
 import { useNotificationStore } from './stores/notification.store'
 import { NotificationPanel } from './components/NotificationPanel'
 import { useExtensionRegistry } from './extensions/registry'
@@ -331,13 +332,6 @@ export function App(): JSX.Element {
   }, [])
 
   useEffect(() => {
-    if (!window.electronAPI.extensionEvents) return
-    return window.electronAPI.extensionEvents.onToast(({ type, message }) => {
-      addToast({ type: type as 'info' | 'success' | 'warning' | 'error', message })
-    })
-  }, [addToast])
-
-  useEffect(() => {
     if (!window.electronAPI.extensionEvents?.onTogglePanel) return
     return window.electronAPI.extensionEvents.onTogglePanel((panelId) => {
       togglePanel(panelId)
@@ -452,8 +446,9 @@ export function App(): JSX.Element {
     const unsubDisconnected = window.electronAPI.extensionBridge.on(
       'remote:tunnel-disconnected',
       () => {
-        addToast({
+        dispatchNotification({
           type: 'error',
+          title: 'Remote tunnel disconnected',
           message: 'ngrok tunnel disconnected. Click Reconnect in Settings to restore it.',
         })
       }
@@ -462,7 +457,7 @@ export function App(): JSX.Element {
       unsubLog()
       unsubDisconnected()
     }
-  }, [addToast])
+  }, [])
 
   const showMetricsBar = globalSettings?.ui?.showMetricsBar ?? false
   const scratchSessions = getScratchSessions()

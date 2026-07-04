@@ -1,8 +1,8 @@
 import { useCallback } from 'react'
 import { useSessionStore } from '../stores/session.store'
 import { useWorkspaceStore } from '../stores/workspace.store'
-import { useNotificationStore } from '../stores/notification.store'
 import { TerminalInstance } from '../components/terminal/TerminalSession'
+import { dispatchNotification } from '../lib/notifications'
 import type { PaneSplitDirection } from '../../../shared/types/index'
 
 function makeBellHandler(sessionId: string, incrementBellCount: (id: string) => void): () => void {
@@ -18,14 +18,7 @@ function makeBellHandler(sessionId: string, incrementBellCount: (id: string) => 
     const tabTitle = useSessionStore.getState().sessions.get(sessionId)?.tabTitle ?? 'Terminal'
     const title = 'Terminator'
     const body = `${tabTitle} needs attention`
-    window.electronAPI.notification.show(title, body)
-    useNotificationStore.getState().addNotification({
-      id: `bell-${sessionId}-${Date.now()}`,
-      type: 'info',
-      title,
-      message: body,
-      timestamp: Date.now(),
-    })
+    dispatchNotification({ type: 'info', title, message: body })
   }
 }
 

@@ -27,6 +27,7 @@ const DEFAULT_SETTINGS = {
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},
   ui: { hasSeenWelcome: false },
+  notifications: { defaultTargets: ['system', 'center', 'toast'], extensionOverrides: {} },
 }
 
 function resetStore() {
@@ -270,6 +271,58 @@ describe('useSettingsStore', () => {
       await useSettingsStore.getState().updatePromptForName(false)
       expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
         terminal: { promptForName: false },
+      })
+    })
+  })
+
+  describe('updateNotificationDefaultTargets', () => {
+    it('calls updateGlobal with the new default targets and updates store', async () => {
+      const updated = {
+        ...DEFAULT_SETTINGS,
+        notifications: { defaultTargets: ['toast'], extensionOverrides: {} },
+      }
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+      await useSettingsStore.getState().updateNotificationDefaultTargets(['toast'])
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        notifications: { defaultTargets: ['toast'] },
+      })
+      expect(useSettingsStore.getState().globalSettings).toEqual(updated)
+    })
+  })
+
+  describe('updateNotificationExtensionOverride', () => {
+    it('calls updateGlobal with a single-extension override patch and updates store', async () => {
+      const updated = {
+        ...DEFAULT_SETTINGS,
+        notifications: {
+          defaultTargets: ['system', 'center', 'toast'],
+          extensionOverrides: { 'terminator.git-integration': ['system'] },
+        },
+      }
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+      await useSettingsStore
+        .getState()
+        .updateNotificationExtensionOverride('terminator.git-integration', ['system'])
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        notifications: { extensionOverrides: { 'terminator.git-integration': ['system'] } },
+      })
+      expect(useSettingsStore.getState().globalSettings).toEqual(updated)
+    })
+
+    it('reverts to default by sending an empty targets array', async () => {
+      const updated = {
+        ...DEFAULT_SETTINGS,
+        notifications: { defaultTargets: ['system', 'center', 'toast'], extensionOverrides: {} },
+      }
+      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+      await useSettingsStore
+        .getState()
+        .updateNotificationExtensionOverride('terminator.notepad', [])
+      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+        notifications: { extensionOverrides: { 'terminator.notepad': [] } },
       })
     })
   })

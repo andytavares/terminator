@@ -352,7 +352,6 @@ describe('App', () => {
         },
         onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
         onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onToast: vi.fn().mockReturnValue(vi.fn()),
         onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
         onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
       },
@@ -377,7 +376,6 @@ describe('App', () => {
         },
         onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
         onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onToast: vi.fn().mockReturnValue(vi.fn()),
         onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
         onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
       },
@@ -525,7 +523,6 @@ describe('App', () => {
         },
         onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
         onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onToast: vi.fn().mockReturnValue(vi.fn()),
         onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
         onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
       },
@@ -537,29 +534,6 @@ describe('App', () => {
     render(<App />)
     openSettingsCallback?.()
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
-  })
-
-  it('calls onToast extensionEvent to display a toast', () => {
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
-      extensionEvents: {
-        onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
-        onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-        onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onToast: (cb: (payload: { type: string; message: string }) => void) => {
-          cb({ type: 'info', message: 'hello' })
-          return vi.fn()
-        },
-        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
-        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
-      },
-      extensionBridge: {
-        on: vi.fn().mockReturnValue(mockUnsubscribe),
-        invoke: vi.fn().mockResolvedValue({}),
-      },
-    }
-    render(<App />)
-    expect(mockAddToast).toHaveBeenCalledWith({ type: 'info', message: 'hello' })
   })
 
   it('calls onTogglePanel extensionEvent to toggle a panel', () => {
@@ -574,7 +548,6 @@ describe('App', () => {
         onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
         onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
         onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onToast: vi.fn().mockReturnValue(vi.fn()),
         onTogglePanel: (cb: (panelId: string) => void) => {
           cb('git-changes')
           return vi.fn()
@@ -648,7 +621,6 @@ describe('App', () => {
         onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
         onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
         onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onToast: vi.fn().mockReturnValue(vi.fn()),
         onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
         onSelectProjectTab: (cb: (tabId: string) => void) => {
           cb('git')
@@ -810,7 +782,6 @@ describe('App', () => {
           onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
           onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
           onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-          onToast: vi.fn().mockReturnValue(vi.fn()),
           onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
           onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
           onMenuCloseTab: (cb: () => void) => {
@@ -852,7 +823,6 @@ describe('App', () => {
           onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
           onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
           onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-          onToast: vi.fn().mockReturnValue(vi.fn()),
           onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
           onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
           onMenuCloseTab: (cb: () => void) => {
@@ -897,7 +867,6 @@ describe('App', () => {
           onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
           onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
           onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-          onToast: vi.fn().mockReturnValue(vi.fn()),
           onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
           onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
           onMenuCloseTab: (cb: () => void) => {
@@ -944,7 +913,6 @@ describe('App', () => {
           onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
           onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
           onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-          onToast: vi.fn().mockReturnValue(vi.fn()),
           onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
           onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
           onMenuCloseTab: (cb: () => void) => {
@@ -994,7 +962,6 @@ describe('App', () => {
           return vi.fn()
         },
         onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-        onToast: vi.fn().mockReturnValue(vi.fn()),
         onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
         onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
       },
@@ -1085,7 +1052,6 @@ describe('App', () => {
           return vi.fn()
         },
         onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-        onToast: vi.fn().mockReturnValue(vi.fn()),
         onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
         onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
       },
@@ -1116,7 +1082,6 @@ describe('App', () => {
           toggleSidebarCb = cb
           return vi.fn()
         },
-        onToast: vi.fn().mockReturnValue(vi.fn()),
         onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
         onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
       },
@@ -1183,7 +1148,6 @@ describe('App', () => {
         onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
         onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
         onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onToast: vi.fn().mockReturnValue(vi.fn()),
         onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
         onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
         notifyPanelState: mockNotifyPanelState,

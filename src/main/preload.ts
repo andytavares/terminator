@@ -149,14 +149,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     readFile: (filePath: string) => ipcRenderer.invoke('fs:read-file', { filePath }),
   },
   extensionEvents: {
-    onToast: (handler: (payload: { type: string; message: string }) => void) => {
-      const listener = (
-        _event: Electron.IpcRendererEvent,
-        payload: { type: string; message: string }
-      ) => handler(payload)
-      ipcRenderer.on('extension:toast', listener)
-      return () => ipcRenderer.removeListener('extension:toast', listener)
-    },
     onTogglePanel: (handler: (panelId: string) => void) => {
       const listener = (_event: Electron.IpcRendererEvent, panelId: string) => handler(panelId)
       ipcRenderer.on('extension:toggle-panel', listener)
@@ -215,21 +207,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener(channel, listener)
     },
   },
-  notification: {
-    show: (title: string, body: string) =>
-      ipcRenderer.invoke('notifications:create', {
-        type: 'info',
-        title,
-        message: body,
-        targets: ['system'],
-      }),
-  },
   notifications: {
     create: (payload: {
       type: 'info' | 'success' | 'warning' | 'error'
       title: string
       message?: string
-      targets?: Array<'system' | 'center' | 'toast'>
+      source?: string
     }) => ipcRenderer.invoke('notifications:create', payload),
     list: () => ipcRenderer.invoke('notifications:list'),
     dismiss: (id: string) => ipcRenderer.invoke('notifications:dismiss', { id }),

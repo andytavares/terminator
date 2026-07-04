@@ -190,7 +190,6 @@ export interface ExtensionAPI {
       type: ToastType
       title: string
       message?: string
-      targets?: Array<'system' | 'center' | 'toast'>
       actions?: Array<{ id: string; label: string; handler: () => void }>
     }): Disposable
   }
@@ -470,15 +469,12 @@ export function createExtensionAPI(
     },
     notifications: {
       showToast(type: ToastType, message: string): void {
-        for (const win of BrowserWindow.getAllWindows()) {
-          if (!win.isDestroyed()) win.webContents.send('extension:toast', { type, message })
-        }
+        notificationManager.create({ type, title: message, source: extensionId })
       },
       createNotification(opts: {
         type: ToastType
         title: string
         message?: string
-        targets?: Array<'system' | 'center' | 'toast'>
         actions?: Array<{ id: string; label: string; handler: () => void }>
       }): Disposable {
         const id = notificationManager.create({
@@ -486,7 +482,6 @@ export function createExtensionAPI(
           title: opts.title,
           message: opts.message,
           source: extensionId,
-          targets: opts.targets,
           actions: opts.actions,
         })
         return disposable(() => notificationManager.dismiss(id))

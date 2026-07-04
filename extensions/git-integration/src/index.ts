@@ -30,6 +30,21 @@ export function activate(api: ExtensionAPI): void {
     })
   )
 
+  // Bridges this extension's renderer (an isolated webview, no direct access to
+  // api.notifications) to the shared notification dispatcher.
+  disposables.push(
+    api.ipc.registerHandler('git:notify', (payload) => {
+      const { type, title, message } = (payload ?? {}) as {
+        type?: 'info' | 'success' | 'warning' | 'error'
+        title?: string
+        message?: string
+      }
+      if (!type || !title) return { error: 'VALIDATION_ERROR' }
+      api.notifications.createNotification({ type, title, message })
+      return { ok: true }
+    })
+  )
+
   disposables.push(
     api.settings.register({
       label: 'Git Integration',

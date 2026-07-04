@@ -3,25 +3,11 @@ import type { ExtensionDB } from '../../../../src/main/extensions/api'
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-const { mockOsNotif, mockNotifIsSupported } = vi.hoisted(() => {
-  const mockOsNotif = { on: vi.fn(), show: vi.fn() }
-  const mockNotifIsSupported = vi.fn(() => false)
-  return { mockOsNotif, mockNotifIsSupported }
-})
-
 const mockSend = vi.fn()
 const mockWin = { isDestroyed: vi.fn(() => false), webContents: { send: mockSend } }
 
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: vi.fn(() => [mockWin]) },
-  Notification: Object.assign(
-    vi.fn(function () {
-      return mockOsNotif
-    }),
-    {
-      isSupported: mockNotifIsSupported,
-    }
-  ),
 }))
 
 // ── DB mock factory ──────────────────────────────────────────────────────────
@@ -106,7 +92,6 @@ let mock: MockDb
 beforeEach(() => {
   vi.clearAllMocks()
   mock = createMockDb()
-  mockNotifIsSupported.mockReturnValue(false)
   vi.useFakeTimers()
 })
 
@@ -642,112 +627,14 @@ describe('startTaskScheduler — scheduler never inserts task rows', () => {
   })
 })
 
-// ── OS system notifications (Notification.isSupported = true) ─────────────────
+// ── action handler navigation ──────────────────────────────────────────────────
+// System-notification click handling now lives entirely in notificationManager
+// (src/main/notifications/notification-manager.spec.ts) — it wires the OS
+// bubble's click event to actions[0].handler(), the same handler tested here.
 
-describe('startTaskScheduler — OS system notifications', () => {
-  it('shows an OS notification for a due task when Notification.isSupported returns true', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-    mockNotifIsSupported.mockReturnValue(true)
-
-    const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
-    mock.mockAll.mockResolvedValue([
-      {
-        id: 't-os',
-        text: 'OS Due Task',
-        due_date: '2026-05-26',
-        metadata: '{}',
-        recurrence_notify_at: null,
-      },
-    ])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    scheduler.dispose()
-
-    expect(mockOsNotif.show).toHaveBeenCalled()
-  })
-
-  it('OS notification click handler broadcasts navigate-task with source_ref (not due_date)', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-    mockNotifIsSupported.mockReturnValue(true)
-
-    const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
-    mock.mockAll.mockResolvedValue([
-      {
-        id: 't-click',
-        text: 'Clickable',
-        due_date: '2026-05-26',
-        source_ref: '2026-05-20',
-        metadata: '{}',
-        recurrence_notify_at: null,
-      },
-    ])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    scheduler.dispose()
-
-    const clickArgs = mockOsNotif.on.mock.calls.find(([event]: [string]) => event === 'click')
-    expect(clickArgs).toBeTruthy()
-    clickArgs![1]()
-    expect(mockSend).toHaveBeenCalledWith(
-      'task-vault:navigate-task',
-      expect.objectContaining({ taskId: 't-click', date: '2026-05-20' })
-    )
-  })
-
-  it('shows an OS notification for a blocked task when Notification.isSupported returns true', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-    mockNotifIsSupported.mockReturnValue(true)
-
-    const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
-    mock.mockBlockedAll.mockResolvedValue([
-      blockedRow({
-        id: 'b-os',
-        text: 'OS Blocked Task',
-        metadata: JSON.stringify({
-          blocked_check_interval: '1-hour',
-          blocked_reason: 'waiting on PR',
-        }),
-      }),
-    ])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    scheduler.dispose()
-
-    expect(mockOsNotif.show).toHaveBeenCalled()
-  })
-
-  it('OS notification click handler for blocked task broadcasts { taskId, date }', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-    mockNotifIsSupported.mockReturnValue(true)
-
-    const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
-    mock.mockBlockedAll.mockResolvedValue([
-      blockedRow({
-        id: 'b-click',
-        source_ref: '2026-05-20',
-        metadata: JSON.stringify({ blocked_check_interval: '1-hour' }),
-      }),
-    ])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    scheduler.dispose()
-
-    const clickArgs = mockOsNotif.on.mock.calls.find(([event]: [string]) => event === 'click')
-    expect(clickArgs).toBeTruthy()
-    clickArgs![1]()
-    expect(mockSend).toHaveBeenCalledWith(
-      'task-vault:navigate-task',
-      expect.objectContaining({ taskId: 'b-click', date: '2026-05-20' })
-    )
-  })
-
+describe('startTaskScheduler — action handler navigation', () => {
   it('in-app action handler for blocked task broadcasts { taskId, date }', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-    mockNotifIsSupported.mockReturnValue(false)
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
     const createNotification = vi.spyOn(api.notifications, 'createNotification')

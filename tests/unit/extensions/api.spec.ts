@@ -76,6 +76,9 @@ import * as shellExecutor from '../../../src/main/shell/shell-executor'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockGetGlobalSettings.mockReturnValue({
+    notifications: { defaultTargets: ['system', 'center', 'toast'], extensionOverrides: {} },
+  })
   // Reset shared registry state between tests
   globalRegistry.sidebarPanels.clear()
   globalRegistry.topBarItems.clear()
@@ -125,24 +128,24 @@ describe('api.settings.resolveWorktreeBaseDir', () => {
 })
 
 describe('api.notifications.showToast', () => {
-  it('sends extension:toast IPC message to all windows', () => {
+  it('routes through notificationManager, resolving targets from settings like createNotification', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
     api.notifications.showToast('info', 'Hello toast')
 
-    expect(mockSend).toHaveBeenCalledWith('extension:toast', {
-      type: 'info',
-      message: 'Hello toast',
-    })
+    expect(mockSend).toHaveBeenCalledWith(
+      'notifications:push',
+      expect.objectContaining({ type: 'info', title: 'Hello toast', source: 'test.ext' })
+    )
   })
 
   it('sends error toast with correct type', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
     api.notifications.showToast('error', 'Something failed')
 
-    expect(mockSend).toHaveBeenCalledWith('extension:toast', {
-      type: 'error',
-      message: 'Something failed',
-    })
+    expect(mockSend).toHaveBeenCalledWith(
+      'notifications:push',
+      expect.objectContaining({ type: 'error', title: 'Something failed', source: 'test.ext' })
+    )
   })
 })
 

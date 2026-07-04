@@ -4,7 +4,7 @@ import React from 'react'
 
 const mockMergeCommit = vi.fn()
 const mockClearSession = vi.fn()
-const mockAddToast = vi.fn()
+const mockNotify = vi.fn()
 
 vi.mock('../../src/api/merge-flow', () => ({
   mergeFlowAPI: {
@@ -13,8 +13,8 @@ vi.mock('../../src/api/merge-flow', () => ({
   },
 }))
 
-vi.mock('../../../../src/renderer/stores/toast.store', () => ({
-  useToastStore: () => ({ addToast: mockAddToast }),
+vi.mock('../../src/api/notifications', () => ({
+  notificationsAPI: { notify: (...a: unknown[]) => mockNotify(...a) },
 }))
 
 let mockStoreState: Record<string, unknown> = {}
@@ -114,7 +114,7 @@ describe('CompletionScreen', () => {
     render(<CompletionScreen repoRoot="/repo" onExit={onExit} />)
     fireEvent.click(screen.getByText(/Commit merge/i))
     await waitFor(() => {
-      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
+      expect(mockNotify).toHaveBeenCalledWith('error', 'Commit failed', 'hook failed')
     })
     expect(onExit).not.toHaveBeenCalled()
   })

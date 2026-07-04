@@ -65,13 +65,11 @@ describe('notification IPC handlers', () => {
       expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
     })
 
-    it('passes optional targets to the manager', async () => {
+    it('ignores a caller-supplied targets field (delivery is settings-resolved, not caller-supplied)', async () => {
       mockCreate.mockReturnValue('tid')
       const handler = captureHandle('notifications:create')
       await handler(null, { type: 'success', title: 'T', targets: ['system', 'toast'] })
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ targets: ['system', 'toast'] })
-      )
+      expect(mockCreate).toHaveBeenCalledWith({ type: 'success', title: 'T' })
     })
   })
 

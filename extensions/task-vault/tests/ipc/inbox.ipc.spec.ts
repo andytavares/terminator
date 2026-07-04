@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as fs from 'node:fs/promises'
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
@@ -21,10 +21,6 @@ const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
 }))
 vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
-  Notification: Object.assign(
-    vi.fn(() => ({ show: vi.fn() })),
-    { isSupported: vi.fn(() => false) }
-  ),
 }))
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
@@ -72,6 +68,9 @@ const TASK_ROW = {
 }
 
 let db: ReturnType<typeof createMockDb>
+const mockApi = {
+  notifications: { createNotification: vi.fn() },
+} as unknown as ExtensionAPI
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -89,7 +88,7 @@ function getHandler(channel: string): (event: unknown, payload: unknown) => Prom
   vi.mocked(mockHandle).mockImplementation((ch, fn) => {
     if (ch === channel) handler = fn as typeof handler
   })
-  registerVaultIpcHandlers(db)
+  registerVaultIpcHandlers(mockApi, db)
   if (!handler) throw new Error(`Handler for ${channel} not registered`)
   return handler
 }

@@ -148,6 +148,53 @@ describe('GlobalSettingsSchema', () => {
     const result = GlobalSettingsSchema.safeParse({ ...validGlobal, ui: { hasSeenWelcome: 'yes' } })
     expect(result.success).toBe(false)
   })
+
+  it('applies default value for notifications field when omitted', () => {
+    const result = GlobalSettingsSchema.safeParse(validGlobal)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.notifications).toEqual({
+        defaultTargets: ['system', 'center', 'toast'],
+        extensionOverrides: {},
+      })
+    }
+  })
+
+  it('accepts a custom notifications section', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      notifications: {
+        defaultTargets: ['toast'],
+        extensionOverrides: { 'terminator.git-integration': ['system', 'center'] },
+      },
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.notifications.defaultTargets).toEqual(['toast'])
+      expect(result.data.notifications.extensionOverrides).toEqual({
+        'terminator.git-integration': ['system', 'center'],
+      })
+    }
+  })
+
+  it('rejects an unknown notification target', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      notifications: { defaultTargets: ['popup'], extensionOverrides: {} },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects an unknown notification target in an extension override', () => {
+    const result = GlobalSettingsSchema.safeParse({
+      ...validGlobal,
+      notifications: {
+        defaultTargets: ['toast'],
+        extensionOverrides: { 'terminator.notepad': ['popup'] },
+      },
+    })
+    expect(result.success).toBe(false)
+  })
 })
 
 describe('DEFAULT_GLOBAL_SETTINGS', () => {

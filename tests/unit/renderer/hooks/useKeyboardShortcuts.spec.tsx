@@ -16,8 +16,8 @@ vi.mock('../../../../src/renderer/extensions/registry', () => ({
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
   useTerminalSession: vi.fn(),
 }))
-vi.mock('../../../../src/renderer/stores/toast.store', () => ({
-  useToastStore: vi.fn(() => ({ addToast: vi.fn() })),
+vi.mock('../../../../src/renderer/lib/notifications', () => ({
+  dispatchNotification: vi.fn(),
 }))
 
 const mockSetActiveWorkspace = vi.fn()
@@ -276,7 +276,7 @@ describe('useKeyboardShortcuts', () => {
     setupMocks({ activeProjectId: 'proj-1' })
     const useKeyboardShortcuts = await importHook()
     renderHook(() => useKeyboardShortcuts())
-    // Should not throw — the .catch handler swallows and calls addToast
+    // Should not throw — the .catch handler swallows and dispatches a notification
     pressKey('d', { metaKey: true })
     await new Promise((r) => setTimeout(r, 10))
     expect(mockSplitSession).toHaveBeenCalled()
