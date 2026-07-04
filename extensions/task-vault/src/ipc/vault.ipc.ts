@@ -317,9 +317,6 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     const now = new Date().toISOString()
     const todayStr = today()
 
-    const taskRow = await db.get<{ text: string }>(`SELECT text FROM tasks WHERE id=?`, [taskId])
-    const taskText = taskRow?.text ?? ''
-
     try {
       let nextTaskId: string | null = null
       await db.transaction(async (tx) => {
@@ -345,12 +342,6 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
         })
       }
 
-      api.notifications.createNotification({
-        type: 'success',
-        title: 'Task completed',
-        message: taskText,
-        key: 'taskCompleted',
-      })
       broadcast('task-vault:push:index-updated', {})
       return { success: true }
     } catch (err) {
