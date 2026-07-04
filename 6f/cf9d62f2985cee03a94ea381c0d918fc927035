@@ -1,0 +1,42 @@
+src/renderer/hooks/useTerminalSession.ts
+  s_f76be9eaf0aff6::t_5f44597e124671 21
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_f76be9eaf0aff6::t_46d56a023aabab 199,218,238
+src/renderer/components/settings/SettingsPanel.tsx
+  s_f76be9eaf0aff6::t_5877f284533cc2 122,129,150,157,171,178,209,220,227,321-326,332,335-340,347
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_f76be9eaf0aff6::t_7a54bc183102ac 725
+  s_f76be9eaf0aff6::t_2cb8b657bce166 658,673,688,710
+src/renderer/lib/notifications.ts
+  s_f76be9eaf0aff6::t_a2f168e7cd7c13 4-6,14
+tests/unit/renderer/hooks/useTerminalSession.spec.tsx
+  s_f76be9eaf0aff6::t_738001373c1028 353,417
+src/renderer/App.tsx
+  s_f76be9eaf0aff6::t_94ee435de6d1ee 453
+tests/unit/renderer/lib/notifications.spec.ts
+  s_f76be9eaf0aff6::t_8c7fd1239d9e56 18-25,29-30
+src/renderer/components/sidebar/BranchSwitcher.tsx
+  s_f76be9eaf0aff6::t_19234f2a45eb2a 166
+  s_f76be9eaf0aff6::t_38360dc6eb4760 147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "6fcf9d62f2985cee03a94ea381c0d918fc927035",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f76be9eaf0aff6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c5890d1-3b53-4ec7-bf4f-ae6a3beefb2a",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
