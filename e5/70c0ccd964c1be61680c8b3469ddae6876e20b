@@ -1,0 +1,32 @@
+tests/unit/extensions/api.spec.ts
+  s_f76be9eaf0aff6::t_4d2c44b70b13ee 131,135-138,145-148
+docs/EXTENSION-DEVELOPMENT.md
+  s_f76be9eaf0aff6::t_c4fcde800fc0fa 323-330
+  s_f76be9eaf0aff6::t_6fe16a8f4a9758 331
+docs/ARCHITECTURE.md
+  s_f76be9eaf0aff6::t_2f1ed749712e9d 322-345
+  s_f76be9eaf0aff6::t_7e47e89fcdf9a9 194
+src/main/extensions/api.ts
+  s_f76be9eaf0aff6::t_4aa6ad771f3d49 472
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "e570c0ccd964c1be61680c8b3469ddae6876e20b",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f76be9eaf0aff6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c5890d1-3b53-4ec7-bf4f-ae6a3beefb2a",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
