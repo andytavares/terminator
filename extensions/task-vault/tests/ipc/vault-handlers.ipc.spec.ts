@@ -156,16 +156,11 @@ describe('task-vault:vault:complete-task', () => {
     expect(result.nextTaskId).toBeUndefined()
   })
 
-  it('notifies via the shared dispatcher on completion', async () => {
+  it('does not create a server-side notification (renderer notify() owns this event)', async () => {
     mockGet.mockResolvedValue({ id: 'task-1', text: 'Test task' })
     const handler = getHandler('task-vault:vault:complete-task')
     await handler({}, { taskId: 'task-1' })
-    expect(mockCreateNotification).toHaveBeenCalledWith({
-      type: 'success',
-      title: 'Task completed',
-      message: 'Test task',
-      key: 'taskCompleted',
-    })
+    expect(mockCreateNotification).not.toHaveBeenCalled()
   })
 })
 

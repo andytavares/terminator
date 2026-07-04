@@ -40,6 +40,7 @@ jobs:
       - name: Call Anthropic API
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then
             echo "::warning::ANTHROPIC_API_KEY secret is not set — skipping description generation"
@@ -48,7 +49,6 @@ jobs:
 
           COMMITS=$(cat commits.txt)
           DIFF=$(cat pr.diff)
-          PR_TITLE="${{ github.event.pull_request.title }}"
 
           PROMPT="You are writing a GitHub pull request description for an Electron + React TypeScript desktop app (a terminal emulator).
 
