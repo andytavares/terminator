@@ -1,0 +1,35 @@
+extensions/notepad/src/index.ts
+  s_f76be9eaf0aff6::t_9a64dc960d4034 11-41
+  s_f76be9eaf0aff6::t_1659595e81cca3 204-205
+  s_f76be9eaf0aff6::t_1b30d531caddf5 55-56
+  s_f76be9eaf0aff6::t_f79a5cf633d6f6 167
+extensions/speckit-pilot/src/index.ts
+  s_f76be9eaf0aff6::t_04d8e8575cac3a 1
+  s_f76be9eaf0aff6::t_5cca4536e582d5 596-600
+  s_f76be9eaf0aff6::t_cec212891cce1b 740
+  s_f76be9eaf0aff6::t_eab49752e48c2f 1381
+  s_f76be9eaf0aff6::t_65b39ffbee1c8d 640-677,742,1383,1415,2031
+  s_f76be9eaf0aff6::t_fed3a73a9acd18 1413
+  s_f76be9eaf0aff6::t_e4bb9a5e65781f 741,743-744,878,895,1382,1384-1385,1414,1416-1417,1545,1617,1696,1842
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "df14c82459b9fc1b81b9732c0929cf244ac35339",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f76be9eaf0aff6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c5890d1-3b53-4ec7-bf4f-ae6a3beefb2a",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
