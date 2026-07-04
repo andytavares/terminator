@@ -312,7 +312,7 @@ The Code Reviews tab is a **workspace-scoped tab** — hover over a workspace ca
 Features:
 
 - Paginated queue of open/closed PRs with search by title or PR number.
-- **Five filter pills:** All, High risk, Quick wins, In progress, Stale >3d.
+- **Five filter pills:** All, High risk, Quick wins, In progress, Stale >3d. In the queue, a PR's risk is classified by total lines changed (≥400 = high, ≥150 = medium) so large diffs surface under **High risk** immediately; opening a PR refines its risk with per-file analysis (churn, blast radius, coverage, complexity).
 - **Stat cards:** awaiting count, high-risk count, total review time, in-progress count.
 - PRs scored across six signals: tests, coverage, CI, lint, churn, and blast radius.
 - Chapter-by-chapter review surface with syntax-highlighted diffs and inline comment threading.
