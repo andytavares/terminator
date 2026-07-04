@@ -603,8 +603,28 @@ export function createExtensionAPI(
     },
     window: {
       openAuxiliary(view: string, params?: Record<string, string>): void {
+        const navigate = (win: BrowserWindow): void => {
+          const query: Record<string, string> = { view, ...params }
+          if (rendererUrl) {
+            const url = new URL(rendererUrl)
+            for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v)
+            win.loadURL(url.toString())
+          } else {
+            const devUrl = process.env['ELECTRON_RENDERER_URL']
+            if (devUrl) {
+              win.loadURL(`${devUrl}?${new URLSearchParams(query).toString()}`)
+            } else {
+              win.loadFile(join(__dirname, '../renderer/index.html'), { query })
+            }
+          }
+        }
+
         const existing = auxiliaryWindows.get(view)
         if (existing && !existing.isDestroyed()) {
+          // Re-navigate an already-open auxiliary window when the caller hands
+          // through specific context (e.g. the active PR being reviewed) —
+          // otherwise a bare re-open (no params) just refocuses it as-is.
+          if (params && Object.keys(params).length > 0) navigate(existing)
           existing.focus()
           return
         }
@@ -621,24 +641,14 @@ export function createExtensionAPI(
         win.on('closed', () => {
           auxiliaryWindows.delete(view)
         })
-        const query: Record<string, string> = { view, ...params }
         if (rendererUrl) {
           // Load the extension's own renderer directly so it handles the view param natively,
           // without needing to create a WebContentsView inside the auxiliary window.
           win.webContents.on('did-finish-load', () => {
             win.webContents.insertCSS(EXTENSION_BASE_CSS).catch(() => {})
           })
-          const url = new URL(rendererUrl)
-          for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v)
-          win.loadURL(url.toString())
-        } else {
-          const devUrl = process.env['ELECTRON_RENDERER_URL']
-          if (devUrl) {
-            win.loadURL(`${devUrl}?${new URLSearchParams(query).toString()}`)
-          } else {
-            win.loadFile(join(__dirname, '../renderer/index.html'), { query })
-          }
         }
+        navigate(win)
       },
       broadcast(channel: string, data: unknown): void {
         if (deps?.broadcastToWindows) {

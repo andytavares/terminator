@@ -553,6 +553,36 @@ describe('api.window.openAuxiliary', () => {
     expect(mockBWInstance.loadURL).toHaveBeenCalledWith(expect.stringContaining('view=my-view'))
     expect(mockBWInstance.loadURL).toHaveBeenCalledWith(expect.stringContaining('extra=val'))
   })
+
+  it('TAV-6: re-navigates an already-open window when called again with params', () => {
+    const rendererUrl = 'ext://com.test.ext/index.html'
+    const api = createExtensionAPI('test.aux-renav', '0.1.0', undefined, rendererUrl)
+    api.window.openAuxiliary('pr-review', { repoRoot: '/repo' })
+    vi.mocked(mockBWInstance.loadURL).mockClear()
+    mockBWInstance.isDestroyed.mockReturnValueOnce(false)
+
+    // Popping out again while reviewing a specific PR must carry the PR
+    // context through to the already-open window, not just refocus it as-is.
+    api.window.openAuxiliary('pr-review', { repoRoot: '/repo', prNumber: '49' })
+
+    expect(mockBWInstance.loadURL).toHaveBeenCalledWith(expect.stringContaining('prNumber=49'))
+    expect(mockBWInstance.focus).toHaveBeenCalled()
+  })
+
+  it('does not re-navigate an already-open window when called again with no params', () => {
+    const rendererUrl = 'ext://com.test.ext/index.html'
+    const api = createExtensionAPI('test.aux-bare', '0.1.0', undefined, rendererUrl)
+    api.window.openAuxiliary('pr-review', { repoRoot: '/repo', prNumber: '49' })
+    vi.mocked(mockBWInstance.loadURL).mockClear()
+    mockBWInstance.isDestroyed.mockReturnValueOnce(false)
+
+    // A bare re-open (e.g. the "Code Reviews in New Window" menu item, which
+    // always passes {}) should just refocus the window as-is, not reset it.
+    api.window.openAuxiliary('pr-review', {})
+
+    expect(mockBWInstance.loadURL).not.toHaveBeenCalled()
+    expect(mockBWInstance.focus).toHaveBeenCalled()
+  })
 })
 
 // ── window.focusSelf ──────────────────────────────────────────────────────────
