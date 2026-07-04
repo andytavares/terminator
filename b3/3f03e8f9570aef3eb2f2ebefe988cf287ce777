@@ -1,0 +1,48 @@
+extensions/git-integration/src/components/merge-flow/ConflictResolver.tsx
+  s_f76be9eaf0aff6::t_3fc9d4fb032264 9
+  s_f76be9eaf0aff6::t_38ca9f261da1f8 95,98
+  s_f76be9eaf0aff6::t_2abfdd85846221 74
+  s_f76be9eaf0aff6::t_2a53d748cd4303 112,115,117
+extensions/git-integration/src/index.ts
+  s_f76be9eaf0aff6::t_586ded266589c3 33-47
+extensions/git-integration/src/api/notifications.ts
+  s_f76be9eaf0aff6::t_d4770dc88caa80 6-10
+  s_f76be9eaf0aff6::t_4d16344d7ed7e4 1-5,11-12
+extensions/git-integration/tests/unit/ConflictResolver.spec.tsx
+  s_f76be9eaf0aff6::t_a8e509312b5116 17-18
+extensions/git-integration/src/components/merge-flow/MergeFlowView.tsx
+  s_f76be9eaf0aff6::t_1311ab4c691470 4
+  s_f76be9eaf0aff6::t_90734f535c3512 81,91,98
+  s_f76be9eaf0aff6::t_d08d9da2dd91d4 46,51,59
+extensions/git-integration/tests/unit/notifications-api.spec.ts
+  s_f76be9eaf0aff6::t_07954bc756804c 1-38
+extensions/git-integration/src/components/merge-flow/CompletionScreen.tsx
+  s_f76be9eaf0aff6::t_dde205516e593e 96,100-104,110
+  s_f76be9eaf0aff6::t_c5ad2f4c2c5030 4
+extensions/git-integration/tests/unit/CompletionScreen.spec.tsx
+  s_f76be9eaf0aff6::t_e51d9fd2d815fe 7,16-17
+  s_f76be9eaf0aff6::t_32d4701a1d9008 117
+extensions/git-integration/tests/unit/MergeFlowView.spec.tsx
+  s_f76be9eaf0aff6::t_f1d993e1cc6769 27-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "b33f03e8f9570aef3eb2f2ebefe988cf287ce777",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f76be9eaf0aff6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c5890d1-3b53-4ec7-bf4f-ae6a3beefb2a",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
