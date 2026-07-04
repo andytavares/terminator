@@ -119,8 +119,8 @@ export interface GlobalSettings {
   }
   notifications: {
     defaultTargets: NotificationTarget[]
-    extensionOverrides: {
-      [extensionId: string]: NotificationTarget[]
+    overrides: {
+      [notificationKey: string]: NotificationTarget[]
     }
   }
 }

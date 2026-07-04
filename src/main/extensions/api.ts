@@ -185,11 +185,20 @@ export interface ExtensionAPI {
     }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut: boolean }>
   }
   notifications: {
-    showToast(type: ToastType, message: string): void
+    /**
+     * `key` identifies this specific notification kind (unique within this
+     * extension, e.g. 'taskCompleted') so the user can configure its delivery
+     * target(s) independently of every other notification this extension
+     * sends. Register matching settings via api.settings.register() —
+     * `${extensionId}.notify.${key}.system` / `.center` / `.toast` (booleans)
+     * — so they appear in this extension's own settings panel.
+     */
+    showToast(type: ToastType, message: string, key: string): void
     createNotification(opts: {
       type: ToastType
       title: string
       message?: string
+      key: string
       actions?: Array<{ id: string; label: string; handler: () => void }>
     }): Disposable
   }
@@ -236,7 +245,11 @@ import { join } from 'path'
 
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
 import { fsWatcherService } from '../fs/fs-watcher.js'
-import { notificationManager } from '../notifications/notification-manager.js'
+import {
+  notificationManager,
+  setExtensionNotificationSettingReader,
+} from '../notifications/notification-manager.js'
+import type { NotificationTarget } from '../notifications/notification-manager.js'
 import { getExtensionSetting, setExtensionSetting } from '../storage/extension-settings-store.js'
 import { getGlobalSettings, getWorkspaceSettings } from '../storage/settings-store.js'
 import { makeLogger } from '../logger.js'
@@ -285,6 +298,32 @@ export const globalRegistry: Registry = {
   sessionCreateHandlers: new Set(),
   sessionCloseHandlers: new Set(),
 }
+
+// Resolves an extension's own per-notification-key delivery-target settings
+// (3 booleans: `${extensionId}.notify.${key}.{system,center,toast}`), falling
+// back to the extension's own registered schema default the same way
+// settings.get<T>() does below. Injected into notification-manager.ts (rather
+// than imported there) to avoid a circular dependency, since this module
+// already imports notification-manager.ts for createNotification/showToast.
+setExtensionNotificationSettingReader((extensionId, key) => {
+  const prefix = `${extensionId}.notify.${key}`
+  const schema = globalRegistry.settingsSections.get(`${extensionId}.settings`)
+  const readBoolean = (suffix: 'system' | 'center' | 'toast'): boolean | undefined => {
+    const fullKey = `${prefix}.${suffix}`
+    const stored = getExtensionSetting(fullKey)
+    if (stored !== undefined) return stored as boolean
+    return schema?.properties[fullKey]?.default as boolean | undefined
+  }
+  const system = readBoolean('system')
+  const center = readBoolean('center')
+  const toast = readBoolean('toast')
+  if (system === undefined && center === undefined && toast === undefined) return null
+  const targets: NotificationTarget[] = []
+  if (system) targets.push('system')
+  if (center) targets.push('center')
+  if (toast) targets.push('toast')
+  return targets
+})
 
 // Callback set by the main process so api.ts can trigger a full menu rebuild
 // without importing from index.ts (which would create a circular dependency).
@@ -468,13 +507,14 @@ export function createExtensionAPI(
       },
     },
     notifications: {
-      showToast(type: ToastType, message: string): void {
-        notificationManager.create({ type, title: message, source: extensionId })
+      showToast(type: ToastType, message: string, key: string): void {
+        notificationManager.create({ type, title: message, source: extensionId, key })
       },
       createNotification(opts: {
         type: ToastType
         title: string
         message?: string
+        key: string
         actions?: Array<{ id: string; label: string; handler: () => void }>
       }): Disposable {
         const id = notificationManager.create({
@@ -482,6 +522,7 @@ export function createExtensionAPI(
           title: opts.title,
           message: opts.message,
           source: extensionId,
+          key: opts.key,
           actions: opts.actions,
         })
         return disposable(() => notificationManager.dismiss(id))

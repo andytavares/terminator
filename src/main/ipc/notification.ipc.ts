@@ -7,6 +7,7 @@ const CreateSchema = z.object({
   title: z.string().min(1),
   message: z.string().optional(),
   source: z.string().optional(),
+  key: z.string().min(1),
 })
 
 const DismissSchema = z.object({ id: z.string().min(1) })

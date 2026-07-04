@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { useSettingsStore } from '../../stores/settings.store'
-import type { Extension } from '../../../shared/types/index'
 import type { NotificationTarget } from '../../../shared/types/index'
 import './SettingsPanel.css'
 
@@ -8,6 +7,27 @@ const NOTIFICATION_TARGETS: Array<{ value: NotificationTarget; label: string }> 
   { value: 'system', label: 'System' },
   { value: 'center', label: 'In-App' },
   { value: 'toast', label: 'Toast' },
+]
+
+// Core's own notification kinds only. Each extension's notification settings
+// live entirely in that extension's own settings panel (registered via
+// api.settings.register) — core has no knowledge of what notifications any
+// extension defines, so nothing extension-specific is listed here.
+const CORE_NOTIFICATION_KEYS: Array<{ key: string; label: string }> = [
+  { key: 'terminalBell', label: 'Terminal bell (session needs attention)' },
+  { key: 'branchSwitchFailed', label: 'Branch switch failed' },
+  { key: 'splitPaneFailed', label: 'Split pane failed' },
+  { key: 'closeTerminalFailed', label: 'Close terminal failed' },
+  { key: 'remoteTunnelDisconnected', label: 'Remote tunnel disconnected' },
+  { key: 'extensionInstalled', label: 'Extension installed' },
+  { key: 'extensionInstallFailed', label: 'Extension install failed' },
+  { key: 'extensionReloaded', label: 'Extension reloaded' },
+  { key: 'extensionReloadFailed', label: 'Extension reload failed' },
+  { key: 'extensionUninstalled', label: 'Extension uninstalled' },
+  { key: 'extensionUninstallFailed', label: 'Extension uninstall failed' },
+  { key: 'extensionUpgraded', label: 'Extension upgraded' },
+  { key: 'extensionUpgradeFailed', label: 'Extension upgrade failed' },
+  { key: 'extensionSettingAction', label: 'Extension setting action result' },
 ]
 
 export function GlobalSettings(): JSX.Element {
@@ -20,14 +40,8 @@ export function GlobalSettings(): JSX.Element {
     updateShowMetricsBar,
     updatePromptForName,
     updateNotificationDefaultTargets,
-    updateNotificationExtensionOverride,
+    updateNotificationOverride,
   } = useSettingsStore()
-
-  const [extensions, setExtensions] = useState<Extension[]>([])
-
-  useEffect(() => {
-    window.electronAPI.extension.list().then((result) => setExtensions(result.extensions))
-  }, [])
 
   if (!globalSettings) return <div>Loading...</div>
 
@@ -194,39 +208,36 @@ export function GlobalSettings(): JSX.Element {
         </span>
       </div>
 
-      {extensions.length > 0 && (
-        <div className="settings-section__field">
-          <label className="settings-section__label">Per-Extension Overrides</label>
-          {extensions.map((ext) => {
-            const override = globalSettings.notifications.extensionOverrides[ext.id] ?? []
-            return (
-              <div key={ext.id} className="settings-section__ext-override-row">
-                <span className="settings-section__ext-override-name">{ext.name}</span>
-                <div className="settings-section__radio-group">
-                  {NOTIFICATION_TARGETS.map(({ value, label }) => (
-                    <label key={value} className="settings-section__radio">
-                      <input
-                        type="checkbox"
-                        checked={override.includes(value)}
-                        onChange={() =>
-                          void updateNotificationExtensionOverride(
-                            ext.id,
-                            toggleTarget(override, value)
-                          )
-                        }
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
+      <div className="settings-section__field">
+        <label className="settings-section__label">Per-Notification Overrides (Core)</label>
+        {CORE_NOTIFICATION_KEYS.map(({ key, label }) => {
+          const override = globalSettings.notifications.overrides[key] ?? []
+          return (
+            <div key={key} className="settings-section__ext-override-row">
+              <span className="settings-section__ext-override-name">{label}</span>
+              <div className="settings-section__radio-group">
+                {NOTIFICATION_TARGETS.map(({ value, label: targetLabel }) => (
+                  <label key={value} className="settings-section__radio">
+                    <input
+                      type="checkbox"
+                      checked={override.includes(value)}
+                      onChange={() =>
+                        void updateNotificationOverride(key, toggleTarget(override, value))
+                      }
+                    />
+                    {targetLabel}
+                  </label>
+                ))}
               </div>
-            )
-          })}
-          <span className="settings-section__hint">
-            Leave all unchecked for an extension to use the default targets above.
-          </span>
-        </div>
-      )}
+            </div>
+          )
+        })}
+        <span className="settings-section__hint">
+          Leave all unchecked for a notification to use the default targets above. Each
+          extension&rsquo;s own notifications are configured in that extension&rsquo;s settings
+          panel, not here.
+        </span>
+      </div>
     </div>
   )
 }

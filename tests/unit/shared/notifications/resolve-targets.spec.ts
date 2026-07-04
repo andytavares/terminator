@@ -1,47 +1,45 @@
 import { describe, it, expect } from 'vitest'
 import {
-  resolveNotificationTargets,
-  type NotificationSettings,
+  resolveCoreNotificationTargets,
+  type CoreNotificationSettings,
 } from '../../../../src/shared/notifications/resolve-targets'
 
-const settings: NotificationSettings = {
+const settings: CoreNotificationSettings = {
   defaultTargets: ['toast'],
-  extensionOverrides: {
-    'terminator.git-integration': ['system'],
-    'terminator.notepad': [],
+  overrides: {
+    terminalBell: ['system'],
+    branchSwitchFailed: [],
   },
 }
 
-describe('resolveNotificationTargets', () => {
-  it('uses the global default when no source is given', () => {
-    expect(resolveNotificationTargets(settings, { type: 'info' })).toEqual(['toast'])
-  })
-
-  it('uses the global default when the source has no override', () => {
+describe('resolveCoreNotificationTargets', () => {
+  it('uses the global default when the key has no override', () => {
     expect(
-      resolveNotificationTargets(settings, { source: 'terminator.task-vault', type: 'info' })
+      resolveCoreNotificationTargets(settings, { key: 'extensionInstalled', type: 'info' })
     ).toEqual(['toast'])
   })
 
-  it('prefers a per-extension override over the global default', () => {
-    expect(
-      resolveNotificationTargets(settings, { source: 'terminator.git-integration', type: 'info' })
-    ).toEqual(['system'])
+  it('prefers a per-key override over the global default', () => {
+    expect(resolveCoreNotificationTargets(settings, { key: 'terminalBell', type: 'info' })).toEqual(
+      ['system']
+    )
   })
 
   it('treats an empty override array as "use default"', () => {
     expect(
-      resolveNotificationTargets(settings, { source: 'terminator.notepad', type: 'info' })
+      resolveCoreNotificationTargets(settings, { key: 'branchSwitchFailed', type: 'info' })
     ).toEqual(['toast'])
   })
 
   it('force-includes toast for errors even when the resolved targets omit it', () => {
     expect(
-      resolveNotificationTargets(settings, { source: 'terminator.git-integration', type: 'error' })
+      resolveCoreNotificationTargets(settings, { key: 'terminalBell', type: 'error' })
     ).toEqual(['system', 'toast'])
   })
 
   it('does not duplicate toast for errors when already present', () => {
-    expect(resolveNotificationTargets(settings, { type: 'error' })).toEqual(['toast'])
+    expect(
+      resolveCoreNotificationTargets(settings, { key: 'extensionInstalled', type: 'error' })
+    ).toEqual(['toast'])
   })
 })

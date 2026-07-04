@@ -22,12 +22,16 @@ export const GlobalSettingsSchema = z.object({
       hasSeenWelcome: z.boolean(),
     })
     .default({ hasSeenWelcome: false }),
+  // Core's own notification kinds only (e.g. 'terminalBell') — never keyed by
+  // extension id. Each extension's own notification settings live entirely in
+  // its own per-extension settings (registered via api.settings.register),
+  // not here, so core never needs to know which extensions exist.
   notifications: z
     .object({
       defaultTargets: z.array(NotificationTargetSchema).default(['system', 'center', 'toast']),
-      extensionOverrides: z.record(z.string(), z.array(NotificationTargetSchema)).default({}),
+      overrides: z.record(z.string(), z.array(NotificationTargetSchema)).default({}),
     })
-    .default({ defaultTargets: ['system', 'center', 'toast'], extensionOverrides: {} }),
+    .default({ defaultTargets: ['system', 'center', 'toast'], overrides: {} }),
 })
 
 export const WorkspaceSettingsSchema = z.object({
@@ -69,7 +73,7 @@ export const DEFAULT_GLOBAL_SETTINGS = {
   ui: { hasSeenWelcome: false },
   notifications: {
     defaultTargets: ['system', 'center', 'toast'] as ('system' | 'center' | 'toast')[],
-    extensionOverrides: {} as Record<string, ('system' | 'center' | 'toast')[]>,
+    overrides: {} as Record<string, ('system' | 'center' | 'toast')[]>,
   },
 }
 

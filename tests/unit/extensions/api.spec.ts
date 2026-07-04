@@ -130,7 +130,7 @@ describe('api.settings.resolveWorktreeBaseDir', () => {
 describe('api.notifications.showToast', () => {
   it('routes through notificationManager, resolving targets from settings like createNotification', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
-    api.notifications.showToast('info', 'Hello toast')
+    api.notifications.showToast('info', 'Hello toast', 'somethingHappened')
 
     expect(mockSend).toHaveBeenCalledWith(
       'notifications:push',
@@ -140,7 +140,7 @@ describe('api.notifications.showToast', () => {
 
   it('sends error toast with correct type', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
-    api.notifications.showToast('error', 'Something failed')
+    api.notifications.showToast('error', 'Something failed', 'somethingFailed')
 
     expect(mockSend).toHaveBeenCalledWith(
       'notifications:push',
@@ -408,6 +408,7 @@ describe('api.notifications.createNotification', () => {
     const disposable = api.notifications.createNotification({
       type: 'info',
       title: 'Test notif',
+      key: 'testNotif',
     })
     expect(disposable).toHaveProperty('dispose')
     expect(() => disposable.dispose()).not.toThrow()
@@ -419,6 +420,7 @@ describe('api.notifications.createNotification', () => {
       type: 'warning',
       title: 'With actions',
       message: 'Please review',
+      key: 'withActions',
       actions: [{ id: 'go', label: 'Go', handler: vi.fn() }],
     })
     expect(disposable).toHaveProperty('dispose')

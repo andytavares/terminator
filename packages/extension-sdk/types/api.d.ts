@@ -167,12 +167,20 @@ export interface ExtensionAPI {
     }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut: boolean }>
   }
   notifications: {
-    showToast(type: ToastType, message: string): void
+    /**
+     * `key` identifies this specific notification kind (unique within this
+     * extension, e.g. 'taskCompleted') so the user can configure its delivery
+     * target(s) independently of every other notification this extension
+     * sends. Register matching settings via api.settings.register() —
+     * `${extensionId}.notify.${key}.system` / `.center` / `.toast` (booleans)
+     * — so they appear in this extension's own settings panel.
+     */
+    showToast(type: ToastType, message: string, key: string): void
     createNotification(opts: {
       type: ToastType
       title: string
       message?: string
-      targets?: Array<'system' | 'center' | 'toast'>
+      key: string
       actions?: Array<{ id: string; label: string; handler: () => void }>
     }): Disposable
   }

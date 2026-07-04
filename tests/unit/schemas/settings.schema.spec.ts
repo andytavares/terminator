@@ -155,24 +155,24 @@ describe('GlobalSettingsSchema', () => {
     if (result.success) {
       expect(result.data.notifications).toEqual({
         defaultTargets: ['system', 'center', 'toast'],
-        extensionOverrides: {},
+        overrides: {},
       })
     }
   })
 
-  it('accepts a custom notifications section', () => {
+  it('accepts a custom notifications section keyed by core notification key', () => {
     const result = GlobalSettingsSchema.safeParse({
       ...validGlobal,
       notifications: {
         defaultTargets: ['toast'],
-        extensionOverrides: { 'terminator.git-integration': ['system', 'center'] },
+        overrides: { terminalBell: ['system', 'center'] },
       },
     })
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.notifications.defaultTargets).toEqual(['toast'])
-      expect(result.data.notifications.extensionOverrides).toEqual({
-        'terminator.git-integration': ['system', 'center'],
+      expect(result.data.notifications.overrides).toEqual({
+        terminalBell: ['system', 'center'],
       })
     }
   })
@@ -180,17 +180,17 @@ describe('GlobalSettingsSchema', () => {
   it('rejects an unknown notification target', () => {
     const result = GlobalSettingsSchema.safeParse({
       ...validGlobal,
-      notifications: { defaultTargets: ['popup'], extensionOverrides: {} },
+      notifications: { defaultTargets: ['popup'], overrides: {} },
     })
     expect(result.success).toBe(false)
   })
 
-  it('rejects an unknown notification target in an extension override', () => {
+  it('rejects an unknown notification target in an override', () => {
     const result = GlobalSettingsSchema.safeParse({
       ...validGlobal,
       notifications: {
         defaultTargets: ['toast'],
-        extensionOverrides: { 'terminator.notepad': ['popup'] },
+        overrides: { terminalBell: ['popup'] },
       },
     })
     expect(result.success).toBe(false)
