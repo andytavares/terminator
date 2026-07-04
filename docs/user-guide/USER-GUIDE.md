@@ -359,7 +359,7 @@ Click the **SpecKit** tab in the content area tab bar.
 ### Workflow
 
 1. Connect your Linear or Jira account in Settings → SpecKit Pilot (credentials stored in the main-process secrets store, never exposed to the renderer).
-2. Open the **Tickets** tab, select a ticket, and click **Start**.
+2. Your assigned tickets load onto the board automatically when SpecKit Pilot opens (deduped, so reopening never creates duplicates); use **Import ticket** to refresh on demand. Open a card and click **Start** to run it.
 3. SpecKit creates a feature directory and begins running phases automatically.
 4. At each phase boundary a gate appears — review the output and click **Approve** or **Request Changes**.
 5. The **Implement** phase streams live batch check-in banners showing progress.

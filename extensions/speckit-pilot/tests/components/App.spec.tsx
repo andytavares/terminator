@@ -5,6 +5,7 @@ import { createInitialState } from '../../src/state/state-persistence.js'
 
 const mockCardList = vi.fn()
 const mockCardCreate = vi.fn()
+const mockTicketList = vi.fn()
 const mockPilotState = vi.fn()
 const mockOnStateChanged = vi.fn().mockReturnValue(vi.fn())
 
@@ -19,7 +20,7 @@ vi.mock('../../src/types/electron.js', () => ({
     historyLoad: vi.fn().mockResolvedValue({ entries: [] }),
     artifactList: vi.fn().mockResolvedValue({ artifacts: [] }),
     knowledgeSearch: vi.fn().mockResolvedValue({ results: [] }),
-    ticketList: vi.fn().mockResolvedValue({ tickets: [] }),
+    ticketList: mockTicketList,
     credentialsStatus: vi.fn().mockResolvedValue({ connected: false }),
     credentialsSet: vi.fn().mockResolvedValue({ ok: true }),
     onStateChanged: mockOnStateChanged,
@@ -56,6 +57,7 @@ describe('App', () => {
     mockOnStateChanged.mockReturnValue(vi.fn())
     mockCardList.mockResolvedValue({ cards: [] })
     mockCardCreate.mockResolvedValue({ featureDir: '/repo/specs/001-x' })
+    mockTicketList.mockResolvedValue({ tickets: [] })
     mockPilotState.mockResolvedValue({ state: createInitialState('/repo/specs/016-a') })
     workspaceList.mockResolvedValue({ workspaces: [{ id: 'w1', folderPath: '/repo' }] })
     ;(window as unknown as Record<string, unknown>).electronAPI = {
@@ -99,13 +101,86 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New card' })).toBeNull())
   })
 
-  it('opens and closes the Import modal', async () => {
+  it('auto-imports assigned tickets that are not already on the board', async () => {
+    mockCardList.mockResolvedValue({ cards: [] })
+    mockTicketList.mockResolvedValue({
+      tickets: [
+        { source: 'linear', key: 'TAV-1', title: 'First', sourceUrl: 'https://l/TAV-1' },
+        { source: 'linear', key: 'TAV-2', title: 'Second', sourceUrl: 'https://l/TAV-2' },
+      ],
+    })
     render(<App />)
-    await waitFor(() => screen.getByText(/import ticket/i))
+    await waitFor(() => expect(mockCardCreate).toHaveBeenCalledTimes(2))
+    expect(mockCardCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ ticket: expect.objectContaining({ key: 'TAV-1' }) })
+    )
+  })
+
+  it('does not re-import tickets already on the board', async () => {
+    mockCardList.mockResolvedValue({
+      cards: [{ ...card(), source: 'linear', sourceKey: 'TAV-1' }],
+    })
+    mockTicketList.mockResolvedValue({
+      tickets: [{ source: 'linear', key: 'TAV-1', title: 'First', sourceUrl: 'https://l/TAV-1' }],
+    })
+    render(<App />)
+    await waitFor(() => expect(mockTicketList).toHaveBeenCalled())
+    expect(mockCardCreate).not.toHaveBeenCalled()
+  })
+
+  it('re-runs the reconcile when Import ticket is clicked', async () => {
+    render(<App />)
+    await waitFor(() => expect(mockTicketList).toHaveBeenCalledTimes(1))
     fireEvent.click(screen.getByText(/import ticket/i))
-    await waitFor(() => screen.getByRole('dialog', { name: 'Import ticket' }))
-    fireEvent.click(screen.getByLabelText('Close'))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Import ticket' })).toBeNull())
+    await waitFor(() => expect(mockTicketList).toHaveBeenCalledTimes(2))
+  })
+
+  it('still renders the board when the ticket fetch fails', async () => {
+    mockTicketList.mockResolvedValue({ error: 'no creds' })
+    render(<App />)
+    await waitFor(() => expect(screen.getByText(/create your first card/i)).toBeTruthy())
+    expect(mockCardCreate).not.toHaveBeenCalled()
+  })
+
+  it('disables the Import ticket button while a reconcile is in flight', async () => {
+    let resolveTickets!: (v: { tickets: unknown[] }) => void
+    mockTicketList.mockReturnValue(
+      new Promise((resolve) => {
+        resolveTickets = resolve
+      })
+    )
+    render(<App />)
+    const button = screen.getByRole('button', { name: /importing/i })
+    expect(button.hasAttribute('disabled')).toBe(true)
+    expect(button.getAttribute('aria-busy')).toBe('true')
+    resolveTickets({ tickets: [] })
+    await waitFor(() => expect(screen.getByText(/import ticket/i)).toBeTruthy())
+  })
+
+  it('skips auto-load when no workspace is open', async () => {
+    window.history.replaceState({}, '', '/')
+    render(<App />)
+    await waitFor(() => screen.getByText('SpecKit Pilot'))
+    expect(mockTicketList).not.toHaveBeenCalled()
+  })
+
+  it('recovers the Import button when a reconcile call rejects', async () => {
+    mockTicketList.mockRejectedValue(new Error('boom'))
+    render(<App />)
+    // The rejection is swallowed; the button returns to its idle, enabled state.
+    await waitFor(() => {
+      const button = screen.getByRole('button', { name: /import ticket/i })
+      expect(button.hasAttribute('disabled')).toBe(false)
+    })
+    expect(screen.getByText(/create your first card/i)).toBeTruthy()
+  })
+
+  it('re-runs the reconcile for a new workspace after workspace:changed', async () => {
+    render(<App />)
+    await waitFor(() => expect(mockTicketList).toHaveBeenCalledTimes(1))
+    bridgeHandlers['workspace:changed']({ repoRoot: '/other' })
+    await waitFor(() => expect(mockTicketList).toHaveBeenCalledTimes(2))
+    expect(mockCardList).toHaveBeenCalledWith({ repoRoot: '/other' })
   })
 
   it('shows settings and returns to the board', async () => {
