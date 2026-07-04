@@ -1,0 +1,31 @@
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_f76be9eaf0aff6::t_cf56dd019eae86 515-570
+src/renderer/components/settings/SettingsPanel.css
+  s_f76be9eaf0aff6::t_c4e714b5d6fbc2 442-486
+src/renderer/components/settings/SettingsPanel.tsx
+  s_f76be9eaf0aff6::t_421ceeb7d67e6e 330-354,356
+  s_f76be9eaf0aff6::t_9f339534719dfb 532-581
+  s_f76be9eaf0aff6::t_550eb45f3230a1 92-133,584
+  s_f76be9eaf0aff6::t_f90c13c3e7add8 582-583
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "9b001894e2b7c2e1d0e5f78b9009d839f7ea9349",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f76be9eaf0aff6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c5890d1-3b53-4ec7-bf4f-ae6a3beefb2a",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
