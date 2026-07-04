@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 export const ThemeSchema = z.enum(['dark', 'light'])
+export const NotificationTargetSchema = z.enum(['system', 'center', 'toast'])
 
 export const GlobalSettingsSchema = z.object({
   appearance: z.object({
@@ -21,6 +22,12 @@ export const GlobalSettingsSchema = z.object({
       hasSeenWelcome: z.boolean(),
     })
     .default({ hasSeenWelcome: false }),
+  notifications: z
+    .object({
+      defaultTargets: z.array(NotificationTargetSchema).default(['system', 'center', 'toast']),
+      extensionOverrides: z.record(z.string(), z.array(NotificationTargetSchema)).default({}),
+    })
+    .default({ defaultTargets: ['system', 'center', 'toast'], extensionOverrides: {} }),
 })
 
 export const WorkspaceSettingsSchema = z.object({
@@ -60,6 +67,10 @@ export const DEFAULT_GLOBAL_SETTINGS = {
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},
   ui: { hasSeenWelcome: false },
+  notifications: {
+    defaultTargets: ['system', 'center', 'toast'] as const,
+    extensionOverrides: {},
+  },
 }
 
 export type GlobalSettingsData = z.infer<typeof GlobalSettingsSchema>

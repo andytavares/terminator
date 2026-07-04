@@ -33,6 +33,37 @@ describe('settings-store', () => {
     const settings = getGlobalSettings()
     expect(settings.appearance.theme).toBe('dark')
     expect(settings.terminal.scrollbackLimit).toBe(10000)
+    expect(settings.notifications).toEqual({
+      defaultTargets: ['system', 'center', 'toast'],
+      extensionOverrides: {},
+    })
+  })
+
+  it('updateGlobalSettings replaces the notifications default targets', async () => {
+    const { getGlobalSettings, updateGlobalSettings } = await import(
+      '../../../src/main/storage/settings-store'
+    )
+    updateGlobalSettings({ notifications: { defaultTargets: ['toast'] } })
+    const settings = getGlobalSettings()
+    expect(settings.notifications.defaultTargets).toEqual(['toast'])
+    expect(settings.notifications.extensionOverrides).toEqual({})
+  })
+
+  it('updateGlobalSettings patches a single extension override without clobbering others', async () => {
+    const { getGlobalSettings, updateGlobalSettings } = await import(
+      '../../../src/main/storage/settings-store'
+    )
+    updateGlobalSettings({
+      notifications: { extensionOverrides: { 'terminator.git-integration': ['system'] } },
+    })
+    updateGlobalSettings({
+      notifications: { extensionOverrides: { 'terminator.notepad': ['toast'] } },
+    })
+    const settings = getGlobalSettings()
+    expect(settings.notifications.extensionOverrides).toEqual({
+      'terminator.git-integration': ['system'],
+      'terminator.notepad': ['toast'],
+    })
   })
 
   it('updateGlobalSettings merges patch', async () => {

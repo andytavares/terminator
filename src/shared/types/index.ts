@@ -1,3 +1,6 @@
+export type { NotificationTarget, NotificationType } from '../notifications/resolve-targets'
+import type { NotificationTarget } from '../notifications/resolve-targets'
+
 export interface Workspace {
   id: string
   name: string
@@ -113,6 +116,12 @@ export interface GlobalSettings {
   ui: {
     hasSeenWelcome: boolean
     showMetricsBar?: boolean
+  }
+  notifications: {
+    defaultTargets: NotificationTarget[]
+    extensionOverrides: {
+      [extensionId: string]: NotificationTarget[]
+    }
   }
 }
 

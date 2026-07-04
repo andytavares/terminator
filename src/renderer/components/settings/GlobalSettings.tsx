@@ -1,6 +1,14 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useSettingsStore } from '../../stores/settings.store'
+import type { Extension } from '../../../shared/types/index'
+import type { NotificationTarget } from '../../../shared/types/index'
 import './SettingsPanel.css'
+
+const NOTIFICATION_TARGETS: Array<{ value: NotificationTarget; label: string }> = [
+  { value: 'system', label: 'System' },
+  { value: 'center', label: 'In-App' },
+  { value: 'toast', label: 'Toast' },
+]
 
 export function GlobalSettings(): JSX.Element {
   const {
@@ -11,9 +19,24 @@ export function GlobalSettings(): JSX.Element {
     updateBranchExcludePatterns,
     updateShowMetricsBar,
     updatePromptForName,
+    updateNotificationDefaultTargets,
+    updateNotificationExtensionOverride,
   } = useSettingsStore()
 
+  const [extensions, setExtensions] = useState<Extension[]>([])
+
+  useEffect(() => {
+    window.electronAPI.extension.list().then((result) => setExtensions(result.extensions))
+  }, [])
+
   if (!globalSettings) return <div>Loading...</div>
+
+  function toggleTarget(
+    current: NotificationTarget[],
+    target: NotificationTarget
+  ): NotificationTarget[] {
+    return current.includes(target) ? current.filter((t) => t !== target) : [...current, target]
+  }
 
   return (
     <div className="settings-section">
@@ -142,6 +165,68 @@ export function GlobalSettings(): JSX.Element {
           <code>gh-readonly-queue/*</code>). Matching branches are hidden from the branch selector.
         </span>
       </div>
+
+      <h3 className="settings-section__title" style={{ marginTop: 20 }}>
+        Notifications
+      </h3>
+
+      <div className="settings-section__field">
+        <label className="settings-section__label">Default Delivery Targets</label>
+        <div className="settings-section__radio-group">
+          {NOTIFICATION_TARGETS.map(({ value, label }) => (
+            <label key={value} className="settings-section__radio">
+              <input
+                type="checkbox"
+                checked={globalSettings.notifications.defaultTargets.includes(value)}
+                onChange={() =>
+                  void updateNotificationDefaultTargets(
+                    toggleTarget(globalSettings.notifications.defaultTargets, value)
+                  )
+                }
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+        <span className="settings-section__hint">
+          Where notifications are delivered by default. Errors always show a toast regardless of
+          this setting.
+        </span>
+      </div>
+
+      {extensions.length > 0 && (
+        <div className="settings-section__field">
+          <label className="settings-section__label">Per-Extension Overrides</label>
+          {extensions.map((ext) => {
+            const override = globalSettings.notifications.extensionOverrides[ext.id] ?? []
+            return (
+              <div key={ext.id} className="settings-section__ext-override-row">
+                <span className="settings-section__ext-override-name">{ext.name}</span>
+                <div className="settings-section__radio-group">
+                  {NOTIFICATION_TARGETS.map(({ value, label }) => (
+                    <label key={value} className="settings-section__radio">
+                      <input
+                        type="checkbox"
+                        checked={override.includes(value)}
+                        onChange={() =>
+                          void updateNotificationExtensionOverride(
+                            ext.id,
+                            toggleTarget(override, value)
+                          )
+                        }
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+          <span className="settings-section__hint">
+            Leave all unchecked for an extension to use the default targets above.
+          </span>
+        </div>
+      )}
     </div>
   )
 }
