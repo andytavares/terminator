@@ -1,0 +1,41 @@
+docs/ARCHITECTURE.md
+  s_fc4edc94ae57ea::t_ad646e536eb8b9 676
+  s_fc4edc94ae57ea::t_1f40d446864b55 677-680
+docs/user-guide/USER-GUIDE.md
+  s_fc4edc94ae57ea::t_955e7064c6788e 362
+extensions/speckit-pilot/tests/state/reconcile-tickets.spec.ts
+  s_fc4edc94ae57ea::t_e23bd565c94304 1-127
+extensions/speckit-pilot/src/state/reconcile-tickets.ts
+  s_fc4edc94ae57ea::t_839b325617a085 1-26,31-70
+  s_fc4edc94ae57ea::t_7b664f8ef1df4f 27-30
+extensions/speckit-pilot/src/renderer/App.tsx
+  s_fc4edc94ae57ea::t_8b0d3770a245c3 68-70,76,80-81,84,87-93
+  s_fc4edc94ae57ea::t_a198562993961a 114-116,119
+  s_fc4edc94ae57ea::t_00cbb7e5476a4e 71-75,77-79,82-83,85-86
+  s_fc4edc94ae57ea::t_253166ab4a6d2c 9,11
+  s_fc4edc94ae57ea::t_342d00d5d30500 117-118,120
+extensions/speckit-pilot/tests/components/App.spec.tsx
+  s_fc4edc94ae57ea::t_448893ac9a88ba 8,23
+  s_fc4edc94ae57ea::t_c8a1806ecb44a2 104-111,113-133,135-142
+  s_fc4edc94ae57ea::t_955126161de0a5 145-159,178-183
+  s_fc4edc94ae57ea::t_28bc80bd2cf21a 160-166
+  s_fc4edc94ae57ea::t_8a9c2895b5aba5 143,167-177
+  s_fc4edc94ae57ea::t_77a0f7fddb7cc9 60
+  s_fc4edc94ae57ea::t_d3f1290bdcd8a3 144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "604ca6e3c764826a1bfbb283a6a0448e63d71237",
+  "prompts": {},
+  "sessions": {
+    "s_fc4edc94ae57ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2eb6eb57-12e6-48d2-a147-a2173f29f5ce",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
