@@ -1,8 +1,13 @@
 import { BrowserWindow, Notification, app } from 'electron'
 import { randomUUID } from 'crypto'
+import { resolveNotificationTargets } from '../../shared/notifications/resolve-targets'
+import type {
+  NotificationTarget,
+  NotificationType,
+} from '../../shared/notifications/resolve-targets'
+import { getGlobalSettings } from '../storage/settings-store'
 
-export type NotificationType = 'info' | 'success' | 'warning' | 'error'
-export type NotificationTarget = 'system' | 'center' | 'toast'
+export type { NotificationTarget, NotificationType }
 
 export interface NotificationAction {
   id: string
@@ -24,17 +29,21 @@ interface NotificationRecord extends SerializedNotification {
   callbacks: Map<string, () => void>
 }
 
-const ALL_TARGETS: NotificationTarget[] = ['system', 'center', 'toast']
-
 class NotificationManager {
   private records = new Map<string, NotificationRecord>()
 
+  /**
+   * Single entry point for every notification in the app. Delivery targets
+   * are never caller-supplied — they're always resolved from user settings
+   * (global default, overridable per extension), so a notification's actual
+   * mechanism (system/center/toast) is fully user-configurable and never
+   * hardcoded at the call site.
+   */
   create(opts: {
     type: NotificationType
     title: string
     message?: string
     source?: string
-    targets?: NotificationTarget[]
     actions?: Array<{ id: string; label: string; handler: () => void }>
   }): string {
     const id = randomUUID()
@@ -46,7 +55,10 @@ class NotificationManager {
       actions.push({ id: action.id, label: action.label })
     }
 
-    const targets = opts.targets ?? ALL_TARGETS
+    const targets = resolveNotificationTargets(getGlobalSettings().notifications, {
+      source: opts.source,
+      type: opts.type,
+    })
     const persistent = targets.includes('center') || targets.includes('toast')
 
     if (targets.includes('system') && Notification.isSupported()) {
@@ -54,6 +66,10 @@ class NotificationManager {
       notif.on('failed', (_e, error) => {
         console.warn('[notifications] system notification failed:', error)
       })
+      if (actions.length > 0) {
+        const primary = opts.actions![0]
+        notif.on('click', () => primary.handler())
+      }
       notif.show()
       if (process.platform === 'darwin' && app.dock) {
         app.dock.bounce('critical')

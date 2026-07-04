@@ -68,8 +68,8 @@ export const DEFAULT_GLOBAL_SETTINGS = {
   extensions: {},
   ui: { hasSeenWelcome: false },
   notifications: {
-    defaultTargets: ['system', 'center', 'toast'] as const,
-    extensionOverrides: {},
+    defaultTargets: ['system', 'center', 'toast'] as ('system' | 'center' | 'toast')[],
+    extensionOverrides: {} as Record<string, ('system' | 'center' | 'toast')[]>,
   },
 }
 

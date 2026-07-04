@@ -190,7 +190,6 @@ export interface ExtensionAPI {
       type: ToastType
       title: string
       message?: string
-      targets?: Array<'system' | 'center' | 'toast'>
       actions?: Array<{ id: string; label: string; handler: () => void }>
     }): Disposable
   }
@@ -478,7 +477,6 @@ export function createExtensionAPI(
         type: ToastType
         title: string
         message?: string
-        targets?: Array<'system' | 'center' | 'toast'>
         actions?: Array<{ id: string; label: string; handler: () => void }>
       }): Disposable {
         const id = notificationManager.create({
@@ -486,7 +484,6 @@ export function createExtensionAPI(
           title: opts.title,
           message: opts.message,
           source: extensionId,
-          targets: opts.targets,
           actions: opts.actions,
         })
         return disposable(() => notificationManager.dismiss(id))

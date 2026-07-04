@@ -229,7 +229,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       type: 'info' | 'success' | 'warning' | 'error'
       title: string
       message?: string
-      targets?: Array<'system' | 'center' | 'toast'>
     }) => ipcRenderer.invoke('notifications:create', payload),
     list: () => ipcRenderer.invoke('notifications:list'),
     dismiss: (id: string) => ipcRenderer.invoke('notifications:dismiss', { id }),

@@ -268,7 +268,6 @@
         type: 'info' | 'success' | 'warning' | 'error'
         title: string
         message?: string
-        targets?: Array<'system' | 'center' | 'toast'>
       }) => invoke('notifications:create', payload),
       list: () => invoke('notifications:list'),
       dismiss: (id: string) => invoke('notifications:dismiss', { id }),

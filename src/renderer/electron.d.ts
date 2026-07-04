@@ -8,9 +8,10 @@ import type {
   WorktreeInfo,
   SystemMetrics,
   ProcessMetrics,
+  NotificationTarget,
 } from '../shared/types/index'
 
-export type NotificationTarget = 'system' | 'center' | 'toast'
+export type { NotificationTarget }
 
 export interface SerializedNotification {
   id: string
@@ -189,7 +190,6 @@ interface ElectronAPI {
       type: 'info' | 'success' | 'warning' | 'error'
       title: string
       message?: string
-      targets?: NotificationTarget[]
     }): Promise<{ id: string } | { error: string }>
     list(): Promise<SerializedNotification[]>
     dismiss(id: string): Promise<{ ok: true } | { error: string }>

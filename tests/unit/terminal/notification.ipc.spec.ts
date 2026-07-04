@@ -50,12 +50,10 @@ describe('registerNotificationHandlers', () => {
     expect(result).toEqual({ id: 'test-uuid' })
   })
 
-  it('passes targets through to notificationManager.create', async () => {
+  it('ignores a caller-supplied targets field (delivery is settings-resolved, not caller-supplied)', async () => {
     const handler = captureHandle('notifications:create')
     await handler(null, { type: 'success', title: 'T', targets: ['system', 'toast'] })
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ targets: ['system', 'toast'] })
-    )
+    expect(mockCreate).toHaveBeenCalledWith({ type: 'success', title: 'T' })
   })
 
   it('returns VALIDATION_ERROR for invalid type', async () => {
@@ -68,12 +66,6 @@ describe('registerNotificationHandlers', () => {
   it('returns VALIDATION_ERROR for missing title', async () => {
     const handler = captureHandle('notifications:create')
     const result = await handler(null, { type: 'info' })
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('returns VALIDATION_ERROR for invalid target value', async () => {
-    const handler = captureHandle('notifications:create')
-    const result = await handler(null, { type: 'info', title: 'T', targets: ['unknown'] })
     expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
   })
 })

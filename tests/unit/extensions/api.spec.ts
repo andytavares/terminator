@@ -76,6 +76,9 @@ import * as shellExecutor from '../../../src/main/shell/shell-executor'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockGetGlobalSettings.mockReturnValue({
+    notifications: { defaultTargets: ['system', 'center', 'toast'], extensionOverrides: {} },
+  })
   // Reset shared registry state between tests
   globalRegistry.sidebarPanels.clear()
   globalRegistry.topBarItems.clear()
