@@ -27,6 +27,9 @@ export async function fetchAssignedTickets(
     // Linear generates a VCS branch name per issue (e.g. andrew/tav-11-title);
     // prefer it when creating the card's worktree branch.
     branchName: issue.branchName ?? null,
+    // completedAt is part of Linear's standard Issue fragment (no extra fetch),
+    // so this is free to compute alongside every other field above.
+    completed: issue.completedAt != null,
   }))
 }
 
