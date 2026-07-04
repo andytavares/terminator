@@ -349,6 +349,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
         type: 'success',
         title: 'Task completed',
         message: taskText,
+        key: 'taskCompleted',
       })
       broadcast('task-vault:push:index-updated', {})
       return { success: true }
@@ -748,6 +749,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
       type: 'info',
       title: 'Area archived',
       message: areaName,
+      key: 'areaArchived',
     })
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
@@ -1146,6 +1148,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
         type: 'info',
         title: 'Project archived',
         message: projectName,
+        key: 'projectArchived',
       })
     }
     broadcast('task-vault:push:index-updated', {})

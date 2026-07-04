@@ -45,31 +45,43 @@ describe('notification IPC handlers', () => {
     it('calls notificationManager.create and returns the id', async () => {
       mockCreate.mockReturnValue('new-id')
       const handler = captureHandle('notifications:create')
-      const result = await handler(null, { type: 'info', title: 'Hello' })
+      const result = await handler(null, { type: 'info', title: 'Hello', key: 'helloKey' })
       expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'info', title: 'Hello' })
+        expect.objectContaining({ type: 'info', title: 'Hello', key: 'helloKey' })
       )
       expect(result).toEqual({ id: 'new-id' })
     })
 
     it('returns VALIDATION_ERROR for missing title', async () => {
       const handler = captureHandle('notifications:create')
-      const result = await handler(null, { type: 'info' })
+      const result = await handler(null, { type: 'info', key: 'tKey' })
+      expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+      expect(mockCreate).not.toHaveBeenCalled()
+    })
+
+    it('returns VALIDATION_ERROR for missing key', async () => {
+      const handler = captureHandle('notifications:create')
+      const result = await handler(null, { type: 'info', title: 'T' })
       expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
       expect(mockCreate).not.toHaveBeenCalled()
     })
 
     it('returns VALIDATION_ERROR for invalid type', async () => {
       const handler = captureHandle('notifications:create')
-      const result = await handler(null, { type: 'bad', title: 'T' })
+      const result = await handler(null, { type: 'bad', title: 'T', key: 'tKey' })
       expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
     })
 
     it('ignores a caller-supplied targets field (delivery is settings-resolved, not caller-supplied)', async () => {
       mockCreate.mockReturnValue('tid')
       const handler = captureHandle('notifications:create')
-      await handler(null, { type: 'success', title: 'T', targets: ['system', 'toast'] })
-      expect(mockCreate).toHaveBeenCalledWith({ type: 'success', title: 'T' })
+      await handler(null, {
+        type: 'success',
+        title: 'T',
+        key: 'tKey',
+        targets: ['system', 'toast'],
+      })
+      expect(mockCreate).toHaveBeenCalledWith({ type: 'success', title: 'T', key: 'tKey' })
     })
   })
 

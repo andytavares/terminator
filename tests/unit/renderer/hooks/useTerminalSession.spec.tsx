@@ -350,6 +350,7 @@ describe('useTerminalSession', () => {
         type: 'info',
         title: 'Terminator',
         message: 'Split Terminal needs attention',
+        key: 'terminalBell',
       })
     })
 
@@ -413,6 +414,7 @@ describe('useTerminalSession', () => {
         type: 'info',
         title: 'Terminator',
         message: 'My Tab needs attention',
+        key: 'terminalBell',
       })
     })
 

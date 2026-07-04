@@ -195,7 +195,7 @@ function SubtaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', {
       taskId: subtask.id,
     })
-    notify('success', `Completed: ${subtask.text}`, {
+    notify('success', `Completed: ${subtask.text}`, 'taskCompleted', {
       onClick: makeTaskNavHandler(subtask.id),
     })
     await onRefresh()
@@ -798,7 +798,9 @@ function TaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:cancel-task', {
       taskId: task.id,
     })
-    notify('info', `Archived: ${task.text}`, { onClick: makeTaskNavHandler(task.id) })
+    notify('info', `Archived: ${task.text}`, 'taskArchived', {
+      onClick: makeTaskNavHandler(task.id),
+    })
     await onRefresh()
   }
 
@@ -815,7 +817,11 @@ function TaskRow({
       targetId: session.sessionId,
     })
     if (result && typeof result === 'object' && 'error' in result) {
-      notify('error', `Could not save terminal link: ${(result as { error: string }).error}`)
+      notify(
+        'error',
+        `Could not save terminal link: ${(result as { error: string }).error}`,
+        'terminalLinkSaveFailed'
+      )
       setLinking(false)
       return
     }
@@ -829,7 +835,9 @@ function TaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:reopen-task', {
       taskId: task.id,
     })
-    notify('info', `Reopened: ${task.text}`, { onClick: makeTaskNavHandler(task.id) })
+    notify('info', `Reopened: ${task.text}`, 'taskReopened', {
+      onClick: makeTaskNavHandler(task.id),
+    })
     await onRefresh()
   }
 
@@ -840,7 +848,9 @@ function TaskRow({
       reason,
       checkInterval,
     })
-    notify('warning', `Blocked: ${task.text}`, { onClick: makeTaskNavHandler(task.id) })
+    notify('warning', `Blocked: ${task.text}`, 'taskBlocked', {
+      onClick: makeTaskNavHandler(task.id),
+    })
     await onRefresh()
   }
 
@@ -848,7 +858,9 @@ function TaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:unblock-task', {
       taskId: task.id,
     })
-    notify('success', `Unblocked: ${task.text}`, { onClick: makeTaskNavHandler(task.id) })
+    notify('success', `Unblocked: ${task.text}`, 'taskUnblocked', {
+      onClick: makeTaskNavHandler(task.id),
+    })
     await onRefresh()
   }
 
@@ -873,6 +885,7 @@ function TaskRow({
     notify(
       'success',
       `Recurrence set: ${formatRecurrenceRule(days && days.length > 0 ? `weekly:${days.sort((a, b) => a - b).join(',')}` : interval)}`,
+      'recurrenceSet',
       { onClick: makeTaskNavHandler(task.id) }
     )
     await onRefresh()
@@ -883,7 +896,7 @@ function TaskRow({
       taskId: task.id,
       action: 'someday',
     })
-    notify('info', `Moved to backlog: ${task.text}`)
+    notify('info', `Moved to backlog: ${task.text}`, 'taskMovedToBacklog')
     await onRefresh()
   }
 
@@ -892,7 +905,7 @@ function TaskRow({
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:clear-recurrence', {
       taskId: task.id,
     })
-    notify('info', `Recurrence removed: ${task.text}`)
+    notify('info', `Recurrence removed: ${task.text}`, 'recurrenceRemoved')
     await onRefresh()
   }
 

@@ -26,10 +26,7 @@ interface SettingsState {
   updateShowMetricsBar: (show: boolean) => Promise<void>
   updatePromptForName: (enabled: boolean) => Promise<void>
   updateNotificationDefaultTargets: (targets: NotificationTarget[]) => Promise<void>
-  updateNotificationExtensionOverride: (
-    extensionId: string,
-    targets: NotificationTarget[]
-  ) => Promise<void>
+  updateNotificationOverride: (key: string, targets: NotificationTarget[]) => Promise<void>
   resolveSettings: (workspaceId?: string | null) => GlobalSettings
 }
 
@@ -43,7 +40,7 @@ const DEFAULT_SETTINGS: GlobalSettings = {
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},
   ui: { hasSeenWelcome: false },
-  notifications: { defaultTargets: ['system', 'center', 'toast'], extensionOverrides: {} },
+  notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
 }
 
 function mergeSettings(
@@ -184,9 +181,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ globalSettings: result.settings })
   },
 
-  updateNotificationExtensionOverride: async (extensionId, targets) => {
+  updateNotificationOverride: async (key, targets) => {
     const result = await window.electronAPI.settings.updateGlobal({
-      notifications: { extensionOverrides: { [extensionId]: targets } },
+      notifications: { overrides: { [key]: targets } },
     })
     set({ globalSettings: result.settings })
   },

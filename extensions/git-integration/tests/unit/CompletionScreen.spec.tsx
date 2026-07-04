@@ -114,7 +114,12 @@ describe('CompletionScreen', () => {
     render(<CompletionScreen repoRoot="/repo" onExit={onExit} />)
     fireEvent.click(screen.getByText(/Commit merge/i))
     await waitFor(() => {
-      expect(mockNotify).toHaveBeenCalledWith('error', 'Commit failed', 'hook failed')
+      expect(mockNotify).toHaveBeenCalledWith(
+        'error',
+        'Commit failed',
+        'commitFailed',
+        'hook failed'
+      )
     })
     expect(onExit).not.toHaveBeenCalled()
   })

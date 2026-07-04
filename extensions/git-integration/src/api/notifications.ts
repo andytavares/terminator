@@ -6,7 +6,8 @@ export const notificationsAPI = {
   notify: (
     type: NotifyType,
     title: string,
+    key: string,
     message?: string
   ): Promise<{ ok: true } | { error: string }> =>
-    bridge().invoke('git:notify', { type, title, message }),
+    bridge().invoke('git:notify', { type, title, key, message }),
 }

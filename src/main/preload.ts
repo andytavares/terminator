@@ -213,6 +213,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       title: string
       message?: string
       source?: string
+      key: string
     }) => ipcRenderer.invoke('notifications:create', payload),
     list: () => ipcRenderer.invoke('notifications:list'),
     dismiss: (id: string) => ipcRenderer.invoke('notifications:dismiss', { id }),

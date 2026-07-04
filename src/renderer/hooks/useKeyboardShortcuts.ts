@@ -196,6 +196,7 @@ export function useKeyboardShortcuts({
                 type: 'error',
                 title: 'Split pane failed',
                 message: 'Could not create split pane',
+                key: 'splitPaneFailed',
               })
           )
         }
@@ -214,6 +215,7 @@ export function useKeyboardShortcuts({
                 type: 'error',
                 title: 'Split pane failed',
                 message: 'Could not create split pane',
+                key: 'splitPaneFailed',
               })
           )
         }
@@ -233,6 +235,7 @@ export function useKeyboardShortcuts({
                 type: 'error',
                 title: 'Close terminal failed',
                 message: 'Could not close terminal',
+                key: 'closeTerminalFailed',
               })
             )
           } else {

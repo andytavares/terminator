@@ -32,13 +32,13 @@ afterEach(() => {
 
 describe('notify', () => {
   it('adds a local toast with the correct type and message', () => {
-    notify('success', 'Task done')
+    notify('success', 'Task done', 'taskCompleted')
     expect(mockAddToast).toHaveBeenCalledWith('success', 'Task done', { onClick: undefined })
   })
 
   it('forwards all toast types to the local store', () => {
     const types = ['success', 'error', 'warning', 'info'] as const
-    types.forEach((type) => notify(type, type))
+    types.forEach((type) => notify(type, type, 'testKey'))
     types.forEach((type, i) => {
       expect(mockAddToast.mock.calls[i][0]).toBe(type)
     })
@@ -46,27 +46,28 @@ describe('notify', () => {
 
   it('passes onClick through to the toast store', () => {
     const onClick = vi.fn()
-    notify('info', 'Hello', { onClick })
+    notify('info', 'Hello', 'testKey', { onClick })
     expect(mockAddToast).toHaveBeenCalledWith('info', 'Hello', { onClick })
   })
 
   it('does not throw when called without options', () => {
-    expect(() => notify('error', 'Oops')).not.toThrow()
+    expect(() => notify('error', 'Oops', 'testKey')).not.toThrow()
   })
 
-  it('routes through the shared dispatcher tagged with this extension source', () => {
-    notify('warning', 'Task overdue')
+  it('routes through the shared dispatcher tagged with this extension source and key', () => {
+    notify('warning', 'Task overdue', 'dueTaskReminder')
     expect(mockCreate).toHaveBeenCalledWith({
       type: 'warning',
       title: 'Task overdue',
       source: 'terminator.task-vault',
+      key: 'dueTaskReminder',
     })
   })
 
   it('does not throw when electronAPI.notifications is unavailable', () => {
     const orig = window.electronAPI
     ;(window as unknown as Record<string, unknown>).electronAPI = undefined
-    expect(() => notify('info', 'Oops')).not.toThrow()
+    expect(() => notify('info', 'Oops', 'testKey')).not.toThrow()
     ;(window as unknown as Record<string, unknown>).electronAPI = orig
   })
 })

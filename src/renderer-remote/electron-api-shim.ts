@@ -261,6 +261,7 @@
         title: string
         message?: string
         source?: string
+        key: string
       }) => invoke('notifications:create', payload),
       list: () => invoke('notifications:list'),
       dismiss: (id: string) => invoke('notifications:dismiss', { id }),

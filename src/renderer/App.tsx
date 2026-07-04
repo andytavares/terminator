@@ -450,6 +450,7 @@ export function App(): JSX.Element {
           type: 'error',
           title: 'Remote tunnel disconnected',
           message: 'ngrok tunnel disconnected. Click Reconnect in Settings to restore it.',
+          key: 'remoteTunnelDisconnected',
         })
       }
     )

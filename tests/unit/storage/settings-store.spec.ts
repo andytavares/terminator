@@ -35,7 +35,7 @@ describe('settings-store', () => {
     expect(settings.terminal.scrollbackLimit).toBe(10000)
     expect(settings.notifications).toEqual({
       defaultTargets: ['system', 'center', 'toast'],
-      extensionOverrides: {},
+      overrides: {},
     })
   })
 
@@ -46,23 +46,23 @@ describe('settings-store', () => {
     updateGlobalSettings({ notifications: { defaultTargets: ['toast'] } })
     const settings = getGlobalSettings()
     expect(settings.notifications.defaultTargets).toEqual(['toast'])
-    expect(settings.notifications.extensionOverrides).toEqual({})
+    expect(settings.notifications.overrides).toEqual({})
   })
 
-  it('updateGlobalSettings patches a single extension override without clobbering others', async () => {
+  it('updateGlobalSettings patches a single core notification override without clobbering others', async () => {
     const { getGlobalSettings, updateGlobalSettings } = await import(
       '../../../src/main/storage/settings-store'
     )
     updateGlobalSettings({
-      notifications: { extensionOverrides: { 'terminator.git-integration': ['system'] } },
+      notifications: { overrides: { terminalBell: ['system'] } },
     })
     updateGlobalSettings({
-      notifications: { extensionOverrides: { 'terminator.notepad': ['toast'] } },
+      notifications: { overrides: { branchSwitchFailed: ['toast'] } },
     })
     const settings = getGlobalSettings()
-    expect(settings.notifications.extensionOverrides).toEqual({
-      'terminator.git-integration': ['system'],
-      'terminator.notepad': ['toast'],
+    expect(settings.notifications.overrides).toEqual({
+      terminalBell: ['system'],
+      branchSwitchFailed: ['toast'],
     })
   })
 

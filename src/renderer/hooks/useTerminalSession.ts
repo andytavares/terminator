@@ -18,7 +18,7 @@ function makeBellHandler(sessionId: string, incrementBellCount: (id: string) => 
     const tabTitle = useSessionStore.getState().sessions.get(sessionId)?.tabTitle ?? 'Terminal'
     const title = 'Terminator'
     const body = `${tabTitle} needs attention`
-    dispatchNotification({ type: 'info', title, message: body })
+    dispatchNotification({ type: 'info', title, message: body, key: 'terminalBell' })
   }
 }
 

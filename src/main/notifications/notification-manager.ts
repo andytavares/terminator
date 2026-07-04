@@ -1,6 +1,6 @@
 import { BrowserWindow, Notification, app } from 'electron'
 import { randomUUID } from 'crypto'
-import { resolveNotificationTargets } from '../../shared/notifications/resolve-targets'
+import { resolveCoreNotificationTargets } from '../../shared/notifications/resolve-targets'
 import type {
   NotificationTarget,
   NotificationType,
@@ -8,6 +8,27 @@ import type {
 import { getGlobalSettings } from '../storage/settings-store'
 
 export type { NotificationTarget, NotificationType }
+
+/**
+ * Resolves an extension's own per-notification-key target settings. Injected
+ * by src/main/extensions/api.ts (which owns the extension settings registry)
+ * at module load, rather than imported directly, to avoid a circular import:
+ * api.ts already imports this module for createNotification/showToast.
+ * Returns null if the extension hasn't registered settings for this key,
+ * signalling the caller should fall back to the global default.
+ */
+export type ExtensionNotificationSettingReader = (
+  extensionId: string,
+  key: string
+) => NotificationTarget[] | null
+
+let readExtensionNotificationTargets: ExtensionNotificationSettingReader = () => null
+
+export function setExtensionNotificationSettingReader(
+  fn: ExtensionNotificationSettingReader
+): void {
+  readExtensionNotificationTargets = fn
+}
 
 export interface NotificationAction {
   id: string
@@ -34,16 +55,18 @@ class NotificationManager {
 
   /**
    * Single entry point for every notification in the app. Delivery targets
-   * are never caller-supplied — they're always resolved from user settings
-   * (global default, overridable per extension), so a notification's actual
-   * mechanism (system/center/toast) is fully user-configurable and never
-   * hardcoded at the call site.
+   * are never caller-supplied — they're always resolved from user settings,
+   * keyed per individual notification kind (`key`, unique within `source`),
+   * so every distinct notification is independently configurable: global
+   * default → per-key override, with the extension itself owning its own
+   * per-key settings (core never enumerates or hardcodes extension keys).
    */
   create(opts: {
     type: NotificationType
     title: string
     message?: string
     source?: string
+    key: string
     actions?: Array<{ id: string; label: string; handler: () => void }>
   }): string {
     const id = randomUUID()
@@ -55,10 +78,16 @@ class NotificationManager {
       actions.push({ id: action.id, label: action.label })
     }
 
-    const targets = resolveNotificationTargets(getGlobalSettings().notifications, {
-      source: opts.source,
-      type: opts.type,
-    })
+    const globalSettings = getGlobalSettings()
+    const base = opts.source
+      ? (readExtensionNotificationTargets(opts.source, opts.key) ??
+        globalSettings.notifications.defaultTargets)
+      : resolveCoreNotificationTargets(globalSettings.notifications, {
+          key: opts.key,
+          type: opts.type,
+        })
+    const targets: NotificationTarget[] =
+      opts.type === 'error' && !base.includes('toast') ? [...base, 'toast'] : base
     const persistent = targets.includes('center') || targets.includes('toast')
 
     if (targets.includes('system') && Notification.isSupported()) {

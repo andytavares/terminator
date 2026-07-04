@@ -89,6 +89,48 @@ type ExtensionSchema = {
   properties: Record<string, SettingPropDef>
 }
 
+// Any extension may declare per-notification-kind delivery settings using the
+// convention `<extensionId>.notify.<notificationKey>.(system|center|toast)`
+// (3 booleans per notification kind). This is a naming convention only — core
+// never knows which specific notification keys an extension defines — but it
+// lets the generic settings UI group them into a compact table instead of a
+// long list of individual switches.
+const NOTIFICATION_SETTING_KEY_RE = /^(.+)\.notify\.([^.]+)\.(system|center|toast)$/
+
+interface NotificationSettingRow {
+  notifKey: string
+  label: string
+  system: string
+  center: string
+  toast: string
+}
+
+function partitionNotificationSettings(properties: Record<string, SettingPropDef>): {
+  rows: NotificationSettingRow[]
+  rest: [string, SettingPropDef][]
+} {
+  const rowsByKey = new Map<string, NotificationSettingRow>()
+  const rest: [string, SettingPropDef][] = []
+  for (const [key, def] of Object.entries(properties)) {
+    const match = NOTIFICATION_SETTING_KEY_RE.exec(key)
+    if (!match) {
+      rest.push([key, def])
+      continue
+    }
+    const [, , notifKey, target] = match
+    const row = rowsByKey.get(notifKey) ?? {
+      notifKey,
+      label: def.label.split(' → ')[0],
+      system: '',
+      center: '',
+      toast: '',
+    }
+    row[target as 'system' | 'center' | 'toast'] = key
+    rowsByKey.set(notifKey, row)
+  }
+  return { rows: Array.from(rowsByKey.values()), rest }
+}
+
 function ExtensionsSection(): JSX.Element {
   const [extensions, setExtensions] = React.useState<
     Array<{ id: string; name: string; version: string; status: string }>
@@ -119,12 +161,14 @@ function ExtensionsSection(): JSX.Element {
         type: 'info',
         title: 'Extension installed',
         message: 'Reload the window to activate it.',
+        key: 'extensionInstalled',
       })
     } else {
       dispatchNotification({
         type: 'error',
         title: 'Extension install failed',
         message: installResult.error,
+        key: 'extensionInstallFailed',
       })
     }
   }
@@ -145,12 +189,14 @@ function ExtensionsSection(): JSX.Element {
         type: 'info',
         title: 'Extension reloaded',
         message: 'Reload the window to see UI changes.',
+        key: 'extensionReloaded',
       })
     } else {
       dispatchNotification({
         type: 'error',
         title: 'Extension reload failed',
         message: result.error,
+        key: 'extensionReloadFailed',
       })
     }
   }
@@ -164,12 +210,14 @@ function ExtensionsSection(): JSX.Element {
         type: 'info',
         title: 'Extension uninstalled',
         message: `"${name}" uninstalled. Reload the window to remove its UI.`,
+        key: 'extensionUninstalled',
       })
     } else {
       dispatchNotification({
         type: 'error',
         title: 'Extension uninstall failed',
         message: result.error,
+        key: 'extensionUninstallFailed',
       })
     }
   }
@@ -200,6 +248,7 @@ function ExtensionsSection(): JSX.Element {
         type: 'error',
         title: 'Extension upgrade failed',
         message: uninstallResult.error,
+        key: 'extensionUpgradeFailed',
       })
       return
     }
@@ -210,12 +259,14 @@ function ExtensionsSection(): JSX.Element {
         type: 'info',
         title: 'Extension upgraded',
         message: 'Reload the window to activate.',
+        key: 'extensionUpgraded',
       })
     } else {
       dispatchNotification({
         type: 'error',
         title: 'Extension upgrade failed',
         message: `Failed during install: ${installResult.error}`,
+        key: 'extensionUpgradeFailed',
       })
     }
   }
@@ -276,19 +327,33 @@ function ExtensionsSection(): JSX.Element {
                 {schema.description && (
                   <p className="extension-settings-panel__desc">{schema.description}</p>
                 )}
-                {Object.entries(schema.properties).map(([key, def]) =>
-                  def.type === 'action' && def.channel ? (
-                    <ActionSettingRow key={key} def={def} />
-                  ) : (
-                    <ExtensionSettingRow
-                      key={key}
-                      propKey={key}
-                      def={def}
-                      value={settingValues[key] ?? def.default}
-                      onChange={handleSettingChange}
-                    />
+                {(() => {
+                  const { rows, rest } = partitionNotificationSettings(schema.properties)
+                  return (
+                    <>
+                      {rest.map(([key, def]) =>
+                        def.type === 'action' && def.channel ? (
+                          <ActionSettingRow key={key} def={def} />
+                        ) : (
+                          <ExtensionSettingRow
+                            key={key}
+                            propKey={key}
+                            def={def}
+                            value={settingValues[key] ?? def.default}
+                            onChange={handleSettingChange}
+                          />
+                        )
+                      )}
+                      {rows.length > 0 && (
+                        <NotificationSettingsTable
+                          rows={rows}
+                          values={settingValues}
+                          onChange={handleSettingChange}
+                        />
+                      )}
+                    </>
                   )
-                )}
+                })()}
               </div>
             )}
           </div>
@@ -309,21 +374,33 @@ function ActionSettingRow({ def }: { def: SettingPropDef }): JSX.Element {
       const errMsg = (result as { error?: string } | null)?.error
       const integrity = (result as { data?: { integrity?: string } } | null)?.data?.integrity
       if (errMsg) {
-        dispatchNotification({ type: 'error', title: def.label, message: errMsg })
+        dispatchNotification({
+          type: 'error',
+          title: def.label,
+          message: errMsg,
+          key: 'extensionSettingAction',
+        })
       } else if (integrity && integrity !== 'ok') {
         dispatchNotification({
           type: 'warning',
           title: def.label,
           message: `Integrity issues — ${integrity}`,
+          key: 'extensionSettingAction',
         })
       } else {
-        dispatchNotification({ type: 'success', title: def.label, message: 'Done' })
+        dispatchNotification({
+          type: 'success',
+          title: def.label,
+          message: 'Done',
+          key: 'extensionSettingAction',
+        })
       }
     } catch (err) {
       dispatchNotification({
         type: 'error',
         title: def.label,
         message: err instanceof Error ? err.message : String(err),
+        key: 'extensionSettingAction',
       })
     } finally {
       setBusy(false)
@@ -449,6 +526,59 @@ function ExtensionSettingRow({
           onChange={(e) => handleChange(e.target.value)}
         />
       )}
+    </div>
+  )
+}
+
+const NOTIFICATION_TABLE_TARGETS = [
+  { target: 'system' as const, label: 'System' },
+  { target: 'center' as const, label: 'In-App' },
+  { target: 'toast' as const, label: 'Toast' },
+]
+
+function NotificationSettingsTable({
+  rows,
+  values,
+  onChange,
+}: {
+  rows: NotificationSettingRow[]
+  values: Record<string, unknown>
+  onChange: (key: string, value: unknown) => Promise<void>
+}): JSX.Element {
+  return (
+    <div className="notification-settings">
+      <label className="settings-section__label">Notifications</label>
+      <table className="notification-settings-table">
+        <thead>
+          <tr>
+            <th>Notification</th>
+            {NOTIFICATION_TABLE_TARGETS.map(({ target, label }) => (
+              <th key={target}>{label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.notifKey}>
+              <td className="notification-settings-table__label">{row.label}</td>
+              {NOTIFICATION_TABLE_TARGETS.map(({ target }) => {
+                const fullKey = row[target]
+                const checked = Boolean(values[fullKey] ?? true)
+                return (
+                  <td key={target} className="notification-settings-table__checkbox-cell">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      aria-label={`${row.label} → ${target}`}
+                      onChange={() => void onChange(fullKey, !checked)}
+                    />
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

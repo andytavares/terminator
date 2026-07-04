@@ -16,8 +16,7 @@ const mockUpdateBranchExclude = vi.fn()
 const mockUpdateGlobal = vi.fn()
 const mockUpdatePromptForName = vi.fn()
 const mockUpdateNotificationDefaultTargets = vi.fn()
-const mockUpdateNotificationExtensionOverride = vi.fn()
-const mockExtensionList = vi.fn()
+const mockUpdateNotificationOverride = vi.fn()
 
 const globalSettings = {
   appearance: { theme: 'dark' as const },
@@ -30,14 +29,13 @@ const globalSettings = {
   ui: { hasSeenWelcome: false, showMetricsBar: false },
   notifications: {
     defaultTargets: ['system', 'center', 'toast'] as const,
-    extensionOverrides: {},
+    overrides: {},
   },
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   mockUpdateGlobal.mockResolvedValue(undefined)
-  mockExtensionList.mockResolvedValue({ extensions: [] })
   vi.mocked(useSettingsStore).mockReturnValue({
     globalSettings,
     updateGlobalTheme: mockUpdateTheme,
@@ -47,11 +45,10 @@ beforeEach(() => {
     updateBranchExcludePatterns: mockUpdateBranchExclude,
     updatePromptForName: mockUpdatePromptForName,
     updateNotificationDefaultTargets: mockUpdateNotificationDefaultTargets,
-    updateNotificationExtensionOverride: mockUpdateNotificationExtensionOverride,
+    updateNotificationOverride: mockUpdateNotificationOverride,
   } as unknown as ReturnType<typeof useSettingsStore>)
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     settings: { updateGlobal: mockUpdateGlobal },
-    extension: { list: mockExtensionList },
   }
 })
 
@@ -155,14 +152,14 @@ describe('GlobalSettings', () => {
   describe('Notifications', () => {
     it('renders the default target checkboxes, all checked by default', () => {
       render(<GlobalSettings />)
-      expect(screen.getByRole('checkbox', { name: 'System' })).toHaveProperty('checked', true)
-      expect(screen.getByRole('checkbox', { name: 'In-App' })).toHaveProperty('checked', true)
-      expect(screen.getByRole('checkbox', { name: 'Toast' })).toHaveProperty('checked', true)
+      expect(screen.getAllByRole('checkbox', { name: 'System' })[0]).toHaveProperty('checked', true)
+      expect(screen.getAllByRole('checkbox', { name: 'In-App' })[0]).toHaveProperty('checked', true)
+      expect(screen.getAllByRole('checkbox', { name: 'Toast' })[0]).toHaveProperty('checked', true)
     })
 
     it('unchecking a default target removes it from the array', () => {
       render(<GlobalSettings />)
-      fireEvent.click(screen.getByRole('checkbox', { name: 'System' }))
+      fireEvent.click(screen.getAllByRole('checkbox', { name: 'System' })[0])
       expect(mockUpdateNotificationDefaultTargets).toHaveBeenCalledWith(['center', 'toast'])
     })
 
@@ -170,7 +167,7 @@ describe('GlobalSettings', () => {
       vi.mocked(useSettingsStore).mockReturnValue({
         globalSettings: {
           ...globalSettings,
-          notifications: { defaultTargets: ['toast'], extensionOverrides: {} },
+          notifications: { defaultTargets: ['toast'], overrides: {} },
         },
         updateGlobalTheme: mockUpdateTheme,
         updateScrollbackLimit: mockUpdateScrollback,
@@ -179,41 +176,29 @@ describe('GlobalSettings', () => {
         updateBranchExcludePatterns: mockUpdateBranchExclude,
         updatePromptForName: mockUpdatePromptForName,
         updateNotificationDefaultTargets: mockUpdateNotificationDefaultTargets,
-        updateNotificationExtensionOverride: mockUpdateNotificationExtensionOverride,
+        updateNotificationOverride: mockUpdateNotificationOverride,
       } as unknown as ReturnType<typeof useSettingsStore>)
       render(<GlobalSettings />)
-      fireEvent.click(screen.getByRole('checkbox', { name: 'System' }))
+      fireEvent.click(screen.getAllByRole('checkbox', { name: 'System' })[0])
       expect(mockUpdateNotificationDefaultTargets).toHaveBeenCalledWith(['toast', 'system'])
     })
 
-    it('renders a per-extension override row for each installed extension', async () => {
-      mockExtensionList.mockResolvedValue({
-        extensions: [
-          { id: 'terminator.git-integration', name: 'Git Integration' },
-          { id: 'terminator.notepad', name: 'Notepad' },
-        ],
-      })
+    it('renders a per-notification override row for each core notification kind', () => {
       render(<GlobalSettings />)
-      expect(await screen.findByText('Git Integration')).toBeTruthy()
-      expect(screen.getByText('Notepad')).toBeTruthy()
+      expect(screen.getByText('Terminal bell (session needs attention)')).toBeTruthy()
+      expect(screen.getByText('Branch switch failed')).toBeTruthy()
+      expect(screen.getByText('Extension install failed')).toBeTruthy()
     })
 
-    it('checking a target on an extension override row calls updateNotificationExtensionOverride', async () => {
-      mockExtensionList.mockResolvedValue({
-        extensions: [{ id: 'terminator.git-integration', name: 'Git Integration' }],
-      })
+    it('checking a target on a core notification override row calls updateNotificationOverride', () => {
       render(<GlobalSettings />)
-      await screen.findByText('Git Integration')
-      const row = screen.getByText('Git Integration').closest('div')!
+      const row = screen.getByText('Terminal bell (session needs attention)').closest('div')!
       const systemCheckbox = within(row.parentElement as HTMLElement).getAllByRole('checkbox')[0]
       fireEvent.click(systemCheckbox)
-      expect(mockUpdateNotificationExtensionOverride).toHaveBeenCalledWith(
-        'terminator.git-integration',
-        ['system']
-      )
+      expect(mockUpdateNotificationOverride).toHaveBeenCalledWith('terminalBell', ['system'])
     })
 
-    it('does not render the per-extension section when there are no extensions', () => {
+    it('does not show a per-extension table (extensions configure their own notifications)', () => {
       render(<GlobalSettings />)
       expect(screen.queryByText('Per-Extension Overrides')).toBeNull()
     })

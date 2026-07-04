@@ -1,6 +1,46 @@
-import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
+import type { ExtensionAPI, Disposable, SettingDefinition } from '../../../src/main/extensions/api'
 import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
 import { registerGithubHandlers } from './ipc/github.ipc.js'
+
+// Every notification kind this extension ever raises, so the user can
+// independently choose its delivery target(s) (system/in-app/toast) in this
+// extension's own settings — core never knows these keys exist (Extension Isolation).
+const NOTIFICATION_KEYS: { key: string; label: string }[] = [
+  { key: 'sidebarToggleHint', label: 'Sidebar toggle hint' },
+  { key: 'gitViewOpened', label: 'Git view opened' },
+  { key: 'commitFailed', label: 'Commit failed' },
+  { key: 'commitPushFailed', label: 'Committed but push failed' },
+  { key: 'conflictResolveFailed', label: 'Could not resolve conflict' },
+  { key: 'conflictUndoFailed', label: 'Could not undo conflict resolution' },
+  { key: 'loadConflictsFailed', label: 'Could not load conflicts' },
+  { key: 'noConflictsFound', label: 'No merge conflicts found' },
+  { key: 'openResolverFailed', label: 'Could not open conflict resolver' },
+  { key: 'resetFailed', label: 'Could not reset merge session' },
+  { key: 'reloadConflictsFailed', label: 'Could not reload conflicts' },
+  { key: 'startOverFailed', label: 'Start over failed' },
+]
+
+function buildNotificationSettingProperties(): Record<string, SettingDefinition> {
+  const properties: Record<string, SettingDefinition> = {}
+  for (const { key, label } of NOTIFICATION_KEYS) {
+    properties[`terminator.git-integration.notify.${key}.system`] = {
+      type: 'boolean',
+      label: `${label} → System notification`,
+      default: true,
+    }
+    properties[`terminator.git-integration.notify.${key}.center`] = {
+      type: 'boolean',
+      label: `${label} → In-app notification center`,
+      default: true,
+    }
+    properties[`terminator.git-integration.notify.${key}.toast`] = {
+      type: 'boolean',
+      label: `${label} → Toast`,
+      default: true,
+    }
+  }
+  return properties
+}
 
 const disposables: Disposable[] = []
 
@@ -34,13 +74,14 @@ export function activate(api: ExtensionAPI): void {
   // api.notifications) to the shared notification dispatcher.
   disposables.push(
     api.ipc.registerHandler('git:notify', (payload) => {
-      const { type, title, message } = (payload ?? {}) as {
+      const { type, title, key, message } = (payload ?? {}) as {
         type?: 'info' | 'success' | 'warning' | 'error'
         title?: string
+        key?: string
         message?: string
       }
-      if (!type || !title) return { error: 'VALIDATION_ERROR' }
-      api.notifications.createNotification({ type, title, message })
+      if (!type || !title || !key) return { error: 'VALIDATION_ERROR' }
+      api.notifications.createNotification({ type, title, key, message })
       return { ok: true }
     })
   )
@@ -96,6 +137,7 @@ export function activate(api: ExtensionAPI): void {
           min: 10,
           max: 5000,
         },
+        ...buildNotificationSettingProperties(),
       },
     })
   )
@@ -106,7 +148,11 @@ export function activate(api: ExtensionAPI): void {
       label: 'Git Changes',
       tooltip: 'Toggle Git Changes sidebar',
       onClick: () => {
-        api.notifications.showToast('info', 'Toggle git sidebar via View menu or shortcut')
+        api.notifications.showToast(
+          'info',
+          'Toggle git sidebar via View menu or shortcut',
+          'sidebarToggleHint'
+        )
       },
     })
   )
@@ -161,7 +207,7 @@ export function activate(api: ExtensionAPI): void {
       label: 'Git',
       tooltip: 'Open Git view',
       onClick: () => {
-        api.notifications.showToast('info', 'Git view')
+        api.notifications.showToast('info', 'Git view', 'gitViewOpened')
       },
     })
   )

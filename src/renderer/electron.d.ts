@@ -187,6 +187,7 @@ interface ElectronAPI {
       title: string
       message?: string
       source?: string
+      key: string
     }): Promise<{ id: string } | { error: string }>
     list(): Promise<SerializedNotification[]>
     dismiss(id: string): Promise<{ ok: true } | { error: string }>
