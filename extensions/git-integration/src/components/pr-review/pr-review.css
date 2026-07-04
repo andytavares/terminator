@@ -1283,10 +1283,10 @@
   line-height: 1.45;
 }
 .diff-line--add {
-  background: rgba(63, 185, 80, 0.08);
+  background: var(--tm-diff-added-bg);
 }
 .diff-line--remove {
-  background: rgba(248, 81, 73, 0.08);
+  background: var(--tm-diff-removed-bg);
 }
 .diff-line--selecting,
 .diff-line--selecting td {
@@ -1303,9 +1303,9 @@
   white-space: nowrap;
   text-align: right;
   padding: 0 8px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--tm-text-secondary);
   user-select: none;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid var(--tm-border);
   vertical-align: top;
   font-size: 11px;
 }
@@ -1319,7 +1319,7 @@
   width: 18px;
   min-width: 18px;
   padding: 0 4px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--tm-text-secondary);
   user-select: none;
   vertical-align: top;
 }

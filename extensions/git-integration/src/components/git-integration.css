@@ -588,11 +588,11 @@
 }
 
 .diff-line--add {
-  background: rgba(152, 195, 121, 0.12);
+  background: var(--tm-diff-added-bg);
 }
 
 .diff-line--remove {
-  background: rgba(224, 108, 117, 0.12);
+  background: var(--tm-diff-removed-bg);
 }
 
 .diff-line__old-num,
@@ -604,7 +604,6 @@
   padding: 0 6px;
   border-right: 1px solid var(--tm-border);
   font-size: 11px;
-  opacity: 0.6;
 }
 
 .diff-line__prefix {
@@ -659,11 +658,11 @@
 }
 
 .diff-line__content--remove {
-  background: rgba(224, 108, 117, 0.12);
+  background: var(--tm-diff-removed-bg);
 }
 
 .diff-line__content--add {
-  background: rgba(152, 195, 121, 0.12);
+  background: var(--tm-diff-added-bg);
 }
 
 .diff-line__content--empty {
