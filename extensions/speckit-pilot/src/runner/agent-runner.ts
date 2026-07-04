@@ -3,7 +3,11 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { PhaseId } from '../types/speckit.types.js'
-import { sessionIdFromStreamJsonLine, textFromStreamJsonLine } from './stream-json.js'
+import {
+  noteFromStreamJsonLine,
+  sessionIdFromStreamJsonLine,
+  textFromStreamJsonLine,
+} from './stream-json.js'
 
 /** Absolute path to a phase's persisted output log. */
 export function phaseLogPath(featureDir: string, phase: PhaseId): string {
@@ -59,6 +63,8 @@ export interface StartPhaseRunnerOpts {
   // to answer the model's questions from the run console (the reply is
   // `phaseCommand`).
   resumeSessionId?: string
+  // Kill the run if it hasn't finished in this long (default 15 min).
+  timeoutMs?: number
   onStart?: () => void | Promise<void>
   onComplete?: (exitCode: number) => void | Promise<void>
   // Fires with the Claude session id as soon as it's known, so the pilot can
@@ -74,8 +80,12 @@ const SELF_REVIEW_CMD = [
   'npm run format',
   'npm run lint',
   'npx vitest run --coverage',
-  'claude --print --permission-mode bypassPermissions /google-review',
+  'claude --print --permission-mode bypassPermissions --strict-mcp-config /google-review',
 ].join(' && ')
+
+// Kill a phase that has produced nothing for this long — a headless run that
+// hangs (e.g. on a blocked API call) would otherwise wait forever.
+const DEFAULT_PHASE_TIMEOUT_MS = 15 * 60 * 1000
 
 function shellQuote(s: string): string {
   return "'" + s.replace(/'/g, "'\\''") + "'"
@@ -92,6 +102,7 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
         feedbackNote,
         batchIndex,
         resumeSessionId,
+        timeoutMs = DEFAULT_PHASE_TIMEOUT_MS,
         onStart,
         onComplete,
         onSession,
@@ -132,11 +143,32 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
         // Phases run headless in the card's isolated worktree, so bypass
         // permission prompts — a spawned `--print` process has no interactive
         // channel to approve tool calls, and without this every Write/Edit/Bash
-        // stalls forever (see ADR-007).
-        cmd = `claude --print ${resumeFlag}--permission-mode bypassPermissions --output-format stream-json --verbose --include-partial-messages ${shellQuote(prompt)}`
+        // stalls forever (see ADR-007). `--strict-mcp-config` (with no
+        // --mcp-config) disables all MCP servers, which otherwise hang the
+        // headless spawn on startup (context7, Linear, Gmail, …).
+        cmd = `claude --print ${resumeFlag}--permission-mode bypassPermissions --strict-mcp-config --output-format stream-json --verbose --include-partial-messages ${shellQuote(prompt)}`
       }
 
       const child = spawn(shellBin, ['-l', '-c', cmd], spawnOpts)
+
+      // Safety net: a hung headless run (blocked API call, wedged tool) would
+      // otherwise never emit `close`. Kill it and let the close handler report.
+      const killTimer = setTimeout(() => {
+        api.window.broadcast('speckit:run-output', {
+          featureDir,
+          phase,
+          line: `⚠ no response after ${Math.round(timeoutMs / 60000)} min — stopping this phase`,
+          ts: new Date().toISOString(),
+        })
+        child.kill('SIGTERM')
+        setTimeout(() => {
+          try {
+            child.kill('SIGKILL')
+          } catch {
+            // already gone
+          }
+        }, 3000)
+      }, timeoutMs)
 
       if (onStart) void Promise.resolve(onStart())
 
@@ -197,7 +229,19 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
             }
           }
           const chunk = textFromStreamJsonLine(jline)
-          if (!chunk) continue
+          if (!chunk) {
+            // No assistant text — surface tool activity / errors so a run that's
+            // busy with tool calls (or has failed) isn't a silent blank console.
+            const note = noteFromStreamJsonLine(jline)
+            if (note) {
+              if (displayBuffer.length > 0) {
+                emitLine(displayBuffer)
+                displayBuffer = ''
+              }
+              emitLine(note)
+            }
+            continue
+          }
           displayBuffer += chunk
           const displayLines = displayBuffer.split('\n')
           displayBuffer = displayLines.pop() ?? ''
@@ -253,6 +297,7 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
       })
 
       child.on('error', (err) => {
+        clearTimeout(killTimer)
         flushStreamJson()
         persist(`[runner error] ${err.message}`)
         logStream?.end()
@@ -267,6 +312,7 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
       })
 
       child.on('close', (exitCode) => {
+        clearTimeout(killTimer)
         flushStreamJson()
         const code = exitCode ?? 0
         logStream?.end()
@@ -288,6 +334,7 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
 
       return {
         stop() {
+          clearTimeout(killTimer)
           child.kill('SIGTERM')
         },
       }

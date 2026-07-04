@@ -140,6 +140,40 @@ describe('startPhaseRunner', () => {
       event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } },
     }) + '\n'
 
+  const toolUse = (name: string) =>
+    JSON.stringify({
+      type: 'stream_event',
+      event: { type: 'content_block_start', content_block: { type: 'tool_use', name } },
+    }) + '\n'
+
+  it('flushes pending text then surfaces a tool call as an activity note', async () => {
+    const { child, emitStdout } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    createAgentRunner(api).startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: '/speckit-plan',
+      phase: 'plan',
+    })
+
+    // Partial assistant text (no newline) then a tool call — the buffered text
+    // is flushed before the note.
+    emitStdout(delta('reading the spec'))
+    emitStdout(toolUse('Read'))
+
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'speckit:run-output',
+      expect.objectContaining({ line: 'reading the spec' })
+    )
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'speckit:run-output',
+      expect.objectContaining({ line: '🔧 Read' })
+    )
+  })
+
   it('broadcasts assistant text from stream-json output, one line at a time', async () => {
     const { child, emitStdout } = makeMockChild()
     vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
@@ -330,6 +364,48 @@ describe('startPhaseRunner', () => {
     expect(spawnArgs).toContain('--permission-mode bypassPermissions')
   })
 
+  // MCP servers (context7, Linear, Gmail, …) hang the headless spawn on startup.
+  it('disables MCP servers with --strict-mcp-config', async () => {
+    const { child } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    createAgentRunner(api).startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: '/speckit-plan',
+      phase: 'plan',
+    })
+    const spawnArgs = (vi.mocked(spawn).mock.calls[0][1] as string[]).join(' ')
+    expect(spawnArgs).toContain('--strict-mcp-config')
+  })
+
+  it('kills a hung run after the timeout and reports it', async () => {
+    vi.useFakeTimers()
+    const { child } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+    const api = makeApi()
+    const { createAgentRunner } = await loadRunner()
+    createAgentRunner(api).startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: '/speckit-specify x',
+      phase: 'specify',
+      timeoutMs: 1000,
+    })
+
+    vi.advanceTimersByTime(1000)
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM')
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'speckit:run-output',
+      expect.objectContaining({ line: expect.stringContaining('no response after') })
+    )
+    // A process that ignores SIGTERM is force-killed shortly after.
+    vi.advanceTimersByTime(3000)
+    expect(child.kill).toHaveBeenCalledWith('SIGKILL')
+    vi.useRealTimers()
+  })
+
   it('resumes the session when replying and captures the session id', async () => {
     const { child, emitStdout } = makeMockChild()
     vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
@@ -410,7 +486,9 @@ describe('startPhaseRunner', () => {
     })
 
     const spawnArgs = (vi.mocked(spawn).mock.calls[0][1] as string[]).join(' ')
-    expect(spawnArgs).toContain('claude --print --permission-mode bypassPermissions /google-review')
+    expect(spawnArgs).toContain(
+      'claude --print --permission-mode bypassPermissions --strict-mcp-config /google-review'
+    )
   })
 
   it('broadcasts speckit:run-phase-complete on exit', async () => {
