@@ -4,11 +4,11 @@ import { BoardView } from '../components/BoardView.js'
 import { CardDetail } from '../components/CardDetail.js'
 import { CardBriefEditor } from '../components/CardBriefEditor.js'
 import { KnowledgeSearch } from '../components/KnowledgeSearch.js'
-import { ImportTicketModal } from '../components/ImportTicketModal.js'
 import { SettingsView } from '../components/SettingsView.js'
 import { getSpeckitAPI } from '../types/electron.js'
+import { reconcileAssignedTickets } from '../state/reconcile-tickets.js'
 
-type Overlay = 'none' | 'new-card' | 'import' | 'settings'
+type Overlay = 'none' | 'new-card' | 'settings'
 
 export function App(): JSX.Element {
   const [repoRoot, setRepoRoot] = useState<string | null>(
@@ -65,6 +65,32 @@ export function App(): JSX.Element {
 
   const workspacePath = repoRoot ?? ''
 
+  // Auto-load assigned tickets onto the board when it opens (and on workspace
+  // change). Newly created cards surface via the existing speckit:state-changed
+  // broadcast that BoardView subscribes to, so no manual board reload is needed.
+  const [importing, setImporting] = useState(false)
+  // Tracks the repoRoot currently being reconciled so a re-render (React double-invoke,
+  // rapid button clicks) is skipped, while a workspace switch to a *different* repoRoot
+  // still gets its own auto-load.
+  const reconcilingRef = useRef<string | null>(null)
+  const runReconcile = useCallback(async () => {
+    if (!repoRoot || reconcilingRef.current === repoRoot) return
+    reconcilingRef.current = repoRoot
+    setImporting(true)
+    try {
+      await reconcileAssignedTickets(repoRoot)
+    } catch {
+      // Backend handlers toast fetch/create failures; nothing to surface here.
+    } finally {
+      if (reconcilingRef.current === repoRoot) reconcilingRef.current = null
+      setImporting(false)
+    }
+  }, [repoRoot])
+
+  useEffect(() => {
+    void runReconcile()
+  }, [runReconcile])
+
   const createCard = useCallback(
     async (brief: {
       title: string
@@ -85,8 +111,13 @@ export function App(): JSX.Element {
         <div className="sk-appbar__search">
           {repoRoot && <KnowledgeSearch repoRoot={repoRoot} />}
         </div>
-        <button className="sk-btn" onClick={() => setOverlay('import')}>
-          <Download size={14} /> Import ticket
+        <button
+          className="sk-btn"
+          onClick={() => void runReconcile()}
+          disabled={importing}
+          aria-busy={importing}
+        >
+          <Download size={14} /> {importing ? 'Importing…' : 'Import ticket'}
         </button>
         <button aria-label="Settings" className="sk-btn" onClick={() => setOverlay('settings')}>
           <Settings size={14} />
@@ -136,14 +167,6 @@ export function App(): JSX.Element {
             />
           </div>
         </div>
-      )}
-
-      {overlay === 'import' && repoRoot && (
-        <ImportTicketModal
-          repoRoot={repoRoot}
-          onClose={() => setOverlay('none')}
-          onImported={() => setOverlay('none')}
-        />
       )}
     </div>
   )

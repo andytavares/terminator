@@ -673,7 +673,11 @@ activate(api)
 ### Renderer Architecture (`extensions/speckit-pilot/src/renderer/`)
 
 ```
-App.tsx  (board home + header: KnowledgeSearch / Import ticket / Settings)
+App.tsx  (board home + header: KnowledgeSearch / Import ticket (manual refresh) / Settings)
+  ├─ On open (and workspace change) auto-reconciles assigned Linear/Jira tickets onto
+  │    the board via reconcileAssignedTickets(): fetch ticketList() + cardList(), dedup on
+  │    source:sourceKey, cardCreate() the missing ones. The "Import ticket" button re-runs
+  │    the same reconcile as a manual refresh. New cards surface via speckit:state-changed.
   ├─ BoardView       — six stage columns (@dnd-kit); buckets CardSummary[] by derived stage
   │    └─ CardTile        — type badge, title, scope, compact phase rail, run-status chip
   ├─ CardDetail      — slide-over drawer with tabs:
@@ -685,7 +689,6 @@ App.tsx  (board home + header: KnowledgeSearch / Import ticket / Settings)
   │    │    └─ BatchCheckIn   — implement batch boundary: continue / pause / split / redirect
   │    ├─ Activity       — ActivityFeed: comments + audit log, composer (steers next phase)
   │    └─ Artifacts      — ArtifactsPanel: artifacts + revision history + diff/markdown viewer
-  ├─ ImportTicketModal — Linear/Jira assigned issues → create a backlog card
   ├─ KnowledgeSearch — keyword search; attach a result to a card brief
   └─ SettingsView    — integrations / autonomy & gates (incl. maxConcurrentRuns) / agent runner
 ```
