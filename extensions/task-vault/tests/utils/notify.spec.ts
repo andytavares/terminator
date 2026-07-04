@@ -54,12 +54,12 @@ describe('notify', () => {
     expect(() => notify('error', 'Oops')).not.toThrow()
   })
 
-  it('creates a notification center + system notification via electronAPI', () => {
+  it('routes through the shared dispatcher tagged with this extension source', () => {
     notify('warning', 'Task overdue')
     expect(mockCreate).toHaveBeenCalledWith({
       type: 'warning',
       title: 'Task overdue',
-      targets: ['center', 'system'],
+      source: 'terminator.task-vault',
     })
   })
 

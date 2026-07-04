@@ -332,13 +332,6 @@ export function App(): JSX.Element {
   }, [])
 
   useEffect(() => {
-    if (!window.electronAPI.extensionEvents) return
-    return window.electronAPI.extensionEvents.onToast(({ type, message }) => {
-      addToast({ type: type as 'info' | 'success' | 'warning' | 'error', message })
-    })
-  }, [addToast])
-
-  useEffect(() => {
     if (!window.electronAPI.extensionEvents?.onTogglePanel) return
     return window.electronAPI.extensionEvents.onTogglePanel((panelId) => {
       togglePanel(panelId)

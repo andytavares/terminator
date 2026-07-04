@@ -1,4 +1,4 @@
-import { BrowserWindow, Notification } from 'electron'
+import { BrowserWindow } from 'electron'
 import type { ExtensionAPI, ExtensionDB, Disposable } from '../../../../src/main/extensions/api.js'
 
 let _tick: (() => void) | null = null
@@ -140,17 +140,9 @@ export function startTaskScheduler(
         const taskId = task.id
         const taskDate = task.source_ref ?? null
         const notifTitle = isOverdue ? `Overdue: ${task.text}` : `Due today: ${task.text}`
-        if (Notification.isSupported()) {
-          const osNotif = new Notification({ title: notifTitle, silent: false })
-          osNotif.on('click', () =>
-            broadcast('task-vault:navigate-task', { taskId, date: taskDate })
-          )
-          osNotif.show()
-        }
         const notif = api.notifications.createNotification({
           type: isOverdue ? 'error' : 'warning',
           title: notifTitle,
-          targets: ['center', 'toast'],
           actions: [
             {
               id: 'open',
@@ -205,22 +197,10 @@ export function startTaskScheduler(
         blockedTaskNotifs.get(task.id)?.dispose()
 
         const blockedTitle = `Check in: ${task.text}`
-        if (Notification.isSupported()) {
-          const osNotif = new Notification({
-            title: blockedTitle,
-            body: meta.blocked_reason ?? '',
-            silent: false,
-          })
-          osNotif.on('click', () =>
-            broadcast('task-vault:navigate-task', { taskId, date: taskDate })
-          )
-          osNotif.show()
-        }
         const notif = api.notifications.createNotification({
           type: 'info',
           title: blockedTitle,
           message: meta.blocked_reason ?? undefined,
-          targets: ['center', 'toast'],
           actions: [
             {
               id: 'open',

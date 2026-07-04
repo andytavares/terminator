@@ -1,6 +1,6 @@
 import * as path from 'node:path'
-import { ipcMain, Notification, BrowserWindow } from 'electron'
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import { ipcMain } from 'electron'
+import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
 import { randomUUID } from '../vault/db'
 import { extractTags, toDisplayName } from '../vault/tags'
 import { localDate as _localDate } from '../vault/recurrence'
@@ -95,7 +95,7 @@ async function resolveProjectAndAreaIds(
   return { projectId, areaId }
 }
 
-export function registerVaultIpcHandlers(db: ExtensionDB): () => void {
+export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const handlers: Array<[string, (...args: unknown[]) => unknown]> = []
 
   function handle(
@@ -111,21 +111,6 @@ export function registerVaultIpcHandlers(db: ExtensionDB): () => void {
     })
     handlers.push([channel, fn as (...args: unknown[]) => unknown])
   }
-
-  handle('task-vault:system-notify', async (_event, payload) => {
-    const {
-      title = 'Task Vault',
-      body = '',
-      type = 'info',
-    } = (payload ?? {}) as { title?: string; body?: string; type?: string }
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) win.webContents.send('extension:toast', { type, message: body })
-    }
-    if (Notification.isSupported()) {
-      new Notification({ title, body, silent: true }).show()
-    }
-    return { ok: true }
-  })
 
   handle('task-vault:vault:capture', async (_event, payload) => {
     const parsed = CaptureRequestSchema.safeParse(payload)
@@ -360,9 +345,11 @@ export function registerVaultIpcHandlers(db: ExtensionDB): () => void {
         })
       }
 
-      if (Notification.isSupported()) {
-        new Notification({ title: 'Task completed', body: taskText, silent: true }).show()
-      }
+      api.notifications.createNotification({
+        type: 'success',
+        title: 'Task completed',
+        message: taskText,
+      })
       broadcast('task-vault:push:index-updated', {})
       return { success: true }
     } catch (err) {
@@ -757,10 +744,11 @@ export function registerVaultIpcHandlers(db: ExtensionDB): () => void {
     ])
     await db.run(`UPDATE areas SET status='archived', updated_at=? WHERE id=?`, [now, area.id])
 
-    if (Notification.isSupported()) {
-      new Notification({ title: 'Area archived', body: areaName, silent: true }).show()
-    }
-    broadcast('extension:toast', { type: 'info', message: `Area archived: ${areaName}` })
+    api.notifications.createNotification({
+      type: 'info',
+      title: 'Area archived',
+      message: areaName,
+    })
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
@@ -1154,10 +1142,11 @@ export function registerVaultIpcHandlers(db: ExtensionDB): () => void {
 
     await db.run(`UPDATE projects SET status=?, updated_at=? WHERE id=?`, [status, now, proj.id])
     if (status === 'archived') {
-      if (Notification.isSupported()) {
-        new Notification({ title: 'Project archived', body: projectName, silent: true }).show()
-      }
-      broadcast('extension:toast', { type: 'info', message: `Project archived: ${projectName}` })
+      api.notifications.createNotification({
+        type: 'info',
+        title: 'Project archived',
+        message: projectName,
+      })
     }
     broadcast('task-vault:push:index-updated', {})
     return { success: true }

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs/promises'
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
@@ -21,10 +21,6 @@ const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
 }))
 vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
-  Notification: Object.assign(
-    vi.fn(() => ({ show: vi.fn() })),
-    { isSupported: vi.fn(() => false) }
-  ),
 }))
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
@@ -68,6 +64,9 @@ function createMockDb() {
 }
 
 let db: ReturnType<typeof createMockDb>
+const mockApi = {
+  notifications: { createNotification: vi.fn() },
+} as unknown as ExtensionAPI
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -85,7 +84,7 @@ afterEach(() => {
 
 describe('task-vault:vault:capture IPC handler', () => {
   it('registers the capture handler', () => {
-    registerVaultIpcHandlers(db)
+    registerVaultIpcHandlers(mockApi, db)
     const registeredChannels = vi.mocked(mockHandle).mock.calls.map((c) => c[0])
     expect(registeredChannels).toContain('task-vault:vault:capture')
   })
@@ -95,7 +94,7 @@ describe('task-vault:vault:capture IPC handler', () => {
     vi.mocked(mockHandle).mockImplementation((channel, fn) => {
       if (channel === 'task-vault:vault:capture') captureHandler = fn as typeof captureHandler
     })
-    registerVaultIpcHandlers(db)
+    registerVaultIpcHandlers(mockApi, db)
     expect(captureHandler).toBeDefined()
 
     const result = await captureHandler!({} as Electron.IpcMainInvokeEvent, { text: '' })
@@ -107,7 +106,7 @@ describe('task-vault:vault:capture IPC handler', () => {
     vi.mocked(mockHandle).mockImplementation((channel, fn) => {
       if (channel === 'task-vault:vault:capture') captureHandler = fn as typeof captureHandler
     })
-    registerVaultIpcHandlers(db)
+    registerVaultIpcHandlers(mockApi, db)
 
     const result = await captureHandler!({} as Electron.IpcMainInvokeEvent, { text: '   ' })
     expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
@@ -118,7 +117,7 @@ describe('task-vault:vault:capture IPC handler', () => {
     vi.mocked(mockHandle).mockImplementation((channel, fn) => {
       if (channel === 'task-vault:vault:capture') captureHandler = fn as typeof captureHandler
     })
-    registerVaultIpcHandlers(db)
+    registerVaultIpcHandlers(mockApi, db)
 
     const result = await captureHandler!({} as Electron.IpcMainInvokeEvent, { text: 'New task' })
     expect(result).toMatchObject({ taskId: 'test-uuid' })
@@ -129,7 +128,7 @@ describe('task-vault:vault:capture IPC handler', () => {
     vi.mocked(mockHandle).mockImplementation((channel, fn) => {
       if (channel === 'task-vault:vault:capture') captureHandler = fn as typeof captureHandler
     })
-    registerVaultIpcHandlers(db)
+    registerVaultIpcHandlers(mockApi, db)
 
     // null payload should fail validation
     const result = await captureHandler!({} as Electron.IpcMainInvokeEvent, null)

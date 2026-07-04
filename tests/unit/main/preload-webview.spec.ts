@@ -47,7 +47,6 @@ describe('preload-webview', () => {
       'extensionEvents',
       'app',
       'extensionBridge',
-      'notification',
       'notifications',
       'db',
       'metrics',

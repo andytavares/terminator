@@ -161,7 +161,6 @@ interface ElectronAPI {
     isReserved(accelerator: string): boolean
   }
   extensionEvents: {
-    onToast(handler: (payload: { type: string; message: string }) => void): () => void
     onTogglePanel(handler: (panelId: string) => void): () => void
     onSelectProjectTab(handler: (tabId: string) => void): () => void
     onMenuOpenSettings(handler: () => void): () => void
@@ -182,14 +181,12 @@ interface ElectronAPI {
       platform: string
     }>
   }
-  notification: {
-    show(title: string, body: string): void
-  }
   notifications: {
     create(payload: {
       type: 'info' | 'success' | 'warning' | 'error'
       title: string
       message?: string
+      source?: string
     }): Promise<{ id: string } | { error: string }>
     list(): Promise<SerializedNotification[]>
     dismiss(id: string): Promise<{ ok: true } | { error: string }>

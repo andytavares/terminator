@@ -1,25 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
 
-const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
+const { mockHandle, mockRemoveHandler, mockCreateNotification } = vi.hoisted(() => ({
   mockHandle: vi.fn(),
   mockRemoveHandler: vi.fn(),
+  mockCreateNotification: vi.fn(),
 }))
-const mockNotification = { show: vi.fn() }
-const mockWebContentsSend = vi.fn()
 vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
-  Notification: Object.assign(
-    vi.fn(function () {
-      return mockNotification
-    }),
-    { isSupported: vi.fn(() => false) }
-  ),
-  BrowserWindow: {
-    getAllWindows: vi.fn(() => [
-      { isDestroyed: () => false, webContents: { send: mockWebContentsSend } },
-    ]),
-  },
 }))
 
 vi.mock('../../src/vault/db', () => ({
@@ -37,7 +25,6 @@ vi.mock('../../src/notifications/task-scheduler.js', () => ({
 }))
 
 import { registerVaultIpcHandlers } from '../../src/ipc/vault.ipc'
-import { broadcast } from '../../src/notifications/task-scheduler.js'
 
 // ── mock db factory ──────────────────────────────────────────────────────────
 
@@ -45,6 +32,10 @@ let db: ExtensionDB
 let mockQuery: ReturnType<typeof vi.fn>
 let mockGet: ReturnType<typeof vi.fn>
 let mockRun: ReturnType<typeof vi.fn>
+
+const mockApi = {
+  notifications: { createNotification: mockCreateNotification },
+} as unknown as ExtensionAPI
 
 function resetDb() {
   mockQuery = vi.fn().mockResolvedValue([])
@@ -94,7 +85,7 @@ function getHandler(channel: string): (event: unknown, payload: unknown) => Prom
   vi.mocked(mockHandle).mockImplementation((ch, fn) => {
     if (ch === channel) handler = fn as typeof handler
   })
-  registerVaultIpcHandlers(db)
+  registerVaultIpcHandlers(mockApi, db)
   if (!handler) throw new Error(`Handler for ${channel} not registered`)
   return handler
 }
@@ -163,6 +154,17 @@ describe('task-vault:vault:complete-task', () => {
     }
     expect(result).toEqual({ success: true })
     expect(result.nextTaskId).toBeUndefined()
+  })
+
+  it('notifies via the shared dispatcher on completion', async () => {
+    mockGet.mockResolvedValue({ id: 'task-1', text: 'Test task' })
+    const handler = getHandler('task-vault:vault:complete-task')
+    await handler({}, { taskId: 'task-1' })
+    expect(mockCreateNotification).toHaveBeenCalledWith({
+      type: 'success',
+      title: 'Task completed',
+      message: 'Test task',
+    })
   })
 })
 
@@ -1470,7 +1472,7 @@ describe('task-vault:vault:get-calendar-month', () => {
 
 describe('registerVaultIpcHandlers dispose', () => {
   it('calls ipcMain.removeHandler for all registered channels', () => {
-    const dispose = registerVaultIpcHandlers(db)
+    const dispose = registerVaultIpcHandlers(mockApi, db)
     dispose()
     const removedChannels = vi.mocked(mockRemoveHandler).mock.calls.map((c) => c[0])
     expect(removedChannels).toContain('task-vault:vault:capture')
@@ -1488,75 +1490,42 @@ describe('registerVaultIpcHandlers dispose', () => {
     expect(removedChannels).toContain('task-vault:vault:set-recurrence')
     expect(removedChannels).toContain('task-vault:vault:clear-recurrence')
     expect(removedChannels).toContain('task-vault:vault:get-calendar-month')
-    expect(removedChannels).toContain('task-vault:system-notify')
   })
 })
 
-// ── system-notify ─────────────────────────────────────────────────────────────
+// ── archive-area notifies via the shared dispatcher ───────────────────────────
 
-describe('task-vault:system-notify', () => {
-  it('returns { ok: true } and broadcasts extension:toast to all windows', async () => {
-    const handler = getHandler('task-vault:system-notify')
-    const result = await handler({}, { title: 'Test', body: 'Hello', type: 'info' })
-    expect(result).toEqual({ ok: true })
-    expect(mockWebContentsSend).toHaveBeenCalledWith('extension:toast', {
-      type: 'info',
-      message: 'Hello',
-    })
-  })
-
-  it('shows a native Notification when isSupported is true', async () => {
-    const { Notification: MockNotif } = await import('electron')
-    vi.mocked(MockNotif.isSupported).mockReturnValueOnce(true)
-    const handler = getHandler('task-vault:system-notify')
-    await handler({}, { title: 'Task Vault', body: 'Done', type: 'success' })
-    expect(MockNotif).toHaveBeenCalledWith({ title: 'Task Vault', body: 'Done', silent: true })
-    expect(mockNotification.show).toHaveBeenCalled()
-  })
-
-  it('uses default title, empty body, and info type when payload omits them', async () => {
-    const handler = getHandler('task-vault:system-notify')
-    const result = await handler({}, {})
-    expect(result).toEqual({ ok: true })
-    expect(mockWebContentsSend).toHaveBeenCalledWith('extension:toast', {
-      type: 'info',
-      message: '',
-    })
-  })
-})
-
-// ── archive-area broadcasts extension:toast ───────────────────────────────────
-
-describe('task-vault:vault:archive-area broadcasts extension:toast', () => {
-  it('calls broadcast with extension:toast on success', async () => {
+describe('task-vault:vault:archive-area notification', () => {
+  it('calls api.notifications.createNotification on success', async () => {
     mockGet.mockResolvedValue({ id: 'area-1' })
     mockQuery.mockResolvedValue([])
     const handler = getHandler('task-vault:vault:archive-area')
     await handler({}, { areaName: 'Work' })
-    expect(vi.mocked(broadcast)).toHaveBeenCalledWith('extension:toast', {
+    expect(mockCreateNotification).toHaveBeenCalledWith({
       type: 'info',
-      message: 'Area archived: Work',
+      title: 'Area archived',
+      message: 'Work',
     })
   })
 })
 
-describe('task-vault:vault:update-project-status broadcasts extension:toast when archiving', () => {
-  it('calls broadcast with extension:toast on archive', async () => {
+describe('task-vault:vault:update-project-status notification when archiving', () => {
+  it('calls api.notifications.createNotification on archive', async () => {
     mockGet.mockResolvedValue({ id: 'proj-1', name: 'Alpha' })
     const handler = getHandler('task-vault:vault:update-project-status')
     await handler({}, { projectFilePath: 'Alpha', status: 'archived' })
-    expect(vi.mocked(broadcast)).toHaveBeenCalledWith('extension:toast', {
+    expect(mockCreateNotification).toHaveBeenCalledWith({
       type: 'info',
-      message: 'Project archived: Alpha',
+      title: 'Project archived',
+      message: 'Alpha',
     })
   })
 
-  it('does not broadcast extension:toast when status is not archived', async () => {
+  it('does not notify when status is not archived', async () => {
     mockGet.mockResolvedValue({ id: 'proj-1', name: 'Alpha' })
     const handler = getHandler('task-vault:vault:update-project-status')
     await handler({}, { projectFilePath: 'Alpha', status: 'active' })
-    const toastCalls = vi.mocked(broadcast).mock.calls.filter((c) => c[0] === 'extension:toast')
-    expect(toastCalls).toHaveLength(0)
+    expect(mockCreateNotification).not.toHaveBeenCalled()
   })
 })
 

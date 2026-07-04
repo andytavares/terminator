@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useToastStore } from '../../../../src/renderer/stores/toast.store'
+import { notify } from '../utils/notify'
 import type { IndexedTask } from '../vault/types'
 
 interface Props {
@@ -14,7 +14,6 @@ export function WeeklyReviewStepStaleTasks({
   onComplete,
 }: Props): React.JSX.Element {
   const [tasks, setTasks] = useState(initialTasks)
-  const { addToast } = useToastStore()
 
   function remove(taskId: string) {
     setTasks((prev) => prev.filter((t) => t.id !== taskId))
@@ -26,7 +25,7 @@ export function WeeklyReviewStepStaleTasks({
       { taskId, action: 'someday' }
     )
     if (result && 'error' in result) {
-      addToast({ type: 'error', message: `Could not move to backlog: ${result.error}` })
+      notify('error', `Could not move to backlog: ${result.error}`)
       return
     }
     remove(taskId)
@@ -37,7 +36,7 @@ export function WeeklyReviewStepStaleTasks({
       taskId,
     })
     if (result && 'error' in result) {
-      addToast({ type: 'error', message: `Could not delete task: ${result.error}` })
+      notify('error', `Could not delete task: ${result.error}`)
       return
     }
     remove(taskId)
@@ -49,7 +48,7 @@ export function WeeklyReviewStepStaleTasks({
       { taskId }
     )
     if (result && 'error' in result) {
-      addToast({ type: 'error', message: `Could not reset task: ${result.error}` })
+      notify('error', `Could not reset task: ${result.error}`)
       return
     }
     remove(taskId)

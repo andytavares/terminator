@@ -234,10 +234,6 @@
       readFile: (filePath: string) => invoke('fs:read-file', { filePath }),
     },
     extensionEvents: {
-      onToast: makePushOn<{ type: string; message: string }>(
-        'extension:toast',
-        (args) => args[0] as { type: string; message: string }
-      ),
       onTogglePanel: makePushOn<string>(
         'extension:toggle-panel',
         (args) => (args[0] as { panelId: string }).panelId
@@ -259,15 +255,12 @@
       on: (channel: string, handler: (data: unknown) => void) =>
         on(channel, (data) => handler(data)),
     },
-    notification: {
-      show: (title: string, body: string) =>
-        invoke('notifications:create', { type: 'info', title, message: body, targets: ['system'] }),
-    },
     notifications: {
       create: (payload: {
         type: 'info' | 'success' | 'warning' | 'error'
         title: string
         message?: string
+        source?: string
       }) => invoke('notifications:create', payload),
       list: () => invoke('notifications:list'),
       dismiss: (id: string) => invoke('notifications:dismiss', { id }),

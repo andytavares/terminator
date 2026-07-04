@@ -56,6 +56,16 @@ describe('registerNotificationHandlers', () => {
     expect(mockCreate).toHaveBeenCalledWith({ type: 'success', title: 'T' })
   })
 
+  it('passes an optional source through so per-extension overrides can resolve', async () => {
+    const handler = captureHandle('notifications:create')
+    await handler(null, { type: 'info', title: 'T', source: 'terminator.task-vault' })
+    expect(mockCreate).toHaveBeenCalledWith({
+      type: 'info',
+      title: 'T',
+      source: 'terminator.task-vault',
+    })
+  })
+
   it('returns VALIDATION_ERROR for invalid type', async () => {
     const handler = captureHandle('notifications:create')
     const result = await handler(null, { type: 'bad', title: 'T' })

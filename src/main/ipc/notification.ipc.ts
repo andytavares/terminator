@@ -6,6 +6,7 @@ const CreateSchema = z.object({
   type: z.enum(['info', 'success', 'warning', 'error']),
   title: z.string().min(1),
   message: z.string().optional(),
+  source: z.string().optional(),
 })
 
 const DismissSchema = z.object({ id: z.string().min(1) })

@@ -507,12 +507,6 @@ describe('electron-api-shim other APIs', () => {
     expect(hasMsg(ws, 'app:get-info')).toBe(true)
   })
 
-  it('notification.show invokes notifications:create with system target', async () => {
-    const { api, ws } = await loadShim()
-    void api.notification.show('title', 'body')
-    expect(hasMsg(ws, 'notifications:create')).toBe(true)
-  })
-
   it('notifications.create invokes notifications:create', async () => {
     const { api, ws } = await loadShim()
     void api.notifications.create({ type: 'info', title: 'title', message: 'body' })
@@ -662,26 +656,6 @@ describe('electron-api-shim other APIs', () => {
         repoRoot: null,
       })
     ).not.toThrow()
-  })
-
-  it('extensionEvents.onToast subscribes to extension:toast', async () => {
-    const { api, ws } = await loadShim()
-    api.extensionEvents.onToast(vi.fn())
-    expect(hasMsg(ws, 'extension:toast')).toBe(true)
-  })
-
-  it('extensionEvents.onToast dispatches toast payload when event fires', async () => {
-    const { api, ws } = await loadShim()
-    const handler = vi.fn()
-    api.extensionEvents.onToast(handler)
-    ws.onmessage?.({
-      data: JSON.stringify({
-        type: 'event',
-        channel: 'extension:toast',
-        args: [{ type: 'success', message: 'done' }],
-      }),
-    })
-    expect(handler).toHaveBeenCalledWith({ type: 'success', message: 'done' })
   })
 
   it('extensionEvents.onTogglePanel subscribes to extension:toggle-panel', async () => {

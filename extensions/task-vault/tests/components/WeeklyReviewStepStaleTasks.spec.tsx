@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 
 const mockInvoke = vi.fn()
-const mockAddToast = vi.fn()
+const { mockNotify } = vi.hoisted(() => ({ mockNotify: vi.fn() }))
 
 Object.defineProperty(window, 'electronAPI', {
   value: {
@@ -16,8 +16,8 @@ Object.defineProperty(window, 'electronAPI', {
   configurable: true,
 })
 
-vi.mock('../../../../src/renderer/stores/toast.store', () => ({
-  useToastStore: vi.fn(() => ({ addToast: mockAddToast })),
+vi.mock('../../src/utils/notify', () => ({
+  notify: mockNotify,
 }))
 
 import { WeeklyReviewStepStaleTasks } from '../../src/components/WeeklyReviewStepStaleTasks'
@@ -129,9 +129,7 @@ describe('WeeklyReviewStepStaleTasks', () => {
       <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
     )
     fireEvent.click(screen.getByRole('button', { name: /backlog/i }))
-    await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
-    )
+    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('error', expect.any(String)))
     expect(screen.getByText('Backlog fail task')).toBeTruthy()
   })
 
@@ -142,9 +140,7 @@ describe('WeeklyReviewStepStaleTasks', () => {
       <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
     )
     fireEvent.click(screen.getByRole('button', { name: /delete/i }))
-    await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
-    )
+    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('error', expect.any(String)))
     expect(screen.getByText('Delete fail task')).toBeTruthy()
   })
 
@@ -155,9 +151,7 @@ describe('WeeklyReviewStepStaleTasks', () => {
       <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
     )
     fireEvent.click(screen.getByRole('button', { name: /keep/i }))
-    await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
-    )
+    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('error', expect.any(String)))
     expect(screen.getByText('Keep fail task')).toBeTruthy()
   })
 })
