@@ -48,7 +48,10 @@ vi.mock('../../../src/main/logger.js', () => ({
   makeLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }))
 
-import { ExtensionViewHost } from '../../../../src/main/extensions/extension-view-host.js'
+import {
+  ExtensionViewHost,
+  EXTENSION_BASE_CSS,
+} from '../../../../src/main/extensions/extension-view-host.js'
 import type { Extension } from '../../../../src/shared/types/index.js'
 
 function makeMainWindow() {
@@ -281,5 +284,29 @@ describe('ExtensionViewHost', () => {
     // No handleBoundsUpdate call — lastBounds is null
     host.setBottomInset(280)
     expect(mockSetBounds).not.toHaveBeenCalled()
+  })
+})
+
+describe('EXTENSION_BASE_CSS', () => {
+  // Regression test: these tokens are consumed by extension diff/syntax-highlighting
+  // CSS (e.g. git-integration's FileDiffView/syntax-theme.css) but are only defined
+  // in core's own renderer/styles.css — extension webviews never load that file, so
+  // any --tm-* token used by extension CSS must also be defined here or it silently
+  // resolves to nothing (no diff highlight background, no syntax colors).
+  const requiredTokens = [
+    '--tm-diff-added-bg',
+    '--tm-diff-removed-bg',
+    '--tm-syntax-comment',
+    '--tm-syntax-keyword',
+    '--tm-syntax-string',
+    '--tm-syntax-tag',
+    '--tm-syntax-literal',
+    '--tm-syntax-number',
+    '--tm-syntax-title',
+    '--tm-syntax-attribute',
+  ]
+
+  it.each(requiredTokens)('defines %s', (token) => {
+    expect(EXTENSION_BASE_CSS).toMatch(new RegExp(`${token}:\\s*\\S`))
   })
 })

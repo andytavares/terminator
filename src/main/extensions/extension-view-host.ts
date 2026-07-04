@@ -26,6 +26,16 @@ export const EXTENSION_BASE_CSS = `
   --tm-danger: #e05c5c;
   --tm-success: #4ade80;
   --tm-warning: #facc15;
+  --tm-diff-added-bg: rgba(152,195,121,0.12);
+  --tm-diff-removed-bg: rgba(224,108,117,0.12);
+  --tm-syntax-comment: #8585b8;
+  --tm-syntax-keyword: #cf9ee8;
+  --tm-syntax-string: #4ade80;
+  --tm-syntax-tag: #e05c5c;
+  --tm-syntax-literal: #6cc9d9;
+  --tm-syntax-number: #e0a361;
+  --tm-syntax-title: #7fb8f0;
+  --tm-syntax-attribute: #e2c07e;
   --tm-radius-xs: 4px;
   --tm-radius-sm: 6px;
   --tm-radius-md: 10px;
