@@ -469,9 +469,7 @@ export function createExtensionAPI(
     },
     notifications: {
       showToast(type: ToastType, message: string): void {
-        for (const win of BrowserWindow.getAllWindows()) {
-          if (!win.isDestroyed()) win.webContents.send('extension:toast', { type, message })
-        }
+        notificationManager.create({ type, title: message, source: extensionId })
       },
       createNotification(opts: {
         type: ToastType

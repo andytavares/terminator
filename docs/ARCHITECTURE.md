@@ -191,7 +191,7 @@ ExtensionHost.load(directoryPath)
       │           api.topBar.registerMenuItem()     → globalRegistry.topBarItems (v1.1.0)
       │           api.nativeMenu.addViewMenuItem()  → globalRegistry.nativeMenuItems + rebuild (v1.1.0)
       │           api.shell.exec()                  → shell-executor.ts (sandboxed, v1.1.0)
-      │           api.notifications.showToast()     → BrowserWindow.webContents.send (v1.1.0)
+      │           api.notifications.showToast()     → notificationManager (settings-resolved targets, v1.1.0)
       │           api.fs.watch()                    → FsWatcherService handlers (v1.1.0)
       │           api.ipc.registerHandler()         → ipcMain.handle() (v1.1.0)
       │           api.ipc.invokeChannel()           → dispatches to a registered ipcMain handler (v1.4.0)
@@ -319,12 +319,30 @@ All store actions are async — they call IPC first, then update local state onl
 
 ### Notification Model
 
-Two distinct notification systems exist and are intentionally complementary:
+Every notification — core app or extension-originated — goes through one
+main-process dispatcher, `notificationManager.create()`
+(`src/main/notifications/notification-manager.ts`). Callers never choose the
+delivery mechanism: `create()` always resolves it via
+`resolveNotificationTargets()` (`src/shared/notifications/`) against the
+user's global notification settings (Settings → Notifications), with an
+optional per-extension override taking precedence. A notification's type
+(`error`) always forces a toast into the resolved set regardless of
+configuration, so failures can't be silently muted.
 
-- **In-app notification center** (`notification.store.ts` + `notifications:*` IPC, plural): persisted notifications shown in the bell-icon panel. Survives OS notification mute settings.
-- **Native OS notification** (`notification.show` IPC, singular): fires a system-level desktop alert for immediate attention when a terminal session needs attention (bell event).
+Delivery targets, any combination of:
 
-When a bell event fires in a backgrounded terminal session, both systems are triggered: `window.electronAPI.notification.show` (OS) and `useNotificationStore.getState().addNotification` (in-app). This ensures the user sees the signal regardless of OS notification preferences.
+- **System** — a native OS desktop notification (+ critical dock bounce on macOS).
+- **Center** (`notification.store.ts` + `notifications:*` IPC): a persisted entry in the bell-icon panel, surviving reload and OS notification mute settings.
+- **Toast** (`toast.store.ts`): an ephemeral in-window banner.
+
+The renderer never decides this either: core-renderer code calls
+`dispatchNotification()` (`src/renderer/lib/notifications.ts`), which just
+forwards to `notifications:create` over IPC; the existing
+`notifications:push` listener in `App.tsx` renders whatever the resolved
+notification's `targets` say (adding to the center store and/or firing a
+toast). Extensions call `api.notifications.showToast()` /
+`createNotification()`, both of which resolve identically through the same
+dispatcher.
 
 ---
 
