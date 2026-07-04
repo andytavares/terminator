@@ -20,12 +20,13 @@ const mockPrInlineCommentsAPI = vi.fn()
 const mockSessionsForRepoAPI = vi.fn().mockResolvedValue({ sessions: [] })
 const mockActiveReviewsForRepoAPI = vi.fn().mockResolvedValue({ error: 'NOT_FOUND' })
 const mockPruneActiveReviewsAPI = vi.fn().mockResolvedValue({ openNumbers: [] })
+const mockCurrentUserAPI = vi.fn().mockResolvedValue({ login: 'testuser' })
 
 const mockPrIssueCommentsAPI = vi.fn()
 
 vi.mock('../../src/api/github', () => ({
   githubAPI: {
-    currentUser: vi.fn().mockResolvedValue({ login: 'testuser' }),
+    currentUser: (...args: unknown[]) => mockCurrentUserAPI(...args),
     listOpenPrs: (...args: unknown[]) => mockListOpenPrsAPI(...args),
     prReviewDetail: (...args: unknown[]) => mockPrReviewDetailAPI(...args),
     fileMetrics: (...args: unknown[]) => mockFileMetricsAPI(...args),
@@ -82,6 +83,7 @@ const mockSetThreads = vi.fn()
 const mockSetIssueComments = vi.fn()
 const mockUpdateFileRiskScore = vi.fn()
 const mockUpdateQueuePrRisk = vi.fn()
+const mockSetCurrentUserLogin = vi.fn()
 
 // Aliases so test assertions work without changes
 const mockListOpenPrs = mockListOpenPrsAPI
@@ -128,6 +130,7 @@ beforeEach(() => {
     setThreads: mockSetThreads,
     updateFileRiskScore: mockUpdateFileRiskScore,
     updateQueuePrRisk: mockUpdateQueuePrRisk,
+    setCurrentUserLogin: mockSetCurrentUserLogin,
     includeClosedPrs: false,
     activePr: null,
   } as unknown as ReturnType<typeof usePrReviewStore>)
@@ -376,6 +379,109 @@ describe('useLoadPrQueue', () => {
     })
     expect(mockSetLoadingMorePrs).toHaveBeenCalledWith(true)
     expect(mockSetLoadingMorePrs).toHaveBeenCalledWith(false)
+  })
+
+  it('TAV-7: discards a stale response that resolves after a newer request', async () => {
+    // Simulates pasting "049": an earlier query's slower response (e.g. a
+    // broader text search) resolves *after* a later query's faster response
+    // (e.g. the exact PR-number lookup). The stale response must not clobber
+    // the newer, correct result.
+    let resolveStale!: (v: unknown) => void
+    let resolveFresh!: (v: unknown) => void
+    const basePr = {
+      author: 'alice',
+      authorAvatarUrl: '',
+      openedAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat/test',
+      baseRefName: 'main',
+      isDraft: false,
+      ciStatus: 'none' as const,
+      fileCount: 1,
+      additions: 0,
+      deletions: 0,
+      estimatedMinutes: 1,
+      riskLevel: 'low' as const,
+      signalDots: {
+        tests: 'unknown' as const,
+        coverage: 'unknown' as const,
+        ci: 'unknown' as const,
+        lint: 'unknown' as const,
+        churn: 'unknown' as const,
+        blast: 'unknown' as const,
+      },
+      sessionStatus: 'not-started' as const,
+      viewedFileCount: 0,
+    }
+    const stalePr = { ...basePr, number: 50, title: 'Stale match' }
+    const freshPr = { ...basePr, number: 49, title: 'Fresh match' }
+    mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
+    mockActiveReviewsForRepoAPI.mockResolvedValue({ error: 'NOT_FOUND' })
+    mockListOpenPrs
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveStale = resolve
+          })
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFresh = resolve
+          })
+      )
+
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+
+    const staleCall = result.current({ search: '04' })
+    const freshCall = result.current({ search: '049' })
+
+    // Fresh (later-issued) request resolves first...
+    resolveFresh({ prs: [freshPr], hasMore: false, nextCursor: undefined })
+    await act(async () => {
+      await freshCall
+    })
+    // ...then the stale (earlier-issued) request resolves after it.
+    resolveStale({ prs: [stalePr], hasMore: false, nextCursor: undefined })
+    await act(async () => {
+      await staleCall
+    })
+
+    // setQueue must have been called exactly once, with the fresh result —
+    // the stale, later-arriving response must be discarded.
+    expect(mockSetQueue).toHaveBeenCalledTimes(1)
+    expect(mockSetQueue).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ number: 49 })])
+    )
+  })
+
+  it('TAV-7: discards a stale currentUser response for a superseded request', async () => {
+    let resolveStaleUser!: (v: unknown) => void
+    mockCurrentUserAPI
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveStaleUser = resolve
+          })
+      )
+      .mockResolvedValueOnce({ login: 'fresh-user' })
+    mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: false, nextCursor: undefined })
+
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+
+    const staleCall = result.current()
+    const freshCall = result.current()
+    await act(async () => {
+      await freshCall
+    })
+    resolveStaleUser({ login: 'stale-user' })
+    await act(async () => {
+      await staleCall
+    })
+
+    // The superseded (stale) request's currentUser response must not overwrite
+    // the newer request's login.
+    expect(mockSetCurrentUserLogin).not.toHaveBeenCalledWith('stale-user')
+    expect(mockSetCurrentUserLogin).toHaveBeenCalledWith('fresh-user')
   })
 })
 
@@ -832,6 +938,62 @@ describe('useLoadPrQueue — NOT_AUTHENTICATED branch', () => {
     expect(mockSessionsForRepoAPI).toHaveBeenCalledWith('/repo')
     // Queue should be set (with merged session status)
     expect(mockSetQueue).toHaveBeenCalled()
+  })
+
+  it('mergeSessionStatuses: session with pausedAt set marks PR as paused', async () => {
+    mockSessionsForRepoAPI.mockResolvedValue({
+      sessions: [
+        {
+          repoRoot: '/repo',
+          prNumber: 42,
+          headSHA: 'abc123',
+          currentChapterId: null,
+          currentFilePath: null,
+          viewedFiles: ['src/foo.ts'],
+          fileOrderOverrides: {},
+          scrollPosition: null,
+          pausedAt: '2026-01-01T00:00:00Z', // paused
+          lastAccessedAt: '2026-01-01T00:00:00Z',
+        },
+      ],
+    })
+
+    const prData = {
+      number: 42,
+      title: 'Test',
+      author: 'alice',
+      authorAvatarUrl: '',
+      openedAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat/test',
+      baseRefName: 'main',
+      isDraft: false,
+      ciStatus: 'none',
+      fileCount: 1,
+      additions: 0,
+      deletions: 0,
+      estimatedMinutes: 1,
+      riskLevel: 'low',
+      signalDots: {
+        tests: 'unknown',
+        coverage: 'unknown',
+        ci: 'unknown',
+        lint: 'unknown',
+        churn: 'unknown',
+        blast: 'unknown',
+      },
+      sessionStatus: 'not-started',
+      viewedFileCount: 0,
+    }
+
+    mockListOpenPrs.mockResolvedValue({ prs: [prData], hasMore: false })
+
+    const { result } = renderHook(() => useLoadPrQueue('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+
+    const queue = mockSetQueue.mock.calls[0]?.[0] ?? []
+    expect(queue.find((p: { number: number }) => p.number === 42)?.sessionStatus).toBe('paused')
   })
 
   it('mergeSessionStatuses: falls back to original prs on error', async () => {

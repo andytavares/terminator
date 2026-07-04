@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import { githubAPI } from '../api/github'
 import { usePrReviewStore } from '../stores/pr-review.store'
 import {
@@ -119,6 +119,12 @@ export function useLoadPrQueue(repoRoot: string | null) {
     setCurrentUserLogin,
   } = usePrReviewStore()
 
+  // Monotonic request id: guards against an earlier, slower request (e.g. a
+  // stale search query) resolving after a later one and overwriting its
+  // results (TAV-7). Any response whose id no longer matches the latest
+  // issued request is discarded instead of being applied to the store.
+  const latestRequestIdRef = useRef(0)
+
   return useCallback(
     async (options?: {
       cursor?: string
@@ -128,6 +134,8 @@ export function useLoadPrQueue(repoRoot: string | null) {
     }) => {
       if (!repoRoot) return
       const isAppend = Boolean(options?.append)
+      const requestId = ++latestRequestIdRef.current
+      const isStale = () => requestId !== latestRequestIdRef.current
       if (isAppend) {
         setLoadingMorePrs(true)
       } else {
@@ -139,6 +147,7 @@ export function useLoadPrQueue(repoRoot: string | null) {
         githubAPI
           .currentUser(repoRoot)
           .then((res) => {
+            if (isStale()) return
             const login = (res as { login?: string }).login ?? null
             setCurrentUserLogin(login)
           })
@@ -152,6 +161,7 @@ export function useLoadPrQueue(repoRoot: string | null) {
           search: options?.search,
           includeClosedPrs: options?.includeClosedPrs ?? includeClosedPrs,
         })
+        if (isStale()) return
         if ('error' in result) {
           const err = (result as { error: string }).error
           if (err === 'RATE_LIMITED') {
@@ -170,6 +180,7 @@ export function useLoadPrQueue(repoRoot: string | null) {
         const res = result as { prs: unknown[]; hasMore: boolean; nextCursor?: string }
         const prs = parsePrList(res.prs)
         const prsWithStatus = await mergeSessionStatuses(repoRoot, prs, isAppend)
+        if (isStale()) return
         if (isAppend) {
           appendQueue(prsWithStatus)
         } else {
@@ -178,12 +189,14 @@ export function useLoadPrQueue(repoRoot: string | null) {
         setHasMorePrs(res.hasMore)
         setNextPrCursor(res.nextCursor)
       } catch (e) {
-        setQueueError(String(e))
+        if (!isStale()) setQueueError(String(e))
       } finally {
-        if (isAppend) {
-          setLoadingMorePrs(false)
-        } else {
-          setQueueLoading(false)
+        if (!isStale()) {
+          if (isAppend) {
+            setLoadingMorePrs(false)
+          } else {
+            setQueueLoading(false)
+          }
         }
       }
     },
