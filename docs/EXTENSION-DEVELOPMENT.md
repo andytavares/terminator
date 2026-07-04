@@ -782,6 +782,12 @@ api.window.openAuxiliary('my-extension-view', { runId: '123' })
 // The renderer detects the `view` param and renders the corresponding component
 ```
 
+Only one auxiliary window per `view` name is kept open at a time. Calling
+`openAuxiliary` again for a view that's already open re-navigates that window
+with the new params (so it reflects the new context) and focuses it — unless
+you call it with no params, in which case it just focuses the existing window
+as-is without resetting its state.
+
 Use `api.ipc.registerHandler` to back the auxiliary window's data needs.
 
 ---
