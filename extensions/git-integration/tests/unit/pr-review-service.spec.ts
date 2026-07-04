@@ -4,6 +4,9 @@ import {
   detectChangedFiles,
   computeRiskScore,
   parseReviewQueuePR,
+  queueRiskLevel,
+  QUEUE_RISK_HIGH_LINES,
+  QUEUE_RISK_MEDIUM_LINES,
   chapterRiskLevel,
   classifyHunk,
   extractIssueRefs,
@@ -301,9 +304,88 @@ describe('computeRiskScore()', () => {
   })
 })
 
+// ─── queueRiskLevel thresholds ───────────────────────────────────────────────
+
+describe('queueRiskLevel()', () => {
+  it('flags a diff at the high threshold as high risk', () => {
+    expect(queueRiskLevel(QUEUE_RISK_HIGH_LINES)).toBe('high')
+  })
+
+  it('does not flag a diff just below the high threshold as high', () => {
+    expect(queueRiskLevel(QUEUE_RISK_HIGH_LINES - 1)).toBe('medium')
+  })
+
+  it('flags thousands of lines as high risk', () => {
+    expect(queueRiskLevel(3200)).toBe('high')
+  })
+
+  it('classifies a diff at the medium threshold as medium', () => {
+    expect(queueRiskLevel(QUEUE_RISK_MEDIUM_LINES)).toBe('medium')
+  })
+
+  it('classifies a diff just below the medium threshold as low', () => {
+    expect(queueRiskLevel(QUEUE_RISK_MEDIUM_LINES - 1)).toBe('low')
+  })
+
+  it('classifies an empty diff as low', () => {
+    expect(queueRiskLevel(0)).toBe('low')
+  })
+})
+
 // ─── parseReviewQueuePR branches ─────────────────────────────────────────────
 
 describe('parseReviewQueuePR()', () => {
+  it('flags a PR with thousands of lines changed as high risk', () => {
+    const raw = {
+      number: 100,
+      title: 'Huge refactor',
+      author: { login: 'alice', avatarUrl: '' },
+      createdAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat/huge',
+      baseRefName: 'main',
+      isDraft: false,
+      changedFiles: 40,
+      additions: 3000,
+      deletions: 500,
+      statusCheckRollup: [],
+    }
+    expect(parseReviewQueuePR(raw).riskLevel).toBe('high')
+  })
+
+  it('classifies a mid-size PR (150-399 lines) as medium risk', () => {
+    const raw = {
+      number: 102,
+      title: 'Mid-size change',
+      author: { login: 'alice', avatarUrl: '' },
+      createdAt: '2025-01-01T00:00:00Z',
+      headRefName: 'feat/mid',
+      baseRefName: 'main',
+      isDraft: false,
+      changedFiles: 5,
+      additions: 150,
+      deletions: 50,
+      statusCheckRollup: [],
+    }
+    expect(parseReviewQueuePR(raw).riskLevel).toBe('medium')
+  })
+
+  it('leaves a small PR at low risk (so it can still be a quick win)', () => {
+    const raw = {
+      number: 101,
+      title: 'Tiny tweak',
+      author: { login: 'alice', avatarUrl: '' },
+      createdAt: '2025-01-01T00:00:00Z',
+      headRefName: 'fix/typo',
+      baseRefName: 'main',
+      isDraft: false,
+      changedFiles: 1,
+      additions: 5,
+      deletions: 2,
+      statusCheckRollup: [],
+    }
+    expect(parseReviewQueuePR(raw).riskLevel).toBe('low')
+  })
+
   it('parses a PR with no files (uses changedFiles, additions, deletions from root)', () => {
     const raw = {
       number: 1,

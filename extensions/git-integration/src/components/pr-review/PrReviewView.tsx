@@ -7,6 +7,7 @@ import { ReviewDiffPane } from './ReviewDiffPane'
 import { RiskBreakdownPanel } from './RiskBreakdownPanel'
 import { ReviewSubmitPanel } from './ReviewSubmitPanel'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
+import { QUEUE_RISK_HIGH_LINES } from '../../github/pr-review-service'
 import { useResizePanel } from '../../hooks/useResizePanel'
 import { StatusChecksBar } from './StatusChecksBar'
 import type { PrReviewDetail, PrChangedFile } from '../../schemas/pr-review.schema'
@@ -77,7 +78,7 @@ export function PrReviewView({
     .flatMap((c) => c.files)
     .reduce((s, f) => s + f.additions + f.deletions, 0)
   const estimatedReviewMinutes = Math.round((totalLoc / 100) * 25)
-  const isLargePr = totalLoc > 400
+  const isLargePr = totalLoc >= QUEUE_RISK_HIGH_LINES
   const showLargePrBanner = isLargePr && !largePrDismissed
 
   const handleRefresh = async () => {

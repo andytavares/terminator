@@ -174,6 +174,24 @@ export function computeRiskScore(metrics: FileMetrics, allFilesMetrics: FileMetr
   }
 }
 
+// ─── Queue-level (list) risk ────────────────────────────────────────────────────
+
+// The PR list is built before any per-file analysis runs, so it can only score risk
+// from the coarse signals GitHub returns with the list (total lines changed). Large
+// diffs are inherently high-risk/slow to review, so change size alone classifies the
+// list-level risk here; once a PR is opened, the deeper per-file `computeRiskScore`
+// pass refines it via `updateQueuePrRisk`. Thresholds are the total of additions +
+// deletions across the PR. PrReviewView reuses QUEUE_RISK_HIGH_LINES for its
+// "large PR" cognitive-load banner, so the two stay in lockstep.
+export const QUEUE_RISK_HIGH_LINES = 400
+export const QUEUE_RISK_MEDIUM_LINES = 150
+
+export function queueRiskLevel(changeSize: number): 'low' | 'medium' | 'high' {
+  if (changeSize >= QUEUE_RISK_HIGH_LINES) return 'high'
+  if (changeSize >= QUEUE_RISK_MEDIUM_LINES) return 'medium'
+  return 'low'
+}
+
 // ─── Chapter building ─────────────────────────────────────────────────────────
 
 function isLockOrGeneratedFile(name: string): boolean {
@@ -753,7 +771,7 @@ export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
     additions,
     deletions,
     estimatedMinutes: Math.max(1, Math.ceil((additions + deletions) / 60)),
-    riskLevel: 'low',
+    riskLevel: queueRiskLevel(additions + deletions),
     signalDots,
     sessionStatus: 'not-started',
     approvalCount: approvedBy.length,

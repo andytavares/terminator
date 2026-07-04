@@ -13,7 +13,7 @@ import type {
   SignalDots,
   ReviewQueuePR,
 } from '../schemas/pr-review.schema'
-import { computeRiskScore } from '../github/pr-review-service'
+import { computeRiskScore, queueRiskLevel } from '../github/pr-review-service'
 
 // ─── Queue loading ────────────────────────────────────────────────────────────
 
@@ -297,7 +297,7 @@ export function useFetchFileMetrics(repoRoot: string | null) {
       const highCount = riskLevels.filter((l) => l === 'high').length
       const medCount = riskLevels.filter((l) => l === 'medium').length
       const n = riskLevels.length
-      const prRiskLevel: 'low' | 'medium' | 'high' =
+      const fileRiskLevel: 'low' | 'medium' | 'high' =
         highCount > 0
           ? 'high'
           : medCount >= 3 || (n > 0 && medCount / n >= 0.3)
@@ -305,6 +305,16 @@ export function useFetchFileMetrics(repoRoot: string | null) {
             : medCount > 0
               ? 'medium'
               : 'low'
+
+      // Keep the size-based floor from the queue so a large-but-mechanically-simple PR
+      // isn't silently downgraded out of the High-risk filter once it's opened.
+      const totalChangeSize = collected.reduce(
+        (s, c) => s + c.metrics.additions + c.metrics.deletions,
+        0
+      )
+      const rank = { low: 0, medium: 1, high: 2 } as const
+      const sizeFloor = queueRiskLevel(totalChangeSize)
+      const prRiskLevel = rank[sizeFloor] >= rank[fileRiskLevel] ? sizeFloor : fileRiskLevel
 
       const anyMissingTest = collected.some((c) => !c.metrics.testFilePresent)
       const maxChurn = Math.max(...collected.map((c) => c.metrics.churn90d ?? 0))

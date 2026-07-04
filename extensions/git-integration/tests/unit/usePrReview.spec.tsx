@@ -37,23 +37,29 @@ vi.mock('../../src/api/github', () => ({
   },
 }))
 
-vi.mock('../../src/github/pr-review-service', () => ({
-  computeRiskScore: vi.fn().mockReturnValue({
-    level: 'low',
-    composite: 10,
-    dominantDriver: 'changeSize',
-    topImporters: [],
-    importerCount: 0,
-    metrics: {
-      changeSize: 5,
-      churn90d: null,
-      blastRadius: null,
-      testFilePresent: null,
-      complexityDelta: null,
-      patchCoverage: null,
-    },
-  }),
-}))
+vi.mock('../../src/github/pr-review-service', async (importActual) => {
+  const actual = await importActual<typeof import('../../src/github/pr-review-service')>()
+  return {
+    // Keep the real queueRiskLevel + thresholds so the size-floor logic runs for real;
+    // only computeRiskScore (the per-file scorer) is stubbed to a fixed low result.
+    ...actual,
+    computeRiskScore: vi.fn().mockReturnValue({
+      level: 'low',
+      composite: 10,
+      dominantDriver: 'changeSize',
+      topImporters: [],
+      importerCount: 0,
+      metrics: {
+        changeSize: 5,
+        churn90d: null,
+        blastRadius: null,
+        testFilePresent: null,
+        complexityDelta: null,
+        patchCoverage: null,
+      },
+    }),
+  }
+})
 
 vi.mock('../../src/github/pr-review-service-renderer', () => ({
   buildThreads: vi
@@ -569,6 +575,68 @@ describe('useFetchFileMetrics', () => {
     expect(mockFileMetrics).toHaveBeenCalledWith('/repo', 'src/foo.ts')
     expect(mockUpdateFileRiskScore).toHaveBeenCalled()
     expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
+  })
+
+  it('keeps a large but mechanically-simple PR at high risk via the size floor', async () => {
+    const prBigSimple = {
+      ...validActivePr,
+      chapters: [
+        {
+          id: 'ch-1',
+          name: 'Chapter 1',
+          estimatedMinutes: 9,
+          status: 'not-started' as const,
+          files: [
+            {
+              path: 'src/big.ts',
+              oldPath: undefined,
+              changeType: 'modified' as const,
+              additions: 500,
+              deletions: 0,
+              isBinary: false,
+              tier: 1 as const,
+              whyHere: 'changed',
+              estimatedMinutes: 9,
+              riskScore: {
+                level: 'low' as const,
+                composite: 5,
+                dominantDriver: 'changeSize',
+                topImporters: [],
+                importerCount: 0,
+                metrics: {
+                  changeSize: 500,
+                  churn90d: null,
+                  blastRadius: null,
+                  testFilePresent: null,
+                  complexityDelta: null,
+                  patchCoverage: null,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    }
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...vi.mocked(usePrReviewStore)(),
+      activePr: prBigSimple,
+      updateFileRiskScore: mockUpdateFileRiskScore,
+      updateQueuePrRisk: mockUpdateQueuePrRisk,
+    } as unknown as ReturnType<typeof usePrReviewStore>)
+    // Low per-file signals → per-file risk is 'low', but 500 lines changed
+    // must still resolve to 'high' because of the size floor.
+    mockFileMetrics.mockResolvedValue({
+      churn90d: 1,
+      blastRadius: 1,
+      topImporters: [],
+      importerCount: 0,
+      testFilePresent: true,
+    })
+    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
+    await act(async () => {
+      await result.current()
+    })
+    expect(mockUpdateQueuePrRisk).toHaveBeenCalledWith(42, 'high', expect.anything())
   })
 
   it('does nothing when all files are tier-3 (lock files excluded from risk scoring)', async () => {
