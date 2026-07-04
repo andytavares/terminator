@@ -2,14 +2,14 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
-import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { SettingsPanel } from '../../../../src/renderer/components/settings/SettingsPanel'
 
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
   useWorkspaceStore: vi.fn(),
 }))
-vi.mock('../../../../src/renderer/stores/toast.store', () => ({
-  useToastStore: vi.fn(),
+const { mockDispatchNotification } = vi.hoisted(() => ({ mockDispatchNotification: vi.fn() }))
+vi.mock('../../../../src/renderer/lib/notifications', () => ({
+  dispatchNotification: mockDispatchNotification,
 }))
 vi.mock('../../../../src/renderer/components/settings/GlobalSettings', () => ({
   GlobalSettings: () => <div data-testid="global-settings">GlobalSettings</div>,
@@ -20,14 +20,9 @@ vi.mock('../../../../src/renderer/components/settings/WorkspaceSettings', () => 
   ),
 }))
 
-const mockAddToast = vi.fn()
-
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(useWorkspaceStore).mockReturnValue({ activeWorkspaceId: null } as unknown as ReturnType<
-    typeof useWorkspaceStore
-  >)
-  vi.mocked(useToastStore).mockReturnValue({ addToast: mockAddToast } as unknown as ReturnType<
     typeof useWorkspaceStore
   >)
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
@@ -219,7 +214,9 @@ describe('ExtensionsSection', () => {
     await waitFor(() => screen.getByText('Install from Directory'))
     fireEvent.click(screen.getByText('Install from Directory'))
     await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
+      expect(mockDispatchNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error' })
+      )
     )
   })
 
@@ -258,7 +255,9 @@ describe('ExtensionsSection', () => {
     await waitFor(() => screen.getByText('Reload'))
     fireEvent.click(screen.getByText('Reload'))
     await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }))
+      expect(mockDispatchNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'info' })
+      )
     )
   })
 
@@ -275,7 +274,9 @@ describe('ExtensionsSection', () => {
     await waitFor(() => screen.getByText('Reload'))
     fireEvent.click(screen.getByText('Reload'))
     await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
+      expect(mockDispatchNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error' })
+      )
     )
   })
 
@@ -336,7 +337,9 @@ describe('ExtensionsSection', () => {
     await waitFor(() => screen.getByText('Upgrade'))
     fireEvent.click(screen.getByText('Upgrade'))
     await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }))
+      expect(mockDispatchNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'info' })
+      )
     )
   })
 
@@ -359,7 +362,9 @@ describe('ExtensionsSection', () => {
     await waitFor(() => screen.getByText('Upgrade'))
     fireEvent.click(screen.getByText('Upgrade'))
     await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
+      expect(mockDispatchNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error' })
+      )
     )
   })
 
@@ -379,7 +384,9 @@ describe('ExtensionsSection', () => {
     await waitFor(() => screen.getByText('Upgrade'))
     fireEvent.click(screen.getByText('Upgrade'))
     await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
+      expect(mockDispatchNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error' })
+      )
     )
   })
 
@@ -644,7 +651,11 @@ describe('ExtensionsSection', () => {
       await openSettings()
       fireEvent.click(screen.getByText('Do Thing'))
       await waitFor(() =>
-        expect(mockAddToast).toHaveBeenCalledWith({ type: 'success', message: 'Do Thing: done' })
+        expect(mockDispatchNotification).toHaveBeenCalledWith({
+          type: 'success',
+          title: 'Do Thing',
+          message: 'Done',
+        })
       )
     })
 
@@ -654,9 +665,10 @@ describe('ExtensionsSection', () => {
       await openSettings()
       fireEvent.click(screen.getByText('Do Thing'))
       await waitFor(() =>
-        expect(mockAddToast).toHaveBeenCalledWith({
+        expect(mockDispatchNotification).toHaveBeenCalledWith({
           type: 'error',
-          message: 'Do Thing: DB locked',
+          title: 'Do Thing',
+          message: 'DB locked',
         })
       )
     })
@@ -667,9 +679,10 @@ describe('ExtensionsSection', () => {
       await openSettings()
       fireEvent.click(screen.getByText('Do Thing'))
       await waitFor(() =>
-        expect(mockAddToast).toHaveBeenCalledWith({
+        expect(mockDispatchNotification).toHaveBeenCalledWith({
           type: 'error',
-          message: 'Do Thing: IPC failed',
+          title: 'Do Thing',
+          message: 'IPC failed',
         })
       )
     })
@@ -687,9 +700,10 @@ describe('ExtensionsSection', () => {
       await openSettings()
       fireEvent.click(screen.getByText('Do Thing'))
       await waitFor(() =>
-        expect(mockAddToast).toHaveBeenCalledWith({
+        expect(mockDispatchNotification).toHaveBeenCalledWith({
           type: 'warning',
-          message: 'Do Thing: integrity issues — corruption found',
+          title: 'Do Thing',
+          message: 'Integrity issues — corruption found',
         })
       )
     })
@@ -700,7 +714,11 @@ describe('ExtensionsSection', () => {
       await openSettings()
       fireEvent.click(screen.getByText('Do Thing'))
       await waitFor(() =>
-        expect(mockAddToast).toHaveBeenCalledWith({ type: 'success', message: 'Do Thing: done' })
+        expect(mockDispatchNotification).toHaveBeenCalledWith({
+          type: 'success',
+          title: 'Do Thing',
+          message: 'Done',
+        })
       )
     })
 
@@ -858,7 +876,9 @@ describe('ExtensionsSection', () => {
     await waitFor(() => screen.getByText('Uninstall'))
     fireEvent.click(screen.getByText('Uninstall'))
     await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
+      expect(mockDispatchNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error' })
+      )
     )
     vi.unstubAllGlobals()
   })

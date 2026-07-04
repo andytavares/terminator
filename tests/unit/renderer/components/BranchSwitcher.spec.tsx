@@ -2,7 +2,6 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
-import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { BranchSwitcher } from '../../../../src/renderer/components/sidebar/BranchSwitcher'
 
 vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
@@ -10,15 +9,15 @@ vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
     getState: vi.fn().mockReturnValue({ projectsByWorkspaceId: new Map() }),
   }),
 }))
-vi.mock('../../../../src/renderer/stores/toast.store', () => ({
-  useToastStore: vi.fn(),
+const { mockDispatchNotification } = vi.hoisted(() => ({ mockDispatchNotification: vi.fn() }))
+vi.mock('../../../../src/renderer/lib/notifications', () => ({
+  dispatchNotification: mockDispatchNotification,
 }))
 vi.mock('../../../../src/renderer/hooks/useBranchSync', () => ({
   useBranchSync: vi.fn(),
 }))
 
 const mockUpdateProjectBranch = vi.fn()
-const mockAddToast = vi.fn()
 const mockListBranches = vi.fn()
 const mockCheckout = vi.fn()
 
@@ -32,9 +31,6 @@ beforeEach(() => {
   }
   vi.mocked(useWorkspaceStore).mockReturnValue({
     updateProjectBranch: mockUpdateProjectBranch,
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
-  vi.mocked(useToastStore).mockReturnValue({
-    addToast: mockAddToast,
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   mockListBranches.mockResolvedValue({
     branches: [
@@ -145,7 +141,9 @@ describe('BranchSwitcher', () => {
     await waitFor(() => screen.getByText('feature/test'))
     fireEvent.click(screen.getByText('feature/test'))
     await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
+      expect(mockDispatchNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error' })
+      )
     )
   })
 
@@ -227,7 +225,7 @@ describe('BranchSwitcher', () => {
     await waitFor(() => screen.getByText('feature/test'))
     fireEvent.click(screen.getByText('feature/test'))
     await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith(
+      expect(mockDispatchNotification).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'error',
           message: expect.stringContaining('network failure'),

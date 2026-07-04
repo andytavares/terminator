@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { GlobalSettings } from './GlobalSettings'
 import { WorkspaceSettings } from './WorkspaceSettings'
 import { useWorkspaceStore } from '../../stores/workspace.store'
-import { useToastStore } from '../../stores/toast.store'
 import { useModalEffect } from '../../stores/modal.store'
+import { dispatchNotification } from '../../lib/notifications'
 import './SettingsPanel.css'
 
 type Section = 'global' | 'workspace' | 'extensions'
@@ -96,7 +96,6 @@ function ExtensionsSection(): JSX.Element {
   const [schemas, setSchemas] = React.useState<ExtensionSchema[]>([])
   const [settingValues, setSettingValues] = React.useState<Record<string, unknown>>({})
   const [expandedSettings, setExpandedSettings] = React.useState<Set<string>>(new Set())
-  const { addToast } = useToastStore()
 
   React.useEffect(() => {
     window.electronAPI.extension.list().then((r) => setExtensions(r.extensions ?? []))
@@ -116,9 +115,17 @@ function ExtensionsSection(): JSX.Element {
     const installResult = await window.electronAPI.extension.install(result.filePath)
     if ('extension' in installResult) {
       setExtensions((prev) => [...prev, installResult.extension])
-      addToast({ type: 'info', message: `Extension installed. Reload the window to activate it.` })
+      dispatchNotification({
+        type: 'info',
+        title: 'Extension installed',
+        message: 'Reload the window to activate it.',
+      })
     } else {
-      addToast({ type: 'error', message: `Failed to install extension: ${installResult.error}` })
+      dispatchNotification({
+        type: 'error',
+        title: 'Extension install failed',
+        message: installResult.error,
+      })
     }
   }
 
@@ -134,12 +141,17 @@ function ExtensionsSection(): JSX.Element {
     const result = await window.electronAPI.extension.reload(id)
     if ('extension' in result) {
       setExtensions((prev) => prev.map((e) => (e.id === id ? result.extension : e)))
-      addToast({
+      dispatchNotification({
         type: 'info',
-        message: `Extension reloaded. Reload the window to see UI changes.`,
+        title: 'Extension reloaded',
+        message: 'Reload the window to see UI changes.',
       })
     } else {
-      addToast({ type: 'error', message: `Reload failed: ${result.error}` })
+      dispatchNotification({
+        type: 'error',
+        title: 'Extension reload failed',
+        message: result.error,
+      })
     }
   }
 
@@ -148,12 +160,17 @@ function ExtensionsSection(): JSX.Element {
     const result = await window.electronAPI.extension.uninstall(id)
     if ('ok' in result) {
       setExtensions((prev) => prev.filter((e) => e.id !== id))
-      addToast({
+      dispatchNotification({
         type: 'info',
+        title: 'Extension uninstalled',
         message: `"${name}" uninstalled. Reload the window to remove its UI.`,
       })
     } else {
-      addToast({ type: 'error', message: `Uninstall failed: ${result.error}` })
+      dispatchNotification({
+        type: 'error',
+        title: 'Extension uninstall failed',
+        message: result.error,
+      })
     }
   }
 
@@ -179,15 +196,27 @@ function ExtensionsSection(): JSX.Element {
     if ('cancelled' in result) return
     const uninstallResult = await window.electronAPI.extension.uninstall(id)
     if ('error' in uninstallResult) {
-      addToast({ type: 'error', message: `Upgrade failed: ${uninstallResult.error}` })
+      dispatchNotification({
+        type: 'error',
+        title: 'Extension upgrade failed',
+        message: uninstallResult.error,
+      })
       return
     }
     const installResult = await window.electronAPI.extension.install(result.filePath)
     if ('extension' in installResult) {
       setExtensions((prev) => prev.map((e) => (e.id === id ? installResult.extension : e)))
-      addToast({ type: 'info', message: `Extension upgraded. Reload the window to activate.` })
+      dispatchNotification({
+        type: 'info',
+        title: 'Extension upgraded',
+        message: 'Reload the window to activate.',
+      })
     } else {
-      addToast({ type: 'error', message: `Upgrade failed during install: ${installResult.error}` })
+      dispatchNotification({
+        type: 'error',
+        title: 'Extension upgrade failed',
+        message: `Failed during install: ${installResult.error}`,
+      })
     }
   }
 
@@ -270,7 +299,6 @@ function ExtensionsSection(): JSX.Element {
 }
 
 function ActionSettingRow({ def }: { def: SettingPropDef }): JSX.Element {
-  const { addToast } = useToastStore()
   const [busy, setBusy] = React.useState(false)
 
   async function run(): Promise<void> {
@@ -281,16 +309,21 @@ function ActionSettingRow({ def }: { def: SettingPropDef }): JSX.Element {
       const errMsg = (result as { error?: string } | null)?.error
       const integrity = (result as { data?: { integrity?: string } } | null)?.data?.integrity
       if (errMsg) {
-        addToast({ type: 'error', message: `${def.label}: ${errMsg}` })
+        dispatchNotification({ type: 'error', title: def.label, message: errMsg })
       } else if (integrity && integrity !== 'ok') {
-        addToast({ type: 'warning', message: `${def.label}: integrity issues — ${integrity}` })
+        dispatchNotification({
+          type: 'warning',
+          title: def.label,
+          message: `Integrity issues — ${integrity}`,
+        })
       } else {
-        addToast({ type: 'success', message: `${def.label}: done` })
+        dispatchNotification({ type: 'success', title: def.label, message: 'Done' })
       }
     } catch (err) {
-      addToast({
+      dispatchNotification({
         type: 'error',
-        message: `${def.label}: ${err instanceof Error ? err.message : String(err)}`,
+        title: def.label,
+        message: err instanceof Error ? err.message : String(err),
       })
     } finally {
       setBusy(false)

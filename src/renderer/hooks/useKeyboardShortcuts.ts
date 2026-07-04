@@ -4,7 +4,7 @@ import { useSessionStore } from '../stores/session.store'
 import { useTerminalSession } from './useTerminalSession'
 import { useSettingsStore } from '../stores/settings.store'
 import { useExtensionRegistry, matchesAccelerator } from '../extensions/registry'
-import { useToastStore } from '../stores/toast.store'
+import { dispatchNotification } from '../lib/notifications'
 
 interface Options {
   onOpenSettings?: () => void
@@ -46,7 +46,6 @@ export function useKeyboardShortcuts({
   const { createSession, splitSession } = useTerminalSession()
   const { resolveSettings } = useSettingsStore()
   const { keyboardShortcuts } = useExtensionRegistry()
-  const { addToast } = useToastStore()
 
   const effectiveProjectId = scratchProjectId ?? activeProjectId
 
@@ -192,7 +191,12 @@ export function useKeyboardShortcuts({
           const settings = resolveSettings(activeWorkspaceId)
           const cwd = resolveActiveCwd()
           splitSession(activeProjectId, 'vertical', cwd, settings.terminal.scrollbackLimit).catch(
-            () => addToast({ type: 'error', message: 'Could not create split pane' })
+            () =>
+              dispatchNotification({
+                type: 'error',
+                title: 'Split pane failed',
+                message: 'Could not create split pane',
+              })
           )
         }
         return
@@ -205,7 +209,12 @@ export function useKeyboardShortcuts({
           const settings = resolveSettings(activeWorkspaceId)
           const cwd = resolveActiveCwd()
           splitSession(activeProjectId, 'horizontal', cwd, settings.terminal.scrollbackLimit).catch(
-            () => addToast({ type: 'error', message: 'Could not create split pane' })
+            () =>
+              dispatchNotification({
+                type: 'error',
+                title: 'Split pane failed',
+                message: 'Could not create split pane',
+              })
           )
         }
         return
@@ -220,7 +229,11 @@ export function useKeyboardShortcuts({
           if (layout && focusedId) {
             closeSplitLeaf(effectiveProjectId, focusedId)
             closeSession(focusedId).catch(() =>
-              addToast({ type: 'error', message: 'Could not close terminal' })
+              dispatchNotification({
+                type: 'error',
+                title: 'Close terminal failed',
+                message: 'Could not close terminal',
+              })
             )
           } else {
             const activeId = getActiveSessionForProject(effectiveProjectId)
@@ -266,7 +279,6 @@ export function useKeyboardShortcuts({
     getFocusedSession,
     closeSplitLeaf,
     closeSession,
-    addToast,
     onOpenSettings,
     onToggleLog,
     onOpenCommandPalette,
