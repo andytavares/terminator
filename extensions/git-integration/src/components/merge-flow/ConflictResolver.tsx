@@ -71,7 +71,12 @@ export function ConflictResolver({ repoRoot, onBack, onComplete, onStartOver, on
           activeBlock.originalConflictText
         )
         if ('error' in result) {
-          void notificationsAPI.notify('error', 'Could not resolve conflict', result.error)
+          void notificationsAPI.notify(
+            'error',
+            'Could not resolve conflict',
+            'conflictResolveFailed',
+            result.error
+          )
           return
         }
         confirmDecision(activeBlock.blockId, {
@@ -92,7 +97,12 @@ export function ConflictResolver({ repoRoot, onBack, onComplete, onStartOver, on
         // can continue reviewing — setPendingResolution will be cleared below
         setPendingResolution(null)
       } catch (e) {
-        void notificationsAPI.notify('error', 'Could not resolve conflict', String(e))
+        void notificationsAPI.notify(
+          'error',
+          'Could not resolve conflict',
+          'conflictResolveFailed',
+          String(e)
+        )
       }
     },
     [activeBlock, session, repoRoot, confirmDecision, goToNextBlock, onComplete]
@@ -109,10 +119,10 @@ export function ConflictResolver({ repoRoot, onBack, onComplete, onStartOver, on
         decision.originalConflictText
       )
       if ('error' in result) {
-        void notificationsAPI.notify('error', 'Could not undo', result.error)
+        void notificationsAPI.notify('error', 'Could not undo', 'conflictUndoFailed', result.error)
       }
     } catch (e) {
-      void notificationsAPI.notify('error', 'Could not undo', String(e))
+      void notificationsAPI.notify('error', 'Could not undo', 'conflictUndoFailed', String(e))
     }
   }, [undoLastDecision, repoRoot])
 
