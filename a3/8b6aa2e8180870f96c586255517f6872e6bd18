@@ -1,0 +1,70 @@
+tests/unit/renderer/lib/notifications.spec.ts
+  s_f76be9eaf0aff6::t_48c95edd32adac 1-27
+src/renderer/App.tsx
+  s_f76be9eaf0aff6::t_50af980f4d6842 18
+  s_f76be9eaf0aff6::t_493153730dc304 456,458
+  s_f76be9eaf0aff6::t_1018f3eb81d16c 467
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_f76be9eaf0aff6::t_3c934baf776d3e 654-658,670-671,684-685
+  s_f76be9eaf0aff6::t_30a75aa434dfc2 10-12
+  s_f76be9eaf0aff6::t_8c2270446ea1c3 217-219,258-260,277-279,340-342,365-367,387-389,879-881
+  s_f76be9eaf0aff6::t_85b9de77f562ac 705-706,717-721
+  s_f76be9eaf0aff6::t_201fc726c9434c 668,682,703
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_f76be9eaf0aff6::t_7ef8ed5ac0626d 19-20
+  s_f76be9eaf0aff6::t_78ecc72a03079b 279
+src/renderer/components/sidebar/BranchSwitcher.tsx
+  s_f76be9eaf0aff6::t_bf2dee5a37a5ba 6
+  s_f76be9eaf0aff6::t_a5b027555e0404 143-147
+  s_f76be9eaf0aff6::t_7f12f9265d1426 161,163-164
+src/renderer/components/settings/SettingsPanel.tsx
+  s_f76be9eaf0aff6::t_f636360fd051be 199-203,209-213,215-219
+  s_f76be9eaf0aff6::t_cc5b1c66e9d24d 6
+  s_f76be9eaf0aff6::t_3d57fe6d7c2b27 118-122,124-128
+  s_f76be9eaf0aff6::t_63938db0b47561 144,146-147
+  s_f76be9eaf0aff6::t_e4f4590861924b 312,314-318,320,323,325-326
+  s_f76be9eaf0aff6::t_8c2270446ea1c3 150-154
+  s_f76be9eaf0aff6::t_bc5616695e6eef 163,165,169-173
+tests/unit/renderer/hooks/useTerminalSession.spec.tsx
+  s_f76be9eaf0aff6::t_314a8aa2a7fec6 13-15
+  s_f76be9eaf0aff6::t_a037f7660c1eba 322
+  s_f76be9eaf0aff6::t_1150c4644f7fe3 349-353
+  s_f76be9eaf0aff6::t_d37aa436aefdff 412-415,419
+  s_f76be9eaf0aff6::t_0c4efcab6da817 383,387-388
+  s_f76be9eaf0aff6::t_21bbed067390a7 443,475
+src/renderer/lib/notifications.ts
+  s_f76be9eaf0aff6::t_8f74818c7c9168 1-14
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_f76be9eaf0aff6::t_503d4695047cc7 212-217
+  s_f76be9eaf0aff6::t_f29390b3565197 194-199
+  s_f76be9eaf0aff6::t_16ec9760f31145 232-236
+  s_f76be9eaf0aff6::t_b87159fc219b2b 7
+src/renderer/hooks/useTerminalSession.ts
+  s_f76be9eaf0aff6::t_cfec10d6149109 21
+  s_f76be9eaf0aff6::t_fcee288aa00f0c 5
+tests/unit/renderer/components/BranchSwitcher.spec.tsx
+  s_f76be9eaf0aff6::t_a886f9eabcd342 228
+  s_f76be9eaf0aff6::t_d07a7390d287a4 12-14
+  s_f76be9eaf0aff6::t_1f9a3956866002 144-146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "a38b6aa2e8180870f96c586255517f6872e6bd18",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f76be9eaf0aff6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c5890d1-3b53-4ec7-bf4f-ae6a3beefb2a",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
