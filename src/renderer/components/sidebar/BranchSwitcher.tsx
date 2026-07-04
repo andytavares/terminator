@@ -144,6 +144,7 @@ export function BranchSwitcher({
           type: 'error',
           title: 'Branch switch failed',
           message: `Could not switch to "${branch}": ${result.error}`,
+          key: 'branchSwitchFailed',
         })
       } else {
         await updateProjectBranch(project.id, branch)
@@ -162,6 +163,7 @@ export function BranchSwitcher({
         type: 'error',
         title: 'Branch switch failed',
         message: err instanceof Error ? err.message : String(err),
+        key: 'branchSwitchFailed',
       })
     } finally {
       setSwitching(false)

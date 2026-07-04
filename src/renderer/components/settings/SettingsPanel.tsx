@@ -119,12 +119,14 @@ function ExtensionsSection(): JSX.Element {
         type: 'info',
         title: 'Extension installed',
         message: 'Reload the window to activate it.',
+        key: 'extensionInstalled',
       })
     } else {
       dispatchNotification({
         type: 'error',
         title: 'Extension install failed',
         message: installResult.error,
+        key: 'extensionInstallFailed',
       })
     }
   }
@@ -145,12 +147,14 @@ function ExtensionsSection(): JSX.Element {
         type: 'info',
         title: 'Extension reloaded',
         message: 'Reload the window to see UI changes.',
+        key: 'extensionReloaded',
       })
     } else {
       dispatchNotification({
         type: 'error',
         title: 'Extension reload failed',
         message: result.error,
+        key: 'extensionReloadFailed',
       })
     }
   }
@@ -164,12 +168,14 @@ function ExtensionsSection(): JSX.Element {
         type: 'info',
         title: 'Extension uninstalled',
         message: `"${name}" uninstalled. Reload the window to remove its UI.`,
+        key: 'extensionUninstalled',
       })
     } else {
       dispatchNotification({
         type: 'error',
         title: 'Extension uninstall failed',
         message: result.error,
+        key: 'extensionUninstallFailed',
       })
     }
   }
@@ -200,6 +206,7 @@ function ExtensionsSection(): JSX.Element {
         type: 'error',
         title: 'Extension upgrade failed',
         message: uninstallResult.error,
+        key: 'extensionUpgradeFailed',
       })
       return
     }
@@ -210,12 +217,14 @@ function ExtensionsSection(): JSX.Element {
         type: 'info',
         title: 'Extension upgraded',
         message: 'Reload the window to activate.',
+        key: 'extensionUpgraded',
       })
     } else {
       dispatchNotification({
         type: 'error',
         title: 'Extension upgrade failed',
         message: `Failed during install: ${installResult.error}`,
+        key: 'extensionUpgradeFailed',
       })
     }
   }
@@ -309,21 +318,33 @@ function ActionSettingRow({ def }: { def: SettingPropDef }): JSX.Element {
       const errMsg = (result as { error?: string } | null)?.error
       const integrity = (result as { data?: { integrity?: string } } | null)?.data?.integrity
       if (errMsg) {
-        dispatchNotification({ type: 'error', title: def.label, message: errMsg })
+        dispatchNotification({
+          type: 'error',
+          title: def.label,
+          message: errMsg,
+          key: 'extensionSettingAction',
+        })
       } else if (integrity && integrity !== 'ok') {
         dispatchNotification({
           type: 'warning',
           title: def.label,
           message: `Integrity issues — ${integrity}`,
+          key: 'extensionSettingAction',
         })
       } else {
-        dispatchNotification({ type: 'success', title: def.label, message: 'Done' })
+        dispatchNotification({
+          type: 'success',
+          title: def.label,
+          message: 'Done',
+          key: 'extensionSettingAction',
+        })
       }
     } catch (err) {
       dispatchNotification({
         type: 'error',
         title: def.label,
         message: err instanceof Error ? err.message : String(err),
+        key: 'extensionSettingAction',
       })
     } finally {
       setBusy(false)

@@ -655,6 +655,7 @@ describe('ExtensionsSection', () => {
           type: 'success',
           title: 'Do Thing',
           message: 'Done',
+          key: 'extensionSettingAction',
         })
       )
     })
@@ -669,6 +670,7 @@ describe('ExtensionsSection', () => {
           type: 'error',
           title: 'Do Thing',
           message: 'DB locked',
+          key: 'extensionSettingAction',
         })
       )
     })
@@ -683,6 +685,7 @@ describe('ExtensionsSection', () => {
           type: 'error',
           title: 'Do Thing',
           message: 'IPC failed',
+          key: 'extensionSettingAction',
         })
       )
     })
@@ -704,6 +707,7 @@ describe('ExtensionsSection', () => {
           type: 'warning',
           title: 'Do Thing',
           message: 'Integrity issues — corruption found',
+          key: 'extensionSettingAction',
         })
       )
     })
@@ -718,6 +722,7 @@ describe('ExtensionsSection', () => {
           type: 'success',
           title: 'Do Thing',
           message: 'Done',
+          key: 'extensionSettingAction',
         })
       )
     })
