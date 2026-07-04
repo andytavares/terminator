@@ -17,6 +17,7 @@ const MOCK_ISSUES_NODES = [
     identifier: 'ENG-99',
     title: 'Fix login bug',
     url: 'https://linear.app/team/issue/ENG-99',
+    completedAt: new Date('2026-01-01T00:00:00Z'),
   },
 ]
 
@@ -96,6 +97,13 @@ describe('fetchAssignedTickets', () => {
     const { fetchAssignedTickets } = await import('../../src/api/linear.js')
     const tickets = await fetchAssignedTickets('lin-test-key')
     expect(tickets[0].sourceUrl).toBe('https://linear.app/team/issue/ENG-42')
+  })
+
+  it('maps completedAt to a completed boolean', async () => {
+    const { fetchAssignedTickets } = await import('../../src/api/linear.js')
+    const tickets = await fetchAssignedTickets('lin-test-key')
+    expect(tickets[0].completed).toBe(false)
+    expect(tickets[1].completed).toBe(true)
   })
 
   it('constructs LinearClient with the provided api key', async () => {

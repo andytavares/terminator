@@ -154,6 +154,9 @@ export interface Ticket {
   runRef?: string | null
   // The tracker's suggested VCS branch name (Linear provides one per issue).
   branchName?: string | null
+  // Whether the tracker considers this ticket done. Used to auto-advance the
+  // matching card to the "done" board stage (Linear only, for now).
+  completed?: boolean
 }
 
 export interface TicketRef {

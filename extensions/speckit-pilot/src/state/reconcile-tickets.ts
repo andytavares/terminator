@@ -3,6 +3,7 @@ import type { CardSummary, Ticket } from '../types/speckit.types.js'
 
 export interface ReconcileResult {
   created: number
+  completed: number
   error?: string
 }
 
@@ -21,7 +22,7 @@ function identity(source: string, key: string | null): string {
  * so the caller can render without crashing.
  */
 export async function reconcileAssignedTickets(repoRoot: string): Promise<ReconcileResult> {
-  if (!repoRoot) return { created: 0 }
+  if (!repoRoot) return { created: 0, completed: 0 }
 
   const api = getSpeckitAPI()
   const [cardResult, ticketResult] = await Promise.all([
@@ -29,8 +30,8 @@ export async function reconcileAssignedTickets(repoRoot: string): Promise<Reconc
     api.ticketList(),
   ])
 
-  if ('error' in ticketResult) return { created: 0, error: ticketResult.error }
-  if ('error' in cardResult) return { created: 0, error: cardResult.error }
+  if ('error' in ticketResult) return { created: 0, completed: 0, error: ticketResult.error }
+  if ('error' in cardResult) return { created: 0, completed: 0, error: cardResult.error }
 
   const existing = new Set(
     cardResult.cards
@@ -52,7 +53,40 @@ export async function reconcileAssignedTickets(repoRoot: string): Promise<Reconc
     }
   }
 
-  return { created, error }
+  const completed = await advanceCompletedTickets(repoRoot, cardResult.cards, ticketResult.tickets)
+
+  return { created, completed, error }
+}
+
+/**
+ * Auto-advance any card whose linked ticket is now marked done in its tracker
+ * (Linear's completedAt) to the board's "done" stage, so ticket completion
+ * doesn't require a manual drag on the board.
+ */
+async function advanceCompletedTickets(
+  repoRoot: string,
+  cards: CardSummary[],
+  tickets: Ticket[]
+): Promise<number> {
+  const completedTicketKeys = new Set(
+    tickets.filter((t) => t.completed).map((t) => identity(t.source, t.key))
+  )
+  if (completedTicketKeys.size === 0) return 0
+
+  const api = getSpeckitAPI()
+  let completed = 0
+  for (const card of cards) {
+    if (card.stage === 'done') continue
+    if (card.sourceKey == null) continue
+    if (!completedTicketKeys.has(identity(card.source, card.sourceKey))) continue
+    const result = await api.cardMove({
+      featureDir: card.featureDir,
+      workspacePath: repoRoot,
+      toStage: 'done',
+    })
+    if ('ok' in result) completed += 1
+  }
+  return completed
 }
 
 function createCard(repoRoot: string, ticket: Ticket) {
