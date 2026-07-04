@@ -1,0 +1,38 @@
+extensions/git-integration/src/components/pr-review/PrReviewView.tsx
+  s_fc4edc94ae57ea::t_2f16188077a38f 81
+  s_fc4edc94ae57ea::t_6f4c084d5ac845 10
+docs/user-guide/USER-GUIDE.md
+  s_fc4edc94ae57ea::t_6cda640f104c36 315
+extensions/git-integration/tests/unit/usePrReview.spec.tsx
+  s_fc4edc94ae57ea::t_a69a666106c4d0 40-62
+  s_fc4edc94ae57ea::t_68e65f009d5347 580-641
+extensions/git-integration/src/hooks/usePrReview.ts
+  s_fc4edc94ae57ea::t_119ce6593c73f9 16
+  s_fc4edc94ae57ea::t_2abb4a52f58169 300,309-317
+  s_fc4edc94ae57ea::t_d70aad68caff16 318
+extensions/git-integration/tests/unit/pr-review-service.spec.ts
+  s_fc4edc94ae57ea::t_082287f2694c78 355-371
+  s_fc4edc94ae57ea::t_e3a050c8c017b1 307-334,338-354,372-388
+  s_fc4edc94ae57ea::t_5ba7bb71d5f334 7-9
+extensions/git-integration/src/github/pr-review-service.ts
+  s_fc4edc94ae57ea::t_2e352a5de7a4f5 774
+  s_fc4edc94ae57ea::t_fc1a97a88c086b 177-183,187-194
+  s_fc4edc94ae57ea::t_44fc6356a5f663 186
+  s_fc4edc94ae57ea::t_6bccaab18c50b0 184-185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "22089b4f6d800db574af23fe046e3746ee8b3d1e",
+  "prompts": {},
+  "sessions": {
+    "s_fc4edc94ae57ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2eb6eb57-12e6-48d2-a147-a2173f29f5ce",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
