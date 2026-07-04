@@ -1,0 +1,19 @@
+.github/workflows/fill-pr-description.yml
+  s_579d1968486250::t_f8ff56b60807ed 43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "154b48969fc3d1ef892baa83c1863b96338d21ed",
+  "prompts": {},
+  "sessions": {
+    "s_579d1968486250": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d717ba10-b5c1-4ca6-9f04-374af5545b90",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
