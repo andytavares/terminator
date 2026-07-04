@@ -512,6 +512,62 @@ describe('ExtensionsSection', () => {
     expect(screen.getByRole('switch', { name: 'Enable Feature' })).toBeTruthy()
   })
 
+  it('groups per-notification-kind boolean settings into a 4-column table instead of individual switches', async () => {
+    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    const extAPI = window.electronAPI as unknown as {
+      extension: {
+        list: ReturnType<typeof vi.fn>
+        getSettingsSchemas: ReturnType<typeof vi.fn>
+        getSettingsValues: ReturnType<typeof vi.fn>
+        updateSetting: ReturnType<typeof vi.fn>
+      }
+    }
+    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
+    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+      schemas: [
+        {
+          extensionId: 'com.test',
+          label: 'Test Extension',
+          properties: {
+            'com.test.notify.taskCompleted.system': {
+              type: 'boolean',
+              label: 'Task completed → System notification',
+              default: true,
+            },
+            'com.test.notify.taskCompleted.center': {
+              type: 'boolean',
+              label: 'Task completed → In-app notification center',
+              default: true,
+            },
+            'com.test.notify.taskCompleted.toast': {
+              type: 'boolean',
+              label: 'Task completed → Toast',
+              default: true,
+            },
+          },
+        },
+      ],
+    })
+    render(<SettingsPanel onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Extensions'))
+    await waitFor(() => screen.getByTitle('Configure'))
+    fireEvent.click(screen.getByTitle('Configure'))
+
+    // One row for the notification kind, not three separate switch rows
+    await waitFor(() => expect(screen.getByText('Task completed')).toBeTruthy())
+    expect(screen.queryByRole('switch')).toBeNull()
+
+    const checkboxes = screen.getAllByRole('checkbox')
+    expect(checkboxes).toHaveLength(3)
+    fireEvent.click(checkboxes[0])
+    await waitFor(() =>
+      expect(extAPI.extension.updateSetting).toHaveBeenCalledWith(
+        'com.test.notify.taskCompleted.system',
+        false
+      )
+    )
+  })
+
   it('ExtensionSettingRow renders enum select', async () => {
     const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
     const extAPI = window.electronAPI as unknown as {

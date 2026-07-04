@@ -439,6 +439,51 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
+/* Per-notification-kind settings table (4 columns: name + system/center/toast) */
+.notification-settings {
+  padding: 8px 12px;
+}
+
+.notification-settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.notification-settings-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.notification-settings-table th:not(:first-child),
+.notification-settings-table td.notification-settings-table__checkbox-cell {
+  text-align: center;
+}
+
+.notification-settings-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+
+.notification-settings-table tr:last-child td {
+  border-bottom: none;
+}
+
+.notification-settings-table__label {
+  white-space: normal;
+}
+
+.notification-settings-table__checkbox-cell input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
 /* Toggle switch */
 .ext-toggle {
   position: relative;
