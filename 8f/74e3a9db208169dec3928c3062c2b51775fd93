@@ -1,0 +1,81 @@
+tests/unit/schemas/settings.schema.spec.ts
+  s_f76be9eaf0aff6::t_2cf59ff89cf7b0 158,163,168,174-175,183,188,193
+src/main/extensions/api.ts
+  s_f76be9eaf0aff6::t_1ff27881a25410 188-196,201
+  s_f76be9eaf0aff6::t_089aee202a9230 302-327
+  s_f76be9eaf0aff6::t_94f3ecdfb60452 248-252
+  s_f76be9eaf0aff6::t_4cfa2325c6aba5 510-511,517,525
+packages/extension-sdk/types/api.d.ts
+  s_f76be9eaf0aff6::t_08efcf1983552b 170-178,183
+tests/unit/shared/notifications/resolve-targets.spec.ts
+  s_f76be9eaf0aff6::t_2a47d5f032548d 3-4,7,9-11,15-16,22,30,41-43
+  s_f76be9eaf0aff6::t_daa705e7f3a07b 18,23-25,36
+src/main/preload.ts
+  s_f76be9eaf0aff6::t_8a5fe7c4e4f543 216
+src/shared/schemas/settings.schema.ts
+  s_f76be9eaf0aff6::t_248d695322c9df 76
+  s_f76be9eaf0aff6::t_924b76fa3dea2b 25-28,32,34
+src/shared/types/index.ts
+  s_f76be9eaf0aff6::t_da42f67f3ea320 122-123
+src/main/notifications/notification-manager.ts
+  s_f76be9eaf0aff6::t_23405e5238d35d 3,12-31
+  s_f76be9eaf0aff6::t_70a49029d35c64 58-62,69,81-88
+  s_f76be9eaf0aff6::t_827852f29a51e5 89-90
+  s_f76be9eaf0aff6::t_a1260387951890 32
+tests/unit/renderer/components/GlobalSettings.spec.tsx
+  s_f76be9eaf0aff6::t_dd498c0d03d0d6 155-157,162,170,179,182,186,188-190,193,195,198,201
+  s_f76be9eaf0aff6::t_ed31e8b86d578d 19,32,48
+src/renderer/components/settings/GlobalSettings.tsx
+  s_f76be9eaf0aff6::t_18cc5e5ba99303 211-230,232-240
+  s_f76be9eaf0aff6::t_83d0198a2bd833 1,12-32,43
+src/renderer/electron.d.ts
+  s_f76be9eaf0aff6::t_fba13aafc914c0 190
+src/renderer/stores/settings.store.ts
+  s_f76be9eaf0aff6::t_5e6b7790c75f06 29
+  s_f76be9eaf0aff6::t_36dda4cfe49b49 43
+  s_f76be9eaf0aff6::t_23d2eccee5b2ad 184,186
+src/main/preload-webview.ts
+  s_f76be9eaf0aff6::t_cb0ca4d397e79b 177
+tests/unit/notifications/notification-manager.spec.ts
+  s_f76be9eaf0aff6::t_d2f823e1df09a5 35-38,43,47-48,53,64-65,71,79-98,102-103,105,110-112,115-117,127-141,150,157,163,169,178,188,196,203,213,224,231,243,251,261,267-273,288,295,302,308,315,331,343
+src/main/ipc/notification.ipc.ts
+  s_f76be9eaf0aff6::t_d008f0a8e8d9b1 10
+tests/unit/extensions/api.spec.ts
+  s_f76be9eaf0aff6::t_733585a5d022c4 411,423
+  s_f76be9eaf0aff6::t_2aa50e0d24cbc2 133,143
+src/shared/notifications/resolve-targets.ts
+  s_f76be9eaf0aff6::t_11e3140ae9b5f6 4,6,10-18,20-22,24
+src/renderer-remote/electron-api-shim.ts
+  s_f76be9eaf0aff6::t_8bb665139455a3 264
+tests/integration/ipc/notification.ipc.spec.ts
+  s_f76be9eaf0aff6::t_d50cb4760b255a 48,50,57-64,71,78-84
+tests/unit/storage/settings-store.spec.ts
+  s_f76be9eaf0aff6::t_af0b5750542b91 38,49,52,57,60,63-65
+tests/unit/terminal/notification.ipc.spec.ts
+  s_f76be9eaf0aff6::t_2e289cffc02032 46,48,55-61,66-71,75,82,89,92-97
+  s_f76be9eaf0aff6::t_94cc648401c8f6 98
+tests/unit/renderer/stores/settings.store.spec.ts
+  s_f76be9eaf0aff6::t_dbad3ad12ec947 30
+  s_f76be9eaf0aff6::t_1b8a4bd38a0075 282,294-295,300,305,307,315,319,321
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "8f74e3a9db208169dec3928c3062c2b51775fd93",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f76be9eaf0aff6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c5890d1-3b53-4ec7-bf4f-ae6a3beefb2a",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
