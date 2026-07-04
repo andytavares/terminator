@@ -8,6 +8,37 @@ import { registerExportIpcHandlers } from './ipc/export.ipc'
 import { registerDiagramsIpcHandlers } from './ipc/diagrams.ipc'
 import { registerDiagramCommentsIpcHandlers } from './ipc/diagram-comments.ipc'
 import { registerFoldersIpcHandlers } from './ipc/folders.ipc'
+import type { SettingDefinition } from '../../../src/main/extensions/api'
+
+// Every notification kind this extension ever raises, so the user can
+// independently choose its delivery target(s) (system/in-app/toast) in this
+// extension's own settings — core never knows these keys exist (Extension Isolation).
+const NOTIFICATION_KEYS: { key: string; label: string }[] = [
+  { key: 'schemaInitFailed', label: 'Database schema failed to apply' },
+  { key: 'globalShortcutTaken', label: 'Global quick-create shortcut unavailable' },
+]
+
+function buildNotificationSettingProperties(): Record<string, SettingDefinition> {
+  const properties: Record<string, SettingDefinition> = {}
+  for (const { key, label } of NOTIFICATION_KEYS) {
+    properties[`terminator.notepad.notify.${key}.system`] = {
+      type: 'boolean',
+      label: `${label} → System notification`,
+      default: true,
+    }
+    properties[`terminator.notepad.notify.${key}.center`] = {
+      type: 'boolean',
+      label: `${label} → In-app notification center`,
+      default: true,
+    }
+    properties[`terminator.notepad.notify.${key}.toast`] = {
+      type: 'boolean',
+      label: `${label} → Toast`,
+      default: true,
+    }
+  }
+  return properties
+}
 
 const disposables: Disposable[] = []
 let _pendingQuickCreate = false
@@ -21,7 +52,8 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     console.error('[notepad] Failed to initialize schema:', err)
     api.notifications.showToast(
       'error',
-      'Notepad: database schema failed to apply. Restart the app — if the problem persists, check the logs.'
+      'Notepad: database schema failed to apply. Restart the app — if the problem persists, check the logs.',
+      'schemaInitFailed'
     )
   }
 
@@ -132,6 +164,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
           description: 'Let agents read/search notes',
           default: false,
         },
+        ...buildNotificationSettingProperties(),
       },
     })
   )
@@ -168,7 +201,8 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   } catch {
     api.notifications.showToast(
       'warning',
-      'Notepad: Could not register Cmd+Shift+N globally — use in-app shortcut instead'
+      'Notepad: Could not register Cmd+Shift+N globally — use in-app shortcut instead',
+      'globalShortcutTaken'
     )
   }
 

@@ -1,4 +1,4 @@
-import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
+import type { ExtensionAPI, Disposable, SettingDefinition } from '../../../src/main/extensions/api'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type {
@@ -593,7 +593,11 @@ async function advanceQueue(api: ExtensionAPI, workspacePath: string): Promise<v
       })
       api.window.broadcast('speckit:state-changed', { state: s })
     } catch (err) {
-      api.notifications.showToast('error', `Could not start queued card: ${String(err)}`)
+      api.notifications.showToast(
+        'error',
+        `Could not start queued card: ${String(err)}`,
+        'startQueuedCardFailed'
+      )
     }
   }
 }
@@ -631,6 +635,44 @@ async function checkArtifacts(
     result[phase] = exists
   }
   return result
+}
+
+// Every notification kind this extension ever raises, so the user can
+// independently choose its delivery target(s) (system/in-app/toast) in this
+// extension's own settings — core never knows these keys exist (Extension Isolation).
+const NOTIFICATION_KEYS: { key: string; label: string }[] = [
+  { key: 'startQueuedCardFailed', label: 'Could not start queued card' },
+  { key: 'createCardFailed', label: 'Could not create card' },
+  { key: 'moveCardFailed', label: 'Could not move card' },
+  { key: 'handoffFailed', label: 'Handoff failed' },
+  { key: 'fetchTicketsFailed', label: 'Could not fetch tickets' },
+  { key: 'saveCredentialsFailed', label: 'Could not save credentials' },
+  { key: 'dispatchFailed', label: 'Dispatch failed' },
+  { key: 'cancelFailed', label: 'Cancel failed' },
+  { key: 'resetFailed', label: 'Reset failed' },
+  { key: 'openPrFailed', label: 'Open PR failed' },
+]
+
+function buildNotificationSettingProperties(): Record<string, SettingDefinition> {
+  const properties: Record<string, SettingDefinition> = {}
+  for (const { key, label } of NOTIFICATION_KEYS) {
+    properties[`terminator.speckit-pilot.notify.${key}.system`] = {
+      type: 'boolean',
+      label: `${label} → System notification`,
+      default: true,
+    }
+    properties[`terminator.speckit-pilot.notify.${key}.center`] = {
+      type: 'boolean',
+      label: `${label} → In-app notification center`,
+      default: true,
+    }
+    properties[`terminator.speckit-pilot.notify.${key}.toast`] = {
+      type: 'boolean',
+      label: `${label} → Toast`,
+      default: true,
+    }
+  }
+  return properties
 }
 
 export function activate(api: ExtensionAPI): void {
@@ -695,7 +737,11 @@ export function activate(api: ExtensionAPI): void {
       api.window.broadcast('speckit:state-changed', { state })
       return { featureDir }
     } catch (err) {
-      api.notifications.showToast('error', `Could not create card: ${String(err)}`)
+      api.notifications.showToast(
+        'error',
+        `Could not create card: ${String(err)}`,
+        'createCardFailed'
+      )
       return { error: String(err) }
     }
   })
@@ -829,7 +875,7 @@ export function activate(api: ExtensionAPI): void {
       if (toStage === 'backlog' && runActive) await advanceQueue(api, workspacePath)
       return { ok: true }
     } catch (err) {
-      api.notifications.showToast('error', `Could not move card: ${String(err)}`)
+      api.notifications.showToast('error', `Could not move card: ${String(err)}`, 'moveCardFailed')
       return { error: String(err) }
     }
   })
@@ -846,7 +892,7 @@ export function activate(api: ExtensionAPI): void {
     try {
       return await handoffCard(api, featureDir, workspacePath, baseBranch, mode)
     } catch (err) {
-      api.notifications.showToast('error', `Handoff failed: ${String(err)}`)
+      api.notifications.showToast('error', `Handoff failed: ${String(err)}`, 'handoffFailed')
       return { error: String(err) }
     }
   })
@@ -1332,7 +1378,11 @@ export function activate(api: ExtensionAPI): void {
       const tickets = results.flat()
       return { tickets }
     } catch (err) {
-      api.notifications.showToast('error', `Could not fetch tickets: ${String(err)}`)
+      api.notifications.showToast(
+        'error',
+        `Could not fetch tickets: ${String(err)}`,
+        'fetchTicketsFailed'
+      )
       return { error: String(err) }
     }
   })
@@ -1360,7 +1410,11 @@ export function activate(api: ExtensionAPI): void {
       }
       return { ok: true }
     } catch (err) {
-      api.notifications.showToast('error', `Could not save credentials: ${String(err)}`)
+      api.notifications.showToast(
+        'error',
+        `Could not save credentials: ${String(err)}`,
+        'saveCredentialsFailed'
+      )
       return { error: String(err) }
     }
   })
@@ -1488,7 +1542,7 @@ export function activate(api: ExtensionAPI): void {
       api.window.broadcast('speckit:state-changed', { state })
       return { featureDir, queued: false }
     } catch (err) {
-      api.notifications.showToast('error', `Dispatch failed: ${String(err)}`)
+      api.notifications.showToast('error', `Dispatch failed: ${String(err)}`, 'dispatchFailed')
       return { error: String(err) }
     }
   })
@@ -1560,7 +1614,7 @@ export function activate(api: ExtensionAPI): void {
       if (workspacePath) await advanceQueue(api, workspacePath)
       return { ok: true }
     } catch (err) {
-      api.notifications.showToast('error', `Cancel failed: ${String(err)}`)
+      api.notifications.showToast('error', `Cancel failed: ${String(err)}`, 'cancelFailed')
       return { error: String(err) }
     }
   })
@@ -1639,7 +1693,7 @@ export function activate(api: ExtensionAPI): void {
       if (workspacePath) await advanceQueue(api, workspacePath)
       return { ok: true, state }
     } catch (err) {
-      api.notifications.showToast('error', `Reset failed: ${String(err)}`)
+      api.notifications.showToast('error', `Reset failed: ${String(err)}`, 'resetFailed')
       return { error: String(err) }
     }
   })
@@ -1785,7 +1839,7 @@ export function activate(api: ExtensionAPI): void {
       await advanceQueue(api, workspacePath)
       return { prUrl }
     } catch (err) {
-      api.notifications.showToast('error', `Open PR failed: ${String(err)}`)
+      api.notifications.showToast('error', `Open PR failed: ${String(err)}`, 'openPrFailed')
       return { error: String(err) }
     }
   })
@@ -1974,6 +2028,7 @@ export function activate(api: ExtensionAPI): void {
           label: 'Days to keep persisted step logs',
           default: 30,
         },
+        ...buildNotificationSettingProperties(),
       },
     })
   )
