@@ -1,0 +1,62 @@
+extensions/task-vault/src/components/DailyLog.tsx
+  s_f76be9eaf0aff6::t_27bf2c084d9272 899
+  s_f76be9eaf0aff6::t_bfea72828fd7ef 908
+  s_f76be9eaf0aff6::t_3198ca935f9579 801-803,838-840,851-852
+  s_f76be9eaf0aff6::t_16d319262a674f 198
+  s_f76be9eaf0aff6::t_39caba112050ec 853,861-863
+  s_f76be9eaf0aff6::t_e7a0d4dbc0592b 820-824
+  s_f76be9eaf0aff6::t_d037a67695b3a5 888
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_f76be9eaf0aff6::t_46b0fb08e6a472 352
+  s_f76be9eaf0aff6::t_7d4338d5afd2c9 752
+  s_f76be9eaf0aff6::t_0c417a445736cf 1151
+extensions/task-vault/tests/utils/notify.spec.ts
+  s_f76be9eaf0aff6::t_4a1411ca9eff85 35,41,49,54,57-58,63,70
+extensions/task-vault/tests/components/WeeklyReviewStepStaleTasks.spec.tsx
+  s_f76be9eaf0aff6::t_eea8e21c2994fe 145-147
+  s_f76be9eaf0aff6::t_69f4bdc49a588b 132-134
+  s_f76be9eaf0aff6::t_32758921d39bcf 158-160
+extensions/task-vault/src/utils/notify.ts
+  s_f76be9eaf0aff6::t_6985cfea5d5f27 9-15,26
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_f76be9eaf0aff6::t_e82f14b7179872 468
+  s_f76be9eaf0aff6::t_4cf54aec30592b 496
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_f76be9eaf0aff6::t_0f73b91f0fcea5 167
+  s_f76be9eaf0aff6::t_1a07e0a5da3719 1523
+  s_f76be9eaf0aff6::t_41ab496661092c 1509
+extensions/task-vault/src/notifications/task-scheduler.ts
+  s_f76be9eaf0aff6::t_9a650775a2aece 205
+  s_f76be9eaf0aff6::t_dcf7a6e94edb67 146
+extensions/task-vault/src/index.ts
+  s_f76be9eaf0aff6::t_abfc986595174d 133
+  s_f76be9eaf0aff6::t_f6bac25db81380 194-195
+  s_f76be9eaf0aff6::t_5b49d11812948a 294-298
+  s_f76be9eaf0aff6::t_688acb307f4c11 278-279
+  s_f76be9eaf0aff6::t_c7344649e8d05a 12-60
+extensions/task-vault/src/components/WeeklyReviewStepStaleTasks.tsx
+  s_f76be9eaf0aff6::t_5521f9adce67f1 39
+  s_f76be9eaf0aff6::t_e8fca158a323a5 28
+  s_f76be9eaf0aff6::t_66692b4f5f4ec8 51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "ab7f5dbb1b699508d24e66b86ae472fdf063c809",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f76be9eaf0aff6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c5890d1-3b53-4ec7-bf4f-ae6a3beefb2a",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
