@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { handleChannel } from './channel-registrar.js'
 import type { BrowserWindow } from 'electron'
 import { z } from 'zod'
 import fs from 'node:fs/promises'
@@ -13,19 +13,19 @@ export function registerFsHandlers(getMainWindow: () => BrowserWindow | null): v
     if (win && !win.isDestroyed()) win.webContents.send('fs:changed', event)
   })
 
-  ipcMain.handle('fs:watch-start', (_event, payload) => {
+  handleChannel('fs:watch-start', (_event, payload) => {
     const parsed = WatchStartSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     fsWatcherService.watchStart(parsed.data.projectRoot)
     return { ok: true }
   })
 
-  ipcMain.handle('fs:watch-stop', () => {
+  handleChannel('fs:watch-stop', () => {
     fsWatcherService.watchStop()
     return { ok: true }
   })
 
-  ipcMain.handle('fs:read-file', async (_event, payload) => {
+  handleChannel('fs:read-file', async (_event, payload) => {
     const parsed = ReadFileSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     try {

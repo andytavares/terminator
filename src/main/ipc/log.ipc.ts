@@ -1,8 +1,8 @@
-import { ipcMain } from 'electron'
+import { onChannel } from './channel-registrar.js'
 import { writeFromRenderer, type LogLevel } from '../logger.js'
 
 export function registerLogHandlers(): void {
-  ipcMain.on(
+  onChannel(
     'log:write',
     (_event, payload: { level: LogLevel; namespace: string; message: string }) => {
       const { level, namespace, message } = payload ?? {}

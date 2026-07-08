@@ -239,7 +239,8 @@ export interface ExtensionAPI {
   }
 }
 
-import { BrowserWindow, ipcMain, globalShortcut as electronGlobalShortcut } from 'electron'
+import { handleChannel, removeChannel } from '../ipc/channel-registrar.js'
+import { BrowserWindow, globalShortcut as electronGlobalShortcut } from 'electron'
 import { EXTENSION_BASE_CSS } from './extension-view-host.js'
 import { join } from 'path'
 
@@ -578,8 +579,8 @@ export function createExtensionAPI(
         channel: string,
         handler: (payload: unknown) => Promise<unknown> | unknown
       ): Disposable {
-        ipcMain.handle(channel, (_event, payload) => handler(payload))
-        return disposable(() => ipcMain.removeHandler(channel))
+        handleChannel(channel, (_event, payload) => handler(payload))
+        return disposable(() => removeChannel(channel))
       },
       async invokeChannel(channel: string, payload: unknown): Promise<unknown> {
         const entry = deps?.bridge?.invokeRegistry.get(channel)

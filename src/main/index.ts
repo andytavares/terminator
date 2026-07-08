@@ -1,3 +1,4 @@
+import { handleChannel, onChannel } from './ipc/channel-registrar.js'
 import { app, BrowserWindow, ipcMain, dialog, Menu, shell, net, session, protocol } from 'electron'
 import { join } from 'path'
 import { registerWorkspaceHandlers } from './ipc/workspace.ipc.js'
@@ -27,8 +28,11 @@ import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
 import { runLegacyMigration } from './db/migrate.js'
 import { globalRegistry, setMenuRebuildCallback } from './extensions/api.js'
 
-// Intercept ipcMain.handle/on to capture handlers into the bridge registry
-// so the remote-control extension bridge can dispatch IPC calls from browser clients.
+// Compatibility capture: core code and the ExtensionAPI register channels through
+// channel-registrar.ts, which records them in the bridge registry directly. This
+// interception remains ONLY for extensions that still call ipcMain.handle/on
+// themselves (notepad, task-vault) so their channels stay dispatchable by the
+// remote bridge. It is removed once those extensions register via api.ipc.
 
 const _origHandle = ipcMain.handle.bind(ipcMain)
 const _origOn = ipcMain.on.bind(ipcMain)
@@ -247,7 +251,7 @@ function registerAppHandlers(): void {
     }
   )
 
-  ipcMain.handle('app:get-info', () => ({
+  handleChannel('app:get-info', () => ({
     appName: app.getName(),
     version: app.getVersion(),
     electronVersion: process.versions.electron,
@@ -258,7 +262,7 @@ function registerAppHandlers(): void {
 }
 
 function registerDialogHandlers(): void {
-  ipcMain.handle('dialog:open-directory', async () => {
+  handleChannel('dialog:open-directory', async () => {
     if (!mainWindow) return { cancelled: true }
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openDirectory'],
@@ -337,7 +341,7 @@ app.whenReady().then(async () => {
   >()
   const creatingViews = new Set<string>()
 
-  ipcMain.handle(
+  handleChannel(
     'extension:update-panel-bounds',
     async (_event, { extensionId, viewParam, bounds, visible, repoRoot }) => {
       const viewKey = `${extensionId}:${viewParam}`
@@ -372,11 +376,11 @@ app.whenReady().then(async () => {
     }
   )
 
-  ipcMain.on('extension:set-bottom-inset', (_event, { inset }: { inset: number }) => {
+  onChannel('extension:set-bottom-inset', (_event, { inset }: { inset: number }) => {
     viewHost?.setBottomInset(inset)
   })
 
-  ipcMain.on('workspace:active-changed', (_event, data) => {
+  onChannel('workspace:active-changed', (_event, data) => {
     viewHost?.broadcastToAll('workspace:changed', data)
   })
   registerGitHandlers()

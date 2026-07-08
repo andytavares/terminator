@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { handleChannel } from './channel-registrar.js'
 import { z } from 'zod'
 import {
   isGitRepo,
@@ -16,7 +16,7 @@ import {
 const PathSchema = z.object({ path: z.string().min(1) })
 
 export function registerGitHandlers(): void {
-  ipcMain.handle('git:is-repo', async (_event, payload) => {
+  handleChannel('git:is-repo', async (_event, payload) => {
     const parsed = PathSchema.safeParse(payload)
     if (!parsed.success) return { isRepo: false }
     try {
@@ -29,7 +29,7 @@ export function registerGitHandlers(): void {
     }
   })
 
-  ipcMain.handle('git:current-branch', async (_event, payload) => {
+  handleChannel('git:current-branch', async (_event, payload) => {
     const parsed = PathSchema.safeParse(payload)
     if (!parsed.success) return { error: 'INVALID_PATH' }
     try {
@@ -40,7 +40,7 @@ export function registerGitHandlers(): void {
     }
   })
 
-  ipcMain.handle('git:list-branches', async (_event, payload) => {
+  handleChannel('git:list-branches', async (_event, payload) => {
     const parsed = PathSchema.safeParse(payload)
     if (!parsed.success) return { branches: [] }
     try {
@@ -51,7 +51,7 @@ export function registerGitHandlers(): void {
     }
   })
 
-  ipcMain.handle('git:checkout', async (_event, payload) => {
+  handleChannel('git:checkout', async (_event, payload) => {
     const schema = z.object({ path: z.string().min(1), branch: z.string().min(1) })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
@@ -63,7 +63,7 @@ export function registerGitHandlers(): void {
     }
   })
 
-  ipcMain.handle('git:create-branch', async (_event, payload) => {
+  handleChannel('git:create-branch', async (_event, payload) => {
     const schema = z.object({ path: z.string().min(1), branch: z.string().min(1) })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
@@ -75,7 +75,7 @@ export function registerGitHandlers(): void {
     }
   })
 
-  ipcMain.handle('git:suggest-worktree-path', async (_event, payload) => {
+  handleChannel('git:suggest-worktree-path', async (_event, payload) => {
     const schema = z.object({
       repoRoot: z.string().min(1),
       branch: z.string().min(1),
@@ -88,7 +88,7 @@ export function registerGitHandlers(): void {
     }
   })
 
-  ipcMain.handle('git:create-worktree', async (_event, payload) => {
+  handleChannel('git:create-worktree', async (_event, payload) => {
     const schema = z.object({
       repoRoot: z.string().min(1),
       worktreePath: z.string().min(1),
@@ -110,7 +110,7 @@ export function registerGitHandlers(): void {
     }
   })
 
-  ipcMain.handle('git:remove-worktree', async (_event, payload) => {
+  handleChannel('git:remove-worktree', async (_event, payload) => {
     const schema = z.object({ repoRoot: z.string().min(1), worktreePath: z.string().min(1) })
     const parsed = schema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
@@ -122,7 +122,7 @@ export function registerGitHandlers(): void {
     }
   })
 
-  ipcMain.handle('git:list-worktrees', async (_event, payload) => {
+  handleChannel('git:list-worktrees', async (_event, payload) => {
     const parsed = PathSchema.safeParse(payload)
     if (!parsed.success) return { worktrees: [] }
     try {

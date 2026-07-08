@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { handleChannel, onChannel } from './channel-registrar.js'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { homedir } from 'os'
@@ -39,7 +39,7 @@ export function registerTerminalHandlers(
   ptyManager: PtyManager,
   getWindow: () => BrowserWindow | null
 ): void {
-  ipcMain.handle('terminal:create', (_event, payload) => {
+  handleChannel('terminal:create', (_event, payload) => {
     const parsed = CreateTerminalSchema.safeParse(payload)
     if (!parsed.success) {
       return { error: 'VALIDATION_ERROR', message: parsed.error.message }
@@ -73,37 +73,37 @@ export function registerTerminalHandlers(
     return { sessionId }
   })
 
-  ipcMain.handle('terminal:list-sessions', () => {
+  handleChannel('terminal:list-sessions', () => {
     return Array.from(activeSessionRegistry.values())
   })
 
-  ipcMain.handle('terminal:close', (_event, { sessionId }) => {
+  handleChannel('terminal:close', (_event, { sessionId }) => {
     activeSessionRegistry.delete(sessionId)
     ptyManager.kill(sessionId)
     return { success: true }
   })
 
-  ipcMain.on('terminal:input', (_event, payload) => {
+  onChannel('terminal:input', (_event, payload) => {
     const parsed = TerminalInputSchema.safeParse(payload)
     if (parsed.success) {
       ptyManager.write(parsed.data.sessionId, parsed.data.data)
     }
   })
 
-  ipcMain.on('terminal:resize', (_event, payload) => {
+  onChannel('terminal:resize', (_event, payload) => {
     const parsed = TerminalResizeSchema.safeParse(payload)
     if (parsed.success) {
       ptyManager.resize(parsed.data.sessionId, parsed.data.cols, parsed.data.rows)
     }
   })
 
-  ipcMain.handle('terminal:close-all', async () => {
+  handleChannel('terminal:close-all', async () => {
     const count = ptyManager.getSessionIds().length
     await ptyManager.killAll()
     return { terminatedCount: count }
   })
 
-  ipcMain.handle('terminal:cleanup-orphans', () => {
+  handleChannel('terminal:cleanup-orphans', () => {
     return ptyManager.cleanupOrphans()
   })
 }

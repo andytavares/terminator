@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { handleChannel } from './channel-registrar.js'
 import { z } from 'zod'
 import { notificationManager } from '../notifications/notification-manager'
 
@@ -17,25 +17,25 @@ const TriggerActionSchema = z.object({
 })
 
 export function registerNotificationHandlers(): void {
-  ipcMain.handle('notifications:create', (_event, payload: unknown) => {
+  handleChannel('notifications:create', (_event, payload: unknown) => {
     const parsed = CreateSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR', message: parsed.error.message }
     const id = notificationManager.create(parsed.data)
     return { id }
   })
 
-  ipcMain.handle('notifications:list', () => {
+  handleChannel('notifications:list', () => {
     return notificationManager.list()
   })
 
-  ipcMain.handle('notifications:dismiss', (_event, payload: unknown) => {
+  handleChannel('notifications:dismiss', (_event, payload: unknown) => {
     const parsed = DismissSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR', message: parsed.error.message }
     notificationManager.dismiss(parsed.data.id)
     return { ok: true }
   })
 
-  ipcMain.handle('notifications:trigger-action', (_event, payload: unknown) => {
+  handleChannel('notifications:trigger-action', (_event, payload: unknown) => {
     const parsed = TriggerActionSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR', message: parsed.error.message }
     return notificationManager.triggerAction(parsed.data.notifId, parsed.data.actionId)

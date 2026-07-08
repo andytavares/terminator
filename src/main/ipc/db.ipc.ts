@@ -1,8 +1,8 @@
-import { ipcMain } from 'electron'
+import { handleChannel } from './channel-registrar.js'
 import { healthCheck } from '../db/index.js'
 
 export function registerDbIpcHandlers(): void {
-  ipcMain.handle('db:health', async () => {
+  handleChannel('db:health', async () => {
     try {
       return await healthCheck()
     } catch (err) {
