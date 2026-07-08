@@ -1,0 +1,37 @@
+src/shared/electron-api/__tests__/manifest.spec.ts
+  s_08902e443a9840::t_70b13711d8ab07 1-131
+src/shared/electron-api/__tests__/build-api.spec.ts
+  s_08902e443a9840::t_15394a0c5449e6 1-147
+src/main/preload.ts
+  s_08902e443a9840::t_3d4a251120bb25 2-11,32-59
+src/main/remote/__tests__/remote-accessible-channels.spec.ts
+  s_08902e443a9840::t_b67eafb3a7fad9 3,5-9,12-17,28-30,35-44
+  s_08902e443a9840::t_3974a441b23619 45-46
+tests/unit/renderer-remote/electron-api-shim.spec.ts
+  s_08902e443a9840::t_8d129991d768f4 718,723
+  s_08902e443a9840::t_ad3571053e5fe6 765,775,785,795
+src/main/remote/remote-accessible-channels.ts
+  s_08902e443a9840::t_02e5c548bc4675 1-2,4-10,12-15,24,26
+src/shared/electron-api/build-api.ts
+  s_08902e443a9840::t_d20732acb75c7c 1-81
+src/shared/electron-api/manifest.ts
+  s_08902e443a9840::t_d163149f57d6a2 1-489
+src/renderer-remote/electron-api-shim.ts
+  s_08902e443a9840::t_3403a3e38e8215 3-7,137-140,144-152,156-160,163
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "b8220cfe8d3449dd893c626772c68ad32129fa88",
+  "prompts": {},
+  "sessions": {
+    "s_08902e443a9840": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a0afc34-4f92-4bff-9395-8510afc8fba3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
