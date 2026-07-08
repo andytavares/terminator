@@ -1,0 +1,23 @@
+extensions/remote-control/src/server/session-store.ts
+  s_08902e443a9840::t_8f7df0a3a63f1c 1-68
+extensions/remote-control/tests/unit/session-store.spec.ts
+  s_08902e443a9840::t_9143df3e257bc2 1-61
+extensions/remote-control/src/server/remote-server.ts
+  s_08902e443a9840::t_fc8898b552799c 14,159,161-170,175-178,187,192,239,246,260,267,321-322,345-346,355-356
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "6172a5448b871b77bd8195c32dd50f1ac48bd4d6",
+  "prompts": {},
+  "sessions": {
+    "s_08902e443a9840": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a0afc34-4f92-4bff-9395-8510afc8fba3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
