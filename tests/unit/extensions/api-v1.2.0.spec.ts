@@ -406,8 +406,21 @@ describe('api.ipc bridge channels', () => {
 // ── pty ──────────────────────────────────────────────────────────────────────
 
 describe('api.pty', () => {
+  const sessionInfo = {
+    sessionId: 's1',
+    cwd: '/cwd',
+    type: 'human' as const,
+    origin: 'app' as const,
+    createdAt: 't',
+    pid: 1,
+  }
   const mockPtyManager = {
     spawn: vi.fn(() => 'session-xyz'),
+    spawnSession: vi.fn(() => sessionInfo),
+    onData: vi.fn(() => () => {}),
+    onExit: vi.fn(() => () => {}),
+    getSession: vi.fn(() => sessionInfo),
+    setWorkspace: vi.fn(() => true),
     write: vi.fn(),
     resize: vi.fn(),
     kill: vi.fn(),
@@ -415,6 +428,53 @@ describe('api.pty', () => {
     attachOnData: vi.fn(() => () => {}),
     attachOnExit: vi.fn(() => () => {}),
   }
+
+  describe('session authority surface (v1.4.0)', () => {
+    it('spawnSession delegates and returns the session info', () => {
+      const api = createExtensionAPI('test.pty10', '0.1.0', { ptyManager: mockPtyManager })
+      const opts = {
+        sessionId: 's1',
+        cwd: '/cwd',
+        shell: '/bin/zsh',
+        type: 'human' as const,
+        origin: 'remote' as const,
+      }
+      expect(api.pty.spawnSession(opts)).toEqual(sessionInfo)
+      expect(mockPtyManager.spawnSession).toHaveBeenCalledWith(opts)
+    })
+
+    it('spawnSession throws without a ptyManager in context', () => {
+      const api = createExtensionAPI('test.pty11', '0.1.0', {})
+      expect(() =>
+        api.pty.spawnSession({
+          sessionId: 's',
+          cwd: '/',
+          shell: '/bin/sh',
+          type: 'human',
+          origin: 'app',
+        })
+      ).toThrow('PTY access not available')
+    })
+
+    it('onData/onExit delegate and fall back to null without a ptyManager', () => {
+      const api = createExtensionAPI('test.pty12', '0.1.0', { ptyManager: mockPtyManager })
+      expect(api.pty.onData('s1', vi.fn())).toBeTypeOf('function')
+      expect(api.pty.onExit('s1', vi.fn())).toBeTypeOf('function')
+      const bare = createExtensionAPI('test.pty13', '0.1.0', {})
+      expect(bare.pty.onData('s1', vi.fn())).toBeNull()
+      expect(bare.pty.onExit('s1', vi.fn())).toBeNull()
+    })
+
+    it('getSession and setWorkspace delegate, defaulting without a ptyManager', () => {
+      const api = createExtensionAPI('test.pty14', '0.1.0', { ptyManager: mockPtyManager })
+      expect(api.pty.getSession('s1')).toEqual(sessionInfo)
+      expect(api.pty.setWorkspace('s1', 'ws-1')).toBe(true)
+      expect(mockPtyManager.setWorkspace).toHaveBeenCalledWith('s1', 'ws-1')
+      const bare = createExtensionAPI('test.pty15', '0.1.0', {})
+      expect(bare.pty.getSession('s1')).toBeUndefined()
+      expect(bare.pty.setWorkspace('s1', 'ws-1')).toBe(false)
+    })
+  })
 
   describe('with ptyManager', () => {
     it('spawn delegates to ptyManager.spawn', () => {

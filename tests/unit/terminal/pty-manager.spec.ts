@@ -246,8 +246,8 @@ describe('PtyManager', () => {
     expect(result).toHaveLength(2)
     expect(result).toEqual(
       expect.arrayContaining([
-        { sessionId: 's1', cwd: '/home/user' },
-        { sessionId: 's2', cwd: '/tmp' },
+        expect.objectContaining({ sessionId: 's1', cwd: '/home/user' }),
+        expect.objectContaining({ sessionId: 's2', cwd: '/tmp' }),
       ])
     )
   })
@@ -280,5 +280,140 @@ describe('PtyManager', () => {
     const mgr = new PtyManager()
     const result = mgr.attachOnData('no-such', vi.fn())
     expect(result).toBeNull()
+  })
+})
+
+describe('PtyManager session authority (spawnSession)', () => {
+  let capturedDataCb: ((data: string) => void) | null
+  let capturedExitCb: ((args: { exitCode: number }) => void) | null
+
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+    capturedDataCb = null
+    capturedExitCb = null
+    mockPty.onData.mockImplementation((cb: (data: string) => void) => {
+      capturedDataCb = cb
+      return { dispose: vi.fn() }
+    })
+    mockPty.onExit.mockImplementation((cb: (args: { exitCode: number }) => void) => {
+      capturedExitCb = cb
+      return { dispose: vi.fn() }
+    })
+  })
+
+  async function makeManager() {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    return new PtyManager()
+  }
+
+  it('spawnSession records metadata and returns the session info', async () => {
+    const mgr = await makeManager()
+    const info = mgr.spawnSession({
+      sessionId: 's-app',
+      cwd: '/repo',
+      shell: '/bin/zsh',
+      type: 'human',
+      origin: 'app',
+      projectId: 'proj-1',
+      tabTitle: 'Terminal 1',
+    })
+    expect(info).toMatchObject({
+      sessionId: 's-app',
+      cwd: '/repo',
+      type: 'human',
+      origin: 'app',
+      projectId: 'proj-1',
+      tabTitle: 'Terminal 1',
+      pid: 12345,
+    })
+    expect(info.createdAt).toBeTruthy()
+    expect(mgr.getSession('s-app')).toMatchObject({ sessionId: 's-app', origin: 'app' })
+  })
+
+  it('fans data out to every onData subscriber and disposes independently', async () => {
+    const mgr = await makeManager()
+    mgr.spawnSession({ sessionId: 's1', cwd: '/', shell: '/bin/sh', type: 'human', origin: 'app' })
+    const a = vi.fn()
+    const b = vi.fn()
+    const disposeA = mgr.onData('s1', a)!
+    mgr.onData('s1', b)
+    capturedDataCb!('hello')
+    expect(a).toHaveBeenCalledWith('hello')
+    expect(b).toHaveBeenCalledWith('hello')
+    disposeA()
+    capturedDataCb!('again')
+    expect(a).toHaveBeenCalledTimes(1)
+    expect(b).toHaveBeenCalledTimes(2)
+  })
+
+  it('fans exit out to every onExit subscriber and removes the session first', async () => {
+    const mgr = await makeManager()
+    mgr.spawnSession({
+      sessionId: 's2',
+      cwd: '/',
+      shell: '/bin/sh',
+      type: 'agent',
+      origin: 'remote',
+    })
+    const seenDuringExit: boolean[] = []
+    mgr.onExit('s2', () => seenDuringExit.push(mgr.getSession('s2') !== undefined))
+    const exit2 = vi.fn()
+    mgr.onExit('s2', exit2)
+    capturedExitCb!({ exitCode: 3 })
+    expect(exit2).toHaveBeenCalledWith(3)
+    expect(seenDuringExit).toEqual([false])
+    expect(mgr.getSession('s2')).toBeUndefined()
+  })
+
+  it('onData and onExit return null for unknown sessions', async () => {
+    const mgr = await makeManager()
+    expect(mgr.onData('nope', vi.fn())).toBeNull()
+    expect(mgr.onExit('nope', vi.fn())).toBeNull()
+  })
+
+  it('setWorkspace stamps and clears workspace metadata', async () => {
+    const mgr = await makeManager()
+    mgr.spawnSession({
+      sessionId: 's3',
+      cwd: '/',
+      shell: '/bin/sh',
+      type: 'human',
+      origin: 'remote',
+    })
+    expect(mgr.setWorkspace('s3', 'ws-9')).toBe(true)
+    expect(mgr.getSession('s3')?.workspaceId).toBe('ws-9')
+    expect(mgr.setWorkspace('s3', null)).toBe(true)
+    expect(mgr.getSession('s3')?.workspaceId).toBeUndefined()
+    expect(mgr.setWorkspace('unknown', 'ws-9')).toBe(false)
+  })
+
+  it('listSessions exposes the full session info', async () => {
+    const mgr = await makeManager()
+    mgr.spawnSession({ sessionId: 'sa', cwd: '/a', shell: '/bin/sh', type: 'human', origin: 'app' })
+    mgr.spawnSession({
+      sessionId: 'sr',
+      cwd: '/r',
+      shell: '/bin/sh',
+      type: 'agent',
+      origin: 'remote',
+    })
+    const origins = mgr.listSessions().map((s) => [s.sessionId, s.origin])
+    expect(origins).toEqual([
+      ['sa', 'app'],
+      ['sr', 'remote'],
+    ])
+  })
+
+  it('legacy spawn() delegates to spawnSession with app origin and wires callbacks', async () => {
+    const mgr = await makeManager()
+    const onData = vi.fn()
+    const onExit = vi.fn()
+    mgr.spawn('legacy', '/l', '/bin/sh', 'human', onData, onExit)
+    expect(mgr.getSession('legacy')?.origin).toBe('app')
+    capturedDataCb!('out')
+    expect(onData).toHaveBeenCalledWith('out')
+    capturedExitCb!({ exitCode: 0 })
+    expect(onExit).toHaveBeenCalledWith(0)
   })
 })

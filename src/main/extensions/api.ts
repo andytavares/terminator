@@ -112,7 +112,32 @@ export interface ProjectSnapshot {
   readonly name: string
 }
 
+export type SessionOrigin = 'app' | 'remote'
+
+export interface SpawnSessionOptions {
+  sessionId: string
+  cwd: string
+  shell: string
+  type: 'human' | 'agent'
+  origin: SessionOrigin
+  projectId?: string
+  tabTitle?: string
+}
+
+export interface SessionInfo {
+  sessionId: string
+  cwd: string
+  type: 'human' | 'agent'
+  origin: SessionOrigin
+  createdAt: string
+  pid: number
+  projectId?: string
+  tabTitle?: string
+  workspaceId?: string
+}
+
 export interface PtyManagerAPI {
+  /** @deprecated since v1.4.0 — use spawnSession() plus onData()/onExit(). */
   spawn(
     sessionId: string,
     cwd: string,
@@ -121,11 +146,23 @@ export interface PtyManagerAPI {
     onData: (data: string) => void,
     onExit: (exitCode: number) => void
   ): string
+  /** v1.4.0 — spawn with metadata; subscribe output/exit separately via onData/onExit. */
+  spawnSession(opts: SpawnSessionOptions): SessionInfo
+  /** v1.4.0 — multi-subscriber output fan-out. Returns a disposer, or null if unknown. */
+  onData(sessionId: string, listener: (data: string) => void): (() => void) | null
+  /** v1.4.0 — multi-subscriber exit fan-out. Listeners fire after the session is removed. */
+  onExit(sessionId: string, listener: (exitCode: number) => void): (() => void) | null
+  /** v1.4.0 */
+  getSession(sessionId: string): SessionInfo | undefined
+  /** v1.4.0 — stamps workspace metadata on the session (null clears it). */
+  setWorkspace(sessionId: string, workspaceId: string | null): boolean
   write(sessionId: string, data: string): void
   resize(sessionId: string, cols: number, rows: number): void
   kill(sessionId: string): void
-  listSessions(): Array<{ sessionId: string; cwd: string }>
+  listSessions(): SessionInfo[]
+  /** @deprecated since v1.4.0 — alias of onData(). */
   attachOnData(sessionId: string, onData: (data: string) => void): (() => void) | null
+  /** @deprecated since v1.4.0 — alias of onExit(). */
   attachOnExit(sessionId: string, onExit: (exitCode: number) => void): (() => void) | null
 }
 
@@ -629,6 +666,22 @@ export function createExtensionAPI(
       spawn(sessionId, cwd, shell, type, onData, onExit) {
         if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
         return deps.ptyManager.spawn(sessionId, cwd, shell, type, onData, onExit)
+      },
+      spawnSession(opts) {
+        if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
+        return deps.ptyManager.spawnSession(opts)
+      },
+      onData(sessionId, listener) {
+        return deps?.ptyManager?.onData(sessionId, listener) ?? null
+      },
+      onExit(sessionId, listener) {
+        return deps?.ptyManager?.onExit(sessionId, listener) ?? null
+      },
+      getSession(sessionId) {
+        return deps?.ptyManager?.getSession(sessionId)
+      },
+      setWorkspace(sessionId, workspaceId) {
+        return deps?.ptyManager?.setWorkspace(sessionId, workspaceId) ?? false
       },
       write(sessionId, data) {
         deps?.ptyManager?.write(sessionId, data)

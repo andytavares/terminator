@@ -26,15 +26,8 @@ const TerminalResizeSchema = z.object({
   rows: z.number().int().positive(),
 })
 
-interface ActiveSessionMeta {
-  sessionId: string
-  projectId: string
-  tabTitle: string
-  type: 'human' | 'agent'
-}
-
-const activeSessionRegistry = new Map<string, ActiveSessionMeta>()
-
+// PtyManager owns session state (see ADR-024); this layer only translates IPC
+// payloads and relays output/exit pushes to the renderer window.
 export function registerTerminalHandlers(
   ptyManager: PtyManager,
   getWindow: () => BrowserWindow | null
@@ -51,34 +44,36 @@ export function registerTerminalHandlers(
     const sessionId = randomUUID()
     const resolvedCwd = cwd === '~' ? homedir() : cwd
 
-    activeSessionRegistry.set(sessionId, { sessionId, projectId, tabTitle, type })
-
-    ptyManager.spawn(
+    ptyManager.spawnSession({
       sessionId,
-      resolvedCwd,
-      defaultShell,
+      cwd: resolvedCwd,
+      shell: defaultShell,
       type,
-      (data) => {
-        const win = getWindow()
-        if (win && !win.isDestroyed()) win.webContents.send('terminal:output', { sessionId, data })
-      },
-      (exitCode) => {
-        activeSessionRegistry.delete(sessionId)
-        const win = getWindow()
-        if (win && !win.isDestroyed())
-          win.webContents.send('terminal:process-exit', { sessionId, exitCode })
-      }
-    )
+      origin: 'app',
+      projectId,
+      tabTitle,
+    })
+    ptyManager.onData(sessionId, (data) => {
+      const win = getWindow()
+      if (win && !win.isDestroyed()) win.webContents.send('terminal:output', { sessionId, data })
+    })
+    ptyManager.onExit(sessionId, (exitCode) => {
+      const win = getWindow()
+      if (win && !win.isDestroyed())
+        win.webContents.send('terminal:process-exit', { sessionId, exitCode })
+    })
 
     return { sessionId }
   })
 
   handleChannel('terminal:list-sessions', () => {
-    return Array.from(activeSessionRegistry.values())
+    return ptyManager
+      .listSessions()
+      .filter((s) => s.origin === 'app')
+      .map(({ sessionId, projectId, tabTitle, type }) => ({ sessionId, projectId, tabTitle, type }))
   })
 
   handleChannel('terminal:close', (_event, { sessionId }) => {
-    activeSessionRegistry.delete(sessionId)
     ptyManager.kill(sessionId)
     return { success: true }
   })

@@ -57,12 +57,31 @@ describe('RemoteServer', () => {
     ReturnType<typeof import('../../src/server/remote-server').createRemoteServer>
   >
 
+  // Minimal stateful fake of the v1.4.0 session-authority PtyManagerAPI
+  const ptySessions = new Map<string, Record<string, unknown>>()
   const mockPtyManager = {
-    spawn: vi.fn(),
+    spawnSession: vi.fn(
+      (opts: { sessionId: string; cwd: string; type: string; origin: string }) => {
+        const info = { ...opts, createdAt: new Date().toISOString(), pid: 1 }
+        ptySessions.set(opts.sessionId, info)
+        return { ...info }
+      }
+    ),
+    onData: vi.fn((id: string) => (ptySessions.has(id) ? () => {} : null)),
+    onExit: vi.fn((id: string) => (ptySessions.has(id) ? () => {} : null)),
+    getSession: vi.fn((id: string) => ptySessions.get(id)),
+    setWorkspace: vi.fn((id: string, ws: string | null) => {
+      const info = ptySessions.get(id)
+      if (!info) return false
+      info.workspaceId = ws ?? undefined
+      return true
+    }),
     write: vi.fn(),
-    kill: vi.fn(),
+    kill: vi.fn((id: string) => {
+      ptySessions.delete(id)
+    }),
     resize: vi.fn(),
-    getSessionIds: vi.fn(() => []),
+    listSessions: vi.fn(() => [...ptySessions.values()]),
   }
 
   const mockOnPortInUse = vi.fn()
@@ -91,6 +110,7 @@ describe('RemoteServer', () => {
 
   afterEach(async () => {
     await remoteServer.stop()
+    ptySessions.clear()
     vi.resetModules()
     vi.clearAllMocks()
   })

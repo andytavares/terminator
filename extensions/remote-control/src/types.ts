@@ -1,18 +1,40 @@
+export type SessionOrigin = 'app' | 'remote'
+
+export interface SpawnSessionOptions {
+  sessionId: string
+  cwd: string
+  shell: string
+  type: 'human' | 'agent'
+  origin: SessionOrigin
+  projectId?: string
+  tabTitle?: string
+}
+
+export interface SessionInfo {
+  sessionId: string
+  cwd: string
+  type: 'human' | 'agent'
+  origin: SessionOrigin
+  createdAt: string
+  pid: number
+  projectId?: string
+  tabTitle?: string
+  workspaceId?: string
+}
+
+// Mirrors the v1.4.0 session-authority surface of the core PtyManagerAPI
+// (ExtensionAPI contract). PtyManager owns all session state; this extension
+// keeps no session registry of its own.
 export interface PtyManagerAPI {
-  spawn(
-    sessionId: string,
-    cwd: string,
-    shell: string,
-    type: 'human' | 'agent',
-    onData: (data: string) => void,
-    onExit: (code: number | null) => void
-  ): string
+  spawnSession(opts: SpawnSessionOptions): SessionInfo
+  onData(sessionId: string, listener: (data: string) => void): (() => void) | null
+  onExit(sessionId: string, listener: (exitCode: number) => void): (() => void) | null
+  getSession(sessionId: string): SessionInfo | undefined
+  setWorkspace(sessionId: string, workspaceId: string | null): boolean
   write(sessionId: string, data: string): void
   resize(sessionId: string, cols: number, rows: number): void
   kill(sessionId: string): void
-  listSessions(): Array<{ sessionId: string; cwd: string }>
-  attachOnData(sessionId: string, onData: (data: string) => void): (() => void) | null
-  attachOnExit(sessionId: string, onExit: (exitCode: number) => void): (() => void) | null
+  listSessions(): SessionInfo[]
 }
 
 export interface WorkspaceSnapshot {
