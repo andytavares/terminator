@@ -1,0 +1,106 @@
+tests/unit/extensions/api.spec.ts
+  s_08902e443a9840::t_73e269f754ea4a 75
+  s_08902e443a9840::t_58ceacf6de4b6f 479-495
+extensions/notepad/tests/unit/ipc/diagrams.ipc.spec.ts
+  s_08902e443a9840::t_22496fe038bebe 8-24,288,296
+extensions/notepad/tests/unit/ipc/diagram-comments.ipc.spec.ts
+  s_08902e443a9840::t_22496fe038bebe 8-24,201
+  s_08902e443a9840::t_20c74dac003ba9 178-199
+extensions/notepad/src/ipc/diagram-comments.ipc.ts
+  s_08902e443a9840::t_cedf359ed882b1 5-6,153-155,159,162,166
+  s_08902e443a9840::t_5411d54dcc9591 158
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_08902e443a9840::t_22496fe038bebe 13-21,46
+extensions/notepad/src/index.ts
+  s_08902e443a9840::t_abd6d47bed2e36 59,62,65,68,71,74,101,104,107,116
+extensions/notepad/src/ipc/register.ts
+  s_08902e443a9840::t_24c61bd6d2ee6b 1-19
+extensions/task-vault/tests/ipc/links.ipc.spec.ts
+  s_08902e443a9840::t_22496fe038bebe 12-19,23,54,249
+  s_08902e443a9840::t_5411d54dcc9591 20-22
+extensions/task-vault/src/ipc/links.ipc.ts
+  s_08902e443a9840::t_cedf359ed882b1 1-2,10-11,13-14,16,23,61,102,124
+extensions/notepad/src/ipc/folders.ipc.ts
+  s_08902e443a9840::t_cedf359ed882b1 4-5,126-134
+extensions/notepad/src/ipc/notes.ipc.ts
+  s_08902e443a9840::t_cedf359ed882b1 4-5,313-317,319,348-359
+extensions/task-vault/tests/ipc/capture.ipc.spec.ts
+  s_08902e443a9840::t_22496fe038bebe 26-34,77
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_08902e443a9840::t_cedf359ed882b1 3,99,101-102,104,111,235,264,309,350,429,467,567,597,616,628,657,677,696,745,782,828,906,916,960,981,1017,1106,1145,1165,1189,1217,1238,1258,1331,1368,1386,1403,1411,1421
+extensions/task-vault/tests/ipc/projects.ipc.spec.ts
+  s_08902e443a9840::t_22496fe038bebe 16-23,27,58,103,266,435
+  s_08902e443a9840::t_5411d54dcc9591 24-26
+extensions/task-vault/src/ipc/kanban.ipc.ts
+  s_08902e443a9840::t_5411d54dcc9591 63-69,71,124-137,139
+  s_08902e443a9840::t_cedf359ed882b1 2-3,53-55,73,111,141
+extensions/task-vault/tests/ipc/kanban.ipc.spec.ts
+  s_08902e443a9840::t_22496fe038bebe 12-19,23,57,67,79,96,105,118,128,152,175,197,208,218,226,248,260,275,285
+  s_08902e443a9840::t_5411d54dcc9591 20-22
+extensions/notepad/tests/unit/ipc/folders.ipc.spec.ts
+  s_08902e443a9840::t_22496fe038bebe 10-25,287
+  s_08902e443a9840::t_20c74dac003ba9 250-285
+tests/unit/extensions/api-v1.2.0.spec.ts
+  s_08902e443a9840::t_004837b3f0d90f 371-373,375-376,388-392,395,401-402
+docs/adr/023-channel-manifest-and-declared-remote-access.md
+  s_08902e443a9840::t_b97c4cf75db477 1-65
+extensions/notepad/src/ipc/diagrams.ipc.ts
+  s_08902e443a9840::t_cedf359ed882b1 4-5,227-231,233-234,236
+  s_08902e443a9840::t_5411d54dcc9591 232,235
+extensions/task-vault/src/ipc/register.ts
+  s_08902e443a9840::t_d5462161dd65fe 1-19
+extensions/notepad/src/ipc/search.ipc.ts
+  s_08902e443a9840::t_cedf359ed882b1 3-4,159-160,163
+  s_08902e443a9840::t_5411d54dcc9591 161
+docs/EXTENSION-DEVELOPMENT.md
+  s_08902e443a9840::t_cfeecf84016828 388-395
+extensions/task-vault/src/ipc/admin.ipc.ts
+  s_08902e443a9840::t_cedf359ed882b1 1-2,6-8,19,55
+  s_08902e443a9840::t_5411d54dcc9591 36-46,48-51,53
+src/main/index.ts
+  s_08902e443a9840::t_4b4429f3884844 2
+  s_08902e443a9840::t_eeada516a1e1a5 20,25-28
+extensions/notepad/tests/unit/ipc/notes.ipc.spec.ts
+  s_08902e443a9840::t_22496fe038bebe 3-18,294,445,454,469,490
+extensions/task-vault/src/ipc/projects.ipc.ts
+  s_08902e443a9840::t_cedf359ed882b1 1-2,22-23,25-26,28,35,138,173,200,231,260,276,299
+extensions/notepad/tests/unit/ipc/search.ipc.spec.ts
+  s_08902e443a9840::t_22496fe038bebe 3-18,75,200
+extensions/notepad/src/ipc/export.ipc.ts
+  s_08902e443a9840::t_5411d54dcc9591 289,291
+  s_08902e443a9840::t_cedf359ed882b1 1,9-10,279-281,293
+extensions/task-vault/src/index.ts
+  s_08902e443a9840::t_abd6d47bed2e36 1,138,149,167,171,173,175,177
+src/main/extensions/api.ts
+  s_08902e443a9840::t_66dcbaefe2bc02 221-225,228-229
+  s_08902e443a9840::t_6b9339df428deb 586-587,589-591
+  s_08902e443a9840::t_07c309bd4dcbee 600-601,603-607
+extensions/notepad/src/ipc/comments.ipc.ts
+  s_08902e443a9840::t_cedf359ed882b1 6-7,179,191,193,196
+extensions/notepad/tests/unit/ipc/export.ipc.spec.ts
+  s_08902e443a9840::t_20c74dac003ba9 343-377
+  s_08902e443a9840::t_22496fe038bebe 3-18,379,386
+extensions/task-vault/tests/ipc/admin.ipc.spec.ts
+  s_08902e443a9840::t_5411d54dcc9591 20-22
+  s_08902e443a9840::t_22496fe038bebe 12-19,23,60,68,79,89,100,111,121,131,142,151,161,170,179,189
+extensions/task-vault/tests/ipc/inbox.ipc.spec.ts
+  s_08902e443a9840::t_22496fe038bebe 26-34,81
+extensions/notepad/tests/unit/ipc/comments.ipc.spec.ts
+  s_08902e443a9840::t_22496fe038bebe 3-18,64,352
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "fe520496f9c38c61c363d23600a776d5355ee7bf",
+  "prompts": {},
+  "sessions": {
+    "s_08902e443a9840": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a0afc34-4f92-4bff-9395-8510afc8fba3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
