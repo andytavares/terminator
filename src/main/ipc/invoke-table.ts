@@ -19,7 +19,7 @@ export interface InvokeSpec<S extends z.ZodType = z.ZodType> {
 
 /** Identity helper so each table row infers its own schema's payload type. */
 export function invokeSpec<S extends z.ZodType>(spec: InvokeSpec<S>): InvokeSpec {
-  return spec as InvokeSpec
+  return spec as unknown as InvokeSpec
 }
 
 export function registerInvokeTable(specs: ReadonlyArray<InvokeSpec>): void {

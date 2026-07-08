@@ -210,7 +210,7 @@ function setupMenu(): void {
 setMenuRebuildCallback(setupMenu)
 
 function registerAppHandlers(): void {
-  _origOn(
+  onChannel(
     'menu:set-panel-checked',
     (_event, { panelId, open }: { panelId: string; open: boolean }) => {
       const menuItemId = globalRegistry.panelMenuItemIds.get(panelId)

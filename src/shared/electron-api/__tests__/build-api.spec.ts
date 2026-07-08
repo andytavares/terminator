@@ -1,27 +1,26 @@
 import { describe, it, expect, vi } from 'vitest'
 import { buildElectronApi, type ApiTransport } from '../build-api.js'
 
-interface FakeTransport extends ApiTransport {
-  invoke: ReturnType<typeof vi.fn>
-  send: ReturnType<typeof vi.fn>
-  subscribe: ReturnType<typeof vi.fn>
-  push(channel: string, ...args: unknown[]): void
-}
-
-function makeTransport(): FakeTransport {
+function makeTransport() {
   const listeners = new Map<string, Set<(args: unknown[]) => void>>()
+  // Typed vi.fn implementations so the object structurally satisfies ApiTransport.
+  const invoke = vi.fn(async (_channel: string, _payload?: unknown): Promise<unknown> => undefined)
+  const send = vi.fn((_channel: string, _payload?: unknown): void => {})
+  const subscribe = vi.fn((channel: string, listener: (args: unknown[]) => void) => {
+    if (!listeners.has(channel)) listeners.set(channel, new Set())
+    listeners.get(channel)!.add(listener)
+    return () => {
+      listeners.get(channel)!.delete(listener)
+    }
+  })
   return {
-    invoke: vi.fn().mockResolvedValue(undefined),
-    send: vi.fn(),
-    subscribe: vi.fn((channel: string, listener: (args: unknown[]) => void) => {
-      if (!listeners.has(channel)) listeners.set(channel, new Set())
-      listeners.get(channel)!.add(listener)
-      return () => listeners.get(channel)!.delete(listener)
-    }),
+    invoke,
+    send,
+    subscribe,
     push(channel: string, ...args: unknown[]) {
       listeners.get(channel)?.forEach((l) => l(args))
     },
-  }
+  } satisfies ApiTransport & { push: (channel: string, ...args: unknown[]) => void }
 }
 
 const NATIVE_LOCALS = {
