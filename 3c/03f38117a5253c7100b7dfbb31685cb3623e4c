@@ -1,0 +1,25 @@
+src/main/ipc/invoke-table.ts
+  s_08902e443a9840::t_f51ab130cffe5f 22
+src/shared/electron-api/__tests__/build-api.spec.ts
+  s_08902e443a9840::t_a21a3740d92567 4,6-15,17-19,23
+src/main/index.ts
+  s_08902e443a9840::t_d889b311e5b7a7 213
+.gitignore
+  s_08902e443a9840::t_4f0398f1122eee 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "3c03f38117a5253c7100b7dfbb31685cb3623e4c",
+  "prompts": {},
+  "sessions": {
+    "s_08902e443a9840": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a0afc34-4f92-4bff-9395-8510afc8fba3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
