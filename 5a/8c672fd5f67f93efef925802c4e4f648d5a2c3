@@ -1,0 +1,54 @@
+src/main/ipc/git.ipc.ts
+  s_08902e443a9840::t_966ce7bc4514f6 1,19,32,43,54,66,78,91,113,125
+src/main/ipc/channel-registrar.ts
+  s_08902e443a9840::t_b5d8133acafc9d 21-23,26
+  s_08902e443a9840::t_b011b5d0ac5ca5 36
+  s_08902e443a9840::t_e0634f019302cc 1-20,24-25,27-35,37-45
+src/main/ipc/log.ipc.ts
+  s_08902e443a9840::t_966ce7bc4514f6 1,5
+src/main/ipc/fs.ipc.ts
+  s_08902e443a9840::t_966ce7bc4514f6 1,16,23,28
+src/main/ipc/extension.ipc.ts
+  s_08902e443a9840::t_966ce7bc4514f6 1,13,17,21,27,33,41,50,54,59,70,80,95,107
+src/main/ipc/terminal.ipc.ts
+  s_08902e443a9840::t_966ce7bc4514f6 1,42,76,80,86,93,100,106
+src/main/extensions/api.ts
+  s_08902e443a9840::t_966ce7bc4514f6 242-243,582-583
+src/main/ipc/db.ipc.ts
+  s_08902e443a9840::t_966ce7bc4514f6 1,5
+src/main/ipc/metrics.ipc.ts
+  s_08902e443a9840::t_966ce7bc4514f6 1,141,151,158
+src/main/ipc/workspace.ipc.ts
+  s_08902e443a9840::t_4db1a174f45394 2
+  s_08902e443a9840::t_966ce7bc4514f6 1,41,43,47,51,55,61,65,69,79,83,87,91
+src/main/ipc/notification.ipc.ts
+  s_08902e443a9840::t_966ce7bc4514f6 1,20,27,31,38
+tests/unit/ipc/channel-registrar.spec.ts
+  s_08902e443a9840::t_8b8bab37e0eb38 1-90
+src/main/index.ts
+  s_08902e443a9840::t_966ce7bc4514f6 1,254,265,344,379,383
+  s_08902e443a9840::t_3b81430b9abb81 31-35
+tests/unit/terminal/metrics.ipc.spec.ts
+  s_08902e443a9840::t_d5c257cbf2e153 127-163
+  s_08902e443a9840::t_584899ef5e8efe 109-126
+src/main/ipc/settings.ipc.ts
+  s_08902e443a9840::t_966ce7bc4514f6 1,10,14,18,22
+src/main/ipc/shell.ipc.ts
+  s_08902e443a9840::t_966ce7bc4514f6 1-2,22,30,41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "5a8c672fd5f67f93efef925802c4e4f648d5a2c3",
+  "prompts": {},
+  "sessions": {
+    "s_08902e443a9840": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a0afc34-4f92-4bff-9395-8510afc8fba3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
