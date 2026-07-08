@@ -1,0 +1,34 @@
+extensions/task-vault/src/ipc/vault.ipc.ts
+  s_08902e443a9840::t_bbdd2d50ec2774 4,131-142,168-184,283-296,363-375,397-407,975-984
+  s_08902e443a9840::t_99223c03a00756 1061-1066,1068,1070-1082
+extensions/task-vault/src/vault/ensure-next-occurrence.ts
+  s_08902e443a9840::t_19c9063b8351d2 3-9,59-64,76-90
+  s_08902e443a9840::t_a0825137a86afb 91-95
+extensions/task-vault/src/vault/task-repository.ts
+  s_08902e443a9840::t_0848f810cc5430 1-23,26-39,42-44,47-49,51-58,61-79
+  s_08902e443a9840::t_e1fe7a2ce842e3 24-25,40-41,45-46,50,59-60
+extensions/task-vault/src/vault/mappers.ts
+  s_08902e443a9840::t_dbda441032689d 41-43,49-55,58-59
+  s_08902e443a9840::t_c035df6f0ce417 6
+extensions/task-vault/src/vault/recurrence.ts
+  s_08902e443a9840::t_0d5f3dccf45e7e 85-140
+  s_08902e443a9840::t_15bff466c23809 141-142
+extensions/task-vault/tests/vault/task-repository.spec.ts
+  s_08902e443a9840::t_870226abec20cb 1-103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "ad7488660d28c3d798395a5964a409ee4d5ac167",
+  "prompts": {},
+  "sessions": {
+    "s_08902e443a9840": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a0afc34-4f92-4bff-9395-8510afc8fba3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
