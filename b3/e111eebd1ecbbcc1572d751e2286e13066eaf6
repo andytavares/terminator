@@ -1,0 +1,27 @@
+tests/unit/ipc/git.ipc.spec.ts
+  s_08902e443a9840::t_b11b029b8ab525 1-177
+tests/unit/ipc/invoke-table.spec.ts
+  s_08902e443a9840::t_2b571b7a16c432 1-103
+src/main/ipc/git.ipc.ts
+  s_08902e443a9840::t_b6816c65a05dc0 2,17,20-110
+src/main/ipc/notification.ipc.ts
+  s_08902e443a9840::t_f46a36eab1fa49 2-3,6,9,11-39
+src/main/ipc/invoke-table.ts
+  s_08902e443a9840::t_014983ea06fbe8 1-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "b3e111eebd1ecbbcc1572d751e2286e13066eaf6",
+  "prompts": {},
+  "sessions": {
+    "s_08902e443a9840": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a0afc34-4f92-4bff-9395-8510afc8fba3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
