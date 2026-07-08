@@ -10,6 +10,15 @@ vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
 }))
 
+// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
+// capture/assert code (mockHandle.mock.calls, removeHandler assertions) still works.
+const mockApiIpc = {
+  registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+    mockHandle(ch, (_e: unknown, payload: unknown) => fn(payload))
+    return { dispose: () => mockRemoveHandler(ch) }
+  },
+}
+
 vi.mock('../../src/vault/db', () => ({
   randomUUID: vi.fn(() => 'test-uuid'),
 }))
@@ -34,6 +43,7 @@ let mockGet: ReturnType<typeof vi.fn>
 let mockRun: ReturnType<typeof vi.fn>
 
 const mockApi = {
+  ipc: mockApiIpc,
   notifications: { createNotification: mockCreateNotification },
 } as unknown as ExtensionAPI
 

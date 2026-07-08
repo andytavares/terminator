@@ -1,5 +1,5 @@
 import { handleChannel, onChannel } from './ipc/channel-registrar.js'
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell, net, session, protocol } from 'electron'
+import { app, BrowserWindow, dialog, Menu, shell, net, session, protocol } from 'electron'
 import { join } from 'path'
 import { registerWorkspaceHandlers } from './ipc/workspace.ipc.js'
 import { registerTerminalHandlers } from './ipc/terminal.ipc.js'
@@ -17,45 +17,15 @@ import { ExtensionHost } from './extensions/extension-host.js'
 import { ExtensionViewHost } from './extensions/extension-view-host.js'
 import { logger } from './logger.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
-import { REMOTE_ACCESSIBLE_CHANNELS } from './remote/remote-accessible-channels.js'
-import {
-  ipcInvokeRegistry,
-  ipcSendRegistry,
-  type IpcHandler,
-  type IpcSendHandler,
-} from './remote/ipc-registry.js'
+import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
 import { runLegacyMigration } from './db/migrate.js'
 import { globalRegistry, setMenuRebuildCallback } from './extensions/api.js'
 
-// Compatibility capture: core code and the ExtensionAPI register channels through
-// channel-registrar.ts, which records them in the bridge registry directly. This
-// interception remains ONLY for extensions that still call ipcMain.handle/on
-// themselves (notepad, task-vault) so their channels stay dispatchable by the
-// remote bridge. It is removed once those extensions register via api.ipc.
-
-const _origHandle = ipcMain.handle.bind(ipcMain)
-const _origOn = ipcMain.on.bind(ipcMain)
-const _origRemoveHandler = ipcMain.removeHandler.bind(ipcMain)
-// @ts-expect-error - patch to intercept all handler registrations
-ipcMain.handle = (channel: string, fn: IpcHandler, opts?: { remoteAccessible?: boolean }) => {
-  // Default the remote-access flag from the central allowlist so the bridge
-  // surface is auditable in one place (remote-accessible-channels.ts). An explicit
-  // opt-in flag at the call site still wins if a future channel needs to override.
-  const remoteAccessible = opts?.remoteAccessible ?? REMOTE_ACCESSIBLE_CHANNELS.has(channel)
-  ipcInvokeRegistry.set(channel, { handler: fn, remoteAccessible })
-  return _origHandle(channel, fn)
-}
-// @ts-expect-error - patch to intercept fire-and-forget handlers
-ipcMain.on = (channel: string, fn: IpcSendHandler) => {
-  ipcSendRegistry.set(channel, fn)
-  return _origOn(channel, fn)
-}
-// @ts-expect-error - patch to keep bridge registry in sync when handlers are removed
-ipcMain.removeHandler = (channel: string) => {
-  ipcInvokeRegistry.delete(channel)
-  return _origRemoveHandler(channel)
-}
+// All IPC channel registration goes through channel-registrar.ts (core) or
+// api.ipc.registerHandler (extensions), both of which record the bridge
+// registry entry and its remote-access declaration explicitly. ipcMain is
+// never monkey-patched.
 
 declare module 'electron' {
   interface App {

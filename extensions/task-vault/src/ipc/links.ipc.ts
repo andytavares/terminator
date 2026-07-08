@@ -1,5 +1,5 @@
-import { ipcMain } from 'electron'
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
+import { createIpcRegistrar } from './register'
 import {
   LinksCreateRequestSchema,
   LinksRemoveRequestSchema,
@@ -7,24 +7,20 @@ import {
 } from '../schemas/vault.schema'
 import { rowToTask, rowToProject } from '../vault/mappers'
 
-export function registerLinksIpcHandlers(db: ExtensionDB): () => void {
-  const channels: string[] = []
+export function registerLinksIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
+  const registrar = createIpcRegistrar(api)
 
-  function handle(
-    channel: string,
-    fn: (event: Electron.IpcMainInvokeEvent, payload: unknown) => Promise<unknown>
-  ) {
-    ipcMain.handle(channel, async (event, payload) => {
+  function handle(channel: string, fn: (payload: unknown) => Promise<unknown>) {
+    registrar.handle(channel, async (payload) => {
       try {
-        return await fn(event, payload)
+        return await fn(payload)
       } catch (err) {
         return { error: err instanceof Error ? err.message : String(err) }
       }
     })
-    channels.push(channel)
   }
 
-  handle('task-vault:links:create', async (_event, payload) => {
+  handle('task-vault:links:create', async (payload) => {
     const parsed = LinksCreateRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, projectFilePath, targetId } = parsed.data
@@ -62,7 +58,7 @@ export function registerLinksIpcHandlers(db: ExtensionDB): () => void {
     }
   })
 
-  handle('task-vault:links:remove', async (_event, payload) => {
+  handle('task-vault:links:remove', async (payload) => {
     const parsed = LinksRemoveRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, projectFilePath, targetId } = parsed.data
@@ -103,7 +99,7 @@ export function registerLinksIpcHandlers(db: ExtensionDB): () => void {
     }
   })
 
-  handle('task-vault:links:get-for-terminator-target', async (_event, payload) => {
+  handle('task-vault:links:get-for-terminator-target', async (payload) => {
     const parsed = LinksGetForTargetRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { targetId } = parsed.data
@@ -125,9 +121,5 @@ export function registerLinksIpcHandlers(db: ExtensionDB): () => void {
     return { tasks, projects }
   })
 
-  return () => {
-    for (const channel of channels) {
-      ipcMain.removeHandler(channel)
-    }
-  }
+  return registrar.cleanup
 }

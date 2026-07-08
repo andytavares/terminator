@@ -368,12 +368,12 @@ describe('api.ipc bridge channels', () => {
     expect(api.ipc.isRemoteAccessible('no-such-channel')).toBe(false)
   })
 
-  it('isRemoteAccessible: true for extension channels registered in invokeRegistry', () => {
-    // Dot-prefixed channels (notepad) and short-prefixed channels (task-vault) both work
-    // as long as they have a registered handler in invokeRegistry
+  it('isRemoteAccessible: true for extension channels declared remoteAccessible at registration', () => {
+    // Extension channels registered via api.ipc.registerHandler default to
+    // remoteAccessible: true, which is what these registry entries reflect.
     const invokeRegistry = new Map([
-      ['terminator.notepad:notes.list', { handler: vi.fn(), remoteAccessible: false }],
-      ['task-vault:vault:get-today', { handler: vi.fn(), remoteAccessible: false }],
+      ['terminator.notepad:notes.list', { handler: vi.fn(), remoteAccessible: true }],
+      ['task-vault:vault:get-today', { handler: vi.fn(), remoteAccessible: true }],
     ])
     const eventBus = new EventEmitter()
     const api = createExtensionAPI('test.ipc6', '0.1.0', {
@@ -385,22 +385,21 @@ describe('api.ipc bridge channels', () => {
     expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
   })
 
-  it('isRemoteAccessible: any channel in invokeRegistry is accessible (design intent — all registered channels are extension-owned or explicitly allowlisted)', () => {
-    // This is the regression test for the registry-based design: the `remoteAccessible` flag
-    // on registry entries is intentionally ignored. Access is gated by registry presence only,
-    // so adding a channel to the registry (which only extensions do at runtime) makes it
-    // accessible. Core non-allowlist channels (shell:open-external, dialog:open-directory)
-    // are never invoked via the bridge in practice — the shim handles them locally.
+  it('isRemoteAccessible: registry presence alone is NOT sufficient — the declared flag decides', () => {
+    // Regression test for the declared-authority design: a channel registered
+    // without remoteAccessible: true stays unreachable from the bridge. The old
+    // rule ("any registered channel is accessible") also exposed every internal
+    // core invoke channel to authenticated remote clients.
     const invokeRegistry = new Map([
       ['dialog:open-directory', { handler: vi.fn(), remoteAccessible: false }],
+      ['my-ext:local-only', { handler: vi.fn(), remoteAccessible: false }],
     ])
     const eventBus = new EventEmitter()
     const api = createExtensionAPI('test.ipc6', '0.1.0', {
       bridge: { invokeRegistry, sendRegistry: new Map(), eventBus },
     })
-    // The remoteAccessible flag is NOT checked — registry presence is sufficient.
-    // If this assertion changes to false, the extension channel access design has regressed.
-    expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(true)
+    expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
+    expect(api.ipc.isRemoteAccessible('my-ext:local-only')).toBe(false)
   })
 })
 

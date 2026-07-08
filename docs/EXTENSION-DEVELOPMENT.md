@@ -385,6 +385,14 @@ handler.dispose()
 
 **Error handling**: throw or return `{ error: string }` to signal failure. The renderer receives the rejection or error payload.
 
+**Remote access** _(v1.3.0)_: channels registered through `registerHandler` are dispatchable by the remote-control bridge (the `/app/` browser surface) **by default**, so extension panels keep working remotely. Pass `{ remoteAccessible: false }` as the third argument to keep a channel reachable only from the local Electron renderer:
+
+```typescript
+api.ipc.registerHandler('my-ext:local-secret', handler, { remoteAccessible: false })
+```
+
+The declaration made at registration is the single authority — a channel that is neither in the core manifest-derived allowlist nor declared `remoteAccessible` at registration is rejected by the bridge. Extensions must never call Electron's `ipcMain` directly: handlers registered that way are invisible to the bridge registry and unreachable remotely.
+
 ---
 
 ## Disposables

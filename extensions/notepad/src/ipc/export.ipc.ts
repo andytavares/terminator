@@ -1,4 +1,4 @@
-import { ipcMain, dialog } from 'electron'
+import { dialog } from 'electron'
 import { z } from 'zod'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
@@ -6,6 +6,8 @@ import * as path from 'node:path'
 import matter from 'gray-matter'
 import { randomUUID } from '../db/db'
 import type { ExtensionDB } from '../../../../src/main/db/index'
+import type { ExtensionAPI } from '../../../../src/main/extensions/api'
+import { createIpcRegistrar } from './register'
 
 // ──────────────────────────────────────────────────────────────
 // Pure utilities
@@ -274,8 +276,9 @@ export async function importNotes(
 // IPC Registration
 // ──────────────────────────────────────────────────────────────
 
-export function registerExportIpcHandlers(db: ExtensionDB): () => void {
-  ipcMain.handle('terminator.notepad:export.pickFolder', async () => {
+export function registerExportIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
+  const { handle, cleanup } = createIpcRegistrar(api)
+  handle('terminator.notepad:export.pickFolder', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory'],
     })
@@ -283,17 +286,9 @@ export function registerExportIpcHandlers(db: ExtensionDB): () => void {
     return { data: result.filePaths[0] }
   })
 
-  ipcMain.handle('terminator.notepad:export.run', (_evt, payload: unknown) =>
-    exportNotes(db, payload)
-  )
+  handle('terminator.notepad:export.run', (payload: unknown) => exportNotes(db, payload))
 
-  ipcMain.handle('terminator.notepad:import.run', (_evt, payload: unknown) =>
-    importNotes(db, payload)
-  )
+  handle('terminator.notepad:import.run', (payload: unknown) => importNotes(db, payload))
 
-  return () => {
-    ipcMain.removeHandler('terminator.notepad:export.pickFolder')
-    ipcMain.removeHandler('terminator.notepad:export.run')
-    ipcMain.removeHandler('terminator.notepad:import.run')
-  }
+  return cleanup
 }

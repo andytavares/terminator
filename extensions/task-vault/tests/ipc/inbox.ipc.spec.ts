@@ -23,6 +23,15 @@ vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
 }))
 
+// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
+// capture/assert code (mockHandle.mock.calls, removeHandler assertions) still works.
+const mockApiIpc = {
+  registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+    mockHandle(ch, (_e: unknown, payload: unknown) => fn(payload))
+    return { dispose: () => mockRemoveHandler(ch) }
+  },
+}
+
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
   triggerSchedulerTick: vi.fn(),
   broadcast: vi.fn(),
@@ -69,6 +78,7 @@ const TASK_ROW = {
 
 let db: ReturnType<typeof createMockDb>
 const mockApi = {
+  ipc: mockApiIpc,
   notifications: { createNotification: vi.fn() },
 } as unknown as ExtensionAPI
 

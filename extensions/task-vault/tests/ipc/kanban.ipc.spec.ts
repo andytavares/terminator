@@ -9,6 +9,18 @@ vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
 }))
 
+// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
+// capture/assert code (mockHandle.mock.calls, removeHandler assertions) still works.
+const mockApiIpc = {
+  registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+    mockHandle(ch, (_e: unknown, payload: unknown) => fn(payload))
+    return { dispose: () => mockRemoveHandler(ch) }
+  },
+}
+const mockApi = {
+  ipc: mockApiIpc,
+} as unknown as import('../../../../src/main/extensions/api').ExtensionAPI
+
 import { registerKanbanIpcHandlers } from '../../src/ipc/kanban.ipc.js'
 import { DEFAULT_KANBAN_CONFIG } from '../../src/vault/types.js'
 
@@ -42,7 +54,7 @@ describe('registerKanbanIpcHandlers', () => {
 
   it('registers five IPC handlers', () => {
     const db = createMockDb()
-    registerKanbanIpcHandlers(db)
+    registerKanbanIpcHandlers(mockApi, db)
     expect(mockHandle).toHaveBeenCalledWith('task-vault:kanban:get-config', expect.any(Function))
     expect(mockHandle).toHaveBeenCalledWith('task-vault:kanban:save-config', expect.any(Function))
     expect(mockHandle).toHaveBeenCalledWith('task-vault:kanban:list-tasks', expect.any(Function))
@@ -52,7 +64,7 @@ describe('registerKanbanIpcHandlers', () => {
 
   it('returns dispose function that removes all handlers', () => {
     const db = createMockDb()
-    const dispose = registerKanbanIpcHandlers(db)
+    const dispose = registerKanbanIpcHandlers(mockApi, db)
     dispose()
     expect(mockRemoveHandler).toHaveBeenCalledWith('task-vault:kanban:get-config')
     expect(mockRemoveHandler).toHaveBeenCalledWith('task-vault:kanban:save-config')
@@ -64,7 +76,7 @@ describe('registerKanbanIpcHandlers', () => {
   describe('get-config handler', () => {
     it('returns default config when no config is stored in DB', async () => {
       const db = createMockDb()
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const result = await getHandler(db, 'task-vault:kanban:get-config')()
       expect(result).toMatchObject({
         viewMode: 'list',
@@ -81,7 +93,7 @@ describe('registerKanbanIpcHandlers', () => {
       }
       const db = createMockDb()
       db.mockGet.mockResolvedValue({ value: JSON.stringify(stored) })
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const result = await getHandler(db, 'task-vault:kanban:get-config')()
       expect(result).toMatchObject(stored)
     })
@@ -90,7 +102,7 @@ describe('registerKanbanIpcHandlers', () => {
   describe('save-config handler', () => {
     it('writes valid config to DB', async () => {
       const db = createMockDb()
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const config = {
         viewMode: 'kanban',
         lanes: [{ id: 'todo', label: 'Todo', taskStatuses: ['open'] }],
@@ -103,7 +115,7 @@ describe('registerKanbanIpcHandlers', () => {
 
     it('returns error for invalid payload', async () => {
       const db = createMockDb()
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const result = await getHandler(db, 'task-vault:kanban:save-config')(null, { invalid: true })
       expect(result).toHaveProperty('error')
     })
@@ -113,7 +125,7 @@ describe('registerKanbanIpcHandlers', () => {
     it('returns distinct contexts from DB', async () => {
       const db = createMockDb()
       db.mockQuery.mockResolvedValue([{ context: 'work' }, { context: 'home' }])
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:kanban:list-contexts')()) as {
         contexts: string[]
       }
@@ -137,7 +149,7 @@ describe('registerKanbanIpcHandlers', () => {
           metadata: '{}',
         },
       ])
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:kanban:list-tasks')()) as {
         tasks: unknown[]
       }
@@ -160,7 +172,7 @@ describe('registerKanbanIpcHandlers', () => {
           metadata: JSON.stringify({ description: 'Detailed explanation' }),
         },
       ])
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:kanban:list-tasks')()) as {
         tasks: Record<string, unknown>[]
       }
@@ -182,7 +194,7 @@ describe('registerKanbanIpcHandlers', () => {
           metadata: '{}',
         },
       ])
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:kanban:list-tasks')()) as {
         tasks: Record<string, unknown>[]
       }
@@ -193,7 +205,7 @@ describe('registerKanbanIpcHandlers', () => {
   describe('get-config with DB fallback', () => {
     it('get-config returns default config when DB returns no row', async () => {
       const db = createMockDb()
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const result = await getHandler(db, 'task-vault:kanban:get-config')()
       expect(result).toMatchObject(DEFAULT_KANBAN_CONFIG)
     })
@@ -203,7 +215,7 @@ describe('registerKanbanIpcHandlers', () => {
     it('list-tasks returns error when db.query throws', async () => {
       const db = createMockDb()
       db.mockQuery.mockRejectedValueOnce(new Error('db unavailable'))
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:kanban:list-tasks')()) as { error: string }
       expect(result.error).toMatch(/db unavailable/)
     })
@@ -211,7 +223,7 @@ describe('registerKanbanIpcHandlers', () => {
     it('list-contexts returns error when db.query throws', async () => {
       const db = createMockDb()
       db.mockQuery.mockRejectedValueOnce(new Error('db unavailable'))
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:kanban:list-contexts')()) as {
         error: string
       }
@@ -233,7 +245,7 @@ describe('registerKanbanIpcHandlers', () => {
           metadata: 'not-json{{{',
         },
       ])
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:kanban:list-tasks')()) as {
         tasks: Record<string, unknown>[]
       }
@@ -245,7 +257,7 @@ describe('registerKanbanIpcHandlers', () => {
     it('updates task status in DB', async () => {
       const db = createMockDb()
       db.mockGet.mockResolvedValue({ id: 'task-1' })
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const result = await getHandler(db, 'task-vault:kanban:move-task')(null, {
         taskId: 'task-1',
         toStatus: 'in-progress',
@@ -260,7 +272,7 @@ describe('registerKanbanIpcHandlers', () => {
     it('returns error when task not found', async () => {
       const db = createMockDb()
       db.mockGet.mockResolvedValue(undefined)
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const result = await getHandler(db, 'task-vault:kanban:move-task')(null, {
         taskId: 'nonexistent',
         toStatus: 'done',
@@ -270,7 +282,7 @@ describe('registerKanbanIpcHandlers', () => {
 
     it('returns error for invalid toStatus', async () => {
       const db = createMockDb()
-      registerKanbanIpcHandlers(db)
+      registerKanbanIpcHandlers(mockApi, db)
       const result = await getHandler(db, 'task-vault:kanban:move-task')(null, {
         taskId: 'task-1',
         toStatus: 'invalid-status',

@@ -1,5 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { ipcMain } from 'electron'
+
+// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
+// capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
+const mockApi = {
+  ipc: {
+    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+      ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
+        ch,
+        (_e: unknown, payload: unknown) => fn(payload)
+      )
+      return {
+        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
+      }
+    },
+  },
+} as unknown as import('../../../../../src/main/extensions/api').ExtensionAPI
 import { PGlite } from '@electric-sql/pglite'
 
 vi.mock('electron', () => ({
@@ -45,7 +61,7 @@ afterEach(async () => {
 
 describe('registerCommentsIpcHandlers', () => {
   it('returns a dispose function', () => {
-    const dispose = registerCommentsIpcHandlers(db)
+    const dispose = registerCommentsIpcHandlers(mockApi, db)
     expect(typeof dispose).toBe('function')
     dispose()
   })
@@ -333,7 +349,7 @@ describe('validation errors', () => {
 describe('IPC handler registration', () => {
   it('registerCommentsIpcHandlers calls ipcMain.handle for all channels', () => {
     vi.mocked(ipcMain.handle).mockClear()
-    const dispose = registerCommentsIpcHandlers(db)
+    const dispose = registerCommentsIpcHandlers(mockApi, db)
     expect(ipcMain.handle).toHaveBeenCalledWith(
       'terminator.notepad:comments.list',
       expect.any(Function)

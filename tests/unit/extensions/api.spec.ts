@@ -72,6 +72,7 @@ import {
   globalRegistry,
   setMenuRebuildCallback,
 } from '../../../src/main/extensions/api'
+import { ipcInvokeRegistry } from '../../../src/main/remote/ipc-registry'
 import * as shellExecutor from '../../../src/main/shell/shell-executor'
 
 beforeEach(() => {
@@ -473,6 +474,23 @@ describe('api.ipc.registerHandler', () => {
     const handler = vi.fn().mockResolvedValue({ ok: true })
     const disposable = api.ipc.registerHandler('test.ext:my-channel', handler)
     expect(disposable).toHaveProperty('dispose')
+    disposable.dispose()
+  })
+
+  it('records the channel as remoteAccessible by default', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const disposable = api.ipc.registerHandler('test.ext:remote-default', vi.fn())
+    expect(ipcInvokeRegistry.get('test.ext:remote-default')?.remoteAccessible).toBe(true)
+    disposable.dispose()
+    expect(ipcInvokeRegistry.has('test.ext:remote-default')).toBe(false)
+  })
+
+  it('honors remoteAccessible: false for local-only channels', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const disposable = api.ipc.registerHandler('test.ext:local-only', vi.fn(), {
+      remoteAccessible: false,
+    })
+    expect(ipcInvokeRegistry.get('test.ext:local-only')?.remoteAccessible).toBe(false)
     disposable.dispose()
   })
 })

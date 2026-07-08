@@ -218,9 +218,15 @@ export interface ExtensionAPI {
     register(command: CommandContribution, handler: () => void): Disposable
   }
   ipc: {
+    /**
+     * Registers a main-process handler for an extension-owned channel.
+     * Extension channels are dispatchable by the remote-control bridge by
+     * default; pass `remoteAccessible: false` to keep a channel local-only.
+     */
     registerHandler(
       channel: string,
-      handler: (payload: unknown) => Promise<unknown> | unknown
+      handler: (payload: unknown) => Promise<unknown> | unknown,
+      opts?: { remoteAccessible?: boolean }
     ): Disposable
     invokeChannel(channel: string, payload: unknown): Promise<unknown>
     sendChannel(channel: string, payload: unknown): void
@@ -577,9 +583,12 @@ export function createExtensionAPI(
     ipc: {
       registerHandler(
         channel: string,
-        handler: (payload: unknown) => Promise<unknown> | unknown
+        handler: (payload: unknown) => Promise<unknown> | unknown,
+        opts?: { remoteAccessible?: boolean }
       ): Disposable {
-        handleChannel(channel, (_event, payload) => handler(payload))
+        handleChannel(channel, (_event, payload) => handler(payload), {
+          remoteAccessible: opts?.remoteAccessible ?? true,
+        })
         return disposable(() => removeChannel(channel))
       },
       async invokeChannel(channel: string, payload: unknown): Promise<unknown> {
@@ -588,12 +597,14 @@ export function createExtensionAPI(
         return entry.handler(null as never, payload)
       },
       isRemoteAccessible(channel: string): boolean {
+        // Core channels (invoke, send, and push/subscribe) are declared in the
+        // channel manifest, which REMOTE_ACCESSIBLE_CHANNELS is derived from.
         if (REMOTE_ACCESSIBLE_CHANNELS.has(channel)) return true
-        // Any channel registered in the invokeRegistry but not in the core allowlist is
-        // extension-owned and safe to expose. Core channels not in REMOTE_ACCESSIBLE_CHANNELS
-        // (db:health, dialog:open-directory, shell:open-external, workspace:get-active) are
-        // never invoked via the bridge by the shim — they're handled in-shim or unused remotely.
-        return deps?.bridge?.invokeRegistry.has(channel) ?? false
+        // Everything else is decided by what was declared at registration.
+        // Registered-but-undeclared channels are NOT reachable: the old rule
+        // ("any registered channel is extension-owned and safe") also exposed
+        // every internal core invoke channel to authenticated remote clients.
+        return deps?.bridge?.invokeRegistry.get(channel)?.remoteAccessible ?? false
       },
       sendChannel(channel: string, payload: unknown): void {
         const handler = deps?.bridge?.sendRegistry.get(channel)

@@ -1,7 +1,8 @@
-import { ipcMain } from 'electron'
 import { z } from 'zod'
 import { randomUUID } from '../db/db'
 import type { ExtensionDB } from '../../../../src/main/db/index'
+import type { ExtensionAPI } from '../../../../src/main/extensions/api'
+import { createIpcRegistrar } from './register'
 
 const VALIDATION_ERROR = { error: 'VALIDATION_ERROR' }
 
@@ -309,16 +310,13 @@ export async function deleteTag(
   return { data: { ok: true } }
 }
 
-export function registerTagsIpcHandlers(db: ExtensionDB): () => void {
-  ipcMain.handle('terminator.notepad:tags.list', (_, payload) => listTags(db, payload))
-  ipcMain.handle('terminator.notepad:tags.rename', (_, payload) => renameTag(db, payload))
-  ipcMain.handle('terminator.notepad:tags.delete', (_, payload) => deleteTag(db, payload))
+export function registerTagsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
+  const { handle, cleanup } = createIpcRegistrar(api)
+  handle('terminator.notepad:tags.list', (payload) => listTags(db, payload))
+  handle('terminator.notepad:tags.rename', (payload) => renameTag(db, payload))
+  handle('terminator.notepad:tags.delete', (payload) => deleteTag(db, payload))
 
-  return () => {
-    ipcMain.removeHandler('terminator.notepad:tags.list')
-    ipcMain.removeHandler('terminator.notepad:tags.rename')
-    ipcMain.removeHandler('terminator.notepad:tags.delete')
-  }
+  return cleanup
 }
 
 export async function reorderItems(
@@ -347,24 +345,16 @@ export async function reorderItems(
 
 // ---- IPC Registration ----
 
-export function registerNotesIpcHandlers(db: ExtensionDB): () => void {
-  ipcMain.handle('terminator.notepad:notes.create', (_, payload) => createNote(db, payload))
-  ipcMain.handle('terminator.notepad:notes.list', (_, payload) => listNotes(db, payload))
-  ipcMain.handle('terminator.notepad:notes.get', (_, payload) => getNote(db, payload))
-  ipcMain.handle('terminator.notepad:notes.autosave', (_, payload) => autosaveNote(db, payload))
-  ipcMain.handle('terminator.notepad:notes.archive', (_, payload) => archiveNote(db, payload))
-  ipcMain.handle('terminator.notepad:notes.restore', (_, payload) => restoreNote(db, payload))
-  ipcMain.handle('terminator.notepad:notes.hardDelete', (_, payload) => hardDeleteNote(db, payload))
-  ipcMain.handle('terminator.notepad:notes.reorder', (_, payload) => reorderItems(db, payload))
+export function registerNotesIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
+  const { handle, cleanup } = createIpcRegistrar(api)
+  handle('terminator.notepad:notes.create', (payload) => createNote(db, payload))
+  handle('terminator.notepad:notes.list', (payload) => listNotes(db, payload))
+  handle('terminator.notepad:notes.get', (payload) => getNote(db, payload))
+  handle('terminator.notepad:notes.autosave', (payload) => autosaveNote(db, payload))
+  handle('terminator.notepad:notes.archive', (payload) => archiveNote(db, payload))
+  handle('terminator.notepad:notes.restore', (payload) => restoreNote(db, payload))
+  handle('terminator.notepad:notes.hardDelete', (payload) => hardDeleteNote(db, payload))
+  handle('terminator.notepad:notes.reorder', (payload) => reorderItems(db, payload))
 
-  return () => {
-    ipcMain.removeHandler('terminator.notepad:notes.create')
-    ipcMain.removeHandler('terminator.notepad:notes.list')
-    ipcMain.removeHandler('terminator.notepad:notes.get')
-    ipcMain.removeHandler('terminator.notepad:notes.autosave')
-    ipcMain.removeHandler('terminator.notepad:notes.archive')
-    ipcMain.removeHandler('terminator.notepad:notes.restore')
-    ipcMain.removeHandler('terminator.notepad:notes.hardDelete')
-    ipcMain.removeHandler('terminator.notepad:notes.reorder')
-  }
+  return cleanup
 }

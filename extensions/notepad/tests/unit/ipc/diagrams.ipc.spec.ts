@@ -5,6 +5,23 @@ vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
   app: { getPath: vi.fn(() => '/tmp') },
 }))
+import { ipcMain } from 'electron'
+
+// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
+// capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
+const mockApi = {
+  ipc: {
+    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+      ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
+        ch,
+        (_e: unknown, payload: unknown) => fn(payload)
+      )
+      return {
+        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
+      }
+    },
+  },
+} as unknown as import('../../../../../src/main/extensions/api').ExtensionAPI
 
 import { wrapDb } from '../../../../../src/main/db/index'
 import { applyNotepadSchema } from '../../../src/db/db'
@@ -268,7 +285,7 @@ describe('listDiagrams sort_order', () => {
 
 describe('registerDiagramsIpcHandlers', () => {
   it('registers and disposes without error', () => {
-    const dispose = registerDiagramsIpcHandlers(db)
+    const dispose = registerDiagramsIpcHandlers(mockApi, db)
     expect(typeof dispose).toBe('function')
     dispose()
   })
@@ -276,7 +293,7 @@ describe('registerDiagramsIpcHandlers', () => {
   it('wrappers route to underlying handlers', async () => {
     const { ipcMain } = await import('electron')
     vi.mocked(ipcMain.handle).mockClear()
-    registerDiagramsIpcHandlers(db)
+    registerDiagramsIpcHandlers(mockApi, db)
     const calls = vi.mocked(ipcMain.handle).mock.calls as [string, (...a: unknown[]) => unknown][]
     const getHandler = (ch: string) => calls.find(([c]) => c === ch)?.[1]
     await getHandler('terminator.notepad:diagrams.create')?.(null, { title: 'T' })

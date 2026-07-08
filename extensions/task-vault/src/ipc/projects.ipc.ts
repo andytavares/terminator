@@ -1,5 +1,5 @@
-import { ipcMain } from 'electron'
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
+import { createIpcRegistrar } from './register'
 import { randomUUID } from '../vault/db'
 import { toDisplayName } from '../vault/tags'
 import { broadcast } from '../notifications/task-scheduler.js'
@@ -19,24 +19,20 @@ import {
   TASK_JOINS,
 } from '../vault/mappers'
 
-export function registerProjectsIpcHandlers(db: ExtensionDB): () => void {
-  const handlers: string[] = []
+export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
+  const registrar = createIpcRegistrar(api)
 
-  function handle(
-    channel: string,
-    fn: (event: Electron.IpcMainInvokeEvent, payload: unknown) => Promise<unknown>
-  ) {
-    ipcMain.handle(channel, async (event, payload) => {
+  function handle(channel: string, fn: (payload: unknown) => Promise<unknown>) {
+    registrar.handle(channel, async (payload) => {
       try {
-        return await fn(event, payload)
+        return await fn(payload)
       } catch (err) {
         return { error: err instanceof Error ? err.message : String(err) }
       }
     })
-    handlers.push(channel)
   }
 
-  handle('task-vault:projects:list', async (_event, payload) => {
+  handle('task-vault:projects:list', async (payload) => {
     const parsed = ListProjectsRequestSchema.safeParse(payload ?? {})
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
 
@@ -139,7 +135,7 @@ export function registerProjectsIpcHandlers(db: ExtensionDB): () => void {
     }
   })
 
-  handle('task-vault:projects:create', async (_event, payload) => {
+  handle('task-vault:projects:create', async (payload) => {
     const parsed = CreateProjectRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { name, area, deadline, outcome } = parsed.data
@@ -174,7 +170,7 @@ export function registerProjectsIpcHandlers(db: ExtensionDB): () => void {
     return { success: true, filePath: displayName }
   })
 
-  handle('task-vault:projects:delete', async (_event, payload) => {
+  handle('task-vault:projects:delete', async (payload) => {
     const parsed = DeleteProjectRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { projectFilePath: projectName } = parsed.data
@@ -201,7 +197,7 @@ export function registerProjectsIpcHandlers(db: ExtensionDB): () => void {
     return { success: true }
   })
 
-  handle('task-vault:projects:update-status', async (_event, payload) => {
+  handle('task-vault:projects:update-status', async (payload) => {
     const parsed = UpdateProjectStatusRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { projectFilePath: projectName, status } = parsed.data
@@ -232,7 +228,7 @@ export function registerProjectsIpcHandlers(db: ExtensionDB): () => void {
     return { success: true }
   })
 
-  handle('task-vault:projects:update-area', async (_event, payload) => {
+  handle('task-vault:projects:update-area', async (payload) => {
     const { projectFilePath: projectName, area } = payload as {
       projectFilePath: string
       area: string | null
@@ -261,7 +257,7 @@ export function registerProjectsIpcHandlers(db: ExtensionDB): () => void {
     return { success: true }
   })
 
-  handle('task-vault:projects:update-deadline', async (_event, payload) => {
+  handle('task-vault:projects:update-deadline', async (payload) => {
     const { projectFilePath: projectName, deadline } = payload as {
       projectFilePath: string
       deadline: string | null
@@ -277,7 +273,7 @@ export function registerProjectsIpcHandlers(db: ExtensionDB): () => void {
     return { success: true }
   })
 
-  handle('task-vault:projects:rename', async (_event, payload) => {
+  handle('task-vault:projects:rename', async (payload) => {
     const { projectFilePath: projectName, newName } = payload as {
       projectFilePath: string
       newName: string
@@ -300,9 +296,5 @@ export function registerProjectsIpcHandlers(db: ExtensionDB): () => void {
     return { success: true }
   })
 
-  return () => {
-    for (const channel of handlers) {
-      ipcMain.removeHandler(channel)
-    }
-  }
+  return registrar.cleanup
 }

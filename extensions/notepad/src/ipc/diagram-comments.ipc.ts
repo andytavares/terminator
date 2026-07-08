@@ -1,8 +1,9 @@
-import { ipcMain } from 'electron'
 import { z } from 'zod'
 import { randomUUID } from '../db/db'
 import type { DiagramComment } from '../db/types'
 import type { ExtensionDB } from '../../../../src/main/db/index'
+import type { ExtensionAPI } from '../../../../src/main/extensions/api'
+import { createIpcRegistrar } from './register'
 
 const VALIDATION_ERROR = { error: 'VALIDATION_ERROR' }
 
@@ -149,24 +150,18 @@ export async function deleteDiagramComment(
   return { data: { ok: true } }
 }
 
-export function registerDiagramCommentsIpcHandlers(db: ExtensionDB): () => void {
-  ipcMain.handle('terminator.notepad:diagram-comments.create', (_, payload) =>
+export function registerDiagramCommentsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
+  const { handle, cleanup } = createIpcRegistrar(api)
+  handle('terminator.notepad:diagram-comments.create', (payload) =>
     createDiagramComment(db, payload)
   )
-  ipcMain.handle('terminator.notepad:diagram-comments.list', (_, payload) =>
-    listDiagramComments(db, payload)
-  )
-  ipcMain.handle('terminator.notepad:diagram-comments.resolve', (_, payload) =>
+  handle('terminator.notepad:diagram-comments.list', (payload) => listDiagramComments(db, payload))
+  handle('terminator.notepad:diagram-comments.resolve', (payload) =>
     resolveDiagramComment(db, payload)
   )
-  ipcMain.handle('terminator.notepad:diagram-comments.delete', (_, payload) =>
+  handle('terminator.notepad:diagram-comments.delete', (payload) =>
     deleteDiagramComment(db, payload)
   )
 
-  return () => {
-    ipcMain.removeHandler('terminator.notepad:diagram-comments.create')
-    ipcMain.removeHandler('terminator.notepad:diagram-comments.list')
-    ipcMain.removeHandler('terminator.notepad:diagram-comments.resolve')
-    ipcMain.removeHandler('terminator.notepad:diagram-comments.delete')
-  }
+  return cleanup
 }

@@ -1,9 +1,10 @@
-import { ipcMain } from 'electron'
 import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import { rowToComment } from '../db/mappers'
 import type { Comment } from '../db/types'
 import type { ExtensionDB } from '../../../../src/main/db/index'
+import type { ExtensionAPI } from '../../../../src/main/extensions/api'
+import { createIpcRegistrar } from './register'
 
 const ListPayload = z.object({
   noteId: z.string(),
@@ -175,7 +176,7 @@ export async function markOrphaned(db: ExtensionDB, payload: unknown): Promise<u
   return { data: { ok: true } }
 }
 
-export function registerCommentsIpcHandlers(db: ExtensionDB): () => void {
+export function registerCommentsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const channels: [string, (db: ExtensionDB, payload: unknown) => Promise<unknown>][] = [
     ['terminator.notepad:comments.list', listComments],
     ['terminator.notepad:comments.create', createComment],
@@ -187,13 +188,10 @@ export function registerCommentsIpcHandlers(db: ExtensionDB): () => void {
     ['terminator.notepad:comments.markOrphaned', markOrphaned],
   ]
 
+  const registrar = createIpcRegistrar(api)
   for (const [channel, handler] of channels) {
-    ipcMain.handle(channel, (_event, payload) => handler(db, payload))
+    registrar.handle(channel, (payload) => handler(db, payload))
   }
 
-  return () => {
-    for (const [channel] of channels) {
-      ipcMain.removeHandler(channel)
-    }
-  }
+  return registrar.cleanup
 }
