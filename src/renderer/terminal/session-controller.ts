@@ -1,0 +1,87 @@
+import { useSessionStore } from '../stores/session.store'
+import { useWorkspaceStore } from '../stores/workspace.store'
+import { TerminalInstance } from '../components/terminal/TerminalSession'
+import { dispatchNotification } from '../lib/notifications'
+import type { PaneSplitDirection } from '../../shared/types/index'
+
+// The single owner of "a live terminal tab": composes the store record, the
+// xterm instance, and the busy/bell/idle wiring. TerminalInstance is a pure
+// view object that emits activity events; only this module translates them
+// into store state and notifications.
+
+function handleBell(sessionId: string): void {
+  const sessionStore = useSessionStore.getState()
+  const session = sessionStore.sessions.get(sessionId)
+  if (!session) return
+  const isActiveSession = sessionStore.getActiveSessionForProject(session.projectId) === sessionId
+  const isActiveProject = useWorkspaceStore.getState().activeProjectId === session.projectId
+  if (isActiveSession && isActiveProject) return
+  sessionStore.incrementBellCount(sessionId)
+  dispatchNotification({
+    type: 'info',
+    title: 'Terminator',
+    message: `${session.tabTitle} needs attention`,
+    key: 'terminalBell',
+  })
+}
+
+function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInstance {
+  return new TerminalInstance(sessionId, scrollbackLimit, {
+    onBell: () => handleBell(sessionId),
+    onBusy: () => useSessionStore.getState().setSessionBusy(sessionId),
+    onIdle: () => useSessionStore.getState().setSessionIdle(sessionId),
+  })
+}
+
+export async function createTerminalSession(
+  projectId: string,
+  type: 'human' | 'agent',
+  title: string,
+  cwd: string,
+  scrollbackLimit: number,
+  parentSessionId?: string
+): Promise<string> {
+  const store = useSessionStore.getState()
+  const sessionId = await store.createSession(
+    projectId,
+    type,
+    title,
+    cwd,
+    scrollbackLimit,
+    parentSessionId
+  )
+  const instance = buildInstance(sessionId, scrollbackLimit)
+  // Store the instance first, then activate — TerminalPane's effect fires after
+  // both updates land so getTerminalInstance() is guaranteed to return the instance.
+  store.setTerminalInstance(sessionId, instance)
+  store.setActiveSessionForProject(projectId, sessionId)
+  return sessionId
+}
+
+export async function splitTerminalSession(
+  projectId: string,
+  direction: PaneSplitDirection,
+  cwd: string,
+  scrollbackLimit: number
+): Promise<void> {
+  const store = useSessionStore.getState()
+  const focusedId =
+    store.getFocusedSession(projectId) ?? store.getActiveSessionForProject(projectId)
+  if (!focusedId) return
+
+  // Pin split panes to the root session (one level of nesting max).
+  const focusedSession = store.sessions.get(focusedId)
+  const parentSessionId = focusedSession?.parentSessionId ?? focusedId
+
+  const sessionId = await store.createSession(
+    projectId,
+    'human',
+    '',
+    cwd,
+    scrollbackLimit,
+    parentSessionId
+  )
+  const instance = buildInstance(sessionId, scrollbackLimit)
+  store.setTerminalInstance(sessionId, instance)
+  store.activateSplit(projectId, focusedId, sessionId, direction)
+}

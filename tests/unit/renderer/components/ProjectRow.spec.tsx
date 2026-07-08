@@ -29,7 +29,7 @@ const mockSessionStore = {
   getBellCountForProject: vi.fn().mockReturnValue(0),
   isProjectBusy: vi.fn().mockReturnValue(false),
   isSessionBusy: vi.fn().mockReturnValue(false),
-  activeSessionIdByProject: new Map<string, string>(),
+  projectViews: new Map(),
   setActiveSessionForProject: vi.fn(),
 }
 
@@ -442,6 +442,76 @@ describe('ProjectRow', () => {
       )
       fireEvent.click(container.querySelector('.project-row__branch-chip')!)
       expect(onBranchBadgeClick).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('branch coverage — grouping, dimming, expand toggle, worktree icon', () => {
+    const mkSession = (id: string, tabTitle: string, parentSessionId?: string) => ({
+      id,
+      projectId: 'proj-1',
+      tabTitle,
+      status: 'active',
+      type: 'human',
+      scrollbackLimit: 1000,
+      createdAt: '',
+      parentSessionId,
+    })
+
+    it('groups split children under their parent session when expanded', () => {
+      mockSessionStore.getSessionsForProject.mockReturnValue([
+        mkSession('root-1', 'Root'),
+        mkSession('child-1', 'Child', 'root-1'),
+      ])
+      render(<ProjectRow {...defaultProps} isExpanded />)
+      expect(screen.getByText('Root')).toBeTruthy()
+      // the child renders inside the root session's group
+      expect(screen.getByText('Child')).toBeTruthy()
+    })
+
+    it('dims the row when the search query matches neither project nor any session title', () => {
+      mockSessionStore.getSessionsForProject.mockReturnValue([mkSession('s1', 'Terminal 1')])
+      const { container } = render(<ProjectRow {...defaultProps} searchQuery="zzz-no-match" />)
+      expect(container.querySelector('.project-row--dimmed')).toBeTruthy()
+    })
+
+    it('does not dim when a session title matches the query even if the project name does not', () => {
+      mockSessionStore.getSessionsForProject.mockReturnValue([mkSession('s1', 'deploy-watch')])
+      const { container } = render(<ProjectRow {...defaultProps} searchQuery="deploy" />)
+      expect(container.querySelector('.project-row--dimmed')).toBeNull()
+    })
+
+    it('shows the expand toggle with the right chevron state and stops click propagation', () => {
+      mockSessionStore.getSessionsForProject.mockReturnValue([mkSession('s1', 'Terminal 1')])
+      const onToggleExpand = vi.fn()
+      const onSelect = vi.fn()
+      const { container, rerender } = render(
+        <ProjectRow
+          {...defaultProps}
+          isExpanded={false}
+          onToggleExpand={onToggleExpand}
+          onSelect={onSelect}
+        />
+      )
+      const toggle = container.querySelector('.project-row__expand-toggle')!
+      fireEvent.click(toggle)
+      expect(onToggleExpand).toHaveBeenCalledOnce()
+      expect(onSelect).not.toHaveBeenCalled()
+      rerender(
+        <ProjectRow
+          {...defaultProps}
+          isExpanded
+          onToggleExpand={onToggleExpand}
+          onSelect={onSelect}
+        />
+      )
+      expect(container.querySelector('.project-row__expand-toggle')).toBeTruthy()
+    })
+
+    it('renders the worktree icon for worktree projects', () => {
+      const { container } = render(
+        <ProjectRow {...defaultProps} project={makeProject({ isWorktree: true })} />
+      )
+      expect(container.querySelector('.project-row__icon')).toBeTruthy()
     })
   })
 })

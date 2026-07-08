@@ -1,7 +1,6 @@
 import { Terminal, IBufferCell, ILinkProvider, ILink } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
-import { useSessionStore } from '../../stores/session.store'
 
 const IDLE_DEBOUNCE_MS = 1500
 
@@ -58,8 +57,19 @@ function ansiColorToCss(color: number, defaultCss: string): string {
   return `rgb(${grey},${grey},${grey})`
 }
 
+/**
+ * Activity callbacks wired by the session controller. TerminalInstance is a
+ * pure view object: it emits these events and never touches a store.
+ */
+export interface TerminalInstanceHooks {
+  onBell?: () => void
+  onBusy?: () => void
+  onIdle?: () => void
+}
+
 export class TerminalInstance {
   terminal: Terminal
+  private hooks?: TerminalInstanceHooks
   private fitAddon: FitAddon
   private outputUnsubscribe: (() => void) | null = null
   private resizeObserver: ResizeObserver | null = null
@@ -76,8 +86,9 @@ export class TerminalInstance {
   // Snapshot captured in unmount() so Overview can display it after the element is detached.
   lastSnapshot: string | null = null
 
-  constructor(sessionId: string, scrollbackLimit: number, onBell?: () => void) {
+  constructor(sessionId: string, scrollbackLimit: number, hooks?: TerminalInstanceHooks) {
     this.sessionId = sessionId
+    this.hooks = hooks
     const initialTheme =
       document.documentElement.dataset.theme === 'light' ? XTERM_THEMES.light : XTERM_THEMES.dark
     this.terminal = new Terminal({
@@ -128,8 +139,8 @@ export class TerminalInstance {
       window.electronAPI.terminal.resize(sessionId, cols, rows)
     })
 
-    if (onBell) {
-      this.terminal.onBell(onBell)
+    if (hooks?.onBell) {
+      this.terminal.onBell(hooks.onBell)
     }
 
     this.registerLinkProviders()
@@ -137,11 +148,11 @@ export class TerminalInstance {
     this.outputUnsubscribe = window.electronAPI.terminal.onOutput((sid, data) => {
       if (sid !== sessionId) return
       this.terminal.write(data)
-      useSessionStore.getState().setSessionBusy(sessionId)
+      this.hooks?.onBusy?.()
       if (this.busyTimer !== null) clearTimeout(this.busyTimer)
       this.busyTimer = setTimeout(() => {
         this.busyTimer = null
-        useSessionStore.getState().setSessionIdle(sessionId)
+        this.hooks?.onIdle?.()
       }, IDLE_DEBOUNCE_MS)
     })
   }
@@ -571,7 +582,7 @@ export class TerminalInstance {
     this.cmdClickCleanup?.()
     this.cmdClickCleanup = null
     this.linkOverlay = null
-    useSessionStore.getState().setSessionIdle(this.sessionId)
+    this.hooks?.onIdle?.()
     this.unmount()
     this.outputUnsubscribe?.()
     this.outputUnsubscribe = null

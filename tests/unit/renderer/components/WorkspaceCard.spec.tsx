@@ -19,7 +19,7 @@ vi.mock('../../../../src/renderer/stores/session.store', () => ({
     getBellCountForProject: vi.fn().mockReturnValue(0),
     isProjectBusy: vi.fn().mockReturnValue(false),
     isSessionBusy: vi.fn().mockReturnValue(false),
-    activeSessionIdByProject: new Map(),
+    projectViews: new Map(),
   }),
 }))
 

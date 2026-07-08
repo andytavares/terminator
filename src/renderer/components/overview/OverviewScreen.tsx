@@ -38,7 +38,6 @@ export function OverviewScreen(): JSX.Element {
   const { sessions } = useSessionStore()
   const { workspaces, projectsByWorkspaceId, setScratchActive } = useWorkspaceStore()
   const { processesBySessionId, startPolling, stopPolling } = useMetricsStore()
-  const { busySessions } = useSessionStore()
 
   // Build fast lookup maps
   const projectById = useMemo(() => {
@@ -76,8 +75,8 @@ export function OverviewScreen(): JSX.Element {
       result.push({ session, project, workspace })
     }
     result.sort((a, b) => {
-      const aBusy = busySessions.has(a.session.id) ? 0 : 1
-      const bBusy = busySessions.has(b.session.id) ? 0 : 1
+      const aBusy = a.session.busy ? 0 : 1
+      const bBusy = b.session.busy ? 0 : 1
       if (aBusy !== bBusy) return aBusy - bBusy
       const wCmp = a.workspace.name.localeCompare(b.workspace.name)
       if (wCmp !== 0) return wCmp
@@ -86,7 +85,7 @@ export function OverviewScreen(): JSX.Element {
       return a.session.tabTitle.localeCompare(b.session.tabTitle)
     })
     return result
-  }, [sessions, projectById, workspaceById, busySessions])
+  }, [sessions, projectById, workspaceById])
 
   // Resolve PIDs and start polling whenever the session list changes
   const sessionIdsKey = tiles.map((t) => t.session.id).join(',')

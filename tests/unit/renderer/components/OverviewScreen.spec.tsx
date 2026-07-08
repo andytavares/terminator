@@ -95,7 +95,6 @@ beforeEach(() => {
 
   vi.mocked(useSessionStore).mockReturnValue({
     sessions: new Map(),
-    busySessions: new Set(),
   } as unknown as ReturnType<typeof useSessionStore>)
 
   vi.mocked(useSessionStore).getState = vi.fn().mockReturnValue({
@@ -146,7 +145,6 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['sess-1', session]]),
-      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -168,7 +166,6 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['sess-1', session]]),
-      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -191,7 +188,6 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['sess-1', session]]),
-      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -216,7 +212,6 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['sess-1', session]]),
-      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -247,7 +242,6 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['sess-1', session]]),
-      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -276,7 +270,6 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['sess-1', session]]),
-      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -309,7 +302,6 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['sess-1', session]]),
-      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -344,9 +336,8 @@ describe('OverviewScreen', () => {
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([
         ['s-a', sessA],
-        ['s-z', sessZ],
+        ['s-z', { ...sessZ, busy: true }],
       ]),
-      busySessions: new Set(['s-z']),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -376,7 +367,6 @@ describe('OverviewScreen', () => {
         ['s-1', sess1],
         ['s-2', sess2],
       ]),
-      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -406,7 +396,6 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['scratch-1', scratchSession]]),
-      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -431,7 +420,6 @@ describe('OverviewScreen', () => {
 
     vi.mocked(useSessionStore).mockReturnValue({
       sessions: new Map([['scratch-2', scratchSession]]),
-      busySessions: new Set(),
     } as unknown as ReturnType<typeof useSessionStore>)
 
     vi.mocked(useWorkspaceStore).mockReturnValue({
@@ -452,5 +440,77 @@ describe('OverviewScreen', () => {
     expect(mockSetScratchActive).toHaveBeenCalledWith(true)
     expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
     expect(mockSetActiveProject).not.toHaveBeenCalled()
+  })
+
+  it('sorts tiles: busy first, then workspace, project, and tab title', async () => {
+    const wsA = makeWorkspace({ id: 'ws-a', name: 'Alpha' })
+    const wsB = makeWorkspace({ id: 'ws-b', name: 'Beta' })
+    const projA = makeProject({ id: 'proj-a', workspaceId: 'ws-a', name: 'api' })
+    const projB = makeProject({ id: 'proj-b', workspaceId: 'ws-a', name: 'web' })
+    const projC = makeProject({ id: 'proj-c', workspaceId: 'ws-b', name: 'api' })
+
+    vi.mocked(useSessionStore).mockReturnValue({
+      sessions: new Map([
+        ['s-1', makeSession({ id: 's-1', projectId: 'proj-b', tabTitle: 'bbb' })],
+        ['s-2', makeSession({ id: 's-2', projectId: 'proj-a', tabTitle: 'zzz' })],
+        ['s-3', makeSession({ id: 's-3', projectId: 'proj-a', tabTitle: 'aaa' })],
+        ['s-4', makeSession({ id: 's-4', projectId: 'proj-c', tabTitle: 'ccc', busy: true })],
+      ]),
+    } as unknown as ReturnType<typeof useSessionStore>)
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [wsA, wsB],
+      projectsByWorkspaceId: new Map([
+        ['ws-a', [projA, projB]],
+        ['ws-b', [projC]],
+      ]),
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+
+    await act(async () => {
+      render(<OverviewScreen />)
+    })
+
+    const ids = [...document.querySelectorAll('[data-testid^="tile-"]')].map((el) =>
+      el.getAttribute('data-testid')
+    )
+    // busy s-4 first; then Alpha/api by title (aaa, zzz), then Alpha/web, per comparator
+    expect(ids).toEqual(['tile-s-4', 'tile-s-3', 'tile-s-2', 'tile-s-1'])
+  })
+
+  it('skips sessions whose project or workspace cannot be resolved', async () => {
+    vi.mocked(useSessionStore).mockReturnValue({
+      sessions: new Map([
+        ['s-orphan', makeSession({ id: 's-orphan', projectId: 'proj-ghost' })],
+        ['s-lost-ws', makeSession({ id: 's-lost-ws', projectId: 'proj-x' })],
+      ]),
+    } as unknown as ReturnType<typeof useSessionStore>)
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [],
+      projectsByWorkspaceId: new Map([
+        ['ws-gone', [makeProject({ id: 'proj-x', workspaceId: 'ws-gone' })]],
+      ]),
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+
+    await act(async () => {
+      render(<OverviewScreen />)
+    })
+
+    expect(document.querySelector('[data-testid^="tile-"]')).toBeNull()
+  })
+
+  it('starts empty polling when PID resolution rejects', async () => {
+    mockGetPids.mockRejectedValueOnce(new Error('ipc down'))
+    vi.mocked(useSessionStore).mockReturnValue({
+      sessions: new Map([['sess-1', makeSession()]]),
+    } as unknown as ReturnType<typeof useSessionStore>)
+    vi.mocked(useWorkspaceStore).mockReturnValue({
+      workspaces: [makeWorkspace()],
+      projectsByWorkspaceId: new Map([['ws-1', [makeProject()]]]),
+    } as unknown as ReturnType<typeof useWorkspaceStore>)
+
+    await act(async () => {
+      render(<OverviewScreen />)
+    })
+
+    expect(mockStartPolling).toHaveBeenCalledWith([])
   })
 })

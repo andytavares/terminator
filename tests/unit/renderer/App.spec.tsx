@@ -220,7 +220,7 @@ function setupMocks(
     getSessionsForProject: vi.fn().mockReturnValue([]),
     getScratchSessions: vi.fn().mockReturnValue([]),
     closeSession: vi.fn().mockResolvedValue(undefined),
-    activeSessionIdByProject: new Map(),
+    projectViews: new Map(),
     setActiveSessionForProject: vi.fn(),
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useToastStore).mockReturnValue({
@@ -762,7 +762,7 @@ describe('App', () => {
         getSessionsForProject: vi.fn().mockReturnValue([]),
         getScratchSessions: vi.fn().mockReturnValue([]),
         closeSession: mockCloseSession,
-        activeSessionIdByProject: new Map([['proj-1', 'ses-active']]),
+        projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'ses-active' }]]),
         setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
       setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
@@ -771,7 +771,7 @@ describe('App', () => {
         getSessionsForProject: vi.fn().mockReturnValue([]),
         getScratchSessions: vi.fn().mockReturnValue([]),
         closeSession: mockCloseSession,
-        activeSessionIdByProject: new Map([['proj-1', 'ses-active']]),
+        projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'ses-active' }]]),
         setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
 
@@ -812,7 +812,7 @@ describe('App', () => {
         getSessionsForProject: vi.fn().mockReturnValue([]),
         getScratchSessions: vi.fn().mockReturnValue([]),
         closeSession: mockCloseSession,
-        activeSessionIdByProject: new Map(),
+        projectViews: new Map(),
         setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
 
@@ -856,7 +856,9 @@ describe('App', () => {
         getSessionsForProject: vi.fn().mockReturnValue([]),
         getScratchSessions: vi.fn().mockReturnValue([]),
         closeSession: mockCloseSession,
-        activeSessionIdByProject: new Map([[SCRATCH_PROJECT_ID, 'ses-scratch']]),
+        projectViews: new Map([
+          [SCRATCH_PROJECT_ID, { terminalCounter: 0, activeSessionId: 'ses-scratch' }],
+        ]),
         setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
 
@@ -902,7 +904,7 @@ describe('App', () => {
         getScratchSessions: vi.fn().mockReturnValue([]),
         closeSession: mockCloseSession,
         // proj-1 has no active session mapped
-        activeSessionIdByProject: new Map(),
+        projectViews: new Map(),
         setActiveSessionForProject: vi.fn(),
       } as unknown as ReturnType<typeof useSessionStore>)
 
@@ -1276,7 +1278,7 @@ describe('App', () => {
           .mockReturnValue({ terminal: { scrollbackLimit: 5000, promptForName: true } }),
       } as unknown as ReturnType<typeof useSettingsStore>)
       ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
-        terminalCountByProject: new Map([['proj-1', 2]]),
+        projectViews: new Map([['proj-1', { terminalCounter: 2 }]]),
         setActiveSessionForProject: vi.fn(),
       })
       render(<App />)
@@ -1298,7 +1300,7 @@ describe('App', () => {
           .mockReturnValue({ terminal: { scrollbackLimit: 5000, promptForName: true } }),
       } as unknown as ReturnType<typeof useSettingsStore>)
       ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
-        terminalCountByProject: new Map(),
+        projectViews: new Map(),
         setActiveSessionForProject: vi.fn(),
       })
       render(<App />)
@@ -1322,7 +1324,7 @@ describe('App', () => {
           .mockReturnValue({ terminal: { scrollbackLimit: 5000, promptForName: true } }),
       } as unknown as ReturnType<typeof useSettingsStore>)
       ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
-        terminalCountByProject: new Map(),
+        projectViews: new Map(),
         setActiveSessionForProject: vi.fn(),
       })
       render(<App />)

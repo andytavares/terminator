@@ -74,16 +74,11 @@ vi.mock('xterm-addon-fit', () => {
 
 vi.mock('xterm/css/xterm.css', () => ({}))
 
+// TerminalInstance is a pure view object: busy/idle/bell reach the outside
+// world only through the constructor hooks (wired by the session controller).
 const mockSetSessionBusy = vi.fn()
 const mockSetSessionIdle = vi.fn()
-vi.mock('../../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: Object.assign(vi.fn(), {
-    getState: () => ({
-      setSessionBusy: mockSetSessionBusy,
-      setSessionIdle: mockSetSessionIdle,
-    }),
-  }),
-}))
+const ACTIVITY_HOOKS = { onBusy: () => mockSetSessionBusy(), onIdle: () => mockSetSessionIdle() }
 
 // Mock canvas getContext so captureToDataUrl's drawing code is exercisable
 const mockFillRect = vi.fn()
@@ -236,9 +231,9 @@ describe('TerminalInstance', () => {
     expect(instance.element.style.cssText).toContain('width')
   })
 
-  it('accepts an optional onBell callback', () => {
+  it('accepts an optional onBell hook', () => {
     const onBell = vi.fn()
-    const instance = new TerminalInstance('ses-1', 1000, onBell)
+    const instance = new TerminalInstance('ses-1', 1000, { onBell })
     expect(instance.terminal.onBell).toHaveBeenCalledWith(onBell)
   })
 
@@ -303,20 +298,20 @@ describe('TerminalInstance', () => {
   })
 
   describe('busy/idle tracking', () => {
-    it('calls setSessionBusy and schedules setSessionIdle on output', () => {
+    it('fires onBusy and schedules onIdle on output', () => {
       vi.useFakeTimers()
-      new TerminalInstance('ses-busy', 1000)
+      new TerminalInstance('ses-busy', 1000, ACTIVITY_HOOKS)
       const outputCallback = mockOnOutput.mock.calls[0][0]
       outputCallback('ses-busy', 'data')
 
-      expect(mockSetSessionBusy).toHaveBeenCalledWith('ses-busy')
+      expect(mockSetSessionBusy).toHaveBeenCalled()
       vi.runAllTimers()
-      expect(mockSetSessionIdle).toHaveBeenCalledWith('ses-busy')
+      expect(mockSetSessionIdle).toHaveBeenCalled()
       vi.useRealTimers()
     })
 
     it('ignores output from other sessions', () => {
-      new TerminalInstance('ses-a', 1000)
+      new TerminalInstance('ses-a', 1000, ACTIVITY_HOOKS)
       const outputCallback = mockOnOutput.mock.calls[0][0]
       outputCallback('ses-other', 'data')
       expect(mockSetSessionBusy).not.toHaveBeenCalled()
@@ -404,16 +399,16 @@ describe('TerminalInstance', () => {
   })
 
   describe('dispose()', () => {
-    it('clears busy timer and calls setSessionIdle', () => {
+    it('clears busy timer and fires onIdle on dispose', () => {
       vi.useFakeTimers()
-      const instance = new TerminalInstance('ses-dispose', 1000)
+      const instance = new TerminalInstance('ses-dispose', 1000, ACTIVITY_HOOKS)
       // Trigger a busy timer
       const outputCallback = mockOnOutput.mock.calls[0][0]
       outputCallback('ses-dispose', 'data')
 
       mockSetSessionIdle.mockClear()
       instance.dispose()
-      expect(mockSetSessionIdle).toHaveBeenCalledWith('ses-dispose')
+      expect(mockSetSessionIdle).toHaveBeenCalled()
       vi.useRealTimers()
     })
   })
