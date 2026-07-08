@@ -1,0 +1,43 @@
+extensions/remote-control/src/index.ts
+  s_08902e443a9840::t_75ebceee289c58 183-187
+  s_08902e443a9840::t_ce3b84d869c360 192-197,199-209,211-229,231-240,242-243,247,284-286
+  s_08902e443a9840::t_e3f1943bb1fe61 188-191,244-246,248-250,252-258,260-263,265-283,287-304,311,313-318
+src/main/extensions/extension-view-host.ts
+  s_08902e443a9840::t_7963e94a9c415d 94-97,100,107-111,114-127,129-131
+  s_08902e443a9840::t_d128a1b203c600 187,189
+extensions/task-vault/src/index.ts
+  s_08902e443a9840::t_889902999e9d93 168
+  s_08902e443a9840::t_6cec2210201021 149-155,161-167,169-170
+src/main/remote/__tests__/remote-accessible-channels.spec.ts
+  s_08902e443a9840::t_5ac5db74b1d9f3 5-9,12-15,28-29
+src/main/index.ts
+  s_08902e443a9840::t_6d44551a96262e 308-315
+src/main/ipc/terminal.ipc.ts
+  s_08902e443a9840::t_d00065524d7e1b 70-72,75
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_08902e443a9840::t_742842fc4e8de7 368-371,373-374,376-389
+src/main/extensions/api.ts
+  s_08902e443a9840::t_1ad96fb690777d 115-118
+extensions/remote-control/src/server/routes/terminal.routes.ts
+  s_08902e443a9840::t_ee66ffd039295a 198-200,203-204
+  s_08902e443a9840::t_0fb34963372bbd 50,53-54,58-62
+  s_08902e443a9840::t_d470699dd27661 63
+tests/unit/extensions/extension-view-host.spec.ts
+  s_08902e443a9840::t_46064d6ead843a 231,242,244,253-254,260
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "046d147670b075a00604e1c12f3d4545cab5eae2",
+  "prompts": {},
+  "sessions": {
+    "s_08902e443a9840": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a0afc34-4f92-4bff-9395-8510afc8fba3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
