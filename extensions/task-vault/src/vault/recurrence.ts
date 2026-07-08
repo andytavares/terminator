@@ -113,7 +113,8 @@ export function parseRecurrenceEndMeta(
       endType: meta.recurrence_end_type as RecurrenceEndType,
       endDate: (meta.recurrence_end_date as string) ?? null,
       endCount: meta.recurrence_end_count != null ? (meta.recurrence_end_count as number) : null,
-      completedCount: (meta.recurrence_completed_count as number) || 0,
+      completedCount:
+        meta.recurrence_completed_count != null ? (meta.recurrence_completed_count as number) : 0,
     }
   } catch {
     return null

@@ -5,6 +5,10 @@ import type { ExtensionDB } from '../../../../src/main/extensions/api'
  * own column subsets; a schema change now touches this file, not every
  * call site. Fields not provided fall back to the schema's semantics
  * (NULL, or '{}'/'[]' for the JSON blobs).
+ *
+ * Assumes applyTaskVaultMigrations has run: the column list includes migration
+ * columns (today_since, recurrence_*). Schema + migrations always run together
+ * at extension activation before any handler can reach this.
  */
 export interface NewTaskRow {
   id: string
