@@ -1,0 +1,34 @@
+tests/unit/extensions/api.spec.ts
+  s_08902e443a9840::t_d8a54c70bf410d 590-658
+  s_08902e443a9840::t_aa3e8d8c56ef19 74-81
+src/main/ipc/extension.ipc.ts
+  s_08902e443a9840::t_fbf2d563fe495b 3-10
+  s_08902e443a9840::t_a07e3a77a0a669 62,66,75,80,84
+  s_08902e443a9840::t_f8b1750f1c8bc5 49
+tests/integration/ipc/extension.ipc.spec.ts
+  s_08902e443a9840::t_55464895bc9c79 4-6,11,13-24,27-43,49
+src/main/index.ts
+  s_08902e443a9840::t_e03137b8cb92e3 23-27
+  s_08902e443a9840::t_27080f277d884e 124-134
+  s_08902e443a9840::t_1efc4715045442 219
+src/main/extensions/api.ts
+  s_08902e443a9840::t_2665dd1d02926f 430-432
+  s_08902e443a9840::t_a893554ecda225 400-429,433-497
+  s_08902e443a9840::t_53aaad780cd763 328-330
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "187be58f4d14e792d666f934f83589b2e71dbaea",
+  "prompts": {},
+  "sessions": {
+    "s_08902e443a9840": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a0afc34-4f92-4bff-9395-8510afc8fba3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
