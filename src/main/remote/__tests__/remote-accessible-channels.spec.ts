@@ -1,32 +1,20 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { REMOTE_ACCESSIBLE_CHANNELS } from '../remote-accessible-channels'
+import { ELECTRON_API_MANIFEST } from '../../../shared/electron-api/manifest'
 
-// The browser `/app/` surface routes every electronAPI call through the shim as a
-// bridge invoke/send/subscribe. If the shim uses a channel the bridge does not
-// allowlist, that call is silently rejected and `/app/` breaks for that feature.
-// This test makes the allowlist and the shim fail together, so the security
-// mechanism can never half-ship without its allowlist again (the original defect).
-const SHIM_PATH = fileURLToPath(
-  new URL('../../../renderer-remote/electron-api-shim.ts', import.meta.url)
-)
-
-function channelsUsedByShim(): Set<string> {
-  const src = readFileSync(SHIM_PATH, 'utf8')
-  const channels = new Set<string>()
-  // invoke('channel'...), fire('channel'...), on('channel'...)
-  const re = /\b(?:invoke|fire|on)\(\s*'([^']+)'/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(src)) !== null) channels.add(m[1])
-  return channels
-}
+// The remote surface is derived from the channel manifest, so the shim and the
+// allowlist can no longer half-ship independently: both are generated from the
+// same declaration. The exact expected channel list is pinned in
+// src/shared/electron-api/__tests__/manifest.spec.ts; this spec checks the
+// derivation contract from the bridge's point of view.
 
 describe('REMOTE_ACCESSIBLE_CHANNELS', () => {
-  it('covers every channel the /app/ shim actually uses (no silent /app/ breakage)', () => {
-    const used = channelsUsedByShim()
-    expect(used.size).toBeGreaterThan(0) // guard against a regex that matched nothing
-    const missing = [...used].filter((ch) => !REMOTE_ACCESSIBLE_CHANNELS.has(ch))
+  it('covers every channel the generated remote shim can reach (no silent /app/ breakage)', () => {
+    const shimChannels = ELECTRON_API_MANIFEST.filter(
+      (s) => s.kind !== 'local' && (s.remote ?? 'same') === 'same'
+    ).map((s) => s.channel!)
+    expect(shimChannels.length).toBeGreaterThan(0)
+    const missing = shimChannels.filter((ch) => !REMOTE_ACCESSIBLE_CHANNELS.has(ch))
     expect(missing).toEqual([])
   })
 
@@ -37,8 +25,23 @@ describe('REMOTE_ACCESSIBLE_CHANNELS', () => {
       'remote:toggle',
       'remote:update-password',
       'db:health',
+      'workspace:get-active',
+      'extension:update-panel-bounds',
+      'extension:set-bottom-inset',
     ]) {
       expect(REMOTE_ACCESSIBLE_CHANNELS.has(internal)).toBe(false)
+    }
+  })
+
+  it('does not expose channels for stubbed or omitted manifest methods', () => {
+    for (const spec of ELECTRON_API_MANIFEST) {
+      if (spec.kind === 'local' || !spec.channel) continue
+      if ((spec.remote ?? 'same') !== 'same') {
+        expect(
+          REMOTE_ACCESSIBLE_CHANNELS.has(spec.channel),
+          `${spec.channel} is '${spec.remote}' and must not be remote-accessible`
+        ).toBe(false)
+      }
     }
   })
 })
