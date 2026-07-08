@@ -3,6 +3,7 @@
  * Previously each module contained its own duplicate copies.
  */
 import type { IndexedTask, IndexedProject, TaskStatus, ProjectStatus } from './types'
+import { parseRecurrenceEndMeta } from './recurrence'
 
 export function rowToTask(row: Record<string, unknown>): IndexedTask {
   const source = row.source as string
@@ -37,37 +38,25 @@ export function rowToTask(row: Record<string, unknown>): IndexedTask {
     recurrenceCompletedCount = row.recurrence_completed_count as number
   }
 
-  // Fall back to metadata JSON for any fields not yet in columns
+  // Fall back to metadata JSON for any fields not yet in columns. The
+  // recurrence metadata encoding is decoded in exactly one place
+  // (parseRecurrenceEndMeta); only the blocked_* keys are decoded here.
   if (
     blockedReason === undefined &&
     blockedCheckInterval === undefined &&
     recurrenceEndType === undefined
   ) {
+    const endMeta = parseRecurrenceEndMeta(row.metadata as string)
+    if (endMeta) {
+      recurrenceEndType = endMeta.endType
+      recurrenceEndDate = endMeta.endDate ?? undefined
+      recurrenceEndCount = endMeta.endCount ?? undefined
+      recurrenceCompletedCount = endMeta.completedCount || undefined
+    }
     try {
       const meta = JSON.parse((row.metadata as string) || '{}') as Record<string, unknown>
-      if (blockedReason === undefined) {
-        blockedReason = (meta.blocked_reason as string) || undefined
-      }
-      if (blockedCheckInterval === undefined) {
-        blockedCheckInterval = (meta.blocked_check_interval as string) || undefined
-      }
-      if (recurrenceEndType === undefined) {
-        recurrenceEndType =
-          (meta.recurrence_end_type as 'none' | 'on_date' | 'after_count') || undefined
-      }
-      if (recurrenceEndDate === undefined) {
-        recurrenceEndDate = (meta.recurrence_end_date as string) || undefined
-      }
-      if (recurrenceEndCount === undefined) {
-        recurrenceEndCount =
-          meta.recurrence_end_count != null ? (meta.recurrence_end_count as number) : undefined
-      }
-      if (recurrenceCompletedCount === undefined) {
-        recurrenceCompletedCount =
-          meta.recurrence_completed_count != null
-            ? (meta.recurrence_completed_count as number)
-            : undefined
-      }
+      blockedReason = (meta.blocked_reason as string) || undefined
+      blockedCheckInterval = (meta.blocked_check_interval as string) || undefined
     } catch {
       // ignore malformed metadata
     }

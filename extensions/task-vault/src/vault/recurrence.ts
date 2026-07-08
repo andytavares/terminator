@@ -82,3 +82,61 @@ export function computeNextDueDate(fromDate: string, rule: RecurrenceRule): stri
   }
   return localDate(d)
 }
+
+// ─── Recurrence end-condition decoding ───────────────────────────────────────
+
+export type RecurrenceEndType = 'none' | 'on_date' | 'after_count'
+
+export interface RecurrenceEndMeta {
+  endType: RecurrenceEndType
+  endDate: string | null
+  endCount: number | null
+  completedCount: number
+}
+
+/**
+ * Decodes recurrence end-conditions from a legacy metadata JSON blob. This is
+ * the ONE place that knows the metadata key names and coercions: SQL columns
+ * are authoritative (writers populate them; applyTaskVaultMigrations backfills
+ * legacy rows), and this fallback exists only for databases that predate the
+ * columns and have not run the migration. Returns null when the blob carries
+ * no end-conditions (or is malformed).
+ */
+export function parseRecurrenceEndMeta(
+  metadata: string | null | undefined
+): RecurrenceEndMeta | null {
+  if (!metadata || metadata === '{}') return null
+  try {
+    const meta = JSON.parse(metadata) as Record<string, unknown>
+    if (!meta.recurrence_end_type) return null
+    return {
+      endType: meta.recurrence_end_type as RecurrenceEndType,
+      endDate: (meta.recurrence_end_date as string) ?? null,
+      endCount: meta.recurrence_end_count != null ? (meta.recurrence_end_count as number) : null,
+      completedCount: (meta.recurrence_completed_count as number) || 0,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * End-conditions for a task row: columns first, metadata fallback when the
+ * columns say 'none' (matching the historical read semantics).
+ */
+export function readRecurrenceEndState(row: {
+  recurrence_end_type?: string | null
+  recurrence_end_date?: string | null
+  recurrence_end_count?: number | null
+  recurrence_completed_count?: number | null
+  metadata?: string | null
+}): RecurrenceEndMeta {
+  const fromColumns: RecurrenceEndMeta = {
+    endType: (row.recurrence_end_type as RecurrenceEndType) ?? 'none',
+    endDate: row.recurrence_end_date ?? null,
+    endCount: row.recurrence_end_count ?? null,
+    completedCount: row.recurrence_completed_count ?? 0,
+  }
+  if (fromColumns.endType !== 'none') return fromColumns
+  return parseRecurrenceEndMeta(row.metadata) ?? fromColumns
+}

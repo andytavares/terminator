@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import type { ExtensionDB } from '../../../../src/main/extensions/api'
-import { localDate, computeNextDueDate, parseRecurrenceRule } from './recurrence'
+import {
+  localDate,
+  computeNextDueDate,
+  parseRecurrenceRule,
+  readRecurrenceEndState,
+} from './recurrence'
+import { insertTask } from './task-repository'
 
 type TaskRow = {
   id: string
@@ -50,25 +56,12 @@ export async function ensureNextOccurrence(
   const rule = parseRecurrenceRule(task.recurrence_rule)
   const nextDue = computeNextDueDate(task.due_date, rule)
 
-  let endType = task.recurrence_end_type ?? 'none'
-  let endDateCol = task.recurrence_end_date ?? null
-  let endCountCol = task.recurrence_end_count ?? null
-  let spawnCount = task.recurrence_completed_count ?? 0
-
-  if (endType === 'none' && task.metadata && task.metadata !== '{}') {
-    try {
-      const meta = JSON.parse(task.metadata) as Record<string, unknown>
-      if (meta.recurrence_end_type) {
-        endType = meta.recurrence_end_type as string
-        endDateCol = (meta.recurrence_end_date as string) ?? null
-        endCountCol =
-          meta.recurrence_end_count != null ? (meta.recurrence_end_count as number) : null
-        spawnCount = (meta.recurrence_completed_count as number) || 0
-      }
-    } catch {
-      // malformed metadata — treat as no end conditions
-    }
-  }
+  const {
+    endType,
+    endDate: endDateCol,
+    endCount: endCountCol,
+    completedCount: spawnCount,
+  } = readRecurrenceEndState(task)
 
   if (endType === 'on_date') {
     if (endDateCol && nextDue > endDateCol) return null
@@ -80,37 +73,26 @@ export async function ensureNextOccurrence(
   const nowIso = new Date().toISOString()
 
   await db.transaction(async (tx) => {
-    await tx.run(
-      `INSERT INTO tasks
-         (id, text, status, project_id, context, area_id, due_date,
-          source, source_ref, recurrence_rule, recurrence_template_id,
-          recurrence_notify_at, metadata, terminator_links, created_at, updated_at,
-          recurrence_end_type, recurrence_end_date, recurrence_end_count,
-          recurrence_completed_count)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [
-        newId,
-        task.text,
-        'open',
-        task.project_id ?? null,
-        task.context ?? null,
-        task.area_id ?? null,
-        nextDue,
-        task.source,
-        task.source === 'daily' ? nextDue : task.source_ref,
-        task.recurrence_rule,
-        templateId,
-        task.recurrence_notify_at ?? null,
-        '{}',
-        '[]',
-        nowIso,
-        nowIso,
-        endType !== 'none' ? endType : null,
-        endDateCol,
-        endCountCol,
-        spawnCount + 1,
-      ]
-    )
+    await insertTask(tx, {
+      id: newId,
+      text: task.text,
+      status: 'open',
+      projectId: task.project_id,
+      context: task.context,
+      areaId: task.area_id,
+      dueDate: nextDue,
+      source: task.source,
+      sourceRef: task.source === 'daily' ? nextDue : task.source_ref,
+      recurrenceRule: task.recurrence_rule,
+      recurrenceTemplateId: templateId,
+      recurrenceNotifyAt: task.recurrence_notify_at,
+      recurrenceEndType: endType !== 'none' ? endType : null,
+      recurrenceEndDate: endDateCol,
+      recurrenceEndCount: endCountCol,
+      recurrenceCompletedCount: spawnCount + 1,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    })
   })
 
   return newId
