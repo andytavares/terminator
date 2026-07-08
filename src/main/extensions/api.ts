@@ -325,6 +325,9 @@ interface Registry {
   sessionCloseHandlers: Set<(sessionId: string) => void>
 }
 
+// Internal to this module (and its tests). Other modules use the registry
+// query functions below — never the raw collections, so the string-key
+// conventions stay encapsulated here.
 export const globalRegistry: Registry = {
   settingsSections: new Map(),
   settingsValues: new Map(),
@@ -392,6 +395,104 @@ function rebuildViewMenu(): void {
   // Rebuilding from live MenuItem objects (appMenu.items) loses accelerator and
   // click-handler bindings — the callback avoids that by using the original template.
   menuRebuildCallback?.()
+}
+
+// ── Registry queries ─────────────────────────────────────────────────────────
+// The only supported registry access outside this module. The string-key
+// conventions (`${extensionId}.settings`, `ext-menu-${id}`, …) are minted by
+// the registration code above; these functions keep their decoding here too,
+// so no other module re-derives key formats.
+
+export function listExtensionSettingsSections(): Array<{
+  extensionId: string
+  label: string
+  properties: ExtensionSettingsSchema['properties']
+}> {
+  return [...globalRegistry.settingsSections.entries()].map(([key, schema]) => ({
+    extensionId: key.replace(/\.settings$/, ''),
+    label: schema.label,
+    properties: schema.properties,
+  }))
+}
+
+export function listExtensionSidebarItems(): Array<{
+  id: string
+  label: string
+  tooltip?: string
+}> {
+  return [...globalRegistry.sidebarItems.values()].map((item) => ({
+    id: item.id,
+    label: item.label,
+    tooltip: item.tooltip,
+  }))
+}
+
+export function listExtensionContextMenuItems(
+  target: string
+): Array<{ id: string; label: string }> {
+  return [...globalRegistry.contextMenuItems.values()]
+    .filter((entry) => entry.target === target)
+    .map((entry) => ({ id: entry.item.id, label: entry.item.label }))
+}
+
+export function dispatchContextMenuClick(target: string, itemId: string, targetId: string): void {
+  for (const entry of globalRegistry.contextMenuItems.values()) {
+    if (entry.target === target && entry.item.id === itemId) {
+      entry.item.onClick(targetId)
+      break
+    }
+  }
+}
+
+export function listExtensionCommands(): Array<{
+  key: string
+  id: string
+  label: string
+  description?: string
+  shortcut?: string
+  category?: string
+}> {
+  return [...globalRegistry.commandContributions.entries()].map(([key, cmd]) => ({
+    key,
+    id: cmd.id,
+    label: cmd.label,
+    description: cmd.description,
+    shortcut: cmd.shortcut,
+    category: cmd.category,
+  }))
+}
+
+export function executeExtensionCommand(key: string): void {
+  globalRegistry.commandHandlers.get(key)?.()
+}
+
+/**
+ * Extension entries for the native View menu. Also records the
+ * panelId → menu-item-id mapping so getPanelMenuItemId() can resolve checkbox
+ * items when panel state changes.
+ */
+export function listNativeViewMenuItems(): Array<{
+  id: string
+  label: string
+  accelerator?: string
+  type: 'checkbox' | 'normal'
+  onClick: () => void
+}> {
+  return [...globalRegistry.nativeMenuItems.values()].map((contrib) => {
+    const id = `ext-menu-${contrib.id}`
+    if (contrib.panelId) globalRegistry.panelMenuItemIds.set(contrib.panelId, id)
+    return {
+      id,
+      label: contrib.label,
+      accelerator: contrib.accelerator,
+      type: contrib.type === 'checkbox' ? ('checkbox' as const) : ('normal' as const),
+      onClick: () => contrib.onClick(),
+    }
+  })
+}
+
+export function getPanelMenuItemId(panelId: string): string | undefined {
+  return globalRegistry.panelMenuItemIds.get(panelId)
 }
 
 // Map from view name to open auxiliary BrowserWindow (shared across all extensions)

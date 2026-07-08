@@ -71,6 +71,14 @@ import {
   createExtensionAPI,
   globalRegistry,
   setMenuRebuildCallback,
+  listExtensionSettingsSections,
+  listExtensionSidebarItems,
+  listExtensionContextMenuItems,
+  dispatchContextMenuClick,
+  listExtensionCommands,
+  executeExtensionCommand,
+  listNativeViewMenuItems,
+  getPanelMenuItemId,
 } from '../../../src/main/extensions/api'
 import { ipcInvokeRegistry } from '../../../src/main/remote/ipc-registry'
 import * as shellExecutor from '../../../src/main/shell/shell-executor'
@@ -577,5 +585,74 @@ describe('api.pty.attachOnData', () => {
   it('returns null when no ptyManager dep is provided', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
     expect(api.pty.attachOnData('s1', vi.fn())).toBeNull()
+  })
+})
+
+describe('registry query functions', () => {
+  it('listExtensionSettingsSections decodes the extension id from the section key', () => {
+    const api = createExtensionAPI('com.query.settings', '0.1.0')
+    const d = api.settings.register({
+      label: 'Query Test',
+      properties: { 'com.query.settings.flag': { type: 'boolean', label: 'Flag', default: false } },
+    })
+    const section = listExtensionSettingsSections().find(
+      (s) => s.extensionId === 'com.query.settings'
+    )
+    expect(section).toBeDefined()
+    expect(section!.label).toBe('Query Test')
+    expect(section!.properties['com.query.settings.flag']).toBeDefined()
+    d.dispose()
+  })
+
+  it('listExtensionSidebarItems returns the renderer-facing shape', () => {
+    const api = createExtensionAPI('com.query.sidebar', '0.1.0')
+    const d = api.sidebar.registerItem({ id: 'q-item', label: 'Q', tooltip: 'tip' })
+    expect(listExtensionSidebarItems()).toContainEqual({ id: 'q-item', label: 'Q', tooltip: 'tip' })
+    d.dispose()
+  })
+
+  it('context menu items are listed per target and dispatched by id', () => {
+    const api = createExtensionAPI('com.query.ctx', '0.1.0')
+    const onClick = vi.fn()
+    const d = api.contextMenu.registerItem('workspace', { id: 'q-ctx', label: 'Do', onClick })
+    expect(listExtensionContextMenuItems('workspace')).toContainEqual({ id: 'q-ctx', label: 'Do' })
+    expect(listExtensionContextMenuItems('project')).toEqual([])
+    dispatchContextMenuClick('workspace', 'q-ctx', 'target-1')
+    expect(onClick).toHaveBeenCalledWith('target-1')
+    dispatchContextMenuClick('workspace', 'nope', 'target-1')
+    expect(onClick).toHaveBeenCalledTimes(1)
+    d.dispose()
+  })
+
+  it('commands are listed with their key and executed through it', () => {
+    const api = createExtensionAPI('com.query.cmd', '0.1.0')
+    const handler = vi.fn()
+    const d = api.commands.register({ id: 'q-cmd', label: 'Run' }, handler)
+    const cmd = listExtensionCommands().find((c) => c.id === 'q-cmd')
+    expect(cmd).toBeDefined()
+    executeExtensionCommand(cmd!.key)
+    expect(handler).toHaveBeenCalled()
+    executeExtensionCommand('unknown-key')
+    expect(handler).toHaveBeenCalledTimes(1)
+    d.dispose()
+  })
+
+  it('listNativeViewMenuItems records the panel menu-item id mapping', () => {
+    const api = createExtensionAPI('com.query.menu', '0.1.0')
+    const onClick = vi.fn()
+    const d = api.nativeMenu.addViewMenuItem({
+      id: 'q-menu',
+      label: 'Toggle Panel',
+      type: 'checkbox',
+      panelId: 'q-panel',
+      onClick,
+    })
+    const items = listNativeViewMenuItems()
+    const item = items.find((i) => i.id === 'ext-menu-q-menu')
+    expect(item).toMatchObject({ label: 'Toggle Panel', type: 'checkbox' })
+    item!.onClick()
+    expect(onClick).toHaveBeenCalled()
+    expect(getPanelMenuItemId('q-panel')).toBe('ext-menu-q-menu')
+    d.dispose()
   })
 })

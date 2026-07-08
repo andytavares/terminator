@@ -20,7 +20,11 @@ import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
 import { runLegacyMigration } from './db/migrate.js'
-import { globalRegistry, setMenuRebuildCallback } from './extensions/api.js'
+import {
+  listNativeViewMenuItems,
+  getPanelMenuItemId,
+  setMenuRebuildCallback,
+} from './extensions/api.js'
 
 // All IPC channel registration goes through channel-registrar.ts (core) or
 // api.ipc.registerHandler (extensions), both of which record the bridge
@@ -117,18 +121,17 @@ function buildViewSubmenu(): Electron.MenuItemConstructorOptions[] {
     { type: 'separator' },
   ]
 
-  const extItems = Array.from(globalRegistry.nativeMenuItems.values()).map((contrib) => {
-    const id = `ext-menu-${contrib.id}`
-    if (contrib.panelId) globalRegistry.panelMenuItemIds.set(contrib.panelId, id)
-    return {
-      id,
-      label: contrib.label,
-      accelerator: contrib.accelerator,
-      type: (contrib.type === 'checkbox' ? 'checkbox' : 'normal') as 'checkbox' | 'normal',
-      checked: false,
-      click: () => contrib.onClick(),
-    } as Electron.MenuItemConstructorOptions
-  })
+  const extItems = listNativeViewMenuItems().map(
+    (item) =>
+      ({
+        id: item.id,
+        label: item.label,
+        accelerator: item.accelerator,
+        type: item.type,
+        checked: false,
+        click: item.onClick,
+      }) as Electron.MenuItemConstructorOptions
+  )
 
   const tail: Electron.MenuItemConstructorOptions[] = [
     ...(extItems.length > 0 ? [{ type: 'separator' as const }] : []),
@@ -213,7 +216,7 @@ function registerAppHandlers(): void {
   onChannel(
     'menu:set-panel-checked',
     (_event, { panelId, open }: { panelId: string; open: boolean }) => {
-      const menuItemId = globalRegistry.panelMenuItemIds.get(panelId)
+      const menuItemId = getPanelMenuItemId(panelId)
       if (menuItemId) {
         const menuItem = Menu.getApplicationMenu()?.getMenuItemById(menuItemId)
         if (menuItem) menuItem.checked = open
