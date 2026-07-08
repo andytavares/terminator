@@ -8,7 +8,9 @@ import type {
   IssueRef,
   DryViolation,
 } from '../schemas/pr-review.schema.js'
+import type { StatusCheck, IssueComment, InlineComment } from '../schemas/pr-review.schema.js'
 import type { FileDiff } from '../schemas/git.schema.js'
+import { FileDiffSchema } from '../schemas/git.schema.js'
 
 // ─── Decision-point keywords for cyclomatic complexity ───────────────────────
 
@@ -891,4 +893,267 @@ export function detectDryViolations(
     }
   }
   return violations
+}
+
+// ─── gh response mappers (pure; moved from github.ipc.ts) ────────────────────
+
+export function normalizeGraphQLNode(node: unknown): Record<string, unknown> {
+  const obj = node as Record<string, unknown>
+  type CommitContext = { name?: string; context?: string; conclusion?: string; state?: string }
+  type CommitNode = { commit?: { statusCheckRollup?: { contexts?: { nodes?: CommitContext[] } } } }
+  type CommitsField = { nodes?: CommitNode[] }
+  type ReviewNode = {
+    author?: { login?: string; avatarUrl?: string }
+    state?: string
+    submittedAt?: string
+  }
+  type LatestReviews = { nodes?: ReviewNode[] }
+  type ReviewRequestNode = {
+    requestedReviewer?: { login?: string; avatarUrl?: string; name?: string }
+  }
+  type ReviewRequests = { nodes?: ReviewRequestNode[] }
+  type AssigneeNode = { login?: string }
+  type Assignees = { nodes?: AssigneeNode[] }
+  const commits = obj.commits as CommitsField | undefined
+  const contextNodes = commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes ?? []
+  const statusCheckRollup = contextNodes.map((ctx) => ({
+    name: ctx.name ?? ctx.context ?? '',
+    state: ctx.conclusion ?? ctx.state ?? '',
+    conclusion: ctx.conclusion ?? ctx.state ?? '',
+  }))
+  const latestReviewNodes = (obj.latestReviews as LatestReviews | undefined)?.nodes ?? []
+  const reviewRequestNodes = (obj.reviewRequests as ReviewRequests | undefined)?.nodes ?? []
+  const requestedReviewers = reviewRequestNodes
+    .map((n) => n.requestedReviewer?.login ?? n.requestedReviewer?.name ?? '')
+    .filter(Boolean)
+  const assigneeNodes = (obj.assignees as Assignees | undefined)?.nodes ?? []
+  const assigneeLogins = assigneeNodes.map((n) => n.login ?? '').filter(Boolean)
+  return {
+    ...obj,
+    statusCheckRollup,
+    latestReviews: { nodes: latestReviewNodes },
+    requestedReviewers,
+    assigneeLogins,
+  }
+}
+
+export const LINT_CHECK_NAMES = [
+  'lint',
+  'eslint',
+  'rubocop',
+  'flake8',
+  'pylint',
+  'stylelint',
+  'prettier',
+  'tslint',
+]
+export const COVERAGE_CHECK_NAMES = [
+  'coverage',
+  'codecov',
+  'coveralls',
+  'sonar',
+  'codeclimate',
+  'lcov',
+]
+
+const NON_BLOCKING = new Set(['SKIPPED', 'NEUTRAL', 'CANCELLED', 'STALE'])
+
+export function mapMergeStateStatus(raw: string): 'behind' | 'dirty' | 'clean' | 'unknown' {
+  const s = raw.toUpperCase()
+  if (s === 'BEHIND') return 'behind'
+  if (s === 'DIRTY' || s === 'CONFLICTING') return 'dirty'
+  if (s === 'CLEAN' || s === 'HAS_HOOKS' || s === 'UNSTABLE' || s === 'BLOCKED') return 'clean'
+  return 'unknown'
+}
+
+export function mapCiStatus(rollup: unknown): 'passing' | 'failing' | 'pending' | 'none' {
+  if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'none'
+  // Normalise: gh returns `conclusion` on CheckRuns; StatusContext uses `state`
+  const statuses = (rollup as Array<Record<string, unknown>>).map((s) =>
+    String(s.conclusion ?? s.state ?? '').toUpperCase()
+  )
+  if (
+    statuses.some(
+      (s) => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT' || s === 'ACTION_REQUIRED'
+    )
+  )
+    return 'failing'
+  if (
+    statuses.some(
+      (s) => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED' || s === 'WAITING'
+    )
+  )
+    return 'pending'
+  // SKIPPED / NEUTRAL / CANCELLED are non-blocking; pass if at least one check succeeded
+  if (statuses.some((s) => s === 'SUCCESS')) return 'passing'
+  return 'none'
+}
+
+export function mapCheckStatus(
+  rollup: unknown,
+  names: string[]
+): 'pass' | 'fail' | 'warn' | 'unknown' {
+  if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'unknown'
+  const checks = (rollup as Array<Record<string, unknown>>).filter((s) => {
+    const name = String(s.name ?? s.context ?? '').toLowerCase()
+    return names.some((n) => name.includes(n))
+  })
+  if (checks.length === 0) return 'unknown'
+  const statuses = checks.map((s) => String(s.conclusion ?? s.state ?? '').toUpperCase())
+  if (statuses.some((s) => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT')) return 'fail'
+  if (statuses.some((s) => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED')) return 'warn'
+  if (statuses.some((s) => s === 'SUCCESS')) return 'pass'
+  if (statuses.every((s) => NON_BLOCKING.has(s))) return 'unknown'
+  return 'unknown'
+}
+
+export function mapStatusChecks(rollup: unknown): StatusCheck[] {
+  if (!rollup || !Array.isArray(rollup)) return []
+  return (rollup as Array<Record<string, unknown>>).map((s) => {
+    const raw = String(s.conclusion ?? s.state ?? '').toUpperCase()
+    const state: StatusCheck['state'] =
+      raw === 'SUCCESS'
+        ? 'pass'
+        : raw === 'FAILURE' || raw === 'ERROR' || raw === 'TIMED_OUT' || raw === 'ACTION_REQUIRED'
+          ? 'fail'
+          : raw === 'PENDING' || raw === 'IN_PROGRESS' || raw === 'QUEUED' || raw === 'WAITING'
+            ? 'pending'
+            : raw === 'SKIPPED' || raw === 'NEUTRAL' || raw === 'CANCELLED'
+              ? 'skipped'
+              : 'unknown'
+    return {
+      name: String(s.name ?? s.context ?? 'Unknown check'),
+      state,
+      url: s.url ? String(s.url) : undefined,
+    }
+  })
+}
+
+export function mapApprovals(
+  reviews: Array<Record<string, unknown>>
+): Array<{ author: string; authorAvatarUrl: string; submittedAt: string }> {
+  // Only keep the latest APPROVED review per author (later CHANGES_REQUESTED dismiss earlier approvals)
+  const byAuthor = new Map<string, Record<string, unknown>>()
+  for (const r of reviews) {
+    const login = String((r.user as Record<string, unknown>)?.login ?? '')
+    if (!login) continue
+    const state = String(r.state ?? '').toUpperCase()
+    // Track any review per author; we'll filter for APPROVED at the end
+    if (!byAuthor.has(login) || state !== 'COMMENTED') {
+      byAuthor.set(login, r)
+    }
+  }
+  return [...byAuthor.values()]
+    .filter((r) => String(r.state ?? '').toUpperCase() === 'APPROVED')
+    .map((r) => {
+      const user = (r.user as Record<string, unknown>) ?? {}
+      return {
+        author: String(user.login ?? ''),
+        authorAvatarUrl: String(user.avatar_url ?? ''),
+        submittedAt: String(r.submitted_at ?? ''),
+      }
+    })
+}
+
+export function mapIssueComment(raw: unknown): IssueComment {
+  const obj = raw as Record<string, unknown>
+  const user = (obj.user ?? obj.author ?? {}) as Record<string, unknown>
+  return {
+    id: Number(obj.id),
+    author: String(user.login ?? ''),
+    authorAvatarUrl: String(user.avatar_url ?? ''),
+    body: String(obj.body ?? ''),
+    createdAt: String(obj.created_at ?? ''),
+    updatedAt: String(obj.updated_at ?? ''),
+  }
+}
+
+export function mapComment(raw: unknown): InlineComment {
+  const obj = raw as Record<string, unknown>
+  const user = (obj.user ?? obj.author ?? {}) as Record<string, unknown>
+  const id = Number(obj.id)
+  const inReplyTo = obj.in_reply_to_id != null ? Number(obj.in_reply_to_id) : null
+  return {
+    id,
+    author: String(user.login ?? ''),
+    authorAvatarUrl: String(user.avatar_url ?? ''),
+    body: String(obj.body ?? ''),
+    createdAt: String(obj.created_at ?? ''),
+    updatedAt: String(obj.updated_at ?? ''),
+    path: String(obj.path ?? ''),
+    line: Number(obj.line ?? 0),
+    startLine: obj.start_line != null ? Number(obj.start_line) : null,
+    side: (String(obj.side ?? 'RIGHT').toUpperCase() === 'LEFT' ? 'LEFT' : 'RIGHT') as
+      | 'LEFT'
+      | 'RIGHT',
+    diffHunk: String(obj.diff_hunk ?? ''),
+    outdated: Boolean(obj.outdated),
+    threadId: inReplyTo != null ? String(inReplyTo) : String(id),
+    isReply: inReplyTo != null,
+    parentId: inReplyTo,
+  }
+}
+
+export function parseDiff(raw: string, filePath: string): FileDiff {
+  if (!raw.trim()) {
+    return { path: filePath, hunks: [], isBinary: false }
+  }
+  if (raw.includes('Binary files')) {
+    return { path: filePath, hunks: [], isBinary: true }
+  }
+
+  const hunks: FileDiff['hunks'] = []
+  let currentHunk: FileDiff['hunks'][0] | null = null
+
+  for (const line of raw.split('\n')) {
+    if (line.startsWith('@@ ')) {
+      if (currentHunk) hunks.push(currentHunk)
+      currentHunk = { header: line, lines: [] }
+      continue
+    }
+    if (!currentHunk) continue
+
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      currentHunk.lines.push({
+        type: 'add',
+        content: line.slice(1),
+        oldLineNumber: null,
+        newLineNumber: null,
+      })
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
+      currentHunk.lines.push({
+        type: 'remove',
+        content: line.slice(1),
+        oldLineNumber: null,
+        newLineNumber: null,
+      })
+    } else if (!line.startsWith('---') && !line.startsWith('+++')) {
+      currentHunk.lines.push({
+        type: 'context',
+        content: line.slice(1),
+        oldLineNumber: null,
+        newLineNumber: null,
+      })
+    }
+  }
+  if (currentHunk) hunks.push(currentHunk)
+
+  for (const hunk of hunks) {
+    const match = hunk.header.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+    let oldN = match ? parseInt(match[1], 10) : 1
+    let newN = match ? parseInt(match[2], 10) : 1
+    for (const dl of hunk.lines) {
+      if (dl.type === 'add') {
+        dl.newLineNumber = newN++
+      } else if (dl.type === 'remove') {
+        dl.oldLineNumber = oldN++
+      } else {
+        dl.oldLineNumber = oldN++
+        dl.newLineNumber = newN++
+      }
+    }
+  }
+
+  const result = FileDiffSchema.safeParse({ path: filePath, hunks, isBinary: false })
+  return result.success ? result.data : { path: filePath, hunks, isBinary: false }
 }

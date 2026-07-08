@@ -1,16 +1,12 @@
 import { z } from 'zod'
 import Store from 'electron-store'
-import { execFile } from 'child_process'
-import { promisify } from 'util'
 import { basename, join } from 'path'
 import { readFile } from 'fs/promises'
-import { existsSync } from 'fs'
 import type {
   ReviewQueuePR,
   PrReviewDetail,
   InlineComment,
   IssueComment,
-  StatusCheck,
 } from '../schemas/pr-review.schema.js'
 import { ReviewSessionSchema } from '../schemas/pr-review.schema.js'
 import {
@@ -18,183 +14,35 @@ import {
   parseReviewQueuePR,
   extractIssueRefs,
   detectDryViolations,
+  normalizeGraphQLNode,
+  mapMergeStateStatus,
+  mapCiStatus,
+  mapCheckStatus,
+  LINT_CHECK_NAMES,
+  COVERAGE_CHECK_NAMES,
+  mapStatusChecks,
+  mapApprovals,
+  mapIssueComment,
+  mapComment,
+  parseDiff,
 } from '../github/pr-review-service.js'
-import type { FileDiff } from '../schemas/git.schema.js'
-import { FileDiffSchema } from '../schemas/git.schema.js'
-
-const execFileAsync = promisify(execFile)
+import {
+  type GhOptions,
+  isAuthError,
+  runGh,
+  runGit,
+  getRepoOwnerAndName,
+  PR_JSON_FIELDS,
+  computeCoChangeAffinityFromGit,
+} from '../github/gh-cli.js'
 
 type RegisterFn = (
   channel: string,
   handler: (payload: unknown) => Promise<unknown> | unknown
 ) => void
 
-interface GhOptions {
-  getGhPath: () => string
-  getToken: () => string
-}
-
 const sessionStore = new Store<Record<string, unknown>>({ name: 'pr-review-sessions' })
 const activeReviewStore = new Store<Record<string, unknown>>({ name: 'pr-active-reviews' })
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Packaged Electron apps don't inherit the shell PATH, so we probe common
-// locations where `gh` is installed on macOS before falling back to the name.
-const GH_CANDIDATE_PATHS = [
-  '/opt/homebrew/bin/gh', // Apple Silicon Homebrew
-  '/usr/local/bin/gh', // Intel Homebrew
-  '/usr/bin/gh',
-]
-
-let autoResolvedGhPath: string | null = null
-
-async function resolveGh(configuredPath: string): Promise<string> {
-  if (configuredPath) return configuredPath
-  if (autoResolvedGhPath) return autoResolvedGhPath
-  for (const p of GH_CANDIDATE_PATHS) {
-    if (existsSync(p)) {
-      autoResolvedGhPath = p
-      return p
-    }
-  }
-  autoResolvedGhPath = 'gh'
-  return autoResolvedGhPath
-}
-
-function isAuthError(e: unknown): boolean {
-  const msg = String(e)
-  return msg.includes('gh auth login') || msg.includes('GH_TOKEN') || msg.includes('401')
-}
-
-async function runGh(
-  cwd: string,
-  args: string[],
-  opts: GhOptions,
-  timeoutMs = 30_000
-): Promise<string> {
-  const gh = await resolveGh(opts.getGhPath())
-  const token = opts.getToken()
-  const env = token ? { ...process.env, GH_TOKEN: token } : undefined
-  try {
-    const { stdout, stderr } = await execFileAsync(gh, args, { cwd, timeout: timeoutMs, env })
-    if (stderr && !stdout) throw new Error(stderr)
-    return stdout.trim()
-  } catch (e) {
-    // If an explicit token was set but auth failed, retry without it so the
-    // system gh auth / GH_TOKEN env var gets a chance (token may be expired).
-    if (token && isAuthError(e)) {
-      const { stdout, stderr } = await execFileAsync(gh, args, {
-        cwd,
-        timeout: timeoutMs,
-        env: undefined,
-      })
-      if (stderr && !stdout) throw new Error(stderr)
-      return stdout.trim()
-    }
-    throw e
-  }
-}
-
-async function getRepoOwnerAndName(
-  repoRoot: string,
-  opts: GhOptions
-): Promise<{ owner: string; repo: string }> {
-  const raw = await runGh(repoRoot, ['repo', 'view', '--json', 'owner,name'], opts)
-  const data = JSON.parse(raw) as { owner: { login: string }; name: string }
-  return { owner: data.owner.login, repo: data.name }
-}
-
-function normalizeGraphQLNode(node: unknown): Record<string, unknown> {
-  const obj = node as Record<string, unknown>
-  type CommitContext = { name?: string; context?: string; conclusion?: string; state?: string }
-  type CommitNode = { commit?: { statusCheckRollup?: { contexts?: { nodes?: CommitContext[] } } } }
-  type CommitsField = { nodes?: CommitNode[] }
-  type ReviewNode = {
-    author?: { login?: string; avatarUrl?: string }
-    state?: string
-    submittedAt?: string
-  }
-  type LatestReviews = { nodes?: ReviewNode[] }
-  type ReviewRequestNode = {
-    requestedReviewer?: { login?: string; avatarUrl?: string; name?: string }
-  }
-  type ReviewRequests = { nodes?: ReviewRequestNode[] }
-  type AssigneeNode = { login?: string }
-  type Assignees = { nodes?: AssigneeNode[] }
-  const commits = obj.commits as CommitsField | undefined
-  const contextNodes = commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes ?? []
-  const statusCheckRollup = contextNodes.map((ctx) => ({
-    name: ctx.name ?? ctx.context ?? '',
-    state: ctx.conclusion ?? ctx.state ?? '',
-    conclusion: ctx.conclusion ?? ctx.state ?? '',
-  }))
-  const latestReviewNodes = (obj.latestReviews as LatestReviews | undefined)?.nodes ?? []
-  const reviewRequestNodes = (obj.reviewRequests as ReviewRequests | undefined)?.nodes ?? []
-  const requestedReviewers = reviewRequestNodes
-    .map((n) => n.requestedReviewer?.login ?? n.requestedReviewer?.name ?? '')
-    .filter(Boolean)
-  const assigneeNodes = (obj.assignees as Assignees | undefined)?.nodes ?? []
-  const assigneeLogins = assigneeNodes.map((n) => n.login ?? '').filter(Boolean)
-  return {
-    ...obj,
-    statusCheckRollup,
-    latestReviews: { nodes: latestReviewNodes },
-    requestedReviewers,
-    assigneeLogins,
-  }
-}
-
-async function runGit(cwd: string, args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync('git', args, { cwd, timeout: 30_000 })
-  return stdout.trim()
-}
-
-const PR_JSON_FIELDS =
-  'number,title,author,createdAt,headRefName,baseRefName,isDraft,mergeStateStatus,statusCheckRollup,files,additions,deletions,reviews,assignees,latestReviews'
-
-// ─── Co-change affinity (language-agnostic Signal 3) ─────────────────────────
-
-async function computeCoChangeAffinityFromGit(
-  repoRoot: string,
-  files: string[]
-): Promise<Map<string, string[]>> {
-  const affinity = new Map<string, string[]>()
-  if (files.length < 2) return affinity
-  try {
-    const raw = await runGit(repoRoot, ['log', '--name-only', '--format=%H', '--since=90 days ago'])
-    const fileSet = new Set(files)
-    const lines = raw.split('\n')
-    let currentFiles: string[] = []
-
-    const flushCommit = () => {
-      const prFilesInCommit = currentFiles.filter((f) => fileSet.has(f))
-      if (prFilesInCommit.length >= 2) {
-        for (const a of prFilesInCommit) {
-          for (const b of prFilesInCommit) {
-            if (a === b) continue
-            const existing = affinity.get(a) ?? []
-            existing.push(b)
-            affinity.set(a, existing)
-          }
-        }
-      }
-      currentFiles = []
-    }
-
-    for (const line of lines) {
-      if (/^[0-9a-f]{40}$/.test(line.trim())) {
-        flushCommit()
-      } else if (line.trim()) {
-        currentFiles.push(line.trim())
-      }
-    }
-    flushCommit()
-  } catch {
-    // co-change is best-effort — failures degrade gracefully to Signal 1+2 only
-  }
-  return affinity
-}
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
@@ -889,114 +737,6 @@ export function registerGithubHandlers(register: RegisterFn, opts: GhOptions): v
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
-const LINT_CHECK_NAMES = [
-  'lint',
-  'eslint',
-  'rubocop',
-  'flake8',
-  'pylint',
-  'stylelint',
-  'prettier',
-  'tslint',
-]
-const COVERAGE_CHECK_NAMES = ['coverage', 'codecov', 'coveralls', 'sonar', 'codeclimate', 'lcov']
-
-const NON_BLOCKING = new Set(['SKIPPED', 'NEUTRAL', 'CANCELLED', 'STALE'])
-
-function mapMergeStateStatus(raw: string): 'behind' | 'dirty' | 'clean' | 'unknown' {
-  const s = raw.toUpperCase()
-  if (s === 'BEHIND') return 'behind'
-  if (s === 'DIRTY' || s === 'CONFLICTING') return 'dirty'
-  if (s === 'CLEAN' || s === 'HAS_HOOKS' || s === 'UNSTABLE' || s === 'BLOCKED') return 'clean'
-  return 'unknown'
-}
-
-function mapCiStatus(rollup: unknown): 'passing' | 'failing' | 'pending' | 'none' {
-  if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'none'
-  // Normalise: gh returns `conclusion` on CheckRuns; StatusContext uses `state`
-  const statuses = (rollup as Array<Record<string, unknown>>).map((s) =>
-    String(s.conclusion ?? s.state ?? '').toUpperCase()
-  )
-  if (
-    statuses.some(
-      (s) => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT' || s === 'ACTION_REQUIRED'
-    )
-  )
-    return 'failing'
-  if (
-    statuses.some(
-      (s) => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED' || s === 'WAITING'
-    )
-  )
-    return 'pending'
-  // SKIPPED / NEUTRAL / CANCELLED are non-blocking; pass if at least one check succeeded
-  if (statuses.some((s) => s === 'SUCCESS')) return 'passing'
-  return 'none'
-}
-
-function mapCheckStatus(rollup: unknown, names: string[]): 'pass' | 'fail' | 'warn' | 'unknown' {
-  if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'unknown'
-  const checks = (rollup as Array<Record<string, unknown>>).filter((s) => {
-    const name = String(s.name ?? s.context ?? '').toLowerCase()
-    return names.some((n) => name.includes(n))
-  })
-  if (checks.length === 0) return 'unknown'
-  const statuses = checks.map((s) => String(s.conclusion ?? s.state ?? '').toUpperCase())
-  if (statuses.some((s) => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT')) return 'fail'
-  if (statuses.some((s) => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED')) return 'warn'
-  if (statuses.some((s) => s === 'SUCCESS')) return 'pass'
-  if (statuses.every((s) => NON_BLOCKING.has(s))) return 'unknown'
-  return 'unknown'
-}
-
-function mapStatusChecks(rollup: unknown): StatusCheck[] {
-  if (!rollup || !Array.isArray(rollup)) return []
-  return (rollup as Array<Record<string, unknown>>).map((s) => {
-    const raw = String(s.conclusion ?? s.state ?? '').toUpperCase()
-    const state: StatusCheck['state'] =
-      raw === 'SUCCESS'
-        ? 'pass'
-        : raw === 'FAILURE' || raw === 'ERROR' || raw === 'TIMED_OUT' || raw === 'ACTION_REQUIRED'
-          ? 'fail'
-          : raw === 'PENDING' || raw === 'IN_PROGRESS' || raw === 'QUEUED' || raw === 'WAITING'
-            ? 'pending'
-            : raw === 'SKIPPED' || raw === 'NEUTRAL' || raw === 'CANCELLED'
-              ? 'skipped'
-              : 'unknown'
-    return {
-      name: String(s.name ?? s.context ?? 'Unknown check'),
-      state,
-      url: s.url ? String(s.url) : undefined,
-    }
-  })
-}
-
-function mapApprovals(
-  reviews: Array<Record<string, unknown>>
-): Array<{ author: string; authorAvatarUrl: string; submittedAt: string }> {
-  // Only keep the latest APPROVED review per author (later CHANGES_REQUESTED dismiss earlier approvals)
-  const byAuthor = new Map<string, Record<string, unknown>>()
-  for (const r of reviews) {
-    const login = String((r.user as Record<string, unknown>)?.login ?? '')
-    if (!login) continue
-    const state = String(r.state ?? '').toUpperCase()
-    // Track any review per author; we'll filter for APPROVED at the end
-    if (!byAuthor.has(login) || state !== 'COMMENTED') {
-      byAuthor.set(login, r)
-    }
-  }
-  return [...byAuthor.values()]
-    .filter((r) => String(r.state ?? '').toUpperCase() === 'APPROVED')
-    .map((r) => {
-      const user = (r.user as Record<string, unknown>) ?? {}
-      return {
-        author: String(user.login ?? ''),
-        authorAvatarUrl: String(user.avatar_url ?? ''),
-        submittedAt: String(r.submitted_at ?? ''),
-      }
-    })
-}
-
 async function readFileCoverage(repoRoot: string, filePath: string): Promise<number | null> {
   // Try Istanbul/nyc coverage-summary.json first
   try {
@@ -1031,107 +771,4 @@ async function readFileCoverage(repoRoot: string, filePath: string): Promise<num
   }
 
   return null
-}
-
-function mapIssueComment(raw: unknown): IssueComment {
-  const obj = raw as Record<string, unknown>
-  const user = (obj.user ?? obj.author ?? {}) as Record<string, unknown>
-  return {
-    id: Number(obj.id),
-    author: String(user.login ?? ''),
-    authorAvatarUrl: String(user.avatar_url ?? ''),
-    body: String(obj.body ?? ''),
-    createdAt: String(obj.created_at ?? ''),
-    updatedAt: String(obj.updated_at ?? ''),
-  }
-}
-
-function mapComment(raw: unknown): InlineComment {
-  const obj = raw as Record<string, unknown>
-  const user = (obj.user ?? obj.author ?? {}) as Record<string, unknown>
-  const id = Number(obj.id)
-  const inReplyTo = obj.in_reply_to_id != null ? Number(obj.in_reply_to_id) : null
-  return {
-    id,
-    author: String(user.login ?? ''),
-    authorAvatarUrl: String(user.avatar_url ?? ''),
-    body: String(obj.body ?? ''),
-    createdAt: String(obj.created_at ?? ''),
-    updatedAt: String(obj.updated_at ?? ''),
-    path: String(obj.path ?? ''),
-    line: Number(obj.line ?? 0),
-    startLine: obj.start_line != null ? Number(obj.start_line) : null,
-    side: (String(obj.side ?? 'RIGHT').toUpperCase() === 'LEFT' ? 'LEFT' : 'RIGHT') as
-      | 'LEFT'
-      | 'RIGHT',
-    diffHunk: String(obj.diff_hunk ?? ''),
-    outdated: Boolean(obj.outdated),
-    threadId: inReplyTo != null ? String(inReplyTo) : String(id),
-    isReply: inReplyTo != null,
-    parentId: inReplyTo,
-  }
-}
-
-function parseDiff(raw: string, filePath: string): FileDiff {
-  if (!raw.trim()) {
-    return { path: filePath, hunks: [], isBinary: false }
-  }
-  if (raw.includes('Binary files')) {
-    return { path: filePath, hunks: [], isBinary: true }
-  }
-
-  const hunks: FileDiff['hunks'] = []
-  let currentHunk: FileDiff['hunks'][0] | null = null
-
-  for (const line of raw.split('\n')) {
-    if (line.startsWith('@@ ')) {
-      if (currentHunk) hunks.push(currentHunk)
-      currentHunk = { header: line, lines: [] }
-      continue
-    }
-    if (!currentHunk) continue
-
-    if (line.startsWith('+') && !line.startsWith('+++')) {
-      currentHunk.lines.push({
-        type: 'add',
-        content: line.slice(1),
-        oldLineNumber: null,
-        newLineNumber: null,
-      })
-    } else if (line.startsWith('-') && !line.startsWith('---')) {
-      currentHunk.lines.push({
-        type: 'remove',
-        content: line.slice(1),
-        oldLineNumber: null,
-        newLineNumber: null,
-      })
-    } else if (!line.startsWith('---') && !line.startsWith('+++')) {
-      currentHunk.lines.push({
-        type: 'context',
-        content: line.slice(1),
-        oldLineNumber: null,
-        newLineNumber: null,
-      })
-    }
-  }
-  if (currentHunk) hunks.push(currentHunk)
-
-  for (const hunk of hunks) {
-    const match = hunk.header.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
-    let oldN = match ? parseInt(match[1], 10) : 1
-    let newN = match ? parseInt(match[2], 10) : 1
-    for (const dl of hunk.lines) {
-      if (dl.type === 'add') {
-        dl.newLineNumber = newN++
-      } else if (dl.type === 'remove') {
-        dl.oldLineNumber = oldN++
-      } else {
-        dl.oldLineNumber = oldN++
-        dl.newLineNumber = newN++
-      }
-    }
-  }
-
-  const result = FileDiffSchema.safeParse({ path: filePath, hunks, isBinary: false })
-  return result.success ? result.data : { path: filePath, hunks, isBinary: false }
 }
