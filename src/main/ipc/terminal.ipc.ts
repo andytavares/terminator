@@ -67,9 +67,12 @@ export function registerTerminalHandlers(
   })
 
   handleChannel('terminal:list-sessions', () => {
+    // Only sessions created through terminal:create carry project metadata;
+    // legacy api.pty.spawn sessions are 'app'-origin too but have no tab in
+    // the renderer, matching the pre-authority registry's contents.
     return ptyManager
       .listSessions()
-      .filter((s) => s.origin === 'app')
+      .filter((s) => s.origin === 'app' && s.projectId !== undefined)
       .map(({ sessionId, projectId, tabTitle, type }) => ({ sessionId, projectId, tabTitle, type }))
   })
 

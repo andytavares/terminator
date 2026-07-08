@@ -91,41 +91,45 @@ export class ExtensionViewHost {
   /**
    * The single entry point for panel placement: lazily creates the view on
    * first update (deduplicating concurrent creations) and positions it with
-   * the most recent bounds. `ext` may be undefined when the extension is not
-   * installed; the update is then a no-op until it appears.
+   * the most recent bounds. `resolveExt` is only called when a view actually
+   * needs creating — bounds updates fire on every ResizeObserver tick, so the
+   * steady-state path must stay allocation-free. It may return undefined when
+   * the extension is not installed; the update is then a no-op until it appears.
    */
   async updatePanelBounds(
-    ext: Extension | undefined,
+    resolveExt: () => Extension | undefined,
     extensionId: string,
     viewParam: string,
     bounds: BoundsRect,
     visible: boolean,
     repoRoot?: string | null
   ): Promise<void> {
-    const viewKey = `${extensionId}:${viewParam}`
-    this.pendingBounds.set(viewKey, { bounds, visible, repoRoot })
-
-    if (!this.hasView(extensionId, viewParam)) {
-      if (this.creatingViews.has(viewKey)) return
-      this.creatingViews.add(viewKey)
-      try {
-        if (ext) await this.createView(ext, viewParam, repoRoot)
-        const latest = this.pendingBounds.get(viewKey)
-        if (latest) {
-          this.handleBoundsUpdate(
-            extensionId,
-            viewParam,
-            latest.bounds,
-            latest.visible,
-            latest.repoRoot
-          )
-        }
-      } finally {
-        this.creatingViews.delete(viewKey)
-      }
+    if (this.hasView(extensionId, viewParam)) {
+      this.handleBoundsUpdate(extensionId, viewParam, bounds, visible, repoRoot)
       return
     }
-    this.handleBoundsUpdate(extensionId, viewParam, bounds, visible, repoRoot)
+
+    const viewKey = `${extensionId}:${viewParam}`
+    this.pendingBounds.set(viewKey, { bounds, visible, repoRoot })
+    if (this.creatingViews.has(viewKey)) return
+    this.creatingViews.add(viewKey)
+    try {
+      const ext = resolveExt()
+      if (ext) await this.createView(ext, viewParam, repoRoot)
+      const latest = this.pendingBounds.get(viewKey)
+      if (latest) {
+        this.handleBoundsUpdate(
+          extensionId,
+          viewParam,
+          latest.bounds,
+          latest.visible,
+          latest.repoRoot
+        )
+      }
+    } finally {
+      this.creatingViews.delete(viewKey)
+      this.pendingBounds.delete(viewKey)
+    }
   }
 
   async createView(ext: Extension, viewParam: string, repoRoot?: string | null): Promise<void> {
@@ -180,8 +184,9 @@ export class ExtensionViewHost {
   destroyAllViews(extensionId: string): void {
     const entries = this.views.get(extensionId)
     if (!entries) return
-    for (const { view } of entries) {
+    for (const { view, viewParam } of entries) {
       this.mainWindow.contentView.removeChildView(view)
+      this.pendingBounds.delete(`${extensionId}:${viewParam}`)
     }
     this.views.delete(extensionId)
   }

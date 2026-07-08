@@ -146,24 +146,28 @@ export async function activate(api: ExtensionAPI): Promise<void> {
       return { error: err instanceof Error ? err.message : String(err) }
     }
   })
-  const disposeDbReset = api.ipc.registerHandler('task-vault:db.reset', async () => {
-    try {
-      // Delete rows in FK-safe order; do not drop tables — the settings table is
-      // shared with other extensions in the unified PGlite database.
-      await db.exec(`
+  const disposeDbReset = api.ipc.registerHandler(
+    'task-vault:db.reset',
+    async () => {
+      try {
+        // Delete rows in FK-safe order; do not drop tables — the settings table is
+        // shared with other extensions in the unified PGlite database.
+        await db.exec(`
         DELETE FROM tasks;
         DELETE FROM projects;
         DELETE FROM areas;
         DELETE FROM settings;
       `)
-      await applyTaskVaultSchema(db)
-      await applyTaskVaultMigrations(db)
-      maybeStartScheduler(db)
-      return { data: { ok: true } }
-    } catch (err) {
-      return { error: err instanceof Error ? err.message : String(err) }
-    }
-  })
+        await applyTaskVaultSchema(db)
+        await applyTaskVaultMigrations(db)
+        maybeStartScheduler(db)
+        return { data: { ok: true } }
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+    { remoteAccessible: false }
+  )
   disposables.push(disposeDbReinit, disposeDbReset)
 
   const disposeIpc = registerVaultIpcHandlers(api, db)

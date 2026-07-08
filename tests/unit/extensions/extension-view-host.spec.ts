@@ -228,7 +228,7 @@ describe('ExtensionViewHost', () => {
 
     it('creates the view on first update and applies the bounds', async () => {
       const ext = makeExt()
-      await host.updatePanelBounds(ext, ext.id, 'panel', rect(50), true, '/repo')
+      await host.updatePanelBounds(() => ext, ext.id, 'panel', rect(50), true, '/repo')
       expect(createdViews).toHaveLength(1)
       expect(host.hasView(ext.id, 'panel')).toBe(true)
       expect(createdViews[0].setVisible).toHaveBeenCalledWith(true)
@@ -239,9 +239,9 @@ describe('ExtensionViewHost', () => {
 
     it('applies the LATEST bounds received while the view was being created', async () => {
       const ext = makeExt()
-      const first = host.updatePanelBounds(ext, ext.id, 'panel', rect(50), true, '/repo')
+      const first = host.updatePanelBounds(() => ext, ext.id, 'panel', rect(50), true, '/repo')
       // A second update lands while createView is still awaiting loadURL
-      const second = host.updatePanelBounds(ext, ext.id, 'panel', rect(200), true, '/repo')
+      const second = host.updatePanelBounds(() => ext, ext.id, 'panel', rect(200), true, '/repo')
       await Promise.all([first, second])
       expect(createdViews).toHaveLength(1)
       const lastSetBounds = createdViews[0].setBounds.mock.calls.at(-1)![0]
@@ -250,14 +250,14 @@ describe('ExtensionViewHost', () => {
 
     it('updates an existing view without creating another', async () => {
       const ext = makeExt()
-      await host.updatePanelBounds(ext, ext.id, 'panel', rect(50), true, '/repo')
-      await host.updatePanelBounds(ext, ext.id, 'panel', rect(120), false, '/repo')
+      await host.updatePanelBounds(() => ext, ext.id, 'panel', rect(50), true, '/repo')
+      await host.updatePanelBounds(() => ext, ext.id, 'panel', rect(120), false, '/repo')
       expect(createdViews).toHaveLength(1)
       expect(createdViews[0].setVisible).toHaveBeenLastCalledWith(false)
     })
 
     it('is safe when the extension record is unknown', async () => {
-      await host.updatePanelBounds(undefined, 'ghost.ext', 'panel', rect(50), true, null)
+      await host.updatePanelBounds(() => undefined, 'ghost.ext', 'panel', rect(50), true, null)
       expect(createdViews).toHaveLength(0)
       expect(host.hasView('ghost.ext', 'panel')).toBe(false)
     })

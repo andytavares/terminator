@@ -365,12 +365,28 @@ describe('WS /ws/terminals/:sessionId', () => {
     await closed(second)
   })
 
-  it('rejects the subscriber over the limit but keeps the session intact', async () => {
-    const sessionId = await createSession()
+  it('rejects the subscriber over the limit without attaching a broadcast listener', async () => {
+    // App-owned session: POST hasn't attached a broadcast, so a rejected first
+    // viewer must leave zero listeners behind (the pre-refactor rollback guarantee).
+    ptyManager.addSession({ sessionId: 'app-full', origin: 'app' })
     vi.spyOn(subscriberManager, 'addSubscriber').mockReturnValueOnce(false)
-    await connect(sessionId, await ticketFor(sessionId))
-    expect(ptyManager.getSession(sessionId)).toBeDefined()
+    await connect('app-full', await ticketFor('app-full'))
+    expect(ptyManager.getSession('app-full')).toBeDefined()
     expect(ptyManager.kill).not.toHaveBeenCalled()
+    expect(ptyManager.dataListenerCount('app-full')).toBe(0)
+  })
+
+  it('does not stack exit listeners across DELETE and reconnect on an app session', async () => {
+    ptyManager.addSession({ sessionId: 'app-redel', origin: 'app' })
+    const ws = await connect('app-redel', await ticketFor('app-redel'))
+    await app.inject({ method: 'DELETE', url: '/api/terminals/app-redel' })
+    const ws2 = await connect('app-redel', await ticketFor('app-redel'))
+    const destroy = vi.spyOn(subscriberManager, 'destroySession')
+    ptyManager.emitExit('app-redel')
+    // One live broadcast means exactly one exit-driven teardown
+    expect(destroy).toHaveBeenCalledTimes(1)
+    await closed(ws2)
+    ws.terminate()
   })
 
   it('kills a remote-origin session after the grace period when the last subscriber leaves', async () => {

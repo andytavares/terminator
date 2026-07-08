@@ -47,14 +47,19 @@ export async function registerTerminalRoutes(
 
   function attachBroadcast(sessionId: string): void {
     if (broadcastDisposers.has(sessionId)) return
-    const dispose = ptyManager.onData(sessionId, (data) =>
+    const disposeData = ptyManager.onData(sessionId, (data) =>
       subscriberManager.broadcast(sessionId, data)
     )
-    if (!dispose) return
-    broadcastDisposers.set(sessionId, dispose)
-    ptyManager.onExit(sessionId, () => {
+    if (!disposeData) return
+    const disposeExit = ptyManager.onExit(sessionId, () => {
       broadcastDisposers.delete(sessionId)
       subscriberManager.destroySession(sessionId)
+    })
+    // Store BOTH disposers: detaching only onData would let a later reconnect
+    // stack a second exit listener on a still-live app session.
+    broadcastDisposers.set(sessionId, () => {
+      disposeData()
+      disposeExit?.()
     })
   }
 
@@ -190,12 +195,14 @@ export async function registerTerminalRoutes(
         return
       }
 
-      // First remote viewer of an app-owned session starts the broadcast; the
-      // listener stays attached across reconnects and dies with the session.
-      attachBroadcast(sessionId)
-
       const accepted = subscriberManager.addSubscriber(sessionId, ws, getMaxSubscribers())
       if (!accepted) return
+
+      // First remote viewer of an app-owned session starts the broadcast; the
+      // listener stays attached across reconnects and dies with the session.
+      // Attached only after acceptance so a rejected connection leaves no
+      // listener broadcasting to zero subscribers.
+      attachBroadcast(sessionId)
 
       // Cancel any pending grace-period teardown — client reconnected in time
       const pending = gracePeriodTimers.get(sessionId)

@@ -112,29 +112,10 @@ export interface ProjectSnapshot {
   readonly name: string
 }
 
-export type SessionOrigin = 'app' | 'remote'
-
-export interface SpawnSessionOptions {
-  sessionId: string
-  cwd: string
-  shell: string
-  type: 'human' | 'agent'
-  origin: SessionOrigin
-  projectId?: string
-  tabTitle?: string
-}
-
-export interface SessionInfo {
-  sessionId: string
-  cwd: string
-  type: 'human' | 'agent'
-  origin: SessionOrigin
-  createdAt: string
-  pid: number
-  projectId?: string
-  tabTitle?: string
-  workspaceId?: string
-}
+// Canonical session-authority types live with the authority (pty-manager.ts);
+// re-exported here so the ExtensionAPI contract exposes them.
+import type { SessionOrigin, SpawnSessionOptions, SessionInfo } from '../terminal/pty-manager.js'
+export type { SessionOrigin, SpawnSessionOptions, SessionInfo }
 
 export interface PtyManagerAPI {
   /** @deprecated since v1.4.0 — use spawnSession() plus onData()/onExit(). */

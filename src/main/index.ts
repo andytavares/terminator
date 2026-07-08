@@ -305,8 +305,14 @@ app.whenReady().then(async () => {
   handleChannel(
     'extension:update-panel-bounds',
     async (_event, { extensionId, viewParam, bounds, visible, repoRoot }) => {
-      const ext = extensionHost.listExtensions().find((e) => e.id === extensionId)
-      await viewHost?.updatePanelBounds(ext, extensionId, viewParam, bounds, visible, repoRoot)
+      await viewHost?.updatePanelBounds(
+        () => extensionHost.listExtensions().find((e) => e.id === extensionId),
+        extensionId,
+        viewParam,
+        bounds,
+        visible,
+        repoRoot
+      )
     }
   )
 
