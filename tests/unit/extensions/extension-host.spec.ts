@@ -829,3 +829,58 @@ describe('ExtensionHost – successful load paths (real temp extensions)', () =>
     await expect(host.loadBundledExtensions(filePath)).resolves.toBeUndefined()
   })
 })
+
+describe('ExtensionHost – registration disposal on unload', () => {
+  const tmpDir = join(os.tmpdir(), `ext-dispose-${Date.now()}`)
+
+  beforeEach(() => {
+    storeData.extensions = []
+    mkdirSync(tmpDir, { recursive: true })
+    writeFileSync(
+      join(tmpDir, 'manifest.json'),
+      JSON.stringify({
+        id: 'com.dispose',
+        name: 'Dispose',
+        version: '1.0.0',
+        description: 'A test extension',
+        main: 'main.js',
+        minAppVersion: '0.0.1',
+      })
+    )
+    // Registers a command and a sidebar item WITHOUT a deactivate() — the host
+    // must dispose them through the api's collected disposables.
+    writeFileSync(
+      join(tmpDir, 'main.js'),
+      `module.exports = {
+        activate: (api) => {
+          api.commands.register({ id: 'disp-cmd', label: 'Disp' }, () => {})
+          api.sidebar.registerItem({ id: 'disp-side', label: 'Side', onClick: () => {} })
+        },
+      }`
+    )
+  })
+
+  afterEach(() => {
+    try {
+      rmSync(tmpDir, { recursive: true, force: true })
+    } catch {
+      /* ignore */
+    }
+  })
+
+  it('unload disposes every registration the extension made through the api', async () => {
+    const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+    const { globalRegistry } = await import('../../../src/main/extensions/api')
+    const host = new ExtensionHost()
+
+    const result = await host.load(tmpDir)
+    expect('error' in result).toBe(false)
+    expect(globalRegistry.commandContributions.has('com.dispose.command.disp-cmd')).toBe(true)
+    expect(globalRegistry.sidebarItems.has('com.dispose.sidebar.disp-side')).toBe(true)
+
+    await host.unload('com.dispose')
+    expect(globalRegistry.commandContributions.has('com.dispose.command.disp-cmd')).toBe(false)
+    expect(globalRegistry.commandHandlers.has('com.dispose.command.disp-cmd')).toBe(false)
+    expect(globalRegistry.sidebarItems.has('com.dispose.sidebar.disp-side')).toBe(false)
+  })
+})

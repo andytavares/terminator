@@ -6,6 +6,7 @@ import type { Extension } from '../../shared/types/index.js'
 import { ExtensionManifestSchema } from '../../shared/schemas/extension.schema.js'
 import {
   createExtensionAPI,
+  getApiDisposables,
   globalRegistry,
   type Disposable,
   type ExtensionAPIDeps,
@@ -265,7 +266,9 @@ export class ExtensionHost {
       }
       const api = createExtensionAPI(record.id, app.getVersion(), this.deps, record.rendererUrl)
       await mod.activate?.(api)
-      this.loaded.set(record.id, { record, disposables: [], module: mod })
+      // The live array from the api: registrations made after activate() land in
+      // it too, so unload disposes everything the extension ever registered.
+      this.loaded.set(record.id, { record, disposables: getApiDisposables(api), module: mod })
       return { ok: true }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)

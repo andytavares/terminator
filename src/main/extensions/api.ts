@@ -514,7 +514,7 @@ export function createExtensionAPI(
     transaction: notReady,
   }
 
-  return {
+  const api: ExtensionAPI = {
     app: { version: appVersion },
     db: deps?.db ?? dbStub,
     log: extLogger,
@@ -847,4 +847,21 @@ export function createExtensionAPI(
       },
     },
   }
+
+  // The live disposables array (registrations keep pushing into it after
+  // activate) is exposed to the ExtensionHost via getApiDisposables so
+  // unload/reload/toggle can dispose everything the extension registered.
+  apiDisposables.set(api, disposables)
+  return api
+}
+
+const apiDisposables = new WeakMap<ExtensionAPI, Disposable[]>()
+
+/**
+ * The disposables collected by an api instance created with
+ * createExtensionAPI. The array is live — registrations made after activate()
+ * still land in it. Used by ExtensionHost to clean up on unload.
+ */
+export function getApiDisposables(api: ExtensionAPI): Disposable[] {
+  return apiDisposables.get(api) ?? []
 }
