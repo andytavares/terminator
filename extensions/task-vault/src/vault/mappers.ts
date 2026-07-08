@@ -3,6 +3,7 @@
  * Previously each module contained its own duplicate copies.
  */
 import type { IndexedTask, IndexedProject, TaskStatus, ProjectStatus } from './types'
+import { readRecurrenceEndState } from './recurrence'
 
 export function rowToTask(row: Record<string, unknown>): IndexedTask {
   const source = row.source as string
@@ -24,50 +25,38 @@ export function rowToTask(row: Record<string, unknown>): IndexedTask {
   if (row.blocked_check_interval != null) {
     blockedCheckInterval = (row.blocked_check_interval as string) || undefined
   }
-  if (row.recurrence_end_type != null) {
-    recurrenceEndType = (row.recurrence_end_type as 'none' | 'on_date' | 'after_count') || undefined
-  }
-  if (row.recurrence_end_date != null) {
-    recurrenceEndDate = (row.recurrence_end_date as string) || undefined
-  }
-  if (row.recurrence_end_count != null) {
-    recurrenceEndCount = row.recurrence_end_count as number
-  }
-  if (row.recurrence_completed_count != null) {
-    recurrenceCompletedCount = row.recurrence_completed_count as number
+  // Recurrence end-conditions read through the SAME reader the scheduler uses
+  // (readRecurrenceEndState) so the UI and ensure-next-occurrence can never
+  // disagree about a row — including partially-migrated rows whose column says
+  // 'none' while real end-conditions still live in the metadata JSON.
+  const endState = readRecurrenceEndState(
+    row as {
+      recurrence_end_type?: string | null
+      recurrence_end_date?: string | null
+      recurrence_end_count?: number | null
+      recurrence_completed_count?: number | null
+      metadata?: string | null
+    }
+  )
+  if (endState.endType !== 'none') {
+    recurrenceEndType = endState.endType
+    recurrenceEndDate = endState.endDate ?? undefined
+    recurrenceEndCount = endState.endCount ?? undefined
+    recurrenceCompletedCount = endState.completedCount
+  } else if (row.recurrence_end_type != null) {
+    // Explicit 'none' column stays an explicit 'none' in the DTO.
+    recurrenceEndType = 'none'
+    if (row.recurrence_end_count != null) recurrenceEndCount = row.recurrence_end_count as number
+    if (row.recurrence_completed_count != null)
+      recurrenceCompletedCount = row.recurrence_completed_count as number
   }
 
-  // Fall back to metadata JSON for any fields not yet in columns
-  if (
-    blockedReason === undefined &&
-    blockedCheckInterval === undefined &&
-    recurrenceEndType === undefined
-  ) {
+  // Fall back to metadata JSON for the blocked_* keys not yet in columns.
+  if (blockedReason === undefined && blockedCheckInterval === undefined) {
     try {
       const meta = JSON.parse((row.metadata as string) || '{}') as Record<string, unknown>
-      if (blockedReason === undefined) {
-        blockedReason = (meta.blocked_reason as string) || undefined
-      }
-      if (blockedCheckInterval === undefined) {
-        blockedCheckInterval = (meta.blocked_check_interval as string) || undefined
-      }
-      if (recurrenceEndType === undefined) {
-        recurrenceEndType =
-          (meta.recurrence_end_type as 'none' | 'on_date' | 'after_count') || undefined
-      }
-      if (recurrenceEndDate === undefined) {
-        recurrenceEndDate = (meta.recurrence_end_date as string) || undefined
-      }
-      if (recurrenceEndCount === undefined) {
-        recurrenceEndCount =
-          meta.recurrence_end_count != null ? (meta.recurrence_end_count as number) : undefined
-      }
-      if (recurrenceCompletedCount === undefined) {
-        recurrenceCompletedCount =
-          meta.recurrence_completed_count != null
-            ? (meta.recurrence_completed_count as number)
-            : undefined
-      }
+      blockedReason = (meta.blocked_reason as string) || undefined
+      blockedCheckInterval = (meta.blocked_check_interval as string) || undefined
     } catch {
       // ignore malformed metadata
     }

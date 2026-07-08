@@ -1,6 +1,7 @@
 import * as path from 'node:path'
-import { ipcMain } from 'electron'
 import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
+import { createIpcRegistrar } from './register'
+import { insertTask } from '../vault/task-repository'
 import { randomUUID } from '../vault/db'
 import { extractTags, toDisplayName } from '../vault/tags'
 import { localDate as _localDate } from '../vault/recurrence'
@@ -96,23 +97,19 @@ async function resolveProjectAndAreaIds(
 }
 
 export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const handlers: Array<[string, (...args: unknown[]) => unknown]> = []
+  const registrar = createIpcRegistrar(api)
 
-  function handle(
-    channel: string,
-    fn: (event: Electron.IpcMainInvokeEvent, payload: unknown) => Promise<unknown>
-  ) {
-    ipcMain.handle(channel, async (event, payload) => {
+  function handle(channel: string, fn: (payload: unknown) => Promise<unknown>) {
+    registrar.handle(channel, async (payload) => {
       try {
-        return await fn(event, payload)
+        return await fn(payload)
       } catch (err) {
         return { error: err instanceof Error ? err.message : String(err) }
       }
     })
-    handlers.push([channel, fn as (...args: unknown[]) => unknown])
   }
 
-  handle('task-vault:vault:capture', async (_event, payload) => {
+  handle('task-vault:vault:capture', async (payload) => {
     const parsed = CaptureRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR: ' + parsed.error.message }
     const { text, hintArea, hintProject } = parsed.data
@@ -131,23 +128,18 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
       extracted.area,
       now
     )
-    await db.run(
-      `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-      [
-        id,
-        extracted.text,
-        'open',
-        projectId,
-        extracted.context ?? null,
-        areaId,
-        extracted.dueDate ?? null,
-        'inbox',
-        null,
-        now,
-        now,
-      ]
-    )
+    await insertTask(db, {
+      id,
+      text: extracted.text,
+      status: 'open',
+      projectId,
+      context: extracted.context ?? null,
+      areaId,
+      dueDate: extracted.dueDate ?? null,
+      source: 'inbox',
+      createdAt: now,
+      updatedAt: now,
+    })
     broadcast('task-vault:push:index-updated', {})
     return { taskId: id }
   })
@@ -173,23 +165,23 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
             const newId = randomUUID()
             const inheritedTodaySince =
               (row.today_since as string) || (row.source_ref as string) || date
-            await tx.run(
-              `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,today_since,created_at,updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`,
-              [
-                newId,
-                row.text,
-                'open',
-                row.project_id ?? null,
-                row.context ?? null,
-                row.area_id ?? null,
-                row.due_date ?? null,
-                'daily',
-                date,
-                inheritedTodaySince,
-                now,
-                now,
-              ]
+            await insertTask(
+              tx,
+              {
+                id: newId,
+                text: row.text as string,
+                status: 'open',
+                projectId: (row.project_id as string) ?? null,
+                context: (row.context as string) ?? null,
+                areaId: (row.area_id as string) ?? null,
+                dueDate: (row.due_date as string) ?? null,
+                source: 'daily',
+                sourceRef: date,
+                todaySince: inheritedTodaySince,
+                createdAt: now,
+                updatedAt: now,
+              },
+              { orIgnore: true }
             )
             await tx.run(
               `UPDATE tasks SET status='migrated', migrated_to=?, updated_at=? WHERE id=?`,
@@ -236,7 +228,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:vault:get-daily', async (_event, payload) => {
+  handle('task-vault:vault:get-daily', async (payload) => {
     const parsed = GetDailyRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     try {
@@ -265,7 +257,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:vault:add-task', async (_event, payload) => {
+  handle('task-vault:vault:add-task', async (payload) => {
     const parsed = AddTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { filePath, text, dueDate, tags } = parsed.data
@@ -288,29 +280,25 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
       now
     )
     const todaySinceVal = source === 'daily' ? (sourceRef ?? null) : null
-    await db.run(
-      `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,today_since,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [
-        id,
-        extracted.text,
-        'open',
-        projectId,
-        extracted.context ?? null,
-        areaId,
-        extracted.dueDate ?? null,
-        source,
-        sourceRef,
-        todaySinceVal,
-        now,
-        now,
-      ]
-    )
+    await insertTask(db, {
+      id,
+      text: extracted.text,
+      status: 'open',
+      projectId,
+      context: extracted.context ?? null,
+      areaId,
+      dueDate: extracted.dueDate ?? null,
+      source,
+      sourceRef,
+      todaySince: todaySinceVal,
+      createdAt: now,
+      updatedAt: now,
+    })
     broadcast('task-vault:push:index-updated', {})
     return { taskId: id }
   })
 
-  handle('task-vault:vault:complete-task', async (_event, payload) => {
+  handle('task-vault:vault:complete-task', async (payload) => {
     const parsed = CompleteTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
@@ -351,7 +339,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:vault:migrate-task', async (_event, payload) => {
+  handle('task-vault:vault:migrate-task', async (payload) => {
     const parsed = MigrateTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, targetDate } = parsed.data
@@ -372,23 +360,19 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     const originalStatus = task.status as string
     const twinStatus =
       originalStatus === 'done' || originalStatus === 'cancelled' ? originalStatus : 'open'
-    await db.run(
-      `INSERT INTO tasks (id,text,status,project_id,context,area_id,due_date,source,source_ref,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-      [
-        newId,
-        task.text,
-        twinStatus,
-        task.project_id ?? null,
-        task.context ?? null,
-        task.area_id ?? null,
-        task.due_date ?? null,
-        'daily',
-        targetDate,
-        now,
-        now,
-      ]
-    )
+    await insertTask(db, {
+      id: newId,
+      text: task.text as string,
+      status: twinStatus,
+      projectId: (task.project_id as string) ?? null,
+      context: (task.context as string) ?? null,
+      areaId: (task.area_id as string) ?? null,
+      dueDate: (task.due_date as string) ?? null,
+      source: 'daily',
+      sourceRef: targetDate,
+      createdAt: now,
+      updatedAt: now,
+    })
     type SubRow = {
       id: string
       text: string
@@ -410,27 +394,23 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
       )
       const subTwinStatus =
         sub.status === 'done' || sub.status === 'cancelled' ? sub.status : 'open'
-      await db.run(
-        `INSERT INTO tasks (id,text,status,parent_id,sort_order,source,source_ref,created_at,updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?)`,
-        [
-          subTwinId,
-          sub.text,
-          subTwinStatus,
-          newId,
-          sub.sort_order ?? null,
-          'daily',
-          targetDate,
-          now,
-          now,
-        ]
-      )
+      await insertTask(db, {
+        id: subTwinId,
+        text: sub.text,
+        status: subTwinStatus,
+        parentId: newId,
+        sortOrder: sub.sort_order ?? 0,
+        source: 'daily',
+        sourceRef: targetDate,
+        createdAt: now,
+        updatedAt: now,
+      })
     }
     broadcast('task-vault:push:index-updated', {})
     return { newTaskId: newId }
   })
 
-  handle('task-vault:vault:query', async (_event, payload) => {
+  handle('task-vault:vault:query', async (payload) => {
     const parsed = QueryRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { status, context, project, area, dueBefore } = parsed.data
@@ -468,7 +448,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { tasks: rows.map(rowToTask) }
   })
 
-  handle('task-vault:vault:process-inbox-item', async (_event, payload) => {
+  handle('task-vault:vault:process-inbox-item', async (payload) => {
     const parsed = ProcessInboxRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, action, destination, newProjectName } = parsed.data
@@ -568,7 +548,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true, newTaskId: taskId }
   })
 
-  handle('task-vault:vault:edit-task', async (_event, payload) => {
+  handle('task-vault:vault:edit-task', async (payload) => {
     const parsed = EditTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, text } = parsed.data
@@ -598,7 +578,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:vault:delete-task', async (_event, payload) => {
+  handle('task-vault:vault:delete-task', async (payload) => {
     const parsed = DeleteTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
@@ -617,7 +597,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:vault:cancel-task', async (_event, payload) => {
+  handle('task-vault:vault:cancel-task', async (payload) => {
     const parsed = CancelTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
@@ -629,7 +609,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:vault:restore-task', async (_event, payload) => {
+  handle('task-vault:vault:restore-task', async (payload) => {
     const parsed = RestoreTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
@@ -658,7 +638,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:vault:create-area', async (_event, payload) => {
+  handle('task-vault:vault:create-area', async (payload) => {
     const parsed = CreateAreaRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { name } = parsed.data
@@ -678,7 +658,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true, filePath: displayName }
   })
 
-  handle('task-vault:vault:rename-area', async (_event, payload) => {
+  handle('task-vault:vault:rename-area', async (payload) => {
     const { areaFilePath, newName } = payload as { areaFilePath: string; newName: string }
     if (!areaFilePath || !newName?.trim()) return { error: 'VALIDATION_ERROR' }
     const now = new Date().toISOString()
@@ -697,7 +677,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:vault:archive-area', async (_event, payload) => {
+  handle('task-vault:vault:archive-area', async (payload) => {
     const parsed = ArchiveAreaRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { areaName } = parsed.data
@@ -746,7 +726,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:vault:delete-area', async (_event, payload) => {
+  handle('task-vault:vault:delete-area', async (payload) => {
     const parsed = DeleteAreaRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { areaFilePath } = parsed.data
@@ -783,7 +763,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:vault:restore-area', async (_event, payload) => {
+  handle('task-vault:vault:restore-area', async (payload) => {
     const { areaName } = payload as { areaName: string }
     if (!areaName) return { error: 'VALIDATION_ERROR' }
     const now = new Date().toISOString()
@@ -829,7 +809,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:vault:list-areas', async (_event, payload) => {
+  handle('task-vault:vault:list-areas', async (payload) => {
     try {
       const statusFilter = (payload as { status?: string } | undefined)?.status ?? 'active'
       const areaRows =
@@ -907,7 +887,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:projects:get-tasks', async (_event, payload) => {
+  handle('task-vault:projects:get-tasks', async (payload) => {
     const { projectName } = payload as { projectName: string }
     if (!projectName) return { tasks: [] }
     const rows = await db.query<Record<string, unknown>>(
@@ -917,7 +897,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { tasks: rows.map(rowToTask) }
   })
 
-  handle('task-vault:vault:list-archive', async (_event, payload) => {
+  handle('task-vault:vault:list-archive', async (payload) => {
     const parsed = ListArchiveRequestSchema.safeParse(payload ?? {})
     const days = parsed.success ? (parsed.data.days ?? 30) : 30
     try {
@@ -961,7 +941,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:vault:someday-to-today', async (_event, payload) => {
+  handle('task-vault:vault:someday-to-today', async (payload) => {
     const { taskId } = payload as { taskId: string }
     if (!taskId) return { error: 'VALIDATION_ERROR' }
     try {
@@ -982,7 +962,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:vault:add-subtask', async (_event, payload) => {
+  handle('task-vault:vault:add-subtask', async (payload) => {
     const { taskId, text } = payload as { taskId: string; text: string }
     if (!taskId || !text) return { error: 'VALIDATION_ERROR' }
     const parent = await db.get<{ source: string; source_ref: string | null }>(
@@ -992,11 +972,16 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     if (!parent) return { error: 'STALE_ID' }
     const now = new Date().toISOString()
     const newId = randomUUID()
-    await db.run(
-      `INSERT INTO tasks (id,text,status,source,source_ref,parent_id,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?)`,
-      [newId, text.trim(), 'open', parent.source, parent.source_ref, taskId, now, now]
-    )
+    await insertTask(db, {
+      id: newId,
+      text: text.trim(),
+      status: 'open',
+      source: parent.source,
+      sourceRef: parent.source_ref,
+      parentId: taskId,
+      createdAt: now,
+      updatedAt: now,
+    })
     broadcast('task-vault:push:index-updated', {})
     return { success: true }
   })
@@ -1018,7 +1003,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:vault:import-json', async (_event, payload) => {
+  handle('task-vault:vault:import-json', async (payload) => {
     try {
       const data = payload as {
         version?: number
@@ -1073,30 +1058,28 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
             ? await db.get<{ id: string }>(`SELECT id FROM areas WHERE name=?`, [t.area])
             : null
           const areaId = areaRow?.id ?? null
-          await db.run(
-            `INSERT INTO tasks
-               (id,text,status,project_id,context,area_id,due_date,completed_date,migrated_to,
-                source,source_ref,parent_id,sort_order,metadata,terminator_links,created_at,updated_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`,
-            [
-              t.id,
-              t.text,
-              t.status ?? 'open',
+          await insertTask(
+            db,
+            {
+              id: t.id,
+              text: t.text,
+              status: t.status ?? 'open',
               projectId,
-              t.context ?? null,
+              context: t.context ?? null,
               areaId,
-              t.due_date ?? null,
-              t.completed_date ?? null,
-              t.migrated_to ?? null,
-              t.source ?? 'inbox',
-              t.source_ref ?? null,
-              t.parent_id ?? null,
-              t.sort_order ?? 0,
-              t.metadata ?? '{}',
-              t.terminator_links ?? '[]',
-              t.created_at,
-              t.updated_at,
-            ]
+              dueDate: t.due_date ?? null,
+              completedDate: t.completed_date ?? null,
+              migratedTo: t.migrated_to ?? null,
+              source: t.source ?? 'inbox',
+              sourceRef: t.source_ref ?? null,
+              parentId: t.parent_id ?? null,
+              sortOrder: t.sort_order ?? 0,
+              metadata: t.metadata ?? '{}',
+              terminatorLinks: t.terminator_links ?? '[]',
+              createdAt: t.created_at,
+              updatedAt: t.updated_at,
+            },
+            { orIgnore: true }
           )
           imported++
         }
@@ -1107,7 +1090,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:vault:update-project-status', async (_event, payload) => {
+  handle('task-vault:vault:update-project-status', async (payload) => {
     const parsed = UpdateProjectStatusRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { projectFilePath: projectName, status } = parsed.data
@@ -1146,7 +1129,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:vault:get-task-detail', async (_event, payload) => {
+  handle('task-vault:vault:get-task-detail', async (payload) => {
     const parsed = GetTaskDetailRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
@@ -1166,7 +1149,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:vault:save-task-detail', async (_event, payload) => {
+  handle('task-vault:vault:save-task-detail', async (payload) => {
     const parsed = SaveTaskDetailRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, description, acceptanceCriteria, devHints } = parsed.data
@@ -1190,7 +1173,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:vault:reopen-task', async (_event, payload) => {
+  handle('task-vault:vault:reopen-task', async (payload) => {
     const parsed = RestoreTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
@@ -1218,7 +1201,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:vault:block-task', async (_event, payload) => {
+  handle('task-vault:vault:block-task', async (payload) => {
     const parsed = BlockTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR: ' + parsed.error.message }
     const { taskId, reason, checkInterval } = parsed.data
@@ -1239,7 +1222,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:vault:unblock-task', async (_event, payload) => {
+  handle('task-vault:vault:unblock-task', async (payload) => {
     const parsed = UnblockTaskRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
@@ -1259,7 +1242,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:vault:set-recurrence', async (_event, payload) => {
+  handle('task-vault:vault:set-recurrence', async (payload) => {
     const parsed = SetRecurrenceRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId, interval, days, time, endType, endDate, endCount } = parsed.data
@@ -1332,7 +1315,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     }
   })
 
-  handle('task-vault:vault:clear-recurrence', async (_event, payload) => {
+  handle('task-vault:vault:clear-recurrence', async (payload) => {
     const parsed = ClearRecurrenceRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { taskId } = parsed.data
@@ -1369,7 +1352,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:vault:reorder-tasks', async (_event, payload) => {
+  handle('task-vault:vault:reorder-tasks', async (payload) => {
     const parsed = ReorderTasksRequestSchema.safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const { orderedIds } = parsed.data
@@ -1387,7 +1370,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:vault:get-calendar-month', async (_event, payload) => {
+  handle('task-vault:vault:get-calendar-month', async (payload) => {
     const { year, month } = payload as { year: number; month: number }
     const pad = (n: number) => String(n).padStart(2, '0')
     const startDate = `${year}-${pad(month)}-01`
@@ -1404,7 +1387,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { days: rows.map((r) => ({ ...r, count: Number(r.count) })) }
   })
 
-  handle('task-vault:vault:reset-today-since', async (_event, payload) => {
+  handle('task-vault:vault:reset-today-since', async (payload) => {
     const { taskId } = payload as { taskId: string }
     if (!taskId) return { error: 'VALIDATION_ERROR' }
     const now = new Date().toISOString()
@@ -1412,7 +1395,7 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  handle('task-vault:settings:set-stale-threshold', async (_event, payload) => {
+  handle('task-vault:settings:set-stale-threshold', async (payload) => {
     const { days } = payload as { days: number }
     if (typeof days !== 'number' || days < 1) return { error: 'VALIDATION_ERROR' }
     await db.run(
@@ -1422,9 +1405,5 @@ export function registerVaultIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
     return { success: true }
   })
 
-  return () => {
-    for (const [channel] of handlers) {
-      ipcMain.removeHandler(channel)
-    }
-  }
+  return registrar.cleanup
 }

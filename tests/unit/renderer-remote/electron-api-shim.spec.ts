@@ -715,11 +715,12 @@ describe('electron-api-shim other APIs', () => {
     const { api, ws } = await loadShim()
     const handler = vi.fn()
     api.extensionEvents.onTogglePanel(handler)
+    // The wire payload is the bare panelId string — see api.window.broadcast call sites.
     ws.onmessage?.({
       data: JSON.stringify({
         type: 'event',
         channel: 'extension:toggle-panel',
-        args: [{ panelId: 'sidebar' }],
+        args: ['sidebar'],
       }),
     })
     expect(handler).toHaveBeenCalledWith('sidebar')
@@ -761,7 +762,7 @@ describe('electron-api-shim other APIs', () => {
     ws.onmessage?.({
       data: JSON.stringify({ type: 'event', channel: 'menu:open-settings', args: [] }),
     })
-    expect(handler).toHaveBeenCalledWith(undefined)
+    expect(handler).toHaveBeenCalledWith()
   })
 
   it('extensionEvents.onMenuToggleSidebar dispatches void when event fires', async () => {
@@ -771,7 +772,7 @@ describe('electron-api-shim other APIs', () => {
     ws.onmessage?.({
       data: JSON.stringify({ type: 'event', channel: 'menu:toggle-sidebar', args: [] }),
     })
-    expect(handler).toHaveBeenCalledWith(undefined)
+    expect(handler).toHaveBeenCalledWith()
   })
 
   it('extensionEvents.onMenuCloseTab dispatches void when event fires', async () => {
@@ -781,7 +782,7 @@ describe('electron-api-shim other APIs', () => {
     ws.onmessage?.({
       data: JSON.stringify({ type: 'event', channel: 'menu:close-tab', args: [] }),
     })
-    expect(handler).toHaveBeenCalledWith(undefined)
+    expect(handler).toHaveBeenCalledWith()
   })
 
   it('extensionEvents.onMenuOpenAbout dispatches void when event fires', async () => {
@@ -791,7 +792,7 @@ describe('electron-api-shim other APIs', () => {
     ws.onmessage?.({
       data: JSON.stringify({ type: 'event', channel: 'menu:open-about', args: [] }),
     })
-    expect(handler).toHaveBeenCalledWith(undefined)
+    expect(handler).toHaveBeenCalledWith()
   })
 
   it('notifications.onPush dispatches first arg when event fires', async () => {

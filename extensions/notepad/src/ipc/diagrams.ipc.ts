@@ -1,7 +1,8 @@
-import { ipcMain } from 'electron'
 import { z } from 'zod'
 import { randomUUID } from '../db/db'
 import type { ExtensionDB } from '../../../../src/main/db/index'
+import type { ExtensionAPI } from '../../../../src/main/extensions/api'
+import { createIpcRegistrar } from './register'
 
 const VALIDATION_ERROR = { error: 'VALIDATION_ERROR' }
 
@@ -223,25 +224,14 @@ export async function hardDeleteDiagram(
   return { data: { ok: true } }
 }
 
-export function registerDiagramsIpcHandlers(db: ExtensionDB): () => void {
-  ipcMain.handle('terminator.notepad:diagrams.create', (_, payload) => createDiagram(db, payload))
-  ipcMain.handle('terminator.notepad:diagrams.list', (_, payload) => listDiagrams(db, payload))
-  ipcMain.handle('terminator.notepad:diagrams.get', (_, payload) => getDiagram(db, payload))
-  ipcMain.handle('terminator.notepad:diagrams.autosave', (_, payload) =>
-    autosaveDiagram(db, payload)
-  )
-  ipcMain.handle('terminator.notepad:diagrams.archive', (_, payload) => archiveDiagram(db, payload))
-  ipcMain.handle('terminator.notepad:diagrams.restore', (_, payload) => restoreDiagram(db, payload))
-  ipcMain.handle('terminator.notepad:diagrams.hardDelete', (_, payload) =>
-    hardDeleteDiagram(db, payload)
-  )
-  return () => {
-    ipcMain.removeHandler('terminator.notepad:diagrams.create')
-    ipcMain.removeHandler('terminator.notepad:diagrams.list')
-    ipcMain.removeHandler('terminator.notepad:diagrams.get')
-    ipcMain.removeHandler('terminator.notepad:diagrams.autosave')
-    ipcMain.removeHandler('terminator.notepad:diagrams.archive')
-    ipcMain.removeHandler('terminator.notepad:diagrams.restore')
-    ipcMain.removeHandler('terminator.notepad:diagrams.hardDelete')
-  }
+export function registerDiagramsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
+  const { handle, cleanup } = createIpcRegistrar(api)
+  handle('terminator.notepad:diagrams.create', (payload) => createDiagram(db, payload))
+  handle('terminator.notepad:diagrams.list', (payload) => listDiagrams(db, payload))
+  handle('terminator.notepad:diagrams.get', (payload) => getDiagram(db, payload))
+  handle('terminator.notepad:diagrams.autosave', (payload) => autosaveDiagram(db, payload))
+  handle('terminator.notepad:diagrams.archive', (payload) => archiveDiagram(db, payload))
+  handle('terminator.notepad:diagrams.restore', (payload) => restoreDiagram(db, payload))
+  handle('terminator.notepad:diagrams.hardDelete', (payload) => hardDeleteDiagram(db, payload))
+  return cleanup
 }

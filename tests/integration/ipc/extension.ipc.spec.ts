@@ -1,24 +1,52 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ipcMain } from 'electron'
 
+// The handlers delegate to the real api.ts registry query functions, so this
+// spec uses the real api module and seeds the real globalRegistry. Electron
+// and the storage stores are mocked the same way api.spec.ts mocks them.
 vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn(),
     on: vi.fn(),
+    removeHandler: vi.fn(),
   },
+  BrowserWindow: { getAllWindows: vi.fn(() => []) },
+  Menu: {
+    getApplicationMenu: vi.fn(() => null),
+    buildFromTemplate: vi.fn((t) => t),
+    setApplicationMenu: vi.fn(),
+  },
+  MenuItem: vi.fn().mockImplementation((opts) => opts),
+  Notification: Object.assign(
+    vi.fn().mockImplementation(() => ({ show: vi.fn() })),
+    { isSupported: vi.fn(() => false) }
+  ),
+  app: { dock: null },
 }))
 
-vi.mock('../../../src/main/extensions/api', () => ({
-  globalRegistry: {
-    sidebarItems: new Map(),
-    contextMenuItems: new Map(),
-    settingsSections: new Map(),
-  },
+vi.mock('../../../src/main/shell/shell-executor', () => ({
+  execShell: vi.fn(),
+  assertCommandAllowed: vi.fn(),
+  assertCwdInScope: vi.fn(),
+  CommandNotAllowedError: class extends Error {},
+  CwdOutOfScopeError: class extends Error {},
+}))
+
+vi.mock('../../../src/main/storage/settings-store', () => ({
+  getGlobalSettings: vi.fn(() => ({})),
+  getWorkspaceSettings: vi.fn(() => ({})),
+}))
+
+vi.mock('../../../src/main/storage/workspace-store', () => ({
+  listWorkspaces: vi.fn(() => []),
+  listProjects: vi.fn(() => []),
+  deleteProject: vi.fn(),
 }))
 
 vi.mock('../../../src/main/storage/extension-settings-store', () => {
   const store: Record<string, unknown> = {}
   return {
+    getExtensionSetting: (key: string) => store[key],
     getAllExtensionSettings: () => ({ ...store }),
     setExtensionSetting: (key: string, value: unknown) => {
       store[key] = value

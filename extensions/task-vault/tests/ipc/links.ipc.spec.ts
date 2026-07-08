@@ -9,6 +9,18 @@ vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
 }))
 
+// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
+// capture/assert code (mockHandle.mock.calls, removeHandler assertions) still works.
+const mockApiIpc = {
+  registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+    mockHandle(ch, (_e: unknown, payload: unknown) => fn(payload))
+    return { dispose: () => mockRemoveHandler(ch) }
+  },
+}
+const mockApi = {
+  ipc: mockApiIpc,
+} as unknown as import('../../../../src/main/extensions/api').ExtensionAPI
+
 import { registerLinksIpcHandlers } from '../../src/ipc/links.ipc'
 
 const UUID = '550e8400-e29b-41d4-a716-446655440000'
@@ -39,7 +51,7 @@ function getHandler(channel: string): (event: unknown, payload: unknown) => Prom
   vi.mocked(mockHandle).mockImplementation((ch, fn) => {
     if (ch === channel) handler = fn as typeof handler
   })
-  registerLinksIpcHandlers(db)
+  registerLinksIpcHandlers(mockApi, db)
   if (!handler) throw new Error(`Handler for ${channel} not registered`)
   return handler
 }
@@ -234,7 +246,7 @@ describe('task-vault:links:get-for-terminator-target error handling', () => {
 
 describe('registerLinksIpcHandlers dispose', () => {
   it('calls ipcMain.removeHandler for all registered channels', () => {
-    const dispose = registerLinksIpcHandlers(db)
+    const dispose = registerLinksIpcHandlers(mockApi, db)
     dispose()
     const removedChannels = vi.mocked(mockRemoveHandler).mock.calls.map((c) => c[0])
     expect(removedChannels).toContain('task-vault:links:create')

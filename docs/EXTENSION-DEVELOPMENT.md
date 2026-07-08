@@ -385,6 +385,39 @@ handler.dispose()
 
 **Error handling**: throw or return `{ error: string }` to signal failure. The renderer receives the rejection or error payload.
 
+**Remote access** _(v1.4.0)_: channels registered through `registerHandler` are dispatchable by the remote-control bridge (the `/app/` browser surface) **by default**, so extension panels keep working remotely. Pass `{ remoteAccessible: false }` as the third argument to keep a channel reachable only from the local Electron renderer:
+
+```typescript
+api.ipc.registerHandler('my-ext:local-secret', handler, { remoteAccessible: false })
+```
+
+The declaration made at registration is the single authority — a channel that is neither in the core manifest-derived allowlist nor declared `remoteAccessible` at registration is rejected by the bridge. Extensions must never call Electron's `ipcMain` directly: handlers registered that way are invisible to the bridge registry and unreachable remotely.
+
+---
+
+### `api.pty` — Terminal Session Authority _(v1.2.0, session authority since v1.4.0)_
+
+`PtyManager` is the single session authority: it owns the PTY processes, their metadata (origin, project, workspace, timestamps), and multi-subscriber output/exit fan-out. Extensions never keep their own session registries.
+
+```typescript
+// Spawn with metadata; subscribe output/exit separately (v1.4.0)
+const info = api.pty.spawnSession({
+  sessionId,
+  cwd: '/repo',
+  shell: '/bin/zsh',
+  type: 'agent',
+  origin: 'remote', // 'app' sessions belong to the Electron renderer UI
+})
+const stopStreaming = api.pty.onData(sessionId, (data) => broadcast(data))
+api.pty.onExit(sessionId, (code) => cleanup(code)) // fires after the session is removed
+
+api.pty.getSession(sessionId) // full SessionInfo or undefined
+api.pty.setWorkspace(sessionId, 'ws-1') // stamp workspace metadata (null clears)
+api.pty.listSessions() // every live session with full SessionInfo
+```
+
+`onData`/`onExit` support any number of subscribers per session and return disposers; all listeners are cleaned up automatically when the PTY exits. The v1.1.0 methods `spawn(sessionId, cwd, shell, type, onData, onExit)`, `attachOnData`, and `attachOnExit` remain as deprecated aliases.
+
 ---
 
 ## Disposables

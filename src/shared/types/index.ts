@@ -51,6 +51,10 @@ export interface TerminalSession {
   createdAt: string
   closedAt?: string
   parentSessionId?: string
+  /** Unseen bell rings for this session (renderer-side view state). */
+  bellCount?: number
+  /** True while output is streaming (renderer-side view state). */
+  busy?: boolean
 }
 
 export type ExtensionStatus = 'enabled' | 'disabled' | 'error'

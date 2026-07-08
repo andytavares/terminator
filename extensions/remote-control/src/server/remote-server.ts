@@ -2,7 +2,6 @@ import Fastify, { type FastifyInstance } from 'fastify'
 import websocketPlugin from '@fastify/websocket'
 import staticPlugin from '@fastify/static'
 import { join, resolve, dirname } from 'path'
-import { randomBytes } from 'crypto'
 import { readFileSync, existsSync, readdirSync } from 'fs'
 import { app as electronApp } from 'electron'
 import type { PtyManagerAPI, WorkspaceSnapshot, ProjectSnapshot } from '../types.js'
@@ -12,6 +11,7 @@ import { registerWorkspaceRoutes } from './routes/workspace.routes.js'
 import { registerAuthMiddleware } from './auth.middleware.js'
 import { registerBridgeRoute } from './routes/bridge.route.js'
 import { WsTicketStore } from './ws-ticket-store.js'
+import { SessionStore } from './session-store.js'
 import { WsSubscriberManager } from './ws-subscriber-manager.js'
 
 // CSS injected into every extension iframe so --tm-* variables and layout are defined.
@@ -156,47 +156,26 @@ export async function createRemoteServer(
 
   const ticketStore = new WsTicketStore()
   const subscriberManager = new WsSubscriberManager()
-  // token → expiresAt (ms). Mirrors the 8-hour cookie lifetime.
+  // One session store per browser surface; 8-hour cookie lifetime.
   const SESSION_TTL_MS = 8 * 60 * 60 * 1000
-  const appSessions = new Map<string, number>()
-  const mobileSessions = new Map<string, number>()
+  const appSessionStore = new SessionStore({
+    cookieName: 'app-session',
+    cookiePath: '/app',
+    ttlMs: SESSION_TTL_MS,
+  })
+  const mobileSessionStore = new SessionStore({
+    cookieName: 'mobile-session',
+    cookiePath: '/mobile',
+    ttlMs: SESSION_TTL_MS,
+  })
   let sessionCleanupTimer: ReturnType<typeof setInterval> | null = null
-
-  function parseCookieToken(cookieHeader: string, cookieName: string): string | null {
-    const match = cookieHeader
-      .split(';')
-      .map((s) => s.trim())
-      .find((s) => s.startsWith(`${cookieName}=`))
-    return match ? match.slice(`${cookieName}=`.length) : null
-  }
-
-  function hasValidAppSession(cookieHeader: string): boolean {
-    const token = parseCookieToken(cookieHeader, 'app-session')
-    if (!token) return false
-    const expiresAt = appSessions.get(token)
-    if (expiresAt === undefined) return false
-    if (Date.now() > expiresAt) {
-      appSessions.delete(token)
-      return false
-    }
-    return true
-  }
-
-  function hasValidMobileSession(cookieHeader: string): boolean {
-    const token = parseCookieToken(cookieHeader, 'mobile-session')
-    if (!token) return false
-    const expiresAt = mobileSessions.get(token)
-    if (expiresAt === undefined) return false
-    if (Date.now() > expiresAt) {
-      mobileSessions.delete(token)
-      return false
-    }
-    return true
-  }
 
   // hasValidSession is the union of app + mobile sessions (used by auth middleware)
   function hasValidSession(cookieHeader: string): boolean {
-    return hasValidAppSession(cookieHeader) || hasValidMobileSession(cookieHeader)
+    return (
+      appSessionStore.hasValidSession(cookieHeader) ||
+      mobileSessionStore.hasValidSession(cookieHeader)
+    )
   }
 
   const fastify = Fastify({ logger: false })
@@ -205,12 +184,12 @@ export async function createRemoteServer(
   fastify.addHook('onRequest', async (request, reply) => {
     const pathname = request.url.split('?')[0]
     if (pathname.startsWith('/app/') && pathname !== '/app/') {
-      if (!hasValidAppSession(request.headers.cookie ?? '')) {
+      if (!appSessionStore.hasValidSession(request.headers.cookie ?? '')) {
         return reply.status(403).send({ error: 'FORBIDDEN' })
       }
     }
     if (pathname.startsWith('/mobile/') && pathname !== '/mobile/') {
-      if (!hasValidMobileSession(request.headers.cookie ?? '')) {
+      if (!mobileSessionStore.hasValidSession(request.headers.cookie ?? '')) {
         return reply.status(403).send({ error: 'FORBIDDEN' })
       }
     }
@@ -257,20 +236,14 @@ export async function createRemoteServer(
 
   fastify.get<{ Querystring: { t?: string } }>('/app/', async (request, reply) => {
     // Accept an existing valid session cookie (allows page refresh without re-auth)
-    const hasSession = hasValidAppSession(request.headers.cookie ?? '')
+    const hasSession = appSessionStore.hasValidSession(request.headers.cookie ?? '')
 
     if (!hasSession) {
       const t = request.query.t ?? ''
       if (!t || !ticketStore.consumeTicket(t, 'app')) {
         return reply.redirect('/')
       }
-      const sessionToken = randomBytes(32).toString('hex')
-      appSessions.set(sessionToken, Date.now() + SESSION_TTL_MS)
-      // 8-hour HttpOnly session cookie scoped to /app
-      reply.header(
-        'Set-Cookie',
-        `app-session=${sessionToken}; Path=/app; HttpOnly; SameSite=Strict; Max-Age=28800`
-      )
+      reply.header('Set-Cookie', appSessionStore.issueSession().setCookie)
     }
 
     const shimTag = '<script type="module" src="/remote-shim.js"></script>'
@@ -284,19 +257,14 @@ export async function createRemoteServer(
   })
 
   fastify.get<{ Querystring: { t?: string } }>('/mobile/', async (request, reply) => {
-    const hasSession = hasValidMobileSession(request.headers.cookie ?? '')
+    const hasSession = mobileSessionStore.hasValidSession(request.headers.cookie ?? '')
 
     if (!hasSession) {
       const t = request.query.t ?? ''
       if (!t || !ticketStore.consumeTicket(t, 'mobile')) {
         return reply.redirect('/')
       }
-      const sessionToken = randomBytes(32).toString('hex')
-      mobileSessions.set(sessionToken, Date.now() + SESSION_TTL_MS)
-      reply.header(
-        'Set-Cookie',
-        `mobile-session=${sessionToken}; Path=/mobile; HttpOnly; SameSite=Strict; Max-Age=28800`
-      )
+      reply.header('Set-Cookie', mobileSessionStore.issueSession().setCookie)
     }
     try {
       const html = readFileSync(join(loginStaticDir, 'mobile.html'), 'utf8')
@@ -350,13 +318,8 @@ export async function createRemoteServer(
         // Purge expired app-session tokens once per hour
         sessionCleanupTimer = setInterval(
           () => {
-            const now = Date.now()
-            for (const [token, expiresAt] of appSessions) {
-              if (now > expiresAt) appSessions.delete(token)
-            }
-            for (const [token, expiresAt] of mobileSessions) {
-              if (now > expiresAt) mobileSessions.delete(token)
-            }
+            appSessionStore.sweep()
+            mobileSessionStore.sweep()
           },
           60 * 60 * 1000
         )
@@ -379,8 +342,8 @@ export async function createRemoteServer(
         clearInterval(sessionCleanupTimer)
         sessionCleanupTimer = null
       }
-      appSessions.clear()
-      mobileSessions.clear()
+      appSessionStore.clear()
+      mobileSessionStore.clear()
       terminalCleanup.cleanup()
       bridgeCleanup.disconnectAll()
       subscriberManager.destroyAll()
@@ -389,8 +352,8 @@ export async function createRemoteServer(
     },
 
     disconnectAllClients() {
-      appSessions.clear()
-      mobileSessions.clear()
+      appSessionStore.clear()
+      mobileSessionStore.clear()
       // Kill all remote PTYs — password rotation invalidates existing sessions
       terminalCleanup.cleanup()
       bridgeCleanup.disconnectAll()

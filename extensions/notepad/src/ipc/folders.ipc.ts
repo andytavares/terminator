@@ -1,7 +1,8 @@
-import { ipcMain } from 'electron'
 import { z } from 'zod'
 import { randomUUID } from '../db/db'
 import type { ExtensionDB } from '../../../../src/main/db/index'
+import type { ExtensionAPI } from '../../../../src/main/extensions/api'
+import { createIpcRegistrar } from './register'
 
 const VALIDATION_ERROR = { error: 'VALIDATION_ERROR' }
 
@@ -122,18 +123,13 @@ export async function moveItemsToFolder(
   return { data: { ok: true } }
 }
 
-export function registerFoldersIpcHandlers(db: ExtensionDB): () => void {
-  ipcMain.handle('terminator.notepad:folders.create', (_, payload) => createFolder(db, payload))
-  ipcMain.handle('terminator.notepad:folders.list', () => listFolders(db))
-  ipcMain.handle('terminator.notepad:folders.rename', (_, payload) => renameFolder(db, payload))
-  ipcMain.handle('terminator.notepad:folders.delete', (_, payload) => deleteFolder(db, payload))
-  ipcMain.handle('terminator.notepad:folders.move', (_, payload) => moveItemsToFolder(db, payload))
+export function registerFoldersIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
+  const { handle, cleanup } = createIpcRegistrar(api)
+  handle('terminator.notepad:folders.create', (payload) => createFolder(db, payload))
+  handle('terminator.notepad:folders.list', () => listFolders(db))
+  handle('terminator.notepad:folders.rename', (payload) => renameFolder(db, payload))
+  handle('terminator.notepad:folders.delete', (payload) => deleteFolder(db, payload))
+  handle('terminator.notepad:folders.move', (payload) => moveItemsToFolder(db, payload))
 
-  return () => {
-    ipcMain.removeHandler('terminator.notepad:folders.create')
-    ipcMain.removeHandler('terminator.notepad:folders.list')
-    ipcMain.removeHandler('terminator.notepad:folders.rename')
-    ipcMain.removeHandler('terminator.notepad:folders.delete')
-    ipcMain.removeHandler('terminator.notepad:folders.move')
-  }
+  return cleanup
 }

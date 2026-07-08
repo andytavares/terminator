@@ -1,5 +1,10 @@
 // Runs as an IIFE before the renderer bundle. Sets up window.electronAPI over a WebSocket
 // bridge so the unmodified Electron renderer can run in any browser.
+//
+// The electronAPI surface is declared once in src/shared/electron-api/manifest.ts;
+// this file only supplies the WebSocket transport and the browser-local stubs for
+// methods that cannot work remotely (native dialogs, WebContentsView bounds, …).
+import { buildElectronApi, type ApiTransport } from '../shared/electron-api/build-api.js'
 ;(function () {
   let ws: WebSocket
   let wsReady = false
@@ -129,154 +134,31 @@
 
   void connectBridge()
 
-  // Helper: build a subscription-based on() that matches the electronAPI signature
-  // Most on* methods take (handler) and return unsubscribe fn
-  function makePushOn<T>(channel: string, map: (args: unknown[]) => T) {
-    return (handler: (v: T) => void) => on(channel, (...args) => handler(map(args)))
+  const transport: ApiTransport = {
+    invoke,
+    send: fire,
+    subscribe: (channel, listener) => on(channel, (...args) => listener(args)),
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(window as any).electronAPI = {
-    terminal: {
-      create: (payload: unknown) => invoke('terminal:create', payload),
-      close: (sessionId: string) => invoke('terminal:close', { sessionId }),
-      input: (sessionId: string, data: string) => fire('terminal:input', { sessionId, data }),
-      resize: (sessionId: string, cols: number, rows: number) =>
-        fire('terminal:resize', { sessionId, cols, rows }),
-      onOutput: (handler: (sessionId: string, data: string) => void) =>
-        on('terminal:output', (...args) => {
-          const p = args[0] as { sessionId: string; data: string }
-          handler(p.sessionId, p.data)
-        }),
-      closeAll: () => invoke('terminal:close-all'),
-      cleanupOrphans: () => invoke('terminal:cleanup-orphans'),
-      onProcessExit: (handler: (sessionId: string, exitCode: number) => void) =>
-        on('terminal:process-exit', (...args) => {
-          const p = args[0] as { sessionId: string; exitCode: number }
-          handler(p.sessionId, p.exitCode)
-        }),
-    },
-    workspace: {
-      list: () => invoke('workspace:list'),
-      create: (payload: unknown) => invoke('workspace:create', payload),
-      update: (payload: unknown) => invoke('workspace:update', payload),
-      delete: (id: string) => invoke('workspace:delete', { id }),
-      reorder: (ids: string[]) => invoke('workspace:reorder', { ids }),
-    },
-    project: {
-      list: (workspaceId: string) => invoke('project:list', { workspaceId }),
-      create: (payload: unknown) => invoke('project:create', payload),
-      delete: (id: string) => invoke('project:delete', { id }),
-      updateBranch: (id: string, gitBranch: string) =>
-        invoke('project:update-branch', { id, gitBranch }),
-      rename: (id: string, name: string) => invoke('project:rename', { id, name }),
-      reorder: (workspaceId: string, ids: string[]) =>
-        invoke('project:reorder', { workspaceId, ids }),
-    },
-    git: {
-      isRepo: (path: string) => invoke('git:is-repo', { path }),
-      currentBranch: (path: string) => invoke('git:current-branch', { path }),
-      listBranches: (path: string) => invoke('git:list-branches', { path }),
-      checkout: (path: string, branch: string) => invoke('git:checkout', { path, branch }),
-      createBranch: (path: string, branch: string) => invoke('git:create-branch', { path, branch }),
-      suggestWorktreePath: (repoRoot: string, branch: string, baseDir?: string) =>
-        invoke('git:suggest-worktree-path', { repoRoot, branch, baseDir }),
-      createWorktree: (payload: unknown) => invoke('git:create-worktree', payload),
-      removeWorktree: (repoRoot: string, worktreePath: string) =>
-        invoke('git:remove-worktree', { repoRoot, worktreePath }),
-      listWorktrees: (path: string) => invoke('git:list-worktrees', { path }),
-    },
-    settings: {
-      getGlobal: () => invoke('settings:get-global'),
-      updateGlobal: (patch: unknown) => invoke('settings:update-global', { patch }),
-      getWorkspace: (workspaceId: string) => invoke('settings:get-workspace', { workspaceId }),
-      updateWorkspace: (workspaceId: string, patch: unknown) =>
-        invoke('settings:update-workspace', { workspaceId, patch }),
-    },
-    dialog: {
-      openDirectory: () => Promise.resolve({ cancelled: true }),
-    },
-    extension: {
-      list: () => invoke('extension:list'),
-      install: (directoryPath: string) => invoke('extension:install', { directoryPath }),
-      toggle: (id: string, enabled: boolean) => invoke('extension:toggle', { id, enabled }),
-      uninstall: (id: string) => invoke('extension:uninstall', { id }),
-      reload: (id: string) => invoke('extension:reload', { id }),
-      getSettingsSchemas: () => invoke('extension:get-settings-schemas'),
-      getSettingsValues: () => invoke('extension:get-settings-values'),
-      updateSetting: (key: string, value: unknown) =>
-        invoke('extension:update-setting', { key, value }),
-      getSidebarItems: () => invoke('extension:get-sidebar-items'),
-      getContextMenuItems: (target: string) =>
-        invoke('extension:get-context-menu-items', { target }),
-      contextMenuClick: (target: string, itemId: string, targetId: string) =>
-        fire('extension:context-menu-click', { target, itemId, targetId }),
-      getCommands: () => invoke('extension:get-commands'),
-      executeCommand: (key: string) => fire('extension:execute-command', { key }),
-      // No-op in remote mode: WebContentsView positioning is an Electron-only concept
-      updatePanelBounds: () => {},
-    },
-    keyboard: {
-      isReserved: () => false,
-    },
-    shell: {
-      exec: (options: unknown) => invoke('shell:exec', options),
-      openPath: (filePath: string) => invoke('shell:open-path', { filePath }),
-      openExternal: (url: string) => {
+  ;(window as any).electronAPI = buildElectronApi(transport, {
+    mode: 'remote',
+    locals: {
+      // No Electron accelerators in a browser — nothing is reserved.
+      'keyboard.isReserved': () => false,
+      // A browser client cannot open a native directory picker.
+      'dialog.openDirectory': () => Promise.resolve({ cancelled: true }),
+      // Open in a new browser tab instead of the host OS.
+      'shell.openExternal': (url: string) => {
         window.open(url, '_blank')
         return Promise.resolve()
       },
-    },
-    fs: {
-      watchStart: (projectRoot: string) => invoke('fs:watch-start', { projectRoot }),
-      watchStop: () => invoke('fs:watch-stop'),
-      onChanged: makePushOn<unknown>('fs:changed', (args) => args[0]),
-      readFile: (filePath: string) => invoke('fs:read-file', { filePath }),
-    },
-    extensionEvents: {
-      onTogglePanel: makePushOn<string>(
-        'extension:toggle-panel',
-        (args) => (args[0] as { panelId: string }).panelId
-      ),
-      onSelectProjectTab: makePushOn<string>(
-        'extension:select-project-tab',
-        (args) => (args[0] as { tabId: string }).tabId
-      ),
-      onMenuOpenSettings: makePushOn<void>('menu:open-settings', () => undefined),
-      onMenuToggleSidebar: makePushOn<void>('menu:toggle-sidebar', () => undefined),
-      onMenuCloseTab: makePushOn<void>('menu:close-tab', () => undefined),
-      onMenuOpenAbout: makePushOn<void>('menu:open-about', () => undefined),
-    },
-    app: {
-      getInfo: () => invoke('app:get-info'),
-    },
-    extensionBridge: {
-      invoke: (channel: string, payload?: unknown) => invoke(channel, payload),
-      on: (channel: string, handler: (data: unknown) => void) =>
+      // No-op in remote mode: WebContentsView positioning is an Electron-only concept.
+      'extension.updatePanelBounds': () => {},
+      // Dynamic passthrough for extension-owned channels.
+      'extensionBridge.invoke': (channel: string, payload?: unknown) => invoke(channel, payload),
+      'extensionBridge.on': (channel: string, handler: (data: unknown) => void) =>
         on(channel, (data) => handler(data)),
     },
-    notifications: {
-      create: (payload: {
-        type: 'info' | 'success' | 'warning' | 'error'
-        title: string
-        message?: string
-        source?: string
-        key: string
-      }) => invoke('notifications:create', payload),
-      list: () => invoke('notifications:list'),
-      dismiss: (id: string) => invoke('notifications:dismiss', { id }),
-      triggerAction: (notifId: string, actionId: string) =>
-        invoke('notifications:trigger-action', { notifId, actionId }),
-      onPush: makePushOn<unknown>('notifications:push', (args) => args[0]),
-    },
-    metrics: {
-      getSystem: () => invoke('metrics:system'),
-      getProcesses: (pids: number[]) => invoke('metrics:processes', { pids }),
-      getPids: (sessionIds: string[]) => invoke('metrics:pids', { sessionIds }),
-    },
-    logger: {
-      write: (level: string, namespace: string, message: string) =>
-        fire('log:write', { level, namespace, message }),
-    },
-  }
+  })
 })()

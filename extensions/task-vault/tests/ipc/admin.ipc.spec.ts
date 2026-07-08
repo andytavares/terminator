@@ -9,6 +9,18 @@ vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
 }))
 
+// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
+// capture/assert code (mockHandle.mock.calls, removeHandler assertions) still works.
+const mockApiIpc = {
+  registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+    mockHandle(ch, (_e: unknown, payload: unknown) => fn(payload))
+    return { dispose: () => mockRemoveHandler(ch) }
+  },
+}
+const mockApi = {
+  ipc: mockApiIpc,
+} as unknown as import('../../../../src/main/extensions/api').ExtensionAPI
+
 import { registerAdminIpcHandlers } from '../../src/ipc/admin.ipc.js'
 
 function createMockDb(): ExtensionDB & {
@@ -45,7 +57,7 @@ describe('registerAdminIpcHandlers', () => {
 
   it('registers three IPC handlers', () => {
     const db = createMockDb()
-    registerAdminIpcHandlers(db)
+    registerAdminIpcHandlers(mockApi, db)
     expect(mockHandle).toHaveBeenCalledWith('task-vault:admin:list-tables', expect.any(Function))
     expect(mockHandle).toHaveBeenCalledWith('task-vault:admin:table-stats', expect.any(Function))
     expect(mockHandle).toHaveBeenCalledWith('task-vault:admin:run-query', expect.any(Function))
@@ -53,7 +65,7 @@ describe('registerAdminIpcHandlers', () => {
 
   it('dispose removes all three handlers', () => {
     const db = createMockDb()
-    const dispose = registerAdminIpcHandlers(db)
+    const dispose = registerAdminIpcHandlers(mockApi, db)
     dispose()
     expect(mockRemoveHandler).toHaveBeenCalledWith('task-vault:admin:list-tables')
     expect(mockRemoveHandler).toHaveBeenCalledWith('task-vault:admin:table-stats')
@@ -64,7 +76,7 @@ describe('registerAdminIpcHandlers', () => {
     it('returns table names', async () => {
       const db = createMockDb()
       db.mockQuery.mockResolvedValueOnce([{ table_name: 'tasks' }, { table_name: 'projects' }])
-      registerAdminIpcHandlers(db)
+      registerAdminIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:admin:list-tables')()) as {
         tables: string[]
       }
@@ -74,7 +86,7 @@ describe('registerAdminIpcHandlers', () => {
     it('returns error when query throws', async () => {
       const db = createMockDb()
       db.mockQuery.mockRejectedValueOnce(new Error('connection lost'))
-      registerAdminIpcHandlers(db)
+      registerAdminIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:admin:list-tables')()) as { error: string }
       expect(result.error).toMatch(/connection lost/)
     })
@@ -85,7 +97,7 @@ describe('registerAdminIpcHandlers', () => {
       const db = createMockDb()
       db.mockQuery.mockResolvedValueOnce([{ table_name: 'tasks' }, { table_name: 'areas' }])
       db.mockGet.mockResolvedValueOnce({ n: '42' }).mockResolvedValueOnce({ n: '5' })
-      registerAdminIpcHandlers(db)
+      registerAdminIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:admin:table-stats')()) as {
         stats: Record<string, number>
       }
@@ -96,7 +108,7 @@ describe('registerAdminIpcHandlers', () => {
     it('returns error when query throws', async () => {
       const db = createMockDb()
       db.mockQuery.mockRejectedValueOnce(new Error('pg error'))
-      registerAdminIpcHandlers(db)
+      registerAdminIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:admin:table-stats')()) as { error: string }
       expect(result.error).toMatch(/pg error/)
     })
@@ -106,7 +118,7 @@ describe('registerAdminIpcHandlers', () => {
     it('returns rows for SELECT queries', async () => {
       const db = createMockDb()
       db.mockQuery.mockResolvedValueOnce([{ id: '1', text: 'hello' }])
-      registerAdminIpcHandlers(db)
+      registerAdminIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
         sql: 'SELECT * FROM tasks',
       })) as { rows: unknown[] }
@@ -116,7 +128,7 @@ describe('registerAdminIpcHandlers', () => {
     it('returns changes count for write queries', async () => {
       const db = createMockDb()
       db.mockRun.mockResolvedValueOnce(3)
-      registerAdminIpcHandlers(db)
+      registerAdminIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
         sql: "DELETE FROM tasks WHERE status='cancelled'",
       })) as { rows: unknown[]; changes: number }
@@ -127,7 +139,7 @@ describe('registerAdminIpcHandlers', () => {
     it('returns changes: 0 when no rows affected by write', async () => {
       const db = createMockDb()
       db.mockRun.mockResolvedValueOnce(0)
-      registerAdminIpcHandlers(db)
+      registerAdminIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
         sql: "UPDATE tasks SET status='open' WHERE 1=0",
       })) as { changes: number }
@@ -136,7 +148,7 @@ describe('registerAdminIpcHandlers', () => {
 
     it('blocks DROP statements', async () => {
       const db = createMockDb()
-      registerAdminIpcHandlers(db)
+      registerAdminIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
         sql: 'DROP TABLE tasks',
       })) as { error: string }
@@ -146,7 +158,7 @@ describe('registerAdminIpcHandlers', () => {
 
     it('blocks CREATE statements', async () => {
       const db = createMockDb()
-      registerAdminIpcHandlers(db)
+      registerAdminIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
         sql: 'CREATE TABLE foo (id TEXT)',
       })) as { error: string }
@@ -155,7 +167,7 @@ describe('registerAdminIpcHandlers', () => {
 
     it('blocks ALTER statements', async () => {
       const db = createMockDb()
-      registerAdminIpcHandlers(db)
+      registerAdminIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
         sql: 'ALTER TABLE tasks ADD COLUMN x TEXT',
       })) as { error: string }
@@ -164,7 +176,7 @@ describe('registerAdminIpcHandlers', () => {
 
     it('returns error for empty query', async () => {
       const db = createMockDb()
-      registerAdminIpcHandlers(db)
+      registerAdminIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:admin:run-query')(null, { sql: '   ' })) as {
         error: string
       }
@@ -174,7 +186,7 @@ describe('registerAdminIpcHandlers', () => {
     it('returns error when query throws', async () => {
       const db = createMockDb()
       db.mockQuery.mockRejectedValueOnce(new Error('syntax error'))
-      registerAdminIpcHandlers(db)
+      registerAdminIpcHandlers(mockApi, db)
       const result = (await getHandler(db, 'task-vault:admin:run-query')(null, {
         sql: 'SELECT 1',
       })) as { error: string }

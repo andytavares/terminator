@@ -1,4 +1,5 @@
-import { ipcMain, shell } from 'electron'
+import { handleChannel } from './channel-registrar.js'
+import { shell } from 'electron'
 import { homedir } from 'os'
 import { z } from 'zod'
 import {
@@ -18,7 +19,7 @@ const ShellExecPayloadSchema = z.object({
 })
 
 export function registerShellHandlers(): void {
-  ipcMain.handle('shell:open-path', async (_event, payload) => {
+  handleChannel('shell:open-path', async (_event, payload) => {
     const parsed = z.object({ filePath: z.string().min(1) }).safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     const filePath = parsed.data.filePath.replace(/^~(?=\/|$)/, homedir())
@@ -26,7 +27,7 @@ export function registerShellHandlers(): void {
     return errorMsg ? { error: errorMsg } : { ok: true as const }
   })
 
-  ipcMain.handle('shell:open-external', async (_event, payload) => {
+  handleChannel('shell:open-external', async (_event, payload) => {
     const parsed = z.object({ url: z.string().url() }).safeParse(payload)
     if (!parsed.success) return { error: 'VALIDATION_ERROR' }
     try {
@@ -37,7 +38,7 @@ export function registerShellHandlers(): void {
     }
   })
 
-  ipcMain.handle('shell:exec', async (_event, payload) => {
+  handleChannel('shell:exec', async (_event, payload) => {
     const parsed = ShellExecPayloadSchema.safeParse(payload)
     if (!parsed.success) {
       return { error: 'VALIDATION_ERROR', message: parsed.error.message }

@@ -1,4 +1,3 @@
-import { ipcMain } from 'electron'
 import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
 import { applyNotepadSchema, applyNotepadMigrations } from './db/db'
 import { registerNotesIpcHandlers, registerTagsIpcHandlers } from './ipc/notes.ipc'
@@ -57,22 +56,22 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     )
   }
 
-  const disposeNotes = registerNotesIpcHandlers(api.db)
+  const disposeNotes = registerNotesIpcHandlers(api, api.db)
   disposables.push({ dispose: disposeNotes })
 
-  const disposeComments = registerCommentsIpcHandlers(api.db)
+  const disposeComments = registerCommentsIpcHandlers(api, api.db)
   disposables.push({ dispose: disposeComments })
 
-  const disposeTags = registerTagsIpcHandlers(api.db)
+  const disposeTags = registerTagsIpcHandlers(api, api.db)
   disposables.push({ dispose: disposeTags })
 
-  const disposeSearch = registerSearchIpcHandlers(api.db)
+  const disposeSearch = registerSearchIpcHandlers(api, api.db)
   disposables.push({ dispose: disposeSearch })
 
-  const disposeExport = registerExportIpcHandlers(api.db)
+  const disposeExport = registerExportIpcHandlers(api, api.db)
   disposables.push({ dispose: disposeExport })
 
-  const disposeDiagrams = registerDiagramsIpcHandlers(api.db)
+  const disposeDiagrams = registerDiagramsIpcHandlers(api, api.db)
   disposables.push({ dispose: disposeDiagrams })
 
   // Open note/diagram in a dedicated auxiliary window using the extension's own renderer.
@@ -99,13 +98,13 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     })
   )
 
-  const disposeDiagramComments = registerDiagramCommentsIpcHandlers(api.db)
+  const disposeDiagramComments = registerDiagramCommentsIpcHandlers(api, api.db)
   disposables.push({ dispose: disposeDiagramComments })
 
-  const disposeFolders = registerFoldersIpcHandlers(api.db)
+  const disposeFolders = registerFoldersIpcHandlers(api, api.db)
   disposables.push({ dispose: disposeFolders })
 
-  ipcMain.handle('terminator.notepad:db.reinit', async () => {
+  const disposeDbReinit = api.ipc.registerHandler('terminator.notepad:db.reinit', async () => {
     try {
       await applyNotepadSchema(api.db)
       await applyNotepadMigrations(api.db)
@@ -114,7 +113,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
       return { error: err instanceof Error ? err.message : String(err) }
     }
   })
-  disposables.push({ dispose: () => ipcMain.removeHandler('terminator.notepad:db.reinit') })
+  disposables.push(disposeDbReinit)
 
   disposables.push(
     api.settings.register({

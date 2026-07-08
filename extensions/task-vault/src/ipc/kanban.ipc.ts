@@ -1,6 +1,6 @@
-import { ipcMain } from 'electron'
 import { z } from 'zod'
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
+import { createIpcRegistrar } from './register'
 import type { KanbanConfig, TaskStatus } from '../vault/types'
 import { DEFAULT_KANBAN_CONFIG } from '../vault/types'
 
@@ -50,8 +50,9 @@ const SaveConfigSchema = z.object({
   swimlaneGrouping: z.enum(['none', 'project', 'area']),
 })
 
-export function registerKanbanIpcHandlers(db: ExtensionDB): () => void {
-  const getConfigHandler = ipcMain.handle('task-vault:kanban:get-config', async () => {
+export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
+  const { handle, cleanup } = createIpcRegistrar(api)
+  handle('task-vault:kanban:get-config', async () => {
     try {
       return await readConfig(db)
     } catch (err) {
@@ -59,20 +60,17 @@ export function registerKanbanIpcHandlers(db: ExtensionDB): () => void {
     }
   })
 
-  const saveConfigHandler = ipcMain.handle(
-    'task-vault:kanban:save-config',
-    async (_event, payload: unknown) => {
-      try {
-        const config = SaveConfigSchema.parse(payload)
-        await writeConfig(db, config)
-        return { ok: true }
-      } catch (err) {
-        return { error: String(err) }
-      }
+  handle('task-vault:kanban:save-config', async (payload: unknown) => {
+    try {
+      const config = SaveConfigSchema.parse(payload)
+      await writeConfig(db, config)
+      return { ok: true }
+    } catch (err) {
+      return { error: String(err) }
     }
-  )
+  })
 
-  const listTasksHandler = ipcMain.handle('task-vault:kanban:list-tasks', async () => {
+  handle('task-vault:kanban:list-tasks', async () => {
     try {
       const rows = await db.query<Record<string, unknown>>(
         `SELECT t.id, t.text, t.status, p.name AS project, t.context, a.name AS area,
@@ -110,7 +108,7 @@ export function registerKanbanIpcHandlers(db: ExtensionDB): () => void {
     }
   })
 
-  const listContextsHandler = ipcMain.handle('task-vault:kanban:list-contexts', async () => {
+  handle('task-vault:kanban:list-contexts', async () => {
     try {
       const rows = await db.query<{ context: string }>(
         `SELECT DISTINCT context FROM tasks
@@ -123,36 +121,22 @@ export function registerKanbanIpcHandlers(db: ExtensionDB): () => void {
     }
   })
 
-  const moveTaskHandler = ipcMain.handle(
-    'task-vault:kanban:move-task',
-    async (_event, payload: unknown) => {
-      try {
-        const { taskId, toStatus } = MoveTaskSchema.parse(payload)
-        const now = new Date().toISOString()
-        const existing = await db.get<{ id: string }>(`SELECT id FROM tasks WHERE id=?`, [taskId])
-        if (!existing) return { error: 'Task not found' }
-        await db.run(`UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?`, [
-          toStatus,
-          now,
-          taskId,
-        ])
-        return { ok: true }
-      } catch (err) {
-        return { error: String(err) }
-      }
+  handle('task-vault:kanban:move-task', async (payload: unknown) => {
+    try {
+      const { taskId, toStatus } = MoveTaskSchema.parse(payload)
+      const now = new Date().toISOString()
+      const existing = await db.get<{ id: string }>(`SELECT id FROM tasks WHERE id=?`, [taskId])
+      if (!existing) return { error: 'Task not found' }
+      await db.run(`UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?`, [
+        toStatus,
+        now,
+        taskId,
+      ])
+      return { ok: true }
+    } catch (err) {
+      return { error: String(err) }
     }
-  )
+  })
 
-  return () => {
-    ipcMain.removeHandler('task-vault:kanban:get-config')
-    ipcMain.removeHandler('task-vault:kanban:save-config')
-    ipcMain.removeHandler('task-vault:kanban:list-tasks')
-    ipcMain.removeHandler('task-vault:kanban:list-contexts')
-    ipcMain.removeHandler('task-vault:kanban:move-task')
-    void getConfigHandler
-    void saveConfigHandler
-    void listTasksHandler
-    void listContextsHandler
-    void moveTaskHandler
-  }
+  return cleanup
 }

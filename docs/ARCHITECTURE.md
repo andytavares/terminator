@@ -51,7 +51,9 @@ Terminator is an Electron application with two OS processes and one shared code 
 
 ## IPC Contract
 
-All renderer-to-main communication goes through `window.electronAPI`, exposed by `src/main/preload.ts` via `contextBridge`. Every IPC payload is validated with Zod at both ends.
+All renderer-to-main communication goes through `window.electronAPI`. The surface is declared once as a channel manifest (`src/shared/electron-api/manifest.ts`) — each method's channel, kind (invoke/send/event), payload mapping, and remote behavior — and both adapters are generated from it: `src/main/preload.ts` (native, `contextBridge` over `ipcRenderer`) and `src/renderer-remote/electron-api-shim.ts` (browser, WebSocket bridge). The manifest also derives the core remote allowlist (see [ADR-023](adr/023-channel-manifest-and-declared-remote-access.md)). Every IPC payload is validated with Zod at both ends.
+
+On the main-process side, every channel registers through `src/main/ipc/channel-registrar.ts` (core code) or `api.ipc.registerHandler` (extensions); registration records the channel and its remote-access declaration in the bridge registry — `ipcMain` is never monkey-patched. Terminal session state lives solely in `PtyManager` (see [ADR-024](adr/024-ptymanager-session-authority.md)).
 
 ### Channel namespaces
 

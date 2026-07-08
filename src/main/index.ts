@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell, net, session, protocol } from 'electron'
+import { handleChannel, onChannel } from './ipc/channel-registrar.js'
+import { app, BrowserWindow, dialog, Menu, shell, net, session, protocol } from 'electron'
 import { join } from 'path'
 import { registerWorkspaceHandlers } from './ipc/workspace.ipc.js'
 import { registerTerminalHandlers } from './ipc/terminal.ipc.js'
@@ -16,42 +17,19 @@ import { ExtensionHost } from './extensions/extension-host.js'
 import { ExtensionViewHost } from './extensions/extension-view-host.js'
 import { logger } from './logger.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
-import { REMOTE_ACCESSIBLE_CHANNELS } from './remote/remote-accessible-channels.js'
-import {
-  ipcInvokeRegistry,
-  ipcSendRegistry,
-  type IpcHandler,
-  type IpcSendHandler,
-} from './remote/ipc-registry.js'
+import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
 import { runLegacyMigration } from './db/migrate.js'
-import { globalRegistry, setMenuRebuildCallback } from './extensions/api.js'
+import {
+  listNativeViewMenuItems,
+  getPanelMenuItemId,
+  setMenuRebuildCallback,
+} from './extensions/api.js'
 
-// Intercept ipcMain.handle/on to capture handlers into the bridge registry
-// so the remote-control extension bridge can dispatch IPC calls from browser clients.
-
-const _origHandle = ipcMain.handle.bind(ipcMain)
-const _origOn = ipcMain.on.bind(ipcMain)
-const _origRemoveHandler = ipcMain.removeHandler.bind(ipcMain)
-// @ts-expect-error - patch to intercept all handler registrations
-ipcMain.handle = (channel: string, fn: IpcHandler, opts?: { remoteAccessible?: boolean }) => {
-  // Default the remote-access flag from the central allowlist so the bridge
-  // surface is auditable in one place (remote-accessible-channels.ts). An explicit
-  // opt-in flag at the call site still wins if a future channel needs to override.
-  const remoteAccessible = opts?.remoteAccessible ?? REMOTE_ACCESSIBLE_CHANNELS.has(channel)
-  ipcInvokeRegistry.set(channel, { handler: fn, remoteAccessible })
-  return _origHandle(channel, fn)
-}
-// @ts-expect-error - patch to intercept fire-and-forget handlers
-ipcMain.on = (channel: string, fn: IpcSendHandler) => {
-  ipcSendRegistry.set(channel, fn)
-  return _origOn(channel, fn)
-}
-// @ts-expect-error - patch to keep bridge registry in sync when handlers are removed
-ipcMain.removeHandler = (channel: string) => {
-  ipcInvokeRegistry.delete(channel)
-  return _origRemoveHandler(channel)
-}
+// All IPC channel registration goes through channel-registrar.ts (core) or
+// api.ipc.registerHandler (extensions), both of which record the bridge
+// registry entry and its remote-access declaration explicitly. ipcMain is
+// never monkey-patched.
 
 declare module 'electron' {
   interface App {
@@ -143,18 +121,17 @@ function buildViewSubmenu(): Electron.MenuItemConstructorOptions[] {
     { type: 'separator' },
   ]
 
-  const extItems = Array.from(globalRegistry.nativeMenuItems.values()).map((contrib) => {
-    const id = `ext-menu-${contrib.id}`
-    if (contrib.panelId) globalRegistry.panelMenuItemIds.set(contrib.panelId, id)
-    return {
-      id,
-      label: contrib.label,
-      accelerator: contrib.accelerator,
-      type: (contrib.type === 'checkbox' ? 'checkbox' : 'normal') as 'checkbox' | 'normal',
-      checked: false,
-      click: () => contrib.onClick(),
-    } as Electron.MenuItemConstructorOptions
-  })
+  const extItems = listNativeViewMenuItems().map(
+    (item) =>
+      ({
+        id: item.id,
+        label: item.label,
+        accelerator: item.accelerator,
+        type: item.type,
+        checked: false,
+        click: item.onClick,
+      }) as Electron.MenuItemConstructorOptions
+  )
 
   const tail: Electron.MenuItemConstructorOptions[] = [
     ...(extItems.length > 0 ? [{ type: 'separator' as const }] : []),
@@ -236,10 +213,10 @@ function setupMenu(): void {
 setMenuRebuildCallback(setupMenu)
 
 function registerAppHandlers(): void {
-  _origOn(
+  onChannel(
     'menu:set-panel-checked',
     (_event, { panelId, open }: { panelId: string; open: boolean }) => {
-      const menuItemId = globalRegistry.panelMenuItemIds.get(panelId)
+      const menuItemId = getPanelMenuItemId(panelId)
       if (menuItemId) {
         const menuItem = Menu.getApplicationMenu()?.getMenuItemById(menuItemId)
         if (menuItem) menuItem.checked = open
@@ -247,7 +224,7 @@ function registerAppHandlers(): void {
     }
   )
 
-  ipcMain.handle('app:get-info', () => ({
+  handleChannel('app:get-info', () => ({
     appName: app.getName(),
     version: app.getVersion(),
     electronVersion: process.versions.electron,
@@ -258,7 +235,7 @@ function registerAppHandlers(): void {
 }
 
 function registerDialogHandlers(): void {
-  ipcMain.handle('dialog:open-directory', async () => {
+  handleChannel('dialog:open-directory', async () => {
     if (!mainWindow) return { cancelled: true }
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openDirectory'],
@@ -325,58 +302,25 @@ app.whenReady().then(async () => {
     viewHost?.broadcastToAll(channel, data)
   )
 
-  // Track the latest bounds per view so we apply them after async createView finishes,
-  // not the potentially-stale bounds from the call that triggered creation.
-  const latestBoundsMap = new Map<
-    string,
-    {
-      bounds: { x: number; y: number; width: number; height: number }
-      visible: boolean
-      repoRoot?: string | null
-    }
-  >()
-  const creatingViews = new Set<string>()
-
-  ipcMain.handle(
+  handleChannel(
     'extension:update-panel-bounds',
     async (_event, { extensionId, viewParam, bounds, visible, repoRoot }) => {
-      const viewKey = `${extensionId}:${viewParam}`
-      latestBoundsMap.set(viewKey, { bounds, visible, repoRoot })
-
-      if (viewHost && !viewHost.hasView(extensionId, viewParam)) {
-        if (!creatingViews.has(viewKey)) {
-          creatingViews.add(viewKey)
-          try {
-            const ext = extensionHost.listExtensions().find((e) => e.id === extensionId)
-            if (ext) await viewHost.createView(ext, viewParam, repoRoot)
-            // Apply the LATEST bounds received during async creation, not the stale initial ones.
-            const latest = latestBoundsMap.get(viewKey)
-            if (latest) {
-              viewHost?.handleBoundsUpdate(
-                extensionId,
-                viewParam,
-                latest.bounds,
-                latest.visible,
-                latest.repoRoot
-              )
-            }
-          } finally {
-            creatingViews.delete(viewKey)
-          }
-        }
-        // Skip the handleBoundsUpdate below while view is being created; it will
-        // be called above with the latest bounds once creation completes.
-        return
-      }
-      viewHost?.handleBoundsUpdate(extensionId, viewParam, bounds, visible, repoRoot)
+      await viewHost?.updatePanelBounds(
+        () => extensionHost.listExtensions().find((e) => e.id === extensionId),
+        extensionId,
+        viewParam,
+        bounds,
+        visible,
+        repoRoot
+      )
     }
   )
 
-  ipcMain.on('extension:set-bottom-inset', (_event, { inset }: { inset: number }) => {
+  onChannel('extension:set-bottom-inset', (_event, { inset }: { inset: number }) => {
     viewHost?.setBottomInset(inset)
   })
 
-  ipcMain.on('workspace:active-changed', (_event, data) => {
+  onChannel('workspace:active-changed', (_event, data) => {
     viewHost?.broadcastToAll('workspace:changed', data)
   })
   registerGitHandlers()

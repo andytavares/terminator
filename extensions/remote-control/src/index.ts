@@ -180,106 +180,142 @@ export function activate(api: ExtensionAPI): void {
     queue = queue.then(fn).catch(() => {})
   }
 
-  // Register IPC handlers
-  api.ipc.registerHandler('remote:toggle', async (payload) => {
-    const { enabled } = payload as { enabled: boolean }
-    api.settings.set(KEY.enabled, enabled)
-    enqueue(enabled ? startServer : stopServer)
-    return { ok: true }
-  })
+  // Register IPC handlers.
+  // Every remote:* channel is server self-management (enable/disable, ports,
+  // credentials, tunnel). A remote browser client must not control the server
+  // it is connected through, so all of them are declared local-only.
+  const LOCAL_ONLY = { remoteAccessible: false }
+  api.ipc.registerHandler(
+    'remote:toggle',
+    async (payload) => {
+      const { enabled } = payload as { enabled: boolean }
+      api.settings.set(KEY.enabled, enabled)
+      enqueue(enabled ? startServer : stopServer)
+      return { ok: true }
+    },
+    LOCAL_ONLY
+  )
 
-  api.ipc.registerHandler('remote:port-change', async (payload) => {
-    const { port } = payload as { port: number }
-    if (port < 1024 || port > 65535) return { error: 'INVALID_PORT' }
-    api.settings.set(KEY.port, port)
-    if (api.settings.get<boolean>(KEY.enabled)) enqueue(startServer)
-    return { ok: true }
-  })
+  api.ipc.registerHandler(
+    'remote:port-change',
+    async (payload) => {
+      const { port } = payload as { port: number }
+      if (port < 1024 || port > 65535) return { error: 'INVALID_PORT' }
+      api.settings.set(KEY.port, port)
+      if (api.settings.get<boolean>(KEY.enabled)) enqueue(startServer)
+      return { ok: true }
+    },
+    LOCAL_ONLY
+  )
 
-  api.ipc.registerHandler('remote:update-password', async (payload) => {
-    const { password } = payload as { password: string }
-    const actual = password || randomBytes(16).toString('base64url')
-    const hash = await bcryptjs.hash(actual, 10)
-    api.settings.set(KEY.password, actual)
-    api.settings.set(KEY.passwordHash, hash)
-    remoteServer?.disconnectAllClients()
-    const listening = !!remoteServer?.isListening()
-    const port = api.settings.get<number>(KEY.port) ?? 7681
-    api.window.broadcast('remote:status', {
-      enabled: listening,
-      ...(listening && { port, lanUrl: getLanUrl(port), publicUrl: currentPublicUrl }),
-    })
-    return { password: actual }
-  })
+  api.ipc.registerHandler(
+    'remote:update-password',
+    async (payload) => {
+      const { password } = payload as { password: string }
+      const actual = password || randomBytes(16).toString('base64url')
+      const hash = await bcryptjs.hash(actual, 10)
+      api.settings.set(KEY.password, actual)
+      api.settings.set(KEY.passwordHash, hash)
+      remoteServer?.disconnectAllClients()
+      const listening = !!remoteServer?.isListening()
+      const port = api.settings.get<number>(KEY.port) ?? 7681
+      api.window.broadcast('remote:status', {
+        enabled: listening,
+        ...(listening && { port, lanUrl: getLanUrl(port), publicUrl: currentPublicUrl }),
+      })
+      return { password: actual }
+    },
+    LOCAL_ONLY
+  )
 
-  api.ipc.registerHandler('remote:update-max-subscribers', async (payload) => {
-    const { maxSubscribers } = payload as { maxSubscribers: number }
-    if (maxSubscribers < 1 || maxSubscribers > 20) return { error: 'INVALID_VALUE' }
-    api.settings.set(KEY.maxSubscribers, maxSubscribers)
-    return { ok: true }
-  })
+  api.ipc.registerHandler(
+    'remote:update-max-subscribers',
+    async (payload) => {
+      const { maxSubscribers } = payload as { maxSubscribers: number }
+      if (maxSubscribers < 1 || maxSubscribers > 20) return { error: 'INVALID_VALUE' }
+      api.settings.set(KEY.maxSubscribers, maxSubscribers)
+      return { ok: true }
+    },
+    LOCAL_ONLY
+  )
 
-  api.ipc.registerHandler('remote:update-ngrok-token', async (payload) => {
-    const { ngrokAuthToken } = payload as { ngrokAuthToken: string }
-    api.settings.set(KEY.ngrokAuthToken, ngrokAuthToken)
-    return { ok: true }
-  })
+  api.ipc.registerHandler(
+    'remote:update-ngrok-token',
+    async (payload) => {
+      const { ngrokAuthToken } = payload as { ngrokAuthToken: string }
+      api.settings.set(KEY.ngrokAuthToken, ngrokAuthToken)
+      return { ok: true }
+    },
+    LOCAL_ONLY
+  )
 
-  api.ipc.registerHandler('remote:caddyfile', (_payload) => {
-    return generateCaddyfile(getPort())
-  })
+  api.ipc.registerHandler(
+    'remote:caddyfile',
+    (_payload) => {
+      return generateCaddyfile(getPort())
+    },
+    LOCAL_ONLY
+  )
 
-  api.ipc.registerHandler('remote:get-settings', () => {
-    const listening = !!remoteServer?.isListening()
-    const port = getPort()
-    return {
-      enabled: api.settings.get<boolean>(KEY.enabled) ?? false,
-      port,
-      maxSubscribers: getMaxSubscribers(),
-      password: api.settings.get<string>(KEY.password) ?? '',
-      ngrokAuthToken: api.settings.get<string>(KEY.ngrokAuthToken) ?? '',
-      ...(listening && { lanUrl: getLanUrl(port), publicUrl: currentPublicUrl }),
-    }
-  })
-
-  api.ipc.registerHandler('remote:tunnel-reconnect', async () => {
-    if (!remoteServer?.isListening()) return { ok: false }
-    enqueue(async () => {
-      ngrokManager.stop()
+  api.ipc.registerHandler(
+    'remote:get-settings',
+    () => {
+      const listening = !!remoteServer?.isListening()
       const port = getPort()
-      const authToken = api.settings.get<string>(KEY.ngrokAuthToken) || undefined
-      try {
-        const publicUrl = await ngrokManager.start(port, authToken)
-        currentPublicUrl = publicUrl
-        ngrokManager.setOnCrash(() => {
+      return {
+        enabled: api.settings.get<boolean>(KEY.enabled) ?? false,
+        port,
+        maxSubscribers: getMaxSubscribers(),
+        password: api.settings.get<string>(KEY.password) ?? '',
+        ngrokAuthToken: api.settings.get<string>(KEY.ngrokAuthToken) ?? '',
+        ...(listening && { lanUrl: getLanUrl(port), publicUrl: currentPublicUrl }),
+      }
+    },
+    LOCAL_ONLY
+  )
+
+  api.ipc.registerHandler(
+    'remote:tunnel-reconnect',
+    async () => {
+      if (!remoteServer?.isListening()) return { ok: false }
+      enqueue(async () => {
+        ngrokManager.stop()
+        const port = getPort()
+        const authToken = api.settings.get<string>(KEY.ngrokAuthToken) || undefined
+        try {
+          const publicUrl = await ngrokManager.start(port, authToken)
+          currentPublicUrl = publicUrl
+          ngrokManager.setOnCrash(() => {
+            currentPublicUrl = null
+            api.window.broadcast('remote:tunnel-disconnected', {})
+            api.window.broadcast('remote:status', {
+              enabled: true,
+              port,
+              publicUrl: null,
+              lanUrl: getLanUrl(port),
+            })
+          })
+          api.window.broadcast('remote:status', {
+            enabled: true,
+            port,
+            publicUrl,
+            lanUrl: getLanUrl(port),
+          })
+        } catch (err) {
           currentPublicUrl = null
-          api.window.broadcast('remote:tunnel-disconnected', {})
           api.window.broadcast('remote:status', {
             enabled: true,
             port,
             publicUrl: null,
             lanUrl: getLanUrl(port),
+            ngrokError: String(err),
           })
-        })
-        api.window.broadcast('remote:status', {
-          enabled: true,
-          port,
-          publicUrl,
-          lanUrl: getLanUrl(port),
-        })
-      } catch (err) {
-        currentPublicUrl = null
-        api.window.broadcast('remote:status', {
-          enabled: true,
-          port,
-          publicUrl: null,
-          lanUrl: getLanUrl(port),
-          ngrokError: String(err),
-        })
-      }
-    })
-    return { ok: true }
-  })
+        }
+      })
+      return { ok: true }
+    },
+    LOCAL_ONLY
+  )
 
   // Auto-start if previously enabled
   if (api.settings.get<boolean>(KEY.enabled)) {

@@ -49,7 +49,7 @@ export function ProjectRow({
   const { deleteProject, renameProject, workspaces } = useWorkspaceStore()
   const {
     getSessionsForProject,
-    activeSessionIdByProject,
+    projectViews,
     getBellCountForProject,
     isProjectBusy,
     isSessionBusy,
@@ -59,7 +59,7 @@ export function ProjectRow({
   useBranchSync(project, cwd)
 
   const sessions = getSessionsForProject(project.id)
-  const activeSessionId = activeSessionIdByProject.get(project.id) ?? null
+  const activeSessionId = projectViews.get(project.id)?.activeSessionId ?? null
   const isBusy = isProjectBusy(project.id)
 
   const rootSessions = sessions.filter((s) => !s.parentSessionId)

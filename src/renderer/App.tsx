@@ -59,10 +59,10 @@ export function App(): JSX.Element {
     handleProcessExit,
     getSessionsForProject,
     closeSession,
-    activeSessionIdByProject,
+    projectViews,
     getScratchSessions,
   } = useSessionStore()
-  const activeScratchSessionId = activeSessionIdByProject.get(SCRATCH_PROJECT_ID) ?? null
+  const activeScratchSessionId = projectViews.get(SCRATCH_PROJECT_ID)?.activeSessionId ?? null
   const { addToast } = useToastStore()
   const {
     addNotification,
@@ -118,8 +118,8 @@ export function App(): JSX.Element {
     const cwd = resolveActiveCwd()
     const scrollbackLimit = settings.terminal.scrollbackLimit
     if (settings.terminal.promptForName) {
-      const { terminalCountByProject } = useSessionStore.getState()
-      const next = (terminalCountByProject.get(projectId) ?? 0) + 1
+      const { projectViews } = useSessionStore.getState()
+      const next = (projectViews.get(projectId)?.terminalCounter ?? 0) + 1
       setPendingCreate({ projectId, cwd, scrollbackLimit, defaultName: `Terminal ${next}` })
     } else {
       void createSession(projectId, 'human', '', cwd, scrollbackLimit)
@@ -377,12 +377,12 @@ export function App(): JSX.Element {
     if (!window.electronAPI.extensionEvents?.onMenuCloseTab) return
     return window.electronAPI.extensionEvents.onMenuCloseTab(() => {
       const effectiveProjectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
-      const sessionId = activeSessionIdByProject.get(effectiveProjectId ?? '')
+      const sessionId = projectViews.get(effectiveProjectId ?? '')?.activeSessionId
       if (effectiveProjectId && sessionId) {
         void closeSession(sessionId)
       }
     })
-  }, [scratchActive, activeProjectId, activeSessionIdByProject, closeSession])
+  }, [scratchActive, activeProjectId, projectViews, closeSession])
 
   // Keep a ref so the effect always sees the latest openPanels without re-running on every change
   const openPanelsRef = useRef(openPanels)

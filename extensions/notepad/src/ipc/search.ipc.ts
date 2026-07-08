@@ -1,6 +1,7 @@
-import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { ExtensionDB } from '../../../../src/main/db/index'
+import type { ExtensionAPI } from '../../../../src/main/extensions/api'
+import { createIpcRegistrar } from './register'
 import type { SearchResult } from '../db/types'
 
 const searchSchema = z.object({
@@ -155,12 +156,9 @@ export async function searchNotes(
   return { data }
 }
 
-export function registerSearchIpcHandlers(db: ExtensionDB): () => void {
-  ipcMain.handle('terminator.notepad:search.query', (_evt, payload: unknown) =>
-    searchNotes(db, payload)
-  )
+export function registerSearchIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
+  const { handle, cleanup } = createIpcRegistrar(api)
+  handle('terminator.notepad:search.query', (payload: unknown) => searchNotes(db, payload))
 
-  return () => {
-    ipcMain.removeHandler('terminator.notepad:search.query')
-  }
+  return cleanup
 }

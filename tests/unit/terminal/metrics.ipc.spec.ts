@@ -106,6 +106,61 @@ describe('registerMetricsHandlers', () => {
     expect(result.data).toEqual([])
   })
 
+  it('metrics:processes returns empty array when payload is undefined', async () => {
+    vi.resetModules()
+    const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
+    registerMetricsHandlers(getPtyManager() as never)
+    const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:processes')![1]
+    const result = handler(null, undefined) as { data: unknown[] }
+    expect(result.data).toEqual([])
+  })
+
+  it('metrics:pids returns empty array when payload is undefined', async () => {
+    vi.resetModules()
+    const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
+    registerMetricsHandlers(getPtyManager() as never)
+    const handler = mockHandle.mock.calls.find(([ch]) => ch === 'metrics:pids')![1]
+    const result = handler(null, undefined) as { data: unknown[] }
+    expect(result.data).toEqual([])
+  })
+
+  it('queryProcessMetrics skips rows with non-numeric fields', async () => {
+    mockExecSync.mockImplementation((cmd: string) => {
+      if (String(cmd).startsWith('ps ')) return 'abc def ghi\n1234 5.0 1024\n'
+      return ''
+    })
+    vi.resetModules()
+    const { queryProcessMetrics } = await import('../../../src/main/ipc/metrics.ipc.js')
+    const result = queryProcessMetrics([1234])
+    expect(result).toEqual([{ pid: 1234, cpuPercent: 5.0, rssBytes: 1024 * 1024 }])
+  })
+
+  it('readNetBytes tolerates truncated netstat rows on macOS', async () => {
+    mockExecSync.mockImplementation((cmd: string) => {
+      if (String(cmd).startsWith('netstat')) {
+        // Header + a row with too few columns + a row with non-numeric byte counts
+        return 'Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes\nen0 1500\nen1 1500 link a 1 0 abc 2 0 xyz\n'
+      }
+      return ''
+    })
+    vi.resetModules()
+    const { readNetBytes } = await import('../../../src/main/ipc/metrics.ipc.js')
+    expect(readNetBytes()).toEqual({ bytesIn: 0, bytesOut: 0 })
+  })
+
+  it('readNetBytes tolerates truncated /proc/net/dev rows on linux', async () => {
+    const originalPlatform = process.platform
+    Object.defineProperty(process, 'platform', { value: 'linux' })
+    try {
+      mockReadFileSync.mockReturnValue('header\nheader\neth0:\nlo: 1 2 3 4 5 6 7 8 9\n')
+      vi.resetModules()
+      const { readNetBytes } = await import('../../../src/main/ipc/metrics.ipc.js')
+      expect(readNetBytes()).toEqual({ bytesIn: 0, bytesOut: 0 })
+    } finally {
+      Object.defineProperty(process, 'platform', { value: originalPlatform })
+    }
+  })
+
   it('metrics:processes parses ps output', async () => {
     mockExecSync.mockImplementation((cmd: string) => {
       if (String(cmd).startsWith('ps ')) return '1234 12.5 204800\n'

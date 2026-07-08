@@ -368,12 +368,12 @@ describe('api.ipc bridge channels', () => {
     expect(api.ipc.isRemoteAccessible('no-such-channel')).toBe(false)
   })
 
-  it('isRemoteAccessible: true for extension channels registered in invokeRegistry', () => {
-    // Dot-prefixed channels (notepad) and short-prefixed channels (task-vault) both work
-    // as long as they have a registered handler in invokeRegistry
+  it('isRemoteAccessible: true for extension channels declared remoteAccessible at registration', () => {
+    // Extension channels registered via api.ipc.registerHandler default to
+    // remoteAccessible: true, which is what these registry entries reflect.
     const invokeRegistry = new Map([
-      ['terminator.notepad:notes.list', { handler: vi.fn(), remoteAccessible: false }],
-      ['task-vault:vault:get-today', { handler: vi.fn(), remoteAccessible: false }],
+      ['terminator.notepad:notes.list', { handler: vi.fn(), remoteAccessible: true }],
+      ['task-vault:vault:get-today', { handler: vi.fn(), remoteAccessible: true }],
     ])
     const eventBus = new EventEmitter()
     const api = createExtensionAPI('test.ipc6', '0.1.0', {
@@ -385,30 +385,42 @@ describe('api.ipc bridge channels', () => {
     expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
   })
 
-  it('isRemoteAccessible: any channel in invokeRegistry is accessible (design intent — all registered channels are extension-owned or explicitly allowlisted)', () => {
-    // This is the regression test for the registry-based design: the `remoteAccessible` flag
-    // on registry entries is intentionally ignored. Access is gated by registry presence only,
-    // so adding a channel to the registry (which only extensions do at runtime) makes it
-    // accessible. Core non-allowlist channels (shell:open-external, dialog:open-directory)
-    // are never invoked via the bridge in practice — the shim handles them locally.
+  it('isRemoteAccessible: registry presence alone is NOT sufficient — the declared flag decides', () => {
+    // Regression test for the declared-authority design: a channel registered
+    // without remoteAccessible: true stays unreachable from the bridge. The old
+    // rule ("any registered channel is accessible") also exposed every internal
+    // core invoke channel to authenticated remote clients.
     const invokeRegistry = new Map([
       ['dialog:open-directory', { handler: vi.fn(), remoteAccessible: false }],
+      ['my-ext:local-only', { handler: vi.fn(), remoteAccessible: false }],
     ])
     const eventBus = new EventEmitter()
     const api = createExtensionAPI('test.ipc6', '0.1.0', {
       bridge: { invokeRegistry, sendRegistry: new Map(), eventBus },
     })
-    // The remoteAccessible flag is NOT checked — registry presence is sufficient.
-    // If this assertion changes to false, the extension channel access design has regressed.
-    expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(true)
+    expect(api.ipc.isRemoteAccessible('dialog:open-directory')).toBe(false)
+    expect(api.ipc.isRemoteAccessible('my-ext:local-only')).toBe(false)
   })
 })
 
 // ── pty ──────────────────────────────────────────────────────────────────────
 
 describe('api.pty', () => {
+  const sessionInfo = {
+    sessionId: 's1',
+    cwd: '/cwd',
+    type: 'human' as const,
+    origin: 'app' as const,
+    createdAt: 't',
+    pid: 1,
+  }
   const mockPtyManager = {
     spawn: vi.fn(() => 'session-xyz'),
+    spawnSession: vi.fn(() => sessionInfo),
+    onData: vi.fn(() => () => {}),
+    onExit: vi.fn(() => () => {}),
+    getSession: vi.fn(() => sessionInfo),
+    setWorkspace: vi.fn(() => true),
     write: vi.fn(),
     resize: vi.fn(),
     kill: vi.fn(),
@@ -416,6 +428,53 @@ describe('api.pty', () => {
     attachOnData: vi.fn(() => () => {}),
     attachOnExit: vi.fn(() => () => {}),
   }
+
+  describe('session authority surface (v1.4.0)', () => {
+    it('spawnSession delegates and returns the session info', () => {
+      const api = createExtensionAPI('test.pty10', '0.1.0', { ptyManager: mockPtyManager })
+      const opts = {
+        sessionId: 's1',
+        cwd: '/cwd',
+        shell: '/bin/zsh',
+        type: 'human' as const,
+        origin: 'remote' as const,
+      }
+      expect(api.pty.spawnSession(opts)).toEqual(sessionInfo)
+      expect(mockPtyManager.spawnSession).toHaveBeenCalledWith(opts)
+    })
+
+    it('spawnSession throws without a ptyManager in context', () => {
+      const api = createExtensionAPI('test.pty11', '0.1.0', {})
+      expect(() =>
+        api.pty.spawnSession({
+          sessionId: 's',
+          cwd: '/',
+          shell: '/bin/sh',
+          type: 'human',
+          origin: 'app',
+        })
+      ).toThrow('PTY access not available')
+    })
+
+    it('onData/onExit delegate and fall back to null without a ptyManager', () => {
+      const api = createExtensionAPI('test.pty12', '0.1.0', { ptyManager: mockPtyManager })
+      expect(api.pty.onData('s1', vi.fn())).toBeTypeOf('function')
+      expect(api.pty.onExit('s1', vi.fn())).toBeTypeOf('function')
+      const bare = createExtensionAPI('test.pty13', '0.1.0', {})
+      expect(bare.pty.onData('s1', vi.fn())).toBeNull()
+      expect(bare.pty.onExit('s1', vi.fn())).toBeNull()
+    })
+
+    it('getSession and setWorkspace delegate, defaulting without a ptyManager', () => {
+      const api = createExtensionAPI('test.pty14', '0.1.0', { ptyManager: mockPtyManager })
+      expect(api.pty.getSession('s1')).toEqual(sessionInfo)
+      expect(api.pty.setWorkspace('s1', 'ws-1')).toBe(true)
+      expect(mockPtyManager.setWorkspace).toHaveBeenCalledWith('s1', 'ws-1')
+      const bare = createExtensionAPI('test.pty15', '0.1.0', {})
+      expect(bare.pty.getSession('s1')).toBeUndefined()
+      expect(bare.pty.setWorkspace('s1', 'ws-1')).toBe(false)
+    })
+  })
 
   describe('with ptyManager', () => {
     it('spawn delegates to ptyManager.spawn', () => {

@@ -1,5 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { ipcMain } from 'electron'
+
+// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
+// capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
+const mockApi = {
+  ipc: {
+    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+      ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
+        ch,
+        (_e: unknown, payload: unknown) => fn(payload)
+      )
+      return {
+        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
+      }
+    },
+  },
+} as unknown as import('../../../../../src/main/extensions/api').ExtensionAPI
 import { PGlite } from '@electric-sql/pglite'
 
 vi.mock('electron', () => ({
@@ -275,7 +291,7 @@ describe('listNotes with tagId filter', () => {
 
 describe('registerNotesIpcHandlers', () => {
   it('registers and disposes without error', () => {
-    const dispose = registerNotesIpcHandlers(db)
+    const dispose = registerNotesIpcHandlers(mockApi, db)
     expect(typeof dispose).toBe('function')
     expect(() => dispose()).not.toThrow()
   })
@@ -426,7 +442,7 @@ describe('reorderItems', () => {
 
 describe('registerTagsIpcHandlers', () => {
   it('registers and disposes without error', () => {
-    const dispose = registerTagsIpcHandlers(db)
+    const dispose = registerTagsIpcHandlers(mockApi, db)
     expect(typeof dispose).toBe('function')
     expect(() => dispose()).not.toThrow()
   })
@@ -435,7 +451,7 @@ describe('registerTagsIpcHandlers', () => {
 describe('IPC handler structure', () => {
   it('registerNotesIpcHandlers calls ipcMain.handle for all channels', () => {
     vi.mocked(ipcMain.handle).mockClear()
-    const dispose = registerNotesIpcHandlers(db)
+    const dispose = registerNotesIpcHandlers(mockApi, db)
     expect(ipcMain.handle).toHaveBeenCalledWith(
       'terminator.notepad:notes.create',
       expect.any(Function)
@@ -450,7 +466,7 @@ describe('IPC handler structure', () => {
 
   it('registerNotesIpcHandlers wrappers route to underlying handlers', async () => {
     vi.mocked(ipcMain.handle).mockClear()
-    registerNotesIpcHandlers(db)
+    registerNotesIpcHandlers(mockApi, db)
     const calls = vi.mocked(ipcMain.handle).mock.calls as [string, (...a: unknown[]) => unknown][]
     const getHandler = (ch: string) => calls.find(([c]) => c === ch)?.[1]
     // Invoke wrappers to cover the anonymous arrow functions
@@ -471,7 +487,7 @@ describe('IPC handler structure', () => {
 
   it('registerTagsIpcHandlers wrappers route to underlying handlers', async () => {
     vi.mocked(ipcMain.handle).mockClear()
-    registerTagsIpcHandlers(db)
+    registerTagsIpcHandlers(mockApi, db)
     const calls = vi.mocked(ipcMain.handle).mock.calls as [string, (...a: unknown[]) => unknown][]
     const getHandler = (ch: string) => calls.find(([c]) => c === ch)?.[1]
     await getHandler('terminator.notepad:tags.list')?.(null, {})

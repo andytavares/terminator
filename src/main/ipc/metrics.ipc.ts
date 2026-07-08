@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { handleChannel } from './channel-registrar.js'
 import { execSync } from 'child_process'
 import * as os from 'os'
 import { readFileSync } from 'fs'
@@ -138,7 +138,7 @@ export function queryProcessMetrics(pids: number[]): ProcessMetrics[] {
 export function registerMetricsHandlers(ptyManager: PtyManager): void {
   startSampler()
 
-  ipcMain.handle('metrics:system', (): { data: SystemMetrics } => ({
+  handleChannel('metrics:system', (): { data: SystemMetrics } => ({
     data: {
       cpuPercent: Math.min(100, Math.max(0, latestCpuPercent)),
       memUsedBytes: os.totalmem() - os.freemem(),
@@ -148,14 +148,14 @@ export function registerMetricsHandlers(ptyManager: PtyManager): void {
     },
   }))
 
-  ipcMain.handle(
+  handleChannel(
     'metrics:processes',
     (_event, payload: { pids?: number[] }): { data: ProcessMetrics[] } => ({
       data: queryProcessMetrics(payload?.pids ?? []),
     })
   )
 
-  ipcMain.handle(
+  handleChannel(
     'metrics:pids',
     (
       _event,

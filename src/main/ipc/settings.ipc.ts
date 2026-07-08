@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { handleChannel } from './channel-registrar.js'
 import {
   getGlobalSettings,
   updateGlobalSettings,
@@ -7,19 +7,19 @@ import {
 } from '../storage/settings-store.js'
 
 export function registerSettingsHandlers(): void {
-  ipcMain.handle('settings:get-global', () => {
+  handleChannel('settings:get-global', () => {
     return { settings: getGlobalSettings() }
   })
 
-  ipcMain.handle('settings:update-global', (_event, { patch }) => {
+  handleChannel('settings:update-global', (_event, { patch }) => {
     return { settings: updateGlobalSettings(patch) }
   })
 
-  ipcMain.handle('settings:get-workspace', (_event, { workspaceId }) => {
+  handleChannel('settings:get-workspace', (_event, { workspaceId }) => {
     return { settings: getWorkspaceSettings(workspaceId) }
   })
 
-  ipcMain.handle('settings:update-workspace', (_event, { workspaceId, patch }) => {
+  handleChannel('settings:update-workspace', (_event, { workspaceId, patch }) => {
     return { settings: updateWorkspaceSettings(workspaceId, patch) }
   })
 }

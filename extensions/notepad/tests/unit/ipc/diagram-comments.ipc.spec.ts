@@ -5,6 +5,23 @@ vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
   app: { getPath: vi.fn(() => '/tmp') },
 }))
+import { ipcMain } from 'electron'
+
+// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
+// capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
+const mockApi = {
+  ipc: {
+    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+      ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
+        ch,
+        (_e: unknown, payload: unknown) => fn(payload)
+      )
+      return {
+        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
+      }
+    },
+  },
+} as unknown as import('../../../../../src/main/extensions/api').ExtensionAPI
 
 import { wrapDb } from '../../../../../src/main/db/index'
 import { applyNotepadSchema } from '../../../src/db/db'
@@ -158,8 +175,30 @@ describe('deleteDiagramComment', () => {
 })
 
 describe('registerDiagramCommentsIpcHandlers', () => {
+  it('dispatches each registered handler to its function', async () => {
+    ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mockClear()
+    const dispose = registerDiagramCommentsIpcHandlers(mockApi, db)
+    const get = (ch: string) =>
+      (ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mock.calls.find(
+        ([c]) => c === ch
+      )![1] as (e: unknown, payload?: unknown) => Promise<unknown>
+
+    // Invalid payloads still prove the dispatch reaches each function: every
+    // handler validates and answers with a structured VALIDATION_ERROR.
+    for (const ch of [
+      'terminator.notepad:diagram-comments.create',
+      'terminator.notepad:diagram-comments.list',
+      'terminator.notepad:diagram-comments.resolve',
+      'terminator.notepad:diagram-comments.delete',
+    ]) {
+      const result = (await get(ch)({}, {})) as { error?: string }
+      expect(result.error).toContain('VALIDATION_ERROR')
+    }
+    dispose()
+  })
+
   it('registers and disposes without error', () => {
-    const dispose = registerDiagramCommentsIpcHandlers(db)
+    const dispose = registerDiagramCommentsIpcHandlers(mockApi, db)
     expect(typeof dispose).toBe('function')
     dispose()
   })

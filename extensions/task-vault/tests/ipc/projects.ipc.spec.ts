@@ -13,6 +13,18 @@ vi.mock('electron', () => ({
   ),
 }))
 
+// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
+// capture/assert code (mockHandle.mock.calls, removeHandler assertions) still works.
+const mockApiIpc = {
+  registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+    mockHandle(ch, (_e: unknown, payload: unknown) => fn(payload))
+    return { dispose: () => mockRemoveHandler(ch) }
+  },
+}
+const mockApi = {
+  ipc: mockApiIpc,
+} as unknown as import('../../../../src/main/extensions/api').ExtensionAPI
+
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
   broadcast: vi.fn(),
 }))
@@ -43,7 +55,7 @@ function getHandler(channel: string): (event: unknown, payload: unknown) => Prom
   vi.mocked(mockHandle).mockImplementation((ch, fn) => {
     if (ch === channel) handler = fn as typeof handler
   })
-  registerProjectsIpcHandlers(db)
+  registerProjectsIpcHandlers(mockApi, db)
   if (!handler) throw new Error(`Handler for ${channel} not registered`)
   return handler
 }
@@ -88,7 +100,7 @@ beforeEach(() => {
 
 describe('task-vault:projects:list IPC handler', () => {
   it('registers the projects list handler', () => {
-    registerProjectsIpcHandlers(db)
+    registerProjectsIpcHandlers(mockApi, db)
     const channels = vi.mocked(mockHandle).mock.calls.map((c) => c[0])
     expect(channels).toContain('task-vault:projects:list')
   })
@@ -251,7 +263,7 @@ describe('task-vault:projects:weekly-review IPC handler', () => {
 
 describe('task-vault:projects:update-status IPC handler', () => {
   it('registers the update-status handler', () => {
-    registerProjectsIpcHandlers(db)
+    registerProjectsIpcHandlers(mockApi, db)
     const channels = vi.mocked(mockHandle).mock.calls.map((c) => c[0])
     expect(channels).toContain('task-vault:projects:update-status')
   })
@@ -420,7 +432,7 @@ describe('task-vault:projects:rename IPC handler', () => {
 
 describe('registerProjectsIpcHandlers dispose', () => {
   it('calls ipcMain.removeHandler for all registered channels', () => {
-    const dispose = registerProjectsIpcHandlers(db)
+    const dispose = registerProjectsIpcHandlers(mockApi, db)
     dispose()
     const removedChannels = vi.mocked(mockRemoveHandler).mock.calls.map((c) => c[0])
     expect(removedChannels).toContain('task-vault:projects:list')

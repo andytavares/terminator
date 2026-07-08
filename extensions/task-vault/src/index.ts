@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow } from 'electron'
 import type { ExtensionAPI, ExtensionDB, Disposable } from '../../../src/main/extensions/api'
 import { DEFAULT_CAPTURE_HOTKEY } from './constants.js'
 import { registerVaultIpcHandlers } from './ipc/vault.ipc.js'
@@ -135,7 +135,7 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     })
   )
 
-  ipcMain.handle('task-vault:db.reinit', async () => {
+  const disposeDbReinit = api.ipc.registerHandler('task-vault:db.reinit', async () => {
     try {
       await applyTaskVaultSchema(db)
       await applyTaskVaultMigrations(db)
@@ -146,40 +146,39 @@ export async function activate(api: ExtensionAPI): Promise<void> {
       return { error: err instanceof Error ? err.message : String(err) }
     }
   })
-  ipcMain.handle('task-vault:db.reset', async () => {
-    try {
-      // Delete rows in FK-safe order; do not drop tables — the settings table is
-      // shared with other extensions in the unified PGlite database.
-      await db.exec(`
+  const disposeDbReset = api.ipc.registerHandler(
+    'task-vault:db.reset',
+    async () => {
+      try {
+        // Delete rows in FK-safe order; do not drop tables — the settings table is
+        // shared with other extensions in the unified PGlite database.
+        await db.exec(`
         DELETE FROM tasks;
         DELETE FROM projects;
         DELETE FROM areas;
         DELETE FROM settings;
       `)
-      await applyTaskVaultSchema(db)
-      await applyTaskVaultMigrations(db)
-      maybeStartScheduler(db)
-      return { data: { ok: true } }
-    } catch (err) {
-      return { error: err instanceof Error ? err.message : String(err) }
-    }
-  })
-  disposables.push({
-    dispose: () => {
-      ipcMain.removeHandler('task-vault:db.reinit')
-      ipcMain.removeHandler('task-vault:db.reset')
+        await applyTaskVaultSchema(db)
+        await applyTaskVaultMigrations(db)
+        maybeStartScheduler(db)
+        return { data: { ok: true } }
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : String(err) }
+      }
     },
-  })
+    { remoteAccessible: false }
+  )
+  disposables.push(disposeDbReinit, disposeDbReset)
 
   const disposeIpc = registerVaultIpcHandlers(api, db)
   disposables.push({ dispose: disposeIpc })
-  const disposeProjectsIpc = registerProjectsIpcHandlers(db)
+  const disposeProjectsIpc = registerProjectsIpcHandlers(api, db)
   disposables.push({ dispose: disposeProjectsIpc })
-  const disposeLinksIpc = registerLinksIpcHandlers(db)
+  const disposeLinksIpc = registerLinksIpcHandlers(api, db)
   disposables.push({ dispose: disposeLinksIpc })
-  const disposeKanbanIpc = registerKanbanIpcHandlers(db)
+  const disposeKanbanIpc = registerKanbanIpcHandlers(api, db)
   disposables.push({ dispose: disposeKanbanIpc })
-  const disposeAdminIpc = registerAdminIpcHandlers(db)
+  const disposeAdminIpc = registerAdminIpcHandlers(api, db)
   disposables.push({ dispose: disposeAdminIpc })
 
   try {

@@ -3,6 +3,12 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
 
+// PtyManager is the single session authority: it owns the PTY processes, the
+// session metadata (origin, project, workspace, timestamps), and the data/exit
+// fan-out. Both consumers — the Electron IPC layer and the remote-control
+// HTTP/WS routes — are thin views over this interface; neither keeps its own
+// session registry.
+
 interface SessionRecord {
   sessionId: string
   pid: number
@@ -10,13 +16,35 @@ interface SessionRecord {
   shell: string
 }
 
+export type SessionOrigin = 'app' | 'remote'
+
+export interface SpawnSessionOptions {
+  sessionId: string
+  cwd: string
+  shell: string
+  type: 'human' | 'agent'
+  origin: SessionOrigin
+  projectId?: string
+  tabTitle?: string
+}
+
+export interface SessionInfo {
+  sessionId: string
+  cwd: string
+  type: 'human' | 'agent'
+  origin: SessionOrigin
+  createdAt: string
+  pid: number
+  projectId?: string
+  tabTitle?: string
+  workspaceId?: string
+}
+
 interface ActiveSession {
   pty: pty.IPty
-  sessionId: string
-  type: 'human' | 'agent'
-  cwd: string
-  onDataCallback?: (data: string) => void
-  onExitCallback?: (exitCode: number) => void
+  info: SessionInfo
+  dataListeners: Set<(data: string) => void>
+  exitListeners: Set<(exitCode: number) => void>
 }
 
 const REGISTRY_FILE = () => join(app.getPath('userData'), 'session-registry.json')
@@ -24,6 +52,48 @@ const REGISTRY_FILE = () => join(app.getPath('userData'), 'session-registry.json
 export class PtyManager {
   private sessions = new Map<string, ActiveSession>()
 
+  spawnSession(opts: SpawnSessionOptions): SessionInfo {
+    const ptyProcess = pty.spawn(opts.shell, ['-l'], {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: opts.cwd,
+      env: process.env as { [key: string]: string },
+    })
+
+    const session: ActiveSession = {
+      pty: ptyProcess,
+      info: {
+        sessionId: opts.sessionId,
+        cwd: opts.cwd,
+        type: opts.type,
+        origin: opts.origin,
+        createdAt: new Date().toISOString(),
+        pid: ptyProcess.pid,
+        projectId: opts.projectId,
+        tabTitle: opts.tabTitle,
+      },
+      dataListeners: new Set(),
+      exitListeners: new Set(),
+    }
+
+    ptyProcess.onData((data) => {
+      for (const listener of session.dataListeners) listener(data)
+    })
+    ptyProcess.onExit(({ exitCode }) => {
+      this.sessions.delete(opts.sessionId)
+      this.persistRegistry()
+      for (const listener of session.exitListeners) listener(exitCode ?? 0)
+      session.dataListeners.clear()
+      session.exitListeners.clear()
+    })
+
+    this.sessions.set(opts.sessionId, session)
+    this.persistRegistry()
+    return { ...session.info }
+  }
+
+  /** @deprecated since ExtensionAPI v1.4.0 — use spawnSession() plus onData()/onExit(). */
   spawn(
     sessionId: string,
     cwd: string,
@@ -32,33 +102,52 @@ export class PtyManager {
     onData: (data: string) => void,
     onExit: (exitCode: number) => void
   ): string {
-    const ptyProcess = pty.spawn(shell, ['-l'], {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
-      cwd,
-      env: process.env as { [key: string]: string },
-    })
-
-    const session: ActiveSession = {
-      pty: ptyProcess,
-      sessionId,
-      type,
-      cwd,
-      onDataCallback: onData,
-      onExitCallback: onExit,
-    }
-
-    ptyProcess.onData(onData)
-    ptyProcess.onExit(({ exitCode }) => {
-      this.sessions.delete(sessionId)
-      this.persistRegistry()
-      onExit(exitCode ?? 0)
-    })
-
-    this.sessions.set(sessionId, session)
-    this.persistRegistry()
+    this.spawnSession({ sessionId, cwd, shell, type, origin: 'app' })
+    this.onData(sessionId, onData)
+    this.onExit(sessionId, onExit)
     return sessionId
+  }
+
+  /** Subscribes to a session's output. Returns a disposer, or null if unknown. */
+  onData(sessionId: string, listener: (data: string) => void): (() => void) | null {
+    const session = this.sessions.get(sessionId)
+    if (!session) return null
+    session.dataListeners.add(listener)
+    return () => session.dataListeners.delete(listener)
+  }
+
+  /** Subscribes to a session's exit. Listeners fire after the session is removed. */
+  onExit(sessionId: string, listener: (exitCode: number) => void): (() => void) | null {
+    const session = this.sessions.get(sessionId)
+    if (!session) return null
+    session.exitListeners.add(listener)
+    return () => session.exitListeners.delete(listener)
+  }
+
+  /** @deprecated since ExtensionAPI v1.4.0 — alias of onData(). */
+  attachOnData(sessionId: string, onData: (data: string) => void): (() => void) | null {
+    return this.onData(sessionId, onData)
+  }
+
+  /** @deprecated since ExtensionAPI v1.4.0 — alias of onExit(). */
+  attachOnExit(sessionId: string, onExit: (exitCode: number) => void): (() => void) | null {
+    return this.onExit(sessionId, onExit)
+  }
+
+  getSession(sessionId: string): SessionInfo | undefined {
+    const session = this.sessions.get(sessionId)
+    return session ? { ...session.info } : undefined
+  }
+
+  listSessions(): SessionInfo[] {
+    return [...this.sessions.values()].map((s) => ({ ...s.info }))
+  }
+
+  setWorkspace(sessionId: string, workspaceId: string | null): boolean {
+    const session = this.sessions.get(sessionId)
+    if (!session) return false
+    session.info.workspaceId = workspaceId ?? undefined
+    return true
   }
 
   resize(sessionId: string, cols: number, rows: number): void {
@@ -92,24 +181,6 @@ export class PtyManager {
 
   getSessionIds(): string[] {
     return [...this.sessions.keys()]
-  }
-
-  listSessions(): Array<{ sessionId: string; cwd: string }> {
-    return [...this.sessions.entries()].map(([id, s]) => ({ sessionId: id, cwd: s.cwd }))
-  }
-
-  attachOnData(sessionId: string, onData: (data: string) => void): (() => void) | null {
-    const session = this.sessions.get(sessionId)
-    if (!session) return null
-    const disposable = session.pty.onData(onData)
-    return () => disposable.dispose()
-  }
-
-  attachOnExit(sessionId: string, onExit: (exitCode: number) => void): (() => void) | null {
-    const session = this.sessions.get(sessionId)
-    if (!session) return null
-    const disposable = session.pty.onExit(({ exitCode }) => onExit(exitCode ?? 0))
-    return () => disposable.dispose()
   }
 
   getPid(sessionId: string): number | undefined {
@@ -146,7 +217,7 @@ export class PtyManager {
       records.push({
         sessionId,
         pid: session.pty.pid,
-        cwd: session.cwd,
+        cwd: session.info.cwd,
         shell: '',
       })
     }

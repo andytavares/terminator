@@ -1,4 +1,5 @@
-import { BrowserWindow, ipcMain } from 'electron'
+import { handleChannel } from './channel-registrar.js'
+import { BrowserWindow } from 'electron'
 import {
   listWorkspaces,
   createWorkspace,
@@ -37,35 +38,35 @@ export function getActiveWorkspaceContext(): ActiveWorkspaceContext {
 }
 
 export function registerWorkspaceHandlers(): void {
-  ipcMain.handle('workspace:get-active', () => activeContext)
+  handleChannel('workspace:get-active', () => activeContext)
 
-  ipcMain.handle('workspace:list', () => {
+  handleChannel('workspace:list', () => {
     return { workspaces: listWorkspaces() }
   })
 
-  ipcMain.handle('workspace:create', (_event, payload) => {
+  handleChannel('workspace:create', (_event, payload) => {
     return createWorkspace(payload)
   })
 
-  ipcMain.handle('workspace:update', (_event, payload) => {
+  handleChannel('workspace:update', (_event, payload) => {
     return updateWorkspace(payload)
   })
 
-  ipcMain.handle('workspace:delete', (_event, { id }) => {
+  handleChannel('workspace:delete', (_event, { id }) => {
     const result = deleteWorkspace(id)
     emitWorkspaceDelete(id)
     return result
   })
 
-  ipcMain.handle('workspace:reorder', (_event, payload) => {
+  handleChannel('workspace:reorder', (_event, payload) => {
     return reorderWorkspaces(payload)
   })
 
-  ipcMain.handle('project:list', (_event, { workspaceId }) => {
+  handleChannel('project:list', (_event, { workspaceId }) => {
     return { projects: listProjects(workspaceId) }
   })
 
-  ipcMain.handle('project:create', (_event, payload) => {
+  handleChannel('project:create', (_event, payload) => {
     const result = createProject(payload)
     if ('project' in result) {
       BrowserWindow.getAllWindows().forEach((win) => {
@@ -75,19 +76,19 @@ export function registerWorkspaceHandlers(): void {
     return result
   })
 
-  ipcMain.handle('project:update-branch', (_event, payload) => {
+  handleChannel('project:update-branch', (_event, payload) => {
     return updateProjectBranch(payload)
   })
 
-  ipcMain.handle('project:rename', (_event, payload) => {
+  handleChannel('project:rename', (_event, payload) => {
     return renameProject(payload)
   })
 
-  ipcMain.handle('project:reorder', (_event, payload) => {
+  handleChannel('project:reorder', (_event, payload) => {
     return reorderProjects(payload)
   })
 
-  ipcMain.handle('project:delete', async (_event, { id }) => {
+  handleChannel('project:delete', async (_event, { id }) => {
     const project = getProjectById(id)
     if (project?.isWorktree && project.worktreePath) {
       const workspace = listWorkspaces().find((w) => w.id === project.workspaceId)

@@ -7,6 +7,22 @@ vi.mock('electron', () => ({
 }))
 
 import { ipcMain } from 'electron'
+
+// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
+// capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
+const mockApi = {
+  ipc: {
+    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+      ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
+        ch,
+        (_e: unknown, payload: unknown) => fn(payload)
+      )
+      return {
+        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
+      }
+    },
+  },
+} as unknown as import('../../../../../src/main/extensions/api').ExtensionAPI
 import { wrapDb } from '../../../../../src/main/db/index'
 import { applyNotepadSchema } from '../../../src/db/db'
 import {
@@ -231,8 +247,44 @@ describe('moveItemsToFolder', () => {
 })
 
 describe('registerFoldersIpcHandlers', () => {
+  it('dispatches registered handlers to the folder functions', async () => {
+    ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mockClear()
+    const cleanup = registerFoldersIpcHandlers(mockApi, db)
+    const get = (ch: string) =>
+      (ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mock.calls.find(
+        ([c]) => c === ch
+      )![1] as (e: unknown, payload?: unknown) => Promise<unknown>
+
+    const created = (await get('terminator.notepad:folders.create')({}, { name: 'Inbox' })) as {
+      data: { id: string }
+    }
+    expect(created.data.id).toBeTruthy()
+
+    const listed = (await get('terminator.notepad:folders.list')({})) as { data: unknown[] }
+    expect(listed.data).toHaveLength(1)
+
+    const renamed = (await get('terminator.notepad:folders.rename')(
+      {},
+      { id: created.data.id, name: 'Later' }
+    )) as { data: unknown }
+    expect(renamed).toHaveProperty('data')
+
+    const moved = await get('terminator.notepad:folders.move')(
+      {},
+      { items: 'not-an-array', folderId: created.data.id }
+    )
+    expect(moved).toEqual({ error: 'VALIDATION_ERROR' })
+
+    const deleted = (await get('terminator.notepad:folders.delete')(
+      {},
+      { id: created.data.id }
+    )) as { data: unknown }
+    expect(deleted).toHaveProperty('data')
+    cleanup()
+  })
+
   it('registers and returns a cleanup function', () => {
-    const cleanup = registerFoldersIpcHandlers(db)
+    const cleanup = registerFoldersIpcHandlers(mockApi, db)
     expect(typeof cleanup).toBe('function')
     expect(ipcMain.handle).toHaveBeenCalledWith(
       'terminator.notepad:folders.create',

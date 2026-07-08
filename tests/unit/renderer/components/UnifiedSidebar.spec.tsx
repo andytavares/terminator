@@ -65,7 +65,7 @@ const mockSessionStore = {
   getBellCountForProject: vi.fn().mockReturnValue(0),
   isProjectBusy: vi.fn().mockReturnValue(false),
   isSessionBusy: vi.fn().mockReturnValue(false),
-  activeSessionIdByProject: new Map<string, string>(),
+  projectViews: new Map(),
   getScratchSessions: vi.fn().mockReturnValue([]),
 }
 

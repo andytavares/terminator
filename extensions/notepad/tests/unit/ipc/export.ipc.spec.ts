@@ -1,5 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { ipcMain } from 'electron'
+
+// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
+// capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
+const mockApi = {
+  ipc: {
+    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
+      ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
+        ch,
+        (_e: unknown, payload: unknown) => fn(payload)
+      )
+      return {
+        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
+      }
+    },
+  },
+} as unknown as import('../../../../../src/main/extensions/api').ExtensionAPI
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -324,15 +340,50 @@ describe('exportNotes with includeDiagrams', () => {
 })
 
 describe('registerExportIpcHandlers', () => {
+  it('dispatches pickFolder through the dialog, including the cancel path', async () => {
+    vi.mocked(ipcMain.handle).mockClear()
+    const dispose = registerExportIpcHandlers(mockApi, db)
+    const get = (ch: string) =>
+      vi.mocked(ipcMain.handle).mock.calls.find(([c]) => c === ch)![1] as (
+        e: unknown,
+        payload?: unknown
+      ) => Promise<unknown>
+
+    const picked = (await get('terminator.notepad:export.pickFolder')({})) as { data: unknown }
+    expect(picked).toEqual({ data: '/tmp/export-test' })
+
+    const { dialog } = await import('electron')
+    vi.mocked(dialog.showOpenDialog).mockResolvedValueOnce({ canceled: true, filePaths: [] })
+    const cancelled = (await get('terminator.notepad:export.pickFolder')({})) as { data: unknown }
+    expect(cancelled).toEqual({ data: null })
+    dispose()
+  })
+
+  it('dispatches export.run and import.run to their functions', async () => {
+    vi.mocked(ipcMain.handle).mockClear()
+    const dispose = registerExportIpcHandlers(mockApi, db)
+    const get = (ch: string) =>
+      vi.mocked(ipcMain.handle).mock.calls.find(([c]) => c === ch)![1] as (
+        e: unknown,
+        payload?: unknown
+      ) => Promise<unknown>
+
+    const exported = (await get('terminator.notepad:export.run')({}, {})) as { error?: string }
+    expect(exported).toHaveProperty('error')
+    const imported = (await get('terminator.notepad:import.run')({}, {})) as { error?: string }
+    expect(imported).toHaveProperty('error')
+    dispose()
+  })
+
   it('returns a dispose function', () => {
-    const dispose = registerExportIpcHandlers(db)
+    const dispose = registerExportIpcHandlers(mockApi, db)
     expect(typeof dispose).toBe('function')
     dispose()
   })
 
   it('registers IPC channels on setup', () => {
     vi.mocked(ipcMain.handle).mockClear()
-    const dispose = registerExportIpcHandlers(db)
+    const dispose = registerExportIpcHandlers(mockApi, db)
     expect(ipcMain.handle).toHaveBeenCalledWith(
       'terminator.notepad:export.run',
       expect.any(Function)

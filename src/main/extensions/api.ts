@@ -112,7 +112,13 @@ export interface ProjectSnapshot {
   readonly name: string
 }
 
+// Canonical session-authority types live with the authority (pty-manager.ts);
+// re-exported here so the ExtensionAPI contract exposes them.
+import type { SessionOrigin, SpawnSessionOptions, SessionInfo } from '../terminal/pty-manager.js'
+export type { SessionOrigin, SpawnSessionOptions, SessionInfo }
+
 export interface PtyManagerAPI {
+  /** @deprecated since v1.4.0 — use spawnSession() plus onData()/onExit(). */
   spawn(
     sessionId: string,
     cwd: string,
@@ -121,11 +127,23 @@ export interface PtyManagerAPI {
     onData: (data: string) => void,
     onExit: (exitCode: number) => void
   ): string
+  /** v1.4.0 — spawn with metadata; subscribe output/exit separately via onData/onExit. */
+  spawnSession(opts: SpawnSessionOptions): SessionInfo
+  /** v1.4.0 — multi-subscriber output fan-out. Returns a disposer, or null if unknown. */
+  onData(sessionId: string, listener: (data: string) => void): (() => void) | null
+  /** v1.4.0 — multi-subscriber exit fan-out. Listeners fire after the session is removed. */
+  onExit(sessionId: string, listener: (exitCode: number) => void): (() => void) | null
+  /** v1.4.0 */
+  getSession(sessionId: string): SessionInfo | undefined
+  /** v1.4.0 — stamps workspace metadata on the session (null clears it). */
+  setWorkspace(sessionId: string, workspaceId: string | null): boolean
   write(sessionId: string, data: string): void
   resize(sessionId: string, cols: number, rows: number): void
   kill(sessionId: string): void
-  listSessions(): Array<{ sessionId: string; cwd: string }>
+  listSessions(): SessionInfo[]
+  /** @deprecated since v1.4.0 — alias of onData(). */
   attachOnData(sessionId: string, onData: (data: string) => void): (() => void) | null
+  /** @deprecated since v1.4.0 — alias of onExit(). */
   attachOnExit(sessionId: string, onExit: (exitCode: number) => void): (() => void) | null
 }
 
@@ -218,9 +236,15 @@ export interface ExtensionAPI {
     register(command: CommandContribution, handler: () => void): Disposable
   }
   ipc: {
+    /**
+     * Registers a main-process handler for an extension-owned channel.
+     * Extension channels are dispatchable by the remote-control bridge by
+     * default; pass `remoteAccessible: false` to keep a channel local-only.
+     */
     registerHandler(
       channel: string,
-      handler: (payload: unknown) => Promise<unknown> | unknown
+      handler: (payload: unknown) => Promise<unknown> | unknown,
+      opts?: { remoteAccessible?: boolean }
     ): Disposable
     invokeChannel(channel: string, payload: unknown): Promise<unknown>
     sendChannel(channel: string, payload: unknown): void
@@ -239,7 +263,8 @@ export interface ExtensionAPI {
   }
 }
 
-import { BrowserWindow, ipcMain, globalShortcut as electronGlobalShortcut } from 'electron'
+import { handleChannel, removeChannel } from '../ipc/channel-registrar.js'
+import { BrowserWindow, globalShortcut as electronGlobalShortcut } from 'electron'
 import { EXTENSION_BASE_CSS } from './extension-view-host.js'
 import { join } from 'path'
 
@@ -281,6 +306,9 @@ interface Registry {
   sessionCloseHandlers: Set<(sessionId: string) => void>
 }
 
+// Internal to this module (and its tests). Other modules use the registry
+// query functions below — never the raw collections, so the string-key
+// conventions stay encapsulated here.
 export const globalRegistry: Registry = {
   settingsSections: new Map(),
   settingsValues: new Map(),
@@ -350,6 +378,104 @@ function rebuildViewMenu(): void {
   menuRebuildCallback?.()
 }
 
+// ── Registry queries ─────────────────────────────────────────────────────────
+// The only supported registry access outside this module. The string-key
+// conventions (`${extensionId}.settings`, `ext-menu-${id}`, …) are minted by
+// the registration code above; these functions keep their decoding here too,
+// so no other module re-derives key formats.
+
+export function listExtensionSettingsSections(): Array<{
+  extensionId: string
+  label: string
+  properties: ExtensionSettingsSchema['properties']
+}> {
+  return [...globalRegistry.settingsSections.entries()].map(([key, schema]) => ({
+    extensionId: key.replace(/\.settings$/, ''),
+    label: schema.label,
+    properties: schema.properties,
+  }))
+}
+
+export function listExtensionSidebarItems(): Array<{
+  id: string
+  label: string
+  tooltip?: string
+}> {
+  return [...globalRegistry.sidebarItems.values()].map((item) => ({
+    id: item.id,
+    label: item.label,
+    tooltip: item.tooltip,
+  }))
+}
+
+export function listExtensionContextMenuItems(
+  target: string
+): Array<{ id: string; label: string }> {
+  return [...globalRegistry.contextMenuItems.values()]
+    .filter((entry) => entry.target === target)
+    .map((entry) => ({ id: entry.item.id, label: entry.item.label }))
+}
+
+export function dispatchContextMenuClick(target: string, itemId: string, targetId: string): void {
+  for (const entry of globalRegistry.contextMenuItems.values()) {
+    if (entry.target === target && entry.item.id === itemId) {
+      entry.item.onClick(targetId)
+      break
+    }
+  }
+}
+
+export function listExtensionCommands(): Array<{
+  key: string
+  id: string
+  label: string
+  description?: string
+  shortcut?: string
+  category?: string
+}> {
+  return [...globalRegistry.commandContributions.entries()].map(([key, cmd]) => ({
+    key,
+    id: cmd.id,
+    label: cmd.label,
+    description: cmd.description,
+    shortcut: cmd.shortcut,
+    category: cmd.category,
+  }))
+}
+
+export function executeExtensionCommand(key: string): void {
+  globalRegistry.commandHandlers.get(key)?.()
+}
+
+/**
+ * Extension entries for the native View menu. Also records the
+ * panelId → menu-item-id mapping so getPanelMenuItemId() can resolve checkbox
+ * items when panel state changes.
+ */
+export function listNativeViewMenuItems(): Array<{
+  id: string
+  label: string
+  accelerator?: string
+  type: 'checkbox' | 'normal'
+  onClick: () => void
+}> {
+  return [...globalRegistry.nativeMenuItems.values()].map((contrib) => {
+    const id = `ext-menu-${contrib.id}`
+    if (contrib.panelId) globalRegistry.panelMenuItemIds.set(contrib.panelId, id)
+    return {
+      id,
+      label: contrib.label,
+      accelerator: contrib.accelerator,
+      type: contrib.type === 'checkbox' ? ('checkbox' as const) : ('normal' as const),
+      onClick: () => contrib.onClick(),
+    }
+  })
+}
+
+export function getPanelMenuItemId(panelId: string): string | undefined {
+  return globalRegistry.panelMenuItemIds.get(panelId)
+}
+
 // Map from view name to open auxiliary BrowserWindow (shared across all extensions)
 const auxiliaryWindows = new Map<string, BrowserWindow>()
 
@@ -388,7 +514,7 @@ export function createExtensionAPI(
     transaction: notReady,
   }
 
-  return {
+  const api: ExtensionAPI = {
     app: { version: appVersion },
     db: deps?.db ?? dbStub,
     log: extLogger,
@@ -576,10 +702,13 @@ export function createExtensionAPI(
     ipc: {
       registerHandler(
         channel: string,
-        handler: (payload: unknown) => Promise<unknown> | unknown
+        handler: (payload: unknown) => Promise<unknown> | unknown,
+        opts?: { remoteAccessible?: boolean }
       ): Disposable {
-        ipcMain.handle(channel, (_event, payload) => handler(payload))
-        return disposable(() => ipcMain.removeHandler(channel))
+        handleChannel(channel, (_event, payload) => handler(payload), {
+          remoteAccessible: opts?.remoteAccessible ?? true,
+        })
+        return disposable(() => removeChannel(channel))
       },
       async invokeChannel(channel: string, payload: unknown): Promise<unknown> {
         const entry = deps?.bridge?.invokeRegistry.get(channel)
@@ -587,12 +716,14 @@ export function createExtensionAPI(
         return entry.handler(null as never, payload)
       },
       isRemoteAccessible(channel: string): boolean {
+        // Core channels (invoke, send, and push/subscribe) are declared in the
+        // channel manifest, which REMOTE_ACCESSIBLE_CHANNELS is derived from.
         if (REMOTE_ACCESSIBLE_CHANNELS.has(channel)) return true
-        // Any channel registered in the invokeRegistry but not in the core allowlist is
-        // extension-owned and safe to expose. Core channels not in REMOTE_ACCESSIBLE_CHANNELS
-        // (db:health, dialog:open-directory, shell:open-external, workspace:get-active) are
-        // never invoked via the bridge by the shim — they're handled in-shim or unused remotely.
-        return deps?.bridge?.invokeRegistry.has(channel) ?? false
+        // Everything else is decided by what was declared at registration.
+        // Registered-but-undeclared channels are NOT reachable: the old rule
+        // ("any registered channel is extension-owned and safe") also exposed
+        // every internal core invoke channel to authenticated remote clients.
+        return deps?.bridge?.invokeRegistry.get(channel)?.remoteAccessible ?? false
       },
       sendChannel(channel: string, payload: unknown): void {
         const handler = deps?.bridge?.sendRegistry.get(channel)
@@ -617,6 +748,22 @@ export function createExtensionAPI(
       spawn(sessionId, cwd, shell, type, onData, onExit) {
         if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
         return deps.ptyManager.spawn(sessionId, cwd, shell, type, onData, onExit)
+      },
+      spawnSession(opts) {
+        if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
+        return deps.ptyManager.spawnSession(opts)
+      },
+      onData(sessionId, listener) {
+        return deps?.ptyManager?.onData(sessionId, listener) ?? null
+      },
+      onExit(sessionId, listener) {
+        return deps?.ptyManager?.onExit(sessionId, listener) ?? null
+      },
+      getSession(sessionId) {
+        return deps?.ptyManager?.getSession(sessionId)
+      },
+      setWorkspace(sessionId, workspaceId) {
+        return deps?.ptyManager?.setWorkspace(sessionId, workspaceId) ?? false
       },
       write(sessionId, data) {
         deps?.ptyManager?.write(sessionId, data)
@@ -700,4 +847,21 @@ export function createExtensionAPI(
       },
     },
   }
+
+  // The live disposables array (registrations keep pushing into it after
+  // activate) is exposed to the ExtensionHost via getApiDisposables so
+  // unload/reload/toggle can dispose everything the extension registered.
+  apiDisposables.set(api, disposables)
+  return api
+}
+
+const apiDisposables = new WeakMap<ExtensionAPI, Disposable[]>()
+
+/**
+ * The disposables collected by an api instance created with
+ * createExtensionAPI. The array is live — registrations made after activate()
+ * still land in it. Used by ExtensionHost to clean up on unload.
+ */
+export function getApiDisposables(api: ExtensionAPI): Disposable[] {
+  return apiDisposables.get(api) ?? []
 }
