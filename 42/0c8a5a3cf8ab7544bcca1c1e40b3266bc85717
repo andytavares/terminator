@@ -1,0 +1,24 @@
+src/main/extensions/extension-view-host.ts
+  s_08902e443a9840::t_6486a997b49f49 78-84,91-128
+  s_08902e443a9840::t_504f83e04d541d 129-130
+tests/unit/extensions/extension-view-host.spec.ts
+  s_08902e443a9840::t_5fbe964a7b936a 225-264
+src/main/index.ts
+  s_08902e443a9840::t_ce77654171c236 305-306
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "420c8a5a3cf8ab7544bcca1c1e40b3266bc85717",
+  "prompts": {},
+  "sessions": {
+    "s_08902e443a9840": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a0afc34-4f92-4bff-9395-8510afc8fba3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
