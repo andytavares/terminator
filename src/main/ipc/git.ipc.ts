@@ -1,5 +1,5 @@
-import { handleChannel } from './channel-registrar.js'
 import { z } from 'zod'
+import { registerInvokeTable, invokeSpec } from './invoke-table.js'
 import {
   isGitRepo,
   getGitRoot,
@@ -14,124 +14,100 @@ import {
 } from '../git/git-service.js'
 
 const PathSchema = z.object({ path: z.string().min(1) })
+const PathAndBranchSchema = z.object({ path: z.string().min(1), branch: z.string().min(1) })
 
 export function registerGitHandlers(): void {
-  handleChannel('git:is-repo', async (_event, payload) => {
-    const parsed = PathSchema.safeParse(payload)
-    if (!parsed.success) return { isRepo: false }
-    try {
-      const isRepo = await isGitRepo(parsed.data.path)
-      if (!isRepo) return { isRepo: false }
-      const root = await getGitRoot(parsed.data.path)
-      return { isRepo: true, root }
-    } catch {
-      return { isRepo: false }
-    }
-  })
-
-  handleChannel('git:current-branch', async (_event, payload) => {
-    const parsed = PathSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'INVALID_PATH' }
-    try {
-      const branch = await getCurrentBranch(parsed.data.path)
-      return { branch }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  handleChannel('git:list-branches', async (_event, payload) => {
-    const parsed = PathSchema.safeParse(payload)
-    if (!parsed.success) return { branches: [] }
-    try {
-      const branches = await listBranches(parsed.data.path)
-      return { branches }
-    } catch {
-      return { branches: [] }
-    }
-  })
-
-  handleChannel('git:checkout', async (_event, payload) => {
-    const schema = z.object({ path: z.string().min(1), branch: z.string().min(1) })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      await checkoutBranch(parsed.data.path, parsed.data.branch)
-      return { success: true }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  handleChannel('git:create-branch', async (_event, payload) => {
-    const schema = z.object({ path: z.string().min(1), branch: z.string().min(1) })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      await createBranch(parsed.data.path, parsed.data.branch)
-      return { success: true }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  handleChannel('git:suggest-worktree-path', async (_event, payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      branch: z.string().min(1),
-      baseDir: z.string().optional(),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { path: '' }
-    return {
-      path: suggestWorktreePath(parsed.data.repoRoot, parsed.data.branch, parsed.data.baseDir),
-    }
-  })
-
-  handleChannel('git:create-worktree', async (_event, payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      worktreePath: z.string().min(1),
-      branch: z.string().min(1),
-      isNewBranch: z.boolean(),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      await createWorktree(
-        parsed.data.repoRoot,
-        parsed.data.worktreePath,
-        parsed.data.branch,
-        parsed.data.isNewBranch
-      )
-      return { success: true }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  handleChannel('git:remove-worktree', async (_event, payload) => {
-    const schema = z.object({ repoRoot: z.string().min(1), worktreePath: z.string().min(1) })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      await removeWorktree(parsed.data.repoRoot, parsed.data.worktreePath)
-      return { success: true }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  handleChannel('git:list-worktrees', async (_event, payload) => {
-    const parsed = PathSchema.safeParse(payload)
-    if (!parsed.success) return { worktrees: [] }
-    try {
-      const worktrees = await listWorktrees(parsed.data.path)
-      return { worktrees }
-    } catch {
-      return { worktrees: [] }
-    }
-  })
+  registerInvokeTable([
+    invokeSpec({
+      channel: 'git:is-repo',
+      schema: PathSchema,
+      invalid: { isRepo: false },
+      run: async ({ path }) => {
+        const isRepo = await isGitRepo(path)
+        if (!isRepo) return { isRepo: false }
+        return { isRepo: true, root: await getGitRoot(path) }
+      },
+      onError: () => ({ isRepo: false }),
+    }),
+    invokeSpec({
+      channel: 'git:current-branch',
+      schema: PathSchema,
+      invalid: { error: 'INVALID_PATH' },
+      run: async ({ path }) => ({ branch: await getCurrentBranch(path) }),
+      onError: (e) => ({ error: String(e) }),
+    }),
+    invokeSpec({
+      channel: 'git:list-branches',
+      schema: PathSchema,
+      invalid: { branches: [] },
+      run: async ({ path }) => ({ branches: await listBranches(path) }),
+      onError: () => ({ branches: [] }),
+    }),
+    invokeSpec({
+      channel: 'git:checkout',
+      schema: PathAndBranchSchema,
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: async ({ path, branch }) => {
+        await checkoutBranch(path, branch)
+        return { success: true }
+      },
+      onError: (e) => ({ error: String(e) }),
+    }),
+    invokeSpec({
+      channel: 'git:create-branch',
+      schema: PathAndBranchSchema,
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: async ({ path, branch }) => {
+        await createBranch(path, branch)
+        return { success: true }
+      },
+      onError: (e) => ({ error: String(e) }),
+    }),
+    invokeSpec({
+      channel: 'git:suggest-worktree-path',
+      schema: z.object({
+        repoRoot: z.string().min(1),
+        branch: z.string().min(1),
+        baseDir: z.string().optional(),
+      }),
+      invalid: { path: '' },
+      run: ({ repoRoot, branch, baseDir }) => ({
+        path: suggestWorktreePath(repoRoot, branch, baseDir),
+      }),
+    }),
+    invokeSpec({
+      channel: 'git:create-worktree',
+      schema: z.object({
+        repoRoot: z.string().min(1),
+        worktreePath: z.string().min(1),
+        branch: z.string().min(1),
+        isNewBranch: z.boolean(),
+      }),
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: async ({ repoRoot, worktreePath, branch, isNewBranch }) => {
+        await createWorktree(repoRoot, worktreePath, branch, isNewBranch)
+        return { success: true }
+      },
+      onError: (e) => ({ error: String(e) }),
+    }),
+    invokeSpec({
+      channel: 'git:remove-worktree',
+      schema: z.object({ repoRoot: z.string().min(1), worktreePath: z.string().min(1) }),
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: async ({ repoRoot, worktreePath }) => {
+        await removeWorktree(repoRoot, worktreePath)
+        return { success: true }
+      },
+      onError: (e) => ({ error: String(e) }),
+    }),
+    invokeSpec({
+      channel: 'git:list-worktrees',
+      schema: PathSchema,
+      invalid: { worktrees: [] },
+      run: async ({ path }) => ({ worktrees: await listWorktrees(path) }),
+      onError: () => ({ worktrees: [] }),
+    }),
+  ])
 }
 // git:status, git:diff-file, git:stage, git:unstage, git:commit, git:pr-status, git:pr-create
 // are registered by the git-integration extension via api.ipc.registerHandler()
