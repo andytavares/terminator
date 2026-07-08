@@ -1,0 +1,26 @@
+extensions/git-integration/src/github/gh-cli.ts
+  s_08902e443a9840::t_674202d0b3204c 1-136
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_08902e443a9840::t_674202d0b3204c 17-20,23-27,29-37
+  s_08902e443a9840::t_33db52069cc33e 21-22
+extensions/git-integration/src/github/pr-review-service.ts
+  s_08902e443a9840::t_674202d0b3204c 11,13,897-939,941-1147,1150
+  s_08902e443a9840::t_33db52069cc33e 940
+  s_08902e443a9840::t_fded0d06ba46f5 1148-1149,1151-1159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "ce9f6029214e47cfa1948766e83b166f704f9fb7",
+  "prompts": {},
+  "sessions": {
+    "s_08902e443a9840": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a0afc34-4f92-4bff-9395-8510afc8fba3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
