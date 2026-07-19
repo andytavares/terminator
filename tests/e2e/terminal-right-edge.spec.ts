@@ -1,19 +1,24 @@
 import { test, expect } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
 import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
 
 // Regression guard for right-edge text clipping.
 //
-// xterm's own CSS positions .xterm-viewport absolutely with left:0/right:0, so it spans
-// the .xterm *padding box* — all the way to the element's right edge. On macOS with the
-// default overlay scrollbars the scrollbar occupies zero layout width, so xterm reports
-// scrollBarWidth = 0, FitAddon reserves no room for it, and the terminal is handed an
-// extra column whose glyphs then render underneath the ~15px overlay scrollbar when it
-// fades in. The result is the last character(s) of full-width wrapped lines being clipped.
+// THE ACTUAL BUG: xterm's DOM renderer gives each row div `overflow: hidden` and a width
+// of exactly cols x cellWidth, but lays text out using the font's natural advance width.
+// The per-column difference accumulates across the line, so the final glyph's ink
+// overhangs the row box and gets sliced. The fix widens the row's clip box (TerminalPane
+// .css). `last-column glyph is not clipped` below is the test that actually catches it.
 //
-// The fix gives .xterm-viewport an explicit ::-webkit-scrollbar width, which makes
-// Chromium use a classic space-reserving scrollbar regardless of the OS setting. These
-// tests assert the resulting invariant: rendered text must never extend into the
-// scrollbar's territory, in either the single-pane or split-pane layout.
+// IMPORTANT: this is only detectable by measuring RENDERED INK. An earlier revision of
+// this file asserted layout-box invariants (screenRight <= viewportContentRight etc.) and
+// passed cleanly the entire time the bug was live — element bounding rects say nothing
+// about whether a glyph's ink was clipped inside its box. Do not "simplify" the
+// screenshot-based test back into a bounding-rect check; it would guard nothing.
+//
+// The scrollbar-width tests below guard a separate, real property: that terminal geometry
+// does not depend on the user's macOS overlay-scrollbar setting. They were mistakenly
+// believed to fix the clipping bug. They do not, and never did.
 
 // Must match the ::-webkit-scrollbar width in TerminalPane.css.
 const SCROLLBAR_WIDTH_PX = 10
@@ -93,4 +98,85 @@ test('split-pane: rendered text never extends under the scrollbar', async () => 
   expect(g.scrollbarPx).toBe(SCROLLBAR_WIDTH_PX)
   expect(g.screenRight).toBeLessThanOrEqual(g.viewportContentRight)
   expect(g.maxRowRight).toBeLessThanOrEqual(g.viewportContentRight)
+})
+
+// The real guard. Renders "X" in every other column of a full-width line, then measures
+// each glyph's ink width from a screenshot. Every X is the same character in the same
+// font, so they must all rasterize to the same ink width — if the last one is narrower,
+// its right side is being clipped at the row boundary.
+test('last-column glyph is not clipped', async () => {
+  const { page } = handle
+  test.setTimeout(120000)
+
+  await page.keyboard.type(
+    'clear; C=$(tput cols); python3 -c "import sys;c=int(sys.argv[1]);sys.stdout.write((\'.X\'*(c//2))[:c])" $C\n'
+  )
+  await page.waitForTimeout(2500)
+
+  const row = await page.evaluate(() => {
+    const r = (document.querySelector('.xterm-rows') as HTMLElement).children[0] as HTMLElement
+    const b = r.getBoundingClientRect()
+    return { top: b.top, height: b.height }
+  })
+
+  const shotPath = test.info().outputPath('last-column.png')
+  await page.screenshot({ path: shotPath })
+
+  // Measure ink runs along the first text row straight out of the PNG.
+  const widths: number[] = await page.evaluate(
+    async ({ dataUrl, top, height }) => {
+      const img = new Image()
+      await new Promise((res) => {
+        img.onload = res
+        img.src = dataUrl
+      })
+      const c = document.createElement('canvas')
+      c.width = img.width
+      c.height = img.height
+      const ctx = c.getContext('2d')!
+      ctx.drawImage(img, 0, 0)
+      const scale = img.width / window.innerWidth
+      const y0 = Math.floor(top * scale)
+      const y1 = Math.ceil((top + height) * scale)
+      const data = ctx.getImageData(0, y0, img.width, y1 - y0).data
+      const lit: boolean[] = []
+      for (let x = 0; x < img.width; x++) {
+        let on = false
+        for (let y = 0; y < y1 - y0; y++) {
+          const i = (y * img.width + x) * 4
+          if (Math.max(data[i], data[i + 1], data[i + 2]) > 90) {
+            on = true
+            break
+          }
+        }
+        lit.push(on)
+      }
+      const runs: number[] = []
+      let start = -1
+      for (let x = 0; x < lit.length; x++) {
+        if (lit[x] && start < 0) start = x
+        else if (!lit[x] && start >= 0) {
+          runs.push(x - start)
+          start = -1
+        }
+      }
+      if (start >= 0) runs.push(lit.length - start)
+      // Wide runs are the X glyphs; the narrow ones are the "." separators.
+      return runs.filter((w) => w >= 8)
+    },
+    {
+      dataUrl: `data:image/png;base64,${(await readFile(shotPath)).toString('base64')}`,
+      top: row.top,
+      height: row.height,
+    }
+  )
+
+  expect(widths.length).toBeGreaterThan(20)
+  // The modal ink width is what an unclipped X measures.
+  const counts = new Map<number, number>()
+  widths.forEach((w) => counts.set(w, (counts.get(w) ?? 0) + 1))
+  const modal = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+  const last = widths[widths.length - 1]
+  // Before the fix: modal 15, last 12.
+  expect(last).toBe(modal)
 })
