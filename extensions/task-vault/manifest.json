@@ -22,7 +22,6 @@
       {
         "id": "task-vault:capture-to-inbox",
         "label": "Task Vault: Capture to Inbox",
-        "shortcut": "CommandOrControl+Shift+O",
         "description": "Quick-capture a task to the vault inbox"
       }
     ]

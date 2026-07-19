@@ -410,12 +410,29 @@ export function NotepadView(): React.JSX.Element {
     }
   }, [])
 
+  // Cmd+Alt+M toggles the comment margin. Handled here rather than via globalShortcut so it
+  // fires only while Terminator is focused and this view is mounted. The chord matches the
+  // CommandOrControl+Alt+M accelerator this replaced — keep them in sync so the binding
+  // users already know does not silently move.
+  //
+  // Matched on e.code, not e.key: on macOS Option+M emits the dead-key character 'µ', so an
+  // e.key === 'm' comparison never fires while Alt is held.
   useEffect(() => {
     function onToggleComments() {
       setShowComments((v) => !v)
     }
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.altKey && e.code === 'KeyM') {
+        e.preventDefault()
+        onToggleComments()
+      }
+    }
     window.addEventListener('notepad:toggleComments', onToggleComments)
-    return () => window.removeEventListener('notepad:toggleComments', onToggleComments)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('notepad:toggleComments', onToggleComments)
+      document.removeEventListener('keydown', onKeyDown)
+    }
   }, [])
 
   useEffect(() => {
@@ -444,14 +461,6 @@ export function NotepadView(): React.JSX.Element {
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [])
-
-  // Listen for global shortcut broadcast to open search
-  useEffect(() => {
-    const off = window.electronAPI.extensionBridge.on('terminator.notepad:ui.openSearch', () => {
-      setShowSearch(true)
-    })
-    return off
   }, [])
 
   // Listen for open-in-window push: activate notepad tab and select the note

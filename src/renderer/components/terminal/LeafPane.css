@@ -45,8 +45,11 @@
   min-height: 0;
 }
 
+/* Match the single-pane gutter (TerminalPane.css). Split panes previously had no
+ * horizontal padding at all, so their text sat flush against the pane edge. */
 .leaf-pane__container .xterm {
   height: 100%;
+  padding: 6px 12px;
 }
 
 .leaf-pane__container .xterm-viewport {

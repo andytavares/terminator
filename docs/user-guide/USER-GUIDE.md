@@ -200,7 +200,7 @@ The overview screen displays a **full-screen tiled grid** of all open sessions. 
 
 Click any tile to navigate directly to that session.
 
-**Open overview:** Click the **grid icon** in the sidebar header or press **`Cmd+Shift+I`**.
+**Open overview:** Click the **grid icon** in the sidebar header or press **`Cmd+Shift+E`**.
 
 ---
 
@@ -241,7 +241,7 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 | Command palette                     | `Cmd+P`                  |
 | Settings                            | `Cmd+,`                  |
 | Toggle Git sidebar                  | `Cmd+Shift+G`            |
-| Toggle Overview screen              | `Cmd+Shift+I`            |
+| Toggle Overview screen              | `Cmd+Shift+E`            |
 | Send newline (always)               | `Cmd+Enter`              |
 | Send newline (bracketed paste mode) | `Shift+Enter`            |
 

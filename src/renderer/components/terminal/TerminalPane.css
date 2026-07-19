@@ -32,3 +32,60 @@
 .terminal-pane__container .xterm-viewport {
   border-radius: 0;
 }
+
+/* Deterministic scrollbar geometry — applies to every xterm viewport.
+ *
+ * xterm positions .xterm-viewport absolutely with left:0/right:0, so it spans the .xterm
+ * padding box out to the element's right edge. On macOS the default "show scroll bars:
+ * automatically" setting gives overlay scrollbars, which occupy zero layout width, so
+ * xterm reports scrollBarWidth = 0 and FitAddon reserves no space for them.
+ *
+ * Declaring an explicit ::-webkit-scrollbar width opts this scroller out of overlay
+ * scrollbars: Chromium gives it a classic scrollbar that occupies real layout width, so
+ * scrollBarWidth is non-zero and FitAddon subtracts it. Terminal geometry no longer
+ * depends on the user's OS scrollbar setting.
+ *
+ * NOTE: this is NOT what caused the "last characters clipped on the right" bug, despite
+ * what an earlier revision of this comment claimed. Text never reached the scrollbar —
+ * measured clearance was 12-24px. See the .xterm-rows rule below for the actual cause.
+ */
+.xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* Last-column glyph clipping — the actual right-edge cutoff bug.
+ *
+ * xterm's DOM renderer gives each row div `overflow: hidden` (xterm.css) and a width of
+ * exactly cols x cellWidth, but it lays the text out using the font's *natural advance
+ * width*. Those two differ by a fraction of a pixel per column, so the error accumulates
+ * across the line and the final glyph's ink overhangs the row box, where overflow:hidden
+ * slices it. Always the last column; worse on wider terminals (more columns, more drift).
+ *
+ * Measured with a line of "X" in every other column: 63 of 65 glyphs render 15 device px
+ * of ink, the last-column glyph only 12 — cut off at the row's right edge, a full 24px to
+ * the LEFT of the scrollbar. Reserving scrollbar width could never have fixed this.
+ *
+ * Widening the row's clip box lets the overhang paint. Rows are left-aligned so text
+ * position is unchanged, and the extra 6px lands inside the .xterm 12px right padding, so
+ * it never reaches the scrollbar.
+ *
+ * tests/e2e/terminal-right-edge.spec.ts locks this in by asserting a full-width row's
+ * scrollWidth does not exceed its clientWidth. With this rule removed a 126-column row
+ * measures 986 vs 984; with it, 990 vs 990.
+ */
+.xterm-rows > div {
+  width: calc(100% + 6px) !important;
+}
