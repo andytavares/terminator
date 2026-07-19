@@ -446,14 +446,6 @@ export function NotepadView(): React.JSX.Element {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  // Listen for global shortcut broadcast to open search
-  useEffect(() => {
-    const off = window.electronAPI.extensionBridge.on('terminator.notepad:ui.openSearch', () => {
-      setShowSearch(true)
-    })
-    return off
-  }, [])
-
   // Listen for open-in-window push: activate notepad tab and select the note
   useEffect(() => {
     const off = window.electronAPI.extensionBridge.on(
