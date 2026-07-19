@@ -15,7 +15,6 @@ import type { SettingDefinition } from '../../../src/main/extensions/api'
 // extension's own settings — core never knows these keys exist (Extension Isolation).
 const NOTIFICATION_KEYS: { key: string; label: string }[] = [
   { key: 'schemaInitFailed', label: 'Database schema failed to apply' },
-  { key: 'globalShortcutTaken', label: 'Global quick-create shortcut unavailable' },
 ]
 
 function buildNotificationSettingProperties(): Record<string, SettingDefinition> {
@@ -182,47 +181,27 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     })
   )
 
-  try {
-    const shortcutDisposable = api.globalShortcut.register('CommandOrControl+Shift+N', () => {
-      // Broadcast to any already-running extension view immediately.
-      api.window.broadcast('terminator.notepad:ui.openQuickCreate', {})
-      // Activate the notepad tab — this creates the WebContentsView if it doesn't exist yet.
-      api.window.broadcast('extension:activate-global-tab', 'terminator.notepad')
-      // Set pending flag so the renderer shows the overlay on first load.
-      // Auto-expire after 5 s so a late manual panel open doesn't surprise the user.
-      _pendingQuickCreate = true
-      if (_pendingQuickCreateTimer !== null) clearTimeout(_pendingQuickCreateTimer)
-      _pendingQuickCreateTimer = setTimeout(() => {
-        _pendingQuickCreate = false
-        _pendingQuickCreateTimer = null
-      }, 5000)
-    })
-    disposables.push(shortcutDisposable)
-  } catch {
-    api.notifications.showToast(
-      'warning',
-      'Notepad: Could not register Cmd+Shift+N globally — use in-app shortcut instead',
-      'globalShortcutTaken'
-    )
-  }
-
-  // T041: Sole registration point for Cmd+Opt+M — toggles comment margin
-  try {
-    const commentToggleDisposable = api.globalShortcut.register('CommandOrControl+Alt+M', () => {
-      api.window.broadcast('terminator.notepad:ui.toggleComments', {})
-    })
-    disposables.push(commentToggleDisposable)
-  } catch {
-    console.warn('[notepad] Could not register Cmd+Alt+M for comment margin toggle')
-  }
-
+  // Cmd+Shift+N lives on the View menu, not globalShortcut: menu accelerators fire only
+  // while Terminator is focused, whereas a global registration would take the combo away
+  // from every other app on the system (it collides with New Incognito Window / New Folder).
   disposables.push(
     api.nativeMenu.addViewMenuItem({
       id: 'notepad-new-note',
       label: 'New Note',
       accelerator: 'CmdOrCtrl+Shift+N',
       onClick: () => {
+        // Broadcast to any already-running extension view immediately.
         api.window.broadcast('terminator.notepad:ui.openQuickCreate', {})
+        // Activate the notepad tab — this creates the WebContentsView if it doesn't exist yet.
+        api.window.broadcast('extension:activate-global-tab', 'terminator.notepad')
+        // Set pending flag so the renderer shows the overlay on first load.
+        // Auto-expire after 5 s so a late manual panel open doesn't surprise the user.
+        _pendingQuickCreate = true
+        if (_pendingQuickCreateTimer !== null) clearTimeout(_pendingQuickCreateTimer)
+        _pendingQuickCreateTimer = setTimeout(() => {
+          _pendingQuickCreate = false
+          _pendingQuickCreateTimer = null
+        }, 5000)
       },
     })
   )

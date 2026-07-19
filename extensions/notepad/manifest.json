@@ -20,7 +20,6 @@
       {
         "id": "notepad:quick-create",
         "label": "New Note",
-        "shortcut": "CmdOrCtrl+Shift+N",
         "description": "Open quick-create overlay"
       }
     ]

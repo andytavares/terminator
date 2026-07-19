@@ -96,8 +96,10 @@ export function useKeyboardShortcuts({
         return
       }
 
-      // Cmd+Shift+I: toggle overview tab
-      if (isMeta && e.shiftKey && e.key === 'i') {
+      // Cmd+Shift+E: toggle overview tab. Not Cmd+Shift+I — that is the "Open Extension
+      // DevTools" menu accelerator, and Electron menu accelerators consume the key before
+      // the renderer ever sees it, which made this branch unreachable.
+      if (isMeta && e.shiftKey && e.key === 'e') {
         e.preventDefault()
         onToggleOverview?.()
         return

@@ -61,13 +61,40 @@ describe('notepad activate() global shortcut registrations', () => {
     expect(accelerators).not.toContain('CommandOrControl+Shift+F')
   })
 
-  it('still registers only the shortcuts that must work while backgrounded', async () => {
+  it('registers no OS-global shortcuts at all — nothing here needs to fire while backgrounded', async () => {
     const { api, register } = makeApi()
     const { activate } = await import('../../src/index.ts')
 
     await activate(api)
 
-    const accelerators = register.mock.calls.map((c) => c[0])
-    expect(accelerators).toEqual(['CommandOrControl+Shift+N', 'CommandOrControl+Alt+M'])
+    expect(register).not.toHaveBeenCalled()
+  })
+
+  it('exposes New Note as a focused-only View menu accelerator', async () => {
+    const { api } = makeApi()
+    const { activate } = await import('../../src/index.ts')
+
+    await activate(api)
+
+    const addItem = api.nativeMenu.addViewMenuItem as unknown as ReturnType<typeof vi.fn>
+    const item = addItem.mock.calls.map((c) => c[0]).find((i) => i.id === 'notepad-new-note')
+    expect(item?.accelerator).toBe('CmdOrCtrl+Shift+N')
+  })
+
+  it('New Note activates the notepad tab so it works before the view is mounted', async () => {
+    const { api } = makeApi()
+    const { activate } = await import('../../src/index.ts')
+
+    await activate(api)
+
+    const addItem = api.nativeMenu.addViewMenuItem as unknown as ReturnType<typeof vi.fn>
+    const item = addItem.mock.calls.map((c) => c[0]).find((i) => i.id === 'notepad-new-note')
+    item?.onClick()
+
+    const channels = (api.window.broadcast as unknown as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c) => c[0]
+    )
+    expect(channels).toContain('terminator.notepad:ui.openQuickCreate')
+    expect(channels).toContain('extension:activate-global-tab')
   })
 })

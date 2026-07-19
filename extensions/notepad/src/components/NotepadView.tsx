@@ -410,12 +410,24 @@ export function NotepadView(): React.JSX.Element {
     }
   }, [])
 
+  // Cmd+Shift+M toggles the comment margin. Handled here rather than via globalShortcut so it
+  // fires only while Terminator is focused and this view is mounted.
   useEffect(() => {
     function onToggleComments() {
       setShowComments((v) => !v)
     }
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'm') {
+        e.preventDefault()
+        onToggleComments()
+      }
+    }
     window.addEventListener('notepad:toggleComments', onToggleComments)
-    return () => window.removeEventListener('notepad:toggleComments', onToggleComments)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('notepad:toggleComments', onToggleComments)
+      document.removeEventListener('keydown', onKeyDown)
+    }
   }, [])
 
   useEffect(() => {

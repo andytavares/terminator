@@ -224,12 +224,22 @@ describe('useKeyboardShortcuts', () => {
     expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('proj-1', 's1')
   })
 
-  it('calls onToggleOverview when Cmd+Shift+I is pressed', async () => {
+  it('calls onToggleOverview when Cmd+Shift+E is pressed', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onToggleOverview = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onToggleOverview }))
+    pressKey('e', { metaKey: true, shiftKey: true })
+    expect(onToggleOverview).toHaveBeenCalled()
+  })
+
+  // Cmd+Shift+I belongs to the "Open Extension DevTools" menu accelerator, which Electron
+  // consumes before the renderer sees it — the hook must not also claim it.
+  it('does not call onToggleOverview when Cmd+Shift+I is pressed', async () => {
     const useKeyboardShortcuts = await importHook()
     const onToggleOverview = vi.fn()
     renderHook(() => useKeyboardShortcuts({ onToggleOverview }))
     pressKey('i', { metaKey: true, shiftKey: true })
-    expect(onToggleOverview).toHaveBeenCalled()
+    expect(onToggleOverview).not.toHaveBeenCalled()
   })
 
   it('calls onNewScratch when Cmd+Shift+T is pressed', async () => {
