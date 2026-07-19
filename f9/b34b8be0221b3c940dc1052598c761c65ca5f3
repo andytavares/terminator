@@ -1,0 +1,27 @@
+tests/e2e/terminal-right-edge.spec.ts
+  s_0567051f6bb6f9::t_0083844ac77760 1-17,21-24,33-70,75-89,94-96
+  s_0567051f6bb6f9::t_0422cc9e77f122 18-20
+  s_0567051f6bb6f9::t_bd5261601289d6 71-74,90-93
+  s_0567051f6bb6f9::t_d1775d01ce738a 25-32
+src/renderer/components/terminal/LeafPane.css
+  s_0567051f6bb6f9::t_98a7e2cd08a78a 48-49,52
+src/renderer/components/terminal/TerminalPane.css
+  s_0567051f6bb6f9::t_6fefa79dc47097 50-52
+  s_0567051f6bb6f9::t_6cff211554cf81 35-49,53-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f9b34b8be0221b3c940dc1052598c761c65ca5f3",
+  "prompts": {},
+  "sessions": {
+    "s_0567051f6bb6f9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "507e809b-09a0-489c-a3b1-c99149a5a39e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
