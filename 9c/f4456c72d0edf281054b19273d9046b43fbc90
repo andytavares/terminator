@@ -1,0 +1,25 @@
+src/renderer/components/terminal/TerminalPane.css
+  s_faeda0aec444c4::t_66700bb17b40e1 68-88
+  s_faeda0aec444c4::t_4ebcda203a41d2 36,40-41,45-50
+tests/e2e/terminal-right-edge.spec.ts
+  s_faeda0aec444c4::t_45e6ceaed8fec9 168
+  s_faeda0aec444c4::t_d57260d12f5a19 102-167,169-182
+  s_faeda0aec444c4::t_cf19de853d8542 2
+  s_faeda0aec444c4::t_46a786fc2e0eaf 7-11,13-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "9cf4456c72d0edf281054b19273d9046b43fbc90",
+  "prompts": {},
+  "sessions": {
+    "s_faeda0aec444c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "69ecf50f-2a55-49e0-a8a3-6081cd372e11",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
