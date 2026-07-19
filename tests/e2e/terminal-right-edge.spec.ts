@@ -113,10 +113,17 @@ test('last-column glyph is not clipped', async () => {
   )
   await page.waitForTimeout(2500)
 
+  // Scope to the FOCUSED terminal, not the first one in the document. By the time this
+  // test runs the split-pane case above has left two panes mounted, and keystrokes go to
+  // whichever is focused — reading the first .xterm-rows could measure a different
+  // terminal than the one we typed into. xterm marks the focused rows container with
+  // .xterm-focus, which is exactly the pane receiving the keystrokes.
   const row = await page.evaluate(() => {
-    const r = (document.querySelector('.xterm-rows') as HTMLElement).children[0] as HTMLElement
+    const rows = (document.querySelector('.xterm-rows.xterm-focus') ??
+      document.querySelector('.xterm-rows')) as HTMLElement
+    const r = rows.children[0] as HTMLElement
     const b = r.getBoundingClientRect()
-    return { top: b.top, height: b.height }
+    return { top: b.top, height: b.height, left: b.left, right: b.right }
   })
 
   const shotPath = test.info().outputPath('last-column.png')
@@ -124,7 +131,7 @@ test('last-column glyph is not clipped', async () => {
 
   // Measure ink runs along the first text row straight out of the PNG.
   const widths: number[] = await page.evaluate(
-    async ({ dataUrl, top, height }) => {
+    async ({ dataUrl, top, height, left, right }) => {
       const img = new Image()
       await new Promise((res) => {
         img.onload = res
@@ -139,8 +146,13 @@ test('last-column glyph is not clipped', async () => {
       const y0 = Math.floor(top * scale)
       const y1 = Math.ceil((top + height) * scale)
       const data = ctx.getImageData(0, y0, img.width, y1 - y0).data
+      // Confine the scan to this pane's horizontal extent. In the split-pane layout the
+      // sibling terminal occupies the same scanline, and its glyphs would otherwise be
+      // counted as if they belonged to this row.
+      const x0 = Math.floor(left * scale)
+      const x1 = Math.ceil(right * scale)
       const lit: boolean[] = []
-      for (let x = 0; x < img.width; x++) {
+      for (let x = x0; x < x1; x++) {
         let on = false
         for (let y = 0; y < y1 - y0; y++) {
           const i = (y * img.width + x) * 4
@@ -168,6 +180,8 @@ test('last-column glyph is not clipped', async () => {
       dataUrl: `data:image/png;base64,${(await readFile(shotPath)).toString('base64')}`,
       top: row.top,
       height: row.height,
+      left: row.left,
+      right: row.right,
     }
   )
 

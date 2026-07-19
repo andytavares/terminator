@@ -178,7 +178,7 @@ export function App(): JSX.Element {
       {
         id: 'core.toggle-overview',
         label: 'Toggle Overview',
-        shortcut: '⌘⇧I',
+        shortcut: '⌘⇧E',
         category: 'App',
         action: () => {
           setActiveGlobalTab(activeGlobalTabId === 'core.overview' ? null : 'core.overview')

@@ -410,14 +410,19 @@ export function NotepadView(): React.JSX.Element {
     }
   }, [])
 
-  // Cmd+Shift+M toggles the comment margin. Handled here rather than via globalShortcut so it
-  // fires only while Terminator is focused and this view is mounted.
+  // Cmd+Alt+M toggles the comment margin. Handled here rather than via globalShortcut so it
+  // fires only while Terminator is focused and this view is mounted. The chord matches the
+  // CommandOrControl+Alt+M accelerator this replaced — keep them in sync so the binding
+  // users already know does not silently move.
+  //
+  // Matched on e.code, not e.key: on macOS Option+M emits the dead-key character 'µ', so an
+  // e.key === 'm' comparison never fires while Alt is held.
   useEffect(() => {
     function onToggleComments() {
       setShowComments((v) => !v)
     }
     function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'm') {
+      if ((e.metaKey || e.ctrlKey) && e.altKey && e.code === 'KeyM') {
         e.preventDefault()
         onToggleComments()
       }
