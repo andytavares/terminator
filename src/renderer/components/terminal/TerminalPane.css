@@ -80,8 +80,11 @@
  *
  * Widening the row's clip box lets the overhang paint. Rows are left-aligned so text
  * position is unchanged, and the extra 6px lands inside the .xterm 12px right padding, so
- * it never reaches the scrollbar. tests/e2e/terminal-right-edge.spec.ts locks this in by
- * measuring rendered ink, not layout boxes — layout boxes cannot detect this at all.
+ * it never reaches the scrollbar.
+ *
+ * tests/e2e/terminal-right-edge.spec.ts locks this in by asserting a full-width row's
+ * scrollWidth does not exceed its clientWidth. With this rule removed a 126-column row
+ * measures 986 vs 984; with it, 990 vs 990.
  */
 .xterm-rows > div {
   width: calc(100% + 6px) !important;

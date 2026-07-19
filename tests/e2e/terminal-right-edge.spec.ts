@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test'
-import { readFile } from 'node:fs/promises'
 import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
 
 // Regression guard for right-edge text clipping.
@@ -10,11 +9,16 @@ import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } 
 // overhangs the row box and gets sliced. The fix widens the row's clip box (TerminalPane
 // .css). `last-column glyph is not clipped` below is the test that actually catches it.
 //
-// IMPORTANT: this is only detectable by measuring RENDERED INK. An earlier revision of
-// this file asserted layout-box invariants (screenRight <= viewportContentRight etc.) and
-// passed cleanly the entire time the bug was live — element bounding rects say nothing
-// about whether a glyph's ink was clipped inside its box. Do not "simplify" the
-// screenshot-based test back into a bounding-rect check; it would guard nothing.
+// IMPORTANT: not every geometry assertion can see this. An earlier revision of this file
+// asserted inter-element POSITIONS (screenRight <= viewportContentRight etc.) and passed
+// cleanly the entire time the bug was live — comparing where boxes sit relative to each
+// other says nothing about whether a box's own content overflows it. The guard below
+// instead compares a row's content extent (scrollWidth) against its clip box
+// (clientWidth), which is the overflow being clipped.
+//
+// Any change to that test must be re-validated by negative control: revert the
+// .xterm-rows rule in TerminalPane.css, REBUILD (the suite runs against out/, so skipping
+// the rebuild silently tests the old bundle), and confirm the test goes red.
 //
 // The scrollbar-width tests below guard a separate, real property: that terminal geometry
 // does not depend on the user's macOS overlay-scrollbar setting. They were mistakenly
@@ -85,6 +89,68 @@ test('single-pane: rendered text never extends under the scrollbar', async () =>
   expect(g.maxRowRight).toBeLessThanOrEqual(g.viewportContentRight)
 })
 
+// The real guard for the clipping bug.
+//
+// The row div's content (the sum of the font's natural per-character advances) is wider
+// than the row's own clip box (cols x xterm's rounded cellWidth). scrollWidth reports the
+// content width, clientWidth the clip box — so content overflowing its clip box is exactly
+// the condition that slices the last glyph, and it is what this asserts.
+//
+// This is NOT the same class of check as the three tests above. Those compare element
+// POSITIONS against each other and cannot see inside a box; they passed for the entire
+// time the bug was live. This compares a box's content extent against the box itself.
+// Verified by negative control: with the .xterm-rows rule in TerminalPane.css reverted,
+// a full-width row measures scrollWidth 986 vs clientWidth 984 and this fails; with the
+// fix it is 990 vs 990. Re-run that control before ever relaxing this test.
+//
+// Must run on a FULL-WIDTH single pane, hence its position before the split test below:
+// the overhang is cols x per-column drift, so a half-width pane roughly halves it and
+// can round away to nothing.
+test('last-column glyph is not clipped', async () => {
+  const { page } = handle
+  test.setTimeout(120000)
+
+  // A line of exactly `tput cols` identical characters, so the per-column advance drift
+  // accumulates across the full width. awk rather than python3: it is guaranteed present
+  // on both macOS and Linux runners. No trailing newline, so the prompt wraps to the next
+  // row and this row stays nothing but the ruler.
+  await page.keyboard.type(
+    'clear; C=$(tput cols); awk -v c=$C \'BEGIN{s="";for(i=0;i<c;i++)s=s"#";printf "%s",s}\'\n'
+  )
+
+  // Poll for the ruler row by content rather than waiting a fixed interval and assuming
+  // row 0 — on CI the shell prints a "default interactive shell is now zsh" notice first,
+  // so the ruler does not reliably land on any particular row.
+  const row = await page.waitForFunction(
+    () => {
+      const rows =
+        document.querySelector('.xterm-rows.xterm-focus') ?? document.querySelector('.xterm-rows')
+      if (!rows) return null
+      for (const el of Array.from(rows.children) as HTMLElement[]) {
+        const text = (el.textContent ?? '').replace(/\u00a0/g, ' ').trimEnd()
+        // Strictly the ruler: nothing but '#', and long enough to be a real full-width line.
+        if (/^#+$/.test(text) && text.length >= 40) {
+          return { cols: text.length, scrollW: el.scrollWidth, clientW: el.clientWidth }
+        }
+      }
+      return null
+    },
+    undefined,
+    { timeout: 30000 }
+  )
+  const m = (await row.jsonValue()) as { cols: number; scrollW: number; clientW: number }
+
+  // Guard the guard: too few columns and the accumulated overhang rounds to zero, which
+  // would make the assertion below vacuously true.
+  expect(m.cols, 'ruler row too narrow for the overhang to be measurable').toBeGreaterThanOrEqual(
+    80
+  )
+  expect(
+    m.scrollW,
+    `row content (${m.scrollW}px) overflows its clip box (${m.clientW}px) — the last column's glyph is being sliced`
+  ).toBeLessThanOrEqual(m.clientW)
+})
+
 test('split-pane: rendered text never extends under the scrollbar', async () => {
   const { page } = handle
   await page.keyboard.press('Meta+d')
@@ -98,99 +164,4 @@ test('split-pane: rendered text never extends under the scrollbar', async () => 
   expect(g.scrollbarPx).toBe(SCROLLBAR_WIDTH_PX)
   expect(g.screenRight).toBeLessThanOrEqual(g.viewportContentRight)
   expect(g.maxRowRight).toBeLessThanOrEqual(g.viewportContentRight)
-})
-
-// The real guard. Renders "X" in every other column of a full-width line, then measures
-// each glyph's ink width from a screenshot. Every X is the same character in the same
-// font, so they must all rasterize to the same ink width — if the last one is narrower,
-// its right side is being clipped at the row boundary.
-test('last-column glyph is not clipped', async () => {
-  const { page } = handle
-  test.setTimeout(120000)
-
-  await page.keyboard.type(
-    'clear; C=$(tput cols); python3 -c "import sys;c=int(sys.argv[1]);sys.stdout.write((\'.X\'*(c//2))[:c])" $C\n'
-  )
-  await page.waitForTimeout(2500)
-
-  // Scope to the FOCUSED terminal, not the first one in the document. By the time this
-  // test runs the split-pane case above has left two panes mounted, and keystrokes go to
-  // whichever is focused — reading the first .xterm-rows could measure a different
-  // terminal than the one we typed into. xterm marks the focused rows container with
-  // .xterm-focus, which is exactly the pane receiving the keystrokes.
-  const row = await page.evaluate(() => {
-    const rows = (document.querySelector('.xterm-rows.xterm-focus') ??
-      document.querySelector('.xterm-rows')) as HTMLElement
-    const r = rows.children[0] as HTMLElement
-    const b = r.getBoundingClientRect()
-    return { top: b.top, height: b.height, left: b.left, right: b.right }
-  })
-
-  const shotPath = test.info().outputPath('last-column.png')
-  await page.screenshot({ path: shotPath })
-
-  // Measure ink runs along the first text row straight out of the PNG.
-  const widths: number[] = await page.evaluate(
-    async ({ dataUrl, top, height, left, right }) => {
-      const img = new Image()
-      await new Promise((res) => {
-        img.onload = res
-        img.src = dataUrl
-      })
-      const c = document.createElement('canvas')
-      c.width = img.width
-      c.height = img.height
-      const ctx = c.getContext('2d')!
-      ctx.drawImage(img, 0, 0)
-      const scale = img.width / window.innerWidth
-      const y0 = Math.floor(top * scale)
-      const y1 = Math.ceil((top + height) * scale)
-      const data = ctx.getImageData(0, y0, img.width, y1 - y0).data
-      // Confine the scan to this pane's horizontal extent. In the split-pane layout the
-      // sibling terminal occupies the same scanline, and its glyphs would otherwise be
-      // counted as if they belonged to this row.
-      const x0 = Math.floor(left * scale)
-      const x1 = Math.ceil(right * scale)
-      const lit: boolean[] = []
-      for (let x = x0; x < x1; x++) {
-        let on = false
-        for (let y = 0; y < y1 - y0; y++) {
-          const i = (y * img.width + x) * 4
-          if (Math.max(data[i], data[i + 1], data[i + 2]) > 90) {
-            on = true
-            break
-          }
-        }
-        lit.push(on)
-      }
-      const runs: number[] = []
-      let start = -1
-      for (let x = 0; x < lit.length; x++) {
-        if (lit[x] && start < 0) start = x
-        else if (!lit[x] && start >= 0) {
-          runs.push(x - start)
-          start = -1
-        }
-      }
-      if (start >= 0) runs.push(lit.length - start)
-      // Wide runs are the X glyphs; the narrow ones are the "." separators.
-      return runs.filter((w) => w >= 8)
-    },
-    {
-      dataUrl: `data:image/png;base64,${(await readFile(shotPath)).toString('base64')}`,
-      top: row.top,
-      height: row.height,
-      left: row.left,
-      right: row.right,
-    }
-  )
-
-  expect(widths.length).toBeGreaterThan(20)
-  // The modal ink width is what an unclipped X measures.
-  const counts = new Map<number, number>()
-  widths.forEach((w) => counts.set(w, (counts.get(w) ?? 0) + 1))
-  const modal = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]
-  const last = widths[widths.length - 1]
-  // Before the fix: modal 15, last 12.
-  expect(last).toBe(modal)
 })
