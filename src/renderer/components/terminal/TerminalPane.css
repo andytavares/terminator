@@ -32,3 +32,34 @@
 .terminal-pane__container .xterm-viewport {
   border-radius: 0;
 }
+
+/* Right-edge clipping fix — applies to every xterm viewport (single and split panes).
+ *
+ * xterm positions .xterm-viewport absolutely with left:0/right:0, so it spans the .xterm
+ * padding box out to the element's right edge. On macOS the default "show scroll bars:
+ * automatically" setting gives overlay scrollbars, which occupy zero layout width — so
+ * xterm reports scrollBarWidth = 0, FitAddon reserves no space, and the terminal gets an
+ * extra column whose glyphs render underneath the ~15px overlay scrollbar when it fades
+ * in. That is the "last characters clipped on the right" bug.
+ *
+ * Declaring an explicit ::-webkit-scrollbar width opts this scroller out of overlay
+ * scrollbars: Chromium gives it a classic scrollbar that occupies real layout width, so
+ * scrollBarWidth is non-zero and FitAddon subtracts it. The geometry no longer depends on
+ * the user's OS scrollbar setting. tests/e2e/terminal-right-edge.spec.ts locks this in.
+ */
+.xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
