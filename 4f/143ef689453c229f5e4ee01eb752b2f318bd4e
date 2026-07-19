@@ -1,0 +1,24 @@
+.python-version
+  s_faeda0aec444c4::t_27a55cd3b54897 1
+src/renderer/components/terminal/TerminalPane.css
+  s_faeda0aec444c4::t_e8c87d2e5984a5 83-87
+tests/e2e/terminal-right-edge.spec.ts
+  s_faeda0aec444c4::t_c87562889e1046 12-21
+  s_faeda0aec444c4::t_7ea32f50ef403d 92-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "4f143ef689453c229f5e4ee01eb752b2f318bd4e",
+  "prompts": {},
+  "sessions": {
+    "s_faeda0aec444c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "69ecf50f-2a55-49e0-a8a3-6081cd372e11",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
