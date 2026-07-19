@@ -1,0 +1,28 @@
+extensions/notepad/tests/unit/index.spec.ts
+  s_0567051f6bb6f9::t_dfe5555e10642b 1-55,57-65,67-73
+  s_f644beb4e9426f::t_95f715ddf89b66 56,66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "3eb217124a2ed0510595bb06411530fa882fc3fe",
+  "prompts": {},
+  "sessions": {
+    "s_0567051f6bb6f9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "507e809b-09a0-489c-a3b1-c99149a5a39e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_f644beb4e9426f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0741c95c-a911-4739-a109-1f3164a9dc03",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
