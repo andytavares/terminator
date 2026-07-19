@@ -1,0 +1,28 @@
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_0567051f6bb6f9::t_659ead543cb817 227,231,235-242
+  s_0567051f6bb6f9::t_843a5847c57397 243-244
+extensions/notepad/src/components/NotepadView.tsx
+  s_0567051f6bb6f9::t_ad750199097892 413-414,419-424,426-430
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_0567051f6bb6f9::t_4ad747c56bfbf0 99-102
+extensions/notepad/tests/unit/index.spec.ts
+  s_0567051f6bb6f9::t_af4cf098191207 64,70-98
+extensions/notepad/src/index.ts
+  s_0567051f6bb6f9::t_2524b4c9e3084c 184-186,193,195-204
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "a64efe2b410069b6be1b20c1f5963022875904b3",
+  "prompts": {},
+  "sessions": {
+    "s_0567051f6bb6f9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "507e809b-09a0-489c-a3b1-c99149a5a39e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
