@@ -11,6 +11,7 @@ import { createStallSurfacer, type StallSurfacer, type ShadowStore } from './sta
 import { createStallScheduler, type StallScheduler } from './stall/stall-scheduler.js'
 import { readTranscript } from './agent-runtime/transcript-tailer.js'
 import { staleLanes, mayMergeLane } from './lanes/lane-coordination.js'
+import { findReclaimable, type ReclaimableWorktree } from './worktree/reclaim.js'
 import { parseHunks } from './review/parse-hunks.js'
 import type { Hunk } from './review/hunk-decisions.js'
 import { reconcile } from './state/reconcile.js'
@@ -136,6 +137,18 @@ export interface SupervisionService {
   mayBeginImplementation(workItemId: string): ReturnType<typeof mayBeginImplementation>
   /** Normalises a ticket URL or a dropped document into one shape (FR-068). */
   intake(input: { url?: string; filePath?: string; contents?: string }): IntakeResult
+  /**
+   * Working copies that outlived their session: orphans nothing references,
+   * and checkouts belonging to sessions that finished. A working copy still
+   * being used is never listed.
+   */
+  reclaimableWorktrees(): ReclaimableWorktree[]
+  /**
+   * Removes one, running the repository's teardown first and freeing its port
+   * span. Refuses anything still in use rather than pulling a checkout out
+   * from under a running agent.
+   */
+  reclaimWorktree(path: string): Promise<{ ok: boolean; reason: string | null }>
   /**
    * Stops the agent where it is, and optionally redirects it (FR-029). Without
    * this the four actions offered on a stall had nothing behind them and a
@@ -279,6 +292,9 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
   // overlaps them (SC-008). Keyed by worktree so a released copy frees its span
   // — an array that is only ever read would let every session take port 4000.
   const spansByWorktree = new Map<string, PortSpan>()
+
+  // Where working copies live, so what is left behind can be found again.
+  const worktreeRoot = options.worktreeRoot ?? join(dir, 'worktrees')
 
   const baseProvisioner = createProvisioner({
     git: options.git ?? {
@@ -550,6 +566,45 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
         return intakeFromDocument(input.filePath, input.contents ?? '', now())
       }
       return { ok: false, reason: 'nothing to bring in' }
+    },
+
+    reclaimableWorktrees: () => findReclaimable(worktreeRoot, registry.list()),
+
+    reclaimWorktree: async (path) => {
+      const reclaimable = findReclaimable(worktreeRoot, registry.list()).find(
+        (entry) => entry.path === path
+      )
+      if (reclaimable === undefined) {
+        // Either it is gone already, or a session is still using it. Both are
+        // refusals, and neither should quietly delete a live checkout.
+        return { ok: false, reason: 'that working copy is not reclaimable' }
+      }
+
+      const session = registry.list().find((entry) => entry.worktreePath === path) ?? null
+      const span = spansByWorktree.get(path)
+      try {
+        await provisioner.release({
+          // An orphan has no session, so it has no repository either — the
+          // teardown script lives in the repository and simply does not run.
+          repoPath: reclaimable.repoPath ?? session?.repoPath ?? '',
+          worktreePath: path,
+          workItemId: session?.workItemId ?? session?.id ?? 'orphan',
+          portBase: span?.portBase ?? 0,
+        })
+      } catch (error) {
+        return { ok: false, reason: error instanceof Error ? error.message : String(error) }
+      }
+
+      spansByWorktree.delete(path)
+      if (session !== null) {
+        feed.post({
+          at: now(),
+          sessionId: session.id,
+          author: 'console',
+          summary: 'Working copy reclaimed.',
+        })
+      }
+      return { ok: true, reason: null }
     },
 
     interruptSession: async (sessionId, redirect) => {

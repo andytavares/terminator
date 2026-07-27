@@ -801,3 +801,45 @@ describe('stopping a session (FR-029)', () => {
     ).resolves.toEqual({ ok: false, reason: 'discarding is unavailable' })
   })
 })
+
+describe('reclaiming working copies', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('lists what can be reclaimed', async () => {
+    const source = { ...fullSource(), listReclaimable: () => [{ path: '/wt/a', reason: 'orphan' }] }
+    registerSupervisionHandlers(source)
+    await expect(handlerFor(SUPERVISION_CHANNELS.listReclaimable)({})).resolves.toHaveLength(1)
+  })
+
+  it('lists nothing on a console without the capability', async () => {
+    registerSupervisionHandlers(BARE)
+    await expect(handlerFor(SUPERVISION_CHANNELS.listReclaimable)({})).resolves.toEqual([])
+  })
+
+  it('reclaims the path it was given', async () => {
+    const source = {
+      ...fullSource(),
+      reclaimWorktree: vi.fn().mockResolvedValue({ ok: true, reason: null }),
+    }
+    registerSupervisionHandlers(source)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.reclaimWorktree)({}, { path: '/wt/a' })
+    ).resolves.toEqual({ ok: true, reason: null })
+    expect(source.reclaimWorktree).toHaveBeenCalledWith('/wt/a')
+  })
+
+  it('refuses a request with no path', async () => {
+    registerSupervisionHandlers(fullSource())
+    await expect(handlerFor(SUPERVISION_CHANNELS.reclaimWorktree)({}, {})).resolves.toEqual({
+      ok: false,
+      reason: 'invalid request',
+    })
+  })
+
+  it('says reclaiming is unavailable rather than throwing', async () => {
+    registerSupervisionHandlers(BARE)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.reclaimWorktree)({}, { path: '/wt/a' })
+    ).resolves.toEqual({ ok: false, reason: 'reclaiming is unavailable' })
+  })
+})

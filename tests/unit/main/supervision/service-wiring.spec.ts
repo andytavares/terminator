@@ -889,3 +889,98 @@ describe('starting the console back up', () => {
     service.stop()
   })
 })
+
+describe('reclaiming a working copy', () => {
+  function withWorktrees() {
+    const wtRoot = join(root, 'worktrees')
+    mkdirSync(join(wtRoot, 'orphan'), { recursive: true })
+    mkdirSync(join(wtRoot, 'live'), { recursive: true })
+    const removed: string[] = []
+    const service = build({
+      worktreeRoot: wtRoot,
+      git: {
+        createWorktree: async () => {},
+        removeWorktree: async (_repo: string, path: string) => void removed.push(path),
+      },
+    })
+    return { service, wtRoot, removed }
+  }
+
+  it('lists a directory no session references', () => {
+    const { service, wtRoot } = withWorktrees()
+    expect(service.reclaimableWorktrees().map((entry) => entry.path)).toContain(
+      join(wtRoot, 'orphan')
+    )
+  })
+
+  it('does not list one a session is still using', () => {
+    const { service, wtRoot } = withWorktrees()
+    service.registry.register('s1', meta({ worktreePath: join(wtRoot, 'live') }))
+    expect(service.reclaimableWorktrees().map((entry) => entry.path)).not.toContain(
+      join(wtRoot, 'live')
+    )
+  })
+
+  it('removes the working copy it was given', async () => {
+    const { service, wtRoot, removed } = withWorktrees()
+    await expect(service.reclaimWorktree(join(wtRoot, 'orphan'))).resolves.toMatchObject({
+      ok: true,
+    })
+    expect(removed).toContain(join(wtRoot, 'orphan'))
+  })
+
+  it('refuses one that is still in use rather than deleting it', async () => {
+    const { service, wtRoot, removed } = withWorktrees()
+    service.registry.register('s1', meta({ worktreePath: join(wtRoot, 'live') }))
+    // Pulling a checkout out from under a running agent destroys its work.
+    await expect(service.reclaimWorktree(join(wtRoot, 'live'))).resolves.toMatchObject({
+      ok: false,
+    })
+    expect(removed).toEqual([])
+  })
+
+  it('refuses a path it does not know', async () => {
+    const { service } = withWorktrees()
+    await expect(service.reclaimWorktree('/tmp/somewhere-else')).resolves.toEqual({
+      ok: false,
+      reason: 'that working copy is not reclaimable',
+    })
+  })
+
+  it('reports a teardown that threw rather than claiming success', async () => {
+    const wtRoot = join(root, 'worktrees')
+    mkdirSync(join(wtRoot, 'orphan'), { recursive: true })
+    const service = build({
+      worktreeRoot: wtRoot,
+      git: {
+        createWorktree: async () => {},
+        removeWorktree: async () => {
+          throw new Error('worktree is locked')
+        },
+      },
+    })
+    await expect(service.reclaimWorktree(join(wtRoot, 'orphan'))).resolves.toMatchObject({
+      ok: false,
+      reason: 'worktree is locked',
+    })
+  })
+
+  it('records the reclaim in the feed when there is a session it belonged to', async () => {
+    const wtRoot = join(root, 'worktrees')
+    mkdirSync(join(wtRoot, 'done'), { recursive: true })
+    const service = build({
+      worktreeRoot: wtRoot,
+      git: { createWorktree: async () => {}, removeWorktree: async () => {} },
+    })
+    service.registry.register('s1', meta({ worktreePath: join(wtRoot, 'done') }))
+    service.bus.publish({
+      kind: 'branch_merged',
+      sessionId: 's1',
+      unattended: false,
+      at: 20_000,
+    })
+
+    await service.reclaimWorktree(join(wtRoot, 'done'))
+    expect(service.feed.forSession('s1').at(-1)?.summary).toMatch(/Working copy reclaimed/)
+  })
+})

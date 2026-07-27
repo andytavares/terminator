@@ -39,6 +39,8 @@ export const SUPERVISION_CHANNELS = {
   getDigest: 'supervision:getDigest',
   interruptSession: 'supervision:interruptSession',
   discardSession: 'supervision:discardSession',
+  listReclaimable: 'supervision:listReclaimable',
+  reclaimWorktree: 'supervision:reclaimWorktree',
 } as const
 
 /**
@@ -97,6 +99,8 @@ export interface SupervisionSource {
     redirect?: string
   ): Promise<{ ok: boolean; reason: string | null }>
   discardSession?(sessionId: string): Promise<{ ok: boolean; reason: string | null }>
+  listReclaimable?(): readonly unknown[]
+  reclaimWorktree?(path: string): Promise<{ ok: boolean; reason: string | null }>
   producerAction?(
     workItemId: string,
     action: 'approveGate' | 'rejectGate' | 'advancePhase' | 'sendBack',
@@ -165,6 +169,7 @@ const producerActionPayload = z.object({
 // Zero or a negative window would produce an empty digest that reads as "no
 // progress" rather than "you asked for nothing".
 const digestPayload = z.object({ windowMs: z.number().int().positive() })
+const reclaimPayload = z.object({ path: z.string().min(1) })
 const interruptPayload = z.object({
   sessionId: z.string().min(1),
   redirect: z.string().optional(),
@@ -363,6 +368,19 @@ export function registerSupervisionHandlers(source: SupervisionSource): void {
       (await source.discardSession?.(parsed.data.sessionId)) ?? {
         ok: false,
         reason: 'discarding is unavailable',
+      }
+    )
+  })
+
+  handleChannel(SUPERVISION_CHANNELS.listReclaimable, async () => source.listReclaimable?.() ?? [])
+
+  handleChannel(SUPERVISION_CHANNELS.reclaimWorktree, async (_event, payload: unknown) => {
+    const parsed = reclaimPayload.safeParse(payload)
+    if (!parsed.success) return { ok: false, reason: 'invalid request' }
+    return (
+      (await source.reclaimWorktree?.(parsed.data.path)) ?? {
+        ok: false,
+        reason: 'reclaiming is unavailable',
       }
     )
   })

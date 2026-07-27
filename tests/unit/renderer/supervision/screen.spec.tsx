@@ -74,6 +74,12 @@ function props(over: Partial<SupervisionScreenProps> = {}): SupervisionScreenPro
     onIntake: vi.fn(),
     selectedWorkItemId: null,
     selectedLaneOrd: null,
+    reclaimable: [],
+    reclaimBusy: null,
+    reclaimError: null,
+    onReclaim: () => {},
+    onReclaimAll: () => {},
+    onRefreshReclaimable: () => {},
     provisioning: null,
     onOpenInEditor: vi.fn(),
     lastViewedAt: null,
@@ -86,9 +92,19 @@ function props(over: Partial<SupervisionScreenProps> = {}): SupervisionScreenPro
 }
 
 describe('every concept is reachable', () => {
-  it('offers a tab for all seven surfaces', () => {
+  it('offers a tab for every surface', () => {
     render(<SupervisionScreen {...props()} />)
-    for (const label of ['Needs you', 'Review', 'Work items', 'Lanes', 'Feed', 'Stalls', 'Find']) {
+    const labels = [
+      'Needs you',
+      'Review',
+      'Work items',
+      'Lanes',
+      'Feed',
+      'Stalls',
+      'Worktrees',
+      'Find',
+    ]
+    for (const label of labels) {
       expect(screen.getByText(label)).toBeDefined()
     }
   })

@@ -22,10 +22,11 @@ end.
 9. [Lanes — one work item, several repositories](#9-lanes--one-work-item-several-repositories)
 10. [Feed — catching up after time away](#10-feed--catching-up-after-time-away)
 11. [Find — one keystroke to anywhere](#11-find--one-keystroke-to-anywhere)
-12. [Configuring a repository](#12-configuring-a-repository)
-13. [Settings](#13-settings)
-14. [End-to-end walkthrough](#14-end-to-end-walkthrough)
-15. [Keyboard reference](#15-keyboard-reference)
+12. [Worktrees — reclaiming what is left behind](#11a-worktrees--reclaiming-what-is-left-behind)
+13. [Configuring a repository](#12-configuring-a-repository)
+14. [Settings](#13-settings)
+15. [End-to-end walkthrough](#14-end-to-end-walkthrough)
+16. [Keyboard reference](#15-keyboard-reference)
 
 ---
 
@@ -348,6 +349,27 @@ Choosing a session opens it; choosing a work item opens its lanes; choosing a
 command runs it.
 
 ---
+
+## 11a. Worktrees — reclaiming what is left behind
+
+Working copies outlive the sessions that made them. A crash between creating one
+and registering its session leaves a directory nothing knows about; a session
+that finished still holds its checkout. Each costs a port range and however
+large that repository's dependencies are, and neither is visible anywhere else —
+so they accumulate silently.
+
+The **Worktrees** tab lists what can go, and why:
+
+- **no session references it** — an orphan; nothing can be harmed by removing it.
+- **its session has finished** — merged or failed, with nothing left to do.
+
+Reclaiming runs the repository's teardown script, removes the working copy, and
+frees its port range. **Reclaim all** does them one at a time, because each runs
+git against a repository and several at once is how you get lock errors.
+
+A working copy still in use is never listed. That includes a session that is
+`ready`: its diff has not been reviewed yet, and it is the most dangerous one to
+delete.
 
 ## 12. Configuring a repository
 

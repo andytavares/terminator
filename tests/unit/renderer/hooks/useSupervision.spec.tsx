@@ -104,6 +104,12 @@ function makeBridge(over: Record<string, unknown> = {}) {
     intake: vi.fn().mockResolvedValue({ ok: true, id: 'FLU-221' }),
     interruptSession: vi.fn().mockResolvedValue({ ok: true, reason: null }),
     discardSession: vi.fn().mockResolvedValue({ ok: true, reason: null }),
+    listReclaimable: vi
+      .fn()
+      .mockResolvedValue([
+        { path: '/wt/orphan', reason: 'orphan', sessionId: null, branch: null, repoPath: null },
+      ]),
+    reclaimWorktree: vi.fn().mockResolvedValue({ ok: true, reason: null }),
     getDigest: vi
       .fn()
       .mockResolvedValue({ from: 0, to: 1, entryCount: 4, sessionCount: 2, bySession: [] }),
@@ -1000,5 +1006,65 @@ describe('answering a question (FR-007)', () => {
       decision: 'allow',
       answer: undefined,
     })
+  })
+})
+
+describe('reclaiming working copies', () => {
+  it('loads what can be reclaimed on mount', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.screenProps.reclaimable).toHaveLength(1))
+  })
+
+  it('reclaims one and re-checks afterwards', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    bridge.listReclaimable.mockClear()
+    await act(async () => {
+      result.current.screenProps.onReclaim('/wt/orphan')
+    })
+    expect(bridge.reclaimWorktree).toHaveBeenCalledWith({ path: '/wt/orphan' })
+    await waitFor(() => expect(bridge.listReclaimable).toHaveBeenCalled())
+  })
+
+  it('states a refusal rather than letting it look like it worked', async () => {
+    install({
+      reclaimWorktree: vi.fn().mockResolvedValue({ ok: false, reason: 'worktree is locked' }),
+    })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onReclaim('/wt/orphan')
+    })
+    await waitFor(() => expect(result.current.screenProps.reclaimError).toBe('worktree is locked'))
+  })
+
+  it('reclaims them one at a time, since each runs git against one repository', async () => {
+    const order: string[] = []
+    install({
+      listReclaimable: vi.fn().mockResolvedValue([
+        { path: '/wt/a', reason: 'orphan', sessionId: null, branch: null, repoPath: null },
+        { path: '/wt/b', reason: 'orphan', sessionId: null, branch: null, repoPath: null },
+      ]),
+      reclaimWorktree: vi.fn().mockImplementation(async ({ path }: { path: string }) => {
+        order.push(path)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        return { ok: true, reason: null }
+      }),
+    })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.screenProps.reclaimable).toHaveLength(2))
+    await act(async () => {
+      result.current.screenProps.onReclaimAll()
+      await new Promise((resolve) => setTimeout(resolve, 60))
+    })
+    expect(order).toEqual(['/wt/a', '/wt/b'])
+  })
+
+  it('survives a build that cannot reclaim at all', async () => {
+    install({ reclaimWorktree: undefined, listReclaimable: undefined })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    expect(() => result.current.screenProps.onReclaim('/wt/a')).not.toThrow()
+    expect(result.current.screenProps.reclaimable).toEqual([])
   })
 })

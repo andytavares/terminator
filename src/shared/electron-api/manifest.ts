@@ -637,6 +637,18 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     remote: 'omit',
   },
   {
+    path: 'supervision.listReclaimable',
+    kind: 'invoke',
+    channel: 'supervision:listReclaimable',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.reclaimWorktree',
+    kind: 'invoke',
+    channel: 'supervision:reclaimWorktree',
+    remote: 'omit',
+  },
+  {
     path: 'supervision.producerAction',
     kind: 'invoke',
     channel: 'supervision:producerAction',

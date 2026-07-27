@@ -6,6 +6,7 @@ import type { StatusSummary } from '../../shared/schemas/supervision'
 import type { AutonomyLevel, RuntimeState, SupervisedSession } from '../../shared/types/supervision'
 import type { SupervisionScreenProps } from '../components/supervision/SupervisionScreen'
 import type { PaletteEntity } from '../components/supervision/SupervisionPalette'
+import type { ReclaimableWorktreeView } from '../components/supervision/WorktreeReclaim'
 import type {
   BackpressureDecision,
   FeedEntry,
@@ -106,6 +107,8 @@ interface SupervisionBridge {
     redirect?: string
   }): Promise<{ ok: boolean; reason: string | null }>
   discardSession?(payload: { sessionId: string }): Promise<{ ok: boolean; reason: string | null }>
+  listReclaimable?(): Promise<ReclaimableWorktreeView[]>
+  reclaimWorktree?(payload: { path: string }): Promise<{ ok: boolean; reason: string | null }>
   producerAction?(payload: {
     workItemId: string
     action: 'approveGate' | 'rejectGate' | 'advancePhase' | 'sendBack'
@@ -239,6 +242,7 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
         setPrecision(result.precision)
       })
       void transport.getDigest?.({ windowMs: DIGEST_WINDOW_MINUTES * 60_000 }).then(setDigest)
+      void transport.listReclaimable?.().then(setReclaimable)
       void transport.precheckBackpressure?.().then((decision) =>
         // Shown only while it would actually refuse a start.
         setBackpressure(decision !== null && decision.allowed ? null : decision)
@@ -287,6 +291,9 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
   )
 
   const [digest, setDigest] = useState<Digest | null>(null)
+  const [reclaimable, setReclaimable] = useState<ReclaimableWorktreeView[]>([])
+  const [reclaimBusy, setReclaimBusy] = useState<string | null>(null)
+  const [reclaimError, setReclaimError] = useState<string | null>(null)
   const [assignResult, setAssignResult] = useState<{
     ok: boolean
     reason?: string
@@ -309,6 +316,25 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
       .precheckBackpressure?.()
       .then((decision) => setBackpressure(decision !== null && decision.allowed ? null : decision))
   }, [load])
+
+  const refreshReclaimable = useCallback(() => {
+    void bridge()?.listReclaimable?.().then(setReclaimable)
+  }, [])
+
+  const reclaim = useCallback(async (path: string): Promise<void> => {
+    const transport = bridge()
+    if (transport?.reclaimWorktree === undefined) return
+    setReclaimBusy(path)
+    try {
+      const result = await transport.reclaimWorktree({ path })
+      // A refusal is stated: teardown failing, or a copy that turned out to
+      // be in use, must not look like a silent success.
+      setReclaimError(result.ok ? null : (result.reason ?? 'could not reclaim that copy'))
+    } finally {
+      setReclaimBusy(null)
+      void transport.listReclaimable?.().then(setReclaimable)
+    }
+  }, [])
 
   const refreshDigest = useCallback(() => {
     void bridge()
@@ -596,6 +622,19 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
         if (result.ok) void transport.listWorkItems?.().then(setBoard)
       })
     },
+
+    reclaimable,
+    reclaimBusy,
+    reclaimError,
+    onReclaim: (path: string) => void reclaim(path),
+    onReclaimAll: () => {
+      void (async () => {
+        // Sequentially: each runs a teardown script and a git command, and
+        // several at once against one repository is how you get lock errors.
+        for (const worktree of reclaimable) await reclaim(worktree.path)
+      })()
+    },
+    onRefreshReclaimable: refreshReclaimable,
 
     provisioning,
     onOpenInEditor: () => {

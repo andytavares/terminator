@@ -7,6 +7,7 @@ import {
   MessageSquare,
   PauseCircle,
   Search,
+  HardDrive,
 } from 'lucide-react'
 import { AttentionQueue } from './AttentionQueue.js'
 import { ReviewInbox, ReviewFlow } from './ReviewInbox.js'
@@ -15,6 +16,7 @@ import { LaneView } from './LaneView.js'
 import { StandupFeed } from './StandupFeed.js'
 import { DigestPanel } from './DigestPanel.js'
 import { StallControls, StallActions } from './StallControls.js'
+import { WorktreeReclaim, type ReclaimableWorktreeView } from './WorktreeReclaim.js'
 import { SupervisionPalette, type PaletteEntity } from './SupervisionPalette.js'
 import { MergeAudit, HunkReview } from './MergeAudit.js'
 import { SinceYouLastLooked } from './SinceYouLastLooked.js'
@@ -48,7 +50,15 @@ import './supervision.css'
 // exist and are tested but nothing renders them — which is the difference
 // between a library and a feature.
 
-export type SupervisionTab = 'attention' | 'review' | 'items' | 'lanes' | 'feed' | 'stalls' | 'find'
+export type SupervisionTab =
+  | 'attention'
+  | 'review'
+  | 'items'
+  | 'lanes'
+  | 'feed'
+  | 'stalls'
+  | 'worktrees'
+  | 'find'
 
 export interface SupervisionScreenProps {
   now: number
@@ -141,6 +151,14 @@ export interface SupervisionScreenProps {
   intakeResult: { ok: boolean; reason?: string; id?: string } | null
   onIntake(input: { url?: string; filePath?: string }): void
 
+  /** Working copies that outlived their session. */
+  reclaimable: readonly ReclaimableWorktreeView[]
+  reclaimBusy: string | null
+  reclaimError: string | null
+  onReclaim(path: string): void
+  onReclaimAll(): void
+  onRefreshReclaimable(): void
+
   provisioning: {
     worktreePath: string | null
     ports: { portBase: number; portSpan: number } | null
@@ -163,6 +181,7 @@ const TABS: Array<{ id: SupervisionTab; label: string; icon: JSX.Element }> = [
   { id: 'lanes', label: 'Lanes', icon: <GitBranch aria-hidden="true" /> },
   { id: 'feed', label: 'Feed', icon: <MessageSquare aria-hidden="true" /> },
   { id: 'stalls', label: 'Stalls', icon: <PauseCircle aria-hidden="true" /> },
+  { id: 'worktrees', label: 'Worktrees', icon: <HardDrive aria-hidden="true" /> },
   { id: 'find', label: 'Find', icon: <Search aria-hidden="true" /> },
 ]
 
@@ -176,6 +195,7 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
     items: props.workItems.length,
     feed: props.feed.length,
     stalls: props.firings.length,
+    worktrees: props.reclaimable.length,
   }
 
   return (
@@ -347,6 +367,17 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
                 </div>
               ))}
           </>
+        )}
+
+        {tab === 'worktrees' && (
+          <WorktreeReclaim
+            worktrees={props.reclaimable}
+            busyPath={props.reclaimBusy}
+            lastError={props.reclaimError}
+            onReclaim={props.onReclaim}
+            onReclaimAll={props.onReclaimAll}
+            onRefresh={props.onRefreshReclaimable}
+          />
         )}
 
         {tab === 'find' && (
