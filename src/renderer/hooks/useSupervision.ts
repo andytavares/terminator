@@ -436,6 +436,13 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
       onOpenSessionInShell?.(sessionId)
     },
 
+    sessions,
+    onStop: (sessionId: string) => {
+      void bridge()
+        ?.interruptSession?.({ sessionId })
+        .then(() => refreshAll())
+    },
+
     review,
     activeReview,
     decisionFor: (hunkId) => hunkDecisions[hunkId] ?? null,

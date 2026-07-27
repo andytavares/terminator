@@ -1068,3 +1068,22 @@ describe('reclaiming working copies', () => {
     expect(result.current.screenProps.reclaimable).toEqual([])
   })
 })
+
+describe('stopping a running session', () => {
+  it('interrupts it, keeping the working copy and its diff', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onStop('s1')
+    })
+    // No redirect: you are stopping it, not steering it.
+    expect(bridge.interruptSession).toHaveBeenCalledWith({ sessionId: 's1' })
+  })
+
+  it('exposes every session, so "what is running" has an answer', async () => {
+    useSupervisionStore.setState({ sessions: [session()], loaded: true })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    expect(result.current.screenProps.sessions).toHaveLength(1)
+  })
+})

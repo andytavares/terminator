@@ -290,3 +290,23 @@ describe('interrupting', () => {
     await expect(driver.interrupt('ghost')).resolves.toBeUndefined()
   })
 })
+
+// Interrupting ends the run without a result message. Saying nothing there
+// leaves the session `working` forever — the silent failure this exists to
+// catch.
+
+describe('a run that ends without reporting a result', () => {
+  it('ends the session anyway', async () => {
+    const { driver, events } = harness([])
+    await driver.start({ sessionId: 's1', prompt: 'x', cwd: '/wt/s1' })
+    await driver.completion('s1')
+    expect(events.some((event) => event.kind === 'session_ended')).toBe(true)
+  })
+
+  it('does not report twice when the run did produce a result', async () => {
+    const { driver, events } = harness()
+    await driver.start({ sessionId: 's1', prompt: 'x', cwd: '/wt/s1' })
+    await driver.completion('s1')
+    expect(events.filter((event) => event.kind === 'session_ended')).toHaveLength(1)
+  })
+})

@@ -136,10 +136,19 @@ export function createSessionDriver(options: SessionDriverOptions): SessionDrive
       // wait for it, or the session could never be interrupted or answered
       // while it was in flight — which is the entire point of the console.
       const completed = (async () => {
+        let reported = false
         try {
           for await (const message of run) {
             if (!isResultMessage(message)) continue
+            reported = true
             for (const event of resultToSessionEvent(message as never, now())) publish(event)
+          }
+
+          // A run can end without a result — interrupting it produces exactly
+          // that. Saying nothing would leave the session `working` forever,
+          // which is the silent failure this console exists to catch.
+          if (!reported) {
+            publish({ kind: 'session_ended', sessionId, outcome: 'success', at: now() })
           }
         } catch (error) {
           // A run that dies without reporting would leave the session `working`

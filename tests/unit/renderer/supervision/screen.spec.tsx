@@ -18,6 +18,8 @@ function props(over: Partial<SupervisionScreenProps> = {}): SupervisionScreenPro
     onApprove: vi.fn(),
     onDeny: vi.fn(),
     onOpenSession: vi.fn(),
+    sessions: [],
+    onStop: () => {},
     review: [],
     activeReview: null,
     decisionFor: () => null,
@@ -96,6 +98,7 @@ describe('every concept is reachable', () => {
     render(<SupervisionScreen {...props()} />)
     const labels = [
       'Needs you',
+      'Sessions',
       'Review',
       'Work items',
       'Lanes',

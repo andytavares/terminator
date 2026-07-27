@@ -16,17 +16,18 @@ end.
 3. [The status bar](#3-the-status-bar)
 4. [Starting an agent](#4-starting-an-agent)
 5. [Needs you — the attention queue](#5-needs-you--the-attention-queue)
-6. [Stalls — the part nobody else has](#6-stalls--the-part-nobody-else-has)
-7. [Review — worst first, and the backpressure gate](#7-review--worst-first-and-the-backpressure-gate)
-8. [Work items — ticket to merged](#8-work-items--ticket-to-merged)
-9. [Lanes — one work item, several repositories](#9-lanes--one-work-item-several-repositories)
-10. [Feed — catching up after time away](#10-feed--catching-up-after-time-away)
-11. [Find — one keystroke to anywhere](#11-find--one-keystroke-to-anywhere)
-12. [Worktrees — reclaiming what is left behind](#11a-worktrees--reclaiming-what-is-left-behind)
-13. [Configuring a repository](#12-configuring-a-repository)
-14. [Settings](#13-settings)
-15. [End-to-end walkthrough](#14-end-to-end-walkthrough)
-16. [Keyboard reference](#15-keyboard-reference)
+6. [Sessions — what is running, and how to stop it](#5a-sessions--what-is-running-and-how-to-stop-it)
+7. [Stalls — the part nobody else has](#6-stalls--the-part-nobody-else-has)
+8. [Review — worst first, and the backpressure gate](#7-review--worst-first-and-the-backpressure-gate)
+9. [Work items — ticket to merged](#8-work-items--ticket-to-merged)
+10. [Lanes — one work item, several repositories](#9-lanes--one-work-item-several-repositories)
+11. [Feed — catching up after time away](#10-feed--catching-up-after-time-away)
+12. [Find — one keystroke to anywhere](#11-find--one-keystroke-to-anywhere)
+13. [Worktrees — reclaiming what is left behind](#11a-worktrees--reclaiming-what-is-left-behind)
+14. [Configuring a repository](#12-configuring-a-repository)
+15. [Settings](#13-settings)
+16. [End-to-end walkthrough](#14-end-to-end-walkthrough)
+17. [Keyboard reference](#15-keyboard-reference)
 
 ---
 
@@ -169,6 +170,28 @@ A failed session carries its reason on the row itself:
 have to open a session to learn why it died.
 
 ---
+
+## 5a. Sessions — what is running, and how to stop it
+
+**Needs you** answers _what needs me_. **Sessions** answers _what is running_ —
+every session whether or not it wants anything, running ones first.
+
+Each row carries what the agent has spent and what it has changed: turns, cost,
+context used, and the size of its diff. So a session quietly burning turns
+against a 61%-full context is visible without opening it.
+
+Three actions on every row:
+
+- **Open** — go to the session.
+- **Stop** — end the run **and keep the working copy**. You stop an agent to look
+  at what it did, not to lose it; the diff stays and the session moves to
+  review if it produced one.
+- **Discard** — end it, remove the working copy, and take the session off the
+  console.
+
+Stop appears only while an agent is still spending time — starting, working,
+waiting on you, or stalled. There is nothing to stop in a session that has
+already finished.
 
 ## 6. Stalls — the part nobody else has
 

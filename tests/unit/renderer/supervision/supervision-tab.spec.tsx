@@ -21,6 +21,8 @@ const props = (): SupervisionScreenProps =>
     onDeny: () => {},
     onAnswer: () => {},
     onOpenSession: () => {},
+    sessions: [],
+    onStop: () => {},
     review: [],
     activeReview: null,
     decisionFor: () => null,

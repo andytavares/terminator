@@ -8,6 +8,7 @@ import {
   PauseCircle,
   Search,
   HardDrive,
+  Activity,
 } from 'lucide-react'
 import { AttentionQueue } from './AttentionQueue.js'
 import { ReviewInbox, ReviewFlow } from './ReviewInbox.js'
@@ -17,6 +18,7 @@ import { StandupFeed } from './StandupFeed.js'
 import { DigestPanel } from './DigestPanel.js'
 import { StallControls, StallActions } from './StallControls.js'
 import { WorktreeReclaim, type ReclaimableWorktreeView } from './WorktreeReclaim.js'
+import { SessionList } from './SessionList.js'
 import { SupervisionPalette, type PaletteEntity } from './SupervisionPalette.js'
 import { MergeAudit, HunkReview } from './MergeAudit.js'
 import { SinceYouLastLooked } from './SinceYouLastLooked.js'
@@ -29,7 +31,11 @@ import {
   type RepoChoice,
 } from './AssignControls.js'
 import type { AttentionItem } from '../../../shared/supervision/rank-attention.js'
-import type { AutonomyLevel, RuntimeState } from '../../../shared/types/supervision.js'
+import type {
+  AutonomyLevel,
+  RuntimeState,
+  SupervisedSession,
+} from '../../../shared/types/supervision.js'
 import type {
   ReviewItem,
   IntentReview,
@@ -52,6 +58,7 @@ import './supervision.css'
 
 export type SupervisionTab =
   | 'attention'
+  | 'sessions'
   | 'review'
   | 'items'
   | 'lanes'
@@ -71,6 +78,10 @@ export interface SupervisionScreenProps {
   /** Answers a request that is a question rather than a yes/no. */
   onAnswer(sessionId: string, requestId: string, answer: string): void
   onOpenSession(sessionId: string): void
+
+  /** Every session, so "what is running" has an answer that is not a number. */
+  sessions: readonly SupervisedSession[]
+  onStop(sessionId: string): void
 
   review: readonly ReviewItem[]
   activeReview: { item: ReviewItem; intent: IntentReview | null; hunks: readonly Hunk[] } | null
@@ -174,8 +185,17 @@ export interface SupervisionScreenProps {
   sinceDiffDelta: { files: number; added: number; removed: number } | null
 }
 
+/** What the tab badge counts: sessions an agent is still spending time on. */
+const RUNNING_STATES: ReadonlySet<string> = new Set([
+  'starting',
+  'working',
+  'needs_input',
+  'stalled',
+])
+
 const TABS: Array<{ id: SupervisionTab; label: string; icon: JSX.Element }> = [
   { id: 'attention', label: 'Needs you', icon: <Inbox aria-hidden="true" /> },
+  { id: 'sessions', label: 'Sessions', icon: <Activity aria-hidden="true" /> },
   { id: 'review', label: 'Review', icon: <ClipboardCheck aria-hidden="true" /> },
   { id: 'items', label: 'Work items', icon: <LayoutGrid aria-hidden="true" /> },
   { id: 'lanes', label: 'Lanes', icon: <GitBranch aria-hidden="true" /> },
@@ -195,6 +215,7 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
     items: props.workItems.length,
     feed: props.feed.length,
     stalls: props.firings.length,
+    sessions: props.sessions.filter((session) => RUNNING_STATES.has(session.runtimeState)).length,
     worktrees: props.reclaimable.length,
   }
 
@@ -272,6 +293,16 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
               />
             )}
           </>
+        )}
+
+        {tab === 'sessions' && (
+          <SessionList
+            sessions={props.sessions}
+            now={props.now}
+            onStop={props.onStop}
+            onDiscard={props.onDiscard}
+            onOpen={props.onOpenSession}
+          />
         )}
 
         {tab === 'review' && (
