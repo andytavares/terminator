@@ -46,8 +46,13 @@ export interface SessionDriver {
   /**
    * Ends the run. An optional reason is delivered first, best effort, so the
    * agent's own record says why it stopped rather than simply ending.
+   *
+   * Returns false when there was no live run to stop — after a restart, or
+   * once the run has already ended. The caller has to end the session itself
+   * in that case, or a session with no agent behind it stays `working`
+   * forever and the Stop button does nothing.
    */
-  stop(sessionId: string, reason?: string): Promise<void>
+  stop(sessionId: string, reason?: string): Promise<boolean>
   /** Sends a further message to a running session — a reply, or a redirect. */
   send(sessionId: string, message: string): Promise<void>
   resolvePermission(sessionId: string, requestId: string, decision: PermissionDecision): void
@@ -214,8 +219,11 @@ export function createSessionDriver(options: SessionDriverOptions): SessionDrive
       session.send(message)
     },
 
-    async stop(sessionId: string, reason?: string): Promise<void> {
-      await running.get(sessionId)?.stop(reason)
+    async stop(sessionId: string, reason?: string): Promise<boolean> {
+      const session = running.get(sessionId)
+      if (session === undefined) return false
+      await session.stop(reason)
+      return true
     },
 
     async interrupt(sessionId: string): Promise<void> {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Square, Trash2, ExternalLink } from 'lucide-react'
+import { Square, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 import { StateIndicator, formatElapsed } from './StateIndicator.js'
 import type { SupervisedSession } from '../../../shared/types/supervision.js'
 import './supervision.css'
@@ -18,6 +18,7 @@ export interface SessionListProps {
   onStop(sessionId: string, reason?: string): void
   /** Ends it and removes the working copy. */
   onDiscard(sessionId: string): void
+  /** Told when a session is expanded, so the shell can follow if it wants to. */
   onOpen(sessionId: string): void
 }
 
@@ -88,6 +89,42 @@ function StopControl({ onStop }: { onStop(reason?: string): void }): JSX.Element
   )
 }
 
+/** Everything the console knows about one session, in the order you would ask. */
+function describe(session: SupervisedSession, now: number): string {
+  const lines = [
+    `branch:      ${session.branch}`,
+    `repository:  ${session.repoPath}`,
+    `working copy:${session.worktreePath === '' ? ' not provisioned' : ` ${session.worktreePath}`}`,
+    `state:       ${session.runtimeState} for ${formatElapsed(Math.max(0, now - session.stateSince))}`,
+    `autonomy:    ${session.autonomyLevel}`,
+    `spent:       ${cost(session)}`,
+    `diff:        ${diff(session) ?? 'nothing changed yet'}`,
+  ]
+
+  if (session.lastToolActivityAt !== null) {
+    lines.push(`last tool:   ${formatElapsed(Math.max(0, now - session.lastToolActivityAt))} ago`)
+  }
+  if (session.workItemId !== null) {
+    lines.push(
+      `work item:   ${session.workItemId}${session.laneOrd !== null ? ` · lane ${session.laneOrd}` : ''}`
+    )
+  }
+  if (session.transcriptPath !== null) lines.push(`transcript:  ${session.transcriptPath}`)
+  if (session.pendingPermission !== null) {
+    lines.push(`waiting on:  ${session.pendingPermission.summary}`)
+  }
+  if (session.failure !== null) {
+    lines.push(
+      `failed:      ${session.failure.step}${
+        session.failure.exitCode !== null ? ` exited ${session.failure.exitCode}` : ''
+      }`,
+      session.failure.output.trim() === '' ? '' : session.failure.output.trim()
+    )
+  }
+
+  return lines.filter((line) => line !== '').join('\n')
+}
+
 export function SessionList({
   sessions,
   now,
@@ -95,6 +132,11 @@ export function SessionList({
   onDiscard,
   onOpen,
 }: SessionListProps): JSX.Element {
+  // Expanded in place. "Open" used to call out to the app shell, which never
+  // listened, so it did nothing at all — and there is no other surface that
+  // shows one session's own detail.
+  const [expanded, setExpanded] = useState<string | null>(null)
+
   if (sessions.length === 0) {
     return <div className="sv-allclear">No sessions. Start one from Needs you.</div>
   }
@@ -136,8 +178,21 @@ export function SessionList({
           </span>
 
           <span className="sv-queue__actions">
-            <button className="sv-queue__btn" onClick={() => onOpen(session.id)}>
-              <ExternalLink aria-hidden="true" /> Open
+            <button
+              className="sv-queue__btn"
+              aria-expanded={expanded === session.id}
+              onClick={() => {
+                const next = expanded === session.id ? null : session.id
+                setExpanded(next)
+                if (next !== null) onOpen(session.id)
+              }}
+            >
+              {expanded === session.id ? (
+                <ChevronDown aria-hidden="true" />
+              ) : (
+                <ChevronRight aria-hidden="true" />
+              )}
+              Details
             </button>
             {RUNNING.has(session.runtimeState) && (
               // Stopping keeps the working copy and whatever it changed: you
@@ -148,6 +203,10 @@ export function SessionList({
               <Trash2 aria-hidden="true" /> Discard
             </button>
           </span>
+
+          {expanded === session.id && (
+            <pre className="sv-queue__detail sv-session__detail">{describe(session, now)}</pre>
+          )}
         </div>
       ))}
 

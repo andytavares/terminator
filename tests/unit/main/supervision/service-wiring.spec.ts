@@ -1048,7 +1048,10 @@ describe('stopping a session', () => {
   function running() {
     const stopped: Array<{ id: string; reason?: string }> = []
     const service = build()
-    service.driver.stop = async (id: string, reason?: string) => void stopped.push({ id, reason })
+    service.driver.stop = async (id: string, reason?: string) => {
+      stopped.push({ id, reason })
+      return true
+    }
     service.registry.register('s1', meta())
     return { service, stopped }
   }
@@ -1092,5 +1095,40 @@ describe('stopping a session', () => {
       ok: false,
       reason: 'no such session',
     })
+  })
+
+  it('ends a session whose run is already gone, so Stop is never a no-op', async () => {
+    // After a restart the driver has nothing to stop. Without this the session
+    // stayed `working` and the button appeared to do nothing.
+    const service = build()
+    service.driver.stop = async () => false
+    service.registry.register('s1', meta())
+    service.bus.publish({
+      kind: 'session_started',
+      sessionId: 's1',
+      transcriptPath: null,
+      cwd: join(root, 'repo'),
+      at: 10_000,
+    })
+
+    await service.stopSession('s1')
+    expect(service.getSession('s1')?.runtimeState).not.toBe('working')
+  })
+
+  it('does not end it twice when the driver did stop a live run', async () => {
+    const { service } = running()
+    service.bus.publish({
+      kind: 'session_started',
+      sessionId: 's1',
+      transcriptPath: null,
+      cwd: join(root, 'repo'),
+      at: 10_000,
+    })
+    const seen: string[] = []
+    service.bus.subscribe((event) => seen.push(event.kind))
+    await service.stopSession('s1')
+    // The run's own completion publishes it; publishing here as well would
+    // report the session ending twice.
+    expect(seen.filter((kind) => kind === 'session_ended')).toEqual([])
   })
 })

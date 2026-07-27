@@ -182,7 +182,9 @@ against a 61%-full context is visible without opening it.
 
 Three actions on every row:
 
-- **Open** — go to the session.
+- **Details** — expands the session in place: its working copy, autonomy level,
+  what it has spent, what it changed, when it last did anything, its transcript
+  path, and why it failed if it did.
 - **Stop** — end the run **and keep the working copy**. You stop an agent to look
   at what it did, not to lose it; the diff stays and the session moves to
   review if it produced one. Stop asks _why_ first — optional, but coming back

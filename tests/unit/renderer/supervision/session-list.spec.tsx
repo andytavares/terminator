@@ -123,11 +123,51 @@ describe('SessionList', () => {
     expect(onDiscard).toHaveBeenCalledWith('s1')
   })
 
-  it('opens a session', () => {
+  it('shows the session’s detail in place, since nothing else shows one session', () => {
+    list([session()])
+    fireEvent.click(screen.getByText('Details'))
+    const detail = document.querySelector('.sv-session__detail')?.textContent ?? ''
+    expect(detail).toContain('/wt/s1')
+    expect(detail).toContain('autonomy:    edit')
+  })
+
+  it('tells the shell which session was opened', () => {
     const onOpen = vi.fn()
     list([session()], { onOpen })
-    fireEvent.click(screen.getByText('Open'))
+    fireEvent.click(screen.getByText('Details'))
     expect(onOpen).toHaveBeenCalledWith('s1')
+  })
+
+  it('collapses again', () => {
+    list([session()])
+    fireEvent.click(screen.getByText('Details'))
+    fireEvent.click(screen.getByText('Details'))
+    expect(document.querySelector('.sv-session__detail')).toBeNull()
+  })
+
+  it('says why a failed session failed', () => {
+    list([
+      session({
+        runtimeState: 'failed',
+        failure: { step: 'setup', exitCode: 3, output: 'lockfile is out of date' },
+      }),
+    ])
+    fireEvent.click(screen.getByText('Details'))
+    const detail = document.querySelector('.sv-session__detail')?.textContent ?? ''
+    expect(detail).toContain('setup exited 3')
+    expect(detail).toContain('lockfile is out of date')
+  })
+
+  it('says a working copy was never provisioned rather than showing an empty path', () => {
+    list([session({ worktreePath: '' })])
+    fireEvent.click(screen.getByText('Details'))
+    expect(document.querySelector('.sv-session__detail')?.textContent).toContain('not provisioned')
+  })
+
+  it('names the work item and lane a session is bound to', () => {
+    list([session({ workItemId: 'FLU-220', laneOrd: 2 })])
+    fireEvent.click(screen.getByText('Details'))
+    expect(document.querySelector('.sv-session__detail')?.textContent).toContain('FLU-220 · lane 2')
   })
 
   it('puts what is running above what is finished', () => {

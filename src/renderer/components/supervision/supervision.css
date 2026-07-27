@@ -237,6 +237,12 @@
   word-break: break-word;
 }
 
+/* One session's own detail, expanded in place, on its own line. */
+.sv-session__detail {
+  flex: 1 0 100%;
+  margin-top: 2px;
+}
+
 /* Stopping, with a reason. */
 .sv-stop {
   display: inline-flex;
@@ -344,10 +350,13 @@
   top: 0;
 }
 
+/* Wraps, so anything taking a full-width line — an expanded detail — drops
+   below the row instead of squeezing its content column to one word per line. */
 .sv-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px 10px;
   width: 100%;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);

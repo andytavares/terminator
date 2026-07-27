@@ -350,8 +350,16 @@ describe('stopping a run', () => {
     expect(await iterator.next()).toMatchObject({ done: true })
   })
 
-  it('does nothing for a session that is not running', async () => {
+  it('reports that there was nothing to stop', async () => {
+    // The caller has to end the session itself, or one whose driver is gone
+    // stays `working` forever and Stop appears to do nothing.
     const { driver } = harness()
-    await expect(driver.stop('ghost')).resolves.toBeUndefined()
+    await expect(driver.stop('ghost')).resolves.toBe(false)
+  })
+
+  it('reports that it stopped a live run', async () => {
+    const { driver } = liveHarness()
+    await driver.start({ sessionId: 's1', prompt: 'x', cwd: '/wt/s1' })
+    await expect(driver.stop('s1')).resolves.toBe(true)
   })
 })

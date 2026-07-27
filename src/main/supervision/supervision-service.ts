@@ -618,15 +618,21 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
       if (session === null) return { ok: false, reason: 'no such session' }
 
       const said = reason?.trim() ?? ''
-      await driver.stop(
-        sessionId,
-        said === '' ? 'Stopped by the operator.' : `Stopped by the operator: ${said}`
-      )
+      const message = said === '' ? 'Stopped by the operator.' : `Stopped by the operator: ${said}`
+      const stopped = await driver.stop(sessionId, message)
+
+      // No live run — the console restarted, or it had already ended without
+      // saying so. The session still has to leave `working`, or Stop looks
+      // like it did nothing at all.
+      if (!stopped) {
+        bus.publish({ kind: 'session_ended', sessionId, outcome: 'success', at: now() })
+      }
+
       feed.post({
         at: now(),
         sessionId,
         author: 'console',
-        summary: said === '' ? 'Stopped by the operator.' : `Stopped by the operator: ${said}`,
+        summary: message,
       })
       return { ok: true, reason: null }
     },
