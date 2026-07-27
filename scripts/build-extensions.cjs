@@ -47,6 +47,13 @@ async function buildExtension(name) {
 }
 
 async function main() {
+  // No extensions directory is a valid state, not an error: the core app must
+  // build and run with every extension removed (spec 021, SC-011).
+  if (!existsSync(extensionsDir)) {
+    console.log('No extensions directory — nothing to build.')
+    return
+  }
+
   const names = readdirSync(extensionsDir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name)

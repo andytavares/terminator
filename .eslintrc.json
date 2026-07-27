@@ -19,19 +19,44 @@
       "rules": {
         "@typescript-eslint/no-var-requires": "off"
       }
+    },
+    {
+      "files": ["src/**/*.ts", "src/**/*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@anthropic-ai/claude-agent-sdk", "@anthropic-ai/claude-agent-sdk/**"],
+                "message": "The agent SDK may only be imported inside src/main/supervision/agent-runtime/. Everything beyond that boundary consumes the runtime-neutral SessionEvent shape (spec FR-002 to FR-004). Keeping the SDK behind one seam is what lets a runtime upgrade land in one module instead of the state machine, the stall detector, the review queue, and every surface at once (SC-007)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/main/supervision/agent-runtime/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
     }
   ],
   "rules": {
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/no-unused-vars": [
       "error",
-      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
     ],
     "no-restricted-syntax": [
       "error",
       {
         "selector": "JSXAttribute[name.name='style'] Literal[value=/^#[0-9a-fA-F]{3,8}$/]",
-        "message": "Don't hardcode hex colors in inline `style` — use a theme token, e.g. color: 'var(--text-secondary)'. Hardcoded hex breaks the light theme (see ErrorBoundary regression). Terminal/xterm palettes and workspace color data belong in named constants, not style props."
+        "message": "Don't hardcode hex colors in inline `style` \u2014 use a theme token, e.g. color: 'var(--text-secondary)'. Hardcoded hex breaks the light theme (see ErrorBoundary regression). Terminal/xterm palettes and workspace color data belong in named constants, not style props."
       }
     ]
   }

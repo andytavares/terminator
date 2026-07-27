@@ -47,7 +47,7 @@ beforeEach(async () => {
   await pg.waitReady
   db = wrapDb(pg)
   await applyNotepadSchema(db)
-  noteId = '00000000-0000-0000-0000-000000000001'
+  noteId = '00000000-0000-4000-8000-000000000001'
   const now = new Date().toISOString()
   await db.run(
     'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',

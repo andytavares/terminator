@@ -51,7 +51,7 @@ beforeEach(async () => {
   await applyNotepadSchema(db)
   exportDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-export-dest-'))
 
-  noteId = '00000000-0000-0000-0000-000000000001'
+  noteId = '00000000-0000-4000-8000-000000000001'
   const now = new Date().toISOString()
   await db.run(
     'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
@@ -120,7 +120,7 @@ describe('exportNotes', () => {
     const now = new Date().toISOString()
     await db.run(
       'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-      ['00000000-0000-0000-0000-000000000002', 'Second Note', 'body', now, now]
+      ['00000000-0000-4000-8000-000000000002', 'Second Note', 'body', now, now]
     )
 
     const result = await exportNotes(db, { folder: exportDir, scope: 'note', noteId })
@@ -131,7 +131,7 @@ describe('exportNotes', () => {
   })
 
   it('exports notes filtered by tag scope', async () => {
-    const tagId = 'tag-00000000-0000-0000-0000-000000000001'
+    const tagId = 'tag-00000000-0000-4000-8000-000000000001'
     await db.run('INSERT INTO tags (id, name) VALUES (?, ?)', [tagId, 'work'])
     await db.run('INSERT INTO note_tags (note_id, tag_id) VALUES (?, ?)', [noteId, tagId])
 

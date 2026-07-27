@@ -1,0 +1,231 @@
+{
+  "version": 3,
+  "featureDir": "/Users/atavares/repos/terminator/specs/027-tav-6",
+  "card": {
+    "title": "Pop-out during PR review returns to PR search screen instead of the active PR",
+    "type": "feature",
+    "scope": "# Summary\n\nIn the git integration, popping out a window while reviewing a PR loses the review context — the popped-out window returns to the PR search screen instead of showing the PR that was being reviewed.\n\n# Steps to Reproduce\n\n1. Open the git integration.\n2. Start a review of a specific PR.\n3. Click \"pop out\" to detach the review into its own window.\n\nExpected: The popped-out window shows the PR that was being reviewed, preserving the current context/navigation state.\nActual: The popped-out window returns to the PR search screen.\n\n# Acceptance Criteria\n\n- [ ] Popping out during an active PR review opens the popped-out window on the same PR\n- [ ] Review navigation/context state is preserved in the popped-out window (not reset to search)\n- [ ] The original (source) window behavior is unchanged\n\n# Dev Hints\n\n* The popped-out window likely isn't passed the currently selected PR / review state on creation. Investigate how the pop-out window is spawned and initialized, and ensure the active PR/review context is handed through to it.",
+    "checklist": [],
+    "attachments": [],
+    "knowledgeRefs": [],
+    "source": "linear",
+    "createdAt": "2026-07-27T03:24:59.574Z"
+  },
+  "stage": "backlog",
+  "mode": "speckit",
+  "ticket": {
+    "source": "linear",
+    "key": "TAV-6",
+    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-6/pop-out-during-pr-review-returns-to-pr-search-screen-instead-of-the",
+    "title": "Pop-out during PR review returns to PR search screen instead of the active PR",
+    "branchName": "andrewtavares87/tav-6-pop-out-during-pr-review-returns-to-pr-search-screen-instead"
+  },
+  "run": null,
+  "queuePosition": null,
+  "worktreePath": null,
+  "branchName": null,
+  "prUrl": null,
+  "phases": {
+    "constitution": {
+      "id": "constitution",
+      "status": "ready",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [".specify/memory/constitution.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "specify": {
+      "id": "specify",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/027-tav-6/spec.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "clarify": {
+      "id": "clarify",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/027-tav-6/spec.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "plan": {
+      "id": "plan",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [
+        "/Users/atavares/repos/terminator/specs/027-tav-6/plan.md",
+        "/Users/atavares/repos/terminator/specs/027-tav-6/research.md",
+        "/Users/atavares/repos/terminator/specs/027-tav-6/data-model.md"
+      ],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "checklist": {
+      "id": "checklist",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [
+        "/Users/atavares/repos/terminator/specs/027-tav-6/checklists/requirements.md"
+      ],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "tasks": {
+      "id": "tasks",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/027-tav-6/tasks.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "analyze": {
+      "id": "analyze",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "implement": {
+      "id": "implement",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "self-review": {
+      "id": "self-review",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/027-tav-6/.pilot/self-review.json"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "open-pr": {
+      "id": "open-pr",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
+    }
+  },
+  "settings": {
+    "defaultModel": "claude-opus-4-6",
+    "defaultAutonomy": "standard",
+    "batchCheckinsEnabled": true,
+    "writeStatusBackOnPrOpen": false,
+    "linear": null,
+    "jira": null,
+    "phaseGates": {
+      "constitution": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "specify": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "clarify": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "plan": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "checklist": {
+        "required": false,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "tasks": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "analyze": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "implement": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": true
+      },
+      "self-review": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "open-pr": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      }
+    },
+    "disallowedPaths": [".env*", "secrets/**", "*.pem", "*.key"],
+    "maxFilesPerImplementRun": 25,
+    "maxTokensPerCommand": 50000,
+    "commandTimeoutMs": 300000,
+    "requireCleanTreeForImplement": true,
+    "createCheckpointBeforeImplement": true,
+    "runConsolePosition": "bottom",
+    "reviewerIdentity": "git",
+    "customReviewerName": null,
+    "branchConvention": "sequential",
+    "customBranchPattern": null,
+    "openSidebarOnStart": true,
+    "maxConcurrentRuns": 3,
+    "runConstitutionPhase": false,
+    "logRetentionDays": 30
+  }
+}

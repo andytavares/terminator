@@ -5,8 +5,8 @@ import {
 } from '../../../src/shared/schemas/session.schema'
 
 const validSession = {
-  id: '00000000-0000-0000-0000-000000000001',
-  projectId: '00000000-0000-0000-0000-000000000002',
+  id: '00000000-0000-4000-8000-000000000001',
+  projectId: '00000000-0000-4000-8000-000000000002',
   tabTitle: 'Shell',
   status: 'active' as const,
   type: 'human' as const,
@@ -69,7 +69,7 @@ describe('TerminalSessionSchema', () => {
 
 describe('CreateSessionInputSchema', () => {
   const validInput = {
-    projectId: '00000000-0000-0000-0000-000000000002',
+    projectId: '00000000-0000-4000-8000-000000000002',
     type: 'human' as const,
     tabTitle: 'Shell',
     scrollbackLimit: 10000,

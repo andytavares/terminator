@@ -520,3 +520,163 @@ See [docs/EXTENSION-DEVELOPMENT.md](../EXTENSION-DEVELOPMENT.md) for the full AP
 ---
 
 _For architecture details see [docs/ARCHITECTURE.md](../ARCHITECTURE.md). For contributing guidelines see [docs/CONTRIBUTING.md](../CONTRIBUTING.md)._
+
+---
+
+## Agent Supervision Console
+
+A console for supervising a small number of long-running agents. It exists
+because of two things: you cannot review agent output as fast as agents produce
+it, and the failure nobody instruments is an agent that is stuck without asking
+for help.
+
+### Session states
+
+Every supervised session shows one state, derived from what the agent actually
+did — never from parsing its terminal output.
+
+| State             | Means                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| `starting`        | Provisioning the worktree, running setup                                            |
+| `working`         | Doing something; the timer shows how long since it last did                         |
+| `needs you`       | Blocked on a permission request. Answer it from any list                            |
+| `stalled`         | Stopped making progress and did not ask. Derived, not reported                      |
+| `ready to review` | Finished with changes, waiting in the review queue                                  |
+| `failed`          | Setup exited non-zero, or the run ended in error                                    |
+| `merged`          | Done                                                                                |
+| `state unknown`   | The console lost track and has not re-established it. Honest rather than reassuring |
+
+### Stall detection, and shadow mode
+
+Three signals, evaluated every 30 seconds:
+
+- **silence** — no tool activity for 8 minutes;
+- **loop** — 15 minutes with no net change while touching a single file;
+- **revert** — the agent has undone its own edits twice in ten edits.
+
+Time spent inside a long-running shell command is excluded, so a twelve-minute
+test suite never reads as a stall.
+
+**Shadow mode is on by default.** The detector runs and records every firing
+with the values that triggered it, but changes nothing you can see. Let it run
+against real work, then judge the recorded firings correct or incorrect and read
+the precision report. Turn shadow mode off when you believe it. A detector that
+cries wolf gets ignored, which is worse than not having one.
+
+### Review and backpressure
+
+Finished work is queued **worst-first by risk**, not by arrival, and each item
+shows the specific trigger for its grade rather than just a letter.
+
+| Grade | Trigger                                                                                       |
+| ----- | --------------------------------------------------------------------------------------------- |
+| P0    | auth, payments, secrets, migrations, a public interface, or a path on your critical-path list |
+| P1    | schema change, a declared shared contract file, or over 300 changed lines                     |
+| P2    | ordinary feature work                                                                         |
+| P3    | formatting, lockfiles, dependency bumps — **and only with green checks**                      |
+
+Review runs intent → risk → structure → tests. Intent first is deliberate: it
+compares what you asked for against the agent's own account and calls out work
+you never requested. It is the step every diff viewer skips.
+
+**Backpressure**: with three finished-but-unreviewed sessions, starting a fourth
+agent is refused with the reason and the count. Override it in one click; the
+override is recorded with the queue depth at the time.
+
+**Unattended merge** is off by default, enabled per repository only, applies to
+P3 alone, and never fires unless checks are green. If the code host is
+unreachable or unauthenticated, check state reads `unavailable` — never
+`passing` — so it cannot fire.
+
+### Repository configuration
+
+`.terminator/config.json` at the repository root. Every key optional; an absent
+file means all defaults, and provisioning still works.
+
+```json
+{
+  "worktree": {
+    "symlink": ["node_modules", "target", ".venv"],
+    "copy": [".env.local", "certs/dev.pem"],
+    "portBase": 4000,
+    "portSpan": 10
+  },
+  "scripts": {
+    "setup": "pnpm install --frozen-lockfile",
+    "teardown": "pnpm db:drop $TERMINATOR_WORKITEM",
+    "verify": "pnpm test && pnpm lint"
+  },
+  "stall": { "silenceMs": 480000, "noProgressMs": 900000 },
+  "review": {
+    "criticalPaths": ["src/auth/**", "migrations/**"],
+    "unattendedMergeLowestGrade": false
+  },
+  "network": { "allowedHosts": ["github.com", "registry.npmjs.org"] }
+}
+```
+
+| Key                                 | Meaning                                                                          | Default   |
+| ----------------------------------- | -------------------------------------------------------------------------------- | --------- |
+| `worktree.symlink`                  | Gitignored directories shared from your primary checkout, not copied             | `[]`      |
+| `worktree.copy`                     | Files copied into each worktree                                                  | `[]`      |
+| `worktree.portBase` / `portSpan`    | First port, and ports per worktree. Spans never overlap                          | 4000 / 10 |
+| `scripts.setup`                     | Run during provisioning. **Non-zero exit fails the session** and starts no agent | none      |
+| `scripts.teardown`                  | Run when a session is archived                                                   | none      |
+| `scripts.verify`                    | Run to verify a working copy                                                     | none      |
+| `stall.silenceMs`                   | Raise this for a repository with a slow test suite                               | 480000    |
+| `stall.noProgressMs`                | No-net-change threshold for the loop signal                                      | 900000    |
+| `review.criticalPaths`              | Extra P0 triggers. **Never inferred** — empty until you declare it               | `[]`      |
+| `review.unattendedMergeLowestGrade` | Per repository only. There is no global switch                                   | `false`   |
+| `network.allowedHosts`              | Hosts that do not prompt. Anything off-list prompts at every autonomy level      | `[]`      |
+
+Every script and agent session gets `TERMINATOR_PORT_BASE`,
+`TERMINATOR_WORKTREE` and `TERMINATOR_WORKITEM`.
+
+### Autonomy levels
+
+Chosen when you assign an agent, not renegotiated at each prompt.
+
+| Level   | Runs without asking                                  |
+| ------- | ---------------------------------------------------- |
+| `read`  | read, search, list                                   |
+| `edit`  | + writes **inside the worktree**                     |
+| `build` | + dependency installs, local build and test commands |
+| `ship`  | + pushing branches, opening pull requests            |
+
+Destructive operations always prompt. So does anything reaching a host not on
+`network.allowedHosts`, at every level — that is what catches
+`redis-cli -h prod-cache-01`.
+
+### Databases are not solved
+
+Deliberately. No product in this category solves per-worktree databases, and
+pretending otherwise would be worse than saying so. `scripts.setup` and
+`scripts.teardown` are the extension point. The two known working patterns are
+Neon or Supabase branch-per-worktree, and a per-worktree Docker Compose project
+keyed on `$TERMINATOR_WORKITEM`.
+
+### Multi-repository work
+
+A work item can span several repositories as ordered **lanes**, one agent each.
+Files declared shared are flagged as predicted collisions on every lane that
+touches them, before those agents start. A lane cannot merge before the lanes
+that block it when a shared file is involved — the refusal names the blocker.
+If an upstream lane merges a shared-file change after a downstream lane started,
+that lane is flagged as needing a rebase or a re-run.
+
+Single-repository work renders as one row with none of this.
+
+### Work items
+
+Work items reach the console through a directory the console owns. Any producer
+can write them — the SpecKit Pilot extension, a script, or a JSON file you write
+by hand — and the board behaves identically for all of them.
+
+The console **never** writes into a producer's files. Approving a gate or
+advancing a phase invokes a command the producer registered; when a producer
+provides no such command, the item renders read-only and says so rather than
+offering a button that does nothing.
+
+Implementation cannot begin until you have approved both the specification and
+the plan. That friction is the point: an agent starting without an approved spec
+has nothing bounding its scope.

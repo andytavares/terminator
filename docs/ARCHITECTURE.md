@@ -738,3 +738,114 @@ All state lives in `.pilot/` inside the feature directory (a subdirectory of `sp
 - [ADR-007: agent-runner-subprocess](adr/007-agent-runner-subprocess.md) — spawn Claude Code as a child process rather than using the Anthropic API directly.
 - [ADR-010: card model](adr/010-speckit-card-model.md) — a card unifies feature dir, ticket, and run; `PilotState` v3.
 - [ADR-011: parallel runs](adr/011-speckit-parallel-runs.md) — concurrency cap replaces the single-active-run queue.
+
+---
+
+## Agent Supervision Console
+
+Core subsystem under `src/main/supervision/`. Two capabilities carry it: derived
+runtime state for every supervised session, and detection of a session that has
+stopped making progress without asking for anything. Everything else exists to
+make those two usable.
+
+### Event flow
+
+```
+@anthropic-ai/claude-agent-sdk
+        │  canUseTool · result messages · lifecycle hooks · transcript
+        ▼
+agent-runtime/        ← THE SEAM. Only importer of the SDK anywhere in src/.
+  driver · permission-bridge · hooks · transcript-tailer · to-session-event
+        │
+        ▼  SessionEvent — runtime-neutral, references no SDK type
+   events/event-bus
+        │
+        ├──▶ state/state-machine ──▶ state/session-registry ──▶ IPC ──▶ renderer
+        ├──▶ stall/stall-scheduler ──▶ evaluate-stall ──▶ surface-stall ──▶ firing-log
+        └──▶ review/review-queue ──▶ risk-grader · backpressure · merge-policy
+```
+
+`supervision-service.ts` is the composition root; it is constructed once in
+`src/main/index.ts` and is the only place the parts are wired together.
+
+### The seam, and why it exists
+
+Everything the agent runtime knows is confined to `agent-runtime/`, which emits
+a `SessionEvent` union containing no runtime type. The state machine, the stall
+detector, the review queue and every surface consume only that union.
+
+This is a seam with exactly one implementation — not a plugin point, and not on
+the Extension API. It is justified by SC-007 (a runtime upgrade must not
+regress state reporting, and absorbing one must touch only this boundary), not
+by an anticipated second runtime, which is an explicit non-goal. Two guards
+enforce it:
+
+- an ESLint `no-restricted-imports` rule permitting the SDK only under `agent-runtime/`;
+- a test asserting the neutral union's module imports nothing at all.
+
+See [ADR-026](adr/026-agent-sdk-over-pty-supervision.md) and
+[ADR-027](adr/027-agent-runtime-seam.md).
+
+### Transcript paths are never computed
+
+Every SDK hook payload extends `BaseHookInput`, which carries `transcript_path`,
+`session_id` and `cwd`. The tailer opens what it is told. Deriving
+`~/.claude/projects/<encoded-cwd>/` would depend on an undocumented encoding, and
+it is unnecessary.
+
+### The long-running-command exemption
+
+`tool_started` carries `callId` and `isShell` precisely so an in-flight shell
+call can be paired with its `tool_finished` and excluded from the silence
+calculation. Without it every test suite longer than the threshold reads as a
+stall. This is the one behaviour that decides whether stall detection is usable
+at all, and it has a dedicated negative test.
+
+### Shadow mode
+
+Global, **on by default**. The detector runs and records every firing with the
+input values that satisfied it; shadow mode gates only the consequence — no
+state change, no feed entry, no notification. One code path, one boolean, read
+at the surfacing step and never inside `evaluateStall`, so precision is
+measurable identically in both modes.
+
+### Boundaries
+
+Core depends on no extension, for anything (spec FR-065). Two consequences worth
+knowing:
+
+- **Work items** arrive through a console-owned publication directory whose
+  schema the console defines. The console never reads inside a producer's own
+  directory and never writes producer state; lane-to-session bindings live in
+  console-owned storage. Outbound actions go through Extension API commands a
+  producer registers. See [ADR-028](adr/028-console-owned-publication-directory.md).
+- **Code-host access** is core's own (`src/main/codehost/`), because unattended
+  merge safety turns on check state and must not depend on an install. Check
+  state resolves to `unavailable`, never `passing`, whenever we cannot tell.
+  See [ADR-029](adr/029-core-owned-codehost-client.md).
+
+Enforced by `tests/unit/config/eslint-boundaries.spec.ts`, which resolves every
+relative import under `src/` and fails if one lands inside `extensions/`. A glob
+cannot do this job: `src/main/extensions/` is the extension _host_, core
+plumbing, and any pattern broad enough to catch the real violation flags it too.
+
+### Storage
+
+| What                                              | Where                                 | Why                                                                       |
+| ------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------- |
+| Session registry, shadow-mode flag                | `electron-store` (`supervision.json`) | Small, keyed, read whole                                                  |
+| Stall firings, feed, overrides, unattended merges | append-only JSONL under user data     | Grows without bound; rewriting a whole blob per append is the wrong shape |
+
+The JSONL helper heals a torn tail before appending — a crash leaves a partial
+line, and appending onto it would lose two records instead of one.
+
+### Surfaces
+
+All seven concepts are core React under `src/renderer/components/supervision/`
+and work with zero extensions installed. State is distinguished by shape and
+label rather than colour; icons are flat `lucide-react` inheriting
+`currentColor` (Constitution XII).
+
+`rankAttention` lives in `src/shared/supervision/` because both processes need
+it: the Attention Queue, the Standup Feed and the palette are three renderings
+of one query, built once.

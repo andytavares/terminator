@@ -1021,3 +1021,123 @@ Key behavioural differences in the webview model:
 - `registry.setActiveGlobalTab()` — not available. Navigation between extension surfaces uses URL params.
 - `registry.updateGlobalTab(..., { badge })` — not available. Badge updates require a separate IPC mechanism if needed.
 - Core store imports (`useWorkspaceStore`, etc.) — not available. Use `extensionBridge` and URL params instead.
+
+---
+
+## Publishing work items to the supervision console
+
+The console supervises agent sessions and renders work items, but it never runs
+a specification pipeline itself. Producing work items is an extension's job.
+
+The boundary runs one way in each direction, and neither side reaches across it:
+
+```
+your extension  ──writes──▶  console-owned publication directory  ──reads──▶  console
+console         ──invokes──▶  commands you registered on the API   ─────────▶  your extension
+```
+
+The console never reads inside your extension's directory, never writes your
+files, and holds no knowledge of your internal layout.
+
+### Publishing
+
+```ts
+const dir = await api.workItems.publicationDirectory()
+// <userData>/supervision/workitems/<your-extension-id>/
+
+// Write one file per work item. Prefer a temp file + rename: the console
+// tolerates a torn read either way, but a rename makes it a non-event.
+await fs.writeFile(join(dir, `${id}.json.tmp`), JSON.stringify(contract))
+await fs.rename(join(dir, `${id}.json.tmp`), join(dir, `${id}.json`))
+```
+
+### The contract
+
+```jsonc
+{
+  "contract_version": 1, // REQUIRED
+  "id": "FLU-220", // REQUIRED, unique within your extension
+  "source": "linear", // "linear" | "github" | "local"
+  "source_url": "https://…", // optional
+  "title": "Unify session identity", // REQUIRED
+  "created_at": "2026-07-27T09:04:11Z", // REQUIRED, ISO 8601 UTC
+  "phase": "implement", // intake→specify→clarify→plan→tasks→implement→review→merged
+  "artifacts": { "spec": "…", "plan": "…", "tasks": "…" }, // optional paths
+  "gates": { "spec_approved_by_human": { "ok": true, "at": "…" } },
+  "contract": { "summary": "…", "shared_files": ["proto/session.proto"] },
+  "lanes": [
+    // REQUIRED, at least one
+    {
+      "ord": 1,
+      "repo": "fluent",
+      "role": "producer",
+      "branch": "feat/x",
+      "task_ids": ["T001"],
+      "blocks": [2],
+      "blocked_by": [],
+    },
+  ],
+}
+```
+
+**There is no `session_id` on a lane.** Which session runs which lane is the
+console's business and lives in console-owned storage, so binding a session
+never modifies your file. If you add the field it is ignored.
+
+### Registering actions
+
+Every handler is optional. An action you do not provide renders read-only with a
+stated reason — never a button that silently does nothing.
+
+```ts
+api.workItems.registerProducer({
+  async approveGate(workItemId, gate) {
+    /* … */
+  },
+  async rejectGate(workItemId, gate, notes) {
+    /* … */
+  },
+  async advancePhase(workItemId) {
+    /* … */
+  },
+  async sendBack(workItemId, phase, notes) {
+    /* … */
+  },
+})
+```
+
+### Versioning
+
+- **Major bump** for any removed or semantically changed required field. The
+  console rejects unknown majors outright rather than guessing.
+- Additive optional fields do **not** bump the major; unknown fields are
+  ignored, so a newer producer degrades gracefully against an older console.
+
+### Failure behaviour
+
+Every failure is per item — one bad file never affects another item or any
+surface.
+
+| Condition                        | What the operator sees                                               |
+| -------------------------------- | -------------------------------------------------------------------- |
+| Unknown major `contract_version` | unreadable, naming the version                                       |
+| Missing `contract_version`       | unreadable, "no contract version"                                    |
+| Schema violation                 | unreadable, naming the failing field                                 |
+| Partial write                    | unreadable; re-read on the next change                               |
+| Same `id` from two producers     | **both** flagged as conflicted, naming both. Never silently resolved |
+| Zero lanes                       | schema violation                                                     |
+
+## Reading supervision state
+
+```ts
+const sessions = await api.supervision.listSessions()
+const off = api.supervision.onStateChanged(({ sessionId, from, to }) => {
+  /* … */
+})
+```
+
+Read-only, and deliberately narrow: no transcript path, no pending permission
+request, no raw event stream. Transcripts are sensitive and unversioned, and a
+permission decision belongs to the operator. Nothing here lets an extension
+assert a session's state — it is derived from observed agent activity, and an
+extension declaring it would defeat the point.

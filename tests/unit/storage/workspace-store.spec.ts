@@ -121,7 +121,7 @@ describe('workspace-store', () => {
 
   it('createProject returns WORKSPACE_NOT_FOUND for unknown workspace', async () => {
     const { createProject } = await import('../../../src/main/storage/workspace-store')
-    const result = createProject({ workspaceId: '00000000-0000-0000-0000-000000000099', name: 'P' })
+    const result = createProject({ workspaceId: '00000000-0000-4000-8000-000000000099', name: 'P' })
     expect('error' in result && result.error).toBe('WORKSPACE_NOT_FOUND')
   })
 
@@ -147,7 +147,7 @@ describe('workspace-store', () => {
   it('updateProjectBranch returns NOT_FOUND for unknown project', async () => {
     const { updateProjectBranch } = await import('../../../src/main/storage/workspace-store')
     const result = updateProjectBranch({
-      id: '00000000-0000-0000-0000-000000000003',
+      id: '00000000-0000-4000-8000-000000000003',
       gitBranch: 'main',
     })
     expect('error' in result && result.error).toBe('NOT_FOUND')
@@ -191,7 +191,7 @@ describe('workspace-store', () => {
 
   it('renameProject returns NOT_FOUND for unknown project', async () => {
     const { renameProject } = await import('../../../src/main/storage/workspace-store')
-    const result = renameProject({ id: '00000000-0000-0000-0000-000000000001', name: 'NewName' })
+    const result = renameProject({ id: '00000000-0000-4000-8000-000000000001', name: 'NewName' })
     expect('error' in result && result.error).toBe('NOT_FOUND')
   })
 
@@ -260,7 +260,7 @@ describe('workspace-store', () => {
 
   it('updateWorkspace returns NOT_FOUND for unknown workspace id', async () => {
     const { updateWorkspace } = await import('../../../src/main/storage/workspace-store')
-    const result = updateWorkspace({ id: '00000000-0000-0000-0000-000000000002', name: 'NewName' })
+    const result = updateWorkspace({ id: '00000000-0000-4000-8000-000000000002', name: 'NewName' })
     expect('error' in result && result.error).toBe('NOT_FOUND')
   })
 

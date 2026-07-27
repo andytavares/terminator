@@ -79,6 +79,7 @@ import {
   executeExtensionCommand,
   listNativeViewMenuItems,
   getPanelMenuItemId,
+  setSupervisionDeps,
 } from '../../../src/main/extensions/api'
 import { ipcInvokeRegistry } from '../../../src/main/remote/ipc-registry'
 import * as shellExecutor from '../../../src/main/shell/shell-executor'
@@ -654,5 +655,123 @@ describe('registry query functions', () => {
     expect(onClick).toHaveBeenCalled()
     expect(getPanelMenuItemId('q-panel')).toBe('ext-menu-q-menu')
     d.dispose()
+  })
+})
+
+// The supervision surface an extension sees. Read-only by construction: no
+// transcript path, no pending permission, no raw event stream, and no way to
+// assert a runtime state (Constitution II, FR-070 – FR-073).
+
+describe('the supervision extension API', () => {
+  const session = { id: 's1', repoPath: '/repo', branch: 'feat/x', runtimeState: 'working' }
+
+  function withDeps(over: Record<string, unknown> = {}) {
+    const off = vi.fn()
+    const deps = {
+      listSessions: vi.fn().mockReturnValue([session]),
+      getSession: vi.fn().mockReturnValue(session),
+      onStateChanged: vi.fn().mockReturnValue(off),
+      provisionWorktree: vi.fn().mockResolvedValue({ worktreePath: '/wt/s1' }),
+      releaseWorktree: vi.fn().mockResolvedValue(undefined),
+      listWorktrees: vi.fn().mockReturnValue([{ worktreePath: '/wt/s1' }]),
+      publicationDirectoryFor: vi.fn().mockReturnValue('/data/workitems/test.ext'),
+      registerProducer: vi.fn(),
+      unregisterProducer: vi.fn(),
+      ...over,
+    }
+    setSupervisionDeps(deps as never)
+    return { deps, off }
+  }
+
+  it('lists sessions and reads one', async () => {
+    const { deps } = withDeps()
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    await expect(api.supervision.listSessions()).resolves.toEqual([session])
+    await expect(api.supervision.getSession('s1')).resolves.toEqual(session)
+    expect(deps.getSession).toHaveBeenCalledWith('s1')
+  })
+
+  it('subscribes to state changes and unsubscribes on dispose', () => {
+    const { deps, off } = withDeps()
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const handler = vi.fn()
+    const subscription = api.supervision.onStateChanged(handler)
+    expect(deps.onStateChanged).toHaveBeenCalledWith(handler)
+    subscription.dispose()
+    expect(off).toHaveBeenCalled()
+  })
+
+  it('provisions, lists and releases worktrees', async () => {
+    const { deps } = withDeps()
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    await expect(
+      api.worktrees.provision({ repoPath: '/repo', branch: 'feat/x' })
+    ).resolves.toMatchObject({ worktreePath: '/wt/s1' })
+    await expect(api.worktrees.list()).resolves.toHaveLength(1)
+    await api.worktrees.release('/wt/s1')
+    expect(deps.releaseWorktree).toHaveBeenCalledWith('/wt/s1')
+  })
+
+  it('hands a producer its own publication directory, never a shared one', async () => {
+    const { deps } = withDeps()
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    await expect(api.workItems.publicationDirectory()).resolves.toBe('/data/workitems/test.ext')
+    expect(deps.publicationDirectoryFor).toHaveBeenCalledWith('test.ext')
+  })
+
+  it('registers a producer and unregisters it on dispose', () => {
+    const { deps } = withDeps()
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const handlers = { approveGate: vi.fn() }
+    const subscription = api.workItems.registerProducer(handlers)
+    expect(deps.registerProducer).toHaveBeenCalledWith('test.ext', handlers)
+    subscription.dispose()
+    expect(deps.unregisterProducer).toHaveBeenCalledWith('test.ext')
+  })
+})
+
+describe('the supervision extension API on a console built without supervision (SC-011)', () => {
+  beforeEach(() => {
+    // The injection point is module state; clearing it is how a host that never
+    // wired supervision is represented.
+    setSupervisionDeps(null as never)
+  })
+
+  it('reports an empty session list rather than throwing', async () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    await expect(api.supervision.listSessions()).resolves.toEqual([])
+    await expect(api.supervision.getSession('s1')).resolves.toBeNull()
+  })
+
+  it('returns a disposable subscription that is safe to dispose', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const subscription = api.supervision.onStateChanged(vi.fn())
+    expect(() => subscription.dispose()).not.toThrow()
+  })
+
+  it('reports no worktrees and releases nothing', async () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    await expect(api.worktrees.list()).resolves.toEqual([])
+    await expect(api.worktrees.release('/wt/s1')).resolves.toBeUndefined()
+  })
+
+  it('refuses to provision, saying why rather than failing silently', async () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    await expect(api.worktrees.provision({ repoPath: '/repo', branch: 'b' })).rejects.toThrow(
+      /supervision is not available/
+    )
+  })
+
+  it('refuses to hand out a publication directory that does not exist', async () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    await expect(api.workItems.publicationDirectory()).rejects.toThrow(
+      /supervision is not available/
+    )
+  })
+
+  it('accepts a producer registration that goes nowhere, rather than throwing', () => {
+    const api = createExtensionAPI('test.ext', '0.1.0')
+    const subscription = api.workItems.registerProducer({})
+    expect(() => subscription.dispose()).not.toThrow()
   })
 })

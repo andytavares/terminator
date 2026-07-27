@@ -223,6 +223,27 @@ export interface ExtensionAPI {
   nativeMenu: {
     addViewMenuItem(item: NativeMenuItemContribution): Disposable
   }
+  /** Read-only view of supervised sessions. Nothing here can assert state. */
+  supervision: {
+    listSessions(): Promise<readonly unknown[]>
+    getSession(sessionId: string): Promise<unknown | null>
+    onStateChanged(handler: (event: SupervisionStateChange) => void): Disposable
+  }
+  /** Provisioning, provided by core. Core never calls an extension's. */
+  worktrees: {
+    provision(opts: {
+      repoPath: string
+      branch: string
+      workItemId?: string
+    }): Promise<{ path: string; portBase: number; portSpan: number }>
+    release(worktreePath: string): Promise<void>
+    list(): Promise<readonly { path: string; branch: string; sessionId: string | null }[]>
+  }
+  /** Publishing work items into the console-owned publication directory. */
+  workItems: {
+    publicationDirectory(): Promise<string>
+    registerProducer(handlers: ProducerHandlerSet): Disposable
+  }
   fs: {
     watch(handler: (event: FsChangeEvent) => void): Disposable
   }
@@ -356,6 +377,47 @@ setExtensionNotificationSettingReader((extensionId, key) => {
 // Callback set by the main process so api.ts can trigger a full menu rebuild
 // without importing from index.ts (which would create a circular dependency).
 let menuRebuildCallback: (() => void) | null = null
+
+// Supervision is injected rather than imported: api.ts is loaded during
+// extension host start-up, and reaching into the supervision subsystem from
+// here would invert the dependency the composition root owns.
+
+export interface SupervisionStateChange {
+  sessionId: string
+  from: string
+  to: string
+  at: number
+}
+
+export interface ProducerHandlerSet {
+  approveGate?(workItemId: string, gate: string): Promise<void>
+  rejectGate?(workItemId: string, gate: string, notes: string): Promise<void>
+  advancePhase?(workItemId: string): Promise<void>
+  sendBack?(workItemId: string, phase: string, notes: string): Promise<void>
+}
+
+export interface SupervisionApiDeps {
+  listSessions(): readonly unknown[]
+  getSession(sessionId: string): unknown | null
+  onStateChanged(handler: (event: SupervisionStateChange) => void): () => void
+  provisionWorktree(opts: {
+    repoPath: string
+    branch: string
+    workItemId?: string
+  }): Promise<{ path: string; portBase: number; portSpan: number }>
+  releaseWorktree(worktreePath: string): Promise<void>
+  listWorktrees(): readonly { path: string; branch: string; sessionId: string | null }[]
+  publicationDirectoryFor(producerId: string): Promise<string>
+  registerProducer(producerId: string, handlers: ProducerHandlerSet): void
+  unregisterProducer(producerId: string): void
+}
+
+let supervisionDeps: SupervisionApiDeps | null = null
+
+/** Called once by the composition root, before any extension activates. */
+export function setSupervisionDeps(deps: SupervisionApiDeps): void {
+  supervisionDeps = deps
+}
 
 export function setMenuRebuildCallback(fn: () => void): void {
   menuRebuildCallback = fn
@@ -663,6 +725,38 @@ export function createExtensionAPI(
           globalRegistry.nativeMenuItems.delete(key)
           rebuildViewMenu()
         })
+      },
+    },
+    // ── supervision ────────────────────────────────────────────────────────
+    // Read-only, and deliberately narrow: no transcript path, no pending
+    // permission, no raw event stream. Runtime state is derived from observed
+    // agent activity, so nothing here lets an extension assert it.
+    supervision: {
+      listSessions: async () => supervisionDeps?.listSessions() ?? [],
+      getSession: async (sessionId: string) => supervisionDeps?.getSession(sessionId) ?? null,
+      onStateChanged(handler: (event: SupervisionStateChange) => void): Disposable {
+        const off = supervisionDeps?.onStateChanged(handler)
+        return disposable(() => off?.())
+      },
+    },
+    worktrees: {
+      provision: async (opts: { repoPath: string; branch: string; workItemId?: string }) => {
+        if (supervisionDeps === null) throw new Error('supervision is not available')
+        return supervisionDeps.provisionWorktree(opts)
+      },
+      release: async (worktreePath: string) => {
+        await supervisionDeps?.releaseWorktree(worktreePath)
+      },
+      list: async () => supervisionDeps?.listWorktrees() ?? [],
+    },
+    workItems: {
+      publicationDirectory: async () => {
+        if (supervisionDeps === null) throw new Error('supervision is not available')
+        return supervisionDeps.publicationDirectoryFor(extensionId)
+      },
+      registerProducer(handlers: ProducerHandlerSet): Disposable {
+        supervisionDeps?.registerProducer(extensionId, handlers)
+        return disposable(() => supervisionDeps?.unregisterProducer(extensionId))
       },
     },
     fs: {

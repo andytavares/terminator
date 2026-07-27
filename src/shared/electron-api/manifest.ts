@@ -472,6 +472,146 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
   // ── top-level ─────────────────────────────────────────────────────────────
   // Native: webUtils.getPathForFile. No remote equivalent.
   { path: 'getFilePath', kind: 'local', remote: 'omit' },
+
+  // ── supervision ───────────────────────────────────────────────────────────
+  // Read-only: runtime state is derived from observed agent activity, so the
+  // renderer never asserts it — surfaces render what the substrate observed.
+  //
+  // `remote: 'omit'` deliberately. Supervision state carries transcript paths,
+  // accrued cost, and live permission prompts; putting that on the remote
+  // bridge is a decision to take on purpose, not to inherit by default.
+  {
+    path: 'supervision.listSessions',
+    kind: 'invoke',
+    channel: 'supervision:listSessions',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.getSession',
+    kind: 'invoke',
+    channel: 'supervision:getSession',
+    toPayload: (sessionId: string) => ({ sessionId }),
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.onStateChanged',
+    kind: 'event',
+    channel: 'supervision:stateChanged',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.resolvePermission',
+    kind: 'invoke',
+    channel: 'supervision:resolvePermission',
+    remote: 'omit',
+  },
+  { path: 'supervision.listFeed', kind: 'invoke', channel: 'supervision:listFeed', remote: 'omit' },
+  {
+    path: 'supervision.listFirings',
+    kind: 'invoke',
+    channel: 'supervision:listFirings',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.listReview',
+    kind: 'invoke',
+    channel: 'supervision:listReview',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.listUnattendedMerges',
+    kind: 'invoke',
+    channel: 'supervision:listUnattendedMerges',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.listWorkItems',
+    kind: 'invoke',
+    channel: 'supervision:listWorkItems',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.replyToSession',
+    kind: 'invoke',
+    channel: 'supervision:replyToSession',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.setShadowMode',
+    kind: 'invoke',
+    channel: 'supervision:setShadowMode',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.judgeFiring',
+    kind: 'invoke',
+    channel: 'supervision:judgeFiring',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.openInEditor',
+    kind: 'invoke',
+    channel: 'supervision:openInEditor',
+    remote: 'omit',
+  },
+  { path: 'supervision.archive', kind: 'invoke', channel: 'supervision:archive', remote: 'omit' },
+  {
+    path: 'supervision.provision',
+    kind: 'invoke',
+    channel: 'supervision:provision',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.getReviewDetail',
+    kind: 'invoke',
+    channel: 'supervision:getReviewDetail',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.decideHunk',
+    kind: 'invoke',
+    channel: 'supervision:decideHunk',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.advanceReview',
+    kind: 'invoke',
+    channel: 'supervision:advanceReview',
+    remote: 'omit',
+  },
+  { path: 'supervision.getLanes', kind: 'invoke', channel: 'supervision:getLanes', remote: 'omit' },
+  {
+    path: 'supervision.mergeLane',
+    kind: 'invoke',
+    channel: 'supervision:mergeLane',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.getProvisioning',
+    kind: 'invoke',
+    channel: 'supervision:getProvisioning',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.getSinceLastLooked',
+    kind: 'invoke',
+    channel: 'supervision:getSinceLastLooked',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.precheckBackpressure',
+    kind: 'invoke',
+    channel: 'supervision:precheckBackpressure',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.entityIndex',
+    kind: 'invoke',
+    channel: 'supervision:entityIndex',
+    remote: 'omit',
+  },
+  { path: 'supervision.intake', kind: 'invoke', channel: 'supervision:intake', remote: 'omit' },
+  { path: 'supervision.assign', kind: 'invoke', channel: 'supervision:assign', remote: 'omit' },
 ]
 
 /**

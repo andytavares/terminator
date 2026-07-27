@@ -12,6 +12,15 @@ import { registerLogHandlers } from './ipc/log.ipc.js'
 import { registerNotificationHandlers } from './ipc/notification.ipc.js'
 import { registerMetricsHandlers } from './ipc/metrics.ipc.js'
 import { registerDbIpcHandlers } from './ipc/db.ipc.js'
+import { registerSupervisionHandlers } from './ipc/supervision.ipc.js'
+import { createSupervisionService } from './supervision/supervision-service.js'
+import { supervisionStore } from './storage/supervision-store.js'
+import { setSupervisionDeps } from './extensions/api.js'
+import { mayArchive } from './supervision/worktree/archive.js'
+import { openInEditor } from './supervision/worktree/editor-handoff.js'
+import { runCommand } from './codehost/codehost-client.js'
+import { reviewIntent } from './supervision/review/intent-diff.js'
+import { laneViews, mayMergeLane } from './supervision/lanes/lane-coordination.js'
 import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
 import { ExtensionViewHost } from './extensions/extension-view-host.js'
@@ -295,6 +304,74 @@ app.whenReady().then(async () => {
   session.defaultSession.protocol.handle('ext', handleExtProtocol)
   session.fromPartition('ext-views').protocol.handle('ext', handleExtProtocol)
 
+  // Supervision substrate. Composed in supervision-service.ts; this is the only
+  // place it is constructed. Stall detection starts in shadow mode by default
+  // (FR-018) — it records from the first run but stays silent until the
+  // operator turns shadow mode off on the evidence of the precision report.
+  const supervision = createSupervisionService({
+    userDataPath: userData,
+    registryStore: {
+      get: () => supervisionStore.get('sessions'),
+      set: (value) => supervisionStore.set('sessions', value),
+    },
+    shadowStore: {
+      get: () => supervisionStore.get('stallShadowMode') as boolean | undefined,
+      set: (value) => supervisionStore.set('stallShadowMode', value),
+    },
+    bindingStore: {
+      get: () => supervisionStore.get('laneBindings'),
+      set: (value) => supervisionStore.set('laneBindings', value),
+    },
+    onStateChanged: (change) => mainWindow?.webContents.send('supervision:stateChanged', change),
+  })
+  supervision.start()
+  app.on('will-quit', () => supervision.stop())
+
+  // Publish the read-only supervision surface to extensions. Injected rather
+  // than imported by api.ts, so the dependency runs one way: the composition
+  // root knows about both, and neither knows about the other.
+  setSupervisionDeps({
+    listSessions: () => supervision.listSessions(),
+    getSession: (sessionId) => supervision.getSession(sessionId),
+    onStateChanged: () => () => {},
+    provisionWorktree: async (opts) => {
+      const result = await supervision.provisioner.provision({
+        sessionId: opts.workItemId ?? opts.branch,
+        workItemId: opts.workItemId ?? opts.branch,
+        repoPath: opts.repoPath,
+        branch: opts.branch,
+        worktreeRoot: join(app.getPath('userData'), 'worktrees'),
+      })
+      return {
+        path: result.worktreePath,
+        portBase: result.ports.portBase,
+        portSpan: result.ports.portSpan,
+      }
+    },
+    releaseWorktree: async (worktreePath) => {
+      const session = supervision
+        .listSessions()
+        .find((candidate) => candidate.worktreePath === worktreePath)
+      if (session === undefined) return
+      await supervision.provisioner.release({
+        repoPath: session.repoPath,
+        worktreePath,
+        workItemId: session.workItemId ?? session.id,
+        portBase: 0,
+      })
+    },
+    listWorktrees: () =>
+      supervision.listSessions().map((session) => ({
+        path: session.worktreePath,
+        branch: session.branch,
+        sessionId: session.id,
+      })),
+    publicationDirectoryFor: async (producerId) => supervision.publicationDirectoryFor(producerId),
+    registerProducer: (producerId, handlers) =>
+      supervision.producers.register(producerId, handlers),
+    unregisterProducer: (producerId) => supervision.producers.unregister(producerId),
+  })
+
   registerWorkspaceHandlers()
   registerTerminalHandlers(ptyManager, () => mainWindow)
   registerSettingsHandlers()
@@ -330,6 +407,156 @@ app.whenReady().then(async () => {
   registerNotificationHandlers()
   registerMetricsHandlers(ptyManager)
   registerDbIpcHandlers()
+  registerSupervisionHandlers({
+    listSessions: () => supervision.listSessions(),
+    getSession: (sessionId) => supervision.getSession(sessionId),
+    resolvePermission: (sessionId, requestId, decision) =>
+      supervision.driver.resolvePermission(sessionId, requestId, { allow: decision === 'allow' }),
+    setShadowMode: (value) => supervision.stalls.setShadowMode(value),
+    judgeFiring: (firingId, judgement) =>
+      supervision.firings.judge(firingId, judgement, Date.now()),
+    listFeed: () => supervision.feed.list(),
+    listFirings: () => ({
+      firings: supervision.firings.list(),
+      precision: supervision.firings.precision(0, Date.now()),
+    }),
+    listReview: () => supervision.reviewQueue.list(),
+    listUnattendedMerges: () => supervision.mergePolicy.unattendedMerges(),
+    listWorkItems: () => {
+      const snapshot = supervision.publications.snapshot()
+      return {
+        items: snapshot.items.map((published) => ({
+          producerId: published.producerId,
+          item: published.item,
+        })),
+        unreadable: snapshot.unreadable,
+        conflicts: snapshot.conflicts,
+        // Read-only until some producer registers the actions (FR-078).
+        canAct: snapshot.items.some((published) =>
+          supervision.producers.supports(published.producerId, 'approveGate')
+        ),
+      }
+    },
+    getReviewDetail: (sessionId) => {
+      const item = supervision.reviewQueue.list().find((entry) => entry.sessionId === sessionId)
+      if (item === undefined) return null
+      const session = supervision.getSession(sessionId)
+      return {
+        item,
+        intent: reviewIntent({
+          request:
+            supervision.feed.forSession(sessionId).find((entry) => entry.author === 'agent')
+              ?.summary ?? item.branch,
+          agentAccount:
+            supervision.feed.forSession(sessionId).at(-1)?.summary ?? 'No account recorded.',
+          changedFiles: supervision.changedFilesFor(sessionId),
+          // Declared by the bound lane's work item; empty for ad-hoc work,
+          // where there is no declared scope to compare against.
+          expectedFiles: supervision.expectedFilesFor(sessionId),
+        }),
+        hunks: supervision.hunksFor(sessionId),
+        session,
+      }
+    },
+    decideHunk: (sessionId, hunkId, decision) =>
+      supervision.hunkDecisionsFor(sessionId).decide(hunkId, decision),
+    advanceReview: (sessionId) => {
+      supervision.reviewQueue.advance(sessionId)
+    },
+    getLanes: (workItemId) => {
+      const published = supervision.publications
+        .snapshot()
+        .items.find((entry) => entry.item.id === workItemId)
+      if (published === undefined) {
+        return { lanes: [], mergedOrds: [], staleOrds: [], blockedReasons: {} }
+      }
+      const merged = supervision
+        .listSessions()
+        .filter((session) => session.runtimeState === 'merged' && session.laneOrd !== null)
+        .map((session) => session.laneOrd as number)
+      const blockedReasons: Record<number, string> = {}
+      for (const view of laneViews(published.item)) {
+        const decision = mayMergeLane(published.item, view.lane.ord, merged)
+        if (!decision.allowed && decision.reason !== null) {
+          blockedReasons[view.lane.ord] = decision.reason
+        }
+      }
+      return {
+        lanes: laneViews(published.item),
+        mergedOrds: merged,
+        staleOrds: supervision.staleLanesFor(workItemId),
+        blockedReasons,
+      }
+    },
+    mergeLane: async (workItemId, ord) => {
+      const published = supervision.publications
+        .snapshot()
+        .items.find((entry) => entry.item.id === workItemId)
+      if (published === undefined) return { ok: false, reason: 'no such work item' }
+      const merged = supervision
+        .listSessions()
+        .filter((session) => session.runtimeState === 'merged' && session.laneOrd !== null)
+        .map((session) => session.laneOrd as number)
+      const decision = mayMergeLane(published.item, ord, merged)
+      if (!decision.allowed) return { ok: false, reason: decision.reason }
+      const binding = supervision.laneBindings.forLane(workItemId, ord)
+      const session = binding === null ? null : supervision.getSession(binding.sessionId)
+      if (session === null) return { ok: false, reason: 'no session is bound to that lane' }
+      return supervision.codeHost.merge(session.repoPath, session.branch)
+    },
+    getProvisioning: (sessionId) => supervision.provisioningFor(sessionId),
+    getSinceLastLooked: (sessionId) => {
+      const session = supervision.getSession(sessionId)
+      const lastViewedAt = session?.lastViewedAt ?? null
+      supervision.registry.markViewed(sessionId, Date.now())
+      return {
+        lastViewedAt,
+        entries: supervision.feed.forSession(sessionId),
+      }
+    },
+    precheckBackpressure: () => supervision.backpressure.check(),
+    entityIndex: () =>
+      supervision.entityIndex([
+        { id: 'toggle-shadow', label: 'Toggle stall shadow mode' },
+        { id: 'open-attention', label: 'Open the attention queue' },
+      ]),
+    intake: (input) => supervision.intake(input),
+    assign: (request) =>
+      supervision.assigner.assign({
+        ...(request as Parameters<typeof supervision.assigner.assign>[0]),
+        worktreeRoot: join(app.getPath('userData'), 'worktrees'),
+      }),
+    replyToSession: (sessionId, message) =>
+      supervision.feedReply.reply(
+        supervision.feed
+          .forSession(sessionId)
+          .filter((entry) => entry.replyable)
+          .at(-1)?.id ?? '',
+        message
+      ),
+    archive: async (sessionId) => {
+      const session = supervision.getSession(sessionId)
+      if (session === null) return { allowed: false, reason: 'no such session' }
+      const decision = mayArchive(session.runtimeState)
+      if (!decision.allowed) return decision
+      await supervision.provisioner.release({
+        repoPath: session.repoPath,
+        worktreePath: session.worktreePath,
+        workItemId: session.workItemId ?? sessionId,
+        portBase: 0,
+      })
+      return decision
+    },
+    openInEditor: async (sessionId) => {
+      const session = supervision.getSession(sessionId)
+      if (session === null) return { ok: false, reason: 'no such session' }
+      return openInEditor({
+        editorCommand: (supervisionStore.get('externalEditor') as string | undefined) ?? null,
+        worktreePath: session.worktreePath,
+        run: runCommand,
+      })
+    },
+  })
   registerDialogHandlers()
   registerAppHandlers()
 

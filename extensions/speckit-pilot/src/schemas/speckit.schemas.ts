@@ -85,7 +85,7 @@ const PilotSettingsSchema = z.object({
   writeStatusBackOnPrOpen: z.boolean().default(false),
   linear: LinearSettingsSchema.nullable().default(null),
   jira: JiraSettingsSchema.nullable().default(null),
-  phaseGates: z.record(PhaseIdSchema, PhaseGateConfigSchema),
+  phaseGates: z.partialRecord(PhaseIdSchema, PhaseGateConfigSchema),
   disallowedPaths: z.array(z.string()),
   maxFilesPerImplementRun: z.number().int().positive(),
   maxTokensPerCommand: z.number().int().positive(),
@@ -144,7 +144,7 @@ export const PilotStateSchema = z.object({
   worktreePath: z.string().nullable().default(null),
   branchName: z.string().nullable().default(null),
   prUrl: z.string().nullable().default(null),
-  phases: z.record(PhaseIdSchema, PhaseStateSchema),
+  phases: z.partialRecord(PhaseIdSchema, PhaseStateSchema),
   settings: PilotSettingsSchema,
 })
 
@@ -158,7 +158,7 @@ const PilotStateV2Schema = z.object({
   worktreePath: z.string().nullable().default(null),
   branchName: z.string().nullable().default(null),
   prUrl: z.string().nullable().default(null),
-  phases: z.record(PhaseIdSchema, PhaseStateSchema),
+  phases: z.partialRecord(PhaseIdSchema, PhaseStateSchema),
   settings: PilotSettingsSchema,
 })
 
@@ -166,7 +166,7 @@ const PilotStateV2Schema = z.object({
 const PilotStateV1Schema = z.object({
   version: z.literal(1),
   featureDir: z.string(),
-  phases: z.record(PhaseIdSchema, PhaseStateSchema),
+  phases: z.partialRecord(PhaseIdSchema, PhaseStateSchema),
   settings: PilotSettingsSchema,
 })
 
@@ -270,7 +270,7 @@ export const DispatchPayloadSchema = z.object({
   workspacePath: z.string().min(1),
   ticket: TicketRefSchema,
   autonomyLevel: z.enum(['guided', 'standard', 'fast']),
-  phaseGates: z.record(
+  phaseGates: z.partialRecord(
     PhaseIdSchema,
     z.object({ required: z.boolean(), autoApprove: z.boolean(), perFileConfirm: z.boolean() })
   ),

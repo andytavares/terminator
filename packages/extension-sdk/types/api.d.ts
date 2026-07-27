@@ -187,6 +187,60 @@ export interface ExtensionAPI {
   nativeMenu: {
     addViewMenuItem(item: NativeMenuItemContribution): Disposable
   }
+  /**
+   * Read-only view of supervised agent sessions.
+   *
+   * Deliberately excludes the transcript path, pending permission requests, and
+   * the raw event stream: transcripts are sensitive and unversioned, and a
+   * permission decision belongs to the operator. Both can be added later if a
+   * real need appears; the reverse is not true.
+   *
+   * Nothing here lets an extension assert state. Runtime state is derived from
+   * observed agent activity — an extension declaring it would defeat the point.
+   */
+  supervision: {
+    listSessions(): Promise<readonly SupervisedSessionView[]>
+    getSession(sessionId: string): Promise<SupervisedSessionView | null>
+    onStateChanged(
+      handler: (event: {
+        sessionId: string
+        from: SupervisedRuntimeState
+        to: SupervisedRuntimeState
+        at: number
+      }) => void
+    ): Disposable
+  }
+  /**
+   * Working-copy provisioning, provided by the core application. Extensions may
+   * consume it; core never calls an extension's provisioning.
+   */
+  worktrees: {
+    provision(opts: {
+      repoPath: string
+      branch: string
+      workItemId?: string
+    }): Promise<{ path: string; portBase: number; portSpan: number }>
+    release(worktreePath: string): Promise<void>
+    list(): Promise<readonly { path: string; branch: string; sessionId: string | null }[]>
+  }
+  /**
+   * Publishing work items to the console.
+   *
+   * The console owns the publication directory and its schema; a producer writes
+   * contract files into it and registers the actions the console may invoke.
+   * Every handler is optional — an unregistered action renders read-only with a
+   * stated reason rather than failing.
+   */
+  workItems: {
+    /** Absolute path this producer writes contract files into. Created on call. */
+    publicationDirectory(): Promise<string>
+    registerProducer(handlers: {
+      approveGate?(workItemId: string, gate: string): Promise<void>
+      rejectGate?(workItemId: string, gate: string, notes: string): Promise<void>
+      advancePhase?(workItemId: string): Promise<void>
+      sendBack?(workItemId: string, phase: string, notes: string): Promise<void>
+    }): Disposable
+  }
   fs: {
     watch(handler: (event: FsChangeEvent) => void): Disposable
   }
@@ -218,4 +272,29 @@ export interface ExtensionAPI {
     openAuxiliary(view: string, params?: Record<string, string>): void
     broadcast(channel: string, data: unknown): void
   }
+}
+
+export type SupervisedRuntimeState =
+  | 'starting'
+  | 'working'
+  | 'needs_input'
+  | 'stalled'
+  | 'ready'
+  | 'failed'
+  | 'merged'
+  | 'unknown'
+
+export interface SupervisedSessionView {
+  readonly id: string
+  readonly workItemId: string | null
+  readonly laneOrd: number | null
+  readonly repoPath: string
+  readonly worktreePath: string
+  readonly branch: string
+  readonly runtimeState: SupervisedRuntimeState
+  readonly stateSince: number
+  readonly turns: number
+  readonly costUsd: number
+  readonly contextPct: number | null
+  readonly diffSummary: { files: number; added: number; removed: number }
 }
