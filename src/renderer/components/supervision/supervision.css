@@ -12,6 +12,9 @@
 .sv-statusbar,
 .sv-queue__main,
 .sv-row,
+/* The card body is a button so the whole row is keyboard-reachable; without
+   the reset it renders as a white UA button inside a dark surface. */
+.sv-row__main,
 .sv-queue__btn,
 .sv-tab {
   appearance: none;
@@ -301,8 +304,11 @@
   height: 11px;
 }
 
+/* Each warning is its own statement. Inline-flex ran a predicted collision and
+   a merge-order block together on one line as though they were one sentence. */
 .sv-warn {
-  display: inline-flex;
+  display: flex;
+  width: fit-content;
   align-items: center;
   gap: 5px;
   font-size: 11px;
@@ -601,6 +607,20 @@
   color: var(--text-muted);
   text-transform: none;
   letter-spacing: 0;
+}
+
+/* The palette's search box spans the panel and reads as the way in. */
+.sv-panel__search {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+.sv-panel__search:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
 }
 
 /* An inline row of controls that is a form, not a list. */

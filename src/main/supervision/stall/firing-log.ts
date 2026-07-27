@@ -24,6 +24,33 @@ interface JudgementRow {
 
 type Row = (RecordedFiring & { kind?: 'firing' }) | JudgementRow
 
+/**
+ * The log is a file on disk: it can be truncated by a crash, hand-edited, or
+ * written by an older build that had fewer fields. A row that is not a whole
+ * firing is dropped rather than surfaced — the surfaces dereference `inputs`
+ * directly, so one bad line would otherwise blank every supervision screen
+ * behind an error boundary, which is precisely the silent failure this console
+ * exists to prevent.
+ */
+function isWholeFiring(row: unknown): row is RecordedFiring {
+  if (typeof row !== 'object' || row === null) return false
+  const candidate = row as Record<string, unknown>
+  if (typeof candidate.id !== 'string' || typeof candidate.sessionId !== 'string') return false
+  if (typeof candidate.signal !== 'string' || typeof candidate.firedAt !== 'number') return false
+
+  const inputs = candidate.inputs
+  if (typeof inputs !== 'object' || inputs === null) return false
+  const values = inputs as Record<string, unknown>
+  return (
+    typeof values.toolSilenceMs === 'number' &&
+    typeof values.diffSilenceMs === 'number' &&
+    typeof values.distinctFiles === 'number' &&
+    typeof values.netChange === 'number' &&
+    typeof values.reverts === 'number' &&
+    typeof values.shellInFlight === 'boolean'
+  )
+}
+
 export interface PrecisionReport {
   readonly total: number
   readonly judged: number
@@ -57,8 +84,8 @@ export function createFiringLog(path: string): FiringLog {
           judgement: judgementRow.judgement,
           judgedAt: judgementRow.judgedAt,
         })
-      } else {
-        const firing = row as RecordedFiring
+      } else if (isWholeFiring(row)) {
+        const firing = row
         firings.set(firing.id, firing)
       }
     }

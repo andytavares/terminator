@@ -203,3 +203,56 @@ describe('a lane bound twice (spec Edge Cases)', () => {
     expect(bindings.forSession('first')).toBeNull()
   })
 })
+
+describe('the entity index has one row per identity', () => {
+  const session = (over: Record<string, unknown> = {}) => ({
+    id: 's1',
+    workItemId: null,
+    laneOrd: null,
+    repoPath: '/repos/fluent',
+    worktreePath: '/wt/shared',
+    branch: 'feat/x',
+    transcriptPath: null,
+    runtimeState: 'working' as const,
+    stateSince: 1,
+    lastToolActivityAt: null,
+    lastNetChangeAt: null,
+    openShellCallId: null,
+    turns: 0,
+    costUsd: 0,
+    contextPct: null,
+    pendingPermission: null,
+    diffSummary: { files: 0, added: 0, removed: 0 },
+    autonomyLevel: 'edit' as const,
+    lastViewedAt: null,
+    failure: null,
+    ...over,
+  })
+
+  it('lists a shared worktree once, not once per session', () => {
+    const index = buildEntityIndex({
+      sessions: [session(), session({ id: 's2' }), session({ id: 's3' })],
+      workItems: [],
+      commands: [],
+    })
+    expect(index.filter((e) => e.kind === 'worktree')).toHaveLength(1)
+  })
+
+  it('lists a repository backing several sessions once', () => {
+    const index = buildEntityIndex({
+      sessions: [session(), session({ id: 's2', worktreePath: '/wt/other' })],
+      workItems: [],
+      commands: [],
+    })
+    expect(index.filter((e) => e.kind === 'repository')).toHaveLength(1)
+  })
+
+  it('still lists each distinct session', () => {
+    const index = buildEntityIndex({
+      sessions: [session(), session({ id: 's2' })],
+      workItems: [],
+      commands: [],
+    })
+    expect(index.filter((e) => e.kind === 'session')).toHaveLength(2)
+  })
+})

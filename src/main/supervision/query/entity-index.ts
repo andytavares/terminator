@@ -64,5 +64,15 @@ export function buildEntityIndex(input: IndexInput): IndexedEntity[] {
     entities.push({ id: command.id, kind: 'command', label: command.label })
   }
 
-  return entities
+  // One entity per identity. Sessions sharing a working copy, or a repository
+  // backing several sessions, would otherwise put the same row in the palette
+  // once per session — noise in the one surface whose whole job is to get you
+  // somewhere in a single keystroke.
+  const seen = new Set<string>()
+  return entities.filter((entity) => {
+    const key = `${entity.kind}:${entity.id}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }

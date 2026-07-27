@@ -59,6 +59,7 @@ Extension dependencies (not part of the core app): `@electric-sql/pglite`, `sql.
 ## Documentation
 
 - **[User Guide](docs/user-guide/USER-GUIDE.md)** — End-to-end walkthrough of every feature and extension, with screenshots.
+- **[Supervising agents](SUPERVISION.md)** — The Agent Supervision Console end to end: starting agents, stall detection, review and backpressure, work items and lanes, with screenshots.
 - **[Architecture](docs/ARCHITECTURE.md)** — Process model, IPC, extension system deep-dive.
 - **[Extension Development Guide](docs/EXTENSION-DEVELOPMENT.md)** — Building extensions with the Extension SDK.
 - **[Contributing](docs/CONTRIBUTING.md)** — Development setup, conventions, PR process.

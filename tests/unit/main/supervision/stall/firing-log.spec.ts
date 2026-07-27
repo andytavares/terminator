@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync } from 'fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { createFiringLog } from '../../../../../src/main/supervision/stall/firing-log.js'
@@ -130,5 +130,72 @@ describe('durability', () => {
     const first = createFiringLog(logPath)
     first.record(firing(), true)
     expect(createFiringLog(logPath).list()).toHaveLength(1)
+  })
+})
+
+// The log is a file on disk: a crash can truncate it, an older build can have
+// written fewer fields, and a person can edit it. The surfaces read
+// `firing.inputs` directly, so a bad row must never reach them — one would
+// blank every supervision screen behind the error boundary.
+
+describe('a row that is not a whole firing', () => {
+  function withRows(rows: unknown[]) {
+    const path = join(dir, 'firings.jsonl')
+    writeFileSync(path, rows.map((r) => JSON.stringify(r)).join('\n') + '\n')
+    return createFiringLog(path)
+  }
+
+  const whole = {
+    id: 'f1',
+    sessionId: 's1',
+    signal: 'silence',
+    firedAt: 1_000,
+    shadowMode: true,
+    judgement: null,
+    judgedAt: null,
+    inputs: {
+      toolSilenceMs: 600_000,
+      diffSilenceMs: 900_000,
+      distinctFiles: 1,
+      netChange: 0,
+      reverts: 2,
+      shellInFlight: false,
+    },
+  }
+
+  it('keeps a whole firing', () => {
+    expect(withRows([whole]).list()).toHaveLength(1)
+  })
+
+  it('drops a row with no inputs at all', () => {
+    expect(withRows([{ ...whole, inputs: undefined }]).list()).toEqual([])
+  })
+
+  it('drops a row whose inputs are missing a field', () => {
+    const { toolSilenceMs: _drop, ...partial } = whole.inputs
+    expect(withRows([{ ...whole, inputs: partial }]).list()).toEqual([])
+  })
+
+  it('drops a row with no id', () => {
+    const { id: _drop, ...noId } = whole
+    expect(withRows([noId]).list()).toEqual([])
+  })
+
+  it('drops a row that is not an object', () => {
+    expect(withRows([42]).list()).toEqual([])
+  })
+
+  it('keeps the good rows around a bad one', () => {
+    const log = withRows([whole, { nonsense: true }, { ...whole, id: 'f2' }])
+    expect(log.list().map((f) => f.id)).toEqual(['f1', 'f2'])
+  })
+
+  it('still applies a judgement to a firing that survived', () => {
+    const log = withRows([
+      whole,
+      { nonsense: true },
+      { kind: 'judgement', id: 'f1', judgement: 'incorrect', judgedAt: 2_000 },
+    ])
+    expect(log.list()[0].judgement).toBe('incorrect')
   })
 })

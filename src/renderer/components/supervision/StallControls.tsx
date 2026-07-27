@@ -74,9 +74,12 @@ export function StallControls({
             <span className="sv-row__grade">{firing.signal}</span>
             <span className="sv-row__main">
               <div className="sv-queue__title">{firing.sessionId}</div>
+              {/* Read defensively: the log is a file on disk and a row written
+                  by an older build must degrade, never blank the screen. */}
               <div className="sv-queue__meta">
-                silence {Math.round(firing.inputs.toolSilenceMs / 60_000)}m · files{' '}
-                {firing.inputs.distinctFiles} · reverts {firing.inputs.reverts}
+                {firing.inputs === undefined
+                  ? 'recorded without its inputs'
+                  : `silence ${Math.round(firing.inputs.toolSilenceMs / 60_000)}m · files ${firing.inputs.distinctFiles} · reverts ${firing.inputs.reverts}`}
                 {firing.shadowMode && ' · shadow'}
               </div>
             </span>

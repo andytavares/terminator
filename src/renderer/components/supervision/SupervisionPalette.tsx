@@ -72,8 +72,11 @@ export function SupervisionPalette({
 
   return (
     <div className="sv-panel">
+      {/* Its own class, not the section-header one: that is uppercased with
+          letter-spacing, so it rendered what you typed in capitals. */}
       <input
-        className="sv-panel__header"
+        className="sv-panel__search"
+        placeholder="Search sessions, work items, repositories, worktrees and commands"
         aria-label="Search sessions, work items, repositories, worktrees and commands"
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}

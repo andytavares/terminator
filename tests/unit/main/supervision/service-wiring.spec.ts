@@ -820,6 +820,60 @@ describe('starting the console back up', () => {
     service.stop()
   })
 
+  it('re-queues work that was already finished, so the queue survives a restart', async () => {
+    // The queue is in-memory and the sessions are not: without this the status
+    // bar counts work to review while the review surface says there is none —
+    // on the same screen (FR-045, SC-009).
+    const service = build({
+      readDiff: async () => ({ files: 2, added: 10, removed: 1 }),
+      readFiles: async () => ['src/widgets/button.tsx'],
+      run: async () => ({ ok: true, stdout: '', stderr: '' }),
+      codeHost: {
+        checkState: async () => 'passing' as const,
+        pullRequestFor: async () => null,
+        createPullRequest: async () => null,
+        merge: async () => ({ ok: true, reason: null }),
+        isAvailable: async () => true,
+      },
+    })
+    service.registry.register('s1', meta())
+    service.bus.publish({
+      kind: 'session_started',
+      sessionId: 's1',
+      transcriptPath: null,
+      cwd: join(root, 'repo'),
+      at: 10_000,
+    })
+    service.registry.apply({
+      kind: 'turn_finished',
+      sessionId: 's1',
+      turns: 1,
+      costUsd: 0,
+      contextPct: null,
+      at: 11_000,
+    })
+    ;(service.registry.get('s1') as { diffSummary: { files: number } }).diffSummary.files = 1
+    service.bus.publish({ kind: 'session_ended', sessionId: 's1', outcome: 'success', at: 12_000 })
+    await vi.waitFor(() => expect(service.getSession('s1')?.runtimeState).toBe('ready'))
+
+    // A fresh queue, as a restart produces.
+    service.reviewQueue.remove('s1')
+    expect(service.reviewQueue.count()).toBe(0)
+
+    service.start()
+    await vi.waitFor(() => expect(service.reviewQueue.count()).toBe(1))
+    service.stop()
+  })
+
+  it('re-queues nothing for sessions that are not finished', async () => {
+    const service = build()
+    service.registry.register('s1', meta())
+    service.start()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(service.reviewQueue.count()).toBe(0)
+    service.stop()
+  })
+
   it('starts the stall scheduler as well', () => {
     const service = build()
     expect(() => service.start()).not.toThrow()

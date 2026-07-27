@@ -697,6 +697,16 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
       // guaranteed — so reconcile now rather than up to 30 seconds later
       // (SC-010).
       for (const session of registry.list()) service.reconcileFromTranscript(session.id)
+
+      // The queue is in-memory and the sessions are not. Without this a
+      // restart empties the review queue while the sessions are still sitting
+      // in `ready` — the status bar counts work to review and the review
+      // surface says there is none, on the same screen (FR-045, SC-009).
+      for (const session of registry.list()) {
+        if (session.runtimeState !== 'ready') continue
+        void enqueueForReview(session.id)
+      }
+
       scheduler.start()
     },
     stop: () => {
