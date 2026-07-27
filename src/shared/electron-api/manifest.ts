@@ -613,6 +613,12 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
   { path: 'supervision.intake', kind: 'invoke', channel: 'supervision:intake', remote: 'omit' },
   { path: 'supervision.assign', kind: 'invoke', channel: 'supervision:assign', remote: 'omit' },
   {
+    path: 'supervision.onWorkItemsChanged',
+    kind: 'event',
+    channel: 'supervision:workItemsChanged',
+    remote: 'omit',
+  },
+  {
     path: 'supervision.getDigest',
     kind: 'invoke',
     channel: 'supervision:getDigest',

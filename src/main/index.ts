@@ -331,6 +331,7 @@ app.whenReady().then(async () => {
       set: (value) => supervisionStore.set('laneBindings', value),
     },
     onStateChanged: (change) => stateFanout.publish(change),
+    onPublicationsChanged: () => mainWindow?.webContents.send('supervision:workItemsChanged', {}),
     // FR-027: a stall is a non-blocking indicator, never a modal. The service
     // has already applied the channel policy — anything that reaches here is
     // meant to be seen.

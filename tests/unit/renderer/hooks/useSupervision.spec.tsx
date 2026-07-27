@@ -52,6 +52,7 @@ function makeBridge(over: Record<string, unknown> = {}) {
   return {
     listSessions: vi.fn().mockResolvedValue([session()]),
     onStateChanged: vi.fn().mockReturnValue(vi.fn()),
+    onWorkItemsChanged: vi.fn().mockReturnValue(vi.fn()),
     resolvePermission: vi.fn().mockResolvedValue(undefined),
     setShadowMode: vi.fn().mockResolvedValue(undefined),
     judgeFiring: vi.fn().mockResolvedValue(undefined),
@@ -616,5 +617,30 @@ describe('the progress digest (FR-028)', () => {
     await waitFor(() => expect(result.current.loaded).toBe(true))
     act(() => result.current.screenProps.onRefreshDigest())
     expect(result.current.screenProps.digest).toBeNull()
+  })
+})
+
+// FR-071: the board must reflect a producer's write without the operator
+// refreshing anything. The watcher exists to say so; polling is the backstop.
+
+describe('a producer writing a work item', () => {
+  it('re-reads the board when the watcher fires', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    expect(bridge.onWorkItemsChanged).toHaveBeenCalled()
+
+    const handler = bridge.onWorkItemsChanged.mock.calls[0][0] as () => void
+    bridge.listWorkItems.mockClear()
+    act(() => handler())
+    await waitFor(() => expect(bridge.listWorkItems).toHaveBeenCalled())
+  })
+
+  it('unsubscribes from the watcher on unmount', async () => {
+    const off = vi.fn()
+    install({ onWorkItemsChanged: vi.fn().mockReturnValue(off) })
+    const { result, unmount } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    unmount()
+    expect(off).toHaveBeenCalled()
   })
 })

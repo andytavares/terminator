@@ -34,6 +34,8 @@ const TICK_MS = 1_000
 interface SupervisionBridge {
   listSessions(): Promise<SupervisedSession[]>
   onStateChanged?(handler: (change: unknown) => void): () => void
+  /** A producer wrote a work item; the board reflects it without a refresh. */
+  onWorkItemsChanged?(handler: () => void): () => void
   resolvePermission?(payload: {
     sessionId: string
     requestId: string
@@ -162,11 +164,15 @@ export function useSupervision(): UseSupervision {
     // Pushed the moment the substrate observes a change, so a permission
     // request reaches this surface in one IPC hop rather than a poll interval.
     const unsubscribe = transport.onStateChanged?.(() => refresh())
+    const unsubscribeItems = transport.onWorkItemsChanged?.(() => {
+      void transport.listWorkItems?.().then(setBoard)
+    })
     const backstop = setInterval(refresh, BACKSTOP_MS)
     const tick = setInterval(() => setNow(Date.now()), TICK_MS)
 
     return () => {
       unsubscribe?.()
+      unsubscribeItems?.()
       clearInterval(backstop)
       clearInterval(tick)
     }

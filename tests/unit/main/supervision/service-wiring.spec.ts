@@ -394,3 +394,18 @@ describe('directing an action at a producer', () => {
     expect(readFileSync(file, 'utf-8')).toBe(before)
   })
 })
+
+describe('telling the console a producer wrote something (FR-071)', () => {
+  it('reports a publication change without being polled', async () => {
+    const onPublicationsChanged = vi.fn()
+    build({ onPublicationsChanged })
+    publish()
+
+    // The watcher is filesystem-driven; the re-scan backstop bounds how long
+    // this can take under load.
+    await vi.waitFor(() => expect(onPublicationsChanged).toHaveBeenCalled(), {
+      timeout: 3_000,
+      interval: 100,
+    })
+  })
+})

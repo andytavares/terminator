@@ -72,6 +72,12 @@ export interface SupervisionServiceOptions {
   codeHost?: CodeHostClient
   now?: () => number
   onStateChanged?: (change: { sessionId: string; to: string; at: number }) => void
+  /**
+   * A producer wrote, changed or removed a work item. FR-071: the board must
+   * reflect it without the operator refreshing anything, and the watcher's
+   * whole purpose is to say so rather than be polled.
+   */
+  onPublicationsChanged?: () => void
   notify?: (entry: { sessionId: string; summary: string }) => void
 }
 
@@ -217,7 +223,9 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
   const laneBindings = createLaneBindings(
     options.bindingStore ?? { get: () => undefined, set: () => {} }
   )
-  const publications = watchPublications(publicationRoot(userDataPath), () => {})
+  const publications = watchPublications(publicationRoot(userDataPath), () => {
+    options.onPublicationsChanged?.()
+  })
   const codeHost = options.codeHost ?? createCodeHostClient(options.run ?? runCommand)
   const readDiff = options.readDiff ?? readDiffSummary
   const readFiles = options.readFiles ?? readChangedFiles
