@@ -1,0 +1,43 @@
+src/renderer/components/supervision/supervision.css
+  s_5f98598a6d950e::t_8798ce55db6503 507-508,510,528-551
+  s_5f98598a6d950e::t_112fc38a64e6f6 552
+src/renderer/hooks/useSupervision.ts
+  s_5f98598a6d950e::t_4fc7e6ff7f02e3 187-192
+  s_5f98598a6d950e::t_ee87b965bd5f7c 3,182-186,193-221,554-557
+  s_5f98598a6d950e::t_88d446250ef541 178-181
+tests/unit/renderer/supervision/assign-panel.spec.tsx
+  s_5f98598a6d950e::t_7bc1ae26eca90a 54-58
+  s_5f98598a6d950e::t_1c6b496c901e28 12-16,23-26,34-35,38-52,59-73,78,81,84-85,92-98,100-106,108-116,118-129,133,143,146-147,154-155,162,187,206-208,210-212
+  s_5f98598a6d950e::t_4104a23e487d89 99,107,117,209
+  s_5f98598a6d950e::t_63f343ed669032 53
+src/renderer/components/supervision/SupervisionScreen.tsx
+  s_5f98598a6d950e::t_ee87b965bd5f7c 27,125-129
+  s_5f98598a6d950e::t_cfc19dbf73b633 232-235
+src/renderer/components/supervision/AssignControls.tsx
+  s_5f98598a6d950e::t_b1cac1eebe4360 237-243,249-255,271-275,281-284,289-290,294-304,309-310,327-344,346-348,352-353,355,357-371,373-406,439-441
+  s_5f98598a6d950e::t_7bc1ae26eca90a 345,349-351
+  s_5f98598a6d950e::t_4104a23e487d89 372
+tests/unit/renderer/hooks/useSupervision.spec.tsx
+  s_5f98598a6d950e::t_0a1ce7a691d1ab 5,121-132,137-149,941-985
+  s_5f98598a6d950e::t_106c3a5a3cf0c0 986
+tests/unit/renderer/supervision/screen.spec.tsx
+  s_5f98598a6d950e::t_c008994e4c5e1b 69-72
+SUPERVISION.md
+  s_5f98598a6d950e::t_b28c6074207498 95-97,99-104,108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "e44ed6f1be5cab8ab5d975f637a9e9a697c0ddbf",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
