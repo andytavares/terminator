@@ -1,0 +1,34 @@
+src/main/supervision/supervision-service.ts
+  s_5f98598a6d950e::t_4d3351524ad91e 693-701
+tests/unit/main/supervision/service-wiring.spec.ts
+  s_5f98598a6d950e::t_f949efd70a9e99 789-837
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_5f98598a6d950e::t_a6876a0e4ee4c2 498-499,502-503,505-507,510-511,513-515,518-519,521-523
+  s_5f98598a6d950e::t_df3c38ffc73666 500-501,504,508-509,512,516-517,520
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_5f98598a6d950e::t_d58b45d1b7ae19 16-17,29,111-116
+  s_5f98598a6d950e::t_70fabccec316f3 117-119
+src/renderer/App.tsx
+  s_5f98598a6d950e::t_d58b45d1b7ae19 158
+  s_5f98598a6d950e::t_ea1194a4cf1e72 149-150
+docs/ARCHITECTURE.md
+  s_5f98598a6d950e::t_134cdb26ae72ac 853-859
+docs/user-guide/USER-GUIDE.md
+  s_5f98598a6d950e::t_8cbcfccad64665 245,670-673
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "65e51279cd639e0543ea8d798133dd386983a54c",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
