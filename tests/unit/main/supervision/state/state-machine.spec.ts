@@ -218,6 +218,41 @@ describe('session end (FR-045)', () => {
       started,
       { kind: 'session_ended', sessionId: 's1', outcome: 'success', at: at(900) },
     ])
+    expect(s.runtimeState).not.toBe('ready')
+  })
+
+  it('does not call an empty-diff session merged — no branch reached the trunk', () => {
+    // Calling it `merged` would unblock downstream lanes waiting on a change
+    // that was never made (FR-088, FR-090).
+    const s = reduce([
+      started,
+      { kind: 'session_ended', sessionId: 's1', outcome: 'success', at: at(900) },
+    ])
+    expect(s.runtimeState).toBe('failed')
+    expect(s.failure?.output).toMatch(/without changing anything/)
+  })
+
+  it('moves to `merged` only when the branch actually reached the trunk', () => {
+    const s = reduce([
+      started,
+      {
+        kind: 'turn_finished',
+        sessionId: 's1',
+        turns: 1,
+        costUsd: 0,
+        contextPct: null,
+        at: at(800),
+      },
+      { kind: 'branch_merged', sessionId: 's1', unattended: false, at: at(900) },
+    ])
+    expect(s.runtimeState).toBe('merged')
+  })
+
+  it('records an unattended merge as a merge just the same', () => {
+    const s = reduce([
+      started,
+      { kind: 'branch_merged', sessionId: 's1', unattended: true, at: at(900) },
+    ])
     expect(s.runtimeState).toBe('merged')
   })
 

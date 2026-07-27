@@ -21,6 +21,7 @@ const SOURCE_PATH = resolve(
 describe('SessionEvent kinds (data-model.md §1)', () => {
   it('declares exactly the documented set of kinds', () => {
     expect([...SESSION_EVENT_KINDS].sort()).toEqual([
+      'branch_merged',
       'permission_requested',
       'permission_resolved',
       'session_ended',

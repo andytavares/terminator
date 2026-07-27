@@ -520,22 +520,7 @@ app.whenReady().then(async () => {
         blockedReasons,
       }
     },
-    mergeLane: async (workItemId, ord) => {
-      const published = supervision.publications
-        .snapshot()
-        .items.find((entry) => entry.item.id === workItemId)
-      if (published === undefined) return { ok: false, reason: 'no such work item' }
-      const merged = supervision
-        .listSessions()
-        .filter((session) => session.runtimeState === 'merged' && session.laneOrd !== null)
-        .map((session) => session.laneOrd as number)
-      const decision = mayMergeLane(published.item, ord, merged)
-      if (!decision.allowed) return { ok: false, reason: decision.reason }
-      const binding = supervision.laneBindings.forLane(workItemId, ord)
-      const session = binding === null ? null : supervision.getSession(binding.sessionId)
-      if (session === null) return { ok: false, reason: 'no session is bound to that lane' }
-      return supervision.codeHost.merge(session.repoPath, session.branch)
-    },
+    mergeLane: (workItemId, ord) => supervision.mergeLane(workItemId, ord),
     getProvisioning: (sessionId) => supervision.provisioningFor(sessionId),
     getSinceLastLooked: (sessionId) => supervision.sinceLastLooked(sessionId, Date.now()),
     precheckBackpressure: () => supervision.backpressure.check(),

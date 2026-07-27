@@ -666,6 +666,14 @@ that lane is flagged as needing a rebase or a re-run.
 
 Single-repository work renders as one row with none of this.
 
+### Unattended merge
+
+Off by default, and enabled per repository rather than globally — one bad
+auto-merge kills the feature permanently, so the blast radius is capped at one
+repository by construction. Only the lowest grade qualifies, and only with green
+checks; anything else waits for you. Everything merged this way is recorded with
+its change summary, grade trigger and check state, and listed under **Review**.
+
 ### Starting an agent
 
 **Needs you** carries the start panel. Give it a repository path and a branch,

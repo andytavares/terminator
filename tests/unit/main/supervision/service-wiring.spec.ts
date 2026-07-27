@@ -257,7 +257,6 @@ describe('downstream lanes left behind by an upstream merge (FR-090)', () => {
     const service = build()
     service.registry.register('s1', meta({ workItemId: 'FLU-220', laneOrd: 1 }))
     service.registry.register('s2', meta({ workItemId: 'FLU-220', laneOrd: 2 }))
-    // The producer lane reaches `merged` the only way the state machine allows.
     service.bus.publish({
       kind: 'session_started',
       sessionId: 's1',
@@ -265,10 +264,11 @@ describe('downstream lanes left behind by an upstream merge (FR-090)', () => {
       cwd: join(root, 'repo'),
       at: 10_000,
     })
+    // Only a branch actually reaching the trunk means merged.
     service.bus.publish({
-      kind: 'session_ended',
+      kind: 'branch_merged',
       sessionId: 's1',
-      outcome: 'success',
+      unattended: false,
       at: 50_000,
     })
 
@@ -518,5 +518,198 @@ describe('what changed since you last looked', () => {
       })
     }
     expect(service.sinceLastLooked('s1', 999_999).stateChanges.length).toBeLessThanOrEqual(50)
+  })
+})
+
+// FR-060/FR-061. The policy was written and tested but nothing ever called it,
+// so nothing was ever merged unattended and the merge-audit surface could only
+// ever be empty.
+
+describe('unattended merge', () => {
+  function repoWithUnattended(enabled: boolean): void {
+    mkdirSync(join(root, 'repo', '.terminator'), { recursive: true })
+    writeFileSync(
+      join(root, 'repo', '.terminator', 'config.json'),
+      JSON.stringify({ review: { unattendedMergeLowestGrade: enabled, baseBranch: 'main' } })
+    )
+  }
+
+  function finished(over: Record<string, unknown> = {}) {
+    const merge = vi.fn().mockResolvedValue({ ok: true, reason: null })
+    const service = build({
+      readDiff: async () => ({ files: 1, added: 2, removed: 0 }),
+      // Lockfile-only: the lowest grade.
+      readFiles: async () => ['package-lock.json'],
+      run: async () => ({ ok: true, stdout: '', stderr: '' }),
+      codeHost: {
+        checkState: async () => 'passing' as const,
+        pullRequestFor: async () => null,
+        createPullRequest: async () => null,
+        merge,
+        isAvailable: async () => true,
+      },
+      ...over,
+    })
+    service.registry.register('s1', meta())
+    service.registry.apply({
+      kind: 'turn_finished',
+      sessionId: 's1',
+      turns: 1,
+      costUsd: 0,
+      contextPct: null,
+      at: 11_000,
+    })
+    ;(service.registry.get('s1') as { diffSummary: { files: number } }).diffSummary.files = 1
+    service.bus.publish({ kind: 'session_ended', sessionId: 's1', outcome: 'success', at: 12_000 })
+    return { service, merge }
+  }
+
+  it('merges the lowest grade with green checks where the repository opted in', async () => {
+    repoWithUnattended(true)
+    const { service, merge } = finished()
+    await vi.waitFor(() => expect(merge).toHaveBeenCalled())
+    expect(service.mergePolicy.unattendedMerges()).toHaveLength(1)
+  })
+
+  it('takes it out of the review queue, since nobody needs to look', async () => {
+    repoWithUnattended(true)
+    const { service } = finished()
+    await vi.waitFor(() => expect(service.reviewQueue.count()).toBe(0))
+  })
+
+  it('marks the session merged, so its lane unblocks the next one', async () => {
+    repoWithUnattended(true)
+    const { service } = finished()
+    await vi.waitFor(() => expect(service.getSession('s1')?.runtimeState).toBe('merged'))
+  })
+
+  it('records it with enough detail to review after the fact (SC-012)', async () => {
+    repoWithUnattended(true)
+    const { service } = finished()
+    await vi.waitFor(() => expect(service.mergePolicy.unattendedMerges()).toHaveLength(1))
+    expect(service.mergePolicy.unattendedMerges()[0]).toMatchObject({
+      sessionId: 's1',
+      checkState: 'passing',
+    })
+  })
+
+  it('merges nothing where the repository did not opt in', async () => {
+    repoWithUnattended(false)
+    const { service, merge } = finished()
+    await vi.waitFor(() => expect(service.reviewQueue.count()).toBe(1))
+    expect(merge).not.toHaveBeenCalled()
+  })
+
+  it('merges nothing when the checks are not green', async () => {
+    repoWithUnattended(true)
+    const { service, merge } = finished({
+      codeHost: {
+        checkState: async () => 'failing' as const,
+        pullRequestFor: async () => null,
+        createPullRequest: async () => null,
+        merge: vi.fn(),
+        isAvailable: async () => true,
+      },
+    })
+    await vi.waitFor(() => expect(service.reviewQueue.count()).toBe(1))
+    expect(merge).not.toHaveBeenCalled()
+  })
+
+  it('merges nothing above the lowest grade', async () => {
+    repoWithUnattended(true)
+    const { service, merge } = finished({ readFiles: async () => ['src/auth/token.ts'] })
+    await vi.waitFor(() => expect(service.reviewQueue.list()[0]?.grade).toBe('P0'))
+    expect(merge).not.toHaveBeenCalled()
+  })
+
+  it('leaves the item queued when the merge itself fails', async () => {
+    repoWithUnattended(true)
+    const { service } = finished({
+      codeHost: {
+        checkState: async () => 'passing' as const,
+        pullRequestFor: async () => null,
+        createPullRequest: async () => null,
+        merge: vi.fn().mockResolvedValue({ ok: false, reason: 'branch is behind' }),
+        isAvailable: async () => true,
+      },
+    })
+    await vi.waitFor(() => expect(service.reviewQueue.count()).toBe(1))
+    expect(service.mergePolicy.unattendedMerges()).toEqual([])
+  })
+})
+
+describe('merging a lane in order (FR-088)', () => {
+  function laned() {
+    publish()
+    const merge = vi.fn().mockResolvedValue({ ok: true, reason: null })
+    const service = build({
+      codeHost: {
+        checkState: async () => 'passing' as const,
+        pullRequestFor: async () => null,
+        createPullRequest: async () => null,
+        merge,
+        isAvailable: async () => true,
+      },
+    })
+    service.registry.register('s1', meta({ workItemId: 'FLU-220', laneOrd: 1 }))
+    service.registry.register('s2', meta({ workItemId: 'FLU-220', laneOrd: 2 }))
+    service.laneBindings.bind('FLU-220', 1, 's1', 10_000)
+    service.laneBindings.bind('FLU-220', 2, 's2', 10_000)
+    return { service, merge }
+  }
+
+  it('merges the producer lane', async () => {
+    const { service, merge } = laned()
+    await expect(service.mergeLane('FLU-220', 1)).resolves.toMatchObject({ ok: true })
+    expect(merge).toHaveBeenCalled()
+  })
+
+  it('records the merge, so the next lane actually unblocks', async () => {
+    // Merging without recording leaves every downstream lane waiting forever.
+    const { service } = laned()
+    await service.mergeLane('FLU-220', 1)
+    expect(service.getSession('s1')?.runtimeState).toBe('merged')
+    await expect(service.mergeLane('FLU-220', 2)).resolves.toMatchObject({ ok: true })
+  })
+
+  it('refuses a downstream lane before its upstream merged, naming the blocker', async () => {
+    const { service, merge } = laned()
+    const result = await service.mergeLane('FLU-220', 2)
+    expect(result.ok).toBe(false)
+    expect(result.reason).toMatch(/1/)
+    expect(merge).not.toHaveBeenCalled()
+  })
+
+  it('refuses a work item nobody published', async () => {
+    const { service } = laned()
+    await expect(service.mergeLane('FLU-999', 1)).resolves.toEqual({
+      ok: false,
+      reason: 'no such work item',
+    })
+  })
+
+  it('refuses a lane with no session bound to it', async () => {
+    publish()
+    const service = build()
+    await expect(service.mergeLane('FLU-220', 1)).resolves.toMatchObject({
+      reason: 'no session is bound to that lane',
+    })
+  })
+
+  it('does not record a merge that the code host refused', async () => {
+    publish()
+    const service = build({
+      codeHost: {
+        checkState: async () => 'passing' as const,
+        pullRequestFor: async () => null,
+        createPullRequest: async () => null,
+        merge: vi.fn().mockResolvedValue({ ok: false, reason: 'checks are failing' }),
+        isAvailable: async () => true,
+      },
+    })
+    service.registry.register('s1', meta({ workItemId: 'FLU-220', laneOrd: 1 }))
+    service.laneBindings.bind('FLU-220', 1, 's1', 10_000)
+    await expect(service.mergeLane('FLU-220', 1)).resolves.toMatchObject({ ok: false })
+    expect(service.getSession('s1')?.runtimeState).not.toBe('merged')
   })
 })

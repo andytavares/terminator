@@ -17,6 +17,7 @@ export const SESSION_EVENT_KINDS = [
   'turn_finished',
   'session_ended',
   'setup_finished',
+  'branch_merged',
 ] as const
 
 interface BaseEvent {
@@ -81,6 +82,17 @@ export interface SetupFinishedEvent extends BaseEvent {
   readonly output: string
 }
 
+/**
+ * The branch reached the trunk — by the operator merging it, or by an
+ * unattended merge. Without this nothing could ever put a session in `merged`,
+ * so lane ordering and downstream staleness had nothing to key off.
+ */
+export interface BranchMergedEvent extends BaseEvent {
+  readonly kind: 'branch_merged'
+  /** True when the console merged it without a person looking (FR-060). */
+  readonly unattended: boolean
+}
+
 export type SessionEvent =
   | SessionStartedEvent
   | ToolStartedEvent
@@ -90,6 +102,7 @@ export type SessionEvent =
   | TurnFinishedEvent
   | SessionEndedEvent
   | SetupFinishedEvent
+  | BranchMergedEvent
 
 const KIND_SET: ReadonlySet<string> = new Set(SESSION_EVENT_KINDS)
 

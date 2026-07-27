@@ -10,7 +10,7 @@ import { createFiringLog, type FiringLog } from './stall/firing-log.js'
 import { createStallSurfacer, type StallSurfacer, type ShadowStore } from './stall/surface-stall.js'
 import { createStallScheduler, type StallScheduler } from './stall/stall-scheduler.js'
 import { readTranscript } from './agent-runtime/transcript-tailer.js'
-import { staleLanes } from './lanes/lane-coordination.js'
+import { staleLanes, mayMergeLane } from './lanes/lane-coordination.js'
 import { parseHunks } from './review/parse-hunks.js'
 import type { Hunk } from './review/hunk-decisions.js'
 import { reconcile } from './state/reconcile.js'
@@ -123,6 +123,12 @@ export interface SupervisionService {
   mayBeginImplementation(workItemId: string): ReturnType<typeof mayBeginImplementation>
   /** Normalises a ticket URL or a dropped document into one shape (FR-068). */
   intake(input: { url?: string; filePath?: string; contents?: string }): IntakeResult
+  /**
+   * Merges a lane in order (FR-088). Refuses out-of-order when a shared
+   * contract file is involved, and records the merge so the next lane unblocks
+   * — merging without recording leaves every downstream lane waiting forever.
+   */
+  mergeLane(workItemId: string, ord: number): Promise<{ ok: boolean; reason: string | null }>
   /**
    * What changed while the operator was not looking, and marks it looked at
    * (FR-036). Assembled here rather than in the composition root so it is
@@ -391,7 +397,7 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
         : (publications.snapshot().items.find((entry) => entry.item.id === binding.workItemId)?.item
             .contract?.shared_files ?? [])
 
-    reviewQueue.enqueue({
+    const enqueued = reviewQueue.enqueue({
       sessionId,
       repoPath: session.repoPath,
       branch: session.branch,
@@ -405,6 +411,29 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
       },
       queuedAt: now(),
     })
+
+    if (enqueued === null) return
+
+    // FR-060/FR-061: the lowest grade, green checks, and only where the
+    // operator opted the repository in. Everything else waits for a person.
+    const candidate = {
+      sessionId,
+      repoPath: session.repoPath,
+      grade: enqueued.grade,
+      gradeTrigger: enqueued.gradeTrigger,
+      checkState,
+      diffSummary,
+    }
+    if (!mergePolicy.mayMergeUnattended(candidate).may) return
+
+    const merged = await codeHost.merge(session.repoPath, session.branch)
+    if (!merged.ok) return
+
+    // Recorded at merge time, unconditionally: retrieval must never depend on
+    // the operator having done something first (SC-012).
+    mergePolicy.recordUnattendedMerge(candidate, now())
+    reviewQueue.remove(sessionId)
+    bus.publish({ kind: 'branch_merged', sessionId, unattended: true, at: now() })
   }
 
   const service: SupervisionService = {
@@ -495,6 +524,30 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
         return intakeFromDocument(input.filePath, input.contents ?? '', now())
       }
       return { ok: false, reason: 'nothing to bring in' }
+    },
+
+    mergeLane: async (workItemId, ord) => {
+      const published = publications.snapshot().items.find((entry) => entry.item.id === workItemId)
+      if (published === undefined) return { ok: false, reason: 'no such work item' }
+
+      const mergedOrds = registry
+        .list()
+        .filter((session) => session.runtimeState === 'merged' && session.laneOrd !== null)
+        .map((session) => session.laneOrd as number)
+
+      const decision = mayMergeLane(published.item, ord, mergedOrds)
+      if (!decision.allowed) return { ok: false, reason: decision.reason }
+
+      const binding = laneBindings.forLane(workItemId, ord)
+      const session = binding === null ? null : registry.get(binding.sessionId)
+      if (session === null) return { ok: false, reason: 'no session is bound to that lane' }
+
+      const result = await codeHost.merge(session.repoPath, session.branch)
+      if (!result.ok) return result
+
+      bus.publish({ kind: 'branch_merged', sessionId: session.id, unattended: false, at: now() })
+      reviewQueue.remove(session.id)
+      return result
     },
 
     sinceLastLooked: (sessionId, at) => {

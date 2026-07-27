@@ -850,6 +850,13 @@ label rather than colour; icons are flat `lucide-react` inheriting
 it: the Attention Queue, the Standup Feed and the palette are three renderings
 of one query, built once.
 
+### `merged` means a branch reached the trunk
+
+Only a `branch_merged` event puts a session in `merged` — the operator merging a
+lane, or an unattended merge. A session that ends having changed nothing is
+terminal and distinguishable, but it is _not_ merged: calling it merged would
+unblock downstream lanes waiting on a change that was never made.
+
 ### Navigation is a callback, not a broadcast
 
 The palette and the attention queue navigate by calling into the hook, and the

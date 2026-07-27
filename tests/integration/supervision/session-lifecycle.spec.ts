@@ -110,7 +110,10 @@ describe('a session driven from request to review (SC-001)', () => {
       at: 2_000,
     })
     service.bus.publish({ kind: 'session_ended', sessionId: 's1', outcome: 'success', at: 5_000 })
-    expect(service.getSession('s1')?.runtimeState).toBe('merged')
+    // Terminal and distinguishable, but never `merged`: no branch reached the
+    // trunk, and saying otherwise would unblock lanes waiting on a change that
+    // was never made.
+    expect(service.getSession('s1')?.runtimeState).toBe('failed')
     expect(service.reviewQueue.count()).toBe(0)
   })
 

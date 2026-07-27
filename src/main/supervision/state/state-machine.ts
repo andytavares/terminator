@@ -130,8 +130,18 @@ export function applyEvent(state: SessionState, event: SessionEvent): SessionSta
       }
       // A session that changed nothing is terminal but has nothing to review,
       // so it must not enter the review queue (FR-045).
-      const producedChanges = state.diffSummary.files > 0
-      return transition(state, producedChanges ? 'ready' : 'merged', event.at)
+      // A session that changed nothing is terminal but has nothing to review,
+      // so it must not enter the review queue (FR-045) — and it is not a
+      // merge either: no branch reached the trunk. Calling it `merged` would
+      // unblock downstream lanes waiting on a change that was never made.
+      if (state.diffSummary.files > 0) return transition(state, 'ready', event.at)
+      return {
+        ...transition(state, 'failed', event.at),
+        failure: { step: 'agent', exitCode: null, output: 'finished without changing anything' },
+      }
     }
+
+    case 'branch_merged':
+      return transition(state, 'merged', event.at)
   }
 }
