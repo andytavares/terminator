@@ -52,7 +52,10 @@ beforeEach(() => {
 
 afterEach(() => {
   while (built.length > 0) built.pop()?.stop()
-  rmSync(root, { recursive: true, force: true })
+  // The setup script runs a real shell, and git leaves lock files behind it —
+  // a directory that is briefly non-empty is expected, not a failure. Without
+  // the retries this teardown raced and the suite flaked on ENOTEMPTY.
+  rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
 })
 
 function writeConfig(scripts: Record<string, string>): void {

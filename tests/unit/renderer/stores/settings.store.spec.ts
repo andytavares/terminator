@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = {
     promptForName: false,
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
+  supervision: { externalEditor: '' },
   extensions: {},
   ui: { hasSeenWelcome: false },
   notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
@@ -321,5 +322,30 @@ describe('useSettingsStore', () => {
         notifications: { overrides: { branchSwitchFailed: [] } },
       })
     })
+  })
+})
+
+describe('the supervision editor command', () => {
+  it('is persisted globally, so the worktree handoff can actually be configured', async () => {
+    // It used to live in a store key nothing ever wrote, which made "Open in
+    // editor" permanently unconfigurable (FR-044).
+    mockElectronAPI.settings.updateGlobal.mockResolvedValue({
+      settings: { ...DEFAULT_SETTINGS, supervision: { externalEditor: 'zed' } },
+    })
+
+    await useSettingsStore.getState().updateExternalEditor('zed')
+
+    expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+      supervision: { externalEditor: 'zed' },
+    })
+    expect(useSettingsStore.getState().globalSettings?.supervision.externalEditor).toBe('zed')
+  })
+
+  it('clears back to unconfigured', async () => {
+    mockElectronAPI.settings.updateGlobal.mockResolvedValue({
+      settings: { ...DEFAULT_SETTINGS, supervision: { externalEditor: '' } },
+    })
+    await useSettingsStore.getState().updateExternalEditor('')
+    expect(useSettingsStore.getState().globalSettings?.supervision.externalEditor).toBe('')
   })
 })

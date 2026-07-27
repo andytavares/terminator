@@ -18,6 +18,7 @@ interface SettingsState {
   updateWorktreeBaseDir: (dir: string) => Promise<void>
   updateWorkspaceWorktreeBaseDir: (workspaceId: string, dir: string | undefined) => Promise<void>
   updateBranchExcludePatterns: (patterns: string[]) => Promise<void>
+  updateExternalEditor: (command: string) => Promise<void>
   updateWorkspaceBranchExcludePatterns: (
     workspaceId: string,
     patterns: string[] | undefined
@@ -38,6 +39,7 @@ const DEFAULT_SETTINGS: GlobalSettings = {
     promptForName: false,
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
+  supervision: { externalEditor: '' },
   extensions: {},
   ui: { hasSeenWelcome: false },
   notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
@@ -125,6 +127,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   updateWorktreeBaseDir: async (dir) => {
     const result = await window.electronAPI.settings.updateGlobal({ git: { worktreeBaseDir: dir } })
+    set({ globalSettings: result.settings })
+  },
+
+  updateExternalEditor: async (command) => {
+    const result = await window.electronAPI.settings.updateGlobal({
+      supervision: { externalEditor: command },
+    })
     set({ globalSettings: result.settings })
   },
 

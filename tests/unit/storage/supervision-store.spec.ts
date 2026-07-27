@@ -35,9 +35,11 @@ describe('the supervision store', () => {
     expect(supervisionStore.get('laneBindings')).toEqual({})
   })
 
-  it('has no editor configured until the operator sets one (FR-044)', async () => {
+  it('holds no editor command — that is a global setting the operator can reach', async () => {
+    // It lived here and nothing ever wrote it, so the handoff could never be
+    // configured. It is in Settings → Supervision now.
     const { supervisionStore } = await import('../../../src/main/storage/supervision-store')
-    expect(supervisionStore.get('externalEditor')).toBe('')
+    expect(supervisionStore.get('externalEditor' as never)).toBeUndefined()
   })
 
   it('lives in its own file rather than the app settings blob', async () => {

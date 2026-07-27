@@ -114,6 +114,13 @@ export interface GlobalSettings {
     worktreeBaseDir: string
     branchExcludePatterns: string[]
   }
+  supervision: {
+    /**
+     * Command the worktree handoff runs, e.g. `code` or `zed`. Empty means no
+     * editor is configured, and the handoff says so rather than doing nothing.
+     */
+    externalEditor: string
+  }
   extensions: {
     [extensionId: string]: Record<string, unknown>
   }

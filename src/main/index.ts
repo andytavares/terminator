@@ -16,6 +16,7 @@ import { registerSupervisionHandlers } from './ipc/supervision.ipc.js'
 import { createSupervisionService } from './supervision/supervision-service.js'
 import { createStateFanout } from './supervision/state-fanout.js'
 import { supervisionStore } from './storage/supervision-store.js'
+import { getGlobalSettings } from './storage/settings-store.js'
 import { setSupervisionDeps } from './extensions/api.js'
 import { mayArchive } from './supervision/worktree/archive.js'
 import { openInEditor } from './supervision/worktree/editor-handoff.js'
@@ -565,7 +566,7 @@ app.whenReady().then(async () => {
       const session = supervision.getSession(sessionId)
       if (session === null) return { ok: false, reason: 'no such session' }
       return openInEditor({
-        editorCommand: (supervisionStore.get('externalEditor') as string | undefined) ?? null,
+        editorCommand: getGlobalSettings().supervision?.externalEditor || null,
         worktreePath: session.worktreePath,
         run: runCommand,
       })

@@ -37,6 +37,7 @@ export function GlobalSettings(): JSX.Element {
     updateScrollbackLimit,
     updateWorktreeBaseDir,
     updateBranchExcludePatterns,
+    updateExternalEditor,
     updateShowMetricsBar,
     updatePromptForName,
     updateNotificationDefaultTargets,
@@ -137,6 +138,26 @@ export function GlobalSettings(): JSX.Element {
         </label>
         <span className="settings-section__hint">
           Displays a system metrics bar at the bottom of every screen.
+        </span>
+      </div>
+
+      <h3 className="settings-section__title" style={{ marginTop: 20 }}>
+        Supervision
+      </h3>
+
+      <div className="settings-section__field">
+        <label className="settings-section__label">External Editor Command</label>
+        <input
+          type="text"
+          className="settings-section__input"
+          defaultValue={globalSettings.supervision?.externalEditor ?? ''}
+          placeholder="code"
+          onBlur={(e) => void updateExternalEditor(e.target.value.trim())}
+        />
+        <span className="settings-section__hint">
+          Run against a session&rsquo;s working copy by &ldquo;Open in editor&rdquo;. Handing off to
+          an editor is a first-class action, not a gap — but with nothing set here the button can
+          only tell you it is unconfigured.
         </span>
       </div>
 

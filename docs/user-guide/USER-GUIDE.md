@@ -666,6 +666,13 @@ that lane is flagged as needing a rebase or a re-run.
 
 Single-repository work renders as one row with none of this.
 
+### Handing a working copy to your editor
+
+Set the command under **Settings → Supervision → External Editor Command** —
+`code`, `zed`, `cursor`, whatever you use. **Open in editor** then runs it
+against the session's working copy. With nothing set, the button tells you it is
+unconfigured rather than doing nothing.
+
 ### When a session stalls
 
 The **Stalls** tab lists every session currently flagged, each with the four

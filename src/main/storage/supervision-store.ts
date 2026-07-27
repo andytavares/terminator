@@ -13,8 +13,6 @@ interface SupervisionStoreSchema {
   stallShadowMode: boolean
   /** Console-owned lane bindings — never written into producer state (FR-075). */
   laneBindings: unknown
-  /** The operator's editor command for the worktree handoff (FR-044). */
-  externalEditor: string
 }
 
 export const supervisionStore = new Store<SupervisionStoreSchema>({
@@ -23,6 +21,5 @@ export const supervisionStore = new Store<SupervisionStoreSchema>({
     sessions: {},
     stallShadowMode: true,
     laneBindings: {},
-    externalEditor: '',
   },
 })

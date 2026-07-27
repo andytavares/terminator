@@ -16,6 +16,12 @@ export const GlobalSettingsSchema = z.object({
     worktreeBaseDir: z.string(),
     branchExcludePatterns: z.array(z.string()).default([]),
   }),
+  supervision: z
+    .object({
+      /** Command the worktree handoff runs. Empty means no editor configured. */
+      externalEditor: z.string().default(''),
+    })
+    .prefault({}),
   extensions: z.record(z.string(), z.record(z.string(), z.unknown())),
   ui: z
     .object({
@@ -69,6 +75,7 @@ export const DEFAULT_GLOBAL_SETTINGS = {
     promptForName: false,
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
+  supervision: { externalEditor: '' },
   extensions: {},
   ui: { hasSeenWelcome: false },
   notifications: {
