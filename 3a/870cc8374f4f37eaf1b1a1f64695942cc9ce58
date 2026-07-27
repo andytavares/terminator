@@ -1,0 +1,73 @@
+tests/unit/main/supervision/events/event-bus.spec.ts
+  s_5f98598a6d950e::t_610a423a385c0c 110-150
+tests/unit/main/supervision/supervision-service.spec.ts
+  s_5f98598a6d950e::t_c7f2138e2229d2 301,311-349
+src/shared/supervision/gate-reviewable.ts
+  s_5f98598a6d950e::t_28bb1e9146e3fd 1-9,13
+  s_5f98598a6d950e::t_87f7a3fa6b2d46 10-12
+src/renderer/hooks/useSupervision.ts
+  s_5f98598a6d950e::t_d3289f8546cf67 101-105,445-467
+src/main/supervision/workitems/gates.ts
+  s_5f98598a6d950e::t_28bb1e9146e3fd 2,43
+tests/unit/renderer/hooks/useSupervision.spec.tsx
+  s_5f98598a6d950e::t_44dbddfb015b3f 103-104,864-913
+  s_5f98598a6d950e::t_5a7121c2de8a03 914
+tests/unit/shared/supervision/all-clear.spec.ts
+  s_5f98598a6d950e::t_f2433ea69da4a4 1-25
+tests/unit/ipc/supervision.ipc.spec.ts
+  s_5f98598a6d950e::t_26148741976bb2 242-243
+  s_5f98598a6d950e::t_44dbddfb015b3f 741-802
+src/renderer/components/supervision/AttentionQueue.tsx
+  s_5f98598a6d950e::t_b7e4692d63c4ac 4,42-44
+tests/unit/main/supervision/remaining-main.spec.ts
+  s_5f98598a6d950e::t_f2433ea69da4a4 7
+src/renderer/components/supervision/WorkItemBoard.tsx
+  s_5f98598a6d950e::t_28bb1e9146e3fd 14,93-95
+src/main/supervision/events/event-bus.ts
+  s_5f98598a6d950e::t_605518027dd86d 1,14-19,40-47
+src/shared/supervision/all-clear.ts
+  s_5f98598a6d950e::t_b7e4692d63c4ac 1-14
+tests/unit/renderer/supervision/surfaces.spec.tsx
+  s_5f98598a6d950e::t_87f7a3fa6b2d46 897,1003-1012
+  s_5f98598a6d950e::t_f8f8b958d0bd9f 1013-1014
+tests/unit/renderer/supervision/screen.spec.tsx
+  s_5f98598a6d950e::t_4273595091bbd6 55-58,238-278
+  s_5f98598a6d950e::t_c93d5f8570b2e6 279
+src/shared/electron-api/manifest.ts
+  s_5f98598a6d950e::t_71770661dbf557 627-638
+src/main/index.ts
+  s_5f98598a6d950e::t_71770661dbf557 483-484
+tests/unit/main/supervision/service-wiring.spec.ts
+  s_5f98598a6d950e::t_e05790674c6a53 716-788
+src/main/supervision/supervision-service.ts
+  s_5f98598a6d950e::t_c7f2138e2229d2 50
+  s_5f98598a6d950e::t_fceda81b1d11ca 81-86,132,366-375
+  s_5f98598a6d950e::t_d3289f8546cf67 137-140
+  s_5f98598a6d950e::t_4d4e1caadab021 325-331
+  s_5f98598a6d950e::t_e93f35823e6586 133-136,141-142,548-591
+  s_5f98598a6d950e::t_2d9e74f94cf75e 592
+src/main/ipc/supervision.ipc.ts
+  s_5f98598a6d950e::t_71770661dbf557 40-41,90-94,159-162,334-354
+  s_5f98598a6d950e::t_bd79b1bfd5eb43 355
+src/renderer/components/supervision/SupervisionScreen.tsx
+  s_5f98598a6d950e::t_f8807c0ee8d3c8 323
+  s_5f98598a6d950e::t_d3289f8546cf67 17,105-109,308-322,324-334
+docs/user-guide/USER-GUIDE.md
+  s_5f98598a6d950e::t_c407f19140a007 669-680
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "3a870cc8374f4f37eaf1b1a1f64695942cc9ce58",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
