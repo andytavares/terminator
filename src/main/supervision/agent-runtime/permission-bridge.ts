@@ -123,27 +123,33 @@ function summarise(toolName: string, input: unknown): { summary: string; detail:
 }
 
 /**
- * The answers a question offers, if it is one. A question with options is not
- * a yes/no, and approving it tells the agent nothing about which you meant.
+ * The questions being asked and the answers each offers.
+ *
+ * Grouped rather than flattened: an ask with two questions produced one pile of
+ * labels, and clicking "Throwaway" told the agent nothing about which question
+ * it answered.
  */
-function optionsOf(input: unknown): string[] | undefined {
+function questionsOf(input: unknown): Array<{ question: string; options: string[] }> | undefined {
   if (typeof input !== 'object' || input === null) return undefined
   const questions = (input as Record<string, unknown>).questions
   if (!Array.isArray(questions)) return undefined
 
-  const labels = questions.flatMap((entry) => {
-    const options = (entry as Record<string, unknown>).options
-    if (!Array.isArray(options)) return []
-    return options
-      .map((option) =>
-        typeof option === 'object' && option !== null
-          ? String((option as Record<string, unknown>).label ?? '')
-          : String(option)
-      )
-      .filter((label) => label !== '')
+  const asked = questions.flatMap((entry) => {
+    const record = entry as Record<string, unknown>
+    const question = typeof record.question === 'string' ? record.question : ''
+    const options = Array.isArray(record.options)
+      ? record.options
+          .map((option) =>
+            typeof option === 'object' && option !== null
+              ? String((option as Record<string, unknown>).label ?? '')
+              : String(option)
+          )
+          .filter((label) => label !== '')
+      : []
+    return question === '' && options.length === 0 ? [] : [{ question, options }]
   })
 
-  return labels.length === 0 ? undefined : [...new Set(labels)]
+  return asked.length === 0 ? undefined : asked
 }
 
 /** A compact, bounded rendering of an unrecognised tool input. */
@@ -197,7 +203,7 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
         requestId,
         toolName,
         ...summarise(toolName, input),
-        options: optionsOf(input),
+        questions: questionsOf(input),
         targetHost: targetHostOf(input),
         at: now(),
       })

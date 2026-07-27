@@ -21,10 +21,19 @@ export interface AttentionQueueProps {
   onOpen(sessionId: string): void
 }
 
+/** True when every part of the ask is already offered as a button below. */
+function hasAnswerableOptions(
+  permission: NonNullable<AttentionItem['pendingPermission']>
+): boolean {
+  const questions = permission.questions ?? []
+  return questions.length > 0 && questions.every((entry) => entry.options.length > 0)
+}
+
 /** A request the agent expects words back from, rather than a yes or no. */
 function isQuestion(permission: NonNullable<AttentionItem['pendingPermission']>): boolean {
   return (
-    (permission.options?.length ?? 0) > 0 || permission.toolName.toLowerCase().includes('question')
+    (permission.questions?.length ?? 0) > 0 ||
+    permission.toolName.toLowerCase().includes('question')
   )
 }
 
@@ -45,13 +54,15 @@ const REASON_TITLES: Record<AttentionItem['reason'], string> = {
  * of the offered ones.
  */
 function AnswerControls({
-  options,
+  questions,
   onAnswer,
 }: {
-  options: readonly string[] | undefined
+  questions: ReadonlyArray<{ question: string; options: readonly string[] }> | undefined
   onAnswer(answer: string): void
 }): JSX.Element {
   const [draft, setDraft] = useState('')
+  const asked = questions ?? []
+  const hasOptions = asked.some((entry) => entry.options.length > 0)
 
   const send = (): void => {
     if (draft.trim() === '') return
@@ -61,21 +72,36 @@ function AnswerControls({
 
   return (
     <div className="sv-answer">
-      {options !== undefined && options.length > 0 && (
-        <div className="sv-answer__options">
-          {options.map((option) => (
-            <button key={option} className="sv-queue__btn" onClick={() => onAnswer(option)}>
-              {option}
-            </button>
-          ))}
+      {asked.map((entry, index) => (
+        <div className="sv-answer__question" key={`${entry.question}-${index}`}>
+          {/* Named when there is more than one: a bare label would not say
+              which question it answers, and the agent gets only the text. */}
+          {asked.length > 1 && entry.question !== '' && (
+            <div className="sv-answer__label">{entry.question}</div>
+          )}
+          <div className="sv-answer__options">
+            {entry.options.map((option) => (
+              <button
+                key={option}
+                className="sv-queue__btn"
+                onClick={() =>
+                  onAnswer(
+                    asked.length > 1 && entry.question !== ''
+                      ? `${entry.question} — ${option}`
+                      : option
+                  )
+                }
+              >
+                {option}
+              </button>
+            ))}
+          </div>
         </div>
-      )}
+      ))}
       <div className="sv-answer__row">
         <input
           aria-label="Answer"
-          placeholder={
-            options !== undefined && options.length > 0 ? 'or answer in your own words…' : 'answer…'
-          }
+          placeholder={hasOptions ? 'or answer in your own words…' : 'answer…'}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
@@ -133,8 +159,11 @@ export function AttentionQueue({
             {/* The ask in full. You cannot decide what you cannot read, and
                 a summary of an unfamiliar tool is its name, not its request
                 (FR-007). */}
+            {/* Skipped when the questions are rendered as answerable buttons
+                below — the block would repeat them verbatim. */}
             {item.pendingPermission?.detail != null &&
-              item.pendingPermission.detail.trim() !== '' && (
+              item.pendingPermission.detail.trim() !== '' &&
+              !hasAnswerableOptions(item.pendingPermission) && (
                 <pre className="sv-queue__detail">{item.pendingPermission.detail}</pre>
               )}
             {/* The reason, on the queue itself: "failed" with the output hidden
@@ -155,7 +184,7 @@ export function AttentionQueue({
                   of these did you mean" (FR-007). */}
               {isQuestion(item.pendingPermission) ? (
                 <AnswerControls
-                  options={item.pendingPermission.options}
+                  questions={item.pendingPermission.questions}
                   onAnswer={(answer) =>
                     onAnswer(item.sessionId, item.pendingPermission!.requestId, answer)
                   }
@@ -179,7 +208,7 @@ export function AttentionQueue({
                   {/* Denying with a reason is worth more to the agent than a
                       bare refusal, and costs a sentence. */}
                   <AnswerControls
-                    options={undefined}
+                    questions={undefined}
                     onAnswer={(answer) =>
                       onAnswer(item.sessionId, item.pendingPermission!.requestId, answer)
                     }

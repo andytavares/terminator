@@ -1121,6 +1121,7 @@ describe('the ask is readable on the queue (FR-007)', () => {
       toolName: 'AskUserQuestion',
       summary: 'Which database should the worker write to?',
       detail: 'Which database should the worker write to?\n  Postgres\n  SQLite',
+      questions: undefined,
       requestedAt: 1_000,
     },
   }
@@ -1164,7 +1165,9 @@ describe('the ask is readable on the queue (FR-007)', () => {
     queue({
       pendingPermission: {
         ...blocked.pendingPermission,
-        options: ['App-wide UI text', 'Terminal output only'],
+        questions: [
+          { question: 'Which scope?', options: ['App-wide UI text', 'Terminal output only'] },
+        ],
       },
     })
     expect(screen.getByRole('button', { name: 'App-wide UI text' })).toBeDefined()
@@ -1185,7 +1188,12 @@ describe('answering a question rather than approving it (FR-007)', () => {
       toolName: 'AskUserQuestion',
       summary: 'What scope do you actually want turned red?',
       detail: 'What scope do you actually want turned red?',
-      options: ['App-wide UI text', 'Terminal output only', 'One specific view'],
+      questions: [
+        {
+          question: 'What scope do you actually want turned red?',
+          options: ['App-wide UI text', 'Terminal output only', 'One specific view'],
+        },
+      ],
       requestedAt: 1_000,
     },
   }
@@ -1243,7 +1251,7 @@ describe('answering a question rather than approving it (FR-007)', () => {
   })
 
   it('treats a question tool with no options as a question all the same', () => {
-    queue({ pendingPermission: { ...asked.pendingPermission, options: undefined } })
+    queue({ pendingPermission: { ...asked.pendingPermission, questions: undefined } })
     expect(screen.getByLabelText('Answer')).toBeDefined()
     expect(screen.queryByText('Allow')).toBeNull()
   })
@@ -1279,5 +1287,107 @@ describe('answering a question rather than approving it (FR-007)', () => {
     })
     fireEvent.click(screen.getByText('Send'))
     expect(onAnswer).toHaveBeenCalledWith('s1', 'r2', 'not that directory — use dist/')
+  })
+})
+
+describe('two questions in one ask', () => {
+  const both = {
+    sessionId: 's1',
+    repoPath: '/repos/terminator',
+    reason: 'needs_input' as const,
+    waitingMs: 6_000,
+    failure: null,
+    pendingPermission: {
+      requestId: 'r1',
+      toolName: 'AskUserQuestion',
+      summary: 'What scope do you actually want turned red?',
+      detail: 'the full text of both questions',
+      questions: [
+        { question: 'What scope?', options: ['UI chrome only', 'Terminal output only'] },
+        { question: 'Permanent or throwaway?', options: ['Throwaway', 'Real change'] },
+      ],
+      requestedAt: 1_000,
+    },
+  }
+
+  const queue = (handlers: Record<string, unknown> = {}) =>
+    render(
+      <AttentionQueue
+        items={[both]}
+        loaded
+        workingCount={0}
+        onApprove={() => {}}
+        onDeny={() => {}}
+        onAnswer={() => {}}
+        onOpen={() => {}}
+        {...handlers}
+      />
+    )
+
+  it('labels each question, so its options are not one anonymous pile', () => {
+    queue()
+    expect(screen.getByText('What scope?')).toBeDefined()
+    expect(screen.getByText('Permanent or throwaway?')).toBeDefined()
+  })
+
+  it('says which question an answer answers', () => {
+    const onAnswer = vi.fn()
+    queue({ onAnswer })
+    fireEvent.click(screen.getByRole('button', { name: 'Throwaway' }))
+    // The agent gets only the text: a bare "Throwaway" would be ambiguous.
+    expect(onAnswer).toHaveBeenCalledWith('s1', 'r1', 'Permanent or throwaway? — Throwaway')
+  })
+
+  it('sends a bare label when there is only one question to answer', () => {
+    const onAnswer = vi.fn()
+    render(
+      <AttentionQueue
+        items={[
+          {
+            ...both,
+            pendingPermission: {
+              ...both.pendingPermission,
+              questions: [{ question: 'What scope?', options: ['UI chrome only'] }],
+            },
+          },
+        ]}
+        loaded
+        workingCount={0}
+        onApprove={() => {}}
+        onDeny={() => {}}
+        onAnswer={onAnswer}
+        onOpen={() => {}}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'UI chrome only' }))
+    expect(onAnswer).toHaveBeenCalledWith('s1', 'r1', 'UI chrome only')
+  })
+
+  it('does not repeat the ask as text when every part of it is a button', () => {
+    queue()
+    expect(screen.queryByText('the full text of both questions')).toBeNull()
+  })
+
+  it('keeps the text when a question offers no buttons to answer with', () => {
+    render(
+      <AttentionQueue
+        items={[
+          {
+            ...both,
+            pendingPermission: {
+              ...both.pendingPermission,
+              questions: [{ question: 'Why did you choose that?', options: [] }],
+            },
+          },
+        ]}
+        loaded
+        workingCount={0}
+        onApprove={() => {}}
+        onDeny={() => {}}
+        onAnswer={() => {}}
+        onOpen={() => {}}
+      />
+    )
+    expect(screen.getByText('the full text of both questions')).toBeDefined()
   })
 })

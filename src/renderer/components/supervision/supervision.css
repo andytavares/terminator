@@ -132,10 +132,14 @@
   padding: 8px;
 }
 
+/* Indicator and content on the first line; anything the operator has to answer
+ * gets a line of its own. As a single flex row the answer controls squeezed the
+ * content column to nothing and the summary wrapped one character per line. */
 .sv-queue__item {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 12px;
   padding: 10px 12px;
   border-radius: 6px;
   background: var(--bg-card);
@@ -219,14 +223,15 @@
   word-break: break-word;
 }
 
-/* Answering, rather than approving. */
+/* Answering, rather than approving. Its own full-width line, so it never
+   competes with the summary for horizontal space. */
 .sv-queue__respond {
+  flex: 1 0 100%;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  align-items: flex-end;
-  flex-shrink: 0;
-  min-width: 260px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
 }
 
 .sv-answer {
@@ -236,11 +241,21 @@
   width: 100%;
 }
 
+.sv-answer__question {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sv-answer__label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
 .sv-answer__options {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  justify-content: flex-end;
 }
 
 .sv-answer__row {
@@ -470,6 +485,7 @@
 }
 
 .sv-panel input:focus,
+.sv-queue input:focus,
 .sv-panel__search:focus {
   outline: none;
   border-color: var(--accent);
@@ -572,10 +588,14 @@
   color: var(--text-muted);
 }
 
-/* Every input, whatever its type attribute says or does not say — and the
-   selects, which are UA-styled white boxes otherwise. */
+/* Every input in every supervision surface, whatever its type attribute says
+   or does not say — and the selects, which are UA-styled white boxes
+   otherwise. Scoped to `.sv-panel` alone this missed the attention queue,
+   whose root is `.sv-queue`, and its answer box rendered white on black. */
 .sv-panel input:not([type='radio']):not([type='checkbox']),
+.sv-queue input:not([type='radio']):not([type='checkbox']),
 .sv-panel select,
+.sv-queue select,
 .sv-panel__search {
   width: 100%;
   min-width: 0;
@@ -589,7 +609,8 @@
   border-radius: var(--radius-sm, 4px);
 }
 
-.sv-panel input::placeholder {
+.sv-panel input::placeholder,
+.sv-queue input::placeholder {
   color: var(--text-muted);
 }
 

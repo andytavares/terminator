@@ -48,10 +48,11 @@ export interface PendingPermission {
    */
   readonly detail?: string | null
   /**
-   * The answers a question offers. A question is not a yes/no: approving it
-   * tells the agent nothing about which option you meant.
+   * The questions being asked and the answers each offers. A question is not a
+   * yes/no: approving it tells the agent nothing about which option you meant,
+   * and a flat list of labels does not say which question one answers.
    */
-  readonly options?: readonly string[]
+  readonly questions?: ReadonlyArray<{ question: string; options: readonly string[] }>
   /** Present when the action targets a network host. Off-allowlist always prompts (FR-042). */
   readonly targetHost?: string
   readonly requestedAt: number

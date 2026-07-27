@@ -30,7 +30,7 @@ export const pendingPermissionSchema = z.object({
   // summary is a malformed request rather than a permissible one.
   summary: z.string().min(1),
   detail: z.string().nullable().optional(),
-  options: z.array(z.string()).optional(),
+  questions: z.array(z.object({ question: z.string(), options: z.array(z.string()) })).optional(),
   targetHost: z.string().min(1).optional(),
   requestedAt: z.number(),
   autoDecision: z.literal('allow').nullish(),

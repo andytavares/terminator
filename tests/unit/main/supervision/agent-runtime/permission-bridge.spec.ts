@@ -301,29 +301,27 @@ describe('answering rather than approving', () => {
     await expect(pending).resolves.toMatchObject({ behavior: 'allow' })
   })
 
-  it('publishes the options a question offers, so they can be shown as answers', () => {
+  function questionsOn(events: SessionEvent[]) {
+    const event = events.find((e) => e.kind === 'permission_requested') as {
+      questions?: ReadonlyArray<{ question: string; options: readonly string[] }>
+    }
+    return event.questions
+  }
+
+  it('publishes each question with its own options, so an answer can name it', () => {
     const { bridge, events } = bridgeFor()
     void bridge.canUseTool('AskUserQuestion', {
       questions: [
         { question: 'Which scope?', options: [{ label: 'App-wide' }, { label: 'Terminal' }] },
       ],
     })
-    const event = events.find((e) => e.kind === 'permission_requested') as {
-      options?: readonly string[]
-    }
-    expect(event.options).toEqual(['App-wide', 'Terminal'])
+    expect(questionsOn(events)).toEqual([
+      { question: 'Which scope?', options: ['App-wide', 'Terminal'] },
+    ])
   })
 
-  it('offers no options for a request that is a plain yes or no', () => {
-    const { bridge, events } = bridgeFor()
-    void bridge.canUseTool('Bash', { command: 'ls' })
-    const event = events.find((e) => e.kind === 'permission_requested') as {
-      options?: readonly string[]
-    }
-    expect(event.options).toBeUndefined()
-  })
-
-  it('does not repeat an option offered by more than one question', () => {
+  it('keeps two questions apart rather than piling their options together', () => {
+    // Flattened, clicking "Yes" would not say which question it answered.
     const { bridge, events } = bridgeFor()
     void bridge.canUseTool('AskUserQuestion', {
       questions: [
@@ -331,9 +329,21 @@ describe('answering rather than approving', () => {
         { question: 'B?', options: [{ label: 'Yes' }, { label: 'No' }] },
       ],
     })
-    const event = events.find((e) => e.kind === 'permission_requested') as {
-      options?: readonly string[]
-    }
-    expect(event.options).toEqual(['Yes', 'No'])
+    expect(questionsOn(events)).toEqual([
+      { question: 'A?', options: ['Yes'] },
+      { question: 'B?', options: ['Yes', 'No'] },
+    ])
+  })
+
+  it('offers no questions for a request that is a plain yes or no', () => {
+    const { bridge, events } = bridgeFor()
+    void bridge.canUseTool('Bash', { command: 'ls' })
+    expect(questionsOn(events)).toBeUndefined()
+  })
+
+  it('keeps a question that offers no options', () => {
+    const { bridge, events } = bridgeFor()
+    void bridge.canUseTool('AskUserQuestion', { questions: [{ question: 'Why?' }] })
+    expect(questionsOn(events)).toEqual([{ question: 'Why?', options: [] }])
   })
 })
