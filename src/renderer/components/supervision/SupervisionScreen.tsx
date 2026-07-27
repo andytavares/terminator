@@ -200,148 +200,150 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
         />
       )}
 
-      {tab === 'attention' && (
-        <>
-          <SinceYouLastLooked
-            lastViewedAt={props.lastViewedAt}
-            now={props.now}
-            entries={props.sinceEntries}
-            stateChanges={props.sinceStateChanges}
-            diffDelta={props.sinceDiffDelta}
-          />
-          <AttentionQueue
-            items={props.attention}
-            loaded={props.loaded}
-            workingCount={props.workingCount}
-            onApprove={props.onApprove}
-            onDeny={props.onDeny}
-            onOpen={props.onOpenSession}
-          />
-          <AutonomyPicker value={props.autonomy} onChange={props.onAutonomyChange} />
-          <AssignPanel
-            autonomy={props.autonomy}
-            workItemId={props.selectedWorkItemId}
-            laneOrd={props.selectedLaneOrd}
-            onAssign={props.onAssign}
-            lastResult={props.assignResult}
-            busy={props.assigning}
-          />
-          {props.provisioning !== null && (
-            <ProvisioningStatus
-              worktreePath={props.provisioning.worktreePath}
-              ports={props.provisioning.ports}
-              setup={props.provisioning.setup}
-              skipped={props.provisioning.skipped}
-              onOpenInEditor={props.onOpenInEditor}
+      <div className="sv-tabpanel">
+        {tab === 'attention' && (
+          <>
+            <SinceYouLastLooked
+              lastViewedAt={props.lastViewedAt}
+              now={props.now}
+              entries={props.sinceEntries}
+              stateChanges={props.sinceStateChanges}
+              diffDelta={props.sinceDiffDelta}
             />
-          )}
-        </>
-      )}
-
-      {tab === 'review' && (
-        <>
-          <ReviewInbox items={props.review} now={props.now} onOpen={props.onOpenSession} />
-          {props.activeReview !== null && (
-            <>
-              <ReviewFlow
-                step={props.activeReview.item.step}
-                intent={props.activeReview.intent}
-                onAdvance={props.onAdvanceReview}
+            <AttentionQueue
+              items={props.attention}
+              loaded={props.loaded}
+              workingCount={props.workingCount}
+              onApprove={props.onApprove}
+              onDeny={props.onDeny}
+              onOpen={props.onOpenSession}
+            />
+            <AutonomyPicker value={props.autonomy} onChange={props.onAutonomyChange} />
+            <AssignPanel
+              autonomy={props.autonomy}
+              workItemId={props.selectedWorkItemId}
+              laneOrd={props.selectedLaneOrd}
+              onAssign={props.onAssign}
+              lastResult={props.assignResult}
+              busy={props.assigning}
+            />
+            {props.provisioning !== null && (
+              <ProvisioningStatus
+                worktreePath={props.provisioning.worktreePath}
+                ports={props.provisioning.ports}
+                setup={props.provisioning.setup}
+                skipped={props.provisioning.skipped}
+                onOpenInEditor={props.onOpenInEditor}
               />
-              <HunkReview
-                hunks={props.activeReview.hunks}
-                decisionFor={props.decisionFor}
-                onDecide={props.onDecideHunk}
-              />
-            </>
-          )}
-          <MergeAudit merges={props.unattendedMerges} />
-        </>
-      )}
+            )}
+          </>
+        )}
 
-      {tab === 'items' && (
-        <>
-          <IntakePanel onIntake={props.onIntake} result={props.intakeResult} />
-          <WorkItemBoard
-            items={props.workItems}
-            unreadable={props.unreadable}
-            conflicts={props.conflicts}
-            canAct={props.canAct}
-            onOpen={props.onOpenWorkItem}
-            onApproveGate={props.onApproveGate}
-            onRejectGate={props.onRejectGate}
-            onSendBack={props.onSendBack}
-            onAdvancePhase={props.onAdvancePhase}
-            actionError={props.actionError}
-            onDismissActionError={props.onDismissActionError}
-          />
-        </>
-      )}
+        {tab === 'review' && (
+          <>
+            <ReviewInbox items={props.review} now={props.now} onOpen={props.onOpenSession} />
+            {props.activeReview !== null && (
+              <>
+                <ReviewFlow
+                  step={props.activeReview.item.step}
+                  intent={props.activeReview.intent}
+                  onAdvance={props.onAdvanceReview}
+                />
+                <HunkReview
+                  hunks={props.activeReview.hunks}
+                  decisionFor={props.decisionFor}
+                  onDecide={props.onDecideHunk}
+                />
+              </>
+            )}
+            <MergeAudit merges={props.unattendedMerges} />
+          </>
+        )}
 
-      {tab === 'lanes' && (
-        <LaneView
-          lanes={props.lanes}
-          mergedOrds={props.mergedOrds}
-          staleOrds={props.staleOrds}
-          blockedReasons={props.blockedReasons}
-          onMerge={props.onMergeLane}
-        />
-      )}
+        {tab === 'items' && (
+          <>
+            <IntakePanel onIntake={props.onIntake} result={props.intakeResult} />
+            <WorkItemBoard
+              items={props.workItems}
+              unreadable={props.unreadable}
+              conflicts={props.conflicts}
+              canAct={props.canAct}
+              onOpen={props.onOpenWorkItem}
+              onApproveGate={props.onApproveGate}
+              onRejectGate={props.onRejectGate}
+              onSendBack={props.onSendBack}
+              onAdvancePhase={props.onAdvancePhase}
+              actionError={props.actionError}
+              onDismissActionError={props.onDismissActionError}
+            />
+          </>
+        )}
 
-      {tab === 'feed' && (
-        <>
-          <DigestPanel
-            digest={props.digest}
-            windowMinutes={props.digestWindowMinutes}
-            onRefresh={props.onRefreshDigest}
+        {tab === 'lanes' && (
+          <LaneView
+            lanes={props.lanes}
+            mergedOrds={props.mergedOrds}
+            staleOrds={props.staleOrds}
+            blockedReasons={props.blockedReasons}
+            onMerge={props.onMergeLane}
           />
-          <StandupFeed
-            entries={props.feed}
-            mutedSessions={props.mutedSessions}
-            onReply={props.onReply}
-            onToggleMute={props.onToggleMute}
-          />
-        </>
-      )}
+        )}
 
-      {tab === 'stalls' && (
-        <>
-          <StallControls
-            shadowMode={props.shadowMode}
-            firings={props.firings}
-            precision={props.precision}
-            onSetShadowMode={props.onSetShadowMode}
-            onJudge={props.onJudge}
-          />
-          {/* Every session currently stalled, with something to do about it —
+        {tab === 'feed' && (
+          <>
+            <DigestPanel
+              digest={props.digest}
+              windowMinutes={props.digestWindowMinutes}
+              onRefresh={props.onRefreshDigest}
+            />
+            <StandupFeed
+              entries={props.feed}
+              mutedSessions={props.mutedSessions}
+              onReply={props.onReply}
+              onToggleMute={props.onToggleMute}
+            />
+          </>
+        )}
+
+        {tab === 'stalls' && (
+          <>
+            <StallControls
+              shadowMode={props.shadowMode}
+              firings={props.firings}
+              precision={props.precision}
+              onSetShadowMode={props.onSetShadowMode}
+              onJudge={props.onJudge}
+            />
+            {/* Every session currently stalled, with something to do about it —
               a stall that only reports itself is half the feature (FR-029). */}
-          {props.attention
-            .filter((item) => item.reason === 'stalled')
-            .map((item) => (
-              <div className="sv-row" key={item.sessionId}>
-                <span className="sv-row__main">
-                  <div className="sv-queue__title">{item.repoPath.split('/').pop()}</div>
-                  <StallActions
-                    sessionId={item.sessionId}
-                    onAsk={props.onAskWhatIsWrong}
-                    onShowTranscript={props.onShowActivity}
-                    onInterrupt={props.onInterrupt}
-                    onDiscard={props.onDiscard}
-                  />
-                </span>
-              </div>
-            ))}
-        </>
-      )}
+            {props.attention
+              .filter((item) => item.reason === 'stalled')
+              .map((item) => (
+                <div className="sv-row" key={item.sessionId}>
+                  <span className="sv-row__main">
+                    <div className="sv-queue__title">{item.repoPath.split('/').pop()}</div>
+                    <StallActions
+                      sessionId={item.sessionId}
+                      onAsk={props.onAskWhatIsWrong}
+                      onShowTranscript={props.onShowActivity}
+                      onInterrupt={props.onInterrupt}
+                      onDiscard={props.onDiscard}
+                    />
+                  </span>
+                </div>
+              ))}
+          </>
+        )}
 
-      {tab === 'find' && (
-        <SupervisionPalette
-          entities={props.entities}
-          query={query}
-          onQueryChange={setQuery}
-          onChoose={props.onChooseEntity}
-        />
-      )}
+        {tab === 'find' && (
+          <SupervisionPalette
+            entities={props.entities}
+            query={query}
+            onQueryChange={setQuery}
+            onChoose={props.onChooseEntity}
+          />
+        )}
+      </div>
     </div>
   )
 }

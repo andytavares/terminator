@@ -200,7 +200,7 @@
 
 /* The all-clear is a statement, never an empty div. */
 .sv-allclear {
-  padding: 32px 16px;
+  padding: 20px 16px;
   text-align: center;
   color: var(--text-muted);
   font-size: 13px;
@@ -396,20 +396,6 @@
   margin: 3px 0 6px;
 }
 
-.sv-feed__entry input,
-.sv-panel input[type='text'],
-.sv-panel__search {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 8px;
-  font: inherit;
-  font-size: 12px;
-  color: var(--text-primary);
-  background: var(--bg-input);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-}
-
 .sv-panel input:focus,
 .sv-panel__search:focus {
   outline: none;
@@ -428,6 +414,202 @@
 }
 
 .sv-row input[type='radio'] {
-  margin-top: 3px;
+  margin-top: 2px;
   accent-color: var(--accent);
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+/* One reading column for every tab. Without it each section is a full-bleed
+ * slab across the whole window and the eye has no left edge to follow. */
+.sv-tabpanel {
+  width: 100%;
+  max-width: 940px;
+  margin: 0 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Sections stack inside the column, so their headers align with their content
+ * instead of each one drawing its own full-width band. */
+.sv-tabpanel > .sv-panel,
+.sv-tabpanel > * > .sv-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  margin: 12px 0;
+  overflow: visible;
+}
+
+/* A row that is a choice, not a record: the divider and the height that suit a
+ * list of sessions make a four-option picker read as a wall. */
+.sv-row--compact {
+  align-items: center;
+  gap: 9px;
+  padding: 7px 14px;
+  border-bottom: none;
+}
+
+.sv-row--compact .sv-queue__title {
+  font-size: 12px;
+}
+
+.sv-row--compact .sv-queue__meta {
+  margin-top: 1px;
+}
+
+/* ── forms ───────────────────────────────────────────────────────────────
+ *
+ * Assign and intake are forms, not lists. They were built out of `.sv-row`,
+ * which is a 44px-tall list row with a divider — so a four-field form became a
+ * wall of boxed lines, and the inputs, having no `type` attribute, missed the
+ * `input[type='text']` rule entirely and rendered as white UA boxes on a dark
+ * surface. */
+
+.sv-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  /* A repository path is not 1900px wide. Forms get a reading column; lists,
+     which scan vertically, keep the full width. */
+  max-width: 620px;
+}
+
+.sv-form:empty {
+  display: none;
+}
+
+.sv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sv-field__label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+
+.sv-field__note {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Every input, whatever its type attribute says or does not say. */
+.sv-panel input:not([type='radio']):not([type='checkbox']),
+.sv-panel__search {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 6px 9px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm, 4px);
+}
+
+.sv-panel input::placeholder {
+  color: var(--text-muted);
+}
+
+.sv-form__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The one action a form exists for reads as the primary one. */
+.sv-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 500;
+  padding: 5px 14px;
+}
+
+.sv-btn--primary:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.12);
+}
+
+.sv-btn--primary:disabled {
+  background: var(--bg-elevated);
+  border-color: var(--border-strong);
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.sv-result {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Four levels on one axis, least to most. */
+.sv-segmented {
+  display: flex;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm, 4px);
+  overflow: hidden;
+  width: fit-content;
+}
+
+.sv-segmented__option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 5px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-right: 1px solid var(--border-strong);
+}
+
+.sv-segmented__option:last-child {
+  border-right: none;
+}
+
+.sv-segmented__option input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.sv-segmented__option:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.sv-segmented__option:has(input:checked) {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+
+.sv-segmented__option:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.sv-panel__header-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* An inline row of controls that is a form, not a list. */
+.sv-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sv-inline input {
+  flex: 1;
 }

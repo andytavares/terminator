@@ -331,6 +331,9 @@ app.whenReady().then(async () => {
       set: (value) => supervisionStore.set('laneBindings', value),
     },
     onStateChanged: (change) => stateFanout.publish(change),
+    // Replies and redirects reach the running agent. Without this the default
+    // throws, and every reply in the feed and every stall redirect failed.
+    sendToSession: (sessionId, message) => supervision.driver.send(sessionId, message),
     onPublicationsChanged: () => mainWindow?.webContents.send('supervision:workItemsChanged', {}),
     // FR-027: a stall is a non-blocking indicator, never a modal. The service
     // has already applied the channel policy — anything that reaches here is

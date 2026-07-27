@@ -24,24 +24,28 @@ export function AutonomyPicker({ value, onChange }: AutonomyPickerProps): JSX.El
   return (
     <fieldset className="sv-panel">
       <legend className="sv-panel__header">How much can it do without asking?</legend>
-      {AUTONOMY_LEVELS.map((level) => (
-        <label className="sv-row" key={level}>
-          <input
-            type="radio"
-            name="autonomy"
-            value={level}
-            checked={value === level}
-            onChange={() => onChange(level)}
-          />
-          <span className="sv-row__main">
-            <div className="sv-queue__title">{level}</div>
-            <div className="sv-queue__meta">{LEVEL_DESCRIPTIONS[level]}</div>
-          </span>
-        </label>
-      ))}
-      <div className="sv-queue__meta">
-        Anything reaching a host that is not on this repository&rsquo;s allowlist asks at every
-        level.
+      <div className="sv-form">
+        {/* One axis, least to most: a segmented control shows the ladder the
+            four levels actually form. Four full-height rows did not. */}
+        <div className="sv-segmented" role="radiogroup" aria-label="Autonomy level">
+          {AUTONOMY_LEVELS.map((level) => (
+            <label className="sv-segmented__option" key={level}>
+              <input
+                type="radio"
+                name="autonomy"
+                value={level}
+                checked={value === level}
+                onChange={() => onChange(level)}
+              />
+              <span>{level}</span>
+            </label>
+          ))}
+        </div>
+        <span className="sv-field__note">{LEVEL_DESCRIPTIONS[value]}</span>
+        <span className="sv-field__note">
+          Anything reaching a host that is not on this repository&rsquo;s allowlist asks at every
+          level.
+        </span>
       </div>
     </fieldset>
   )
@@ -203,27 +207,29 @@ export function IntakePanel({ onIntake, result }: IntakePanelProps): JSX.Element
       <div className="sv-panel__header">
         <span>Bring in a ticket</span>
       </div>
-      <div className="sv-queue__actions">
-        <input
-          aria-label="Ticket URL or local document path"
-          placeholder="https://linear.app/… or /path/to/spec.md"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') submit()
-          }}
-        />
-        <button className="sv-queue__btn" onClick={submit}>
-          Queue it
-        </button>
-      </div>
-      {result !== null && (
-        <div className={result.ok ? 'sv-queue__meta' : 'sv-warn'}>
-          {result.ok
-            ? `Queued as ${result.id}. It waits until you start it.`
-            : (result.reason ?? 'could not bring that in')}
+      <div className="sv-form">
+        <div className="sv-inline">
+          <input
+            aria-label="Ticket URL or local document path"
+            placeholder="https://linear.app/… or /path/to/spec.md"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') submit()
+            }}
+          />
+          <button className="sv-queue__btn sv-btn--primary" onClick={submit}>
+            Queue it
+          </button>
         </div>
-      )}
+        {result !== null && (
+          <div className={result.ok ? 'sv-result' : 'sv-warn'}>
+            {result.ok
+              ? `Queued as ${result.id}. It waits until you start it.`
+              : (result.reason ?? 'could not bring that in')}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -280,38 +286,34 @@ export function AssignPanel({
         <span>
           <Terminal aria-hidden="true" /> Start an agent
         </span>
-        <span>{autonomy}</span>
+        <span className="sv-panel__header-meta">autonomy: {autonomy}</span>
       </div>
 
-      <label className="sv-row">
-        <span className="sv-row__main">
-          <div className="sv-queue__title">Repository</div>
+      <div className="sv-form">
+        <label className="sv-field">
+          <span className="sv-field__label">Repository</span>
           <input
             aria-label="Repository path"
             placeholder="/Users/you/repos/fluent"
             value={repoPath}
             onChange={(event) => setRepoPath(event.target.value)}
           />
-        </span>
-      </label>
+        </label>
 
-      <label className="sv-row">
-        <span className="sv-row__main">
-          <div className="sv-queue__title">Branch</div>
+        <label className="sv-field">
+          <span className="sv-field__label">Branch</span>
           <input
             aria-label="Branch"
             placeholder="feat/session-ulid"
             value={branch}
             onChange={(event) => setBranch(event.target.value)}
           />
-        </span>
-      </label>
+        </label>
 
-      <label className="sv-row">
-        <span className="sv-row__main">
-          <div className="sv-queue__title">
+        <label className="sv-field">
+          <span className="sv-field__label">
             {workItemId === null ? 'What should it do?' : 'Anything to add?'}
-          </div>
+          </span>
           <input
             aria-label="Instruction"
             placeholder={
@@ -323,35 +325,39 @@ export function AssignPanel({
               if (event.key === 'Enter') submit()
             }}
           />
-        </span>
-      </label>
-
-      {workItemId !== null && (
-        <div className="sv-queue__meta">
-          Bound to {workItemId}
-          {laneOrd !== null && ` · lane ${laneOrd}`}
-        </div>
-      )}
-
-      <div className="sv-queue__actions">
-        <button className="sv-queue__btn" disabled={!ready || busy} onClick={submit}>
-          {busy ? 'Starting…' : 'Start'}
-        </button>
-      </div>
-
-      {/* A refusal is never silent: the gate, the queue and a failed setup
-          script all end here with their reason (FR-034, FR-053, FR-083). */}
-      {lastResult !== null && (
-        <div className={lastResult.ok ? 'sv-queue__meta' : 'sv-warn'}>
-          {lastResult.ok ? (
-            `Started in ${lastResult.worktreePath}`
-          ) : (
-            <>
-              <AlertOctagon aria-hidden="true" /> {lastResult.reason ?? 'could not start'}
-            </>
+          {workItemId !== null && (
+            <span className="sv-field__note">
+              Bound to {workItemId}
+              {laneOrd !== null && ` · lane ${laneOrd}`}
+            </span>
           )}
+        </label>
+
+        <div className="sv-form__actions">
+          <button
+            className="sv-queue__btn sv-btn--primary"
+            disabled={!ready || busy}
+            onClick={submit}
+          >
+            {busy ? 'Starting…' : 'Start'}
+          </button>
+          {!ready && <span className="sv-field__note">Repository and branch are required.</span>}
         </div>
-      )}
+
+        {/* A refusal is never silent: the gate, the queue and a failed setup
+            script all end here with their reason (FR-034, FR-053, FR-083). */}
+        {lastResult !== null && (
+          <div className={lastResult.ok ? 'sv-result' : 'sv-warn'}>
+            {lastResult.ok ? (
+              `Started in ${lastResult.worktreePath}`
+            ) : (
+              <>
+                <AlertOctagon aria-hidden="true" /> {lastResult.reason ?? 'could not start'}
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -38,13 +38,66 @@ export interface SessionDriver {
   /** Resolves when the run ends. For orderly shutdown and for tests. */
   completion(sessionId: string): Promise<void>
   interrupt(sessionId: string): Promise<void>
+  /** Sends a further message to a running session — a reply, or a redirect. */
+  send(sessionId: string, message: string): Promise<void>
   resolvePermission(sessionId: string, requestId: string, decision: PermissionDecision): void
 }
 
 interface RunningSession {
   bridge: PermissionBridge
   interrupt: () => Promise<void>
+  send: (message: string) => void
   completed: Promise<void>
+}
+
+/**
+ * The prompt, as a stream the console can push onto.
+ *
+ * Both of the things the operator needs on a stalled session require this: the
+ * runtime documents `interrupt()` as available in streaming input mode only,
+ * and a follow-up message has nowhere to go when the prompt is a plain string.
+ * With a string prompt both silently do nothing.
+ */
+function createPromptStream(first: string): {
+  stream: AsyncIterable<unknown>
+  push: (text: string) => void
+  close: () => void
+} {
+  const pending: string[] = [first]
+  let wake: (() => void) | null = null
+  let closed = false
+
+  const message = (text: string): unknown => ({
+    type: 'user' as const,
+    session_id: '',
+    parent_tool_use_id: null,
+    message: { role: 'user' as const, content: [{ type: 'text' as const, text }] },
+  })
+
+  return {
+    stream: {
+      async *[Symbol.asyncIterator]() {
+        while (true) {
+          while (pending.length > 0) yield message(pending.shift() as string)
+          if (closed) return
+          await new Promise<void>((resolve) => {
+            wake = resolve
+          })
+        }
+      },
+    },
+    push(text: string): void {
+      if (closed) return
+      pending.push(text)
+      wake?.()
+      wake = null
+    },
+    close(): void {
+      closed = true
+      wake?.()
+      wake = null
+    },
+  }
 }
 
 function isResultMessage(message: unknown): boolean {
@@ -65,8 +118,11 @@ export function createSessionDriver(options: SessionDriverOptions): SessionDrive
       const { sessionId, prompt, cwd, autoDecide } = start
       const bridge = createPermissionBridge({ sessionId, publish, now, autoDecide })
 
+      const prompts = createPromptStream(prompt)
+
       const run = query({
-        prompt,
+        // Streaming input, not a string: see createPromptStream.
+        prompt: prompts.stream,
         options: {
           cwd,
           // The only documented source of "blocked on the operator" — the
@@ -99,6 +155,7 @@ export function createSessionDriver(options: SessionDriverOptions): SessionDrive
           // Any prompt still outstanding can no longer be answered; leaving its
           // promise pending would hang the runtime's turn.
           bridge.rejectAll('Session ended')
+          prompts.close()
           running.delete(sessionId)
         }
       })()
@@ -108,12 +165,25 @@ export function createSessionDriver(options: SessionDriverOptions): SessionDrive
         completed,
         interrupt: async () => {
           await run.interrupt?.()
+          // Closing the stream is what actually ends the run: interrupting
+          // stops the current turn, it does not end the session.
+          prompts.close()
         },
+        send: (message: string) => prompts.push(message),
       })
     },
 
     async completion(sessionId: string): Promise<void> {
       await running.get(sessionId)?.completed
+    },
+
+    async send(sessionId: string, message: string): Promise<void> {
+      const session = running.get(sessionId)
+      if (session === undefined) {
+        // Reported, never swallowed: a reply that goes nowhere must say so.
+        throw new Error('this session is no longer running')
+      }
+      session.send(message)
     },
 
     async interrupt(sessionId: string): Promise<void> {

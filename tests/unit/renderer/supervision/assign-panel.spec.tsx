@@ -99,7 +99,7 @@ describe('AssignPanel', () => {
 
   it('shows the autonomy it will start with (FR-041)', () => {
     panel({ autonomy: 'ship' })
-    expect(screen.getByText('ship')).toBeDefined()
+    expect(screen.getByText(/autonomy: ship/)).toBeDefined()
   })
 
   it('will not start twice while one attempt is in flight', () => {

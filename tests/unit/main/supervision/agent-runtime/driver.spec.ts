@@ -26,6 +26,28 @@ const successResult = {
   is_error: false,
 }
 
+/**
+ * A run that stays open, the way a real one does for minutes or hours. The
+ * session has to still be running for a reply or an interrupt to reach it.
+ */
+function liveHarness() {
+  const interrupt = vi.fn().mockResolvedValue(undefined)
+  const iterable = {
+    // Never yields and never returns — a real run produces nothing until the
+    // agent does, and the session must stay open in the meantime.
+    [Symbol.asyncIterator]: () => ({ next: () => new Promise<never>(() => {}) }),
+    interrupt,
+  }
+  const events: SessionEvent[] = []
+  const query = vi.fn().mockReturnValue(iterable)
+  const driver = createSessionDriver({
+    query: query as never,
+    publish: (e) => events.push(e),
+    now: () => 1_000,
+  })
+  return { driver, events, query, interrupt }
+}
+
 function harness(messages: unknown[] = [successResult]) {
   const events: SessionEvent[] = []
   const { query, interrupt } = fakeQuery(messages)
@@ -38,12 +60,24 @@ function harness(messages: unknown[] = [successResult]) {
 }
 
 describe('starting a session', () => {
-  it('passes the prompt and the working copy as cwd', async () => {
+  it('passes the prompt as a stream and the working copy as cwd', async () => {
     const { driver, query } = harness()
     await driver.start({ sessionId: 's1', prompt: 'do the thing', cwd: '/wt/s1' })
-    const options = query.mock.calls[0][0] as { prompt: string; options: { cwd: string } }
-    expect(options.prompt).toBe('do the thing')
+    const options = query.mock.calls[0][0] as {
+      prompt: AsyncIterable<unknown>
+      options: { cwd: string }
+    }
     expect(options.options.cwd).toBe('/wt/s1')
+
+    // Streaming input, not a string: the runtime documents interrupt() as
+    // available in streaming mode only, and a follow-up message has nowhere
+    // to go otherwise. With a string prompt both silently do nothing.
+    expect(typeof options.prompt).toBe('object')
+    const first = await options.prompt[Symbol.asyncIterator]().next()
+    expect(first.value).toMatchObject({
+      type: 'user',
+      message: { role: 'user', content: [{ type: 'text', text: 'do the thing' }] },
+    })
   })
 
   it('wires canUseTool, which is the only source of needs_input (FR-010)', async () => {
@@ -184,5 +218,75 @@ describe('interrupting and redirecting (FR-043)', () => {
   it('ignores a permission decision for an unknown session', () => {
     const { driver } = harness()
     expect(() => driver.resolvePermission('ghost', 'r1', { allow: true })).not.toThrow()
+  })
+})
+
+// Both actions the operator needs on a stalled session run through this.
+
+describe('sending a further message to a running session', () => {
+  async function promptStream(query: ReturnType<typeof liveHarness>['query']) {
+    const call = query.mock.calls[0][0] as { prompt: AsyncIterable<unknown> }
+    return call.prompt[Symbol.asyncIterator]()
+  }
+
+  it('delivers the message into the prompt stream', async () => {
+    const { driver, query } = liveHarness()
+    await driver.start({ sessionId: 's1', prompt: 'first', cwd: '/wt/s1' })
+    const iterator = await promptStream(query)
+    await iterator.next()
+
+    await driver.send('s1', 'try the other approach')
+    const next = await iterator.next()
+    expect(next.value).toMatchObject({
+      message: { content: [{ type: 'text', text: 'try the other approach' }] },
+    })
+  })
+
+  it('delivers several messages in order', async () => {
+    const { driver, query } = liveHarness()
+    await driver.start({ sessionId: 's1', prompt: 'first', cwd: '/wt/s1' })
+    const iterator = await promptStream(query)
+    await iterator.next()
+
+    await driver.send('s1', 'one')
+    await driver.send('s1', 'two')
+    expect((await iterator.next()).value).toMatchObject({
+      message: { content: [{ text: 'one' }] },
+    })
+    expect((await iterator.next()).value).toMatchObject({
+      message: { content: [{ text: 'two' }] },
+    })
+  })
+
+  it('reports a session that is no longer running rather than swallowing it', async () => {
+    const { driver } = harness()
+    // A reply that goes nowhere must say so.
+    await expect(driver.send('ghost', 'hello')).rejects.toThrow(/no longer running/)
+  })
+})
+
+describe('interrupting', () => {
+  it('calls the runtime interrupt', async () => {
+    const { driver, interrupt } = liveHarness()
+    await driver.start({ sessionId: 's1', prompt: 'x', cwd: '/wt/s1' })
+    await driver.interrupt('s1')
+    expect(interrupt).toHaveBeenCalled()
+  })
+
+  it('closes the prompt stream, which is what actually ends the run', async () => {
+    const { driver, query } = liveHarness()
+    await driver.start({ sessionId: 's1', prompt: 'x', cwd: '/wt/s1' })
+    const call = query.mock.calls[0][0] as { prompt: AsyncIterable<unknown> }
+    const iterator = call.prompt[Symbol.asyncIterator]()
+    await iterator.next()
+
+    await driver.interrupt('s1')
+    // Interrupting stops the current turn; it does not end the session.
+    expect(await iterator.next()).toMatchObject({ done: true })
+  })
+
+  it('does nothing for a session that is not running', async () => {
+    const { driver } = harness()
+    await expect(driver.interrupt('ghost')).resolves.toBeUndefined()
   })
 })
