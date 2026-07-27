@@ -93,6 +93,8 @@ function makeBridge(over: Record<string, unknown> = {}) {
       .mockResolvedValue({ worktreePath: '/wt/x', ports: null, setup: null, skipped: [] }),
     getSinceLastLooked: vi.fn().mockResolvedValue({ lastViewedAt: 500, entries: [] }),
     producerAction: vi.fn().mockResolvedValue({ ok: true, reason: null }),
+    assign: vi.fn().mockResolvedValue({ ok: true, sessionId: 's9', worktreePath: '/wt/s9' }),
+    intake: vi.fn().mockResolvedValue({ ok: true, id: 'FLU-221' }),
     getDigest: vi
       .fn()
       .mockResolvedValue({ from: 0, to: 1, entryCount: 4, sessionCount: 2, bySession: [] }),
@@ -209,14 +211,14 @@ describe('opening a session', () => {
     expect(result.current.screenProps.lastViewedAt).toBe(500)
   })
 
-  it('announces the open so the rest of the shell can follow', async () => {
-    const heard = vi.fn()
-    window.addEventListener('supervision:open-session', heard)
-    const { result } = renderHook(() => useSupervision())
+  it('tells the shell, so it can focus the session tab', async () => {
+    // Passed in rather than broadcast on a window event: a listener that does
+    // not exist should be a compile error, not silence.
+    const onOpenSessionInShell = vi.fn()
+    const { result } = renderHook(() => useSupervision({ onOpenSessionInShell }))
     await waitFor(() => expect(result.current.loaded).toBe(true))
     act(() => result.current.screenProps.onOpenSession('s1'))
-    expect(heard).toHaveBeenCalled()
-    window.removeEventListener('supervision:open-session', heard)
+    expect(onOpenSessionInShell).toHaveBeenCalledWith('s1')
   })
 })
 
@@ -373,14 +375,56 @@ describe('the entity index', () => {
     )
   })
 
-  it('announces the chosen entity', async () => {
-    const heard = vi.fn()
-    window.addEventListener('supervision:choose', heard)
+  it('opens the session it was given, rather than announcing and doing nothing', async () => {
     const { result } = renderHook(() => useSupervision())
     await waitFor(() => expect(result.current.loaded).toBe(true))
-    act(() => result.current.screenProps.onChooseEntity({ id: 'x', kind: 'session', label: 'x' }))
-    expect(heard).toHaveBeenCalled()
-    window.removeEventListener('supervision:choose', heard)
+    act(() => result.current.screenProps.onChooseEntity({ id: 's1', kind: 'session', label: 'x' }))
+    await waitFor(() => expect(bridge.getReviewDetail).toHaveBeenCalledWith({ sessionId: 's1' }))
+  })
+
+  it('opens the lanes of a chosen work item', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    act(() =>
+      result.current.screenProps.onChooseEntity({ id: 'FLU-220', kind: 'workItem', label: 'x' })
+    )
+    await waitFor(() => expect(bridge.getLanes).toHaveBeenCalledWith({ workItemId: 'FLU-220' }))
+  })
+
+  it('toggles shadow mode from the palette', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    act(() =>
+      result.current.screenProps.onChooseEntity({
+        id: 'toggle-shadow',
+        kind: 'command',
+        label: 'Toggle stall shadow mode',
+      })
+    )
+    expect(bridge.setShadowMode).toHaveBeenCalledWith({ value: false })
+  })
+
+  it('opens the session that owns a chosen worktree', async () => {
+    useSupervisionStore.setState({ sessions: [session()], loaded: true })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    act(() =>
+      result.current.screenProps.onChooseEntity({
+        id: '/wt/FLU-220-fluent',
+        kind: 'worktree',
+        label: 'x',
+      })
+    )
+    await waitFor(() => expect(bridge.getReviewDetail).toHaveBeenCalledWith({ sessionId: 's1' }))
+  })
+
+  it('tells the shell after navigating', async () => {
+    const onNavigate = vi.fn()
+    const { result } = renderHook(() => useSupervision({ onNavigate }))
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    const entity = { id: 's1', kind: 'session' as const, label: 'x' }
+    act(() => result.current.screenProps.onChooseEntity(entity))
+    expect(onNavigate).toHaveBeenCalledWith(entity)
   })
 })
 
@@ -642,5 +686,154 @@ describe('a producer writing a work item', () => {
     await waitFor(() => expect(result.current.loaded).toBe(true))
     unmount()
     expect(off).toHaveBeenCalled()
+  })
+})
+
+// The front door. Everything else in the console supervises what this creates;
+// before it existed the substrate had nothing to watch.
+
+describe('starting an agent', () => {
+  it('assigns with the autonomy level chosen at assign time (FR-041)', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    act(() => result.current.screenProps.onAutonomyChange('build'))
+    await act(async () => {
+      result.current.screenProps.onAssign({ repoPath: '/repos/fluent', branch: 'feat/x' })
+    })
+    expect(bridge.assign).toHaveBeenCalledWith({
+      repoPath: '/repos/fluent',
+      branch: 'feat/x',
+      autonomyLevel: 'build',
+    })
+  })
+
+  it('reports where the session started', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onAssign({ repoPath: '/r', branch: 'b' })
+    })
+    await waitFor(() =>
+      expect(result.current.screenProps.assignResult).toMatchObject({ worktreePath: '/wt/s9' })
+    )
+  })
+
+  it('surfaces a refusal by the review queue as the refusal dialog (FR-053)', async () => {
+    install({
+      assign: vi.fn().mockResolvedValue({
+        ok: false,
+        reason: '4 unreviewed',
+        backpressure: { allowed: false, unreviewed: 4, limit: 3, reason: '4 unreviewed' },
+      }),
+    })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onAssign({ repoPath: '/r', branch: 'b' })
+    })
+    await waitFor(() =>
+      expect(result.current.screenProps.backpressure).toMatchObject({ unreviewed: 4 })
+    )
+  })
+
+  it('reports a refusal that is not backpressure, rather than failing silently', async () => {
+    install({
+      assign: vi.fn().mockResolvedValue({ ok: false, reason: 'setup exited 1' }),
+    })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onAssign({ repoPath: '/r', branch: 'b' })
+    })
+    await waitFor(() =>
+      expect(result.current.screenProps.assignResult).toMatchObject({ reason: 'setup exited 1' })
+    )
+  })
+
+  it('says so on a build that cannot start agents at all', async () => {
+    install({ assign: undefined })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    act(() => result.current.screenProps.onAssign({ repoPath: '/r', branch: 'b' }))
+    expect(result.current.screenProps.assignResult).toMatchObject({ ok: false })
+  })
+
+  it('is not busy once the attempt settles', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onAssign({ repoPath: '/r', branch: 'b' })
+    })
+    await waitFor(() => expect(result.current.screenProps.assigning).toBe(false))
+  })
+})
+
+describe('bringing in a ticket (FR-068)', () => {
+  it('takes a ticket url', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onIntake({ url: 'https://linear.app/x' })
+    })
+    expect(bridge.intake).toHaveBeenCalledWith({ url: 'https://linear.app/x' })
+    await waitFor(() => expect(result.current.screenProps.intakeResult?.id).toBe('FLU-221'))
+  })
+
+  it('re-reads the board so the queued item appears without a refresh', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    bridge.listWorkItems.mockClear()
+    await act(async () => {
+      result.current.screenProps.onIntake({ filePath: '/specs/idea.md' })
+    })
+    await waitFor(() => expect(bridge.listWorkItems).toHaveBeenCalled())
+  })
+
+  it('reports a refusal rather than swallowing it', async () => {
+    install({ intake: vi.fn().mockResolvedValue({ ok: false, reason: 'not a recognised URL' }) })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onIntake({ url: 'nonsense' })
+    })
+    await waitFor(() =>
+      expect(result.current.screenProps.intakeResult).toMatchObject({ ok: false })
+    )
+  })
+
+  it('says so on a build that cannot take tickets in', async () => {
+    install({ intake: undefined })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    act(() => result.current.screenProps.onIntake({ url: 'x' }))
+    expect(result.current.screenProps.intakeResult).toMatchObject({ ok: false })
+  })
+})
+
+describe('which lane an assignment binds to', () => {
+  it('binds to the first lane nothing has merged and nothing is blocking (FR-088)', async () => {
+    install({
+      getLanes: vi.fn().mockResolvedValue({
+        lanes: [
+          { lane: { ord: 1 }, collisions: [], blockedBy: [] },
+          { lane: { ord: 2 }, collisions: [], blockedBy: [1] },
+        ],
+        mergedOrds: [],
+        staleOrds: [],
+        blockedReasons: { 2: 'lane 1 must merge first' },
+      }),
+    })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    act(() => result.current.screenProps.onOpenWorkItem('FLU-220'))
+    await waitFor(() => expect(result.current.screenProps.selectedLaneOrd).toBe(1))
+    expect(result.current.screenProps.selectedWorkItemId).toBe('FLU-220')
+  })
+
+  it('binds to nothing when no work item is open', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    expect(result.current.screenProps.selectedWorkItemId).toBeNull()
+    expect(result.current.screenProps.selectedLaneOrd).toBeNull()
   })
 })

@@ -18,7 +18,13 @@ import { StallControls } from './StallControls.js'
 import { SupervisionPalette, type PaletteEntity } from './SupervisionPalette.js'
 import { MergeAudit, HunkReview } from './MergeAudit.js'
 import { SinceYouLastLooked } from './SinceYouLastLooked.js'
-import { AutonomyPicker, BackpressureDialog, ProvisioningStatus } from './AssignControls.js'
+import {
+  AutonomyPicker,
+  BackpressureDialog,
+  ProvisioningStatus,
+  AssignPanel,
+  IntakePanel,
+} from './AssignControls.js'
 import type { AttentionItem } from '../../../shared/supervision/rank-attention.js'
 import type { AutonomyLevel } from '../../../shared/types/supervision.js'
 import type {
@@ -65,6 +71,9 @@ export interface SupervisionScreenProps {
   conflicts: ReadonlyArray<{ workItemId: string; producers: string[] }>
   canAct: boolean
   onOpenWorkItem(workItemId: string): void
+  /** Prefills the assign panel when a work-item lane is selected. */
+  selectedWorkItemId: string | null
+  selectedLaneOrd: number | null
   onApproveGate(workItemId: string, gate: string): void
   onRejectGate(workItemId: string, gate: string, notes: string): void
   onSendBack(workItemId: string, phase: string, notes: string): void
@@ -103,6 +112,20 @@ export interface SupervisionScreenProps {
   onCancelAssign(): void
   autonomy: AutonomyLevel
   onAutonomyChange(level: AutonomyLevel): void
+
+  /** Starting a supervised session — the front door (FR-030, FR-041). */
+  assigning: boolean
+  assignResult: { ok: boolean; reason?: string; worktreePath?: string } | null
+  onAssign(request: {
+    repoPath: string
+    branch: string
+    instruction?: string
+    workItemId?: string
+    laneOrd?: number
+  }): void
+  /** Stage 1: a ticket URL or a local document becomes a queued item (FR-068). */
+  intakeResult: { ok: boolean; reason?: string; id?: string } | null
+  onIntake(input: { url?: string; filePath?: string }): void
 
   provisioning: {
     worktreePath: string | null
@@ -187,6 +210,14 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
             onOpen={props.onOpenSession}
           />
           <AutonomyPicker value={props.autonomy} onChange={props.onAutonomyChange} />
+          <AssignPanel
+            autonomy={props.autonomy}
+            workItemId={props.selectedWorkItemId}
+            laneOrd={props.selectedLaneOrd}
+            onAssign={props.onAssign}
+            lastResult={props.assignResult}
+            busy={props.assigning}
+          />
           {props.provisioning !== null && (
             <ProvisioningStatus
               worktreePath={props.provisioning.worktreePath}
@@ -221,19 +252,22 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
       )}
 
       {tab === 'items' && (
-        <WorkItemBoard
-          items={props.workItems}
-          unreadable={props.unreadable}
-          conflicts={props.conflicts}
-          canAct={props.canAct}
-          onOpen={props.onOpenWorkItem}
-          onApproveGate={props.onApproveGate}
-          onRejectGate={props.onRejectGate}
-          onSendBack={props.onSendBack}
-          onAdvancePhase={props.onAdvancePhase}
-          actionError={props.actionError}
-          onDismissActionError={props.onDismissActionError}
-        />
+        <>
+          <IntakePanel onIntake={props.onIntake} result={props.intakeResult} />
+          <WorkItemBoard
+            items={props.workItems}
+            unreadable={props.unreadable}
+            conflicts={props.conflicts}
+            canAct={props.canAct}
+            onOpen={props.onOpenWorkItem}
+            onApproveGate={props.onApproveGate}
+            onRejectGate={props.onRejectGate}
+            onSendBack={props.onSendBack}
+            onAdvancePhase={props.onAdvancePhase}
+            actionError={props.actionError}
+            onDismissActionError={props.onDismissActionError}
+          />
+        </>
       )}
 
       {tab === 'lanes' && (

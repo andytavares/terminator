@@ -170,3 +170,188 @@ export function ProvisioningStatus({
     </div>
   )
 }
+
+export interface IntakeResultView {
+  readonly ok: boolean
+  readonly reason?: string
+  readonly id?: string
+}
+
+export interface IntakePanelProps {
+  onIntake(input: { url?: string; filePath?: string }): void
+  result: IntakeResultView | null
+}
+
+/**
+ * Stage 1. A ticket URL or a local document becomes a queued work item — and
+ * nothing starts on its own. Auto-start on intake is what produces backlogs
+ * nobody can review (FR-068).
+ */
+export function IntakePanel({ onIntake, result }: IntakePanelProps): JSX.Element {
+  const [value, setValue] = React.useState('')
+
+  const submit = (): void => {
+    const trimmed = value.trim()
+    if (trimmed === '') return
+    // A path is a path; anything else is treated as a ticket URL.
+    onIntake(trimmed.startsWith('/') ? { filePath: trimmed } : { url: trimmed })
+    setValue('')
+  }
+
+  return (
+    <div className="sv-panel">
+      <div className="sv-panel__header">
+        <span>Bring in a ticket</span>
+      </div>
+      <div className="sv-queue__actions">
+        <input
+          aria-label="Ticket URL or local document path"
+          placeholder="https://linear.app/… or /path/to/spec.md"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') submit()
+          }}
+        />
+        <button className="sv-queue__btn" onClick={submit}>
+          Queue it
+        </button>
+      </div>
+      {result !== null && (
+        <div className={result.ok ? 'sv-queue__meta' : 'sv-warn'}>
+          {result.ok
+            ? `Queued as ${result.id}. It waits until you start it.`
+            : (result.reason ?? 'could not bring that in')}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export interface AssignPanelProps {
+  autonomy: AutonomyLevel
+  /** Prefilled from the selected work item's lane, when there is one. */
+  workItemId: string | null
+  laneOrd: number | null
+  onAssign(request: {
+    repoPath: string
+    branch: string
+    instruction?: string
+    workItemId?: string
+    laneOrd?: number
+  }): void
+  /** The last attempt's outcome, so a refusal is never silent. */
+  lastResult: { ok: boolean; reason?: string; worktreePath?: string } | null
+  busy: boolean
+}
+
+/**
+ * Starting a supervised session. Everything else in the console exists to
+ * supervise what this creates; without it the substrate has nothing to watch.
+ */
+export function AssignPanel({
+  autonomy,
+  workItemId,
+  laneOrd,
+  onAssign,
+  lastResult,
+  busy,
+}: AssignPanelProps): JSX.Element {
+  const [repoPath, setRepoPath] = React.useState('')
+  const [branch, setBranch] = React.useState('')
+  const [instruction, setInstruction] = React.useState('')
+
+  const ready = repoPath.trim() !== '' && branch.trim() !== ''
+
+  const submit = (): void => {
+    if (!ready || busy) return
+    onAssign({
+      repoPath: repoPath.trim(),
+      branch: branch.trim(),
+      instruction: instruction.trim() === '' ? undefined : instruction.trim(),
+      workItemId: workItemId ?? undefined,
+      laneOrd: laneOrd ?? undefined,
+    })
+  }
+
+  return (
+    <div className="sv-panel">
+      <div className="sv-panel__header">
+        <span>
+          <Terminal aria-hidden="true" /> Start an agent
+        </span>
+        <span>{autonomy}</span>
+      </div>
+
+      <label className="sv-row">
+        <span className="sv-row__main">
+          <div className="sv-queue__title">Repository</div>
+          <input
+            aria-label="Repository path"
+            placeholder="/Users/you/repos/fluent"
+            value={repoPath}
+            onChange={(event) => setRepoPath(event.target.value)}
+          />
+        </span>
+      </label>
+
+      <label className="sv-row">
+        <span className="sv-row__main">
+          <div className="sv-queue__title">Branch</div>
+          <input
+            aria-label="Branch"
+            placeholder="feat/session-ulid"
+            value={branch}
+            onChange={(event) => setBranch(event.target.value)}
+          />
+        </span>
+      </label>
+
+      <label className="sv-row">
+        <span className="sv-row__main">
+          <div className="sv-queue__title">
+            {workItemId === null ? 'What should it do?' : 'Anything to add?'}
+          </div>
+          <input
+            aria-label="Instruction"
+            placeholder={
+              workItemId === null ? 'fix the flaky session test' : 'optional steer for this lane'
+            }
+            value={instruction}
+            onChange={(event) => setInstruction(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') submit()
+            }}
+          />
+        </span>
+      </label>
+
+      {workItemId !== null && (
+        <div className="sv-queue__meta">
+          Bound to {workItemId}
+          {laneOrd !== null && ` · lane ${laneOrd}`}
+        </div>
+      )}
+
+      <div className="sv-queue__actions">
+        <button className="sv-queue__btn" disabled={!ready || busy} onClick={submit}>
+          {busy ? 'Starting…' : 'Start'}
+        </button>
+      </div>
+
+      {/* A refusal is never silent: the gate, the queue and a failed setup
+          script all end here with their reason (FR-034, FR-053, FR-083). */}
+      {lastResult !== null && (
+        <div className={lastResult.ok ? 'sv-queue__meta' : 'sv-warn'}>
+          {lastResult.ok ? (
+            `Started in ${lastResult.worktreePath}`
+          ) : (
+            <>
+              <AlertOctagon aria-hidden="true" /> {lastResult.reason ?? 'could not start'}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}

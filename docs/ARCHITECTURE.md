@@ -850,6 +850,13 @@ label rather than colour; icons are flat `lucide-react` inheriting
 it: the Attention Queue, the Standup Feed and the palette are three renderings
 of one query, built once.
 
+### Navigation is a callback, not a broadcast
+
+The palette and the attention queue navigate by calling into the hook, and the
+hook tells the app shell through options passed to `useSupervision`. An earlier
+cut broadcast `CustomEvent`s on `window` that nothing listened for — a listener
+that does not exist should be a compile error, not silence.
+
 ### Notification discipline
 
 `feed/digest.ts` routes every notifiable event to one of three channels: modal

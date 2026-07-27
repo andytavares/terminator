@@ -75,6 +75,25 @@ interface SupervisionBridge {
     sessionId: string
   }): Promise<{ lastViewedAt: number | null; entries: FeedEntry[] }>
   precheckBackpressure?(): Promise<BackpressureDecision | null>
+  assign?(request: {
+    repoPath: string
+    branch: string
+    autonomyLevel: AutonomyLevel
+    workItemId?: string
+    laneOrd?: number
+    instruction?: string
+    overrideBackpressure?: boolean
+  }): Promise<{
+    ok: boolean
+    reason?: string
+    worktreePath?: string
+    backpressure?: BackpressureDecision
+  }>
+  intake?(input: { url?: string; filePath?: string }): Promise<{
+    ok: boolean
+    reason?: string
+    id?: string
+  }>
   getDigest?(payload: { windowMs: number }): Promise<Digest | null>
   producerAction?(payload: {
     workItemId: string
@@ -99,7 +118,19 @@ export interface UseSupervision {
   screenProps: SupervisionScreenProps
 }
 
-export function useSupervision(): UseSupervision {
+export interface UseSupervisionOptions {
+  /**
+   * The app shell's own reaction to a session being opened — focusing its tab,
+   * for instance. Passed in rather than broadcast on a window event, so a
+   * listener that does not exist is a compile error instead of silence.
+   */
+  onOpenSessionInShell?: (sessionId: string) => void
+  /** Called after the palette has navigated, for anything the shell must do. */
+  onNavigate?: (entity: PaletteEntity) => void
+}
+
+export function useSupervision(options: UseSupervisionOptions = {}): UseSupervision {
+  const { onOpenSessionInShell, onNavigate } = options
   const [now, setNow] = useState(() => Date.now())
   const [attentionOpen, setAttentionOpen] = useState(false)
   const [autonomy, setAutonomy] = useState<AutonomyLevel>('edit')
@@ -202,7 +233,28 @@ export function useSupervision(): UseSupervision {
   )
 
   const [digest, setDigest] = useState<Digest | null>(null)
+  const [assignResult, setAssignResult] = useState<{
+    ok: boolean
+    reason?: string
+    worktreePath?: string
+  } | null>(null)
+  const [assigning, setAssigning] = useState(false)
+  const [intakeResult, setIntakeResult] = useState<{
+    ok: boolean
+    reason?: string
+    id?: string
+  } | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+
+  const refreshAll = useCallback(() => {
+    const transport = bridge()
+    if (transport === null) return
+    void load({ listSessions: () => transport.listSessions() })
+    void transport.listReview?.().then(setReview)
+    void transport
+      .precheckBackpressure?.()
+      .then((decision) => setBackpressure(decision !== null && decision.allowed ? null : decision))
+  }, [load])
 
   const refreshDigest = useCallback(() => {
     void bridge()
@@ -277,6 +329,13 @@ export function useSupervision(): UseSupervision {
     return list
   }, [sessions, board.items])
 
+  const nextLaneOrd =
+    laneState.lanes.find(
+      (view) =>
+        !laneState.mergedOrds.includes(view.lane.ord) &&
+        laneState.blockedReasons[view.lane.ord] === undefined
+    )?.lane.ord ?? null
+
   const entities = remoteEntities ?? localEntities
   const attention = attentionOf(now)
   const summary = summaryOf(now)
@@ -290,7 +349,7 @@ export function useSupervision(): UseSupervision {
     onDeny: (sessionId, requestId) => resolve(sessionId, requestId, 'deny'),
     onOpenSession: (sessionId) => {
       setOpenSession(sessionId)
-      window.dispatchEvent(new CustomEvent('supervision:open-session', { detail: { sessionId } }))
+      onOpenSessionInShell?.(sessionId)
     },
 
     review,
@@ -331,11 +390,13 @@ export function useSupervision(): UseSupervision {
     actionError,
     onDismissActionError: () => setActionError(null),
 
+    selectedWorkItemId: openWorkItem,
+    // The next lane to start: the lowest ordinal nothing has merged yet and
+    // nothing is blocking. Merge order is left to right, so that is the only
+    // lane it would be correct to start next (FR-088).
+    selectedLaneOrd: nextLaneOrd,
     onOpenWorkItem: (workItemId) => {
       setOpenWorkItem(workItemId)
-      window.dispatchEvent(
-        new CustomEvent('supervision:open-work-item', { detail: { workItemId } })
-      )
     },
 
     lanes: laneState.lanes,
@@ -376,8 +437,28 @@ export function useSupervision(): UseSupervision {
     },
 
     entities,
+    // FR-026: one keystroke to get anywhere. Dispatching an event nothing
+    // listens for is the same as doing nothing.
     onChooseEntity: (entity) => {
-      window.dispatchEvent(new CustomEvent('supervision:choose', { detail: entity }))
+      if (entity.kind === 'session') {
+        setOpenSession(entity.id)
+      } else if (entity.kind === 'workItem') {
+        setOpenWorkItem(entity.id)
+      } else if (entity.kind === 'command' && entity.id === 'toggle-shadow') {
+        setShadow((current) => {
+          void bridge()?.setShadowMode?.({ value: !current })
+          return !current
+        })
+      }
+      // A repository or a worktree has no surface of its own yet; choosing one
+      // opens the session that owns it, which does.
+      if (entity.kind === 'repository' || entity.kind === 'worktree') {
+        const owner = sessions.find(
+          (session) => session.repoPath === entity.id || session.worktreePath === entity.id
+        )
+        if (owner !== undefined) setOpenSession(owner.id)
+      }
+      onNavigate?.(entity)
     },
 
     backpressure,
@@ -387,6 +468,48 @@ export function useSupervision(): UseSupervision {
     onCancelAssign: () => setBackpressure(null),
     autonomy,
     onAutonomyChange: setAutonomy,
+
+    // The front door. Everything else in the console supervises what this
+    // creates; without it the substrate has nothing to watch.
+    assigning,
+    assignResult,
+    onAssign: (request: {
+      repoPath: string
+      branch: string
+      instruction?: string
+      workItemId?: string
+      laneOrd?: number
+    }) => {
+      const transport = bridge()
+      if (transport?.assign === undefined) {
+        setAssignResult({ ok: false, reason: 'This build cannot start agents.' })
+        return
+      }
+      setAssigning(true)
+      void transport
+        .assign({ ...request, autonomyLevel: autonomy })
+        .then((result) => {
+          setAssignResult(result)
+          // A refusal by the review queue is shown as the refusal dialog, not
+          // as a line of text — being told why is the whole mechanism (FR-053).
+          if (result.backpressure !== undefined) setBackpressure(result.backpressure)
+          if (result.ok) void transport.listSessions().then(() => refreshAll())
+        })
+        .finally(() => setAssigning(false))
+    },
+
+    intakeResult,
+    onIntake: (input: { url?: string; filePath?: string }) => {
+      const transport = bridge()
+      if (transport?.intake === undefined) {
+        setIntakeResult({ ok: false, reason: 'This build cannot take in tickets.' })
+        return
+      }
+      void transport.intake(input).then((result) => {
+        setIntakeResult(result)
+        if (result.ok) void transport.listWorkItems?.().then(setBoard)
+      })
+    },
 
     provisioning,
     onOpenInEditor: () => {

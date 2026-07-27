@@ -666,6 +666,25 @@ that lane is flagged as needing a rebase or a re-run.
 
 Single-repository work renders as one row with none of this.
 
+### Starting an agent
+
+**Needs you** carries the start panel. Give it a repository path and a branch,
+optionally say what the agent should do, and press **Start**. The autonomy level
+above it is chosen here and not renegotiated per interrupt.
+
+If a work item is open, the panel binds the session to it and to the next lane
+that nothing has merged and nothing is blocking — merge order is left to right,
+so that is the only lane it would be correct to start next.
+
+Every refusal states its reason in place: an unapproved gate, a full review
+queue, or a setup script that exited non-zero.
+
+### Bringing in a ticket
+
+The **Work items** tab takes a Linear or GitHub URL, or a path to a local
+markdown spec. What you queue sits there until you start it — nothing
+auto-starts, because auto-start is what produces a backlog nobody can review.
+
 The **Feed** tab opens with a progress digest covering the last hour. Routine
 progress never interrupts you — it is batched here and read when you choose to.
 Anything that actually needs you appears in **Needs you** instead.
