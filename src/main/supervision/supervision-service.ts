@@ -23,7 +23,7 @@ import { createBackpressureGate, type BackpressureGate } from './review/backpres
 import { createMergePolicy, type MergePolicy } from './review/merge-policy.js'
 import { loadRepoConfig } from './worktree/repo-config.js'
 import { createReviewQueue, type ReviewQueue } from './review/review-queue.js'
-import { createFeedLog, type FeedLog } from './feed/feed-log.js'
+import { createFeedLog, type FeedLog, type FeedEntry } from './feed/feed-log.js'
 import { createLaneBindings, type LaneBindings } from './workitems/lane-bindings.js'
 import {
   createProducerRegistry,
@@ -123,6 +123,20 @@ export interface SupervisionService {
   mayBeginImplementation(workItemId: string): ReturnType<typeof mayBeginImplementation>
   /** Normalises a ticket URL or a dropped document into one shape (FR-068). */
   intake(input: { url?: string; filePath?: string; contents?: string }): IntakeResult
+  /**
+   * What changed while the operator was not looking, and marks it looked at
+   * (FR-036). Assembled here rather than in the composition root so it is
+   * testable and so "what did I miss" cannot silently answer "nothing".
+   */
+  sinceLastLooked(
+    sessionId: string,
+    at: number
+  ): {
+    lastViewedAt: number | null
+    entries: readonly FeedEntry[]
+    stateChanges: ReadonlyArray<{ to: string; at: number }>
+    diffDelta: { files: number; added: number; removed: number } | null
+  }
   /**
    * Directs an action at whichever producer published the item (FR-077). The
    * console never reaches into a producer by any other means, and never edits
@@ -304,11 +318,22 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
   // Every event reaches the registry; state changes are pushed to the renderer.
   const seenEvents: SessionEvent[] = []
 
+  // What each session did while you were not looking (FR-036). Bounded: this
+  // is a "what did I miss" panel, not an audit log, and an unbounded array on a
+  // long-running session is a leak.
+  const TRANSITION_HISTORY = 50
+  const transitionsBySession = new Map<string, Array<{ to: string; at: number }>>()
+  /** The diff as it stood when the operator last looked, for the delta. */
+  const diffAtLastView = new Map<string, { files: number; added: number; removed: number }>()
+
   bus.subscribe((event) => {
     const before = registry.get(event.sessionId)?.runtimeState
     registry.apply(event)
     const after = registry.get(event.sessionId)?.runtimeState
     if (after !== undefined && after !== before) {
+      const history = transitionsBySession.get(event.sessionId) ?? []
+      history.push({ to: after, at: event.at })
+      transitionsBySession.set(event.sessionId, history.slice(-TRANSITION_HISTORY))
       options.onStateChanged?.({ sessionId: event.sessionId, to: after, at: event.at })
     }
 
@@ -470,6 +495,37 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
         return intakeFromDocument(input.filePath, input.contents ?? '', now())
       }
       return { ok: false, reason: 'nothing to bring in' }
+    },
+
+    sinceLastLooked: (sessionId, at) => {
+      const session = registry.get(sessionId)
+      const lastViewedAt = session?.lastViewedAt ?? null
+      const previous = diffAtLastView.get(sessionId) ?? null
+      const current = session?.diffSummary ?? null
+
+      const result = {
+        lastViewedAt,
+        entries: feed
+          .forSession(sessionId)
+          .filter((entry) => lastViewedAt === null || entry.at > lastViewedAt),
+        stateChanges: (transitionsBySession.get(sessionId) ?? []).filter(
+          (change) => lastViewedAt === null || change.at > lastViewedAt
+        ),
+        // Null on a first look: there is no previous state to differ from, and
+        // reporting the whole diff as "new since you looked" would be a lie.
+        diffDelta:
+          previous === null || current === null
+            ? null
+            : {
+                files: current.files - previous.files,
+                added: current.added - previous.added,
+                removed: current.removed - previous.removed,
+              },
+      }
+
+      registry.markViewed(sessionId, at)
+      if (current !== null) diffAtLastView.set(sessionId, { ...current })
+      return result
     },
 
     runProducerAction: async (workItemId, action, args) => {

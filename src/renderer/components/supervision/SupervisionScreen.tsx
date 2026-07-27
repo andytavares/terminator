@@ -26,7 +26,7 @@ import {
   IntakePanel,
 } from './AssignControls.js'
 import type { AttentionItem } from '../../../shared/supervision/rank-attention.js'
-import type { AutonomyLevel } from '../../../shared/types/supervision.js'
+import type { AutonomyLevel, RuntimeState } from '../../../shared/types/supervision.js'
 import type {
   ReviewItem,
   IntentReview,
@@ -137,6 +137,9 @@ export interface SupervisionScreenProps {
 
   lastViewedAt: number | null
   sinceEntries: readonly FeedEntry[]
+  /** FR-036: two of this panel's three answers were permanently empty. */
+  sinceStateChanges: ReadonlyArray<{ to: RuntimeState; at: number }>
+  sinceDiffDelta: { files: number; added: number; removed: number } | null
 }
 
 const TABS: Array<{ id: SupervisionTab; label: string; icon: JSX.Element }> = [
@@ -198,8 +201,8 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
             lastViewedAt={props.lastViewedAt}
             now={props.now}
             entries={props.sinceEntries}
-            stateChanges={[]}
-            diffDelta={null}
+            stateChanges={props.sinceStateChanges}
+            diffDelta={props.sinceDiffDelta}
           />
           <AttentionQueue
             items={props.attention}

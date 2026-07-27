@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSupervisionStore } from '../stores/supervision.store'
 import type { AttentionItem } from '../../shared/supervision/rank-attention'
 import type { StatusSummary } from '../../shared/schemas/supervision'
-import type { AutonomyLevel, SupervisedSession } from '../../shared/types/supervision'
+import type { AutonomyLevel, RuntimeState, SupervisedSession } from '../../shared/types/supervision'
 import type { SupervisionScreenProps } from '../components/supervision/SupervisionScreen'
 import type { PaletteEntity } from '../components/supervision/SupervisionPalette'
 import type {
@@ -71,9 +71,12 @@ interface SupervisionBridge {
   }>
   mergeLane?(payload: { workItemId: string; ord: number }): Promise<unknown>
   getProvisioning?(payload: { sessionId: string }): Promise<SupervisionScreenProps['provisioning']>
-  getSinceLastLooked?(payload: {
-    sessionId: string
-  }): Promise<{ lastViewedAt: number | null; entries: FeedEntry[] }>
+  getSinceLastLooked?(payload: { sessionId: string }): Promise<{
+    lastViewedAt: number | null
+    entries: FeedEntry[]
+    stateChanges: Array<{ to: RuntimeState; at: number }>
+    diffDelta: { files: number; added: number; removed: number } | null
+  }>
   precheckBackpressure?(): Promise<BackpressureDecision | null>
   assign?(request: {
     repoPath: string
@@ -158,10 +161,12 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
     blockedReasons: Record<number, string>
   }>({ lanes: [], mergedOrds: [], staleOrds: [], blockedReasons: {} })
   const [provisioning, setProvisioning] = useState<SupervisionScreenProps['provisioning']>(null)
-  const [since, setSince] = useState<{ lastViewedAt: number | null; entries: FeedEntry[] }>({
-    lastViewedAt: null,
-    entries: [],
-  })
+  const [since, setSince] = useState<{
+    lastViewedAt: number | null
+    entries: FeedEntry[]
+    stateChanges: Array<{ to: RuntimeState; at: number }>
+    diffDelta: { files: number; added: number; removed: number } | null
+  }>({ lastViewedAt: null, entries: [], stateChanges: [], diffDelta: null })
   const [backpressure, setBackpressure] = useState<BackpressureDecision | null>(null)
 
   const loaded = useSupervisionStore((state) => state.loaded)
@@ -519,6 +524,8 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
 
     lastViewedAt: since.lastViewedAt,
     sinceEntries: since.entries,
+    sinceStateChanges: since.stateChanges,
+    sinceDiffDelta: since.diffDelta,
   }
 
   return {

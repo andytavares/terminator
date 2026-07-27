@@ -409,3 +409,114 @@ describe('telling the console a producer wrote something (FR-071)', () => {
     })
   })
 })
+
+// FR-036. "What did I miss" is the one novel part of the focused session view,
+// and two of its three answers — the state changes and the diff delta — were
+// hardcoded empty at the surface.
+
+describe('what changed since you last looked', () => {
+  function started(service: ReturnType<typeof build>) {
+    service.registry.register('s1', meta())
+    service.bus.publish({
+      kind: 'session_started',
+      sessionId: 's1',
+      transcriptPath: null,
+      cwd: join(root, 'repo'),
+      at: 1_000,
+    })
+    return service
+  }
+
+  it('reports nothing viewed yet on the first look', () => {
+    const service = started(build())
+    expect(service.sinceLastLooked('s1', 5_000).lastViewedAt).toBeNull()
+  })
+
+  it('reports no delta on the first look, rather than the whole diff', () => {
+    // Reporting every line as "new since you looked" would be a lie.
+    const service = started(build())
+    expect(service.sinceLastLooked('s1', 5_000).diffDelta).toBeNull()
+  })
+
+  it('reports the transitions that happened while you were away', () => {
+    const service = started(build())
+    service.sinceLastLooked('s1', 2_000)
+    service.bus.publish({
+      kind: 'permission_requested',
+      sessionId: 's1',
+      requestId: 'r1',
+      toolName: 'Bash',
+      input: {},
+      at: 3_000,
+    })
+
+    const since = service.sinceLastLooked('s1', 4_000)
+    expect(since.stateChanges.map((change) => change.to)).toContain('needs_input')
+  })
+
+  it('leaves out transitions you have already seen', () => {
+    const service = started(build())
+    service.bus.publish({
+      kind: 'permission_requested',
+      sessionId: 's1',
+      requestId: 'r1',
+      toolName: 'Bash',
+      input: {},
+      at: 3_000,
+    })
+    service.sinceLastLooked('s1', 4_000)
+    expect(service.sinceLastLooked('s1', 5_000).stateChanges).toEqual([])
+  })
+
+  it('reports the diff delta against the state at your last look', () => {
+    const service = started(build())
+    const session = service.registry.get('s1') as { diffSummary: { files: number } }
+    session.diffSummary.files = 1
+    service.sinceLastLooked('s1', 2_000)
+
+    const grown = service.registry.get('s1') as {
+      diffSummary: { files: number; added: number; removed: number }
+    }
+    grown.diffSummary.files = 4
+    grown.diffSummary.added = 90
+
+    expect(service.sinceLastLooked('s1', 6_000).diffDelta).toMatchObject({ files: 3, added: 90 })
+  })
+
+  it('marks the session viewed, so the next call measures from here', () => {
+    const service = started(build())
+    service.sinceLastLooked('s1', 7_000)
+    expect(service.sinceLastLooked('s1', 9_000).lastViewedAt).toBe(7_000)
+  })
+
+  it('answers for a session it does not know without throwing', () => {
+    const service = build()
+    expect(service.sinceLastLooked('ghost', 1_000)).toMatchObject({
+      lastViewedAt: null,
+      stateChanges: [],
+      diffDelta: null,
+    })
+  })
+
+  it('bounds the transition history rather than growing without limit', () => {
+    const service = started(build())
+    for (let i = 0; i < 120; i++) {
+      service.bus.publish({
+        kind: 'permission_requested',
+        sessionId: 's1',
+        requestId: `r${i}`,
+        toolName: 'Bash',
+        input: {},
+        at: 10_000 + i * 2,
+      })
+      service.bus.publish({
+        kind: 'permission_resolved',
+        sessionId: 's1',
+        requestId: `r${i}`,
+        decision: 'allow',
+        at: 10_001 + i * 2,
+      })
+    }
+    expect(service.sinceLastLooked('s1', 999_999).stateChanges.length).toBeLessThanOrEqual(50)
+  })
+})

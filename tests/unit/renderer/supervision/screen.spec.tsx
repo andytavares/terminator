@@ -70,6 +70,8 @@ function props(over: Partial<SupervisionScreenProps> = {}): SupervisionScreenPro
     onOpenInEditor: vi.fn(),
     lastViewedAt: null,
     sinceEntries: [],
+    sinceStateChanges: [],
+    sinceDiffDelta: null,
     ...over,
   }
 }

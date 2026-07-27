@@ -91,7 +91,12 @@ function makeBridge(over: Record<string, unknown> = {}) {
     getProvisioning: vi
       .fn()
       .mockResolvedValue({ worktreePath: '/wt/x', ports: null, setup: null, skipped: [] }),
-    getSinceLastLooked: vi.fn().mockResolvedValue({ lastViewedAt: 500, entries: [] }),
+    getSinceLastLooked: vi.fn().mockResolvedValue({
+      lastViewedAt: 500,
+      entries: [],
+      stateChanges: [{ to: 'needs_input', at: 900 }],
+      diffDelta: { files: 2, added: 30, removed: 4 },
+    }),
     producerAction: vi.fn().mockResolvedValue({ ok: true, reason: null }),
     assign: vi.fn().mockResolvedValue({ ok: true, sessionId: 's9', worktreePath: '/wt/s9' }),
     intake: vi.fn().mockResolvedValue({ ok: true, id: 'FLU-221' }),
@@ -835,5 +840,22 @@ describe('which lane an assignment binds to', () => {
     await waitFor(() => expect(result.current.loaded).toBe(true))
     expect(result.current.screenProps.selectedWorkItemId).toBeNull()
     expect(result.current.screenProps.selectedLaneOrd).toBeNull()
+  })
+})
+
+describe('what changed since you last looked (FR-036)', () => {
+  it('carries the state changes and the diff delta, not just the feed', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    act(() => result.current.screenProps.onOpenSession('s1'))
+    await waitFor(() => expect(result.current.screenProps.sinceStateChanges).toHaveLength(1))
+    expect(result.current.screenProps.sinceDiffDelta).toMatchObject({ files: 2, added: 30 })
+  })
+
+  it('starts empty before a session is opened', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    expect(result.current.screenProps.sinceStateChanges).toEqual([])
+    expect(result.current.screenProps.sinceDiffDelta).toBeNull()
   })
 })

@@ -537,15 +537,7 @@ app.whenReady().then(async () => {
       return supervision.codeHost.merge(session.repoPath, session.branch)
     },
     getProvisioning: (sessionId) => supervision.provisioningFor(sessionId),
-    getSinceLastLooked: (sessionId) => {
-      const session = supervision.getSession(sessionId)
-      const lastViewedAt = session?.lastViewedAt ?? null
-      supervision.registry.markViewed(sessionId, Date.now())
-      return {
-        lastViewedAt,
-        entries: supervision.feed.forSession(sessionId),
-      }
-    },
+    getSinceLastLooked: (sessionId) => supervision.sinceLastLooked(sessionId, Date.now()),
     precheckBackpressure: () => supervision.backpressure.check(),
     entityIndex: () =>
       supervision.entityIndex([
