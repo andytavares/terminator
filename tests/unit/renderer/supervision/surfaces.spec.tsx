@@ -53,6 +53,7 @@ function attention(over: Partial<AttentionItem> = {}): AttentionItem {
   return {
     sessionId: 's1',
     repoPath: '/repos/fluent',
+    branch: 'feat/x',
     reason: 'needs_input',
     waitingMs: 65_000,
     pendingPermission: {
@@ -78,6 +79,8 @@ describe('AttentionQueue (FR-022 – FR-024)', () => {
         workingCount={3}
         onApprove={noop}
         onDeny={noop}
+        onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={noop}
       />
     )
@@ -93,6 +96,8 @@ describe('AttentionQueue (FR-022 – FR-024)', () => {
         workingCount={0}
         onApprove={noop}
         onDeny={noop}
+        onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={noop}
       />
     )
@@ -107,6 +112,8 @@ describe('AttentionQueue (FR-022 – FR-024)', () => {
         workingCount={0}
         onApprove={noop}
         onDeny={noop}
+        onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={noop}
       />
     )
@@ -123,6 +130,8 @@ describe('AttentionQueue (FR-022 – FR-024)', () => {
         workingCount={0}
         onApprove={onApprove}
         onDeny={noop}
+        onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={onOpen}
       />
     )
@@ -140,6 +149,8 @@ describe('AttentionQueue (FR-022 – FR-024)', () => {
         workingCount={0}
         onApprove={noop}
         onDeny={onDeny}
+        onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={noop}
       />
     )
@@ -155,6 +166,8 @@ describe('AttentionQueue (FR-022 – FR-024)', () => {
         workingCount={0}
         onApprove={noop}
         onDeny={noop}
+        onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={noop}
       />
     )
@@ -172,6 +185,8 @@ describe('AttentionQueue (FR-022 – FR-024)', () => {
         workingCount={0}
         onApprove={noop}
         onDeny={noop}
+        onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={noop}
       />
     )
@@ -377,6 +392,7 @@ describe('MergeAudit and HunkReview (FR-052, FR-061)', () => {
   const merge = {
     sessionId: 's1',
     repoPath: '/repos/fluent',
+    branch: 'feat/x',
     mergedAt: 1_700_000_000_000,
     gradeTrigger: 'lockfile only',
     checkState: 'passing' as const,
@@ -588,7 +604,16 @@ describe('WorkItemBoard (FR-074, FR-080 – FR-082)', () => {
   })
 
   it('says ad-hoc work still runs when nothing is published (FR-081)', () => {
-    render(<WorkItemBoard items={[]} unreadable={[]} conflicts={[]} canAct onOpen={() => {}} />)
+    render(
+      <WorkItemBoard
+        {...boardActions}
+        items={[]}
+        unreadable={[]}
+        conflicts={[]}
+        canAct
+        onOpen={() => {}}
+      />
+    )
     expect(screen.getByText(/Sessions still run as ad-hoc work/)).toBeDefined()
   })
 })
@@ -1046,6 +1071,7 @@ describe('a failed session says why on the queue itself (FR-034)', () => {
   const failed = {
     sessionId: 's1',
     repoPath: '/repos/fluent',
+    branch: 'feat/x',
     reason: 'failed' as const,
     waitingMs: 60_000,
     pendingPermission: null,
@@ -1060,6 +1086,8 @@ describe('a failed session says why on the queue itself (FR-034)', () => {
         workingCount={0}
         onApprove={() => {}}
         onDeny={() => {}}
+        onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={() => {}}
       />
     )
@@ -1074,6 +1102,8 @@ describe('a failed session says why on the queue itself (FR-034)', () => {
         workingCount={0}
         onApprove={() => {}}
         onDeny={() => {}}
+        onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={() => {}}
       />
     )
@@ -1088,6 +1118,8 @@ describe('a failed session says why on the queue itself (FR-034)', () => {
         workingCount={0}
         onApprove={() => {}}
         onDeny={() => {}}
+        onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={() => {}}
       />
     )
@@ -1102,6 +1134,8 @@ describe('a failed session says why on the queue itself (FR-034)', () => {
         workingCount={0}
         onApprove={() => {}}
         onDeny={() => {}}
+        onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={() => {}}
       />
     )
@@ -1113,6 +1147,7 @@ describe('the ask is readable on the queue (FR-007)', () => {
   const blocked = {
     sessionId: 's1',
     repoPath: '/repos/fluent',
+    branch: 'feat/x',
     reason: 'needs_input' as const,
     waitingMs: 29_000,
     failure: null,
@@ -1134,6 +1169,8 @@ describe('the ask is readable on the queue (FR-007)', () => {
         workingCount={0}
         onApprove={() => {}}
         onDeny={() => {}}
+        onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={() => {}}
       />
     )
@@ -1180,6 +1217,7 @@ describe('answering a question rather than approving it (FR-007)', () => {
   const asked = {
     sessionId: 's1',
     repoPath: '/repos/terminator',
+    branch: 'feat/x',
     reason: 'needs_input' as const,
     waitingMs: 35_000,
     failure: null,
@@ -1207,6 +1245,7 @@ describe('answering a question rather than approving it (FR-007)', () => {
         onApprove={() => {}}
         onDeny={() => {}}
         onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={() => {}}
         {...handlers}
       />
@@ -1294,6 +1333,7 @@ describe('two questions in one ask', () => {
   const both = {
     sessionId: 's1',
     repoPath: '/repos/terminator',
+    branch: 'feat/x',
     reason: 'needs_input' as const,
     waitingMs: 6_000,
     failure: null,
@@ -1319,6 +1359,7 @@ describe('two questions in one ask', () => {
         onApprove={() => {}}
         onDeny={() => {}}
         onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={() => {}}
         {...handlers}
       />
@@ -1356,6 +1397,7 @@ describe('two questions in one ask', () => {
         onApprove={() => {}}
         onDeny={() => {}}
         onAnswer={onAnswer}
+        onDiscard={() => {}}
         onOpen={() => {}}
       />
     )
@@ -1385,9 +1427,87 @@ describe('two questions in one ask', () => {
         onApprove={() => {}}
         onDeny={() => {}}
         onAnswer={() => {}}
+        onDiscard={() => {}}
         onOpen={() => {}}
       />
     )
     expect(screen.getByText('the full text of both questions')).toBeDefined()
+  })
+})
+
+describe('a session that is over, or lost (FR-029)', () => {
+  const lost = {
+    sessionId: 's1',
+    repoPath: '/Users/you/repos/terminator',
+    branch: 'feat/session-ulid',
+    reason: 'unknown' as const,
+    waitingMs: 60_000,
+    pendingPermission: null,
+    failure: null,
+  }
+
+  const queue = (over: Record<string, unknown> = {}, handlers: Record<string, unknown> = {}) =>
+    render(
+      <AttentionQueue
+        items={[{ ...lost, ...over }]}
+        loaded
+        workingCount={0}
+        onApprove={() => {}}
+        onDeny={() => {}}
+        onAnswer={() => {}}
+        onDiscard={() => {}}
+        onOpen={() => {}}
+        {...handlers}
+      />
+    )
+
+  it('is identified by its branch, not by the state repeated twice', () => {
+    // Three rows all reading "State unknown" are indistinguishable.
+    queue()
+    expect(screen.getByText('feat/session-ulid')).toBeDefined()
+  })
+
+  it('explains what an unknown state means and what happens next', () => {
+    queue()
+    expect(screen.getByText(/did not survive/)).toBeDefined()
+  })
+
+  it('can be discarded, so it does not sit on the queue forever', () => {
+    const onDiscard = vi.fn()
+    queue({}, { onDiscard })
+    fireEvent.click(screen.getByText('Discard'))
+    expect(onDiscard).toHaveBeenCalledWith('s1')
+  })
+
+  it('offers the same way out of a failed session', () => {
+    const onDiscard = vi.fn()
+    queue(
+      {
+        reason: 'failed' as const,
+        failure: { step: 'setup' as const, exitCode: 3, output: 'lockfile is out of date' },
+      },
+      { onDiscard }
+    )
+    fireEvent.click(screen.getByText('Discard'))
+    expect(onDiscard).toHaveBeenCalledWith('s1')
+  })
+
+  it('offers no discard for work that is merely waiting to be reviewed', () => {
+    // Its diff is unreviewed; discarding it would throw the work away.
+    queue({ reason: 'ready' as const })
+    expect(screen.queryByText('Discard')).toBeNull()
+  })
+
+  it('offers no discard while a session is blocked on a permission request', () => {
+    queue({
+      reason: 'needs_input' as const,
+      pendingPermission: {
+        requestId: 'r1',
+        toolName: 'Bash',
+        summary: 'ls',
+        requestedAt: 1_000,
+      },
+    })
+    expect(screen.queryByText('Discard')).toBeNull()
   })
 })

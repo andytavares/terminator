@@ -635,13 +635,29 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
 
       await driver.interrupt(sessionId)
       reviewQueue.remove(sessionId)
+
       const span = spansByWorktree.get(session.worktreePath)
-      await provisioner.release({
-        repoPath: session.repoPath,
-        worktreePath: session.worktreePath,
-        workItemId: session.workItemId ?? sessionId,
-        portBase: span?.portBase ?? 0,
-      })
+      try {
+        await provisioner.release({
+          repoPath: session.repoPath,
+          worktreePath: session.worktreePath,
+          workItemId: session.workItemId ?? sessionId,
+          portBase: span?.portBase ?? 0,
+        })
+      } catch (error) {
+        // A working copy that is already gone, or a teardown that failed, must
+        // not strand the session on the queue forever — that is the state the
+        // operator is trying to get out of. Reported, then removed anyway.
+        feed.post({
+          at: now(),
+          sessionId,
+          author: 'console',
+          summary: `Could not remove the working copy: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        })
+      }
+
       spansByWorktree.delete(session.worktreePath)
       feed.post({
         at: now(),
@@ -649,6 +665,9 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
         author: 'console',
         summary: 'Discarded by the operator; the working copy was removed.',
       })
+      // Discarding ends with the session leaving the console. Leaving the
+      // record behind is what put rows on the queue that could not be removed.
+      registry.forget(sessionId)
       return { ok: true, reason: null }
     },
 

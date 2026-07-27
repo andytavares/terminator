@@ -984,3 +984,59 @@ describe('reclaiming a working copy', () => {
     expect(service.feed.forSession('s1').at(-1)?.summary).toMatch(/Working copy reclaimed/)
   })
 })
+
+// Discarding has to end with the session leaving the console. Releasing the
+// working copy while leaving the record behind put rows on the attention queue
+// that had no action and could never be removed.
+
+describe('discarding takes the session off the console', () => {
+  function running(over: Record<string, unknown> = {}) {
+    const service = build(over)
+    service.driver.interrupt = async () => {}
+    service.registry.register('s1', meta())
+    return service
+  }
+
+  it('forgets the session', async () => {
+    const service = running()
+    await service.discardSession('s1')
+    expect(service.getSession('s1')).toBeNull()
+    expect(service.listSessions()).toEqual([])
+  })
+
+  it('forgets it even when the working copy could not be removed', async () => {
+    // Already gone, or a teardown that failed: stranding it on the queue is
+    // the state the operator is trying to get out of.
+    const service = running({
+      git: {
+        createWorktree: async () => {},
+        removeWorktree: async () => {
+          throw new Error('worktree is locked')
+        },
+      },
+    })
+    await expect(service.discardSession('s1')).resolves.toMatchObject({ ok: true })
+    expect(service.getSession('s1')).toBeNull()
+  })
+
+  it('says in the feed that the copy could not be removed', async () => {
+    const service = running({
+      git: {
+        createWorktree: async () => {},
+        removeWorktree: async () => {
+          throw new Error('worktree is locked')
+        },
+      },
+    })
+    await service.discardSession('s1')
+    const said = service.feed.forSession('s1').map((entry) => entry.summary)
+    expect(said.some((summary) => summary.includes('worktree is locked'))).toBe(true)
+  })
+
+  it('leaves other sessions alone', async () => {
+    const service = running()
+    service.registry.register('s2', meta())
+    await service.discardSession('s1')
+    expect(service.listSessions().map((entry) => entry.id)).toEqual(['s2'])
+  })
+})

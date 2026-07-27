@@ -261,6 +261,7 @@ describe('a stalled session offers something to do about it (FR-029)', () => {
   const stalled = {
     sessionId: 's1',
     repoPath: '/repos/fluent',
+    branch: 'feat/x',
     reason: 'stalled' as const,
     waitingMs: 600_000,
     pendingPermission: null,

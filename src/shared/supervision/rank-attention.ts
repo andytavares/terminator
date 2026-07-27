@@ -18,6 +18,8 @@ export type AttentionReason = Extract<
 export interface AttentionItem {
   readonly sessionId: string
   readonly repoPath: string
+  /** So two sessions in one repository are tellable apart. */
+  readonly branch: string
   readonly reason: AttentionReason
   readonly waitingMs: number
   readonly pendingPermission: PendingPermission | null
@@ -57,6 +59,7 @@ export function rankAttention(
         {
           sessionId: session.id,
           repoPath: session.repoPath,
+          branch: session.branch,
           reason,
           waitingMs: Math.max(0, now - session.stateSince),
           pendingPermission: session.pendingPermission,

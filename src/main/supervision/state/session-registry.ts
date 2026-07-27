@@ -39,6 +39,12 @@ export interface SessionRegistry {
   get(sessionId: string): SupervisedSession | null
   list(): SupervisedSession[]
   markViewed(sessionId: string, at: number): void
+  /**
+   * Removes a session entirely. Discarding one has to end with it leaving the
+   * console: releasing its working copy while leaving the record behind left a
+   * row on the attention queue with nothing to do and no way to remove it.
+   */
+  forget(sessionId: string): void
 }
 
 /** States that a restart cannot invalidate, because nothing further will happen to them. */
@@ -139,6 +145,11 @@ export function createSessionRegistry(options: SessionRegistryOptions): SessionR
 
     list(): SupervisedSession[] {
       return [...entries].map(([sessionId, entry]) => project(sessionId, entry))
+    },
+
+    forget(sessionId: string): void {
+      if (!entries.delete(sessionId)) return
+      persist()
     },
 
     markViewed(sessionId: string, at: number): void {

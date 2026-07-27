@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { CornerDownLeft } from 'lucide-react'
+import { CornerDownLeft, Trash2 } from 'lucide-react'
 import { StateIndicator, formatElapsed } from './StateIndicator.js'
 import type { AttentionItem } from '../../../shared/supervision/rank-attention.js'
 import { allClearMessage } from '../../../shared/supervision/all-clear.js'
@@ -16,6 +16,8 @@ export interface AttentionQueueProps {
   workingCount: number
   onApprove(sessionId: string, requestId: string): void
   onDeny(sessionId: string, requestId: string): void
+  /** Ends a session and takes it off the queue (FR-029). */
+  onDiscard(sessionId: string): void
   /** Answers a request that is a question rather than a yes/no (FR-007). */
   onAnswer(sessionId: string, requestId: string, answer: string): void
   onOpen(sessionId: string): void
@@ -36,6 +38,9 @@ function isQuestion(permission: NonNullable<AttentionItem['pendingPermission']>)
     permission.toolName.toLowerCase().includes('question')
   )
 }
+
+/** Reasons a session is on the queue with nothing left to wait for. */
+const ENDABLE: ReadonlySet<AttentionItem['reason']> = new Set(['failed', 'unknown'])
 
 const REASON_TITLES: Record<AttentionItem['reason'], string> = {
   needs_input: 'Waiting on you',
@@ -127,6 +132,7 @@ export function AttentionQueue({
   onApprove,
   onDeny,
   onAnswer,
+  onDiscard,
   onOpen,
 }: AttentionQueueProps): JSX.Element {
   if (!loaded) {
@@ -146,9 +152,10 @@ export function AttentionQueue({
           <StateIndicator state={item.reason} showLabel={false} sinceMs={item.waitingMs} />
 
           <button className="sv-queue__main" onClick={() => onOpen(item.sessionId)}>
-            <div className="sv-queue__title">
-              {item.pendingPermission?.summary ?? REASON_TITLES[item.reason]}
-            </div>
+            {/* The branch, not the state repeated: three rows all reading
+                "State unknown" are indistinguishable, and the state is on the
+                line below anyway. */}
+            <div className="sv-queue__title">{item.pendingPermission?.summary ?? item.branch}</div>
             <div className="sv-queue__meta">
               {item.repoPath.split('/').pop()} · {REASON_TITLES[item.reason]} ·{' '}
               {formatElapsed(item.waitingMs)}
@@ -166,6 +173,15 @@ export function AttentionQueue({
               !hasAnswerableOptions(item.pendingPermission) && (
                 <pre className="sv-queue__detail">{item.pendingPermission.detail}</pre>
               )}
+            {item.reason === 'unknown' && (
+              // Honest about what it means, and about what happens next: a row
+              // saying only "State unknown" leaves the operator with nothing to
+              // decide.
+              <div className="sv-row__trigger">
+                It was running when the console last closed. The agent did not survive; the console
+                re-reads its record and will update this if it can.
+              </div>
+            )}
             {/* The reason, on the queue itself: "failed" with the output hidden
                 behind a click is exactly the trip this saves (FR-034). */}
             {item.failure !== null && (
@@ -176,6 +192,17 @@ export function AttentionQueue({
               </div>
             )}
           </button>
+
+          {/* Every row can be acted on. A session that is over, or that the
+              console lost track of, had no action at all — so it sat on the
+              queue forever. */}
+          {item.pendingPermission === null && ENDABLE.has(item.reason) && (
+            <div className="sv-queue__actions">
+              <button className="sv-queue__btn" onClick={() => onDiscard(item.sessionId)}>
+                <Trash2 aria-hidden="true" /> Discard
+              </button>
+            </div>
+          )}
 
           {item.pendingPermission !== null && (
             <div className="sv-queue__respond">

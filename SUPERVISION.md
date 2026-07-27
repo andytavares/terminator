@@ -152,6 +152,12 @@ Approve or deny inline.
 
 You should never be asked to approve something you cannot read.
 
+Every row is identified by its **branch**, and every row you can do something
+about has a button. A session that failed, or that the console lost track of
+when it last closed, carries **Discard** — it stops the agent, removes the
+working copy, and takes the session off the console. Work that is merely
+waiting to be reviewed does not: discarding it would throw the diff away.
+
 A failed session carries its reason on the row itself:
 `setup exited 3 — pnpm install failed: lockfile is out of date`. You should never
 have to open a session to learn why it died.

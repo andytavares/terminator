@@ -246,6 +246,7 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
               onApprove={props.onApprove}
               onDeny={props.onDeny}
               onAnswer={props.onAnswer}
+              onDiscard={props.onDiscard}
               onOpen={props.onOpenSession}
             />
             <AutonomyPicker value={props.autonomy} onChange={props.onAutonomyChange} />

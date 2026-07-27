@@ -182,3 +182,29 @@ describe('projection to the shared shape', () => {
     expect(registry.get('s1')?.lastViewedAt).toBe(500)
   })
 })
+
+describe('forgetting a session', () => {
+  it('removes it from the listing', () => {
+    const registry = createSessionRegistry({ store, now: () => 1_000 })
+    registry.register('s1', meta)
+    registry.forget('s1')
+    expect(registry.get('s1')).toBeNull()
+    expect(registry.list()).toEqual([])
+  })
+
+  it('survives the console restarting', () => {
+    const registry = createSessionRegistry({ store, now: () => 1_000 })
+    registry.register('s1', meta)
+    registry.forget('s1')
+    // Persisted, not just dropped in memory: it must not come back.
+    const reopened = createSessionRegistry({ store, now: () => 2_000 })
+    expect(reopened.list()).toEqual([])
+  })
+
+  it('ignores one it does not know', () => {
+    const registry = createSessionRegistry({ store, now: () => 1_000 })
+    registry.register('s1', meta)
+    registry.forget('ghost')
+    expect(registry.list()).toHaveLength(1)
+  })
+})
