@@ -1,0 +1,26 @@
+tests/unit/main/supervision/state-fanout.spec.ts
+  s_5f98598a6d950e::t_fc4fd237ceb5f8 1-93
+src/main/index.ts
+  s_5f98598a6d950e::t_ab300f1905d625 17,313-318,333,354
+  s_5f98598a6d950e::t_c88ea2d4e20be0 29,334-343
+src/main/supervision/state-fanout.ts
+  s_5f98598a6d950e::t_ab300f1905d625 1-54
+docs/ARCHITECTURE.md
+  s_5f98598a6d950e::t_f2130966407266 861-868
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "9f3b2ea9ea36298efbd67912c9bccc34fb4a5b58",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
