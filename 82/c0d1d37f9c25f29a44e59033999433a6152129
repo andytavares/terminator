@@ -1,0 +1,39 @@
+tests/unit/renderer/supervision/assign-panel.spec.tsx
+  s_5f98598a6d950e::t_0b507b2b67d7c0 102
+src/main/index.ts
+  s_5f98598a6d950e::t_7d8fe2ef77b3be 334-336
+src/renderer/components/supervision/AssignControls.tsx
+  s_5f98598a6d950e::t_5943f2f27100e3 210-223,225-232,292-294,301,303-304,311,313-314,316,328-334,336-344,347-359
+  s_5f98598a6d950e::t_b870368f06b923 27,45-48
+  s_5f98598a6d950e::t_1e3a7578284768 28-44,289
+src/main/supervision/agent-runtime/driver.ts
+  s_5f98598a6d950e::t_31ea31e600929c 41-42,49,53-102,121-122,124-125,158,168-170,172,180-187
+  s_5f98598a6d950e::t_769fa788de7650 188
+src/renderer/components/supervision/supervision.css
+  s_5f98598a6d950e::t_1e3a7578284768 474-476,550-603
+  s_5f98598a6d950e::t_5b4ecf4c54b572 417,419-421,442-443,461-473,481-549,604-614
+  s_5f98598a6d950e::t_285a65d3ccbaf8 203,422-441
+  s_5f98598a6d950e::t_b870368f06b923 444-460,477-480
+tests/unit/main/supervision/agent-runtime/driver.spec.ts
+  s_5f98598a6d950e::t_1995b11dfa7a8e 29-35,39-50,227,233,246,270,277
+  s_5f98598a6d950e::t_efe68e357bb3f3 36-38
+  s_5f98598a6d950e::t_0e1389ef3e6a58 63,66-69,71-80,223-226,228-232,234-245,247-269,271-276,278-292
+src/renderer/components/supervision/SupervisionScreen.tsx
+  s_5f98598a6d950e::t_285a65d3ccbaf8 203-211,213-236,238-240,242-261,263-280,282-288,290,292-317,319-336,338-346
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "82c0d1d37f9c25f29a44e59033999433a6152129",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
