@@ -209,7 +209,6 @@ function fullSource() {
     listSessions: () => [session()],
     getSession: () => session(),
     provision: vi.fn().mockResolvedValue({ worktreePath: '/wt/s1', ok: true }),
-    release: vi.fn().mockResolvedValue(undefined),
     archive: vi.fn().mockResolvedValue({ allowed: true, reason: null }),
     openInEditor: vi.fn().mockResolvedValue({ ok: true, reason: null }),
     setShadowMode: vi.fn(),
@@ -275,20 +274,12 @@ describe('the write channels', () => {
     })
   })
 
-  it('releases a worktree', async () => {
-    const source = fullSource()
-    registerSupervisionHandlers(source)
-    await expect(
-      handlerFor(SUPERVISION_CHANNELS.release)({}, { sessionId: 's1' })
-    ).resolves.toEqual({ ok: true })
-    expect(source.release).toHaveBeenCalledWith('s1')
-  })
-
-  it('reports release unavailable rather than throwing', async () => {
-    registerSupervisionHandlers(BARE)
-    await expect(
-      handlerFor(SUPERVISION_CHANNELS.release)({}, { sessionId: 's1' })
-    ).resolves.toEqual({ ok: false })
+  it('offers no unguarded worktree release', () => {
+    // Removing a worktree goes through `archive`, which refuses while the
+    // session is still running. A bare release channel would let the renderer
+    // pull the working copy out from under a live agent.
+    registerSupervisionHandlers(fullSource())
+    expect(Object.values(SUPERVISION_CHANNELS)).not.toContain('supervision:release')
   })
 
   it('archives a session', async () => {

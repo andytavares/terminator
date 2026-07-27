@@ -13,7 +13,6 @@ export const SUPERVISION_CHANNELS = {
   listSessions: 'supervision:listSessions',
   getSession: 'supervision:getSession',
   provision: 'supervision:provision',
-  release: 'supervision:release',
   archive: 'supervision:archive',
   openInEditor: 'supervision:openInEditor',
   setShadowMode: 'supervision:setShadowMode',
@@ -55,7 +54,6 @@ export interface SupervisionSource {
     repoPath: string
     branch: string
   }): Promise<{ worktreePath: string; ok: boolean }>
-  release?(sessionId: string): Promise<void>
   archive?(sessionId: string): Promise<{ allowed: boolean; reason: string | null }>
   openInEditor?(sessionId: string): Promise<{ ok: boolean; reason: string | null }>
   setShadowMode?(value: boolean): void
@@ -174,13 +172,6 @@ export function registerSupervisionHandlers(source: SupervisionSource): void {
     // console built without provisioning gets an answer, not a crash.
     if (source.provision === undefined) return { worktreePath: null, ok: false }
     return source.provision(parsed.data)
-  })
-
-  handleChannel(SUPERVISION_CHANNELS.release, async (_event, payload: unknown) => {
-    const parsed = sessionPayload.safeParse(payload)
-    if (!parsed.success || source.release === undefined) return { ok: false }
-    await source.release(parsed.data.sessionId)
-    return { ok: true }
   })
 
   handleChannel(SUPERVISION_CHANNELS.archive, async (_event, payload: unknown) => {
