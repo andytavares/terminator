@@ -23,6 +23,9 @@ import type { CommandRegistration } from './extensions/registry'
 import { EmptyState } from './components/EmptyState'
 import { OverviewScreen } from './components/overview/OverviewScreen'
 import { MetricsBar } from './components/overview/MetricsBar'
+import { StatusBar } from './components/supervision/StatusBar'
+import { SupervisionScreen } from './components/supervision/SupervisionScreen'
+import { useSupervision } from './hooks/useSupervision'
 import { useMetricsStore } from './stores/metrics.store'
 import { AboutDialog } from './components/AboutDialog'
 import { NameTerminalDialog } from './components/NameTerminalDialog'
@@ -461,6 +464,11 @@ export function App(): JSX.Element {
   }, [])
 
   const showMetricsBar = globalSettings?.ui?.showMetricsBar ?? false
+
+  // Supervision: the status bar is always visible so "is anything wrong" never
+  // requires navigating anywhere (FR-025), and the attention queue opens from
+  // it (FR-022).
+  const supervision = useSupervision()
   const scratchSessions = getScratchSessions()
   // Scratch view takes priority over project view when active
   const displayProjectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
@@ -631,6 +639,14 @@ export function App(): JSX.Element {
           {overlays.map((Overlay, i) => (
             <Overlay key={i} />
           ))}
+        </div>
+        {supervision.attentionOpen && (
+          <div className="app-supervision-panel">
+            <SupervisionScreen {...supervision.screenProps} />
+          </div>
+        )}
+        <div className="app-supervision-status">
+          <StatusBar summary={supervision.summary} onOpenAttention={supervision.toggleAttention} />
         </div>
         {showMetricsBar && (
           <div className="app-global-metrics">

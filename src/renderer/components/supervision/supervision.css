@@ -1,0 +1,433 @@
+/* Supervision surfaces.
+ *
+ * State is distinguished by shape and label, never by colour alone; opacity is
+ * the only differentiator applied to icons (Constitution XII), so these read
+ * correctly in both themes and without relying on hue.
+ *
+ * Several rows and chips are <button> elements for keyboard reachability, so
+ * every one of them resets the UA button styling — otherwise they render on a
+ * white background inside a dark surface. */
+
+.sv-reset,
+.sv-statusbar,
+.sv-queue__main,
+.sv-row,
+.sv-queue__btn,
+.sv-tab {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: none;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* ── state indicator ─────────────────────────────────────────────────────── */
+
+.sv-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sv-state__icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sv-state__icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Settled states recede; anything wanting a person stays at full strength. */
+.sv-state--merged .sv-state__icon,
+.sv-state--starting .sv-state__icon {
+  opacity: 0.55;
+}
+
+.sv-state--needs_input,
+.sv-state--stalled,
+.sv-state--failed {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.sv-state--working .sv-state__icon svg {
+  animation: sv-spin 1.4s linear infinite;
+}
+
+@keyframes sv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-state--working .sv-state__icon svg {
+    animation: none;
+  }
+}
+
+.sv-state__elapsed {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+/* ── status bar ──────────────────────────────────────────────────────────── */
+
+.sv-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-family: var(--font-ui);
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  font-variant-numeric: tabular-nums;
+}
+
+.sv-statusbar:hover {
+  background: var(--bg-elevated);
+}
+
+.sv-statusbar__group {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.sv-statusbar__group svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0.7;
+}
+
+.sv-statusbar__group--attention {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.sv-statusbar__group--attention svg {
+  opacity: 1;
+}
+
+/* ── attention queue ─────────────────────────────────────────────────────── */
+
+.sv-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+}
+
+.sv-queue__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.sv-queue__item:hover {
+  background: var(--bg-card-hover);
+}
+
+.sv-queue__main {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+}
+
+.sv-queue__title {
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sv-queue__meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.sv-queue__actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sv-queue__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.sv-queue__btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent);
+}
+
+.sv-queue__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sv-queue__btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* The all-clear is a statement, never an empty div. */
+.sv-allclear {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ── shared panel / row ──────────────────────────────────────────────────── */
+
+.sv-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+.sv-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+}
+
+.sv-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sv-row:hover {
+  background: var(--bg-surface);
+}
+
+.sv-row__grade {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.sv-row__trigger {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.sv-row__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.sv-row pre {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+}
+
+.sv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 1px 7px;
+  margin-right: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.sv-chip--on {
+  color: var(--text-primary);
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.sv-chip svg {
+  width: 11px;
+  height: 11px;
+}
+
+.sv-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--warning);
+  margin-top: 3px;
+}
+
+.sv-warn svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+/* ── tabs ────────────────────────────────────────────────────────────────── */
+
+.sv-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px 0;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.sv-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-radius: 5px 5px 0 0;
+  white-space: nowrap;
+}
+
+.sv-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.sv-tab[aria-selected='true'] {
+  color: var(--text-primary);
+  background: var(--bg-base);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.sv-tab svg {
+  width: 13px;
+  height: 13px;
+}
+
+.sv-tab__count {
+  font-size: 10px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--accent-dim);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── feed ────────────────────────────────────────────────────────────────── */
+
+.sv-feed__entry {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sv-feed__author {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sv-feed__author svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Console-authored entries are marked, so "Terminator noticed" never reads as
+ * "the agent told me" (FR-092). */
+.sv-feed__author--console {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.sv-feed__summary {
+  font-size: 13px;
+  color: var(--text-primary);
+  margin: 3px 0 6px;
+}
+
+.sv-feed__entry input,
+.sv-panel input[type='text'],
+.sv-panel__search {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+}
+
+.sv-panel input:focus,
+.sv-panel__search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Radio rows in the autonomy picker. */
+.sv-panel fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sv-panel legend {
+  width: 100%;
+}
+
+.sv-row input[type='radio'] {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}

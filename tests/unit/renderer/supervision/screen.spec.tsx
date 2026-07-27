@@ -1,0 +1,205 @@
+import React from 'react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
+import {
+  SupervisionScreen,
+  type SupervisionScreenProps,
+} from '../../../../src/renderer/components/supervision/SupervisionScreen.js'
+
+// The screen exists so every surface is reachable. Components that nothing
+// renders are dead code, however well tested they are in isolation.
+
+function props(over: Partial<SupervisionScreenProps> = {}): SupervisionScreenProps {
+  return {
+    now: 10_000,
+    loaded: true,
+    attention: [],
+    workingCount: 0,
+    onApprove: vi.fn(),
+    onDeny: vi.fn(),
+    onOpenSession: vi.fn(),
+    review: [],
+    activeReview: null,
+    decisionFor: () => null,
+    onDecideHunk: vi.fn(),
+    onAdvanceReview: vi.fn(),
+    unattendedMerges: [],
+    workItems: [],
+    unreadable: [],
+    conflicts: [],
+    canAct: true,
+    onOpenWorkItem: vi.fn(),
+    lanes: [],
+    mergedOrds: [],
+    staleOrds: [],
+    blockedReasons: {},
+    onMergeLane: vi.fn(),
+    feed: [],
+    mutedSessions: [],
+    onReply: vi.fn(),
+    onToggleMute: vi.fn(),
+    shadowMode: true,
+    firings: [],
+    precision: { total: 0, judged: 0, incorrect: 0, incorrectRate: null },
+    onSetShadowMode: vi.fn(),
+    onJudge: vi.fn(),
+    entities: [],
+    onChooseEntity: vi.fn(),
+    backpressure: null,
+    onOverrideBackpressure: vi.fn(),
+    onCancelAssign: vi.fn(),
+    autonomy: 'edit',
+    onAutonomyChange: vi.fn(),
+    provisioning: null,
+    onOpenInEditor: vi.fn(),
+    lastViewedAt: null,
+    sinceEntries: [],
+    ...over,
+  }
+}
+
+describe('every concept is reachable', () => {
+  it('offers a tab for all seven surfaces', () => {
+    render(<SupervisionScreen {...props()} />)
+    for (const label of ['Needs you', 'Review', 'Work items', 'Lanes', 'Feed', 'Stalls', 'Find']) {
+      expect(screen.getByText(label)).toBeDefined()
+    }
+  })
+
+  it('opens on the attention queue, which is the sit-down triage case', () => {
+    render(<SupervisionScreen {...props()} />)
+    expect(screen.getByText(/Nothing needs you/)).toBeDefined()
+  })
+
+  it('reaches the review inbox', () => {
+    render(<SupervisionScreen {...props()} />)
+    fireEvent.click(screen.getByText('Review'))
+    expect(screen.getByText(/Nothing is waiting for review/)).toBeDefined()
+  })
+
+  it('reaches the work item board', () => {
+    render(<SupervisionScreen {...props()} />)
+    fireEvent.click(screen.getByText('Work items'))
+    expect(screen.getByText(/Sessions still run as ad-hoc work/)).toBeDefined()
+  })
+
+  it('reaches the standup feed', () => {
+    render(<SupervisionScreen {...props()} />)
+    fireEvent.click(screen.getByText('Feed'))
+    expect(screen.getByText(/Nothing has happened yet/)).toBeDefined()
+  })
+
+  it('reaches the stall controls — the only way to turn shadow mode off', () => {
+    render(<SupervisionScreen {...props()} />)
+    fireEvent.click(screen.getByText('Stalls'))
+    expect(screen.getByText('Turn shadow mode off')).toBeDefined()
+  })
+
+  it('turns shadow mode off from the UI', () => {
+    const onSetShadowMode = vi.fn()
+    render(<SupervisionScreen {...props({ onSetShadowMode })} />)
+    fireEvent.click(screen.getByText('Stalls'))
+    fireEvent.click(screen.getByText('Turn shadow mode off'))
+    expect(onSetShadowMode).toHaveBeenCalledWith(false)
+  })
+
+  it('reaches the palette over every entity kind', () => {
+    render(<SupervisionScreen {...props()} />)
+    fireEvent.click(screen.getByText('Find'))
+    expect(
+      screen.getByLabelText(/Search sessions, work items, repositories, worktrees and commands/)
+    ).toBeDefined()
+  })
+
+  it('reaches the lane view, and a single lane carries no multi-repo ceremony', () => {
+    render(
+      <SupervisionScreen
+        {...props({
+          lanes: [
+            {
+              lane: {
+                ord: 1,
+                repo: 'fluent',
+                role: 'producer',
+                branch: 'feat/x',
+                task_ids: [],
+                blocks: [],
+                blocked_by: [],
+              },
+              collisions: [],
+              blockedBy: [],
+            },
+          ],
+        })}
+      />
+    )
+    fireEvent.click(screen.getByText('Lanes'))
+    expect(screen.getByText('fluent')).toBeDefined()
+    // FR-089: one lane renders as one row, with no "N repositories" header.
+    expect(screen.queryByText(/repositories/)).toBeNull()
+  })
+
+  it('offers the autonomy picker where an agent is assigned', () => {
+    render(<SupervisionScreen {...props()} />)
+    expect(screen.getByText(/How much can it do without asking/)).toBeDefined()
+  })
+})
+
+describe('counts and refusals', () => {
+  it('badges a tab with its count', () => {
+    render(
+      <SupervisionScreen
+        {...props({
+          feed: [
+            { id: 'e1', at: 1, sessionId: 's1', author: 'agent', summary: 'x', replyable: true },
+          ],
+        })}
+      />
+    )
+    expect(screen.getByText('1')).toBeDefined()
+  })
+
+  it('shows a backpressure refusal over whatever tab is open (FR-053)', () => {
+    render(
+      <SupervisionScreen
+        {...props({
+          backpressure: {
+            allowed: false,
+            unreviewed: 3,
+            limit: 3,
+            reason: '3 finished sessions are waiting for review, and the limit is 3.',
+          },
+        })}
+      />
+    )
+    expect(screen.getByText(/waiting for review, and the limit is 3/)).toBeDefined()
+  })
+
+  it('sends the operator to the review tab from the refusal', () => {
+    render(
+      <SupervisionScreen
+        {...props({
+          backpressure: { allowed: false, unreviewed: 3, limit: 3, reason: 'full' },
+        })}
+      />
+    )
+    fireEvent.click(screen.getByText('Review something'))
+    expect(screen.getByText(/Nothing is waiting for review/)).toBeDefined()
+  })
+
+  it('shows provisioning output where it can be read without opening a session', () => {
+    render(
+      <SupervisionScreen
+        {...props({
+          provisioning: {
+            worktreePath: '/wt/x',
+            ports: { portBase: 4000, portSpan: 10 },
+            setup: { exitCode: 3, output: 'pnpm install failed', durationMs: 5 },
+            skipped: [],
+          },
+        })}
+      />
+    )
+    expect(screen.getByText('pnpm install failed')).toBeDefined()
+  })
+})

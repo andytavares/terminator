@@ -1,0 +1,13 @@
+/* Supervision: the status bar sits with the metrics bar at the foot of every
+ * surface, so "is anything wrong" is answerable without navigating. */
+.app-supervision-status {
+  border-top: 1px solid var(--border-subtle, transparent);
+  background: var(--bg-secondary);
+}
+
+.app-supervision-panel {
+  max-height: 40vh;
+  overflow: auto;
+  border-top: 1px solid var(--border-subtle, transparent);
+  background: var(--bg-primary);
+}
