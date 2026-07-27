@@ -182,6 +182,12 @@ against a 61%-full context is visible without opening it.
 
 Three actions on every row:
 
+- **Terminal** — opens a shell in the session's working copy and types
+  `claude --resume <its session id>` for you. The console drives agents
+  headlessly, so there is no terminal to attach to; this is as close as the
+  runtime allows to looking over its shoulder, and it lets you take the
+  conversation over by hand. The command is typed, not run — press Enter when
+  you have read it.
 - **Details** — expands the session in place: its working copy, autonomy level,
   what it has spent, what it changed, when it last did anything, its transcript
   path, and why it failed if it did.

@@ -363,3 +363,46 @@ describe('stopping a run', () => {
     await expect(driver.stop('s1')).resolves.toBe(true)
   })
 })
+
+// Everything the runtime reports is keyed by *its* session id, which is not
+// the one the console registered. Published as-is, every hook event and every
+// result landed on a session that does not exist and was silently discarded —
+// no tool activity, no turns, no end, a session stuck `working` with nothing
+// to show for it.
+
+describe('events are keyed by the console’s session id', () => {
+  it('re-keys a result to the session the console knows', async () => {
+    const { driver, events } = harness([{ ...successResult, session_id: 'runtime-abc' }])
+    await driver.start({ sessionId: 'ours', prompt: 'x', cwd: '/wt' })
+    await driver.completion('ours')
+    expect(events.every((event) => event.sessionId === 'ours')).toBe(true)
+  })
+
+  it('reports the runtime’s own id separately, which is what resumes it', async () => {
+    const seen: Array<[string, string]> = []
+    const { query } = fakeQuery([{ ...successResult, session_id: 'runtime-abc' }])
+    const driver = createSessionDriver({
+      query: query as never,
+      publish: () => {},
+      now: () => 1_000,
+      onRuntimeSessionId: (sessionId, runtimeSessionId) => seen.push([sessionId, runtimeSessionId]),
+    })
+    await driver.start({ sessionId: 'ours', prompt: 'x', cwd: '/wt' })
+    await driver.completion('ours')
+    expect(seen[0]).toEqual(['ours', 'runtime-abc'])
+  })
+
+  it('says nothing when a message carries no session id', async () => {
+    const seen: string[] = []
+    const { query } = fakeQuery([{ type: 'assistant' }])
+    const driver = createSessionDriver({
+      query: query as never,
+      publish: () => {},
+      now: () => 1_000,
+      onRuntimeSessionId: (_id, runtime) => seen.push(runtime),
+    })
+    await driver.start({ sessionId: 'ours', prompt: 'x', cwd: '/wt' })
+    await driver.completion('ours')
+    expect(seen).toEqual([])
+  })
+})

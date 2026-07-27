@@ -82,6 +82,8 @@ export interface SupervisionScreenProps {
   /** Every session, so "what is running" has an answer that is not a number. */
   sessions: readonly SupervisedSession[]
   onStop(sessionId: string, reason?: string): void
+  /** Opens a terminal in a session's working copy, with its conversation resumed. */
+  onAttach(session: SupervisedSession): void
 
   review: readonly ReviewItem[]
   activeReview: { item: ReviewItem; intent: IntentReview | null; hunks: readonly Hunk[] } | null
@@ -302,6 +304,7 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
             onStop={props.onStop}
             onDiscard={props.onDiscard}
             onOpen={props.onOpenSession}
+            onAttach={props.onAttach}
           />
         )}
 

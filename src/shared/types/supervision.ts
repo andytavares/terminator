@@ -94,6 +94,11 @@ export interface SupervisedSession {
   readonly diffSummary: DiffSummary
   readonly autonomyLevel: AutonomyLevel
   /** Drives the "since you last looked" panel (FR-027). */
+  /**
+   * The agent runtime's own id for this conversation. `claude --resume` takes
+   * this one, so it is what lets the operator pick the session up by hand.
+   */
+  readonly runtimeSessionId: string | null
   readonly lastViewedAt: number | null
   /**
    * Why it failed, when it did. FR-034: a setup script that exited non-zero

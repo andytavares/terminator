@@ -871,6 +871,18 @@ hook tells the app shell through options passed to `useSupervision`. An earlier
 cut broadcast `CustomEvent`s on `window` that nothing listened for — a listener
 that does not exist should be a compile error, not silence.
 
+### Two session identifiers
+
+The console registers a session under an id it generates; the agent runtime has
+its own, announced on the message it opens with. Everything the runtime reports
+— every hook event, every result — is keyed by _its_ id, so the driver re-keys
+each one to the console's before publishing. Published as they arrived, they
+landed on a session that did not exist and were silently dropped: no tool
+activity, no turns, no end, a session stuck `working` with nothing to show.
+
+The runtime's id is kept because `claude --resume` takes that one, which is what
+lets the operator open a terminal on a running session and take it over.
+
 ### Interrupting and stopping are different operations
 
 `interrupt` ends the current turn and leaves the prompt stream open, so a

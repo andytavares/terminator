@@ -239,6 +239,8 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
   const driver = createSessionDriver({
     publish: (event: SessionEvent) => bus.publish(event),
     now,
+    onRuntimeSessionId: (sessionId, runtimeSessionId) =>
+      registry.noteRuntimeSessionId(sessionId, runtimeSessionId),
   })
 
   const stalls = createStallSurfacer({

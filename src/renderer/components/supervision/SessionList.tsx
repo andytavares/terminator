@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Square, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Square, Trash2, ChevronDown, ChevronRight, TerminalSquare } from 'lucide-react'
 import { StateIndicator, formatElapsed } from './StateIndicator.js'
 import type { SupervisedSession } from '../../../shared/types/supervision.js'
 import './supervision.css'
@@ -20,6 +20,11 @@ export interface SessionListProps {
   onDiscard(sessionId: string): void
   /** Told when a session is expanded, so the shell can follow if it wants to. */
   onOpen(sessionId: string): void
+  /**
+   * Opens a terminal in the session's working copy with the conversation
+   * resumed, so the operator can watch it and take over by hand.
+   */
+  onAttach(session: SupervisedSession): void
 }
 
 /** States in which an agent is still consuming time and money. */
@@ -109,6 +114,8 @@ function describe(session: SupervisedSession, now: number): string {
       `work item:   ${session.workItemId}${session.laneOrd !== null ? ` · lane ${session.laneOrd}` : ''}`
     )
   }
+  if (session.runtimeSessionId !== null)
+    lines.push(`agent session:${` ${session.runtimeSessionId}`}`)
   if (session.transcriptPath !== null) lines.push(`transcript:  ${session.transcriptPath}`)
   if (session.pendingPermission !== null) {
     lines.push(`waiting on:  ${session.pendingPermission.summary}`)
@@ -131,6 +138,7 @@ export function SessionList({
   onStop,
   onDiscard,
   onOpen,
+  onAttach,
 }: SessionListProps): JSX.Element {
   // Expanded in place. "Open" used to call out to the app shell, which never
   // listened, so it did nothing at all — and there is no other surface that
@@ -194,6 +202,15 @@ export function SessionList({
               )}
               Details
             </button>
+            {session.worktreePath !== '' && (
+              // The console drives the agent headlessly, so there is no
+              // terminal to watch — this opens one in its working copy and
+              // resumes the same conversation, which is as close as the
+              // runtime allows to looking over its shoulder.
+              <button className="sv-queue__btn" onClick={() => onAttach(session)}>
+                <TerminalSquare aria-hidden="true" /> Terminal
+              </button>
+            )}
             {RUNNING.has(session.runtimeState) && (
               // Stopping keeps the working copy and whatever it changed: you
               // stop an agent to look at what it did, not to lose it.
@@ -212,9 +229,11 @@ export function SessionList({
 
       <div className="sv-form">
         <span className="sv-field__note">
-          Stopping ends the run and keeps the working copy, so you can review what it did. Its
-          reason goes to the agent and into the feed, so a half-finished diff still says why it
-          stopped. Discarding also removes the working copy and takes the session off the console.
+          Terminal opens a shell in the working copy and resumes the same conversation, so you can
+          watch it and take over. Stopping ends the run and keeps the working copy, so you can
+          review what it did. Its reason goes to the agent and into the feed, so a half-finished
+          diff still says why it stopped. Discarding also removes the working copy and takes the
+          session off the console.
         </span>
       </div>
     </div>

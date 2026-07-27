@@ -23,6 +23,7 @@ function session(over: Partial<SupervisedSession> = {}): SupervisedSession {
     diffSummary: { files: 0, added: 0, removed: 0 },
     autonomyLevel: 'edit',
     lastViewedAt: null,
+    runtimeSessionId: null,
     failure: null,
     ...over,
   }

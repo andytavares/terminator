@@ -136,6 +136,12 @@ export interface UseSupervision {
 
 export interface UseSupervisionOptions {
   /**
+   * Opens a terminal in a session's working copy with its conversation
+   * resumed. The console drives agents headlessly, so there is no terminal to
+   * attach to — this is the shell's job, not the console's.
+   */
+  onAttachTerminal?: (session: SupervisedSession) => void
+  /**
    * The app shell's own reaction to a session being opened — focusing its tab,
    * for instance. Passed in rather than broadcast on a window event, so a
    * listener that does not exist is a compile error instead of silence.
@@ -146,7 +152,7 @@ export interface UseSupervisionOptions {
 }
 
 export function useSupervision(options: UseSupervisionOptions = {}): UseSupervision {
-  const { onOpenSessionInShell, onNavigate } = options
+  const { onOpenSessionInShell, onNavigate, onAttachTerminal } = options
   const [now, setNow] = useState(() => Date.now())
   const [autonomy, setAutonomy] = useState<AutonomyLevel>('edit')
   const [muted, setMuted] = useState<string[]>([])
@@ -441,6 +447,7 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
     },
 
     sessions,
+    onAttach: (session: SupervisedSession) => onAttachTerminal?.(session),
     onStop: (sessionId: string, reason?: string) => {
       void bridge()
         ?.stopSession?.({ sessionId, reason })

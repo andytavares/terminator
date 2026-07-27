@@ -14,6 +14,11 @@ export interface SessionMeta {
   worktreePath: string
   branch: string
   autonomyLevel: AutonomyLevel
+  /**
+   * The runtime's own id for the conversation, once it has told us. This is
+   * what `claude --resume` takes; ours is a different identifier.
+   */
+  runtimeSessionId?: string | null
 }
 
 interface PersistedEntry {
@@ -38,6 +43,8 @@ export interface SessionRegistry {
   apply(event: SessionEvent): void
   get(sessionId: string): SupervisedSession | null
   list(): SupervisedSession[]
+  /** Records the runtime's id for a session, so it can be resumed by hand. */
+  noteRuntimeSessionId(sessionId: string, runtimeSessionId: string): void
   markViewed(sessionId: string, at: number): void
   /**
    * Removes a session entirely. Discarding one has to end with it leaving the
@@ -105,6 +112,7 @@ function project(sessionId: string, entry: PersistedEntry): SupervisedSession {
     pendingPermission: state.pendingPermission,
     diffSummary: state.diffSummary,
     autonomyLevel: meta.autonomyLevel,
+    runtimeSessionId: meta.runtimeSessionId ?? null,
     lastViewedAt: entry.lastViewedAt,
     failure: state.failure ?? null,
   }
@@ -145,6 +153,13 @@ export function createSessionRegistry(options: SessionRegistryOptions): SessionR
 
     list(): SupervisedSession[] {
       return [...entries].map(([sessionId, entry]) => project(sessionId, entry))
+    },
+
+    noteRuntimeSessionId(sessionId: string, runtimeSessionId: string): void {
+      const entry = entries.get(sessionId)
+      if (entry === undefined || entry.meta.runtimeSessionId === runtimeSessionId) return
+      entries.set(sessionId, { ...entry, meta: { ...entry.meta, runtimeSessionId } })
+      persist()
     },
 
     forget(sessionId: string): void {

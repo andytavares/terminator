@@ -146,7 +146,42 @@ export function App(): JSX.Element {
       .catch(() => {})
   }, [activeWorkspaceId, resolveSettings, resolveActiveCwd, createSession])
 
-  const supervision = useSupervision()
+  // Checking in on an agent. The console drives them headlessly, so there is
+  // no terminal to attach to — this opens one in the working copy and resumes
+  // the same conversation, which is as close as the runtime allows to looking
+  // over its shoulder, and lets the operator take over by hand.
+  const attachTerminal = useCallback(
+    (session: {
+      id: string
+      branch: string
+      worktreePath: string
+      runtimeSessionId: string | null
+    }) => {
+      const settings = resolveSettings(activeWorkspaceId)
+      createSession(
+        SCRATCH_PROJECT_ID,
+        'human',
+        session.branch,
+        session.worktreePath,
+        settings.terminal.scrollbackLimit
+      )
+        .then((terminalId) => {
+          setScratchActive(true)
+          setActiveGlobalTab(null)
+          if (typeof terminalId !== 'string' || session.runtimeSessionId === null) return
+          // Resumed by its own id, not ours. Typed rather than run, so nothing
+          // is executed until the operator presses Enter.
+          window.electronAPI.terminal.input(
+            terminalId,
+            `claude --resume ${session.runtimeSessionId}`
+          )
+        })
+        .catch(() => {})
+    },
+    [activeWorkspaceId, resolveSettings, createSession, setActiveGlobalTab]
+  )
+
+  const supervision = useSupervision({ onAttachTerminal: attachTerminal })
 
   const toggleSupervision = useCallback(() => {
     setActiveGlobalTab(activeGlobalTabId === 'core.supervision' ? null : 'core.supervision')

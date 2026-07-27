@@ -30,6 +30,7 @@ function session(over: Partial<SupervisedSession> = {}): SupervisedSession {
     diffSummary: { files: 5, added: 142, removed: 96 },
     autonomyLevel: 'edit',
     lastViewedAt: null,
+    runtimeSessionId: null,
     failure: null,
     ...over,
   }
@@ -227,5 +228,25 @@ describe('what a row says when the numbers are missing', () => {
   it('says one session in the singular', () => {
     list([session()])
     expect(screen.getByText('1 session')).toBeDefined()
+  })
+})
+
+describe('checking in on a session', () => {
+  it('offers a terminal in the working copy', () => {
+    const onAttach = vi.fn()
+    list([session()], { onAttach })
+    fireEvent.click(screen.getByText('Terminal'))
+    expect(onAttach).toHaveBeenCalledWith(expect.objectContaining({ id: 's1' }))
+  })
+
+  it('offers none for a session that never got a working copy', () => {
+    list([session({ worktreePath: '' })])
+    expect(screen.queryByText('Terminal')).toBeNull()
+  })
+
+  it('shows the agent’s own session id, which is what resumes it by hand', () => {
+    list([session({ runtimeSessionId: 'b1e2c3d4' })])
+    fireEvent.click(screen.getByText('Details'))
+    expect(document.querySelector('.sv-session__detail')?.textContent).toContain('b1e2c3d4')
   })
 })

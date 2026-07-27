@@ -58,6 +58,7 @@ export const supervisedSessionSchema = z.object({
   pendingPermission: pendingPermissionSchema.nullable(),
   diffSummary: diffSummarySchema,
   autonomyLevel: autonomyLevelSchema,
+  runtimeSessionId: z.string().nullable(),
   lastViewedAt: epochMs.nullable(),
   failure: z
     .object({

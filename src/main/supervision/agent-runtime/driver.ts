@@ -30,6 +30,11 @@ export interface SessionDriverOptions {
   query?: typeof sdkQuery
   publish: (event: SessionEvent) => void
   now: () => number
+  /**
+   * The runtime's own id for the conversation, reported once it is known.
+   * `claude --resume` takes this one, not the console's.
+   */
+  onRuntimeSessionId?: (sessionId: string, runtimeSessionId: string) => void
 }
 
 export interface SessionDriver {
@@ -116,6 +121,14 @@ function createPromptStream(first: string): {
   }
 }
 
+/** The runtime announces its session id on the init message it opens with. */
+function runtimeSessionIdOf(message: unknown): string | null {
+  if (typeof message !== 'object' || message === null) return null
+  const record = message as Record<string, unknown>
+  const id = record.session_id
+  return typeof id === 'string' && id !== '' ? id : null
+}
+
 function isResultMessage(message: unknown): boolean {
   return (
     typeof message === 'object' &&
@@ -136,6 +149,13 @@ export function createSessionDriver(options: SessionDriverOptions): SessionDrive
 
       const prompts = createPromptStream(prompt)
 
+      // Everything the runtime tells us is keyed by *its* session id, which is
+      // not the one the console registered. Published as-is, every hook event
+      // and every result landed on a session that does not exist and was
+      // silently discarded — no tool activity, no turns, no end, a session
+      // stuck `working` forever with nothing to show for it.
+      const publishForSession = (event: SessionEvent): void => publish({ ...event, sessionId })
+
       const run = query({
         // Streaming input, not a string: see createPromptStream.
         prompt: prompts.stream,
@@ -144,7 +164,7 @@ export function createSessionDriver(options: SessionDriverOptions): SessionDrive
           // The only documented source of "blocked on the operator" — the
           // Notification hook does not fire for permission prompts (FR-010).
           canUseTool: (toolName: string, input: unknown) => bridge.canUseTool(toolName, input),
-          hooks: buildSupervisionHooks({ publish, now }),
+          hooks: buildSupervisionHooks({ publish: publishForSession, now }),
         },
       } as never) as AsyncIterable<unknown> & { interrupt?: () => Promise<void> }
 
@@ -155,9 +175,16 @@ export function createSessionDriver(options: SessionDriverOptions): SessionDrive
         let reported = false
         try {
           for await (const message of run) {
+            // The runtime's own id for this conversation, which is what
+            // `claude --resume` takes. Ours is a different identifier.
+            const runtimeId = runtimeSessionIdOf(message)
+            if (runtimeId !== null) options.onRuntimeSessionId?.(sessionId, runtimeId)
+
             if (!isResultMessage(message)) continue
             reported = true
-            for (const event of resultToSessionEvent(message as never, now())) publish(event)
+            for (const event of resultToSessionEvent(message as never, now())) {
+              publishForSession(event)
+            }
           }
 
           // A run can end without a result — interrupting it produces exactly

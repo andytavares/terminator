@@ -35,6 +35,7 @@ function session(overrides: Partial<SupervisedSession> = {}): SupervisedSession 
     diffSummary: { files: 0, added: 0, removed: 0 },
     autonomyLevel: 'read',
     lastViewedAt: null,
+    runtimeSessionId: null,
     failure: null,
     ...overrides,
   }

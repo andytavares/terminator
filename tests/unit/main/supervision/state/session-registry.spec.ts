@@ -208,3 +208,31 @@ describe('forgetting a session', () => {
     expect(registry.list()).toHaveLength(1)
   })
 })
+
+describe('the agent runtime’s own session id', () => {
+  it('is recorded, since `claude --resume` takes that one and not ours', () => {
+    const registry = createSessionRegistry({ store, now: () => 1_000 })
+    registry.register('s1', meta)
+    registry.noteRuntimeSessionId('s1', 'runtime-abc')
+    expect(registry.get('s1')?.runtimeSessionId).toBe('runtime-abc')
+  })
+
+  it('is null until the runtime has told us', () => {
+    const registry = createSessionRegistry({ store, now: () => 1_000 })
+    registry.register('s1', meta)
+    expect(registry.get('s1')?.runtimeSessionId).toBeNull()
+  })
+
+  it('survives a restart, so a session can still be resumed by hand', () => {
+    const registry = createSessionRegistry({ store, now: () => 1_000 })
+    registry.register('s1', meta)
+    registry.noteRuntimeSessionId('s1', 'runtime-abc')
+    const reopened = createSessionRegistry({ store, now: () => 2_000 })
+    expect(reopened.get('s1')?.runtimeSessionId).toBe('runtime-abc')
+  })
+
+  it('ignores a session it does not know', () => {
+    const registry = createSessionRegistry({ store, now: () => 1_000 })
+    expect(() => registry.noteRuntimeSessionId('ghost', 'x')).not.toThrow()
+  })
+})
