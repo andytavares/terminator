@@ -121,3 +121,48 @@ describe('finding what can be reclaimed', () => {
     expect(found.map((entry) => entry.reason).sort()).toEqual(['finished', 'orphan'])
   })
 })
+
+// After a restart every session the console was watching becomes `unknown` —
+// and a restart is exactly when you go looking for copies to reclaim. Leaving
+// these out made the list permanently empty.
+
+describe('a session the console lost track of', () => {
+  it('is reclaimable when it changed nothing', () => {
+    const path = worktree('a')
+    const found = findReclaimable(root, [session({ runtimeState: 'unknown', worktreePath: path })])
+    expect(found[0]).toMatchObject({ path, reason: 'lost', sessionId: 's1' })
+  })
+
+  it('is withheld when it holds changes nobody has reviewed', () => {
+    // Losing track of a session is not a reason to throw its work away.
+    const path = worktree('a')
+    const found = findReclaimable(root, [
+      session({
+        runtimeState: 'unknown',
+        worktreePath: path,
+        diffSummary: { files: 4, added: 120, removed: 8 },
+      }),
+    ])
+    expect(found).toEqual([])
+  })
+
+  it('names its branch, so you know what you are throwing away', () => {
+    const path = worktree('a')
+    const found = findReclaimable(root, [
+      session({ runtimeState: 'unknown', worktreePath: path, branch: 'feat/session-ulid' }),
+    ])
+    expect(found[0]?.branch).toBe('feat/session-ulid')
+  })
+})
+
+describe('the same directory named two ways', () => {
+  it('matches a session whose path is not the canonical one', () => {
+    // On macOS /var/... and /private/var/... are the same place. Compared as
+    // raw strings, a live working copy looks like an orphan.
+    const path = worktree('a')
+    const found = findReclaimable(root, [session({ worktreePath: path.replace('/private/', '/') })])
+    // Still working, so still not reclaimable — the point is that it was
+    // recognised as the same directory at all.
+    expect(found).toEqual([])
+  })
+})

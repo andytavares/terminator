@@ -362,14 +362,18 @@ The **Worktrees** tab lists what can go, and why:
 
 - **no session references it** — an orphan; nothing can be harmed by removing it.
 - **its session has finished** — merged or failed, with nothing left to do.
+- **the console lost track of its session** — it was mid-flight when the app
+  last closed, and it changed nothing. The agent process dies with the
+  application, so nothing is using the copy.
 
 Reclaiming runs the repository's teardown script, removes the working copy, and
 frees its port range. **Reclaim all** does them one at a time, because each runs
 git against a repository and several at once is how you get lock errors.
 
-A working copy still in use is never listed. That includes a session that is
-`ready`: its diff has not been reviewed yet, and it is the most dangerous one to
-delete.
+A working copy still in use is never listed, and neither is one holding changes
+nobody has reviewed. That includes a session that is `ready`, and one the
+console lost track of that had already done work — losing track of a session is
+not a reason to throw its work away.
 
 ## 12. Configuring a repository
 

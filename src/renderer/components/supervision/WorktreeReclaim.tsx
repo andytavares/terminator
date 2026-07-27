@@ -11,7 +11,7 @@ import './supervision.css'
 
 export interface ReclaimableWorktreeView {
   readonly path: string
-  readonly reason: 'orphan' | 'finished'
+  readonly reason: 'orphan' | 'finished' | 'lost'
   readonly sessionId: string | null
   readonly branch: string | null
   readonly repoPath: string | null
@@ -30,6 +30,7 @@ export interface WorktreeReclaimProps {
 const REASONS: Record<ReclaimableWorktreeView['reason'], string> = {
   orphan: 'no session references it',
   finished: 'its session has finished',
+  lost: 'the console lost track of its session, and it changed nothing',
 }
 
 export function WorktreeReclaim({
@@ -101,8 +102,9 @@ export function WorktreeReclaim({
       <div className="sv-form">
         <span className="sv-field__note">
           Reclaiming runs the repository&rsquo;s teardown script, removes the working copy, and
-          frees its port range. A working copy still in use is never listed — a session that is
-          ready for review still needs its checkout.
+          frees its port range. A working copy still in use is never listed, and neither is one
+          holding changes nobody has reviewed — a session that is ready for review, or one the
+          console lost track of that had done work, keeps its checkout.
         </span>
       </div>
     </div>

@@ -34,7 +34,20 @@ const panel = (over: Record<string, unknown> = {}) =>
     />
   )
 
+const lost = {
+  path: '/Users/you/.terminator/wt/FLU-9-cli',
+  reason: 'lost' as const,
+  sessionId: 'a7',
+  branch: 'feat/x',
+  repoPath: '/Users/you/repos/cli',
+}
+
 describe('WorktreeReclaim', () => {
+  it('says when the console lost track of the session, not just that it is gone', () => {
+    panel({ worktrees: [lost] })
+    expect(screen.getByText(/lost track of its session, and it changed nothing/)).toBeDefined()
+  })
+
   it('says why each one can go', () => {
     panel()
     expect(screen.getByText(/no session references it/)).toBeDefined()
