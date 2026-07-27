@@ -1,0 +1,43 @@
+src/main/supervision/supervision-service.ts
+  s_5f98598a6d950e::t_00317a5c5a8ab8 700-709
+src/renderer/components/supervision/supervision.css
+  s_5f98598a6d950e::t_ca2377bf1e42b3 307-308,310-311
+  s_5f98598a6d950e::t_bcaa43ed9878e1 15-17
+  s_5f98598a6d950e::t_466dd4fb73fbf1 612-625
+tests/unit/main/supervision/stall/firing-log.spec.ts
+  s_5f98598a6d950e::t_92ee18b4a43725 135-201
+  s_5f98598a6d950e::t_157a6e3f042d99 2
+SUPERVISION.md
+  s_5f98598a6d950e::t_11e8b8a308a134 67,85-90,169,187-191,200-201,233,418-422,430-438
+  s_5f98598a6d950e::t_c1a94ca7537986 1-66,68-84,91-168,170-186,192-199,202-232,234-417,423-429,439-452
+src/main/supervision/query/entity-index.ts
+  s_5f98598a6d950e::t_b5c01c76e5aa26 67-77
+tests/unit/main/supervision/final-gaps.spec.ts
+  s_5f98598a6d950e::t_11e8b8a308a134 206-258
+src/renderer/components/supervision/StallControls.tsx
+  s_5f98598a6d950e::t_1c4f6602f79f5d 77-78,80-82
+src/main/supervision/stall/firing-log.ts
+  s_5f98598a6d950e::t_6b97419be67545 27-53,87-88
+tests/unit/main/supervision/service-wiring.spec.ts
+  s_5f98598a6d950e::t_1a8c8fe358e850 823-876
+src/renderer/components/supervision/SupervisionPalette.tsx
+  s_5f98598a6d950e::t_466dd4fb73fbf1 75-76,78-79
+README.md
+  s_5f98598a6d950e::t_a7fdc0e84a92d1 62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "bbd4835aaa4ec10f5d362a846af8f706f1369870",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
