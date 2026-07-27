@@ -3,6 +3,16 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, lstatSync } 
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { execFileSync } from 'child_process'
+
+// Git exports GIT_DIR, GIT_INDEX_FILE and friends into any process it spawns —
+// including a hook — so a test that shells out to git inherits the *outer*
+// repository's index and fails only when run from a commit hook. Scrub them.
+const cleanEnv = (): NodeJS.ProcessEnv =>
+  Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')))
+
+const git = (cwd: string, ...args: string[]): void => {
+  execFileSync('git', args, { cwd, stdio: 'pipe', env: cleanEnv() })
+}
 import { createSupervisionService } from '../../../src/main/supervision/supervision-service.js'
 import { rankAttention } from '../../../src/shared/supervision/rank-attention.js'
 
@@ -26,15 +36,12 @@ beforeEach(() => {
   mkdirSync(worktreeRoot, { recursive: true })
   mkdirSync(userDataPath, { recursive: true })
 
-  const git = (...args: string[]): void => {
-    execFileSync('git', args, { cwd: repoPath, stdio: 'pipe' })
-  }
-  git('init', '--initial-branch=main')
-  git('config', 'user.email', 'test@example.com')
-  git('config', 'user.name', 'Test')
+  git(repoPath, 'init', '--initial-branch=main')
+  git(repoPath, 'config', 'user.email', 'test@example.com')
+  git(repoPath, 'config', 'user.name', 'Test')
   writeFileSync(join(repoPath, 'README.md'), '# repo\n')
-  git('add', '.')
-  git('commit', '-m', 'initial')
+  git(repoPath, 'add', '.')
+  git(repoPath, 'commit', '-m', 'initial')
 
   // The heavy directory that must be shared rather than copied, and the
   // gitignored file that must be carried across.
@@ -71,10 +78,10 @@ function build() {
     shadowStore: { get: () => undefined, set: () => {} },
     git: {
       createWorktree: async (repo: string, path: string, branch: string) => {
-        execFileSync('git', ['worktree', 'add', '-b', branch, path], { cwd: repo, stdio: 'pipe' })
+        git(repo, 'worktree', 'add', '-b', branch, path)
       },
       removeWorktree: async (repo: string, path: string) => {
-        execFileSync('git', ['worktree', 'remove', '--force', path], { cwd: repo, stdio: 'pipe' })
+        git(repo, 'worktree', 'remove', '--force', path)
       },
     },
   })
@@ -128,6 +135,7 @@ describe('SC-005 — a fresh working copy is usable with no manual step', () => 
     const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
       cwd: result.worktreePath,
       encoding: 'utf-8',
+      env: cleanEnv(),
     }).trim()
     expect(branch).toBe('feat/s1')
   })

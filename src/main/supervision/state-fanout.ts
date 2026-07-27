@@ -3,6 +3,7 @@
 // the fan-out so neither audience knows about the other, and so one bad
 // subscriber cannot starve the other of state.
 
+/** The shape an extension subscriber receives. */
 export interface ExtensionStateEvent {
   sessionId: string
   from: string
