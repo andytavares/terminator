@@ -894,7 +894,7 @@ describe('WorkItemBoard gate actions (FR-083, FR-084)', () => {
       title: 'Unify session identity',
       created_at: '2026-07-27T09:04:11Z',
       phase: 'specify' as const,
-      artifacts: { spec: 'specs/x/spec.md' },
+      artifacts: { spec: 'specs/x/spec.md', plan: 'specs/x/plan.md' },
       gates: {},
       lanes: [
         {
@@ -998,6 +998,18 @@ describe('WorkItemBoard gate actions (FR-083, FR-084)', () => {
     fireEvent.change(input, { target: { value: 'x' } })
     fireEvent.keyDown(input, { key: 'Escape' })
     expect(onRejectGate).not.toHaveBeenCalled()
+  })
+
+  it('offers no approval for a gate whose artefact does not exist yet', () => {
+    // "Approve plan" on an item with no plan is a button that cannot mean
+    // anything.
+    const specOnly = {
+      ...unapproved,
+      item: { ...unapproved.item, artifacts: { spec: 'specs/x/spec.md' } },
+    }
+    board({ items: [specOnly] })
+    expect(screen.getByText(/Approve spec/)).toBeDefined()
+    expect(screen.queryByText(/Approve plan/)).toBeNull()
   })
 
   it('advances the phase', () => {

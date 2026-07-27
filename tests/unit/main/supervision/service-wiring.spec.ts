@@ -713,3 +713,76 @@ describe('merging a lane in order (FR-088)', () => {
     expect(service.getSession('s1')?.runtimeState).not.toBe('merged')
   })
 })
+
+// FR-029. The four actions a stall offers had nothing behind them: driver
+// .interrupt() was never called from anywhere in production.
+
+describe('interrupting and discarding a session', () => {
+  function running(over: Record<string, unknown> = {}) {
+    const sent: string[] = []
+    const service = build({
+      sendToSession: async (_id: string, m: string) => void sent.push(m),
+      ...over,
+    })
+    const interrupt = vi.fn().mockResolvedValue(undefined)
+    service.driver.interrupt = interrupt
+    service.registry.register('s1', meta())
+    return { service, interrupt, sent }
+  }
+
+  it('stops the agent where it is', async () => {
+    const { service, interrupt } = running()
+    await expect(service.interruptSession('s1')).resolves.toMatchObject({ ok: true })
+    expect(interrupt).toHaveBeenCalledWith('s1')
+  })
+
+  it('redirects it, because stopping alone leaves it as stuck as it was', async () => {
+    const { service, sent } = running()
+    await service.interruptSession('s1', 'try the integration test instead')
+    expect(sent).toEqual(['try the integration test instead'])
+  })
+
+  it('does not send an empty redirect', async () => {
+    const { service, sent } = running()
+    await service.interruptSession('s1', '   ')
+    expect(sent).toEqual([])
+  })
+
+  it('records the interruption as the console speaking, not the agent (FR-092)', async () => {
+    const { service } = running()
+    await service.interruptSession('s1', 'do the other thing')
+    const entry = service.feed.forSession('s1').at(-1)
+    expect(entry).toMatchObject({ author: 'console' })
+    expect(entry?.summary).toMatch(/do the other thing/)
+  })
+
+  it('refuses to interrupt a session it does not know', async () => {
+    const { service } = running()
+    await expect(service.interruptSession('ghost')).resolves.toEqual({
+      ok: false,
+      reason: 'no such session',
+    })
+  })
+
+  it('discards the session, its queue entry and its working copy', async () => {
+    const { service, interrupt } = running()
+    service.registry.register('s1', meta())
+    await expect(service.discardSession('s1')).resolves.toMatchObject({ ok: true })
+    expect(interrupt).toHaveBeenCalledWith('s1')
+    expect(service.reviewQueue.count()).toBe(0)
+  })
+
+  it('records the discard in the feed', async () => {
+    const { service } = running()
+    await service.discardSession('s1')
+    expect(service.feed.forSession('s1').at(-1)?.summary).toMatch(/Discarded by the operator/)
+  })
+
+  it('refuses to discard a session it does not know', async () => {
+    const { service } = running()
+    await expect(service.discardSession('ghost')).resolves.toEqual({
+      ok: false,
+      reason: 'no such session',
+    })
+  })
+})

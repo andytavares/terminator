@@ -98,6 +98,11 @@ interface SupervisionBridge {
     id?: string
   }>
   getDigest?(payload: { windowMs: number }): Promise<Digest | null>
+  interruptSession?(payload: {
+    sessionId: string
+    redirect?: string
+  }): Promise<{ ok: boolean; reason: string | null }>
+  discardSession?(payload: { sessionId: string }): Promise<{ ok: boolean; reason: string | null }>
   producerAction?(payload: {
     workItemId: string
     action: 'approveGate' | 'rejectGate' | 'advancePhase' | 'sendBack'
@@ -437,6 +442,29 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
       setShadow(value)
       void bridge()?.setShadowMode?.({ value })
     },
+    // FR-029: the four actions a stall must offer. Without these a stalled
+    // session told you it was stuck and gave you nothing to do about it.
+    onAskWhatIsWrong: (sessionId) => {
+      void bridge()?.replyToSession?.({
+        sessionId,
+        message: 'You appear to be stuck. What is blocking you?',
+      })
+    },
+    onShowActivity: (sessionId) => {
+      setOpenSession(sessionId)
+      onOpenSessionInShell?.(sessionId)
+    },
+    onInterrupt: (sessionId, redirect) => {
+      void bridge()
+        ?.interruptSession?.({ sessionId, redirect })
+        .then(() => refreshAll())
+    },
+    onDiscard: (sessionId) => {
+      void bridge()
+        ?.discardSession?.({ sessionId })
+        .then(() => refreshAll())
+    },
+
     onJudge: (firingId, judgement) => {
       void bridge()?.judgeFiring?.({ firingId, judgement })
     },

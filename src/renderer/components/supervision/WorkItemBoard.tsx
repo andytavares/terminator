@@ -11,6 +11,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import type { WorkItemView as WorkItemContract } from '../../../shared/supervision/view-types.js'
+import { gateIsReviewable } from '../../../shared/supervision/gate-reviewable.js'
 import './supervision.css'
 
 // Concept 02. Derived entirely from the published contract, so it behaves
@@ -89,7 +90,9 @@ function GateActions({
 
   return (
     <div className="sv-queue__actions">
-      {GATES.filter((gate) => item.gates[gate.key]?.ok !== true).map((gate) => (
+      {GATES.filter(
+        (gate) => item.gates[gate.key]?.ok !== true && gateIsReviewable(item.artifacts, gate.key)
+      ).map((gate) => (
         <React.Fragment key={gate.key}>
           <button className="sv-queue__btn" onClick={() => onApproveGate(item.id, gate.key)}>
             <ThumbsUp aria-hidden="true" /> Approve {gate.label.replace(' approved', '')}

@@ -107,3 +107,44 @@ describe('event bus', () => {
     expect(late).toHaveBeenCalledExactlyOnceWith(toolStarted)
   })
 })
+
+// The shapes feeding this bus come from hooks and a transcript whose formats
+// are not published contracts, so a malformed event is reachable in production
+// and not only from a typed caller.
+
+describe('a value that is not a session event', () => {
+  it('never reaches a subscriber', () => {
+    const handler = vi.fn()
+    const bus = createEventBus()
+    bus.subscribe(handler)
+    bus.publish({ kind: 'nonsense', sessionId: 's1', at: 1 } as never)
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('is reported rather than dropped silently', () => {
+    const onInvalid = vi.fn()
+    const bus = createEventBus({ onInvalid })
+    bus.publish({ kind: 'nonsense' } as never)
+    expect(onInvalid).toHaveBeenCalled()
+  })
+
+  it('does not throw when nobody is watching for it', () => {
+    const bus = createEventBus()
+    expect(() => bus.publish(null as never)).not.toThrow()
+  })
+
+  it('still delivers the well-formed events around it', () => {
+    const handler = vi.fn()
+    const bus = createEventBus()
+    bus.subscribe(handler)
+    bus.publish({ kind: 'nonsense' } as never)
+    bus.publish({
+      kind: 'session_started',
+      sessionId: 's1',
+      transcriptPath: null,
+      cwd: '/repo',
+      at: 1_000,
+    })
+    expect(handler).toHaveBeenCalledTimes(1)
+  })
+})

@@ -1,6 +1,7 @@
 import React from 'react'
 import { StateIndicator, formatElapsed } from './StateIndicator.js'
 import type { AttentionItem } from '../../../shared/supervision/rank-attention.js'
+import { allClearMessage } from '../../../shared/supervision/all-clear.js'
 import './supervision.css'
 
 // Concept 01. One ranked list of everything needing the operator, ordered by
@@ -38,18 +39,9 @@ export function AttentionQueue({
     return <div className="sv-allclear">Checking sessions…</div>
   }
 
-  if (items.length === 0) {
-    // FR-024: assert that everything is fine. Silence is indistinguishable from
-    // a console that has crashed, which is the complacency failure this avoids.
-    return (
-      <div className="sv-allclear">
-        {workingCount === 0
-          ? 'Nothing needs you, and nothing is running.'
-          : `Nothing needs you. ${workingCount} ${
-              workingCount === 1 ? 'session is' : 'sessions are'
-            } working.`}
-      </div>
-    )
+  const allClear = allClearMessage(items.length, workingCount)
+  if (allClear !== null) {
+    return <div className="sv-allclear">{allClear}</div>
   }
 
   return (

@@ -14,7 +14,7 @@ import { WorkItemBoard, type BoardItem } from './WorkItemBoard.js'
 import { LaneView } from './LaneView.js'
 import { StandupFeed } from './StandupFeed.js'
 import { DigestPanel } from './DigestPanel.js'
-import { StallControls } from './StallControls.js'
+import { StallControls, StallActions } from './StallControls.js'
 import { SupervisionPalette, type PaletteEntity } from './SupervisionPalette.js'
 import { MergeAudit, HunkReview } from './MergeAudit.js'
 import { SinceYouLastLooked } from './SinceYouLastLooked.js'
@@ -102,6 +102,11 @@ export interface SupervisionScreenProps {
   precision: PrecisionReport
   onSetShadowMode(value: boolean): void
   onJudge(firingId: string, judgement: 'correct' | 'incorrect'): void
+  /** FR-029: what a stall lets you actually do about it. */
+  onAskWhatIsWrong(sessionId: string): void
+  onShowActivity(sessionId: string): void
+  onInterrupt(sessionId: string, redirect?: string): void
+  onDiscard(sessionId: string): void
 
   entities: readonly PaletteEntity[]
   onChooseEntity(entity: PaletteEntity): void
@@ -300,13 +305,33 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
       )}
 
       {tab === 'stalls' && (
-        <StallControls
-          shadowMode={props.shadowMode}
-          firings={props.firings}
-          precision={props.precision}
-          onSetShadowMode={props.onSetShadowMode}
-          onJudge={props.onJudge}
-        />
+        <>
+          <StallControls
+            shadowMode={props.shadowMode}
+            firings={props.firings}
+            precision={props.precision}
+            onSetShadowMode={props.onSetShadowMode}
+            onJudge={props.onJudge}
+          />
+          {/* Every session currently stalled, with something to do about it —
+              a stall that only reports itself is half the feature (FR-029). */}
+          {props.attention
+            .filter((item) => item.reason === 'stalled')
+            .map((item) => (
+              <div className="sv-row" key={item.sessionId}>
+                <span className="sv-row__main">
+                  <div className="sv-queue__title">{item.repoPath.split('/').pop()}</div>
+                  <StallActions
+                    sessionId={item.sessionId}
+                    onAsk={props.onAskWhatIsWrong}
+                    onShowTranscript={props.onShowActivity}
+                    onInterrupt={props.onInterrupt}
+                    onDiscard={props.onDiscard}
+                  />
+                </span>
+              </div>
+            ))}
+        </>
       )}
 
       {tab === 'find' && (

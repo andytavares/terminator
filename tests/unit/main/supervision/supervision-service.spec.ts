@@ -298,7 +298,7 @@ describe('review queue population (FR-045)', () => {
     })
   })
 
-  it('writes a feed entry when a session reaches a milestone (FR-091)', () => {
+  it('writes a feed entry when a session reaches a milestone (FR-091)', async () => {
     const { service } = build()
     service.registry.register('s1', metaFor())
     service.bus.publish({
@@ -308,9 +308,45 @@ describe('review queue population (FR-045)', () => {
       cwd: '/repo',
       at: 2_000,
     })
-    const entries = service.feed.list()
-    expect(entries.length).toBeGreaterThan(0)
-    expect(entries[0]).toMatchObject({ sessionId: 's1', author: 'agent' })
+    // The summariser is an optional async seam, so the entry lands on the next
+    // turn even when no summariser is configured.
+    await vi.waitFor(() => expect(service.feed.list().length).toBeGreaterThan(0))
+    expect(service.feed.list()[0]).toMatchObject({ sessionId: 's1', author: 'agent' })
+  })
+
+  it('uses a configured summariser for the prose, keeping the record either way', async () => {
+    const { service } = build({
+      summariseMilestone: async () => 'started work on the session identity change',
+    })
+    service.registry.register('s1', metaFor())
+    service.bus.publish({
+      kind: 'session_started',
+      sessionId: 's1',
+      transcriptPath: '/t',
+      cwd: '/repo',
+      at: 2_000,
+    })
+    await vi.waitFor(() =>
+      expect(service.feed.list()[0]?.summary).toBe('started work on the session identity change')
+    )
+  })
+
+  it('falls back to the local description when the summariser fails', async () => {
+    const { service } = build({
+      summariseMilestone: async () => {
+        throw new Error('model is down')
+      },
+    })
+    service.registry.register('s1', metaFor())
+    service.bus.publish({
+      kind: 'session_started',
+      sessionId: 's1',
+      transcriptPath: '/t',
+      cwd: '/repo',
+      at: 2_000,
+    })
+    // A summariser that is down costs prose, not the record.
+    await vi.waitFor(() => expect(service.feed.list().length).toBeGreaterThan(0))
   })
 
   it('names a publication directory per producer, inside the console tree', () => {

@@ -52,6 +52,10 @@ function props(over: Partial<SupervisionScreenProps> = {}): SupervisionScreenPro
     precision: { total: 0, judged: 0, incorrect: 0, incorrectRate: null },
     onSetShadowMode: vi.fn(),
     onJudge: vi.fn(),
+    onAskWhatIsWrong: vi.fn(),
+    onShowActivity: vi.fn(),
+    onInterrupt: vi.fn(),
+    onDiscard: vi.fn(),
     entities: [],
     onChooseEntity: vi.fn(),
     backpressure: null,
@@ -229,5 +233,47 @@ describe('the feed tab carries both deliveries', () => {
     // Routine progress never interrupts, so this is the only place it lands.
     expect(screen.getByText(/Progress digest/)).toBeDefined()
     expect(screen.getByText(/Nothing has happened yet/)).toBeDefined()
+  })
+})
+
+describe('a stalled session offers something to do about it (FR-029)', () => {
+  const stalled = {
+    sessionId: 's1',
+    repoPath: '/repos/fluent',
+    reason: 'stalled' as const,
+    waitingMs: 600_000,
+    pendingPermission: null,
+  }
+
+  it('offers all four actions', () => {
+    render(<SupervisionScreen {...props({ attention: [stalled] })} />)
+    fireEvent.click(screen.getByText('Stalls'))
+    expect(screen.getByText(/Ask what is wrong/)).toBeDefined()
+    expect(screen.getByText(/Show activity/)).toBeDefined()
+    expect(screen.getByText(/Interrupt and redirect/)).toBeDefined()
+    expect(screen.getByText(/Discard session and worktree/)).toBeDefined()
+  })
+
+  it('asks the session what is wrong', () => {
+    const onAskWhatIsWrong = vi.fn()
+    render(<SupervisionScreen {...props({ attention: [stalled], onAskWhatIsWrong })} />)
+    fireEvent.click(screen.getByText('Stalls'))
+    fireEvent.click(screen.getByText(/Ask what is wrong/))
+    expect(onAskWhatIsWrong).toHaveBeenCalledWith('s1')
+  })
+
+  it('discards the session and its worktree', () => {
+    const onDiscard = vi.fn()
+    render(<SupervisionScreen {...props({ attention: [stalled], onDiscard })} />)
+    fireEvent.click(screen.getByText('Stalls'))
+    fireEvent.click(screen.getByText(/Discard session and worktree/))
+    expect(onDiscard).toHaveBeenCalledWith('s1')
+  })
+
+  it('offers nothing for a session that is merely waiting on you', () => {
+    const needsInput = { ...stalled, reason: 'needs_input' as const }
+    render(<SupervisionScreen {...props({ attention: [needsInput] })} />)
+    fireEvent.click(screen.getByText('Stalls'))
+    expect(screen.queryByText(/Discard session and worktree/)).toBeNull()
   })
 })

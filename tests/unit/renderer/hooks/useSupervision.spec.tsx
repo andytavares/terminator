@@ -100,6 +100,8 @@ function makeBridge(over: Record<string, unknown> = {}) {
     producerAction: vi.fn().mockResolvedValue({ ok: true, reason: null }),
     assign: vi.fn().mockResolvedValue({ ok: true, sessionId: 's9', worktreePath: '/wt/s9' }),
     intake: vi.fn().mockResolvedValue({ ok: true, id: 'FLU-221' }),
+    interruptSession: vi.fn().mockResolvedValue({ ok: true, reason: null }),
+    discardSession: vi.fn().mockResolvedValue({ ok: true, reason: null }),
     getDigest: vi
       .fn()
       .mockResolvedValue({ from: 0, to: 1, entryCount: 4, sessionCount: 2, bySession: [] }),
@@ -857,5 +859,56 @@ describe('what changed since you last looked (FR-036)', () => {
     await waitFor(() => expect(result.current.loaded).toBe(true))
     expect(result.current.screenProps.sinceStateChanges).toEqual([])
     expect(result.current.screenProps.sinceDiffDelta).toBeNull()
+  })
+})
+
+describe('acting on a stall (FR-029)', () => {
+  it('asks the session what is blocking it', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    act(() => result.current.screenProps.onAskWhatIsWrong('s1'))
+    expect(bridge.replyToSession).toHaveBeenCalledWith({
+      sessionId: 's1',
+      message: expect.stringContaining('stuck'),
+    })
+  })
+
+  it('opens the session when asked to show its activity', async () => {
+    const onOpenSessionInShell = vi.fn()
+    const { result } = renderHook(() => useSupervision({ onOpenSessionInShell }))
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    act(() => result.current.screenProps.onShowActivity('s1'))
+    expect(onOpenSessionInShell).toHaveBeenCalledWith('s1')
+  })
+
+  it('interrupts and redirects', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onInterrupt('s1', 'try the other approach')
+    })
+    expect(bridge.interruptSession).toHaveBeenCalledWith({
+      sessionId: 's1',
+      redirect: 'try the other approach',
+    })
+  })
+
+  it('discards the session', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onDiscard('s1')
+    })
+    expect(bridge.discardSession).toHaveBeenCalledWith({ sessionId: 's1' })
+  })
+
+  it('survives a build that offers neither', async () => {
+    install({ interruptSession: undefined, discardSession: undefined })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    expect(() => {
+      result.current.screenProps.onInterrupt('s1')
+      result.current.screenProps.onDiscard('s1')
+    }).not.toThrow()
   })
 })

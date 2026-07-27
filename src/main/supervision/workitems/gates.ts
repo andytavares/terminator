@@ -1,4 +1,5 @@
 import type { WorkItemContract } from './contract-schema.js'
+import { gateIsReviewable as isReviewable } from '../../../shared/supervision/gate-reviewable.js'
 
 // The deliberate friction (FR-083). Implementation cannot begin until the
 // operator has approved both the specification and the plan.
@@ -39,7 +40,5 @@ export function mayBeginImplementation(item: WorkItemContract): GateDecision {
 
 /** Whether an artefact the operator is being asked to approve actually exists. */
 export function gateIsReviewable(item: WorkItemContract, gate: RequiredGate): boolean {
-  return gate === 'spec_approved_by_human'
-    ? item.artifacts.spec !== undefined
-    : item.artifacts.plan !== undefined
+  return isReviewable(item.artifacts, gate)
 }

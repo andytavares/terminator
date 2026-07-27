@@ -239,6 +239,8 @@ function fullSource() {
     intake: vi.fn().mockReturnValue({ ok: true }),
     assign: vi.fn().mockResolvedValue({ ok: true, sessionId: 's2' }),
     producerAction: vi.fn().mockResolvedValue({ ok: true, reason: null }),
+    interruptSession: vi.fn().mockResolvedValue({ ok: true, reason: null }),
+    discardSession: vi.fn().mockResolvedValue({ ok: true, reason: null }),
     getDigest: vi
       .fn()
       .mockReturnValue({ from: 0, to: 1, entryCount: 2, sessionCount: 1, bySession: [] }),
@@ -734,5 +736,67 @@ describe('the progress digest (FR-028)', () => {
     await expect(
       handlerFor(SUPERVISION_CHANNELS.getDigest)({}, { windowMs: 60_000 })
     ).resolves.toBeNull()
+  })
+})
+
+describe('stopping a session (FR-029)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('interrupts, carrying the redirect', async () => {
+    const source = fullSource()
+    registerSupervisionHandlers(source)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.interruptSession)(
+        {},
+        { sessionId: 's1', redirect: 'do the other thing' }
+      )
+    ).resolves.toMatchObject({ ok: true })
+    expect(source.interruptSession).toHaveBeenCalledWith('s1', 'do the other thing')
+  })
+
+  it('interrupts without a redirect', async () => {
+    const source = fullSource()
+    registerSupervisionHandlers(source)
+    await handlerFor(SUPERVISION_CHANNELS.interruptSession)({}, { sessionId: 's1' })
+    expect(source.interruptSession).toHaveBeenCalledWith('s1', undefined)
+  })
+
+  it('refuses an interrupt with no session', async () => {
+    registerSupervisionHandlers(fullSource())
+    await expect(handlerFor(SUPERVISION_CHANNELS.interruptSession)({}, {})).resolves.toEqual({
+      ok: false,
+      reason: 'invalid request',
+    })
+  })
+
+  it('says interrupting is unavailable rather than throwing', async () => {
+    registerSupervisionHandlers(BARE)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.interruptSession)({}, { sessionId: 's1' })
+    ).resolves.toEqual({ ok: false, reason: 'interrupting is unavailable' })
+  })
+
+  it('discards a session', async () => {
+    const source = fullSource()
+    registerSupervisionHandlers(source)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.discardSession)({}, { sessionId: 's1' })
+    ).resolves.toMatchObject({ ok: true })
+    expect(source.discardSession).toHaveBeenCalledWith('s1')
+  })
+
+  it('refuses a discard with no session', async () => {
+    registerSupervisionHandlers(fullSource())
+    await expect(handlerFor(SUPERVISION_CHANNELS.discardSession)({}, {})).resolves.toEqual({
+      ok: false,
+      reason: 'invalid request',
+    })
+  })
+
+  it('says discarding is unavailable rather than throwing', async () => {
+    registerSupervisionHandlers(BARE)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.discardSession)({}, { sessionId: 's1' })
+    ).resolves.toEqual({ ok: false, reason: 'discarding is unavailable' })
   })
 })

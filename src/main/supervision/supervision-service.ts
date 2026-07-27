@@ -47,7 +47,7 @@ import { readDiffSummary, readChangedFiles } from './state/session-metrics.js'
 import { createFeedReply } from './feed/feed-reply.js'
 import { createAssigner } from './assign-agent.js'
 import { createDecisionSet, type DecisionSet } from './review/hunk-decisions.js'
-import { detectMilestones, describeMilestone } from './feed/milestone-summary.js'
+import { detectMilestones, summariseMilestone, type Milestone } from './feed/milestone-summary.js'
 import type { SessionEvent } from './events/session-event.js'
 import type { SupervisedSession } from '../../shared/types/supervision.js'
 
@@ -78,6 +78,12 @@ export interface SupervisionServiceOptions {
    * whole purpose is to say so rather than be polled.
    */
   onPublicationsChanged?: () => void
+  /**
+   * Optional prose for a milestone. Absent by default: the local description
+   * already satisfies the written-summary requirement, and this is the seam
+   * for a model call rather than an assumption that there is one.
+   */
+  summariseMilestone?: (milestone: Milestone, fallback: string) => Promise<string>
   notify?: (entry: { sessionId: string; summary: string }) => void
 }
 
@@ -123,6 +129,17 @@ export interface SupervisionService {
   mayBeginImplementation(workItemId: string): ReturnType<typeof mayBeginImplementation>
   /** Normalises a ticket URL or a dropped document into one shape (FR-068). */
   intake(input: { url?: string; filePath?: string; contents?: string }): IntakeResult
+  /**
+   * Stops the agent where it is, and optionally redirects it (FR-029). Without
+   * this the four actions offered on a stall had nothing behind them and a
+   * running agent could not be stopped at all.
+   */
+  interruptSession(
+    sessionId: string,
+    redirect?: string
+  ): Promise<{ ok: boolean; reason: string | null }>
+  /** Stops the agent and removes its working copy, running teardown (FR-029). */
+  discardSession(sessionId: string): Promise<{ ok: boolean; reason: string | null }>
   /**
    * Merges a lane in order (FR-088). Refuses out-of-order when a shared
    * contract file is involved, and records the merge so the next lane unblocks
@@ -305,15 +322,13 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
     }
   >()
 
-  const feedReply = createFeedReply({
-    log: feed,
-    sendToSession:
-      options.sendToSession ??
-      (async () => {
-        throw new Error('this session is no longer running')
-      }),
-    now,
-  })
+  const sendToSession =
+    options.sendToSession ??
+    (async () => {
+      throw new Error('this session is no longer running')
+    })
+
+  const feedReply = createFeedReply({ log: feed, sendToSession, now })
 
   const mergePolicy = createMergePolicy({
     isUnattendedEnabledFor: (repoPath) =>
@@ -348,12 +363,16 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
     const milestones = detectMilestones(seenEvents)
     const latest = milestones.at(-1)
     if (latest !== undefined && latest.at === event.at) {
-      feed.post({
-        at: latest.at,
-        sessionId: latest.sessionId,
-        author: 'agent',
-        summary: describeMilestone(latest),
-      })
+      // The summariser is optional: with none configured this is the local
+      // description, and a summariser that is down costs prose, not the record.
+      void summariseMilestone(latest, { summarise: options.summariseMilestone }).then((summary) =>
+        feed.post({
+          at: latest.at,
+          sessionId: latest.sessionId,
+          author: 'agent',
+          summary,
+        })
+      )
     }
 
     // Reaching `ready` is what puts work in front of the operator. Without this
@@ -524,6 +543,51 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
         return intakeFromDocument(input.filePath, input.contents ?? '', now())
       }
       return { ok: false, reason: 'nothing to bring in' }
+    },
+
+    interruptSession: async (sessionId, redirect) => {
+      const session = registry.get(sessionId)
+      if (session === null) return { ok: false, reason: 'no such session' }
+
+      await driver.interrupt(sessionId)
+      if (redirect !== undefined && redirect.trim() !== '') {
+        // Redirecting is the point: stopping without saying what to do instead
+        // leaves the session exactly as stuck as it was.
+        await sendToSession(sessionId, redirect.trim())
+      }
+      feed.post({
+        at: now(),
+        sessionId,
+        author: 'console',
+        summary:
+          redirect === undefined || redirect.trim() === ''
+            ? 'Interrupted by the operator.'
+            : `Interrupted and redirected: ${redirect.trim()}`,
+      })
+      return { ok: true, reason: null }
+    },
+
+    discardSession: async (sessionId) => {
+      const session = registry.get(sessionId)
+      if (session === null) return { ok: false, reason: 'no such session' }
+
+      await driver.interrupt(sessionId)
+      reviewQueue.remove(sessionId)
+      const span = spansByWorktree.get(session.worktreePath)
+      await provisioner.release({
+        repoPath: session.repoPath,
+        worktreePath: session.worktreePath,
+        workItemId: session.workItemId ?? sessionId,
+        portBase: span?.portBase ?? 0,
+      })
+      spansByWorktree.delete(session.worktreePath)
+      feed.post({
+        at: now(),
+        sessionId,
+        author: 'console',
+        summary: 'Discarded by the operator; the working copy was removed.',
+      })
+      return { ok: true, reason: null }
     },
 
     mergeLane: async (workItemId, ord) => {

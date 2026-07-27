@@ -666,6 +666,18 @@ that lane is flagged as needing a rebase or a re-run.
 
 Single-repository work renders as one row with none of this.
 
+### When a session stalls
+
+The **Stalls** tab lists every session currently flagged, each with the four
+things you can do about it: ask it what is wrong, show its activity, interrupt
+and redirect it, or discard the session and its working copy. Interrupting
+without redirecting leaves it exactly as stuck as it was, so say what to do
+instead.
+
+Everything Terminator writes to the feed is attributed to Terminator, never to
+the agent — a stall notice you could mistake for the agent's own words would be
+worthless.
+
 ### Unattended merge
 
 Off by default, and enabled per repository rather than globally — one bad

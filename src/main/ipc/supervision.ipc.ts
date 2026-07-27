@@ -37,6 +37,8 @@ export const SUPERVISION_CHANNELS = {
   assign: 'supervision:assign',
   producerAction: 'supervision:producerAction',
   getDigest: 'supervision:getDigest',
+  interruptSession: 'supervision:interruptSession',
+  discardSession: 'supervision:discardSession',
 } as const
 
 /**
@@ -85,6 +87,11 @@ export interface SupervisionSource {
   intake?(input: { url?: string; filePath?: string; contents?: string }): unknown
   assign?(request: unknown): Promise<unknown>
   getDigest?(windowMs: number): unknown
+  interruptSession?(
+    sessionId: string,
+    redirect?: string
+  ): Promise<{ ok: boolean; reason: string | null }>
+  discardSession?(sessionId: string): Promise<{ ok: boolean; reason: string | null }>
   producerAction?(
     workItemId: string,
     action: 'approveGate' | 'rejectGate' | 'advancePhase' | 'sendBack',
@@ -149,6 +156,10 @@ const producerActionPayload = z.object({
 // Zero or a negative window would produce an empty digest that reads as "no
 // progress" rather than "you asked for nothing".
 const digestPayload = z.object({ windowMs: z.number().int().positive() })
+const interruptPayload = z.object({
+  sessionId: z.string().min(1),
+  redirect: z.string().optional(),
+})
 const judgePayload = z.object({
   firingId: z.string().min(1),
   judgement: z.enum(['correct', 'incorrect']),
@@ -318,6 +329,28 @@ export function registerSupervisionHandlers(source: SupervisionSource): void {
     const parsed = digestPayload.safeParse(payload)
     if (!parsed.success) return null
     return source.getDigest?.(parsed.data.windowMs) ?? null
+  })
+
+  handleChannel(SUPERVISION_CHANNELS.interruptSession, async (_event, payload: unknown) => {
+    const parsed = interruptPayload.safeParse(payload)
+    if (!parsed.success) return { ok: false, reason: 'invalid request' }
+    return (
+      (await source.interruptSession?.(parsed.data.sessionId, parsed.data.redirect)) ?? {
+        ok: false,
+        reason: 'interrupting is unavailable',
+      }
+    )
+  })
+
+  handleChannel(SUPERVISION_CHANNELS.discardSession, async (_event, payload: unknown) => {
+    const parsed = sessionPayload.safeParse(payload)
+    if (!parsed.success) return { ok: false, reason: 'invalid request' }
+    return (
+      (await source.discardSession?.(parsed.data.sessionId)) ?? {
+        ok: false,
+        reason: 'discarding is unavailable',
+      }
+    )
   })
 
   handleChannel(SUPERVISION_CHANNELS.producerAction, async (_event, payload: unknown) => {
