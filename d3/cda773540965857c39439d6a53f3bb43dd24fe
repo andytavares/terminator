@@ -1,0 +1,21 @@
+tests/integration/supervision/provisioning.spec.ts
+  s_5f98598a6d950e::t_1528f17260a5bd 6-15,39-41,43-44,81,84,138
+src/main/supervision/state-fanout.ts
+  s_5f98598a6d950e::t_ea6f177850fd63 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "d3cda773540965857c39439d6a53f3bb43dd24fe",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
