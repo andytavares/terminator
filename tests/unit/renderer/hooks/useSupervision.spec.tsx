@@ -92,6 +92,9 @@ function makeBridge(over: Record<string, unknown> = {}) {
       .mockResolvedValue({ worktreePath: '/wt/x', ports: null, setup: null, skipped: [] }),
     getSinceLastLooked: vi.fn().mockResolvedValue({ lastViewedAt: 500, entries: [] }),
     producerAction: vi.fn().mockResolvedValue({ ok: true, reason: null }),
+    getDigest: vi
+      .fn()
+      .mockResolvedValue({ from: 0, to: 1, entryCount: 4, sessionCount: 2, bySession: [] }),
     precheckBackpressure: vi
       .fn()
       .mockResolvedValue({ allowed: false, unreviewed: 4, limit: 3, reason: '4 unreviewed' }),
@@ -581,5 +584,37 @@ describe('acting on a work item gate', () => {
     })
     act(() => result.current.screenProps.onDismissActionError())
     expect(result.current.screenProps.actionError).toBeNull()
+  })
+})
+
+describe('the progress digest (FR-028)', () => {
+  it('loads on mount, so deferred progress is somewhere to read', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.screenProps.digest).not.toBeNull())
+    expect(result.current.screenProps.digest?.entryCount).toBe(4)
+  })
+
+  it('asks for the window it advertises', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    expect(bridge.getDigest).toHaveBeenCalledWith({
+      windowMs: result.current.screenProps.digestWindowMinutes * 60_000,
+    })
+  })
+
+  it('refreshes on request', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    bridge.getDigest.mockClear()
+    act(() => result.current.screenProps.onRefreshDigest())
+    await waitFor(() => expect(bridge.getDigest).toHaveBeenCalled())
+  })
+
+  it('leaves the digest empty on a console that provides none', async () => {
+    install({ getDigest: undefined })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    act(() => result.current.screenProps.onRefreshDigest())
+    expect(result.current.screenProps.digest).toBeNull()
   })
 })

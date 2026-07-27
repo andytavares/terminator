@@ -13,6 +13,7 @@ import { ReviewInbox, ReviewFlow } from './ReviewInbox.js'
 import { WorkItemBoard, type BoardItem } from './WorkItemBoard.js'
 import { LaneView } from './LaneView.js'
 import { StandupFeed } from './StandupFeed.js'
+import { DigestPanel } from './DigestPanel.js'
 import { StallControls } from './StallControls.js'
 import { SupervisionPalette, type PaletteEntity } from './SupervisionPalette.js'
 import { MergeAudit, HunkReview } from './MergeAudit.js'
@@ -26,6 +27,7 @@ import type {
   FeedEntry,
   LaneViewModel,
   RecordedFiring,
+  Digest,
   PrecisionReport,
   UnattendedMergeRecord,
   Hunk,
@@ -78,6 +80,10 @@ export interface SupervisionScreenProps {
   onMergeLane(ord: number): void
 
   feed: readonly FeedEntry[]
+  /** Routine progress, batched rather than delivered as it happens (FR-028). */
+  digest: Digest | null
+  digestWindowMinutes: number
+  onRefreshDigest(): void
   mutedSessions: readonly string[]
   onReply(sessionId: string, message: string): void
   onToggleMute(sessionId: string): void
@@ -241,12 +247,19 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
       )}
 
       {tab === 'feed' && (
-        <StandupFeed
-          entries={props.feed}
-          mutedSessions={props.mutedSessions}
-          onReply={props.onReply}
-          onToggleMute={props.onToggleMute}
-        />
+        <>
+          <DigestPanel
+            digest={props.digest}
+            windowMinutes={props.digestWindowMinutes}
+            onRefresh={props.onRefreshDigest}
+          />
+          <StandupFeed
+            entries={props.feed}
+            mutedSessions={props.mutedSessions}
+            onReply={props.onReply}
+            onToggleMute={props.onToggleMute}
+          />
+        </>
       )}
 
       {tab === 'stalls' && (

@@ -29,12 +29,21 @@ function props(over: Partial<SupervisionScreenProps> = {}): SupervisionScreenPro
     conflicts: [],
     canAct: true,
     onOpenWorkItem: vi.fn(),
+    onApproveGate: vi.fn(),
+    onRejectGate: vi.fn(),
+    onSendBack: vi.fn(),
+    onAdvancePhase: vi.fn(),
+    actionError: null,
+    onDismissActionError: vi.fn(),
     lanes: [],
     mergedOrds: [],
     staleOrds: [],
     blockedReasons: {},
     onMergeLane: vi.fn(),
     feed: [],
+    digest: null,
+    digestWindowMinutes: 60,
+    onRefreshDigest: () => {},
     mutedSessions: [],
     onReply: vi.fn(),
     onToggleMute: vi.fn(),
@@ -201,5 +210,15 @@ describe('counts and refusals', () => {
       />
     )
     expect(screen.getByText('pnpm install failed')).toBeDefined()
+  })
+})
+
+describe('the feed tab carries both deliveries', () => {
+  it('shows the progress digest above the chronological feed (FR-028)', () => {
+    render(<SupervisionScreen {...props()} />)
+    fireEvent.click(screen.getByText('Feed'))
+    // Routine progress never interrupts, so this is the only place it lands.
+    expect(screen.getByText(/Progress digest/)).toBeDefined()
+    expect(screen.getByText(/Nothing has happened yet/)).toBeDefined()
   })
 })

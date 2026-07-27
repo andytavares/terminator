@@ -458,6 +458,13 @@ app.whenReady().then(async () => {
         session,
       }
     },
+    // FR-028: routine progress never interrupts — it is batched here and read
+    // when the operator chooses to. Batching it and then never showing it
+    // would be the same as dropping it.
+    getDigest: (windowMs) => {
+      const to = Date.now()
+      return supervision.digestSince(to - windowMs, to)
+    },
     // FR-083/FR-084: approving a gate, rejecting it with notes, or sending an
     // item back is the only way implementation ever becomes allowed. It is
     // always the producer that writes it — the console never edits the

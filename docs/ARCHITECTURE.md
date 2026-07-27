@@ -849,3 +849,20 @@ label rather than colour; icons are flat `lucide-react` inheriting
 `rankAttention` lives in `src/shared/supervision/` because both processes need
 it: the Attention Queue, the Standup Feed and the palette are three renderings
 of one query, built once.
+
+### Notification discipline
+
+`feed/digest.ts` routes every notifiable event to one of three channels: modal
+for a blocking permission request only, a non-blocking indicator for stall,
+failure and ready, and the digest for routine progress. Deferral is only a
+discipline if the deferred thing is delivered, so the digest has a surface —
+`DigestPanel`, at the top of the Feed tab, over a one-hour window.
+
+### Directing actions at a producer
+
+The console reads work items from a directory it owns and never writes them.
+Every action it takes on one — approving a gate, rejecting it with notes,
+sending work back, advancing a phase — goes through `producer-commands.ts` to a
+handler the producer registered on the Extension API, reached from the renderer
+by the `supervision:producerAction` channel. A producer that registered no such
+handler renders the card read-only with a stated reason.

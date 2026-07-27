@@ -240,6 +240,9 @@ function fullSource() {
     intake: vi.fn().mockReturnValue({ ok: true }),
     assign: vi.fn().mockResolvedValue({ ok: true, sessionId: 's2' }),
     producerAction: vi.fn().mockResolvedValue({ ok: true, reason: null }),
+    getDigest: vi
+      .fn()
+      .mockReturnValue({ from: 0, to: 1, entryCount: 2, sessionCount: 1, bySession: [] }),
   }
 }
 
@@ -704,5 +707,41 @@ describe('directing an action at the producer that published an item', () => {
         { workItemId: 'FLU-220', action: 'approveGate', args: [] }
       )
     ).resolves.toEqual({ ok: false, reason: 'no producer is registered' })
+  })
+})
+
+describe('the progress digest (FR-028)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('serves the digest for the requested window', async () => {
+    const source = fullSource()
+    registerSupervisionHandlers(source)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.getDigest)({}, { windowMs: 3_600_000 })
+    ).resolves.toMatchObject({ entryCount: 2 })
+    expect(source.getDigest).toHaveBeenCalledWith(3_600_000)
+  })
+
+  it('refuses a window of zero, which would read as "no progress"', async () => {
+    const source = fullSource()
+    registerSupervisionHandlers(source)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.getDigest)({}, { windowMs: 0 })
+    ).resolves.toBeNull()
+    expect(source.getDigest).not.toHaveBeenCalled()
+  })
+
+  it('refuses a negative window', async () => {
+    registerSupervisionHandlers(fullSource())
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.getDigest)({}, { windowMs: -1 })
+    ).resolves.toBeNull()
+  })
+
+  it('returns nothing on a console with no digest, rather than throwing', async () => {
+    registerSupervisionHandlers(BARE)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.getDigest)({}, { windowMs: 60_000 })
+    ).resolves.toBeNull()
   })
 })

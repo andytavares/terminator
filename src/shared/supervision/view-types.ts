@@ -113,6 +113,18 @@ export interface FeedEntry {
   readonly replyable: boolean
 }
 
+/**
+ * Routine progress, batched rather than delivered as it happens (FR-028). The
+ * operator reads this when they choose to; nothing in it ever interrupts.
+ */
+export interface Digest {
+  readonly from: number
+  readonly to: number
+  readonly entryCount: number
+  readonly sessionCount: number
+  readonly bySession: ReadonlyArray<{ sessionId: string; entries: readonly FeedEntry[] }>
+}
+
 // ── work items ─────────────────────────────────────────────────────────────
 
 export interface WorkItemLane {

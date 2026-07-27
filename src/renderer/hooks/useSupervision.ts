@@ -9,6 +9,7 @@ import type {
   BackpressureDecision,
   FeedEntry,
   RecordedFiring,
+  Digest,
   PrecisionReport,
   ReviewItem,
   UnattendedMergeRecord,
@@ -23,6 +24,9 @@ import type {
 // that interval would consume the whole budget before IPC, so the main process
 // pushes state changes and this is only the backstop.
 const BACKSTOP_MS = 5_000
+
+/** How far back the progress digest reaches (FR-028). */
+const DIGEST_WINDOW_MINUTES = 60
 
 /** Elapsed times re-render on this tick; it is not the freshness mechanism. */
 const TICK_MS = 1_000
@@ -69,6 +73,7 @@ interface SupervisionBridge {
     sessionId: string
   }): Promise<{ lastViewedAt: number | null; entries: FeedEntry[] }>
   precheckBackpressure?(): Promise<BackpressureDecision | null>
+  getDigest?(payload: { windowMs: number }): Promise<Digest | null>
   producerAction?(payload: {
     workItemId: string
     action: 'approveGate' | 'rejectGate' | 'advancePhase' | 'sendBack'
@@ -146,6 +151,7 @@ export function useSupervision(): UseSupervision {
         setFirings(result.firings)
         setPrecision(result.precision)
       })
+      void transport.getDigest?.({ windowMs: DIGEST_WINDOW_MINUTES * 60_000 }).then(setDigest)
       void transport.precheckBackpressure?.().then((decision) =>
         // Shown only while it would actually refuse a start.
         setBackpressure(decision !== null && decision.allowed ? null : decision)
@@ -189,7 +195,14 @@ export function useSupervision(): UseSupervision {
     []
   )
 
+  const [digest, setDigest] = useState<Digest | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+
+  const refreshDigest = useCallback(() => {
+    void bridge()
+      ?.getDigest?.({ windowMs: DIGEST_WINDOW_MINUTES * 60_000 })
+      .then(setDigest)
+  }, [])
 
   // A producer refusing, or not providing the command at all, is reported —
   // never swallowed. A button that silently does nothing is worse than one
@@ -331,6 +344,9 @@ export function useSupervision(): UseSupervision {
     },
 
     feed,
+    digest,
+    digestWindowMinutes: DIGEST_WINDOW_MINUTES,
+    onRefreshDigest: refreshDigest,
     mutedSessions: muted,
     onReply: (sessionId, message) => {
       void bridge()?.replyToSession?.({ sessionId, message })

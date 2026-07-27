@@ -666,6 +666,10 @@ that lane is flagged as needing a rebase or a re-run.
 
 Single-repository work renders as one row with none of this.
 
+The **Feed** tab opens with a progress digest covering the last hour. Routine
+progress never interrupts you — it is batched here and read when you choose to.
+Anything that actually needs you appears in **Needs you** instead.
+
 ### Work items
 
 Work items reach the console through a directory the console owns. Any producer
