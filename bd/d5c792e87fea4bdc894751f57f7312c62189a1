@@ -1,0 +1,325 @@
+tests/integration/supervision/no-extensions.spec.ts
+  s_5f98598a6d950e::t_326edfceddec5d 1-73
+src/main/supervision/feed/feed-reply.ts
+  s_5f98598a6d950e::t_42e3380e2b1b2d 1-54
+src/main/supervision/agent-runtime/hooks.ts
+  s_5f98598a6d950e::t_ea413de7917b56 1-43
+tests/unit/main/supervision/state/session-metrics.spec.ts
+  s_5f98598a6d950e::t_6f0907f9232b1d 5-6,86-140
+  s_5f98598a6d950e::t_a8860c9a2da268 1-4,7-85,141-142
+src/main/supervision/workitems/compose-agent-prompt.ts
+  s_5f98598a6d950e::t_5bb9a2e49647b0 1-56
+src/main/supervision/review/hunk-decisions.ts
+  s_5f98598a6d950e::t_dd7e7e7d34c543 1-77
+src/main/supervision/feed/feed-log.ts
+  s_5f98598a6d950e::t_500944b39f7a3b 1-61,63-75
+  s_5f98598a6d950e::t_f2101a9eb6d1a5 62
+src/main/supervision/stall/stall-scheduler.ts
+  s_5f98598a6d950e::t_b5561680638703 1-6
+  s_5f98598a6d950e::t_f277db57800bcc 7-91
+tests/unit/main/supervision/events/event-bus.spec.ts
+  s_5f98598a6d950e::t_9b3b0c4180e3b6 86-91,95-98
+  s_5f98598a6d950e::t_dc3020f4582c62 1-85,99-109
+  s_5f98598a6d950e::t_3e451201a8377f 92-94
+tests/unit/main/supervision/workitems/gates-and-commands.spec.ts
+  s_5f98598a6d950e::t_1f45d9ed282338 1-19,29-142
+  s_5f98598a6d950e::t_f2101a9eb6d1a5 20-28
+tests/unit/main/supervision/autonomy/autonomy-ladder.spec.ts
+  s_5f98598a6d950e::t_e523a20a5212cd 1-112,122-124
+  s_5f98598a6d950e::t_aeb92a2864ef2d 113-121
+tests/unit/main/supervision/feed/feed-log.spec.ts
+  s_5f98598a6d950e::t_f2101a9eb6d1a5 13-18
+  s_5f98598a6d950e::t_cd9b852b99dbeb 1-12,19-114
+src/main/supervision/worktree/archive.ts
+  s_5f98598a6d950e::t_8323952f961a21 1-7,9-24
+  s_5f98598a6d950e::t_63f2a8f173a19d 8
+src/main/supervision/lanes/lane-coordination.ts
+  s_5f98598a6d950e::t_e9d5791680a884 1-27,31-100
+  s_5f98598a6d950e::t_f2101a9eb6d1a5 28-30
+tests/unit/main/supervision/agent-runtime/permission-bridge.spec.ts
+  s_5f98598a6d950e::t_a799057c06255a 1-161
+src/main/supervision/stall/firing-log.ts
+  s_5f98598a6d950e::t_5398cc8332c42a 1-100
+tests/unit/main/supervision/supervision-service.spec.ts
+  s_5f98598a6d950e::t_ef0860790801ef 598
+  s_5f98598a6d950e::t_4e8e7691a62720 21-28,45
+  s_5f98598a6d950e::t_21db6c54ec1452 500-503,505-526,528-587
+  s_5f98598a6d950e::t_a9fe7fd2224151 400-404,406-499
+  s_5f98598a6d950e::t_f7e0bc07734196 588-597,599-677
+  s_5f98598a6d950e::t_f064a635f1ca32 1-20,29-44,46-48,59-63,66-95,97-108,110-126,128-164,167-221,223-239
+  s_5f98598a6d950e::t_e1f180e8feb1eb 240-243,245-302,304-336
+  s_5f98598a6d950e::t_cefb9467ba4636 49-58,64-65,96,109,127,165-166,222,244,303,353,405,504,527
+  s_5f98598a6d950e::t_ecca3b12631c22 337-352,354-399
+tests/unit/main/supervision/remaining-main.spec.ts
+  s_5f98598a6d950e::t_54a93b890663a1 1-186
+tests/unit/main/supervision/worktree/setup-runner.spec.ts
+  s_5f98598a6d950e::t_ba3f783a05ff56 1-54,60-98
+  s_5f98598a6d950e::t_63f2a8f173a19d 55-59
+tests/unit/main/supervision/worktree/repo-config.spec.ts
+  s_5f98598a6d950e::t_56e6dd67e3bad7 1-111
+src/main/supervision/agent-runtime/driver.ts
+  s_5f98598a6d950e::t_aa69c1a116aa7f 36,38-39,47
+  s_5f98598a6d950e::t_476f217e8302a3 79-105,108,113,115-116
+  s_5f98598a6d950e::t_4635bfd4eb9a59 1-35,37,40-46,48-78,106-107,109-112,114,117-127
+tests/unit/main/supervision/service-wiring.spec.ts
+  s_5f98598a6d950e::t_52def7e5e16fd3 1-259,274,276-333
+  s_5f98598a6d950e::t_ebdf26588ab377 260-273,275
+src/main/supervision/query/entity-index.ts
+  s_5f98598a6d950e::t_489437a806ec7a 1,43,58
+  s_5f98598a6d950e::t_912aea1ba56312 2-42,44-57,59-68
+tests/unit/main/supervision/workitems/publication-watcher.spec.ts
+  s_5f98598a6d950e::t_cd55a93a3055f7 1-12,22-142,146,154-168
+  s_5f98598a6d950e::t_160711b28ea308 13-21,143-145,147-153
+src/main/supervision/worktree/port-allocator.ts
+  s_5f98598a6d950e::t_c1b9c63500c59a 1-66
+tests/unit/main/supervision/review/parse-hunks.spec.ts
+  s_5f98598a6d950e::t_96c543d1519471 1-67
+src/main/supervision/worktree/editor-handoff.ts
+  s_5f98598a6d950e::t_1527152a11fddd 1-39
+src/main/supervision/review/review-queue.ts
+  s_5f98598a6d950e::t_70ec087c5ed09c 1-95
+tests/unit/main/supervision/worktree/materialize.spec.ts
+  s_5f98598a6d950e::t_30c3efeb41a475 1,11-96
+  s_5f98598a6d950e::t_c2426c3283dbcb 97-145
+  s_5f98598a6d950e::t_63f2a8f173a19d 2-10
+src/main/supervision/review/backpressure.ts
+  s_5f98598a6d950e::t_a1e06c71fa0988 1-67
+tests/unit/main/supervision/state/state-machine.spec.ts
+  s_5f98598a6d950e::t_798b6d858a375d 186-193,203-206
+  s_5f98598a6d950e::t_056ad0f8702c48 1-185,194-202,207-274
+src/main/supervision/review/risk-grader.ts
+  s_5f98598a6d950e::t_50a828157900b1 35-36
+  s_5f98598a6d950e::t_3d83f5b5922eb4 1-34,37-38,60-61,63-101
+  s_5f98598a6d950e::t_8afd9014dcfb40 39-59,62
+tests/unit/main/supervision/worktree/archive-and-handoff.spec.ts
+  s_5f98598a6d950e::t_e1bea01e41a8e0 1-75
+src/main/supervision/feed/milestone-summary.ts
+  s_5f98598a6d950e::t_8ee25d91d7c208 10
+  s_5f98598a6d950e::t_8def53043d0cb7 1-9,11-122
+src/main/supervision/agent-runtime/permission-bridge.ts
+  s_5f98598a6d950e::t_863f560b22a0f8 108-109,113,116,125,129,131
+  s_5f98598a6d950e::t_3f4bc874b6f275 69-74
+  s_5f98598a6d950e::t_91a70e9e9e7d4f 1-68,75-107,110-112,114-115,117-124,126-128,130,132-135
+tests/unit/ipc/supervision.ipc.spec.ts
+  s_5f98598a6d950e::t_8c456f01e03886 109-199
+  s_5f98598a6d950e::t_12989138737388 200-221,228-231,235-259,263-466,470-639
+  s_5f98598a6d950e::t_ba8fbc1d4f46b0 222-227,232-234,260-262,467-469
+  s_5f98598a6d950e::t_77b6fa9fb69ca4 69-75,80-82,88-90,97-104
+  s_5f98598a6d950e::t_5cccf5be790ec7 1-68,76-79,83-87,91-96,105-108
+src/shared/schemas/supervision.ts
+  s_5f98598a6d950e::t_79f35b27a2d15c 46
+  s_5f98598a6d950e::t_cf3ef418cf5222 1-45,47-73
+tests/unit/main/supervision/state/reconcile.spec.ts
+  s_5f98598a6d950e::t_a8293295dd7963 1-72
+tests/unit/main/supervision/state/session-registry.spec.ts
+  s_5f98598a6d950e::t_798b6d858a375d 45-50
+  s_5f98598a6d950e::t_cdef183f166738 1-44,51-184
+tests/unit/main/supervision/agent-runtime/hooks.spec.ts
+  s_5f98598a6d950e::t_fac4f5435bf3e5 1-117
+src/main/supervision/state/session-registry.ts
+  s_5f98598a6d950e::t_79f35b27a2d15c 90
+  s_5f98598a6d950e::t_bfce96cb0ce4db 1-89,91-150
+tests/unit/main/supervision/agent-runtime/driver.spec.ts
+  s_5f98598a6d950e::t_df8507759e6ef5 1-69,71-79,81-86,88-104,106-108,134-137,155-157,168-188
+  s_5f98598a6d950e::t_c259ac582bc8d5 146
+  s_5f98598a6d950e::t_77d2e5640a4e91 70,80,87,105,109-133
+  s_5f98598a6d950e::t_335fdb270b1cb3 138-145,147-154,158-167
+src/main/codehost/codehost-client.ts
+  s_5f98598a6d950e::t_423fdc10eaffa8 1-114
+tests/unit/main/supervision/assign-agent.spec.ts
+  s_5f98598a6d950e::t_645a435928109c 1
+  s_5f98598a6d950e::t_4e8e7691a62720 65-72,93
+  s_5f98598a6d950e::t_339696e9e9f9ca 258-318,358-359
+  s_5f98598a6d950e::t_63ba849d7522c1 29-59,127,129,226,319-357
+  s_5f98598a6d950e::t_88758d5c8f0aa3 223-225,227-257
+  s_5f98598a6d950e::t_76ede057be7f95 2-28,60-64,73-92,94-126,128,130-222
+src/main/supervision/worktree/setup-runner.ts
+  s_5f98598a6d950e::t_12853cad2be340 1-86
+src/main/supervision/agent-runtime/transcript-tailer.ts
+  s_5f98598a6d950e::t_bfde0475905ef4 1-95
+src/main/supervision/assign-agent.ts
+  s_5f98598a6d950e::t_b6e93cc7e3b722 44-51
+  s_5f98598a6d950e::t_85ddd91504e230 1-43,52-134
+tests/integration/supervision/runtime-upgrade.spec.ts
+  s_5f98598a6d950e::t_d0602f594c492c 1-16,20-24,26-43,45-60
+  s_5f98598a6d950e::t_8ee25d91d7c208 17-19,25,44
+src/main/supervision/worktree/repo-config.ts
+  s_5f98598a6d950e::t_d0fe3e7abaa11c 14
+  s_5f98598a6d950e::t_a63e4a58f3ad21 44-46
+  s_5f98598a6d950e::t_86bc91a36e6cda 27,34,40,49,54
+  s_5f98598a6d950e::t_b5d54a707af75c 1-13,15,19-26,28-33,35-39,41-43,47-48,50-53,55-80
+  s_5f98598a6d950e::t_642a06cf0f4fd5 16-18
+src/main/supervision/agent-runtime/to-session-event.ts
+  s_5f98598a6d950e::t_995a14e73ba94d 1-115
+src/main/supervision/review/parse-hunks.ts
+  s_5f98598a6d950e::t_55ca292dc11e2d 1-29,38-59
+  s_5f98598a6d950e::t_8cf4970f010666 30-37
+src/main/supervision/workitems/producer-commands.ts
+  s_5f98598a6d950e::t_c8957a2ddb8000 1-90
+src/main/supervision/workitems/gates.ts
+  s_5f98598a6d950e::t_d0fe3e7abaa11c 10
+  s_5f98598a6d950e::t_6101383aceab1b 1-9,11-45
+tests/unit/main/supervision/workitems/contract-schema.spec.ts
+  s_5f98598a6d950e::t_de865131482ddb 95-97
+  s_5f98598a6d950e::t_013b73632c2f5f 98-106
+  s_5f98598a6d950e::t_ec5f07d43e7702 1-94,107-115,117-122
+  s_5f98598a6d950e::t_3fb1ab1d7a3967 116
+tests/unit/main/supervision/review/backpressure.spec.ts
+  s_5f98598a6d950e::t_54a14a1bce9420 1-87
+  s_5f98598a6d950e::t_c2426c3283dbcb 88-99
+tests/unit/main/supervision/review/merge-policy.spec.ts
+  s_5f98598a6d950e::t_396e6d992dffc7 1-103
+src/main/supervision/workitems/lane-bindings.ts
+  s_5f98598a6d950e::t_ca09bd5bea1b52 1-81
+tests/unit/main/supervision/worktree/port-allocator.spec.ts
+  s_5f98598a6d950e::t_6623629213f817 1,6-54,59-64,66-107,109,128-129
+  s_5f98598a6d950e::t_aeb92a2864ef2d 2-5,108
+  s_5f98598a6d950e::t_154e024cc67025 55-58,65,110-127
+tests/unit/main/supervision/lanes/lane-coordination.spec.ts
+  s_5f98598a6d950e::t_f88960502250eb 1-150
+src/main/supervision/storage/jsonl-log.ts
+  s_5f98598a6d950e::t_ddc38910e20679 11-43,59-62,68-85
+  s_5f98598a6d950e::t_d223cacab9c2c3 44-58
+  s_5f98598a6d950e::t_77b6fa9fb69ca4 1-10
+  s_5f98598a6d950e::t_2c3f2e377c73ff 63-67
+tests/unit/main/supervision/review/risk-grader.spec.ts
+  s_5f98598a6d950e::t_a6726990722487 1-3,5-47,51-92,96-102,104-118,135-136
+  s_5f98598a6d950e::t_50a828157900b1 48-50,93-95,103
+  s_5f98598a6d950e::t_8afd9014dcfb40 4,119-134
+src/main/supervision/supervision-service.ts
+  s_5f98598a6d950e::t_ef0860790801ef 66,206,209,319,325,331
+  s_5f98598a6d950e::t_f3ec63cc8e91d4 13-15,115-122,253-254,326-330,332-335,450-465,467-480
+  s_5f98598a6d950e::t_155b23455242fc 42,45,59-62,87-89,211,215,217-223,225-227,264-274,282-283,291-309,311-315,320-322,345-351,353-354,356-360,376-378
+  s_5f98598a6d950e::t_3d5a935b051e6a 212-214,216,224,228-234,243-250
+  s_5f98598a6d950e::t_b5561680638703 3-7,139
+  s_5f98598a6d950e::t_447be4e8eeef2a 102-105,108-110,168-173,183-189,492
+  s_5f98598a6d950e::t_ecca3b12631c22 63-64,67,207
+  s_5f98598a6d950e::t_6e2128d340b5ab 43,90,362,379-382,390,496-497
+  s_5f98598a6d950e::t_ed6f7987742a19 34-35
+  s_5f98598a6d950e::t_1bc900f8bb5239 12,16-21,94-101,106-107,111-114,391-449,482-483
+  s_5f98598a6d950e::t_acfe45e05d3141 1-2,8-11,22-24,46-57,68-81,131-138,140-166,174-182,190-194,196-198,275-281,284-290,310,361,363-370,487-489,495,498
+  s_5f98598a6d950e::t_4444801211418b 44,91-93,123-128,235-242,251-252,255-263,383-389,484
+  s_5f98598a6d950e::t_a63e4a58f3ad21 316-318
+  s_5f98598a6d950e::t_a5a7df6bc1b2eb 25-33,58,82-86,129-130,167,195,199-205,210,371-375,485-486,490-491,493-494
+  s_5f98598a6d950e::t_8ee25d91d7c208 36-40
+  s_5f98598a6d950e::t_96c543d1519471 343-344,466,481
+  s_5f98598a6d950e::t_095c142c2cfb47 41,65,208,323-324,336-342,352,355
+src/main/supervision/worktree/materialize.ts
+  s_5f98598a6d950e::t_ed33ed3ca8978a 1-86
+tests/integration/supervision/session-lifecycle.spec.ts
+  s_5f98598a6d950e::t_f1c3113d1e474c 96-99
+  s_5f98598a6d950e::t_390769748372f3 1-22,31-44,46-95,100-329
+  s_5f98598a6d950e::t_4e8e7691a62720 23-30,45
+tests/unit/main/supervision/stall/evaluate-stall.spec.ts
+  s_5f98598a6d950e::t_52f7178189b772 1-48,50-94,100-173
+  s_5f98598a6d950e::t_6218eaf1e0446c 95-99
+  s_5f98598a6d950e::t_50a828157900b1 49
+tests/unit/main/supervision/feed-reply-and-summary.spec.ts
+  s_5f98598a6d950e::t_8ee25d91d7c208 103-109,202-204
+  s_5f98598a6d950e::t_0f0c919bf0f49c 1-102,110-201,205-246
+  s_5f98598a6d950e::t_09eca1fde889e1 316-347
+  s_5f98598a6d950e::t_51f75c026dcb4b 247-315
+src/main/supervision/autonomy/autonomy-ladder.ts
+  s_5f98598a6d950e::t_caa6fa3efc1450 1-109
+tests/unit/main/supervision/stall/surface-stall.spec.ts
+  s_5f98598a6d950e::t_88b27e96cfa31c 1-117
+tests/integration/supervision/success-criteria.spec.ts
+  s_5f98598a6d950e::t_196e073fd4d70e 1-5,10-30,39-50,52-128,132-287
+  s_5f98598a6d950e::t_756760f65b2ce8 6-9,129-131
+  s_5f98598a6d950e::t_4e8e7691a62720 31-38,51
+src/main/supervision/events/event-bus.ts
+  s_5f98598a6d950e::t_e68cf4e708dccc 1-50
+tests/unit/main/supervision/worktree/provisioner.spec.ts
+  s_5f98598a6d950e::t_afc458f336a591 1-55,61-166
+  s_5f98598a6d950e::t_63f2a8f173a19d 56-60
+tests/unit/main/supervision/stall/stall-scheduler.spec.ts
+  s_5f98598a6d950e::t_bd372a4ca4d747 1-143
+tests/unit/main/supervision/events/session-event.spec.ts
+  s_5f98598a6d950e::t_b2f656e6047aa9 1-106
+src/shared/supervision/rank-attention.ts
+  s_5f98598a6d950e::t_14ca22ee385656 2-88
+  s_5f98598a6d950e::t_b5561680638703 1
+src/shared/supervision/view-types.ts
+  s_5f98598a6d950e::t_38d7276d764dd3 1-154
+src/main/supervision/state/state-machine.ts
+  s_5f98598a6d950e::t_798b6d858a375d 2-6
+  s_5f98598a6d950e::t_ec88213b164828 1,7-137
+tests/unit/main/supervision/storage/jsonl-log.spec.ts
+  s_5f98598a6d950e::t_20fd5227a38bf5 1-119
+src/main/supervision/state/reconcile.ts
+  s_5f98598a6d950e::t_798b6d858a375d 14
+  s_5f98598a6d950e::t_4aa85fa1c5ca0f 1-13,15-41
+tests/unit/main/supervision/review/review-queue.spec.ts
+  s_5f98598a6d950e::t_f2101a9eb6d1a5 163-167
+  s_5f98598a6d950e::t_004da59e525c60 1-162,168-186
+src/main/supervision/review/merge-policy.ts
+  s_5f98598a6d950e::t_3e255811c69ad9 1-93
+src/main/supervision/workitems/publication-watcher.ts
+  s_5f98598a6d950e::t_e3a2fbe36d2053 1-44,51-133,136-137,148-152,154-157
+  s_5f98598a6d950e::t_53cd0fef2bde99 45-50,134-135,138-147,153
+src/main/supervision/stall/surface-stall.ts
+  s_5f98598a6d950e::t_b577652ec1ff4e 1-83
+tests/unit/main/supervision/agent-runtime/to-session-event.spec.ts
+  s_5f98598a6d950e::t_b9c9888d8296d8 1-122
+src/main/supervision/stall/evaluate-stall.ts
+  s_5f98598a6d950e::t_7b5b00a03c843b 1-112
+src/main/ipc/supervision.ipc.ts
+  s_5f98598a6d950e::t_f9e2b5682c1077 72-75
+  s_5f98598a6d950e::t_69a3b6e47d9c1e 1-14,39-48,87-99,141-149,317-318
+  s_5f98598a6d950e::t_326ea7455cb3a3 15-20,49-60,100-108,136-140,150-194,205
+  s_5f98598a6d950e::t_8bce7f106f89aa 21-27,61-71,109-114,195-204,206-229,292,307-316
+  s_5f98598a6d950e::t_20f6e21d736925 76-83
+  s_5f98598a6d950e::t_c49dde6a4de19d 28-35,115-121,230-291
+  s_5f98598a6d950e::t_b6e93cc7e3b722 36-38,84-86,122-135,293-304,306
+  s_5f98598a6d950e::t_3200643e9c596d 305
+src/main/supervision/workitems/intake.ts
+  s_5f98598a6d950e::t_f94ed76ff74aaa 61,69-72
+  s_5f98598a6d950e::t_c2d484723fd1d8 1-60,62-68,73-86
+tests/unit/main/supervision/workitems/lane-bindings.spec.ts
+  s_5f98598a6d950e::t_792a00715896c7 1
+  s_5f98598a6d950e::t_b7c722cdf41277 2-119
+tests/unit/main/supervision/stall/firing-log.spec.ts
+  s_5f98598a6d950e::t_3f7961ca7414f8 1-134
+tests/unit/main/supervision/agent-runtime/transcript-tailer.spec.ts
+  s_5f98598a6d950e::t_49aba16e9f04c6 168-228
+  s_5f98598a6d950e::t_823f54e100f307 1-167
+src/shared/types/supervision.ts
+  s_5f98598a6d950e::t_0893927f0d8ead 1-57,64-80
+  s_5f98598a6d950e::t_79f35b27a2d15c 58-63
+tests/unit/main/supervision/final-gaps.spec.ts
+  s_5f98598a6d950e::t_32b7bb6529f7be 1-204
+src/main/supervision/events/session-event.ts
+  s_5f98598a6d950e::t_1c95c38d6f6e99 1-111
+src/main/supervision/workitems/contract-schema.ts
+  s_5f98598a6d950e::t_3fb1ab1d7a3967 41,64
+  s_5f98598a6d950e::t_39e7a2cd3c565b 1-16,18-26,28-33,35-40,42-63,65-105
+  s_5f98598a6d950e::t_d0fe3e7abaa11c 17,27,34
+src/main/supervision/feed/digest.ts
+  s_5f98598a6d950e::t_e34f4f550cb857 1-73
+src/main/supervision/state/session-metrics.ts
+  s_5f98598a6d950e::t_095c142c2cfb47 42-72
+  s_5f98598a6d950e::t_e24318c319162d 1-41,73-89
+src/main/codehost/check-status.ts
+  s_5f98598a6d950e::t_15297ddbc9219b 1-75
+src/main/supervision/worktree/provisioner.ts
+  s_5f98598a6d950e::t_707d0200e1fc9e 1-65,72-81,89-136
+  s_5f98598a6d950e::t_63f2a8f173a19d 66-71,82-88
+src/main/supervision/review/intent-diff.ts
+  s_5f98598a6d950e::t_9582972fadd6a4 1-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "bdd5c792e87fea4bdc894751f57f7312c62189a1",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
