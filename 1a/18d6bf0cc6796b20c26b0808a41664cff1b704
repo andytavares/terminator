@@ -1,0 +1,29 @@
+tests/unit/renderer/supervision/worktree-reclaim.spec.tsx
+  s_5f98598a6d950e::t_1d4fdca2281a34 37-44,46-50
+src/renderer/components/supervision/WorktreeReclaim.tsx
+  s_5f98598a6d950e::t_96dcfe9025ad0d 14,33,105-107
+tests/unit/main/supervision/worktree/reclaim.spec.ts
+  s_5f98598a6d950e::t_37f56f47aac449 124-168
+src/main/supervision/worktree/reclaim.ts
+  s_5f98598a6d950e::t_e5429cb8063d57 1,35-48,77,81
+  s_5f98598a6d950e::t_96dcfe9025ad0d 14,21-23,96-109
+  s_5f98598a6d950e::t_c3f8902d06cb8d 110-113
+SUPERVISION.md
+  s_5f98598a6d950e::t_f4b315d6474cda 365-367,373-376
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "1a18d6bf0cc6796b20c26b0808a41664cff1b704",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
