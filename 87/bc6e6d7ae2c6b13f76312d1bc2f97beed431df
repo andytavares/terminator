@@ -1,0 +1,54 @@
+tests/unit/renderer/hooks/useSupervision.spec.tsx
+  s_5f98598a6d950e::t_e2eab271db8c4d 94,479-547,552-584
+  s_5f98598a6d950e::t_8b0f9ace3b182f 548-551
+  s_5f98598a6d950e::t_e4397d58bb73b9 585
+src/renderer/components/supervision/SupervisionScreen.tsx
+  s_5f98598a6d950e::t_f248b5595970e5 66-72,224-229
+tests/unit/renderer/supervision/surfaces.spec.tsx
+  s_5f98598a6d950e::t_f98c9409311754 495-505,550,564,578
+  s_5f98598a6d950e::t_018d9f35d279b0 533-542,883-1029
+  s_5f98598a6d950e::t_c246c270ccf4a6 1030
+tests/unit/main/supervision/service-wiring.spec.ts
+  s_5f98598a6d950e::t_dfaa87c7d16904 2,334-395
+  s_5f98598a6d950e::t_14c33f976b2f2a 396
+docs/user-guide/USER-GUIDE.md
+  s_5f98598a6d950e::t_fd333bb1b29a3f 683-689
+src/main/supervision/supervision-service.ts
+  s_5f98598a6d950e::t_7d38fc7a021d03 28-33
+  s_5f98598a6d950e::t_660d100b096721 120-129,467-472
+  s_5f98598a6d950e::t_55f3eec42c6622 473-474
+src/main/index.ts
+  s_5f98598a6d950e::t_4f787b4b1632db 461-466
+src/renderer/components/supervision/WorkItemBoard.tsx
+  s_5f98598a6d950e::t_ded28d3d3dd26a 1-12,43-122,182-187,201-212,243-244,255-267
+tests/unit/ipc/supervision.ipc.spec.ts
+  s_5f98598a6d950e::t_018d9f35d279b0 655-659
+  s_5f98598a6d950e::t_8b09cdd36ca68b 242,641-654,660-707
+  s_5f98598a6d950e::t_b9c67908ffe02a 708
+docs/EXTENSION-DEVELOPMENT.md
+  s_5f98598a6d950e::t_8dab8aeed72cdb 1109-1116
+src/main/ipc/supervision.ipc.ts
+  s_5f98598a6d950e::t_018d9f35d279b0 325-329
+  s_5f98598a6d950e::t_59502f9999c410 39,88-92,142-148,321-324,330-333
+  s_5f98598a6d950e::t_eb2812edfd70a8 334-335
+src/renderer/hooks/useSupervision.ts
+  s_5f98598a6d950e::t_606c3bea2d2a3d 72-76,192-214,298-314
+src/shared/electron-api/manifest.ts
+  s_5f98598a6d950e::t_59502f9999c410 615-620
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "87bc6e6d7ae2c6b13f76312d1bc2f97beed431df",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
