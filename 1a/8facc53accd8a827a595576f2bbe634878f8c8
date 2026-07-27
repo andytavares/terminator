@@ -1,0 +1,172 @@
+specs/018-tav-10/.pilot/state.json
+  s_5f98598a6d950e::t_d38ea5007f36a9 14-15
+tests/unit/main/codehost/check-status.spec.ts
+  s_5f98598a6d950e::t_3f025457f1ae26 1-87
+tests/unit/shared/schemas/supervision.spec.ts
+  s_5f98598a6d950e::t_6e8e0a426a3c7e 1-86,90-120
+  s_5f98598a6d950e::t_77b6fa9fb69ca4 87-89
+  s_5f98598a6d950e::t_79f35b27a2d15c 121-153
+specs/023-tav-12/.pilot/card.json
+  s_5f98598a6d950e::t_72b1a77ed65f90 10
+  s_5f98598a6d950e::t_d38ea5007f36a9 1-9
+packages/extension-sdk/package.json
+  s_5f98598a6d950e::t_790fcd8c3a86b3 3
+specs/022-tav-13/.pilot/card.json
+  s_5f98598a6d950e::t_72b1a77ed65f90 10
+  s_5f98598a6d950e::t_d38ea5007f36a9 1-9
+specs/024-tav-11/.pilot/card.json
+  s_5f98598a6d950e::t_72b1a77ed65f90 10
+  s_5f98598a6d950e::t_d38ea5007f36a9 1-9
+extensions/notepad/package.json
+  s_5f98598a6d950e::t_87cebb3f611125 32
+tests/e2e/supervision-attention.spec.ts
+  s_5f98598a6d950e::t_f495082ce13eb1 1-50
+specs/025-tav-8/.pilot/card.json
+  s_5f98598a6d950e::t_72b1a77ed65f90 10
+  s_5f98598a6d950e::t_d38ea5007f36a9 1-9
+.eslintrc.json
+  s_5f98598a6d950e::t_e233862aff9bd7 22-23,25-30,32-39,41,43
+  s_5f98598a6d950e::t_0221bd1aac2941 42,50-53,59
+  s_5f98598a6d950e::t_e9f5f2efe022b5 24,31,40
+extensions/git-integration/package.json
+  s_5f98598a6d950e::t_87cebb3f611125 20
+specs/020-tav-9/.pilot/state.json
+  s_5f98598a6d950e::t_d38ea5007f36a9 14-15
+tests/unit/storage/workspace-store.spec.ts
+  s_5f98598a6d950e::t_364b52d073e34b 124,150,194,263
+docs/user-guide/USER-GUIDE.md
+  s_5f98598a6d950e::t_a42adcc99e9c72 538-547,571-576,618-630,639-642,644
+  s_5f98598a6d950e::t_0dd87ea6dbd5c3 523-537,548-570,577-617,631-638,643,645-682
+docs/EXTENSION-DEVELOPMENT.md
+  s_5f98598a6d950e::t_a42adcc99e9c72 1024-1143
+specs/025-tav-8/.pilot/state.json
+  s_5f98598a6d950e::t_d38ea5007f36a9 1-36,38-48,50-60,62-102,104-138,140-214,216-230
+  s_5f98598a6d950e::t_72b1a77ed65f90 37,49,61,103,139,215,231
+.claude/skills/speckit-implement/SKILL.md
+  s_5f98598a6d950e::t_4a84e50b83180b 1-226
+specs/026-tav-7/.pilot/card.json
+  s_5f98598a6d950e::t_d38ea5007f36a9 1-9
+  s_5f98598a6d950e::t_72b1a77ed65f90 10
+specs/027-tav-6/.pilot/state.json
+  s_5f98598a6d950e::t_72b1a77ed65f90 37,49,61,103,139,215,231
+  s_5f98598a6d950e::t_d38ea5007f36a9 1-36,38-48,50-60,62-102,104-138,140-214,216-230
+tests/unit/storage/supervision-store.spec.ts
+  s_5f98598a6d950e::t_51a56c80c6942c 1-54
+.claude/skills/speckit-specify/SKILL.md
+  s_5f98598a6d950e::t_4a84e50b83180b 1-348
+specs/022-tav-13/.pilot/state.json
+  s_5f98598a6d950e::t_d38ea5007f36a9 1-36,38-48,50-60,62-102,104-216,218-232
+  s_5f98598a6d950e::t_72b1a77ed65f90 37,49,61,103,217,233
+.claude/skills/speckit-constitution/SKILL.md
+  s_5f98598a6d950e::t_4a84e50b83180b 1-159
+.claude/skills/speckit-plan/SKILL.md
+  s_5f98598a6d950e::t_4a84e50b83180b 1-173
+specs/024-tav-11/.pilot/state.json
+  s_5f98598a6d950e::t_d38ea5007f36a9 1-36,38-48,50-60,62-102,104-216,218-232
+  s_5f98598a6d950e::t_72b1a77ed65f90 37,49,61,103,217,233
+extensions/remote-control/package.json
+  s_5f98598a6d950e::t_87cebb3f611125 17
+.claude/skills/speckit-tasks/SKILL.md
+  s_5f98598a6d950e::t_4a84e50b83180b 1-217
+.claude/skills/speckit-analyze/SKILL.md
+  s_5f98598a6d950e::t_4a84e50b83180b 1-262
+.claude/skills/speckit-converge/SKILL.md
+  s_5f98598a6d950e::t_4a84e50b83180b 1-279
+.specify/integrations/claude.manifest.json
+  s_5f98598a6d950e::t_4a84e50b83180b 4
+.claude/skills/speckit-taskstoissues/SKILL.md
+  s_5f98598a6d950e::t_4a84e50b83180b 1-112
+extensions/task-vault/package.json
+  s_5f98598a6d950e::t_87cebb3f611125 17
+extensions/notepad/tests/unit/ipc/comments.ipc.spec.ts
+  s_5f98598a6d950e::t_364b52d073e34b 50
+src/main/index.ts
+  s_5f98598a6d950e::t_5df91b0c9af2ca 307-320,325-328,374
+  s_5f98598a6d950e::t_a58321e31944c2 447-449
+  s_5f98598a6d950e::t_ed6e37bfdbecd8 18,321-324,329-336,370-373
+  s_5f98598a6d950e::t_f9e2b5682c1077 416-417
+  s_5f98598a6d950e::t_41d2fa2e10b95f 17
+  s_5f98598a6d950e::t_4444801211418b 22-23,440-446,450-451,456,458-486,488-517
+  s_5f98598a6d950e::t_801dac0f607a8b 554
+  s_5f98598a6d950e::t_f3ec63cc8e91d4 487
+  s_5f98598a6d950e::t_3200643e9c596d 518-528
+  s_5f98598a6d950e::t_726a30e0d0e42c 19-21,337-368,410-415,418-439,529-553,555-559
+  s_5f98598a6d950e::t_1baa0535240485 452-455,457
+  s_5f98598a6d950e::t_62284f5f789f0a 369
+  s_5f98598a6d950e::t_943f7886e1e338 15-16
+extensions/notepad/tests/unit/ipc/export.ipc.spec.ts
+  s_5f98598a6d950e::t_364b52d073e34b 54,123,134
+README.md
+  s_5f98598a6d950e::t_78d8e62fae2bc5 19
+specs/026-tav-7/.pilot/state.json
+  s_5f98598a6d950e::t_d38ea5007f36a9 1-36,38-48,50-60,62-102,104-138,140-214,216-230
+  s_5f98598a6d950e::t_72b1a77ed65f90 37,49,61,103,139,215,231
+tests/unit/shared/supervision/rank-attention.spec.ts
+  s_5f98598a6d950e::t_2aa67347ded747 142-149
+  s_5f98598a6d950e::t_14ca22ee385656 1-141
+src/main/storage/supervision-store.ts
+  s_5f98598a6d950e::t_ed6e37bfdbecd8 14-15,25
+  s_5f98598a6d950e::t_801dac0f607a8b 17,26
+  s_5f98598a6d950e::t_fc50b45ad1947b 1-13,18-24,27-28
+  s_5f98598a6d950e::t_51a56c80c6942c 16
+specs/027-tav-6/.pilot/card.json
+  s_5f98598a6d950e::t_d38ea5007f36a9 1-9
+  s_5f98598a6d950e::t_72b1a77ed65f90 10
+tests/unit/config/eslint-boundaries.spec.ts
+  s_5f98598a6d950e::t_77b6fa9fb69ca4 29-30
+  s_5f98598a6d950e::t_56e97aad32fd08 1-2,5-28,31-56,94-95,101-120
+  s_5f98598a6d950e::t_543e5cccb0178d 3-4,57-93,96-100
+package.json
+  s_5f98598a6d950e::t_87cebb3f611125 66
+  s_5f98598a6d950e::t_dce114556f3f9d 47
+scripts/build-extensions.cjs
+  s_5f98598a6d950e::t_d2f130f94f52fa 50-56
+extensions/speckit-pilot/src/schemas/speckit.schemas.ts
+  s_5f98598a6d950e::t_622cee521f18ca 88,147,161,169
+  s_5f98598a6d950e::t_e9cdddc7f95755 273
+.claude/skills/speckit-checklist/SKILL.md
+  s_5f98598a6d950e::t_4a84e50b83180b 1-376
+.claude/skills/speckit-clarify/SKILL.md
+  s_5f98598a6d950e::t_4a84e50b83180b 1-288
+extensions/speckit-pilot/package.json
+  s_5f98598a6d950e::t_87cebb3f611125 16-17
+src/shared/electron-api/manifest.ts
+  s_5f98598a6d950e::t_551cf58098a7a4 477,479-482,484-489,494,500
+  s_5f98598a6d950e::t_a94773e53b44a6 502-563
+  s_5f98598a6d950e::t_32ae65869c34fb 475-476,478,483,490-493,495-499,501
+  s_5f98598a6d950e::t_3200643e9c596d 607-614
+  s_5f98598a6d950e::t_995923e0ce9807 564-606
+packages/extension-sdk/types/api.d.ts
+  s_5f98598a6d950e::t_790fcd8c3a86b3 190-243,276-299
+  s_5f98598a6d950e::t_79ac99f3d5690c 300
+tests/unit/extensions/api.spec.ts
+  s_5f98598a6d950e::t_47405079cc324d 82,660-777
+docs/ARCHITECTURE.md
+  s_5f98598a6d950e::t_e6fe5efd7efb76 741-851
+tests/unit/schemas/session.schema.spec.ts
+  s_5f98598a6d950e::t_364b52d073e34b 8-9,72
+specs/023-tav-12/.pilot/state.json
+  s_5f98598a6d950e::t_72b1a77ed65f90 37,49,61,103,217,233
+  s_5f98598a6d950e::t_d38ea5007f36a9 1-36,38-48,50-60,62-102,104-216,218-232
+src/main/extensions/api.ts
+  s_5f98598a6d950e::t_bec9ad389c1579 381-421,730-761
+  s_5f98598a6d950e::t_c7f0c51d0b3bd6 226-246
+package-lock.json
+  s_5f98598a6d950e::t_db2af902d72c5d 14,33,85,115,137,151-152,166,197-346,2454-2466,2837-2926,3422-3428,4485-4525,5361-5416,5579-5588,6059-6068,6076-6095,6103-6120,7188-7194,7434-7443,8100-8109,8117-8139,8157-8247,8394-8400,8541-8562,8649-8668,9294-9303,9375-9377,9380-9384,9388-9391,9541-9560,9934-9940,10207-10216,10349-10363,11337-11363,12148-12157,12426-12438,12629-12638,12706-12716,12805-12814,13208-13221,13263-13279,13320-13366,13922-13938,14181-14234,14266-14285,14563-14573,14585-14587,15215-15221,15275-15334,15566-15575,15681-15690,16730-16732,16738-16747
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "1a8facc53accd8a827a595576f2bbe634878f8c8",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
