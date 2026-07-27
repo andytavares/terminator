@@ -37,7 +37,17 @@ export interface SessionDriver {
   start(options: StartSessionOptions): Promise<void>
   /** Resolves when the run ends. For orderly shutdown and for tests. */
   completion(sessionId: string): Promise<void>
+  /**
+   * Ends the current turn, leaving the session open. A redirect sent after
+   * this reaches the agent — which is the whole point of interrupting rather
+   * than stopping.
+   */
   interrupt(sessionId: string): Promise<void>
+  /**
+   * Ends the run. An optional reason is delivered first, best effort, so the
+   * agent's own record says why it stopped rather than simply ending.
+   */
+  stop(sessionId: string, reason?: string): Promise<void>
   /** Sends a further message to a running session — a reply, or a redirect. */
   send(sessionId: string, message: string): Promise<void>
   resolvePermission(sessionId: string, requestId: string, decision: PermissionDecision): void
@@ -46,6 +56,7 @@ export interface SessionDriver {
 interface RunningSession {
   bridge: PermissionBridge
   interrupt: () => Promise<void>
+  stop: (reason?: string) => Promise<void>
   send: (message: string) => void
   completed: Promise<void>
 }
@@ -173,9 +184,17 @@ export function createSessionDriver(options: SessionDriverOptions): SessionDrive
         bridge,
         completed,
         interrupt: async () => {
+          // The turn only. Closing the stream here would end the session, and
+          // then a redirect sent afterwards would go nowhere — which is what
+          // interrupting is for.
           await run.interrupt?.()
-          // Closing the stream is what actually ends the run: interrupting
-          // stops the current turn, it does not end the session.
+        },
+        stop: async (reason?: string) => {
+          // The reason goes in before the stream closes, so it lands in the
+          // agent's own durable record rather than only in ours.
+          if (reason !== undefined && reason.trim() !== '') prompts.push(reason.trim())
+          await run.interrupt?.()
+          // Closing the stream is what actually ends the run.
           prompts.close()
         },
         send: (message: string) => prompts.push(message),
@@ -193,6 +212,10 @@ export function createSessionDriver(options: SessionDriverOptions): SessionDrive
         throw new Error('this session is no longer running')
       }
       session.send(message)
+    },
+
+    async stop(sessionId: string, reason?: string): Promise<void> {
+      await running.get(sessionId)?.stop(reason)
     },
 
     async interrupt(sessionId: string): Promise<void> {

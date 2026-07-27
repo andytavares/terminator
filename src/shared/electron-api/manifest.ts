@@ -637,6 +637,12 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     remote: 'omit',
   },
   {
+    path: 'supervision.stopSession',
+    kind: 'invoke',
+    channel: 'supervision:stopSession',
+    remote: 'omit',
+  },
+  {
     path: 'supervision.listReclaimable',
     kind: 'invoke',
     channel: 'supervision:listReclaimable',

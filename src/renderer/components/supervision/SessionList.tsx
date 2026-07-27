@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Square, Trash2, ExternalLink } from 'lucide-react'
 import { StateIndicator, formatElapsed } from './StateIndicator.js'
 import type { SupervisedSession } from '../../../shared/types/supervision.js'
@@ -14,8 +14,8 @@ import './supervision.css'
 export interface SessionListProps {
   sessions: readonly SupervisedSession[]
   now: number
-  /** Ends the current turn and the run, keeping the working copy and its diff. */
-  onStop(sessionId: string): void
+  /** Ends the run, keeping the working copy and its diff. */
+  onStop(sessionId: string, reason?: string): void
   /** Ends it and removes the working copy. */
   onDiscard(sessionId: string): void
   onOpen(sessionId: string): void
@@ -40,6 +40,52 @@ function cost(session: SupervisedSession): string {
 function diff(session: SupervisedSession): string | null {
   const { files, added, removed } = session.diffSummary
   return files === 0 ? null : `${files} ${files === 1 ? 'file' : 'files'} +${added} −${removed}`
+}
+
+/**
+ * Stopping, with a reason.
+ *
+ * The reason is optional but offered every time: coming back to a half-finished
+ * diff a day later, "stopped by the operator" tells you nothing and "wrong
+ * branch" tells you everything. It reaches the agent's own record too, not just
+ * ours.
+ */
+function StopControl({ onStop }: { onStop(reason?: string): void }): JSX.Element {
+  const [asking, setAsking] = useState(false)
+  const [reason, setReason] = useState('')
+
+  if (!asking) {
+    return (
+      <button className="sv-queue__btn" onClick={() => setAsking(true)}>
+        <Square aria-hidden="true" /> Stop
+      </button>
+    )
+  }
+
+  const stop = (): void => {
+    onStop(reason.trim() === '' ? undefined : reason.trim())
+    setReason('')
+    setAsking(false)
+  }
+
+  return (
+    <span className="sv-stop">
+      <input
+        aria-label="Why are you stopping it?"
+        placeholder="why? (optional)"
+        value={reason}
+        autoFocus
+        onChange={(event) => setReason(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') stop()
+          if (event.key === 'Escape') setAsking(false)
+        }}
+      />
+      <button className="sv-queue__btn sv-btn--primary" onClick={stop}>
+        <Square aria-hidden="true" /> Stop
+      </button>
+    </span>
+  )
 }
 
 export function SessionList({
@@ -96,9 +142,7 @@ export function SessionList({
             {RUNNING.has(session.runtimeState) && (
               // Stopping keeps the working copy and whatever it changed: you
               // stop an agent to look at what it did, not to lose it.
-              <button className="sv-queue__btn" onClick={() => onStop(session.id)}>
-                <Square aria-hidden="true" /> Stop
-              </button>
+              <StopControl onStop={(reason) => onStop(session.id, reason)} />
             )}
             <button className="sv-queue__btn" onClick={() => onDiscard(session.id)}>
               <Trash2 aria-hidden="true" /> Discard
@@ -109,8 +153,9 @@ export function SessionList({
 
       <div className="sv-form">
         <span className="sv-field__note">
-          Stopping ends the run and keeps the working copy, so you can review what it did.
-          Discarding also removes the working copy and takes the session off the console.
+          Stopping ends the run and keeps the working copy, so you can review what it did. Its
+          reason goes to the agent and into the feed, so a half-finished diff still says why it
+          stopped. Discarding also removes the working copy and takes the session off the console.
         </span>
       </div>
     </div>

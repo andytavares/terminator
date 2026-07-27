@@ -104,6 +104,7 @@ function makeBridge(over: Record<string, unknown> = {}) {
     intake: vi.fn().mockResolvedValue({ ok: true, id: 'FLU-221' }),
     interruptSession: vi.fn().mockResolvedValue({ ok: true, reason: null }),
     discardSession: vi.fn().mockResolvedValue({ ok: true, reason: null }),
+    stopSession: vi.fn().mockResolvedValue({ ok: true, reason: null }),
     listReclaimable: vi
       .fn()
       .mockResolvedValue([
@@ -1070,14 +1071,22 @@ describe('reclaiming working copies', () => {
 })
 
 describe('stopping a running session', () => {
-  it('interrupts it, keeping the working copy and its diff', async () => {
+  it('ends the run and keeps the working copy, saying why', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onStop('s1', 'wrong branch')
+    })
+    expect(bridge.stopSession).toHaveBeenCalledWith({ sessionId: 's1', reason: 'wrong branch' })
+  })
+
+  it('stops without a reason when none was given', async () => {
     const { result } = renderHook(() => useSupervision())
     await waitFor(() => expect(result.current.loaded).toBe(true))
     await act(async () => {
       result.current.screenProps.onStop('s1')
     })
-    // No redirect: you are stopping it, not steering it.
-    expect(bridge.interruptSession).toHaveBeenCalledWith({ sessionId: 's1' })
+    expect(bridge.stopSession).toHaveBeenCalledWith({ sessionId: 's1', reason: undefined })
   })
 
   it('exposes every session, so "what is running" has an answer', async () => {

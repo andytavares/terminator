@@ -871,6 +871,17 @@ hook tells the app shell through options passed to `useSupervision`. An earlier
 cut broadcast `CustomEvent`s on `window` that nothing listened for — a listener
 that does not exist should be a compile error, not silence.
 
+### Interrupting and stopping are different operations
+
+`interrupt` ends the current turn and leaves the prompt stream open, so a
+redirect sent afterwards reaches the agent — that is the whole point of
+interrupting rather than stopping. `stop` pushes its reason onto the stream
+first, then interrupts and closes it, so the reason lands in the agent's own
+record before the run ends.
+
+They were one operation that closed the stream, which meant every
+interrupt-and-redirect delivered its redirect into a closed queue.
+
 ### What a permission request shows
 
 The whole input, verbatim — every field the tool was given, bounded at 24 fields

@@ -237,6 +237,17 @@
   word-break: break-word;
 }
 
+/* Stopping, with a reason. */
+.sv-stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sv-stop input {
+  width: 180px;
+}
+
 /* Answering, rather than approving. Its own full-width line, so it never
    competes with the summary for horizontal space. */
 .sv-queue__respond {

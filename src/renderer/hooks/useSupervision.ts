@@ -107,6 +107,10 @@ interface SupervisionBridge {
     redirect?: string
   }): Promise<{ ok: boolean; reason: string | null }>
   discardSession?(payload: { sessionId: string }): Promise<{ ok: boolean; reason: string | null }>
+  stopSession?(payload: {
+    sessionId: string
+    reason?: string
+  }): Promise<{ ok: boolean; reason: string | null }>
   listReclaimable?(): Promise<ReclaimableWorktreeView[]>
   reclaimWorktree?(payload: { path: string }): Promise<{ ok: boolean; reason: string | null }>
   producerAction?(payload: {
@@ -437,9 +441,9 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
     },
 
     sessions,
-    onStop: (sessionId: string) => {
+    onStop: (sessionId: string, reason?: string) => {
       void bridge()
-        ?.interruptSession?.({ sessionId })
+        ?.stopSession?.({ sessionId, reason })
         .then(() => refreshAll())
     },
 

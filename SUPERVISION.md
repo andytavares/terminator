@@ -185,7 +185,11 @@ Three actions on every row:
 - **Open** — go to the session.
 - **Stop** — end the run **and keep the working copy**. You stop an agent to look
   at what it did, not to lose it; the diff stays and the session moves to
-  review if it produced one.
+  review if it produced one. Stop asks _why_ first — optional, but coming back
+  to a half-finished diff a day later, "stopped by the operator" tells you
+  nothing and "wrong branch" tells you everything. The reason goes to the agent
+  before the run closes, so its own transcript says why it stopped, and into
+  the feed attributed to Terminator.
 - **Discard** — end it, remove the working copy, and take the session off the
   console.
 

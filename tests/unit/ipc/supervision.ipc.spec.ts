@@ -843,3 +843,44 @@ describe('reclaiming working copies', () => {
     ).resolves.toEqual({ ok: false, reason: 'reclaiming is unavailable' })
   })
 })
+
+describe('stopping a run (FR-029)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('stops, carrying the reason', async () => {
+    const source = {
+      ...fullSource(),
+      stopSession: vi.fn().mockResolvedValue({ ok: true, reason: null }),
+    }
+    registerSupervisionHandlers(source)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.stopSession)({}, { sessionId: 's1', reason: 'wrong branch' })
+    ).resolves.toMatchObject({ ok: true })
+    expect(source.stopSession).toHaveBeenCalledWith('s1', 'wrong branch')
+  })
+
+  it('stops without one', async () => {
+    const source = {
+      ...fullSource(),
+      stopSession: vi.fn().mockResolvedValue({ ok: true, reason: null }),
+    }
+    registerSupervisionHandlers(source)
+    await handlerFor(SUPERVISION_CHANNELS.stopSession)({}, { sessionId: 's1' })
+    expect(source.stopSession).toHaveBeenCalledWith('s1', undefined)
+  })
+
+  it('refuses a request with no session', async () => {
+    registerSupervisionHandlers(fullSource())
+    await expect(handlerFor(SUPERVISION_CHANNELS.stopSession)({}, {})).resolves.toEqual({
+      ok: false,
+      reason: 'invalid request',
+    })
+  })
+
+  it('says stopping is unavailable rather than throwing', async () => {
+    registerSupervisionHandlers(BARE)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.stopSession)({}, { sessionId: 's1' })
+    ).resolves.toEqual({ ok: false, reason: 'stopping is unavailable' })
+  })
+})

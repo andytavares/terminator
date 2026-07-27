@@ -81,7 +81,7 @@ export interface SupervisionScreenProps {
 
   /** Every session, so "what is running" has an answer that is not a number. */
   sessions: readonly SupervisedSession[]
-  onStop(sessionId: string): void
+  onStop(sessionId: string, reason?: string): void
 
   review: readonly ReviewItem[]
   activeReview: { item: ReviewItem; intent: IntentReview | null; hunks: readonly Hunk[] } | null

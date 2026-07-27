@@ -39,6 +39,7 @@ export const SUPERVISION_CHANNELS = {
   getDigest: 'supervision:getDigest',
   interruptSession: 'supervision:interruptSession',
   discardSession: 'supervision:discardSession',
+  stopSession: 'supervision:stopSession',
   listReclaimable: 'supervision:listReclaimable',
   reclaimWorktree: 'supervision:reclaimWorktree',
 } as const
@@ -99,6 +100,7 @@ export interface SupervisionSource {
     redirect?: string
   ): Promise<{ ok: boolean; reason: string | null }>
   discardSession?(sessionId: string): Promise<{ ok: boolean; reason: string | null }>
+  stopSession?(sessionId: string, reason?: string): Promise<{ ok: boolean; reason: string | null }>
   listReclaimable?(): readonly unknown[]
   reclaimWorktree?(path: string): Promise<{ ok: boolean; reason: string | null }>
   producerAction?(
@@ -170,6 +172,7 @@ const producerActionPayload = z.object({
 // progress" rather than "you asked for nothing".
 const digestPayload = z.object({ windowMs: z.number().int().positive() })
 const reclaimPayload = z.object({ path: z.string().min(1) })
+const stopPayload = z.object({ sessionId: z.string().min(1), reason: z.string().optional() })
 const interruptPayload = z.object({
   sessionId: z.string().min(1),
   redirect: z.string().optional(),
@@ -368,6 +371,17 @@ export function registerSupervisionHandlers(source: SupervisionSource): void {
       (await source.discardSession?.(parsed.data.sessionId)) ?? {
         ok: false,
         reason: 'discarding is unavailable',
+      }
+    )
+  })
+
+  handleChannel(SUPERVISION_CHANNELS.stopSession, async (_event, payload: unknown) => {
+    const parsed = stopPayload.safeParse(payload)
+    if (!parsed.success) return { ok: false, reason: 'invalid request' }
+    return (
+      (await source.stopSession?.(parsed.data.sessionId, parsed.data.reason)) ?? {
+        ok: false,
+        reason: 'stopping is unavailable',
       }
     )
   })

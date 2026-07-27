@@ -158,6 +158,12 @@ export interface SupervisionService {
     sessionId: string,
     redirect?: string
   ): Promise<{ ok: boolean; reason: string | null }>
+  /**
+   * Ends the run and keeps the working copy. The reason reaches the agent
+   * before the run closes and is recorded in the feed, so coming back to the
+   * diff later you can see why it stopped.
+   */
+  stopSession(sessionId: string, reason?: string): Promise<{ ok: boolean; reason: string | null }>
   /** Stops the agent and removes its working copy, running teardown (FR-029). */
   discardSession(sessionId: string): Promise<{ ok: boolean; reason: string | null }>
   /**
@@ -604,6 +610,24 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
           summary: 'Working copy reclaimed.',
         })
       }
+      return { ok: true, reason: null }
+    },
+
+    stopSession: async (sessionId, reason) => {
+      const session = registry.get(sessionId)
+      if (session === null) return { ok: false, reason: 'no such session' }
+
+      const said = reason?.trim() ?? ''
+      await driver.stop(
+        sessionId,
+        said === '' ? 'Stopped by the operator.' : `Stopped by the operator: ${said}`
+      )
+      feed.post({
+        at: now(),
+        sessionId,
+        author: 'console',
+        summary: said === '' ? 'Stopped by the operator.' : `Stopped by the operator: ${said}`,
+      })
       return { ok: true, reason: null }
     },
 

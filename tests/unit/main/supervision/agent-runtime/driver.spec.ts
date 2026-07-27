@@ -273,7 +273,7 @@ describe('interrupting', () => {
     expect(interrupt).toHaveBeenCalled()
   })
 
-  it('closes the prompt stream, which is what actually ends the run', async () => {
+  it('leaves the session open, so a redirect sent afterwards still reaches it', async () => {
     const { driver, query } = liveHarness()
     await driver.start({ sessionId: 's1', prompt: 'x', cwd: '/wt/s1' })
     const call = query.mock.calls[0][0] as { prompt: AsyncIterable<unknown> }
@@ -281,8 +281,11 @@ describe('interrupting', () => {
     await iterator.next()
 
     await driver.interrupt('s1')
-    // Interrupting stops the current turn; it does not end the session.
-    expect(await iterator.next()).toMatchObject({ done: true })
+    await driver.send('s1', 'try the other approach')
+    // Closing the stream here would have made every redirect go nowhere.
+    expect(await iterator.next()).toMatchObject({
+      value: { message: { content: [{ text: 'try the other approach' }] } },
+    })
   })
 
   it('does nothing for a session that is not running', async () => {
@@ -308,5 +311,47 @@ describe('a run that ends without reporting a result', () => {
     await driver.start({ sessionId: 's1', prompt: 'x', cwd: '/wt/s1' })
     await driver.completion('s1')
     expect(events.filter((event) => event.kind === 'session_ended')).toHaveLength(1)
+  })
+})
+
+// Stopping is the other half: it ends the run, and says why first.
+
+describe('stopping a run', () => {
+  it('delivers the reason before the stream closes', async () => {
+    const { driver, query } = liveHarness()
+    await driver.start({ sessionId: 's1', prompt: 'x', cwd: '/wt/s1' })
+    const call = query.mock.calls[0][0] as { prompt: AsyncIterable<unknown> }
+    const iterator = call.prompt[Symbol.asyncIterator]()
+    await iterator.next()
+
+    await driver.stop('s1', 'Stopped by the operator: wrong branch')
+    // In the agent's own record, not only in ours.
+    expect(await iterator.next()).toMatchObject({
+      value: { message: { content: [{ text: 'Stopped by the operator: wrong branch' }] } },
+    })
+    expect(await iterator.next()).toMatchObject({ done: true })
+  })
+
+  it('interrupts the runtime', async () => {
+    const { driver, interrupt } = liveHarness()
+    await driver.start({ sessionId: 's1', prompt: 'x', cwd: '/wt/s1' })
+    await driver.stop('s1')
+    expect(interrupt).toHaveBeenCalled()
+  })
+
+  it('ends the run', async () => {
+    const { driver, query } = liveHarness()
+    await driver.start({ sessionId: 's1', prompt: 'x', cwd: '/wt/s1' })
+    const call = query.mock.calls[0][0] as { prompt: AsyncIterable<unknown> }
+    const iterator = call.prompt[Symbol.asyncIterator]()
+    await iterator.next()
+
+    await driver.stop('s1')
+    expect(await iterator.next()).toMatchObject({ done: true })
+  })
+
+  it('does nothing for a session that is not running', async () => {
+    const { driver } = harness()
+    await expect(driver.stop('ghost')).resolves.toBeUndefined()
   })
 })

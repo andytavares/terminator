@@ -68,11 +68,42 @@ describe('SessionList', () => {
     expect(screen.queryByText(/files \+/)).toBeNull()
   })
 
-  it('stops a running session', () => {
+  it('asks why before stopping, then stops', () => {
     const onStop = vi.fn()
     list([session()], { onStop })
     fireEvent.click(screen.getByText('Stop'))
-    expect(onStop).toHaveBeenCalledWith('s1')
+    fireEvent.change(screen.getByLabelText('Why are you stopping it?'), {
+      target: { value: 'wrong branch' },
+    })
+    fireEvent.click(screen.getByText('Stop'))
+    expect(onStop).toHaveBeenCalledWith('s1', 'wrong branch')
+  })
+
+  it('stops without a reason when you do not give one', () => {
+    const onStop = vi.fn()
+    list([session()], { onStop })
+    fireEvent.click(screen.getByText('Stop'))
+    fireEvent.click(screen.getByText('Stop'))
+    expect(onStop).toHaveBeenCalledWith('s1', undefined)
+  })
+
+  it('stops on Enter', () => {
+    const onStop = vi.fn()
+    list([session()], { onStop })
+    fireEvent.click(screen.getByText('Stop'))
+    const box = screen.getByLabelText('Why are you stopping it?')
+    fireEvent.change(box, { target: { value: 'took the wrong approach' } })
+    fireEvent.keyDown(box, { key: 'Enter' })
+    expect(onStop).toHaveBeenCalledWith('s1', 'took the wrong approach')
+  })
+
+  it('backs out on Escape without stopping anything', () => {
+    const onStop = vi.fn()
+    list([session()], { onStop })
+    fireEvent.click(screen.getByText('Stop'))
+    fireEvent.keyDown(screen.getByLabelText('Why are you stopping it?'), { key: 'Escape' })
+    expect(onStop).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('Why are you stopping it?')).toBeNull()
   })
 
   it('offers no stop for a session that has already finished', () => {

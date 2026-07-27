@@ -1040,3 +1040,57 @@ describe('discarding takes the session off the console', () => {
     expect(service.listSessions().map((entry) => entry.id)).toEqual(['s2'])
   })
 })
+
+// Stopping keeps the working copy. Its reason reaches the agent before the run
+// closes and lands in the feed, so a half-finished diff still says why.
+
+describe('stopping a session', () => {
+  function running() {
+    const stopped: Array<{ id: string; reason?: string }> = []
+    const service = build()
+    service.driver.stop = async (id: string, reason?: string) => void stopped.push({ id, reason })
+    service.registry.register('s1', meta())
+    return { service, stopped }
+  }
+
+  it('ends the run', async () => {
+    const { service, stopped } = running()
+    await expect(service.stopSession('s1')).resolves.toMatchObject({ ok: true })
+    expect(stopped[0]?.id).toBe('s1')
+  })
+
+  it('tells the agent why, so its own record says so too', async () => {
+    const { service, stopped } = running()
+    await service.stopSession('s1', 'wrong branch')
+    expect(stopped[0]?.reason).toBe('Stopped by the operator: wrong branch')
+  })
+
+  it('still says it was the operator when no reason was given', async () => {
+    const { service, stopped } = running()
+    await service.stopSession('s1')
+    expect(stopped[0]?.reason).toBe('Stopped by the operator.')
+  })
+
+  it('records it in the feed as the console speaking, not the agent', async () => {
+    const { service } = running()
+    await service.stopSession('s1', 'wrong branch')
+    const entry = service.feed.forSession('s1').at(-1)
+    expect(entry).toMatchObject({ author: 'console' })
+    expect(entry?.summary).toBe('Stopped by the operator: wrong branch')
+  })
+
+  it('keeps the session and its working copy', async () => {
+    const { service } = running()
+    await service.stopSession('s1')
+    // You stop an agent to look at what it did, not to lose it.
+    expect(service.getSession('s1')).not.toBeNull()
+  })
+
+  it('refuses a session it does not know', async () => {
+    const { service } = running()
+    await expect(service.stopSession('ghost')).resolves.toEqual({
+      ok: false,
+      reason: 'no such session',
+    })
+  })
+})
