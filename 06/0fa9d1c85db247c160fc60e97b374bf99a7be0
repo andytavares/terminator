@@ -1,0 +1,58 @@
+tests/unit/renderer/supervision/supervision-store.spec.ts
+  s_5f98598a6d950e::t_7f5ef95dfaef58 26
+packages/extension-sdk/types/api.d.ts
+  s_5f98598a6d950e::t_140ef3027943ba 201,218,236
+tests/unit/main/supervision/stall/stall-scheduler.spec.ts
+  s_5f98598a6d950e::t_7f5ef95dfaef58 28
+src/main/extensions/api.ts
+  s_5f98598a6d950e::t_140ef3027943ba 730
+tests/unit/main/supervision/final-gaps.spec.ts
+  s_5f98598a6d950e::t_7f5ef95dfaef58 119
+tests/unit/renderer/hooks/useSupervision.spec.tsx
+  s_5f98598a6d950e::t_7f5ef95dfaef58 32
+tests/unit/shared/schemas/supervision.spec.ts
+  s_5f98598a6d950e::t_7f5ef95dfaef58 62,147
+src/shared/types/supervision.ts
+  s_5f98598a6d950e::t_6ac58ddd8e9a9a 51-56,86-92
+tests/unit/shared/supervision/rank-attention.spec.ts
+  s_5f98598a6d950e::t_b6fcab36f91c7a 151-166
+  s_5f98598a6d950e::t_7f5ef95dfaef58 33
+src/shared/supervision/rank-attention.ts
+  s_5f98598a6d950e::t_49a93cb584c29d 24-29,63
+docs/EXTENSION-DEVELOPMENT.md
+  s_5f98598a6d950e::t_140ef3027943ba 1027,1138
+tests/integration/supervision/provisioning.spec.ts
+  s_5f98598a6d950e::t_51c61909aa5d52 1-208
+src/main/supervision/state/session-registry.ts
+  s_5f98598a6d950e::t_6ac58ddd8e9a9a 103
+src/shared/schemas/supervision.ts
+  s_5f98598a6d950e::t_6ac58ddd8e9a9a 60-66
+tests/unit/renderer/supervision/screen.spec.tsx
+  s_5f98598a6d950e::t_7f5ef95dfaef58 76
+  s_5f98598a6d950e::t_ebdfee87327959 247
+tests/unit/ipc/supervision.ipc.spec.ts
+  s_5f98598a6d950e::t_7f5ef95dfaef58 38
+src/renderer/components/supervision/AttentionQueue.tsx
+  s_5f98598a6d950e::t_c22866f15868b5 64-72
+tests/unit/renderer/supervision/surfaces.spec.tsx
+  s_5f98598a6d950e::t_67c785ede3014f 65
+  s_5f98598a6d950e::t_8cabe96c5bb3ce 1044-1110
+specs/021-agent-supervision-console/quickstart.md
+  s_5f98598a6d950e::t_a87f245fe7fe5d 78-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "060fa9d1c85db247c160fc60e97b374bf99a7be0",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
