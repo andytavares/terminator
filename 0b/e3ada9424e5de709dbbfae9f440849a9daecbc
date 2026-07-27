@@ -1,0 +1,83 @@
+tests/unit/renderer/hooks/useSupervision.spec.tsx
+  s_5f98598a6d950e::t_73a5b2f09dbe6a 977-1004
+SUPERVISION.md
+  s_5f98598a6d950e::t_a8d24205c03790 138-144
+  s_5f98598a6d950e::t_ff8dc98c841c84 53-54,56-65
+tests/unit/ipc/supervision.ipc.spec.ts
+  s_5f98598a6d950e::t_6c637bd196459b 373
+src/renderer/hooks/useSupervision.ts
+  s_5f98598a6d950e::t_90885d1f410e4a 44,283-284,404-407
+tests/unit/renderer/supervision/surfaces.spec.tsx
+  s_5f98598a6d950e::t_c9e35beab2f714 1173,1175-1259,1263-1282
+  s_5f98598a6d950e::t_6c637bd196459b 1163-1172
+  s_5f98598a6d950e::t_c61032d864e110 1174
+src/main/index.ts
+  s_5f98598a6d950e::t_8cee2c625899d9 448-452
+tests/e2e/supervision-attention.spec.ts
+  s_5f98598a6d950e::t_d642df7d748674 54,57-65,67-71,73-75
+  s_5f98598a6d950e::t_e22f61878c4d5f 38-53,55,66,72,79
+  s_5f98598a6d950e::t_3ec5ea25820ec5 78,81
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_5f98598a6d950e::t_4d80ab074a697f 18-19,32,124
+  s_5f98598a6d950e::t_d8c9768c1ea679 78-82,97,104,113,131,138,188,200,219,238,257
+  s_5f98598a6d950e::t_a1c1a663c308dd 119-123
+  s_5f98598a6d950e::t_f22ce37271e7c1 125-127
+src/renderer/App.tsx
+  s_5f98598a6d950e::t_0fd2a590a2338e 2
+  s_5f98598a6d950e::t_a1c1a663c308dd 163-166
+  s_5f98598a6d950e::t_5221b4b56b2e86 500-604,606-613,615-655,657-664,666-667,669-673,675
+  s_5f98598a6d950e::t_ea8659e8951e02 27,151-154,162,433-440
+  s_5f98598a6d950e::t_94438d3df00086 441-444
+docs/user-guide/USER-GUIDE.md
+  s_5f98598a6d950e::t_ff8dc98c841c84 245-246,671-674
+src/renderer/components/supervision/supervision.css
+  s_5f98598a6d950e::t_bb8938e4eb7eb0 276-290,500,505
+  s_5f98598a6d950e::t_5c8edee2c7c99b 222-256
+src/renderer/components/supervision/SupervisionScreen.tsx
+  s_5f98598a6d950e::t_1969d157336436 228
+  s_5f98598a6d950e::t_90885d1f410e4a 61-62
+  s_5f98598a6d950e::t_bb8938e4eb7eb0 182
+docs/ARCHITECTURE.md
+  s_5f98598a6d950e::t_ff8dc98c841c84 883-894
+  s_5f98598a6d950e::t_a8d24205c03790 874-882
+src/main/supervision/state/state-machine.ts
+  s_5f98598a6d950e::t_12b5e251a4b65d 88
+src/renderer/components/supervision/AttentionQueue.tsx
+  s_5f98598a6d950e::t_b8612a07a7c09c 1-2,39-76,78-84,90-96,103
+  s_5f98598a6d950e::t_5c8edee2c7c99b 24-30,77,85-89,152-188
+  s_5f98598a6d950e::t_1969d157336436 19-20
+src/main/supervision/agent-runtime/permission-bridge.ts
+  s_5f98598a6d950e::t_12b5e251a4b65d 18-27,125-148,172-174,200
+src/main/supervision/events/session-event.ts
+  s_5f98598a6d950e::t_12b5e251a4b65d 59-60
+src/main/ipc/supervision.ipc.ts
+  s_5f98598a6d950e::t_8cee2c625899d9 63-68,131-132,233-238
+tests/unit/renderer/supervision/supervision-tab.spec.tsx
+  s_5f98598a6d950e::t_2a72223d0b6915 1-113
+tests/unit/main/supervision/agent-runtime/permission-bridge.spec.ts
+  s_5f98598a6d950e::t_41f1e0c518ae94 256-339
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_5f98598a6d950e::t_9d44902b01febc 524-601
+src/shared/schemas/supervision.ts
+  s_5f98598a6d950e::t_12b5e251a4b65d 33
+src/shared/types/supervision.ts
+  s_5f98598a6d950e::t_12b5e251a4b65d 50-54
+src/renderer/components/supervision/SupervisionTab.tsx
+  s_5f98598a6d950e::t_2b1b66cfa4c852 1-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "0be3ada9424e5de709dbbfae9f440849a9daecbc",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
