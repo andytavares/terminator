@@ -1,0 +1,40 @@
+src/renderer/hooks/useSupervision.ts
+  s_5f98598a6d950e::t_71b4771c553f85 254-256
+  s_5f98598a6d950e::t_0f59b2a4acbf16 393,476-482,502
+  s_5f98598a6d950e::t_27548a7fed6228 332-338,394-397
+  s_5f98598a6d950e::t_a84e55a5fa561e 121-133,352,440-441,443-461
+  s_5f98598a6d950e::t_404d10720b4f6b 78-96,236-246,249-253,257-258,472-475,483-501,503-512
+  s_5f98598a6d950e::t_30819bc48e5f0c 513
+tests/unit/renderer/supervision/screen.spec.tsx
+  s_5f98598a6d950e::t_16291d46b1b0a8 62-68
+tests/unit/renderer/hooks/useSupervision.spec.tsx
+  s_5f98598a6d950e::t_632df98bae4abe 378-408,411-427
+  s_5f98598a6d950e::t_25c1f1aa4dab7a 96-97,691-839
+  s_5f98598a6d950e::t_c453881d19e10f 214-218,221
+src/renderer/components/supervision/SupervisionScreen.tsx
+  s_5f98598a6d950e::t_71b4771c553f85 21-27,74-76,116-129,213-220,255-270
+src/renderer/components/supervision/AssignControls.tsx
+  s_5f98598a6d950e::t_2870c539ce2f9e 173-357
+tests/unit/renderer/supervision/assign-panel.spec.tsx
+  s_5f98598a6d950e::t_a2cc112c3e35fa 1-183
+docs/ARCHITECTURE.md
+  s_5f98598a6d950e::t_2954ef12d8d156 853-859
+docs/user-guide/USER-GUIDE.md
+  s_5f98598a6d950e::t_b0a41b1944bc69 669-687
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "6da3f13a0518196688bd5856e56de39d7d73284c",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
