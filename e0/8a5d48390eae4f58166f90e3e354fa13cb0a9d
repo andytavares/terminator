@@ -1,0 +1,39 @@
+src/main/supervision/state/state-machine.ts
+  s_5f98598a6d950e::t_dc8b53c836df79 88
+src/main/supervision/events/session-event.ts
+  s_5f98598a6d950e::t_dc8b53c836df79 59-63
+src/renderer/components/supervision/supervision.css
+  s_5f98598a6d950e::t_858d10ff90b508 244-254
+  s_5f98598a6d950e::t_ddf82306f4882b 135-137,140-142,226-227,229,233-234,488,591-594,596,598,612-613
+src/renderer/components/supervision/AttentionQueue.tsx
+  s_5f98598a6d950e::t_a56ab5529f1e4d 24-31,162-163,165-166
+  s_5f98598a6d950e::t_858d10ff90b508 35-36,187,211
+  s_5f98598a6d950e::t_04ae1a597d9d4f 57,60,64-65,75-98,100,104
+src/main/supervision/agent-runtime/permission-bridge.ts
+  s_5f98598a6d950e::t_dc8b53c836df79 126-130,132,137-149,152,206
+src/shared/types/supervision.ts
+  s_5f98598a6d950e::t_dc8b53c836df79 51-53,55
+tests/unit/main/supervision/agent-runtime/permission-bridge.spec.ts
+  s_5f98598a6d950e::t_c73b8812ff812e 304-311,318-320,323-324,332-347
+tests/unit/renderer/supervision/surfaces.spec.tsx
+  s_5f98598a6d950e::t_77057e7d7a3341 1124,1168-1170,1191-1196,1254
+  s_5f98598a6d950e::t_1283d6aeeee949 1292-1393
+src/shared/schemas/supervision.ts
+  s_5f98598a6d950e::t_858d10ff90b508 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "e08a5d48390eae4f58166f90e3e354fa13cb0a9d",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
