@@ -1,0 +1,36 @@
+tests/unit/main/supervision/service-wiring.spec.ts
+  s_5f98598a6d950e::t_ba3ca7c8728e8c 1051-1054,1099-1133
+src/renderer/components/supervision/SessionList.tsx
+  s_5f98598a6d950e::t_59b1f128dc53cd 2,21,92-127,135-139,181-195,206-209
+src/renderer/components/supervision/supervision.css
+  s_5f98598a6d950e::t_59b1f128dc53cd 241-242,244-245
+  s_5f98598a6d950e::t_d3d48ebd10a960 240,243,353-354,357,359
+tests/unit/renderer/supervision/session-list.spec.tsx
+  s_5f98598a6d950e::t_982636159c2937 126-134,137,141-171
+  s_5f98598a6d950e::t_75de5108bd27f3 172
+src/main/supervision/supervision-service.ts
+  s_5f98598a6d950e::t_3f957afd4a071a 635
+  s_5f98598a6d950e::t_132f9860b18bd9 621-630
+src/main/supervision/agent-runtime/driver.ts
+  s_5f98598a6d950e::t_3f957afd4a071a 49-53,55,222-226
+tests/unit/main/supervision/agent-runtime/driver.spec.ts
+  s_5f98598a6d950e::t_ba3ca7c8728e8c 353-355,357-363
+SUPERVISION.md
+  s_5f98598a6d950e::t_5aa812039903ed 185-187
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "5eb53ce171a230812a732bd78301bb9a190e43d6",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
