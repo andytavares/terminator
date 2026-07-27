@@ -1,0 +1,34 @@
+tests/unit/renderer/supervision/screen.spec.tsx
+  s_5f98598a6d950e::t_6d7c9001c1faa5 73-74
+src/renderer/components/supervision/SupervisionScreen.tsx
+  s_5f98598a6d950e::t_46d2867cf07cba 29,140-142,204-205
+tests/unit/main/supervision/service-wiring.spec.ts
+  s_5f98598a6d950e::t_8a7f044cf17fc6 412-522
+src/main/supervision/supervision-service.ts
+  s_5f98598a6d950e::t_7eb2746dabb169 127-135,137-139,321-328,334-336,500-528
+  s_5f98598a6d950e::t_c980e7068b1588 26,136
+  s_5f98598a6d950e::t_a0b708df2dba75 126,529-530
+src/main/index.ts
+  s_5f98598a6d950e::t_c980e7068b1588 540
+tests/unit/renderer/hooks/useSupervision.spec.tsx
+  s_5f98598a6d950e::t_6d7c9001c1faa5 94-99,845-860
+  s_5f98598a6d950e::t_37447ec6c0f917 861
+src/renderer/hooks/useSupervision.ts
+  s_5f98598a6d950e::t_46d2867cf07cba 5,74-79,164-169,527-528
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "eb4533b5b6cc749a982cb9688d8ccc720b6362c7",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
