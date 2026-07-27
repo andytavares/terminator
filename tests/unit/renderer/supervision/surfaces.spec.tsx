@@ -492,6 +492,17 @@ describe('LaneView (FR-087 – FR-089)', () => {
   })
 })
 
+// Every action the board offers is a producer command; none of them is
+// optional, because the gate they satisfy is what makes implementation legal.
+const boardActions = {
+  onApproveGate: () => {},
+  onRejectGate: () => {},
+  onSendBack: () => {},
+  onAdvancePhase: () => {},
+  actionError: null,
+  onDismissActionError: () => {},
+}
+
 describe('WorkItemBoard (FR-074, FR-080 – FR-082)', () => {
   const item = {
     producerId: 'speckit-pilot',
@@ -519,7 +530,16 @@ describe('WorkItemBoard (FR-074, FR-080 – FR-082)', () => {
   }
 
   it('renders an item with its artefact and gate chips (FR-082)', () => {
-    render(<WorkItemBoard items={[item]} unreadable={[]} conflicts={[]} canAct onOpen={() => {}} />)
+    render(
+      <WorkItemBoard
+        {...boardActions}
+        items={[item]}
+        unreadable={[]}
+        conflicts={[]}
+        canAct
+        onOpen={() => {}}
+      />
+    )
     expect(screen.getByText('Unify session identity')).toBeDefined()
     expect(screen.getByText('spec approved')).toBeDefined()
   })
@@ -527,6 +547,7 @@ describe('WorkItemBoard (FR-074, FR-080 – FR-082)', () => {
   it('reports a duplicate id from two producers rather than picking one (FR-074)', () => {
     render(
       <WorkItemBoard
+        {...boardActions}
         items={[item]}
         unreadable={[]}
         conflicts={[{ workItemId: 'FLU-220', producers: ['a', 'b'] }]}
@@ -540,6 +561,7 @@ describe('WorkItemBoard (FR-074, FR-080 – FR-082)', () => {
   it('reports an unreadable item with its reason (FR-085)', () => {
     render(
       <WorkItemBoard
+        {...boardActions}
         items={[]}
         unreadable={[{ filePath: '/x.json', reason: 'no contract version' }]}
         conflicts={[]}
@@ -553,6 +575,7 @@ describe('WorkItemBoard (FR-074, FR-080 – FR-082)', () => {
   it('states the board is read-only when no producer provides actions (FR-078)', () => {
     render(
       <WorkItemBoard
+        {...boardActions}
         items={[item]}
         unreadable={[]}
         conflicts={[]}
@@ -855,5 +878,153 @@ describe('StandupFeed replies', () => {
     fireEvent.change(screen.getByLabelText('Reply to s1'), { target: { value: 'ok' } })
     fireEvent.click(screen.getByText('Send'))
     expect(screen.queryByLabelText('Reply to s1')).toBeNull()
+  })
+})
+
+// The gate controls. Implementation cannot begin until a human approves the
+// spec and the plan (FR-083); before these existed there was no way to satisfy
+// that gate from the console at all, so nothing bound to a work item could run.
+describe('WorkItemBoard gate actions (FR-083, FR-084)', () => {
+  const unapproved = {
+    producerId: 'speckit-pilot',
+    item: {
+      contract_version: 1,
+      id: 'FLU-220',
+      source: 'linear' as const,
+      title: 'Unify session identity',
+      created_at: '2026-07-27T09:04:11Z',
+      phase: 'specify' as const,
+      artifacts: { spec: 'specs/x/spec.md' },
+      gates: {},
+      lanes: [
+        {
+          ord: 1,
+          repo: 'fluent',
+          role: 'producer' as const,
+          branch: 'b',
+          task_ids: [],
+          blocks: [],
+          blocked_by: [],
+        },
+      ],
+    },
+  }
+
+  const board = (over: Record<string, unknown> = {}) =>
+    render(
+      <WorkItemBoard
+        {...boardActions}
+        items={[unapproved]}
+        unreadable={[]}
+        conflicts={[]}
+        canAct
+        onOpen={() => {}}
+        {...over}
+      />
+    )
+
+  it('approves the spec gate', () => {
+    const onApproveGate = vi.fn()
+    board({ onApproveGate })
+    fireEvent.click(screen.getByText(/Approve spec/))
+    expect(onApproveGate).toHaveBeenCalledWith('FLU-220', 'spec_approved_by_human')
+  })
+
+  it('approves the plan gate', () => {
+    const onApproveGate = vi.fn()
+    board({ onApproveGate })
+    fireEvent.click(screen.getByText(/Approve plan/))
+    expect(onApproveGate).toHaveBeenCalledWith('FLU-220', 'plan_approved_by_human')
+  })
+
+  it('offers no approval for a gate already approved', () => {
+    const approved = {
+      ...unapproved,
+      item: { ...unapproved.item, gates: { spec_approved_by_human: { ok: true } } },
+    }
+    board({ items: [approved] })
+    expect(screen.queryByText(/Approve spec/)).toBeNull()
+    expect(screen.getByText(/Approve plan/)).toBeDefined()
+  })
+
+  it('requires notes before it will send work back (FR-084)', () => {
+    const onRejectGate = vi.fn()
+    const onSendBack = vi.fn()
+    board({ onRejectGate, onSendBack })
+    fireEvent.click(screen.getByText(/Reject spec/))
+    fireEvent.click(screen.getByText('Send back'))
+    // Sending work back without saying why is what produced the unbounded-scope
+    // failures this gate exists to prevent.
+    expect(onRejectGate).not.toHaveBeenCalled()
+    expect(onSendBack).not.toHaveBeenCalled()
+  })
+
+  it('rejects with notes and returns the item to the phase that produced it', () => {
+    const onRejectGate = vi.fn()
+    const onSendBack = vi.fn()
+    board({ onRejectGate, onSendBack })
+    fireEvent.click(screen.getByText(/Reject spec/))
+    fireEvent.change(screen.getByLabelText(/Why are you rejecting the spec/), {
+      target: { value: 'scope is unbounded' },
+    })
+    fireEvent.click(screen.getByText('Send back'))
+    expect(onRejectGate).toHaveBeenCalledWith(
+      'FLU-220',
+      'spec_approved_by_human',
+      'scope is unbounded'
+    )
+    expect(onSendBack).toHaveBeenCalledWith('FLU-220', 'specify', 'scope is unbounded')
+  })
+
+  it('sends the rejection on Enter', () => {
+    const onRejectGate = vi.fn()
+    board({ onRejectGate })
+    fireEvent.click(screen.getByText(/Reject plan/))
+    const input = screen.getByLabelText(/Why are you rejecting the plan/)
+    fireEvent.change(input, { target: { value: 'no rollback story' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onRejectGate).toHaveBeenCalledWith(
+      'FLU-220',
+      'plan_approved_by_human',
+      'no rollback story'
+    )
+  })
+
+  it('ignores other keys in the notes box', () => {
+    const onRejectGate = vi.fn()
+    board({ onRejectGate })
+    fireEvent.click(screen.getByText(/Reject plan/))
+    const input = screen.getByLabelText(/Why are you rejecting the plan/)
+    fireEvent.change(input, { target: { value: 'x' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(onRejectGate).not.toHaveBeenCalled()
+  })
+
+  it('advances the phase', () => {
+    const onAdvancePhase = vi.fn()
+    board({ onAdvancePhase })
+    fireEvent.click(screen.getByText(/Advance phase/))
+    expect(onAdvancePhase).toHaveBeenCalledWith('FLU-220')
+  })
+
+  it('offers no actions at all when no producer provides them (FR-078)', () => {
+    board({ canAct: false })
+    expect(screen.queryByText(/Approve spec/)).toBeNull()
+    expect(screen.queryByText(/Advance phase/)).toBeNull()
+  })
+
+  it('reports a producer that refused, with a way to dismiss it', () => {
+    const onDismissActionError = vi.fn()
+    board({ actionError: 'speckit-pilot does not provide sending work back', onDismissActionError })
+    expect(screen.getByText(/does not provide sending work back/)).toBeDefined()
+    fireEvent.click(screen.getByText('Dismiss'))
+    expect(onDismissActionError).toHaveBeenCalled()
+  })
+
+  it('still opens the item when the card is clicked', () => {
+    const onOpen = vi.fn()
+    board({ onOpen })
+    fireEvent.click(screen.getByText('Unify session identity'))
+    expect(onOpen).toHaveBeenCalledWith('FLU-220')
   })
 })

@@ -91,6 +91,7 @@ function makeBridge(over: Record<string, unknown> = {}) {
       .fn()
       .mockResolvedValue({ worktreePath: '/wt/x', ports: null, setup: null, skipped: [] }),
     getSinceLastLooked: vi.fn().mockResolvedValue({ lastViewedAt: 500, entries: [] }),
+    producerAction: vi.fn().mockResolvedValue({ ok: true, reason: null }),
     precheckBackpressure: vi
       .fn()
       .mockResolvedValue({ allowed: false, unreviewed: 4, limit: 3, reason: '4 unreviewed' }),
@@ -473,5 +474,112 @@ describe('a bridge that implements only listSessions', () => {
       props.onOpenInEditor()
     })
     expect(result.current.loaded).toBe(true)
+  })
+})
+
+// FR-083/FR-084 end to end from the surface: without these the gate can never
+// be satisfied, and a session bound to a work item could never start.
+
+describe('acting on a work item gate', () => {
+  it('approves a gate through the producer', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onApproveGate('FLU-220', 'spec_approved_by_human')
+    })
+    expect(bridge.producerAction).toHaveBeenCalledWith({
+      workItemId: 'FLU-220',
+      action: 'approveGate',
+      args: ['FLU-220', 'spec_approved_by_human'],
+    })
+  })
+
+  it('rejects a gate with the notes attached', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onRejectGate('FLU-220', 'plan_approved_by_human', 'too broad')
+    })
+    expect(bridge.producerAction).toHaveBeenCalledWith({
+      workItemId: 'FLU-220',
+      action: 'rejectGate',
+      args: ['FLU-220', 'plan_approved_by_human', 'too broad'],
+    })
+  })
+
+  it('sends work back to a phase with the notes', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onSendBack('FLU-220', 'specify', 'missing acceptance criteria')
+    })
+    expect(bridge.producerAction).toHaveBeenCalledWith({
+      workItemId: 'FLU-220',
+      action: 'sendBack',
+      args: ['FLU-220', 'specify', 'missing acceptance criteria'],
+    })
+  })
+
+  it('advances the phase', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onAdvancePhase('FLU-220')
+    })
+    expect(bridge.producerAction).toHaveBeenCalledWith({
+      workItemId: 'FLU-220',
+      action: 'advancePhase',
+      args: ['FLU-220'],
+    })
+  })
+
+  it('re-reads the board once the action lands, so the gate chip updates', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    bridge.listWorkItems.mockClear()
+    await act(async () => {
+      result.current.screenProps.onApproveGate('FLU-220', 'spec_approved_by_human')
+    })
+    await waitFor(() => expect(bridge.listWorkItems).toHaveBeenCalled())
+  })
+
+  it('reports a producer that refused, rather than swallowing it (FR-078)', async () => {
+    install({
+      producerAction: vi.fn().mockResolvedValue({
+        ok: false,
+        reason: 'speckit-pilot does not provide sending work back',
+      }),
+    })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onSendBack('FLU-220', 'specify', 'notes')
+    })
+    await waitFor(() =>
+      expect(result.current.screenProps.actionError).toBe(
+        'speckit-pilot does not provide sending work back'
+      )
+    )
+  })
+
+  it('says so when no producer is wired at all', async () => {
+    install({ producerAction: undefined })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onApproveGate('FLU-220', 'spec_approved_by_human')
+    })
+    expect(result.current.screenProps.actionError).toMatch(/No producer is registered/)
+  })
+
+  it('dismisses the error', async () => {
+    install({ producerAction: undefined })
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onApproveGate('FLU-220', 'x')
+    })
+    act(() => result.current.screenProps.onDismissActionError())
+    expect(result.current.screenProps.actionError).toBeNull()
   })
 })

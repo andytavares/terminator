@@ -63,6 +63,13 @@ export interface SupervisionScreenProps {
   conflicts: ReadonlyArray<{ workItemId: string; producers: string[] }>
   canAct: boolean
   onOpenWorkItem(workItemId: string): void
+  onApproveGate(workItemId: string, gate: string): void
+  onRejectGate(workItemId: string, gate: string, notes: string): void
+  onSendBack(workItemId: string, phase: string, notes: string): void
+  onAdvancePhase(workItemId: string): void
+  /** A producer refused, or provides no such command (FR-078). */
+  actionError: string | null
+  onDismissActionError(): void
 
   lanes: readonly LaneViewModel[]
   mergedOrds: readonly number[]
@@ -214,6 +221,12 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
           conflicts={props.conflicts}
           canAct={props.canAct}
           onOpen={props.onOpenWorkItem}
+          onApproveGate={props.onApproveGate}
+          onRejectGate={props.onRejectGate}
+          onSendBack={props.onSendBack}
+          onAdvancePhase={props.onAdvancePhase}
+          actionError={props.actionError}
+          onDismissActionError={props.onDismissActionError}
         />
       )}
 

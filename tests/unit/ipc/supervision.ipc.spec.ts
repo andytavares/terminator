@@ -239,6 +239,7 @@ function fullSource() {
     entityIndex: () => [{ id: 'e1' }],
     intake: vi.fn().mockReturnValue({ ok: true }),
     assign: vi.fn().mockResolvedValue({ ok: true, sessionId: 's2' }),
+    producerAction: vi.fn().mockResolvedValue({ ok: true, reason: null }),
   }
 }
 
@@ -635,5 +636,73 @@ describe('the read channels', () => {
     await expect(
       handlerFor(SUPERVISION_CHANNELS.getSinceLastLooked)({}, { sessionId: 's1' })
     ).resolves.toEqual({ lastViewedAt: null, entries: [] })
+  })
+})
+
+// Approving a gate is what makes implementation legal (FR-083). Without this
+// channel the gate can never be satisfied and no session bound to a work item
+// could ever start.
+
+describe('directing an action at the producer that published an item', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('forwards the action and its arguments', async () => {
+    const source = fullSource()
+    registerSupervisionHandlers(source)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.producerAction)(
+        {},
+        {
+          workItemId: 'FLU-220',
+          action: 'approveGate',
+          args: ['FLU-220', 'spec_approved_by_human'],
+        }
+      )
+    ).resolves.toEqual({ ok: true, reason: null })
+    expect(source.producerAction).toHaveBeenCalledWith('FLU-220', 'approveGate', [
+      'FLU-220',
+      'spec_approved_by_human',
+    ])
+  })
+
+  it('defaults the arguments to none rather than rejecting the call', async () => {
+    const source = fullSource()
+    registerSupervisionHandlers(source)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.producerAction)(
+        {},
+        { workItemId: 'FLU-220', action: 'advancePhase' }
+      )
+    ).resolves.toMatchObject({ ok: true })
+    expect(source.producerAction).toHaveBeenCalledWith('FLU-220', 'advancePhase', [])
+  })
+
+  it('refuses an action outside the closed set', async () => {
+    const source = fullSource()
+    registerSupervisionHandlers(source)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.producerAction)(
+        {},
+        { workItemId: 'FLU-220', action: 'deleteEverything', args: [] }
+      )
+    ).resolves.toEqual({ ok: false, reason: 'invalid request' })
+    expect(source.producerAction).not.toHaveBeenCalled()
+  })
+
+  it('refuses a request with no work item', async () => {
+    registerSupervisionHandlers(fullSource())
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.producerAction)({}, { action: 'approveGate' })
+    ).resolves.toEqual({ ok: false, reason: 'invalid request' })
+  })
+
+  it('says no producer is registered rather than throwing', async () => {
+    registerSupervisionHandlers(BARE)
+    await expect(
+      handlerFor(SUPERVISION_CHANNELS.producerAction)(
+        {},
+        { workItemId: 'FLU-220', action: 'approveGate', args: [] }
+      )
+    ).resolves.toEqual({ ok: false, reason: 'no producer is registered' })
   })
 })

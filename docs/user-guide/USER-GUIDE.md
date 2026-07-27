@@ -680,3 +680,10 @@ offering a button that does nothing.
 Implementation cannot begin until you have approved both the specification and
 the plan. That friction is the point: an agent starting without an approved spec
 has nothing bounding its scope.
+
+Each card carries the actions for the gates it has not passed. **Approve spec**
+and **Approve plan** are one click. **Reject** asks for notes before it will do
+anything, then returns the item to the phase that produced the artefact —
+rejecting a spec sends the item back to `specify`, carrying your notes. If the
+producer refuses, or provides no such command, the board says so at the top and
+leaves the item untouched.

@@ -612,6 +612,12 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
   },
   { path: 'supervision.intake', kind: 'invoke', channel: 'supervision:intake', remote: 'omit' },
   { path: 'supervision.assign', kind: 'invoke', channel: 'supervision:assign', remote: 'omit' },
+  {
+    path: 'supervision.producerAction',
+    kind: 'invoke',
+    channel: 'supervision:producerAction',
+    remote: 'omit',
+  },
 ]
 
 /**

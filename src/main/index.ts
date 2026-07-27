@@ -458,6 +458,12 @@ app.whenReady().then(async () => {
         session,
       }
     },
+    // FR-083/FR-084: approving a gate, rejecting it with notes, or sending an
+    // item back is the only way implementation ever becomes allowed. It is
+    // always the producer that writes it — the console never edits the
+    // contract file (FR-076).
+    producerAction: (workItemId, action, args) =>
+      supervision.runProducerAction(workItemId, action, args),
     decideHunk: (sessionId, hunkId, decision) =>
       supervision.hunkDecisionsFor(sessionId).decide(hunkId, decision),
     advanceReview: (sessionId) => {

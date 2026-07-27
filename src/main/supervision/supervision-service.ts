@@ -25,7 +25,12 @@ import { loadRepoConfig } from './worktree/repo-config.js'
 import { createReviewQueue, type ReviewQueue } from './review/review-queue.js'
 import { createFeedLog, type FeedLog } from './feed/feed-log.js'
 import { createLaneBindings, type LaneBindings } from './workitems/lane-bindings.js'
-import { createProducerRegistry, type ProducerRegistry } from './workitems/producer-commands.js'
+import {
+  createProducerRegistry,
+  type ProducerRegistry,
+  type ProducerAction,
+  type ActionResult,
+} from './workitems/producer-commands.js'
 import {
   watchPublications,
   publicationRoot,
@@ -112,6 +117,16 @@ export interface SupervisionService {
   mayBeginImplementation(workItemId: string): ReturnType<typeof mayBeginImplementation>
   /** Normalises a ticket URL or a dropped document into one shape (FR-068). */
   intake(input: { url?: string; filePath?: string; contents?: string }): IntakeResult
+  /**
+   * Directs an action at whichever producer published the item (FR-077). The
+   * console never reaches into a producer by any other means, and never edits
+   * the contract file itself (FR-076).
+   */
+  runProducerAction(
+    workItemId: string,
+    action: ProducerAction,
+    args: readonly unknown[]
+  ): Promise<ActionResult>
   /** Files a session changed, for the intent step and the grader. */
   changedFilesFor(sessionId: string): string[]
   /** Files the lane's work item implied, or empty for ad-hoc work. */
@@ -447,6 +462,14 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
         return intakeFromDocument(input.filePath, input.contents ?? '', now())
       }
       return { ok: false, reason: 'nothing to bring in' }
+    },
+
+    runProducerAction: async (workItemId, action, args) => {
+      const published = publications.snapshot().items.find((entry) => entry.item.id === workItemId)
+      if (published === undefined) {
+        return { ok: false, reason: `no work item named ${workItemId} is published` }
+      }
+      return producers.invoke(published.producerId, action, args)
     },
 
     changedFilesFor: (sessionId: string) => changedFilesBySession.get(sessionId) ?? [],

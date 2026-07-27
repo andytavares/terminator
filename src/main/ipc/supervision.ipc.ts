@@ -36,6 +36,7 @@ export const SUPERVISION_CHANNELS = {
   entityIndex: 'supervision:entityIndex',
   intake: 'supervision:intake',
   assign: 'supervision:assign',
+  producerAction: 'supervision:producerAction',
 } as const
 
 /**
@@ -84,6 +85,11 @@ export interface SupervisionSource {
   entityIndex?(): readonly unknown[]
   intake?(input: { url?: string; filePath?: string; contents?: string }): unknown
   assign?(request: unknown): Promise<unknown>
+  producerAction?(
+    workItemId: string,
+    action: 'approveGate' | 'rejectGate' | 'advancePhase' | 'sendBack',
+    args: readonly unknown[]
+  ): Promise<{ ok: boolean; reason: string | null }>
 }
 
 const getSessionPayload = z.object({ sessionId: z.string().min(1) })
@@ -132,6 +138,13 @@ const assignPayload = z.object({
   laneOrd: z.number().int().positive().optional(),
   instruction: z.string().optional(),
   overrideBackpressure: z.boolean().optional(),
+})
+// The action set is closed: an unknown action must be refused here rather than
+// forwarded to a producer that would have to guess what it means.
+const producerActionPayload = z.object({
+  workItemId: z.string().min(1),
+  action: z.enum(['approveGate', 'rejectGate', 'advancePhase', 'sendBack']),
+  args: z.array(z.unknown()).default([]),
 })
 const judgePayload = z.object({
   firingId: z.string().min(1),
@@ -303,6 +316,21 @@ export function registerSupervisionHandlers(source: SupervisionSource): void {
     const parsed = assignPayload.safeParse(payload)
     if (!parsed.success) return { ok: false, reason: 'invalid request' }
     return (await source.assign?.(parsed.data)) ?? { ok: false, reason: 'assigning is unavailable' }
+  })
+
+  handleChannel(SUPERVISION_CHANNELS.producerAction, async (_event, payload: unknown) => {
+    const parsed = producerActionPayload.safeParse(payload)
+    if (!parsed.success) return { ok: false, reason: 'invalid request' }
+    return (
+      (await source.producerAction?.(
+        parsed.data.workItemId,
+        parsed.data.action,
+        parsed.data.args
+      )) ?? {
+        ok: false,
+        reason: 'no producer is registered',
+      }
+    )
   })
 
   handleChannel(SUPERVISION_CHANNELS.replyToSession, async (_event, payload: unknown) => {

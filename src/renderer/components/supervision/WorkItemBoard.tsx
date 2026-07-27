@@ -1,5 +1,15 @@
-import React from 'react'
-import { FileText, Map, ListChecks, Check, Minus, AlertTriangle } from 'lucide-react'
+import React, { useState } from 'react'
+import {
+  FileText,
+  Map,
+  ListChecks,
+  Check,
+  Minus,
+  AlertTriangle,
+  ThumbsUp,
+  Undo2,
+  ChevronRight,
+} from 'lucide-react'
 import type { WorkItemView as WorkItemContract } from '../../../shared/supervision/view-types.js'
 import './supervision.css'
 
@@ -30,6 +40,86 @@ export interface WorkItemBoardProps {
   /** False when no producer registered the action, rendering the card read-only. */
   canAct: boolean
   onOpen(workItemId: string): void
+  /** FR-083: implementation cannot begin until these are approved by a human. */
+  onApproveGate(workItemId: string, gate: string): void
+  /** FR-084: rejection carries the notes back to the producer. */
+  onRejectGate(workItemId: string, gate: string, notes: string): void
+  onSendBack(workItemId: string, phase: string, notes: string): void
+  onAdvancePhase(workItemId: string): void
+  actionError: string | null
+  onDismissActionError(): void
+}
+
+const GATES = [
+  { key: 'spec_approved_by_human', label: 'spec approved', phase: 'specify' },
+  { key: 'plan_approved_by_human', label: 'plan approved', phase: 'plan' },
+] as const
+
+/**
+ * The gate controls. Approving is one click; rejecting is deliberately not —
+ * sending work back without saying why is what produced the unbounded-scope
+ * failures this gate exists to prevent (FR-084).
+ */
+function GateActions({
+  item,
+  onApproveGate,
+  onRejectGate,
+  onSendBack,
+  onAdvancePhase,
+}: {
+  item: WorkItemContract
+  onApproveGate: WorkItemBoardProps['onApproveGate']
+  onRejectGate: WorkItemBoardProps['onRejectGate']
+  onSendBack: WorkItemBoardProps['onSendBack']
+  onAdvancePhase: WorkItemBoardProps['onAdvancePhase']
+}): JSX.Element {
+  const [rejecting, setRejecting] = useState<string | null>(null)
+  const [notes, setNotes] = useState('')
+
+  const reject = (gate: { key: string; phase: string }): void => {
+    if (notes.trim() === '') return
+    onRejectGate(item.id, gate.key, notes.trim())
+    // Returning the item to the phase that produced the artefact is the other
+    // half of the rejection — a rejected gate with the item left in `implement`
+    // would leave the work unbounded.
+    onSendBack(item.id, gate.phase, notes.trim())
+    setNotes('')
+    setRejecting(null)
+  }
+
+  return (
+    <div className="sv-queue__actions">
+      {GATES.filter((gate) => item.gates[gate.key]?.ok !== true).map((gate) => (
+        <React.Fragment key={gate.key}>
+          <button className="sv-queue__btn" onClick={() => onApproveGate(item.id, gate.key)}>
+            <ThumbsUp aria-hidden="true" /> Approve {gate.label.replace(' approved', '')}
+          </button>
+          {rejecting === gate.key ? (
+            <>
+              <input
+                aria-label={`Why are you rejecting the ${gate.label.replace(' approved', '')}?`}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') reject(gate)
+                }}
+              />
+              <button className="sv-queue__btn" onClick={() => reject(gate)}>
+                Send back
+              </button>
+            </>
+          ) : (
+            <button className="sv-queue__btn" onClick={() => setRejecting(gate.key)}>
+              <Undo2 aria-hidden="true" /> Reject {gate.label.replace(' approved', '')}
+            </button>
+          )}
+        </React.Fragment>
+      ))}
+      <button className="sv-queue__btn" onClick={() => onAdvancePhase(item.id)}>
+        <ChevronRight aria-hidden="true" /> Advance phase
+      </button>
+    </div>
+  )
 }
 
 function ArtifactChips({ item }: { item: WorkItemContract }): JSX.Element {
@@ -89,6 +179,12 @@ export function WorkItemBoard({
   conflicts,
   canAct,
   onOpen,
+  onApproveGate,
+  onRejectGate,
+  onSendBack,
+  onAdvancePhase,
+  actionError,
+  onDismissActionError,
 }: WorkItemBoardProps): JSX.Element {
   if (items.length === 0 && unreadable.length === 0) {
     // No producer installed is not an error — sessions are still supervised as
@@ -102,6 +198,18 @@ export function WorkItemBoard({
 
   return (
     <div className="sv-panel">
+      {actionError !== null && (
+        <div className="sv-row">
+          <span className="sv-warn">
+            <AlertTriangle aria-hidden="true" />
+            {actionError}
+          </span>
+          <button className="sv-queue__btn" onClick={onDismissActionError}>
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {conflicts.map((conflict) => (
         <div className="sv-row" key={conflict.workItemId}>
           <span className="sv-warn">
@@ -132,8 +240,8 @@ export function WorkItemBoard({
               <span>{inPhase.length}</span>
             </div>
             {inPhase.map(({ item }) => (
-              <button className="sv-row" key={item.id} onClick={() => onOpen(item.id)}>
-                <span className="sv-row__main">
+              <div className="sv-row" key={item.id}>
+                <button className="sv-row__main" onClick={() => onOpen(item.id)}>
                   <div className="sv-queue__title">{item.title}</div>
                   <div className="sv-queue__meta">
                     {item.id} · {item.lanes.length}{' '}
@@ -144,8 +252,19 @@ export function WorkItemBoard({
                     <ArtifactChips item={item} />
                     <GateChips item={item} />
                   </div>
-                </span>
-              </button>
+                </button>
+                {/* Read-only rather than broken when no producer registered a
+                    command: the card still renders and says why (FR-078). */}
+                {canAct && (
+                  <GateActions
+                    item={item}
+                    onApproveGate={onApproveGate}
+                    onRejectGate={onRejectGate}
+                    onSendBack={onSendBack}
+                    onAdvancePhase={onAdvancePhase}
+                  />
+                )}
+              </div>
             ))}
           </section>
         )

@@ -1106,6 +1106,14 @@ api.workItems.registerProducer({
 })
 ```
 
+The console calls these from the **Work items** tab. Approving a gate is one
+click; rejecting requires notes and also sends the item back to the phase that
+produced the artefact, so a rejected spec never leaves work running against it.
+`advancePhase` is offered on every card.
+
+Nothing else in the console writes your contract file — the file is yours, and
+these commands are the only way state ever changes.
+
 ### Versioning
 
 - **Major bump** for any removed or semantically changed required field. The

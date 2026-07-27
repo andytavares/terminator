@@ -69,6 +69,11 @@ interface SupervisionBridge {
     sessionId: string
   }): Promise<{ lastViewedAt: number | null; entries: FeedEntry[] }>
   precheckBackpressure?(): Promise<BackpressureDecision | null>
+  producerAction?(payload: {
+    workItemId: string
+    action: 'approveGate' | 'rejectGate' | 'advancePhase' | 'sendBack'
+    args: unknown[]
+  }): Promise<{ ok: boolean; reason: string | null }>
 }
 
 function bridge(): SupervisionBridge | null {
@@ -184,6 +189,29 @@ export function useSupervision(): UseSupervision {
     []
   )
 
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  // A producer refusing, or not providing the command at all, is reported —
+  // never swallowed. A button that silently does nothing is worse than one
+  // that explains itself (FR-078).
+  const act = useCallback(
+    async (
+      workItemId: string,
+      action: 'approveGate' | 'rejectGate' | 'advancePhase' | 'sendBack',
+      args: unknown[]
+    ): Promise<void> => {
+      const transport = bridge()
+      if (transport?.producerAction === undefined) {
+        setActionError('No producer is registered to act on this item.')
+        return
+      }
+      const result = await transport.producerAction({ workItemId, action, args })
+      setActionError(result.ok ? null : (result.reason ?? 'the producer refused'))
+      if (result.ok) void transport.listWorkItems?.().then(setBoard)
+    },
+    []
+  )
+
   const [remoteEntities, setRemoteEntities] = useState<PaletteEntity[] | null>(null)
 
   // Built once in the main process over every entity it knows about; the local
@@ -267,6 +295,23 @@ export function useSupervision(): UseSupervision {
     unreadable: board.unreadable,
     conflicts: board.conflicts,
     canAct: board.canAct,
+    // FR-083/FR-084. Without these the gate can never be satisfied and no
+    // session bound to a work item could ever start.
+    onApproveGate: (workItemId, gate) => {
+      void act(workItemId, 'approveGate', [workItemId, gate])
+    },
+    onRejectGate: (workItemId, gate, notes) => {
+      void act(workItemId, 'rejectGate', [workItemId, gate, notes])
+    },
+    onSendBack: (workItemId, phase, notes) => {
+      void act(workItemId, 'sendBack', [workItemId, phase, notes])
+    },
+    onAdvancePhase: (workItemId) => {
+      void act(workItemId, 'advancePhase', [workItemId])
+    },
+    actionError,
+    onDismissActionError: () => setActionError(null),
+
     onOpenWorkItem: (workItemId) => {
       setOpenWorkItem(workItemId)
       window.dispatchEvent(

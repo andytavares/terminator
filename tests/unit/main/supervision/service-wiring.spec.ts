@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { createSupervisionService } from '../../../../src/main/supervision/supervision-service.js'
@@ -329,5 +329,68 @@ describe('reconciling against the transcript', () => {
     service.bus.subscribe((event) => seen.push(event))
     service.reconcileFromTranscript('ghost')
     expect(seen).toEqual([])
+  })
+})
+
+// The outbound half of the boundary: the console directs actions at whichever
+// producer published the item, and never edits the contract file (FR-076,
+// FR-077).
+
+describe('directing an action at a producer', () => {
+  it('routes to the producer that published the item', async () => {
+    publish()
+    const service = build()
+    const approveGate = vi.fn().mockResolvedValue(undefined)
+    service.producers.register('test-producer', { approveGate })
+
+    await expect(
+      service.runProducerAction('FLU-220', 'approveGate', ['FLU-220', 'spec_approved_by_human'])
+    ).resolves.toEqual({ ok: true, reason: null })
+    expect(approveGate).toHaveBeenCalledWith('FLU-220', 'spec_approved_by_human')
+  })
+
+  it('carries the rejection notes through (FR-084)', async () => {
+    publish()
+    const service = build()
+    const rejectGate = vi.fn().mockResolvedValue(undefined)
+    service.producers.register('test-producer', { rejectGate })
+
+    await service.runProducerAction('FLU-220', 'rejectGate', [
+      'FLU-220',
+      'spec_approved_by_human',
+      'scope is unbounded',
+    ])
+    expect(rejectGate).toHaveBeenCalledWith(
+      'FLU-220',
+      'spec_approved_by_human',
+      'scope is unbounded'
+    )
+  })
+
+  it('reports an item nobody published rather than guessing a producer', async () => {
+    const service = build()
+    await expect(service.runProducerAction('FLU-999', 'approveGate', [])).resolves.toEqual({
+      ok: false,
+      reason: 'no work item named FLU-999 is published',
+    })
+  })
+
+  it('reports a command the producer does not provide (FR-078)', async () => {
+    publish()
+    const service = build()
+    service.producers.register('test-producer', { approveGate: vi.fn() })
+    await expect(service.runProducerAction('FLU-220', 'sendBack', [])).resolves.toMatchObject({
+      ok: false,
+    })
+  })
+
+  it('never writes the contract file itself (FR-076)', async () => {
+    publish()
+    const service = build()
+    const file = join(root, 'supervision', 'workitems', 'test-producer', 'FLU-220.json')
+    const before = readFileSync(file, 'utf-8')
+    service.producers.register('test-producer', { approveGate: vi.fn() })
+    await service.runProducerAction('FLU-220', 'approveGate', ['FLU-220', 'spec_approved_by_human'])
+    expect(readFileSync(file, 'utf-8')).toBe(before)
   })
 })
