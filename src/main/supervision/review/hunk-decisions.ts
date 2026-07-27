@@ -1,0 +1,77 @@
+// Per-hunk accept/reject (FR-052). Only accepted changes are retained.
+//
+// Going direct to the agent runtime is what makes this possible at all: Zed
+// cannot offer it for external agents because the ACP filesystem APIs were
+// removed. The unit of decision is a hunk, not a file, because a single file
+// routinely contains both the change you asked for and the one you did not.
+
+export interface Hunk {
+  readonly id: string
+  readonly file: string
+  /** First line of the hunk in the new file. */
+  readonly newStart: number
+  readonly lines: readonly string[]
+}
+
+export type HunkDecision = 'accept' | 'reject'
+
+export interface FileDecisions {
+  readonly file: string
+  readonly accepted: string[]
+  readonly rejected: string[]
+}
+
+export interface DecisionSet {
+  decide(hunkId: string, decision: HunkDecision): void
+  decisionFor(hunkId: string): HunkDecision | null
+  byFile(): FileDecisions[]
+  /** Every hunk decided, so the review can be completed. */
+  isComplete(): boolean
+  /** All rejected: the branch keeps nothing and the session is discarded, not merged. */
+  isFullReject(): boolean
+  acceptedHunks(): Hunk[]
+}
+
+export function createDecisionSet(hunks: readonly Hunk[]): DecisionSet {
+  const decisions = new Map<string, HunkDecision>()
+  const byId = new Map(hunks.map((hunk) => [hunk.id, hunk]))
+
+  return {
+    decide(hunkId: string, decision: HunkDecision): void {
+      // Unknown hunks are ignored rather than recorded: a decision about
+      // something that is not in the diff cannot be applied.
+      if (!byId.has(hunkId)) return
+      decisions.set(hunkId, decision)
+    },
+
+    decisionFor(hunkId: string): HunkDecision | null {
+      return decisions.get(hunkId) ?? null
+    },
+
+    byFile(): FileDecisions[] {
+      const files = new Map<string, FileDecisions>()
+      for (const hunk of hunks) {
+        const entry = files.get(hunk.file) ?? { file: hunk.file, accepted: [], rejected: [] }
+        const decision = decisions.get(hunk.id)
+        if (decision === 'accept') entry.accepted.push(hunk.id)
+        else if (decision === 'reject') entry.rejected.push(hunk.id)
+        files.set(hunk.file, entry)
+      }
+      return [...files.values()].sort((a, b) => a.file.localeCompare(b.file))
+    },
+
+    isComplete(): boolean {
+      return hunks.every((hunk) => decisions.has(hunk.id))
+    },
+
+    isFullReject(): boolean {
+      // Distinguished from "nothing decided yet": an empty diff is not a
+      // rejection, and a half-reviewed diff is not one either.
+      return hunks.length > 0 && hunks.every((hunk) => decisions.get(hunk.id) === 'reject')
+    },
+
+    acceptedHunks(): Hunk[] {
+      return hunks.filter((hunk) => decisions.get(hunk.id) === 'accept')
+    },
+  }
+}
