@@ -92,13 +92,20 @@ The **Needs you** tab carries the start panel.
    Anything reaching a host that is not on the repository's allowlist asks at
    **every** level, including `ship`.
 
-2. **Give it a repository and a branch.** Both are required.
+2. **Pick the repository** from the workspaces you already have open in the
+   sidebar. There is nothing to type, and nothing to mistype — the full path of
+   what you picked is shown beneath the picker.
 
-3. **Say what it should do** — or leave it empty if the session is bound to a
+3. **Name the branch.** **New** is the default and is cut from the repository's
+   current branch, which is named for you. Switch to **Existing** to choose from
+   that repository's own branches instead — an agent working directly on a
+   branch you already have is the case you want to have chosen deliberately.
+
+4. **Say what it should do** — or leave it empty if the session is bound to a
    work item, in which case the lane's tasks and artefact paths are handed to the
    agent for you.
 
-4. **Start.** Terminator provisions an isolated working copy first: a git
+5. **Start.** Terminator provisions an isolated working copy first: a git
    worktree, heavy directories like `node_modules` symlinked rather than copied,
    declared files such as `.env.local` copied in, a port range allocated and
    exported, and your setup script run. If setup exits non-zero, no agent starts

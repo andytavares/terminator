@@ -234,11 +234,25 @@ export function IntakePanel({ onIntake, result }: IntakePanelProps): JSX.Element
   )
 }
 
+export interface RepoChoice {
+  /** Absolute path to the repository working tree. */
+  readonly path: string
+  /** What the operator calls it in the sidebar. */
+  readonly label: string
+}
+
 export interface AssignPanelProps {
   autonomy: AutonomyLevel
   /** Prefilled from the selected work item's lane, when there is one. */
   workItemId: string | null
   laneOrd: number | null
+  /** The repositories the app already knows about, from the sidebar. */
+  repos: readonly RepoChoice[]
+  /** Branches in the chosen repository, or empty while they load. */
+  branches: readonly string[]
+  /** The repository's current branch, offered as the base for a new one. */
+  currentBranch: string | null
+  onRepoChange(repoPath: string): void
   onAssign(request: {
     repoPath: string
     branch: string
@@ -254,26 +268,46 @@ export interface AssignPanelProps {
 /**
  * Starting a supervised session. Everything else in the console exists to
  * supervise what this creates; without it the substrate has nothing to watch.
+ *
+ * The repository and the branch are picked from what the app already knows —
+ * the workspaces in the sidebar, and that repository's own branches. Asking an
+ * operator to retype a path the app is already displaying is how you get typos
+ * in the one field that cannot be wrong.
  */
 export function AssignPanel({
   autonomy,
   workItemId,
   laneOrd,
+  repos,
+  branches,
+  currentBranch,
+  onRepoChange,
   onAssign,
   lastResult,
   busy,
 }: AssignPanelProps): JSX.Element {
-  const [repoPath, setRepoPath] = React.useState('')
+  const [repoPath, setRepoPath] = React.useState(repos[0]?.path ?? '')
+  const [mode, setMode] = React.useState<'new' | 'existing'>('new')
   const [branch, setBranch] = React.useState('')
   const [instruction, setInstruction] = React.useState('')
 
-  const ready = repoPath.trim() !== '' && branch.trim() !== ''
+  // Follow the sidebar: if the panel opens before the workspaces have loaded,
+  // or the operator removes the one that was selected, land on a real one.
+  React.useEffect(() => {
+    if (repos.length === 0) return
+    if (repos.some((repo) => repo.path === repoPath)) return
+    setRepoPath(repos[0].path)
+    onRepoChange(repos[0].path)
+  }, [repos, repoPath, onRepoChange])
+
+  const chosen = mode === 'new' ? branch.trim() : branch
+  const ready = repoPath !== '' && chosen !== ''
 
   const submit = (): void => {
     if (!ready || busy) return
     onAssign({
-      repoPath: repoPath.trim(),
-      branch: branch.trim(),
+      repoPath,
+      branch: chosen,
       instruction: instruction.trim() === '' ? undefined : instruction.trim(),
       workItemId: workItemId ?? undefined,
       laneOrd: laneOrd ?? undefined,
@@ -290,25 +324,86 @@ export function AssignPanel({
       </div>
 
       <div className="sv-form">
-        <label className="sv-field">
-          <span className="sv-field__label">Repository</span>
-          <input
-            aria-label="Repository path"
-            placeholder="/Users/you/repos/fluent"
-            value={repoPath}
-            onChange={(event) => setRepoPath(event.target.value)}
-          />
-        </label>
+        {repos.length === 0 ? (
+          <span className="sv-field__note">
+            No repositories yet. Add a workspace in the sidebar and it will appear here.
+          </span>
+        ) : (
+          <label className="sv-field">
+            <span className="sv-field__label">Repository</span>
+            <select
+              aria-label="Repository"
+              value={repoPath}
+              onChange={(event) => {
+                setRepoPath(event.target.value)
+                setBranch('')
+                onRepoChange(event.target.value)
+              }}
+            >
+              {repos.map((repo) => (
+                <option key={repo.path} value={repo.path}>
+                  {repo.label}
+                </option>
+              ))}
+            </select>
+            {/* The path below rather than inside the option: an option string
+                carrying a full path is unreadable at any real path length. */}
+            <span className="sv-field__note">{repoPath}</span>
+          </label>
+        )}
 
-        <label className="sv-field">
+        <div className="sv-field">
           <span className="sv-field__label">Branch</span>
-          <input
-            aria-label="Branch"
-            placeholder="feat/session-ulid"
-            value={branch}
-            onChange={(event) => setBranch(event.target.value)}
-          />
-        </label>
+          {/* New by default: an agent working directly on an existing branch is
+              the case you want to have chosen deliberately. */}
+          <div className="sv-segmented" role="radiogroup" aria-label="Branch">
+            {(['new', 'existing'] as const).map((option) => (
+              <label className="sv-segmented__option" key={option}>
+                <input
+                  type="radio"
+                  name="branch-mode"
+                  value={option}
+                  checked={mode === option}
+                  onChange={() => {
+                    setMode(option)
+                    setBranch('')
+                  }}
+                />
+                <span>{option === 'new' ? 'New' : 'Existing'}</span>
+              </label>
+            ))}
+          </div>
+
+          {mode === 'new' ? (
+            <>
+              <input
+                aria-label="New branch name"
+                placeholder="feat/session-ulid"
+                value={branch}
+                onChange={(event) => setBranch(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') submit()
+                }}
+              />
+              {currentBranch !== null && (
+                <span className="sv-field__note">Branched from {currentBranch}.</span>
+              )}
+            </>
+          ) : (
+            <select
+              aria-label="Existing branch"
+              value={branch}
+              onChange={(event) => setBranch(event.target.value)}
+            >
+              <option value="">Choose a branch…</option>
+              {branches.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
 
         <label className="sv-field">
           <span className="sv-field__label">
@@ -341,7 +436,9 @@ export function AssignPanel({
           >
             {busy ? 'Starting…' : 'Start'}
           </button>
-          {!ready && <span className="sv-field__note">Repository and branch are required.</span>}
+          {!ready && repos.length > 0 && (
+            <span className="sv-field__note">Name the branch it should work on.</span>
+          )}
         </div>
 
         {/* A refusal is never silent: the gate, the queue and a failed setup

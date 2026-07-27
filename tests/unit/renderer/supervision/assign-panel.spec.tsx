@@ -9,12 +9,21 @@ import {
 // The front door. Everything else in the console supervises what this creates.
 
 describe('AssignPanel', () => {
+  const REPOS = [
+    { path: '/Users/you/repos/fluent', label: 'fluent' },
+    { path: '/Users/you/repos/forge', label: 'forge' },
+  ]
+
   const panel = (over: Record<string, unknown> = {}) =>
     render(
       <AssignPanel
         autonomy="edit"
         workItemId={null}
         laneOrd={null}
+        repos={REPOS}
+        branches={['main', 'feat/existing']}
+        currentBranch="main"
+        onRepoChange={() => {}}
         onAssign={() => {}}
         lastResult={null}
         busy={false}
@@ -22,36 +31,106 @@ describe('AssignPanel', () => {
       />
     )
 
-  function fill(): void {
-    fireEvent.change(screen.getByLabelText('Repository path'), {
-      target: { value: '/repos/fluent' },
-    })
-    fireEvent.change(screen.getByLabelText('Branch'), { target: { value: 'feat/x' } })
+  const nameBranch = (name: string): void => {
+    fireEvent.change(screen.getByLabelText('New branch name'), { target: { value: name } })
   }
 
-  it('will not start without a repository and a branch', () => {
+  it('offers the repositories the app already knows, not a path to retype', () => {
+    panel()
+    const select = screen.getByLabelText('Repository') as HTMLSelectElement
+    expect([...select.options].map((option) => option.value)).toEqual([
+      '/Users/you/repos/fluent',
+      '/Users/you/repos/forge',
+    ])
+  })
+
+  it('selects the first repository without being asked', () => {
+    panel()
+    expect((screen.getByLabelText('Repository') as HTMLSelectElement).value).toBe(
+      '/Users/you/repos/fluent'
+    )
+  })
+
+  it('shows the path of what is selected, without burying it in the option', () => {
+    panel()
+    expect(screen.getByText('/Users/you/repos/fluent')).toBeDefined()
+  })
+
+  it('says so when there are no repositories yet, rather than an empty picker', () => {
+    panel({ repos: [] })
+    expect(screen.getByText(/Add a workspace in the sidebar/)).toBeDefined()
+  })
+
+  it('reports the chosen repository so its branches can be read', () => {
+    const onRepoChange = vi.fn()
+    panel({ onRepoChange })
+    fireEvent.change(screen.getByLabelText('Repository'), {
+      target: { value: '/Users/you/repos/forge' },
+    })
+    expect(onRepoChange).toHaveBeenCalledWith('/Users/you/repos/forge')
+  })
+
+  it('will not start without a branch', () => {
     panel()
     expect(screen.getByText('Start').closest('button')?.hasAttribute('disabled')).toBe(true)
   })
 
-  it('starts once both are given', () => {
+  it('starts on a new branch, which is the default', () => {
     const onAssign = vi.fn()
     panel({ onAssign })
-    fill()
+    nameBranch('feat/session-ulid')
     fireEvent.click(screen.getByText('Start'))
     expect(onAssign).toHaveBeenCalledWith({
-      repoPath: '/repos/fluent',
-      branch: 'feat/x',
+      repoPath: '/Users/you/repos/fluent',
+      branch: 'feat/session-ulid',
       instruction: undefined,
       workItemId: undefined,
       laneOrd: undefined,
     })
   })
 
+  it('names what a new branch is cut from', () => {
+    panel()
+    expect(screen.getByText(/Branched from main/)).toBeDefined()
+  })
+
+  it('offers the repository’s own branches when working on an existing one', () => {
+    panel()
+    fireEvent.click(screen.getByText('Existing'))
+    const select = screen.getByLabelText('Existing branch') as HTMLSelectElement
+    expect([...select.options].map((option) => option.value)).toEqual(['', 'main', 'feat/existing'])
+  })
+
+  it('starts on a chosen existing branch', () => {
+    const onAssign = vi.fn()
+    panel({ onAssign })
+    fireEvent.click(screen.getByText('Existing'))
+    fireEvent.change(screen.getByLabelText('Existing branch'), {
+      target: { value: 'feat/existing' },
+    })
+    fireEvent.click(screen.getByText('Start'))
+    expect(onAssign).toHaveBeenCalledWith(expect.objectContaining({ branch: 'feat/existing' }))
+  })
+
+  it('will not start on the empty placeholder option', () => {
+    panel()
+    fireEvent.click(screen.getByText('Existing'))
+    expect(screen.getByText('Start').closest('button')?.hasAttribute('disabled')).toBe(true)
+  })
+
+  it('clears the branch when the repository changes, so it cannot be stale', () => {
+    panel()
+    nameBranch('feat/session-ulid')
+    fireEvent.change(screen.getByLabelText('Repository'), {
+      target: { value: '/Users/you/repos/forge' },
+    })
+    expect((screen.getByLabelText('New branch name') as HTMLInputElement).value).toBe('')
+  })
+
   it('carries an ad-hoc instruction, which is the whole task when there is no work item', () => {
     const onAssign = vi.fn()
     panel({ onAssign })
-    fill()
+    nameBranch('feat/x')
     fireEvent.change(screen.getByLabelText('Instruction'), {
       target: { value: 'fix the flaky test' },
     })
@@ -61,26 +140,26 @@ describe('AssignPanel', () => {
     )
   })
 
-  it('starts on Enter from the instruction box', () => {
+  it('starts on Enter from the branch name', () => {
     const onAssign = vi.fn()
     panel({ onAssign })
-    fill()
-    fireEvent.keyDown(screen.getByLabelText('Instruction'), { key: 'Enter' })
+    nameBranch('feat/x')
+    fireEvent.keyDown(screen.getByLabelText('New branch name'), { key: 'Enter' })
     expect(onAssign).toHaveBeenCalled()
   })
 
   it('ignores other keys', () => {
     const onAssign = vi.fn()
     panel({ onAssign })
-    fill()
-    fireEvent.keyDown(screen.getByLabelText('Instruction'), { key: 'a' })
+    nameBranch('feat/x')
+    fireEvent.keyDown(screen.getByLabelText('New branch name'), { key: 'a' })
     expect(onAssign).not.toHaveBeenCalled()
   })
 
   it('binds to the selected work item and lane', () => {
     const onAssign = vi.fn()
     panel({ onAssign, workItemId: 'FLU-220', laneOrd: 2 })
-    fill()
+    nameBranch('feat/x')
     fireEvent.click(screen.getByText('Start'))
     expect(onAssign).toHaveBeenCalledWith(
       expect.objectContaining({ workItemId: 'FLU-220', laneOrd: 2 })
@@ -105,7 +184,7 @@ describe('AssignPanel', () => {
   it('will not start twice while one attempt is in flight', () => {
     const onAssign = vi.fn()
     panel({ onAssign, busy: true })
-    fill()
+    nameBranch('feat/x')
     fireEvent.click(screen.getByText('Starting…'))
     expect(onAssign).not.toHaveBeenCalled()
   })
@@ -123,6 +202,13 @@ describe('AssignPanel', () => {
   it('falls back to a stated reason when none was given', () => {
     panel({ lastResult: { ok: false } })
     expect(screen.getByText(/could not start/)).toBeDefined()
+  })
+
+  it('offers no branch list it cannot fill', () => {
+    panel({ branches: [], currentBranch: null })
+    fireEvent.click(screen.getByText('Existing'))
+    const select = screen.getByLabelText('Existing branch') as HTMLSelectElement
+    expect(select.options).toHaveLength(1)
   })
 })
 

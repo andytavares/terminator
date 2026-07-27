@@ -24,6 +24,7 @@ import {
   ProvisioningStatus,
   AssignPanel,
   IntakePanel,
+  type RepoChoice,
 } from './AssignControls.js'
 import type { AttentionItem } from '../../../shared/supervision/rank-attention.js'
 import type { AutonomyLevel, RuntimeState } from '../../../shared/types/supervision.js'
@@ -121,6 +122,11 @@ export interface SupervisionScreenProps {
   /** Starting a supervised session — the front door (FR-030, FR-041). */
   assigning: boolean
   assignResult: { ok: boolean; reason?: string; worktreePath?: string } | null
+  /** Repositories the app already knows about, and the chosen one's branches. */
+  repos: readonly RepoChoice[]
+  branches: readonly string[]
+  currentBranch: string | null
+  onRepoChange(repoPath: string): void
   onAssign(request: {
     repoPath: string
     branch: string
@@ -223,6 +229,10 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
               autonomy={props.autonomy}
               workItemId={props.selectedWorkItemId}
               laneOrd={props.selectedLaneOrd}
+              repos={props.repos}
+              branches={props.branches}
+              currentBranch={props.currentBranch}
+              onRepoChange={props.onRepoChange}
               onAssign={props.onAssign}
               lastResult={props.assignResult}
               busy={props.assigning}

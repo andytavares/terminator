@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useSupervision } from '../../../../src/renderer/hooks/useSupervision.js'
 import { useSupervisionStore } from '../../../../src/renderer/stores/supervision.store.js'
+import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store.js'
 import type { SupervisedSession } from '../../../../src/shared/types/supervision.js'
 
 // The hook is the only thing binding the substrate to the surfaces. Every
@@ -117,11 +118,35 @@ let bridge: ReturnType<typeof makeBridge>
 
 function install(over: Record<string, unknown> = {}): void {
   bridge = makeBridge(over)
-  ;(globalThis as { electronAPI?: unknown }).electronAPI = { supervision: bridge }
+  ;(globalThis as { electronAPI?: unknown }).electronAPI = {
+    supervision: bridge,
+    git: {
+      listBranches: vi.fn().mockResolvedValue({
+        branches: [
+          { name: 'main', isCurrent: true, isRemote: false },
+          { name: 'feat/x', isCurrent: false, isRemote: false },
+          { name: 'origin/main', isCurrent: false, isRemote: true },
+        ],
+      }),
+    },
+  }
 }
 
 beforeEach(() => {
   useSupervisionStore.setState({ sessions: [], loaded: false })
+  useWorkspaceStore.setState({
+    workspaces: [
+      {
+        id: 'w1',
+        name: 'fluent',
+        folderPath: '/Users/you/repos/fluent',
+        color: '#4A90E2',
+        tags: [],
+        createdAt: '',
+        updatedAt: '',
+      },
+    ],
+  })
   install()
 })
 
@@ -911,5 +936,51 @@ describe('acting on a stall (FR-029)', () => {
       result.current.screenProps.onInterrupt('s1')
       result.current.screenProps.onDiscard('s1')
     }).not.toThrow()
+  })
+})
+
+// The repository and branch come from what the app already knows: the
+// workspaces in the sidebar, and that repository's own branches.
+
+describe('choosing where the agent works', () => {
+  it('offers the workspaces the sidebar is already showing', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    expect(result.current.screenProps.repos).toEqual([
+      { path: '/Users/you/repos/fluent', label: 'fluent' },
+    ])
+  })
+
+  it('reads the branches of the chosen repository', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.screenProps.branches).toEqual(['main', 'feat/x']))
+    expect(result.current.screenProps.currentBranch).toBe('main')
+  })
+
+  it('leaves out remote branches, which an agent cannot work on directly', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.screenProps.branches.length).toBeGreaterThan(0))
+    expect(result.current.screenProps.branches).not.toContain('origin/main')
+  })
+
+  it('re-reads when the operator picks another repository', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    const listBranches = (
+      globalThis as { electronAPI?: { git: { listBranches: ReturnType<typeof vi.fn> } } }
+    ).electronAPI!.git.listBranches
+    listBranches.mockClear()
+    act(() => result.current.screenProps.onRepoChange('/Users/you/repos/forge'))
+    await waitFor(() => expect(listBranches).toHaveBeenCalledWith('/Users/you/repos/forge'))
+  })
+
+  it('offers no branches for something that is not a repository', async () => {
+    ;(
+      globalThis as { electronAPI?: { git: { listBranches: ReturnType<typeof vi.fn> } } }
+    ).electronAPI!.git.listBranches.mockRejectedValue(new Error('not a git repository'))
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    // A stale list from whichever repository was chosen before would be worse.
+    await waitFor(() => expect(result.current.screenProps.branches).toEqual([]))
   })
 })

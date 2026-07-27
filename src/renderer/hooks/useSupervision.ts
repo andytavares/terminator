@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSupervisionStore } from '../stores/supervision.store'
+import { useWorkspaceStore } from '../stores/workspace.store'
 import type { AttentionItem } from '../../shared/supervision/rank-attention'
 import type { StatusSummary } from '../../shared/schemas/supervision'
 import type { AutonomyLevel, RuntimeState, SupervisedSession } from '../../shared/types/supervision'
@@ -173,6 +174,50 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
     diffDelta: { files: number; added: number; removed: number } | null
   }>({ lastViewedAt: null, entries: [], stateChanges: [], diffDelta: null })
   const [backpressure, setBackpressure] = useState<BackpressureDecision | null>(null)
+
+  const [assignRepo, setAssignRepo] = useState<string | null>(null)
+  const [branches, setBranches] = useState<string[]>([])
+  const [currentBranch, setCurrentBranch] = useState<string | null>(null)
+
+  // The repositories the operator has already opened. Retyping a path the app
+  // is displaying two panels away is how you get a typo in the one field that
+  // cannot be wrong.
+  const workspaces = useWorkspaceStore((state) => state.workspaces)
+  const repos = useMemo(
+    () =>
+      // Guarded: the supervision panel must not be able to take the whole app
+      // down over the shape of somebody else's store.
+      (Array.isArray(workspaces) ? workspaces : [])
+        .filter((workspace) => typeof workspace?.folderPath === 'string')
+        .map((workspace) => ({ path: workspace.folderPath, label: workspace.name })),
+    [workspaces]
+  )
+
+  // Its own branches, read the same way the sidebar reads them.
+  useEffect(() => {
+    const repoPath = assignRepo ?? repos[0]?.path
+    if (repoPath === undefined) return
+
+    let cancelled = false
+    void window.electronAPI?.git
+      ?.listBranches?.(repoPath)
+      .then((result) => {
+        if (cancelled) return
+        const local = result.branches.filter((branch) => !branch.isRemote)
+        setBranches(local.map((branch) => branch.name))
+        setCurrentBranch(local.find((branch) => branch.isCurrent)?.name ?? null)
+      })
+      .catch(() => {
+        // Not a repository, or git is unavailable: offer no branches rather
+        // than a stale list from whichever repository was chosen before.
+        if (cancelled) return
+        setBranches([])
+        setCurrentBranch(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [assignRepo, repos])
 
   const loaded = useSupervisionStore((state) => state.loaded)
   const load = useSupervisionStore((state) => state.load)
@@ -506,6 +551,10 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
     // creates; without it the substrate has nothing to watch.
     assigning,
     assignResult,
+    repos,
+    branches,
+    currentBranch,
+    onRepoChange: setAssignRepo,
     onAssign: (request: {
       repoPath: string
       branch: string
