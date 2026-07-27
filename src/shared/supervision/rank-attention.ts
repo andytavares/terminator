@@ -21,6 +21,12 @@ export interface AttentionItem {
   readonly reason: AttentionReason
   readonly waitingMs: number
   readonly pendingPermission: PendingPermission | null
+  /**
+   * Why it failed, carried onto the queue itself. "Failed" with the reason
+   * hidden behind a click is exactly the trip this console exists to save
+   * (FR-034).
+   */
+  readonly failure: { step: 'setup' | 'agent'; exitCode: number | null; output: string } | null
 }
 
 // Ordered by how much the operator is needed, not by project and not by
@@ -54,6 +60,7 @@ export function rankAttention(
           reason,
           waitingMs: Math.max(0, now - session.stateSince),
           pendingPermission: session.pendingPermission,
+          failure: session.failure,
         },
       ]
     })

@@ -1024,7 +1024,7 @@ Key behavioural differences in the webview model:
 
 ---
 
-## Publishing work items to the supervision console
+## Publishing work items to the supervision console _(v1.5.0)_
 
 The console supervises agent sessions and renders work items, but it never runs
 a specification pipeline itself. Producing work items is an extension's job.
@@ -1135,7 +1135,7 @@ surface.
 | Same `id` from two producers     | **both** flagged as conflicted, naming both. Never silently resolved |
 | Zero lanes                       | schema violation                                                     |
 
-## Reading supervision state
+## Reading supervision state _(v1.5.0)_
 
 ```ts
 const sessions = await api.supervision.listSessions()

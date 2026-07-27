@@ -100,6 +100,7 @@ function project(sessionId: string, entry: PersistedEntry): SupervisedSession {
     diffSummary: state.diffSummary,
     autonomyLevel: meta.autonomyLevel,
     lastViewedAt: entry.lastViewedAt,
+    failure: state.failure ?? null,
   }
 }
 

@@ -198,6 +198,7 @@ export interface ExtensionAPI {
    * Nothing here lets an extension assert state. Runtime state is derived from
    * observed agent activity — an extension declaring it would defeat the point.
    */
+  /** v1.5.0 */
   supervision: {
     listSessions(): Promise<readonly SupervisedSessionView[]>
     getSession(sessionId: string): Promise<SupervisedSessionView | null>
@@ -214,6 +215,7 @@ export interface ExtensionAPI {
    * Working-copy provisioning, provided by the core application. Extensions may
    * consume it; core never calls an extension's provisioning.
    */
+  /** v1.5.0 */
   worktrees: {
     provision(opts: {
       repoPath: string
@@ -231,6 +233,7 @@ export interface ExtensionAPI {
    * Every handler is optional — an unregistered action renders read-only with a
    * stated reason rather than failing.
    */
+  /** v1.5.0 */
   workItems: {
     /** Absolute path this producer writes contract files into. Created on call. */
     publicationDirectory(): Promise<string>

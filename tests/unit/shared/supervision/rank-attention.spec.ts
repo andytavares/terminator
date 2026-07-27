@@ -30,6 +30,7 @@ function session(over: Partial<SupervisedSession> = {}): SupervisedSession {
     diffSummary: { files: 0, added: 0, removed: 0 },
     autonomyLevel: 'edit',
     lastViewedAt: null,
+    failure: null,
     ...over,
   }
 }
@@ -145,5 +146,21 @@ describe('shared view types', () => {
     const { REVIEW_STEPS } = await import('../../../../src/shared/supervision/view-types.js')
     // Intent first is the point — it is the step every diff viewer skips.
     expect([...REVIEW_STEPS]).toEqual(['intent', 'risk', 'structure', 'tests'])
+  })
+})
+
+describe('the failure reason travels with the item (FR-034)', () => {
+  it('carries the setup output onto the queue', () => {
+    const failed = session({
+      runtimeState: 'failed',
+      failure: { step: 'setup', exitCode: 3, output: 'lockfile is out of date' },
+    })
+    const [item] = rankAttention([failed], 10_000)
+    expect(item.failure).toMatchObject({ step: 'setup', exitCode: 3 })
+  })
+
+  it('is null for a session that did not fail', () => {
+    const [item] = rankAttention([session({ runtimeState: 'needs_input' })], 10_000)
+    expect(item.failure).toBeNull()
   })
 })

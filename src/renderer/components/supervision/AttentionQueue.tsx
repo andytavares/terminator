@@ -61,6 +61,15 @@ export function AttentionQueue({
                 <> · host {item.pendingPermission.targetHost}</>
               )}
             </div>
+            {/* The reason, on the queue itself: "failed" with the output hidden
+                behind a click is exactly the trip this saves (FR-034). */}
+            {item.failure !== null && (
+              <div className="sv-row__trigger">
+                {item.failure.step === 'setup' ? 'setup' : 'agent'}
+                {item.failure.exitCode !== null && ` exited ${item.failure.exitCode}`}
+                {item.failure.output.trim() !== '' && ` — ${item.failure.output.trim()}`}
+              </div>
+            )}
           </button>
 
           {item.pendingPermission !== null && (

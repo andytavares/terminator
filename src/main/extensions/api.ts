@@ -727,7 +727,7 @@ export function createExtensionAPI(
         })
       },
     },
-    // ── supervision ────────────────────────────────────────────────────────
+    // ── supervision (v1.5.0) ───────────────────────────────────────────────
     // Read-only, and deliberately narrow: no transcript path, no pending
     // permission, no raw event stream. Runtime state is derived from observed
     // agent activity, so nothing here lets an extension assert it.

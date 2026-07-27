@@ -75,6 +75,8 @@ EOF
 
 **Expected**: buildable and runnable with zero manual steps; `node_modules` shared not copied; `.env.local` present (SC-005).
 
+Automated equivalent: `npx vitest run tests/integration/supervision/provisioning.spec.ts` — a real git repository, a real setup script, and the production provisioner.
+
 2. Provision a second working copy of the same repository concurrently.
 
 **Expected**: non-overlapping port spans; both dev servers start (SC-008).

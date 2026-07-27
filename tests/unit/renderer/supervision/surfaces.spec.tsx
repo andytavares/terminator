@@ -62,6 +62,7 @@ function attention(over: Partial<AttentionItem> = {}): AttentionItem {
       targetHost: 'prod-cache-01',
       requestedAt: 1_000,
     },
+    failure: null,
     ...over,
   }
 }
@@ -1038,5 +1039,72 @@ describe('WorkItemBoard gate actions (FR-083, FR-084)', () => {
     board({ onOpen })
     fireEvent.click(screen.getByText('Unify session identity'))
     expect(onOpen).toHaveBeenCalledWith('FLU-220')
+  })
+})
+
+describe('a failed session says why on the queue itself (FR-034)', () => {
+  const failed = {
+    sessionId: 's1',
+    repoPath: '/repos/fluent',
+    reason: 'failed' as const,
+    waitingMs: 60_000,
+    pendingPermission: null,
+    failure: { step: 'setup' as const, exitCode: 3, output: 'lockfile is out of date' },
+  }
+
+  it('shows the step, the exit code and the output without opening anything', () => {
+    render(
+      <AttentionQueue
+        items={[failed]}
+        loaded
+        workingCount={0}
+        onApprove={() => {}}
+        onDeny={() => {}}
+        onOpen={() => {}}
+      />
+    )
+    expect(screen.getByText(/setup exited 3 — lockfile is out of date/)).toBeDefined()
+  })
+
+  it('shows nothing extra for a session that did not fail', () => {
+    render(
+      <AttentionQueue
+        items={[{ ...failed, reason: 'needs_input' as const, failure: null }]}
+        loaded
+        workingCount={0}
+        onApprove={() => {}}
+        onDeny={() => {}}
+        onOpen={() => {}}
+      />
+    )
+    expect(screen.queryByText(/exited/)).toBeNull()
+  })
+
+  it('omits an exit code it does not have', () => {
+    render(
+      <AttentionQueue
+        items={[{ ...failed, failure: { step: 'agent', exitCode: null, output: 'model refused' } }]}
+        loaded
+        workingCount={0}
+        onApprove={() => {}}
+        onDeny={() => {}}
+        onOpen={() => {}}
+      />
+    )
+    expect(screen.getByText(/agent — model refused/)).toBeDefined()
+  })
+
+  it('says only the step when there was no output at all', () => {
+    render(
+      <AttentionQueue
+        items={[{ ...failed, failure: { step: 'setup', exitCode: 1, output: '   ' } }]}
+        loaded
+        workingCount={0}
+        onApprove={() => {}}
+        onDeny={() => {}}
+        onOpen={() => {}}
+      />
+    )
+    expect(screen.getByText(/setup exited 1/)).toBeDefined()
   })
 })

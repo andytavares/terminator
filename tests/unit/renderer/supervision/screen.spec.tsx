@@ -73,6 +73,7 @@ function props(over: Partial<SupervisionScreenProps> = {}): SupervisionScreenPro
     provisioning: null,
     onOpenInEditor: vi.fn(),
     lastViewedAt: null,
+    failure: null,
     sinceEntries: [],
     sinceStateChanges: [],
     sinceDiffDelta: null,
@@ -243,6 +244,7 @@ describe('a stalled session offers something to do about it (FR-029)', () => {
     reason: 'stalled' as const,
     waitingMs: 600_000,
     pendingPermission: null,
+    failure: null,
   }
 
   it('offers all four actions', () => {

@@ -48,6 +48,12 @@ export interface PendingPermission {
   readonly autoDecision?: 'allow' | null
 }
 
+export interface SessionFailureView {
+  readonly step: 'setup' | 'agent'
+  readonly exitCode: number | null
+  readonly output: string
+}
+
 export interface SupervisedSession {
   readonly id: string
   readonly workItemId: string | null
@@ -77,4 +83,11 @@ export interface SupervisedSession {
   readonly autonomyLevel: AutonomyLevel
   /** Drives the "since you last looked" panel (FR-027). */
   readonly lastViewedAt: number | null
+  /**
+   * Why it failed, when it did. FR-034: a setup script that exited non-zero
+   * must be readable from a listing surface — "failed" without the output
+   * makes you open the session to learn anything, which is the whole thing
+   * this console exists to avoid.
+   */
+  readonly failure: SessionFailureView | null
 }

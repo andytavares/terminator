@@ -57,6 +57,13 @@ export const supervisedSessionSchema = z.object({
   diffSummary: diffSummarySchema,
   autonomyLevel: autonomyLevelSchema,
   lastViewedAt: epochMs.nullable(),
+  failure: z
+    .object({
+      step: z.enum(['setup', 'agent']),
+      exitCode: z.number().int().nullable(),
+      output: z.string(),
+    })
+    .nullable(),
 })
 
 export const supervisedSessionListSchema = z.array(supervisedSessionSchema)

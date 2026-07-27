@@ -59,6 +59,7 @@ describe('SupervisedSession schema', () => {
     diffSummary: { files: 2, added: 10, removed: 4 },
     autonomyLevel: 'edit',
     lastViewedAt: null,
+    failure: null,
   }
 
   it('accepts a well-formed session', () => {
@@ -143,6 +144,7 @@ describe('a session that has not started yet', () => {
       diffSummary: { files: 0, added: 0, removed: 0 },
       autonomyLevel: 'edit' as const,
       lastViewedAt: null,
+      failure: null,
     }
     expect(supervisedSessionSchema.safeParse(base).success).toBe(true)
   })
