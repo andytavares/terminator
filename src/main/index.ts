@@ -14,6 +14,7 @@ import { registerMetricsHandlers } from './ipc/metrics.ipc.js'
 import { registerDbIpcHandlers } from './ipc/db.ipc.js'
 import { registerSupervisionHandlers } from './ipc/supervision.ipc.js'
 import { createSupervisionService } from './supervision/supervision-service.js'
+import { createStateFanout } from './supervision/state-fanout.js'
 import { supervisionStore } from './storage/supervision-store.js'
 import { setSupervisionDeps } from './extensions/api.js'
 import { mayArchive } from './supervision/worktree/archive.js'
@@ -25,6 +26,7 @@ import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
 import { ExtensionViewHost } from './extensions/extension-view-host.js'
 import { logger } from './logger.js'
+import { notificationManager } from './notifications/notification-manager.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
@@ -308,6 +310,12 @@ app.whenReady().then(async () => {
   // place it is constructed. Stall detection starts in shadow mode by default
   // (FR-018) — it records from the first run but stays silent until the
   // operator turns shadow mode off on the evidence of the precision report.
+  const stateFanout = createStateFanout({
+    toRenderer: (change) => mainWindow?.webContents.send('supervision:stateChanged', change),
+    onSubscriberError: (error) =>
+      logger.error('[supervision] extension state subscriber failed', error),
+  })
+
   const supervision = createSupervisionService({
     userDataPath: userData,
     registryStore: {
@@ -322,7 +330,17 @@ app.whenReady().then(async () => {
       get: () => supervisionStore.get('laneBindings'),
       set: (value) => supervisionStore.set('laneBindings', value),
     },
-    onStateChanged: (change) => mainWindow?.webContents.send('supervision:stateChanged', change),
+    onStateChanged: (change) => stateFanout.publish(change),
+    // FR-027: a stall is a non-blocking indicator, never a modal. The service
+    // has already applied the channel policy — anything that reaches here is
+    // meant to be seen.
+    notify: (entry) =>
+      void notificationManager.create({
+        type: 'warning',
+        title: 'A session stopped making progress',
+        message: entry.summary,
+        key: 'supervision.stalled',
+      }),
   })
   supervision.start()
   app.on('will-quit', () => supervision.stop())
@@ -333,7 +351,7 @@ app.whenReady().then(async () => {
   setSupervisionDeps({
     listSessions: () => supervision.listSessions(),
     getSession: (sessionId) => supervision.getSession(sessionId),
-    onStateChanged: () => () => {},
+    onStateChanged: (handler) => stateFanout.subscribe(handler),
     provisionWorktree: async (opts) => {
       const result = await supervision.provisioner.provision({
         sessionId: opts.workItemId ?? opts.branch,

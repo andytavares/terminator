@@ -858,6 +858,14 @@ failure and ready, and the digest for routine progress. Deferral is only a
 discipline if the deferred thing is delivered, so the digest has a surface —
 `DigestPanel`, at the top of the Feed tab, over a one-hour window.
 
+### One fan-out, two audiences
+
+`state-fanout.ts` is the only place a state change reaches anyone. The renderer
+is told first and outside the subscriber loop — SC-001 budgets two seconds for a
+blocked session to become visible and an extension must not be able to spend it
+— then every extension that subscribed through the published API. A subscriber
+that throws is logged and skipped, never allowed to starve the rest.
+
 ### Directing actions at a producer
 
 The console reads work items from a directory it owns and never writes them.
