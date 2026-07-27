@@ -1,0 +1,44 @@
+src/main/supervision/state/state-machine.ts
+  s_5f98598a6d950e::t_5e85345a3c4286 133-141
+  s_5f98598a6d950e::t_016da52a64f350 143-145
+src/main/supervision/supervision-service.ts
+  s_5f98598a6d950e::t_c8abd48493ceba 13
+  s_5f98598a6d950e::t_b81a555a6ef223 127-131,529-550
+  s_5f98598a6d950e::t_1f151927997b2b 436
+  s_5f98598a6d950e::t_8f28f21eedaaa0 400,414-435
+  s_5f98598a6d950e::t_adab828609e13e 126,551-552
+src/main/supervision/events/session-event.ts
+  s_5f98598a6d950e::t_016da52a64f350 20,85-95,105
+tests/unit/main/supervision/events/session-event.spec.ts
+  s_5f98598a6d950e::t_5adf5f79fdef15 24
+tests/unit/main/supervision/service-wiring.spec.ts
+  s_5f98598a6d950e::t_531532a4c07fde 523-715
+  s_5f98598a6d950e::t_5adf5f79fdef15 267,269,271
+tests/unit/main/supervision/state/state-machine.spec.ts
+  s_5f98598a6d950e::t_5adf5f79fdef15 221-237,246-255
+  s_5f98598a6d950e::t_531532a4c07fde 238-245
+tests/integration/supervision/session-lifecycle.spec.ts
+  s_5f98598a6d950e::t_9a9b4209a94bd5 113-116
+src/main/index.ts
+  s_5f98598a6d950e::t_c8abd48493ceba 523
+docs/ARCHITECTURE.md
+  s_5f98598a6d950e::t_060c78550a1fbe 853-859
+docs/user-guide/USER-GUIDE.md
+  s_5f98598a6d950e::t_da87a287143863 669-676
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "9d3011eb0beedc031001e7a52eda629660efd0c1",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
