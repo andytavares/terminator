@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState, createElement } from 'react'
-import { LayoutGrid } from 'lucide-react'
+import { LayoutGrid, Inbox } from 'lucide-react'
 import { UnifiedSidebar } from './components/sidebar/UnifiedSidebar'
 import { TerminalPane } from './components/terminal/TerminalPane'
 import { TabBar } from './components/terminal/TabBar'
@@ -24,7 +24,7 @@ import { EmptyState } from './components/EmptyState'
 import { OverviewScreen } from './components/overview/OverviewScreen'
 import { MetricsBar } from './components/overview/MetricsBar'
 import { StatusBar } from './components/supervision/StatusBar'
-import { SupervisionScreen } from './components/supervision/SupervisionScreen'
+import { SupervisionProvider, SupervisionTab } from './components/supervision/SupervisionTab'
 import { useSupervision } from './hooks/useSupervision'
 import { useMetricsStore } from './stores/metrics.store'
 import { AboutDialog } from './components/AboutDialog'
@@ -148,6 +148,10 @@ export function App(): JSX.Element {
 
   const supervision = useSupervision()
 
+  const toggleSupervision = useCallback(() => {
+    setActiveGlobalTab(activeGlobalTabId === 'core.supervision' ? null : 'core.supervision')
+  }, [activeGlobalTabId, setActiveGlobalTab])
+
   useKeyboardShortcuts({
     onOpenSettings: handleOpenSettings,
     onToggleLog: handleToggleLog,
@@ -155,7 +159,11 @@ export function App(): JSX.Element {
     onToggleOverview: handleToggleOverview,
     onNewScratch: handleNewScratch,
     onNewTab: handleNewTab,
-    onToggleAttention: () => supervision.toggleAttention(),
+    onToggleAttention: () => toggleSupervision(),
+    onEscapeView: () => {
+      if (activeGlobalTabId) setActiveGlobalTab(null)
+      else if (activeWorkspaceTabId) setActiveWorkspaceTab(null)
+    },
     scratchProjectId: scratchActive ? SCRATCH_PROJECT_ID : null,
   })
 
@@ -422,6 +430,18 @@ export function App(): JSX.Element {
     })
   }, [])
 
+  // The supervision console, registered the same way Overview is: a view with
+  // its own place in the sidebar, not a drawer over whatever you were doing.
+  useEffect(() => {
+    return useExtensionRegistry.getState().registerGlobalTab({
+      id: 'core.supervision',
+      label: 'Agents',
+      icon: createElement(Inbox),
+      component: SupervisionTab,
+      permanent: true,
+    })
+  }, [])
+
   useEffect(() => {
     return window.electronAPI.extensionBridge.on('extension:activate-global-tab', (tabId) => {
       if (typeof tabId === 'string') setActiveGlobalTab(tabId)
@@ -477,185 +497,182 @@ export function App(): JSX.Element {
 
   return (
     <ErrorBoundary>
-      <div className="app-layout">
-        <div className="app-body">
-          <UnifiedSidebar
-            globalTabs={Array.from(globalTabs.values()).sort((a, b) => {
-              const weight = (t: typeof a) =>
-                t.sortOrder !== undefined ? t.sortOrder : t.id.startsWith('core.') ? 0 : 1
-              return weight(a) - weight(b)
-            })}
-            activeGlobalTabId={activeGlobalTabId}
-            onSelectGlobalTab={(id) => setActiveGlobalTab(id === activeGlobalTabId ? null : id)}
-            activeWorkspaceTabId={activeWorkspaceTabId}
-            onSelectWorkspaceTab={(workspaceId, tabId) => {
-              const isAlreadyActive =
-                tabId === activeWorkspaceTabId && workspaceId === activeWorkspaceId
-              setActiveWorkspace(workspaceId)
-              setActiveWorkspaceTab(isAlreadyActive ? null : tabId)
-            }}
-            onSelectProject={() => {
-              if (activeGlobalTabId) setActiveGlobalTab(null)
-              if (activeWorkspaceTabId) setActiveWorkspaceTab(null)
-              if (activeProjectTabId) setActiveProjectTab(null)
-            }}
-            unreadNotifications={unreadCount}
-            notificationPanelOpen={notificationPanelOpen}
-            onBellClick={toggleNotificationPanel}
-            onNewScratch={handleNewScratch}
-            scratchActive={scratchActive}
-            hasScratchSessions={scratchSessions.length > 0}
-            activeScratchSessionId={scratchActive ? activeScratchSessionId : null}
-            onSelectScratchSession={(sessionId) => {
-              setScratchActive(true)
-              if (activeWorkspaceTabId) setActiveWorkspaceTab(null)
-              useSessionStore.getState().setActiveSessionForProject(SCRATCH_PROJECT_ID, sessionId)
-            }}
-            visible={sidebarVisible}
-          />
-
-          <div className="app-main-area">
-            {activeGlobalTabId && globalTabs.has(activeGlobalTabId) ? (
-              (() => {
-                const tab = globalTabs.get(activeGlobalTabId)!
-                const TabComponent = tab.component as React.ComponentType<Record<string, never>>
-                return (
-                  <div className="main-content">
-                    <TabComponent />
-                  </div>
-                )
-              })()
-            ) : activeWorkspaceTabId && workspaceTabs.has(activeWorkspaceTabId) ? (
-              (() => {
-                const tab = workspaceTabs.get(activeWorkspaceTabId)!
-                const TabComponent = tab.component
-                return (
-                  <div className="main-content">
-                    <TabComponent repoRoot={repoRoot} />
-                  </div>
-                )
-              })()
-            ) : (
-              <div className="main-content">
-                {scratchActive ? (
-                  <>
-                    <TabBar
-                      projectId={SCRATCH_PROJECT_ID}
-                      activeProjectTabId={null}
-                      projectTabs={[]}
-                      onSelectProjectTab={() => {}}
-                      onNewTab={handleNewTab}
-                      onScratchDeactivate={() => setScratchActive(false)}
-                    />
-                    <TerminalPane projectId={SCRATCH_PROJECT_ID} />
-                  </>
-                ) : displayProjectId ? (
-                  <>
-                    <TabBar
-                      projectId={displayProjectId}
-                      activeProjectTabId={activeProjectTabId}
-                      projectTabs={Array.from(projectTabs.values())}
-                      onSelectProjectTab={setActiveProjectTab}
-                      onNewTab={handleNewTab}
-                    />
-                    {activeProjectTabId && projectTabs.has(activeProjectTabId) ? (
-                      (() => {
-                        const tab = projectTabs.get(activeProjectTabId)!
-                        const TabComponent = tab.component
-                        return <TabComponent repoRoot={repoRoot} />
-                      })()
-                    ) : (
-                      <TerminalPane projectId={displayProjectId} />
-                    )}
-                  </>
-                ) : globalSettings && !globalSettings.ui?.hasSeenWelcome ? (
-                  <EmptyState
-                    icon="⬡"
-                    title="Welcome to Terminator"
-                    subtitle="A keyboard-first terminal for developers. Open a project to get started."
-                    actions={[
-                      { label: 'New Tab', shortcut: '⌘T', onClick: () => {} },
-                      {
-                        label: 'Open Settings',
-                        shortcut: '⌘,',
-                        onClick: () => setSettingsOpen(true),
-                      },
-                    ]}
-                  />
-                ) : (
-                  <EmptyState
-                    icon="⌥"
-                    title={
-                      activeWorkspaceId
-                        ? 'Select or create a project'
-                        : 'Select a workspace to get started'
-                    }
-                  />
-                )}
-              </div>
-            )}
-
-            {/* Extension-contributed sidebar panels — hidden when a global tab is active */}
-            {!activeGlobalTabId &&
-              !activeWorkspaceTabId &&
-              (() => {
-                const activePanels = Array.from(openPanels).filter((id) => sidebarPanels.has(id))
-                if (activePanels.length === 0) return null
-                return (
-                  <div className="app-sidebar-panels">
-                    {activePanels.map((panelId) => {
-                      const panel = sidebarPanels.get(panelId)!
-                      const PanelComponent = panel.component
-                      return (
-                        <PanelComponent
-                          key={panelId}
-                          repoRoot={repoRoot}
-                          onClose={() => togglePanel(panelId)}
-                        />
-                      )
-                    })}
-                  </div>
-                )
-              })()}
-          </div>
-
-          <NotificationPanel />
-          {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
-          {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
-          {pendingCreate && (
-            <NameTerminalDialog
-              defaultName={pendingCreate.defaultName}
-              onConfirm={(name) => {
-                const { projectId, cwd, scrollbackLimit } = pendingCreate
-                setPendingCreate(null)
-                void createSession(projectId, 'human', name, cwd, scrollbackLimit)
+      <SupervisionProvider value={supervision.screenProps}>
+        <div className="app-layout">
+          <div className="app-body">
+            <UnifiedSidebar
+              globalTabs={Array.from(globalTabs.values()).sort((a, b) => {
+                const weight = (t: typeof a) =>
+                  t.sortOrder !== undefined ? t.sortOrder : t.id.startsWith('core.') ? 0 : 1
+                return weight(a) - weight(b)
+              })}
+              activeGlobalTabId={activeGlobalTabId}
+              onSelectGlobalTab={(id) => setActiveGlobalTab(id === activeGlobalTabId ? null : id)}
+              activeWorkspaceTabId={activeWorkspaceTabId}
+              onSelectWorkspaceTab={(workspaceId, tabId) => {
+                const isAlreadyActive =
+                  tabId === activeWorkspaceTabId && workspaceId === activeWorkspaceId
+                setActiveWorkspace(workspaceId)
+                setActiveWorkspaceTab(isAlreadyActive ? null : tabId)
               }}
-              onCancel={() => setPendingCreate(null)}
+              onSelectProject={() => {
+                if (activeGlobalTabId) setActiveGlobalTab(null)
+                if (activeWorkspaceTabId) setActiveWorkspaceTab(null)
+                if (activeProjectTabId) setActiveProjectTab(null)
+              }}
+              unreadNotifications={unreadCount}
+              notificationPanelOpen={notificationPanelOpen}
+              onBellClick={toggleNotificationPanel}
+              onNewScratch={handleNewScratch}
+              scratchActive={scratchActive}
+              hasScratchSessions={scratchSessions.length > 0}
+              activeScratchSessionId={scratchActive ? activeScratchSessionId : null}
+              onSelectScratchSession={(sessionId) => {
+                setScratchActive(true)
+                if (activeWorkspaceTabId) setActiveWorkspaceTab(null)
+                useSessionStore.getState().setActiveSessionForProject(SCRATCH_PROJECT_ID, sessionId)
+              }}
+              visible={sidebarVisible}
             />
-          )}
-          {logOpen && <LogWindow onClose={() => setLogOpenWithInset(false)} />}
-          {paletteOpen && (
-            <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />
-          )}
-          <ToastContainer />
-          {overlays.map((Overlay, i) => (
-            <Overlay key={i} />
-          ))}
-        </div>
-        {supervision.attentionOpen && (
-          <div className="app-supervision-panel">
-            <SupervisionScreen {...supervision.screenProps} />
+
+            <div className="app-main-area">
+              {activeGlobalTabId && globalTabs.has(activeGlobalTabId) ? (
+                (() => {
+                  const tab = globalTabs.get(activeGlobalTabId)!
+                  const TabComponent = tab.component as React.ComponentType<Record<string, never>>
+                  return (
+                    <div className="main-content">
+                      <TabComponent />
+                    </div>
+                  )
+                })()
+              ) : activeWorkspaceTabId && workspaceTabs.has(activeWorkspaceTabId) ? (
+                (() => {
+                  const tab = workspaceTabs.get(activeWorkspaceTabId)!
+                  const TabComponent = tab.component
+                  return (
+                    <div className="main-content">
+                      <TabComponent repoRoot={repoRoot} />
+                    </div>
+                  )
+                })()
+              ) : (
+                <div className="main-content">
+                  {scratchActive ? (
+                    <>
+                      <TabBar
+                        projectId={SCRATCH_PROJECT_ID}
+                        activeProjectTabId={null}
+                        projectTabs={[]}
+                        onSelectProjectTab={() => {}}
+                        onNewTab={handleNewTab}
+                        onScratchDeactivate={() => setScratchActive(false)}
+                      />
+                      <TerminalPane projectId={SCRATCH_PROJECT_ID} />
+                    </>
+                  ) : displayProjectId ? (
+                    <>
+                      <TabBar
+                        projectId={displayProjectId}
+                        activeProjectTabId={activeProjectTabId}
+                        projectTabs={Array.from(projectTabs.values())}
+                        onSelectProjectTab={setActiveProjectTab}
+                        onNewTab={handleNewTab}
+                      />
+                      {activeProjectTabId && projectTabs.has(activeProjectTabId) ? (
+                        (() => {
+                          const tab = projectTabs.get(activeProjectTabId)!
+                          const TabComponent = tab.component
+                          return <TabComponent repoRoot={repoRoot} />
+                        })()
+                      ) : (
+                        <TerminalPane projectId={displayProjectId} />
+                      )}
+                    </>
+                  ) : globalSettings && !globalSettings.ui?.hasSeenWelcome ? (
+                    <EmptyState
+                      icon="⬡"
+                      title="Welcome to Terminator"
+                      subtitle="A keyboard-first terminal for developers. Open a project to get started."
+                      actions={[
+                        { label: 'New Tab', shortcut: '⌘T', onClick: () => {} },
+                        {
+                          label: 'Open Settings',
+                          shortcut: '⌘,',
+                          onClick: () => setSettingsOpen(true),
+                        },
+                      ]}
+                    />
+                  ) : (
+                    <EmptyState
+                      icon="⌥"
+                      title={
+                        activeWorkspaceId
+                          ? 'Select or create a project'
+                          : 'Select a workspace to get started'
+                      }
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Extension-contributed sidebar panels — hidden when a global tab is active */}
+              {!activeGlobalTabId &&
+                !activeWorkspaceTabId &&
+                (() => {
+                  const activePanels = Array.from(openPanels).filter((id) => sidebarPanels.has(id))
+                  if (activePanels.length === 0) return null
+                  return (
+                    <div className="app-sidebar-panels">
+                      {activePanels.map((panelId) => {
+                        const panel = sidebarPanels.get(panelId)!
+                        const PanelComponent = panel.component
+                        return (
+                          <PanelComponent
+                            key={panelId}
+                            repoRoot={repoRoot}
+                            onClose={() => togglePanel(panelId)}
+                          />
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
+            </div>
+
+            <NotificationPanel />
+            {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+            {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
+            {pendingCreate && (
+              <NameTerminalDialog
+                defaultName={pendingCreate.defaultName}
+                onConfirm={(name) => {
+                  const { projectId, cwd, scrollbackLimit } = pendingCreate
+                  setPendingCreate(null)
+                  void createSession(projectId, 'human', name, cwd, scrollbackLimit)
+                }}
+                onCancel={() => setPendingCreate(null)}
+              />
+            )}
+            {logOpen && <LogWindow onClose={() => setLogOpenWithInset(false)} />}
+            {paletteOpen && (
+              <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />
+            )}
+            <ToastContainer />
+            {overlays.map((Overlay, i) => (
+              <Overlay key={i} />
+            ))}
           </div>
-        )}
-        <div className="app-supervision-status">
-          <StatusBar summary={supervision.summary} onOpenAttention={supervision.toggleAttention} />
-        </div>
-        {showMetricsBar && (
-          <div className="app-global-metrics">
-            <MetricsBar system={system} />
+          <div className="app-supervision-status">
+            <StatusBar summary={supervision.summary} onOpenAttention={toggleSupervision} />
           </div>
-        )}
-      </div>
+          {showMetricsBar && (
+            <div className="app-global-metrics">
+              <MetricsBar system={system} />
+            </div>
+          )}
+        </div>
+      </SupervisionProvider>
     </ErrorBoundary>
   )
 }

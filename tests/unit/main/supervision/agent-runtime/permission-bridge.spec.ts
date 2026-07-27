@@ -253,3 +253,87 @@ describe('what the operator is told is being asked', () => {
     expect(event.summary).toBe('AskUserQuestion request')
   })
 })
+
+// canUseTool has exactly two ways back to the agent: allow with an updated
+// input, or deny with a message. The message is the only channel that carries
+// words, so a real answer travels as a denial whose message is the answer.
+
+describe('answering rather than approving', () => {
+  function bridgeFor() {
+    const events: SessionEvent[] = []
+    const bridge = createPermissionBridge({
+      sessionId: 's1',
+      publish: (event) => events.push(event),
+      now: () => 1_000,
+    })
+    return { bridge, events }
+  }
+
+  function requestIdOf(events: SessionEvent[]): string {
+    const event = events.find((e) => e.kind === 'permission_requested') as { requestId: string }
+    return event.requestId
+  }
+
+  it('sends the answer to the agent as the message', async () => {
+    const { bridge, events } = bridgeFor()
+    const pending = bridge.canUseTool('AskUserQuestion', {
+      questions: [{ question: 'Which scope?' }],
+    })
+    bridge.resolve(requestIdOf(events), { allow: false, answer: 'terminal output only' })
+    await expect(pending).resolves.toEqual({
+      behavior: 'deny',
+      message: 'terminal output only',
+      interrupt: false,
+    })
+  })
+
+  it('never interrupts the run for an answer — the agent carries on with it', async () => {
+    const { bridge, events } = bridgeFor()
+    const pending = bridge.canUseTool('Bash', { command: 'rm -rf build' })
+    bridge.resolve(requestIdOf(events), { allow: false, answer: 'use dist/ instead' })
+    await expect(pending).resolves.toMatchObject({ interrupt: false })
+  })
+
+  it('ignores an empty answer and behaves as the decision says', async () => {
+    const { bridge, events } = bridgeFor()
+    const pending = bridge.canUseTool('Bash', { command: 'ls' })
+    bridge.resolve(requestIdOf(events), { allow: true, answer: '   ' })
+    await expect(pending).resolves.toMatchObject({ behavior: 'allow' })
+  })
+
+  it('publishes the options a question offers, so they can be shown as answers', () => {
+    const { bridge, events } = bridgeFor()
+    void bridge.canUseTool('AskUserQuestion', {
+      questions: [
+        { question: 'Which scope?', options: [{ label: 'App-wide' }, { label: 'Terminal' }] },
+      ],
+    })
+    const event = events.find((e) => e.kind === 'permission_requested') as {
+      options?: readonly string[]
+    }
+    expect(event.options).toEqual(['App-wide', 'Terminal'])
+  })
+
+  it('offers no options for a request that is a plain yes or no', () => {
+    const { bridge, events } = bridgeFor()
+    void bridge.canUseTool('Bash', { command: 'ls' })
+    const event = events.find((e) => e.kind === 'permission_requested') as {
+      options?: readonly string[]
+    }
+    expect(event.options).toBeUndefined()
+  })
+
+  it('does not repeat an option offered by more than one question', () => {
+    const { bridge, events } = bridgeFor()
+    void bridge.canUseTool('AskUserQuestion', {
+      questions: [
+        { question: 'A?', options: [{ label: 'Yes' }] },
+        { question: 'B?', options: [{ label: 'Yes' }, { label: 'No' }] },
+      ],
+    })
+    const event = events.find((e) => e.kind === 'permission_requested') as {
+      options?: readonly string[]
+    }
+    expect(event.options).toEqual(['Yes', 'No'])
+  })
+})

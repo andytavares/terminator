@@ -219,6 +219,41 @@
   word-break: break-word;
 }
 
+/* Answering, rather than approving. */
+.sv-queue__respond {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  flex-shrink: 0;
+  min-width: 260px;
+}
+
+.sv-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.sv-answer__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.sv-answer__row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.sv-answer__row input {
+  flex: 1;
+  min-width: 0;
+}
+
 /* The all-clear is a statement, never an empty div. */
 .sv-allclear {
   padding: 20px 16px;
@@ -233,10 +268,24 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: auto;
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-ui);
+}
+
+/* The console fills its view. As a drawer it grew to fit its content, so every
+   tab opened at a different height; a view has one size and the tab strip
+   stays where you left it. */
+.sv-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sv-screen > .sv-tabs {
+  flex-shrink: 0;
 }
 
 .sv-panel__header {
@@ -448,11 +497,12 @@
 /* One reading column for every tab. Without it each section is a full-bleed
  * slab across the whole window and the eye has no left edge to follow. */
 .sv-tabpanel {
+  flex: 1;
   width: 100%;
   max-width: 940px;
   margin: 0 auto;
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
 }
 
 /* Sections stack inside the column, so their headers align with their content

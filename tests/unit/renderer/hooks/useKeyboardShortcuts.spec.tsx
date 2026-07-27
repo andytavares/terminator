@@ -521,3 +521,81 @@ describe('reaching the supervision surface (FR-025)', () => {
     expect(onToggleAttention).not.toHaveBeenCalled()
   })
 })
+
+// With Shift held the browser reports the shifted character: Cmd+Shift+E
+// arrives as 'E', not 'e'. Every Cmd+Shift+<letter> shortcut compared against
+// a lowercase literal and so never fired in the real app — these tests
+// dispatched lowercase synthetically and never caught it.
+
+describe('shift shortcuts receive the shifted character', () => {
+  it('toggles the supervision view on the uppercase A a real keypress sends', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onToggleAttention = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onToggleAttention }))
+    pressKey('A', { metaKey: true, shiftKey: true })
+    expect(onToggleAttention).toHaveBeenCalled()
+  })
+
+  it('toggles the overview on an uppercase E', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onToggleOverview = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onToggleOverview }))
+    pressKey('E', { metaKey: true, shiftKey: true })
+    expect(onToggleOverview).toHaveBeenCalled()
+  })
+
+  it('toggles the log on an uppercase L', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onToggleLog = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onToggleLog }))
+    pressKey('L', { metaKey: true, shiftKey: true })
+    expect(onToggleLog).toHaveBeenCalled()
+  })
+
+  it('opens a scratch terminal on an uppercase T', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onNewScratch = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onNewScratch }))
+    pressKey('T', { metaKey: true, shiftKey: true })
+    expect(onNewScratch).toHaveBeenCalled()
+  })
+})
+
+describe('Escape leaves a full-screen view', () => {
+  it('leaves the view', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onEscapeView = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onEscapeView }))
+    pressKey('Escape')
+    expect(onEscapeView).toHaveBeenCalled()
+  })
+
+  it('does not leave from a text field, where Escape abandons what you typed', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onEscapeView = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onEscapeView }))
+
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    input.focus()
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(onEscapeView).not.toHaveBeenCalled()
+    input.remove()
+  })
+
+  it('does not leave from a terminal, where Escape belongs to what is running', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onEscapeView = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onEscapeView }))
+
+    const term = document.createElement('div')
+    term.className = 'xterm'
+    const child = document.createElement('div')
+    term.appendChild(child)
+    document.body.appendChild(term)
+    child.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    // Closing a view out from under someone pressing Escape in vim.
+    expect(onEscapeView).not.toHaveBeenCalled()
+    term.remove()
+  })
+})

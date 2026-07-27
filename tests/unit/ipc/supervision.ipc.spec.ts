@@ -370,7 +370,7 @@ describe('the write channels', () => {
         { sessionId: 's1', requestId: 'r1', decision: 'allow' }
       )
     ).resolves.toEqual({ ok: true })
-    expect(source.resolvePermission).toHaveBeenCalledWith('s1', 'r1', 'allow')
+    expect(source.resolvePermission).toHaveBeenCalledWith('s1', 'r1', 'allow', undefined)
   })
 
   it('rejects a permission decision that is neither allow nor deny', async () => {

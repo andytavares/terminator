@@ -47,6 +47,11 @@ export interface PendingPermission {
    * unfamiliar tool is its name, not its request.
    */
   readonly detail?: string | null
+  /**
+   * The answers a question offers. A question is not a yes/no: approving it
+   * tells the agent nothing about which option you meant.
+   */
+  readonly options?: readonly string[]
   /** Present when the action targets a network host. Off-allowlist always prompts (FR-042). */
   readonly targetHost?: string
   readonly requestedAt: number

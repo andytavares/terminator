@@ -60,7 +60,12 @@ export interface SupervisionSource {
   openInEditor?(sessionId: string): Promise<{ ok: boolean; reason: string | null }>
   setShadowMode?(value: boolean): void
   judgeFiring?(firingId: string, judgement: 'correct' | 'incorrect'): void
-  resolvePermission?(sessionId: string, requestId: string, decision: 'allow' | 'deny'): void
+  resolvePermission?(
+    sessionId: string,
+    requestId: string,
+    decision: 'allow' | 'deny',
+    answer?: string
+  ): void
   listFeed?(): readonly unknown[]
   listFirings?(): { firings: readonly unknown[]; precision: unknown }
   listReview?(): readonly unknown[]
@@ -123,6 +128,8 @@ const permissionPayload = z.object({
   sessionId: z.string().min(1),
   requestId: z.string().min(1),
   decision: z.enum(['allow', 'deny']),
+  /** A real answer, for a request that is a question rather than a yes/no. */
+  answer: z.string().optional(),
 })
 const replyPayload = z.object({ sessionId: z.string().min(1), message: z.string().min(1) })
 const hunkPayload = z.object({
@@ -223,7 +230,12 @@ export function registerSupervisionHandlers(source: SupervisionSource): void {
   handleChannel(SUPERVISION_CHANNELS.resolvePermission, async (_event, payload: unknown) => {
     const parsed = permissionPayload.safeParse(payload)
     if (!parsed.success) return { ok: false }
-    source.resolvePermission?.(parsed.data.sessionId, parsed.data.requestId, parsed.data.decision)
+    source.resolvePermission?.(
+      parsed.data.sessionId,
+      parsed.data.requestId,
+      parsed.data.decision,
+      parsed.data.answer
+    )
     return { ok: true }
   })
 

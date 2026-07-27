@@ -1160,9 +1160,124 @@ describe('the ask is readable on the queue (FR-007)', () => {
     expect(document.querySelector('.sv-queue__detail')).toBeNull()
   })
 
-  it('still offers allow and deny', () => {
-    queue()
+  it('offers the options as answers, because a question is not a yes or no', () => {
+    queue({
+      pendingPermission: {
+        ...blocked.pendingPermission,
+        options: ['App-wide UI text', 'Terminal output only'],
+      },
+    })
+    expect(screen.getByRole('button', { name: 'App-wide UI text' })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Terminal output only' })).toBeDefined()
+    expect(screen.queryByText('Allow')).toBeNull()
+  })
+})
+
+describe('answering a question rather than approving it (FR-007)', () => {
+  const asked = {
+    sessionId: 's1',
+    repoPath: '/repos/terminator',
+    reason: 'needs_input' as const,
+    waitingMs: 35_000,
+    failure: null,
+    pendingPermission: {
+      requestId: 'r1',
+      toolName: 'AskUserQuestion',
+      summary: 'What scope do you actually want turned red?',
+      detail: 'What scope do you actually want turned red?',
+      options: ['App-wide UI text', 'Terminal output only', 'One specific view'],
+      requestedAt: 1_000,
+    },
+  }
+
+  const queue = (over: Record<string, unknown> = {}, handlers: Record<string, unknown> = {}) =>
+    render(
+      <AttentionQueue
+        items={[{ ...asked, ...over }]}
+        loaded
+        workingCount={0}
+        onApprove={() => {}}
+        onDeny={() => {}}
+        onAnswer={() => {}}
+        onOpen={() => {}}
+        {...handlers}
+      />
+    )
+
+  it('answers with the option that was clicked', () => {
+    const onAnswer = vi.fn()
+    queue({}, { onAnswer })
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal output only' }))
+    expect(onAnswer).toHaveBeenCalledWith('s1', 'r1', 'Terminal output only')
+  })
+
+  it('answers in your own words, because the useful answer is often not offered', () => {
+    const onAnswer = vi.fn()
+    queue({}, { onAnswer })
+    fireEvent.change(screen.getByLabelText('Answer'), {
+      target: { value: 'just the diff viewer, and keep it behind a flag' },
+    })
+    fireEvent.click(screen.getByText('Send'))
+    expect(onAnswer).toHaveBeenCalledWith(
+      's1',
+      'r1',
+      'just the diff viewer, and keep it behind a flag'
+    )
+  })
+
+  it('answers on Enter', () => {
+    const onAnswer = vi.fn()
+    queue({}, { onAnswer })
+    const box = screen.getByLabelText('Answer')
+    fireEvent.change(box, { target: { value: 'terminal only' } })
+    fireEvent.keyDown(box, { key: 'Enter' })
+    expect(onAnswer).toHaveBeenCalledWith('s1', 'r1', 'terminal only')
+  })
+
+  it('will not send an empty answer', () => {
+    const onAnswer = vi.fn()
+    queue({}, { onAnswer })
+    fireEvent.change(screen.getByLabelText('Answer'), { target: { value: '   ' } })
+    fireEvent.click(screen.getByText('Send'))
+    expect(onAnswer).not.toHaveBeenCalled()
+  })
+
+  it('treats a question tool with no options as a question all the same', () => {
+    queue({ pendingPermission: { ...asked.pendingPermission, options: undefined } })
+    expect(screen.getByLabelText('Answer')).toBeDefined()
+    expect(screen.queryByText('Allow')).toBeNull()
+  })
+
+  it('keeps allow and deny for a request that really is a yes or no', () => {
+    queue({
+      pendingPermission: {
+        requestId: 'r2',
+        toolName: 'Bash',
+        summary: 'rm -rf build',
+        requestedAt: 1_000,
+      },
+    })
     expect(screen.getByText('Allow')).toBeDefined()
     expect(screen.getByText('Deny')).toBeDefined()
+  })
+
+  it('lets you refuse a yes/no with a reason, which is worth more than a bare no', () => {
+    const onAnswer = vi.fn()
+    queue(
+      {
+        pendingPermission: {
+          requestId: 'r2',
+          toolName: 'Bash',
+          summary: 'rm -rf build',
+          requestedAt: 1_000,
+        },
+      },
+      { onAnswer }
+    )
+    fireEvent.change(screen.getByLabelText('Answer'), {
+      target: { value: 'not that directory — use dist/' },
+    })
+    fireEvent.click(screen.getByText('Send'))
+    expect(onAnswer).toHaveBeenCalledWith('s1', 'r2', 'not that directory — use dist/')
   })
 })

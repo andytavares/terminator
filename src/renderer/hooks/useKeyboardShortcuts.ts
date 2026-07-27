@@ -15,6 +15,8 @@ interface Options {
   onNewTab?: () => void
   /** Concept 10: the supervision surface is one keystroke away, not one click. */
   onToggleAttention?: () => void
+  /** Escape leaves whichever full-screen view is open, like everywhere else. */
+  onEscapeView?: () => void
   /** When scratch mode is active, pass SCRATCH_PROJECT_ID here so all terminal shortcuts work. */
   scratchProjectId?: string | null
 }
@@ -27,6 +29,7 @@ export function useKeyboardShortcuts({
   onNewScratch,
   onNewTab,
   onToggleAttention,
+  onEscapeView,
   scratchProjectId,
 }: Options = {}): void {
   const {
@@ -72,6 +75,11 @@ export function useKeyboardShortcuts({
 
     function handleKeyDown(e: KeyboardEvent): void {
       const isMeta = e.metaKey || e.ctrlKey
+      // With Shift held the browser reports the *shifted* character, so
+      // Cmd+Shift+E arrives as 'E'. Every Cmd+Shift+<letter> shortcut compared
+      // against a lowercase literal and therefore never fired; the tests
+      // dispatched lowercase synthetically and never noticed.
+      const key = e.key.length === 1 ? e.key.toLowerCase() : e.key
       const inXterm = e.target instanceof HTMLElement && !!e.target.closest('.xterm')
       const inTextField =
         !inXterm &&
@@ -86,14 +94,14 @@ export function useKeyboardShortcuts({
       }
 
       // Cmd+P: open command palette
-      if (isMeta && e.key === 'p') {
+      if (isMeta && key === 'p') {
         e.preventDefault()
         onOpenCommandPalette?.()
         return
       }
 
       // Cmd+Shift+L: toggle log window
-      if (isMeta && e.shiftKey && e.key === 'l') {
+      if (isMeta && e.shiftKey && key === 'l') {
         e.preventDefault()
         onToggleLog?.()
         return
@@ -102,23 +110,32 @@ export function useKeyboardShortcuts({
       // Cmd+Shift+E: toggle overview tab. Not Cmd+Shift+I — that is the "Open Extension
       // DevTools" menu accelerator, and Electron menu accelerators consume the key before
       // the renderer ever sees it, which made this branch unreachable.
-      if (isMeta && e.shiftKey && e.key === 'e') {
+      if (isMeta && e.shiftKey && key === 'e') {
         e.preventDefault()
         onToggleOverview?.()
+        return
+      }
+
+      // Escape leaves a full-screen view. Never from a text field, where it
+      // means "abandon what I am typing", and never from a terminal, where it
+      // belongs to whatever is running in it — closing a view out from under
+      // someone pressing Escape in vim would be indefensible.
+      if (e.key === 'Escape' && !inTextField && !inXterm) {
+        onEscapeView?.()
         return
       }
 
       // Cmd+Shift+A: the attention surface. The status bar answers "is
       // everything OK" at a glance; this is the one keystroke to the detail,
       // which is the whole of Concept 10 (FR-025).
-      if (isMeta && e.shiftKey && e.key === 'a') {
+      if (isMeta && e.shiftKey && key === 'a') {
         e.preventDefault()
         onToggleAttention?.()
         return
       }
 
       // Cmd+Shift+T: new scratch terminal
-      if (isMeta && e.shiftKey && e.key === 't') {
+      if (isMeta && e.shiftKey && key === 't') {
         e.preventDefault()
         onNewScratch?.()
         return
@@ -168,7 +185,7 @@ export function useKeyboardShortcuts({
       }
 
       // Cmd+K: clear terminal screen (skip if typing — Cmd+K kills to line start in text fields)
-      if (isMeta && e.key === 'k' && !inTextField) {
+      if (isMeta && key === 'k' && !inTextField) {
         e.preventDefault()
         if (effectiveProjectId) {
           const activeSessionId = getActiveSessionForProject(effectiveProjectId)
@@ -180,7 +197,7 @@ export function useKeyboardShortcuts({
       }
 
       // Cmd+T: new tab
-      if (isMeta && e.key === 't') {
+      if (isMeta && key === 't') {
         e.preventDefault()
         if (onNewTab) {
           onNewTab()
@@ -199,7 +216,7 @@ export function useKeyboardShortcuts({
       }
 
       // Cmd+D: split vertically (side by side) — always in the active project, never scratch
-      if (isMeta && !e.shiftKey && e.key === 'd') {
+      if (isMeta && !e.shiftKey && key === 'd') {
         e.preventDefault()
         if (activeProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
@@ -218,7 +235,7 @@ export function useKeyboardShortcuts({
       }
 
       // Cmd+Shift+D: split horizontally (top / bottom) — always in the active project, never scratch
-      if (isMeta && e.shiftKey && e.key === 'd') {
+      if (isMeta && e.shiftKey && key === 'd') {
         e.preventDefault()
         if (activeProjectId) {
           const settings = resolveSettings(activeWorkspaceId)
@@ -237,7 +254,7 @@ export function useKeyboardShortcuts({
       }
 
       // Cmd+W: close focused split pane (or active tab if not in split mode)
-      if (isMeta && e.key === 'w') {
+      if (isMeta && key === 'w') {
         e.preventDefault()
         if (effectiveProjectId) {
           const layout = getPaneLayout(effectiveProjectId)

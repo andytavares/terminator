@@ -85,6 +85,7 @@ export function applyEvent(state: SessionState, event: SessionEvent): SessionSta
           toolName: event.toolName,
           summary: event.summary,
           detail: event.detail ?? null,
+          options: event.options,
           targetHost: event.targetHost,
           requestedAt: event.at,
         },

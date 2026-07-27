@@ -35,16 +35,48 @@ test('it reports every count the operator needs, without opening anything', asyn
   await expect(statusBar).toContainText('failed')
 })
 
-test('the attention queue opens from the status bar and answers the question', async () => {
+// These share one app instance, so each opens from a known state rather than
+// inheriting whatever the previous test left on screen.
+async function openConsole(): Promise<void> {
+  if ((await handle.page.locator('.sv-screen').count()) === 0) {
+    await handle.page.locator('.sv-statusbar').click()
+  }
+  await expect(handle.page.locator('.sv-screen')).toBeVisible()
+}
+
+async function closeConsole(): Promise<void> {
+  if ((await handle.page.locator('.sv-screen').count()) > 0) {
+    await handle.page.locator('.sv-statusbar').click()
+  }
+  await expect(handle.page.locator('.sv-screen')).toHaveCount(0)
+}
+
+test('the console opens from the status bar and answers the question', async () => {
+  await closeConsole()
   await handle.page.locator('.sv-statusbar').click()
-  const queue = handle.page.locator('.app-supervision-panel')
-  await expect(queue).toBeVisible()
-  // Nothing needs the operator, so the panel says so in words rather than
-  // rendering an ambiguous blank (FR-024).
-  await expect(queue).toContainText('Nothing needs you')
+  // A view like any other, not a drawer over whatever you were doing.
+  const view = handle.page.locator('.sv-screen')
+  await expect(view).toBeVisible()
+  // Nothing needs the operator, so it says so in words rather than rendering
+  // an ambiguous blank (FR-024).
+  await expect(view).toContainText('Nothing needs you')
 })
 
-test('the attention queue closes again', async () => {
+test('Escape leaves it, as it does any full-screen view', async () => {
+  await openConsole()
+  await handle.page.keyboard.press('Escape')
+  await expect(handle.page.locator('.sv-screen')).toHaveCount(0)
+})
+
+test('Cmd+Shift+A opens it — the shifted key a real keypress sends', async () => {
+  await closeConsole()
+  await handle.page.keyboard.press('Meta+Shift+A')
+  await expect(handle.page.locator('.sv-screen')).toBeVisible()
+  await handle.page.keyboard.press('Escape')
+})
+
+test('the status bar closes it again', async () => {
+  await openConsole()
   await handle.page.locator('.sv-statusbar').click()
-  await expect(handle.page.locator('.app-supervision-panel')).toHaveCount(0)
+  await expect(handle.page.locator('.sv-screen')).toHaveCount(0)
 })

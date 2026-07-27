@@ -58,6 +58,8 @@ export interface SupervisionScreenProps {
   workingCount: number
   onApprove(sessionId: string, requestId: string): void
   onDeny(sessionId: string, requestId: string): void
+  /** Answers a request that is a question rather than a yes/no. */
+  onAnswer(sessionId: string, requestId: string, answer: string): void
   onOpenSession(sessionId: string): void
 
   review: readonly ReviewItem[]
@@ -177,7 +179,7 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
   }
 
   return (
-    <div className="sv-panel" style={{ height: '100%' }}>
+    <div className="sv-screen">
       <div className="sv-tabs" role="tablist" aria-label="Supervision">
         {TABS.map((entry) => (
           <button
@@ -223,6 +225,7 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
               workingCount={props.workingCount}
               onApprove={props.onApprove}
               onDeny={props.onDeny}
+              onAnswer={props.onAnswer}
               onOpen={props.onOpenSession}
             />
             <AutonomyPicker value={props.autonomy} onChange={props.onAutonomyChange} />

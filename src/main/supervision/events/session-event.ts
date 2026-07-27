@@ -56,6 +56,8 @@ export interface PermissionRequestedEvent extends BaseEvent {
   readonly summary: string
   /** The ask in full — a question's options, a command's description. */
   readonly detail?: string | null
+  /** The answers a question offers. Absent when the ask is a yes/no. */
+  readonly options?: readonly string[]
   readonly targetHost?: string
 }
 

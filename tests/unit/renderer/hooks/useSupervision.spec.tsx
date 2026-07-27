@@ -501,16 +501,6 @@ describe('assignment controls', () => {
 })
 
 describe('the attention panel', () => {
-  it('toggles open and closed', async () => {
-    const { result } = renderHook(() => useSupervision())
-    await waitFor(() => expect(result.current.loaded).toBe(true))
-    expect(result.current.attentionOpen).toBe(false)
-    act(() => result.current.toggleAttention())
-    expect(result.current.attentionOpen).toBe(true)
-    act(() => result.current.toggleAttention())
-    expect(result.current.attentionOpen).toBe(false)
-  })
-
   it('exposes the ranked queue and the summary the status bar renders', async () => {
     const { result } = renderHook(() => useSupervision())
     await waitFor(() => expect(result.current.loaded).toBe(true))
@@ -982,5 +972,33 @@ describe('choosing where the agent works', () => {
     await waitFor(() => expect(result.current.loaded).toBe(true))
     // A stale list from whichever repository was chosen before would be worse.
     await waitFor(() => expect(result.current.screenProps.branches).toEqual([]))
+  })
+})
+
+describe('answering a question (FR-007)', () => {
+  it('sends the answer through the permission channel', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    act(() => result.current.screenProps.onAnswer('s1', 'r1', 'terminal output only'))
+    // The runtime carries words only on a denial's message; the tool call does
+    // not run and the agent reads what you said.
+    expect(bridge.resolvePermission).toHaveBeenCalledWith({
+      sessionId: 's1',
+      requestId: 'r1',
+      decision: 'deny',
+      answer: 'terminal output only',
+    })
+  })
+
+  it('still approves without an answer', async () => {
+    const { result } = renderHook(() => useSupervision())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    act(() => result.current.screenProps.onApprove('s1', 'r1'))
+    expect(bridge.resolvePermission).toHaveBeenCalledWith({
+      sessionId: 's1',
+      requestId: 'r1',
+      decision: 'allow',
+      answer: undefined,
+    })
   })
 })

@@ -15,6 +15,16 @@ export interface PermissionDecision {
   allow: boolean
   reason?: string
   interrupt?: boolean
+  /**
+   * A real answer, for a request that is a question rather than a yes/no.
+   *
+   * `canUseTool` has exactly two ways back to the agent: allow with an updated
+   * input, or deny with a message. The message is the only channel that
+   * carries words, so answering travels as a denial whose message is the
+   * answer — the tool call does not proceed, and the agent reads what you
+   * said. Nothing is denied in the sense the operator would mean it.
+   */
+  answer?: string
 }
 
 export interface PermissionBridgeOptions {
@@ -112,6 +122,30 @@ function summarise(toolName: string, input: unknown): { summary: string; detail:
   return { summary: `${toolName} request`, detail: rendered }
 }
 
+/**
+ * The answers a question offers, if it is one. A question with options is not
+ * a yes/no, and approving it tells the agent nothing about which you meant.
+ */
+function optionsOf(input: unknown): string[] | undefined {
+  if (typeof input !== 'object' || input === null) return undefined
+  const questions = (input as Record<string, unknown>).questions
+  if (!Array.isArray(questions)) return undefined
+
+  const labels = questions.flatMap((entry) => {
+    const options = (entry as Record<string, unknown>).options
+    if (!Array.isArray(options)) return []
+    return options
+      .map((option) =>
+        typeof option === 'object' && option !== null
+          ? String((option as Record<string, unknown>).label ?? '')
+          : String(option)
+      )
+      .filter((label) => label !== '')
+  })
+
+  return labels.length === 0 ? undefined : [...new Set(labels)]
+}
+
 /** A compact, bounded rendering of an unrecognised tool input. */
 function renderInput(record: Record<string, unknown>): string | null {
   const lines = Object.entries(record)
@@ -135,6 +169,9 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
   let counter = 0
 
   function toResult(decision: PermissionDecision, input: unknown): PermissionResult {
+    if (decision.answer !== undefined && decision.answer.trim() !== '') {
+      return { behavior: 'deny', message: decision.answer.trim(), interrupt: false }
+    }
     return decision.allow
       ? { behavior: 'allow', updatedInput: input }
       : {
@@ -160,6 +197,7 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
         requestId,
         toolName,
         ...summarise(toolName, input),
+        options: optionsOf(input),
         targetHost: targetHostOf(input),
         at: now(),
       })

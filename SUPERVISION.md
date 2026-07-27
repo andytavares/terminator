@@ -50,11 +50,19 @@ Everything else exists to make those two usable.
 
 ## 2. Opening it
 
-Press **`Cmd+Shift+A`**, or click the status bar along the bottom of the window.
-The same key closes it.
+The console is a **view**, listed in the sidebar as **Agents** alongside
+Overview. Three ways in, all equivalent:
 
-The console opens as a panel over your workspace. Your terminals keep running
-underneath.
+- click **Agents** in the sidebar,
+- click the **status bar** along the bottom of the window,
+- press **`Cmd+Shift+A`**.
+
+**`Escape`** leaves it, as it does any full-screen view — except from a text
+field, where Escape means "abandon what I'm typing", and from a terminal, where
+it belongs to whatever is running in it.
+
+Every tab occupies the same space; the tab strip stays where you left it. Your
+terminals keep running behind it.
 
 ---
 
@@ -126,6 +134,13 @@ Sorted by how much you are needed, not by project and not by arrival:
 4. **Ready** — finished work that can wait a moment.
 
 Within a band, whatever has waited longest comes first.
+
+**A question is answered, not approved.** When the agent asks something with
+options, the options appear as buttons — clicking one sends it back. There is
+always a free-text box too, because the useful answer is often none of the ones
+offered. Allow and Deny remain for requests that really are a yes or no, and
+even those let you refuse _with a reason_, which is worth more to the agent than
+a bare no.
 
 A blocked session shows **the ask itself**, not the name of the tool making it:
 a question appears with its options, a shell request with its command and

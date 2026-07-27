@@ -445,8 +445,11 @@ app.whenReady().then(async () => {
   registerSupervisionHandlers({
     listSessions: () => supervision.listSessions(),
     getSession: (sessionId) => supervision.getSession(sessionId),
-    resolvePermission: (sessionId, requestId, decision) =>
-      supervision.driver.resolvePermission(sessionId, requestId, { allow: decision === 'allow' }),
+    resolvePermission: (sessionId, requestId, decision, answer) =>
+      supervision.driver.resolvePermission(sessionId, requestId, {
+        allow: decision === 'allow',
+        answer,
+      }),
     setShadowMode: (value) => supervision.stalls.setShadowMode(value),
     judgeFiring: (firingId, judgement) =>
       supervision.firings.judge(firingId, judgement, Date.now()),

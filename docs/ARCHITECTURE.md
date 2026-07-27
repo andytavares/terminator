@@ -871,6 +871,27 @@ hook tells the app shell through options passed to `useSupervision`. An earlier
 cut broadcast `CustomEvent`s on `window` that nothing listened for — a listener
 that does not exist should be a compile error, not silence.
 
+### Answering, not just approving
+
+`canUseTool` has exactly two ways back to the agent: allow with an updated
+input, or deny with a message. The message is the only channel that carries
+words, so a real answer travels as a denial whose message is the answer — the
+tool call does not run and the agent reads what you said. Nothing is denied in
+the sense the operator would mean it, and `interrupt` stays false so the run
+carries on.
+
+### A view, not a drawer
+
+The console is registered with `registerGlobalTab` exactly as Overview is, so it
+gets the sidebar entry, the single size and the Escape behaviour every other
+view has. It began as a bottom-up drawer whose height followed its content,
+which meant every tab opened at a different size and none could be dismissed the
+usual way.
+
+Its props reach the tab through a context provider rather than the registry:
+`useSupervision` polls and holds subscriptions, so `App` owns the one instance
+and the tab reads it.
+
 ### Notification discipline
 
 `feed/digest.ts` routes every notifiable event to one of three channels: modal

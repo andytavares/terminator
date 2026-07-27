@@ -41,6 +41,7 @@ interface SupervisionBridge {
     sessionId: string
     requestId: string
     decision: 'allow' | 'deny'
+    answer?: string
   }): Promise<unknown>
   setShadowMode?(payload: { value: boolean }): Promise<unknown>
   judgeFiring?(payload: { firingId: string; judgement: 'correct' | 'incorrect' }): Promise<unknown>
@@ -123,8 +124,6 @@ export interface UseSupervision {
   loaded: boolean
   attention: AttentionItem[]
   summary: StatusSummary
-  attentionOpen: boolean
-  toggleAttention(): void
   screenProps: SupervisionScreenProps
 }
 
@@ -142,7 +141,6 @@ export interface UseSupervisionOptions {
 export function useSupervision(options: UseSupervisionOptions = {}): UseSupervision {
   const { onOpenSessionInShell, onNavigate } = options
   const [now, setNow] = useState(() => Date.now())
-  const [attentionOpen, setAttentionOpen] = useState(false)
   const [autonomy, setAutonomy] = useState<AutonomyLevel>('edit')
   const [muted, setMuted] = useState<string[]>([])
   const [feed, setFeed] = useState<FeedEntry[]>([])
@@ -282,8 +280,8 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
   }, [openWorkItem])
 
   const resolve = useCallback(
-    (sessionId: string, requestId: string, decision: 'allow' | 'deny') => {
-      void bridge()?.resolvePermission?.({ sessionId, requestId, decision })
+    (sessionId: string, requestId: string, decision: 'allow' | 'deny', answer?: string) => {
+      void bridge()?.resolvePermission?.({ sessionId, requestId, decision, answer })
     },
     []
   )
@@ -403,6 +401,10 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
     workingCount: summary.working,
     onApprove: (sessionId, requestId) => resolve(sessionId, requestId, 'allow'),
     onDeny: (sessionId, requestId) => resolve(sessionId, requestId, 'deny'),
+    // A question is not a yes/no. The answer reaches the agent as the message
+    // on a denial, which is the only channel the runtime gives us that carries
+    // words — the tool call does not run and the agent reads what you said.
+    onAnswer: (sessionId, requestId, answer) => resolve(sessionId, requestId, 'deny', answer),
     onOpenSession: (sessionId) => {
       setOpenSession(sessionId)
       onOpenSessionInShell?.(sessionId)
@@ -611,8 +613,6 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
     loaded,
     attention,
     summary,
-    attentionOpen,
-    toggleAttention: () => setAttentionOpen((open) => !open),
     screenProps,
   }
 }

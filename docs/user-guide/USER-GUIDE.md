@@ -242,7 +242,8 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 | Settings                            | `Cmd+,`                  |
 | Toggle Git sidebar                  | `Cmd+Shift+G`            |
 | Toggle Overview screen              | `Cmd+Shift+E`            |
-| Toggle supervision surface          | `Cmd+Shift+A`            |
+| Toggle supervision view             | `Cmd+Shift+A`            |
+| Leave a full-screen view            | `Escape`                 |
 | Send newline (always)               | `Cmd+Enter`              |
 | Send newline (bracketed paste mode) | `Shift+Enter`            |
 
@@ -667,9 +668,10 @@ that lane is flagged as needing a rebase or a re-run.
 
 Single-repository work renders as one row with none of this.
 
-The whole surface is one keystroke away: **`Cmd+Shift+A`** opens and closes it.
-The status bar answers "is everything OK" at a glance; this is the way to the
-detail without reaching for the mouse.
+The console is a view in the sidebar, listed as **Agents**. `Cmd+Shift+A` opens
+it, the status bar opens it, and `Escape` leaves it — the same as any other
+view. The status bar answers "is everything OK" at a glance; the view is the
+detail.
 
 ### Handing a working copy to your editor
 
