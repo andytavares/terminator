@@ -13,6 +13,8 @@ interface Options {
   onToggleOverview?: () => void
   onNewScratch?: () => void
   onNewTab?: () => void
+  /** Concept 10: the supervision surface is one keystroke away, not one click. */
+  onToggleAttention?: () => void
   /** When scratch mode is active, pass SCRATCH_PROJECT_ID here so all terminal shortcuts work. */
   scratchProjectId?: string | null
 }
@@ -24,6 +26,7 @@ export function useKeyboardShortcuts({
   onToggleOverview,
   onNewScratch,
   onNewTab,
+  onToggleAttention,
   scratchProjectId,
 }: Options = {}): void {
   const {
@@ -102,6 +105,15 @@ export function useKeyboardShortcuts({
       if (isMeta && e.shiftKey && e.key === 'e') {
         e.preventDefault()
         onToggleOverview?.()
+        return
+      }
+
+      // Cmd+Shift+A: the attention surface. The status bar answers "is
+      // everything OK" at a glance; this is the one keystroke to the detail,
+      // which is the whole of Concept 10 (FR-025).
+      if (isMeta && e.shiftKey && e.key === 'a') {
+        e.preventDefault()
+        onToggleAttention?.()
         return
       }
 

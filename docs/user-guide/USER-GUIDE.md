@@ -242,6 +242,7 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 | Settings                            | `Cmd+,`                  |
 | Toggle Git sidebar                  | `Cmd+Shift+G`            |
 | Toggle Overview screen              | `Cmd+Shift+E`            |
+| Toggle supervision surface          | `Cmd+Shift+A`            |
 | Send newline (always)               | `Cmd+Enter`              |
 | Send newline (bracketed paste mode) | `Shift+Enter`            |
 
@@ -665,6 +666,10 @@ If an upstream lane merges a shared-file change after a downstream lane started,
 that lane is flagged as needing a rebase or a re-run.
 
 Single-repository work renders as one row with none of this.
+
+The whole surface is one keystroke away: **`Cmd+Shift+A`** opens and closes it.
+The status bar answers "is everything OK" at a glance; this is the way to the
+detail without reaching for the mouse.
 
 ### Handing a working copy to your editor
 

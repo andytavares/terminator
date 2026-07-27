@@ -495,3 +495,29 @@ describe('useKeyboardShortcuts', () => {
     })
   })
 })
+
+describe('reaching the supervision surface (FR-025)', () => {
+  it('toggles the attention surface on Cmd+Shift+A', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onToggleAttention = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onToggleAttention }))
+    pressKey('a', { metaKey: true, shiftKey: true })
+    expect(onToggleAttention).toHaveBeenCalled()
+  })
+
+  it('does not fire without the shift', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onToggleAttention = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onToggleAttention }))
+    pressKey('a', { metaKey: true })
+    expect(onToggleAttention).not.toHaveBeenCalled()
+  })
+
+  it('does not fire without the meta key', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onToggleAttention = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onToggleAttention }))
+    pressKey('a', { shiftKey: true })
+    expect(onToggleAttention).not.toHaveBeenCalled()
+  })
+})

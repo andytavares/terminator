@@ -690,7 +690,15 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
       join(publicationRoot(userDataPath), producerId),
     listSessions: () => registry.list(),
     getSession: (sessionId: string) => registry.get(sessionId),
-    start: () => scheduler.start(),
+    start: () => {
+      // On restart the driver is gone and every session that was mid-flight is
+      // reported from persisted state alone. The transcript is the source of
+      // truth on disagreement (FR-006), and a restart is when disagreement is
+      // guaranteed — so reconcile now rather than up to 30 seconds later
+      // (SC-010).
+      for (const session of registry.list()) service.reconcileFromTranscript(session.id)
+      scheduler.start()
+    },
     stop: () => {
       scheduler.stop()
       clearInterval(reconcileTimer)

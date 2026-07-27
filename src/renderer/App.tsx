@@ -146,6 +146,8 @@ export function App(): JSX.Element {
       .catch(() => {})
   }, [activeWorkspaceId, resolveSettings, resolveActiveCwd, createSession])
 
+  const supervision = useSupervision()
+
   useKeyboardShortcuts({
     onOpenSettings: handleOpenSettings,
     onToggleLog: handleToggleLog,
@@ -153,6 +155,7 @@ export function App(): JSX.Element {
     onToggleOverview: handleToggleOverview,
     onNewScratch: handleNewScratch,
     onNewTab: handleNewTab,
+    onToggleAttention: () => supervision.toggleAttention(),
     scratchProjectId: scratchActive ? SCRATCH_PROJECT_ID : null,
   })
 
@@ -468,7 +471,6 @@ export function App(): JSX.Element {
   // Supervision: the status bar is always visible so "is anything wrong" never
   // requires navigating anywhere (FR-025), and the attention queue opens from
   // it (FR-022).
-  const supervision = useSupervision()
   const scratchSessions = getScratchSessions()
   // Scratch view takes priority over project view when active
   const displayProjectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId

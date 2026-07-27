@@ -786,3 +786,52 @@ describe('interrupting and discarding a session', () => {
     })
   })
 })
+
+// SC-010: after a restart the console's state must match the agent's own
+// durable record. A restart is exactly when the two disagree — the driver is
+// gone and everything mid-flight is reported from persisted state alone.
+
+describe('starting the console back up', () => {
+  it('reconciles against the transcript immediately, not on the next tick', () => {
+    const transcript = join(root, 's1.jsonl')
+    writeFileSync(
+      transcript,
+      `${JSON.stringify({
+        timestamp: '2026-07-27T14:07:02Z',
+        message: { content: [{ type: 'tool_use', id: 'c1', name: 'Edit' }] },
+      })}\n`
+    )
+
+    const service = build()
+    service.registry.register('s1', meta())
+    service.bus.publish({
+      kind: 'session_started',
+      sessionId: 's1',
+      transcriptPath: transcript,
+      cwd: join(root, 'repo'),
+      at: 10_000,
+    })
+
+    const seen: Array<{ callId?: string }> = []
+    service.bus.subscribe((event) => seen.push(event as { callId?: string }))
+    service.start()
+
+    expect(seen.some((event) => event.callId === 'transcript-reconcile')).toBe(true)
+    service.stop()
+  })
+
+  it('starts the stall scheduler as well', () => {
+    const service = build()
+    expect(() => service.start()).not.toThrow()
+    service.stop()
+  })
+
+  it('reconciles nothing when there are no sessions', () => {
+    const service = build()
+    const seen: unknown[] = []
+    service.bus.subscribe((event) => seen.push(event))
+    service.start()
+    expect(seen).toEqual([])
+    service.stop()
+  })
+})

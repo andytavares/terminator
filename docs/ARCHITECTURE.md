@@ -850,6 +850,13 @@ label rather than colour; icons are flat `lucide-react` inheriting
 it: the Attention Queue, the Standup Feed and the palette are three renderings
 of one query, built once.
 
+### Restart reconciles immediately
+
+`start()` reconciles every session against its transcript before the scheduler
+runs, not on the next 30-second tick. A restart is precisely when the console
+and the durable record disagree — the driver is gone and everything mid-flight
+is reported from persisted state alone (SC-010).
+
 ### `merged` means a branch reached the trunk
 
 Only a `branch_merged` event puts a session in `merged` — the operator merging a
