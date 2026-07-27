@@ -1,0 +1,31 @@
+src/renderer/components/supervision/supervision.css
+  s_5f98598a6d950e::t_a46bf8f8a8ee5f 167-178,224-225,227
+docs/ARCHITECTURE.md
+  s_5f98598a6d950e::t_0c186ed58132ba 874-880
+tests/unit/main/supervision/agent-runtime/permission-bridge.spec.ts
+  s_5f98598a6d950e::t_be85f8c186c416 214-216,218-225,235-238,243,246-251
+src/main/supervision/agent-runtime/permission-bridge.ts
+  s_5f98598a6d950e::t_ddc93b888b952c 108-118,152-161,164-165,167-171
+tests/unit/renderer/supervision/surfaces.spec.tsx
+  s_5f98598a6d950e::t_9faeea17cbb699 1514-1564
+SUPERVISION.md
+  s_5f98598a6d950e::t_0c186ed58132ba 146-154
+src/renderer/components/supervision/AttentionQueue.tsx
+  s_5f98598a6d950e::t_a46bf8f8a8ee5f 160-166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "9e3593691c09b2ee18a840949ee69f3e4aae75fa",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
