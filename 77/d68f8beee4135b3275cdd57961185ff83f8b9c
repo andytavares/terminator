@@ -1,0 +1,32 @@
+src/shared/electron-api/manifest.ts
+  s_5f98598a6d950e::t_ade6f70f4bf511 616,618-620
+  s_5f98598a6d950e::t_5706641e37f310 617
+  s_5f98598a6d950e::t_675c22a7e8d78d 615
+tests/unit/renderer/hooks/useSupervision.spec.tsx
+  s_5f98598a6d950e::t_cbd515637fe6f6 55,622-645
+  s_5f98598a6d950e::t_2cfe6e63957950 646
+src/main/supervision/supervision-service.ts
+  s_5f98598a6d950e::t_ade6f70f4bf511 75-80,226-228
+src/renderer/hooks/useSupervision.ts
+  s_5f98598a6d950e::t_ade6f70f4bf511 37-38,167-169,175
+tests/unit/main/supervision/service-wiring.spec.ts
+  s_5f98598a6d950e::t_cbd515637fe6f6 397-411
+src/main/index.ts
+  s_5f98598a6d950e::t_cbd515637fe6f6 334
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "77d68f8beee4135b3275cdd57961185ff83f8b9c",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
