@@ -83,6 +83,7 @@ describe('AssignPanel', () => {
     expect(onAssign).toHaveBeenCalledWith({
       repoPath: '/Users/you/repos/fluent',
       branch: 'feat/session-ulid',
+      isNewBranch: true,
       instruction: undefined,
       workItemId: undefined,
       laneOrd: undefined,

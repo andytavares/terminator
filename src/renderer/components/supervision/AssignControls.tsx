@@ -256,6 +256,7 @@ export interface AssignPanelProps {
   onAssign(request: {
     repoPath: string
     branch: string
+    isNewBranch?: boolean
     instruction?: string
     workItemId?: string
     laneOrd?: number
@@ -308,6 +309,9 @@ export function AssignPanel({
     onAssign({
       repoPath,
       branch: chosen,
+      // `git worktree add -b` on a branch that already exists fails; the
+      // operator already told us which case this is.
+      isNewBranch: mode === 'new',
       instruction: instruction.trim() === '' ? undefined : instruction.trim(),
       workItemId: workItemId ?? undefined,
       laneOrd: laneOrd ?? undefined,

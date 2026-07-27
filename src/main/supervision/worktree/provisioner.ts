@@ -19,6 +19,8 @@ export interface ProvisionRequest {
   workItemId: string
   repoPath: string
   branch: string
+  /** Defaults to a new branch, which is what an agent normally wants. */
+  isNewBranch?: boolean
   worktreeRoot: string
 }
 
@@ -31,7 +33,13 @@ export interface ProvisionResult {
 }
 
 export interface GitWorktreeOps {
-  createWorktree(repoPath: string, worktreePath: string, branch: string): Promise<void>
+  createWorktree(
+    repoPath: string,
+    worktreePath: string,
+    branch: string,
+    /** False when the operator chose a branch the repository already has. */
+    isNewBranch: boolean
+  ): Promise<void>
   removeWorktree(repoPath: string, worktreePath: string): Promise<void>
 }
 
@@ -54,7 +62,12 @@ export function createProvisioner(options: ProvisionerOptions) {
         `${request.workItemId}-${request.branch.replace(/[^\w.-]+/g, '-')}`
       )
 
-      await git.createWorktree(request.repoPath, worktreePath, request.branch)
+      await git.createWorktree(
+        request.repoPath,
+        worktreePath,
+        request.branch,
+        request.isNewBranch ?? true
+      )
 
       const materialized = materializeWorktree({
         primaryPath: request.repoPath,

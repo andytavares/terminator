@@ -56,7 +56,8 @@ describe('provisioning', () => {
     expect(git.createWorktree).toHaveBeenCalledWith(
       repoPath,
       result.worktreePath,
-      'feat/session-ulid'
+      'feat/session-ulid',
+      true
     )
   })
 
@@ -162,5 +163,20 @@ describe('release (FR-035)', () => {
       provisioner.release({ repoPath, worktreePath, workItemId: 'FLU-220', portBase: 4000 })
     ).resolves.toBeNull()
     expect(git.removeWorktree).toHaveBeenCalled()
+  })
+})
+
+describe('the branch the worktree is cut on', () => {
+  it('cuts a new branch unless told otherwise, which is what an agent wants', async () => {
+    const { provisioner, git } = harness()
+    await provisioner.provision(request())
+    expect(git.createWorktree.mock.calls[0][3]).toBe(true)
+  })
+
+  it('checks out an existing branch when the operator picked one', async () => {
+    const { provisioner, git } = harness()
+    await provisioner.provision({ ...request(), isNewBranch: false })
+    // `git worktree add -b` on a branch that already exists fails.
+    expect(git.createWorktree.mock.calls[0][3]).toBe(false)
   })
 })

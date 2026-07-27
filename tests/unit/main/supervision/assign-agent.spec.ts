@@ -357,3 +357,41 @@ describe('gates are enforced before an agent starts (FR-083)', () => {
     await expect(assigner.assign(request())).resolves.toMatchObject({ ok: true })
   })
 })
+
+// The branch mode reaches git. `git worktree add -b` on a branch that already
+// exists fails, so the operator's choice has to travel the whole way down.
+
+describe('which kind of branch the worktree is cut on', () => {
+  function recordingGit() {
+    const calls: Array<{ branch: string; isNewBranch: boolean }> = []
+    const service = createSupervisionService({
+      userDataPath: root,
+      registryStore: memoryStore(),
+      shadowStore: { get: () => undefined, set: () => {} },
+      bindingStore: memoryStore(),
+      now: () => 1_000,
+      git: {
+        createWorktree: async (_repo, path, branch, isNewBranch) => {
+          calls.push({ branch, isNewBranch })
+          mkdirSync(path, { recursive: true })
+        },
+        removeWorktree: async () => {},
+      },
+    })
+    service.driver.start = async () => {}
+    built.push(service)
+    return { calls, assigner: createAssigner(service, () => 1_000) }
+  }
+
+  it('creates a new branch by default', async () => {
+    const { calls, assigner } = recordingGit()
+    await assigner.assign(request())
+    expect(calls[0]).toMatchObject({ isNewBranch: true })
+  })
+
+  it('checks out an existing branch when the operator picked one', async () => {
+    const { calls, assigner } = recordingGit()
+    await assigner.assign({ ...request(), isNewBranch: false })
+    expect(calls[0]).toMatchObject({ branch: 'feat/session-ulid', isNewBranch: false })
+  })
+})

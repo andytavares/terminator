@@ -130,6 +130,7 @@ export interface SupervisionScreenProps {
   onAssign(request: {
     repoPath: string
     branch: string
+    isNewBranch?: boolean
     instruction?: string
     workItemId?: string
     laneOrd?: number

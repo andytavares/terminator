@@ -20,6 +20,8 @@ export interface AssignRequest {
   branch: string
   worktreeRoot: string
   autonomyLevel: AutonomyLevel
+  /** False when the operator picked an existing branch. */
+  isNewBranch?: boolean
   /** Bound lane, when the work came from a work item. */
   workItemId?: string
   laneOrd?: number
@@ -78,6 +80,7 @@ export function createAssigner(service: SupervisionService, now: () => number = 
         repoPath: request.repoPath,
         branch: request.branch,
         worktreeRoot: request.worktreeRoot,
+        isNewBranch: request.isNewBranch,
       })
 
       if (!provisioned.ok) {

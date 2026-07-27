@@ -145,6 +145,8 @@ const assignPayload = z.object({
   laneOrd: z.number().int().positive().optional(),
   instruction: z.string().optional(),
   overrideBackpressure: z.boolean().optional(),
+  /** Absent means a new branch, which is what an agent normally wants. */
+  isNewBranch: z.boolean().optional(),
 })
 // The action set is closed: an unknown action must be refused here rather than
 // forwarded to a producer that would have to guess what it means.

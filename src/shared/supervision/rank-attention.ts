@@ -72,6 +72,9 @@ export function rankAttention(
     )
 }
 
+/** Running means "the console is doing something for you right now". */
+const RUNNING: ReadonlySet<RuntimeState> = new Set<RuntimeState>(['starting', 'working'])
+
 /** Blocked means "waiting on the operator" — including a stall, which simply never asked. */
 const BLOCKED: ReadonlySet<RuntimeState> = new Set<RuntimeState>(['needs_input', 'stalled'])
 
@@ -85,7 +88,11 @@ export function summariseStatus(
 
   return {
     needsInput: sessions.filter((s) => s.runtimeState === 'needs_input').length,
-    working: sessions.filter((s) => s.runtimeState === 'working').length,
+    // `starting` counts as working: the operator's question is whether
+    // anything is running, and a session whose worktree is being provisioned
+    // is running. Counting only `working` reported "all clear" the moment
+    // after you pressed Start.
+    working: sessions.filter((s) => RUNNING.has(s.runtimeState)).length,
     awaitingReview: sessions.filter((s) => s.runtimeState === 'ready').length,
     failed: sessions.filter((s) => s.runtimeState === 'failed').length,
     // Null, not zero: nothing blocked is a different statement from "blocked

@@ -62,6 +62,13 @@ export interface SupervisionServiceOptions {
   shadowStore: ShadowStore
   bindingStore?: RegistryStore
   /** Injected so the service can be built without Electron in a test. */
+  /**
+   * Required in production: the default throws rather than degrading, because
+   * a console that cannot make a working copy cannot start anything. Optional
+   * only so a test that never provisions need not stub it — see
+   * tests/unit/config/composition-root.spec.ts, which asserts the composition
+   * root supplies every dependency whose default throws.
+   */
   git?: GitWorktreeOps
   worktreeRoot?: string
   sendToSession?: (sessionId: string, message: string) => Promise<void>

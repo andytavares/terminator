@@ -164,3 +164,22 @@ describe('the failure reason travels with the item (FR-034)', () => {
     expect(item.failure).toBeNull()
   })
 })
+
+describe('a session that is still starting', () => {
+  it('counts as running, so the bar does not say all clear after you press Start', () => {
+    const summary = summariseStatus([session({ runtimeState: 'starting' })], 10_000)
+    expect(summary.working).toBe(1)
+  })
+
+  it('counts alongside sessions that are working', () => {
+    const summary = summariseStatus(
+      [session({ runtimeState: 'starting' }), session({ id: 's2', runtimeState: 'working' })],
+      10_000
+    )
+    expect(summary.working).toBe(2)
+  })
+
+  it('does not put it on the attention queue — nothing needs you yet', () => {
+    expect(rankAttention([session({ runtimeState: 'starting' })], 10_000)).toEqual([])
+  })
+})

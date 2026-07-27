@@ -21,6 +21,10 @@ import { setSupervisionDeps } from './extensions/api.js'
 import { mayArchive } from './supervision/worktree/archive.js'
 import { openInEditor } from './supervision/worktree/editor-handoff.js'
 import { runCommand } from './codehost/codehost-client.js'
+import {
+  createWorktree as createGitWorktree,
+  removeWorktree as removeGitWorktree,
+} from './git/git-service.js'
 import { reviewIntent } from './supervision/review/intent-diff.js'
 import { laneViews, mayMergeLane } from './supervision/lanes/lane-coordination.js'
 import { PtyManager } from './terminal/pty-manager.js'
@@ -332,6 +336,14 @@ app.whenReady().then(async () => {
       set: (value) => supervisionStore.set('laneBindings', value),
     },
     onStateChanged: (change) => stateFanout.publish(change),
+    // Real worktree operations. Without these the provisioner's default throws
+    // and no agent can ever be started.
+    git: {
+      createWorktree: (repoPath, worktreePath, branch, isNewBranch) =>
+        createGitWorktree(repoPath, worktreePath, branch, isNewBranch),
+      removeWorktree: (repoPath, worktreePath) => removeGitWorktree(repoPath, worktreePath),
+    },
+    worktreeRoot: join(app.getPath('userData'), 'worktrees'),
     // Replies and redirects reach the running agent. Without this the default
     // throws, and every reply in the feed and every stall redirect failed.
     sendToSession: (sessionId, message) => supervision.driver.send(sessionId, message),
@@ -536,11 +548,20 @@ app.whenReady().then(async () => {
         { id: 'open-attention', label: 'Open the attention queue' },
       ]),
     intake: (input) => supervision.intake(input),
-    assign: (request) =>
-      supervision.assigner.assign({
-        ...(request as Parameters<typeof supervision.assigner.assign>[0]),
-        worktreeRoot: join(app.getPath('userData'), 'worktrees'),
-      }),
+    assign: async (request) => {
+      try {
+        return await supervision.assigner.assign({
+          ...(request as Parameters<typeof supervision.assigner.assign>[0]),
+          worktreeRoot: join(app.getPath('userData'), 'worktrees'),
+        })
+      } catch (error) {
+        // Anything that throws on the way — git, the filesystem, a setup
+        // script — is the operator's answer, not an unhandled channel error
+        // they only ever see in a log.
+        logger.error('[supervision] assign failed', error)
+        return { ok: false, reason: error instanceof Error ? error.message : String(error) }
+      }
+    },
     replyToSession: (sessionId, message) =>
       supervision.feedReply.reply(
         supervision.feed

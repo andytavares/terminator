@@ -82,6 +82,7 @@ interface SupervisionBridge {
   assign?(request: {
     repoPath: string
     branch: string
+    isNewBranch?: boolean
     autonomyLevel: AutonomyLevel
     workItemId?: string
     laneOrd?: number
@@ -558,6 +559,7 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
     onAssign: (request: {
       repoPath: string
       branch: string
+      isNewBranch?: boolean
       instruction?: string
       workItemId?: string
       laneOrd?: number
