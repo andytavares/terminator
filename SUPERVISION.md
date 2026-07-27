@@ -127,9 +127,14 @@ Sorted by how much you are needed, not by project and not by arrival:
 
 Within a band, whatever has waited longest comes first.
 
-A blocked session shows **what it is asking for** and, when the request reaches
-a host, **which host** — so `redis-cli -h prod-cache-01 FLUSHALL` is recognisable
-without opening anything. Approve or deny inline.
+A blocked session shows **the ask itself**, not the name of the tool making it:
+a question appears with its options, a shell request with its command and
+description, and a tool the console does not recognise with its actual input.
+When the request reaches a host, the host is named too — so
+`redis-cli -h prod-cache-01 FLUSHALL` is recognisable without opening anything.
+Approve or deny inline.
+
+You should never be asked to approve something you cannot read.
 
 A failed session carries its reason on the row itself:
 `setup exited 3 — pnpm install failed: lockfile is out of date`. You should never

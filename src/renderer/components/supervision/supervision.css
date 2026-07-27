@@ -201,6 +201,24 @@
   height: 12px;
 }
 
+/* The full text of what an agent is asking for. Pre-wrapped: a question's
+   options are one per line, and a command must not be silently reflowed. */
+.sv-queue__detail {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  max-height: 220px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* The all-clear is a statement, never an empty div. */
 .sv-allclear {
   padding: 20px 16px;

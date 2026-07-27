@@ -41,6 +41,12 @@ export interface PendingPermission {
   readonly toolName: string
   /** What is being requested, in words — FR-007 requires surfaces state it. */
   readonly summary: string
+  /**
+   * The ask in full: a question's options, a command's description. Deciding
+   * requires seeing what is being asked, and a one-line summary of an
+   * unfamiliar tool is its name, not its request.
+   */
+  readonly detail?: string | null
   /** Present when the action targets a network host. Off-allowlist always prompts (FR-042). */
   readonly targetHost?: string
   readonly requestedAt: number

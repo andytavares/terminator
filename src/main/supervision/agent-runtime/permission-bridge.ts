@@ -53,15 +53,75 @@ function targetHostOf(input: unknown): string | undefined {
 }
 
 /** One readable line describing what the agent wants to do. FR-007 requires it. */
-function summarise(toolName: string, input: unknown): string {
-  if (typeof input === 'object' && input !== null) {
-    const record = input as Record<string, unknown>
-    for (const key of ['command', 'url', 'file_path', 'path', 'pattern']) {
-      const value = record[key]
-      if (typeof value === 'string' && value.length > 0) return value
+/**
+ * What is actually being asked, in one line and then in full.
+ *
+ * Deciding requires seeing the ask. A summary of "AskUserQuestion request" is
+ * the tool's name, not its question — you cannot approve or deny that, and
+ * FR-007 exists precisely so a surface never puts you in that position.
+ */
+function summarise(toolName: string, input: unknown): { summary: string; detail: string | null } {
+  if (typeof input !== 'object' || input === null)
+    return { summary: `${toolName} request`, detail: null }
+  const record = input as Record<string, unknown>
+
+  // A question carries its text in a shape of its own, and its options are
+  // most of what you need to answer it.
+  const questions = record.questions
+  if (Array.isArray(questions) && questions.length > 0) {
+    const asked = questions
+      .map((entry) => {
+        const question = entry as Record<string, unknown>
+        const text = typeof question.question === 'string' ? question.question : ''
+        const options = Array.isArray(question.options)
+          ? question.options
+              .map((option) =>
+                typeof option === 'object' && option !== null
+                  ? String((option as Record<string, unknown>).label ?? '')
+                  : String(option)
+              )
+              .filter((label) => label !== '')
+          : []
+        return options.length === 0 ? text : `${text}\n  ${options.join('\n  ')}`
+      })
+      .filter((text) => text.trim() !== '')
+
+    if (asked.length > 0) {
+      const first =
+        typeof (questions[0] as Record<string, unknown>).question === 'string'
+          ? ((questions[0] as Record<string, unknown>).question as string)
+          : `${toolName} request`
+      return { summary: first, detail: asked.join('\n\n') }
     }
   }
-  return `${toolName} request`
+
+  for (const key of ['command', 'url', 'file_path', 'path', 'pattern', 'question', 'prompt']) {
+    const value = record[key]
+    if (typeof value === 'string' && value.length > 0) {
+      const description = record.description
+      return {
+        summary: value,
+        detail: typeof description === 'string' && description !== '' ? description : null,
+      }
+    }
+  }
+
+  // Nothing recognised: show the input rather than only the tool's name. An
+  // unfamiliar tool is exactly when you most need to see what it wants.
+  const rendered = renderInput(record)
+  return { summary: `${toolName} request`, detail: rendered }
+}
+
+/** A compact, bounded rendering of an unrecognised tool input. */
+function renderInput(record: Record<string, unknown>): string | null {
+  const lines = Object.entries(record)
+    .filter(([, value]) => value !== undefined && value !== null)
+    .slice(0, 8)
+    .map(([key, value]) => {
+      const text = typeof value === 'string' ? value : JSON.stringify(value)
+      return `${key}: ${text.length > 300 ? `${text.slice(0, 300)}…` : text}`
+    })
+  return lines.length === 0 ? null : lines.join('\n')
 }
 
 export function createPermissionBridge(options: PermissionBridgeOptions): PermissionBridge {
@@ -99,7 +159,7 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
         sessionId,
         requestId,
         toolName,
-        summary: summarise(toolName, input),
+        ...summarise(toolName, input),
         targetHost: targetHostOf(input),
         at: now(),
       })

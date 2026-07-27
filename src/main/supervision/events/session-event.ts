@@ -54,6 +54,8 @@ export interface PermissionRequestedEvent extends BaseEvent {
   readonly toolName: string
   /** What is being asked for, in words. FR-007 requires the surface state it. */
   readonly summary: string
+  /** The ask in full — a question's options, a command's description. */
+  readonly detail?: string | null
   readonly targetHost?: string
 }
 

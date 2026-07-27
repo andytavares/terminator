@@ -159,3 +159,97 @@ describe('shutdown', () => {
     await expect(pending).resolves.toMatchObject({ behavior: 'deny' })
   })
 })
+
+// FR-007. Deciding requires seeing the ask. "AskUserQuestion request" is the
+// tool's name, not its question — you cannot approve or deny that.
+
+describe('what the operator is told is being asked', () => {
+  function ask(toolName: string, input: unknown) {
+    const events: SessionEvent[] = []
+    const bridge = createPermissionBridge({
+      sessionId: 's1',
+      publish: (event) => events.push(event),
+      now: () => 1_000,
+    })
+    void bridge.canUseTool(toolName, input)
+    return events.find((event) => event.kind === 'permission_requested') as {
+      summary: string
+      detail?: string | null
+    }
+  }
+
+  it('leads with the question itself', () => {
+    const event = ask('AskUserQuestion', {
+      questions: [{ question: 'Which database should the worker write to?', options: [] }],
+    })
+    expect(event.summary).toBe('Which database should the worker write to?')
+  })
+
+  it('carries the options, which are most of what you need to answer', () => {
+    const event = ask('AskUserQuestion', {
+      questions: [
+        {
+          question: 'Which database?',
+          options: [{ label: 'Postgres' }, { label: 'SQLite' }],
+        },
+      ],
+    })
+    expect(event.detail).toContain('Postgres')
+    expect(event.detail).toContain('SQLite')
+  })
+
+  it('carries every question when more than one is asked', () => {
+    const event = ask('AskUserQuestion', {
+      questions: [{ question: 'First?' }, { question: 'Second?' }],
+    })
+    expect(event.detail).toContain('First?')
+    expect(event.detail).toContain('Second?')
+  })
+
+  it('still leads with the command for a shell request', () => {
+    const event = ask('Bash', { command: 'redis-cli -h prod-cache-01 FLUSHALL' })
+    expect(event.summary).toBe('redis-cli -h prod-cache-01 FLUSHALL')
+  })
+
+  it('carries a command’s description as the detail', () => {
+    const event = ask('Bash', { command: 'rm -rf build', description: 'Clean the build output' })
+    expect(event.detail).toBe('Clean the build output')
+  })
+
+  it('shows the input of a tool it does not recognise, rather than only its name', () => {
+    // An unfamiliar tool is exactly when you most need to see what it wants.
+    const event = ask('SomeNewTool', { target: 'production', mode: 'destructive' })
+    expect(event.detail).toContain('target: production')
+    expect(event.detail).toContain('mode: destructive')
+  })
+
+  it('bounds a very long value rather than pasting it whole', () => {
+    const event = ask('SomeNewTool', { blob: 'x'.repeat(5_000) })
+    expect(event.detail?.length ?? 0).toBeLessThan(400)
+    expect(event.detail).toContain('…')
+  })
+
+  it('bounds how many fields it shows', () => {
+    const input = Object.fromEntries(
+      Array.from({ length: 40 }, (_, index) => [`field${index}`, String(index)])
+    )
+    const event = ask('SomeNewTool', input)
+    expect((event.detail ?? '').split('\n')).toHaveLength(8)
+  })
+
+  it('has no detail to show when the input is not an object', () => {
+    const event = ask('SomeNewTool', 'just a string')
+    expect(event.summary).toBe('SomeNewTool request')
+    expect(event.detail).toBeNull()
+  })
+
+  it('ignores an empty question list rather than claiming a question was asked', () => {
+    const event = ask('AskUserQuestion', { questions: [] })
+    expect(event.summary).toBe('AskUserQuestion request')
+  })
+
+  it('falls back to the tool name when the questions carry no text', () => {
+    const event = ask('AskUserQuestion', { questions: [{ options: [] }] })
+    expect(event.summary).toBe('AskUserQuestion request')
+  })
+})

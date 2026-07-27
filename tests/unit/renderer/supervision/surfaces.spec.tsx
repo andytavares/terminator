@@ -1108,3 +1108,61 @@ describe('a failed session says why on the queue itself (FR-034)', () => {
     expect(screen.getByText(/setup exited 1/)).toBeDefined()
   })
 })
+
+describe('the ask is readable on the queue (FR-007)', () => {
+  const blocked = {
+    sessionId: 's1',
+    repoPath: '/repos/fluent',
+    reason: 'needs_input' as const,
+    waitingMs: 29_000,
+    failure: null,
+    pendingPermission: {
+      requestId: 'r1',
+      toolName: 'AskUserQuestion',
+      summary: 'Which database should the worker write to?',
+      detail: 'Which database should the worker write to?\n  Postgres\n  SQLite',
+      requestedAt: 1_000,
+    },
+  }
+
+  const queue = (over: Record<string, unknown> = {}) =>
+    render(
+      <AttentionQueue
+        items={[{ ...blocked, ...over }]}
+        loaded
+        workingCount={0}
+        onApprove={() => {}}
+        onDeny={() => {}}
+        onOpen={() => {}}
+      />
+    )
+
+  it('shows the question, not the tool name', () => {
+    queue()
+    expect(
+      screen.getAllByText(/Which database should the worker write to\?/).length
+    ).toBeGreaterThan(0)
+  })
+
+  it('shows the options, so the decision can actually be made', () => {
+    queue()
+    expect(screen.getByText(/Postgres/)).toBeDefined()
+    expect(screen.getByText(/SQLite/)).toBeDefined()
+  })
+
+  it('shows nothing extra when there is no detail', () => {
+    queue({ pendingPermission: { ...blocked.pendingPermission, detail: null } })
+    expect(screen.queryByText(/Postgres/)).toBeNull()
+  })
+
+  it('shows nothing extra for a detail that is only whitespace', () => {
+    queue({ pendingPermission: { ...blocked.pendingPermission, detail: '   ' } })
+    expect(document.querySelector('.sv-queue__detail')).toBeNull()
+  })
+
+  it('still offers allow and deny', () => {
+    queue()
+    expect(screen.getByText('Allow')).toBeDefined()
+    expect(screen.getByText('Deny')).toBeDefined()
+  })
+})

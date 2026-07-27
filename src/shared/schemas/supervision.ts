@@ -29,6 +29,7 @@ export const pendingPermissionSchema = z.object({
   // FR-007 requires the surface name what is being requested, so an empty
   // summary is a malformed request rather than a permissible one.
   summary: z.string().min(1),
+  detail: z.string().nullable().optional(),
   targetHost: z.string().min(1).optional(),
   requestedAt: z.number(),
   autoDecision: z.literal('allow').nullish(),

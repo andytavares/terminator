@@ -61,6 +61,13 @@ export function AttentionQueue({
                 <> · host {item.pendingPermission.targetHost}</>
               )}
             </div>
+            {/* The ask in full. You cannot decide what you cannot read, and
+                a summary of an unfamiliar tool is its name, not its request
+                (FR-007). */}
+            {item.pendingPermission?.detail != null &&
+              item.pendingPermission.detail.trim() !== '' && (
+                <pre className="sv-queue__detail">{item.pendingPermission.detail}</pre>
+              )}
             {/* The reason, on the queue itself: "failed" with the output hidden
                 behind a click is exactly the trip this saves (FR-034). */}
             {item.failure !== null && (
