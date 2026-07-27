@@ -871,6 +871,13 @@ hook tells the app shell through options passed to `useSupervision`. An earlier
 cut broadcast `CustomEvent`s on `window` that nothing listened for — a listener
 that does not exist should be a compile error, not silence.
 
+### What a permission request shows
+
+The whole input, verbatim — every field the tool was given, bounded at 24 fields
+and 4,000 characters each and scrolled rather than elided. A description is the
+agent's account of its own command, and a truncated command hides exactly the
+half that might do the damage; neither is something to approve on.
+
 ### Answering, not just approving
 
 `canUseTool` has exactly two ways back to the agent: allow with an updated

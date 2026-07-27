@@ -1511,3 +1511,54 @@ describe('a session that is over, or lost (FR-029)', () => {
     expect(screen.queryByText('Discard')).toBeNull()
   })
 })
+
+describe('seeing what the agent is actually about to run (FR-007)', () => {
+  const asking = {
+    sessionId: 's1',
+    repoPath: '/Users/you/repos/terminator',
+    branch: 'testing-12',
+    reason: 'needs_input' as const,
+    waitingMs: 24_000,
+    failure: null,
+    pendingPermission: {
+      requestId: 'r1',
+      toolName: 'Bash',
+      summary: 'cd /Users/you/Library/Application Support/@a/terminator/worktrees/08e9 && open .',
+      detail:
+        'command: cd /Users/you/Library/Application Support/@a/terminator/worktrees/08e9 && open .\ndescription: Inspect global styles',
+      requestedAt: 1_000,
+    },
+  }
+
+  const queue = () =>
+    render(
+      <AttentionQueue
+        items={[asking]}
+        loaded
+        workingCount={0}
+        onApprove={() => {}}
+        onDeny={() => {}}
+        onAnswer={() => {}}
+        onDiscard={() => {}}
+        onOpen={() => {}}
+      />
+    )
+
+  it('names the tool, since a command and a file write read alike', () => {
+    queue()
+    expect(screen.getByText('Bash')).toBeDefined()
+  })
+
+  it('shows the command itself, not only the agent’s description of it', () => {
+    queue()
+    const detail = document.querySelector('.sv-queue__detail')?.textContent ?? ''
+    expect(detail).toContain('&& open .')
+    expect(detail).toContain('description: Inspect global styles')
+  })
+
+  it('does not elide the command in the block, whatever the title does', () => {
+    queue()
+    const detail = document.querySelector('.sv-queue__detail')?.textContent ?? ''
+    expect(detail).not.toContain('…')
+  })
+})

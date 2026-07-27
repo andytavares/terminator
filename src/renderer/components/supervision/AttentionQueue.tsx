@@ -157,6 +157,13 @@ export function AttentionQueue({
                 line below anyway. */}
             <div className="sv-queue__title">{item.pendingPermission?.summary ?? item.branch}</div>
             <div className="sv-queue__meta">
+              {/* Which tool is asking. A command and a file write read alike
+                  from their arguments alone. */}
+              {item.pendingPermission !== null && (
+                <>
+                  <span className="sv-tool">{item.pendingPermission.toolName}</span>{' '}
+                </>
+              )}
               {item.repoPath.split('/').pop()} · {REASON_TITLES[item.reason]} ·{' '}
               {formatElapsed(item.waitingMs)}
               {item.pendingPermission?.targetHost !== undefined && (

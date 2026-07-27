@@ -164,6 +164,18 @@
   white-space: nowrap;
 }
 
+/* Which tool is asking, before its arguments: a shell command and a file write
+   read alike once you are only looking at a path. */
+.sv-tool {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border-strong);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-primary);
+}
+
 .sv-queue__meta {
   font-size: 11px;
   color: var(--text-muted);
@@ -209,8 +221,10 @@
    options are one per line, and a command must not be silently reflowed. */
 .sv-queue__detail {
   margin: 6px 0 0;
+  /* Never elided: the half of a command you cannot see is the half that might
+     delete something. It scrolls instead. */
   padding: 8px 10px;
-  max-height: 220px;
+  max-height: 320px;
   overflow: auto;
   font-family: var(--font-mono);
   font-size: 11px;

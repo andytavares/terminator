@@ -105,21 +105,18 @@ function summarise(toolName: string, input: unknown): { summary: string; detail:
     }
   }
 
-  for (const key of ['command', 'url', 'file_path', 'path', 'pattern', 'question', 'prompt']) {
-    const value = record[key]
-    if (typeof value === 'string' && value.length > 0) {
-      const description = record.description
-      return {
-        summary: value,
-        detail: typeof description === 'string' && description !== '' ? description : null,
-      }
-    }
-  }
+  // The headline: the field an operator would recognise the request by.
+  const headline = ['command', 'url', 'file_path', 'path', 'pattern', 'prompt']
+    .map((key) => record[key])
+    .find((value): value is string => typeof value === 'string' && value.length > 0)
 
-  // Nothing recognised: show the input rather than only the tool's name. An
-  // unfamiliar tool is exactly when you most need to see what it wants.
-  const rendered = renderInput(record)
-  return { summary: `${toolName} request`, detail: rendered }
+  // And then the whole input, verbatim. The headline is elided in a single-line
+  // title, and a description is the agent's own account of what it is doing —
+  // approving on either alone is taking its word for what the command does.
+  return {
+    summary: headline ?? `${toolName} request`,
+    detail: renderInput(record),
+  }
 }
 
 /**
@@ -152,14 +149,26 @@ function questionsOf(input: unknown): Array<{ question: string; options: string[
   return asked.length === 0 ? undefined : asked
 }
 
-/** A compact, bounded rendering of an unrecognised tool input. */
+/**
+ * Every field the tool was given, verbatim.
+ *
+ * Bounded generously rather than tightly: a command must never be cut, because
+ * the whole reason to show it is that the half you cannot see is the half that
+ * might delete something. The surface scrolls.
+ */
+const FIELD_LIMIT = 4_000
+const FIELD_COUNT = 24
+
 function renderInput(record: Record<string, unknown>): string | null {
   const lines = Object.entries(record)
-    .filter(([, value]) => value !== undefined && value !== null)
-    .slice(0, 8)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .slice(0, FIELD_COUNT)
     .map(([key, value]) => {
-      const text = typeof value === 'string' ? value : JSON.stringify(value)
-      return `${key}: ${text.length > 300 ? `${text.slice(0, 300)}…` : text}`
+      const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2)
+      const shown = text.length > FIELD_LIMIT ? `${text.slice(0, FIELD_LIMIT)}\n… truncated` : text
+      // Multi-line values start on their own line so a diff or a script stays
+      // readable rather than running off after the key.
+      return shown.includes('\n') ? `${key}:\n${shown}` : `${key}: ${shown}`
     })
   return lines.length === 0 ? null : lines.join('\n')
 }

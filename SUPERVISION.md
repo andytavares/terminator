@@ -143,9 +143,15 @@ offered. Allow and Deny remain for requests that really are a yes or no, and
 even those let you refuse _with a reason_, which is worth more to the agent than
 a bare no.
 
-A blocked session shows **the ask itself**, not the name of the tool making it:
-a question appears with its options, a shell request with its command and
-description, and a tool the console does not recognise with its actual input.
+A blocked session shows **the ask itself**, not the name of the tool making it —
+and shows it _in full_. The tool is named, and every argument it was given is
+printed verbatim: the whole command, the file path and the content about to be
+written, the URL about to be fetched. The one-line title elides; the block below
+never does.
+
+The agent's own `description` is shown too, but beside the command rather than
+instead of it. Approving on a description alone is taking the agent's word for
+what its command does.
 When the request reaches a host, the host is named too — so
 `redis-cli -h prod-cache-01 FLUSHALL` is recognisable without opening anything.
 Approve or deny inline.

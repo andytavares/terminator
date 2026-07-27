@@ -211,9 +211,18 @@ describe('what the operator is told is being asked', () => {
     expect(event.summary).toBe('redis-cli -h prod-cache-01 FLUSHALL')
   })
 
-  it('carries a command’s description as the detail', () => {
+  it('carries the command itself, not only the agent’s description of it', () => {
+    // Approving on a description alone is taking the agent's word for what the
+    // command does.
     const event = ask('Bash', { command: 'rm -rf build', description: 'Clean the build output' })
-    expect(event.detail).toBe('Clean the build output')
+    expect(event.detail).toContain('command: rm -rf build')
+    expect(event.detail).toContain('description: Clean the build output')
+  })
+
+  it('shows a command in full, however long the title elides it to', () => {
+    const command = `cd ${'/very-long-path'.repeat(40)} && npm run build`
+    const event = ask('Bash', { command })
+    expect(event.detail).toContain(command)
   })
 
   it('shows the input of a tool it does not recognise, rather than only its name', () => {
@@ -223,18 +232,23 @@ describe('what the operator is told is being asked', () => {
     expect(event.detail).toContain('mode: destructive')
   })
 
-  it('bounds a very long value rather than pasting it whole', () => {
-    const event = ask('SomeNewTool', { blob: 'x'.repeat(5_000) })
-    expect(event.detail?.length ?? 0).toBeLessThan(400)
-    expect(event.detail).toContain('…')
+  it('bounds a value that would never end, and says it did', () => {
+    const event = ask('SomeNewTool', { blob: 'x'.repeat(50_000) })
+    expect(event.detail?.length ?? 0).toBeLessThan(5_000)
+    expect(event.detail).toContain('truncated')
   })
 
   it('bounds how many fields it shows', () => {
     const input = Object.fromEntries(
-      Array.from({ length: 40 }, (_, index) => [`field${index}`, String(index)])
+      Array.from({ length: 60 }, (_, index) => [`field${index}`, String(index)])
     )
     const event = ask('SomeNewTool', input)
-    expect((event.detail ?? '').split('\n')).toHaveLength(8)
+    expect((event.detail ?? '').split('\n')).toHaveLength(24)
+  })
+
+  it('puts a multi-line value on its own line so a script stays readable', () => {
+    const event = ask('Write', { file_path: '/a.sh', content: 'set -e\nrm -rf build\n' })
+    expect(event.detail).toContain('content:\nset -e\nrm -rf build')
   })
 
   it('has no detail to show when the input is not an object', () => {
