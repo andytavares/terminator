@@ -1,0 +1,61 @@
+src/main/supervision/stall/firing-log.ts
+  s_5f98598a6d950e::t_060eecb03594ae 18-23,31,75-76,89-92,126-127
+  s_5f98598a6d950e::t_2240a67b40667a 128,142-145
+  s_5f98598a6d950e::t_96c0ae0c5de267 129
+src/shared/electron-api/manifest.ts
+  s_5f98598a6d950e::t_7afa8a9d43d7f1 614-625
+src/renderer/components/supervision/SupervisionScreen.tsx
+  s_5f98598a6d950e::t_5b3daedec482ff 125-126,133-134
+  s_5f98598a6d950e::t_b498ff52fccd42 389,402
+tests/unit/renderer/supervision/surfaces.spec.tsx
+  s_5f98598a6d950e::t_08a008ac99dee7 392-434
+  s_5f98598a6d950e::t_c0789a7eaa908f 338,352,362-368,384,437-443,897,912,930,948,964
+tests/unit/main/supervision/stall/firing-log.spec.ts
+  s_5f98598a6d950e::t_45d7f5210a8588 238-269
+src/main/supervision/supervision-service.ts
+  s_5f98598a6d950e::t_7afa8a9d43d7f1 149-152,602-604
+  s_5f98598a6d950e::t_f7ee12d9c42a78 605
+src/renderer/hooks/useSupervision.ts
+  s_5f98598a6d950e::t_7afa8a9d43d7f1 105-106,533-536,574-582
+src/main/index.ts
+  s_5f98598a6d950e::t_7afa8a9d43d7f1 502-503
+tests/unit/renderer/supervision/screen.spec.tsx
+  s_5f98598a6d950e::t_6449752bdb5adc 53,59
+tests/unit/renderer/supervision/supervision-tab.spec.tsx
+  s_5f98598a6d950e::t_6449752bdb5adc 58,64
+src/renderer/components/supervision/StallControls.tsx
+  s_5f98598a6d950e::t_28680cc6ccd49e 11
+  s_5f98598a6d950e::t_2a88b11527ac6e 26-27,36,105-106
+  s_5f98598a6d950e::t_b5be050b2b51d6 107
+tests/unit/main/supervision/feed/feed-log.spec.ts
+  s_5f98598a6d950e::t_45d7f5210a8588 166-196
+src/renderer/components/supervision/StandupFeed.tsx
+  s_5f98598a6d950e::t_5b3daedec482ff 2,16-17,29,81-82
+  s_5f98598a6d950e::t_e1136e68395a26 83
+tests/unit/renderer/supervision/controls.spec.tsx
+  s_5f98598a6d950e::t_b30708941dfce9 44,59,74,88,102,117,132,147,161
+  s_5f98598a6d950e::t_6cda4d3f1c55f2 335-352
+src/main/supervision/feed/feed-log.ts
+  s_5f98598a6d950e::t_2240a67b40667a 125-126
+  s_5f98598a6d950e::t_060eecb03594ae 39-40,50-55,59-64,66,73-77
+  s_5f98598a6d950e::t_b8dc7be787e139 127-128
+src/main/ipc/supervision.ipc.ts
+  s_5f98598a6d950e::t_7afa8a9d43d7f1 37-38,101-102,355-367
+  s_5f98598a6d950e::t_40bd3241704ff0 368
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "08111d2f1d38c6c5496ad684885624bba7b807cf",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
