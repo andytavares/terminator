@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, expandWorkspace, type AppHandle } from './helpers'
@@ -109,3 +109,89 @@ test('starting a session opens a project and a terminal running claude', async (
     timeout: 30_000,
   })
 })
+
+// Opt-in, because it drives a real model. It needs working credentials, and
+// whether an agent reaches for Write at all — or reaches for it within any
+// particular number of seconds — is the model's decision, not something a
+// suite can depend on. It does fail sometimes for that reason, which is
+// exactly why it is not in the default run: a flaky test in the gate is worse
+// than an honest manual check.
+//
+// Verified by hand against claude 2.1.220: the request reached the queue
+// naming probe.txt, and allowing it from the console created the file in the
+// worktree. Kept runnable so the next person can repeat that rather than trust
+// it:
+//
+//   TERMINATOR_E2E_LIVE_AGENT=1 npx playwright test -g "attention queue"
+//
+// Everything it covers below the model is unit-tested deterministically: the
+// hook script is run as a real process against a real server, and the driver's
+// end of the round trip is covered in pty-driver.spec.ts.
+const live = process.env.TERMINATOR_E2E_LIVE_AGENT === '1'
+
+;(live ? test : test.skip)(
+  'a tool the agent may not run on its own reaches the attention queue',
+  async () => {
+    // The load-bearing claim of this runtime: a PreToolUse hook holds the tool
+    // call still, posts to the console, and the operator decides. Every part is
+    // unit-tested against a fake; only the real application shows that a real
+    // `claude`, started by a real session, actually blocks and actually appears.
+    // A real agent has to start, think and reach for a tool.
+    test.setTimeout(180_000)
+    const { page } = handle
+
+    const started = await page.evaluate(async (repoPath: string) => {
+      const api = (window as unknown as { electronAPI: any }).electronAPI
+      const workspaces = await api.workspace.list()
+      return api.supervision.assign({
+        repoPath,
+        branch: 'feat/e2e-permission',
+        autonomyLevel: 'read',
+        instruction: 'Create a file called probe.txt containing the word banana. Nothing else.',
+        workspaceId: workspaces.workspaces[0]?.id ?? null,
+      })
+    }, repo)
+    expect(started?.reason ?? 'ok').toBe('ok')
+    expect(started?.ok).toBe(true)
+
+    // `read` autonomy does not cover writing, so the ladder abstains and the
+    // decision is the operator's. Polled through the same surface the console
+    // reads, rather than through the driver, so this fails if any link between
+    // the hook and the queue is broken.
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(async () => {
+            const api = (window as unknown as { electronAPI: any }).electronAPI
+            const sessions = await api.supervision.listSessions()
+            return sessions.find(
+              (session: { branch: string }) => session.branch === 'feat/e2e-permission'
+            )?.pendingPermission?.summary
+          }),
+        { timeout: 120_000, intervals: [1_000] }
+      )
+      .toContain('probe.txt')
+
+    // And answering it lets the agent carry on. This is the whole round trip:
+    // hook holds the call → console shows it → operator allows → the tool runs.
+    const session = await page.evaluate(async () => {
+      const api = (window as unknown as { electronAPI: any }).electronAPI
+      const sessions = await api.supervision.listSessions()
+      return sessions.find((s: { branch: string }) => s.branch === 'feat/e2e-permission')
+    })
+    await page.evaluate(
+      async ([sessionId, requestId]: string[]) => {
+        const api = (window as unknown as { electronAPI: any }).electronAPI
+        await api.supervision.resolvePermission({ sessionId, requestId, decision: 'allow' })
+      },
+      [session.id, session.pendingPermission.requestId]
+    )
+
+    await expect
+      .poll(() => existsSync(join(session.worktreePath, 'probe.txt')), {
+        timeout: 120_000,
+        intervals: [1_000],
+      })
+      .toBe(true)
+  }
+)
