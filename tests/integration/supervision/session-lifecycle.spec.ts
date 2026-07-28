@@ -320,12 +320,14 @@ describe('the runtime seam is the only SDK importer (SC-007)', () => {
   it('has exactly one file under src/ importing the agent SDK', async () => {
     const { execSync } = await import('child_process')
     const hits = execSync(
-      "grep -rl '@anthropic-ai/claude-agent-sdk' src --include='*.ts' --include='*.tsx' || true",
+      "grep -rl 'agent-runtime/pty-driver' src --include='*.ts' --include='*.tsx' || true",
       { encoding: 'utf-8' }
     )
       .split('\n')
       .filter((line) => line.trim() !== '')
-    expect(hits).toEqual(['src/main/supervision/agent-runtime/driver.ts'])
+    // Only the composition point knows which driver is in use; every other
+    // consumer depends on the SessionDriver contract instead.
+    expect(hits).toEqual(['src/main/supervision/supervision-service.ts'])
   })
 })
 

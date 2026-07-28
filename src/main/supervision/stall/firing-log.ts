@@ -139,10 +139,6 @@ export function createFiringLog(path: string): FiringLog {
       return materialise().filter((firing) => firing.judgement === null)
     },
 
-    remove(id: string): void {
-      log.append({ kind: 'removed', id })
-    },
-
     precision(fromMs: number, toMs: number): PrecisionReport {
       const inWindow = materialise().filter((f) => f.firedAt >= fromMs && f.firedAt <= toMs)
       const judged = inWindow.filter((f) => f.judgement !== null)

@@ -14,11 +14,10 @@ export interface SessionMeta {
   worktreePath: string
   branch: string
   autonomyLevel: AutonomyLevel
-  /**
-   * The runtime's own id for the conversation, once it has told us. This is
-   * what `claude --resume` takes; ours is a different identifier.
-   */
-  runtimeSessionId?: string | null
+  /** The terminal the agent runs in, once one has been opened for it. */
+  terminalSessionId?: string | null
+  /** The workspace project its working copy was registered as. */
+  projectId?: string | null
 }
 
 interface PersistedEntry {
@@ -43,8 +42,12 @@ export interface SessionRegistry {
   apply(event: SessionEvent): void
   get(sessionId: string): SupervisedSession | null
   list(): SupervisedSession[]
-  /** Records the runtime's id for a session, so it can be resumed by hand. */
-  noteRuntimeSessionId(sessionId: string, runtimeSessionId: string): void
+  /**
+   * Records where the agent is running, so a surface can take the operator to
+   * it. The session id is the runtime's id too — the console mints it — so
+   * there is nothing else to correlate.
+   */
+  noteTerminal(sessionId: string, terminalSessionId: string, projectId: string | null): void
   markViewed(sessionId: string, at: number): void
   /**
    * Removes a session entirely. Discarding one has to end with it leaving the
@@ -112,7 +115,8 @@ function project(sessionId: string, entry: PersistedEntry): SupervisedSession {
     pendingPermission: state.pendingPermission,
     diffSummary: state.diffSummary,
     autonomyLevel: meta.autonomyLevel,
-    runtimeSessionId: meta.runtimeSessionId ?? null,
+    terminalSessionId: meta.terminalSessionId ?? null,
+    projectId: meta.projectId ?? null,
     lastViewedAt: entry.lastViewedAt,
     failure: state.failure ?? null,
   }
@@ -155,10 +159,13 @@ export function createSessionRegistry(options: SessionRegistryOptions): SessionR
       return [...entries].map(([sessionId, entry]) => project(sessionId, entry))
     },
 
-    noteRuntimeSessionId(sessionId: string, runtimeSessionId: string): void {
+    noteTerminal(sessionId: string, terminalSessionId: string, projectId: string | null): void {
       const entry = entries.get(sessionId)
-      if (entry === undefined || entry.meta.runtimeSessionId === runtimeSessionId) return
-      entries.set(sessionId, { ...entry, meta: { ...entry.meta, runtimeSessionId } })
+      if (entry === undefined || entry.meta.terminalSessionId === terminalSessionId) return
+      entries.set(sessionId, {
+        ...entry,
+        meta: { ...entry.meta, terminalSessionId, projectId },
+      })
       persist()
     },
 

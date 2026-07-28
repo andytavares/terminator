@@ -124,6 +124,30 @@ The **Needs you** tab carries the start panel.
 Every refusal states its reason in place — an unapproved gate, a full review
 queue, a setup script that failed.
 
+### What Start actually creates
+
+Terminator wraps Claude Code rather than replacing it. Starting a session gives
+you, in your current workspace:
+
+- a **git worktree** for the branch,
+- a **project** in the sidebar pointing at it, named for the branch,
+- a **terminal** in that project, with `claude` running in it.
+
+That terminal is not a view onto the agent — it _is_ the agent. You can watch it
+work, scroll back through what it did, and take over by typing in it, all
+without the console losing track of the session. Everything the console knows it
+learns from the agent's transcript and its hooks, so a human typing in the same
+terminal changes nothing about how it is supervised.
+
+The session id Terminator assigns is Claude Code's own session id, so
+`claude --resume <session id>` in any terminal picks up the same conversation.
+
+Permission requests reach **Needs you** through Claude Code's `PreToolUse` hook,
+which holds the tool call still until you answer. If Terminator is not reachable
+— it is closed, or restarting — the request falls back to Claude Code's own
+prompt in the terminal, so a session is never stuck waiting on a console that
+is not there, and nothing is ever approved without somebody saying so.
+
 ---
 
 ## 5. Needs you — the attention queue
@@ -176,18 +200,20 @@ have to open a session to learn why it died.
 **Needs you** answers _what needs me_. **Sessions** answers _what is running_ —
 every session whether or not it wants anything, running ones first.
 
-Each row carries what the agent has spent and what it has changed: turns, cost,
-context used, and the size of its diff. So a session quietly burning turns
-against a 61%-full context is visible without opening it.
+Each row carries what the agent has done and what it has changed: turns and the
+size of its diff. So a session quietly burning turns with nothing to show for
+them is visible without opening it. Cost and context use are not shown — they
+came from the in-process runtime that Terminator no longer uses, and neither is
+recoverable from a terminal, so nothing is claimed rather than a confident
+`$0.00` that means "not measured".
 
 Three actions on every row:
 
-- **Terminal** — opens a shell in the session's working copy and types
-  `claude --resume <its session id>` for you. The console drives agents
-  headlessly, so there is no terminal to attach to; this is as close as the
-  runtime allows to looking over its shoulder, and it lets you take the
-  conversation over by hand. The command is typed, not run — press Enter when
-  you have read it.
+- **Terminal** — takes you to the session's own terminal, where `claude` is
+  running. It is an ordinary tab in an ordinary project: you can read what the
+  agent is doing as it does it, and you can take the work over simply by typing
+  in it. The console does not lose track when you do — what it watches is the
+  transcript and the hooks, not the process.
 - **Details** — expands the session in place: its working copy, autonomy level,
   what it has spent, what it changed, when it last did anything, its transcript
   path, and why it failed if it did.
@@ -549,5 +575,10 @@ torn or unrecognised line is skipped rather than taking a surface down.
   agent-runtime seam, and why state is derived rather than parsed.
 - [`docs/EXTENSION-DEVELOPMENT.md`](docs/EXTENSION-DEVELOPMENT.md) — publishing
   work items to the console as a producer.
+- [`docs/adr/028-agent-in-a-terminal.md`](docs/adr/028-agent-in-a-terminal.md)
+  — why the agent runs in a terminal you can see, how permission requests reach
+  the console through a `PreToolUse` hook, and the parts of the hook contract
+  that differ from the published reference.
 - [`docs/adr/026-agent-sdk-over-pty-supervision.md`](docs/adr/026-agent-sdk-over-pty-supervision.md)
-  — why state comes from the agent SDK and never from parsing terminal output.
+  — why state is still derived from the transcript and the hooks, and never
+  from parsing what scrolls past in the terminal.

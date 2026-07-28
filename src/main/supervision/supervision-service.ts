@@ -5,7 +5,14 @@ import {
   type SessionRegistry,
   type RegistryStore,
 } from './state/session-registry.js'
-import { createSessionDriver, type SessionDriver } from './agent-runtime/driver.js'
+import { createPtyDriver } from './agent-runtime/pty-driver.js'
+import type {
+  OpenedTerminal,
+  SessionDriver,
+  TerminalPlacement,
+} from './agent-runtime/driver-contract.js'
+import type { ControlServer } from './agent-runtime/control-server.js'
+import type { LaunchSpec } from './agent-runtime/claude-launch.js'
 import { createFiringLog, type FiringLog } from './stall/firing-log.js'
 import { createStallSurfacer, type StallSurfacer, type ShadowStore } from './stall/surface-stall.js'
 import { createStallScheduler, type StallScheduler } from './stall/stall-scheduler.js'
@@ -102,6 +109,25 @@ export interface SupervisionServiceOptions {
   /** Injected so the Linear pull can be exercised without the network. */
   fetchLinear?: FetchLike
   notify?: (entry: { sessionId: string; summary: string }) => void
+  /**
+   * How an agent actually gets run: a terminal to type into, and the loopback
+   * server its hooks answer on. Supplied by the composition root, because
+   * terminals belong to projects and projects belong to workspaces — none of
+   * which this module knows anything about.
+   */
+  agentRuntime?: AgentRuntimeOptions
+}
+
+export interface AgentRuntimeOptions {
+  control: ControlServer
+  hookScriptPath: string
+  /**
+   * Opens a terminal in the session's working copy, registering it as a
+   * project in the operator's workspace. Null if it could not.
+   */
+  openTerminal: (spec: LaunchSpec, placement?: TerminalPlacement) => Promise<OpenedTerminal | null>
+  write: (terminalSessionId: string, data: string) => void
+  closeTerminal: (terminalSessionId: string) => void
 }
 
 export interface SupervisionService {
@@ -266,11 +292,34 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
   const registry = createSessionRegistry({ store: registryStore, now })
   const firings = createFiringLog(join(dir, 'stall-firings.jsonl'))
 
-  const driver = createSessionDriver({
+  const driver = createPtyDriver({
     publish: (event: SessionEvent) => bus.publish(event),
     now,
-    onRuntimeSessionId: (sessionId, runtimeSessionId) =>
-      registry.noteRuntimeSessionId(sessionId, runtimeSessionId),
+    settingsDirectory: join(dir, 'agent-settings'),
+    hookScriptPath: options.agentRuntime?.hookScriptPath ?? '',
+    control: options.agentRuntime?.control ?? {
+      url: '',
+      eventUrl: '',
+      token: '',
+      register: () => () => {},
+      close: async () => {},
+    },
+    openTerminal: async (spec, placement) => {
+      const open = options.agentRuntime?.openTerminal
+      if (open === undefined) {
+        // Refused rather than silently starting an agent nobody can see. The
+        // whole point of this runtime is that the session is in front of you.
+        throw new Error('no way to open a terminal was provided')
+      }
+      const opened = await open(spec, placement)
+      // Recorded so a surface can take the operator to the running agent, and
+      // so it survives a restart of the console.
+      if (opened !== null)
+        registry.noteTerminal(spec.sessionId, opened.terminalSessionId, opened.projectId)
+      return opened
+    },
+    write: (terminalSessionId, data) => options.agentRuntime?.write(terminalSessionId, data),
+    closeTerminal: (terminalSessionId) => options.agentRuntime?.closeTerminal(terminalSessionId),
   })
 
   const stalls = createStallSurfacer({

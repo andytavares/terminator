@@ -65,7 +65,7 @@ describe('resolving a request', () => {
     const input = { command: 'ls' }
     const pending = bridge.canUseTool('Bash', input)
     bridge.resolve((events[0] as { requestId: string }).requestId, { allow: true })
-    await expect(pending).resolves.toEqual({ behavior: 'allow', updatedInput: input })
+    await expect(pending).resolves.toEqual({ permissionDecision: 'allow', updatedInput: input })
   })
 
   it('denying returns the documented deny shape carrying the reason', async () => {
@@ -76,21 +76,16 @@ describe('resolving a request', () => {
       reason: 'operator declined',
     })
     await expect(pending).resolves.toEqual({
-      behavior: 'deny',
-      message: 'operator declined',
-      interrupt: false,
+      permissionDecision: 'deny',
+      reason: 'operator declined',
     })
   })
 
-  it('denying with interrupt sets the flag, which is how a redirect stops the turn', async () => {
+  it('names a reason even when the operator gave none, so the agent is not simply refused', async () => {
     const { bridge, events } = harness()
     const pending = bridge.canUseTool('Bash', { command: 'x' })
-    bridge.resolve((events[0] as { requestId: string }).requestId, {
-      allow: false,
-      reason: 'redirecting',
-      interrupt: true,
-    })
-    await expect(pending).resolves.toMatchObject({ behavior: 'deny', interrupt: true })
+    bridge.resolve((events[0] as { requestId: string }).requestId, { allow: false })
+    await expect(pending).resolves.toMatchObject({ reason: 'Denied by the operator' })
   })
 
   it('publishes permission_resolved so the state machine can leave needs_input', async () => {
@@ -128,7 +123,9 @@ describe('auto-decision by the autonomy ladder', () => {
       now: () => 1_000,
       autoDecide: () => ({ allow: true }),
     })
-    await expect(bridge.canUseTool('Read', {})).resolves.toMatchObject({ behavior: 'allow' })
+    await expect(bridge.canUseTool('Read', {})).resolves.toMatchObject({
+      permissionDecision: 'allow',
+    })
     // No prompt was raised, so the operator was never interrupted.
     expect(events.filter((e) => e.kind === 'permission_requested')).toHaveLength(0)
   })
@@ -156,7 +153,7 @@ describe('shutdown', () => {
     const pending = bridge.canUseTool('Bash', { command: 'x' })
     bridge.rejectAll('session ended')
     // Leaving a promise unresolved would hang the runtime's turn forever.
-    await expect(pending).resolves.toMatchObject({ behavior: 'deny' })
+    await expect(pending).resolves.toMatchObject({ permissionDecision: 'deny' })
   })
 })
 
@@ -288,31 +285,23 @@ describe('answering rather than approving', () => {
     return event.requestId
   }
 
-  it('sends the answer to the agent as the message', async () => {
+  it('sends the answer to the agent as the decision reason', async () => {
     const { bridge, events } = bridgeFor()
     const pending = bridge.canUseTool('AskUserQuestion', {
       questions: [{ question: 'Which scope?' }],
     })
     bridge.resolve(requestIdOf(events), { allow: false, answer: 'terminal output only' })
     await expect(pending).resolves.toEqual({
-      behavior: 'deny',
-      message: 'terminal output only',
-      interrupt: false,
+      permissionDecision: 'deny',
+      reason: 'terminal output only',
     })
-  })
-
-  it('never interrupts the run for an answer — the agent carries on with it', async () => {
-    const { bridge, events } = bridgeFor()
-    const pending = bridge.canUseTool('Bash', { command: 'rm -rf build' })
-    bridge.resolve(requestIdOf(events), { allow: false, answer: 'use dist/ instead' })
-    await expect(pending).resolves.toMatchObject({ interrupt: false })
   })
 
   it('ignores an empty answer and behaves as the decision says', async () => {
     const { bridge, events } = bridgeFor()
     const pending = bridge.canUseTool('Bash', { command: 'ls' })
     bridge.resolve(requestIdOf(events), { allow: true, answer: '   ' })
-    await expect(pending).resolves.toMatchObject({ behavior: 'allow' })
+    await expect(pending).resolves.toMatchObject({ permissionDecision: 'allow' })
   })
 
   function questionsOn(events: SessionEvent[]) {

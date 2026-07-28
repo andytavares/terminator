@@ -751,13 +751,14 @@ make those two usable.
 ### Event flow
 
 ```
-@anthropic-ai/claude-agent-sdk
-        │  canUseTool · result messages · lifecycle hooks · transcript
+`claude` in a terminal, in the session's own project and worktree
+        │  PreToolUse hook (blocking) · Stop / SessionEnd hooks · transcript
         ▼
-agent-runtime/        ← THE SEAM. Only importer of the SDK anywhere in src/.
-  driver · permission-bridge · hooks · transcript-tailer · to-session-event
+agent-runtime/        ← THE SEAM. The only thing that knows how an agent runs.
+  pty-driver · control-server · hook-script · claude-launch
+  permission-bridge · transcript-tailer   [contract: driver-contract]
         │
-        ▼  SessionEvent — runtime-neutral, references no SDK type
+        ▼  SessionEvent — runtime-neutral, references no runtime type
    events/event-bus
         │
         ├──▶ state/state-machine ──▶ state/session-registry ──▶ IPC ──▶ renderer
@@ -777,21 +778,34 @@ detector, the review queue and every surface consume only that union.
 This is a seam with exactly one implementation — not a plugin point, and not on
 the Extension API. It is justified by SC-007 (a runtime upgrade must not
 regress state reporting, and absorbing one must touch only this boundary), not
-by an anticipated second runtime, which is an explicit non-goal. Two guards
-enforce it:
+by an anticipated second runtime, which is an explicit non-goal.
 
-- an ESLint `no-restricted-imports` rule permitting the SDK only under `agent-runtime/`;
+It has since been cashed in. Replacing the whole runtime — from an in-process
+SDK to `claude` running in a terminal — changed the driver and the composition
+point and touched neither the state machine, the stall detector, the review
+queue, nor a single surface. Guards:
+
+- `runtime-upgrade.spec.ts` fails if the command line or the hook contract
+  appears anywhere outside `agent-runtime/`;
 - a test asserting the neutral union's module imports nothing at all.
 
-See [ADR-026](adr/026-agent-sdk-over-pty-supervision.md) and
-[ADR-027](adr/027-agent-runtime-seam.md).
+See [ADR-026](adr/026-agent-sdk-over-pty-supervision.md),
+[ADR-027](adr/027-agent-runtime-seam.md) and
+[ADR-028](adr/028-agent-in-a-terminal.md).
 
-### Transcript paths are never computed
+### The session id is ours, so the transcript path is known up front
 
-Every SDK hook payload extends `BaseHookInput`, which carries `transcript_path`,
-`session_id` and `cwd`. The tailer opens what it is told. Deriving
-`~/.claude/projects/<encoded-cwd>/` would depend on an undocumented encoding, and
-it is unnecessary.
+`claude --session-id <uuid>` takes an id Terminator mints, which makes the
+transcript path derivable before the process exists — the encoding is the
+working copy's absolute path with every `/` and `.` replaced by `-`.
+
+This reverses an earlier decision, and the reversal is the point. Letting the
+runtime choose the id meant it was announced after the fact, and every event
+keyed by it landed on a session the console had never registered and was
+silently discarded: half an hour of `working` with no turns and nothing to show.
+Owning the id deletes the correlation entirely. The encoding is reproduced from
+observed behaviour and covered by a test, so if it changes, that test fails
+rather than the stall detector quietly watching a file that is never written.
 
 ### The long-running-command exemption
 
@@ -883,28 +897,25 @@ The Linear pull is read-only and one-directional: `viewer.assignedIssues`
 filtered to states that are neither completed nor cancelled, mapped to intake
 stubs. Nothing is written back, and nothing starts.
 
-### Two session identifiers
+### One session identifier
 
-The console registers a session under an id it generates; the agent runtime has
-its own, announced on the message it opens with. Everything the runtime reports
-— every hook event, every result — is keyed by _its_ id, so the driver re-keys
-each one to the console's before publishing. Published as they arrived, they
-landed on a session that did not exist and were silently dropped: no tool
-activity, no turns, no end, a session stuck `working` with nothing to show.
-
-The runtime's id is kept because `claude --resume` takes that one, which is what
-lets the operator open a terminal on a running session and take it over.
+There used to be two — the console's, and the runtime's own, announced after the
+fact — and re-keying between them was a standing source of silently dropped
+events. `--session-id` removed the second one. The console's id _is_ the Claude
+Code session id, so `claude --resume <session id>` in any terminal picks up the
+same conversation.
 
 ### Interrupting and stopping are different operations
 
-`interrupt` ends the current turn and leaves the prompt stream open, so a
-redirect sent afterwards reaches the agent — that is the whole point of
-interrupting rather than stopping. `stop` pushes its reason onto the stream
-first, then interrupts and closes it, so the reason lands in the agent's own
-record before the run ends.
+The console drives the agent by typing at its terminal, exactly as a person
+would. `interrupt` sends `ESC`, which ends the current turn and leaves the
+session open, so a redirect sent afterwards reaches the agent — that is the
+whole point of interrupting rather than stopping. `stop` sends `ESC`, then the
+reason, then `/exit`, so the reason lands in the agent's own record before the
+conversation ends.
 
-They were one operation that closed the stream, which meant every
-interrupt-and-redirect delivered its redirect into a closed queue.
+Input arriving mid-turn is queued by Claude Code, so a redirect does not require
+the agent to be idle first.
 
 ### What a permission request shows
 
@@ -915,12 +926,29 @@ half that might do the damage; neither is something to approve on.
 
 ### Answering, not just approving
 
-`canUseTool` has exactly two ways back to the agent: allow with an updated
-input, or deny with a message. The message is the only channel that carries
-words, so a real answer travels as a denial whose message is the answer — the
-tool call does not run and the agent reads what you said. Nothing is denied in
-the sense the operator would mean it, and `interrupt` stays false so the run
-carries on.
+A hook decision has exactly two ways back to the agent: allow with an updated
+input, or deny with a reason. The reason is the only channel that carries words,
+so a real answer travels as a denial whose reason is the answer — the tool call
+does not run and the agent reads what you said. Nothing is denied in the sense
+the operator would mean it.
+
+### How a permission request blocks
+
+The `PreToolUse` hook is a command, and the tool call waits for it to exit. The
+hook posts to a loopback HTTP server in the main process, which simply does not
+respond until the operator answers: one open connection is one blocked tool
+call. Nothing polls, and nothing times out on Terminator's side.
+
+Every failure path degrades to `ask`, which is Claude Code's own prompt in the
+terminal the operator is already looking at — console closed, token refused,
+hook timed out, answer unparseable. Nothing is approved behind their back and
+nothing is blocked forever. That fallback is only safe because there is a
+terminal; headless, the same choice would have hung the agent.
+
+The exact output shape is load-bearing and was established by running the
+binary — see [ADR-028](adr/028-agent-in-a-terminal.md). Two fields differ from
+the published examples, and getting either wrong fails **silently**, with the
+tool proceeding as though no hook had run.
 
 ### A view, not a drawer
 

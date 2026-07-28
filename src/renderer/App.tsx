@@ -30,8 +30,17 @@ import { useMetricsStore } from './stores/metrics.store'
 import { AboutDialog } from './components/AboutDialog'
 import { NameTerminalDialog } from './components/NameTerminalDialog'
 import { SCRATCH_PROJECT_ID } from '../shared/types/index'
+import type { SupervisedSession } from '../shared/types/supervision'
 
 installLogInterceptor()
+
+export interface AgentTerminalOpened {
+  terminalSessionId: string
+  projectId: string | null
+  workspaceId: string | null
+  tabTitle: string
+  scrollbackLimit: number
+}
 
 export function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -146,40 +155,66 @@ export function App(): JSX.Element {
       .catch(() => {})
   }, [activeWorkspaceId, resolveSettings, resolveActiveCwd, createSession])
 
-  // Checking in on an agent. The console drives them headlessly, so there is
-  // no terminal to attach to — this opens one in the working copy and resumes
-  // the same conversation, which is as close as the runtime allows to looking
-  // over its shoulder, and lets the operator take over by hand.
+  // Checking in on an agent.
+  //
+  // There is a terminal now: the agent is running `claude` in one, in its own
+  // project, on its own worktree. So this navigates to it rather than opening
+  // a second shell and resuming the conversation beside itself — the operator
+  // ends up in front of the running session and can simply start typing.
   const attachTerminal = useCallback(
-    (session: {
-      id: string
-      branch: string
-      worktreePath: string
-      runtimeSessionId: string | null
-    }) => {
-      const settings = resolveSettings(activeWorkspaceId)
-      createSession(
-        SCRATCH_PROJECT_ID,
-        'human',
-        session.branch,
-        session.worktreePath,
-        settings.terminal.scrollbackLimit
-      )
-        .then((terminalId) => {
-          setScratchActive(true)
-          setActiveGlobalTab(null)
-          if (typeof terminalId !== 'string' || session.runtimeSessionId === null) return
-          // Resumed by its own id, not ours. Typed rather than run, so nothing
-          // is executed until the operator presses Enter.
-          window.electronAPI.terminal.input(
-            terminalId,
-            `claude --resume ${session.runtimeSessionId}`
-          )
-        })
-        .catch(() => {})
+    (session: SupervisedSession) => {
+      if (session.terminalSessionId === null) return
+      setActiveGlobalTab(null)
+
+      if (session.projectId === null) {
+        // Unfiled — no workspace was named when it started. The tab still
+        // exists; the scratch area is where unfiled terminals live.
+        setScratchActive(true)
+        return
+      }
+
+      const { projectsByWorkspaceId } = useWorkspaceStore.getState()
+      for (const [workspaceId, projects] of projectsByWorkspaceId) {
+        if (projects.some((project) => project.id === session.projectId)) {
+          useWorkspaceStore.getState().setActiveWorkspace(workspaceId)
+          break
+        }
+      }
+      useWorkspaceStore.getState().setActiveProject(session.projectId)
+      useSessionStore
+        .getState()
+        .setActiveSessionForProject(session.projectId, session.terminalSessionId)
     },
-    [activeWorkspaceId, resolveSettings, createSession, setActiveGlobalTab]
+    [setActiveGlobalTab]
   )
+
+  // The agent's terminal is spawned in the main process, because that is where
+  // the session is started. This is what makes it a tab.
+  useEffect(() => {
+    const supervisionApi = (
+      window as unknown as {
+        electronAPI?: {
+          supervision?: {
+            onTerminalOpened?: (handler: (opened: AgentTerminalOpened) => void) => () => void
+          }
+        }
+      }
+    ).electronAPI?.supervision
+    return supervisionApi?.onTerminalOpened?.((opened) => {
+      useSessionStore.getState().adoptSession({
+        sessionId: opened.terminalSessionId,
+        projectId: opened.projectId ?? SCRATCH_PROJECT_ID,
+        tabTitle: opened.tabTitle,
+        scrollbackLimit: opened.scrollbackLimit,
+      })
+      if (opened.projectId === null) setScratchActive(true)
+      else if (opened.workspaceId !== null) {
+        // The project was created in the main process; the sidebar only learns
+        // about it by re-reading them.
+        void useWorkspaceStore.getState().loadProjects(opened.workspaceId)
+      }
+    })
+  }, [])
 
   const supervision = useSupervision({ onAttachTerminal: attachTerminal })
 

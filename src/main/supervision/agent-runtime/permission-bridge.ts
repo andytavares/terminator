@@ -1,26 +1,25 @@
 import type { SessionEvent } from '../events/session-event.js'
+import type { HookDecision } from './control-server.js'
 
-// canUseTool is the only documented way to observe that an agent is blocked on
-// the operator: the Notification hook does not fire for permission prompts
-// (FR-010, research.md R1). This bridge turns that callback into console state
-// a surface can act on, and turns the operator's decision back into the
-// PermissionResult shape the runtime expects.
-
-/** The runtime's documented PermissionResult, restated so the seam owns the shape. */
-export type PermissionResult =
-  | { behavior: 'allow'; updatedInput: unknown }
-  | { behavior: 'deny'; message: string; interrupt: boolean }
+// A tool call the agent cannot make without a person, turned into console state
+// a surface can act on, and the operator's answer turned back into something
+// the runtime understands.
+//
+// The PreToolUse hook is the only thing that can hold a tool call still while
+// somebody decides; the Notification hook does not fire for permission prompts
+// at all (FR-010, research.md R1). What travels back is a hook decision rather
+// than the SDK's PermissionResult, which is the only part of this file that
+// ever cared how the agent was being run.
 
 export interface PermissionDecision {
   allow: boolean
   reason?: string
-  interrupt?: boolean
   /**
    * A real answer, for a request that is a question rather than a yes/no.
    *
-   * `canUseTool` has exactly two ways back to the agent: allow with an updated
-   * input, or deny with a message. The message is the only channel that
-   * carries words, so answering travels as a denial whose message is the
+   * A hook decision has exactly two ways back to the agent: allow with an
+   * updated input, or deny with a reason. The reason is the only channel that
+   * carries words, so answering travels as a denial whose reason is the
    * answer — the tool call does not proceed, and the agent reads what you
    * said. Nothing is denied in the sense the operator would mean it.
    */
@@ -36,7 +35,7 @@ export interface PermissionBridgeOptions {
 }
 
 export interface PermissionBridge {
-  canUseTool(toolName: string, input: unknown): Promise<PermissionResult>
+  canUseTool(toolName: string, input: unknown): Promise<HookDecision>
   resolve(requestId: string, decision: PermissionDecision): void
   /** Denies everything outstanding. An unresolved promise would hang the turn. */
   rejectAll(reason: string): void
@@ -177,27 +176,23 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
   const { sessionId, publish, now, autoDecide } = options
   // The original input is held alongside the resolver: an `allow` must return
   // the input the agent asked with, not an empty one.
-  const outstanding = new Map<
-    string,
-    { settle: (result: PermissionResult) => void; input: unknown }
-  >()
+  const outstanding = new Map<string, { settle: (result: HookDecision) => void; input: unknown }>()
   let counter = 0
 
-  function toResult(decision: PermissionDecision, input: unknown): PermissionResult {
+  function toResult(decision: PermissionDecision, input: unknown): HookDecision {
     if (decision.answer !== undefined && decision.answer.trim() !== '') {
-      return { behavior: 'deny', message: decision.answer.trim(), interrupt: false }
+      return { permissionDecision: 'deny', reason: decision.answer.trim() }
     }
     return decision.allow
-      ? { behavior: 'allow', updatedInput: input }
+      ? { permissionDecision: 'allow', updatedInput: input }
       : {
-          behavior: 'deny',
-          message: decision.reason ?? 'Denied by the operator',
-          interrupt: decision.interrupt ?? false,
+          permissionDecision: 'deny',
+          reason: decision.reason ?? 'Denied by the operator',
         }
   }
 
   return {
-    canUseTool(toolName: string, input: unknown): Promise<PermissionResult> {
+    canUseTool(toolName: string, input: unknown): Promise<HookDecision> {
       const auto = autoDecide?.(toolName, input) ?? null
       if (auto !== null) {
         // Resolved by the autonomy ladder — the operator is never interrupted,
@@ -217,7 +212,7 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
         at: now(),
       })
 
-      return new Promise<PermissionResult>((resolvePromise) => {
+      return new Promise<HookDecision>((resolvePromise) => {
         outstanding.set(requestId, { settle: resolvePromise, input })
       })
     },
@@ -241,7 +236,7 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
     rejectAll(reason: string): void {
       for (const [requestId, entry] of outstanding) {
         outstanding.delete(requestId)
-        entry.settle({ behavior: 'deny', message: reason, interrupt: true })
+        entry.settle({ permissionDecision: 'deny', reason })
       }
     },
   }

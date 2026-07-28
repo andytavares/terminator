@@ -21,8 +21,8 @@ export interface SessionListProps {
   /** Told when a session is expanded, so the shell can follow if it wants to. */
   onOpen(sessionId: string): void
   /**
-   * Opens a terminal in the session's working copy with the conversation
-   * resumed, so the operator can watch it and take over by hand.
+   * Goes to the terminal the agent is running in, so the operator can watch it
+   * and take the work over by typing in it.
    */
   onAttach(session: SupervisedSession): void
 }
@@ -114,8 +114,7 @@ function describe(session: SupervisedSession, now: number): string {
       `work item:   ${session.workItemId}${session.laneOrd !== null ? ` · lane ${session.laneOrd}` : ''}`
     )
   }
-  if (session.runtimeSessionId !== null)
-    lines.push(`agent session:${` ${session.runtimeSessionId}`}`)
+  if (session.terminalSessionId !== null) lines.push(`terminal:    ${session.terminalSessionId}`)
   if (session.transcriptPath !== null) lines.push(`transcript:  ${session.transcriptPath}`)
   if (session.pendingPermission !== null) {
     lines.push(`waiting on:  ${session.pendingPermission.summary}`)
@@ -202,11 +201,9 @@ export function SessionList({
               )}
               Details
             </button>
-            {session.worktreePath !== '' && (
-              // The console drives the agent headlessly, so there is no
-              // terminal to watch — this opens one in its working copy and
-              // resumes the same conversation, which is as close as the
-              // runtime allows to looking over its shoulder.
+            {session.terminalSessionId !== null && (
+              // The agent is running in a terminal, in its own project. This
+              // goes to it, rather than opening a second shell beside it.
               <button className="sv-queue__btn" onClick={() => onAttach(session)}>
                 <TerminalSquare aria-hidden="true" /> Terminal
               </button>
@@ -229,11 +226,11 @@ export function SessionList({
 
       <div className="sv-form">
         <span className="sv-field__note">
-          Terminal opens a shell in the working copy and resumes the same conversation, so you can
-          watch it and take over. Stopping ends the run and keeps the working copy, so you can
-          review what it did. Its reason goes to the agent and into the feed, so a half-finished
-          diff still says why it stopped. Discarding also removes the working copy and takes the
-          session off the console.
+          Terminal goes to the session&rsquo;s own terminal, where the agent is running — you can
+          watch it and take over by typing in it. Stopping ends the run and keeps the working copy,
+          so you can review what it did. Its reason goes to the agent and into the feed, so a
+          half-finished diff still says why it stopped. Discarding also removes the working copy and
+          takes the session off the console.
         </span>
       </div>
     </div>

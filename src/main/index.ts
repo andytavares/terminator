@@ -14,6 +14,9 @@ import { registerMetricsHandlers } from './ipc/metrics.ipc.js'
 import { registerDbIpcHandlers } from './ipc/db.ipc.js'
 import { registerSupervisionHandlers } from './ipc/supervision.ipc.js'
 import { createSupervisionService } from './supervision/supervision-service.js'
+import { createAgentTerminal } from './supervision/agent-terminal.js'
+import { createControlServer } from './supervision/agent-runtime/control-server.js'
+import { installHookScript } from './supervision/agent-runtime/hook-script.js'
 import { createStateFanout } from './supervision/state-fanout.js'
 import { supervisionStore } from './storage/supervision-store.js'
 import { getGlobalSettings } from './storage/settings-store.js'
@@ -321,6 +324,17 @@ app.whenReady().then(async () => {
       logger.error('[supervision] extension state subscriber failed', error),
   })
 
+  // Where the agent's hooks answer, and the script that answers them. Started
+  // before the service, because a session cannot begin without both.
+  const agentControl = await createControlServer()
+  const hookScriptPath = installHookScript(join(userData, 'supervision'))
+  const agentTerminal = createAgentTerminal({
+    ptyManager,
+    getWindow: () => mainWindow,
+    defaultShell: () => getGlobalSettings().terminal.defaultShell,
+    scrollbackLimit: () => getGlobalSettings().terminal.scrollbackLimit,
+  })
+
   const supervision = createSupervisionService({
     userDataPath: userData,
     registryStore: {
@@ -336,6 +350,17 @@ app.whenReady().then(async () => {
       set: (value) => supervisionStore.set('laneBindings', value),
     },
     onStateChanged: (change) => stateFanout.publish(change),
+    // The agent runs in a terminal in the operator's workspace rather than
+    // headlessly in this process (ADR-028). Without this the driver's default
+    // refuses to start anything, which is the honest failure: an agent nobody
+    // can see is the thing this runtime exists to stop shipping.
+    agentRuntime: {
+      control: agentControl,
+      hookScriptPath,
+      openTerminal: (spec, placement) => agentTerminal.open(spec, placement),
+      write: (terminalSessionId, data) => agentTerminal.write(terminalSessionId, data),
+      closeTerminal: (terminalSessionId) => agentTerminal.close(terminalSessionId),
+    },
     // Real worktree operations. Without these the provisioner's default throws
     // and no agent can ever be started.
     git: {
@@ -360,7 +385,10 @@ app.whenReady().then(async () => {
       }),
   })
   supervision.start()
-  app.on('will-quit', () => supervision.stop())
+  app.on('will-quit', () => {
+    supervision.stop()
+    void agentControl.close()
+  })
 
   // Publish the read-only supervision surface to extensions. Injected rather
   // than imported by api.ts, so the dependency runs one way: the composition

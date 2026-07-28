@@ -26,6 +26,7 @@ const options = () => ({
   settingsDirectory: join(directory, 'settings'),
   hookScriptPath: '/opt/terminator/pretooluse-hook.mjs',
   controlUrl: 'http://127.0.0.1:5051/pretooluse',
+  controlEventUrl: 'http://127.0.0.1:5051/event',
   controlToken: 'abc123',
   nodePath: '/opt/Terminator.app/Contents/MacOS/Terminator',
   claudePath: 'claude',
@@ -70,13 +71,15 @@ describe('buildSettings', () => {
     buildSettings({
       hookScriptPath: '/opt/hook.mjs',
       controlUrl: 'http://127.0.0.1:1/pretooluse',
+      controlEventUrl: 'http://127.0.0.1:1/event',
       controlToken: 'tok',
       sessionId: 's1',
       nodePath: '/opt/node',
     }) as {
-      hooks: {
-        PreToolUse: Array<{ matcher: string; hooks: Array<{ command: string; timeout: number }> }>
-      }
+      hooks: Record<
+        'PreToolUse' | 'Stop' | 'SessionEnd',
+        Array<{ matcher: string; hooks: Array<{ command: string; timeout: number }> }>
+      >
     }
 
   it('registers a PreToolUse hook, which is the only event that can hold a tool call still', () => {
@@ -100,6 +103,23 @@ describe('buildSettings', () => {
 
   it('waits hours rather than the default minute, because it is waiting for a person', () => {
     expect(settings().hooks.PreToolUse[0].hooks[0].timeout).toBe(43_200)
+  })
+
+  it('asks to be told when a turn ends, which is what tells finished from stuck', () => {
+    expect(settings().hooks.Stop[0].hooks[0].command).toContain(`'stop'`)
+  })
+
+  it('asks to be told when the session ends', () => {
+    expect(settings().hooks.SessionEnd[0].hooks[0].command).toContain(`'session_end'`)
+  })
+
+  it('sends lifecycle reports to the endpoint that answers immediately', () => {
+    expect(settings().hooks.Stop[0].hooks[0].command).toContain(`'http://127.0.0.1:1/event'`)
+  })
+
+  it('gives a lifecycle hook seconds, because nothing is waiting on its answer', () => {
+    expect(settings().hooks.Stop[0].hooks[0].timeout).toBe(10)
+    expect(settings().hooks.SessionEnd[0].hooks[0].timeout).toBe(10)
   })
 })
 

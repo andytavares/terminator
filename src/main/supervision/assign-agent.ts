@@ -29,6 +29,12 @@ export interface AssignRequest {
   instruction?: string
   /** Set after the operator accepts a recorded override (FR-054). */
   overrideBackpressure?: boolean
+  /**
+   * Which workspace the session's project and terminal should appear in.
+   * Passed by whoever asked for the session, because the console has no
+   * ambient notion of the workspace the operator is looking at.
+   */
+  workspaceId?: string | null
 }
 
 export type AssignResult =
@@ -123,6 +129,13 @@ export function createAssigner(service: SupervisionService, now: () => number = 
           instruction: request.instruction,
         }),
         cwd: provisioned.worktreePath,
+        // The agent runs in a terminal, in a project, in a workspace. Without
+        // this it would run somewhere the operator was not looking.
+        placement: {
+          workspaceId: request.workspaceId ?? null,
+          branch: request.branch,
+          repoPath: request.repoPath,
+        },
         // Chosen at assign time, not renegotiated per prompt (FR-041).
         autoDecide: (toolName, input) =>
           decideAutonomy(request.autonomyLevel, toolName, input, {

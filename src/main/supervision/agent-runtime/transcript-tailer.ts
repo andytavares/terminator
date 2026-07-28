@@ -93,3 +93,36 @@ export function readTranscript(sessionId: string, transcriptPath: string): Sessi
   }
   return events
 }
+
+/**
+ * How many turns the agent has taken, counted from its own record.
+ *
+ * Under an in-process runtime this arrived in a `result` message along with
+ * the cost and the context window. A terminal has no such message, and the
+ * transcript carries neither cost nor context — so this is what is honestly
+ * available, and the surfaces say nothing rather than showing a confident
+ * $0.00 that means "not measured".
+ */
+export function countTurns(transcriptPath: string): number {
+  let raw: string
+  try {
+    if (!statSync(transcriptPath).isFile()) return 0
+    raw = readFileSync(transcriptPath, 'utf-8')
+  } catch {
+    return 0
+  }
+
+  let turns = 0
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim()
+    if (trimmed === '') continue
+    try {
+      const entry = JSON.parse(trimmed) as { type?: unknown; isSidechain?: unknown }
+      // A sidechain is a subagent's own conversation, not a turn of this one.
+      if (entry.type === 'assistant' && entry.isSidechain !== true) turns += 1
+    } catch {
+      // Torn or corrupt line — skip it, keep counting.
+    }
+  }
+  return turns
+}

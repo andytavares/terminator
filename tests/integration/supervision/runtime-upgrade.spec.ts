@@ -21,14 +21,26 @@ function filesImporting(specifier: string): string[] {
 }
 
 describe('the runtime is coupled to one module only', () => {
-  it('has exactly one importer of the agent SDK under src/', () => {
-    expect(filesImporting('@anthropic-ai/claude-agent-sdk')).toEqual([`${SEAM}driver.ts`])
+  it('no longer depends on the agent SDK at all', () => {
+    // The agent runs as `claude` in a terminal (ADR-028). Nothing imports the
+    // SDK, and the dependency is gone rather than merely unused.
+    expect(filesImporting('@anthropic-ai/claude-agent-sdk')).toEqual([])
+    const pkg = JSON.parse(readFileSync('package.json', 'utf-8'))
+    expect(pkg.dependencies['@anthropic-ai/claude-agent-sdk']).toBeUndefined()
   })
 
-  it('keeps every SDK importer inside the seam', () => {
-    for (const file of filesImporting('@anthropic-ai/claude-agent-sdk')) {
-      expect(file.startsWith(SEAM)).toBe(true)
-    }
+  it('builds the runtime command line inside the seam and nowhere else', () => {
+    // A second place that knows how to invoke claude is a second place a flag
+    // change has to reach.
+    const callers = filesImporting("'--session-id'").filter((file) => !file.startsWith(SEAM))
+    expect(callers).toEqual([])
+  })
+
+  it('keeps the hook contract inside the seam', () => {
+    // hookSpecificOutput is the runtime's shape, established by running the
+    // binary. Anything outside the seam repeating it would drift silently.
+    const callers = filesImporting('hookSpecificOutput').filter((file) => !file.startsWith(SEAM))
+    expect(callers).toEqual([])
   })
 
   it('keeps the neutral event union free of imports entirely', () => {
@@ -45,16 +57,10 @@ describe('the runtime is coupled to one module only', () => {
     expect(parsers).toEqual([])
   })
 
-  it('pins the SDK to an exact version, because it is 0.x', () => {
-    const pkg = JSON.parse(readFileSync('package.json', 'utf-8'))
-    const pinned = pkg.dependencies['@anthropic-ai/claude-agent-sdk']
-    expect(pinned).toMatch(/^\d+\.\d+\.\d+$/)
-  })
-
   it('records the versions the upgrade sweep has been run against', () => {
     // Updated by hand when the sweep is repeated. Its presence is the receipt
     // that SC-007 was verified rather than assumed.
-    const adr = readFileSync('docs/adr/027-agent-runtime-seam.md', 'utf-8')
+    const adr = readFileSync('docs/adr/028-agent-in-a-terminal.md', 'utf-8')
     expect(adr).toContain('upgrade')
   })
 })

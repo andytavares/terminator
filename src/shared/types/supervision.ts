@@ -95,10 +95,13 @@ export interface SupervisedSession {
   readonly autonomyLevel: AutonomyLevel
   /** Drives the "since you last looked" panel (FR-027). */
   /**
-   * The agent runtime's own id for this conversation. `claude --resume` takes
-   * this one, so it is what lets the operator pick the session up by hand.
+   * The terminal the agent is running in, so a surface can put the operator in
+   * front of it rather than beside it. Null before it has been opened, and
+   * once the run has ended.
    */
-  readonly runtimeSessionId: string | null
+  readonly terminalSessionId: string | null
+  /** The workspace project its working copy was registered as. */
+  readonly projectId: string | null
   readonly lastViewedAt: number | null
   /**
    * Why it failed, when it did. FR-034: a setup script that exited non-zero

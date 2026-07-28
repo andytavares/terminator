@@ -8,9 +8,9 @@ import {
   HOOK_SCRIPT_NAME,
 } from '../../../../../src/main/supervision/agent-runtime/hook-script.js'
 import {
-  createPermissionServer,
-  type PermissionServer,
-} from '../../../../../src/main/supervision/agent-runtime/permission-server.js'
+  createControlServer,
+  type ControlServer,
+} from '../../../../../src/main/supervision/agent-runtime/control-server.js'
 
 // The script is run, not read. It is the one part of this feature that
 // executes outside the application, in a process Claude Code owns, and the
@@ -18,7 +18,7 @@ import {
 // hook JSON on stdin, decision JSON on stdout.
 
 let directory: string
-let server: PermissionServer | null = null
+let server: ControlServer | null = null
 
 beforeEach(() => {
   directory = mkdtempSync(join(tmpdir(), 'hook-script-'))
@@ -73,8 +73,8 @@ describe('installHookScript', () => {
 
 describe('the hook script, run the way Claude Code runs it', () => {
   it('reports allow as the documented hookSpecificOutput shape', async () => {
-    server = await createPermissionServer()
-    server.register('s1', async () => ({ permissionDecision: 'allow' }))
+    server = await createControlServer()
+    server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
     const stdout = await run(
       installHookScript(directory),
       [server.url, server.token, 's1'],
@@ -86,11 +86,13 @@ describe('the hook script, run the way Claude Code runs it', () => {
   })
 
   it('passes the tool and its input through to the console', async () => {
-    server = await createPermissionServer()
+    server = await createControlServer()
     let seen: unknown = null
-    server.register('s1', async (request) => {
-      seen = request
-      return { permissionDecision: 'allow' }
+    server.register('s1', {
+      decide: async (request) => {
+        seen = request
+        return { permissionDecision: 'allow' }
+      },
     })
     await run(installHookScript(directory), [server.url, server.token, 's1'], HOOK_INPUT)
     expect(seen).toEqual({
@@ -101,11 +103,13 @@ describe('the hook script, run the way Claude Code runs it', () => {
   })
 
   it('carries the operator words back to the agent as the decision reason', async () => {
-    server = await createPermissionServer()
-    server.register('s1', async () => ({
-      permissionDecision: 'deny',
-      reason: 'use the staging host',
-    }))
+    server = await createControlServer()
+    server.register('s1', {
+      decide: async () => ({
+        permissionDecision: 'deny',
+        reason: 'use the staging host',
+      }),
+    })
     const stdout = await run(
       installHookScript(directory),
       [server.url, server.token, 's1'],
@@ -123,11 +127,13 @@ describe('the hook script, run the way Claude Code runs it', () => {
   })
 
   it('carries an edited input back inside hookSpecificOutput, where the runtime reads it', async () => {
-    server = await createPermissionServer()
-    server.register('s1', async () => ({
-      permissionDecision: 'allow',
-      updatedInput: { command: 'ls' },
-    }))
+    server = await createControlServer()
+    server.register('s1', {
+      decide: async () => ({
+        permissionDecision: 'allow',
+        updatedInput: { command: 'ls' },
+      }),
+    })
     const stdout = await run(
       installHookScript(directory),
       [server.url, server.token, 's1'],
@@ -153,8 +159,8 @@ describe('the hook script, run the way Claude Code runs it', () => {
   })
 
   it('asks in the terminal when the console refuses the token', async () => {
-    server = await createPermissionServer()
-    server.register('s1', async () => ({ permissionDecision: 'allow' }))
+    server = await createControlServer()
+    server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
     const stdout = await run(installHookScript(directory), [server.url, 'wrong', 's1'], HOOK_INPUT)
     expect(JSON.parse(stdout)).toEqual({
       hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask' },
@@ -162,8 +168,8 @@ describe('the hook script, run the way Claude Code runs it', () => {
   })
 
   it('asks in the terminal when the console answers something unrecognisable', async () => {
-    server = await createPermissionServer()
-    server.register('s1', async () => ({ permissionDecision: 'maybe' }) as never)
+    server = await createControlServer()
+    server.register('s1', { decide: async () => ({ permissionDecision: 'maybe' }) as never })
     const stdout = await run(
       installHookScript(directory),
       [server.url, server.token, 's1'],
@@ -175,8 +181,8 @@ describe('the hook script, run the way Claude Code runs it', () => {
   })
 
   it('asks in the terminal when handed something that is not hook input', async () => {
-    server = await createPermissionServer()
-    server.register('s1', async () => ({ permissionDecision: 'allow' }))
+    server = await createControlServer()
+    server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
     const stdout = await run(
       installHookScript(directory),
       [server.url, server.token, 's1'],
@@ -188,10 +194,69 @@ describe('the hook script, run the way Claude Code runs it', () => {
   })
 
   it('exits zero even when it denies, so the runtime reads the decision rather than an error', async () => {
-    server = await createPermissionServer()
-    server.register('s1', async () => ({ permissionDecision: 'deny' }))
+    server = await createControlServer()
+    server.register('s1', { decide: async () => ({ permissionDecision: 'deny' }) })
     await expect(
       run(installHookScript(directory), [server.url, server.token, 's1'], HOOK_INPUT)
     ).resolves.toBeTruthy()
+  })
+})
+
+describe('the hook script reporting a lifecycle event', () => {
+  const STOP_INPUT = JSON.stringify({
+    session_id: 'runtime-1',
+    hook_event_name: 'Stop',
+    reason: 'end_turn',
+  })
+
+  it('tells the console the turn ended', async () => {
+    server = await createControlServer()
+    const seen: string[] = []
+    server.register('s1', {
+      decide: async () => ({ permissionDecision: 'allow' }),
+      onEvent: (kind) => seen.push(kind),
+    })
+    await run(
+      installHookScript(directory),
+      [server.eventUrl, server.token, 's1', 'stop'],
+      STOP_INPUT
+    )
+    expect(seen).toEqual(['stop'])
+  })
+
+  it('tells the console the session ended', async () => {
+    server = await createControlServer()
+    const seen: string[] = []
+    server.register('s1', {
+      decide: async () => ({ permissionDecision: 'allow' }),
+      onEvent: (kind) => seen.push(kind),
+    })
+    await run(
+      installHookScript(directory),
+      [server.eventUrl, server.token, 's1', 'session_end'],
+      STOP_INPUT
+    )
+    expect(seen).toEqual(['session_end'])
+  })
+
+  it('says nothing to the agent, because a lifecycle report is not a decision', async () => {
+    server = await createControlServer()
+    server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
+    const stdout = await run(
+      installHookScript(directory),
+      [server.eventUrl, server.token, 's1', 'stop'],
+      STOP_INPUT
+    )
+    expect(stdout).toBe('')
+  })
+
+  it('gets out of the way when the console is not listening', async () => {
+    await expect(
+      run(
+        installHookScript(directory),
+        ['http://127.0.0.1:1/event', 'token', 's1', 'stop'],
+        STOP_INPUT
+      )
+    ).resolves.toBe('')
   })
 })

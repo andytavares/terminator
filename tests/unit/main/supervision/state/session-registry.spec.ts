@@ -209,30 +209,43 @@ describe('forgetting a session', () => {
   })
 })
 
-describe('the agent runtime’s own session id', () => {
-  it('is recorded, since `claude --resume` takes that one and not ours', () => {
+describe('where the agent is running', () => {
+  it('records the terminal, so a surface can take the operator to it', () => {
     const registry = createSessionRegistry({ store, now: () => 1_000 })
     registry.register('s1', meta)
-    registry.noteRuntimeSessionId('s1', 'runtime-abc')
-    expect(registry.get('s1')?.runtimeSessionId).toBe('runtime-abc')
+    registry.noteTerminal('s1', 'terminal-1', 'project-1')
+    expect(registry.get('s1')).toMatchObject({
+      terminalSessionId: 'terminal-1',
+      projectId: 'project-1',
+    })
   })
 
-  it('is null until the runtime has told us', () => {
+  it('is null until a terminal has been opened', () => {
     const registry = createSessionRegistry({ store, now: () => 1_000 })
     registry.register('s1', meta)
-    expect(registry.get('s1')?.runtimeSessionId).toBeNull()
+    expect(registry.get('s1')?.terminalSessionId).toBeNull()
   })
 
-  it('survives a restart, so a session can still be resumed by hand', () => {
+  it('records an unfiled terminal, which belongs to no project', () => {
     const registry = createSessionRegistry({ store, now: () => 1_000 })
     registry.register('s1', meta)
-    registry.noteRuntimeSessionId('s1', 'runtime-abc')
+    registry.noteTerminal('s1', 'terminal-1', null)
+    expect(registry.get('s1')).toMatchObject({
+      terminalSessionId: 'terminal-1',
+      projectId: null,
+    })
+  })
+
+  it('survives a restart, so the session can still be found', () => {
+    const registry = createSessionRegistry({ store, now: () => 1_000 })
+    registry.register('s1', meta)
+    registry.noteTerminal('s1', 'terminal-1', 'project-1')
     const reopened = createSessionRegistry({ store, now: () => 2_000 })
-    expect(reopened.get('s1')?.runtimeSessionId).toBe('runtime-abc')
+    expect(reopened.get('s1')?.terminalSessionId).toBe('terminal-1')
   })
 
   it('ignores a session it does not know', () => {
     const registry = createSessionRegistry({ store, now: () => 1_000 })
-    expect(() => registry.noteRuntimeSessionId('ghost', 'x')).not.toThrow()
+    expect(() => registry.noteTerminal('ghost', 'terminal-1', null)).not.toThrow()
   })
 })

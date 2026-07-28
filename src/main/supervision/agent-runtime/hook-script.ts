@@ -34,7 +34,7 @@ import { join } from 'path'
 // but it cannot express allow or carry an edited input, so it is not enough.
 
 export const HOOK_SCRIPT = `// Written by Terminator. Do not edit: it is overwritten on every start.
-const [url, token, sessionId] = process.argv.slice(2)
+const [url, token, sessionId, kind] = process.argv.slice(2)
 
 const ASK = JSON.stringify({
   hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask' },
@@ -45,12 +45,30 @@ function answer(text) {
   process.exit(0)
 }
 
+function post(body) {
+  return fetch(url, {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
 let body = ''
 process.stdin.setEncoding('utf8')
 process.stdin.on('data', (chunk) => {
   body += chunk
 })
 process.stdin.on('end', () => {
+  // A lifecycle hook only tells the console something happened. It has nothing
+  // to wait for and nothing to say to the agent, so it reports and gets out of
+  // the way — including when the console is not listening.
+  if (kind === 'stop' || kind === 'session_end') {
+    post({ sessionId, kind })
+      .then(() => answer(''))
+      .catch(() => answer(''))
+    return
+  }
+
   let hookInput
   try {
     hookInput = JSON.parse(body)
@@ -58,14 +76,10 @@ process.stdin.on('end', () => {
     answer(ASK)
   }
 
-  fetch(url, {
-    method: 'POST',
-    headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      sessionId,
-      toolName: hookInput.tool_name,
-      input: hookInput.tool_input,
-    }),
+  post({
+    sessionId,
+    toolName: hookInput.tool_name,
+    input: hookInput.tool_input,
   })
     .then((response) => response.json())
     .then((decision) => {

@@ -649,6 +649,20 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     remote: 'omit',
   },
   {
+    // A session's agent now has a terminal. The renderer owns the tab list, so
+    // without adopting it the terminal runs and nothing on screen shows it.
+    path: 'supervision.onTerminalOpened',
+    kind: 'event',
+    channel: 'supervision:terminalOpened',
+    remote: 'omit',
+  },
+  {
+    path: 'supervision.onTerminalClosed',
+    kind: 'event',
+    channel: 'supervision:terminalClosed',
+    remote: 'omit',
+  },
+  {
     path: 'supervision.getDigest',
     kind: 'invoke',
     channel: 'supervision:getDigest',

@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { readTranscript } from '../../../../../src/main/supervision/agent-runtime/transcript-tailer.js'
+import {
+  readTranscript,
+  countTurns,
+} from '../../../../../src/main/supervision/agent-runtime/transcript-tailer.js'
 
 // The tailer opens the path the runtime handed us (research.md R3) and never
 // computes one. The per-line JSONL schema is NOT a published contract, so it
@@ -224,5 +227,51 @@ describe('reading a transcript whose lines are not the shape we expect', () => {
         },
       ])
     ).toEqual([])
+  })
+})
+
+describe('counting turns', () => {
+  // Turns used to arrive in the runtime's own result message. A terminal
+  // produces no such message, so they are counted from the record instead.
+  it('counts nothing for a transcript that does not exist yet', () => {
+    expect(countTurns(join(dir, 'missing.jsonl'))).toBe(0)
+  })
+
+  it('counts one per assistant entry', () => {
+    write([
+      { type: 'user', timestamp: '2026-07-27T10:00:00.000Z' },
+      { type: 'assistant', timestamp: '2026-07-27T10:00:01.000Z' },
+      { type: 'assistant', timestamp: '2026-07-27T10:00:02.000Z' },
+    ])
+    expect(countTurns(transcript)).toBe(2)
+  })
+
+  it('ignores everything that is not the agent speaking', () => {
+    write([
+      { type: 'user', timestamp: '2026-07-27T10:00:00.000Z' },
+      { type: 'attachment', timestamp: '2026-07-27T10:00:01.000Z' },
+      { type: 'queue-operation', timestamp: '2026-07-27T10:00:02.000Z' },
+    ])
+    expect(countTurns(transcript)).toBe(0)
+  })
+
+  it('does not count a subagent’s turns as this session’s', () => {
+    write([
+      { type: 'assistant', timestamp: '2026-07-27T10:00:01.000Z' },
+      { type: 'assistant', isSidechain: true, timestamp: '2026-07-27T10:00:02.000Z' },
+    ])
+    expect(countTurns(transcript)).toBe(1)
+  })
+
+  it('keeps counting past a torn line rather than giving up on the session', () => {
+    writeFileSync(
+      transcript,
+      ['{"type":"assistant"}', '{ this is not json', '{"type":"assistant"}'].join('\n')
+    )
+    expect(countTurns(transcript)).toBe(2)
+  })
+
+  it('counts nothing for a path that is a directory', () => {
+    expect(countTurns(dir)).toBe(0)
   })
 })

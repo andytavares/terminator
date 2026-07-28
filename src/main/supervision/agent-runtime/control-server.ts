@@ -1,12 +1,20 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'http'
 import { randomBytes } from 'crypto'
 
-// How a permission request gets from the agent's terminal back to the console.
+// How the agent's terminal talks back to the console.
 //
 // The agent no longer runs inside this process, so there is no callback to
-// hand it. It runs `claude` in a terminal you can see, and Claude Code's
-// PreToolUse hook is the only thing that can hold a tool call still while a
-// human decides — the hook is a command, and the tool waits for it to exit.
+// hand it. It runs `claude` in a terminal you can see, and its hooks are the
+// only channel back. Two kinds travel this way:
+//
+//   /pretooluse — a tool call, held still while a human decides. Claude Code's
+//     PreToolUse hook is the only thing that can block a tool call, and it
+//     blocks by not exiting.
+//   /event — the agent finished a turn, or the session ended. Not blocking:
+//     the reply goes out immediately and the hook exits. Without the turn-end
+//     signal a session that had finished would sit `working` until the stall
+//     detector fired eight minutes later, which is precisely the false alarm
+//     this console exists not to produce.
 //
 // So the hook posts here and the response is deliberately withheld until the
 // operator answers. One connection is one blocked tool call. The socket is the
@@ -46,12 +54,27 @@ export interface HookRequest {
 /** Decides one tool call, resolving whenever the operator does — possibly never. */
 export type PermissionHandler = (request: HookRequest) => Promise<HookDecision>
 
-export interface PermissionServer {
-  /** Where the hook posts. Known only after listening, so it is read, not built. */
+/**
+ * `stop` — the agent finished responding and is waiting for input, which is
+ * the difference between a session that is done and one that is stuck.
+ * `session_end` — the conversation is over.
+ */
+export type AgentEventKind = 'stop' | 'session_end'
+
+export interface SessionHandlers {
+  decide: PermissionHandler
+  /** Optional: a session may want the tool decisions and not the lifecycle. */
+  onEvent?: (kind: AgentEventKind) => void
+}
+
+export interface ControlServer {
+  /** Where the hooks post. Known only after listening, so it is read, not built. */
   readonly url: string
+  /** The lifecycle endpoint, on the same listener and the same token. */
+  readonly eventUrl: string
   readonly token: string
-  /** Registers the decider for one session. Returns a disposer. */
-  register(sessionId: string, handler: PermissionHandler): () => void
+  /** Registers the handlers for one session. Returns a disposer. */
+  register(sessionId: string, handlers: SessionHandlers): () => void
   close(): Promise<void>
 }
 
@@ -108,13 +131,30 @@ function send(response: ServerResponse, status: number, decision: HookDecision):
   response.end(body)
 }
 
-export async function createPermissionServer(): Promise<PermissionServer> {
+function parseEvent(body: string): { sessionId: string; kind: AgentEventKind } | null {
+  let payload: unknown
+  try {
+    payload = JSON.parse(body)
+  } catch {
+    return null
+  }
+  if (typeof payload !== 'object' || payload === null) return null
+  const record = payload as Record<string, unknown>
+  const sessionId = record.sessionId
+  const kind = record.kind
+  if (typeof sessionId !== 'string' || sessionId === '') return null
+  if (kind !== 'stop' && kind !== 'session_end') return null
+  return { sessionId, kind }
+}
+
+export async function createControlServer(): Promise<ControlServer> {
   const token = randomBytes(32).toString('hex')
-  const handlers = new Map<string, PermissionHandler>()
+  const handlers = new Map<string, SessionHandlers>()
 
   const server: Server = createServer((request, response) => {
     void (async () => {
-      if (request.method !== 'POST' || request.url !== '/pretooluse') {
+      const path = request.url
+      if (request.method !== 'POST' || (path !== '/pretooluse' && path !== '/event')) {
         send(response, 404, FALL_BACK_TO_THE_TERMINAL)
         return
       }
@@ -123,19 +163,39 @@ export async function createPermissionServer(): Promise<PermissionServer> {
         return
       }
 
-      let asked: HookRequest | null
+      let body: string
       try {
-        asked = parseRequest(await readBody(request))
+        body = await readBody(request)
       } catch {
         send(response, 400, FALL_BACK_TO_THE_TERMINAL)
         return
       }
+
+      if (path === '/event') {
+        const event = parseEvent(body)
+        if (event === null) {
+          send(response, 400, FALL_BACK_TO_THE_TERMINAL)
+          return
+        }
+        // Answered first, acted on second: a lifecycle hook must never hold
+        // the agent up, and it has nothing to wait for.
+        send(response, 200, { permissionDecision: 'allow' })
+        try {
+          handlers.get(event.sessionId)?.onEvent?.(event.kind)
+        } catch {
+          // A listener that throws is a bug in a surface, not a reason to take
+          // the server down with an unhandled rejection.
+        }
+        return
+      }
+
+      const asked = parseRequest(body)
       if (asked === null) {
         send(response, 400, FALL_BACK_TO_THE_TERMINAL)
         return
       }
 
-      const handler = handlers.get(asked.sessionId)
+      const handler = handlers.get(asked.sessionId)?.decide
       if (handler === undefined) {
         // A session the console does not know about — it restarted, or the
         // terminal outlived the run. The operator can still answer in the
@@ -167,10 +227,11 @@ export async function createPermissionServer(): Promise<PermissionServer> {
 
   return {
     url: `http://127.0.0.1:${port}/pretooluse`,
+    eventUrl: `http://127.0.0.1:${port}/event`,
     token,
 
-    register(sessionId: string, handler: PermissionHandler): () => void {
-      handlers.set(sessionId, handler)
+    register(sessionId: string, sessionHandlers: SessionHandlers): () => void {
+      handlers.set(sessionId, sessionHandlers)
       return () => handlers.delete(sessionId)
     },
 

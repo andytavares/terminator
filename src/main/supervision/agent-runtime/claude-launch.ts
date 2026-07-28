@@ -35,6 +35,7 @@ export interface LaunchSpecOptions {
   settingsDirectory: string
   hookScriptPath: string
   controlUrl: string
+  controlEventUrl: string
   controlToken: string
   /**
    * The program that runs the hook. Electron's own binary in `node` mode, so
@@ -87,20 +88,30 @@ export function transcriptPathFor(cwd: string, sessionId: string, home = homedir
 export function buildSettings(options: {
   hookScriptPath: string
   controlUrl: string
+  controlEventUrl: string
   controlToken: string
   sessionId: string
   nodePath: string
 }): unknown {
-  const command = [
-    // Electron refuses to be a node unless told; without this the hook script
-    // would launch a second copy of the application.
-    'ELECTRON_RUN_AS_NODE=1',
-    shellQuote(options.nodePath),
-    shellQuote(options.hookScriptPath),
-    shellQuote(options.controlUrl),
-    shellQuote(options.controlToken),
-    shellQuote(options.sessionId),
-  ].join(' ')
+  const invoke = (url: string, kind?: string): string =>
+    [
+      // Electron refuses to be a node unless told; without this the hook script
+      // would launch a second copy of the application.
+      'ELECTRON_RUN_AS_NODE=1',
+      shellQuote(options.nodePath),
+      shellQuote(options.hookScriptPath),
+      shellQuote(url),
+      shellQuote(options.controlToken),
+      shellQuote(options.sessionId),
+      ...(kind === undefined ? [] : [shellQuote(kind)]),
+    ].join(' ')
+
+  const notify = (kind: string): unknown => ({
+    matcher: '*',
+    // Seconds, not hours: nothing is waiting on the answer, and a lifecycle
+    // hook that hangs would hold up the agent for no reason at all.
+    hooks: [{ type: 'command', command: invoke(options.controlEventUrl, kind), timeout: 10 }],
+  })
 
   return {
     hooks: {
@@ -110,9 +121,16 @@ export function buildSettings(options: {
           // dangerous is the autonomy ladder's judgement, and it lives in the
           // console where it can be changed without restarting an agent.
           matcher: '*',
-          hooks: [{ type: 'command', command, timeout: HOOK_TIMEOUT_SECONDS }],
+          hooks: [
+            { type: 'command', command: invoke(options.controlUrl), timeout: HOOK_TIMEOUT_SECONDS },
+          ],
         },
       ],
+      // The agent finished responding and is waiting for input. Without this a
+      // session that had finished would look identical to one that was stuck,
+      // and the stall detector would call it a stall eight minutes later.
+      Stop: [notify('stop')],
+      SessionEnd: [notify('session_end')],
     },
   }
 }
@@ -129,6 +147,7 @@ export function buildLaunchSpec(options: LaunchSpecOptions): LaunchSpec {
       buildSettings({
         hookScriptPath: options.hookScriptPath,
         controlUrl: options.controlUrl,
+        controlEventUrl: options.controlEventUrl,
         controlToken: options.controlToken,
         sessionId: options.sessionId,
         nodePath,
