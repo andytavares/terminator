@@ -1,0 +1,145 @@
+src/main/supervision/agent-runtime/transcript-tailer.ts
+  s_5f98598a6d950e::t_3ccc806eab2ed4 96-128
+docs/ARCHITECTURE.md
+  s_5f98598a6d950e::t_cf34a96bd0cf58 900,902-906,910-915,917-918,929-951
+  s_5f98598a6d950e::t_27eb18fc93c0ce 754-755,757-759,761,781,783-789,792-796,798-800,802-808
+tests/unit/main/supervision/agent-runtime/pty-driver.spec.ts
+  s_5f98598a6d950e::t_9c6538501ac9a4 37,202
+  s_5f98598a6d950e::t_7b8ae327d1f8f9 113-114,119,133-140,144,151,160-161,172-175,182-185,207
+  s_5f98598a6d950e::t_37d7aa518715f6 115-118,120,129-130,352
+  s_5f98598a6d950e::t_e05cc362c9c522 1-36,38-112,121-128,131-132,141-143,145-150,152-159,162-163,165-171,176-181,186-201,203-206,208-351,353-358
+  s_5f98598a6d950e::t_8a532b10aed8c8 164
+src/main/supervision/agent-runtime/driver-contract.ts
+  s_5f98598a6d950e::t_059388c46f04dd 31-36
+  s_5f98598a6d950e::t_50301b4bfc2c00 1-19,41-74
+  s_5f98598a6d950e::t_f4a5141fd2354f 20-30,37-40
+src/shared/types/supervision.ts
+  s_5f98598a6d950e::t_1ee9beb79f9fe9 98-100,102-104
+src/renderer/App.tsx
+  s_5f98598a6d950e::t_05dc0c64c162b0 158-163,165-186,188,191-193,201,204,209,216-217
+  s_5f98598a6d950e::t_c8261c49905c99 33,37-44,194-200,202-203,205-208,210-215
+  s_5f98598a6d950e::t_3f9cd4b60146b6 218
+src/main/supervision/agent-runtime/permission-bridge.ts
+  s_5f98598a6d950e::t_3ccc806eab2ed4 179
+  s_5f98598a6d950e::t_424b9459b228c3 2-12
+  s_5f98598a6d950e::t_b6dd6e6055188a 20-22,38,182,184,187,189-190,195,215,239
+src/main/supervision/agent-runtime/hook-script.ts
+  s_5f98598a6d950e::t_d85e075d100633 37,48-55,62-71,79
+  s_5f98598a6d950e::t_a1f1c0d5858d5a 80-82
+tests/unit/main/supervision/stall/stall-scheduler.spec.ts
+  s_5f98598a6d950e::t_3718f0fbfee74f 28-29
+tests/unit/main/supervision/agent-runtime/permission-bridge.spec.ts
+  s_5f98598a6d950e::t_bf8374119d5fea 68,79-80,84,87-88,126-128,156,288,295-296,304
+tests/unit/ipc/supervision.ipc.spec.ts
+  s_5f98598a6d950e::t_3718f0fbfee74f 38-39
+tests/unit/renderer/supervision/screen.spec.tsx
+  s_5f98598a6d950e::t_3718f0fbfee74f 95-96
+src/shared/schemas/supervision.ts
+  s_5f98598a6d950e::t_1ee9beb79f9fe9 61-62
+src/main/supervision/state/session-registry.ts
+  s_5f98598a6d950e::t_1ee9beb79f9fe9 17-20,45-50,118-119,162,164-168
+tests/unit/renderer/hooks/useSupervision.spec.tsx
+  s_5f98598a6d950e::t_3718f0fbfee74f 33-34
+src/main/supervision/agent-runtime/pty-driver.ts
+  s_5f98598a6d950e::t_f4a5141fd2354f 43,78,130
+  s_5f98598a6d950e::t_f21b59c5e73161 1-4,12-36,42,44-66,68-77,79-89,102-110,123-129,132-148,150-221
+  s_5f98598a6d950e::t_1411d2fd60cb69 37-41,131
+  s_5f98598a6d950e::t_9d472fe78637fc 67
+  s_5f98598a6d950e::t_98550f16029f44 5-10
+  s_5f98598a6d950e::t_3ccc806eab2ed4 11,90-101,111-122,149
+src/main/supervision/assign-agent.ts
+  s_5f98598a6d950e::t_f4a5141fd2354f 32-37,132-138
+src/renderer/components/supervision/SessionList.tsx
+  s_5f98598a6d950e::t_e20736649cdcc4 24-25,117,204-206,229-230
+  s_5f98598a6d950e::t_bd255496dcfeef 231-233
+src/main/supervision/agent-runtime/control-server.ts
+  s_5f98598a6d950e::t_44c10a0572f894 183-188
+  s_5f98598a6d950e::t_12c72c915e1616 4-18,24
+  s_5f98598a6d950e::t_5ae2fce061ec3c 230-234
+  s_5f98598a6d950e::t_7a87f3e413f520 45,52,79,107,110-118,120,123,132,134-182,189-198,204-205,213,247-248
+  s_5f98598a6d950e::t_d02ccb4e37fdb4 29,38,57-77,81,89
+tests/unit/shared/supervision/rank-attention.spec.ts
+  s_5f98598a6d950e::t_3718f0fbfee74f 33-34
+tests/unit/main/supervision/agent-runtime/transcript-tailer.spec.ts
+  s_5f98598a6d950e::t_2081c98a38132b 5-8,232-276
+  s_5f98598a6d950e::t_7f150864e3e1f7 277
+src/main/supervision/agent-runtime/claude-launch.ts
+  s_5f98598a6d950e::t_77edec1837574c 91,96-114,124-126,129-133
+  s_5f98598a6d950e::t_6b5578ac294268 38,150
+src/renderer/stores/session.store.ts
+  s_5f98598a6d950e::t_97b2360052e3ce 111-123,229-251
+  s_5f98598a6d950e::t_eef892c7bb4099 252-253
+SUPERVISION.md
+  s_5f98598a6d950e::t_5a97441129bc33 127-135,137-150
+  s_5f98598a6d950e::t_399c8085b77137 203-208,212-216,578-581,583-584
+  s_5f98598a6d950e::t_cf34a96bd0cf58 136
+src/main/supervision/supervision-service.ts
+  s_5f98598a6d950e::t_81d69a70ec3395 8,14-15,112-123,129-130,295,298-306,308-313,320-322
+  s_5f98598a6d950e::t_f4a5141fd2354f 128,307,314
+  s_5f98598a6d950e::t_1411d2fd60cb69 315-319
+  s_5f98598a6d950e::t_16ffc65c3ad99a 124-127
+  s_5f98598a6d950e::t_059388c46f04dd 9-13
+tests/unit/renderer/supervision/supervision-store.spec.ts
+  s_5f98598a6d950e::t_3718f0fbfee74f 26-27
+tests/integration/supervision/session-lifecycle.spec.ts
+  s_5f98598a6d950e::t_905cbea41f09b1 323,328-330
+tests/unit/shared/schemas/supervision.spec.ts
+  s_5f98598a6d950e::t_3718f0fbfee74f 62-63,149
+  s_5f98598a6d950e::t_bd255496dcfeef 150
+tests/unit/main/supervision/worktree/reclaim.spec.ts
+  s_5f98598a6d950e::t_3718f0fbfee74f 43-44
+tests/unit/main/supervision/agent-runtime/claude-launch.spec.ts
+  s_5f98598a6d950e::t_6b5578ac294268 29,74,79-82,107-123
+tests/unit/renderer/supervision/session-list.spec.tsx
+  s_5f98598a6d950e::t_ee3c3a88976f56 236,238,243-244,248-249,251
+  s_5f98598a6d950e::t_3718f0fbfee74f 33-34
+tests/unit/main/supervision/agent-runtime/hook-script.spec.ts
+  s_5f98598a6d950e::t_e3975c22cfedd8 11-13,21,76-77,89,91-95,106-112,130-136,162-163,171-172,184-185,197-198,204-261
+  s_5f98598a6d950e::t_1d863dc97487fb 262
+src/main/index.ts
+  s_5f98598a6d950e::t_ef2691648d62da 17-19,327-337,353-363,388-391
+tests/integration/supervision/runtime-upgrade.spec.ts
+  s_5f98598a6d950e::t_905cbea41f09b1 24-36,39-43,63
+tests/unit/main/supervision/agent-runtime/control-server.spec.ts
+  s_5f98598a6d950e::t_fa65428a5ce8ea 1-89,93-192
+  s_5f98598a6d950e::t_b83fc9a3dd7961 235,237
+  s_5f98598a6d950e::t_37d7aa518715f6 90-92
+  s_5f98598a6d950e::t_e7dc5b00486eea 193-234,236,238-273
+src/shared/electron-api/manifest.ts
+  s_5f98598a6d950e::t_39bd71b9834946 651-664
+tests/unit/renderer/supervision/supervision-tab.spec.tsx
+  s_5f98598a6d950e::t_3718f0fbfee74f 98-99
+tests/unit/main/supervision/state/session-registry.spec.ts
+  s_5f98598a6d950e::t_5e85adcdcba5a4 212-213,216-226,229,232-236,239,242,244
+  s_5f98598a6d950e::t_ee3c3a88976f56 249
+tests/unit/main/supervision/agent-terminal.spec.ts
+  s_5f98598a6d950e::t_1cf1ea96e18b0c 1-53,57-64,73-77,79-113,117-173,175-244,265,288-289
+  s_5f98598a6d950e::t_834fbafc7cefdc 54-56,65-72,78,114-116,245-264,266-287
+  s_5f98598a6d950e::t_1d1f99f0daf3c6 174
+src/main/supervision/agent-terminal.ts
+  s_5f98598a6d950e::t_0eda9ee950cad7 1-6,8-137
+  s_5f98598a6d950e::t_059388c46f04dd 7
+docs/adr/028-agent-in-a-terminal.md
+  s_5f98598a6d950e::t_bd255496dcfeef 29,70-76
+  s_5f98598a6d950e::t_9a2d59ddd92db9 1-28,30-69,77-110
+tests/unit/main/supervision/final-gaps.spec.ts
+  s_5f98598a6d950e::t_3718f0fbfee74f 119-120,230-231
+package-lock.json
+  s_5f98598a6d950e::t_475c5018be3f07 5293,5307,5735,6703,7158,7168,7213,8110,8197,8222,8422,8614,8643,9480,9574-9575,10390,11612,11622,11959,13452,13465,13475,13495,13512,13531,15464
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "d89c5eeb16f628535e635e41a7a93ed01c1f007c",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
