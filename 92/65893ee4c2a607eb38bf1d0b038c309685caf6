@@ -1,0 +1,37 @@
+tests/unit/main/supervision/agent-runtime/hook-script.spec.ts
+  s_5f98598a6d950e::t_f10a6ba4185f0b 1-82,86-102,104-106,108-113,116,122-136,138-149,153-158,162-165,167-171,175-184,188-197
+  s_5f98598a6d950e::t_2c4475beefb495 83-85,107,114-115,117-121,137,150-152,159-161,166,172-174,185-187
+  s_5f98598a6d950e::t_aa08176a8d5bbc 103
+src/main/supervision/agent-runtime/claude-launch.ts
+  s_5f98598a6d950e::t_8d03be8f75d4a3 1-163
+src/main/supervision/agent-runtime/permission-server.ts
+  s_5f98598a6d950e::t_c56fb1a91f7595 1-20,31-35,37-187
+  s_5f98598a6d950e::t_98d761f25b48fc 21-30,36
+tests/unit/main/supervision/agent-runtime/permission-server.spec.ts
+  s_5f98598a6d950e::t_c735bb1bbe01bd 1-67,69-70,72-165,167-181
+  s_5f98598a6d950e::t_2c4475beefb495 68,71,166
+tests/unit/main/supervision/agent-runtime/claude-launch.spec.ts
+  s_5f98598a6d950e::t_0261673c83a992 3,150-168
+  s_5f98598a6d950e::t_86c136af49423a 1-2,4-39,42-140,142-149,169-170
+  s_5f98598a6d950e::t_76df6549285c35 40-41,141
+src/main/supervision/agent-runtime/hook-script.ts
+  s_5f98598a6d950e::t_8db72f9eb09e88 1-18,35-38,42-74,76-78,81,83-101
+  s_5f98598a6d950e::t_34aee8284ea51a 19-34,39-41
+  s_5f98598a6d950e::t_5e11f9a20257b0 75,79-80,82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "9265893ee4c2a607eb38bf1d0b038c309685caf6",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
