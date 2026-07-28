@@ -1,0 +1,70 @@
+src/shared/electron-api/manifest.ts
+  s_5f98598a6d950e::t_489f2eedcc3a31 48-55
+  s_5f98598a6d950e::t_c8739af8b2015e 47
+src/renderer/electron.d.ts
+  s_5f98598a6d950e::t_763917a1624dd5 31-32
+src/main/terminal/pty-manager.ts
+  s_5f98598a6d950e::t_7278dd26d68d9b 29-39,59-60,63-69,98,102-110,141-154
+  s_5f98598a6d950e::t_32a98c6a9b319d 155-156
+src/renderer/stores/session.store.ts
+  s_5f98598a6d950e::t_7abb939df7527a 247-254
+tests/unit/renderer/hooks/useSupervision.spec.tsx
+  s_5f98598a6d950e::t_c87d7ae28cf410 739,743-753
+  s_5f98598a6d950e::t_64a486fd0de2d3 754-755
+src/renderer/hooks/useSupervision.ts
+  s_5f98598a6d950e::t_2728a303519905 94-95
+  s_5f98598a6d950e::t_14f2c075fb718a 153-157,169,651
+  s_5f98598a6d950e::t_aad2c88c03a788 152
+src/main/supervision/agent-terminal.ts
+  s_5f98598a6d950e::t_a649679f6cbd14 89-93
+tests/unit/renderer/stores/session.store.spec.ts
+  s_5f98598a6d950e::t_ef1b97dbe6aa74 642-701
+tests/unit/ipc/terminal.ipc.spec.ts
+  s_5f98598a6d950e::t_86fc0c7f252bfd 60,171-193
+  s_5f98598a6d950e::t_eea1e1cb4fdd04 194-195
+tests/unit/terminal/pty-manager.spec.ts
+  s_5f98598a6d950e::t_af1af632c115fd 420-514
+src/main/ipc/supervision.ipc.ts
+  s_5f98598a6d950e::t_14f2c075fb718a 173-178
+tests/e2e/supervision-session-terminal.spec.ts
+  s_5f98598a6d950e::t_2d6bb6aeda5f3c 1-5,7-22,31-88,92-99,108-111
+  s_5f98598a6d950e::t_4fe5b016b0edf5 6,89-90
+  s_5f98598a6d950e::t_43f422512bc9e7 23-30
+  s_5f98598a6d950e::t_23b887fe197ddf 91
+  s_5f98598a6d950e::t_e39b04b877cdc0 100-107
+src/renderer/components/terminal/TerminalSession.tsx
+  s_5f98598a6d950e::t_2dc7105e7018c4 158-164
+tests/unit/renderer/terminal/session-controller.spec.ts
+  s_5f98598a6d950e::t_832701c224372b 36,50,73,234-284
+  s_5f98598a6d950e::t_b4485f63e6f0c3 285
+src/main/ipc/terminal.ipc.ts
+  s_5f98598a6d950e::t_a649679f6cbd14 79-86
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_5f98598a6d950e::t_28823ffc574896 116,124
+  s_5f98598a6d950e::t_d1adc9d3e32fe9 100
+  s_5f98598a6d950e::t_e73c6869041aab 934-950
+src/renderer/App.tsx
+  s_5f98598a6d950e::t_978ebc5e243bbf 205
+  s_5f98598a6d950e::t_e7533c8289e161 220-223
+  s_5f98598a6d950e::t_09f119b1448641 15
+src/renderer/terminal/session-controller.ts
+  s_5f98598a6d950e::t_978ebc5e243bbf 61-85
+src/shared/electron-api/__tests__/manifest.spec.ts
+  s_5f98598a6d950e::t_3f4fcbe9296397 38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "ff4f3fc8a611354d30ad17cf2cd94a4e565842b6",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
