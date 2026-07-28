@@ -16,7 +16,7 @@ export interface SessionListProps {
   now: number
   /** Ends the run, keeping the working copy and its diff. */
   onStop(sessionId: string, reason?: string): void
-  /** Ends it and removes the working copy. */
+  /** Ends it and removes the working copy, and the branch with it. */
   onDiscard(sessionId: string): void
   /** Told when a session is expanded, so the shell can follow if it wants to. */
   onOpen(sessionId: string): void
@@ -229,8 +229,8 @@ export function SessionList({
           Terminal goes to the session&rsquo;s own terminal, where the agent is running — you can
           watch it and take over by typing in it. Stopping ends the run and keeps the working copy,
           so you can review what it did. Its reason goes to the agent and into the feed, so a
-          half-finished diff still says why it stopped. Discarding also removes the working copy and
-          takes the session off the console.
+          half-finished diff still says why it stopped. Discarding also removes the working copy,
+          deletes the branch it was on, and takes the session off the console.
         </span>
       </div>
     </div>

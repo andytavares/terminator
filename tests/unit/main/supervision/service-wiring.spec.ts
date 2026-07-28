@@ -907,14 +907,16 @@ describe('reclaiming a working copy', () => {
     mkdirSync(join(wtRoot, 'orphan'), { recursive: true })
     mkdirSync(join(wtRoot, 'live'), { recursive: true })
     const removed: string[] = []
+    const branches: string[] = []
     const service = build({
       worktreeRoot: wtRoot,
       git: {
         createWorktree: async () => {},
         removeWorktree: async (_repo: string, path: string) => void removed.push(path),
+        removeBranch: async (_repo: string, branch: string) => void branches.push(branch),
       },
     })
-    return { service, wtRoot, removed }
+    return { service, wtRoot, removed, branches }
   }
 
   it('lists a directory no session references', () => {
@@ -1147,5 +1149,50 @@ describe('stopping a session', () => {
     // The run's own completion publishes it; publishing here as well would
     // report the session ending twice.
     expect(seen.filter((kind) => kind === 'session_ended')).toEqual([])
+  })
+})
+
+describe('cleaning up takes the branch with it', () => {
+  // A worktree removed on its own leaves its branch behind. Both discarding
+  // and reclaiming mean being rid of the thing, not half of it.
+  function withGit() {
+    const wtRoot = join(root, 'worktrees')
+    mkdirSync(join(wtRoot, 'gone'), { recursive: true })
+    const branches: string[] = []
+    const service = build({
+      worktreeRoot: wtRoot,
+      git: {
+        createWorktree: async () => {},
+        removeWorktree: async () => {},
+        removeBranch: async (_repo: string, branch: string) => void branches.push(branch),
+      },
+    })
+    return { service, wtRoot, branches }
+  }
+
+  it('deletes the branch when a session is discarded', async () => {
+    const { service, branches } = withGit()
+    service.registry.register('s1', meta({ branch: 'feat/discarded' }))
+    await service.discardSession('s1')
+    expect(branches).toEqual(['feat/discarded'])
+  })
+
+  it('deletes the branch when its working copy is reclaimed', async () => {
+    const { service, wtRoot, branches } = withGit()
+    service.registry.register('s1', meta({ worktreePath: join(wtRoot, 'gone') }))
+    service.bus.publish({
+      kind: 'session_ended',
+      sessionId: 's1',
+      outcome: 'error',
+      at: 1_000,
+    })
+    await service.reclaimWorktree(join(wtRoot, 'gone'))
+    expect(branches).toEqual([meta().branch])
+  })
+
+  it('deletes no branch for an orphan, which has no session to name one', async () => {
+    const { service, wtRoot, branches } = withGit()
+    await service.reclaimWorktree(join(wtRoot, 'gone'))
+    expect(branches).toEqual([])
   })
 })

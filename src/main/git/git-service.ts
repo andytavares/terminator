@@ -167,3 +167,16 @@ export async function createWorktree(
 export async function removeWorktree(repoRoot: string, worktreePath: string): Promise<void> {
   await git(['worktree', 'remove', '--force', worktreePath], repoRoot)
 }
+
+/**
+ * Deletes a branch, forcibly.
+ *
+ * Forcible because the branches this removes are the ones whose working copy
+ * has just been thrown away on purpose — a discarded session, or a reclaimed
+ * checkout. `-d` refuses anything not merged into the current branch, which is
+ * most of them, and refusing here would leave exactly the litter the operator
+ * asked to be rid of.
+ */
+export async function removeBranch(repoRoot: string, branch: string): Promise<void> {
+  await git(['branch', '-D', branch], repoRoot)
+}

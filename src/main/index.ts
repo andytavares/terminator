@@ -27,6 +27,7 @@ import { runCommand } from './codehost/codehost-client.js'
 import {
   createWorktree as createGitWorktree,
   removeWorktree as removeGitWorktree,
+  removeBranch as removeGitBranch,
 } from './git/git-service.js'
 import { reviewIntent } from './supervision/review/intent-diff.js'
 import { laneViews, mayMergeLane } from './supervision/lanes/lane-coordination.js'
@@ -367,6 +368,8 @@ app.whenReady().then(async () => {
       createWorktree: (repoPath, worktreePath, branch, isNewBranch) =>
         createGitWorktree(repoPath, worktreePath, branch, isNewBranch),
       removeWorktree: (repoPath, worktreePath) => removeGitWorktree(repoPath, worktreePath),
+      // Discarding or reclaiming takes the branch with the working copy.
+      removeBranch: (repoPath, branch) => removeGitBranch(repoPath, branch),
     },
     worktreeRoot: join(app.getPath('userData'), 'worktrees'),
     // Replies and redirects reach the running agent. Without this the default

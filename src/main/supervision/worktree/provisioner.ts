@@ -41,6 +41,13 @@ export interface GitWorktreeOps {
     isNewBranch: boolean
   ): Promise<void>
   removeWorktree(repoPath: string, worktreePath: string): Promise<void>
+  /**
+   * Deletes the branch the working copy was on. Optional so a caller that has
+   * no business deleting branches — a test, a partial composition — simply
+   * does not, rather than being forced to pass a no-op that silently leaves
+   * them behind.
+   */
+  removeBranch?(repoPath: string, branch: string): Promise<void>
 }
 
 export interface ProvisionerOptions {
@@ -123,6 +130,8 @@ export function createProvisioner(options: ProvisionerOptions) {
       worktreePath: string
       workItemId: string
       portBase: number
+      /** Deleted with the working copy. Absent when the caller does not know it. */
+      branch?: string | null
     }): Promise<ScriptResult | null> {
       const config = loadRepoConfig(request.repoPath)
       let teardown: ScriptResult | null = null
@@ -143,6 +152,20 @@ export function createProvisioner(options: ProvisionerOptions) {
       // accumulate broken checkouts, and the teardown output is returned so the
       // failure is still reportable.
       await git.removeWorktree(request.repoPath, request.worktreePath)
+
+      // The branch goes with it. A worktree removed on its own leaves the
+      // branch behind, and those accumulate exactly as silently as the
+      // checkouts did — invisible everywhere except `git branch`, which is the
+      // class of mess this console exists to clear rather than create.
+      if (request.branch != null && request.branch !== '') {
+        try {
+          await git.removeBranch?.(request.repoPath, request.branch)
+        } catch {
+          // Checked out somewhere else, already gone, or protected. The working
+          // copy is the thing that was asked for and it is gone; failing the
+          // whole reclaim over the branch would leave the checkout behind too.
+        }
+      }
       return teardown
     },
   }

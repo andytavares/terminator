@@ -101,10 +101,10 @@ export function WorktreeReclaim({
 
       <div className="sv-form">
         <span className="sv-field__note">
-          Reclaiming runs the repository&rsquo;s teardown script, removes the working copy, and
-          frees its port range. A working copy still in use is never listed, and neither is one
-          holding changes nobody has reviewed — a session that is ready for review, or one the
-          console lost track of that had done work, keeps its checkout.
+          Reclaiming runs the repository&rsquo;s teardown script, removes the working copy, deletes
+          the branch it was on, and frees its port range. A working copy still in use is never
+          listed, and neither is one holding changes nobody has reviewed — a session that is ready
+          for review, or one the console lost track of that had done work, keeps its checkout.
         </span>
       </div>
     </div>

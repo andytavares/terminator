@@ -30,6 +30,7 @@ function harness() {
       mkdirSync(path, { recursive: true })
     }),
     removeWorktree: vi.fn(async () => {}),
+    removeBranch: vi.fn(async () => {}),
   }
   const provisioner = createProvisioner({
     git,
@@ -161,6 +162,61 @@ describe('release (FR-035)', () => {
     const { worktreePath } = await provisioner.provision(request())
     await expect(
       provisioner.release({ repoPath, worktreePath, workItemId: 'FLU-220', portBase: 4000 })
+    ).resolves.toBeNull()
+    expect(git.removeWorktree).toHaveBeenCalled()
+  })
+})
+
+describe('the branch goes with the working copy', () => {
+  // A worktree removed on its own leaves its branch behind, and those pile up
+  // as silently as the checkouts did — invisible everywhere but `git branch`.
+  const release = async (over: Record<string, unknown> = {}) => {
+    const { provisioner, git } = harness()
+    const { worktreePath } = await provisioner.provision(request())
+    await provisioner.release({
+      repoPath,
+      worktreePath,
+      workItemId: 'FLU-220',
+      portBase: 4000,
+      branch: 'feat/session-ulid',
+      ...over,
+    })
+    return git
+  }
+
+  it('deletes the branch it was cut on', async () => {
+    expect((await release()).removeBranch).toHaveBeenCalledWith(repoPath, 'feat/session-ulid')
+  })
+
+  it('removes the working copy first, since a checked-out branch cannot be deleted', async () => {
+    const git = await release()
+    expect(git.removeWorktree.mock.invocationCallOrder[0]).toBeLessThan(
+      git.removeBranch.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('deletes no branch when none was named — an orphan has no session to name one', async () => {
+    expect((await release({ branch: null })).removeBranch).not.toHaveBeenCalled()
+  })
+
+  it('deletes no branch for an empty name', async () => {
+    expect((await release({ branch: '' })).removeBranch).not.toHaveBeenCalled()
+  })
+
+  it('still removes the working copy when the branch cannot be deleted', async () => {
+    // Checked out elsewhere, already gone, or protected. The checkout is what
+    // was asked for; failing over the branch would leave it behind too.
+    const { provisioner, git } = harness()
+    git.removeBranch.mockRejectedValueOnce(new Error('branch is checked out'))
+    const { worktreePath } = await provisioner.provision(request())
+    await expect(
+      provisioner.release({
+        repoPath,
+        worktreePath,
+        workItemId: 'FLU-220',
+        portBase: 4000,
+        branch: 'feat/session-ulid',
+      })
     ).resolves.toBeNull()
     expect(git.removeWorktree).toHaveBeenCalled()
   })

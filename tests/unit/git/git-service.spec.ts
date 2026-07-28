@@ -44,6 +44,7 @@ import {
   listWorktrees,
   createWorktree,
   removeWorktree,
+  removeBranch,
 } from '../../../src/main/git/git-service'
 
 const customMock = () =>
@@ -345,5 +346,32 @@ describe('removeWorktree', () => {
     expect(args).toContain('remove')
     expect(args).toContain('--force')
     expect(args).toContain('/worktrees/old-feature')
+  })
+})
+
+// ─── removeBranch ─────────────────────────────────────────────────────────────
+
+describe('removeBranch', () => {
+  it('deletes the branch by name', async () => {
+    mockResolve('')
+    await removeBranch('/repo', 'feat/session-ulid')
+    const args: string[] = customMock().mock.calls[0][1]
+    expect(args).toContain('branch')
+    expect(args).toContain('feat/session-ulid')
+  })
+
+  it('forces it, because the branches it removes are ones just thrown away', async () => {
+    // `-d` refuses anything not merged into the current branch, which is most
+    // of them — refusing here would leave exactly the litter the operator
+    // asked to be rid of.
+    mockResolve('')
+    await removeBranch('/repo', 'feat/session-ulid')
+    expect(customMock().mock.calls[0][1]).toContain('-D')
+  })
+
+  it('runs in the repository, not the working copy that has just gone', async () => {
+    mockResolve('')
+    await removeBranch('/repo', 'feat/x')
+    expect(customMock().mock.calls[0][2]).toMatchObject({ cwd: '/repo' })
   })
 })

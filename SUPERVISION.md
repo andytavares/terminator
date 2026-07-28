@@ -440,8 +440,12 @@ The **Worktrees** tab lists what can go, and why:
   application, so nothing is using the copy.
 
 Reclaiming runs the repository's teardown script, removes the working copy,
-frees its port range, and clears that session's entries from the feed — with
-nothing left to go back to, the feed has nothing left to be about. **Reclaim all** does them one at a time, because each runs
+**deletes the branch it was on**, frees its port range, and clears that
+session's entries from the feed — with nothing left to go back to, the feed has
+nothing left to be about. The branch goes because a worktree removed on its own
+leaves one behind, and those pile up as silently as the checkouts did:
+invisible everywhere except `git branch`. An orphan has no session to name a
+branch, so nothing is deleted in that case. **Reclaim all** does them one at a time, because each runs
 git against a repository and several at once is how you get lock errors.
 
 A working copy still in use is never listed, and neither is one holding changes

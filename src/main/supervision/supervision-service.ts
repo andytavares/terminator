@@ -710,6 +710,9 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
           worktreePath: path,
           workItemId: session?.workItemId ?? session?.id ?? 'orphan',
           portBase: span?.portBase ?? 0,
+          // Reclaiming means being rid of it. An orphan has no session to name
+          // a branch, so there is nothing to delete in that case.
+          branch: reclaimable.branch ?? session?.branch ?? null,
         })
       } catch (error) {
         return { ok: false, reason: error instanceof Error ? error.message : String(error) }
@@ -783,6 +786,9 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
           worktreePath: session.worktreePath,
           workItemId: session.workItemId ?? sessionId,
           portBase: span?.portBase ?? 0,
+          // Discarding is throwing the work away on purpose; leaving the branch
+          // behind leaves the litter the operator asked to be rid of.
+          branch: session.branch,
         })
       } catch (error) {
         // A working copy that is already gone, or a teardown that failed, must
