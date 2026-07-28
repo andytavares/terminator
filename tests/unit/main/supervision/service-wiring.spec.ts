@@ -1196,3 +1196,223 @@ describe('cleaning up takes the branch with it', () => {
     expect(branches).toEqual([])
   })
 })
+
+describe('measuring what a session changed', () => {
+  // Nothing reported this before, so the diff stayed at zero for a session's
+  // whole life. `ready` was unreachable, so the review queue could never fill
+  // and backpressure counted nothing. Every finished session was recorded as
+  // having "finished without changing anything", however much it had changed.
+  function withDiff(summary: { files: number; added: number; removed: number }) {
+    const service = build({
+      readDiff: async () => summary,
+      readFiles: async () => ['src/a.ts'],
+      run: async () => ({ ok: true, stdout: '', stderr: '' }),
+      codeHost: {
+        checkState: async () => 'passing' as const,
+        pullRequestFor: async () => null,
+        createPullRequest: async () => null,
+        merge: async () => ({ ok: true, reason: null }),
+        isAvailable: async () => true,
+      },
+    })
+    service.registry.register('s1', meta())
+    return service
+  }
+
+  it('records it against the session, so a listing surface can show it', () => {
+    const service = withDiff({ files: 2, added: 9, removed: 1 })
+    service.bus.publish({
+      kind: 'diff_measured',
+      sessionId: 's1',
+      files: 2,
+      added: 9,
+      removed: 1,
+      at: 11_000,
+    })
+    expect(service.registry.get('s1')?.diffSummary).toEqual({ files: 2, added: 9, removed: 1 })
+  })
+
+  it('is what puts a finished session in front of the operator', async () => {
+    const service = withDiff({ files: 2, added: 9, removed: 1 })
+    service.bus.publish({
+      kind: 'diff_measured',
+      sessionId: 's1',
+      files: 2,
+      added: 9,
+      removed: 1,
+      at: 11_000,
+    })
+    service.bus.publish({ kind: 'session_ended', sessionId: 's1', outcome: 'success', at: 12_000 })
+    await new Promise((resolve) => setTimeout(resolve, 30))
+
+    expect(service.registry.get('s1')?.runtimeState).toBe('ready')
+    expect(service.reviewQueue.list().map((entry) => entry.sessionId)).toEqual(['s1'])
+  })
+
+  it('gives backpressure something to count, which is what makes it a gate', async () => {
+    const service = withDiff({ files: 2, added: 9, removed: 1 })
+    service.bus.publish({
+      kind: 'diff_measured',
+      sessionId: 's1',
+      files: 2,
+      added: 9,
+      removed: 1,
+      at: 11_000,
+    })
+    service.bus.publish({ kind: 'session_ended', sessionId: 's1', outcome: 'success', at: 12_000 })
+    await new Promise((resolve) => setTimeout(resolve, 30))
+
+    expect(service.reviewQueue.count()).toBe(1)
+  })
+
+  it('still reports a session that genuinely changed nothing as such', async () => {
+    const service = withDiff({ files: 0, added: 0, removed: 0 })
+    service.bus.publish({
+      kind: 'diff_measured',
+      sessionId: 's1',
+      files: 0,
+      added: 0,
+      removed: 0,
+      at: 11_000,
+    })
+    service.bus.publish({ kind: 'session_ended', sessionId: 's1', outcome: 'success', at: 12_000 })
+    await new Promise((resolve) => setTimeout(resolve, 30))
+
+    expect(service.registry.get('s1')?.runtimeState).toBe('failed')
+    expect(service.reviewQueue.list()).toEqual([])
+  })
+})
+
+describe('re-measuring a session while it is still running', () => {
+  // Without this the diff is only known once the run is over, so a listing
+  // surface shows nothing changing and the no-progress signal has nothing to
+  // measure from until it is too late to matter.
+  it('reads the working copy on the reconcile tick', async () => {
+    vi.useFakeTimers()
+    try {
+      const reads: string[] = []
+      const service = build({
+        readDiff: async (worktreePath: string) => {
+          reads.push(worktreePath)
+          return { files: 1, added: 3, removed: 0 }
+        },
+      })
+      service.registry.register('s1', meta())
+      service.bus.publish({
+        kind: 'tool_started',
+        sessionId: 's1',
+        toolName: 'Edit',
+        callId: 't1',
+        isShell: false,
+        at: 10_500,
+      })
+      service.start()
+
+      await vi.advanceTimersByTimeAsync(31_000)
+      expect(reads).toContain(meta().worktreePath)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('leaves a session that has finished alone — nothing is changing under it', async () => {
+    vi.useFakeTimers()
+    try {
+      const reads: string[] = []
+      const service = build({
+        readDiff: async (worktreePath: string) => {
+          reads.push(worktreePath)
+          return { files: 0, added: 0, removed: 0 }
+        },
+      })
+      service.registry.register('s1', meta())
+      service.bus.publish({
+        kind: 'session_ended',
+        sessionId: 's1',
+        outcome: 'error',
+        at: 10_500,
+      })
+      service.start()
+
+      await vi.advanceTimersByTimeAsync(31_000)
+      expect(reads).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('how the service gives the driver a terminal', () => {
+  // The composition point between "a supervised session" and "somewhere the
+  // operator can watch it". Wired wrong, the agent runs where nobody can see
+  // it, which is the failure this runtime exists to have got rid of.
+  function withRuntime(openTerminal: (spec: unknown) => Promise<unknown>) {
+    const written: Array<{ terminal: string; data: string }> = []
+    const closed: string[] = []
+    const service = build({
+      agentRuntime: {
+        control: {
+          url: '',
+          eventUrl: '',
+          token: '',
+          register: () => () => {},
+          close: async () => {},
+        },
+        hookScriptPath: '/opt/hook.mjs',
+        openTerminal,
+        write: (terminal: string, data: string) => written.push({ terminal, data }),
+        closeTerminal: (terminal: string) => closed.push(terminal),
+      },
+    })
+    service.registry.register('s1', meta())
+    return { service, written, closed }
+  }
+
+  // `root` is a per-test temporary directory, so this is built when the test
+  // runs rather than when the file loads.
+  const start = () => ({ sessionId: 's1', prompt: 'do it', cwd: join(root, 'wt') })
+
+  it('records where the session ended up, so a surface can take you to it', async () => {
+    const { service } = withRuntime(async () => ({
+      terminalSessionId: 'terminal-1',
+      projectId: 'project-1',
+    }))
+    await service.driver.start(start())
+    expect(service.registry.get('s1')).toMatchObject({
+      terminalSessionId: 'terminal-1',
+      projectId: 'project-1',
+    })
+  })
+
+  it('types the launch command into that terminal', async () => {
+    const { service, written } = withRuntime(async () => ({
+      terminalSessionId: 'terminal-1',
+      projectId: null,
+    }))
+    await service.driver.start(start())
+    expect(written[0]?.terminal).toBe('terminal-1')
+    expect(written[0]?.data).toContain('--session-id s1')
+  })
+
+  it('closes the terminal when the session is disposed of', async () => {
+    const { service, closed } = withRuntime(async () => ({
+      terminalSessionId: 'terminal-1',
+      projectId: null,
+    }))
+    await service.driver.start(start())
+    service.driver.dispose('s1')
+    expect(closed).toEqual(['terminal-1'])
+  })
+
+  it('records nothing when no terminal could be opened', async () => {
+    const { service } = withRuntime(async () => null)
+    await service.driver.start(start())
+    expect(service.registry.get('s1')?.terminalSessionId).toBeNull()
+  })
+
+  it('refuses to start an agent nobody can see when nothing can open a terminal', async () => {
+    const service = build()
+    service.registry.register('s1', meta())
+    await expect(service.driver.start(start())).rejects.toThrow('no way to open a terminal')
+  })
+})

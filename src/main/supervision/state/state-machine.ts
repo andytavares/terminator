@@ -115,13 +115,45 @@ export function applyEvent(state: SessionState, event: SessionEvent): SessionSta
       }
     }
 
-    case 'turn_finished':
-      return {
+    case 'turn_finished': {
+      const counted = {
         ...state,
         turns: event.turns,
         costUsd: event.costUsd,
         contextPct: event.contextPct,
       }
+      // The agent has stopped responding and is waiting. Running in a terminal
+      // it does not exit when it finishes — it sits at its prompt — so waiting
+      // for the conversation to end would mean work was never offered for
+      // review until somebody closed it by hand.
+      //
+      // Reversible on purpose: a session put back to work by anything typed at
+      // it returns to `working` on its next tool call, so this is "there is
+      // something to look at", not "this is over".
+      if (counted.diffSummary.files === 0) return counted
+      if (counted.pendingPermission !== null) return counted
+      if (counted.runtimeState !== 'working' && counted.runtimeState !== 'stalled') return counted
+      return transition(counted, 'ready', event.at)
+    }
+
+    case 'diff_measured': {
+      const diffSummary = {
+        files: event.files,
+        added: event.added,
+        removed: event.removed,
+      }
+      // The no-progress signal measures from the last time the net change
+      // actually moved. A measurement that reports the same numbers is not
+      // progress, and treating it as progress would make that signal unable to
+      // fire at all — every poll would reset the clock.
+      const net = event.added - event.removed
+      const previousNet = state.diffSummary.added - state.diffSummary.removed
+      return {
+        ...state,
+        diffSummary,
+        lastNetChangeAt: net === previousNet ? state.lastNetChangeAt : event.at,
+      }
+    }
 
     case 'session_ended': {
       if (event.outcome === 'error') {

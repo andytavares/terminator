@@ -143,6 +143,55 @@ test('a session started with no workspace selected still lands beside the work',
   })
 })
 
+test('what a session changed is actually measured, in the real application', async () => {
+  // Everything downstream depended on a diff nobody measured: reaching `ready`
+  // requires a non-empty one, so the review queue was permanently empty,
+  // backpressure counted nothing, and every finished session was recorded as
+  // having "finished without changing anything".
+  //
+  // The measurement is what was missing, and it is what this asserts — driven
+  // by editing the session's own worktree rather than by a real agent, so it
+  // tests the wiring and not a model. That a measured diff then reaches the
+  // review queue is covered in service-wiring.spec.ts.
+  test.setTimeout(120_000)
+  const { page } = handle
+
+  const started = await page.evaluate(async (repoPath: string) => {
+    const api = (window as unknown as { electronAPI: any }).electronAPI
+    return api.supervision.assign({
+      repoPath,
+      branch: 'feat/e2e-review',
+      autonomyLevel: 'read',
+      instruction: 'Wait.',
+      workspaceId: null,
+    })
+  }, repo)
+  expect(started?.ok).toBe(true)
+
+  const session = await page.evaluate(async () => {
+    const api = (window as unknown as { electronAPI: any }).electronAPI
+    const sessions = await api.supervision.listSessions()
+    return sessions.find((s: { branch: string }) => s.branch === 'feat/e2e-review')
+  })
+  expect(session.diffSummary).toEqual({ files: 0, added: 0, removed: 0 })
+
+  // The agent's own edit, made directly: what matters is that a changed working
+  // copy is noticed, not who changed it.
+  writeFileSync(join(session.worktreePath, 'changed.txt'), 'banana\n')
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async (sessionId: string) => {
+          const api = (window as unknown as { electronAPI: any }).electronAPI
+          const sessions = await api.supervision.listSessions()
+          return sessions.find((s: { id: string }) => s.id === sessionId)?.diffSummary?.files
+        }, session.id),
+      { timeout: 90_000, intervals: [2_000] }
+    )
+    .toBeGreaterThan(0)
+})
+
 // Opt-in, because it drives a real model. It needs working credentials, and
 // whether an agent reaches for Write at all — or reaches for it within any
 // particular number of seconds — is the model's decision, not something a

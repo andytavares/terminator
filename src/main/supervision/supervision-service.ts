@@ -318,6 +318,7 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
         registry.noteTerminal(spec.sessionId, opened.terminalSessionId, opened.projectId)
       return opened
     },
+    measureDiff: (sessionId) => measureDiff(sessionId),
     write: (terminalSessionId, data) => options.agentRuntime?.write(terminalSessionId, data),
     closeTerminal: (terminalSessionId) => options.agentRuntime?.closeTerminal(terminalSessionId),
   })
@@ -346,10 +347,38 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
     now,
   })
 
+  /**
+   * Reads what a session's working copy has changed and tells the state machine.
+   *
+   * Nothing reported this before, so the diff stayed at zero for a session's
+   * whole life — which made `ready` unreachable, the review queue permanently
+   * empty, backpressure a gate that counted nothing, and the no-progress stall
+   * signal unable to fire.
+   */
+  async function measureDiff(sessionId: string): Promise<void> {
+    const session = registry.get(sessionId)
+    if (session === null || session.worktreePath === '') return
+    const summary = await readDiff(
+      session.worktreePath,
+      loadRepoConfig(session.repoPath).review.baseBranch,
+      run
+    )
+    bus.publish({ kind: 'diff_measured', sessionId, ...summary, at: now() })
+  }
+
+  /** States in which a working copy can still be changing under us. */
+  const LIVE: ReadonlySet<string> = new Set(['starting', 'working', 'needs_input', 'stalled'])
+
   // Reconcile against the durable record on the same tick. The driver can die,
   // lag, or be restarted; the transcript survives all three (FR-006).
   const reconcileTimer = setInterval(() => {
-    for (const session of registry.list()) service.reconcileFromTranscript(session.id)
+    for (const session of registry.list()) {
+      service.reconcileFromTranscript(session.id)
+      // What it has changed, so a listing surface can show a diff growing and
+      // the no-progress signal has something to measure — rather than both
+      // waiting until the run is over to learn anything.
+      if (LIVE.has(session.runtimeState)) void measureDiff(session.id)
+    }
   }, 30_000)
   reconcileTimer.unref?.()
 
@@ -512,7 +541,9 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
     // The unit of review is the hunk, not the file: one file routinely holds
     // both the change you asked for and the one you did not (FR-052).
     try {
-      const patch = await run('git', ['diff', `${base}...HEAD`], session.worktreePath)
+      // Against the base, so the hunks are the same change the summary counted
+      // — including work the agent never committed.
+      const patch = await run('git', ['diff', base], session.worktreePath)
       hunksBySession.set(sessionId, patch.ok ? parseHunks(patch.stdout) : [])
     } catch {
       hunksBySession.set(sessionId, [])

@@ -18,6 +18,7 @@ export const SESSION_EVENT_KINDS = [
   'session_ended',
   'setup_finished',
   'branch_merged',
+  'diff_measured',
 ] as const
 
 interface BaseEvent {
@@ -83,6 +84,24 @@ export interface SessionEndedEvent extends BaseEvent {
   readonly reason?: string
 }
 
+/**
+ * What the working copy has actually changed, read from git.
+ *
+ * Nothing used to report this, so the state carried zeros for a session's whole
+ * life. Three things depended on it and all three were dead: reaching `ready`
+ * requires a non-empty diff, so every finished session was recorded as having
+ * "finished without changing anything" and the review queue could never fill;
+ * backpressure counts the review queue, so it counted nothing and never
+ * refused; and the no-progress stall signal measures from the last net change,
+ * which never moved.
+ */
+export interface DiffMeasuredEvent extends BaseEvent {
+  readonly kind: 'diff_measured'
+  readonly files: number
+  readonly added: number
+  readonly removed: number
+}
+
 export interface SetupFinishedEvent extends BaseEvent {
   readonly kind: 'setup_finished'
   readonly exitCode: number
@@ -110,6 +129,7 @@ export type SessionEvent =
   | SessionEndedEvent
   | SetupFinishedEvent
   | BranchMergedEvent
+  | DiffMeasuredEvent
 
 const KIND_SET: ReadonlySet<string> = new Set(SESSION_EVENT_KINDS)
 

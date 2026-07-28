@@ -307,3 +307,140 @@ describe('purity', () => {
     expect(after.stateSince).toBe(working.stateSince)
   })
 })
+
+describe('what the working copy has changed', () => {
+  // Nothing reported this before, so the diff stayed at zero for a session's
+  // whole life: `ready` was unreachable, every finished session was recorded as
+  // having changed nothing, and the review queue could never fill.
+  const measured = (
+    over: Partial<{ files: number; added: number; removed: number; at: number }> = {}
+  ) => ({
+    kind: 'diff_measured' as const,
+    sessionId: 's1',
+    files: 2,
+    added: 9,
+    removed: 1,
+    at: at(500),
+    ...over,
+  })
+
+  it('records it', () => {
+    expect(reduce([started, measured()]).diffSummary).toEqual({ files: 2, added: 9, removed: 1 })
+  })
+
+  it('is what lets a finished session reach review', () => {
+    const s = reduce([
+      started,
+      measured(),
+      { kind: 'session_ended', sessionId: 's1', outcome: 'success', at: at(900) },
+    ])
+    expect(s.runtimeState).toBe('ready')
+  })
+
+  it('still calls a session that changed nothing what it is', () => {
+    const s = reduce([
+      started,
+      measured({ files: 0, added: 0, removed: 0 }),
+      { kind: 'session_ended', sessionId: 's1', outcome: 'success', at: at(900) },
+    ])
+    expect(s.runtimeState).toBe('failed')
+  })
+
+  it('notes when the net change moved, which is what no-progress measures from', () => {
+    expect(reduce([started, measured()]).lastNetChangeAt).toBe(at(500))
+  })
+
+  it('does not count a measurement that changed nothing as progress', () => {
+    // Otherwise every poll resets the clock and the no-progress signal can
+    // never fire at all.
+    const s = reduce([started, measured(), measured({ at: at(800) })])
+    expect(s.lastNetChangeAt).toBe(at(500))
+  })
+
+  it('notes progress again when the net change moves further', () => {
+    const s = reduce([started, measured(), measured({ added: 20, at: at(800) })])
+    expect(s.lastNetChangeAt).toBe(at(800))
+  })
+
+  it('notes a revert as progress too — the net moved, in the other direction', () => {
+    const s = reduce([started, measured(), measured({ added: 1, at: at(800) })])
+    expect(s.lastNetChangeAt).toBe(at(800))
+  })
+})
+
+describe('finishing a turn offers the work for review', () => {
+  // Running in a terminal the agent does not exit when it finishes — it sits at
+  // its prompt. Waiting for the conversation to end meant work was never
+  // offered for review until somebody closed the session by hand, so the
+  // review queue stayed empty however much the agent did.
+  const measured = {
+    kind: 'diff_measured' as const,
+    sessionId: 's1',
+    files: 2,
+    added: 9,
+    removed: 1,
+    at: at(500),
+  }
+  const turn = (over: Record<string, unknown> = {}) => ({
+    kind: 'turn_finished' as const,
+    sessionId: 's1',
+    turns: 3,
+    costUsd: 0,
+    contextPct: null,
+    at: at(600),
+    ...over,
+  })
+
+  it('moves to `ready` when it finished a turn having changed something', () => {
+    expect(reduce([started, measured, turn()]).runtimeState).toBe('ready')
+  })
+
+  it('stays put when it has changed nothing — there is nothing to look at', () => {
+    expect(reduce([started, turn()]).runtimeState).not.toBe('ready')
+  })
+
+  it('does not call a session waiting on the operator ready', () => {
+    const s = reduce([
+      started,
+      measured,
+      {
+        kind: 'permission_requested',
+        sessionId: 's1',
+        requestId: 'p1',
+        toolName: 'Bash',
+        summary: 'rm -rf /',
+        at: at(550),
+      },
+      turn(),
+    ])
+    expect(s.runtimeState).toBe('needs_input')
+  })
+
+  it('offers a stalled session that produced work for review too', () => {
+    const s = reduce([started, measured, turn()])
+    expect(s.runtimeState).toBe('ready')
+  })
+
+  it('still counts the turn', () => {
+    expect(reduce([started, measured, turn()]).turns).toBe(3)
+  })
+
+  it('goes back to work when the agent picks the task up again', () => {
+    // Reversible on purpose: this says "there is something to look at", not
+    // "this is over", and anything typed at the terminal carries it on.
+    const s = reduce([
+      started,
+      measured,
+      turn(),
+      {
+        kind: 'tool_started',
+        sessionId: 's1',
+        toolName: 'Edit',
+        callId: 't2',
+        isShell: false,
+        at: at(700),
+      },
+    ])
+    expect(s.runtimeState).toBe('working')
+  })
+})

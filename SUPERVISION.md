@@ -201,7 +201,9 @@ have to open a session to learn why it died.
 every session whether or not it wants anything, running ones first.
 
 Each row carries what the agent has done and what it has changed: turns and the
-size of its diff. So a session quietly burning turns with nothing to show for
+size of its diff, re-measured every thirty seconds while it runs and once more
+the moment it finishes a turn. New files count — an agent that has only created
+files has still changed something. So a session quietly burning turns with nothing to show for
 them is visible without opening it. Cost and context use are not shown — they
 came from the in-process runtime that Terminator no longer uses, and neither is
 recoverable from a terminal, so nothing is claimed rather than a confident
@@ -282,8 +284,14 @@ worthless.
 
 ![The review inbox and the merge audit](docs/images/supervision/review.png)
 
-When a session finishes with changes it is graded and queued **worst first**, not
-by arrival:
+A session reaches review when the agent **finishes a turn** having changed
+something — not when the conversation ends. Running in a terminal it does not
+exit when it is done, it sits at its prompt, so waiting for the session to close
+would mean work was never offered for review until you closed it by hand. The
+session stays live: type at its terminal and it carries on, and its next tool
+call puts it back to `working`.
+
+It is then graded and queued **worst first**, not by arrival:
 
 | Grade | Trigger                                                                                | Handling              |
 | ----- | -------------------------------------------------------------------------------------- | --------------------- |

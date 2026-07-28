@@ -22,6 +22,7 @@ describe('SessionEvent kinds (data-model.md §1)', () => {
   it('declares exactly the documented set of kinds', () => {
     expect([...SESSION_EVENT_KINDS].sort()).toEqual([
       'branch_merged',
+      'diff_measured',
       'permission_requested',
       'permission_resolved',
       'session_ended',

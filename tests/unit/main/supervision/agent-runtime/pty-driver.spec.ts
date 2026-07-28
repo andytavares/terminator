@@ -24,6 +24,8 @@ let typed: Array<{ terminal: string; data: string }>
 let closed: string[]
 let openedWith: LaunchSpec | null
 let terminalId: string | null
+let measured: string[]
+let measureDiff: ((sessionId: string) => Promise<void>) | undefined
 
 function makeDriver(): SessionDriver {
   return createPtyDriver({
@@ -38,6 +40,7 @@ function makeDriver(): SessionDriver {
     },
     write: (terminal, data) => typed.push({ terminal, data }),
     closeTerminal: (terminal) => closed.push(terminal),
+    measureDiff,
   })
 }
 
@@ -55,6 +58,8 @@ beforeEach(async () => {
   closed = []
   openedWith = null
   terminalId = 'terminal-1'
+  measured = []
+  measureDiff = async (sessionId) => void measured.push(sessionId)
 })
 
 afterEach(async () => {
@@ -354,5 +359,92 @@ describe('discarding', () => {
 
     driver.dispose(start.sessionId)
     expect(await pending).toMatchObject({ permissionDecision: 'deny' })
+  })
+})
+
+describe('what the session changed, before it is recorded as over', () => {
+  async function report(kind: string): Promise<void> {
+    await fetch(control.eventUrl, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionId: start.sessionId, kind }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 30))
+  }
+
+  it('measures the working copy when the session ends', async () => {
+    await makeDriver().start(start)
+    await report('session_end')
+    expect(measured).toEqual([start.sessionId])
+  })
+
+  it('measures it before saying the session ended', async () => {
+    // Reaching `ready` requires a non-empty diff, so a measurement taken after
+    // the fact arrives too late to affect it and the session is recorded as
+    // having changed nothing.
+    const order: string[] = []
+    measureDiff = async () => void order.push('measured')
+    const driver = createPtyDriver({
+      publish: (event) => {
+        if (event.kind === 'session_ended') order.push('ended')
+      },
+      now: () => 1_000,
+      control,
+      settingsDirectory: join(directory, 'settings'),
+      hookScriptPath: join(directory, 'hook.mjs'),
+      openTerminal: async () => ({ terminalSessionId: 'terminal-1', projectId: null }),
+      write: () => {},
+      closeTerminal: () => {},
+      measureDiff,
+    })
+    await driver.start(start)
+    await report('session_end')
+    expect(order).toEqual(['measured', 'ended'])
+  })
+
+  it('still ends the session when the working copy cannot be read', async () => {
+    measureDiff = async () => {
+      throw new Error('the working copy has already gone')
+    }
+    await makeDriver().start(start)
+    await report('session_end')
+    expect(kinds()).toContain('session_ended')
+  })
+
+  it('ends the session when nothing measures diffs at all', async () => {
+    measureDiff = undefined
+    await makeDriver().start(start)
+    await report('session_end')
+    expect(kinds()).toContain('session_ended')
+  })
+
+  it('measures it when a turn ends too, which is when the work is offered for review', async () => {
+    // Running in a terminal the agent does not exit when it finishes — it sits
+    // at its prompt. Waiting for the conversation to end would mean work was
+    // never offered for review until somebody closed it by hand.
+    await makeDriver().start(start)
+    await report('stop')
+    expect(measured).toEqual([start.sessionId])
+  })
+
+  it('measures before reporting the turn, not after', async () => {
+    const order: string[] = []
+    measureDiff = async () => void order.push('measured')
+    const driver = createPtyDriver({
+      publish: (event) => {
+        if (event.kind === 'turn_finished') order.push('turn')
+      },
+      now: () => 1_000,
+      control,
+      settingsDirectory: join(directory, 'settings'),
+      hookScriptPath: join(directory, 'hook.mjs'),
+      openTerminal: async () => ({ terminalSessionId: 'terminal-1', projectId: null }),
+      write: () => {},
+      closeTerminal: () => {},
+      measureDiff,
+    })
+    await driver.start(start)
+    await report('stop')
+    expect(order).toEqual(['measured', 'turn'])
   })
 })

@@ -45,6 +45,16 @@ export interface PtyDriverOptions {
   write: (terminalSessionId: string, data: string) => void
   /** Ends a terminal and whatever is running in it. */
   closeTerminal: (terminalSessionId: string) => void
+  /**
+   * Reads what the working copy has changed, so it is known before the session
+   * is recorded as over.
+   *
+   * Ordering is the whole point: reaching `ready` requires a non-empty diff,
+   * and a diff measured after the fact arrives too late to affect it. Without
+   * this, a session that changed plenty was still recorded as having finished
+   * without changing anything.
+   */
+  measureDiff?: (sessionId: string) => Promise<void>
 }
 
 interface RunningSession {
@@ -105,25 +115,39 @@ export function createPtyDriver(options: PtyDriverOptions): SessionDriver {
           return result
         },
         onEvent: (kind) => {
-          if (kind === 'stop') {
-            // The agent finished responding and is waiting. Not an ending: it
-            // will keep going the moment anything is typed at it.
-            //
-            // Cost and context window are left unreported rather than guessed.
-            // They came from the runtime's own result message, which a terminal
-            // does not produce and the transcript does not carry.
-            publish({
-              kind: 'turn_finished',
-              sessionId,
-              turns: countTurns(transcriptPath),
-              costUsd: 0,
-              contextPct: null,
-              at: now(),
-            })
-            return
-          }
-          publish({ kind: 'session_ended', sessionId, outcome: 'success', at: now() })
-          endRun(sessionId)
+          // The diff is read before either report, because both of them are
+          // decisions the state machine makes by looking at it — and after the
+          // fact is too late to affect the outcome.
+          void (async () => {
+            try {
+              await options.measureDiff?.(sessionId)
+            } catch {
+              // A working copy that has already gone, or a git that failed.
+              // Reported as no change, which is what it was already.
+            }
+
+            if (kind === 'stop') {
+              // The agent stopped responding and is waiting. Not an ending:
+              // running in a terminal it sits at its prompt rather than
+              // exiting, and anything typed at it carries on the same session.
+              //
+              // Cost and context window are left unreported rather than
+              // guessed. They came from the runtime's own result message, which
+              // a terminal does not produce and the transcript does not carry.
+              publish({
+                kind: 'turn_finished',
+                sessionId,
+                turns: countTurns(transcriptPath),
+                costUsd: 0,
+                contextPct: null,
+                at: now(),
+              })
+              return
+            }
+
+            publish({ kind: 'session_ended', sessionId, outcome: 'success', at: now() })
+            endRun(sessionId)
+          })()
         },
       })
 
