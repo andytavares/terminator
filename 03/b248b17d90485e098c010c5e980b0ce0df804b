@@ -1,0 +1,40 @@
+SUPERVISION.md
+  s_5f98598a6d950e::t_fb179966965c29 443-448
+tests/unit/git/git-service.spec.ts
+  s_5f98598a6d950e::t_4d833e3522c18f 47,351-376
+  s_5f98598a6d950e::t_e37899e5e5315e 377
+src/renderer/components/supervision/WorktreeReclaim.tsx
+  s_5f98598a6d950e::t_fb179966965c29 104-107
+src/main/supervision/worktree/provisioner.ts
+  s_5f98598a6d950e::t_5e8425e5b90b30 44-50,133-134,155-168
+tests/unit/main/supervision/service-wiring.spec.ts
+  s_5f98598a6d950e::t_7bdf35e2549266 910,916,919,1154-1197
+  s_5f98598a6d950e::t_8feb3822a4c04e 1198
+src/renderer/components/supervision/SessionList.tsx
+  s_5f98598a6d950e::t_fb179966965c29 19,232-233
+src/main/supervision/supervision-service.ts
+  s_5f98598a6d950e::t_9e21a809c61c07 713-715,789-791
+tests/unit/main/supervision/worktree/provisioner.spec.ts
+  s_5f98598a6d950e::t_71d834390bc088 33,170-219,222
+  s_5f98598a6d950e::t_9cfed9a27b9bdc 220-221,223-224
+src/main/git/git-service.ts
+  s_5f98598a6d950e::t_5e8425e5b90b30 170-182
+src/main/index.ts
+  s_5f98598a6d950e::t_9e21a809c61c07 30,371-372
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "03b248b17d90485e098c010c5e980b0ce0df804b",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
