@@ -312,3 +312,56 @@ describe('a stalled session offers something to do about it (FR-029)', () => {
     expect(screen.queryByText(/Discard session and worktree/)).toBeNull()
   })
 })
+
+describe('starting a queued ticket (FR-069)', () => {
+  const ticket = {
+    id: 'TAV-14',
+    source: 'linear' as const,
+    sourceUrl: 'https://linear.app/t/TAV-14',
+    title: 'Make all text in the application red',
+    createdAt: 1_000,
+  }
+
+  function startIt() {
+    render(<SupervisionScreen {...props({ queuedIntake: [ticket] })} />)
+    fireEvent.click(screen.getByText('Work items'))
+    fireEvent.click(screen.getByText('Start'))
+  }
+
+  it('takes the operator to the start panel, not a board that quietly changed', () => {
+    startIt()
+    expect(screen.getByText('Start an agent')).toBeDefined()
+  })
+
+  it('fills in what the ticket said, so nothing is retyped', () => {
+    startIt()
+    expect((screen.getByLabelText('Instruction') as HTMLTextAreaElement).value).toContain(
+      'Make all text in the application red'
+    )
+  })
+
+  it('carries the ticket identifier into the instruction, so the record says where it came from', () => {
+    startIt()
+    expect((screen.getByLabelText('Instruction') as HTMLTextAreaElement).value).toContain('TAV-14')
+  })
+
+  it('carries the link too', () => {
+    startIt()
+    expect((screen.getByLabelText('Instruction') as HTMLTextAreaElement).value).toContain(
+      'https://linear.app/t/TAV-14'
+    )
+  })
+
+  it('suggests a branch named for the ticket, so everything downstream says which one it is', () => {
+    startIt()
+    expect((screen.getByLabelText('New branch name') as HTMLInputElement).value).toBe('feat/tav-14')
+  })
+
+  it('starts nothing on its own — the repository is still the operator’s to choose', () => {
+    const onAssign = vi.fn()
+    render(<SupervisionScreen {...props({ queuedIntake: [ticket], onAssign })} />)
+    fireEvent.click(screen.getByText('Work items'))
+    fireEvent.click(screen.getByText('Start'))
+    expect(onAssign).not.toHaveBeenCalled()
+  })
+})

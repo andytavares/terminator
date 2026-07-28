@@ -1,8 +1,9 @@
 import { randomUUID } from 'crypto'
 import { basename } from 'path'
+import { realpathSync } from 'fs'
 import type { BrowserWindow } from 'electron'
 import type { PtyManager } from '../terminal/pty-manager.js'
-import { createProject, listProjects } from '../storage/workspace-store.js'
+import { createProject, listProjects, listWorkspaces } from '../storage/workspace-store.js'
 import type { LaunchSpec } from './agent-runtime/claude-launch.js'
 import type { OpenedTerminal, TerminalPlacement } from './agent-runtime/driver-contract.js'
 
@@ -26,6 +27,45 @@ export interface AgentTerminalOptions {
   scrollbackLimit: () => number
 }
 
+/**
+ * The workspace a repository belongs to.
+ *
+ * The renderer passes the one the operator is looking at, but "looking at" is
+ * not always a thing that has been decided — nothing has to be selected for a
+ * session to be started, and when nothing was, every agent's terminal landed
+ * in Scratch instead of beside the work. The repository is not ambiguous, so
+ * it answers the question when the selection cannot.
+ */
+function workspaceOwning(repoPath: string | undefined): string | null {
+  if (repoPath === undefined || repoPath === '') return null
+  const workspaces = listWorkspaces()
+
+  const byFolder = workspaces.find((workspace) => samePath(workspace.folderPath, repoPath))
+  if (byFolder !== undefined) return byFolder.id
+
+  // Or a workspace one of whose projects already checks this repository out.
+  for (const workspace of workspaces) {
+    const owns = listProjects(workspace.id).some(
+      (project) => project.worktreePath !== undefined && samePath(project.worktreePath, repoPath)
+    )
+    if (owns) return workspace.id
+  }
+  return null
+}
+
+/** `/private/var` and `/var` are the same place on macOS; so are trailing slashes. */
+function samePath(a: string, b: string): boolean {
+  const normalise = (path: string): string => {
+    const trimmed = path.replace(/\/+$/, '')
+    try {
+      return realpathSync(trimmed)
+    } catch {
+      return trimmed
+    }
+  }
+  return normalise(a) === normalise(b)
+}
+
 /** The tab title: the branch, which is what the operator called the work. */
 function titleFor(placement: TerminalPlacement | undefined, spec: LaunchSpec): string {
   return placement?.branch ?? basename(spec.cwd)
@@ -38,19 +78,22 @@ function titleFor(placement: TerminalPlacement | undefined, spec: LaunchSpec): s
  * branch should land in the project you were already looking at, not beside it
  * in a second one with the same name.
  */
-function projectFor(placement: TerminalPlacement | undefined, spec: LaunchSpec): string | null {
-  const workspaceId = placement?.workspaceId
+function projectFor(
+  placement: TerminalPlacement | undefined,
+  spec: LaunchSpec
+): { projectId: string | null; workspaceId: string | null } {
+  const workspaceId = placement?.workspaceId ?? workspaceOwning(placement?.repoPath)
   if (workspaceId == null) {
-    // No workspace was named. The terminal is still opened — an agent you can
+    // Nothing to file it under. The terminal is still opened — an agent you can
     // see in an unfiled tab beats an agent you cannot see at all.
-    return null
+    return { projectId: null, workspaceId: null }
   }
 
   const name = titleFor(placement, spec)
   const existing = listProjects(workspaceId).find(
     (project) => project.worktreePath === spec.cwd || project.name === name
   )
-  if (existing !== undefined) return existing.id
+  if (existing !== undefined) return { projectId: existing.id, workspaceId }
 
   const created = createProject({
     workspaceId,
@@ -59,7 +102,7 @@ function projectFor(placement: TerminalPlacement | undefined, spec: LaunchSpec):
     worktreePath: spec.cwd,
     isWorktree: true,
   })
-  return 'project' in created ? created.project.id : null
+  return { projectId: 'project' in created ? created.project.id : null, workspaceId }
 }
 
 export function createAgentTerminal(options: AgentTerminalOptions) {
@@ -71,7 +114,7 @@ export function createAgentTerminal(options: AgentTerminalOptions) {
      * it, so it appears as an ordinary tab the operator can click into.
      */
     async open(spec: LaunchSpec, placement?: TerminalPlacement): Promise<OpenedTerminal | null> {
-      const projectId = projectFor(placement, spec)
+      const { projectId, workspaceId } = projectFor(placement, spec)
       const terminalSessionId = randomUUID()
       const tabTitle = titleFor(placement, spec)
 
@@ -118,7 +161,9 @@ export function createAgentTerminal(options: AgentTerminalOptions) {
           sessionId: spec.sessionId,
           terminalSessionId,
           projectId,
-          workspaceId: placement?.workspaceId ?? null,
+          // The workspace it actually went into, which is not always the one
+          // we were handed: the sidebar has to reload the right one to show it.
+          workspaceId,
           tabTitle,
           cwd: spec.cwd,
           scrollbackLimit: options.scrollbackLimit(),

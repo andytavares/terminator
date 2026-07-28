@@ -110,6 +110,39 @@ test('starting a session opens a project and a terminal running claude', async (
   })
 })
 
+test('a session started with no workspace selected still lands beside the work', async () => {
+  // What actually happened in use: nothing has to be selected for a session to
+  // be started, and when nothing was, the agent's terminal went to Scratch
+  // instead of into the workspace holding the repository. The repository is not
+  // ambiguous, so it answers the question the selection could not.
+  const { page } = handle
+
+  const started = await page.evaluate(async (repoPath: string) => {
+    const api = (window as unknown as { electronAPI: any }).electronAPI
+    return api.supervision.assign({
+      repoPath,
+      branch: 'feat/e2e-unselected',
+      autonomyLevel: 'read',
+      instruction: 'Say the word banana and nothing else.',
+      workspaceId: null,
+    })
+  }, repo)
+  expect(started?.reason ?? 'ok').toBe('ok')
+
+  const filed = await page.evaluate(async () => {
+    const api = (window as unknown as { electronAPI: any }).electronAPI
+    const workspaces = await api.workspace.list()
+    const projects = await api.project.list(workspaces.workspaces[0].id)
+    return projects.projects.some((p: { name: string }) => p.name === 'feat/e2e-unselected')
+  })
+  expect(filed).toBe(true)
+
+  await expandWorkspace(page, 'Agents')
+  await expect(page.locator('.project-row__name', { hasText: 'feat/e2e-unselected' })).toBeVisible({
+    timeout: 30_000,
+  })
+})
+
 // Opt-in, because it drives a real model. It needs working credentials, and
 // whether an agent reaches for Write at all — or reaches for it within any
 // particular number of seconds — is the model's decision, not something a

@@ -15,7 +15,10 @@ const projects: Array<{
   isWorktree: boolean
 }> = []
 
+const workspaces: Array<{ id: string; folderPath: string }> = []
+
 vi.mock('../../../../src/main/storage/workspace-store.js', () => ({
+  listWorkspaces: () => workspaces,
   listProjects: (workspaceId: string) => projects.filter((p) => p.workspaceId === workspaceId),
   createProject: (input: {
     workspaceId: string
@@ -104,6 +107,7 @@ const placement: TerminalPlacement = {
 }
 
 beforeEach(() => {
+  workspaces.length = 0
   projects.length = 0
   spawned = []
   killed = []
@@ -183,7 +187,38 @@ describe('opening a terminal for a session', () => {
   })
 })
 
-describe('when there is no workspace to file it under', () => {
+describe('when the operator had no workspace selected', () => {
+  // Nothing has to be selected for a session to be started, and when nothing
+  // was, every agent's terminal landed in Scratch instead of beside the work.
+  it('files it under the workspace that owns the repository', async () => {
+    workspaces.push({ id: 'workspace-1', folderPath: '/repos/fluent' })
+    const opened = await build().open(spec, { ...placement, workspaceId: null })
+    expect(opened?.projectId).toBe('project-1')
+    expect(projects[0].workspaceId).toBe('workspace-1')
+  })
+
+  it('finds it through a project already checking that repository out', async () => {
+    workspaces.push({ id: 'workspace-2', folderPath: '/somewhere/else' })
+    projects.push({
+      id: 'existing',
+      workspaceId: 'workspace-2',
+      name: 'main',
+      worktreePath: '/repos/fluent',
+      isWorktree: false,
+    })
+    const opened = await build().open(spec, { ...placement, workspaceId: null })
+    expect(projects.find((p) => p.id === opened?.projectId)?.workspaceId).toBe('workspace-2')
+  })
+
+  it('prefers the workspace it was told over the one it can infer', async () => {
+    workspaces.push({ id: 'inferred', folderPath: '/repos/fluent' })
+    workspaces.push({ id: 'workspace-1', folderPath: '/elsewhere' })
+    await build().open(spec, placement)
+    expect(projects[0].workspaceId).toBe('workspace-1')
+  })
+})
+
+describe('when there is no workspace to file it under at all', () => {
   it('still opens the terminal — an unfiled agent beats an invisible one', async () => {
     const opened = await build().open(spec, { ...placement, workspaceId: null })
     expect(opened?.terminalSessionId).toEqual(expect.any(String))
@@ -285,5 +320,21 @@ describe('relaying what the terminal does', () => {
     build().close('terminal-1')
     expect(killed).toEqual(['terminal-1'])
     expect(sent).toEqual([])
+  })
+})
+
+describe('telling the renderer which workspace to reload', () => {
+  it('names the workspace it actually filed the project under', async () => {
+    // Not the one it was handed: when that was null and the repository decided
+    // it, the sidebar has to reload the workspace it really went into or the
+    // project never appears.
+    workspaces.push({ id: 'workspace-1', folderPath: '/repos/fluent' })
+    await build().open(spec, { ...placement, workspaceId: null })
+    expect(openedEvent()?.payload.workspaceId).toBe('workspace-1')
+  })
+
+  it('names no workspace when there was none to file it under', async () => {
+    await build().open(spec, { ...placement, workspaceId: null })
+    expect(openedEvent()?.payload.workspaceId).toBeNull()
   })
 })

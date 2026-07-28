@@ -281,6 +281,19 @@ export interface AssignPanelProps {
   /** The last attempt's outcome, so a refusal is never silent. */
   lastResult: { ok: boolean; reason?: string; worktreePath?: string } | null
   busy: boolean
+  /**
+   * A ticket the operator chose to start, with its instruction and a branch
+   * name suggested from its identifier. Filled in rather than started: which
+   * repository, and whether the branch is new, are still theirs to say.
+   */
+  prefill: AssignPrefill | null
+}
+
+export interface AssignPrefill {
+  /** Changes whenever a new ticket is chosen, including the same one twice. */
+  readonly token: number
+  readonly branch: string
+  readonly instruction: string
 }
 
 /**
@@ -303,11 +316,23 @@ export function AssignPanel({
   onAssign,
   lastResult,
   busy,
+  prefill,
 }: AssignPanelProps): JSX.Element {
   const [repoPath, setRepoPath] = React.useState(repos[0]?.path ?? '')
   const [mode, setMode] = React.useState<'new' | 'existing'>('new')
   const [branch, setBranch] = React.useState('')
   const [instruction, setInstruction] = React.useState('')
+
+  // Keyed on the token rather than the contents, so choosing the same ticket
+  // again refills fields the operator has since edited — which is what asking
+  // for it a second time means.
+  React.useEffect(() => {
+    if (prefill === null) return
+    setBranch(prefill.branch)
+    setMode('new')
+    setInstruction(prefill.instruction)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.token])
 
   // Follow the sidebar: if the panel opens before the workspaces have loaded,
   // or the operator removes the one that was selected, land on a real one.

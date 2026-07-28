@@ -572,6 +572,7 @@ describe('LaneView (FR-087 – FR-089)', () => {
 const boardActions = {
   queued: [],
   onRemoveQueued: () => {},
+  onStartQueued: () => {},
   onApproveGate: () => {},
   onRejectGate: () => {},
   onSendBack: () => {},
@@ -1625,5 +1626,60 @@ describe('seeing what the agent is actually about to run (FR-007)', () => {
     queue()
     const detail = document.querySelector('.sv-queue__detail')?.textContent ?? ''
     expect(detail).not.toContain('…')
+  })
+})
+
+describe('acting on a queued ticket (FR-069)', () => {
+  const ticket = {
+    id: 'TAV-14',
+    source: 'linear' as const,
+    sourceUrl: 'https://linear.app/t/TAV-14',
+    title: 'Make all text in the application red',
+    createdAt: 1_000,
+  }
+
+  const board = (overrides: Record<string, unknown> = {}) =>
+    render(
+      <WorkItemBoard
+        {...boardActions}
+        queued={[ticket]}
+        items={[]}
+        unreadable={[]}
+        conflicts={[]}
+        canAct
+        onOpen={() => {}}
+        {...overrides}
+      />
+    )
+
+  it('offers a way to start it — a queue you cannot act on is a list', () => {
+    board()
+    expect(screen.getByText('Start')).toBeDefined()
+  })
+
+  it('hands the whole ticket over, not just its id', () => {
+    const onStartQueued = vi.fn()
+    board({ onStartQueued })
+    fireEvent.click(screen.getByText('Start'))
+    expect(onStartQueued).toHaveBeenCalledWith(ticket)
+  })
+
+  it('still offers the ticket itself, for reading what it actually says', () => {
+    board()
+    expect(screen.getByText('Open').closest('a')?.getAttribute('href')).toBe(ticket.sourceUrl)
+  })
+
+  it('offers no link for a ticket that came from a dropped file', () => {
+    board({ queued: [{ ...ticket, sourceUrl: null }] })
+    expect(screen.queryByText('Open')).toBeNull()
+    // Startable regardless: where it came from is not what makes it work.
+    expect(screen.getByText('Start')).toBeDefined()
+  })
+
+  it('still offers to drop it', () => {
+    const onRemoveQueued = vi.fn()
+    board({ onRemoveQueued })
+    fireEvent.click(screen.getByText('Remove'))
+    expect(onRemoveQueued).toHaveBeenCalledWith('TAV-14')
   })
 })

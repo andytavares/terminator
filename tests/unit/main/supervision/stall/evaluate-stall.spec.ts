@@ -14,6 +14,7 @@ function facts(over: Partial<SessionFacts> = {}): SessionFacts {
   return {
     sessionId: 's1',
     runtimeState: 'working',
+    stateSince: 0,
     lastToolActivityAt: 0,
     lastNetChangeAt: 0,
     openShellStartedAt: null,
@@ -48,6 +49,32 @@ describe('silence signal (FR-012)', () => {
   it('treats a session that has never recorded activity as silent from its start', () => {
     const firing = evaluateStall(facts({ lastToolActivityAt: null }), DEFAULT_THRESHOLDS, 9 * MIN)
     expect(firing?.signal).toBe('silence')
+  })
+
+  it('measures that silence from when it started, not from the epoch', () => {
+    // Falling back to zero measured from 1970: a session that had not yet made
+    // its first tool call reported fifty-six years of silence and stalled the
+    // instant it started, every time.
+    const firing = evaluateStall(
+      facts({ stateSince: 8 * MIN, lastToolActivityAt: null }),
+      DEFAULT_THRESHOLDS,
+      18 * MIN
+    )
+    expect(firing?.inputs.toolSilenceMs).toBe(10 * MIN)
+  })
+
+  it('gives a session that has just started time to make its first tool call', () => {
+    const justStarted = facts({ stateSince: 100 * MIN, lastToolActivityAt: null })
+    expect(evaluateStall(justStarted, DEFAULT_THRESHOLDS, 100 * MIN + 30_000)).toBeNull()
+  })
+
+  it('measures a session that has changed nothing from its start too', () => {
+    const firing = evaluateStall(
+      facts({ stateSince: 8 * MIN, lastNetChangeAt: null }),
+      DEFAULT_THRESHOLDS,
+      18 * MIN
+    )
+    expect(firing?.inputs.diffSilenceMs).toBe(10 * MIN)
   })
 })
 

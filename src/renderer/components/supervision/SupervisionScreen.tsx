@@ -28,6 +28,7 @@ import {
   ProvisioningStatus,
   AssignPanel,
   IntakePanel,
+  type AssignPrefill,
   type RepoChoice,
 } from './AssignControls.js'
 import type { AttentionItem } from '../../../shared/supervision/rank-attention.js'
@@ -204,6 +205,29 @@ const RUNNING_STATES: ReadonlySet<string> = new Set([
   'stalled',
 ])
 
+/**
+ * A branch name from the ticket's identifier — `feat/tav-14` — because that is
+ * what makes the branch, the worktree, the project and the tab all say which
+ * ticket they are, and because typing it by hand is how they stop matching.
+ */
+function branchNameFor(ticket: QueuedIntakeView): string {
+  const slug = ticket.id
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return slug === '' ? '' : `feat/${slug}`
+}
+
+/**
+ * What the agent is told. The ticket's own words, with its identifier and its
+ * link, so the session's record says where the work came from.
+ */
+function instructionFor(ticket: QueuedIntakeView): string {
+  const lines = [`${ticket.id}: ${ticket.title}`]
+  if (ticket.sourceUrl !== null) lines.push(ticket.sourceUrl)
+  return lines.join('\n')
+}
+
 const TABS: Array<{ id: SupervisionTab; label: string; icon: JSX.Element }> = [
   { id: 'attention', label: 'Needs you', icon: <Inbox aria-hidden="true" /> },
   { id: 'sessions', label: 'Sessions', icon: <Activity aria-hidden="true" /> },
@@ -218,6 +242,9 @@ const TABS: Array<{ id: SupervisionTab; label: string; icon: JSX.Element }> = [
 
 export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
   const [tab, setTab] = useState<SupervisionTab>('attention')
+  // What a queued ticket, once started, hands to the start panel. Held here
+  // because the two live on different tabs.
+  const [prefill, setPrefill] = useState<AssignPrefill | null>(null)
   const [query, setQuery] = useState('')
 
   const counts: Partial<Record<SupervisionTab, number>> = {
@@ -293,6 +320,7 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
               onAssign={props.onAssign}
               lastResult={props.assignResult}
               busy={props.assigning}
+              prefill={prefill}
             />
             {props.provisioning !== null && (
               <ProvisioningStatus
@@ -349,6 +377,17 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
             <WorkItemBoard
               queued={props.queuedIntake}
               onRemoveQueued={props.onRemoveIntake}
+              onStartQueued={(ticket) => {
+                setPrefill({
+                  token: props.now,
+                  branch: branchNameFor(ticket),
+                  instruction: instructionFor(ticket),
+                })
+                // The start panel is on Needs you, so go there — leaving the
+                // operator on a board whose fields have quietly changed
+                // elsewhere is not an action, it is a puzzle.
+                setTab('attention')
+              }}
               items={props.workItems}
               unreadable={props.unreadable}
               conflicts={props.conflicts}

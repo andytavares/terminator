@@ -36,6 +36,7 @@ function toFacts(session: SupervisedSession, now: number): SessionFacts {
   return {
     sessionId: session.id,
     runtimeState: session.runtimeState,
+    stateSince: session.stateSince,
     lastToolActivityAt: session.lastToolActivityAt,
     lastNetChangeAt: session.lastNetChangeAt,
     // The registry tracks only whether a shell call is open, not when it began.

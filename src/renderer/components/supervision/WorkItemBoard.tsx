@@ -11,6 +11,7 @@ import {
   ThumbsUp,
   Undo2,
   ChevronRight,
+  Play,
 } from 'lucide-react'
 import type { WorkItemView as WorkItemContract } from '../../../shared/supervision/view-types.js'
 import { gateIsReviewable } from '../../../shared/supervision/gate-reviewable.js'
@@ -49,6 +50,15 @@ export interface WorkItemBoardProps {
   /** Tickets queued but not yet planned by any producer. */
   queued: readonly QueuedIntakeView[]
   onRemoveQueued(id: string): void
+  /**
+   * Takes the ticket to the start panel with what it says already filled in.
+   *
+   * Not a start in itself: the repository and the branch are still the
+   * operator's to choose, and auto-starting on intake is what produces the
+   * backlog nobody can review (FR-069). But a queued ticket with no way to act
+   * on it is a list, not a queue.
+   */
+  onStartQueued(ticket: QueuedIntakeView): void
   items: readonly BoardItem[]
   unreadable: ReadonlyArray<{ filePath: string; reason: string }>
   conflicts: ReadonlyArray<{ workItemId: string; producers: string[] }>
@@ -193,6 +203,7 @@ function GateChips({ item }: { item: WorkItemContract }): JSX.Element {
 export function WorkItemBoard({
   queued,
   onRemoveQueued,
+  onStartQueued,
   items,
   unreadable,
   conflicts,
@@ -266,6 +277,12 @@ export function WorkItemBoard({
                     the backlog nobody can review (FR-069). */}
               </span>
               <span className="sv-queue__actions">
+                <button
+                  className="sv-queue__btn sv-btn--primary"
+                  onClick={() => onStartQueued(ticket)}
+                >
+                  <Play aria-hidden="true" /> Start
+                </button>
                 {ticket.sourceUrl !== null && (
                   <a
                     className="sv-queue__btn"

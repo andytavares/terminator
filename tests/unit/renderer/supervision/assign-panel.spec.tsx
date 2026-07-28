@@ -27,6 +27,7 @@ describe('AssignPanel', () => {
         onAssign={() => {}}
         lastResult={null}
         busy={false}
+        prefill={null}
         {...over}
       />
     )
@@ -266,5 +267,62 @@ describe('IntakePanel (FR-068)', () => {
     fireEvent.change(input, { target: { value: 'https://linear.app/x' } })
     fireEvent.click(screen.getByText('Queue it'))
     expect(input.value).toBe('')
+  })
+})
+
+describe('starting from a queued ticket', () => {
+  const panel = (over: Record<string, unknown> = {}) =>
+    render(
+      <AssignPanel
+        autonomy="edit"
+        workItemId={null}
+        laneOrd={null}
+        repos={[{ path: '/Users/you/repos/fluent', label: 'fluent' }]}
+        branches={['main']}
+        currentBranch="main"
+        onRepoChange={() => {}}
+        onAssign={() => {}}
+        lastResult={null}
+        busy={false}
+        prefill={null}
+        {...over}
+      />
+    )
+
+  // Start on a ticket does not start anything by itself — auto-starting on
+  // intake is what produces the backlog nobody can review. It fills the panel
+  // in and leaves the repository and the branch to the operator.
+  const prefill = {
+    token: 1,
+    branch: 'feat/tav-14',
+    instruction: 'TAV-14: Make all text in the application red\nhttps://linear.app/t/TAV-14',
+  }
+
+  it('fills in what the ticket said', () => {
+    panel({ prefill })
+    expect((screen.getByLabelText('What should it do?') as HTMLTextAreaElement).value).toContain(
+      'Make all text in the application red'
+    )
+  })
+
+  it('suggests a branch named for the ticket, so everything says which one it is', () => {
+    panel({ prefill })
+    expect((screen.getByLabelText('New branch name') as HTMLInputElement).value).toBe('feat/tav-14')
+  })
+
+  it('leaves it on a new branch, which is what a ticket nobody has started needs', () => {
+    panel({ prefill })
+    expect((screen.getByLabelText('New branch name') as HTMLInputElement).value).not.toBe('')
+  })
+
+  it('starts nothing on its own', () => {
+    const onAssign = vi.fn()
+    panel({ prefill, onAssign })
+    expect(onAssign).not.toHaveBeenCalled()
+  })
+
+  it('leaves the panel alone when no ticket was chosen', () => {
+    panel({ prefill: null })
+    expect((screen.getByLabelText('New branch name') as HTMLInputElement).value).toBe('')
   })
 })

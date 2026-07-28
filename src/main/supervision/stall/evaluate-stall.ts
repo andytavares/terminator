@@ -23,6 +23,17 @@ export const DEFAULT_THRESHOLDS: StallThresholds = {
 export interface SessionFacts {
   readonly sessionId: string
   readonly runtimeState: RuntimeState
+  /**
+   * When this session entered the state it is in. Silence is measured from
+   * here when there is nothing else to measure from.
+   *
+   * Falling back to zero instead measured from 1970, so a session that had not
+   * yet made its first tool call was reported as silent for fifty-six years
+   * and stalled the instant it started — every time. A detector that fires on
+   * every session before it has done anything is one you turn off, and then
+   * the real stalls go unreported too.
+   */
+  readonly stateSince: number
   readonly lastToolActivityAt: number | null
   readonly lastNetChangeAt: number | null
   /** When the in-flight shell command started, or null if none is running. */
@@ -65,8 +76,10 @@ export function evaluateStall(
   if (!CAN_STALL.has(facts.runtimeState)) return null
 
   const shellInFlight = facts.openShellStartedAt !== null
-  const toolSilenceMs = now - (facts.lastToolActivityAt ?? 0)
-  const diffSilenceMs = now - (facts.lastNetChangeAt ?? 0)
+  // An agent that has never called a tool has been quiet since it started, and
+  // one that has never changed a line has changed nothing since it started.
+  const toolSilenceMs = now - (facts.lastToolActivityAt ?? facts.stateSince)
+  const diffSilenceMs = now - (facts.lastNetChangeAt ?? facts.stateSince)
   const distinctFiles = new Set(facts.recentToolPaths).size
 
   const inputs = {
