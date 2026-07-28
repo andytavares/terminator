@@ -1,0 +1,94 @@
+src/main/supervision/workitems/intake-queue.ts
+  s_5f98598a6d950e::t_f9a68b37fbdb21 1-72
+src/renderer/hooks/useSupervision.ts
+  s_5f98598a6d950e::t_5af462e5c0f74c 10,105-107,260,318-319,353,639-642,646-660,665-671,681-684
+  s_5f98598a6d950e::t_3dd14b66529dc0 643-645,661-664
+src/renderer/components/supervision/SupervisionScreen.tsx
+  s_5f98598a6d950e::t_3dd14b66529dc0 15,166-170,222,339-344
+  s_5f98598a6d950e::t_b220837253f467 346-347
+src/renderer/stores/settings.store.ts
+  s_5f98598a6d950e::t_258c4bfa2f7238 22,43,141-143
+  s_5f98598a6d950e::t_af08504b34b69a 144-147
+src/shared/electron-api/manifest.ts
+  s_5f98598a6d950e::t_258c4bfa2f7238 614-631
+src/main/supervision/stall/firing-log.ts
+  s_5f98598a6d950e::t_40e7823bc06d6a 65,67-68
+  s_5f98598a6d950e::t_382f98d2e920e3 114,118-123
+  s_5f98598a6d950e::t_d1efe11440e574 124-125
+tests/unit/main/supervision/feed/feed-log.spec.ts
+  s_5f98598a6d950e::t_2361432359e63f 122,130,138,145,148,152,160
+  s_5f98598a6d950e::t_80083178c2c25b 115-121,123-129,131-137,139-144,146-147,149-151,153-159,161-165
+tests/unit/main/supervision/workitems/linear-client.spec.ts
+  s_5f98598a6d950e::t_5537e8a2c2ed30 1-113
+src/main/ipc/supervision.ipc.ts
+  s_5f98598a6d950e::t_258c4bfa2f7238 37-39,99-101,181,351-368
+  s_5f98598a6d950e::t_bb846524e68e92 369
+tests/unit/main/supervision/workitems/intake-queue.spec.ts
+  s_5f98598a6d950e::t_114abf7f477b53 1-30,32-85
+  s_5f98598a6d950e::t_8b4e7c5cbe008f 31
+tests/unit/main/supervision/stall/firing-log.spec.ts
+  s_5f98598a6d950e::t_ffcd9478d0bc05 75
+  s_5f98598a6d950e::t_70e47dc2545769 200,202-235
+  s_5f98598a6d950e::t_a4a6588c30feb0 65,84,199
+  s_5f98598a6d950e::t_888b96fef9df2a 201
+src/renderer/components/supervision/AssignControls.tsx
+  s_5f98598a6d950e::t_3dd14b66529dc0 187-189,197-202,233-240
+  s_5f98598a6d950e::t_4416cd0edaebc0 241
+src/renderer/components/settings/GlobalSettings.tsx
+  s_5f98598a6d950e::t_258c4bfa2f7238 41,165-177
+  s_5f98598a6d950e::t_6d435b7d477961 178-180
+tests/unit/renderer/stores/settings.store.spec.ts
+  s_5f98598a6d950e::t_4a7b494ee8bbf4 28
+src/renderer/components/supervision/supervision.css
+  s_5f98598a6d950e::t_11d555c072d77f 197-200
+src/main/supervision/supervision-service.ts
+  s_5f98598a6d950e::t_d8e534beadcc6b 22-29,102-103,149-159,243-248,312,598-614,616-631
+  s_5f98598a6d950e::t_99299351bbe7e1 722,733-735,743-746,751
+  s_5f98598a6d950e::t_40e7823bc06d6a 662-664,739-742
+  s_5f98598a6d950e::t_739413d10d19d5 736-738
+tests/unit/renderer/supervision/supervision-tab.spec.tsx
+  s_5f98598a6d950e::t_9c5805cca8aeb5 78-81
+tests/unit/renderer/supervision/surfaces.spec.tsx
+  s_5f98598a6d950e::t_9c5805cca8aeb5 515-516
+src/main/supervision/feed/feed-log.ts
+  s_5f98598a6d950e::t_d88fda948d39a2 43-51,53,56-72,86,90-92
+  s_5f98598a6d950e::t_70bb2aaea0b5e4 96-104
+  s_5f98598a6d950e::t_3c337a56f324d4 33-38
+src/shared/types/index.ts
+  s_5f98598a6d950e::t_258c4bfa2f7238 123-127
+src/main/index.ts
+  s_5f98598a6d950e::t_258c4bfa2f7238 502-505
+tests/unit/main/supervision/service-wiring.spec.ts
+  s_5f98598a6d950e::t_99299351bbe7e1 1044,1046-1047,1049-1050
+  s_5f98598a6d950e::t_87dbf288d474b8 775-777,779,781-789,979,994,996-997
+src/main/supervision/workitems/linear-client.ts
+  s_5f98598a6d950e::t_258c4bfa2f7238 18
+  s_5f98598a6d950e::t_6c2d8edb023359 1-17,19-139
+src/renderer/components/supervision/WorkItemBoard.tsx
+  s_5f98598a6d950e::t_3dd14b66529dc0 3-4,39-47,49-51,194-195,208,252-286
+  s_5f98598a6d950e::t_64a85f66a03764 287
+tests/unit/renderer/supervision/screen.spec.tsx
+  s_5f98598a6d950e::t_9c5805cca8aeb5 77-80
+src/shared/schemas/settings.schema.ts
+  s_5f98598a6d950e::t_258c4bfa2f7238 23-24,80
+SUPERVISION.md
+  s_5f98598a6d950e::t_9eb4b50b3a89d1 201-202,234-236,416-418
+docs/ARCHITECTURE.md
+  s_5f98598a6d950e::t_7399ab5dba9fb0 874-885
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "cb3ff1e6a48e1ecaa10897428c8f5d601db88b76",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
