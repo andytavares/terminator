@@ -155,6 +155,13 @@ export class TerminalInstance {
         this.hooks?.onIdle?.()
       }, IDLE_DEBOUNCE_MS)
     })
+
+    // Subscribed first, then attached: anything the process printed before this
+    // terminal existed on screen has been held back, and is delivered now. A
+    // terminal the operator opened themselves has nothing held and this is a
+    // no-op; one the application opened — a supervised agent — would otherwise
+    // be missing its launch command and everything up to the moment it appeared.
+    void window.electronAPI.terminal.attach(sessionId)
   }
 
   private registerLinkProviders(): void {

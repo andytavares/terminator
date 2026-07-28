@@ -91,6 +91,8 @@ interface SupervisionBridge {
     laneOrd?: number
     instruction?: string
     overrideBackpressure?: boolean
+    /** Where the session's project and terminal should be created. */
+    workspaceId?: string | null
   }): Promise<{
     ok: boolean
     reason?: string
@@ -148,6 +150,12 @@ export interface UseSupervisionOptions {
    */
   onAttachTerminal?: (session: SupervisedSession) => void
   /**
+   * The workspace the operator is looking at. A started session's project and
+   * terminal are created in it, so without this the agent's terminal would
+   * appear unfiled rather than beside the work.
+   */
+  activeWorkspaceId?: string | null
+  /**
    * The app shell's own reaction to a session being opened — focusing its tab,
    * for instance. Passed in rather than broadcast on a window event, so a
    * listener that does not exist is a compile error instead of silence.
@@ -158,7 +166,7 @@ export interface UseSupervisionOptions {
 }
 
 export function useSupervision(options: UseSupervisionOptions = {}): UseSupervision {
-  const { onOpenSessionInShell, onNavigate, onAttachTerminal } = options
+  const { onOpenSessionInShell, onNavigate, onAttachTerminal, activeWorkspaceId } = options
   const [now, setNow] = useState(() => Date.now())
   const [autonomy, setAutonomy] = useState<AutonomyLevel>('edit')
   const [muted, setMuted] = useState<string[]>([])
@@ -640,7 +648,7 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
       }
       setAssigning(true)
       void transport
-        .assign({ ...request, autonomyLevel: autonomy })
+        .assign({ ...request, autonomyLevel: autonomy, workspaceId: activeWorkspaceId ?? null })
         .then((result) => {
           setAssignResult(result)
           // A refusal by the review queue is shown as the refusal dialog, not

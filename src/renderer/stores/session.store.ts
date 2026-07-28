@@ -244,9 +244,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       sessions.set(sessionId, session)
       const view = viewOf(s.projectViews, projectId)
       const projectViews = new Map(s.projectViews)
-      if (view.order) {
-        projectViews.set(projectId, { ...view, order: [...view.order, sessionId] })
-      }
+      projectViews.set(projectId, {
+        ...view,
+        ...(view.order ? { order: [...view.order, sessionId] } : {}),
+        // Made active when the project has nothing showing. Without this the
+        // tab exists and no pane is ever mounted, so opening the project shows
+        // an empty project rather than the agent that is running in it.
+        activeSessionId: view.activeSessionId ?? sessionId,
+      })
       return { sessions, projectViews }
     })
   },

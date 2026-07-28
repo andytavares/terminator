@@ -12,6 +12,7 @@ import { useWorkspaceStore } from './stores/workspace.store'
 import { useSettingsStore } from './stores/settings.store'
 import { useSessionStore } from './stores/session.store'
 import { useTerminalSession } from './hooks/useTerminalSession'
+import { adoptTerminalSession } from './terminal/session-controller'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { installLogInterceptor, useLogStore } from './stores/log.store'
 import { useToastStore } from './stores/toast.store'
@@ -201,7 +202,7 @@ export function App(): JSX.Element {
       }
     ).electronAPI?.supervision
     return supervisionApi?.onTerminalOpened?.((opened) => {
-      useSessionStore.getState().adoptSession({
+      adoptTerminalSession({
         sessionId: opened.terminalSessionId,
         projectId: opened.projectId ?? SCRATCH_PROJECT_ID,
         tabTitle: opened.tabTitle,
@@ -216,7 +217,10 @@ export function App(): JSX.Element {
     })
   }, [])
 
-  const supervision = useSupervision({ onAttachTerminal: attachTerminal })
+  const supervision = useSupervision({
+    onAttachTerminal: attachTerminal,
+    activeWorkspaceId,
+  })
 
   const toggleSupervision = useCallback(() => {
     setActiveGlobalTab(activeGlobalTabId === 'core.supervision' ? null : 'core.supervision')

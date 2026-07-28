@@ -170,6 +170,12 @@ const assignPayload = z.object({
   overrideBackpressure: z.boolean().optional(),
   /** Absent means a new branch, which is what an agent normally wants. */
   isNewBranch: z.boolean().optional(),
+  /**
+   * The workspace the session's project and terminal should appear in. Passed
+   * by the renderer, which is the only part that knows which one the operator
+   * is looking at — guessing would open an agent's terminal somewhere else.
+   */
+  workspaceId: z.string().nullable().optional(),
 })
 // The action set is closed: an unknown action must be refused here rather than
 // forwarded to a producer that would have to guess what it means.

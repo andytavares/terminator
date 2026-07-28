@@ -86,6 +86,11 @@ export function createAgentTerminal(options: AgentTerminalOptions) {
           origin: 'app',
           projectId: projectId ?? undefined,
           tabTitle,
+          // The tab that will show this does not exist yet. Held until it does,
+          // or the launch command and the agent's first output are printed to
+          // nobody and the operator opens a terminal that looks like it never
+          // started.
+          holdOutput: true,
         })
       } catch {
         // A working copy that vanished between provisioning and starting, or a

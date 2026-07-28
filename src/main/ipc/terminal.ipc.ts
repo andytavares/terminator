@@ -76,6 +76,14 @@ export function registerTerminalHandlers(
       .map(({ sessionId, projectId, tabTitle, type }) => ({ sessionId, projectId, tabTitle, type }))
   })
 
+  handleChannel('terminal:attach', (_event, payload) => {
+    const parsed = z.object({ sessionId: z.string() }).safeParse(payload)
+    if (!parsed.success) return { released: false }
+    // A terminal is on screen and ready to be written to. Anything the process
+    // printed before now was held back rather than dropped.
+    return { released: ptyManager.releaseOutput(parsed.data.sessionId) }
+  })
+
   handleChannel('terminal:close', (_event, { sessionId }) => {
     ptyManager.kill(sessionId)
     return { success: true }

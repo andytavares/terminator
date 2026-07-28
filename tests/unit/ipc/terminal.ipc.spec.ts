@@ -57,6 +57,7 @@ function makeFakePtyManager() {
     }),
     listSessions: vi.fn(() => [...sessions.values()].map((s) => ({ ...s }))),
     kill: vi.fn((id: string) => sessions.delete(id)),
+    releaseOutput: vi.fn((id: string) => id === 'held'),
     write: vi.fn(),
     resize: vi.fn(),
     killAll: vi.fn(async () => sessions.clear()),
@@ -164,6 +165,31 @@ describe('registerTerminalHandlers', () => {
         tabTitle: 'Terminal 1',
         type: 'human',
       })
+    })
+  })
+
+  describe('terminal:attach', () => {
+    // Output a terminal produced before it was on screen is held rather than
+    // dropped; this is what says the tab is ready for it.
+    it('releases what was held for the session', () => {
+      const result = invokeHandler('terminal:attach')({}, { sessionId: 'held' }) as {
+        released: boolean
+      }
+      expect(ptyManager.releaseOutput).toHaveBeenCalledWith('held')
+      expect(result.released).toBe(true)
+    })
+
+    it('reports nothing released for a terminal that was never holding', () => {
+      const result = invokeHandler('terminal:attach')({}, { sessionId: 'ordinary' }) as {
+        released: boolean
+      }
+      expect(result.released).toBe(false)
+    })
+
+    it('refuses a payload naming no session rather than guessing one', () => {
+      const result = invokeHandler('terminal:attach')({}, {}) as { released: boolean }
+      expect(result.released).toBe(false)
+      expect(ptyManager.releaseOutput).not.toHaveBeenCalled()
     })
   })
 

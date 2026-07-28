@@ -736,7 +736,21 @@ describe('starting an agent', () => {
       repoPath: '/repos/fluent',
       branch: 'feat/x',
       autonomyLevel: 'build',
+      workspaceId: null,
     })
+  })
+
+  it('starts the session in the workspace the operator is looking at', async () => {
+    // Without this the agent's terminal appears unfiled rather than beside the
+    // work it is doing.
+    const { result } = renderHook(() => useSupervision({ activeWorkspaceId: 'workspace-1' }))
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      result.current.screenProps.onAssign({ repoPath: '/repos/fluent', branch: 'feat/x' })
+    })
+    expect(bridge.assign).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: 'workspace-1' })
+    )
   })
 
   it('reports where the session started', async () => {
