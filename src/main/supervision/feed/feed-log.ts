@@ -30,13 +30,45 @@ export interface FeedLog {
   list(): FeedEntry[]
   since(at: number): FeedEntry[]
   forSession(sessionId: string): FeedEntry[]
+  /**
+   * Drops everything said about a session. Discarding one, or reclaiming its
+   * working copy, leaves nothing to go back to — so its entries in the feed
+   * are noise about something that no longer exists.
+   */
+  forget(sessionId: string): void
   /** Whether an entry should raise a notification, or only appear in the feed (FR-029). */
   shouldNotify(entry: FeedEntry, mutes: readonly MuteRule[]): boolean
 }
 
+/** A tombstone: everything said about this session is gone. */
+interface ForgottenRow {
+  readonly forgotten: string
+}
+
+function isForgotten(row: FeedEntry | ForgottenRow): row is ForgottenRow {
+  return typeof (row as ForgottenRow).forgotten === 'string'
+}
+
 export function createFeedLog(path: string): FeedLog {
-  const log = createJsonlLog<FeedEntry>(path)
+  const log = createJsonlLog<FeedEntry | ForgottenRow>(path)
   let counter = 0
+
+  /** What survives: entries about sessions nothing has forgotten since. */
+  function live(): FeedEntry[] {
+    const entries: FeedEntry[] = []
+    for (const row of log.readAll()) {
+      if (isForgotten(row)) {
+        // A session can be forgotten and then, in principle, seen again — so
+        // this drops what came before rather than filtering the whole file.
+        for (let index = entries.length - 1; index >= 0; index--) {
+          if (entries[index].sessionId === row.forgotten) entries.splice(index, 1)
+        }
+        continue
+      }
+      entries.push(row)
+    }
+    return entries
+  }
 
   return {
     post(entry): FeedEntry {
@@ -51,15 +83,25 @@ export function createFeedLog(path: string): FeedLog {
     },
 
     list(): FeedEntry[] {
-      return log.readAll().sort((a, b) => a.at - b.at)
+      return live().sort((a, b) => a.at - b.at)
     },
 
     since(at: number): FeedEntry[] {
-      return log.readRange((entry) => entry.at >= at).sort((a, b) => a.at - b.at)
+      return live()
+        .filter((entry) => entry.at >= at)
+        .sort((a, b) => a.at - b.at)
     },
 
     forSession(sessionId: string): FeedEntry[] {
-      return log.readRange((entry) => entry.sessionId === sessionId).sort((a, b) => a.at - b.at)
+      return live()
+        .filter((entry) => entry.sessionId === sessionId)
+        .sort((a, b) => a.at - b.at)
+    },
+
+    forget(sessionId: string): void {
+      // Append-only, like every other record here: a tombstone rather than a
+      // rewrite, so a crash costs the last line and not the feed.
+      log.append({ forgotten: sessionId })
     },
 
     shouldNotify(entry: FeedEntry, mutes: readonly MuteRule[]): boolean {

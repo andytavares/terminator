@@ -20,6 +20,8 @@ export const GlobalSettingsSchema = z.object({
     .object({
       /** Command the worktree handoff runs. Empty means no editor configured. */
       externalEditor: z.string().default(''),
+      /** Personal API key used to pull your assigned issues. Read-only access. */
+      linearApiKey: z.string().default(''),
     })
     .prefault({}),
   extensions: z.record(z.string(), z.record(z.string(), z.unknown())),
@@ -75,7 +77,7 @@ export const DEFAULT_GLOBAL_SETTINGS = {
     promptForName: false,
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
-  supervision: { externalEditor: '' },
+  supervision: { externalEditor: '', linearApiKey: '' },
   extensions: {},
   ui: { hasSeenWelcome: false },
   notifications: {

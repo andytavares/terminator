@@ -184,6 +184,9 @@ export interface IntakeResultView {
 export interface IntakePanelProps {
   onIntake(input: { url?: string; filePath?: string }): void
   result: IntakeResultView | null
+  /** Pulls the issues assigned to you in Linear. */
+  onPullFromLinear(): void
+  pulling: boolean
 }
 
 /**
@@ -191,7 +194,12 @@ export interface IntakePanelProps {
  * nothing starts on its own. Auto-start on intake is what produces backlogs
  * nobody can review (FR-068).
  */
-export function IntakePanel({ onIntake, result }: IntakePanelProps): JSX.Element {
+export function IntakePanel({
+  onIntake,
+  result,
+  onPullFromLinear,
+  pulling,
+}: IntakePanelProps): JSX.Element {
   const [value, setValue] = React.useState('')
 
   const submit = (): void => {
@@ -221,6 +229,15 @@ export function IntakePanel({ onIntake, result }: IntakePanelProps): JSX.Element
           <button className="sv-queue__btn sv-btn--primary" onClick={submit}>
             Queue it
           </button>
+        </div>
+        <div className="sv-inline">
+          <button className="sv-queue__btn" disabled={pulling} onClick={onPullFromLinear}>
+            {pulling ? 'Pulling…' : 'Pull my Linear issues'}
+          </button>
+          <span className="sv-field__note">
+            Everything assigned to you that is not finished. Nothing starts — what arrives sits in
+            the queue until you start it.
+          </span>
         </div>
         {result !== null && (
           <div className={result.ok ? 'sv-result' : 'sv-warn'}>

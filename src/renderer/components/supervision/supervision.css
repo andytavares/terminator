@@ -194,6 +194,10 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  /* A label that wraps mid-phrase reads as two buttons, and an anchor styled
+     as a button must not keep its underline. */
+  white-space: nowrap;
+  text-decoration: none;
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 4px;

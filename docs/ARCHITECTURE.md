@@ -871,6 +871,18 @@ hook tells the app shell through options passed to `useSupervision`. An earlier
 cut broadcast `CustomEvent`s on `window` that nothing listened for — a listener
 that does not exist should be a compile error, not silence.
 
+### Intake is queued, not just parsed
+
+`intake.jsonl` holds tickets taken in but not planned. Intake used to return a
+stub that nothing kept, so the board never showed one and "it waits until you
+start it" was true of nothing. Append-only like the other records, with removal
+as a tombstone; a ticket taken in twice updates rather than duplicating, so
+pulling from Linear again is safe whenever.
+
+The Linear pull is read-only and one-directional: `viewer.assignedIssues`
+filtered to states that are neither completed nor cancelled, mapped to intake
+stubs. Nothing is written back, and nothing starts.
+
 ### Two session identifiers
 
 The console registers a session under an id it generates; the agent runtime has

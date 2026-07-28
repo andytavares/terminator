@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import {
+  ExternalLink,
+  X,
   FileText,
   Map,
   ListChecks,
@@ -34,7 +36,19 @@ export interface BoardItem {
   readonly producerId: string
 }
 
+/** A ticket taken in but not yet planned: it has no lanes and no artefacts. */
+export interface QueuedIntakeView {
+  readonly id: string
+  readonly source: 'linear' | 'github' | 'local'
+  readonly sourceUrl: string | null
+  readonly title: string
+  readonly createdAt: number
+}
+
 export interface WorkItemBoardProps {
+  /** Tickets queued but not yet planned by any producer. */
+  queued: readonly QueuedIntakeView[]
+  onRemoveQueued(id: string): void
   items: readonly BoardItem[]
   unreadable: ReadonlyArray<{ filePath: string; reason: string }>
   conflicts: ReadonlyArray<{ workItemId: string; producers: string[] }>
@@ -177,6 +191,8 @@ function GateChips({ item }: { item: WorkItemContract }): JSX.Element {
 }
 
 export function WorkItemBoard({
+  queued,
+  onRemoveQueued,
   items,
   unreadable,
   conflicts,
@@ -189,7 +205,7 @@ export function WorkItemBoard({
   actionError,
   onDismissActionError,
 }: WorkItemBoardProps): JSX.Element {
-  if (items.length === 0 && unreadable.length === 0) {
+  if (items.length === 0 && unreadable.length === 0 && queued.length === 0) {
     // No producer installed is not an error — sessions are still supervised as
     // ad-hoc work (FR-081).
     return (
@@ -232,6 +248,42 @@ export function WorkItemBoard({
           </span>
         </div>
       ))}
+
+      {queued.length > 0 && (
+        <section>
+          <div className="sv-panel__header">
+            <span>queued</span>
+            <span>{queued.length}</span>
+          </div>
+          {queued.map((ticket) => (
+            <div className="sv-row" key={ticket.id}>
+              <span className="sv-row__main">
+                <div className="sv-queue__title">{ticket.title}</div>
+                <div className="sv-queue__meta">
+                  {ticket.id} · {ticket.source} · not planned yet
+                </div>
+                {/* Nothing started. Auto-starting on intake is what produces
+                    the backlog nobody can review (FR-069). */}
+              </span>
+              <span className="sv-queue__actions">
+                {ticket.sourceUrl !== null && (
+                  <a
+                    className="sv-queue__btn"
+                    href={ticket.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <ExternalLink aria-hidden="true" /> Open
+                  </a>
+                )}
+                <button className="sv-queue__btn" onClick={() => onRemoveQueued(ticket.id)}>
+                  <X aria-hidden="true" /> Remove
+                </button>
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
 
       {PHASES.map((phase) => {
         const inPhase = items.filter((entry) => entry.item.phase === phase)

@@ -198,8 +198,8 @@ Three actions on every row:
   nothing and "wrong branch" tells you everything. The reason goes to the agent
   before the run closes, so its own transcript says why it stopped, and into
   the feed attributed to Terminator.
-- **Discard** — end it, remove the working copy, and take the session off the
-  console.
+- **Discard** — end it, remove the working copy, take the session off the
+  console, and clear its feed entries.
 
 Stop appears only while an agent is still spending time — starting, working,
 waiting on you, or stalled. There is nothing to stop in a session that has
@@ -231,9 +231,9 @@ run it in shadow for a week of your real work, judge the firings **Right** or
 **Wrong** as they appear, and watch the precision figure at the top of the tab.
 Turn shadow mode off when you believe it.
 
-The panel shows each firing's signal, the values that satisfied it, and your
-judgement — so a firing can be re-judged later rather than argued about from
-memory.
+The panel lists firings **still awaiting a judgement**. Calling one right or
+wrong answers it and takes it off the list; it goes on counting towards the
+precision figure above, which is what SC-002 is measured against.
 
 ### When something is stalled
 
@@ -413,8 +413,9 @@ The **Worktrees** tab lists what can go, and why:
   last closed, and it changed nothing. The agent process dies with the
   application, so nothing is using the copy.
 
-Reclaiming runs the repository's teardown script, removes the working copy, and
-frees its port range. **Reclaim all** does them one at a time, because each runs
+Reclaiming runs the repository's teardown script, removes the working copy,
+frees its port range, and clears that session's entries from the feed — with
+nothing left to go back to, the feed has nothing left to be about. **Reclaim all** does them one at a time, because each runs
 git against a repository and several at once is how you get lock errors.
 
 A working copy still in use is never listed, and neither is one holding changes

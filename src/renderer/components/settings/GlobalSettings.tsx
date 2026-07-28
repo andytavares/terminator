@@ -38,6 +38,7 @@ export function GlobalSettings(): JSX.Element {
     updateWorktreeBaseDir,
     updateBranchExcludePatterns,
     updateExternalEditor,
+    updateLinearApiKey,
     updateShowMetricsBar,
     updatePromptForName,
     updateNotificationDefaultTargets,
@@ -158,6 +159,22 @@ export function GlobalSettings(): JSX.Element {
           Run against a session&rsquo;s working copy by &ldquo;Open in editor&rdquo;. Handing off to
           an editor is a first-class action, not a gap — but with nothing set here the button can
           only tell you it is unconfigured.
+        </span>
+      </div>
+
+      <div className="settings-section__field">
+        <label className="settings-section__label">Linear API Key</label>
+        <input
+          type="password"
+          className="settings-section__input"
+          defaultValue={globalSettings.supervision?.linearApiKey ?? ''}
+          placeholder="lin_api_…"
+          onBlur={(e) => void updateLinearApiKey(e.target.value.trim())}
+        />
+        <span className="settings-section__hint">
+          A personal API key, used to pull the issues assigned to you into Work items. Read only —
+          the console never writes back to Linear. Stored in this app&rsquo;s settings file, not in
+          the system keychain.
         </span>
       </div>
 

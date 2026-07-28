@@ -512,6 +512,8 @@ describe('LaneView (FR-087 – FR-089)', () => {
 // Every action the board offers is a producer command; none of them is
 // optional, because the gate they satisfy is what makes implementation legal.
 const boardActions = {
+  queued: [],
+  onRemoveQueued: () => {},
   onApproveGate: () => {},
   onRejectGate: () => {},
   onSendBack: () => {},

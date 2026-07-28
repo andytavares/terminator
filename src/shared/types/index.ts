@@ -120,6 +120,11 @@ export interface GlobalSettings {
      * editor is configured, and the handoff says so rather than doing nothing.
      */
     externalEditor: string
+    /**
+     * Personal Linear API key, used to pull the issues assigned to you. Read
+     * only: the console never writes back to Linear.
+     */
+    linearApiKey: string
   }
   extensions: {
     [extensionId: string]: Record<string, unknown>

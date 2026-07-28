@@ -772,10 +772,21 @@ describe('interrupting and discarding a session', () => {
     expect(service.reviewQueue.count()).toBe(0)
   })
 
-  it('records the discard in the feed', async () => {
+  it('takes everything said about it out of the feed', async () => {
+    // A feed still discussing a session you discarded is noise about something
+    // that no longer exists.
     const { service } = running()
+    service.feed.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'did a thing' })
     await service.discardSession('s1')
-    expect(service.feed.forSession('s1').at(-1)?.summary).toMatch(/Discarded by the operator/)
+    expect(service.feed.forSession('s1')).toEqual([])
+  })
+
+  it('leaves other sessions’ entries alone', async () => {
+    const { service } = running()
+    service.feed.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'mine' })
+    service.feed.post({ at: 1_000, sessionId: 's2', author: 'agent', summary: 'theirs' })
+    await service.discardSession('s1')
+    expect(service.feed.forSession('s2')).toHaveLength(1)
   })
 
   it('refuses to discard a session it does not know', async () => {
@@ -965,7 +976,7 @@ describe('reclaiming a working copy', () => {
     })
   })
 
-  it('records the reclaim in the feed when there is a session it belonged to', async () => {
+  it('takes the session’s feed entries with the working copy', async () => {
     const wtRoot = join(root, 'worktrees')
     mkdirSync(join(wtRoot, 'done'), { recursive: true })
     const service = build({
@@ -980,8 +991,10 @@ describe('reclaiming a working copy', () => {
       at: 20_000,
     })
 
+    service.feed.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'did a thing' })
     await service.reclaimWorktree(join(wtRoot, 'done'))
-    expect(service.feed.forSession('s1').at(-1)?.summary).toMatch(/Working copy reclaimed/)
+    // Nothing left to go back to, so nothing left for the feed to be about.
+    expect(service.feed.forSession('s1')).toEqual([])
   })
 })
 
@@ -1028,9 +1041,13 @@ describe('discarding takes the session off the console', () => {
         },
       },
     })
+    service.feed.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'did a thing' })
     await service.discardSession('s1')
+    // The rest is cleared; a directory still on disk is the one thing worth
+    // keeping a line about.
     const said = service.feed.forSession('s1').map((entry) => entry.summary)
-    expect(said.some((summary) => summary.includes('worktree is locked'))).toBe(true)
+    expect(said).toHaveLength(1)
+    expect(said[0]).toContain('worktree is locked')
   })
 
   it('leaves other sessions alone', async () => {

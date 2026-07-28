@@ -499,6 +499,10 @@ app.whenReady().then(async () => {
     // FR-028: routine progress never interrupts — it is batched here and read
     // when the operator chooses to. Batching it and then never showing it
     // would be the same as dropping it.
+    listIntake: () => supervision.queuedIntake(),
+    removeIntake: (id) => supervision.removeIntake(id),
+    pullFromLinear: () =>
+      supervision.pullFromLinear(getGlobalSettings().supervision?.linearApiKey ?? ''),
     stopSession: (sessionId, reason) => supervision.stopSession(sessionId, reason),
     listReclaimable: () => supervision.reclaimableWorktrees(),
     reclaimWorktree: (path) => supervision.reclaimWorktree(path),

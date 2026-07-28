@@ -112,3 +112,54 @@ describe('mute rules (FR-029)', () => {
     expect(log.list()).toHaveLength(1)
   })
 })
+
+// Discarding a session, or reclaiming its working copy, leaves nothing to go
+// back to — so a feed still discussing it is noise about something that no
+// longer exists.
+
+describe('forgetting a session', () => {
+  it('drops everything said about it', () => {
+    const log = newLog()
+    log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'did a thing' })
+    log.post({ at: 2_000, sessionId: 's1', author: 'console', summary: 'stalled' })
+    log.forget('s1')
+    expect(log.forSession('s1')).toEqual([])
+  })
+
+  it('leaves other sessions alone', () => {
+    const log = newLog()
+    log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'mine' })
+    log.post({ at: 1_000, sessionId: 's2', author: 'agent', summary: 'theirs' })
+    log.forget('s1')
+    expect(log.list().map((entry) => entry.sessionId)).toEqual(['s2'])
+  })
+
+  it('takes them out of a time window too', () => {
+    const log = newLog()
+    log.post({ at: 5_000, sessionId: 's1', author: 'agent', summary: 'x' })
+    log.forget('s1')
+    expect(log.since(0)).toEqual([])
+  })
+
+  it('survives a reopen, so they do not come back', () => {
+    const log = newLog()
+    log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'x' })
+    log.forget('s1')
+    expect(newLog().list()).toEqual([])
+  })
+
+  it('keeps anything said after it was forgotten', () => {
+    const log = newLog()
+    log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'before' })
+    log.forget('s1')
+    log.post({ at: 2_000, sessionId: 's1', author: 'console', summary: 'after' })
+    expect(log.forSession('s1').map((entry) => entry.summary)).toEqual(['after'])
+  })
+
+  it('ignores a session it never heard of', () => {
+    const log = newLog()
+    log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'x' })
+    log.forget('ghost')
+    expect(log.list()).toHaveLength(1)
+  })
+})

@@ -25,7 +25,7 @@ const DEFAULT_SETTINGS = {
     promptForName: false,
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
-  supervision: { externalEditor: '' },
+  supervision: { externalEditor: '', linearApiKey: '' },
   extensions: {},
   ui: { hasSeenWelcome: false },
   notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },

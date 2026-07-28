@@ -34,6 +34,9 @@ export const SUPERVISION_CHANNELS = {
   precheckBackpressure: 'supervision:precheckBackpressure',
   entityIndex: 'supervision:entityIndex',
   intake: 'supervision:intake',
+  listIntake: 'supervision:listIntake',
+  removeIntake: 'supervision:removeIntake',
+  pullFromLinear: 'supervision:pullFromLinear',
   assign: 'supervision:assign',
   producerAction: 'supervision:producerAction',
   getDigest: 'supervision:getDigest',
@@ -93,6 +96,9 @@ export interface SupervisionSource {
   precheckBackpressure?(): unknown
   entityIndex?(): readonly unknown[]
   intake?(input: { url?: string; filePath?: string; contents?: string }): unknown
+  listIntake?(): readonly unknown[]
+  removeIntake?(id: string): void
+  pullFromLinear?(): Promise<{ ok: boolean; added: number; reason: string | null }>
   assign?(request: unknown): Promise<unknown>
   getDigest?(windowMs: number): unknown
   interruptSession?(
@@ -172,6 +178,7 @@ const producerActionPayload = z.object({
 // progress" rather than "you asked for nothing".
 const digestPayload = z.object({ windowMs: z.number().int().positive() })
 const reclaimPayload = z.object({ path: z.string().min(1) })
+const intakeIdPayload = z.object({ id: z.string().min(1) })
 const stopPayload = z.object({ sessionId: z.string().min(1), reason: z.string().optional() })
 const interruptPayload = z.object({
   sessionId: z.string().min(1),
@@ -340,6 +347,25 @@ export function registerSupervisionHandlers(source: SupervisionSource): void {
     if (!parsed.success) return { ok: false, reason: 'invalid request' }
     return source.intake?.(parsed.data) ?? { ok: false, reason: 'intake is unavailable' }
   })
+
+  handleChannel(SUPERVISION_CHANNELS.listIntake, async () => source.listIntake?.() ?? [])
+
+  handleChannel(SUPERVISION_CHANNELS.removeIntake, async (_event, payload: unknown) => {
+    const parsed = intakeIdPayload.safeParse(payload)
+    if (!parsed.success) return { ok: false }
+    source.removeIntake?.(parsed.data.id)
+    return { ok: true }
+  })
+
+  handleChannel(
+    SUPERVISION_CHANNELS.pullFromLinear,
+    async () =>
+      (await source.pullFromLinear?.()) ?? {
+        ok: false,
+        added: 0,
+        reason: 'pulling from Linear is unavailable',
+      }
+  )
 
   handleChannel(SUPERVISION_CHANNELS.assign, async (_event, payload: unknown) => {
     const parsed = assignPayload.safeParse(payload)

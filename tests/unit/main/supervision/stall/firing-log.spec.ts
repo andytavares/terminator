@@ -62,7 +62,7 @@ describe('recording', () => {
   it('starts unjudged', () => {
     const log = createFiringLog(logPath)
     log.record(firing(), true)
-    expect(log.list()[0].judgement).toBeNull()
+    expect(log.all()[0].judgement).toBeNull()
   })
 })
 
@@ -72,7 +72,7 @@ describe('judging (FR-020)', () => {
     log.record(firing(), true)
     const { id } = log.list()[0]
     log.judge(id, 'incorrect', 5_000)
-    expect(log.list()[0]).toMatchObject({ judgement: 'incorrect', judgedAt: 5_000 })
+    expect(log.all()[0]).toMatchObject({ judgement: 'incorrect', judgedAt: 5_000 })
   })
 
   it('allows a judgement to be revised', () => {
@@ -81,7 +81,7 @@ describe('judging (FR-020)', () => {
     const { id } = log.list()[0]
     log.judge(id, 'incorrect', 5_000)
     log.judge(id, 'correct', 6_000)
-    expect(log.list()[0].judgement).toBe('correct')
+    expect(log.all()[0].judgement).toBe('correct')
   })
 
   it('ignores a judgement for an unknown firing', () => {
@@ -196,6 +196,42 @@ describe('a row that is not a whole firing', () => {
       { nonsense: true },
       { kind: 'judgement', id: 'f1', judgement: 'incorrect', judgedAt: 2_000 },
     ])
-    expect(log.list()[0].judgement).toBe('incorrect')
+    expect(log.all()[0].judgement).toBe('incorrect')
+  })
+})
+
+// Judging a firing answers it. Leaving it on the list makes the list read as
+// work outstanding when it is not — the precision figure is where judged ones
+// go on counting.
+
+describe('a firing you have judged', () => {
+  it('leaves the list', () => {
+    const log = createFiringLog(logPath)
+    log.record(firing(), true)
+    const { id } = log.list()[0]
+    log.judge(id, 'correct', 5_000)
+    expect(log.list()).toEqual([])
+  })
+
+  it('still counts towards precision', () => {
+    const log = createFiringLog(logPath)
+    log.record(firing(), true)
+    log.judge(log.list()[0].id, 'incorrect', 5_000)
+    expect(log.precision(0, 10_000)).toMatchObject({ total: 1, judged: 1, incorrect: 1 })
+  })
+
+  it('is still there when you ask for everything', () => {
+    const log = createFiringLog(logPath)
+    log.record(firing(), true)
+    log.judge(log.list()[0].id, 'correct', 5_000)
+    expect(log.all()).toHaveLength(1)
+  })
+
+  it('leaves the unjudged ones alone', () => {
+    const log = createFiringLog(logPath)
+    log.record(firing(), true)
+    log.record(firing({ sessionId: 's2' }), true)
+    log.judge(log.list()[0].id, 'correct', 5_000)
+    expect(log.list()).toHaveLength(1)
   })
 })

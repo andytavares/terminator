@@ -62,7 +62,10 @@ export interface PrecisionReport {
 export interface FiringLog {
   record(firing: StallFiring, shadowMode: boolean): void
   judge(id: string, judgement: Judgement, at: number): void
+  /** Firings still awaiting a judgement. Judging one is what takes it off. */
   list(): RecordedFiring[]
+  /** Every firing, judged or not — what the precision figure is measured over. */
+  all(): RecordedFiring[]
   precision(fromMs: number, toMs: number): PrecisionReport
 }
 
@@ -108,8 +111,16 @@ export function createFiringLog(path: string): FiringLog {
       log.append({ kind: 'judgement', id, judgement, judgedAt: at })
     },
 
-    list(): RecordedFiring[] {
+    all(): RecordedFiring[] {
       return materialise()
+    },
+
+    list(): RecordedFiring[] {
+      // Only what still needs judging. A firing you have already called right
+      // or wrong is answered, and leaving it on the list makes the list read
+      // as work outstanding when it is not — the precision figure above it is
+      // where judged ones continue to count.
+      return materialise().filter((firing) => firing.judgement === null)
     },
 
     precision(fromMs: number, toMs: number): PrecisionReport {

@@ -7,6 +7,7 @@ import type { AutonomyLevel, RuntimeState, SupervisedSession } from '../../share
 import type { SupervisionScreenProps } from '../components/supervision/SupervisionScreen'
 import type { PaletteEntity } from '../components/supervision/SupervisionPalette'
 import type { ReclaimableWorktreeView } from '../components/supervision/WorktreeReclaim'
+import type { QueuedIntakeView } from '../components/supervision/WorkItemBoard'
 import type {
   BackpressureDecision,
   FeedEntry,
@@ -101,6 +102,9 @@ interface SupervisionBridge {
     reason?: string
     id?: string
   }>
+  listIntake?(): Promise<QueuedIntakeView[]>
+  removeIntake?(payload: { id: string }): Promise<unknown>
+  pullFromLinear?(): Promise<{ ok: boolean; added: number; reason: string | null }>
   getDigest?(payload: { windowMs: number }): Promise<Digest | null>
   interruptSession?(payload: {
     sessionId: string
@@ -253,6 +257,7 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
       })
       void transport.getDigest?.({ windowMs: DIGEST_WINDOW_MINUTES * 60_000 }).then(setDigest)
       void transport.listReclaimable?.().then(setReclaimable)
+      void transport.listIntake?.().then(setQueuedIntake)
       void transport.precheckBackpressure?.().then((decision) =>
         // Shown only while it would actually refuse a start.
         setBackpressure(decision !== null && decision.allowed ? null : decision)
@@ -310,6 +315,8 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
     worktreePath?: string
   } | null>(null)
   const [assigning, setAssigning] = useState(false)
+  const [queuedIntake, setQueuedIntake] = useState<QueuedIntakeView[]>([])
+  const [pulling, setPulling] = useState(false)
   const [intakeResult, setIntakeResult] = useState<{
     ok: boolean
     reason?: string
@@ -343,6 +350,7 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
     } finally {
       setReclaimBusy(null)
       void transport.listReclaimable?.().then(setReclaimable)
+      void transport.listIntake?.().then(setQueuedIntake)
     }
   }, [])
 
@@ -628,6 +636,39 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
         .finally(() => setAssigning(false))
     },
 
+    queuedIntake,
+    pulling,
+    onRemoveIntake: (id: string) => {
+      const transport = bridge()
+      void transport
+        ?.removeIntake?.({ id })
+        .then(() => transport.listIntake?.().then(setQueuedIntake))
+    },
+    onPullFromLinear: () => {
+      const transport = bridge()
+      if (transport?.pullFromLinear === undefined) {
+        setIntakeResult({ ok: false, reason: 'This build cannot pull from Linear.' })
+        return
+      }
+      setPulling(true)
+      void transport
+        .pullFromLinear()
+        .then((result) => {
+          // A key that is missing or rejected must say so: an empty list would
+          // otherwise read as "you have no issues".
+          setIntakeResult(
+            result.ok
+              ? {
+                  ok: true,
+                  reason: `Pulled ${result.added} ${result.added === 1 ? 'issue' : 'issues'} from Linear.`,
+                }
+              : { ok: false, reason: result.reason ?? 'could not reach Linear' }
+          )
+          return transport.listIntake?.().then(setQueuedIntake)
+        })
+        .finally(() => setPulling(false))
+    },
+
     intakeResult,
     onIntake: (input: { url?: string; filePath?: string }) => {
       const transport = bridge()
@@ -637,7 +678,10 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
       }
       void transport.intake(input).then((result) => {
         setIntakeResult(result)
-        if (result.ok) void transport.listWorkItems?.().then(setBoard)
+        if (result.ok) {
+          void transport.listWorkItems?.().then(setBoard)
+          void transport.listIntake?.().then(setQueuedIntake)
+        }
       })
     },
 

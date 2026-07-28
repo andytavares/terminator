@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { AttentionQueue } from './AttentionQueue.js'
 import { ReviewInbox, ReviewFlow } from './ReviewInbox.js'
-import { WorkItemBoard, type BoardItem } from './WorkItemBoard.js'
+import { WorkItemBoard, type BoardItem, type QueuedIntakeView } from './WorkItemBoard.js'
 import { LaneView } from './LaneView.js'
 import { StandupFeed } from './StandupFeed.js'
 import { DigestPanel } from './DigestPanel.js'
@@ -163,6 +163,11 @@ export interface SupervisionScreenProps {
   /** Stage 1: a ticket URL or a local document becomes a queued item (FR-068). */
   intakeResult: { ok: boolean; reason?: string; id?: string } | null
   onIntake(input: { url?: string; filePath?: string }): void
+  /** Tickets taken in but not yet planned, and the Linear pull. */
+  queuedIntake: readonly QueuedIntakeView[]
+  pulling: boolean
+  onRemoveIntake(id: string): void
+  onPullFromLinear(): void
 
   /** Working copies that outlived their session. */
   reclaimable: readonly ReclaimableWorktreeView[]
@@ -214,7 +219,7 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
   const counts: Partial<Record<SupervisionTab, number>> = {
     attention: props.attention.length,
     review: props.review.length,
-    items: props.workItems.length,
+    items: props.workItems.length + props.queuedIntake.length,
     feed: props.feed.length,
     stalls: props.firings.length,
     sessions: props.sessions.filter((session) => RUNNING_STATES.has(session.runtimeState)).length,
@@ -331,8 +336,15 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
 
         {tab === 'items' && (
           <>
-            <IntakePanel onIntake={props.onIntake} result={props.intakeResult} />
+            <IntakePanel
+              onIntake={props.onIntake}
+              result={props.intakeResult}
+              onPullFromLinear={props.onPullFromLinear}
+              pulling={props.pulling}
+            />
             <WorkItemBoard
+              queued={props.queuedIntake}
+              onRemoveQueued={props.onRemoveIntake}
               items={props.workItems}
               unreadable={props.unreadable}
               conflicts={props.conflicts}

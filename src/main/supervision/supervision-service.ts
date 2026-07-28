@@ -19,7 +19,14 @@ import { applyEvent, initialSessionState } from './state/state-machine.js'
 import { channelFor, buildDigest } from './feed/digest.js'
 import { buildEntityIndex } from './query/entity-index.js'
 import { mayBeginImplementation } from './workitems/gates.js'
-import { intakeFromUrl, intakeFromDocument, type IntakeResult } from './workitems/intake.js'
+import {
+  intakeFromUrl,
+  intakeFromDocument,
+  type IntakeResult,
+  type IntakeStub,
+} from './workitems/intake.js'
+import { createIntakeQueue } from './workitems/intake-queue.js'
+import { fetchAssignedIssues, type FetchLike } from './workitems/linear-client.js'
 import { createBackpressureGate, type BackpressureGate } from './review/backpressure.js'
 import { createMergePolicy, type MergePolicy } from './review/merge-policy.js'
 import { loadRepoConfig } from './worktree/repo-config.js'
@@ -92,6 +99,8 @@ export interface SupervisionServiceOptions {
    * for a model call rather than an assumption that there is one.
    */
   summariseMilestone?: (milestone: Milestone, fallback: string) => Promise<string>
+  /** Injected so the Linear pull can be exercised without the network. */
+  fetchLinear?: FetchLike
   notify?: (entry: { sessionId: string; summary: string }) => void
 }
 
@@ -137,6 +146,17 @@ export interface SupervisionService {
   mayBeginImplementation(workItemId: string): ReturnType<typeof mayBeginImplementation>
   /** Normalises a ticket URL or a dropped document into one shape (FR-068). */
   intake(input: { url?: string; filePath?: string; contents?: string }): IntakeResult
+  /** Tickets taken in but not yet planned, newest first. */
+  queuedIntake(): IntakeStub[]
+  /** Drops one from the queue. Nothing was started, so nothing is undone. */
+  removeIntake(id: string): void
+  /**
+   * Pulls the issues assigned to whoever the API key belongs to and queues
+   * them. Read-only and one-directional: nothing is written back to Linear,
+   * and nothing starts — twenty issues pulled at once would otherwise become
+   * twenty unreviewable agents.
+   */
+  pullFromLinear(apiKey: string): Promise<{ ok: boolean; added: number; reason: string | null }>
   /**
    * Working copies that outlived their session: orphans nothing references,
    * and checkouts belonging to sessions that finished. A working copy still
@@ -220,6 +240,12 @@ export interface SupervisionService {
 
 const UNREVIEWED_LIMIT = 3
 
+/** The runtime's own fetch, adapted to the shape the client asks for. */
+const defaultFetch: FetchLike = async (url, init) => {
+  const response = await fetch(url, init)
+  return { ok: response.ok, status: response.status, json: () => response.json() }
+}
+
 export function createSupervisionService(options: SupervisionServiceOptions): SupervisionService {
   const { userDataPath, registryStore, shadowStore } = options
   const now = options.now ?? Date.now
@@ -283,6 +309,7 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
   })
 
   const feed = createFeedLog(join(dir, 'feed.jsonl'))
+  const intakeQueue = createIntakeQueue(join(dir, 'intake.jsonl'))
   const reviewQueue = createReviewQueue()
   const producers = createProducerRegistry()
   const laneBindings = createLaneBindings(
@@ -568,12 +595,40 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
       return mayBeginImplementation(published.item)
     },
 
-    intake: (input) => {
-      if (input.url !== undefined) return intakeFromUrl(input.url, now())
-      if (input.filePath !== undefined) {
-        return intakeFromDocument(input.filePath, input.contents ?? '', now())
+    queuedIntake: () => intakeQueue.list(),
+
+    removeIntake: (id: string) => intakeQueue.remove(id, now()),
+
+    pullFromLinear: async (apiKey: string) => {
+      const result = await fetchAssignedIssues(apiKey, options.fetchLinear ?? defaultFetch)
+      if (!result.ok) return { ok: false, added: 0, reason: result.reason }
+
+      for (const issue of result.issues) {
+        intakeQueue.add({
+          id: issue.identifier,
+          source: 'linear',
+          sourceUrl: issue.url === '' ? null : issue.url,
+          title: issue.title,
+          createdAt: Date.parse(issue.createdAt) || now(),
+          phase: 'intake',
+        })
       }
-      return { ok: false, reason: 'nothing to bring in' }
+      return { ok: true, added: result.issues.length, reason: null }
+    },
+
+    intake: (input) => {
+      const result =
+        input.url !== undefined
+          ? intakeFromUrl(input.url, now())
+          : input.filePath !== undefined
+            ? intakeFromDocument(input.filePath, input.contents ?? '', now())
+            : ({ ok: false, reason: 'nothing to bring in' } as IntakeResult)
+
+      // Queued for real. It used to return a stub that nothing kept, so the
+      // board never showed one and "it waits until you start it" was true of
+      // nothing.
+      if (result.ok) intakeQueue.add(result.stub)
+      return result
     },
 
     reclaimableWorktrees: () => findReclaimable(worktreeRoot, registry.list()),
@@ -604,14 +659,9 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
       }
 
       spansByWorktree.delete(path)
-      if (session !== null) {
-        feed.post({
-          at: now(),
-          sessionId: session.id,
-          author: 'console',
-          summary: 'Working copy reclaimed.',
-        })
-      }
+      // Its working copy is gone, so there is nothing left to go back to and
+      // the feed has nothing left to be about.
+      if (session !== null) feed.forget(session.id)
       return { ok: true, reason: null }
     },
 
@@ -669,6 +719,7 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
       reviewQueue.remove(sessionId)
 
       const span = spansByWorktree.get(session.worktreePath)
+      let removalFailure: string | null = null
       try {
         await provisioner.release({
           repoPath: session.repoPath,
@@ -679,26 +730,28 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
       } catch (error) {
         // A working copy that is already gone, or a teardown that failed, must
         // not strand the session on the queue forever — that is the state the
-        // operator is trying to get out of. Reported, then removed anyway.
+        // operator is trying to get out of. Removed anyway, and reported
+        // below, after the rest of its feed is cleared.
+        removalFailure = error instanceof Error ? error.message : String(error)
+      }
+
+      spansByWorktree.delete(session.worktreePath)
+      // Everything said about it goes too. Discarding ends with the session
+      // leaving the console; a feed still discussing it is noise about
+      // something that no longer exists.
+      feed.forget(sessionId)
+
+      // Except this: a directory still on disk is the one thing worth keeping
+      // a line about, and it is posted after the clear so it survives.
+      if (removalFailure !== null) {
         feed.post({
           at: now(),
           sessionId,
           author: 'console',
-          summary: `Could not remove the working copy: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
+          summary: `Discarded, but the working copy could not be removed: ${removalFailure}`,
         })
       }
 
-      spansByWorktree.delete(session.worktreePath)
-      feed.post({
-        at: now(),
-        sessionId,
-        author: 'console',
-        summary: 'Discarded by the operator; the working copy was removed.',
-      })
-      // Discarding ends with the session leaving the console. Leaving the
-      // record behind is what put rows on the queue that could not be removed.
       registry.forget(sessionId)
       return { ok: true, reason: null }
     },
