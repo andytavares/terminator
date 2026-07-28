@@ -1,0 +1,22 @@
+tests/e2e/supervision-session-terminal.spec.ts
+  s_5f98598a6d950e::t_f49cf0ef27ed2b 112,131
+  s_5f98598a6d950e::t_49a71d6dda2a58 124-130,132-141,143,145-155,157-180,182-197
+  s_5f98598a6d950e::t_ca3e4d3ff47c52 3,142,144,156,181
+  s_5f98598a6d950e::t_10b15f1ccc3a66 113-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "da080348d78dd675cee3fea4aad48498edf30546",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
