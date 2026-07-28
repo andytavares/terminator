@@ -235,3 +235,35 @@ describe('a firing you have judged', () => {
     expect(log.list()).toHaveLength(1)
   })
 })
+
+describe('removing a firing', () => {
+  it('takes it off the list', () => {
+    const log = createFiringLog(logPath)
+    log.record(firing(), true)
+    log.remove(log.list()[0].id)
+    expect(log.list()).toEqual([])
+  })
+
+  it('takes it out of the precision figure too', () => {
+    // Removing is not judging: it never happened as far as the record goes.
+    const log = createFiringLog(logPath)
+    log.record(firing(), true)
+    log.remove(log.list()[0].id)
+    expect(log.precision(0, 10_000)).toMatchObject({ total: 0, judged: 0 })
+  })
+
+  it('survives a reopen', () => {
+    const log = createFiringLog(logPath)
+    log.record(firing(), true)
+    log.remove(log.list()[0].id)
+    expect(createFiringLog(logPath).all()).toEqual([])
+  })
+
+  it('leaves the others', () => {
+    const log = createFiringLog(logPath)
+    log.record(firing(), true)
+    log.record(firing({ sessionId: 's2' }), true)
+    log.remove(log.list()[0].id)
+    expect(log.list()).toHaveLength(1)
+  })
+})

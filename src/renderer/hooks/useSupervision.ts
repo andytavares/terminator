@@ -102,6 +102,8 @@ interface SupervisionBridge {
     reason?: string
     id?: string
   }>
+  removeFeedEntry?(payload: { id: string }): Promise<unknown>
+  removeFiring?(payload: { id: string }): Promise<unknown>
   listIntake?(): Promise<QueuedIntakeView[]>
   removeIntake?(payload: { id: string }): Promise<unknown>
   pullFromLinear?(): Promise<{ ok: boolean; added: number; reason: string | null }>
@@ -528,6 +530,10 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
     onReply: (sessionId, message) => {
       void bridge()?.replyToSession?.({ sessionId, message })
     },
+    onRemoveFeedEntry: (id: string) => {
+      const transport = bridge()
+      void transport?.removeFeedEntry?.({ id }).then(() => transport.listFeed?.().then(setFeed))
+    },
     onToggleMute: (sessionId) =>
       setMuted((current) =>
         current.includes(sessionId)
@@ -565,6 +571,15 @@ export function useSupervision(options: UseSupervisionOptions = {}): UseSupervis
         .then(() => refreshAll())
     },
 
+    onRemoveFiring: (id: string) => {
+      const transport = bridge()
+      void transport?.removeFiring?.({ id }).then(() =>
+        transport.listFirings?.().then((result) => {
+          setFirings(result.firings)
+          setPrecision(result.precision)
+        })
+      )
+    },
     onJudge: (firingId, judgement) => {
       void bridge()?.judgeFiring?.({ firingId, judgement })
     },

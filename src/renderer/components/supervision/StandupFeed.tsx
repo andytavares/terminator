@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Bot, Monitor, BellOff } from 'lucide-react'
+import { Bot, Monitor, BellOff, X } from 'lucide-react'
 import type { FeedEntry } from '../../../shared/supervision/view-types.js'
 import './supervision.css'
 
@@ -13,6 +13,8 @@ export interface StandupFeedProps {
   mutedSessions: readonly string[]
   onReply(sessionId: string, message: string): void
   onToggleMute(sessionId: string): void
+  /** Removes one entry. A record you cannot prune becomes noise (FR-093). */
+  onRemove(id: string): void
 }
 
 function formatTime(at: number): string {
@@ -24,6 +26,7 @@ export function StandupFeed({
   mutedSessions,
   onReply,
   onToggleMute,
+  onRemove,
 }: StandupFeedProps): JSX.Element {
   const [replyTo, setReplyTo] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
@@ -74,6 +77,9 @@ export function StandupFeed({
             )}
             <button className="sv-queue__btn" onClick={() => onToggleMute(entry.sessionId)}>
               {mutedSessions.includes(entry.sessionId) ? 'Unmute' : 'Mute'}
+            </button>
+            <button className="sv-queue__btn" onClick={() => onRemove(entry.id)}>
+              <X aria-hidden="true" /> Remove
             </button>
           </div>
 

@@ -122,12 +122,16 @@ export interface SupervisionScreenProps {
   mutedSessions: readonly string[]
   onReply(sessionId: string, message: string): void
   onToggleMute(sessionId: string): void
+  /** Removes one feed entry. Any list of past information should be prunable. */
+  onRemoveFeedEntry(id: string): void
 
   shadowMode: boolean
   firings: readonly RecordedFiring[]
   precision: PrecisionReport
   onSetShadowMode(value: boolean): void
   onJudge(firingId: string, judgement: 'correct' | 'incorrect'): void
+  /** Removes a firing outright, rather than judging it. */
+  onRemoveFiring(id: string): void
   /** FR-029: what a stall lets you actually do about it. */
   onAskWhatIsWrong(sessionId: string): void
   onShowActivity(sessionId: string): void
@@ -382,6 +386,7 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
               mutedSessions={props.mutedSessions}
               onReply={props.onReply}
               onToggleMute={props.onToggleMute}
+              onRemove={props.onRemoveFeedEntry}
             />
           </>
         )}
@@ -394,6 +399,7 @@ export function SupervisionScreen(props: SupervisionScreenProps): JSX.Element {
               precision={props.precision}
               onSetShadowMode={props.onSetShadowMode}
               onJudge={props.onJudge}
+              onRemove={props.onRemoveFiring}
             />
             {/* Every session currently stalled, with something to do about it —
               a stall that only reports itself is half the feature (FR-029). */}

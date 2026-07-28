@@ -15,6 +15,12 @@ export interface RecordedFiring extends StallFiring {
   readonly judgedAt: number | null
 }
 
+/** A tombstone: this firing never happened as far as the record is concerned. */
+interface RemovedRow {
+  readonly kind: 'removed'
+  readonly id: string
+}
+
 interface JudgementRow {
   readonly kind: 'judgement'
   readonly id: string
@@ -22,7 +28,7 @@ interface JudgementRow {
   readonly judgedAt: number
 }
 
-type Row = (RecordedFiring & { kind?: 'firing' }) | JudgementRow
+type Row = (RecordedFiring & { kind?: 'firing' }) | JudgementRow | RemovedRow
 
 /**
  * The log is a file on disk: it can be truncated by a crash, hand-edited, or
@@ -66,6 +72,8 @@ export interface FiringLog {
   list(): RecordedFiring[]
   /** Every firing, judged or not — what the precision figure is measured over. */
   all(): RecordedFiring[]
+  /** Removes a firing entirely — from the list and from the precision figure. */
+  remove(id: string): void
   precision(fromMs: number, toMs: number): PrecisionReport
 }
 
@@ -78,6 +86,10 @@ export function createFiringLog(path: string): FiringLog {
     // Append-only: a later judgement row supersedes an earlier one for the same
     // firing, which is how a judgement can be revised without a rewrite.
     for (const row of log.readAll()) {
+      if ((row as RemovedRow).kind === 'removed') {
+        firings.delete((row as RemovedRow).id)
+        continue
+      }
       if ((row as JudgementRow).kind === 'judgement') {
         const judgementRow = row as JudgementRow
         const existing = firings.get(judgementRow.id)
@@ -111,6 +123,10 @@ export function createFiringLog(path: string): FiringLog {
       log.append({ kind: 'judgement', id, judgement, judgedAt: at })
     },
 
+    remove(id: string): void {
+      log.append({ kind: 'removed', id })
+    },
+
     all(): RecordedFiring[] {
       return materialise()
     },
@@ -121,6 +137,10 @@ export function createFiringLog(path: string): FiringLog {
       // as work outstanding when it is not — the precision figure above it is
       // where judged ones continue to count.
       return materialise().filter((firing) => firing.judgement === null)
+    },
+
+    remove(id: string): void {
+      log.append({ kind: 'removed', id })
     },
 
     precision(fromMs: number, toMs: number): PrecisionReport {

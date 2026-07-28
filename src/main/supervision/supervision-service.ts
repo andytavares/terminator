@@ -146,6 +146,10 @@ export interface SupervisionService {
   mayBeginImplementation(workItemId: string): ReturnType<typeof mayBeginImplementation>
   /** Normalises a ticket URL or a dropped document into one shape (FR-068). */
   intake(input: { url?: string; filePath?: string; contents?: string }): IntakeResult
+  /** Removes one feed entry. Anything shown as a list should be prunable. */
+  removeFeedEntry(id: string): void
+  /** Removes one stall firing, from the list and from the precision figure. */
+  removeFiring(id: string): void
   /** Tickets taken in but not yet planned, newest first. */
   queuedIntake(): IntakeStub[]
   /** Drops one from the queue. Nothing was started, so nothing is undone. */
@@ -594,6 +598,10 @@ export function createSupervisionService(options: SupervisionServiceOptions): Su
       }
       return mayBeginImplementation(published.item)
     },
+
+    removeFeedEntry: (id: string) => feed.removeEntry(id),
+
+    removeFiring: (id: string) => firings.remove(id),
 
     queuedIntake: () => intakeQueue.list(),
 

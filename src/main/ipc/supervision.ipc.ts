@@ -34,6 +34,8 @@ export const SUPERVISION_CHANNELS = {
   precheckBackpressure: 'supervision:precheckBackpressure',
   entityIndex: 'supervision:entityIndex',
   intake: 'supervision:intake',
+  removeFeedEntry: 'supervision:removeFeedEntry',
+  removeFiring: 'supervision:removeFiring',
   listIntake: 'supervision:listIntake',
   removeIntake: 'supervision:removeIntake',
   pullFromLinear: 'supervision:pullFromLinear',
@@ -96,6 +98,8 @@ export interface SupervisionSource {
   precheckBackpressure?(): unknown
   entityIndex?(): readonly unknown[]
   intake?(input: { url?: string; filePath?: string; contents?: string }): unknown
+  removeFeedEntry?(id: string): void
+  removeFiring?(id: string): void
   listIntake?(): readonly unknown[]
   removeIntake?(id: string): void
   pullFromLinear?(): Promise<{ ok: boolean; added: number; reason: string | null }>
@@ -346,6 +350,20 @@ export function registerSupervisionHandlers(source: SupervisionSource): void {
     const parsed = intakePayload.safeParse(payload)
     if (!parsed.success) return { ok: false, reason: 'invalid request' }
     return source.intake?.(parsed.data) ?? { ok: false, reason: 'intake is unavailable' }
+  })
+
+  handleChannel(SUPERVISION_CHANNELS.removeFeedEntry, async (_event, payload: unknown) => {
+    const parsed = intakeIdPayload.safeParse(payload)
+    if (!parsed.success) return { ok: false }
+    source.removeFeedEntry?.(parsed.data.id)
+    return { ok: true }
+  })
+
+  handleChannel(SUPERVISION_CHANNELS.removeFiring, async (_event, payload: unknown) => {
+    const parsed = intakeIdPayload.safeParse(payload)
+    if (!parsed.success) return { ok: false }
+    source.removeFiring?.(parsed.data.id)
+    return { ok: true }
   })
 
   handleChannel(SUPERVISION_CHANNELS.listIntake, async () => source.listIntake?.() ?? [])

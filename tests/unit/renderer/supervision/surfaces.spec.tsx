@@ -335,6 +335,7 @@ describe('StandupFeed (FR-091 – FR-093)', () => {
         entries={entries}
         mutedSessions={[]}
         onReply={() => {}}
+        onRemove={() => {}}
         onToggleMute={() => {}}
       />
     )
@@ -348,6 +349,7 @@ describe('StandupFeed (FR-091 – FR-093)', () => {
         entries={entries}
         mutedSessions={[]}
         onReply={() => {}}
+        onRemove={() => {}}
         onToggleMute={() => {}}
       />
     )
@@ -357,7 +359,13 @@ describe('StandupFeed (FR-091 – FR-093)', () => {
   it('delivers a reply to the originating session (FR-093)', () => {
     const onReply = vi.fn()
     render(
-      <StandupFeed entries={entries} mutedSessions={[]} onReply={onReply} onToggleMute={() => {}} />
+      <StandupFeed
+        entries={entries}
+        mutedSessions={[]}
+        onReply={onReply}
+        onRemove={() => {}}
+        onToggleMute={() => {}}
+      />
     )
     fireEvent.click(screen.getByText('Reply'))
     fireEvent.change(screen.getByLabelText('Reply to s1'), {
@@ -373,6 +381,7 @@ describe('StandupFeed (FR-091 – FR-093)', () => {
         entries={entries}
         mutedSessions={['s1']}
         onReply={() => {}}
+        onRemove={() => {}}
         onToggleMute={() => {}}
       />
     )
@@ -380,9 +389,58 @@ describe('StandupFeed (FR-091 – FR-093)', () => {
     expect(screen.getByText('Ran the tests')).toBeDefined()
   })
 
+  it('removes the entry you point at, not the session', () => {
+    const onRemove = vi.fn()
+    render(
+      <StandupFeed
+        entries={entries}
+        mutedSessions={[]}
+        onReply={() => {}}
+        onRemove={onRemove}
+        onToggleMute={() => {}}
+      />
+    )
+    fireEvent.click(screen.getAllByText('Remove')[0])
+    expect(onRemove).toHaveBeenCalledWith('e1')
+  })
+
+  it('mutes the session an entry came from', () => {
+    const onToggleMute = vi.fn()
+    render(
+      <StandupFeed
+        entries={entries}
+        mutedSessions={[]}
+        onReply={() => {}}
+        onRemove={() => {}}
+        onToggleMute={onToggleMute}
+      />
+    )
+    fireEvent.click(screen.getAllByText('Mute')[0])
+    expect(onToggleMute).toHaveBeenCalledWith('s1')
+  })
+
+  it('offers to unmute a session already muted', () => {
+    render(
+      <StandupFeed
+        entries={entries}
+        mutedSessions={['s1']}
+        onReply={() => {}}
+        onRemove={() => {}}
+        onToggleMute={() => {}}
+      />
+    )
+    expect(screen.getAllByText('Unmute').length).toBe(entries.length)
+  })
+
   it('says so when nothing has happened', () => {
     render(
-      <StandupFeed entries={[]} mutedSessions={[]} onReply={() => {}} onToggleMute={() => {}} />
+      <StandupFeed
+        entries={[]}
+        mutedSessions={[]}
+        onReply={() => {}}
+        onRemove={() => {}}
+        onToggleMute={() => {}}
+      />
     )
     expect(screen.getByText(/Nothing has happened yet/)).toBeDefined()
   })
@@ -836,6 +894,7 @@ describe('StandupFeed replies', () => {
         entries={[agentEntry]}
         mutedSessions={[]}
         onReply={() => {}}
+        onRemove={() => {}}
         onToggleMute={() => {}}
       />
     )
@@ -850,6 +909,7 @@ describe('StandupFeed replies', () => {
         entries={[agentEntry]}
         mutedSessions={[]}
         onReply={onReply}
+        onRemove={() => {}}
         onToggleMute={() => {}}
       />
     )
@@ -867,6 +927,7 @@ describe('StandupFeed replies', () => {
         entries={[agentEntry]}
         mutedSessions={[]}
         onReply={onReply}
+        onRemove={() => {}}
         onToggleMute={() => {}}
       />
     )
@@ -884,6 +945,7 @@ describe('StandupFeed replies', () => {
         entries={[agentEntry]}
         mutedSessions={[]}
         onReply={onReply}
+        onRemove={() => {}}
         onToggleMute={() => {}}
       />
     )
@@ -899,6 +961,7 @@ describe('StandupFeed replies', () => {
         entries={[agentEntry]}
         mutedSessions={[]}
         onReply={() => {}}
+        onRemove={() => {}}
         onToggleMute={() => {}}
       />
     )

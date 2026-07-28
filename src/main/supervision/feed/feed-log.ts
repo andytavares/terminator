@@ -36,6 +36,8 @@ export interface FeedLog {
    * are noise about something that no longer exists.
    */
   forget(sessionId: string): void
+  /** Removes one entry. Anything shown as a list should be prunable. */
+  removeEntry(id: string): void
   /** Whether an entry should raise a notification, or only appear in the feed (FR-029). */
   shouldNotify(entry: FeedEntry, mutes: readonly MuteRule[]): boolean
 }
@@ -45,18 +47,34 @@ interface ForgottenRow {
   readonly forgotten: string
 }
 
-function isForgotten(row: FeedEntry | ForgottenRow): row is ForgottenRow {
+/** A tombstone for a single entry rather than a whole session. */
+interface DroppedRow {
+  readonly dropped: string
+}
+
+function isForgotten(row: FeedRow): row is ForgottenRow {
   return typeof (row as ForgottenRow).forgotten === 'string'
 }
 
+function isDropped(row: FeedRow): row is DroppedRow {
+  return typeof (row as DroppedRow).dropped === 'string'
+}
+
+type FeedRow = FeedEntry | ForgottenRow | DroppedRow
+
 export function createFeedLog(path: string): FeedLog {
-  const log = createJsonlLog<FeedEntry | ForgottenRow>(path)
+  const log = createJsonlLog<FeedRow>(path)
   let counter = 0
 
   /** What survives: entries about sessions nothing has forgotten since. */
   function live(): FeedEntry[] {
     const entries: FeedEntry[] = []
     for (const row of log.readAll()) {
+      if (isDropped(row)) {
+        const index = entries.findIndex((entry) => entry.id === row.dropped)
+        if (index !== -1) entries.splice(index, 1)
+        continue
+      }
       if (isForgotten(row)) {
         // A session can be forgotten and then, in principle, seen again — so
         // this drops what came before rather than filtering the whole file.
@@ -102,6 +120,10 @@ export function createFeedLog(path: string): FeedLog {
       // Append-only, like every other record here: a tombstone rather than a
       // rewrite, so a crash costs the last line and not the feed.
       log.append({ forgotten: sessionId })
+    },
+
+    removeEntry(id: string): void {
+      log.append({ dropped: id })
     },
 
     shouldNotify(entry: FeedEntry, mutes: readonly MuteRule[]): boolean {

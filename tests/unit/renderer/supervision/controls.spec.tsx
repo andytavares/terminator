@@ -41,6 +41,7 @@ describe('StallControls — turning shadow mode off (FR-018, FR-019)', () => {
         firings={[firing()]}
         precision={noPrecision}
         onSetShadowMode={() => {}}
+        onRemove={() => {}}
         onJudge={() => {}}
       />
     )
@@ -55,6 +56,7 @@ describe('StallControls — turning shadow mode off (FR-018, FR-019)', () => {
         firings={[]}
         precision={noPrecision}
         onSetShadowMode={onSetShadowMode}
+        onRemove={() => {}}
         onJudge={() => {}}
       />
     )
@@ -69,6 +71,7 @@ describe('StallControls — turning shadow mode off (FR-018, FR-019)', () => {
         firings={[]}
         precision={noPrecision}
         onSetShadowMode={() => {}}
+        onRemove={() => {}}
         onJudge={() => {}}
       />
     )
@@ -82,6 +85,7 @@ describe('StallControls — turning shadow mode off (FR-018, FR-019)', () => {
         firings={[firing()]}
         precision={noPrecision}
         onSetShadowMode={() => {}}
+        onRemove={() => {}}
         onJudge={() => {}}
       />
     )
@@ -95,6 +99,7 @@ describe('StallControls — turning shadow mode off (FR-018, FR-019)', () => {
         firings={[firing({ judgement: 'incorrect' })]}
         precision={{ total: 20, judged: 20, incorrect: 1, incorrectRate: 0.05 }}
         onSetShadowMode={() => {}}
+        onRemove={() => {}}
         onJudge={() => {}}
       />
     )
@@ -109,6 +114,7 @@ describe('StallControls — turning shadow mode off (FR-018, FR-019)', () => {
         firings={[firing()]}
         precision={{ total: 2, judged: 2, incorrect: 0, incorrectRate: 0 }}
         onSetShadowMode={() => {}}
+        onRemove={() => {}}
         onJudge={() => {}}
       />
     )
@@ -123,6 +129,7 @@ describe('StallControls — turning shadow mode off (FR-018, FR-019)', () => {
         firings={[firing()]}
         precision={noPrecision}
         onSetShadowMode={() => {}}
+        onRemove={() => {}}
         onJudge={onJudge}
       />
     )
@@ -137,6 +144,7 @@ describe('StallControls — turning shadow mode off (FR-018, FR-019)', () => {
         firings={[firing()]}
         precision={noPrecision}
         onSetShadowMode={() => {}}
+        onRemove={() => {}}
         onJudge={() => {}}
       />
     )
@@ -150,6 +158,7 @@ describe('StallControls — turning shadow mode off (FR-018, FR-019)', () => {
         firings={[]}
         precision={{ total: 0, judged: 0, incorrect: 0, incorrectRate: null }}
         onSetShadowMode={() => {}}
+        onRemove={() => {}}
         onJudge={() => {}}
       />
     )
@@ -321,5 +330,23 @@ describe('ProvisioningStatus (FR-033, FR-034, FR-044)', () => {
     )
     fireEvent.click(screen.getByText('Open in editor'))
     expect(onOpenInEditor).toHaveBeenCalled()
+  })
+})
+
+describe('StallControls — removing a firing you have finished with', () => {
+  it('removes the one you point at', () => {
+    const onRemove = vi.fn()
+    render(
+      <StallControls
+        shadowMode
+        firings={[firing()]}
+        precision={noPrecision}
+        onSetShadowMode={() => {}}
+        onRemove={onRemove}
+        onJudge={() => {}}
+      />
+    )
+    fireEvent.click(screen.getByText('Remove'))
+    expect(onRemove).toHaveBeenCalledWith('f1')
   })
 })

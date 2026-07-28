@@ -8,6 +8,7 @@ import {
   FileText,
   Square,
   Trash2,
+  X,
 } from 'lucide-react'
 import type { RecordedFiring, PrecisionReport } from '../../../shared/supervision/view-types.js'
 import './supervision.css'
@@ -22,6 +23,8 @@ export interface StallControlsProps {
   precision: PrecisionReport
   onSetShadowMode(value: boolean): void
   onJudge(firingId: string, judgement: 'correct' | 'incorrect'): void
+  /** Removes a firing outright — from the list and from the precision figure. */
+  onRemove(id: string): void
 }
 
 export function StallControls({
@@ -30,6 +33,7 @@ export function StallControls({
   precision,
   onSetShadowMode,
   onJudge,
+  onRemove,
 }: StallControlsProps): JSX.Element {
   const rate = precision.incorrectRate
   // Under 10% over a week of real work is what SC-002 asks for before you
@@ -97,6 +101,9 @@ export function StallControls({
                 onClick={() => onJudge(firing.id, 'incorrect')}
               >
                 <ThumbsDown aria-hidden="true" /> Wrong
+              </button>
+              <button className="sv-queue__btn" onClick={() => onRemove(firing.id)}>
+                <X aria-hidden="true" /> Remove
               </button>
             </span>
           </div>

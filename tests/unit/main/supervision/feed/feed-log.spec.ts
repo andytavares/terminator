@@ -163,3 +163,34 @@ describe('forgetting a session', () => {
     expect(log.list()).toHaveLength(1)
   })
 })
+
+describe('removing one entry', () => {
+  it('takes it off the feed', () => {
+    const log = newLog()
+    const entry = log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'noise' })
+    log.removeEntry(entry.id)
+    expect(log.list()).toEqual([])
+  })
+
+  it('leaves the others', () => {
+    const log = newLog()
+    const first = log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'noise' })
+    log.post({ at: 2_000, sessionId: 's1', author: 'agent', summary: 'keep' })
+    log.removeEntry(first.id)
+    expect(log.list().map((entry) => entry.summary)).toEqual(['keep'])
+  })
+
+  it('survives a reopen', () => {
+    const log = newLog()
+    const entry = log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'noise' })
+    log.removeEntry(entry.id)
+    expect(newLog().list()).toEqual([])
+  })
+
+  it('ignores an id it does not have', () => {
+    const log = newLog()
+    log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'keep' })
+    log.removeEntry('nope')
+    expect(log.list()).toHaveLength(1)
+  })
+})
