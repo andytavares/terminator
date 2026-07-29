@@ -1,0 +1,37 @@
+extensions/speckit-pilot/tests/ipc/phase4-ipc.spec.ts
+  s_5f98598a6d950e::t_611355a16ec92d 39-52
+  s_5f98598a6d950e::t_56f502b6a8abd2 81,527-529
+extensions/speckit-pilot/src/runner/agent-runner.ts
+  s_5f98598a6d950e::t_2bcfb961f9e06c 7
+extensions/speckit-pilot/src/state/state-persistence.ts
+  s_5f98598a6d950e::t_f9f26a2a4adc56 1,152-159,163
+extensions/speckit-pilot/tests/state/artifact-paths.spec.ts
+  s_5f98598a6d950e::t_9895a4a6faa193 2
+extensions/speckit-pilot/tests/state/state-persistence.spec.ts
+  s_5f98598a6d950e::t_96601b13ef389c 200-207
+docs/ARCHITECTURE.md
+  s_5f98598a6d950e::t_b0a6899651a27d 709-714
+docs/adr/007-agent-runner-subprocess.md
+  s_5f98598a6d950e::t_b0a6899651a27d 30-35
+extensions/speckit-pilot/src/index.ts
+  s_5f98598a6d950e::t_f37445a42d4dd0 23
+  s_5f98598a6d950e::t_f9f26a2a4adc56 223-224,226
+extensions/speckit-pilot/src/runner/self-review-plan.ts
+  s_5f98598a6d950e::t_2095d224ad7fbb 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "d1ce84842a1097b871cf5aa847e170c605a8732c",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
