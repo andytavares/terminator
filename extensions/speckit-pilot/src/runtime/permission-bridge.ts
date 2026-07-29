@@ -33,6 +33,8 @@ export interface PermissionDecision {
  * how the two ended up coupled in the first place.
  */
 export interface PendingPermission {
+  /** The conversation it belongs to, so an answer reaches the right run. */
+  readonly sessionId: string
   readonly requestId: string
   readonly toolName: string
   /** One line naming what is actually being asked. */
@@ -53,11 +55,24 @@ export interface PermissionBridgeOptions {
   now: () => number
   /** The autonomy ladder. Returns null to abstain and let the operator decide. */
   autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
+  /**
+   * How long to hold a tool call before handing the decision back to the
+   * terminal.
+   *
+   * A request nobody answers must not block the agent indefinitely. When this
+   * elapses the bridge abstains — `ask` — and Claude Code raises its own prompt
+   * in the terminal the operator is already looking at, which they can answer
+   * there. That is a worse surface than the console but an available one, and
+   * it is the difference between a slow answer and a run that is stuck.
+   */
+  askAfterMs?: number
 }
 
 export interface PermissionBridge {
   canUseTool(toolName: string, input: unknown): Promise<HookDecision>
   resolve(requestId: string, decision: PermissionDecision): void
+  /** Hands one back to the terminal, as the timeout does. */
+  handBackToTerminal(requestId: string): void
   /** Denies everything outstanding. An unresolved promise would hang the turn. */
   rejectAll(reason: string): void
 }
@@ -176,6 +191,13 @@ function questionsOf(input: unknown): Array<{ question: string; options: string[
  * the whole reason to show it is that the half you cannot see is the half that
  * might delete something. The surface scrolls.
  */
+/**
+ * Five minutes. Long enough to walk back to the console, short enough that a
+ * run left alone keeps moving on the operator's own terminal rather than
+ * sitting on a held hook for the twelve hours the hook itself allows.
+ */
+const DEFAULT_ASK_AFTER_MS = 5 * 60_000
+
 const FIELD_LIMIT = 4_000
 const FIELD_COUNT = 24
 
@@ -196,10 +218,29 @@ function renderInput(record: Record<string, unknown>): string | null {
 export function createPermissionBridge(options: PermissionBridgeOptions): PermissionBridge {
   const { onPending, onResolved, now, autoDecide } = options
   const sessionId = options.sessionId
+  const askAfterMs = options.askAfterMs ?? DEFAULT_ASK_AFTER_MS
   // The original input is held alongside the resolver: an `allow` must return
   // the input the agent asked with, not an empty one.
-  const outstanding = new Map<string, { settle: (result: HookDecision) => void; input: unknown }>()
+  const outstanding = new Map<
+    string,
+    { settle: (result: HookDecision) => void; input: unknown; timer: ReturnType<typeof setTimeout> }
+  >()
   let counter = 0
+
+  /**
+   * Gives the decision back to Claude Code, which prompts in the terminal.
+   *
+   * Not an allow and not a deny: nothing is approved on the operator's behalf,
+   * and nothing is refused because they were away from the console.
+   */
+  function handBack(requestId: string): void {
+    const entry = outstanding.get(requestId)
+    if (entry === undefined) return
+    outstanding.delete(requestId)
+    clearTimeout(entry.timer)
+    onResolved(requestId, 'deny')
+    entry.settle({ permissionDecision: 'ask' })
+  }
 
   function toResult(decision: PermissionDecision, input: unknown): HookDecision {
     if (decision.answer !== undefined && decision.answer.trim() !== '') {
@@ -224,6 +265,7 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
 
       const requestId = `${sessionId}-perm-${++counter}`
       onPending({
+        sessionId,
         requestId,
         toolName,
         ...summarise(toolName, input),
@@ -233,7 +275,10 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
       })
 
       return new Promise<HookDecision>((resolvePromise) => {
-        outstanding.set(requestId, { settle: resolvePromise, input })
+        const timer = setTimeout(() => handBack(requestId), askAfterMs)
+        // Never keep the process alive for a prompt nobody is watching.
+        timer.unref?.()
+        outstanding.set(requestId, { settle: resolvePromise, input, timer })
       })
     },
 
@@ -243,13 +288,19 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
       // resolution or reopen a closed prompt.
       if (entry === undefined) return
       outstanding.delete(requestId)
+      clearTimeout(entry.timer)
       onResolved(requestId, decision.allow ? 'allow' : 'deny')
       entry.settle(toResult(decision, entry.input))
+    },
+
+    handBackToTerminal(requestId: string): void {
+      handBack(requestId)
     },
 
     rejectAll(reason: string): void {
       for (const [requestId, entry] of outstanding) {
         outstanding.delete(requestId)
+        clearTimeout(entry.timer)
         entry.settle({ permissionDecision: 'deny', reason })
       }
     },

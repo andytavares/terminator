@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { createAgentRunner, setSupervisedRunner } from '../../src/runner/agent-runner.js'
+import {
+  createAgentRunner,
+  setPermissionSink,
+  setSupervisedRunner,
+} from '../../src/runner/agent-runner.js'
 import type { SupervisedRunner } from '../../src/runtime/supervised-runner.js'
 
 // A phase used to be a hidden `claude --print --permission-mode
@@ -75,7 +79,10 @@ beforeEach(() => {
   setSupervisedRunner(fakeRunner())
 })
 
-afterEach(() => setSupervisedRunner(null))
+afterEach(() => {
+  setSupervisedRunner(null)
+  setPermissionSink(null)
+})
 
 describe('a phase run, once the extension has a supervised runtime', () => {
   it('goes to the terminal rather than a hidden child process', async () => {
@@ -155,5 +162,81 @@ describe('with no supervised runtime', () => {
     createAgentRunner(api()).startPhaseRunner(phaseOpts)
     await settle()
     expect(started).toEqual([])
+  })
+})
+
+describe('what a raised request reaches', () => {
+  // The sink is what a surface reads. Without it the request is held at the
+  // hook with nothing rendering it, which is how a phase ends up stuck.
+  it('reaches the sink, stamped with the card it belongs to', async () => {
+    const held: Array<{ featureDir: string; requestId: string }> = []
+    setPermissionSink({
+      onPending: (ask) => held.push(ask),
+      onResolved: () => {},
+    })
+    const runner = fakeRunner()
+    let raise: ((p: unknown) => void) | null = null
+    runner.start = async (options) => {
+      raise = (options as { onPending: (p: unknown) => void }).onPending
+      return startResult
+    }
+    setSupervisedRunner(runner)
+
+    createAgentRunner(api()).startPhaseRunner(phaseOpts)
+    await settle()
+    raise?.({ sessionId: 'session-1', requestId: 'req-1', toolName: 'Bash', summary: 'ls', at: 1 })
+    expect(held).toEqual([expect.objectContaining({ featureDir: phaseOpts.featureDir })])
+  })
+
+  it('clears from the sink when answered', async () => {
+    const cleared: string[] = []
+    setPermissionSink({ onPending: () => {}, onResolved: (id) => cleared.push(id) })
+    const runner = fakeRunner()
+    let settleIt: ((id: string, d: 'allow' | 'deny') => void) | null = null
+    runner.start = async (options) => {
+      settleIt = (options as { onResolved: (id: string, d: 'allow' | 'deny') => void }).onResolved
+      return startResult
+    }
+    setSupervisedRunner(runner)
+
+    createAgentRunner(api()).startPhaseRunner(phaseOpts)
+    await settle()
+    settleIt?.('req-1', 'allow')
+    expect(cleared).toEqual(['req-1'])
+  })
+
+  it('runs without a sink at all, rather than throwing into the agent', async () => {
+    setPermissionSink(null)
+    const runner = fakeRunner()
+    let raise: ((p: unknown) => void) | null = null
+    runner.start = async (options) => {
+      raise = (options as { onPending: (p: unknown) => void }).onPending
+      return startResult
+    }
+    setSupervisedRunner(runner)
+
+    createAgentRunner(api()).startPhaseRunner(phaseOpts)
+    await settle()
+    expect(() =>
+      raise?.({ sessionId: 's', requestId: 'r', toolName: 'Bash', summary: 'ls', at: 1 })
+    ).not.toThrow()
+  })
+
+  it('reports the end of a run as a completion, so the card does not sit mid-phase', async () => {
+    const codes: number[] = []
+    const runner = fakeRunner()
+    let finish: (() => void) | null = null
+    runner.start = async (options) => {
+      finish = (options as { onEnd?: () => void }).onEnd ?? null
+      return startResult
+    }
+    setSupervisedRunner(runner)
+
+    createAgentRunner(api()).startPhaseRunner({ ...phaseOpts, onComplete: (c) => codes.push(c) })
+    await settle()
+    finish?.()
+    finish?.()
+    // Once, however many times the runtime says it ended.
+    expect(codes).toEqual([0])
   })
 })

@@ -4,6 +4,7 @@ import * as path from 'node:path'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { PhaseId } from '../types/speckit.types.js'
 import type { SupervisedRunner } from '../runtime/supervised-runner.js'
+import type { PendingAsk } from '../runtime/pending-permissions.js'
 import {
   noteFromStreamJsonLine,
   sessionIdFromStreamJsonLine,
@@ -90,6 +91,24 @@ let supervised: SupervisedRunner | null = null
 
 export function setSupervisedRunner(runner: SupervisedRunner | null): void {
   supervised = runner
+}
+
+/**
+ * Where a raised request is held so a surface can show it, and cleared again
+ * once it is answered. Injected rather than imported so the runner does not
+ * reach into the extension's state, and so a test can watch it.
+ */
+let onPermissionPending: ((ask: PendingAsk) => void) | null = null
+let onPermissionResolved: ((requestId: string) => void) | null = null
+
+export function setPermissionSink(
+  sink: {
+    onPending: (ask: PendingAsk) => void
+    onResolved: (requestId: string) => void
+  } | null
+): void {
+  onPermissionPending = sink?.onPending ?? null
+  onPermissionResolved = sink?.onResolved ?? null
 }
 
 /** The workspace a card's repository belongs to, for placing its terminal. */
@@ -435,18 +454,25 @@ function startSupervised(opts: {
       prompt,
       phase: opts.phase,
       resumeSessionId: opts.resumeSessionId,
-      onPending: (pending) =>
+      onPending: (pending) => {
+        // The session comes from the bridge, which knows it: reading it back
+        // from the run being started would be a reference to a binding that is
+        // not assigned until start() returns.
+        onPermissionPending?.({ ...pending, featureDir: opts.featureDir })
         opts.api.window.broadcast('speckit:permission-requested', {
           featureDir: opts.featureDir,
           phase: opts.phase,
           pending,
-        }),
-      onResolved: (requestId, decision) =>
+        })
+      },
+      onResolved: (requestId, decision) => {
+        onPermissionResolved?.(requestId)
         opts.api.window.broadcast('speckit:permission-resolved', {
           featureDir: opts.featureDir,
           requestId,
           decision,
-        }),
+        })
+      },
       onEnd: () => {
         if (ended) return
         ended = true

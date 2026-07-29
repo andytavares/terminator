@@ -62,6 +62,8 @@ export interface SupervisedRunner {
   start(options: StartSupervisedRunOptions): Promise<SupervisedRun | null>
   /** Answers a tool call the operator was asked about. */
   resolve(sessionId: string, requestId: string, decision: PermissionDecision): void
+  /** Gives one back to the terminal, for answering where the agent is. */
+  handBackToTerminal(sessionId: string, requestId: string): void
   /** Ends the current turn, leaving the session open so a redirect lands. */
   interrupt(sessionId: string): void
   /** Ends the run, saying why first so the agent's own record carries it. */
@@ -194,6 +196,10 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
 
     resolve(sessionId, requestId, decision): void {
       running.get(sessionId)?.bridge.resolve(requestId, decision)
+    },
+
+    handBackToTerminal(sessionId, requestId): void {
+      running.get(sessionId)?.bridge.handBackToTerminal(requestId)
     },
 
     interrupt(sessionId): void {

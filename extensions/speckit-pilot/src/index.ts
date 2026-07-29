@@ -96,10 +96,12 @@ import {
   createAgentRunner,
   phaseLogPath,
   pruneOldLogs,
+  setPermissionSink,
   setSupervisedRunner,
 } from './runner/agent-runner.js'
 import { createControlServer, type ControlServer } from './runtime/control-server.js'
 import { createSupervisedRunner, type SupervisedRunner } from './runtime/supervised-runner.js'
+import { createPendingPermissions } from './runtime/pending-permissions.js'
 import type { RunnerHandle } from './runner/agent-runner.js'
 
 const disposables: Disposable[] = []
@@ -687,6 +689,9 @@ function buildNotificationSettingProperties(): Record<string, SettingDefinition>
 // per agent would be a port per card.
 let control: ControlServer | null = null
 let supervisedRunner: SupervisedRunner | null = null
+// What is waiting on the operator, across every card. Without somewhere to
+// hold these the surface has nothing to render and a phase sits at its hook.
+const pendingPermissions = createPendingPermissions()
 
 async function startSupervisionRuntime(api: ExtensionAPI): Promise<void> {
   try {
@@ -697,6 +702,13 @@ async function startSupervisionRuntime(api: ExtensionAPI): Promise<void> {
       stateDir: path.join(api.settings.resolveWorktreeBaseDir(''), '.speckit-pilot-runtime'),
     })
     setSupervisedRunner(supervisedRunner)
+    // Raised requests are held here so a surface can render them, and cleared
+    // when answered — by the operator, the autonomy ladder, or the bridge
+    // handing the decision back to the terminal.
+    setPermissionSink({
+      onPending: (ask) => pendingPermissions.add(ask),
+      onResolved: (requestId) => pendingPermissions.remove(requestId),
+    })
   } catch (error) {
     // Without it, phases fall back to the headless spawn. Said out loud: the
     // difference is whether tool calls are asked about or approved silently.
@@ -706,6 +718,42 @@ async function startSupervisionRuntime(api: ExtensionAPI): Promise<void> {
 
 export function activate(api: ExtensionAPI): void {
   void startSupervisionRuntime(api)
+
+  // What a supervised run is waiting on, and how the operator answers it.
+  // Without these a phase blocks at its PreToolUse hook until the bridge hands
+  // the decision back to the terminal — which works, but makes the console a
+  // spectator of its own agents.
+  reg(api, 'speckit:permissions-list', () => ({ pending: pendingPermissions.list() }))
+
+  reg(api, 'speckit:permission-resolve', (payload: unknown) => {
+    const { requestId, decision, answer } = payload as {
+      requestId: string
+      decision: 'allow' | 'deny'
+      answer?: string
+    }
+    const sessionId = pendingPermissions.sessionFor(requestId)
+    if (sessionId === null || supervisedRunner === null) {
+      // Already answered, already handed back, or the run has ended. Reported
+      // rather than swallowed: a click that does nothing is worse than a
+      // refusal that says why.
+      return { ok: false, reason: 'that request is no longer waiting' }
+    }
+    supervisedRunner.resolve(sessionId, requestId, {
+      allow: decision === 'allow',
+      answer: answer === undefined || answer.trim() === '' ? undefined : answer,
+    })
+    return { ok: true }
+  })
+
+  // Hands one back deliberately: the operator would rather answer it in the
+  // terminal, where they can see what the agent was doing around it.
+  reg(api, 'speckit:permission-hand-back', (payload: unknown) => {
+    const { requestId } = payload as { requestId: string }
+    const sessionId = pendingPermissions.sessionFor(requestId)
+    if (sessionId === null || supervisedRunner === null) return { ok: false }
+    supervisedRunner.handBackToTerminal(sessionId, requestId)
+    return { ok: true }
+  })
 
   // speckit:feature-list — scan specs/ for feature dirs
   reg(api, 'speckit:feature-list', async (payload: unknown) => {
@@ -2069,6 +2117,7 @@ export function deactivate(): void {
   disposables.forEach((d) => d.dispose())
   disposables.length = 0
   setSupervisedRunner(null)
+  setPermissionSink(null)
   supervisedRunner?.dispose()
   supervisedRunner = null
   void control?.close()

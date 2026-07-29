@@ -352,3 +352,60 @@ describe('answering rather than approving', () => {
     expect(questionsOn(events)).toEqual([{ question: 'Why?', options: [] }])
   })
 })
+
+describe('a request nobody answers', () => {
+  // It must not block the agent indefinitely. The hook itself waits twelve
+  // hours; the console handing the decision back long before that is the
+  // difference between a slow answer and a run that is stuck.
+  function bridgeWith(askAfterMs: number) {
+    const events: PendingPermission[] = []
+    const resolved: Array<{ requestId: string; decision: string }> = []
+    const bridge = createPermissionBridge({
+      sessionId: 's1',
+      now: () => 1_000,
+      askAfterMs,
+      onPending: (p) => events.push(p),
+      onResolved: (requestId, decision) => resolved.push({ requestId, decision }),
+    })
+    return { bridge, events, resolved }
+  }
+
+  it('hands the decision back to the terminal rather than holding it', async () => {
+    const { bridge } = bridgeWith(10)
+    // `ask` is Claude Code's own prompt, in the terminal the operator is
+    // already looking at. Not an allow — nothing is approved for them — and not
+    // a deny, which would refuse work because they stepped away.
+    await expect(bridge.canUseTool('Bash', { command: 'ls' })).resolves.toEqual({
+      permissionDecision: 'ask',
+    })
+  })
+
+  it('clears the prompt, so a surface stops showing an ask nobody owns', async () => {
+    const { bridge, resolved } = bridgeWith(10)
+    await bridge.canUseTool('Bash', { command: 'ls' })
+    expect(resolved).toHaveLength(1)
+  })
+
+  it('does not hand back one the operator answered in time', async () => {
+    const { bridge, events, resolved } = bridgeWith(10_000)
+    const pending = bridge.canUseTool('Bash', { command: 'ls' })
+    bridge.resolve(events[0].requestId, { allow: true })
+    await expect(pending).resolves.toMatchObject({ permissionDecision: 'allow' })
+    expect(resolved).toEqual([{ requestId: events[0].requestId, decision: 'allow' }])
+  })
+
+  it('can be handed back deliberately, not only by running out of time', async () => {
+    const { bridge, events } = bridgeWith(10_000)
+    const pending = bridge.canUseTool('Bash', { command: 'ls' })
+    bridge.handBackToTerminal(events[0].requestId)
+    await expect(pending).resolves.toEqual({ permissionDecision: 'ask' })
+  })
+
+  it('ignores handing back something already answered', async () => {
+    const { bridge, events } = bridgeWith(10_000)
+    const pending = bridge.canUseTool('Bash', { command: 'ls' })
+    bridge.resolve(events[0].requestId, { allow: true })
+    await pending
+    expect(() => bridge.handBackToTerminal(events[0].requestId)).not.toThrow()
+  })
+})
