@@ -1,0 +1,40 @@
+extensions/speckit-pilot/src/components/PermissionQueue.tsx
+  s_5f98598a6d950e::t_92b81da40c88b4 1-137,139-163
+  s_5f98598a6d950e::t_b0be834f38ae07 138
+extensions/speckit-pilot/tests/components/App.spec.tsx
+  s_5f98598a6d950e::t_8c4a18f8eb0065 27-30
+extensions/speckit-pilot/tests/components/BoardView.spec.tsx
+  s_5f98598a6d950e::t_351fc6655e25e2 122-127
+  s_5f98598a6d950e::t_0b0d9c3b21895a 7-10,17-20
+  s_5f98598a6d950e::t_cb5094d99770ba 97-121,128-168
+extensions/speckit-pilot/src/components/speckit-pilot.css
+  s_5f98598a6d950e::t_b0be834f38ae07 2754-2880
+extensions/speckit-pilot/src/types/electron.ts
+  s_5f98598a6d950e::t_369cca33595744 162-171,193-207,343-351
+  s_5f98598a6d950e::t_c38c5768ff4eef 180-181,361-370
+extensions/speckit-pilot/tests/components/PermissionQueue.spec.tsx
+  s_5f98598a6d950e::t_b0be834f38ae07 89-92
+  s_5f98598a6d950e::t_0e72a3afc0c4ea 1-88,93-187
+extensions/speckit-pilot/src/components/BoardView.tsx
+  s_5f98598a6d950e::t_866bde8a1419de 76-79,105-113,115-123
+  s_5f98598a6d950e::t_c38c5768ff4eef 114
+  s_5f98598a6d950e::t_adae03fb5a308b 192
+  s_5f98598a6d950e::t_ce9a8a160bd0ce 17-18,173-191,193-194
+  s_5f98598a6d950e::t_f403f43ad049ac 124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "fc593fc0f61d50d587316a7ac5ab54b3abc40170",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
