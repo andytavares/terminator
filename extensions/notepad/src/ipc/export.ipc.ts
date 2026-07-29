@@ -3,7 +3,7 @@ import { z } from 'zod'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import matter from 'gray-matter'
+import { parseFrontMatter, stringifyFrontMatter } from './front-matter'
 import { randomUUID } from '../db/db'
 import type { ExtensionDB } from '../../../../src/main/db/index'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api'
@@ -63,7 +63,7 @@ function buildExistingIdMap(folder: string): Map<string, string> {
     if (!file.endsWith('.md')) continue
     try {
       const content = fs.readFileSync(path.join(folder, file), 'utf-8')
-      const { data } = matter(content)
+      const { data } = parseFrontMatter(content)
       if (typeof data.id === 'string') map.set(data.id, file)
     } catch {
       // skip unparseable files
@@ -130,7 +130,7 @@ export async function exportNotes(
         created: note.created_at,
         updated: note.updated_at,
       }
-      fileContent = matter.stringify(note.body, frontmatter)
+      fileContent = stringifyFrontMatter(note.body, frontmatter)
     } else {
       fileContent = note.body
     }
@@ -196,7 +196,7 @@ export async function importNotes(
   for (const file of files) {
     try {
       const content = fs.readFileSync(path.join(folder, file), 'utf-8')
-      const { data: fm, content: body } = matter(content)
+      const { data: fm, content: body } = parseFrontMatter(content)
 
       if (typeof fm.id !== 'string') {
         skipped++

@@ -37,13 +37,6 @@ vi.mock('../../src/notifications/task-scheduler.js', () => ({
   broadcast: vi.fn(),
 }))
 
-vi.mock('gray-matter', () => ({
-  default: vi.fn((content: string) => ({
-    content,
-    data: {},
-  })),
-}))
-
 vi.mock('../../src/vault/indexer', () => ({
   buildIndex: vi.fn().mockResolvedValue({ tasks: [], projects: [], inboxCount: 0 }),
   readIndex: vi.fn().mockResolvedValue(null),
