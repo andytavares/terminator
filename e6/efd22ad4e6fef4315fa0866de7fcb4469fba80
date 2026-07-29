@@ -1,0 +1,97 @@
+tests/e2e/speckit-supervised-run.spec.ts
+  s_5f98598a6d950e::t_ce6404f9824374 293-312
+extensions/speckit-pilot/tests/runtime/supervised-runner.spec.ts
+  s_5f98598a6d950e::t_6cbb9d4971cd32 125-129
+specs/021-tav-14/.pilot/card.json
+  s_5f98598a6d950e::t_b00c6d13aec483 10
+  s_5f98598a6d950e::t_1a81e05143b013 1-9
+extensions/speckit-pilot/tests/components/SupervisionPanel.spec.tsx
+  s_5f98598a6d950e::t_6cbb9d4971cd32 90,228-231,233
+extensions/speckit-pilot/src/components/RunConsole.tsx
+  s_5f98598a6d950e::t_679f1ab16c48f8 11-16,21,112-116
+extensions/speckit-pilot/tests/components/RunDashboard.spec.tsx
+  s_5f98598a6d950e::t_3c9462900995ea 13-15,45-47,102-108,298-350
+  s_5f98598a6d950e::t_623fa66016230d 351
+specs/022-tav-13/.pilot/state.json
+  s_5f98598a6d950e::t_b00c6d13aec483 37-233
+  s_5f98598a6d950e::t_d5b69c4522b72a 1-36
+specs/025-tav-8/.pilot/state.json
+  s_5f98598a6d950e::t_b00c6d13aec483 37-231
+  s_5f98598a6d950e::t_880cdf9a867fb5 1-36
+specs/022-tav-13/.pilot/card.json
+  s_5f98598a6d950e::t_b00c6d13aec483 10
+  s_5f98598a6d950e::t_ab71baedcf17f5 1-9
+extensions/speckit-pilot/src/types/electron.ts
+  s_5f98598a6d950e::t_b00c6d13aec483 538
+  s_5f98598a6d950e::t_f8d34dc865bcf7 177-178
+extensions/speckit-pilot/src/components/RunDashboard.tsx
+  s_5f98598a6d950e::t_7386ada9ba577d 253-256
+  s_5f98598a6d950e::t_679f1ab16c48f8 5
+  s_5f98598a6d950e::t_bb360180aee5d4 45-51,368-384
+  s_5f98598a6d950e::t_1387a7469d21dc 52-78
+extensions/speckit-pilot/src/components/BoardView.tsx
+  s_5f98598a6d950e::t_6f79fe554d66c1 108-110,115
+specs/021-tav-14/.pilot/state.json
+  s_5f98598a6d950e::t_b00c6d13aec483 42-238
+  s_5f98598a6d950e::t_7912b5e7a11907 1-41
+specs/024-tav-11/.pilot/card.json
+  s_5f98598a6d950e::t_b00c6d13aec483 10
+  s_5f98598a6d950e::t_999e404b974f11 1-9
+specs/025-tav-8/.pilot/card.json
+  s_5f98598a6d950e::t_b00c6d13aec483 10
+  s_5f98598a6d950e::t_81e34f7cf62cc0 1-9
+specs/026-tav-7/.pilot/state.json
+  s_5f98598a6d950e::t_b00c6d13aec483 37-231
+  s_5f98598a6d950e::t_0100e4a34ced6e 1-36
+extensions/speckit-pilot/src/components/SupervisionPanel.tsx
+  s_5f98598a6d950e::t_b00c6d13aec483 96-99
+  s_5f98598a6d950e::t_6f79fe554d66c1 94-95,100-101,180
+extensions/speckit-pilot/src/index.ts
+  s_5f98598a6d950e::t_f8d34dc865bcf7 1163-1168,1171-1178,2540-2549
+  s_5f98598a6d950e::t_ec7082bb5df337 2164-2182
+specs/023-tav-12/.pilot/state.json
+  s_5f98598a6d950e::t_b00c6d13aec483 37-233
+  s_5f98598a6d950e::t_039f88fa3f0a86 1-36
+specs/027-tav-6/.pilot/card.json
+  s_5f98598a6d950e::t_b00c6d13aec483 10
+  s_5f98598a6d950e::t_da6e2e6d4993ce 1-9
+specs/026-tav-7/.pilot/card.json
+  s_5f98598a6d950e::t_b00c6d13aec483 10
+  s_5f98598a6d950e::t_2c68b187bc2ef5 1-9
+specs/027-tav-6/.pilot/state.json
+  s_5f98598a6d950e::t_b00c6d13aec483 37-231
+  s_5f98598a6d950e::t_9baa900fd45ed9 1-36
+extensions/speckit-pilot/src/runtime/supervised-runner.ts
+  s_5f98598a6d950e::t_5d03e449415f27 75-81,99,207,263-267
+  s_5f98598a6d950e::t_54af1d078d2cd8 74
+extensions/speckit-pilot/tests/ipc/run-actions-ipc.spec.ts
+  s_5f98598a6d950e::t_6cbb9d4971cd32 31,165,186-194,197-202,204-208
+specs/023-tav-12/.pilot/card.json
+  s_5f98598a6d950e::t_b00c6d13aec483 10
+  s_5f98598a6d950e::t_9895561ea49b3d 1-9
+specs/024-tav-11/.pilot/state.json
+  s_5f98598a6d950e::t_b00c6d13aec483 37-233
+  s_5f98598a6d950e::t_dd2b3094f3fb6f 1-36
+specs/018-tav-10/.pilot/state.json
+  s_5f98598a6d950e::t_8c891ed49916c6 14-15
+specs/020-tav-9/.pilot/state.json
+  s_5f98598a6d950e::t_4e6a071c273d27 14-15
+extensions/speckit-pilot/SUPERVISION.md
+  s_5f98598a6d950e::t_849eafbfb29599 25-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "e6efd22ad4e6fef4315fa0866de7fcb4469fba80",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
