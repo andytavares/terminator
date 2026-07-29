@@ -111,6 +111,7 @@ import { paletteEntries } from './runtime/palette.js'
 import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
 import { hashArtifacts } from './state/artifact-hash.js'
 import { applyHashVerification, computeStalePhases } from './state/phase-state-machine.js'
+import { artifactEntries, resolveArtifactPath } from './state/artifact-paths.js'
 import { readCardLanes } from './runtime/workitem.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
 import type { HunkDecision } from './runtime/review/hunk-decisions.js'
@@ -336,21 +337,6 @@ async function gitUsername(api: ExtensionAPI, cwd: string): Promise<string> {
 }
 
 /**
- * A phase's artifacts, as absolute paths.
- *
- * `defaultArtifactPaths` gives the constitution a repository-relative path and
- * everything else an absolute one. Hashing the relative one as-is reads it
- * against whatever the process's working directory happens to be, which is not
- * the repository — so it resolves to nothing and every approval looks modified.
- */
-function artifactPathsOf(featureDir: string, paths: readonly string[]): string[] {
-  const repoRoot = path.dirname(path.dirname(featureDir))
-  return paths.map((artifact) =>
-    path.isAbsolute(artifact) ? artifact : path.join(repoRoot, artifact)
-  )
-}
-
-/**
  * Marks any approved phase whose artifacts are no longer what was approved.
  *
  * Read-only: it never writes the state back. The record of what you approved is
@@ -364,7 +350,12 @@ async function withHashVerification(state: PilotState): Promise<PilotState> {
     const phaseState = state.phases[phase]
     if (!phaseState || phaseState.status !== 'approved' || !phaseState.approvedHash) continue
     anyToCheck = true
-    hashes[phase] = await hashArtifacts(artifactPathsOf(state.featureDir, phaseState.artifactPaths))
+    hashes[phase] = await hashArtifacts(
+      artifactEntries(
+        { featureDir: state.featureDir, worktreePath: state.worktreePath },
+        phaseState.artifactPaths
+      )
+    )
   }
   return anyToCheck ? applyHashVerification(state, hashes) : state
 }
@@ -1481,7 +1472,10 @@ export function activate(api: ExtensionAPI): void {
           )
           continue
         }
-        const absPath = path.join(featureDir, spec.relPath)
+        const absPath = resolveArtifactPath(
+          { featureDir, worktreePath: state?.worktreePath },
+          path.join(featureDir, spec.relPath)
+        )
         let exists = false
         try {
           await fs.promises.access(absPath)
@@ -1596,7 +1590,9 @@ export function activate(api: ExtensionAPI): void {
     ps.approvedAt = new Date().toISOString()
     ps.approvedBy = 'user'
     // What was approved, so an edit afterwards is visible rather than silent.
-    ps.approvedHash = await hashArtifacts(artifactPathsOf(featureDir, ps.artifactPaths))
+    ps.approvedHash = await hashArtifacts(
+      artifactEntries({ featureDir, worktreePath: state.worktreePath }, ps.artifactPaths)
+    )
     if (note) ps.lastRunId = note
     // Everything downstream was approved against what this phase used to say.
     for (const downstream of computeStalePhases(state, phase)) {
@@ -1686,11 +1682,18 @@ export function activate(api: ExtensionAPI): void {
       commit?: string
     }
     if (!filePath) return { error: 'filePath required' }
-    const cwd = repoRoot || featureDir || path.dirname(filePath)
+    // Resolved against the run's worktree: the recorded path names the main
+    // checkout, and that is not where the phase wrote it.
+    const state = featureDir ? await readPilotState(featureDir) : null
+    const resolved =
+      featureDir === undefined
+        ? filePath
+        : resolveArtifactPath({ featureDir, worktreePath: state?.worktreePath }, filePath)
+    const cwd = state?.worktreePath || repoRoot || featureDir || path.dirname(resolved)
     const { exec } = await import('node:child_process')
     const { promisify } = await import('node:util')
     const execAsync = promisify(exec)
-    const relPath = path.relative(cwd, filePath)
+    const relPath = path.relative(cwd, resolved)
 
     let current: string | null = null
     if (commit) {
@@ -1703,7 +1706,7 @@ export function activate(api: ExtensionAPI): void {
       }
     } else {
       try {
-        current = await fs.promises.readFile(filePath, 'utf-8')
+        current = await fs.promises.readFile(resolved, 'utf-8')
       } catch {
         current = null
       }

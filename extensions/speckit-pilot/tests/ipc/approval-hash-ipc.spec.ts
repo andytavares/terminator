@@ -41,6 +41,15 @@ vi.mock('../../src/runtime/control-server.js', () => ({
 
 let repo: string
 let featureDir: string
+/**
+ * Where the phase actually wrote the spec.
+ *
+ * Not `<repo>/specs/021-a/spec.md`: a phase runs in the card's worktree, and
+ * `git worktree add` checks out a branch, so the card directory the board
+ * created — uncommitted, in the main checkout — is not there. The agent creates
+ * it inside the worktree. Verified against real git.
+ */
+let worktreePath: string
 let specPath: string
 let getHandler: (channel: string) => ((payload: unknown) => Promise<unknown>) | undefined
 
@@ -50,20 +59,25 @@ function call(channel: string, payload: unknown = {}): Promise<unknown> {
   return handler(payload)
 }
 
-/** The card on disk, as the pilot writes it. */
+/** The card on disk, as the pilot writes it: state in the repo, work in the worktree. */
 async function seed(status: PhaseId extends never ? never : string = 'awaiting_review') {
   const { createInitialState } = await import('../../src/state/state-persistence.js')
   const state = createInitialState(featureDir) as PilotState
   state.phases.specify.status = status as PilotState['phases']['specify']['status']
-  state.phases.specify.artifactPaths = [specPath]
+  // Recorded against the main checkout, exactly as `defaultArtifactPaths` does.
+  state.phases.specify.artifactPaths = [join(featureDir, 'spec.md')]
+  state.worktreePath = worktreePath
+  state.branchName = 'feat/a'
   writeFileSync(join(featureDir, '.pilot', 'state.json'), JSON.stringify(state))
 }
 
 beforeAll(async () => {
   repo = mkdtempSync(join(tmpdir(), 'approval-hash-'))
   featureDir = join(repo, 'specs', '021-a')
-  specPath = join(featureDir, 'spec.md')
+  worktreePath = join(repo, '.worktrees', 'feat-a')
+  specPath = join(worktreePath, 'specs', '021-a', 'spec.md')
   mkdirSync(join(featureDir, '.pilot'), { recursive: true })
+  mkdirSync(join(worktreePath, 'specs', '021-a'), { recursive: true })
 
   const handlers = new Map<string, (payload: unknown) => Promise<unknown>>()
   const api = {
@@ -130,6 +144,23 @@ beforeEach(async () => {
 })
 
 describe('approving a phase', () => {
+  it('hashes the artifact the phase wrote, not the path it was recorded under', async () => {
+    // The recorded path is in the main checkout and nothing is there. Hashing
+    // that would hash a permanently missing file: consistent, and useless.
+    const { state } = (await call('speckit:phase-approve', {
+      featureDir,
+      phase: 'specify',
+    })) as { state: PilotState }
+    const withoutTheFile = state.phases.specify.approvedHash
+
+    rmSync(specPath)
+    const { state: second } = (await call('speckit:phase-approve', {
+      featureDir,
+      phase: 'specify',
+    })) as { state: PilotState }
+    expect(second.phases.specify.approvedHash).not.toBe(withoutTheFile)
+  })
+
   it('records what it approved', async () => {
     const { state } = (await call('speckit:phase-approve', {
       featureDir,
@@ -189,6 +220,27 @@ describe('reading the card afterwards', () => {
     await seed('approved')
     const { state } = (await call('speckit:pilot-state', { featureDir })) as { state: PilotState }
     expect(state.phases.specify.status).toBe('approved')
+  })
+})
+
+describe('the gate preview', () => {
+  it('shows the artifact the phase wrote, from the worktree it wrote it in', async () => {
+    // Reading the recorded path instead showed "No artifact to preview" for
+    // every supervised run, which is every run.
+    writeFileSync(specPath, '# Spec\n\nWhat the agent wrote.\n')
+    const result = (await call('speckit:artifact-read', {
+      filePath: join(featureDir, 'spec.md'),
+      featureDir,
+    })) as { current: string | null }
+    expect(result.current).toContain('What the agent wrote.')
+  })
+
+  it('reports nothing rather than throwing when there is no such artifact', async () => {
+    const result = (await call('speckit:artifact-read', {
+      filePath: join(featureDir, 'nothing.md'),
+      featureDir,
+    })) as { current: string | null }
+    expect(result.current).toBeNull()
   })
 })
 

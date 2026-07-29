@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
+import type { ArtifactEntry } from './artifact-paths.js'
 
 // What a phase's artifacts were when you approved them.
 //
@@ -25,18 +26,22 @@ export async function computeHash(filePath: string): Promise<string | null> {
  * file against one file's hash, which is what the unused version of this did,
  * reports a change on the second artifact of every multi-artifact phase.
  *
- * The path goes into the digest with the content, so renaming an artifact counts
- * as a change. Sorted, so the order the paths happen to be listed in does not.
+ * Each entry contributes its **name** and its content, where the name is
+ * repository-relative. Renaming an artifact therefore counts as a change, while
+ * reading the same artifact from a different checkout does not — and it is read
+ * from a different checkout routinely: a card acquires a worktree the moment its
+ * next phase starts. Sorted by name, so the order they were listed in does not
+ * matter either.
  */
-export async function hashArtifacts(paths: readonly string[]): Promise<string | null> {
-  if (paths.length === 0) return null
+export async function hashArtifacts(entries: readonly ArtifactEntry[]): Promise<string | null> {
+  if (entries.length === 0) return null
 
   const digest = createHash('sha256')
-  for (const path of [...paths].sort()) {
-    const hash = await computeHash(path)
+  for (const entry of [...entries].sort((a, b) => a.name.localeCompare(b.name))) {
+    const hash = await computeHash(entry.path)
     // A missing artifact is a change, and a distinguishable one: it hashes
     // differently from any content, so an approval does not survive a delete.
-    digest.update(`${path}:${hash ?? 'missing'}\n`)
+    digest.update(`${entry.name}:${hash ?? 'missing'}\n`)
   }
   return digest.digest('hex')
 }

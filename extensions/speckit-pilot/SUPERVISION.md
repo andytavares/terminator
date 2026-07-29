@@ -175,7 +175,15 @@ and only appeared when the application ran.
 Approving a phase records a hash of its artifacts — one hash over the set, since
 `plan` produces three files. Reading the card recomputes it, and a phase whose
 artifacts no longer match is marked **modified**: what is on disk is not what you
-approved. That is a different thing from **stale**, which means something
+approved.
+
+The artifacts are read **from the card's worktree**, which is where the phase
+wrote them. `defaultArtifactPaths` records them against the main checkout, and
+that is not where they are: `git worktree add` checks out a branch, so the card
+directory the board created — uncommitted, in the main checkout — is not in the
+worktree, and the agent creates it there. The hash is taken over each artifact's
+_repository-relative_ name plus its content, so reading the same artifact from a
+different checkout is not a change while renaming one still is. That is a different thing from **stale**, which means something
 upstream moved, and the board says which.
 
 A phase can also be **skipped** from its gate, and unskipped from the rail. Not

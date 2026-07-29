@@ -60,6 +60,11 @@ describe('computeHash()', () => {
 })
 
 describe('hashArtifacts()', () => {
+  /** Names an artifact by its file name, which is what the caller does with a
+      repository-relative path. */
+  const entries = (paths: string[]) =>
+    paths.map((path) => ({ name: path.slice(path.lastIndexOf('/') + 1), path }))
+
   // A phase can produce more than one artifact — `plan` produces three — and
   // `approvedHash` is one field. Comparing every file against one file's hash,
   // which is what the unused version did, reports a change on the second
@@ -76,9 +81,9 @@ describe('hashArtifacts()', () => {
     await writeFile(a, 'plan')
     await writeFile(b, 'research')
 
-    const before = await hashArtifacts([a, b])
+    const before = await hashArtifacts(entries([a, b]))
     await writeFile(b, 'research, revised')
-    expect(await hashArtifacts([a, b])).not.toBe(before)
+    expect(await hashArtifacts(entries([a, b]))).not.toBe(before)
   })
 
   it('does not depend on the order the paths were listed in', async () => {
@@ -87,7 +92,7 @@ describe('hashArtifacts()', () => {
     const b = join(d, 'b.md')
     await writeFile(a, 'one')
     await writeFile(b, 'two')
-    expect(await hashArtifacts([a, b])).toBe(await hashArtifacts([b, a]))
+    expect(await hashArtifacts(entries([a, b]))).toBe(await hashArtifacts(entries([b, a])))
   })
 
   it('changes when an artifact is renamed, since the path is part of it', async () => {
@@ -96,23 +101,49 @@ describe('hashArtifacts()', () => {
     const b = join(d, 'spec-old.md')
     await writeFile(a, 'same content')
     await writeFile(b, 'same content')
-    expect(await hashArtifacts([a])).not.toBe(await hashArtifacts([b]))
+    expect(await hashArtifacts(entries([a]))).not.toBe(await hashArtifacts(entries([b])))
   })
 
   it('changes when an artifact is deleted — an approval does not survive that', async () => {
     const d = await dir()
     const a = join(d, 'spec.md')
     await writeFile(a, 'content')
-    const before = await hashArtifacts([a])
+    const before = await hashArtifacts(entries([a]))
     await unlink(a)
-    expect(await hashArtifacts([a])).not.toBe(before)
+    expect(await hashArtifacts(entries([a]))).not.toBe(before)
   })
 
   it('is stable when nothing changed', async () => {
     const d = await dir()
     const a = join(d, 'spec.md')
     await writeFile(a, 'content')
-    expect(await hashArtifacts([a])).toBe(await hashArtifacts([a]))
+    expect(await hashArtifacts(entries([a]))).toBe(await hashArtifacts(entries([a])))
+  })
+
+  it('is the same read from another checkout, which is where it is read from', async () => {
+    // A card acquires a worktree the moment its next phase starts. Hashing the
+    // absolute path made every approval taken before that look modified after.
+    const main = await dir()
+    const worktree = await dir()
+    await writeFile(join(main, 'spec.md'), 'the thing, as approved')
+    await writeFile(join(worktree, 'spec.md'), 'the thing, as approved')
+
+    expect(
+      await hashArtifacts([{ name: 'specs/021-a/spec.md', path: join(main, 'spec.md') }])
+    ).toBe(await hashArtifacts([{ name: 'specs/021-a/spec.md', path: join(worktree, 'spec.md') }]))
+  })
+
+  it('still differs when that other checkout has different content', async () => {
+    const main = await dir()
+    const worktree = await dir()
+    await writeFile(join(main, 'spec.md'), 'the thing, as approved')
+    await writeFile(join(worktree, 'spec.md'), 'and one more thing nobody approved')
+
+    expect(
+      await hashArtifacts([{ name: 'specs/021-a/spec.md', path: join(main, 'spec.md') }])
+    ).not.toBe(
+      await hashArtifacts([{ name: 'specs/021-a/spec.md', path: join(worktree, 'spec.md') }])
+    )
   })
 
   it('reports nothing for a phase that produces no artifacts', async () => {
