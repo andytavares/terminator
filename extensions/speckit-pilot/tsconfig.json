@@ -1,0 +1,26 @@
+{
+  // The root typecheck references only main, renderer and shared, so extension
+  // code was never checked at all — type errors in it reached CI green. This
+  // brings the pilot's own sources under `tsc`, at the same strictness.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"]
+  },
+  // Scoped to the supervision runtime for now. The root typecheck references
+  // only main, renderer and shared, so extension code was never checked at all
+  // — widening this to the whole extension surfaces 25 pre-existing errors in
+  // components written before it, which is its own change rather than one to
+  // smuggle in here.
+  "include": ["src/runtime/**/*.ts"],
+  "exclude": ["src/index.js", "dist", "node_modules"]
+}

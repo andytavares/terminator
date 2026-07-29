@@ -107,6 +107,7 @@ import { createPendingPermissions } from './runtime/pending-permissions.js'
 import { createStallWatcher, type StallWatcher } from './runtime/stall-watcher.js'
 import { createSupervision, type Supervision } from './runtime/supervision.js'
 import { buildDigest } from './runtime/feed/digest.js'
+import type { CardLanes } from './runtime/lane-coordination.js'
 import type { StallFiring } from './runtime/evaluate-stall.js'
 import type { RunnerHandle } from './runner/agent-runner.js'
 
@@ -881,6 +882,46 @@ export function activate(api: ExtensionAPI): void {
     const ok = (await supervision?.decideHunk(sessionId, hunkId, decision)) ?? false
     return { ok }
   })
+
+  // The request set against the agent's own account of what it did. The step
+  // every diff viewer skips, and the one that catches work that is defensible
+  // in isolation and was never asked for.
+  reg(api, 'speckit:review-intent', async (payload: unknown) => {
+    const { sessionId, request, agentAccount } = payload as {
+      sessionId: string
+      request: string
+      agentAccount: string
+    }
+    const intent = await supervision?.intentFor(sessionId, request, agentAccount)
+    return { intent: intent ?? null }
+  })
+
+  // Merge ordering across the repositories a card touches. A card with one lane
+  // costs nothing: every rule collapses to a no-op.
+  reg(api, 'speckit:lanes', (payload: unknown) => {
+    const { card } = payload as { card: CardLanes }
+    return { lanes: supervision?.lanes(card) ?? [] }
+  })
+
+  reg(api, 'speckit:lane-may-merge', (payload: unknown) => {
+    const { card, ord, merged } = payload as {
+      card: CardLanes
+      ord: number
+      merged: number[]
+    }
+    return (
+      supervision?.mayMerge(card, ord, merged ?? []) ?? {
+        allowed: false,
+        reason: 'no runtime',
+        blockingLane: null,
+      }
+    )
+  })
+
+  // What merged without a person looking, so it can be reviewed after the fact.
+  reg(api, 'speckit:unattended-merges', () => ({
+    merges: supervision?.mergePolicy.unattendedMerges() ?? [],
+  }))
 
   reg(api, 'speckit:review-done', (payload: unknown) => {
     const { sessionId } = payload as { sessionId: string }

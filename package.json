@@ -29,7 +29,8 @@
     "check-patch-coverage": "node scripts/check-patch-coverage.cjs",
     "create-extension": "node scripts/create-extension.cjs",
     "package": "npm run build:extensions && npm run build:remote && electron-vite build && electron-builder --mac --arm64 --publish never",
-    "prepare": "husky"
+    "prepare": "husky",
+    "typecheck:extensions": "tsc --noEmit -p extensions/speckit-pilot/tsconfig.json"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

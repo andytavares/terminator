@@ -406,3 +406,136 @@ describe('how it reaches git', () => {
     expect(() => build().finish('nobody', 2_000)).not.toThrow()
   })
 })
+
+describe('the intent step', () => {
+  // The step every diff viewer skips: what was asked for, against what the
+  // agent says it did, with work outside the request called out.
+  function withFiles(files: string[]): Supervision {
+    return build({
+      run: async (_command, args) => ({
+        ok: true,
+        stdout: args.includes('ls-files') ? '' : files.map((f) => `1\t0\t${f}`).join('\n'),
+      }),
+    })
+  }
+
+  it('reports what the agent touched against what it said', async () => {
+    const s = withFiles(['src/a.ts'])
+    addRun(s)
+    const intent = await s.intentFor('session-1', 'Add a helper', 'Added the helper')
+    expect(intent).toMatchObject({ request: 'Add a helper', agentAccount: 'Added the helper' })
+  })
+
+  it('names files the request never asked about — the scope-creep signal', async () => {
+    const s = withFiles(['src/a.ts', 'src/config/timeouts.ts'])
+    addRun(s)
+    // The request names the file it is about; the agent also touched another.
+    const intent = await s.intentFor('session-1', 'Add a helper to src/a.ts', 'Added it')
+    expect(intent?.unexpectedFiles).toContain('src/config/timeouts.ts')
+  })
+
+  it('reports nothing for a run it does not have', async () => {
+    expect(await build().intentFor('nobody', 'x', 'y')).toBeNull()
+  })
+})
+
+describe('lanes across repositories', () => {
+  const card = {
+    id: 'FLU-220',
+    lanes: [
+      {
+        ord: 1,
+        repo: 'fluent',
+        branch: 'feat/x',
+        role: 'producer' as const,
+        blocks: [2],
+        blocked_by: [],
+      },
+      {
+        ord: 2,
+        repo: 'cli',
+        branch: 'feat/x',
+        role: 'consumer' as const,
+        blocks: [],
+        blocked_by: [1],
+      },
+    ],
+    contract: { shared_files: ['proto/session.proto'] },
+  }
+
+  it('orders them, so a consumer is never merged before its producer', () => {
+    const s = build()
+    expect(s.lanes(card).map((v) => v.lane.ord)).toEqual([1, 2])
+  })
+
+  it('flags the file both lanes touch, before either starts', () => {
+    const s = build()
+    expect(s.lanes(card)[0].collisions).toContain('proto/session.proto')
+  })
+
+  it('refuses a consumer while its producer is unmerged', () => {
+    expect(build().mayMerge(card, 2, []).allowed).toBe(false)
+  })
+
+  it('allows it once the producer has merged', () => {
+    expect(build().mayMerge(card, 2, [1]).allowed).toBe(true)
+  })
+
+  it('allows the producer straight away', () => {
+    expect(build().mayMerge(card, 1, []).allowed).toBe(true)
+  })
+
+  it('costs a single-lane card nothing', () => {
+    // Every rule collapses to a no-op, so ordinary work never sees any of this.
+    const single = {
+      id: 'X',
+      lanes: [{ ord: 1, repo: 'r', branch: 'b', blocks: [], blocked_by: [] }],
+    }
+    const s = build()
+    expect(s.lanes(single)[0].collisions).toEqual([])
+    expect(s.mayMerge(single, 1, []).allowed).toBe(true)
+  })
+
+  it('names lanes that started before their upstream merged', () => {
+    // They are working against a contract that has since changed.
+    const started = new Map([
+      [1, 0],
+      [2, 1_000],
+    ])
+    expect(build().staleLanes(card, 1, 5_000, started)).toContain(2)
+  })
+})
+
+describe('an unattended merge', () => {
+  it('is refused unless the repository opted in', () => {
+    const s = build()
+    const decision = s.mergePolicy.mayMergeUnattended({
+      sessionId: 'session-1',
+      repoPath: '/wt/a',
+      branch: 'feat/a',
+      grade: 'P3',
+      checkState: 'passing',
+      diffSummary: { files: 1, added: 1, removed: 0 },
+    })
+    // The one action that happens with nobody watching, so it is not a default.
+    // Note this is the merge *policy*'s decision, which says `may`; lane
+    // ordering has its own shape that says `allowed`.
+    expect(decision.may).toBe(false)
+  })
+
+  it('records what merged without a person, for reviewing after the fact', () => {
+    const s = build()
+    s.mergePolicy.recordUnattendedMerge(
+      {
+        sessionId: 'session-1',
+        repoPath: '/wt/a',
+        branch: 'feat/a',
+        grade: 'P3',
+        checkState: 'passing',
+        diffSummary: { files: 1, added: 1, removed: 0 },
+      },
+      9_000
+    )
+    expect(s.mergePolicy.unattendedMerges()).toHaveLength(1)
+  })
+})

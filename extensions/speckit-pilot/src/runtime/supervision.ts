@@ -8,6 +8,9 @@ import { readDiffSummary, readChangedFiles, type RunCommand } from './diff-metri
 import type { CheckState } from './review/risk-grader.js'
 import { parseHunks } from './review/parse-hunks.js'
 import { createDecisionSet, type DecisionSet, type HunkDecision } from './review/hunk-decisions.js'
+import { reviewIntent, type IntentReview } from './review/intent-diff.js'
+import { createMergePolicy, type MergePolicy } from './review/merge-policy.js'
+import { laneViews, mayMergeLane, staleLanes, type CardLanes } from './lane-coordination.js'
 
 // The supervision layer: what is running, what it changed, what needs looking
 // at, and what must not start yet.
@@ -21,6 +24,7 @@ export interface Supervision {
   readonly review: ReviewQueue
   readonly backpressure: BackpressureGate
   readonly feed: FeedLog
+  readonly mergePolicy: MergePolicy
   /**
    * Reads what a run's working copy has changed and records it.
    *
@@ -46,6 +50,31 @@ export interface Supervision {
    */
   hunksFor(sessionId: string): Promise<DecisionSet | null>
   decideHunk(sessionId: string, hunkId: string, decision: HunkDecision): Promise<boolean>
+  /**
+   * The request set against the agent's own account of what it did.
+   *
+   * The step every diff viewer skips, and the one that catches work that is
+   * defensible in isolation and was never asked for.
+   */
+  intentFor(sessionId: string, request: string, agentAccount: string): Promise<IntentReview | null>
+  /**
+   * Whether a lane may merge yet, and what it would collide with.
+   *
+   * A card with one lane costs nothing here: every rule collapses to a no-op,
+   * so single-repository work never sees any of this.
+   */
+  lanes(card: CardLanes): ReturnType<typeof laneViews>
+  /**
+   * Lanes that started before an upstream lane merged, so they are working
+   * against a contract that has since changed and need re-running.
+   */
+  staleLanes(
+    card: CardLanes,
+    upstreamOrd: number,
+    upstreamMergedAt: number,
+    laneStartedAt: ReadonlyMap<number, number>
+  ): number[]
+  mayMerge(card: CardLanes, ord: number, merged: readonly number[]): ReturnType<typeof mayMergeLane>
   /** Everything a surface needs in one read. */
   snapshot(): {
     runs: Run[]
@@ -63,6 +92,11 @@ export interface SupervisionOptions {
   reviewLimit?: number
   /** The branch a card's work is measured against. */
   baseBranch?: string
+  /**
+   * Whether a P3 change with green checks may merge without a person. Off by
+   * default: it is the one action that happens with nobody watching.
+   */
+  unattendedMergeEnabled?: boolean
 }
 
 /**
@@ -87,6 +121,13 @@ export function createSupervision(options: SupervisionOptions): Supervision {
   const runs = createRunRegistry()
   const review = createReviewQueue()
   const feed = createFeedLog(path.join(stateDir, 'feed.jsonl'))
+  const mergePolicy = createMergePolicy({
+    // Off unless a repository opts in. An unattended merge is the one action
+    // here that happens with nobody watching, so it is not a default.
+    isUnattendedEnabledFor: () => options.unattendedMergeEnabled ?? false,
+    auditLogPath: path.join(stateDir, 'unattended-merges.jsonl'),
+  })
+
   const backpressure = createBackpressureGate({
     limit: options.reviewLimit ?? DEFAULT_REVIEW_LIMIT,
     // Counted across every card: the limit is the operator's attention, and
@@ -94,6 +135,18 @@ export function createSupervision(options: SupervisionOptions): Supervision {
     countUnreviewed: () => review.count(),
     overrideLogPath: path.join(stateDir, 'backpressure-overrides.jsonl'),
   })
+
+  /**
+   * File paths named in a request.
+   *
+   * Deliberately conservative: a token has to look like a path with an
+   * extension before it counts, because a false expectation reads as "the agent
+   * missed something" and that is worse than saying nothing.
+   */
+  function pathsIn(text: string): string[] {
+    const matches = text.match(/[A-Za-z0-9_.@/-]+\.[A-Za-z0-9]{1,6}\b/g) ?? []
+    return [...new Set(matches.filter((token) => token.includes('/')))]
+  }
 
   // Built on first read and kept while the run is being reviewed, so decisions
   // survive scrolling away from it.
@@ -110,6 +163,7 @@ export function createSupervision(options: SupervisionOptions): Supervision {
     review,
     backpressure,
     feed,
+    mergePolicy,
     measure,
 
     async finishTurn(sessionId, turns, at): Promise<void> {
@@ -187,6 +241,34 @@ export function createSupervision(options: SupervisionOptions): Supervision {
       if (set === null) return false
       set.decide(hunkId, decision)
       return true
+    },
+
+    async intentFor(sessionId, request, agentAccount): Promise<IntentReview | null> {
+      const run = runs.get(sessionId)
+      if (run === null) return null
+      const changedFiles = await readChangedFiles(run.worktreePath, baseBranch, runCommand)
+      return reviewIntent({
+        request,
+        agentAccount,
+        changedFiles,
+        // Taken from the request itself. A card's tasks name the files they
+        // touch, so the paths in the text are what the work was expected to
+        // cover — and with nothing named the step reports nothing rather than
+        // flagging every file, which would be noise that trains you to skip it.
+        expectedFiles: pathsIn(request),
+      })
+    },
+
+    lanes(card) {
+      return laneViews(card)
+    },
+
+    staleLanes(card, upstreamOrd, upstreamMergedAt, laneStartedAt) {
+      return staleLanes(card, upstreamOrd, upstreamMergedAt, laneStartedAt)
+    },
+
+    mayMerge(card, ord, merged) {
+      return mayMergeLane(card, ord, merged)
     },
 
     snapshot() {
