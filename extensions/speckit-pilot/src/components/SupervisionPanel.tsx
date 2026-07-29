@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   getSpeckitAPI,
+  type DigestView,
   type FeedEntryView,
   type ReviewItemView,
   type RunView,
@@ -29,6 +30,14 @@ export interface SupervisionPanelProps {
   workspacePath?: string
   /** Something changed that the rest of the board should reload. */
   onChanged?: () => void
+  /**
+   * Show this run, or this queued diff, now.
+   *
+   * The palette hands the panel a session and expects the section it lives in
+   * to be the one on screen; without this the jump lands on whatever tab was
+   * open and reads as having done nothing.
+   */
+  focus?: { kind: 'run' | 'review'; sessionId: string } | null
 }
 
 const STATE_LABEL: Record<RunView['state'], string> = {
@@ -355,14 +364,20 @@ function Review({
   items,
   backpressure,
   cardLabel,
+  openSessionId,
   onDone,
 }: {
   items: readonly ReviewItemView[]
   backpressure: SupervisionSnapshot['backpressure']
   cardLabel?: (featureDir: string) => string
+  /** Opened from elsewhere — the palette, today. */
+  openSessionId?: string | null
   onDone: (sessionId: string) => void
 }): JSX.Element {
-  const [open, setOpen] = useState<string | null>(null)
+  const [open, setOpen] = useState<string | null>(openSessionId ?? null)
+  useEffect(() => {
+    if (openSessionId !== undefined && openSessionId !== null) setOpen(openSessionId)
+  }, [openSessionId])
   return (
     <>
       {/* Said out loud rather than shown as a disabled button somewhere else. */}
@@ -416,12 +431,50 @@ function Review({
   )
 }
 
+/**
+ * When you last read the feed.
+ *
+ * Kept in the browser rather than the runtime: it is a property of the person
+ * looking, not of the runs, and it must survive the extension host restarting
+ * without becoming state a run has to reason about.
+ */
+const LAST_LOOKED_KEY = 'speckit.feed.lastLookedAt'
+
+function readLastLooked(): number | null {
+  const raw = window.localStorage.getItem(LAST_LOOKED_KEY)
+  if (raw === null) return null
+  const at = Number(raw)
+  return Number.isFinite(at) ? at : null
+}
+
 function Feed({ entries, now }: { entries: readonly FeedEntryView[]; now: number }): JSX.Element {
+  const [lastLooked] = useState(readLastLooked)
+  const [digest, setDigest] = useState<DigestView | null>(null)
+
+  // Coming back after 45 minutes away, the question is not "what happened" line
+  // by line — it is "what happened that I have not seen". Marked as read on the
+  // way out so the next visit answers the same question about a new interval.
+  useEffect(() => {
+    if (lastLooked === null) return
+    void getSpeckitAPI().feedDigest({ from: lastLooked }).then(setDigest)
+  }, [lastLooked])
+
+  useEffect(() => {
+    return () => window.localStorage.setItem(LAST_LOOKED_KEY, String(Date.now()))
+  }, [])
+
   if (entries.length === 0) {
     return <div className="sk-sup__clear">Nothing has happened yet.</div>
   }
   return (
     <div className="sk-sup__list">
+      {digest !== null && digest.entryCount > 0 && (
+        <div className="sk-sup__note">
+          Since you last looked {elapsed(Math.max(0, now - digest.from))} ago: {digest.entryCount}{' '}
+          {digest.entryCount === 1 ? 'thing' : 'things'} across {digest.sessionCount}{' '}
+          {digest.sessionCount === 1 ? 'run' : 'runs'}.
+        </div>
+      )}
       {entries.map((entry) => (
         <div className="sk-sup__row" key={entry.id}>
           {/* Attributed, because an entry the pilot wrote is not the agent
@@ -444,6 +497,7 @@ export function SupervisionPanel({
   onOpenTerminal,
   workspacePath,
   onChanged,
+  focus,
 }: SupervisionPanelProps): JSX.Element {
   const [section, setSection] = useState<Section>('runs')
   const [snapshot, setSnapshot] = useState<SupervisionSnapshot>({
@@ -488,6 +542,12 @@ export function SupervisionPanel({
     }, 5_000)
     return () => clearInterval(timer)
   }, [load])
+
+  // A jump has to land where the thing is, or it reads as having done nothing.
+  useEffect(() => {
+    if (focus == null) return
+    setSection(focus.kind === 'review' ? 'review' : 'runs')
+  }, [focus])
 
   const counts: Record<Section, number> = {
     runs: snapshot.runs.filter((run) => run.state !== 'finished').length,
@@ -537,6 +597,7 @@ export function SupervisionPanel({
           items={snapshot.review}
           backpressure={snapshot.backpressure}
           cardLabel={cardLabel}
+          openSessionId={focus?.kind === 'review' ? focus.sessionId : null}
           onDone={(sessionId) => void getSpeckitAPI().reviewDone({ sessionId }).then(reload)}
         />
       )}

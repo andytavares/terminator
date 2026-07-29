@@ -107,6 +107,7 @@ import { createPendingPermissions } from './runtime/pending-permissions.js'
 import { createStallWatcher, type StallWatcher } from './runtime/stall-watcher.js'
 import { createSupervision, type Supervision } from './runtime/supervision.js'
 import { buildDigest } from './runtime/feed/digest.js'
+import { paletteEntries } from './runtime/palette.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
 import type { HunkDecision } from './runtime/review/hunk-decisions.js'
 
@@ -766,6 +767,18 @@ let supervisedRunner: SupervisedRunner | null = null
 // hold these the surface has nothing to render and a phase sits at its hook.
 const pendingPermissions = createPendingPermissions()
 let stallWatcher: StallWatcher | null = null
+/**
+ * The palette's current entries, disposed and rebuilt when what is running
+ * changes.
+ *
+ * The host takes a fixed contribution list, so keeping runs in the palette
+ * means re-registering rather than answering a query. Cheap: the list is one
+ * entry per live run and one per queued diff, and it only rebuilds when the
+ * text would actually differ.
+ */
+let paletteRegistrations: Disposable[] = []
+let paletteSignature = ''
+let paletteTimer: NodeJS.Timeout | null = null
 // What is running, what it changed, what needs looking at, and what must not
 // start yet.
 let supervision: Supervision | null = null
@@ -860,6 +873,13 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
       },
     })
     stallWatcher.start()
+
+    // Kept in step with the register on a timer rather than an event: the
+    // registry is read by everything and subscribed to by nothing, and a
+    // palette that lists a run which ended is worse than one a few seconds
+    // behind.
+    refreshPalette(api)
+    paletteTimer = setInterval(() => refreshPalette(api), 5_000)
     return supervision
   } catch (error) {
     // Without it, phases fall back to the headless spawn. Said out loud: the
@@ -2462,6 +2482,44 @@ export function activate(api: ExtensionAPI): void {
   )
 }
 
+/**
+ * Puts what is running, and what is waiting to be reviewed, one keystroke away.
+ *
+ * Three surfaces answer the same question — what needs me, ranked — and this is
+ * the one you reach without moving your hands.
+ */
+function refreshPalette(api: ExtensionAPI): void {
+  const snapshot = supervision?.snapshot() ?? null
+  const entries = snapshot === null ? [] : paletteEntries(snapshot.runs, snapshot.review)
+  // Rebuilt only when it would read differently, so an open palette is not
+  // re-registered under the cursor every tick.
+  const signature = entries.map((e) => `${e.id}:${e.description}`).join('|')
+  if (signature === paletteSignature) return
+  paletteSignature = signature
+
+  for (const registration of paletteRegistrations) registration.dispose()
+  paletteRegistrations = entries.map((entry) =>
+    api.commands.register(
+      {
+        id: entry.id,
+        label: entry.label,
+        description: entry.description,
+        category: entry.category,
+      },
+      () => {
+        // The window first: a command that changes what is on screen behind
+        // another window has done nothing you can see.
+        api.window.focusSelf()
+        api.window.broadcast('speckit:palette-goto', {
+          kind: entry.kind,
+          sessionId: entry.sessionId,
+          terminalSessionId: supervisedRunner?.terminalFor(entry.sessionId) ?? null,
+        })
+      }
+    )
+  )
+}
+
 export function deactivate(): void {
   disposables.forEach((d) => d.dispose())
   disposables.length = 0
@@ -2472,6 +2530,11 @@ export function deactivate(): void {
   supervision = null
   stallWatcher?.stop()
   stallWatcher = null
+  if (paletteTimer !== null) clearInterval(paletteTimer)
+  paletteTimer = null
+  for (const registration of paletteRegistrations) registration.dispose()
+  paletteRegistrations = []
+  paletteSignature = ''
   supervisedRunner?.dispose()
   supervisedRunner = null
   void control?.close()

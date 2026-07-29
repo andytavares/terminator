@@ -173,6 +173,8 @@ export interface SpeckitAPI {
   supervisionSnapshot(): Promise<SupervisionSnapshot>
   stallsList(): Promise<{ firings: StallFiringView[]; shadowMode: boolean }>
   feedList(): Promise<{ entries: FeedEntryView[] }>
+  /** What happened between two moments, rolled up rather than replayed. */
+  feedDigest(payload: { from: number; to?: number }): Promise<DigestView>
   reviewHunks(payload: { sessionId: string }): Promise<{
     files: HunkFileView[]
     complete: boolean
@@ -215,6 +217,8 @@ export interface SpeckitAPI {
   onDispatchStarted(
     handler: (data: { featureDir: string; branchName: string; worktreePath?: string }) => void
   ): () => void
+  /** The palette was used to jump to a run or a queued diff. */
+  onPaletteGoto(handler: (data: PaletteGotoView) => void): () => void
   onCheckinReady(
     handler: (data: { featureDir: string; batchIndex: number; diffSummary: string }) => void
   ): () => void
@@ -299,6 +303,23 @@ export interface HunkView {
 export interface HunkFileView {
   file: string
   hunks: HunkView[]
+}
+
+/** What happened while you were away. */
+export interface DigestView {
+  from: number
+  to: number
+  entryCount: number
+  sessionCount: number
+  bySession: Array<{ sessionId: string; entries: FeedEntryView[] }>
+}
+
+/** Where the palette wants to take you. */
+export interface PaletteGotoView {
+  kind: 'run' | 'review'
+  sessionId: string
+  /** Null once the run has ended, so the surface shows it instead of jumping. */
+  terminalSessionId: string | null
 }
 
 /** One thing said in a run, flattened to words a surface can render. */
@@ -460,6 +481,7 @@ export function getSpeckitAPI(): SpeckitAPI {
         shadowMode: boolean
       }>,
     feedList: () => bridge.invoke('speckit:feed-list', {}) as Promise<{ entries: FeedEntryView[] }>,
+    feedDigest: (payload) => bridge.invoke('speckit:feed-digest', payload) as Promise<DigestView>,
     reviewHunks: (payload) =>
       bridge.invoke('speckit:review-hunks', payload) as Promise<{
         files: HunkFileView[]
@@ -509,6 +531,8 @@ export function getSpeckitAPI(): SpeckitAPI {
     onRunOutput: (handler) => bridge.on('speckit:run-output', handler as (data: unknown) => void),
     onDispatchStarted: (handler) =>
       bridge.on('speckit:dispatch-started', handler as (data: unknown) => void),
+    onPaletteGoto: (handler) =>
+      bridge.on('speckit:palette-goto', handler as (data: unknown) => void),
     onCheckinReady: (handler) =>
       bridge.on('speckit:checkin-ready', handler as (data: unknown) => void),
   }

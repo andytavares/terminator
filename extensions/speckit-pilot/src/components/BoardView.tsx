@@ -87,6 +87,8 @@ export function BoardView({ repoRoot, onOpenCard, onNewCard }: BoardViewProps) {
   const sessions = useSessionStore((s) => s.sessions)
   const setActiveSessionForProject = useSessionStore((s) => s.setActiveSessionForProject)
   const setActiveProject = useWorkspaceStore((s) => s.setActiveProject)
+  // Where the palette last asked to go, so the panel opens on it.
+  const [focus, setFocus] = useState<{ kind: 'run' | 'review'; sessionId: string } | null>(null)
   // Require an 8px drag before a pointer gesture counts as a drag, so a plain click
   // opens the card instead of being mistaken for a drag.
   const sensors = useSensors(
@@ -109,6 +111,22 @@ export function BoardView({ repoRoot, onOpenCard, onNewCard }: BoardViewProps) {
     const unsub = getSpeckitAPI().onStateChanged(() => void load())
     return unsub
   }, [load])
+
+  // The palette jumps here. A run goes to its terminal when it still has one;
+  // otherwise, and for a queued diff, the supervision panel opens on it.
+  useEffect(() => {
+    return getSpeckitAPI().onPaletteGoto((goto) => {
+      if (goto.kind === 'run' && goto.terminalSessionId !== null) {
+        const session = sessions.get(goto.terminalSessionId)
+        if (session !== undefined) {
+          setActiveProject(session.projectId)
+          setActiveSessionForProject(session.projectId, goto.terminalSessionId)
+          return
+        }
+      }
+      setFocus({ kind: goto.kind, sessionId: goto.sessionId })
+    })
+  }, [sessions, setActiveProject, setActiveSessionForProject])
 
   const loadPending = useCallback(async () => {
     const result = await getSpeckitAPI().permissionsList()
@@ -217,6 +235,7 @@ export function BoardView({ repoRoot, onOpenCard, onNewCard }: BoardViewProps) {
           setActiveSessionForProject(session.projectId, terminalSessionId)
         }}
         onChanged={() => void load()}
+        focus={focus}
       />
       {cards.length === 0 ? (
         <div className="sk-board__empty">Create your first card to get started.</div>

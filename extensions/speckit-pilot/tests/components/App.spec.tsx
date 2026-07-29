@@ -36,6 +36,7 @@ vi.mock('../../src/types/electron.js', () => ({
     }),
     stallsList: vi.fn().mockResolvedValue({ firings: [], shadowMode: true }),
     feedList: vi.fn().mockResolvedValue({ entries: [] }),
+    onPaletteGoto: vi.fn().mockReturnValue(vi.fn()),
   }),
 }))
 

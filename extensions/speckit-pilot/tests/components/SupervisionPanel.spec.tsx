@@ -19,6 +19,7 @@ const api = {
   runRedirect: vi.fn(),
   runStop: vi.fn(),
   runDiscard: vi.fn(),
+  feedDigest: vi.fn(),
 }
 
 vi.mock('../../src/types/electron.js', () => ({ getSpeckitAPI: () => api }))
@@ -76,6 +77,14 @@ beforeEach(() => {
   api.runRedirect.mockResolvedValue({ ok: true })
   api.runStop.mockResolvedValue({ ok: true })
   api.runDiscard.mockResolvedValue({ ok: true })
+  api.feedDigest.mockResolvedValue({
+    from: 0,
+    to: 0,
+    entryCount: 0,
+    sessionCount: 0,
+    bySession: [],
+  })
+  window.localStorage.clear()
 })
 
 describe('saying that everything is fine', () => {
@@ -402,6 +411,52 @@ describe('what is waiting to be reviewed', () => {
   })
 })
 
+describe('being jumped to from the palette', () => {
+  it('opens the section the thing lives in, not whichever tab was last used', async () => {
+    // A jump that lands on the wrong tab reads as having done nothing.
+    api.supervisionSnapshot.mockResolvedValue({
+      runs: [],
+      review: [
+        {
+          sessionId: 'session-1',
+          branch: 'feat/thing',
+          grade: 'P1',
+          gradeTrigger: 'shared contract file',
+          queuedAt: 1,
+          diffSummary: { files: 1, added: 1, removed: 0 },
+        },
+      ],
+      backpressure: { allowed: true, unreviewed: 1, limit: 3 },
+    })
+    panel({ focus: { kind: 'review', sessionId: 'session-1' } })
+    expect(await screen.findByText(/shared contract file/)).toBeDefined()
+  })
+
+  it('opens the diff of the one it was pointed at', async () => {
+    api.supervisionSnapshot.mockResolvedValue({
+      runs: [],
+      review: [
+        {
+          sessionId: 'session-1',
+          branch: 'feat/thing',
+          grade: 'P1',
+          gradeTrigger: 'shared contract file',
+          queuedAt: 1,
+          diffSummary: { files: 1, added: 1, removed: 0 },
+        },
+      ],
+      backpressure: { allowed: true, unreviewed: 1, limit: 3 },
+    })
+    api.reviewHunks.mockResolvedValue({
+      files: [{ file: 'proto/session.proto', hunks: [] }],
+      complete: false,
+      fullReject: false,
+    })
+    panel({ focus: { kind: 'review', sessionId: 'session-1' } })
+    expect(await screen.findByText('proto/session.proto')).toBeDefined()
+  })
+})
+
 describe('what happened while you were away', () => {
   it('attributes an entry the pilot wrote rather than blurring it with the agent', async () => {
     // A feed that blurs the two is one you stop trusting.
@@ -420,6 +475,58 @@ describe('what happened while you were away', () => {
     panel()
     fireEvent.click(await screen.findByText(/feed/))
     expect(await screen.findByText('Pilot')).toBeDefined()
+  })
+})
+
+describe('since you last looked', () => {
+  const entry = {
+    id: 'e1',
+    at: Date.now(),
+    sessionId: 'session-1',
+    author: 'agent' as const,
+    summary: 'ready to review',
+    replyable: false,
+  }
+
+  it('asks nothing of a first visit — there is no "last" yet', async () => {
+    api.feedList.mockResolvedValue({ entries: [entry] })
+    panel()
+    fireEvent.click(await screen.findByText(/feed/))
+    await screen.findByText('ready to review')
+    expect(api.feedDigest).not.toHaveBeenCalled()
+  })
+
+  it('asks from when you last looked', async () => {
+    window.localStorage.setItem('speckit.feed.lastLookedAt', '1000')
+    api.feedList.mockResolvedValue({ entries: [entry] })
+    panel()
+    fireEvent.click(await screen.findByText(/feed/))
+    await waitFor(() => expect(api.feedDigest).toHaveBeenCalledWith({ from: 1000 }))
+  })
+
+  it('rolls it up rather than replaying it line by line', async () => {
+    window.localStorage.setItem('speckit.feed.lastLookedAt', String(Date.now() - 60_000))
+    api.feedList.mockResolvedValue({ entries: [entry] })
+    api.feedDigest.mockResolvedValue({
+      from: Date.now() - 60_000,
+      to: Date.now(),
+      entryCount: 7,
+      sessionCount: 2,
+      bySession: [],
+    })
+    panel()
+    fireEvent.click(await screen.findByText(/feed/))
+    expect(await screen.findByText(/7 things across 2 runs/)).toBeDefined()
+  })
+
+  it('says nothing when nothing happened while you were away', async () => {
+    // A heading that reads "0 things" is noise you learn to skip past.
+    window.localStorage.setItem('speckit.feed.lastLookedAt', '1000')
+    api.feedList.mockResolvedValue({ entries: [entry] })
+    panel()
+    fireEvent.click(await screen.findByText(/feed/))
+    await screen.findByText('ready to review')
+    expect(screen.queryByText(/Since you last looked/)).toBeNull()
   })
 })
 

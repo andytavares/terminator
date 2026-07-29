@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import React from 'react'
 
 const mockCardList = vi.fn()
@@ -8,6 +8,12 @@ const mockOnPermissionsChanged = vi.fn().mockReturnValue(vi.fn())
 const mockPermissionsList = vi.fn().mockResolvedValue({ pending: [] })
 const mockPermissionResolve = vi.fn().mockResolvedValue({ ok: true })
 const mockPermissionHandBack = vi.fn().mockResolvedValue({ ok: true })
+// Captured so a test can fire the jump the palette sends.
+let paletteHandler: ((data: unknown) => void) | null = null
+const mockOnPaletteGoto = vi.fn((handler: (data: unknown) => void) => {
+  paletteHandler = handler
+  return vi.fn()
+})
 
 vi.mock('../../src/types/electron.js', () => ({
   getSpeckitAPI: () => ({
@@ -27,6 +33,7 @@ vi.mock('../../src/types/electron.js', () => ({
     }),
     stallsList: vi.fn().mockResolvedValue({ firings: [], shadowMode: true }),
     feedList: vi.fn().mockResolvedValue({ entries: [] }),
+    onPaletteGoto: mockOnPaletteGoto,
   }),
 }))
 
@@ -173,5 +180,38 @@ describe('a supervised run waiting on the operator', () => {
     render(<BoardView repoRoot="/repo" onOpenCard={vi.fn()} onNewCard={vi.fn()} />)
     await screen.findByText('Card A')
     expect(screen.queryByText(/waiting on you/)).toBeNull()
+  })
+})
+
+describe('jumping here from the palette', () => {
+  beforeEach(() => {
+    paletteHandler = null
+    mockCardList.mockResolvedValue({ cards: [card()] })
+  })
+
+  it('subscribes, or the palette entries would go nowhere', async () => {
+    render(<BoardView repoRoot="/repo" onOpenCard={vi.fn()} onNewCard={vi.fn()} />)
+    await screen.findByText('Card A')
+    expect(paletteHandler).not.toBeNull()
+  })
+
+  it('opens the supervision panel on a queued diff', async () => {
+    render(<BoardView repoRoot="/repo" onOpenCard={vi.fn()} onNewCard={vi.fn()} />)
+    await screen.findByText('Card A')
+    act(() => {
+      paletteHandler?.({ kind: 'review', sessionId: 'session-1', terminalSessionId: null })
+    })
+    // The review section, rather than whichever tab happened to be open.
+    expect(await screen.findByText(/Nothing is waiting to be reviewed/)).toBeDefined()
+  })
+
+  it('falls back to the panel when the run no longer has a terminal', async () => {
+    // A jump that silently does nothing is worse than one that shows the run.
+    render(<BoardView repoRoot="/repo" onOpenCard={vi.fn()} onNewCard={vi.fn()} />)
+    await screen.findByText('Card A')
+    act(() => {
+      paletteHandler?.({ kind: 'run', sessionId: 'session-1', terminalSessionId: 'gone' })
+    })
+    expect(await screen.findByText('Nothing is running.')).toBeDefined()
   })
 })
