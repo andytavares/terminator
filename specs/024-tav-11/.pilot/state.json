@@ -1,23 +1,24 @@
 {
   "version": 3,
-  "featureDir": "/Users/atavares/repos/terminator/specs/020-tav-9",
+  "featureDir": "/Users/atavares/repos/terminator/specs/024-tav-11",
   "card": {
-    "title": "High-risk filter in PR list never flags large changes",
+    "title": "SpecKit Pilot should auto-load assigned tickets on open (Import becomes a manual reload)",
     "type": "feature",
-    "scope": "# Summary\n\nThe \"high risk\" filter in the PR list never flags large changes — even PRs with thousands of lines changed are not marked high risk.\n\n# Steps to Reproduce\n\n1. Open the PR list.\n2. Apply / view the high-risk filter.\n3. Observe a PR with a very large diff (thousands of lines changed).\n\nExpected: Large/high-impact PRs are flagged as high risk and surfaced by the high-risk filter.\nActual: No PRs get flagged as high risk, even ones with thousands of lines changed.\n\n# Acceptance Criteria\n\n- [ ] PRs with large diffs (e.g. thousands of lines) are flagged as high risk\n- [ ] The high-risk filter surfaces those PRs\n- [ ] The risk score/field is populated and the size threshold is correct\n- [ ] Tests cover risk classification at boundary change sizes (just below / just above the threshold)\n\n# Dev Hints\n\n* Likely a broken risk-scoring calculation or filter predicate. Verify: is the risk field populated at all? Is the change-size threshold ever met? Is the filter comparing against the correct value?",
+    "scope": "# Summary\n\nOpening the SpecKit Pilot board should automatically pull down assigned ticket data (Linear/Jira) and reconcile it onto the board on load — no manual import step required. The existing \"Import ticket\" button should remain, but as a manual reload/refresh option rather than the only way to get tickets onto the board.\n\n# Context\n\nToday the board only fetches ticket data when the user explicitly opens the Import ticket modal — `ImportTicketModal` calls `ticketList()` on mount and the user picks tickets one at a time to create cards. Users expect their assigned work to appear as soon as they open the extension. The main tradeoff is that an automatic fetch on load adds a network call at startup and requires deduplication so re-opening/reloading does not create duplicate cards for tickets already on the board.\n\n# Acceptance Criteria\n\n- [ ] Opening SpecKit Pilot automatically fetches assigned tickets from configured sources (Linear/Jira) without any manual action\n- [ ] Fetched tickets that are not already cards appear on the board (e.g. in Backlog)\n- [ ] Re-opening or reloading does not create duplicate cards for tickets already imported (dedup by ticket source key)\n- [ ] The \"Import ticket\" button remains available and now acts as a manual reload/refresh\n- [ ] If no source is configured or the fetch fails, the board still loads and surfaces the error via a toast (no crash)\n- [ ] Auto-load respects the existing assignee filter (only the user's assigned tickets), consistent with current `ticketList` behavior\n\n# Dev Hints\n\n* Current manual path: `extensions/speckit-pilot/src/renderer/components/ImportTicketModal.tsx` fetches via `getSpeckitAPI().ticketList()` on mount, then calls `cardCreate()` per selected ticket.\n* Fetch source (assignee-filtered): `extensions/speckit-pilot/src/api/linear.ts` `fetchAssignedTickets()`.\n* Board home + overlay wiring: `extensions/speckit-pilot/src/renderer/App.tsx` (`overlay === 'import'`, `BoardView`).\n* Reuse the existing `cardCreate` / card-list IPC for reconciliation; dedup on the ticket source key (`Ticket.key` / Linear `identifier`).\n* Keep the `Download` icon affordance for the manual refresh.",
     "checklist": [],
     "attachments": [],
     "knowledgeRefs": [],
     "source": "linear",
-    "createdAt": "2026-07-03T14:35:34.353Z"
+    "createdAt": "2026-07-29T23:31:29.817Z"
   },
   "stage": "done",
   "mode": "speckit",
   "ticket": {
     "source": "linear",
-    "key": "TAV-9",
-    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-9/high-risk-filter-in-pr-list-never-flags-large-changes",
-    "title": "High-risk filter in PR list never flags large changes"
+    "key": "TAV-11",
+    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-11/speckit-pilot-should-auto-load-assigned-tickets-on-open-import-becomes",
+    "title": "SpecKit Pilot should auto-load assigned tickets on open (Import becomes a manual reload)",
+    "branchName": "andrewtavares87/tav-11-speckit-pilot-should-auto-load-assigned-tickets-on-open"
   },
   "run": null,
   "queuePosition": null,
@@ -45,7 +46,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/spec.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/024-tav-11/spec.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -57,7 +58,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/spec.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/024-tav-11/spec.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -70,9 +71,9 @@
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": [
-        "/Users/atavares/repos/terminator/specs/020-tav-9/plan.md",
-        "/Users/atavares/repos/terminator/specs/020-tav-9/research.md",
-        "/Users/atavares/repos/terminator/specs/020-tav-9/data-model.md"
+        "/Users/atavares/repos/terminator/specs/024-tav-11/plan.md",
+        "/Users/atavares/repos/terminator/specs/024-tav-11/research.md",
+        "/Users/atavares/repos/terminator/specs/024-tav-11/data-model.md"
       ],
       "feedback": null,
       "batchIndex": null
@@ -86,7 +87,7 @@
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": [
-        "/Users/atavares/repos/terminator/specs/020-tav-9/checklists/requirements.md"
+        "/Users/atavares/repos/terminator/specs/024-tav-11/checklists/requirements.md"
       ],
       "feedback": null,
       "batchIndex": null
@@ -99,7 +100,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/tasks.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/024-tav-11/tasks.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -135,7 +136,9 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/.pilot/self-review.json"],
+      "artifactPaths": [
+        "/Users/atavares/repos/terminator/specs/024-tav-11/.pilot/self-review.json"
+      ],
       "feedback": null,
       "batchIndex": null
     },

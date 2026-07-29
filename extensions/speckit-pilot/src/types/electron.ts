@@ -174,8 +174,8 @@ export interface SpeckitAPI {
     sessionId: string
   }): Promise<{ ok: boolean; reverted: number; error: string | null }>
   reviewDone(payload: { sessionId: string }): Promise<{ ok: boolean }>
-  /** Where a run is running, so a surface can go there rather than describe it. */
-  runTerminal(payload: { sessionId: string }): Promise<{ terminalSessionId: string | null }>
+  /** Takes you to the terminal the run is in. */
+  runTerminal(payload: { sessionId: string }): Promise<{ ok: boolean }>
   /** What it was doing, in its own words. */
   runTranscript(payload: {
     sessionId: string
@@ -376,8 +376,6 @@ export interface DigestView {
 export interface PaletteGotoView {
   kind: 'run' | 'review'
   sessionId: string
-  /** Null once the run has ended, so the surface shows it instead of jumping. */
-  terminalSessionId: string | null
 }
 
 /** One thing said in a run, flattened to words a surface can render. */
@@ -537,9 +535,7 @@ export function getSpeckitAPI(): SpeckitAPI {
     reviewDone: (payload) =>
       bridge.invoke('speckit:review-done', payload) as Promise<{ ok: boolean }>,
     runTerminal: (payload) =>
-      bridge.invoke('speckit:run-terminal', payload) as Promise<{
-        terminalSessionId: string | null
-      }>,
+      bridge.invoke('speckit:run-terminal', payload) as Promise<{ ok: boolean }>,
     runTranscript: (payload) =>
       bridge.invoke('speckit:run-transcript', payload) as Promise<{
         lines: TranscriptLineView[]

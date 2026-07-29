@@ -10,6 +10,9 @@ const mockPhaseReject = vi.fn()
 const mockPhaseRevoke = vi.fn()
 const mockPhaseSkip = vi.fn()
 const mockPhaseUnskip = vi.fn()
+const mockSupervisionSnapshot = vi.fn()
+const mockRunTranscript = vi.fn()
+const mockRunTerminal = vi.fn()
 const mockPhaseRequestChanges = vi.fn()
 const mockPhaseComment = vi.fn()
 const mockFileWrite = vi.fn()
@@ -39,6 +42,9 @@ vi.mock('../../src/types/electron.js', () => ({
     phaseUnskip: mockPhaseUnskip,
     // Selecting a phase other than the running one loads its persisted output.
     runOutputRead: vi.fn().mockResolvedValue({ lines: [] }),
+    supervisionSnapshot: mockSupervisionSnapshot,
+    runTranscript: mockRunTranscript,
+    runTerminal: mockRunTerminal,
   }),
 }))
 
@@ -93,6 +99,13 @@ function makeState(overrides?: Partial<PilotState>): PilotState {
 describe('RunDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockSupervisionSnapshot.mockResolvedValue({
+      runs: [],
+      review: [],
+      backpressure: { allowed: true, unreviewed: 0, limit: 3 },
+    })
+    mockRunTranscript.mockResolvedValue({ lines: [] })
+    mockRunTerminal.mockResolvedValue({ ok: true })
     mockOnStateChanged.mockReturnValue(vi.fn())
     mockOnRunOutput.mockReturnValue(vi.fn())
     mockPhaseApprove.mockResolvedValue({ state: makeState() })
@@ -280,5 +293,59 @@ describe('a phase that is not simply running', () => {
         expect.objectContaining({ phase: 'constitution' })
       )
     )
+  })
+})
+
+describe('a phase running in a terminal', () => {
+  // A supervised phase writes nothing to `speckit:run-output` — it runs in a
+  // terminal and its output goes there. The console used to sit on "Waiting for
+  // output…" for the whole run.
+
+  const run = {
+    sessionId: 'session-1',
+    featureDir: '/repo/specs/001',
+    phase: 'specify',
+    branch: 'feat/red-text',
+    worktreePath: '/wt/a',
+    terminalSessionId: 'terminal-1',
+    state: 'working' as const,
+    stateSince: 1,
+    turns: 1,
+    asked: 0,
+    diff: { files: 0, added: 0, removed: 0 },
+  }
+
+  beforeEach(() => {
+    mockPilotState.mockResolvedValue({ state: makeState() })
+    mockSupervisionSnapshot.mockResolvedValue({
+      runs: [run],
+      review: [],
+      backpressure: { allowed: true, unreviewed: 0, limit: 3 },
+    })
+  })
+
+  it('shows what the agent said, read from its transcript', async () => {
+    mockRunTranscript.mockResolvedValue({
+      lines: [{ role: 'assistant', text: 'Reading the spec…', at: 1 }],
+    })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    expect(await screen.findByText(/Reading the spec…/)).toBeTruthy()
+  })
+
+  it('offers a way into the session rather than only describing it', async () => {
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    fireEvent.click(await screen.findByRole('button', { name: /open the terminal/i }))
+    await waitFor(() => expect(mockRunTerminal).toHaveBeenCalledWith({ sessionId: 'session-1' }))
+  })
+
+  it('says the output is in the terminal when it has said nothing yet', async () => {
+    // Not "Waiting for output…", which never resolves for a supervised run.
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    expect(await screen.findByText(/open it above to watch or take over/i)).toBeTruthy()
+  })
+
+  it('names the branch, so you know which terminal you are being sent to', async () => {
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    expect(await screen.findByText(/feat\/red-text/)).toBeTruthy()
   })
 })

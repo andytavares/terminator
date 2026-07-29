@@ -1,0 +1,10 @@
+{
+  "title": "Import list should exclude already-imported tickets (prevent duplicate imports)",
+  "type": "feature",
+  "scope": "# Summary\n\nA ticket that already exists as a card on the SpecKit Pilot board should not be importable again. Already-imported tickets should be filtered out of the Import ticket list so the same ticket can't be imported twice (which creates duplicate cards).\n\n# Steps to Reproduce\n\n1. Open the SpecKit Pilot board.\n2. Open the Import ticket modal and import a ticket (creates a card).\n3. Open the Import ticket modal again.\n\nExpected: The ticket just imported no longer appears in the import list.\nActual: The already-imported ticket still appears and can be imported again, creating a duplicate card.\n\n# Acceptance Criteria\n\n- [ ] The Import ticket list excludes any ticket that already exists as a card on the board (matched by ticket source key)\n- [ ] Importing the same ticket twice is not possible via the import list\n- [ ] Re-opening the import modal reflects newly-created cards (already-imported tickets disappear)\n- [ ] Matching is by stable ticket source key (Linear `identifier` / `Ticket.key`), not by title\n- [ ] If every assigned ticket is already imported, the list shows an appropriate empty state\n\n# Dev Hints\n\n* Import list source: `extensions/speckit-pilot/src/renderer/components/ImportTicketModal.tsx` — fetches all assigned tickets via `getSpeckitAPI().ticketList()` with no filtering against existing cards.\n* Cross-reference against existing cards via the card-list IPC; filter fetched tickets whose source key matches an existing card's ticket key.\n* This is the same dedup concern as the auto-load work in [TAV-11](https://linear.app/andrew-tavares/issue/TAV-11/speckit-pilot-should-auto-load-assigned-tickets-on-open-import-becomes) — consider a shared \"which tickets are already cards\" helper so both the import list and auto-load reconcile identically.",
+  "checklist": [],
+  "attachments": [],
+  "knowledgeRefs": [],
+  "source": "linear",
+  "createdAt": "2026-07-29T23:31:29.815Z"
+}

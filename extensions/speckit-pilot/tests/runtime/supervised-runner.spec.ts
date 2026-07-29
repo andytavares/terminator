@@ -122,7 +122,11 @@ describe('starting a supervised run', () => {
   it('says which terminal it is running in', async () => {
     const r = runner()
     const run = await r.start(start)
-    expect(r.terminalFor(run?.sessionId ?? '')).toBe('terminal-1')
+    // The project as well as the tab: the core's navigation selects the
+    // workspace and project before the session.
+    expect(r.terminalFor(run?.sessionId ?? '')).toMatchObject({
+      terminalSessionId: 'terminal-1',
+    })
   })
 
   it('resumes an existing conversation rather than starting a second one', async () => {

@@ -28,7 +28,7 @@ const runner = {
   interrupt: vi.fn(),
   stop: vi.fn().mockReturnValue(true),
   send: vi.fn().mockReturnValue(true),
-  terminalFor: vi.fn().mockReturnValue('terminal-1'),
+  terminalFor: vi.fn().mockReturnValue({ terminalSessionId: 'terminal-1', projectId: 'project-1' }),
   watchable: vi.fn().mockReturnValue([]),
   dispose: vi.fn(),
 }
@@ -162,7 +162,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   runner.stop.mockReturnValue(true)
   runner.send.mockReturnValue(true)
-  runner.terminalFor.mockReturnValue('terminal-1')
+  runner.terminalFor.mockReturnValue({ terminalSessionId: 'terminal-1', projectId: 'project-1' })
   exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
 })
 
@@ -183,17 +183,29 @@ describe('the runtime came up', () => {
 })
 
 describe('going to a run', () => {
-  it('answers with the terminal it is running in', async () => {
-    expect(await call('speckit:run-terminal', { sessionId: 'session-1' })).toEqual({
-      terminalSessionId: 'terminal-1',
-    })
+  it('takes you there through the core’s own navigation', async () => {
+    // Not by handing an id back to the panel: that UI is a separate renderer
+    // process, so a core store it imports is a second copy nothing renders.
+    expect(await call('speckit:run-terminal', { sessionId: 'session-1' })).toEqual({ ok: true })
+    const broadcasts = vi.mocked(api.window.broadcast).mock.calls
+    expect(broadcasts).toContainEqual([
+      'terminal:navigate-to-session',
+      { sessionId: 'terminal-1', projectId: 'project-1' },
+    ])
   })
 
-  it('answers null rather than a stale id once the run has ended', async () => {
+  it('brings the window forward, or the jump happens behind another one', async () => {
+    await call('speckit:run-terminal', { sessionId: 'session-1' })
+    expect(api.window.focusSelf).toHaveBeenCalled()
+  })
+
+  it('says so rather than navigating nowhere once the run has ended', async () => {
     runner.terminalFor.mockReturnValue(null)
-    expect(await call('speckit:run-terminal', { sessionId: 'gone' })).toEqual({
-      terminalSessionId: null,
-    })
+    expect(await call('speckit:run-terminal', { sessionId: 'gone' })).toEqual({ ok: false })
+    expect(vi.mocked(api.window.broadcast).mock.calls).not.toContainEqual([
+      'terminal:navigate-to-session',
+      expect.anything(),
+    ])
   })
 })
 

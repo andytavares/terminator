@@ -71,8 +71,14 @@ export interface SupervisedRunner {
   stop(sessionId: string, reason?: string): boolean
   /** Sends a further message — a reply, or a redirect. */
   send(sessionId: string, message: string): boolean
-  /** Where a session is running, for a surface that wants to go there. */
-  terminalFor(sessionId: string): string | null
+  /**
+   * Where a session is running, for a surface that wants to go there.
+   *
+   * The project as well as the tab: the core's navigation needs both — it
+   * selects the workspace and project before the session — and the extension's
+   * UI is a separate renderer, so it cannot work the project out for itself.
+   */
+  terminalFor(sessionId: string): { terminalSessionId: string; projectId: string } | null
   /**
    * The live runs, as the stall detector needs them. Read each tick rather than
    * subscribed to, so a run that ends simply drops out.
@@ -90,6 +96,7 @@ const EXIT = '/exit\r'
 interface Running {
   bridge: ReturnType<typeof createPermissionBridge>
   terminalSessionId: string
+  projectId: string
   transcriptPath: string
   featureDir: string
   startedAt: number
@@ -197,6 +204,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       running.set(sessionId, {
         bridge,
         terminalSessionId,
+        projectId: project.id,
         transcriptPath: spec.transcriptPath,
         featureDir: start.featureDir,
         startedAt: now(),
@@ -252,8 +260,11 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       return true
     },
 
-    terminalFor(sessionId): string | null {
-      return running.get(sessionId)?.terminalSessionId ?? null
+    terminalFor(sessionId): { terminalSessionId: string; projectId: string } | null {
+      const run = running.get(sessionId)
+      return run === undefined
+        ? null
+        : { terminalSessionId: run.terminalSessionId, projectId: run.projectId }
     },
 
     watchable(): WatchedRun[] {

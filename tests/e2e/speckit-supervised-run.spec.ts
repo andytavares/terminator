@@ -290,3 +290,23 @@ test('the supervision panel is on screen, not merely built', async () => {
     }
   }
 })
+
+test('the card drawer shows the terminal, not an empty console', async () => {
+  test.setTimeout(180_000)
+  // The complaint this closes: a supervised phase writes nothing to
+  // `speckit:run-output`, so the drawer's console sat on "Waiting for output…"
+  // for the whole run with no way into the session.
+  const snapshot = (await pilot('speckit:supervision-snapshot')) as {
+    runs: Array<{ sessionId: string }>
+  }
+  expect(snapshot.runs.length).toBeGreaterThan(0)
+  const sessionId = snapshot.runs[0].sessionId
+
+  // The transcript is what the drawer renders in place of the dead stream.
+  const transcript = (await pilot('speckit:run-transcript', { sessionId })) as { lines: unknown[] }
+  expect(Array.isArray(transcript.lines)).toBe(true)
+
+  // And the jump is answered by the main process, which is the only place that
+  // can select a tab in this window — the extension's UI is a separate renderer.
+  await expect(pilot('speckit:run-terminal', { sessionId })).resolves.toEqual({ ok: true })
+})

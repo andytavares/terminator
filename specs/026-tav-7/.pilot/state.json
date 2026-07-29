@@ -1,23 +1,24 @@
 {
   "version": 3,
-  "featureDir": "/Users/atavares/repos/terminator/specs/020-tav-9",
+  "featureDir": "/Users/atavares/repos/terminator/specs/026-tav-7",
   "card": {
-    "title": "High-risk filter in PR list never flags large changes",
+    "title": "PR search is flaky — race condition between input and API results (pasted PR numbers return wrong matches)",
     "type": "feature",
-    "scope": "# Summary\n\nThe \"high risk\" filter in the PR list never flags large changes — even PRs with thousands of lines changed are not marked high risk.\n\n# Steps to Reproduce\n\n1. Open the PR list.\n2. Apply / view the high-risk filter.\n3. Observe a PR with a very large diff (thousands of lines changed).\n\nExpected: Large/high-impact PRs are flagged as high risk and surfaced by the high-risk filter.\nActual: No PRs get flagged as high risk, even ones with thousands of lines changed.\n\n# Acceptance Criteria\n\n- [ ] PRs with large diffs (e.g. thousands of lines) are flagged as high risk\n- [ ] The high-risk filter surfaces those PRs\n- [ ] The risk score/field is populated and the size threshold is correct\n- [ ] Tests cover risk classification at boundary change sizes (just below / just above the threshold)\n\n# Dev Hints\n\n* Likely a broken risk-scoring calculation or filter predicate. Verify: is the risk field populated at all? Is the change-size threshold ever met? Is the filter comparing against the correct value?",
+    "scope": "# Summary\n\nPR search is unreliable: pasting a PR number returns seemingly random results, and the correct results only appear after deleting a character and re-typing it. This points to a race condition where search responses arrive out of order relative to the current input and stale responses are not discarded.\n\n# Steps to Reproduce\n\n1. Open PR search.\n2. Paste a PR number (e.g. `049`) into the search bar.\n\nExpected: Results contain PRs where `049` appears in the title or the PR number `049`.\nActual: Unrelated results are returned (e.g. PRs containing `050` and `031`); deleting a character and re-adding it is required to get the expected results. Search feels flaky in general.\n\n# Acceptance Criteria\n\n- [ ] Pasting a PR number returns only matching results (title or PR number) without needing to edit the input\n- [ ] Rapid typing or pasting never displays results from a stale/earlier query\n- [ ] Searching `049` returns PRs matching `049`, not `050`/`031`\n- [ ] Search input is debounced and out-of-order/stale responses are discarded (or in-flight requests aborted)\n\n# Dev Hints\n\n* Likely cause: in-flight requests aren't cancelled/ignored, so a later paste/keystroke's results get overwritten by an earlier request that resolves last.\n* Fixes to consider: tag each request with its query and ignore responses that don't match the current input; use `AbortController` to cancel superseded requests; add input debounce.",
     "checklist": [],
     "attachments": [],
     "knowledgeRefs": [],
     "source": "linear",
-    "createdAt": "2026-07-03T14:35:34.353Z"
+    "createdAt": "2026-07-29T23:31:29.821Z"
   },
   "stage": "done",
   "mode": "speckit",
   "ticket": {
     "source": "linear",
-    "key": "TAV-9",
-    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-9/high-risk-filter-in-pr-list-never-flags-large-changes",
-    "title": "High-risk filter in PR list never flags large changes"
+    "key": "TAV-7",
+    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-7/pr-search-is-flaky-race-condition-between-input-and-api-results-pasted",
+    "title": "PR search is flaky — race condition between input and API results (pasted PR numbers return wrong matches)",
+    "branchName": "andrewtavares87/tav-7-pr-search-is-flaky-race-condition-between-input-and-api"
   },
   "run": null,
   "queuePosition": null,
@@ -45,7 +46,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/spec.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/026-tav-7/spec.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -57,7 +58,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/spec.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/026-tav-7/spec.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -70,9 +71,9 @@
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": [
-        "/Users/atavares/repos/terminator/specs/020-tav-9/plan.md",
-        "/Users/atavares/repos/terminator/specs/020-tav-9/research.md",
-        "/Users/atavares/repos/terminator/specs/020-tav-9/data-model.md"
+        "/Users/atavares/repos/terminator/specs/026-tav-7/plan.md",
+        "/Users/atavares/repos/terminator/specs/026-tav-7/research.md",
+        "/Users/atavares/repos/terminator/specs/026-tav-7/data-model.md"
       ],
       "feedback": null,
       "batchIndex": null
@@ -86,7 +87,7 @@
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": [
-        "/Users/atavares/repos/terminator/specs/020-tav-9/checklists/requirements.md"
+        "/Users/atavares/repos/terminator/specs/026-tav-7/checklists/requirements.md"
       ],
       "feedback": null,
       "batchIndex": null
@@ -99,7 +100,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/tasks.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/026-tav-7/tasks.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -135,7 +136,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/.pilot/self-review.json"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/026-tav-7/.pilot/self-review.json"],
       "feedback": null,
       "batchIndex": null
     },

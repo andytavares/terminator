@@ -1160,11 +1160,22 @@ export function activate(api: ExtensionAPI): void {
   // name a stall and offer nothing — which is the shape of every "correct and
   // useless" surface this line of work exists to stop shipping.
 
-  // Where it is running, so a surface can take you to the terminal rather than
-  // describe one.
+  // Takes you to the terminal the run is in.
+  //
+  // Done here rather than in the panel: the extension's UI is a separate
+  // renderer process, so a store it imports from core is a second copy that
+  // nothing renders. `terminal:navigate-to-session` is the core's own channel
+  // for this — it selects the workspace, the project and the tab.
   reg(api, 'speckit:run-terminal', (payload: unknown) => {
     const { sessionId } = payload as { sessionId: string }
-    return { terminalSessionId: supervisedRunner?.terminalFor(sessionId) ?? null }
+    const terminal = supervisedRunner?.terminalFor(sessionId) ?? null
+    if (terminal === null) return { ok: false }
+    api.window.focusSelf()
+    api.window.broadcast('terminal:navigate-to-session', {
+      sessionId: terminal.terminalSessionId,
+      projectId: terminal.projectId,
+    })
+    return { ok: true }
   })
 
   // What it was doing, in its own words. The action that decides the others.
@@ -2150,6 +2161,25 @@ export function activate(api: ExtensionAPI): void {
     const { featureDir, text } = payload as { featureDir?: string; text?: string }
     if (!featureDir || !text || !text.trim()) return { error: 'featureDir and text required' }
 
+    // A supervised run is a terminal with claude in it: the reply is typed
+    // there. Falling through to the headless path below would kill the session
+    // the operator is watching and start a second, invisible agent.
+    const live = supervision?.runs
+      .live()
+      .find((run) => run.featureDir === featureDir && run.state !== 'finished')
+    if (live !== undefined && supervisedRunner !== null) {
+      const sent = supervisedRunner.send(live.sessionId, text.trim())
+      if (sent) {
+        supervision?.feed.post({
+          at: Date.now(),
+          sessionId: live.sessionId,
+          author: 'console',
+          summary: `replied: ${text.trim()}`,
+        })
+        return { ok: true }
+      }
+    }
+
     const sessionId = phaseSessionIds.get(featureDir)
     if (!sessionId) {
       return { error: 'No active conversation to reply to yet — run a phase first.' }
@@ -2507,10 +2537,19 @@ function refreshPalette(api: ExtensionAPI): void {
         // The window first: a command that changes what is on screen behind
         // another window has done nothing you can see.
         api.window.focusSelf()
+        const terminal =
+          entry.kind === 'run' ? (supervisedRunner?.terminalFor(entry.sessionId) ?? null) : null
+        if (terminal !== null) {
+          // Straight to the terminal, through the core's own navigation.
+          api.window.broadcast('terminal:navigate-to-session', {
+            sessionId: terminal.terminalSessionId,
+            projectId: terminal.projectId,
+          })
+          return
+        }
         api.window.broadcast('speckit:palette-goto', {
           kind: entry.kind,
           sessionId: entry.sessionId,
-          terminalSessionId: supervisedRunner?.terminalFor(entry.sessionId) ?? null,
         })
       }
     )

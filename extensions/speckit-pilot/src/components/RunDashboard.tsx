@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Square } from 'lucide-react'
 import type { PhaseId, PilotState } from '../types/speckit.types.js'
 import { PHASE_ORDER } from '../types/speckit.types.js'
-import { getSpeckitAPI } from '../types/electron.js'
+import { getSpeckitAPI, type RunView } from '../types/electron.js'
 import { PhaseRail } from './PhaseRail.js'
 import { RunConsole } from './RunConsole.js'
 import { GatePanel } from './GatePanel.js'
@@ -42,6 +42,40 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
   const [linesByPhase, setLinesByPhase] = useState<Partial<Record<string, string[]>>>({})
   const [viewingPhase, setViewingPhase] = useState<PhaseId | null>(null)
   const [gateContent, setGateContent] = useState<string | null>(null)
+  // The run this card has in a terminal, and what it has been saying.
+  //
+  // A supervised phase writes nothing to `speckit:run-output` — it runs in a
+  // terminal, and its output goes there. Without this the console below sits on
+  // "Waiting for output…" for the whole run, which is what it used to do.
+  const [liveRun, setLiveRun] = useState<RunView | null>(null)
+  const [transcript, setTranscript] = useState<string[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    const read = async () => {
+      const api = getSpeckitAPI()
+      const snapshot = await api.supervisionSnapshot()
+      const run =
+        snapshot.runs.find((r) => r.featureDir === featureDir && r.state !== 'finished') ?? null
+      if (cancelled) return
+      setLiveRun(run)
+      if (run === null) {
+        setTranscript([])
+        return
+      }
+      const { lines } = await api.runTranscript({ sessionId: run.sessionId, limit: 60 })
+      if (cancelled) return
+      setTranscript(lines.map((line) => `${line.role === 'user' ? '🧑' : '🤖'} ${line.text}`))
+    }
+    void read()
+    // Polled rather than pushed: the terminal's output does not come through
+    // this extension at all, so there is no event to subscribe to.
+    const timer = setInterval(() => void read(), 3_000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [featureDir])
   const [gateComments, setGateComments] = useState<Array<{ note: string; ts: string }>>([])
   const [checkinData, setCheckinData] = useState<CheckinReadyData | null>(null)
   const [stopping, setStopping] = useState(false)
@@ -216,6 +250,10 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
         .flat()
         .filter((line): line is string => line !== undefined)
 
+  // The terminal's transcript wins when there is one: it is what the agent
+  // actually said, and the broadcast lines only exist for the headless path.
+  const consoleLines = liveRun !== null ? transcript : displayLines
+
   return (
     <div
       style={{
@@ -327,7 +365,23 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
       )}
 
       {/* Console */}
-      <RunConsole featureDir={featureDir} lines={displayLines} phase={displayPhase} />
+      {liveRun !== null && (
+        <div className="sk-sup__note" role="status">
+          This phase is running in a terminal — {liveRun.branch}
+          <button
+            className="sk-sup__btn"
+            onClick={() => void getSpeckitAPI().runTerminal({ sessionId: liveRun.sessionId })}
+          >
+            Open the terminal
+          </button>
+        </div>
+      )}
+      <RunConsole
+        featureDir={featureDir}
+        lines={consoleLines}
+        phase={displayPhase}
+        inTerminal={liveRun !== null}
+      />
 
       {/* Self-review gate */}
       {state && awaitingPhase === 'self-review' && <SelfReviewGate featureDir={featureDir} />}

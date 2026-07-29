@@ -22,6 +22,17 @@ in four sections:
 | **review** | `speckit:supervision-snapshot`             | what is waiting on a decision from you |
 | **feed**   | `speckit:feed-list`, `speckit:feed-digest` | what happened while you were away      |
 
+A card's drawer shows the same run: the phase's console renders the **terminal's
+transcript**, with **Open the terminal** next to it. A supervised phase
+broadcasts nothing on `speckit:run-output` — it runs in a terminal and its
+output goes there — so the console read "Waiting for output…" for the whole run
+until this. Replying in the drawer types into that session rather than starting
+a second, invisible agent.
+
+Every jump to a terminal happens **in the main process**, through the core's own
+`terminal:navigate-to-session`. The extension's UI is a separate renderer
+process, so a core store imported into it is a second copy that nothing renders.
+
 The **permission queue** sits above it, because a held tool call is the one
 state where nothing moves until a person acts.
 

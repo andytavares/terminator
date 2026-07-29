@@ -17,8 +17,6 @@ import type { BoardStage, CardSummary } from '../types/speckit.types.js'
 import { getSpeckitAPI, type PendingAskView } from '../types/electron.js'
 import { PermissionQueue } from './PermissionQueue.js'
 import { SupervisionPanel } from './SupervisionPanel.js'
-import { useSessionStore } from '../../../../src/renderer/stores/session.store'
-import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { CardTile } from './CardTile.js'
 import { bucketCards, resolveDrop } from './board-util.js'
 
@@ -82,11 +80,6 @@ export function BoardView({ repoRoot, onOpenCard, onNewCard }: BoardViewProps) {
   const [pending, setPending] = useState<PendingAskView[]>([])
   const [error, setError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
-  // Going to a run's terminal is a core navigation, so it is done through the
-  // core stores rather than reimplemented here.
-  const sessions = useSessionStore((s) => s.sessions)
-  const setActiveSessionForProject = useSessionStore((s) => s.setActiveSessionForProject)
-  const setActiveProject = useWorkspaceStore((s) => s.setActiveProject)
   // Where the palette last asked to go, so the panel opens on it.
   const [focus, setFocus] = useState<{ kind: 'run' | 'review'; sessionId: string } | null>(null)
   // Require an 8px drag before a pointer gesture counts as a drag, so a plain click
@@ -112,21 +105,14 @@ export function BoardView({ repoRoot, onOpenCard, onNewCard }: BoardViewProps) {
     return unsub
   }, [load])
 
-  // The palette jumps here. A run goes to its terminal when it still has one;
-  // otherwise, and for a queued diff, the supervision panel opens on it.
+  // The palette jumps here for anything that is not a live run — a run with a
+  // terminal is taken straight there by the core's own navigation, in the main
+  // process, because this UI is a separate renderer and cannot drive it.
   useEffect(() => {
     return getSpeckitAPI().onPaletteGoto((goto) => {
-      if (goto.kind === 'run' && goto.terminalSessionId !== null) {
-        const session = sessions.get(goto.terminalSessionId)
-        if (session !== undefined) {
-          setActiveProject(session.projectId)
-          setActiveSessionForProject(session.projectId, goto.terminalSessionId)
-          return
-        }
-      }
       setFocus({ kind: goto.kind, sessionId: goto.sessionId })
     })
-  }, [sessions, setActiveProject, setActiveSessionForProject])
+  }, [])
 
   const loadPending = useCallback(async () => {
     const result = await getSpeckitAPI().permissionsList()
@@ -228,12 +214,6 @@ export function BoardView({ repoRoot, onOpenCard, onNewCard }: BoardViewProps) {
           featureDir
         }
         workspacePath={repoRoot}
-        onOpenTerminal={(terminalSessionId) => {
-          const session = sessions.get(terminalSessionId)
-          if (session === undefined) return
-          setActiveProject(session.projectId)
-          setActiveSessionForProject(session.projectId, terminalSessionId)
-        }}
         onChanged={() => void load()}
         focus={focus}
       />

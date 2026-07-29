@@ -1,33 +1,39 @@
 {
   "version": 3,
-  "featureDir": "/Users/atavares/repos/terminator/specs/020-tav-9",
+  "featureDir": "/Users/atavares/repos/terminator/specs/021-tav-14",
   "card": {
-    "title": "High-risk filter in PR list never flags large changes",
+    "title": "Make all text in the application red",
     "type": "feature",
-    "scope": "# Summary\n\nThe \"high risk\" filter in the PR list never flags large changes — even PRs with thousands of lines changed are not marked high risk.\n\n# Steps to Reproduce\n\n1. Open the PR list.\n2. Apply / view the high-risk filter.\n3. Observe a PR with a very large diff (thousands of lines changed).\n\nExpected: Large/high-impact PRs are flagged as high risk and surfaced by the high-risk filter.\nActual: No PRs get flagged as high risk, even ones with thousands of lines changed.\n\n# Acceptance Criteria\n\n- [ ] PRs with large diffs (e.g. thousands of lines) are flagged as high risk\n- [ ] The high-risk filter surfaces those PRs\n- [ ] The risk score/field is populated and the size threshold is correct\n- [ ] Tests cover risk classification at boundary change sizes (just below / just above the threshold)\n\n# Dev Hints\n\n* Likely a broken risk-scoring calculation or filter predicate. Verify: is the risk field populated at all? Is the change-size threshold ever met? Is the filter comparing against the correct value?",
+    "scope": "# Summary\n\nMake all text in the application red\n\n# Context\n\nMake all text in the application red\n\n# Acceptance Criteria\n\n- [ ] All text in the application is red\n\n# Dev Hints\n\n* Text should be red",
     "checklist": [],
     "attachments": [],
     "knowledgeRefs": [],
     "source": "linear",
-    "createdAt": "2026-07-03T14:35:34.353Z"
+    "createdAt": "2026-07-29T23:31:29.811Z"
   },
-  "stage": "done",
+  "stage": "in-progress",
   "mode": "speckit",
   "ticket": {
     "source": "linear",
-    "key": "TAV-9",
-    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-9/high-risk-filter-in-pr-list-never-flags-large-changes",
-    "title": "High-risk filter in PR list never flags large changes"
+    "key": "TAV-14",
+    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-14/make-all-text-in-the-application-red",
+    "title": "Make all text in the application red",
+    "branchName": "andrewtavares87/tav-14-make-all-text-in-the-application-red"
   },
-  "run": null,
-  "queuePosition": null,
-  "worktreePath": null,
-  "branchName": null,
+  "run": {
+    "status": "running",
+    "startedAt": "2026-07-29T23:34:02.667Z",
+    "completedAt": null,
+    "autonomyLevel": "standard"
+  },
+  "queuePosition": "active",
+  "worktreePath": "/Users/atavares/repos/terminator/.worktrees/tav-14",
+  "branchName": "andrewtavares87/tav-14-make-all-text-in-the-application-red",
   "prUrl": null,
   "phases": {
     "constitution": {
       "id": "constitution",
-      "status": "ready",
+      "status": "skipped",
       "approvedHash": null,
       "approvedAt": null,
       "approvedBy": null,
@@ -39,13 +45,13 @@
     },
     "specify": {
       "id": "specify",
-      "status": "locked",
+      "status": "running",
       "approvedHash": null,
       "approvedAt": null,
       "approvedBy": null,
       "lastRunId": null,
-      "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/spec.md"],
+      "lastRunAt": "2026-07-29T23:34:02.888Z",
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/021-tav-14/spec.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -57,7 +63,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/spec.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/021-tav-14/spec.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -70,9 +76,9 @@
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": [
-        "/Users/atavares/repos/terminator/specs/020-tav-9/plan.md",
-        "/Users/atavares/repos/terminator/specs/020-tav-9/research.md",
-        "/Users/atavares/repos/terminator/specs/020-tav-9/data-model.md"
+        "/Users/atavares/repos/terminator/specs/021-tav-14/plan.md",
+        "/Users/atavares/repos/terminator/specs/021-tav-14/research.md",
+        "/Users/atavares/repos/terminator/specs/021-tav-14/data-model.md"
       ],
       "feedback": null,
       "batchIndex": null
@@ -86,7 +92,7 @@
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": [
-        "/Users/atavares/repos/terminator/specs/020-tav-9/checklists/requirements.md"
+        "/Users/atavares/repos/terminator/specs/021-tav-14/checklists/requirements.md"
       ],
       "feedback": null,
       "batchIndex": null
@@ -99,7 +105,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/tasks.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/021-tav-14/tasks.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -135,7 +141,9 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/.pilot/self-review.json"],
+      "artifactPaths": [
+        "/Users/atavares/repos/terminator/specs/021-tav-14/.pilot/self-review.json"
+      ],
       "feedback": null,
       "batchIndex": null
     },

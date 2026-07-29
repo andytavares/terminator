@@ -1,23 +1,24 @@
 {
   "version": 3,
-  "featureDir": "/Users/atavares/repos/terminator/specs/020-tav-9",
+  "featureDir": "/Users/atavares/repos/terminator/specs/023-tav-12",
   "card": {
-    "title": "High-risk filter in PR list never flags large changes",
+    "title": "Import list should exclude already-imported tickets (prevent duplicate imports)",
     "type": "feature",
-    "scope": "# Summary\n\nThe \"high risk\" filter in the PR list never flags large changes — even PRs with thousands of lines changed are not marked high risk.\n\n# Steps to Reproduce\n\n1. Open the PR list.\n2. Apply / view the high-risk filter.\n3. Observe a PR with a very large diff (thousands of lines changed).\n\nExpected: Large/high-impact PRs are flagged as high risk and surfaced by the high-risk filter.\nActual: No PRs get flagged as high risk, even ones with thousands of lines changed.\n\n# Acceptance Criteria\n\n- [ ] PRs with large diffs (e.g. thousands of lines) are flagged as high risk\n- [ ] The high-risk filter surfaces those PRs\n- [ ] The risk score/field is populated and the size threshold is correct\n- [ ] Tests cover risk classification at boundary change sizes (just below / just above the threshold)\n\n# Dev Hints\n\n* Likely a broken risk-scoring calculation or filter predicate. Verify: is the risk field populated at all? Is the change-size threshold ever met? Is the filter comparing against the correct value?",
+    "scope": "# Summary\n\nA ticket that already exists as a card on the SpecKit Pilot board should not be importable again. Already-imported tickets should be filtered out of the Import ticket list so the same ticket can't be imported twice (which creates duplicate cards).\n\n# Steps to Reproduce\n\n1. Open the SpecKit Pilot board.\n2. Open the Import ticket modal and import a ticket (creates a card).\n3. Open the Import ticket modal again.\n\nExpected: The ticket just imported no longer appears in the import list.\nActual: The already-imported ticket still appears and can be imported again, creating a duplicate card.\n\n# Acceptance Criteria\n\n- [ ] The Import ticket list excludes any ticket that already exists as a card on the board (matched by ticket source key)\n- [ ] Importing the same ticket twice is not possible via the import list\n- [ ] Re-opening the import modal reflects newly-created cards (already-imported tickets disappear)\n- [ ] Matching is by stable ticket source key (Linear `identifier` / `Ticket.key`), not by title\n- [ ] If every assigned ticket is already imported, the list shows an appropriate empty state\n\n# Dev Hints\n\n* Import list source: `extensions/speckit-pilot/src/renderer/components/ImportTicketModal.tsx` — fetches all assigned tickets via `getSpeckitAPI().ticketList()` with no filtering against existing cards.\n* Cross-reference against existing cards via the card-list IPC; filter fetched tickets whose source key matches an existing card's ticket key.\n* This is the same dedup concern as the auto-load work in [TAV-11](https://linear.app/andrew-tavares/issue/TAV-11/speckit-pilot-should-auto-load-assigned-tickets-on-open-import-becomes) — consider a shared \"which tickets are already cards\" helper so both the import list and auto-load reconcile identically.",
     "checklist": [],
     "attachments": [],
     "knowledgeRefs": [],
     "source": "linear",
-    "createdAt": "2026-07-03T14:35:34.353Z"
+    "createdAt": "2026-07-29T23:31:29.815Z"
   },
-  "stage": "done",
+  "stage": "backlog",
   "mode": "speckit",
   "ticket": {
     "source": "linear",
-    "key": "TAV-9",
-    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-9/high-risk-filter-in-pr-list-never-flags-large-changes",
-    "title": "High-risk filter in PR list never flags large changes"
+    "key": "TAV-12",
+    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-12/import-list-should-exclude-already-imported-tickets-prevent-duplicate",
+    "title": "Import list should exclude already-imported tickets (prevent duplicate imports)",
+    "branchName": "andrewtavares87/tav-12-import-list-should-exclude-already-imported-tickets-prevent"
   },
   "run": null,
   "queuePosition": null,
@@ -45,7 +46,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/spec.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/023-tav-12/spec.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -57,7 +58,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/spec.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/023-tav-12/spec.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -70,9 +71,9 @@
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": [
-        "/Users/atavares/repos/terminator/specs/020-tav-9/plan.md",
-        "/Users/atavares/repos/terminator/specs/020-tav-9/research.md",
-        "/Users/atavares/repos/terminator/specs/020-tav-9/data-model.md"
+        "/Users/atavares/repos/terminator/specs/023-tav-12/plan.md",
+        "/Users/atavares/repos/terminator/specs/023-tav-12/research.md",
+        "/Users/atavares/repos/terminator/specs/023-tav-12/data-model.md"
       ],
       "feedback": null,
       "batchIndex": null
@@ -86,7 +87,7 @@
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": [
-        "/Users/atavares/repos/terminator/specs/020-tav-9/checklists/requirements.md"
+        "/Users/atavares/repos/terminator/specs/023-tav-12/checklists/requirements.md"
       ],
       "feedback": null,
       "batchIndex": null
@@ -99,7 +100,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/tasks.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/023-tav-12/tasks.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -135,7 +136,9 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/.pilot/self-review.json"],
+      "artifactPaths": [
+        "/Users/atavares/repos/terminator/specs/023-tav-12/.pilot/self-review.json"
+      ],
       "feedback": null,
       "batchIndex": null
     },

@@ -1,23 +1,24 @@
 {
   "version": 3,
-  "featureDir": "/Users/atavares/repos/terminator/specs/020-tav-9",
+  "featureDir": "/Users/atavares/repos/terminator/specs/025-tav-8",
   "card": {
-    "title": "High-risk filter in PR list never flags large changes",
+    "title": "Low contrast in code windows across the app, especially red/green diff highlights",
     "type": "feature",
-    "scope": "# Summary\n\nThe \"high risk\" filter in the PR list never flags large changes — even PRs with thousands of lines changed are not marked high risk.\n\n# Steps to Reproduce\n\n1. Open the PR list.\n2. Apply / view the high-risk filter.\n3. Observe a PR with a very large diff (thousands of lines changed).\n\nExpected: Large/high-impact PRs are flagged as high risk and surfaced by the high-risk filter.\nActual: No PRs get flagged as high risk, even ones with thousands of lines changed.\n\n# Acceptance Criteria\n\n- [ ] PRs with large diffs (e.g. thousands of lines) are flagged as high risk\n- [ ] The high-risk filter surfaces those PRs\n- [ ] The risk score/field is populated and the size threshold is correct\n- [ ] Tests cover risk classification at boundary change sizes (just below / just above the threshold)\n\n# Dev Hints\n\n* Likely a broken risk-scoring calculation or filter predicate. Verify: is the risk field populated at all? Is the change-size threshold ever met? Is the filter comparing against the correct value?",
+    "scope": "# Summary\n\nCode windows across the app have too-low contrast, making code hard to read. It is especially bad where red/green diff highlights are applied, and gets worse when viewing the monitor from more than a couple of feet away. This is an accessibility issue.\n\n# Steps to Reproduce\n\n1. Open any code window in the app (e.g. a diff/review view).\n2. View code, particularly lines with red/green added/removed diff highlights.\n3. Step back a few feet from the monitor.\n\nExpected: Code text is comfortably readable against both the base background and diff highlight backgrounds, including at a normal viewing distance.\nActual: Contrast is too low; text over red/green highlights is very hard to read, worse at distance.\n\n# Acceptance Criteria\n\n- [ ] Code text meets WCAG AA contrast (≥ 4.5:1) against the base code background\n- [ ] Code text over added/removed diff-line highlights meets WCAG AA contrast (≥ 4.5:1)\n- [ ] Added vs. removed diff highlights remain distinguishable and readable at typical viewing distance\n- [ ] Verified in both light and dark themes\n\n# Dev Hints\n\n* Review the code/diff theme colors app-wide; verify foreground text contrast against both the base background and the added/removed highlight backgrounds.\n* Use the existing `--tm-*` design tokens rather than hard-coded colors.",
     "checklist": [],
     "attachments": [],
     "knowledgeRefs": [],
     "source": "linear",
-    "createdAt": "2026-07-03T14:35:34.353Z"
+    "createdAt": "2026-07-29T23:31:29.819Z"
   },
   "stage": "done",
   "mode": "speckit",
   "ticket": {
     "source": "linear",
-    "key": "TAV-9",
-    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-9/high-risk-filter-in-pr-list-never-flags-large-changes",
-    "title": "High-risk filter in PR list never flags large changes"
+    "key": "TAV-8",
+    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-8/low-contrast-in-code-windows-across-the-app-especially-redgreen-diff",
+    "title": "Low contrast in code windows across the app, especially red/green diff highlights",
+    "branchName": "andrewtavares87/tav-8-low-contrast-in-code-windows-across-the-app-especially"
   },
   "run": null,
   "queuePosition": null,
@@ -45,7 +46,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/spec.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/025-tav-8/spec.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -57,7 +58,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/spec.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/025-tav-8/spec.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -70,9 +71,9 @@
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": [
-        "/Users/atavares/repos/terminator/specs/020-tav-9/plan.md",
-        "/Users/atavares/repos/terminator/specs/020-tav-9/research.md",
-        "/Users/atavares/repos/terminator/specs/020-tav-9/data-model.md"
+        "/Users/atavares/repos/terminator/specs/025-tav-8/plan.md",
+        "/Users/atavares/repos/terminator/specs/025-tav-8/research.md",
+        "/Users/atavares/repos/terminator/specs/025-tav-8/data-model.md"
       ],
       "feedback": null,
       "batchIndex": null
@@ -86,7 +87,7 @@
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": [
-        "/Users/atavares/repos/terminator/specs/020-tav-9/checklists/requirements.md"
+        "/Users/atavares/repos/terminator/specs/025-tav-8/checklists/requirements.md"
       ],
       "feedback": null,
       "batchIndex": null
@@ -99,7 +100,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/tasks.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/025-tav-8/tasks.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -135,7 +136,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/020-tav-9/.pilot/self-review.json"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/025-tav-8/.pilot/self-review.json"],
       "feedback": null,
       "batchIndex": null
     },

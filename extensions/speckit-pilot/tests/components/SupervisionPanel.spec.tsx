@@ -87,7 +87,7 @@ beforeEach(() => {
   api.reviewHunks.mockResolvedValue({ files: [], complete: false, fullReject: false })
   api.reviewDecideHunk.mockResolvedValue({ ok: true })
   api.reviewDone.mockResolvedValue({ ok: true })
-  api.runTerminal.mockResolvedValue({ terminalSessionId: 'terminal-1' })
+  api.runTerminal.mockResolvedValue({ ok: true })
   api.runTranscript.mockResolvedValue({ lines: [] })
   api.runInterrupt.mockResolvedValue({ ok: true })
   api.runRedirect.mockResolvedValue({ ok: true })
@@ -225,21 +225,12 @@ describe('acting on a run', () => {
     expect(await screen.findByText('retrying the same edit')).toBeDefined()
   })
 
-  it('resolves the terminal when asked rather than assuming one', async () => {
-    // A stall is recorded with a session id and nothing else.
-    const onOpenTerminal = vi.fn()
-    panel({ onOpenTerminal })
+  it('asks the main process to take you there', async () => {
+    // This UI is a separate renderer process and cannot select a tab in the
+    // window itself; the jump happens where the window is.
+    panel()
     fireEvent.click(await screen.findByText('Terminal'))
-    await waitFor(() => expect(onOpenTerminal).toHaveBeenCalledWith('terminal-1'))
-  })
-
-  it('goes nowhere when the run has no terminal any more', async () => {
-    api.runTerminal.mockResolvedValue({ terminalSessionId: null })
-    const onOpenTerminal = vi.fn()
-    panel({ onOpenTerminal })
-    fireEvent.click(await screen.findByText('Terminal'))
-    await waitFor(() => expect(api.runTerminal).toHaveBeenCalled())
-    expect(onOpenTerminal).not.toHaveBeenCalled()
+    await waitFor(() => expect(api.runTerminal).toHaveBeenCalledWith({ sessionId: 'session-1' }))
   })
 })
 

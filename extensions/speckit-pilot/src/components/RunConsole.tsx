@@ -8,11 +8,17 @@ interface RunConsoleProps {
   featureDir: string
   lines?: string[]
   phase?: string
+  /**
+   * The phase is running in a terminal, so this is a read of its transcript
+   * rather than a live stream — and an empty one means it has not said anything
+   * yet, not that this surface is broken.
+   */
+  inTerminal?: boolean
 }
 
 type RenderMode = 'text' | 'markdown'
 
-export function RunConsole({ featureDir, lines = [], phase }: RunConsoleProps) {
+export function RunConsole({ featureDir, lines = [], phase, inTerminal = false }: RunConsoleProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [mode, setMode] = useState<RenderMode>('text')
   const [reply, setReply] = useState('')
@@ -103,7 +109,11 @@ export function RunConsole({ featureDir, lines = [], phase }: RunConsoleProps) {
           }}
         >
           {lines.length === 0 ? (
-            <span style={{ color: 'var(--tm-text-secondary)' }}>Waiting for output…</span>
+            <span style={{ color: 'var(--tm-text-secondary)' }}>
+              {inTerminal
+                ? 'The agent has not said anything yet. Everything it does is in its terminal — open it above to watch or take over.'
+                : 'Waiting for output…'}
+            </span>
           ) : (
             lines.map((line, i) => <div key={i}>{line}</div>)
           )}

@@ -27,8 +27,6 @@ import {
 export interface SupervisionPanelProps {
   /** Names a card, since a run belongs to one. */
   cardLabel?: (featureDir: string) => string
-  /** Takes the operator to a run's terminal. Navigation is the host's job. */
-  onOpenTerminal?: (terminalSessionId: string) => void
   /** The repository a discard removes the worktree and branch from. */
   workspacePath?: string
   /** Something changed that the rest of the board should reload. */
@@ -69,14 +67,12 @@ function RunActions({
   sessionId,
   label,
   workspacePath,
-  onOpenTerminal,
   onChanged,
 }: {
   sessionId: string
   /** Names the run in the redirect field's label, for a screen reader. */
   label: string
   workspacePath?: string
-  onOpenTerminal?: (terminalSessionId: string) => void
   onChanged: () => void
 }): JSX.Element {
   const [redirecting, setRedirecting] = useState(false)
@@ -95,23 +91,14 @@ function RunActions({
   return (
     <>
       <span className="sk-sup__actions">
-        {onOpenTerminal !== undefined && (
-          <button
-            className="sk-sup__btn"
-            // Resolved when clicked rather than carried on the row: a stall is
-            // recorded with a session id and nothing else, and the terminal a
-            // run is in is the runner's to answer.
-            onClick={() =>
-              void getSpeckitAPI()
-                .runTerminal({ sessionId })
-                .then(({ terminalSessionId }) => {
-                  if (terminalSessionId !== null) onOpenTerminal(terminalSessionId)
-                })
-            }
-          >
-            Terminal
-          </button>
-        )}
+        {/* The jump happens in the main process: this UI is a separate
+            renderer, so it cannot select a tab in the window itself. */}
+        <button
+          className="sk-sup__btn"
+          onClick={() => void getSpeckitAPI().runTerminal({ sessionId })}
+        >
+          Terminal
+        </button>
         <button className="sk-sup__btn" onClick={() => void toggleTranscript()}>
           {transcript === null ? 'Transcript' : 'Hide'}
         </button>
@@ -185,13 +172,12 @@ function Runs({
   now,
   cardLabel,
   workspacePath,
-  onOpenTerminal,
   onChanged,
 }: {
   runs: readonly RunView[]
   now: number
   onChanged: () => void
-} & Pick<SupervisionPanelProps, 'cardLabel' | 'onOpenTerminal' | 'workspacePath'>): JSX.Element {
+} & Pick<SupervisionPanelProps, 'cardLabel' | 'workspacePath'>): JSX.Element {
   if (runs.length === 0) {
     return <div className="sk-sup__clear">Nothing is running.</div>
   }
@@ -217,7 +203,6 @@ function Runs({
             sessionId={run.sessionId}
             label={run.branch}
             workspacePath={workspacePath}
-            onOpenTerminal={onOpenTerminal}
             onChanged={onChanged}
           />
         </div>
@@ -232,7 +217,6 @@ function Stalls({
   now,
   cardLabel,
   workspacePath,
-  onOpenTerminal,
   onChanged,
 }: {
   firings: readonly StallFiringView[]
@@ -240,7 +224,6 @@ function Stalls({
   now: number
   cardLabel?: (featureDir: string) => string
   workspacePath?: string
-  onOpenTerminal?: (terminalSessionId: string) => void
   onChanged: () => void
 }): JSX.Element {
   return (
@@ -274,7 +257,6 @@ function Stalls({
                 sessionId={firing.sessionId}
                 label={featureDir.split('/').pop() ?? firing.sessionId}
                 workspacePath={workspacePath}
-                onOpenTerminal={onOpenTerminal}
                 onChanged={onChanged}
               />
             </div>
@@ -662,7 +644,6 @@ type Section = 'runs' | 'stalls' | 'review' | 'feed'
 
 export function SupervisionPanel({
   cardLabel,
-  onOpenTerminal,
   workspacePath,
   onChanged,
   focus,
@@ -748,7 +729,6 @@ export function SupervisionPanel({
           now={now}
           cardLabel={cardLabel}
           workspacePath={workspacePath}
-          onOpenTerminal={onOpenTerminal}
           onChanged={reload}
         />
       )}
@@ -759,7 +739,6 @@ export function SupervisionPanel({
           now={now}
           cardLabel={cardLabel}
           workspacePath={workspacePath}
-          onOpenTerminal={onOpenTerminal}
           onChanged={reload}
         />
       )}
