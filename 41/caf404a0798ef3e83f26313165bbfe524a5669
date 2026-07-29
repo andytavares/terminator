@@ -1,0 +1,39 @@
+extensions/speckit-pilot/package.json
+  s_5f98598a6d950e::t_e64cdd6df3c602 15
+.github/workflows/ci.yml
+  s_5f98598a6d950e::t_997c1f2a4b80b3 28-40
+extensions/notepad/package.json
+  s_5f98598a6d950e::t_109cfcfad8b820 32-33
+extensions/notepad/tests/unit/ipc/front-matter.spec.ts
+  s_5f98598a6d950e::t_0b0974c5d350f6 1,3-92
+  s_5f98598a6d950e::t_887a21b154502c 2
+extensions/notepad/src/ipc/export.ipc.ts
+  s_5f98598a6d950e::t_ed9e7b17ae1d37 66,199
+  s_5f98598a6d950e::t_55159f7637b172 6,133
+package.json
+  s_5f98598a6d950e::t_35b207cc18ad6e 105-107
+  s_5f98598a6d950e::t_b88d038c3f17e4 108
+  s_5f98598a6d950e::t_b588943bd5d448 110
+  s_5f98598a6d950e::t_e64cdd6df3c602 109
+extensions/notepad/src/ipc/front-matter.ts
+  s_5f98598a6d950e::t_0e6e2300a9e6aa 1-55
+  s_5f98598a6d950e::t_55159f7637b172 56-67
+package-lock.json
+  s_5f98598a6d950e::t_74f7105b44b2ab 109,118-139,147-152,177,1062-1064,1068-1069,1072,1075,1078-1081,1084-1085,1088-1091,1093,1095,1098,1102-1104,1106,1108,1111-1114,1380-1382,1386,1391,4466-4468,4475,4903,4988,7820-7822,7826-7852,7856-7858,7860,7862,7865-7868,8205-8207,8213,9428-9430,11241
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "41caf404a0798ef3e83f26313165bbfe524a5669",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
