@@ -1,0 +1,33 @@
+extensions/speckit-pilot/tests/runtime/stall-watcher.spec.ts
+  s_5f98598a6d950e::t_2426f2dbaa1135 1-4,6-219
+  s_5f98598a6d950e::t_e7bedf6e2650a7 5
+extensions/speckit-pilot/src/runtime/stall-watcher.ts
+  s_5f98598a6d950e::t_f119c8058f5120 1-130
+extensions/speckit-pilot/src/runtime/supervised-runner.ts
+  s_5f98598a6d950e::t_9e2f42298dfb5c 14,76-80,94-97,135-145,201-203,259-266
+  s_5f98598a6d950e::t_0be263d1865f43 267-268
+extensions/speckit-pilot/src/runtime/evaluate-stall.ts
+  s_5f98598a6d950e::t_d5136987efef34 1-122
+extensions/speckit-pilot/tests/runtime/evaluate-stall.spec.ts
+  s_5f98598a6d950e::t_e7bedf6e2650a7 163-169
+  s_5f98598a6d950e::t_e989085cccb0da 1-162,170-200
+extensions/speckit-pilot/src/index.ts
+  s_5f98598a6d950e::t_e7bedf6e2650a7 757
+  s_5f98598a6d950e::t_1cdda76143e7b7 106-107,698-716,746-756,758-760,777-783,2178-2179
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "c3d954fcdede647ea73d10f0dfb7d1bdb69cef40",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
