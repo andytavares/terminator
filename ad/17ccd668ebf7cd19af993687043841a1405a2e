@@ -1,0 +1,26 @@
+extensions/speckit-pilot/tests/runner/supervised-phase.spec.ts
+  s_5f98598a6d950e::t_8ed5c8c4a70585 1-159
+extensions/speckit-pilot/src/index.ts
+  s_5f98598a6d950e::t_44515949a0a375 95-98,100-102,685-698,700-706,708-709,2072-2075
+  s_5f98598a6d950e::t_1c00950253ef1f 99,699,2071
+extensions/speckit-pilot/src/runner/agent-runner.ts
+  s_5f98598a6d950e::t_1c00950253ef1f 91
+  s_5f98598a6d950e::t_7ed4b4861117b1 6,80-90,92-109,142-160,394-470,473
+  s_5f98598a6d950e::t_74e8c6905ae3d1 471-472
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "ad17ccd668ebf7cd19af993687043841a1405a2e",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
