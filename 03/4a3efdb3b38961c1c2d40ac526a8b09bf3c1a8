@@ -1,0 +1,33 @@
+extensions/remote-control/package.json
+  s_5f98598a6d950e::t_c06e45de93259b 10
+package.json
+  s_5f98598a6d950e::t_c06e45de93259b 48,100-110
+.github/workflows/ci.yml
+  s_5f98598a6d950e::t_c06e45de93259b 28-40
+extensions/notepad/tests/unit/ipc/front-matter.spec.ts
+  s_5f98598a6d950e::t_c06e45de93259b 1-109
+extensions/notepad/package.json
+  s_5f98598a6d950e::t_c06e45de93259b 27
+extensions/notepad/src/ipc/export.ipc.ts
+  s_5f98598a6d950e::t_c06e45de93259b 6,66,133,199
+extensions/notepad/src/ipc/front-matter.ts
+  s_5f98598a6d950e::t_c06e45de93259b 1-73
+package-lock.json
+  s_5f98598a6d950e::t_5aa2aa0b9a733e 15,109,129,1035-1037,1041-1042,1045,1048,1051-1054,1057-1058,1061-1064,1066,1068,1071,1075-1077,1079,1081,1084-1087,1353-1355,1359,1364,2162-2164,2178,2180-2181,2186-2201,4439-4441,4448,4875,4960,5353-5362,5570-5572,7674-7676,7779-7781,7785-7811,7815-7817,7819,7821,7824-7827,7843-7845,8164-8166,8172,8587-8589,8592-8596,9387-9389,11199,11230-11242,11250-11252,12069-12071,12089,13474-13476,13771-13797
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "034a3efdb3b38961c1c2d40ac526a8b09bf3c1a8",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
