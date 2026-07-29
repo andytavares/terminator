@@ -1,0 +1,24 @@
+package.json
+  s_5f98598a6d950e::t_74000481d68428 48,100-104
+  s_5f98598a6d950e::t_ad80288a57c25b 105
+extensions/remote-control/package.json
+  s_5f98598a6d950e::t_cc9ae160a43e62 10
+package-lock.json
+  s_5f98598a6d950e::t_2efd3ca309a8dd 15,129,2190-2192,2206,2208-2209,2214-2229,5380-5389,5607-5609,7771-7773,7911-7913,11359-11371,11379-11381,12198-12200,12218,13922-13948
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "f466a546e87e173a58b23815c15f0c7a5fc9ada0",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
