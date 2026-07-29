@@ -1,0 +1,32 @@
+docs/adr/026-supervised-runs-in-a-terminal.md
+  s_5f98598a6d950e::t_55e46143662428 1-49,58-113
+  s_5f98598a6d950e::t_d4cf87ff7dca53 50-57
+docs/user-guide/USER-GUIDE.md
+  s_5f98598a6d950e::t_d4cf87ff7dca53 336-340,354,356-376,378-393,407-410
+  s_5f98598a6d950e::t_542036fc32a4c8 377
+extensions/speckit-pilot/SUPERVISION.md
+  s_5f98598a6d950e::t_2ea2e461151f35 1-17,24-27,29-34,37,46-55,58-123
+  s_5f98598a6d950e::t_d4cf87ff7dca53 18-23,38-45,56-57
+  s_5f98598a6d950e::t_542036fc32a4c8 28,35-36
+docs/ARCHITECTURE.md
+  s_5f98598a6d950e::t_dd1579f36109d5 684-699,702-706,717-718,759-761
+  s_5f98598a6d950e::t_380615b75caa13 642
+docs/adr/007-agent-runner-subprocess.md
+  s_5f98598a6d950e::t_f3eb3d348c9f6a 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "e0473c4de82b2fa84718bc8608e34bfd687b5a5d",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
