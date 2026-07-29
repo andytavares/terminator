@@ -1,0 +1,29 @@
+extensions/speckit-pilot/src/components/SelfReviewGate.tsx
+  s_5f98598a6d950e::t_5c7a11361b68fb 93-98
+  s_5f98598a6d950e::t_baeb8db045458b 106-112
+  s_5f98598a6d950e::t_c4cc87d9d29c18 156,158,187
+extensions/speckit-pilot/src/state/artifact-paths.ts
+  s_5f98598a6d950e::t_5c7a11361b68fb 39-43
+extensions/speckit-pilot/tests/components/SelfReviewGate.spec.tsx
+  s_5f98598a6d950e::t_0115c087c3bb2b 118-147
+extensions/speckit-pilot/tests/state/artifact-paths.spec.ts
+  s_5f98598a6d950e::t_0115c087c3bb2b 71-89
+extensions/speckit-pilot/SUPERVISION.md
+  s_5f98598a6d950e::t_ce3e24f633b866 200-207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "909f3c0fa9c126724045b23c4438647e8d9ed57f",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
