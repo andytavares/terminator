@@ -1,0 +1,19 @@
+extensions/speckit-pilot/src/index.ts
+  s_5f98598a6d950e::t_8fd1cf70491757 1872-1877
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "1e925d39acfb0e48aa7581ad4895f290ee99c0ff",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
