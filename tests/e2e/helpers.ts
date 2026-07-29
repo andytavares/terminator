@@ -54,7 +54,14 @@ export async function closeApp(handle: AppHandle | undefined): Promise<void> {
       // Process already exited between the check and the kill — nothing to do.
     }
   }
-  if (handle.userDataDir) rmSync(handle.userDataDir, { recursive: true, force: true })
+  // Retried, because the profile is still being written to as the app dies —
+  // a terminal's scrollback, an extension's state, a transcript — and the
+  // directory disappearing out from under those races the delete. Without this
+  // a spec that ran a real agent fails in teardown as ENOTEMPTY, which reads
+  // as a broken test rather than as tidying up too eagerly.
+  if (handle.userDataDir) {
+    rmSync(handle.userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  }
 }
 
 /**
