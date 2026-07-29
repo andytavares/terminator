@@ -1,0 +1,25 @@
+tests/e2e/speckit-supervised-run.spec.ts
+  s_5f98598a6d950e::t_fad022a0446a0a 219-231
+extensions/speckit-pilot/tests/components/SupervisionPanel.spec.tsx
+  s_5f98598a6d950e::t_1c83fe2169c2c4 56,58-65
+extensions/speckit-pilot/src/types/electron.ts
+  s_5f98598a6d950e::t_1c83fe2169c2c4 313-325
+extensions/speckit-pilot/tsconfig.json
+  s_5f98598a6d950e::t_aea7b961298a76 26-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "21533d578f5d25d1e245d207d6a8882485e9d28a",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
