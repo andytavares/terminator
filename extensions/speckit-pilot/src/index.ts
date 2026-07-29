@@ -103,6 +103,8 @@ import {
 import { createControlServer, type ControlServer } from './runtime/control-server.js'
 import { createSupervisedRunner, type SupervisedRunner } from './runtime/supervised-runner.js'
 import { createPendingPermissions } from './runtime/pending-permissions.js'
+import { createStallWatcher, type StallWatcher } from './runtime/stall-watcher.js'
+import type { StallFiring } from './runtime/evaluate-stall.js'
 import type { RunnerHandle } from './runner/agent-runner.js'
 
 const disposables: Disposable[] = []
@@ -693,6 +695,25 @@ let supervisedRunner: SupervisedRunner | null = null
 // What is waiting on the operator, across every card. Without somewhere to
 // hold these the surface has nothing to render and a phase sits at its hook.
 const pendingPermissions = createPendingPermissions()
+let stallWatcher: StallWatcher | null = null
+/**
+ * Stalls that have fired, newest first, and whether they were judged right.
+ *
+ * Kept in memory rather than persisted: the point of the record is tuning the
+ * thresholds against a week of real use, and a firing about a run that no longer
+ * exists is not something to reload on the next start.
+ */
+const stallFirings: Array<{ firing: StallFiring; featureDir: string; shadow: boolean }> = []
+
+/**
+ * Shadow mode: record, do not interrupt. On by default and deliberately so — a
+ * detector with a 20% false-positive rate produces alarm fatigue and gets turned
+ * off, which is worse than not shipping it. Turn it off on the evidence of the
+ * firings below, not on faith.
+ */
+function stallShadowMode(api: ExtensionAPI): boolean {
+  return api.settings.get<boolean>('terminator.speckit-pilot.stallShadowMode') ?? true
+}
 
 async function startSupervisionRuntime(api: ExtensionAPI): Promise<void> {
   // Self-review's read-only policy does not need the control server, so it is
@@ -722,6 +743,21 @@ async function startSupervisionRuntime(api: ExtensionAPI): Promise<void> {
       onPending: (ask) => pendingPermissions.add(ask),
       onResolved: (requestId) => pendingPermissions.remove(requestId),
     })
+
+    // A run that stops making progress without asking for anything is the
+    // failure nobody instruments: it looks exactly like one that is working.
+    const runner = supervisedRunner
+    stallWatcher = createStallWatcher({
+      runs: () => runner.watchable(),
+      onFiring: (firing, featureDir) => {
+        const shadow = stallShadowMode(api)
+        stallFirings.unshift({ firing, featureDir, shadow })
+        api.window.broadcast('speckit:stall-fired', { firing, featureDir, shadow })
+        if (shadow) return
+        api.notifications.showToast('warning', `A run stopped making progress (${firing.signal})`)
+      },
+    })
+    stallWatcher.start()
   } catch (error) {
     // Without it, phases fall back to the headless spawn. Said out loud: the
     // difference is whether tool calls are asked about or approved silently.
@@ -737,6 +773,13 @@ export function activate(api: ExtensionAPI): void {
   // the decision back to the terminal — which works, but makes the console a
   // spectator of its own agents.
   reg(api, 'speckit:permissions-list', () => ({ pending: pendingPermissions.list() }))
+
+  // The firings, and whether they were recorded or surfaced. Precision is
+  // measured against these by hand before shadow mode is turned off.
+  reg(api, 'speckit:stalls-list', () => ({
+    firings: stallFirings,
+    shadowMode: stallShadowMode(api),
+  }))
 
   reg(api, 'speckit:permission-resolve', (payload: unknown) => {
     const { requestId, decision, answer } = payload as {
@@ -2132,6 +2175,8 @@ export function deactivate(): void {
   setSupervisedRunner(null)
   setPermissionSink(null)
   setReadOnlyStateDir(null)
+  stallWatcher?.stop()
+  stallWatcher = null
   supervisedRunner?.dispose()
   supervisedRunner = null
   void control?.close()

@@ -11,6 +11,7 @@ import {
   type PermissionDecision,
 } from './permission-bridge.js'
 import { countTurns } from './transcript-tailer.js'
+import type { WatchedRun } from './stall-watcher.js'
 
 // Running a phase where the operator can see it.
 //
@@ -72,6 +73,11 @@ export interface SupervisedRunner {
   send(sessionId: string, message: string): boolean
   /** Where a session is running, for a surface that wants to go there. */
   terminalFor(sessionId: string): string | null
+  /**
+   * The live runs, as the stall detector needs them. Read each tick rather than
+   * subscribed to, so a run that ends simply drops out.
+   */
+  watchable(): WatchedRun[]
   dispose(): void
 }
 
@@ -85,6 +91,10 @@ interface Running {
   bridge: ReturnType<typeof createPermissionBridge>
   terminalSessionId: string
   transcriptPath: string
+  featureDir: string
+  startedAt: number
+  /** True while a tool call is held: blocked on a person is not stuck. */
+  isWaiting: boolean
   release: () => void
 }
 
@@ -122,8 +132,17 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         sessionId,
         now,
         autoDecide: start.autoDecide,
-        onPending: start.onPending,
-        onResolved: start.onResolved,
+        onPending: (pending) => {
+          // Held on a person, so the detector must not call it stuck.
+          const run = running.get(sessionId)
+          if (run !== undefined) run.isWaiting = true
+          start.onPending(pending)
+        },
+        onResolved: (requestId, decision) => {
+          const run = running.get(sessionId)
+          if (run !== undefined) run.isWaiting = false
+          start.onResolved(requestId, decision)
+        },
       })
 
       const spec = buildLaunchSpec({
@@ -179,6 +198,9 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         bridge,
         terminalSessionId,
         transcriptPath: spec.transcriptPath,
+        featureDir: start.featureDir,
+        startedAt: now(),
+        isWaiting: false,
         release,
       })
 
@@ -232,6 +254,16 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
 
     terminalFor(sessionId): string | null {
       return running.get(sessionId)?.terminalSessionId ?? null
+    },
+
+    watchable(): WatchedRun[] {
+      return [...running].map(([sessionId, run]) => ({
+        sessionId,
+        featureDir: run.featureDir,
+        transcriptPath: run.transcriptPath,
+        startedAt: run.startedAt,
+        isWaiting: run.isWaiting,
+      }))
     },
 
     dispose(): void {
