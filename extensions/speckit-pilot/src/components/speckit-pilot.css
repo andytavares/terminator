@@ -3070,3 +3070,38 @@
   overflow-x: auto;
   color: var(--tm-text-primary);
 }
+
+/* Merge order across the repositories a card touches. Absent entirely for the
+   single-repository case, which is almost every card. */
+.sk-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.sk-lanes__head {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--tm-text-secondary);
+}
+.sk-lanes__row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border: 1px solid var(--tm-border, #1f2937);
+  border-radius: 6px;
+  background: var(--tm-surface, #111827);
+}
+.sk-lanes__ord {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--tm-border, #1f2937);
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+}

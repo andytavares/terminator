@@ -108,6 +108,7 @@ import { createStallWatcher, type StallWatcher } from './runtime/stall-watcher.j
 import { createSupervision, type Supervision } from './runtime/supervision.js'
 import { buildDigest } from './runtime/feed/digest.js'
 import { paletteEntries } from './runtime/palette.js'
+import { readCardLanes } from './runtime/workitem.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
 import type { HunkDecision } from './runtime/review/hunk-decisions.js'
 
@@ -118,7 +119,6 @@ interface HunkView {
   lines: string[]
   decision: HunkDecision | null
 }
-import type { CardLanes } from './runtime/lane-coordination.js'
 import type { StallFiring } from './runtime/evaluate-stall.js'
 import type { RunnerHandle } from './runner/agent-runner.js'
 
@@ -985,21 +985,31 @@ export function activate(api: ExtensionAPI): void {
 
   // Merge ordering across the repositories a card touches. A card with one lane
   // costs nothing: every rule collapses to a no-op.
+  // Read from the card's own `workitem.json` rather than taken as a payload:
+  // the contract between the pipeline and the console is a file, and a surface
+  // that had to carry the lanes in would need a producer of its own.
   reg(api, 'speckit:lanes', (payload: unknown) => {
-    const { card } = payload as { card: CardLanes }
-    return { lanes: supervision?.lanes(card) ?? [] }
+    const { featureDir } = payload as { featureDir: string }
+    const card = readCardLanes(featureDir)
+    // Null means one repository, which is not a card with a broken work item.
+    return { lanes: card === null ? [] : (supervision?.lanes(card) ?? []) }
   })
 
   reg(api, 'speckit:lane-may-merge', (payload: unknown) => {
-    const { card, ord, merged } = payload as {
-      card: CardLanes
+    const { featureDir, ord, merged } = payload as {
+      featureDir: string
       ord: number
       merged: number[]
+    }
+    const card = readCardLanes(featureDir)
+    if (card === null) {
+      // Nothing declared, nothing to wait for.
+      return { allowed: true, reason: null, blockingLane: null }
     }
     return (
       supervision?.mayMerge(card, ord, merged ?? []) ?? {
         allowed: false,
-        reason: 'no runtime',
+        reason: 'the supervision runtime is not running',
         blockingLane: null,
       }
     )

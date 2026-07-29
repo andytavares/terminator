@@ -20,6 +20,9 @@ const api = {
   runStop: vi.fn(),
   runDiscard: vi.fn(),
   feedDigest: vi.fn(),
+  reviewAdvance: vi.fn(),
+  reviewIntent: vi.fn(),
+  unattendedMerges: vi.fn(),
 }
 
 vi.mock('../../src/types/electron.js', () => ({ getSpeckitAPI: () => api }))
@@ -84,6 +87,9 @@ beforeEach(() => {
     sessionCount: 0,
     bySession: [],
   })
+  api.reviewAdvance.mockResolvedValue({ step: 'risk' })
+  api.reviewIntent.mockResolvedValue({ intent: null })
+  api.unattendedMerges.mockResolvedValue({ merges: [] })
   window.localStorage.clear()
 })
 
@@ -408,6 +414,134 @@ describe('what is waiting to be reviewed', () => {
     fireEvent.click(await screen.findByText('Review'))
     fireEvent.click(await screen.findByText('Finish review'))
     await waitFor(() => expect(api.reviewDone).toHaveBeenCalledWith({ sessionId: 'session-1' }))
+  })
+})
+
+describe('the step every diff viewer skips', () => {
+  const item = {
+    sessionId: 'session-1',
+    branch: 'feat/thing',
+    grade: 'P1' as const,
+    gradeTrigger: 'alters a schema',
+    queuedAt: 1,
+    diffSummary: { files: 1, added: 1, removed: 0 },
+  }
+
+  beforeEach(() => {
+    api.supervisionSnapshot.mockResolvedValue({
+      runs: [],
+      review: [item],
+      backpressure: { allowed: true, unreviewed: 1, limit: 3 },
+    })
+    api.reviewHunks.mockResolvedValue({
+      files: [
+        { file: 'src/a.ts', hunks: [{ id: 'h1', newStart: 1, lines: ['+x'], decision: null }] },
+      ],
+      complete: false,
+      fullReject: false,
+    })
+  })
+
+  async function openReview(): Promise<void> {
+    panel()
+    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByText('Review'))
+    await screen.findByText('src/a.ts')
+  }
+
+  it('reads the diff against what the agent said it did', async () => {
+    api.runTranscript.mockResolvedValue({
+      lines: [{ role: 'assistant', text: 'also shortened the idle timeout', at: 1 }],
+    })
+    await openReview()
+    await waitFor(() =>
+      expect(api.reviewIntent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: 'session-1',
+          agentAccount: 'also shortened the idle timeout',
+        })
+      )
+    )
+  })
+
+  it('names what was changed without being asked', async () => {
+    api.reviewIntent.mockResolvedValue({
+      intent: {
+        request: 'add validation',
+        agentAccount: 'done',
+        unexpectedFiles: ['src/session-timeout.ts'],
+        untouchedFiles: [],
+        hasScopeConcern: true,
+      },
+    })
+    await openReview()
+    expect(await screen.findByText(/src\/session-timeout.ts/)).toBeDefined()
+  })
+
+  it('names what was asked for and never touched', async () => {
+    api.reviewIntent.mockResolvedValue({
+      intent: {
+        request: 'add validation to src/api.ts',
+        agentAccount: 'done',
+        unexpectedFiles: [],
+        untouchedFiles: ['src/api.ts'],
+        hasScopeConcern: false,
+      },
+    })
+    await openReview()
+    expect(await screen.findByText(/never touched: src\/api.ts/)).toBeDefined()
+  })
+
+  it('says so when the change is exactly what was asked for', async () => {
+    api.reviewIntent.mockResolvedValue({
+      intent: {
+        request: 'add validation',
+        agentAccount: 'done',
+        unexpectedFiles: [],
+        untouchedFiles: [],
+        hasScopeConcern: false,
+      },
+    })
+    await openReview()
+    expect(await screen.findByText(/Everything it changed was asked for/)).toBeDefined()
+  })
+
+  it('walks the four steps, and knows when they are done', async () => {
+    await openReview()
+    fireEvent.click(screen.getByText('Next step'))
+    await waitFor(() => expect(api.reviewAdvance).toHaveBeenCalledWith({ sessionId: 'session-1' }))
+    expect(await screen.findByText(/Step: risk/)).toBeDefined()
+
+    api.reviewAdvance.mockResolvedValue({ step: null })
+    fireEvent.click(screen.getByText('Next step'))
+    expect(await screen.findByText(/every step taken/)).toBeDefined()
+  })
+})
+
+describe('what merged with nobody looking', () => {
+  it('shows nothing when nothing has', async () => {
+    panel()
+    fireEvent.click(await screen.findByText(/review/))
+    await screen.findByText(/Nothing is waiting to be reviewed/)
+    expect(screen.queryByText(/Merged without review/)).toBeNull()
+  })
+
+  it('records it next to the queue it bypassed', async () => {
+    api.unattendedMerges.mockResolvedValue({
+      merges: [
+        {
+          sessionId: 'session-9',
+          repoPath: '/repo/.worktrees/deps',
+          mergedAt: 1,
+          gradeTrigger: 'lockfile, formatting or dependency bump with green checks',
+          checkState: 'passing',
+          diffSummary: { files: 1, added: 4, removed: 4 },
+        },
+      ],
+    })
+    panel()
+    fireEvent.click(await screen.findByText(/review/))
+    expect(await screen.findByText(/Merged without review: 1/)).toBeDefined()
   })
 })
 

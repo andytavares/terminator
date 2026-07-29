@@ -78,9 +78,25 @@ evidence nobody has.
 depth. The constraint is one person's capacity to review, which does not scale
 with the number of cards.
 
-Override is one click and is **recorded with the queue depth at the moment it was
-ignored** (`.speckit-pilot-runtime/backpressure-overrides.jsonl`), so a backlog
+The refusal appears on the card, with **Start anyway** next to it. Overriding is
+one click and is **recorded with the queue depth at the moment it was ignored** (`.speckit-pilot-runtime/backpressure-overrides.jsonl`), so a backlog
 built by overriding is visible afterwards rather than only felt.
+
+## Review steps, and multi-repository cards
+
+A review is walked in four steps — **intent → risk → structure → tests**. Intent
+is first deliberately: it is the step that catches work which is defensible in
+isolation and was never asked for, and reading the diff first is how you end up
+justifying such work instead of questioning it. It reads what the card asked for
+against the agent's own account of what it did against what actually changed.
+
+A card that touches more than one repository declares **lanes** in a
+`workitem.json` the plan phase writes into the feature directory — the contract
+between the pipeline and the console is a file, not an API, so the pipeline
+stays usable in a bare terminal. When one is present, the card's Phases tab
+shows the lanes in merge order with their predicted collisions and says which
+one has to land first. A card with no such file has one repository, and none of
+this appears.
 
 ## Stalls
 

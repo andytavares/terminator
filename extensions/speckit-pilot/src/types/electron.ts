@@ -142,7 +142,13 @@ export interface SpeckitAPI {
     workspacePath: string
     baseBranch?: string
     mode?: RunMode
-  }): Promise<{ ok: true; dispatched: true; queued: boolean } | { error: string; message?: string }>
+    /** Start anyway, with the queue depth recorded at the moment it was ignored. */
+    overrideBackpressure?: boolean
+  }): Promise<
+    | { ok: true; dispatched: true; queued: boolean }
+    | { ok: false; error: 'backpressure'; reason?: string | null }
+    | { error: string; message?: string }
+  >
   cardReset(payload: {
     featureDir: string
     workspacePath?: string
@@ -201,6 +207,23 @@ export interface SpeckitAPI {
   /** Kill and discard: the run ends and its worktree and branch go with it. */
   runDiscard(payload: { sessionId: string; workspacePath: string }): Promise<{ ok: boolean }>
   backpressureOverride(payload: { sessionId: string }): Promise<{ ok: boolean }>
+  /** Where a review has got to: intent → risk → structure → tests. */
+  reviewAdvance(payload: { sessionId: string }): Promise<{ step: ReviewStepView | null }>
+  /** The request set against the agent's own account of what it did. */
+  reviewIntent(payload: {
+    sessionId: string
+    request: string
+    agentAccount: string
+  }): Promise<{ intent: IntentReviewView | null }>
+  /** A card's lanes, from the work item its plan phase wrote. */
+  lanes(payload: { featureDir: string }): Promise<{ lanes: LaneViewJson[] }>
+  laneMayMerge(payload: {
+    featureDir: string
+    ord: number
+    merged: number[]
+  }): Promise<{ allowed: boolean; reason: string | null; blockingLane: number | null }>
+  /** What merged with nobody looking, so it can be reviewed after the fact. */
+  unattendedMerges(): Promise<{ merges: UnattendedMergeView[] }>
   artifactList(payload: {
     featureDir: string
   }): Promise<{ artifacts: ArtifactRef[] } | { error: string }>
@@ -303,6 +326,52 @@ export interface HunkView {
 export interface HunkFileView {
   file: string
   hunks: HunkView[]
+}
+
+/**
+ * The four steps of a review, in the order they are taken.
+ *
+ * `advance` answers null past the last one, which is how a surface knows the
+ * review is finished rather than stuck on "tests".
+ */
+export type ReviewStepView = 'intent' | 'risk' | 'structure' | 'tests'
+
+/**
+ * The step every diff viewer skips: what was asked for, against what the agent
+ * says it did, against what it actually changed.
+ */
+export interface IntentReviewView {
+  request: string
+  agentAccount: string
+  /** Touched but not anticipated by the request. The scope-creep signal. */
+  unexpectedFiles: string[]
+  /** Anticipated but never touched — often means the task was not actually done. */
+  untouchedFiles: string[]
+  hasScopeConcern: boolean
+}
+
+/** One lane of a multi-repository card, with what it collides with. */
+export interface LaneViewJson {
+  lane: {
+    ord: number
+    repo: string
+    branch: string
+    role?: 'producer' | 'consumer'
+    blocks: number[]
+    blocked_by: number[]
+  }
+  collisions: string[]
+  blockedBy: number[]
+}
+
+/** A change that merged without a person looking at it. */
+export interface UnattendedMergeView {
+  sessionId: string
+  repoPath: string
+  mergedAt: number
+  gradeTrigger: string
+  checkState: string
+  diffSummary: { files: number; added: number; removed: number }
 }
 
 /** What happened while you were away. */
@@ -507,6 +576,24 @@ export function getSpeckitAPI(): SpeckitAPI {
     runStop: (payload) => bridge.invoke('speckit:run-stop', payload) as Promise<{ ok: boolean }>,
     runDiscard: (payload) =>
       bridge.invoke('speckit:run-discard', payload) as Promise<{ ok: boolean }>,
+    reviewAdvance: (payload) =>
+      bridge.invoke('speckit:review-advance', payload) as Promise<{ step: ReviewStepView | null }>,
+    reviewIntent: (payload) =>
+      bridge.invoke('speckit:review-intent', payload) as Promise<{
+        intent: IntentReviewView | null
+      }>,
+    lanes: (payload) =>
+      bridge.invoke('speckit:lanes', payload) as Promise<{ lanes: LaneViewJson[] }>,
+    laneMayMerge: (payload) =>
+      bridge.invoke('speckit:lane-may-merge', payload) as Promise<{
+        allowed: boolean
+        reason: string | null
+        blockingLane: number | null
+      }>,
+    unattendedMerges: () =>
+      bridge.invoke('speckit:unattended-merges', {}) as Promise<{
+        merges: UnattendedMergeView[]
+      }>,
     backpressureOverride: (payload) =>
       bridge.invoke('speckit:backpressure-override', payload) as Promise<{ ok: boolean }>,
     artifactList: (payload) =>

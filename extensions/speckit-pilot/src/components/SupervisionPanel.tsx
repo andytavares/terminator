@@ -7,6 +7,9 @@ import {
   type RunView,
   type StallFiringView,
   type HunkFileView,
+  type IntentReviewView,
+  type ReviewStepView,
+  type UnattendedMergeView,
   type SupervisionSnapshot,
   type TranscriptLineView,
 } from '../types/electron.js'
@@ -283,16 +286,85 @@ function Stalls({
 }
 
 /**
+ * The step every diff viewer skips: what was asked for, against what the agent
+ * says it did, against what it actually changed.
+ *
+ * First, deliberately. It is the step that catches work which is defensible in
+ * isolation and was never asked for, and reading the diff first is how you end
+ * up justifying it instead of questioning it.
+ */
+function IntentStep({ sessionId, request }: { sessionId: string; request: string }): JSX.Element {
+  const [intent, setIntent] = useState<IntentReviewView | null>(null)
+  const [checked, setChecked] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      // The agent's own account of what it did, in its own words — the last
+      // thing it said before it stopped.
+      const { lines } = await getSpeckitAPI().runTranscript({ sessionId, limit: 6 })
+      const account = lines
+        .filter((line) => line.role === 'assistant')
+        .map((line) => line.text)
+        .join('\n')
+      const result = await getSpeckitAPI().reviewIntent({
+        sessionId,
+        request,
+        agentAccount: account,
+      })
+      if (cancelled) return
+      setIntent(result.intent)
+      setChecked(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [sessionId, request])
+
+  if (!checked) return <div className="sk-sup__meta">Reading what it said it did…</div>
+  if (intent === null) return <></>
+
+  const clean = intent.unexpectedFiles.length === 0 && intent.untouchedFiles.length === 0
+
+  return (
+    <div className={intent.hasScopeConcern ? 'sk-sup__warn' : 'sk-sup__note'}>
+      {clean ? (
+        'Everything it changed was asked for, and everything asked for was changed.'
+      ) : (
+        <>
+          {intent.unexpectedFiles.length > 0 && (
+            <div>Changed without being asked: {intent.unexpectedFiles.join(', ')}</div>
+          )}
+          {intent.untouchedFiles.length > 0 && (
+            <div>Asked for but never touched: {intent.untouchedFiles.join(', ')}</div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+/**
  * The diff, hunk by hunk.
  *
  * The unit of decision is the hunk rather than the file, because one file
  * routinely holds both the change you asked for and the one you did not, and
  * accepting a file wholesale is how the second one ships.
  */
-function HunkReview({ sessionId, onDone }: { sessionId: string; onDone: () => void }): JSX.Element {
+function HunkReview({
+  sessionId,
+  request,
+  onDone,
+}: {
+  sessionId: string
+  /** What the card asked for, which the intent step reads the diff against. */
+  request: string
+  onDone: () => void
+}): JSX.Element {
   const [files, setFiles] = useState<HunkFileView[]>([])
   const [complete, setComplete] = useState(false)
   const [fullReject, setFullReject] = useState(false)
+  const [step, setStep] = useState<ReviewStepView | 'done'>('intent')
 
   const load = useCallback(async () => {
     const result = await getSpeckitAPI().reviewHunks({ sessionId })
@@ -317,6 +389,23 @@ function HunkReview({ sessionId, onDone }: { sessionId: string; onDone: () => vo
 
   return (
     <div className="sk-sup__review">
+      {/* Where this review has got to, and the step that has to come first. */}
+      <div className="sk-sup__meta">
+        Step: {step === 'done' ? 'every step taken' : step}
+        {step !== 'done' && (
+          <button
+            className="sk-sup__btn"
+            onClick={() =>
+              void getSpeckitAPI()
+                .reviewAdvance({ sessionId })
+                .then(({ step: next }) => setStep(next ?? 'done'))
+            }
+          >
+            Next step
+          </button>
+        )}
+      </div>
+      {step === 'intent' && <IntentStep sessionId={sessionId} request={request} />}
       {files.map((file) => (
         <div className="sk-sup__file" key={file.file}>
           <div className="sk-sup__filename">{file.file}</div>
@@ -360,6 +449,37 @@ function HunkReview({ sessionId, onDone }: { sessionId: string; onDone: () => vo
   )
 }
 
+/**
+ * What merged with nobody looking.
+ *
+ * Off by default and shown only when it has happened: an unattended merge is
+ * the one action here that takes place with no person watching, so the record
+ * of it belongs next to the queue it bypassed rather than in a log file.
+ */
+function UnattendedMerges(): JSX.Element {
+  const [merges, setMerges] = useState<UnattendedMergeView[]>([])
+
+  useEffect(() => {
+    void getSpeckitAPI()
+      .unattendedMerges()
+      .then(({ merges: recorded }) => setMerges(recorded))
+  }, [])
+
+  if (merges.length === 0) return <></>
+
+  return (
+    <div className="sk-sup__note">
+      Merged without review: {merges.length}
+      {merges.map((merge) => (
+        <div className="sk-sup__meta" key={`${merge.sessionId}-${merge.mergedAt}`}>
+          {merge.repoPath.split('/').pop()} · {merge.gradeTrigger} · checks {merge.checkState} ·{' '}
+          {merge.diffSummary.files} {merge.diffSummary.files === 1 ? 'file' : 'files'}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function Review({
   items,
   backpressure,
@@ -387,6 +507,7 @@ function Review({
             `${backpressure.unreviewed} diffs are waiting — no new run will start until one is reviewed.`}
         </div>
       )}
+      <UnattendedMerges />
       {items.length === 0 ? (
         <div className="sk-sup__clear">Nothing is waiting to be reviewed.</div>
       ) : (
@@ -417,6 +538,7 @@ function Review({
               {open === item.sessionId && (
                 <HunkReview
                   sessionId={item.sessionId}
+                  request={cardLabel?.(item.branch) ?? item.branch}
                   onDone={() => {
                     setOpen(null)
                     onDone(item.sessionId)

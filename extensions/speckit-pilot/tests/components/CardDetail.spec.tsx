@@ -14,6 +14,10 @@ const mockArtifactList = vi.fn().mockResolvedValue({ artifacts: [] })
 vi.mock('../../src/types/electron.js', () => ({
   getSpeckitAPI: () => ({
     pilotState: mockPilotState,
+    // The phases tab carries the lane strip, which renders nothing for a
+    // single-repository card but still asks.
+    lanes: vi.fn().mockResolvedValue({ lanes: [] }),
+    laneMayMerge: vi.fn().mockResolvedValue({ allowed: true, reason: null, blockingLane: null }),
     cardUpdate: mockCardUpdate,
     cardHandoff: mockCardHandoff,
     cardReset: mockCardReset,
@@ -77,6 +81,7 @@ describe('CardDetail', () => {
         workspacePath: '/repo',
         baseBranch: 'main',
         mode: 'speckit',
+        overrideBackpressure: false,
       })
     )
   })
@@ -94,6 +99,7 @@ describe('CardDetail', () => {
         workspacePath: '/repo',
         baseBranch: 'dev',
         mode: 'speckit',
+        overrideBackpressure: false,
       })
     )
   })
@@ -149,5 +155,39 @@ describe('CardDetail', () => {
     await waitFor(() => screen.getByLabelText('Close'))
     fireEvent.click(screen.getByLabelText('Close'))
     expect(onClose).toHaveBeenCalled()
+  })
+})
+
+describe('when the gate refuses the start', () => {
+  // Refusing silently reads as a button that does nothing, which is how the
+  // gate gets worked around instead of respected.
+  beforeEach(() => {
+    const refused = createInitialState('/repo/specs/x')
+    refused.card.title = 'My Card'
+    mockPilotState.mockResolvedValue({ state: refused })
+    mockCardHandoff.mockResolvedValue({
+      ok: false,
+      error: 'backpressure',
+      reason: '3 diffs are waiting — review one first',
+    })
+  })
+
+  it('says why, in the gate’s own words', async () => {
+    render(<CardDetail featureDir="/repo/specs/016-a" workspacePath="/repo" onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByText('Phases'))
+    fireEvent.click(await screen.findByText('Hand off to agent'))
+    expect(await screen.findByText(/3 diffs are waiting/)).toBeDefined()
+  })
+
+  it('offers the override, and takes it', async () => {
+    render(<CardDetail featureDir="/repo/specs/016-a" workspacePath="/repo" onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByText('Phases'))
+    fireEvent.click(await screen.findByText('Hand off to agent'))
+    fireEvent.click(await screen.findByText('Start anyway'))
+    await waitFor(() =>
+      expect(mockCardHandoff).toHaveBeenLastCalledWith(
+        expect.objectContaining({ overrideBackpressure: true })
+      )
+    )
   })
 })
