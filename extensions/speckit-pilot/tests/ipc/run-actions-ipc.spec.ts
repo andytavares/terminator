@@ -211,6 +211,12 @@ describe('interrupting and redirecting', () => {
     expect(runner.send).toHaveBeenCalledWith('session-1', 'try the other approach')
   })
 
+  it('refuses a payload with no message at all, rather than throwing', async () => {
+    // A handler that throws on a missing field takes the channel down for
+    // everyone rather than refusing one call. Found by driving the real app.
+    expect(await call('speckit:run-redirect', { sessionId: 'session-1' })).toEqual({ ok: false })
+  })
+
   it('refuses an empty redirect rather than ending a turn for nothing', async () => {
     expect(await call('speckit:run-redirect', { sessionId: 'session-1', message: '   ' })).toEqual({
       ok: false,
@@ -267,6 +273,13 @@ describe('discarding a run', () => {
     }
     expect(snapshot.runs.some((r) => r.sessionId === 'session-slot')).toBe(false)
     expect(snapshot.review.some((r) => r.sessionId === 'session-slot')).toBe(false)
+  })
+
+  it('does not throw when no repository was named', async () => {
+    startRun('session-nowhere')
+    expect(await call('speckit:run-discard', { sessionId: 'session-nowhere' })).toEqual({
+      ok: true,
+    })
   })
 
   it('says so rather than pretending, when there is no such run', async () => {

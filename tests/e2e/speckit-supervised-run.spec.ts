@@ -159,3 +159,63 @@ test('starting a phase opens a project and a terminal running claude', async () 
   // The card it belongs to, which is the identity everything downstream keys on.
   expect(snapshot.runs[0].featureDir.startsWith(join(repo, 'specs'))).toBe(true)
 })
+
+test('the run actions are registered in the real host, not just in unit tests', async () => {
+  // Registration is the failure mode these keep having: the unit tests pass
+  // against a mock API that registers anything it is handed.
+  for (const channel of [
+    'speckit:run-terminal',
+    'speckit:run-transcript',
+    'speckit:run-interrupt',
+    'speckit:run-redirect',
+    'speckit:run-stop',
+    'speckit:run-discard',
+  ]) {
+    // An unregistered extension channel rejects; a registered one answers.
+    await expect(pilot(channel, { sessionId: 'nobody' })).resolves.toBeTruthy()
+  }
+})
+
+test('a single-repository card declares no lanes, and says so without failing', async () => {
+  // The lane strip renders nothing for almost every card, and "nothing" has to
+  // be an answer rather than an error.
+  const featureDir = join(repo, 'specs', '021-e2e-card')
+  await expect(pilot('speckit:lanes', { featureDir })).resolves.toEqual({ lanes: [] })
+  await expect(
+    pilot('speckit:lane-may-merge', { featureDir, ord: 1, merged: [] })
+  ).resolves.toEqual({ allowed: true, reason: null, blockingLane: null })
+})
+
+test('a card that declares lanes gets them back in merge order', async () => {
+  const featureDir = join(repo, 'specs', '021-e2e-card')
+  writeFileSync(
+    join(featureDir, 'workitem.json'),
+    JSON.stringify({
+      id: 'E2E-1',
+      contract: { shared_files: ['proto/session.proto'] },
+      lanes: [
+        { ord: 2, repo: 'cli-flow', branch: 'feat/x', role: 'consumer', blocked_by: [1] },
+        { ord: 1, repo: 'fluent', branch: 'feat/x', role: 'producer', blocks: [2] },
+      ],
+    })
+  )
+
+  const { lanes } = (await pilot('speckit:lanes', { featureDir })) as {
+    lanes: Array<{ lane: { ord: number; repo: string }; collisions: string[] }>
+  }
+  expect(lanes.map((view) => view.lane.repo)).toEqual(['fluent', 'cli-flow'])
+  // Flagged on both, not only on the producer.
+  expect(lanes.every((view) => view.collisions.includes('proto/session.proto'))).toBe(true)
+
+  // And the consumer may not go first, because they share a file.
+  const decision = (await pilot('speckit:lane-may-merge', {
+    featureDir,
+    ord: 2,
+    merged: [],
+  })) as { allowed: boolean; blockingLane: number | null }
+  expect(decision).toMatchObject({ allowed: false, blockingLane: 1 })
+})
+
+test('nothing merged with nobody looking, and the log says so rather than erroring', async () => {
+  await expect(pilot('speckit:unattended-merges')).resolves.toEqual({ merges: [] })
+})

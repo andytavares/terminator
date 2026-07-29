@@ -1089,8 +1089,13 @@ export function activate(api: ExtensionAPI): void {
   // Asking it what is wrong, or telling it what to do instead — the same
   // action, and the reason interrupt does not also end the run.
   reg(api, 'speckit:run-redirect', (payload: unknown) => {
-    const { sessionId, message } = payload as { sessionId: string; message: string }
-    if (supervisedRunner === null || message.trim() === '') return { ok: false }
+    const { sessionId, message } = payload as { sessionId: string; message?: string }
+    // Guarded rather than assumed: an IPC payload is whatever the caller sent,
+    // and a handler that throws on a missing field takes the channel down for
+    // everyone rather than refusing one call.
+    if (supervisedRunner === null || typeof message !== 'string' || message.trim() === '') {
+      return { ok: false }
+    }
     supervisedRunner.interrupt(sessionId)
     const ok = supervisedRunner.send(sessionId, message.trim())
     if (ok) {
@@ -1119,11 +1124,14 @@ export function activate(api: ExtensionAPI): void {
   // keep occupying a review slot — that would gate the next run on reviewing a
   // diff that no longer exists.
   reg(api, 'speckit:run-discard', async (payload: unknown) => {
-    const { sessionId, workspacePath } = payload as { sessionId: string; workspacePath: string }
+    const { sessionId, workspacePath } = payload as {
+      sessionId: string
+      workspacePath?: string
+    }
     const run = supervision?.runs.get(sessionId) ?? null
     supervisedRunner?.stop(sessionId, 'Discarding this run.')
     if (run !== null) {
-      await discardWorktree(api, workspacePath, run.worktreePath, run.branch)
+      await discardWorktree(api, workspacePath ?? '', run.worktreePath, run.branch)
       supervision?.review.remove(sessionId)
       supervision?.runs.forget(sessionId)
       supervision?.feed.post({
