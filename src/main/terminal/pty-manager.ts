@@ -26,6 +26,17 @@ export interface SpawnSessionOptions {
   origin: SessionOrigin
   projectId?: string
   tabTitle?: string
+  /**
+   * Withhold output until someone attaches.
+   *
+   * A terminal spawned by the application rather than by the operator starts
+   * producing output immediately, while the tab that will show it does not
+   * exist yet — the renderer has to be told, adopt it, render, and mount an
+   * xterm first. Delivered live, everything in that window is dropped on the
+   * floor, which for a supervised agent means the launch command and its first
+   * output are simply missing from the terminal the operator opens.
+   */
+  holdOutput?: boolean
 }
 
 export interface SessionInfo {
@@ -45,7 +56,16 @@ interface ActiveSession {
   info: SessionInfo
   dataListeners: Set<(data: string) => void>
   exitListeners: Set<(exitCode: number) => void>
+  /** Output produced before anything attached; null once released. */
+  held: string[] | null
 }
+
+/**
+ * How much output to keep for a terminal nobody has attached to yet. Generous
+ * enough for a session that takes a while to appear on screen, bounded because
+ * a runaway process must not be able to grow it without limit.
+ */
+const MAX_HELD_CHARS = 1_000_000
 
 const REGISTRY_FILE = () => join(app.getPath('userData'), 'session-registry.json')
 
@@ -75,9 +95,19 @@ export class PtyManager {
       },
       dataListeners: new Set(),
       exitListeners: new Set(),
+      held: opts.holdOutput === true ? [] : null,
     }
 
     ptyProcess.onData((data) => {
+      if (session.held !== null) {
+        session.held.push(data)
+        // Oldest first: what matters most on a long-running agent is the recent
+        // output, and the alternative is an unbounded buffer.
+        while (session.held.join('').length > MAX_HELD_CHARS && session.held.length > 1) {
+          session.held.shift()
+        }
+        return
+      }
       for (const listener of session.dataListeners) listener(data)
     })
     ptyProcess.onExit(({ exitCode }) => {
@@ -106,6 +136,22 @@ export class PtyManager {
     this.onData(sessionId, onData)
     this.onExit(sessionId, onExit)
     return sessionId
+  }
+
+  /**
+   * Delivers everything held back and resumes live output. Called when a tab is
+   * actually on screen and ready to display it; a no-op for a session that was
+   * never holding, and for one that has already been released.
+   */
+  releaseOutput(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId)
+    if (!session || session.held === null) return false
+    const buffered = session.held.join('')
+    session.held = null
+    if (buffered !== '') {
+      for (const listener of session.dataListeners) listener(buffered)
+    }
+    return true
   }
 
   /** Subscribes to a session's output. Returns a disposer, or null if unknown. */

@@ -639,3 +639,63 @@ describe('useSessionStore', () => {
     })
   })
 })
+
+describe('adoptSession', () => {
+  // A supervised agent's terminal is spawned in the main process; this takes
+  // ownership of it so it becomes an ordinary tab.
+  const adopted = {
+    sessionId: 'terminal-1',
+    projectId: 'proj-1',
+    tabTitle: 'feat/x',
+    scrollbackLimit: 5000,
+  }
+
+  beforeEach(() => resetStore())
+
+  it('records it as an agent’s terminal', () => {
+    useSessionStore.getState().adoptSession(adopted)
+    expect(useSessionStore.getState().sessions.get('terminal-1')).toMatchObject({
+      id: 'terminal-1',
+      projectId: 'proj-1',
+      tabTitle: 'feat/x',
+      type: 'agent',
+      status: 'active',
+    })
+  })
+
+  it('shows it, when the project has nothing showing', () => {
+    useSessionStore.getState().adoptSession(adopted)
+    expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('terminal-1')
+  })
+
+  it('does not steal focus from a terminal the operator is already looking at', () => {
+    useSessionStore.setState({
+      projectViews: new Map([['proj-1', { activeSessionId: 'existing', terminalCounter: 0 }]]),
+    })
+    useSessionStore.getState().adoptSession(adopted)
+    expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('existing')
+  })
+
+  it('appends to an explicit tab order when the project has one', () => {
+    useSessionStore.setState({
+      projectViews: new Map([['proj-1', { order: ['sess-1'], terminalCounter: 0 }]]),
+    })
+    useSessionStore.getState().adoptSession(adopted)
+    expect(useSessionStore.getState().projectViews.get('proj-1')?.order).toEqual([
+      'sess-1',
+      'terminal-1',
+    ])
+  })
+
+  it('leaves a project with no explicit order without one', () => {
+    useSessionStore.getState().adoptSession(adopted)
+    expect(useSessionStore.getState().projectViews.get('proj-1')?.order).toBeUndefined()
+  })
+
+  it('ignores a repeat, so a re-sent notification is not a second tab', () => {
+    useSessionStore.getState().adoptSession(adopted)
+    useSessionStore.getState().adoptSession({ ...adopted, tabTitle: 'changed' })
+    expect(useSessionStore.getState().sessions.size).toBe(1)
+    expect(useSessionStore.getState().sessions.get('terminal-1')?.tabTitle).toBe('feat/x')
+  })
+})

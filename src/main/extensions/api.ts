@@ -129,6 +129,19 @@ export interface PtyManagerAPI {
   ): string
   /** v1.4.0 — spawn with metadata; subscribe output/exit separately via onData/onExit. */
   spawnSession(opts: SpawnSessionOptions): SessionInfo
+  /**
+   * Spawns a terminal and puts it on screen as an ordinary tab.
+   *
+   * `spawnSession` gives an extension a process and a data stream, but nothing
+   * the operator can see or type into — the renderer owns the tab list and does
+   * not know the session exists. This creates both, and holds the process's
+   * output until the tab is actually mounted, so the first thing it printed is
+   * not delivered to nobody.
+   *
+   * Returns the terminal session id, or null when there is no window to show it
+   * in.
+   */
+  openTerminalTab(input: OpenTerminalTabInput): string | null
   /** v1.4.0 — multi-subscriber output fan-out. Returns a disposer, or null if unknown. */
   onData(sessionId: string, listener: (data: string) => void): (() => void) | null
   /** v1.4.0 — multi-subscriber exit fan-out. Listeners fire after the session is removed. */
@@ -154,6 +167,27 @@ export interface BridgeDeps {
 }
 
 export type { ExtensionDB } from '../db/index.js'
+
+export interface CreateProjectInput {
+  workspaceId: string
+  name: string
+  /** The directory the project points at — a worktree, or any checkout. */
+  worktreePath: string
+  gitBranch?: string
+  /** True when the directory is a git worktree rather than a plain folder. */
+  isWorktree?: boolean
+}
+
+export interface OpenTerminalTabInput {
+  /** Where the tab appears. From `workspace.createProject`, normally. */
+  projectId: string
+  cwd: string
+  tabTitle: string
+  /** Marks whose terminal it is. A person can still type in an agent's. */
+  type?: 'human' | 'agent'
+  shell?: string
+  scrollbackLimit?: number
+}
 
 export interface ExtensionAPI {
   db: import('../db/index.js').ExtensionDB
@@ -187,6 +221,17 @@ export interface ExtensionAPI {
   workspace: {
     list(): WorkspaceSnapshot[]
     listProjects(workspaceId: string): ProjectSnapshot[]
+    /**
+     * Registers a directory as a project in a workspace, so it appears in the
+     * sidebar and can hold terminals.
+     *
+     * An extension that provisions a git worktree has, until now, had nowhere
+     * to put it: the checkout existed and nothing on screen ever showed it.
+     * Returns the existing project when the workspace already has one for that
+     * path, so provisioning the same branch twice lands in the project you were
+     * already looking at rather than beside it.
+     */
+    createProject(input: CreateProjectInput): ProjectSnapshot | null
     deleteProject(projectId: string): void
     onDelete(handler: (workspaceId: string) => void): Disposable
     onProjectDelete(handler: (projectId: string) => void): Disposable
@@ -277,10 +322,12 @@ import {
 import type { NotificationTarget } from '../notifications/notification-manager.js'
 import { getExtensionSetting, setExtensionSetting } from '../storage/extension-settings-store.js'
 import { getGlobalSettings, getWorkspaceSettings } from '../storage/settings-store.js'
+import { randomUUID } from 'crypto'
 import { makeLogger } from '../logger.js'
 import {
   listWorkspaces,
   listProjects as listProjectsFromStore,
+  createProject as createProjectInStore,
   deleteProject as deleteProjectFromStore,
 } from '../storage/workspace-store.js'
 import { onWorkspaceDelete, onProjectDelete } from './workspace-events.js'
@@ -597,6 +644,27 @@ export function createExtensionAPI(
           name,
         }))
       },
+      createProject(input): ProjectSnapshot | null {
+        // Reused rather than duplicated: provisioning the same branch twice
+        // should land in the project you were already looking at.
+        const existing = listProjectsFromStore(input.workspaceId).find(
+          (project) => project.worktreePath === input.worktreePath || project.name === input.name
+        )
+        if (existing !== undefined) {
+          return { id: existing.id, workspaceId: existing.workspaceId, name: existing.name }
+        }
+        const created = createProjectInStore({
+          workspaceId: input.workspaceId,
+          name: input.name,
+          worktreePath: input.worktreePath,
+          gitBranch: input.gitBranch,
+          isWorktree: input.isWorktree ?? true,
+        })
+        if (!('project' in created)) return null
+        const { id, workspaceId, name } = created.project
+        deps?.broadcastToWindows?.('workspace:project-added', created.project)
+        return { id, workspaceId, name }
+      },
       deleteProject(projectId: string): void {
         deleteProjectFromStore(projectId)
       },
@@ -752,6 +820,39 @@ export function createExtensionAPI(
       spawnSession(opts) {
         if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
         return deps.ptyManager.spawnSession(opts)
+      },
+      openTerminalTab(input): string | null {
+        if (!deps?.ptyManager) throw new Error('PTY access not available in this extension context')
+        if (!deps.broadcastToWindows) return null
+
+        const sessionId = randomUUID()
+        deps.ptyManager.spawnSession({
+          sessionId,
+          cwd: input.cwd,
+          shell: input.shell ?? getGlobalSettings().terminal.defaultShell,
+          type: input.type ?? 'agent',
+          origin: 'app',
+          projectId: input.projectId,
+          tabTitle: input.tabTitle,
+          // The tab does not exist yet: the renderer has to be told, adopt it,
+          // render, and mount an xterm before anything is listening.
+          holdOutput: true,
+        })
+
+        deps.ptyManager.onData(sessionId, (data) =>
+          deps.broadcastToWindows?.('terminal:output', { sessionId, data })
+        )
+        deps.ptyManager.onExit(sessionId, (exitCode) =>
+          deps.broadcastToWindows?.('terminal:process-exit', { sessionId, exitCode })
+        )
+
+        deps.broadcastToWindows('terminal:adopt', {
+          sessionId,
+          projectId: input.projectId,
+          tabTitle: input.tabTitle,
+          scrollbackLimit: input.scrollbackLimit ?? getGlobalSettings().terminal.scrollbackLimit,
+        })
+        return sessionId
       },
       onData(sessionId, listener) {
         return deps?.ptyManager?.onData(sessionId, listener) ?? null
