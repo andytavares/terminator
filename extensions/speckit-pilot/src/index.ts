@@ -92,7 +92,14 @@ import {
   fetchAssignedTickets as fetchJiraTickets,
   postComment as postJiraComment,
 } from './api/jira.js'
-import { createAgentRunner, phaseLogPath, pruneOldLogs } from './runner/agent-runner.js'
+import {
+  createAgentRunner,
+  phaseLogPath,
+  pruneOldLogs,
+  setSupervisedRunner,
+} from './runner/agent-runner.js'
+import { createControlServer, type ControlServer } from './runtime/control-server.js'
+import { createSupervisedRunner, type SupervisedRunner } from './runtime/supervised-runner.js'
 import type { RunnerHandle } from './runner/agent-runner.js'
 
 const disposables: Disposable[] = []
@@ -675,7 +682,31 @@ function buildNotificationSettingProperties(): Record<string, SettingDefinition>
   return properties
 }
 
+// The loopback endpoint the agents' hooks answer on, and the runner that owns
+// their terminals. Started once for the extension rather than per run: a port
+// per agent would be a port per card.
+let control: ControlServer | null = null
+let supervisedRunner: SupervisedRunner | null = null
+
+async function startSupervisionRuntime(api: ExtensionAPI): Promise<void> {
+  try {
+    control = await createControlServer()
+    supervisedRunner = createSupervisedRunner({
+      api,
+      control,
+      stateDir: path.join(api.settings.resolveWorktreeBaseDir(''), '.speckit-pilot-runtime'),
+    })
+    setSupervisedRunner(supervisedRunner)
+  } catch (error) {
+    // Without it, phases fall back to the headless spawn. Said out loud: the
+    // difference is whether tool calls are asked about or approved silently.
+    api.log.error('supervised runtime unavailable — phases will run unsupervised', error)
+  }
+}
+
 export function activate(api: ExtensionAPI): void {
+  void startSupervisionRuntime(api)
+
   // speckit:feature-list — scan specs/ for feature dirs
   reg(api, 'speckit:feature-list', async (payload: unknown) => {
     const { repoRoot } = payload as { repoRoot: string }
@@ -2037,4 +2068,9 @@ export function activate(api: ExtensionAPI): void {
 export function deactivate(): void {
   disposables.forEach((d) => d.dispose())
   disposables.length = 0
+  setSupervisedRunner(null)
+  supervisedRunner?.dispose()
+  supervisedRunner = null
+  void control?.close()
+  control = null
 }
