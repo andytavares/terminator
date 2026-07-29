@@ -1,0 +1,81 @@
+extensions/speckit-pilot/tests/runtime/transcript-excerpt.spec.ts
+  s_5f98598a6d950e::t_82e1c97c84c808 1-29,35-108
+  s_5f98598a6d950e::t_03e1dc817da603 30-34
+extensions/speckit-pilot/src/runtime/review/hunk-decisions.ts
+  s_5f98598a6d950e::t_4192ae02784788 24-29,33-40,65-66
+  s_5f98598a6d950e::t_c7662854c94d6f 67-68
+extensions/speckit-pilot/src/components/RunDashboard.tsx
+  s_5f98598a6d950e::t_55f2d2dee35718 198-200
+extensions/speckit-pilot/tests/ipc/run-actions-ipc.spec.ts
+  s_5f98598a6d950e::t_c492ead6996a8f 1-11,13-58,62-70,73-134,136-137,144-186,188-205,210-223,225-228,232-250,252-256,258-261,263-272,276-277
+  s_5f98598a6d950e::t_39ce848ec1d348 12,59-61,71-72,135,138-143,187,224,251,262
+  s_5f98598a6d950e::t_55f2d2dee35718 206-209,229-231,257,273-275
+extensions/speckit-pilot/src/components/SupervisionPanel.tsx
+  s_5f98598a6d950e::t_5742acff16273e 1-7,9,11-25,32-48,171-174,176,178-180,183-203,211-221,225-229,233-259,268-275,354-364,366-387,391-393,400-401,411-418,420-428,430-444,447-471,477-518,520,522-529,533-539,541-546
+  s_5f98598a6d950e::t_cbf39e4b2ccc02 10,26,28-31,49-66,68-86,100-170,175,177,181-182,204-207,209-210,222,224,230,232,260-264,266-267,445-446,472-476,519,521,530,532,540
+  s_5f98598a6d950e::t_6a452c327aa5ef 8,276-282,284-353,365,394-399,402-410
+  s_5f98598a6d950e::t_f5a1579cff476a 388-390,419,429
+  s_5f98598a6d950e::t_c9994e9f542d77 27,67,87-99,208,223,231,265,531
+  s_5f98598a6d950e::t_03e1dc817da603 283
+extensions/speckit-pilot/src/types/electron.ts
+  s_5f98598a6d950e::t_af4e85fb01c73d 172-176,178-186,201,238-257,259-287,302-303,455-461,463-464,466-472,488-489
+  s_5f98598a6d950e::t_633cb786727317 187-200,473-487
+  s_5f98598a6d950e::t_c848a2ba7d36a6 304-310
+  s_5f98598a6d950e::t_80cd813f1d1e59 258
+  s_5f98598a6d950e::t_f5a1579cff476a 462
+  s_5f98598a6d950e::t_2d2603af1766ac 465,509,512-513
+  s_5f98598a6d950e::t_e5dc7fe8d5da95 177,288-301
+extensions/speckit-pilot/src/components/speckit-pilot.css
+  s_5f98598a6d950e::t_f5a1579cff476a 2881-3019
+  s_5f98598a6d950e::t_53859193ef7f03 3020-3072
+extensions/speckit-pilot/src/index.ts
+  s_5f98598a6d950e::t_44306cf470e1fd 112-119
+  s_5f98598a6d950e::t_118fee36d1cbac 418-447
+  s_5f98598a6d950e::t_31a28e1426a1df 110,1030-1107
+  s_5f98598a6d950e::t_39ce848ec1d348 791-798,863,868
+  s_5f98598a6d950e::t_ec288d18aecd50 854-859,1371-1374,1376-1377,1380,1385-1386,2427
+  s_5f98598a6d950e::t_4192ae02784788 111,925-940
+  s_5f98598a6d950e::t_97cfe854388ef9 1271
+  s_5f98598a6d950e::t_60af0a98069d87 1108
+extensions/speckit-pilot/tests/components/SupervisionPanel.spec.tsx
+  s_5f98598a6d950e::t_1013626e4af707 1-439
+extensions/speckit-pilot/src/components/BoardView.tsx
+  s_5f98598a6d950e::t_7fa66f06351768 19-21,85-89
+  s_5f98598a6d950e::t_03e1dc817da603 203-220
+extensions/speckit-pilot/tests/components/BoardView.spec.tsx
+  s_5f98598a6d950e::t_a628959b09e517 21-29
+extensions/speckit-pilot/tests/components/App.spec.tsx
+  s_5f98598a6d950e::t_71186374194779 31-38
+extensions/speckit-pilot/src/components/RunConsole.tsx
+  s_5f98598a6d950e::t_69ef5844460c50 3,36
+extensions/speckit-pilot/src/components/CardDetail.tsx
+  s_5f98598a6d950e::t_69ef5844460c50 49
+extensions/speckit-pilot/tsconfig.json
+  s_5f98598a6d950e::t_95543c2e84bffd 19-26
+extensions/speckit-pilot/src/components/board-util.ts
+  s_5f98598a6d950e::t_69ef5844460c50 5-10
+extensions/speckit-pilot/src/components/SettingsPage.tsx
+  s_5f98598a6d950e::t_69ef5844460c50 31-32
+extensions/speckit-pilot/src/runner/agent-runner.ts
+  s_5f98598a6d950e::t_3b4103c7a5f7f6 268-271,278
+  s_5f98598a6d950e::t_5dd1494a47b291 1
+extensions/speckit-pilot/src/runtime/transcript-excerpt.ts
+  s_5f98598a6d950e::t_f92207acc86ad2 1-45,50-77
+  s_5f98598a6d950e::t_03e1dc817da603 46-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "d9268b00949a6cdfc3045258e0d9a6afbc07ec8c",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
