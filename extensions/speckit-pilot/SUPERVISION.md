@@ -197,5 +197,13 @@ something you did not read.
   check state is reported as `unavailable` rather than assumed passing — so an
   auto-merge could only ever fire on evidence nobody has. The policy and its
   audit log were removed rather than shipped as a promise the code cannot keep.
+- **The self-review summary.** The gate's parsed quality table (format, lint,
+  coverage, blockers) needs `.pilot/self-review.json`, and nothing writes it:
+  the checks run as one shell chain, so only its overall exit code is known.
+  Populating the per-check numbers would mean either running the four steps
+  separately — real data, and a change to the one path still using the headless
+  spawn — or parsing their output, which is inventing numbers. The gate says so
+  and points at the console rather than blocking the phase, which is what it
+  used to do.
 - **Stale-lane detection after an upstream merge.** It needs per-lane start and
   merge times, and nothing records a lane merging, so it could not be driven.

@@ -36,6 +36,11 @@ export function repoRootOf(featureDir: string): string {
  */
 export function resolveArtifactPath(location: ArtifactLocation, artifactPath: string): string {
   const repoRoot = repoRootOf(location.featureDir)
+  // `.pilot/` is the pilot's own record of the card — state, history, comments.
+  // It is written beside the card in the main checkout and is not the agent's
+  // output, so it does not move to the worktree with everything else.
+  const pilotDir = path.join(location.featureDir, '.pilot')
+  if (!path.relative(pilotDir, artifactPath).startsWith('..')) return artifactPath
   const base = location.worktreePath ?? repoRoot
   const relative = path.isAbsolute(artifactPath)
     ? path.relative(repoRoot, artifactPath)

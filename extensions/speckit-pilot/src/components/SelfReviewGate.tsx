@@ -90,21 +90,25 @@ export function SelfReviewGate({ featureDir }: SelfReviewGateProps) {
     )
   }
 
-  if (!result) {
-    return (
-      <div style={{ padding: 16, color: 'var(--tm-text-secondary)' }}>
-        No self-review results available.
-      </div>
-    )
-  }
-
-  const rows = parseRows(result)
+  // Deliberately not an early return. The checks run as a shell chain whose
+  // output goes to the console, and nothing writes the parsed summary yet — so
+  // returning here left the phase with no approve button anywhere, and the card
+  // could not move. A gate that cannot be answered is worse than one with no
+  // summary on it.
+  const rows = result === null ? [] : parseRows(result)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16 }}>
       <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--tm-text-primary)' }}>
         Self-Review Quality Gate
       </div>
+
+      {rows.length === 0 && (
+        <div style={{ color: 'var(--tm-text-secondary)', fontSize: 12 }}>
+          No parsed summary — the checks ran as a shell chain and their output is in the console
+          above. Read it before deciding.
+        </div>
+      )}
 
       {/* Quality rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -149,9 +153,9 @@ export function SelfReviewGate({ featureDir }: SelfReviewGateProps) {
               >
                 <div
                   style={{
-                    width: `${Math.min(result.coverage.percentage, 100)}%`,
+                    width: `${Math.min(result?.coverage.percentage ?? 0, 100)}%`,
                     height: '100%',
-                    background: result.coverage.passed
+                    background: result?.coverage.passed
                       ? 'var(--tm-success, #22c55e)'
                       : 'var(--tm-danger)',
                   }}
@@ -180,7 +184,7 @@ export function SelfReviewGate({ featureDir }: SelfReviewGateProps) {
       )}
 
       {/* Summary */}
-      {result.summary && (
+      {result?.summary && (
         <div style={{ fontSize: 12, color: 'var(--tm-text-secondary)', padding: '4px 0' }}>
           {result.summary}
         </div>

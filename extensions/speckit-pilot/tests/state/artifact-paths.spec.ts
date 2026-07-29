@@ -68,6 +68,25 @@ describe('when it does not', () => {
   })
 })
 
+describe("the pilot's own record", () => {
+  it('stays with the card, not with the run', () => {
+    // `.pilot/` is state, history and comments — written beside the card in the
+    // main checkout. It is not the agent's output and does not move.
+    expect(
+      resolveArtifactPath(
+        { featureDir, worktreePath: worktree },
+        `${featureDir}/.pilot/self-review.json`
+      )
+    ).toBe(`${featureDir}/.pilot/self-review.json`)
+  })
+
+  it('leaves the state file where every reader expects it', () => {
+    expect(
+      resolveArtifactPath({ featureDir, worktreePath: worktree }, `${featureDir}/.pilot/state.json`)
+    ).toBe(`${featureDir}/.pilot/state.json`)
+  })
+})
+
 describe('a path that is not in the repository', () => {
   it('is left alone rather than invented somewhere else', () => {
     // Reading nothing is better than reading the wrong file.

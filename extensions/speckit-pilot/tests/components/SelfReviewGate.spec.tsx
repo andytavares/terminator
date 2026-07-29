@@ -115,3 +115,33 @@ describe('SelfReviewGate', () => {
     )
   })
 })
+
+describe('when no summary was parsed', () => {
+  // Nothing writes `.pilot/self-review.json` yet. Returning early on that left
+  // the phase with no approve button anywhere and the card could not move.
+
+  beforeEach(() => {
+    mockSelfReviewRead.mockResolvedValue({ notFound: true, error: 'self-review.json not found' })
+  })
+
+  it('still lets the phase be approved', async () => {
+    render(<SelfReviewGate featureDir="/repo/specs/001" />)
+    fireEvent.click(await screen.findByRole('button', { name: /approve/i }))
+    await waitFor(() =>
+      expect(mockPhaseApprove).toHaveBeenCalledWith(
+        expect.objectContaining({ phase: 'self-review' })
+      )
+    )
+  })
+
+  it('still lets it be sent back', async () => {
+    render(<SelfReviewGate featureDir="/repo/specs/001" />)
+    fireEvent.click(await screen.findByRole('button', { name: /implement/i }))
+    await waitFor(() => expect(mockPhaseRequestChanges).toHaveBeenCalled())
+  })
+
+  it('says where to read the result instead of pretending there is none', async () => {
+    render(<SelfReviewGate featureDir="/repo/specs/001" />)
+    expect(await screen.findByText(/output is in the console above/i)).toBeDefined()
+  })
+})
