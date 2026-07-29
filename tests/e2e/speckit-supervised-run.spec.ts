@@ -216,8 +216,19 @@ test('a card that declares lanes gets them back in merge order', async () => {
   expect(decision).toMatchObject({ allowed: false, blockingLane: 1 })
 })
 
-test('nothing merged with nobody looking, and the log says so rather than erroring', async () => {
-  await expect(pilot('speckit:unattended-merges')).resolves.toEqual({ merges: [] })
+test('the feed answers, and nothing is muted to begin with', async () => {
+  // Muting suppresses the notification and never the entry, so an empty mute
+  // list and a full feed are the normal starting state rather than a failure.
+  const feed = (await pilot('speckit:feed-list')) as { entries: unknown[]; mutes: unknown[] }
+  expect(Array.isArray(feed.entries)).toBe(true)
+  expect(feed.mutes).toEqual([])
+
+  await expect(pilot('speckit:feed-mute', { sessionId: 'session-x' })).resolves.toEqual({
+    mutes: [{ sessionId: 'session-x' }],
+  })
+  await expect(pilot('speckit:feed-unmute', { sessionId: 'session-x' })).resolves.toEqual({
+    mutes: [],
+  })
 })
 
 /**

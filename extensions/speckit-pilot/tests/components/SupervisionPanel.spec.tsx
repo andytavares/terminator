@@ -53,9 +53,16 @@ const firing = (): StallFiringView => ({
   shadow: true,
   firing: {
     sessionId: 'session-1',
-    signal: 'no tool calls',
+    signal: 'silence',
     firedAt: 5_000,
-    inputs: { toolSilenceMs: 600_000, diffSilenceMs: 600_000, shellInFlight: false },
+    inputs: {
+      toolSilenceMs: 600_000,
+      diffSilenceMs: 600_000,
+      distinctFiles: 1,
+      netChange: 0,
+      reverts: 0,
+      shellInFlight: false,
+    },
   },
 })
 

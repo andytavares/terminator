@@ -310,7 +310,19 @@ export interface StallFiringView {
     sessionId: string
     signal: 'silence' | 'loop' | 'revert'
     firedAt: number
-    inputs: { toolSilenceMs: number; shellInFlight: boolean }
+    /**
+     * Every value that satisfied the condition, so a firing can be re-judged
+     * later. Declaring only the two the panel prints would make the rest
+     * unavailable to anything that wants to tune the thresholds.
+     */
+    inputs: {
+      toolSilenceMs: number
+      diffSilenceMs: number
+      distinctFiles: number
+      netChange: number
+      reverts: number
+      shellInFlight: boolean
+    }
   }
   featureDir: string
   /** Recorded rather than surfaced, while the thresholds are being judged. */

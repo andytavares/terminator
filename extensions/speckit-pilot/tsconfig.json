@@ -23,6 +23,10 @@
   // The core's renderer declarations come along because components legitimately
   // call core IPC through `window.electronAPI`; without them every such call is
   // an error about a global that does exist at runtime.
+  // Sources only. The tests are deliberately outside: 36 of them build partial
+  // mocks that do not satisfy the real types (a `Uint8Array` where a `Buffer` is
+  // declared, a v2 `PilotState` in a migration test), and making them typecheck
+  // would mean rewriting mocks that are correct for what they assert.
   "include": ["src/**/*.ts", "src/**/*.tsx", "../../src/renderer/electron.d.ts"],
   "exclude": ["src/index.js", "dist", "node_modules"]
 }
