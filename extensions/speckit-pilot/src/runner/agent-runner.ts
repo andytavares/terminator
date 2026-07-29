@@ -113,6 +113,38 @@ export function setPermissionSink(
 }
 
 /**
+ * The supervision layer, when the extension has one.
+ *
+ * A run has to be registered for anything downstream to see it: the review
+ * queue reads finished runs, backpressure counts them, the stall detector
+ * watches them. Without this they are all correct and all empty.
+ */
+let supervision: RunSupervision | null = null
+
+export interface RunSupervision {
+  runs: {
+    add(run: {
+      sessionId: string
+      featureDir: string
+      phase: string
+      worktreePath: string
+      branch: string
+      terminalSessionId: string
+      transcriptPath: string
+      startedAt: number
+    }): unknown
+    setState(sessionId: string, state: 'working' | 'waiting', at: number): void
+    noteAsked(sessionId: string): void
+  }
+  finishTurn(sessionId: string, turns: number, at: number): Promise<void>
+  finish(sessionId: string, at: number): void
+}
+
+export function setRunSupervision(next: RunSupervision | null): void {
+  supervision = next
+}
+
+/**
  * Where the read-only policy lives on disk, installed on first use.
  *
  * Null when it cannot be written, which the caller turns into a refusal rather
@@ -508,6 +540,8 @@ function startSupervised(opts: {
         // from the run being started would be a reference to a binding that is
         // not assigned until start() returns.
         onPermissionPending?.({ ...pending, featureDir: opts.featureDir })
+        supervision?.runs.setState(pending.sessionId, 'waiting', pending.at)
+        supervision?.runs.noteAsked(pending.sessionId)
         opts.api.window.broadcast('speckit:permission-requested', {
           featureDir: opts.featureDir,
           phase: opts.phase,
@@ -516,15 +550,22 @@ function startSupervised(opts: {
       },
       onResolved: (requestId, decision) => {
         onPermissionResolved?.(requestId)
+        if (sessionId !== null) supervision?.runs.setState(sessionId, 'working', Date.now())
         opts.api.window.broadcast('speckit:permission-resolved', {
           featureDir: opts.featureDir,
           requestId,
           decision,
         })
       },
+      onTurnEnd: (turns) => {
+        // A turn ending with changes is what puts work in front of the
+        // operator; in a terminal the agent does not exit when it is done.
+        if (sessionId !== null) void supervision?.finishTurn(sessionId, turns, Date.now())
+      },
       onEnd: () => {
         if (ended) return
         ended = true
+        if (sessionId !== null) supervision?.finish(sessionId, Date.now())
         void opts.onComplete?.(0)
       },
     })
@@ -536,6 +577,16 @@ function startSupervised(opts: {
       return
     }
     sessionId = run.sessionId
+    supervision?.runs.add({
+      sessionId: run.sessionId,
+      featureDir: opts.featureDir,
+      phase: opts.phase,
+      worktreePath: opts.worktreePath,
+      branch,
+      terminalSessionId: run.terminalSessionId,
+      transcriptPath: run.transcriptPath,
+      startedAt: Date.now(),
+    })
     opts.onSession?.(run.sessionId)
     void opts.onStart?.()
   })()

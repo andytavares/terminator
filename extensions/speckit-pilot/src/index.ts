@@ -98,12 +98,15 @@ import {
   pruneOldLogs,
   setPermissionSink,
   setReadOnlyStateDir,
+  setRunSupervision,
   setSupervisedRunner,
 } from './runner/agent-runner.js'
 import { createControlServer, type ControlServer } from './runtime/control-server.js'
 import { createSupervisedRunner, type SupervisedRunner } from './runtime/supervised-runner.js'
 import { createPendingPermissions } from './runtime/pending-permissions.js'
 import { createStallWatcher, type StallWatcher } from './runtime/stall-watcher.js'
+import { createSupervision, type Supervision } from './runtime/supervision.js'
+import { buildDigest } from './runtime/feed/digest.js'
 import type { StallFiring } from './runtime/evaluate-stall.js'
 import type { RunnerHandle } from './runner/agent-runner.js'
 
@@ -696,6 +699,9 @@ let supervisedRunner: SupervisedRunner | null = null
 // hold these the surface has nothing to render and a phase sits at its hook.
 const pendingPermissions = createPendingPermissions()
 let stallWatcher: StallWatcher | null = null
+// What is running, what it changed, what needs looking at, and what must not
+// start yet.
+let supervision: Supervision | null = null
 /**
  * Stalls that have fired, newest first, and whether they were judged right.
  *
@@ -746,12 +752,29 @@ async function startSupervisionRuntime(api: ExtensionAPI): Promise<void> {
 
     // A run that stops making progress without asking for anything is the
     // failure nobody instruments: it looks exactly like one that is working.
+    supervision = createSupervision({
+      api,
+      stateDir: path.join(api.settings.resolveWorktreeBaseDir(''), '.speckit-pilot-runtime'),
+    })
+    // Registered runs are what everything downstream reads. Without this the
+    // review queue, the gate and the stall detector are all correct and empty.
+    setRunSupervision(supervision)
+
     const runner = supervisedRunner
     stallWatcher = createStallWatcher({
       runs: () => runner.watchable(),
       onFiring: (firing, featureDir) => {
         const shadow = stallShadowMode(api)
         stallFirings.unshift({ firing, featureDir, shadow })
+        supervision?.runs.setState(firing.sessionId, 'stalled', firing.firedAt)
+        // Attributed to the pilot, not the agent: the agent did not say this,
+        // and a feed that blurs the two is one you stop trusting.
+        supervision?.feed.post({
+          at: firing.firedAt,
+          sessionId: firing.sessionId,
+          author: 'console',
+          summary: `stopped making progress (${firing.signal}) in ${path.basename(featureDir)}`,
+        })
         api.window.broadcast('speckit:stall-fired', { firing, featureDir, shadow })
         if (shadow) return
         api.notifications.showToast('warning', `A run stopped making progress (${firing.signal})`)
@@ -780,6 +803,65 @@ export function activate(api: ExtensionAPI): void {
     firings: stallFirings,
     shadowMode: stallShadowMode(api),
   }))
+
+  // What is running, what is waiting to be reviewed, and whether a new run
+  // would be refused.
+  reg(api, 'speckit:supervision-snapshot', () =>
+    supervision === null
+      ? { runs: [], review: [], backpressure: { allowed: true, unreviewed: 0, limit: 0 } }
+      : supervision.snapshot()
+  )
+
+  reg(api, 'speckit:feed-list', () => ({ entries: supervision?.feed.list() ?? [] }))
+
+  // What happened while you were away. Progress posts are rolled up rather
+  // than replayed one by one — the point of coming back to a digest is not to
+  // read every line the agents wrote.
+  reg(api, 'speckit:feed-digest', (payload: unknown) => {
+    const { from, to } = payload as { from: number; to?: number }
+    const entries = supervision?.feed.list() ?? []
+    return buildDigest(entries, from, to ?? Date.now())
+  })
+
+  // Recorded with the queue depth at the moment it was ignored, so a backlog
+  // built by overriding is visible afterwards rather than only felt.
+  reg(api, 'speckit:backpressure-override', (payload: unknown) => {
+    const { sessionId } = payload as { sessionId: string }
+    supervision?.backpressure.override(sessionId, Date.now())
+    return { ok: true }
+  })
+
+  reg(api, 'speckit:review-advance', (payload: unknown) => {
+    const { sessionId } = payload as { sessionId: string }
+    return { step: supervision?.review.advance(sessionId) ?? null }
+  })
+
+  // The unit of review is the hunk, not the file: one file routinely holds both
+  // the change you asked for and the one you did not.
+  reg(api, 'speckit:review-hunks', async (payload: unknown) => {
+    const { sessionId } = payload as { sessionId: string }
+    const set = await supervision?.hunksFor(sessionId)
+    return set === undefined || set === null
+      ? { files: [], complete: false }
+      : { files: set.byFile(), complete: set.isComplete(), fullReject: set.isFullReject() }
+  })
+
+  reg(api, 'speckit:review-decide-hunk', async (payload: unknown) => {
+    const { sessionId, hunkId, decision } = payload as {
+      sessionId: string
+      hunkId: string
+      decision: 'accept' | 'reject'
+    }
+    const ok = (await supervision?.decideHunk(sessionId, hunkId, decision)) ?? false
+    return { ok }
+  })
+
+  reg(api, 'speckit:review-done', (payload: unknown) => {
+    const { sessionId } = payload as { sessionId: string }
+    supervision?.review.remove(sessionId)
+    supervision?.runs.forget(sessionId)
+    return { ok: true }
+  })
 
   reg(api, 'speckit:permission-resolve', (payload: unknown) => {
     const { requestId, decision, answer } = payload as {
@@ -2175,6 +2257,8 @@ export function deactivate(): void {
   setSupervisedRunner(null)
   setPermissionSink(null)
   setReadOnlyStateDir(null)
+  setRunSupervision(null)
+  supervision = null
   stallWatcher?.stop()
   stallWatcher = null
   supervisedRunner?.dispose()
