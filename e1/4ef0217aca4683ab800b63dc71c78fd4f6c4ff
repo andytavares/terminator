@@ -1,0 +1,26 @@
+extensions/speckit-pilot/tests/runtime/backpressure-enforced.spec.ts
+  s_5f98598a6d950e::t_38949eba9dcfa5 99
+  s_5f98598a6d950e::t_e85cf0a654ccd0 1-98,100-116
+extensions/speckit-pilot/src/index.ts
+  s_5f98598a6d950e::t_3e36f01a63aa18 611-613
+  s_5f98598a6d950e::t_9bf7ea67724483 1783-1794
+  s_5f98598a6d950e::t_4fad85acf4621e 510-517
+  s_5f98598a6d950e::t_4481ee826a353a 1128,1133,1137-1144
+  s_5f98598a6d950e::t_d7166154679760 535-551
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "e14ef0217aca4683ab800b63dc71c78fd4f6c4ff",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
