@@ -16,11 +16,13 @@
     "allowImportingTsExtensions": true,
     "types": ["node"]
   },
-  // Scoped to the supervision runtime for now. The root typecheck references
-  // only main, renderer and shared, so extension code was never checked at all
-  // — widening this to the whole extension surfaces 25 pre-existing errors in
-  // components written before it, which is its own change rather than one to
-  // smuggle in here.
-  "include": ["src/runtime/**/*.ts"],
+  // The whole extension, not just the runtime. The root typecheck references
+  // only main, renderer and shared, so none of this was ever checked and type
+  // errors in it reached CI green.
+  //
+  // The core's renderer declarations come along because components legitimately
+  // call core IPC through `window.electronAPI`; without them every such call is
+  // an error about a global that does exist at runtime.
+  "include": ["src/**/*.ts", "src/**/*.tsx", "../../src/renderer/electron.d.ts"],
   "exclude": ["src/index.js", "dist", "node_modules"]
 }

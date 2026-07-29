@@ -169,6 +169,36 @@ export interface SpeckitAPI {
   }): Promise<{ ok: boolean; reason?: string }>
   /** Answer it in the terminal instead, where the agent is. */
   permissionHandBack(payload: { requestId: string }): Promise<{ ok: boolean }>
+  /** What is running, what is waiting to be reviewed, and whether the gate is open. */
+  supervisionSnapshot(): Promise<SupervisionSnapshot>
+  stallsList(): Promise<{ firings: StallFiringView[]; shadowMode: boolean }>
+  feedList(): Promise<{ entries: FeedEntryView[] }>
+  reviewHunks(payload: { sessionId: string }): Promise<{
+    files: HunkFileView[]
+    complete: boolean
+    fullReject?: boolean
+  }>
+  reviewDecideHunk(payload: {
+    sessionId: string
+    hunkId: string
+    decision: 'accept' | 'reject'
+  }): Promise<{ ok: boolean }>
+  reviewDone(payload: { sessionId: string }): Promise<{ ok: boolean }>
+  /** Where a run is running, so a surface can go there rather than describe it. */
+  runTerminal(payload: { sessionId: string }): Promise<{ terminalSessionId: string | null }>
+  /** What it was doing, in its own words. */
+  runTranscript(payload: {
+    sessionId: string
+    limit?: number
+  }): Promise<{ lines: TranscriptLineView[] }>
+  /** Ends the turn, keeping the session so the next message lands. */
+  runInterrupt(payload: { sessionId: string }): Promise<{ ok: boolean }>
+  /** Asking what is wrong, or saying what to do instead. */
+  runRedirect(payload: { sessionId: string; message: string }): Promise<{ ok: boolean }>
+  runStop(payload: { sessionId: string; reason?: string }): Promise<{ ok: boolean }>
+  /** Kill and discard: the run ends and its worktree and branch go with it. */
+  runDiscard(payload: { sessionId: string; workspacePath: string }): Promise<{ ok: boolean }>
+  backpressureOverride(payload: { sessionId: string }): Promise<{ ok: boolean }>
   artifactList(payload: {
     featureDir: string
   }): Promise<{ artifacts: ArtifactRef[] } | { error: string }>
@@ -202,6 +232,79 @@ export interface PendingAskView {
   detail: string | null
   questions?: Array<{ question: string; options: string[] }>
   targetHost?: string
+  at: number
+}
+
+/** A supervised run, as a surface needs it. */
+export interface RunView {
+  sessionId: string
+  featureDir: string
+  phase: string
+  branch: string
+  worktreePath: string
+  terminalSessionId: string
+  state: 'working' | 'waiting' | 'stalled' | 'ready' | 'finished'
+  stateSince: number
+  turns: number
+  asked: number
+  diff: { files: number; added: number; removed: number }
+}
+
+export interface ReviewItemView {
+  sessionId: string
+  branch: string
+  grade: 'P0' | 'P1' | 'P2' | 'P3'
+  /** Why it graded that way — the trigger, not just the letter. */
+  gradeTrigger: string
+  diffSummary: { files: number; added: number; removed: number }
+  queuedAt: number
+}
+
+export interface SupervisionSnapshot {
+  runs: RunView[]
+  review: ReviewItemView[]
+  backpressure: { allowed: boolean; unreviewed: number; limit: number; reason?: string | null }
+}
+
+export interface StallFiringView {
+  firing: {
+    sessionId: string
+    signal: 'silence' | 'loop' | 'revert'
+    firedAt: number
+    inputs: { toolSilenceMs: number; shellInFlight: boolean }
+  }
+  featureDir: string
+  /** Recorded rather than surfaced, while the thresholds are being judged. */
+  shadow: boolean
+}
+
+export interface FeedEntryView {
+  id: string
+  at: number
+  sessionId: string
+  author: 'agent' | 'console'
+  summary: string
+  replyable: boolean
+}
+
+/** One hunk of a run's diff, and what has been decided about it. */
+export interface HunkView {
+  id: string
+  newStart: number
+  lines: string[]
+  decision: 'accept' | 'reject' | null
+}
+
+/** A file's hunks, in the order the diff has them. */
+export interface HunkFileView {
+  file: string
+  hunks: HunkView[]
+}
+
+/** One thing said in a run, flattened to words a surface can render. */
+export interface TranscriptLineView {
+  role: 'user' | 'assistant'
+  text: string
   at: number
 }
 
@@ -349,6 +452,41 @@ export function getSpeckitAPI(): SpeckitAPI {
       }>,
     permissionHandBack: (payload) =>
       bridge.invoke('speckit:permission-hand-back', payload) as Promise<{ ok: boolean }>,
+    supervisionSnapshot: () =>
+      bridge.invoke('speckit:supervision-snapshot', {}) as Promise<SupervisionSnapshot>,
+    stallsList: () =>
+      bridge.invoke('speckit:stalls-list', {}) as Promise<{
+        firings: StallFiringView[]
+        shadowMode: boolean
+      }>,
+    feedList: () => bridge.invoke('speckit:feed-list', {}) as Promise<{ entries: FeedEntryView[] }>,
+    reviewHunks: (payload) =>
+      bridge.invoke('speckit:review-hunks', payload) as Promise<{
+        files: HunkFileView[]
+        complete: boolean
+        fullReject?: boolean
+      }>,
+    reviewDecideHunk: (payload) =>
+      bridge.invoke('speckit:review-decide-hunk', payload) as Promise<{ ok: boolean }>,
+    reviewDone: (payload) =>
+      bridge.invoke('speckit:review-done', payload) as Promise<{ ok: boolean }>,
+    runTerminal: (payload) =>
+      bridge.invoke('speckit:run-terminal', payload) as Promise<{
+        terminalSessionId: string | null
+      }>,
+    runTranscript: (payload) =>
+      bridge.invoke('speckit:run-transcript', payload) as Promise<{
+        lines: TranscriptLineView[]
+      }>,
+    runInterrupt: (payload) =>
+      bridge.invoke('speckit:run-interrupt', payload) as Promise<{ ok: boolean }>,
+    runRedirect: (payload) =>
+      bridge.invoke('speckit:run-redirect', payload) as Promise<{ ok: boolean }>,
+    runStop: (payload) => bridge.invoke('speckit:run-stop', payload) as Promise<{ ok: boolean }>,
+    runDiscard: (payload) =>
+      bridge.invoke('speckit:run-discard', payload) as Promise<{ ok: boolean }>,
+    backpressureOverride: (payload) =>
+      bridge.invoke('speckit:backpressure-override', payload) as Promise<{ ok: boolean }>,
     artifactList: (payload) =>
       bridge.invoke('speckit:artifact-list', payload) as Promise<
         { artifacts: ArtifactRef[] } | { error: string }
@@ -368,9 +506,10 @@ export function getSpeckitAPI(): SpeckitAPI {
         answered()
       }
     },
-    onRunOutput: (handler) => bridge.on('speckit:run-output', handler),
+    onRunOutput: (handler) => bridge.on('speckit:run-output', handler as (data: unknown) => void),
     onDispatchStarted: (handler) =>
       bridge.on('speckit:dispatch-started', handler as (data: unknown) => void),
-    onCheckinReady: (handler) => bridge.on('speckit:checkin-ready', handler),
+    onCheckinReady: (handler) =>
+      bridge.on('speckit:checkin-ready', handler as (data: unknown) => void),
   }
 }

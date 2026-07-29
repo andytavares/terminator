@@ -18,6 +18,15 @@ vi.mock('../../src/types/electron.js', () => ({
     permissionsList: mockPermissionsList,
     permissionResolve: mockPermissionResolve,
     permissionHandBack: mockPermissionHandBack,
+    // The supervision panel lives on the board and reads on mount; without
+    // these the board's own tests fail on a surface they are not testing.
+    supervisionSnapshot: vi.fn().mockResolvedValue({
+      runs: [],
+      review: [],
+      backpressure: { allowed: true, unreviewed: 0, limit: 3 },
+    }),
+    stallsList: vi.fn().mockResolvedValue({ firings: [], shadowMode: true }),
+    feedList: vi.fn().mockResolvedValue({ entries: [] }),
   }),
 }))
 

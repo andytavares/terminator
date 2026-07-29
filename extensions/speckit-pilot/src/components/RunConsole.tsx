@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { PHASE_LABELS } from '../types/speckit.types.js'
+import type { PhaseId } from '../types/speckit.types.js'
 import { renderMarkdown } from '../utils/markdown.js'
 import { getSpeckitAPI } from '../types/electron.js'
 
@@ -32,7 +33,7 @@ export function RunConsole({ featureDir, lines = [], phase }: RunConsoleProps) {
     }
   }, [lines, mode])
 
-  const phaseLabel = phase ? (PHASE_LABELS[phase] ?? phase) : null
+  const phaseLabel = phase ? (PHASE_LABELS[phase as PhaseId] ?? phase) : null
 
   // Shared scroll/surface styling so plain text and markdown read the same.
   const surfaceStyle: React.CSSProperties = {

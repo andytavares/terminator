@@ -21,9 +21,23 @@ export interface FileDecisions {
   readonly rejected: string[]
 }
 
+/** A hunk together with what has been decided about it. */
+export interface ReviewableHunk {
+  readonly hunk: Hunk
+  readonly decision: HunkDecision | null
+}
+
 export interface DecisionSet {
   decide(hunkId: string, decision: HunkDecision): void
   decisionFor(hunkId: string): HunkDecision | null
+  /**
+   * Every hunk, decided or not, in the order the diff has them.
+   *
+   * `byFile` below reports only what has been decided, which is what a summary
+   * needs and exactly what a reviewer cannot use: an undecided hunk is the one
+   * still needing a decision, and it would never appear.
+   */
+  list(): ReviewableHunk[]
   byFile(): FileDecisions[]
   /** Every hunk decided, so the review can be completed. */
   isComplete(): boolean
@@ -46,6 +60,10 @@ export function createDecisionSet(hunks: readonly Hunk[]): DecisionSet {
 
     decisionFor(hunkId: string): HunkDecision | null {
       return decisions.get(hunkId) ?? null
+    },
+
+    list(): ReviewableHunk[] {
+      return hunks.map((hunk) => ({ hunk, decision: decisions.get(hunk.id) ?? null }))
     },
 
     byFile(): FileDecisions[] {

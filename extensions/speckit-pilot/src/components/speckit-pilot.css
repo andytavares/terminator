@@ -2878,3 +2878,195 @@
   color: var(--tm-text-primary);
   font-size: 12px;
 }
+
+/* ── Supervision panel ─────────────────────────────────────────────────────
+   What is running, what stopped making progress, what is waiting to be
+   reviewed, and what happened while you were away. */
+.sk-sup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sk-sup__tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--tm-border, #1f2937);
+  padding-bottom: 6px;
+}
+.sk-sup__tab {
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  text-transform: capitalize;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.sk-sup__tab--on {
+  background: var(--tm-surface, #111827);
+  color: var(--tm-text-primary);
+}
+.sk-sup__count {
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--tm-border, #1f2937);
+  font-size: 10px;
+}
+.sk-sup__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sk-sup__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid var(--tm-border, #1f2937);
+  border-radius: 6px;
+  background: var(--tm-surface, #111827);
+}
+/* Takes the space, so a long branch name wraps instead of squeezing the
+   actions off the row. */
+.sk-sup__main {
+  flex: 1;
+  min-width: 0;
+}
+.sk-sup__title {
+  font-size: 13px;
+  color: var(--tm-text-primary);
+  word-break: break-word;
+}
+.sk-sup__meta {
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+  word-break: break-word;
+}
+.sk-sup__state,
+.sk-sup__grade,
+.sk-sup__author {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--tm-border, #1f2937);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--tm-text-secondary);
+  white-space: nowrap;
+}
+.sk-sup__state--waiting,
+.sk-sup__state--stalled {
+  border-color: var(--tm-warning, #b45309);
+  color: var(--tm-warning, #b45309);
+}
+.sk-sup__state--ready {
+  border-color: var(--tm-accent, #3b82f6);
+  color: var(--tm-accent, #3b82f6);
+}
+/* Worst first is the queue's order; the grade should read that way too. */
+.sk-sup__grade--P0 {
+  border-color: var(--tm-danger, #dc2626);
+  color: var(--tm-danger, #dc2626);
+}
+.sk-sup__grade--P1 {
+  border-color: var(--tm-warning, #b45309);
+  color: var(--tm-warning, #b45309);
+}
+.sk-sup__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sk-sup__btn {
+  padding: 3px 9px;
+  border-radius: 4px;
+  border: 1px solid var(--tm-border, #1f2937);
+  background: transparent;
+  color: var(--tm-text-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+.sk-sup__redirect {
+  flex: 1 0 100%;
+}
+.sk-sup__redirect input {
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--tm-border, #1f2937);
+  background: var(--tm-bg, #0b1220);
+  color: var(--tm-text-primary);
+  font-size: 12px;
+}
+.sk-sup__clear,
+.sk-sup__note {
+  padding: 8px 10px;
+  border: 1px solid var(--tm-border, #1f2937);
+  border-radius: 6px;
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+}
+.sk-sup__warn {
+  padding: 8px 10px;
+  border: 1px solid var(--tm-warning, #b45309);
+  border-radius: 6px;
+  color: var(--tm-warning, #b45309);
+  font-size: 12px;
+}
+
+/* The tail of a run's conversation, and its diff hunk by hunk. Both take the
+   full width of a row, so they wrap under it rather than squeezing it. */
+.sk-sup__transcript,
+.sk-sup__review {
+  flex: 1 0 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-top: 6px;
+}
+.sk-sup__line {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.sk-sup__said {
+  font-size: 12px;
+  color: var(--tm-text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.sk-sup__filename {
+  font-size: 12px;
+  color: var(--tm-text-primary);
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+.sk-sup__hunk {
+  border: 1px solid var(--tm-border, #1f2937);
+  border-radius: 4px;
+  padding: 6px;
+  margin-bottom: 6px;
+}
+/* Decided hunks stay readable — the border says which way, not a wash of
+   colour over the diff itself. */
+.sk-sup__hunk--accept {
+  border-color: var(--tm-success, #15803d);
+}
+.sk-sup__hunk--reject {
+  border-color: var(--tm-danger, #dc2626);
+}
+.sk-sup__diff {
+  margin: 0 0 6px;
+  font-family: var(--tm-font-mono, monospace);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre;
+  overflow-x: auto;
+  color: var(--tm-text-primary);
+}

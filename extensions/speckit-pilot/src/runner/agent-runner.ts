@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, type SpawnOptions } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
@@ -265,14 +265,17 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
       // The dir is relative to the worktree cwd, matching SpecKit's own
       // `specs/<slug>` convention.
       const featureSlug = path.basename(featureDir)
-      const spawnOpts = {
+      // Typed, so `spawn` picks the overload that gives the child piped
+      // streams. As a bare object literal the `as const` stdio tuple matched no
+      // overload at all and every use of the child below inferred `never`.
+      const spawnOpts: SpawnOptions = {
         cwd: worktreePath,
         env: {
           ...process.env,
           SPECIFY_FEATURE: featureSlug,
           SPECIFY_FEATURE_DIRECTORY: path.join('specs', featureSlug),
         } as Record<string, string>,
-        stdio: ['ignore', 'pipe', 'pipe'] as const,
+        stdio: ['ignore', 'pipe', 'pipe'],
       }
 
       // Self-review runs a shell chain (npm/vitest/google-review) whose stdout is

@@ -28,6 +28,8 @@ const PHASE_LABELS: Record<PhaseId, string> = {
   tasks: 'Tasks',
   analyze: 'Analyze',
   implement: 'Implement',
+  'self-review': 'Self-review',
+  'open-pr': 'Open PR',
 }
 
 export function SettingsPage({ settings, onSave, onDismiss }: SettingsPageProps) {

@@ -16,6 +16,9 @@ import { STAGE_ORDER } from '../types/speckit.types.js'
 import type { BoardStage, CardSummary } from '../types/speckit.types.js'
 import { getSpeckitAPI, type PendingAskView } from '../types/electron.js'
 import { PermissionQueue } from './PermissionQueue.js'
+import { SupervisionPanel } from './SupervisionPanel.js'
+import { useSessionStore } from '../../../../src/renderer/stores/session.store'
+import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { CardTile } from './CardTile.js'
 import { bucketCards, resolveDrop } from './board-util.js'
 
@@ -79,6 +82,11 @@ export function BoardView({ repoRoot, onOpenCard, onNewCard }: BoardViewProps) {
   const [pending, setPending] = useState<PendingAskView[]>([])
   const [error, setError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
+  // Going to a run's terminal is a core navigation, so it is done through the
+  // core stores rather than reimplemented here.
+  const sessions = useSessionStore((s) => s.sessions)
+  const setActiveSessionForProject = useSessionStore((s) => s.setActiveSessionForProject)
+  const setActiveProject = useWorkspaceStore((s) => s.setActiveProject)
   // Require an 8px drag before a pointer gesture counts as a drag, so a plain click
   // opens the card instead of being mistaken for a drag.
   const sensors = useSensors(
@@ -192,6 +200,24 @@ export function BoardView({ repoRoot, onOpenCard, onNewCard }: BoardViewProps) {
           onHandBack={(requestId) => void answer(getSpeckitAPI().permissionHandBack({ requestId }))}
         />
       )}
+      {/* Everything the supervision layer knows: what is running, what has
+          stopped making progress, what is waiting to be reviewed, and what
+          happened while you were away. */}
+      <SupervisionPanel
+        cardLabel={(featureDir) =>
+          cards.find((card) => card.featureDir === featureDir)?.title ??
+          featureDir.split('/').pop() ??
+          featureDir
+        }
+        workspacePath={repoRoot}
+        onOpenTerminal={(terminalSessionId) => {
+          const session = sessions.get(terminalSessionId)
+          if (session === undefined) return
+          setActiveProject(session.projectId)
+          setActiveSessionForProject(session.projectId, terminalSessionId)
+        }}
+        onChanged={() => void load()}
+      />
       {cards.length === 0 ? (
         <div className="sk-board__empty">Create your first card to get started.</div>
       ) : (

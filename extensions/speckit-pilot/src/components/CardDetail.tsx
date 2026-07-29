@@ -46,9 +46,7 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
     if (!workspacePath) return
     void (async () => {
       try {
-        const res = (await window.electronAPI.git.listBranches({ repoRoot: workspacePath })) as {
-          branches?: Array<{ name: string; isCurrent?: boolean; isRemote?: boolean }>
-        }
+        const res = await window.electronAPI.git.listBranches(workspacePath)
         const local = (res.branches ?? []).filter((b) => !b.isRemote)
         setBranches(local.map((b) => b.name))
         const current = local.find((b) => b.isCurrent)?.name

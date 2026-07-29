@@ -195,7 +195,9 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
   // show all accumulated output so lines from the new phase aren't hidden.
   const displayLines = displayPhase
     ? (linesByPhase[displayPhase] ?? [])
-    : Object.values(linesByPhase).flat()
+    : Object.values(linesByPhase)
+        .flat()
+        .filter((line): line is string => line !== undefined)
 
   return (
     <div

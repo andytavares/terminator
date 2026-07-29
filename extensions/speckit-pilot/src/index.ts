@@ -107,6 +107,16 @@ import { createPendingPermissions } from './runtime/pending-permissions.js'
 import { createStallWatcher, type StallWatcher } from './runtime/stall-watcher.js'
 import { createSupervision, type Supervision } from './runtime/supervision.js'
 import { buildDigest } from './runtime/feed/digest.js'
+import { readTranscriptTail } from './runtime/transcript-excerpt.js'
+import type { HunkDecision } from './runtime/review/hunk-decisions.js'
+
+/** One hunk as a surface renders it: the change, and what was decided. */
+interface HunkView {
+  id: string
+  newStart: number
+  lines: string[]
+  decision: HunkDecision | null
+}
 import type { CardLanes } from './runtime/lane-coordination.js'
 import type { StallFiring } from './runtime/evaluate-stall.js'
 import type { RunnerHandle } from './runner/agent-runner.js'
@@ -403,6 +413,36 @@ async function createWorktree(
   const res = await api.shell.exec({ command: 'git', args, cwd: workspacePath })
   if (res.exitCode !== 0) throw new Error(res.stderr || res.stdout || 'git worktree add failed')
   return { worktreePath, branchName }
+}
+
+// Reclaim a worktree and the branch it was on.
+//
+// Both, always: a removed worktree whose branch survives leaves a branch nobody
+// will ever check out and makes recreating the card fail on "already exists".
+// Failures are swallowed deliberately — this runs when the operator has already
+// decided the work is going away, and a discard that half-happens and then
+// throws leaves worse state than one that finishes quietly.
+async function discardWorktree(
+  api: ExtensionAPI,
+  workspacePath: string,
+  worktreePath: string | null,
+  branchName: string | null
+): Promise<void> {
+  if (!workspacePath) return
+  if (worktreePath) {
+    await api.shell
+      .exec({
+        command: 'git',
+        args: ['worktree', 'remove', worktreePath, '--force'],
+        cwd: workspacePath,
+      })
+      .catch(() => {})
+  }
+  if (branchName) {
+    await api.shell
+      .exec({ command: 'git', args: ['branch', '-D', branchName], cwd: workspacePath })
+      .catch(() => {})
+  }
 }
 
 // Guarantee a card runs in its own worktree, never the main checkout. Returns
@@ -748,7 +788,14 @@ function stallShadowMode(api: ExtensionAPI): boolean {
   return api.settings.get<boolean>('terminator.speckit-pilot.stallShadowMode') ?? true
 }
 
-async function startSupervisionRuntime(api: ExtensionAPI): Promise<void> {
+/**
+ * Brings up the control server, the runner, the supervision layer and the stall
+ * detector, and returns the layer so a caller can read what is running.
+ *
+ * Returns null when the runtime could not start: phases then fall back to the
+ * unsupervised spawn, and every surface reads empty rather than throwing.
+ */
+export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Supervision | null> {
   // Self-review's read-only policy does not need the control server, so it is
   // installed whether or not the rest of the runtime comes up. Guarded on its
   // own: activation must not fail because a host could not say where worktrees
@@ -804,14 +851,21 @@ async function startSupervisionRuntime(api: ExtensionAPI): Promise<void> {
         })
         api.window.broadcast('speckit:stall-fired', { firing, featureDir, shadow })
         if (shadow) return
-        api.notifications.showToast('warning', `A run stopped making progress (${firing.signal})`)
+        api.notifications.showToast(
+          'warning',
+          `A run stopped making progress (${firing.signal})`,
+          // Keyed by run, so one stall does not stack a toast per tick.
+          `speckit.stalled.${firing.sessionId}`
+        )
       },
     })
     stallWatcher.start()
+    return supervision
   } catch (error) {
     // Without it, phases fall back to the headless spawn. Said out loud: the
     // difference is whether tool calls are asked about or approved silently.
     api.log.error('supervised runtime unavailable — phases will run unsupervised', error)
+    return null
   }
 }
 
@@ -868,9 +922,22 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'speckit:review-hunks', async (payload: unknown) => {
     const { sessionId } = payload as { sessionId: string }
     const set = await supervision?.hunksFor(sessionId)
-    return set === undefined || set === null
-      ? { files: [], complete: false }
-      : { files: set.byFile(), complete: set.isComplete(), fullReject: set.isFullReject() }
+    if (set === undefined || set === null) return { files: [], complete: false, fullReject: false }
+    // Grouped by file, with the hunk's own lines: a reviewer decides on what
+    // the change says, and a list of identifiers is not a diff.
+    const files = new Map<string, HunkView[]>()
+    for (const { hunk, decision } of set.list()) {
+      const entry = files.get(hunk.file) ?? []
+      entry.push({ id: hunk.id, newStart: hunk.newStart, lines: [...hunk.lines], decision })
+      files.set(hunk.file, entry)
+    }
+    return {
+      files: [...files]
+        .map(([file, hunks]) => ({ file, hunks }))
+        .sort((a, b) => a.file.localeCompare(b.file)),
+      complete: set.isComplete(),
+      fullReject: set.isFullReject(),
+    }
   })
 
   reg(api, 'speckit:review-decide-hunk', async (payload: unknown) => {
@@ -958,6 +1025,85 @@ export function activate(api: ExtensionAPI): void {
     if (sessionId === null || supervisedRunner === null) return { ok: false }
     supervisedRunner.handBackToTerminal(sessionId, requestId)
     return { ok: true }
+  })
+
+  // The four things you do about a run that has stopped making progress, and
+  // the one you do about any run. Without these the supervision panel could
+  // name a stall and offer nothing — which is the shape of every "correct and
+  // useless" surface this line of work exists to stop shipping.
+
+  // Where it is running, so a surface can take you to the terminal rather than
+  // describe one.
+  reg(api, 'speckit:run-terminal', (payload: unknown) => {
+    const { sessionId } = payload as { sessionId: string }
+    return { terminalSessionId: supervisedRunner?.terminalFor(sessionId) ?? null }
+  })
+
+  // What it was doing, in its own words. The action that decides the others.
+  reg(api, 'speckit:run-transcript', (payload: unknown) => {
+    const { sessionId, limit } = payload as { sessionId: string; limit?: number }
+    const run = supervision?.runs.get(sessionId) ?? null
+    if (run === null) return { lines: [] }
+    return { lines: readTranscriptTail(run.transcriptPath, limit ?? 40) }
+  })
+
+  // Ends the turn and keeps the session, which is what makes the next message
+  // land instead of queueing behind whatever it is part-way through.
+  reg(api, 'speckit:run-interrupt', (payload: unknown) => {
+    const { sessionId } = payload as { sessionId: string }
+    if (supervisedRunner === null) return { ok: false }
+    supervisedRunner.interrupt(sessionId)
+    return { ok: true }
+  })
+
+  // Asking it what is wrong, or telling it what to do instead — the same
+  // action, and the reason interrupt does not also end the run.
+  reg(api, 'speckit:run-redirect', (payload: unknown) => {
+    const { sessionId, message } = payload as { sessionId: string; message: string }
+    if (supervisedRunner === null || message.trim() === '') return { ok: false }
+    supervisedRunner.interrupt(sessionId)
+    const ok = supervisedRunner.send(sessionId, message.trim())
+    if (ok) {
+      supervision?.runs.setState(sessionId, 'working', Date.now())
+      supervision?.feed.post({
+        at: Date.now(),
+        sessionId,
+        author: 'console',
+        summary: `redirected: ${message.trim()}`,
+      })
+    }
+    return { ok }
+  })
+
+  // Ends the run, saying why first so the agent's own record carries it.
+  reg(api, 'speckit:run-stop', (payload: unknown) => {
+    const { sessionId, reason } = payload as { sessionId: string; reason?: string }
+    if (supervisedRunner === null) return { ok: false }
+    const ok = supervisedRunner.stop(sessionId, reason)
+    if (ok) supervision?.finish(sessionId, Date.now())
+    return { ok }
+  })
+
+  // Kill and discard: the run ends, its worktree and branch go with it, and the
+  // card is put back where it can be started again. A discarded run must not
+  // keep occupying a review slot — that would gate the next run on reviewing a
+  // diff that no longer exists.
+  reg(api, 'speckit:run-discard', async (payload: unknown) => {
+    const { sessionId, workspacePath } = payload as { sessionId: string; workspacePath: string }
+    const run = supervision?.runs.get(sessionId) ?? null
+    supervisedRunner?.stop(sessionId, 'Discarding this run.')
+    if (run !== null) {
+      await discardWorktree(api, workspacePath, run.worktreePath, run.branch)
+      supervision?.review.remove(sessionId)
+      supervision?.runs.forget(sessionId)
+      supervision?.feed.post({
+        at: Date.now(),
+        sessionId,
+        author: 'console',
+        summary: `discarded ${path.basename(run.featureDir)} and removed its worktree`,
+      })
+    }
+    return { ok: run !== null }
   })
 
   // speckit:feature-list — scan specs/ for feature dirs
@@ -1122,24 +1268,7 @@ export function activate(api: ExtensionAPI): void {
           handle.stop()
           activeRunnerHandles.delete(featureDir)
         }
-        if (state.worktreePath) {
-          await api.shell
-            .exec({
-              command: 'git',
-              args: ['worktree', 'remove', state.worktreePath, '--force'],
-              cwd: workspacePath,
-            })
-            .catch(() => {})
-          if (state.branchName) {
-            await api.shell
-              .exec({
-                command: 'git',
-                args: ['branch', '-D', state.branchName],
-                cwd: workspacePath,
-              })
-              .catch(() => {})
-          }
-        }
+        await discardWorktree(api, workspacePath, state.worktreePath, state.branchName)
         state.run = { ...state.run!, status: 'cancelled', completedAt: new Date().toISOString() }
         state.queuePosition = null
         state.worktreePath = null
@@ -1239,27 +1368,22 @@ export function activate(api: ExtensionAPI): void {
     const { repoRoot, query } = payload as { repoRoot: string; query: string }
     if (!repoRoot || !query) return { error: 'repoRoot and query required' }
     try {
+      // `git grep`, not `rg`: the host only permits git and gh, so the ripgrep
+      // call this replaced threw on every search and the fallback below was
+      // doing all the work — silently, because nothing typechecked this file.
+      // Same `path:line:text` output, so the parser is unchanged.
       const res = await api.shell.exec({
-        command: 'rg',
-        args: [
-          '--line-number',
-          '--no-heading',
-          '--color',
-          'never',
-          '--glob',
-          '*.md',
-          '--',
-          query,
-          '.',
-        ],
+        command: 'git',
+        args: ['grep', '--line-number', '--no-color', '-I', '-i', '-e', query, '--', '*.md'],
         cwd: repoRoot,
       })
-      // rg exit 0 = matches, 1 = no matches (both authoritative)
+      // 0 = matches, 1 = none. Both are answers; anything else is a failure.
       if (res.exitCode === 0 || res.exitCode === 1) {
         return { results: parseRgLines(res.stdout) }
       }
     } catch {
-      // rg unavailable — fall through to fs scan
+      // Not a repository, or git is unavailable — fall through to the fs scan,
+      // which also covers files git has never seen.
     }
     // Fallback: scan markdown under specs/ and docs/ plus README.md
     const files: { file: string; content: string }[] = []
@@ -2300,7 +2424,7 @@ export function activate(api: ExtensionAPI): void {
   if (api.terminal?.onSessionCreate) {
     disposables.push(
       api.terminal.onSessionCreate((session) => {
-        activeSessions.set(session.id, { id: session.id, name: session.name ?? session.id })
+        activeSessions.set(session.id, { id: session.id, name: session.tabTitle })
       })
     )
   }
