@@ -1,0 +1,63 @@
+src/renderer/stores/session.store.ts
+  s_5f98598a6d950e::t_4182e1dfc2e97e 111-123,229-256
+  s_5f98598a6d950e::t_9feb6d314ed444 257-258
+tests/unit/renderer/stores/session.store.spec.ts
+  s_5f98598a6d950e::t_4182e1dfc2e97e 642-701
+tests/unit/extensions/api-supervised-runs.spec.ts
+  s_5f98598a6d950e::t_2c809efb5a0e3f 1-214
+docs/EXTENSION-DEVELOPMENT.md
+  s_5f98598a6d950e::t_4aa4dd3e68e937 5,421-468
+  s_5f98598a6d950e::t_18728bea006d0a 469
+src/shared/electron-api/manifest.ts
+  s_5f98598a6d950e::t_676d54dbfb2c62 48-55
+  s_5f98598a6d950e::t_1c2f1fe7139b0a 47
+src/renderer/electron.d.ts
+  s_5f98598a6d950e::t_4182e1dfc2e97e 31-32
+src/main/terminal/pty-manager.ts
+  s_5f98598a6d950e::t_c6d39820e040fc 29-39,59-60,63-69,98,102-110,141-154
+  s_5f98598a6d950e::t_909e39dd332372 155-156
+tests/unit/ipc/terminal.ipc.spec.ts
+  s_5f98598a6d950e::t_4182e1dfc2e97e 60,171-193
+  s_5f98598a6d950e::t_a2839d08bd6d09 194-195
+src/renderer/terminal/session-controller.ts
+  s_5f98598a6d950e::t_4182e1dfc2e97e 61-85
+src/main/extensions/api.ts
+  s_5f98598a6d950e::t_d6f9ef1a3fca2d 171-191,224-234,647-666
+  s_5f98598a6d950e::t_20389c8579e315 325
+  s_5f98598a6d950e::t_1075049cb94305 132-144,824-855
+  s_5f98598a6d950e::t_98dea9fca0a033 330
+  s_5f98598a6d950e::t_1bbbc5c04c6260 667,856
+tests/unit/terminal/pty-manager.spec.ts
+  s_5f98598a6d950e::t_c6d39820e040fc 420-514
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_5f98598a6d950e::t_4182e1dfc2e97e 100,116,124,934-949
+  s_5f98598a6d950e::t_e56b7db1c79c4c 950
+src/shared/electron-api/__tests__/manifest.spec.ts
+  s_5f98598a6d950e::t_658f18f44a3d93 38
+src/renderer/App.tsx
+  s_5f98598a6d950e::t_ce348dd9cbc467 30,426-439
+  s_5f98598a6d950e::t_5f385509e6208d 440
+tests/unit/renderer/terminal/session-controller.spec.ts
+  s_5f98598a6d950e::t_bacc66ae1e7a84 36,50,73,234-284
+  s_5f98598a6d950e::t_199f057a437265 285
+src/main/ipc/terminal.ipc.ts
+  s_5f98598a6d950e::t_4182e1dfc2e97e 79-86
+src/renderer/components/terminal/TerminalSession.tsx
+  s_5f98598a6d950e::t_4182e1dfc2e97e 158-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "74e45fa0982e9f75f44aa71fe28d4f03ded9ba9c",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
