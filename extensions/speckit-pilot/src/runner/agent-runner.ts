@@ -1,4 +1,5 @@
 import { spawn, type SpawnOptions } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
@@ -204,14 +205,47 @@ async function branchIn(api: ExtensionAPI, cwd: string): Promise<string | null> 
  * agent asked to create a file still created it, because a review needs Bash for
  * `git diff` and Bash can write. The decision has to be made on the command.
  */
-function selfReviewCommand(settingsPath: string | null): string {
+/**
+ * The formatting check, which must not be the formatter.
+ *
+ * `format` is `prettier --write` in every repository that has both, so running
+ * it here would mean the phase whose whole premise is "a review may only read"
+ * begins by reformatting the code under review. The read-only policy does not
+ * catch it: those settings apply to the review step alone.
+ *
+ * Decided by reading the repository's own scripts rather than guessed in shell
+ * — `npm run format -- --check` would hand prettier both `--write` and
+ * `--check`, which it refuses.
+ */
+export function formatCheckStep(worktreePath: string): string {
+  let scripts: Record<string, unknown> = {}
+  try {
+    const raw = readFileSync(path.join(worktreePath, 'package.json'), 'utf8')
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed === 'object' && parsed !== null) {
+      const value = (parsed as { scripts?: unknown }).scripts
+      if (typeof value === 'object' && value !== null) scripts = value as Record<string, unknown>
+    }
+  } catch {
+    // No package.json, or not readable. Said out loud below rather than assumed.
+  }
+
+  if (typeof scripts['format:check'] === 'string') return 'npm run format:check'
+  // Said, not silently skipped: "formatting was not checked" and "formatting is
+  // fine" must not look the same on the gate.
+  return "echo '⚠ formatting not checked: this repository defines no format:check script'"
+}
+
+function selfReviewCommand(settingsPath: string | null, worktreePath: string): string {
   const review =
     settingsPath === null
       ? // No settings could be written. Refused rather than silently falling
         // back to bypassing permissions, which is how this was wrong before.
         "echo '⚠ self-review skipped: the read-only policy could not be installed' && false"
       : `claude --print --settings ${shellQuote(settingsPath)} --permission-mode default --strict-mcp-config /google-review`
-  return ['npm run format', 'npm run lint', 'npx vitest run --coverage', review].join(' && ')
+  return [formatCheckStep(worktreePath), 'npm run lint', 'npx vitest run --coverage', review].join(
+    ' && '
+  )
 }
 
 // Kill a phase that has produced nothing for this long — a headless run that
@@ -285,7 +319,7 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
       const streaming = phase !== 'self-review'
       let cmd: string
       if (phase === 'self-review') {
-        cmd = selfReviewCommand(readOnlySettingsPath())
+        cmd = selfReviewCommand(readOnlySettingsPath(), opts.worktreePath)
       } else {
         const prompt = feedbackNote
           ? `${phaseCommand}\n\nFeedback from reviewer:\n${feedbackNote}`

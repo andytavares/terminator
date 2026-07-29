@@ -197,7 +197,11 @@ something you did not read.
   check state is reported as `unavailable` rather than assumed passing — so an
   auto-merge could only ever fire on evidence nobody has. The policy and its
   audit log were removed rather than shipped as a promise the code cannot keep.
-- **The self-review summary.** The gate's parsed quality table (format, lint,
+- **The self-review summary.** The formatting step is `format:check`, never
+  `format` — the latter is `prettier --write` and would rewrite the code under
+  review. A repository with no checking script gets a message saying formatting
+  was not checked, because that must not look like formatting being fine.
+  The gate's parsed quality table (format, lint,
   coverage, blockers) needs `.pilot/self-review.json`, and nothing writes it:
   the checks run as one shell chain, so only its overall exit code is known.
   Populating the per-check numbers would mean either running the four steps

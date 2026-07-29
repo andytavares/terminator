@@ -886,14 +886,14 @@ describe('startPhaseRunner — self-review mode', () => {
 
     const spawnArgs = vi.mocked(spawn).mock.calls[0][1] as string[]
     const cmd = spawnArgs.join(' ')
-    expect(cmd).toContain('npm run format')
+    // Not `npm run format`: that writes. See formatCheckStep.
     expect(cmd).toContain('npm run lint')
     expect(cmd).toContain('vitest')
     expect(cmd).toContain('coverage')
     expect(cmd).toContain('google-review')
   })
 
-  it('shell command contains npm run format when phase is self-review', async () => {
+  it('never runs the formatter itself, which would rewrite the code under review', async () => {
     const { child } = makeMockChild()
     vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
 
@@ -908,8 +908,8 @@ describe('startPhaseRunner — self-review mode', () => {
       phase: 'self-review',
     })
 
-    const spawnArgs = vi.mocked(spawn).mock.calls[0][1] as string[]
-    expect(spawnArgs.join(' ')).toContain('npm run format')
+    const cmd = (vi.mocked(spawn).mock.calls[0][1] as string[]).join(' ')
+    expect(cmd).not.toMatch(/npm run format(?!:check)/)
   })
 
   it('shell command contains npm run lint when phase is self-review', async () => {
@@ -1055,5 +1055,53 @@ describe('self-review when the read-only policy cannot be installed', () => {
     // card cannot advance on a review that never happened.
     expect(cmd).toContain('npm run lint')
     expect(cmd).toContain('false')
+  })
+})
+
+describe('checking formatting without doing it', () => {
+  // `format` is `prettier --write` in every repository that has both, so
+  // running it here would mean the phase whose premise is "a review may only
+  // read" begins by reformatting the code under review.
+
+  let dir: string
+
+  beforeEach(async () => {
+    const { mkdtempSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    dir = mkdtempSync(join(tmpdir(), 'fmt-'))
+  })
+
+  it('uses the checking script when the repository has one', async () => {
+    const { writeFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        scripts: { format: 'prettier --write .', 'format:check': 'prettier --check .' },
+      })
+    )
+    const { formatCheckStep } = await loadRunner()
+    expect(formatCheckStep(dir)).toBe('npm run format:check')
+  })
+
+  it('says so rather than running the writing one when there is no checking script', async () => {
+    const { writeFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ scripts: { format: 'prettier --write .' } })
+    )
+    const { formatCheckStep } = await loadRunner()
+    const step = formatCheckStep(dir)
+    expect(step).not.toContain('npm run format')
+    expect(step).toContain('not checked')
+  })
+
+  it('says so when there is no package.json at all', async () => {
+    // "Formatting was not checked" and "formatting is fine" must not look the
+    // same on the gate.
+    const { formatCheckStep } = await loadRunner()
+    expect(formatCheckStep(dir)).toContain('not checked')
   })
 })
