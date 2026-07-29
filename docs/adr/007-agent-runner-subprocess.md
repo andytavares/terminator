@@ -1,6 +1,7 @@
 # ADR-007: Agent Runner as Child Subprocess
 
 **Status:** Accepted  
+**Superseded in part by:** [ADR-026](026-supervised-runs-in-a-terminal.md) — a card's phases now run supervised, in a visible terminal. The headless spawn described here remains only for self-review, which needs an agent that cannot write.  
 **Date:** 2026-06-27
 
 ## Context

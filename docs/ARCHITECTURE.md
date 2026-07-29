@@ -639,7 +639,7 @@ Documented in `specs/010-markdown-notepad/contracts/ipc-channels.md` and typed i
 
 ## SpecKit Pilot Extension (`extensions/speckit-pilot/`)
 
-SpecKit Pilot is a Quill-style **workflow board** for controlling feature implementation end-to-end when offloading to agents. The home surface is a kanban board of six stage columns (Backlog → Spec → Plan → Implement → In Review → Done); each unit of work is a **card**. A card is a feature dir (`specs/NNN-slug/`) with a brief (`.pilot/card.json`); handing it off runs the 10-phase Spec-Kit pipeline using Claude Code as an autonomous agent subprocess in an isolated git worktree.
+SpecKit Pilot is a Quill-style **workflow board** for controlling feature implementation end-to-end when offloading to agents. The home surface is a kanban board of six stage columns (Backlog → Spec → Plan → Implement → In Review → Done); each unit of work is a **card**. A card is a feature dir (`specs/NNN-slug/`) with a brief (`.pilot/card.json`); handing it off runs the 10-phase Spec-Kit pipeline using Claude Code **in a visible terminal** in an isolated git worktree, with every tool call held at a `PreToolUse` hook until somebody decides (see [ADR-026](adr/026-supervised-runs-in-a-terminal.md)).
 
 ### Card model & board stages
 
@@ -681,13 +681,29 @@ activate(api)
   │    ├─ speckit:card-comment      → append steering comment (.pilot/comments.jsonl)
   │    ├─ speckit:comment-list      → load a card's comments
   │    ├─ speckit:artifact-list     → artifacts + git revision history
-  │    └─ speckit:knowledge-search  → keyword search over repo markdown + briefs (rg, fs fallback)
+  │    ├─ speckit:knowledge-search  → keyword search over repo markdown + briefs (git grep, fs fallback)
+  │    │
+  │    ├─ speckit:permissions-list / -resolve / -hand-back → tool calls held at a PreToolUse hook
+  │    ├─ speckit:supervision-snapshot → what is running, what is queued, whether the gate is open
+  │    ├─ speckit:stalls-list        → firings, and whether they were recorded or surfaced
+  │    ├─ speckit:feed-list / -digest → what happened, and what happened since you last looked
+  │    ├─ speckit:review-hunks / -decide-hunk / -intent / -done → per-hunk review
+  │    ├─ speckit:backpressure-override → recorded with the queue depth it ignored
+  │    ├─ speckit:lanes / -may-merge  → merge ordering across a card's repositories
+  │    └─ speckit:run-terminal / -transcript / -interrupt / -redirect / -stop / -discard
+  │
+  ├─ Supervision runtime (src/runtime/, see SUPERVISION.md and ADR-026)
+  │    ├─ control-server  — loopback endpoint the agents' hooks answer on, token per run
+  │    ├─ supervised-runner — worktree → project → terminal tab running `claude --session-id`
+  │    ├─ supervision     — run register, review queue, backpressure gate, feed
+  │    └─ stall-watcher   — a run that stops making progress without asking (shadow mode by default)
   │
   └─ AgentRunner (src/runner/agent-runner.ts)
-       ├─ Spawns claude --headless --print <command> as a child process
-       ├─ Streams stdout lines → broadcasts speckit:run-output push event
-       ├─ On exit: broadcasts speckit:run-phase-complete (or speckit:checkin-ready for batch implement)
-       └─ self-review phase uses: npm run format && npm run lint && npx vitest run --coverage && claude --headless --print /google-review
+       ├─ A phase runs supervised, in a terminal, with every tool call asked about
+       ├─ Streams transcript output → broadcasts speckit:run-output push event
+       ├─ On turn end: measures the diff, grades it, queues it for review
+       └─ self-review keeps the headless spawn (ADR-007), confined by a command policy:
+          npm run format && npm run lint && npx vitest run --coverage && claude --print /google-review
 ```
 
 ### Renderer Architecture (`extensions/speckit-pilot/src/renderer/`)
@@ -698,6 +714,8 @@ App.tsx  (board home + header: KnowledgeSearch / Import ticket (manual refresh) 
   │    the board via reconcileAssignedTickets(): fetch ticketList() + cardList(), dedup on
   │    source:sourceKey, cardCreate() the missing ones. The "Import ticket" button re-runs
   │    the same reconcile as a manual refresh. New cards surface via speckit:state-changed.
+  ├─ PermissionQueue — tool calls a supervised run is holding until somebody decides
+  ├─ SupervisionPanel — runs / stalls / review / feed; the four actions on a run, per-hunk review
   ├─ BoardView       — six stage columns (@dnd-kit); buckets CardSummary[] by derived stage
   │    └─ CardTile        — type badge, title, scope, compact phase rail, run-status chip
   ├─ CardDetail      — slide-over drawer with tabs:
@@ -738,3 +756,6 @@ All state lives in `.pilot/` inside the feature directory (a subdirectory of `sp
 - [ADR-007: agent-runner-subprocess](adr/007-agent-runner-subprocess.md) — spawn Claude Code as a child process rather than using the Anthropic API directly.
 - [ADR-010: card model](adr/010-speckit-card-model.md) — a card unifies feature dir, ticket, and run; `PilotState` v3.
 - [ADR-011: parallel runs](adr/011-speckit-parallel-runs.md) — concurrency cap replaces the single-active-run queue.
+- [ADR-026: supervised runs in a terminal](adr/026-supervised-runs-in-a-terminal.md) — a phase runs `claude` in a visible terminal behind a `PreToolUse` control server; the verified hook contract; why the stall detector ships in shadow mode.
+
+See [`extensions/speckit-pilot/SUPERVISION.md`](../extensions/speckit-pilot/SUPERVISION.md) for the operator-facing account: the surfaces, the four actions on a run, risk grading, backpressure and stall thresholds.
