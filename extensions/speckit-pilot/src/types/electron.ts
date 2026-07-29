@@ -60,13 +60,6 @@ export interface SpeckitAPI {
   credentialsStatus(payload: {
     source: 'linear' | 'jira'
   }): Promise<{ connected: boolean; email?: string; domain?: string } | { error: string }>
-  dispatch(payload: {
-    ticket: TicketRef
-    workspacePath: string
-    autonomyLevel?: 'guided' | 'standard' | 'fast'
-    baseBranch?: string
-    mode?: RunMode
-  }): Promise<{ featureDir: string; queued: boolean } | { error: string }>
   runCancel(payload: {
     featureDir: string
     workspacePath: string
@@ -438,10 +431,6 @@ export function getSpeckitAPI(): SpeckitAPI {
     credentialsStatus: (payload) =>
       bridge.invoke('speckit:credentials-status', payload) as Promise<
         { connected: boolean; email?: string; domain?: string } | { error: string }
-      >,
-    dispatch: (payload) =>
-      bridge.invoke('speckit:dispatch', payload) as Promise<
-        { featureDir: string; queued: boolean } | { error: string }
       >,
     runCancel: (payload) =>
       bridge.invoke('speckit:run-cancel', payload) as Promise<

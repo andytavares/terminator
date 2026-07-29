@@ -1869,7 +1869,12 @@ export function activate(api: ExtensionAPI): void {
     }
   })
 
-  // speckit:dispatch — create feature dir, init state v2, start agent on constitution phase
+  // speckit:dispatch — create the feature dir, its state, and start the first
+  // phase, in one call.
+  //
+  // The board's own route is card-create then card-handoff; this is the
+  // one-step entry a tracker or the remote bridge uses, and what the e2e drives
+  // to prove a phase really opens a terminal.
   reg(api, 'speckit:dispatch', async (payload: unknown) => {
     const { ticket, workspacePath, autonomyLevel, baseBranch, mode } = payload as {
       ticket: TicketRef
