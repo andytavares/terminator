@@ -40,6 +40,12 @@ export function parseFrontMatter(input: string): FrontMatter {
 
   let data: Record<string, unknown> = {}
   try {
+    // `load` on js-yaml 4 is the safe schema — the one gray-matter reached for
+    // as `safeLoad`, which 4 removed by making it the default. It is worth
+    // being explicit about: on js-yaml 3 the same call name resolves tags like
+    // `!!js/function`, so a note imported from a folder could execute code on
+    // being read. The dependency is pinned to ^4 for that reason and not only
+    // for the advisory.
     const parsed = yaml.load(match[1])
     // A YAML document can legally be a string, a number or null. Only a mapping
     // is front matter; anything else has no fields to read.

@@ -62,6 +62,23 @@ describe('parseFrontMatter', () => {
   it('returns nothing for something that is not a string', () => {
     expect(parseFrontMatter(null as unknown as string)).toEqual({ data: {}, content: '' })
   })
+
+  it('does not execute code in a header, however the note got onto disk', () => {
+    // js-yaml 3's `load` resolves `!!js/function` and builds a real function
+    // from the body — gray-matter avoided it by calling `safeLoad`. On 4 the
+    // safe schema is the default and the tag is simply refused. Notes are
+    // imported from a folder the operator points at, so this is reachable by
+    // anything that can write a file there.
+    const evil = '---\nrun: !!js/function >\n  function(){ return 42 }\n---\nbody'
+    const { data, content } = parseFrontMatter(evil)
+    expect(typeof (data as { run?: unknown }).run).not.toBe('function')
+    expect(content).toBe('body')
+  })
+
+  it('refuses a header that reaches for another file', () => {
+    const { data } = parseFrontMatter('---\nid: !!js/undefined ~\n---\nbody')
+    expect(data).toEqual({})
+  })
 })
 
 describe('stringifyFrontMatter', () => {
