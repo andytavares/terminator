@@ -1,7 +1,10 @@
 import { spawn, type SpawnOptions } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { selfReviewCommand } from './self-review-plan.js'
+import { readSelfReviewSummary } from '../state/self-review-summary.js'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { PhaseId } from '../types/speckit.types.js'
 import type { SupervisedRunner } from '../runtime/supervised-runner.js'
@@ -152,6 +155,32 @@ export function setRunSupervision(next: RunSupervision | null): void {
  * than a fallback: a review that runs unsupervised is the thing this replaced.
  */
 let readOnlyStateDir: string | null = null
+
+/**
+ * Where a self-review's exit codes and reports go.
+ *
+ * Beside the runtime's other state, never in the worktree: a review that adds a
+ * `coverage/` directory to the diff it is reviewing has changed the thing it
+ * was measuring.
+ */
+function selfReviewDir(featureDir: string): string | null {
+  if (readOnlyStateDir === null) return null
+  return path.join(readOnlyStateDir, 'self-review', path.basename(featureDir))
+}
+
+/** Records the summary beside the card, where the gate reads it. */
+function writeSelfReviewSummary(featureDir: string, outputDir: string): void {
+  try {
+    const summary = readSelfReviewSummary(outputDir)
+    if (summary === null) return
+    const pilotDir = path.join(featureDir, '.pilot')
+    mkdirSync(pilotDir, { recursive: true })
+    writeFileSync(path.join(pilotDir, 'self-review.json'), JSON.stringify(summary, null, 2), 'utf8')
+  } catch {
+    // The gate reads the console when there is no summary, so failing to write
+    // one must not fail the phase.
+  }
+}
 let installedReadOnlySettings: string | null = null
 
 export function setReadOnlyStateDir(dir: string | null): void {
@@ -205,48 +234,6 @@ async function branchIn(api: ExtensionAPI, cwd: string): Promise<string | null> 
  * agent asked to create a file still created it, because a review needs Bash for
  * `git diff` and Bash can write. The decision has to be made on the command.
  */
-/**
- * The formatting check, which must not be the formatter.
- *
- * `format` is `prettier --write` in every repository that has both, so running
- * it here would mean the phase whose whole premise is "a review may only read"
- * begins by reformatting the code under review. The read-only policy does not
- * catch it: those settings apply to the review step alone.
- *
- * Decided by reading the repository's own scripts rather than guessed in shell
- * — `npm run format -- --check` would hand prettier both `--write` and
- * `--check`, which it refuses.
- */
-export function formatCheckStep(worktreePath: string): string {
-  let scripts: Record<string, unknown> = {}
-  try {
-    const raw = readFileSync(path.join(worktreePath, 'package.json'), 'utf8')
-    const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed === 'object' && parsed !== null) {
-      const value = (parsed as { scripts?: unknown }).scripts
-      if (typeof value === 'object' && value !== null) scripts = value as Record<string, unknown>
-    }
-  } catch {
-    // No package.json, or not readable. Said out loud below rather than assumed.
-  }
-
-  if (typeof scripts['format:check'] === 'string') return 'npm run format:check'
-  // Said, not silently skipped: "formatting was not checked" and "formatting is
-  // fine" must not look the same on the gate.
-  return "echo '⚠ formatting not checked: this repository defines no format:check script'"
-}
-
-function selfReviewCommand(settingsPath: string | null, worktreePath: string): string {
-  const review =
-    settingsPath === null
-      ? // No settings could be written. Refused rather than silently falling
-        // back to bypassing permissions, which is how this was wrong before.
-        "echo '⚠ self-review skipped: the read-only policy could not be installed' && false"
-      : `claude --print --settings ${shellQuote(settingsPath)} --permission-mode default --strict-mcp-config /google-review`
-  return [formatCheckStep(worktreePath), 'npm run lint', 'npx vitest run --coverage', review].join(
-    ' && '
-  )
-}
 
 // Kill a phase that has produced nothing for this long — a headless run that
 // hangs (e.g. on a blocked API call) would otherwise wait forever.
@@ -317,9 +304,19 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
       // stream-json mode so its assistant output streams to the console in real
       // time instead of arriving in one chunk when --print buffers to the end.
       const streaming = phase !== 'self-review'
+      let selfReviewOutputDir: string | null = null
       let cmd: string
       if (phase === 'self-review') {
-        cmd = selfReviewCommand(readOnlySettingsPath(), opts.worktreePath)
+        selfReviewOutputDir = selfReviewDir(opts.featureDir)
+        cmd = selfReviewCommand({
+          worktreePath: opts.worktreePath,
+          // Anywhere but the worktree. A review that adds files to the diff it
+          // is reviewing has changed the thing it was measuring, so with no
+          // state directory this goes to a temp one and the gate falls back to
+          // the console as it did before.
+          outputDir: selfReviewOutputDir ?? path.join(tmpdir(), 'speckit-self-review'),
+          settingsPath: readOnlySettingsPath(),
+        })
       } else {
         const prompt = feedbackNote
           ? `${phaseCommand}\n\nFeedback from reviewer:\n${feedbackNote}`
@@ -503,6 +500,12 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
         flushStreamJson()
         const code = exitCode ?? 0
         logStream?.end()
+        // What the checks recorded, assembled for the gate. Written before
+        // `onComplete`, which is what moves the phase to awaiting_review and
+        // puts the gate on screen.
+        if (selfReviewOutputDir !== null) {
+          writeSelfReviewSummary(opts.featureDir, selfReviewOutputDir)
+        }
         if (onComplete) void Promise.resolve(onComplete(code))
         if (phase === 'implement' && batchIndex !== undefined) {
           api.window.broadcast('speckit:checkin-ready', {

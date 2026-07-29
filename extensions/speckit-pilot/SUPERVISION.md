@@ -190,6 +190,30 @@ A phase can also be **skipped** from its gate, and unskipped from the rail. Not
 every card needs every phase, and the alternative to offering that is approving
 something you did not read.
 
+## Self-review
+
+Four checks, run as separate steps rather than an `&&` chain: for a gate you
+want all four answers, not the first failure. Each records its own exit code.
+
+| Check  | Command                                     | What the gate shows                             |
+| ------ | ------------------------------------------- | ----------------------------------------------- |
+| Format | the repository's `format:check`             | pass/fail — **never** `format`, which writes    |
+| Lint   | `lint -- --format json --output-file`       | errors and warnings, totalled from the report   |
+| Tests  | `vitest --coverage.reporter=json-summary`   | line coverage from `coverage-summary.json`      |
+| Review | `/google-review` under the read-only policy | pass/fail; it writes prose, so no blocker count |
+
+Every number comes from a tool's own machine-readable report. Anything a tool
+did not report reads as **not measured**, never as zero — a review that says "0
+errors" when it does not know is worse than one that says nothing. A repository
+with no `format:check` or `lint` script gets a step that says it did not run and
+fails, so "not checked" never looks like "clean".
+
+The exit codes and reports are written beside the runtime's other state, never
+in the worktree: a review that adds a `coverage/` directory to the diff it is
+reviewing has changed the thing it was measuring. Step output is not captured —
+it streams to the run console live, and capturing it per step would mean piping,
+whose status variable differs between bash and zsh.
+
 ## What is deliberately not here
 
 - **Unattended merge of a P3 change.** The grading is real and shown, but
@@ -197,17 +221,5 @@ something you did not read.
   check state is reported as `unavailable` rather than assumed passing — so an
   auto-merge could only ever fire on evidence nobody has. The policy and its
   audit log were removed rather than shipped as a promise the code cannot keep.
-- **The self-review summary.** The formatting step is `format:check`, never
-  `format` — the latter is `prettier --write` and would rewrite the code under
-  review. A repository with no checking script gets a message saying formatting
-  was not checked, because that must not look like formatting being fine.
-  The gate's parsed quality table (format, lint,
-  coverage, blockers) needs `.pilot/self-review.json`, and nothing writes it:
-  the checks run as one shell chain, so only its overall exit code is known.
-  Populating the per-check numbers would mean either running the four steps
-  separately — real data, and a change to the one path still using the headless
-  spawn — or parsing their output, which is inventing numbers. The gate says so
-  and points at the console rather than blocking the phase, which is what it
-  used to do.
 - **Stale-lane detection after an upstream merge.** It needs per-lane start and
   merge times, and nothing records a lane merging, so it could not be driven.
