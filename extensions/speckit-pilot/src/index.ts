@@ -507,8 +507,14 @@ async function handoffCard(
   featureDir: string,
   workspacePath: string,
   baseBranch?: string,
-  mode?: RunMode
-): Promise<{ ok: true; dispatched: true; queued: boolean } | { error: string; message?: string }> {
+  mode?: RunMode,
+  /** Set after the operator accepts a recorded refusal. */
+  overrideBackpressure?: boolean
+): Promise<
+  | { ok: true; dispatched: true; queued: boolean }
+  | { ok: false; error: string; reason?: string | null; backpressure?: unknown }
+  | { error: string; message?: string }
+> {
   const state = await readMigratedState(featureDir)
   if (!state) return { error: 'No card state found' }
   const card = await readCard(featureDir)
@@ -525,6 +531,23 @@ async function handoffCard(
     autonomyLevel: state.run?.autonomyLevel ?? state.settings.defaultAutonomy ?? 'standard',
   }
   primePhasesForRun(state)
+
+  // Refused before anything is provisioned: starting a fourth agent while three
+  // diffs are waiting is how a backlog nobody can review gets built, and the
+  // constraint is one person's attention rather than machine capacity.
+  //
+  // Overridden deliberately rather than not enforced — the override is recorded
+  // with the depth at the moment it was ignored, so a backlog built this way is
+  // visible afterwards rather than only felt.
+  const gate = supervision?.backpressure.check()
+  if (gate !== undefined && !gate.allowed && overrideBackpressure !== true) {
+    state.run = null
+    await writePilotState(featureDir, state)
+    return { ok: false, error: 'backpressure', reason: gate.reason, backpressure: gate }
+  }
+  if (gate !== undefined && !gate.allowed && overrideBackpressure === true) {
+    supervision?.backpressure.override(featureDir, Date.now())
+  }
 
   const cap = getMaxConcurrent(api)
   const active = await countActiveRuns(workspacePath)
@@ -585,6 +608,9 @@ async function advanceQueue(api: ExtensionAPI, workspacePath: string): Promise<v
   for (const item of ordered) {
     const active = await countActiveRuns(workspacePath)
     if (shouldQueue(active, cap)) break
+    // The queue drains into the same wall: unreviewed diffs pile up whether a
+    // run was started by hand or by the queue emptying itself.
+    if (supervision?.backpressure.check().allowed === false) break
     const s = item.state
     try {
       const { worktreePath, branchName } = await createWorktree(
@@ -1099,15 +1125,23 @@ export function activate(api: ExtensionAPI): void {
 
   // speckit:card-handoff — explicit "start" action: run the card through the pipeline
   reg(api, 'speckit:card-handoff', async (payload: unknown) => {
-    const { featureDir, workspacePath, baseBranch, mode } = payload as {
+    const { featureDir, workspacePath, baseBranch, mode, overrideBackpressure } = payload as {
       featureDir: string
       workspacePath: string
       baseBranch?: string
       mode?: RunMode
+      overrideBackpressure?: boolean
     }
     if (!featureDir || !workspacePath) return { error: 'featureDir and workspacePath required' }
     try {
-      return await handoffCard(api, featureDir, workspacePath, baseBranch, mode)
+      return await handoffCard(
+        api,
+        featureDir,
+        workspacePath,
+        baseBranch,
+        mode,
+        overrideBackpressure
+      )
     } catch (err) {
       api.notifications.showToast('error', `Handoff failed: ${String(err)}`, 'handoffFailed')
       return { error: String(err) }
@@ -1746,6 +1780,18 @@ export function activate(api: ExtensionAPI): void {
       primePhasesForRun(state)
       state.stage = deriveStage(state.phases, state.run)
       await writePilotState(featureDir, state)
+
+      // Dispatch provisions the card and then runs it. The gate is checked here
+      // too — a card taken in from a tracker is still an agent starting while
+      // diffs wait, and refusing after the worktree exists would waste it.
+      const gate = supervision?.backpressure.check()
+      if (gate !== undefined && !gate.allowed) {
+        state.queuePosition = 'pending'
+        await writePilotState(featureDir, state)
+        api.window.broadcast('speckit:state-changed', { state })
+        return { featureDir, queued: true, reason: gate.reason, backpressure: gate }
+      }
+
       await startRunAt(
         api,
         featureDir,
