@@ -49,13 +49,6 @@ export function resolveArtifactPath(location: ArtifactLocation, artifactPath: st
   return path.join(base, relative)
 }
 
-export function resolveArtifactPaths(
-  location: ArtifactLocation,
-  artifactPaths: readonly string[]
-): string[] {
-  return artifactPaths.map((artifactPath) => resolveArtifactPath(location, artifactPath))
-}
-
 /** An artifact's stable name, and where to read it right now. */
 export interface ArtifactEntry {
   /**

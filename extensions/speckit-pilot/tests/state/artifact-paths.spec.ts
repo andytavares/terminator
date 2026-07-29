@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  repoRootOf,
-  resolveArtifactPath,
-  resolveArtifactPaths,
-} from '../../src/state/artifact-paths.js'
+import { repoRootOf, resolveArtifactPath } from '../../src/state/artifact-paths.js'
 
 // A path recorded at plan time and a path read at review time are two different
 // checkouts. Verified against real git: `git worktree add` checks out a branch,
@@ -42,15 +38,6 @@ describe('while a card has a worktree', () => {
         `${featureDir}/checklists/requirements.md`
       )
     ).toBe(`${worktree}/specs/021-a/checklists/requirements.md`)
-  })
-
-  it('resolves every artifact of a phase at once', () => {
-    expect(
-      resolveArtifactPaths({ featureDir, worktreePath: worktree }, [
-        `${featureDir}/plan.md`,
-        `${featureDir}/research.md`,
-      ])
-    ).toEqual([`${worktree}/specs/021-a/plan.md`, `${worktree}/specs/021-a/research.md`])
   })
 })
 

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import * as path from 'node:path'
+import { shellQuote } from '../runtime/claude-launch.js'
 
 // What self-review runs, and how each step's result gets recorded.
 //
@@ -54,10 +55,6 @@ function scriptsOf(worktreePath: string): Record<string, unknown> {
 
 function has(scripts: Record<string, unknown>, name: string): boolean {
   return typeof scripts[name] === 'string'
-}
-
-export function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`
 }
 
 /** A step that does nothing and says why, so "not run" never reads as "passed". */

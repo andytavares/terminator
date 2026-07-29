@@ -36,6 +36,20 @@ vi.mock('node:fs', () => ({
   },
 }))
 
+// The card's state is written through state-persistence, which imports
+// `node:fs/promises` — a different specifier from the `node:fs` mock above, so
+// it needs its own or the write escapes to the real filesystem.
+vi.mock('node:fs/promises', () => ({
+  mkdir: vi.fn().mockResolvedValue(undefined),
+  readdir: vi.fn().mockResolvedValue([]),
+  writeFile: vi.fn().mockResolvedValue(undefined),
+  rename: vi.fn().mockResolvedValue(undefined),
+  readFile: vi.fn().mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })),
+  appendFile: vi.fn().mockResolvedValue(undefined),
+  stat: vi.fn().mockResolvedValue({ mtimeMs: Date.now() }),
+  unlink: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('../../src/api/credentials.js', () => ({
   setLinearKey: vi.fn(),
   getLinearKey: vi.fn().mockResolvedValue(null),
@@ -64,6 +78,7 @@ vi.mock('../../src/runner/agent-runner.js', () => ({
 }))
 
 import * as nodefs from 'node:fs'
+import * as nodefsPromises from 'node:fs/promises'
 import * as agentRunnerMod from '../../src/runner/agent-runner.js'
 
 function buildMockApi(): {
@@ -509,8 +524,9 @@ describe('speckit:checkin-decision', () => {
       ok?: boolean
     }
     expect(result.ok).toBe(true)
-    // batchIndex must be persisted — check writeFile was called
-    const writeCalls = vi.mocked(nodefs.promises.writeFile).mock.calls
+    // batchIndex must be persisted. Written through state-persistence, which
+    // imports `node:fs/promises` — one writer for the card's state.
+    const writeCalls = vi.mocked(nodefsPromises.writeFile).mock.calls
     // The temp name carries a uuid — writes overlap, and a fixed one is not
     // atomic — so match the state file it is a temp for.
     const stateWrite = writeCalls.find(([p]) => /state\.json\..*\.tmp$/.test(String(p)))

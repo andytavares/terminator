@@ -1,5 +1,4 @@
 import type { ExtensionAPI, Disposable, SettingDefinition } from '../../../src/main/extensions/api'
-import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type {
@@ -21,6 +20,7 @@ import {
 } from './types/speckit.types.js'
 import {
   readState as readMigratedState,
+  writeState,
   readCard,
   writeCard,
   appendComment,
@@ -220,17 +220,10 @@ async function readPilotState(featureDir: string): Promise<PilotState | null> {
   }
 }
 
-// Write pilot state atomically
+// One writer for the card's state, in state-persistence. This wrapper exists so
+// the fifty call sites below do not all have to say `writeState`.
 async function writePilotState(featureDir: string, state: PilotState): Promise<void> {
-  const pilotDir = path.join(featureDir, '.pilot')
-  await fs.promises.mkdir(pilotDir, { recursive: true })
-  const stateFile = path.join(pilotDir, 'state.json')
-  // Unique per write. A fixed `.tmp` is not atomic when two writes overlap —
-  // and they do: approving a phase writes, then auto-starts the next one, which
-  // writes again. The loser's rename finds nothing and throws ENOENT.
-  const tmp = `${stateFile}.${randomUUID()}.tmp`
-  await fs.promises.writeFile(tmp, JSON.stringify(state, null, 2), 'utf-8')
-  await fs.promises.rename(tmp, stateFile)
+  await writeState(featureDir, state)
 }
 
 // Create initial pilot state for a feature dir (v3, backlog card).

@@ -706,8 +706,12 @@ activate(api)
        ├─ A phase runs supervised, in a terminal, with every tool call asked about
        ├─ Streams transcript output → broadcasts speckit:run-output push event
        ├─ On turn end: measures the diff, grades it, queues it for review
-       └─ self-review keeps the headless spawn (ADR-007), confined by a command policy:
-          npm run format && npm run lint && npx vitest run --coverage && claude --print /google-review
+       └─ self-review keeps the headless spawn (ADR-007), confined by a command policy.
+          Four steps, not an && chain: each records its own exit code, and each is
+          asked for its findings as data (eslint --format json, vitest
+          --coverage.reporter=json-summary) so the gate's table is measured rather
+          than scraped. Formatting is checked with the repo's format:check, never
+          `format` — that writes, and a review may only read.
 ```
 
 ### Renderer Architecture (`extensions/speckit-pilot/src/renderer/`)

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { selfReviewCommand } from './self-review-plan.js'
+import { shellQuote } from '../runtime/claude-launch.js'
 import { readSelfReviewSummary } from '../state/self-review-summary.js'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { PhaseId } from '../types/speckit.types.js'
@@ -238,10 +239,6 @@ async function branchIn(api: ExtensionAPI, cwd: string): Promise<string | null> 
 // Kill a phase that has produced nothing for this long — a headless run that
 // hangs (e.g. on a blocked API call) would otherwise wait forever.
 const DEFAULT_PHASE_TIMEOUT_MS = 15 * 60 * 1000
-
-function shellQuote(s: string): string {
-  return "'" + s.replace(/'/g, "'\\''") + "'"
-}
 
 export function createAgentRunner(api: ExtensionAPI): AgentRunner {
   return {
