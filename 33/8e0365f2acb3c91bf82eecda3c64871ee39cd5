@@ -1,0 +1,61 @@
+extensions/speckit-pilot/src/components/RunDashboard.tsx
+  s_5f98598a6d950e::t_8ccda5715a06da 155-160,308-327
+  s_5f98598a6d950e::t_7606d8337648dd 9,149-154,209-210,212
+  s_5f98598a6d950e::t_da4cef33235f78 211
+  s_5f98598a6d950e::t_72a2c676b715fc 328
+  s_5f98598a6d950e::t_80908ff35db6ed 357,359
+extensions/speckit-pilot/tests/state/phase-state-machine.spec.ts
+  s_5f98598a6d950e::t_92b1f96bbbbcbf 210-226,228-263,266-270,273-275,278-303
+extensions/speckit-pilot/tests/state/artifact-hash.spec.ts
+  s_5f98598a6d950e::t_01cee082326847 62-115,118-121
+  s_5f98598a6d950e::t_b5afc42e016837 2
+extensions/speckit-pilot/SUPERVISION.md
+  s_5f98598a6d950e::t_da4cef33235f78 173-184
+extensions/speckit-pilot/src/state/phase-state-machine.ts
+  s_5f98598a6d950e::t_8036f09280dc84 1
+  s_5f98598a6d950e::t_0248c92599e0a4 82-93,96,106-112
+extensions/speckit-pilot/src/components/PhaseRail.tsx
+  s_5f98598a6d950e::t_8ccda5715a06da 19-22
+extensions/speckit-pilot/src/state/artifact-hash.ts
+  s_5f98598a6d950e::t_8d86e8dfe6f3fe 4-9,20-41
+tests/e2e/speckit-supervised-run.spec.ts
+  s_5f98598a6d950e::t_756d70666455ce 76-77,79
+  s_5f98598a6d950e::t_4a316dff61173e 78
+extensions/speckit-pilot/tests/components/RunDashboard.spec.tsx
+  s_5f98598a6d950e::t_02abb505f61d99 11-12,38-39,217-248,252-265,267-275,277-282
+  s_5f98598a6d950e::t_72a2c676b715fc 283-284
+  s_5f98598a6d950e::t_4f6abf5075f767 249-251,266,276
+  s_5f98598a6d950e::t_14c7ed8cfcea88 2
+  s_5f98598a6d950e::t_fccf92b50dd44d 40-41
+extensions/speckit-pilot/src/index.ts
+  s_5f98598a6d950e::t_da4cef33235f78 348-350
+  s_5f98598a6d950e::t_019a304ea933d4 2,227-230
+  s_5f98598a6d950e::t_021a25e194ea4e 112-113,338-347,351-371,1579-1580,1598-1599,1601-1603
+  s_5f98598a6d950e::t_8cfd6c3cfddff4 1619
+extensions/speckit-pilot/tests/ipc/phase4-ipc.spec.ts
+  s_5f98598a6d950e::t_b3ec9ca17fb788 514-516
+extensions/speckit-pilot/tests/ipc/approval-hash-ipc.spec.ts
+  s_5f98598a6d950e::t_019a304ea933d4 25-36
+  s_5f98598a6d950e::t_e41f59c385def3 1-24,37-207
+extensions/speckit-pilot/src/components/GatePanel.tsx
+  s_5f98598a6d950e::t_80908ff35db6ed 2,15-22,35,352-362
+  s_5f98598a6d950e::t_6dee19b09f391e 363-364
+docs/ARCHITECTURE.md
+  s_5f98598a6d950e::t_da4cef33235f78 666-670
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "338e0365f2acb3c91bf82eecda3c64871ee39cd5",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
