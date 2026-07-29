@@ -1,0 +1,48 @@
+extensions/speckit-pilot/src/runtime/hook-script.ts
+  s_5f98598a6d950e::t_39e13ac7c84513 1-115
+extensions/speckit-pilot/src/runtime/permission-bridge.ts
+  s_5f98598a6d950e::t_87131a1d54fba8 1-257
+extensions/speckit-pilot/src/runtime/supervised-runner.ts
+  s_5f98598a6d950e::t_9117ccf4179ef2 1-235
+extensions/speckit-pilot/tests/runtime/control-server.spec.ts
+  s_5f98598a6d950e::t_d6a457ae5f09ab 1-273
+extensions/speckit-pilot/tests/runtime/transcript-tailer.spec.ts
+  s_5f98598a6d950e::t_d9f3b52dc371c8 5
+  s_5f98598a6d950e::t_c325b3c10b01f7 1-4,6-274
+extensions/speckit-pilot/src/runtime/transcript-tailer.ts
+  s_5f98598a6d950e::t_b38b91786c51e5 1-142
+extensions/speckit-pilot/tests/runtime/supervised-runner.spec.ts
+  s_5f98598a6d950e::t_0548e40213acf1 1-5,7-300
+  s_5f98598a6d950e::t_f7e478d63b86f4 6
+extensions/speckit-pilot/src/runtime/claude-launch.ts
+  s_5f98598a6d950e::t_39e13ac7c84513 1-182
+extensions/speckit-pilot/tests/runtime/hook-script.spec.ts
+  s_5f98598a6d950e::t_d6a457ae5f09ab 1-5,8-256
+  s_5f98598a6d950e::t_d9f3b52dc371c8 6-7
+extensions/speckit-pilot/src/runtime/control-server.ts
+  s_5f98598a6d950e::t_39e13ac7c84513 1-248
+extensions/speckit-pilot/tests/runtime/permission-bridge.spec.ts
+  s_5f98598a6d950e::t_d9f3b52dc371c8 178,180
+  s_5f98598a6d950e::t_f30969aaf911cc 1-24,26-92,95-98,103-111,113-117,119-127,130-135,137-144,147-150,152-175,179,181-278,280-282,285-288,291-311,314-354
+  s_5f98598a6d950e::t_764f757f4f9792 25,93,136,151
+  s_5f98598a6d950e::t_033d685cdb172f 94,112,128-129,145-146,176-177
+  s_5f98598a6d950e::t_cd44c46303ac0e 99-102,118,279,283-284,289-290,312-313
+extensions/speckit-pilot/tests/runtime/claude-launch.spec.ts
+  s_5f98598a6d950e::t_d6a457ae5f09ab 1-190
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "fcbfc6d4d7acba2270a2b781d8a04ccfda32f2a5",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
