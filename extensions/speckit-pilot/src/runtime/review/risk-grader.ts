@@ -1,7 +1,7 @@
 // Risk grading. Evaluated strictly top-down, first match wins — and the order
 // carries the safety property: P3 is checked LAST, so a lockfile change that
 // also touches authentication grades P0 rather than slipping into the only
-// lane that can merge unattended.
+// lane that needs the least of your attention.
 
 export type RiskGrade = 'P0' | 'P1' | 'P2' | 'P3'
 

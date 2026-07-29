@@ -105,27 +105,3 @@ export function mayMergeLane(
     blockingLane,
   }
 }
-
-/**
- * FR-090. When an upstream lane merges a change to a shared file after a
- * downstream lane started, that downstream lane is working against a contract
- * that has since moved.
- */
-export function staleLanes(
-  item: CardLanes,
-  upstreamOrd: number,
-  upstreamMergedAt: number,
-  laneStartedAt: ReadonlyMap<number, number>
-): number[] {
-  if ((item.contract?.shared_files ?? []).length === 0) return []
-
-  return item.lanes
-    .filter((lane) => {
-      if (!lane.blocked_by.includes(upstreamOrd)) return false
-      const startedAt = laneStartedAt.get(lane.ord)
-      // Started before the upstream merge landed, so it never saw the change.
-      return startedAt !== undefined && startedAt < upstreamMergedAt
-    })
-    .map((lane) => lane.ord)
-    .sort((a, b) => a - b)
-}

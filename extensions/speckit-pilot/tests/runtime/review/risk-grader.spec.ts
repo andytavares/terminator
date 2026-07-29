@@ -84,7 +84,7 @@ describe('P3 — lowest grade (FR-049)', () => {
     'refuses P3 when checks are %s (FR-057, FR-062)',
     (checkState) => {
       // An unreachable code host must never produce a P3, because P3 is the
-      // only grade that can merge unattended.
+      // grade that gets the least scrutiny.
       expect(gradeRisk(change({ files: ['package-lock.json'], checkState })).grade).not.toBe('P3')
     }
   )

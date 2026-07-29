@@ -3,13 +3,13 @@ import {
   getSpeckitAPI,
   type DigestView,
   type FeedEntryView,
+  type MuteRuleView,
   type ReviewItemView,
   type RunView,
   type StallFiringView,
   type HunkFileView,
   type IntentReviewView,
   type ReviewStepView,
-  type UnattendedMergeView,
   type SupervisionSnapshot,
   type TranscriptLineView,
 } from '../types/electron.js'
@@ -484,37 +484,6 @@ function HunkReview({
   )
 }
 
-/**
- * What merged with nobody looking.
- *
- * Off by default and shown only when it has happened: an unattended merge is
- * the one action here that takes place with no person watching, so the record
- * of it belongs next to the queue it bypassed rather than in a log file.
- */
-function UnattendedMerges(): JSX.Element {
-  const [merges, setMerges] = useState<UnattendedMergeView[]>([])
-
-  useEffect(() => {
-    void getSpeckitAPI()
-      .unattendedMerges()
-      .then(({ merges: recorded }) => setMerges(recorded))
-  }, [])
-
-  if (merges.length === 0) return <></>
-
-  return (
-    <div className="sk-sup__note">
-      Merged without review: {merges.length}
-      {merges.map((merge) => (
-        <div className="sk-sup__meta" key={`${merge.sessionId}-${merge.mergedAt}`}>
-          {merge.repoPath.split('/').pop()} · {merge.gradeTrigger} · checks {merge.checkState} ·{' '}
-          {merge.diffSummary.files} {merge.diffSummary.files === 1 ? 'file' : 'files'}
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function Review({
   items,
   backpressure,
@@ -542,7 +511,6 @@ function Review({
             `${backpressure.unreviewed} diffs are waiting — no new run will start until one is reviewed.`}
         </div>
       )}
-      <UnattendedMerges />
       {items.length === 0 ? (
         <div className="sk-sup__clear">Nothing is waiting to be reviewed.</div>
       ) : (
@@ -604,7 +572,17 @@ function readLastLooked(): number | null {
   return Number.isFinite(at) ? at : null
 }
 
-function Feed({ entries, now }: { entries: readonly FeedEntryView[]; now: number }): JSX.Element {
+function Feed({
+  entries,
+  mutes,
+  now,
+  onChanged,
+}: {
+  entries: readonly FeedEntryView[]
+  mutes: readonly MuteRuleView[]
+  now: number
+  onChanged: () => void
+}): JSX.Element {
   const [lastLooked] = useState(readLastLooked)
   const [digest, setDigest] = useState<DigestView | null>(null)
 
@@ -619,6 +597,8 @@ function Feed({ entries, now }: { entries: readonly FeedEntryView[]; now: number
   useEffect(() => {
     return () => window.localStorage.setItem(LAST_LOOKED_KEY, String(Date.now()))
   }, [])
+
+  const muted = (sessionId: string): boolean => mutes.some((rule) => rule.sessionId === sessionId)
 
   if (entries.length === 0) {
     return <div className="sk-sup__clear">Nothing has happened yet.</div>
@@ -640,6 +620,37 @@ function Feed({ entries, now }: { entries: readonly FeedEntryView[]; now: number
           <span className="sk-sup__main">
             <div className="sk-sup__title">{entry.summary}</div>
             <div className="sk-sup__meta">{elapsed(Math.max(0, now - entry.at))} ago</div>
+          </span>
+          <span className="sk-sup__actions">
+            {/* Muting one noisy run is the only alternative to turning
+                notifications off wholesale. It never hides the entry. */}
+            {muted(entry.sessionId) ? (
+              <button
+                className="sk-sup__btn"
+                onClick={() =>
+                  void getSpeckitAPI().feedUnmute({ sessionId: entry.sessionId }).then(onChanged)
+                }
+              >
+                Unmute
+              </button>
+            ) : (
+              <button
+                className="sk-sup__btn"
+                title="Stop this run interrupting you. What it does is still recorded here."
+                onClick={() =>
+                  void getSpeckitAPI().feedMute({ sessionId: entry.sessionId }).then(onChanged)
+                }
+              >
+                Mute
+              </button>
+            )}
+            <button
+              className="sk-sup__btn"
+              aria-label={`Dismiss ${entry.summary}`}
+              onClick={() => void getSpeckitAPI().feedDismiss({ id: entry.id }).then(onChanged)}
+            >
+              ×
+            </button>
           </span>
         </div>
       ))}
@@ -666,7 +677,10 @@ export function SupervisionPanel({
     firings: [],
     shadowMode: true,
   })
-  const [feed, setFeed] = useState<FeedEntryView[]>([])
+  const [feed, setFeed] = useState<{ entries: FeedEntryView[]; mutes: MuteRuleView[] }>({
+    entries: [],
+    mutes: [],
+  })
   const [now, setNow] = useState(() => Date.now())
 
   const load = useCallback(async () => {
@@ -678,7 +692,7 @@ export function SupervisionPanel({
     ])
     setSnapshot(next)
     setStalls(firings)
-    setFeed(entries.entries)
+    setFeed({ entries: entries.entries, mutes: entries.mutes })
   }, [])
 
   const reload = useCallback(() => {
@@ -710,7 +724,7 @@ export function SupervisionPanel({
     runs: snapshot.runs.filter((run) => run.state !== 'finished').length,
     stalls: stalls.firings.length,
     review: snapshot.review.length,
-    feed: feed.length,
+    feed: feed.entries.length,
   }
 
   return (
@@ -758,7 +772,9 @@ export function SupervisionPanel({
           onDone={(sessionId) => void getSpeckitAPI().reviewDone({ sessionId }).then(reload)}
         />
       )}
-      {section === 'feed' && <Feed entries={feed} now={now} />}
+      {section === 'feed' && (
+        <Feed entries={feed.entries} mutes={feed.mutes} now={now} onChanged={reload} />
+      )}
     </div>
   )
 }

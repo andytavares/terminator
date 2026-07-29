@@ -106,8 +106,9 @@ import { createSupervisedRunner, type SupervisedRunner } from './runtime/supervi
 import { createPendingPermissions } from './runtime/pending-permissions.js'
 import { createStallWatcher, type StallWatcher } from './runtime/stall-watcher.js'
 import { createSupervision, type Supervision } from './runtime/supervision.js'
-import { buildDigest } from './runtime/feed/digest.js'
+import { buildDigest, channelFor, type NotifiableEvent } from './runtime/feed/digest.js'
 import { paletteEntries } from './runtime/palette.js'
+import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
 import { readCardLanes } from './runtime/workitem.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
 import type { HunkDecision } from './runtime/review/hunk-decisions.js'
@@ -783,6 +784,54 @@ let paletteTimer: NodeJS.Timeout | null = null
 // start yet.
 let supervision: Supervision | null = null
 /**
+ * Which runs are allowed to interrupt you.
+ *
+ * Muting suppresses the notification, never the entry: the feed's record stays
+ * complete whether or not it interrupted anyone.
+ */
+let mutes: MuteStore | null = null
+/**
+ * The notification a held tool call raised, so answering it takes the
+ * notification away too. A console that leaves them behind teaches you to
+ * dismiss without reading.
+ */
+const raisedNotifications = new Map<string, Disposable>()
+
+/**
+ * Says something, through the channel the event's kind is allowed.
+ *
+ * Automation complacency is the documented failure mode of supervisory control:
+ * a console that only speaks when something is wrong teaches you that silence
+ * means fine — and silence is also what a crashed console looks like. So the
+ * rule is fixed rather than per-call: only a blocking permission request may
+ * interrupt, everything else that needs a person is an indication, and routine
+ * progress goes to the feed and nowhere else.
+ */
+function notify(
+  api: ExtensionAPI,
+  event: NotifiableEvent,
+  message: string,
+  actions?: Array<{ id: string; label: string; handler: () => void }>
+): Disposable | null {
+  switch (channelFor(event)) {
+    case 'modal':
+      // The nearest thing an extension has to a modal: it persists until it is
+      // answered, and it carries the answer with it.
+      return api.notifications.createNotification({
+        type: 'warning',
+        title: message,
+        key: `speckit.permission.${event.sessionId}`,
+        actions,
+      })
+    case 'indicator':
+      api.notifications.showToast('warning', message, `speckit.${event.kind}.${event.sessionId}`)
+      return null
+    case 'digest':
+      // Already in the feed. Interrupting for it is how a feed gets muted.
+      return null
+  }
+}
+/**
  * Stalls that have fired, newest first, and whether they were judged right.
  *
  * Kept in memory rather than persisted: the point of the record is tuning the
@@ -842,8 +891,39 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     // when answered — by the operator, the autonomy ladder, or the bridge
     // handing the decision back to the terminal.
     setPermissionSink({
-      onPending: (ask) => pendingPermissions.add(ask),
-      onResolved: (requestId) => pendingPermissions.remove(requestId),
+      onPending: (ask) => {
+        pendingPermissions.add(ask)
+        // The one thing allowed to interrupt: the run is stopped dead until
+        // somebody answers, and a request nobody sees is a twelve-hour hang.
+        const notification = notify(
+          api,
+          { kind: 'permission_requested', sessionId: ask.sessionId },
+          `${path.basename(ask.featureDir)} is asking: ${ask.summary}`,
+          [
+            {
+              id: 'allow',
+              label: 'Allow',
+              handler: () =>
+                supervisedRunner?.resolve(ask.sessionId, ask.requestId, { allow: true }),
+            },
+            {
+              id: 'deny',
+              label: 'Deny',
+              handler: () =>
+                supervisedRunner?.resolve(ask.sessionId, ask.requestId, { allow: false }),
+            },
+            { id: 'open', label: 'Open the board', handler: () => api.window.focusSelf() },
+          ]
+        )
+        if (notification !== null) raisedNotifications.set(ask.requestId, notification)
+      },
+      onResolved: (requestId) => {
+        pendingPermissions.remove(requestId)
+        // Taken away with the request: a notification left behind after the
+        // thing it was about is answered teaches you to dismiss without reading.
+        raisedNotifications.get(requestId)?.dispose()
+        raisedNotifications.delete(requestId)
+      },
     })
 
     // A run that stops making progress without asking for anything is the
@@ -855,6 +935,9 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     // Registered runs are what everything downstream reads. Without this the
     // review queue, the gate and the stall detector are all correct and empty.
     setRunSupervision(supervision)
+    mutes = createMuteStore(
+      path.join(api.settings.resolveWorktreeBaseDir(''), '.speckit-pilot-runtime', 'mutes.json')
+    )
 
     const runner = supervisedRunner
     stallWatcher = createStallWatcher({
@@ -866,7 +949,7 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
         supervision?.runs.setState(firing.sessionId, 'stalled', firing.firedAt)
         // Attributed to the pilot, not the agent: the agent did not say this,
         // and a feed that blurs the two is one you stop trusting.
-        supervision?.feed.post({
+        const entry = supervision?.feed.post({
           at: firing.firedAt,
           sessionId: firing.sessionId,
           author: 'console',
@@ -874,11 +957,22 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
         })
         api.window.broadcast('speckit:stall-fired', { firing, featureDir, shadow })
         if (shadow) return
-        api.notifications.showToast(
-          'warning',
-          `A run stopped making progress (${firing.signal})`,
-          // Keyed by run, so one stall does not stack a toast per tick.
-          `speckit.stalled.${firing.sessionId}`
+        // Muted runs are recorded and shown, never surfaced — which is the only
+        // alternative to turning the detector off wholesale when one run is
+        // noisy.
+        if (
+          entry !== undefined &&
+          supervision !== null &&
+          !supervision.feed.shouldNotify(entry, mutes?.list() ?? [])
+        ) {
+          return
+        }
+        // An indication, not an interruption: a stall is not blocked on an
+        // answer the way a held tool call is.
+        notify(
+          api,
+          { kind: 'stalled', sessionId: firing.sessionId },
+          `A run stopped making progress (${firing.signal})`
         )
       },
     })
@@ -923,7 +1017,30 @@ export function activate(api: ExtensionAPI): void {
       : supervision.snapshot()
   )
 
-  reg(api, 'speckit:feed-list', () => ({ entries: supervision?.feed.list() ?? [] }))
+  reg(api, 'speckit:feed-list', () => ({
+    entries: supervision?.feed.list() ?? [],
+    mutes: mutes?.list() ?? [],
+  }))
+
+  // Anything shown as a list should be prunable, and a feed you cannot clear a
+  // line from is one you stop reading.
+  reg(api, 'speckit:feed-dismiss', (payload: unknown) => {
+    const { id } = payload as { id: string }
+    supervision?.feed.removeEntry(id)
+    return { ok: true }
+  })
+
+  reg(api, 'speckit:feed-mute', (payload: unknown) => {
+    const { sessionId, author } = payload as { sessionId?: string; author?: 'agent' | 'console' }
+    mutes?.add({ sessionId, author })
+    return { mutes: mutes?.list() ?? [] }
+  })
+
+  reg(api, 'speckit:feed-unmute', (payload: unknown) => {
+    const { sessionId, author } = payload as { sessionId?: string; author?: 'agent' | 'console' }
+    mutes?.remove({ sessionId, author })
+    return { mutes: mutes?.list() ?? [] }
+  })
 
   // What happened while you were away. Progress posts are rolled up rather
   // than replayed one by one — the point of coming back to a digest is not to
@@ -1016,11 +1133,6 @@ export function activate(api: ExtensionAPI): void {
       }
     )
   })
-
-  // What merged without a person looking, so it can be reviewed after the fact.
-  reg(api, 'speckit:unattended-merges', () => ({
-    merges: supervision?.mergePolicy.unattendedMerges() ?? [],
-  }))
 
   // Applying the decisions is what makes a rejection mean anything: the
   // rejected hunks come back out of the working copy, the accepted ones stay.
@@ -2574,6 +2686,9 @@ export function deactivate(): void {
   setReadOnlyStateDir(null)
   setRunSupervision(null)
   supervision = null
+  mutes = null
+  for (const notification of raisedNotifications.values()) notification.dispose()
+  raisedNotifications.clear()
   stallWatcher?.stop()
   stallWatcher = null
   if (paletteTimer !== null) clearInterval(paletteTimer)

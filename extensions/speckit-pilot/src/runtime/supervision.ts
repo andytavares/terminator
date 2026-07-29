@@ -10,9 +10,8 @@ import type { CheckState } from './review/risk-grader.js'
 import { parseHunks } from './review/parse-hunks.js'
 import { createDecisionSet, type DecisionSet, type HunkDecision } from './review/hunk-decisions.js'
 import { reviewIntent, type IntentReview } from './review/intent-diff.js'
-import { createMergePolicy, type MergePolicy } from './review/merge-policy.js'
 import { revertRejected, type ApplyResult } from './review/apply-decisions.js'
-import { laneViews, mayMergeLane, staleLanes, type CardLanes } from './lane-coordination.js'
+import { laneViews, mayMergeLane, type CardLanes } from './lane-coordination.js'
 
 // The supervision layer: what is running, what it changed, what needs looking
 // at, and what must not start yet.
@@ -26,7 +25,6 @@ export interface Supervision {
   readonly review: ReviewQueue
   readonly backpressure: BackpressureGate
   readonly feed: FeedLog
-  readonly mergePolicy: MergePolicy
   /**
    * Reads what a run's working copy has changed and records it.
    *
@@ -76,16 +74,6 @@ export interface Supervision {
    * so single-repository work never sees any of this.
    */
   lanes(card: CardLanes): ReturnType<typeof laneViews>
-  /**
-   * Lanes that started before an upstream lane merged, so they are working
-   * against a contract that has since changed and need re-running.
-   */
-  staleLanes(
-    card: CardLanes,
-    upstreamOrd: number,
-    upstreamMergedAt: number,
-    laneStartedAt: ReadonlyMap<number, number>
-  ): number[]
   mayMerge(card: CardLanes, ord: number, merged: readonly number[]): ReturnType<typeof mayMergeLane>
   /** Everything a surface needs in one read. */
   snapshot(): {
@@ -106,11 +94,6 @@ export interface SupervisionOptions {
   reviewLimit?: number
   /** The branch a card's work is measured against. */
   baseBranch?: string
-  /**
-   * Whether a P3 change with green checks may merge without a person. Off by
-   * default: it is the one action that happens with nobody watching.
-   */
-  unattendedMergeEnabled?: boolean
 }
 
 /**
@@ -135,12 +118,6 @@ export function createSupervision(options: SupervisionOptions): Supervision {
   const runs = createRunRegistry()
   const review = createReviewQueue()
   const feed = createFeedLog(path.join(stateDir, 'feed.jsonl'))
-  const mergePolicy = createMergePolicy({
-    // Off unless a repository opts in. An unattended merge is the one action
-    // here that happens with nobody watching, so it is not a default.
-    isUnattendedEnabledFor: () => options.unattendedMergeEnabled ?? false,
-    auditLogPath: path.join(stateDir, 'unattended-merges.jsonl'),
-  })
 
   const backpressure = createBackpressureGate({
     limit: options.reviewLimit ?? DEFAULT_REVIEW_LIMIT,
@@ -204,7 +181,6 @@ export function createSupervision(options: SupervisionOptions): Supervision {
     review,
     backpressure,
     feed,
-    mergePolicy,
     measure,
 
     async finishTurn(sessionId, turns, at): Promise<void> {
@@ -323,10 +299,6 @@ export function createSupervision(options: SupervisionOptions): Supervision {
 
     lanes(card) {
       return laneViews(card)
-    },
-
-    staleLanes(card, upstreamOrd, upstreamMergedAt, laneStartedAt) {
-      return staleLanes(card, upstreamOrd, upstreamMergedAt, laneStartedAt)
     },
 
     mayMerge(card, ord, merged) {

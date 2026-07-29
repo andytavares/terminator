@@ -31,7 +31,6 @@ export interface ReviewableHunk {
 
 export interface DecisionSet {
   decide(hunkId: string, decision: HunkDecision): void
-  decisionFor(hunkId: string): HunkDecision | null
   /**
    * Every hunk, decided or not, in the order the diff has them.
    *
@@ -45,7 +44,6 @@ export interface DecisionSet {
   isComplete(): boolean
   /** All rejected: the branch keeps nothing and the session is discarded, not merged. */
   isFullReject(): boolean
-  acceptedHunks(): Hunk[]
 }
 
 export function createDecisionSet(hunks: readonly Hunk[]): DecisionSet {
@@ -58,10 +56,6 @@ export function createDecisionSet(hunks: readonly Hunk[]): DecisionSet {
       // something that is not in the diff cannot be applied.
       if (!byId.has(hunkId)) return
       decisions.set(hunkId, decision)
-    },
-
-    decisionFor(hunkId: string): HunkDecision | null {
-      return decisions.get(hunkId) ?? null
     },
 
     list(): ReviewableHunk[] {
@@ -88,10 +82,6 @@ export function createDecisionSet(hunks: readonly Hunk[]): DecisionSet {
       // Distinguished from "nothing decided yet": an empty diff is not a
       // rejection, and a half-reviewed diff is not one either.
       return hunks.length > 0 && hunks.every((hunk) => decisions.get(hunk.id) === 'reject')
-    },
-
-    acceptedHunks(): Hunk[] {
-      return hunks.filter((hunk) => decisions.get(hunk.id) === 'accept')
     },
   }
 }

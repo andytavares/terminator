@@ -49,20 +49,6 @@ describe('chronology (FR-091)', () => {
     expect(log.list().map((e) => e.summary)).toEqual(['first', 'third'])
   })
 
-  it('returns entries since a point in time, for the catch-up case', () => {
-    const log = newLog()
-    log.post({ ...agentEntry, at: 1_000 })
-    log.post({ ...agentEntry, at: 5_000 })
-    expect(log.since(2_000)).toHaveLength(1)
-  })
-
-  it('filters to one session', () => {
-    const log = newLog()
-    log.post(agentEntry)
-    log.post({ ...agentEntry, sessionId: 's2' })
-    expect(log.forSession('s1')).toHaveLength(1)
-  })
-
   it('is empty before anything is posted', () => {
     expect(newLog().list()).toEqual([])
   })
@@ -123,7 +109,7 @@ describe('forgetting a session', () => {
     log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'did a thing' })
     log.post({ at: 2_000, sessionId: 's1', author: 'console', summary: 'stalled' })
     log.forget('s1')
-    expect(log.forSession('s1')).toEqual([])
+    expect(log.list()).toEqual([])
   })
 
   it('leaves other sessions alone', () => {
@@ -132,13 +118,6 @@ describe('forgetting a session', () => {
     log.post({ at: 1_000, sessionId: 's2', author: 'agent', summary: 'theirs' })
     log.forget('s1')
     expect(log.list().map((entry) => entry.sessionId)).toEqual(['s2'])
-  })
-
-  it('takes them out of a time window too', () => {
-    const log = newLog()
-    log.post({ at: 5_000, sessionId: 's1', author: 'agent', summary: 'x' })
-    log.forget('s1')
-    expect(log.since(0)).toEqual([])
   })
 
   it('survives a reopen, so they do not come back', () => {
@@ -153,7 +132,7 @@ describe('forgetting a session', () => {
     log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'before' })
     log.forget('s1')
     log.post({ at: 2_000, sessionId: 's1', author: 'console', summary: 'after' })
-    expect(log.forSession('s1').map((entry) => entry.summary)).toEqual(['after'])
+    expect(log.list().map((entry) => entry.summary)).toEqual(['after'])
   })
 
   it('ignores a session it never heard of', () => {

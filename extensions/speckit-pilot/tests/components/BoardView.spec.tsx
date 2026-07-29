@@ -34,7 +34,6 @@ vi.mock('../../src/types/electron.js', () => ({
     stallsList: vi.fn().mockResolvedValue({ firings: [], shadowMode: true }),
     feedList: vi.fn().mockResolvedValue({ entries: [] }),
     onPaletteGoto: mockOnPaletteGoto,
-    unattendedMerges: vi.fn().mockResolvedValue({ merges: [] }),
   }),
 }))
 

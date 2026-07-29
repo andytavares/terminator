@@ -98,6 +98,8 @@ isolation and was never asked for, and reading the diff first is how you end up
 justifying such work instead of questioning it. It reads what the card asked for
 against the agent's own account of what it did against what actually changed.
 
+### Multi-repository cards
+
 A card that touches more than one repository declares **lanes** in a
 `workitem.json` the plan phase writes into the feature directory — the contract
 between the pipeline and the console is a file, not an API, so the pipeline
@@ -125,13 +127,35 @@ off with `terminator.speckit-pilot.stallShadowMode`.
 A firing is posted to the feed **attributed to the pilot**, never to the agent.
 The agent did not say it, and a feed that blurs the two is one you stop trusting.
 
+## What may interrupt you
+
+Fixed by kind, not decided per call. Automation complacency is the documented
+failure mode of supervisory control: a console that only speaks when something
+is wrong teaches you that silence means fine, and silence is also what a crashed
+console looks like.
+
+| Event                            | Channel                                                  |
+| -------------------------------- | -------------------------------------------------------- |
+| A tool call is held              | a notification carrying **Allow / Deny**, until answered |
+| A stall, a failure, a diff ready | an indication                                            |
+| Routine progress                 | the feed, and nowhere else                               |
+
+A held tool call is the only thing that interrupts, because it is the only thing
+where nothing moves until you act — and a request nobody sees is a twelve-hour
+hang. Answering it takes the notification away with it.
+
+**Mute** on a feed row stops one run interrupting you without hiding anything it
+does; the entries keep arriving in the feed. Mutes persist, because one you have
+to set again after every restart is one you stop bothering with — and then
+notifications get turned off wholesale.
+
 ## Where state lives
 
 - **In memory** — the run register, the review queue, the stall firings. A run
   does not outlive the application: its terminal is a child of this process, and
   a registry reloaded from disk would describe runs that no longer exist.
 - **On disk**, under `<worktree base>/.speckit-pilot-runtime/` — the feed
-  (`feed.jsonl`), backpressure overrides, unattended merges, and the per-session
+  (`feed.jsonl`), backpressure overrides, mute rules, and the per-session
   `--settings` files and hook script.
 - **In the browser** — when you last read the feed. That is a property of the
   person looking, not of the runs.
@@ -145,3 +169,13 @@ real dispatch through the real application and asserts the worktree became a
 project, the terminal exists, and `claude --session-id` is visible in it — never
 `bypassPermissions`. Every worst bug on this line of work passed its unit tests
 and only appeared when the application ran.
+
+## What is deliberately not here
+
+- **Unattended merge of a P3 change.** The grading is real and shown, but
+  nothing merges without a person: the extension has no source of CI status —
+  check state is reported as `unavailable` rather than assumed passing — so an
+  auto-merge could only ever fire on evidence nobody has. The policy and its
+  audit log were removed rather than shipped as a promise the code cannot keep.
+- **Stale-lane detection after an upstream merge.** It needs per-lane start and
+  merge times, and nothing records a lane merging, so it could not be driven.

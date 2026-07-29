@@ -178,7 +178,18 @@ export interface SpeckitAPI {
   /** What is running, what is waiting to be reviewed, and whether the gate is open. */
   supervisionSnapshot(): Promise<SupervisionSnapshot>
   stallsList(): Promise<{ firings: StallFiringView[]; shadowMode: boolean }>
-  feedList(): Promise<{ entries: FeedEntryView[] }>
+  feedList(): Promise<{ entries: FeedEntryView[]; mutes: MuteRuleView[] }>
+  /** Drops one line from the feed. Anything shown as a list should be prunable. */
+  feedDismiss(payload: { id: string }): Promise<{ ok: boolean }>
+  /** Stops a run interrupting you. The record of what it did stays. */
+  feedMute(payload: {
+    sessionId?: string
+    author?: 'agent' | 'console'
+  }): Promise<{ mutes: MuteRuleView[] }>
+  feedUnmute(payload: {
+    sessionId?: string
+    author?: 'agent' | 'console'
+  }): Promise<{ mutes: MuteRuleView[] }>
   /** What happened between two moments, rolled up rather than replayed. */
   feedDigest(payload: { from: number; to?: number }): Promise<DigestView>
   reviewHunks(payload: { sessionId: string }): Promise<{
@@ -225,8 +236,6 @@ export interface SpeckitAPI {
     ord: number
     merged: number[]
   }): Promise<{ allowed: boolean; reason: string | null; blockingLane: number | null }>
-  /** What merged with nobody looking, so it can be reviewed after the fact. */
-  unattendedMerges(): Promise<{ merges: UnattendedMergeView[] }>
   artifactList(payload: {
     featureDir: string
   }): Promise<{ artifacts: ArtifactRef[] } | { error: string }>
@@ -367,14 +376,15 @@ export interface LaneViewJson {
   blockedBy: number[]
 }
 
-/** A change that merged without a person looking at it. */
-export interface UnattendedMergeView {
-  sessionId: string
-  repoPath: string
-  mergedAt: number
-  gradeTrigger: string
-  checkState: string
-  diffSummary: { files: number; added: number; removed: number }
+/**
+ * A run, or a whole author, that may not interrupt you.
+ *
+ * Suppresses the notification and never the entry — the record of what happened
+ * stays complete whether or not it interrupted anyone.
+ */
+export interface MuteRuleView {
+  sessionId?: string
+  author?: 'agent' | 'console'
 }
 
 /** What happened while you were away. */
@@ -552,7 +562,17 @@ export function getSpeckitAPI(): SpeckitAPI {
         firings: StallFiringView[]
         shadowMode: boolean
       }>,
-    feedList: () => bridge.invoke('speckit:feed-list', {}) as Promise<{ entries: FeedEntryView[] }>,
+    feedList: () =>
+      bridge.invoke('speckit:feed-list', {}) as Promise<{
+        entries: FeedEntryView[]
+        mutes: MuteRuleView[]
+      }>,
+    feedDismiss: (payload) =>
+      bridge.invoke('speckit:feed-dismiss', payload) as Promise<{ ok: boolean }>,
+    feedMute: (payload) =>
+      bridge.invoke('speckit:feed-mute', payload) as Promise<{ mutes: MuteRuleView[] }>,
+    feedUnmute: (payload) =>
+      bridge.invoke('speckit:feed-unmute', payload) as Promise<{ mutes: MuteRuleView[] }>,
     feedDigest: (payload) => bridge.invoke('speckit:feed-digest', payload) as Promise<DigestView>,
     reviewHunks: (payload) =>
       bridge.invoke('speckit:review-hunks', payload) as Promise<{
@@ -598,10 +618,6 @@ export function getSpeckitAPI(): SpeckitAPI {
         allowed: boolean
         reason: string | null
         blockingLane: number | null
-      }>,
-    unattendedMerges: () =>
-      bridge.invoke('speckit:unattended-merges', {}) as Promise<{
-        merges: UnattendedMergeView[]
       }>,
     artifactList: (payload) =>
       bridge.invoke('speckit:artifact-list', payload) as Promise<

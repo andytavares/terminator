@@ -12,39 +12,6 @@ const hunk = (id: string, file = 'src/a.ts'): Hunk => ({
 })
 
 describe('deciding hunk by hunk', () => {
-  it('starts with nothing decided', () => {
-    const set = createDecisionSet([hunk('h1'), hunk('h2')])
-    expect(set.isComplete()).toBe(false)
-    expect(set.acceptedHunks()).toEqual([])
-  })
-
-  it('records an acceptance', () => {
-    const set = createDecisionSet([hunk('h1')])
-    set.decide('h1', 'accept')
-    expect(set.decisionFor('h1')).toBe('accept')
-    expect(set.acceptedHunks().map((h) => h.id)).toEqual(['h1'])
-  })
-
-  it('records a rejection', () => {
-    const set = createDecisionSet([hunk('h1')])
-    set.decide('h1', 'reject')
-    expect(set.decisionFor('h1')).toBe('reject')
-    expect(set.acceptedHunks()).toEqual([])
-  })
-
-  it('lets a decision be changed before the review is finished', () => {
-    const set = createDecisionSet([hunk('h1')])
-    set.decide('h1', 'accept')
-    set.decide('h1', 'reject')
-    expect(set.decisionFor('h1')).toBe('reject')
-  })
-
-  it('ignores a decision about a hunk it does not have', () => {
-    const set = createDecisionSet([hunk('h1')])
-    expect(() => set.decide('never-seen', 'accept')).not.toThrow()
-    expect(set.decisionFor('never-seen')).toBeNull()
-  })
-
   it('is complete only when every hunk has been decided', () => {
     const set = createDecisionSet([hunk('h1'), hunk('h2')])
     set.decide('h1', 'accept')

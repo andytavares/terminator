@@ -282,7 +282,7 @@ describe('reviewing a run hunk by hunk', () => {
     addRun(s)
     const set = await s.hunksFor('session-1')
     // Two hunks in the one file, each decidable on its own.
-    expect(set?.acceptedHunks()).toEqual([])
+    expect(set?.list().every((entry) => entry.decision === null)).toBe(true)
     expect(set?.isComplete()).toBe(false)
     expect(set?.byFile().map((f) => f.file)).toEqual(['src/a.ts'])
   })
@@ -293,7 +293,9 @@ describe('reviewing a run hunk by hunk', () => {
     const set = await s.hunksFor('session-1')
     const hunkId = 'src/a.ts:1:1'
     expect(await s.decideHunk('session-1', hunkId, 'accept')).toBe(true)
-    expect((await s.hunksFor('session-1'))?.decisionFor(hunkId)).toBe('accept')
+    expect(
+      (await s.hunksFor('session-1'))?.list().find((entry) => entry.hunk.id === hunkId)?.decision
+    ).toBe('accept')
     expect(set?.byFile()[0].accepted).toEqual([hunkId])
   })
 
@@ -303,7 +305,9 @@ describe('reviewing a run hunk by hunk', () => {
     await s.hunksFor('session-1')
     const hunkId = 'src/a.ts:1:1'
     await s.decideHunk('session-1', hunkId, 'reject')
-    expect((await s.hunksFor('session-1'))?.decisionFor(hunkId)).toBe('reject')
+    expect(
+      (await s.hunksFor('session-1'))?.list().find((entry) => entry.hunk.id === hunkId)?.decision
+    ).toBe('reject')
   })
 
   it('is not complete until every hunk is decided', async () => {
@@ -494,49 +498,6 @@ describe('lanes across repositories', () => {
     const s = build()
     expect(s.lanes(single)[0].collisions).toEqual([])
     expect(s.mayMerge(single, 1, []).allowed).toBe(true)
-  })
-
-  it('names lanes that started before their upstream merged', () => {
-    // They are working against a contract that has since changed.
-    const started = new Map([
-      [1, 0],
-      [2, 1_000],
-    ])
-    expect(build().staleLanes(card, 1, 5_000, started)).toContain(2)
-  })
-})
-
-describe('an unattended merge', () => {
-  it('is refused unless the repository opted in', () => {
-    const s = build()
-    const decision = s.mergePolicy.mayMergeUnattended({
-      sessionId: 'session-1',
-      repoPath: '/wt/a',
-      branch: 'feat/a',
-      grade: 'P3',
-      checkState: 'passing',
-      diffSummary: { files: 1, added: 1, removed: 0 },
-    })
-    // The one action that happens with nobody watching, so it is not a default.
-    // Note this is the merge *policy*'s decision, which says `may`; lane
-    // ordering has its own shape that says `allowed`.
-    expect(decision.may).toBe(false)
-  })
-
-  it('records what merged without a person, for reviewing after the fact', () => {
-    const s = build()
-    s.mergePolicy.recordUnattendedMerge(
-      {
-        sessionId: 'session-1',
-        repoPath: '/wt/a',
-        branch: 'feat/a',
-        grade: 'P3',
-        checkState: 'passing',
-        diffSummary: { files: 1, added: 1, removed: 0 },
-      },
-      9_000
-    )
-    expect(s.mergePolicy.unattendedMerges()).toHaveLength(1)
   })
 })
 

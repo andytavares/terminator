@@ -37,6 +37,22 @@ vi.mock('../../src/runtime/supervised-runner.js', () => ({
   createSupervisedRunner: () => runner,
 }))
 
+// Captured so a test can raise a held tool call the way the runner does.
+let permissionSink: {
+  onPending: (ask: Record<string, unknown>) => void
+  onResolved: (requestId: string) => void
+} | null = null
+
+vi.mock('../../src/runner/agent-runner.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>
+  return {
+    ...actual,
+    setPermissionSink: (sink: typeof permissionSink) => {
+      permissionSink = sink
+    },
+  }
+})
+
 vi.mock('../../src/runtime/control-server.js', () => ({
   createControlServer: vi.fn().mockResolvedValue({
     url: 'http://127.0.0.1:1/pretooluse',
@@ -60,6 +76,8 @@ let api: ExtensionAPI
 // register, which is the state every one of them keys on.
 let supervision: NonNullable<Awaited<ReturnType<typeof startSupervisionRuntimeType>>>
 const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
+const createNotification = vi.fn().mockReturnValue({ dispose: vi.fn() })
+const showToast = vi.fn()
 
 function call(channel: string, payload: unknown = {}): Promise<unknown> {
   const handler = getHandler(channel)
@@ -96,10 +114,7 @@ beforeAll(async () => {
     },
     window: { broadcast: vi.fn(), openAuxiliary: vi.fn(), focusSelf: vi.fn() },
     shell: { exec },
-    notifications: {
-      showToast: vi.fn(),
-      createNotification: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
+    notifications: { showToast, createNotification },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     settings: {
       register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
@@ -286,5 +301,54 @@ describe('discarding a run', () => {
     expect(
       await call('speckit:run-discard', { sessionId: 'nobody', workspacePath: '/repo' })
     ).toEqual({ ok: false })
+  })
+})
+
+describe('what is allowed to interrupt you', () => {
+  // Automation complacency is the documented failure mode of supervisory
+  // control. The rule is fixed rather than per-call: only a blocking request
+  // may interrupt, and a request nobody sees is a twelve-hour hang.
+  const ask = {
+    sessionId: 'session-1',
+    requestId: 'req-1',
+    featureDir: '/repo/specs/021-thing',
+    toolName: 'Bash',
+    summary: 'redis-cli -h prod-cache-01',
+    detail: null,
+    at: 1,
+  }
+
+  it('raises a held tool call rather than waiting to be looked at', () => {
+    permissionSink?.onPending(ask)
+    expect(createNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ title: expect.stringContaining('redis-cli -h prod-cache-01') })
+    )
+  })
+
+  it('carries the answer with it, so it can be answered from there', () => {
+    permissionSink?.onPending(ask)
+    const actions = createNotification.mock.calls[0][0].actions as Array<{
+      id: string
+      handler: () => void
+    }>
+    expect(actions.map((a) => a.id)).toEqual(['allow', 'deny', 'open'])
+
+    actions.find((a) => a.id === 'allow')?.handler()
+    expect(runner.resolve).toHaveBeenCalledWith('session-1', 'req-1', { allow: true })
+  })
+
+  it('takes it away once answered', () => {
+    // One left behind after the thing it was about is answered teaches you to
+    // dismiss without reading.
+    const dispose = vi.fn()
+    createNotification.mockReturnValueOnce({ dispose })
+    permissionSink?.onPending(ask)
+    permissionSink?.onResolved('req-1')
+    expect(dispose).toHaveBeenCalled()
+  })
+
+  it('does not interrupt for a request that is no longer held', () => {
+    permissionSink?.onResolved('never-raised')
+    expect(createNotification).not.toHaveBeenCalled()
   })
 })

@@ -22,8 +22,10 @@ const api = {
   feedDigest: vi.fn(),
   reviewAdvance: vi.fn(),
   reviewIntent: vi.fn(),
-  unattendedMerges: vi.fn(),
   reviewApply: vi.fn(),
+  feedDismiss: vi.fn(),
+  feedMute: vi.fn(),
+  feedUnmute: vi.fn(),
 }
 
 vi.mock('../../src/types/electron.js', () => ({ getSpeckitAPI: () => api }))
@@ -71,7 +73,10 @@ beforeEach(() => {
     backpressure: { allowed: true, unreviewed: 0, limit: 3 },
   })
   api.stallsList.mockResolvedValue({ firings: [], shadowMode: true })
-  api.feedList.mockResolvedValue({ entries: [] })
+  api.feedList.mockResolvedValue({ entries: [], mutes: [] })
+  api.feedDismiss.mockResolvedValue({ ok: true })
+  api.feedMute.mockResolvedValue({ mutes: [] })
+  api.feedUnmute.mockResolvedValue({ mutes: [] })
   api.reviewHunks.mockResolvedValue({ files: [], complete: false, fullReject: false })
   api.reviewDecideHunk.mockResolvedValue({ ok: true })
   api.reviewDone.mockResolvedValue({ ok: true })
@@ -90,7 +95,6 @@ beforeEach(() => {
   })
   api.reviewAdvance.mockResolvedValue({ step: 'risk' })
   api.reviewIntent.mockResolvedValue({ intent: null })
-  api.unattendedMerges.mockResolvedValue({ merges: [] })
   api.reviewApply.mockResolvedValue({ ok: true, reverted: 0, error: null })
   window.localStorage.clear()
 })
@@ -603,33 +607,6 @@ describe('the step every diff viewer skips', () => {
   })
 })
 
-describe('what merged with nobody looking', () => {
-  it('shows nothing when nothing has', async () => {
-    panel()
-    fireEvent.click(await screen.findByText(/review/))
-    await screen.findByText(/Nothing is waiting to be reviewed/)
-    expect(screen.queryByText(/Merged without review/)).toBeNull()
-  })
-
-  it('records it next to the queue it bypassed', async () => {
-    api.unattendedMerges.mockResolvedValue({
-      merges: [
-        {
-          sessionId: 'session-9',
-          repoPath: '/repo/.worktrees/deps',
-          mergedAt: 1,
-          gradeTrigger: 'lockfile, formatting or dependency bump with green checks',
-          checkState: 'passing',
-          diffSummary: { files: 1, added: 4, removed: 4 },
-        },
-      ],
-    })
-    panel()
-    fireEvent.click(await screen.findByText(/review/))
-    expect(await screen.findByText(/Merged without review: 1/)).toBeDefined()
-  })
-})
-
 describe('being jumped to from the palette', () => {
   it('opens the section the thing lives in, not whichever tab was last used', async () => {
     // A jump that lands on the wrong tab reads as having done nothing.
@@ -690,6 +667,7 @@ describe('what happened while you were away', () => {
           replyable: false,
         },
       ],
+      mutes: [],
     })
     panel()
     fireEvent.click(await screen.findByText(/feed/))
@@ -708,7 +686,7 @@ describe('since you last looked', () => {
   }
 
   it('asks nothing of a first visit — there is no "last" yet', async () => {
-    api.feedList.mockResolvedValue({ entries: [entry] })
+    api.feedList.mockResolvedValue({ entries: [entry], mutes: [] })
     panel()
     fireEvent.click(await screen.findByText(/feed/))
     await screen.findByText('ready to review')
@@ -717,7 +695,7 @@ describe('since you last looked', () => {
 
   it('asks from when you last looked', async () => {
     window.localStorage.setItem('speckit.feed.lastLookedAt', '1000')
-    api.feedList.mockResolvedValue({ entries: [entry] })
+    api.feedList.mockResolvedValue({ entries: [entry], mutes: [] })
     panel()
     fireEvent.click(await screen.findByText(/feed/))
     await waitFor(() => expect(api.feedDigest).toHaveBeenCalledWith({ from: 1000 }))
@@ -725,7 +703,7 @@ describe('since you last looked', () => {
 
   it('rolls it up rather than replaying it line by line', async () => {
     window.localStorage.setItem('speckit.feed.lastLookedAt', String(Date.now() - 60_000))
-    api.feedList.mockResolvedValue({ entries: [entry] })
+    api.feedList.mockResolvedValue({ entries: [entry], mutes: [] })
     api.feedDigest.mockResolvedValue({
       from: Date.now() - 60_000,
       to: Date.now(),
@@ -741,11 +719,53 @@ describe('since you last looked', () => {
   it('says nothing when nothing happened while you were away', async () => {
     // A heading that reads "0 things" is noise you learn to skip past.
     window.localStorage.setItem('speckit.feed.lastLookedAt', '1000')
-    api.feedList.mockResolvedValue({ entries: [entry] })
+    api.feedList.mockResolvedValue({ entries: [entry], mutes: [] })
     panel()
     fireEvent.click(await screen.findByText(/feed/))
     await screen.findByText('ready to review')
     expect(screen.queryByText(/Since you last looked/)).toBeNull()
+  })
+})
+
+describe('which runs may interrupt you', () => {
+  const entry = {
+    id: 'e1',
+    at: Date.now(),
+    sessionId: 'session-1',
+    author: 'agent' as const,
+    summary: 'ready to review',
+    replyable: true,
+  }
+
+  it('mutes one run rather than turning notifications off wholesale', async () => {
+    api.feedList.mockResolvedValue({ entries: [entry], mutes: [] })
+    panel()
+    fireEvent.click(await screen.findByText(/feed/))
+    fireEvent.click(await screen.findByText('Mute'))
+    await waitFor(() => expect(api.feedMute).toHaveBeenCalledWith({ sessionId: 'session-1' }))
+  })
+
+  it('offers to unmute one that is muted', async () => {
+    api.feedList.mockResolvedValue({ entries: [entry], mutes: [{ sessionId: 'session-1' }] })
+    panel()
+    fireEvent.click(await screen.findByText(/feed/))
+    fireEvent.click(await screen.findByText('Unmute'))
+    await waitFor(() => expect(api.feedUnmute).toHaveBeenCalledWith({ sessionId: 'session-1' }))
+  })
+
+  it('still shows what a muted run did — muting hides the toast, not the record', async () => {
+    api.feedList.mockResolvedValue({ entries: [entry], mutes: [{ sessionId: 'session-1' }] })
+    panel()
+    fireEvent.click(await screen.findByText(/feed/))
+    expect(await screen.findByText('ready to review')).toBeDefined()
+  })
+
+  it('drops one line, because a list you cannot clear is one you stop reading', async () => {
+    api.feedList.mockResolvedValue({ entries: [entry], mutes: [] })
+    panel()
+    fireEvent.click(await screen.findByText(/feed/))
+    fireEvent.click(await screen.findByLabelText('Dismiss ready to review'))
+    await waitFor(() => expect(api.feedDismiss).toHaveBeenCalledWith({ id: 'e1' }))
   })
 })
 

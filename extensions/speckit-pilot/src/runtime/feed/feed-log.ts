@@ -28,8 +28,6 @@ export interface MuteRule {
 export interface FeedLog {
   post(entry: Omit<FeedEntry, 'id' | 'replyable'>): FeedEntry
   list(): FeedEntry[]
-  since(at: number): FeedEntry[]
-  forSession(sessionId: string): FeedEntry[]
   /**
    * Drops everything said about a session. Discarding one, or reclaiming its
    * working copy, leaves nothing to go back to — so its entries in the feed
@@ -102,18 +100,6 @@ export function createFeedLog(path: string): FeedLog {
 
     list(): FeedEntry[] {
       return live().sort((a, b) => a.at - b.at)
-    },
-
-    since(at: number): FeedEntry[] {
-      return live()
-        .filter((entry) => entry.at >= at)
-        .sort((a, b) => a.at - b.at)
-    },
-
-    forSession(sessionId: string): FeedEntry[] {
-      return live()
-        .filter((entry) => entry.sessionId === sessionId)
-        .sort((a, b) => a.at - b.at)
     },
 
     forget(sessionId: string): void {
