@@ -1,0 +1,43 @@
+extensions/speckit-pilot/src/runner/agent-runner.ts
+  s_5f98598a6d950e::t_2a5bea9f24f511 2,158-183,503-508
+  s_5f98598a6d950e::t_e229b3b474fb6b 310-312,318-319
+  s_5f98598a6d950e::t_4f3cddfbf4a595 6-7,307
+  s_5f98598a6d950e::t_fd2c653c38411c 3,313-317
+extensions/speckit-pilot/src/types/speckit.types.ts
+  s_5f98598a6d950e::t_4a0f55fff7890d 179-189,191-199
+extensions/speckit-pilot/tests/state/self-review-summary.spec.ts
+  s_5f98598a6d950e::t_83914161052841 1-131
+extensions/speckit-pilot/src/runner/self-review-plan.ts
+  s_5f98598a6d950e::t_ba72d1f3836dd7 1-129
+extensions/speckit-pilot/SUPERVISION.md
+  s_5f98598a6d950e::t_6150f491f27dab 193-216
+extensions/speckit-pilot/src/state/self-review-summary.ts
+  s_5f98598a6d950e::t_d3b6717c63ce66 1-105
+extensions/speckit-pilot/tests/runner/self-review-plan.spec.ts
+  s_5f98598a6d950e::t_87e4a08f372038 1-125
+extensions/speckit-pilot/tests/runner/agent-runner.spec.ts
+  s_5f98598a6d950e::t_ac2442d576d73c 889-890,892,894-897,919,934-937
+  s_5f98598a6d950e::t_e180ed67a972f2 1059-1062
+extensions/speckit-pilot/tests/components/SelfReviewGate.spec.tsx
+  s_5f98598a6d950e::t_7339ed09333dfd 148-195
+extensions/speckit-pilot/src/components/SelfReviewGate.tsx
+  s_5f98598a6d950e::t_099e3d9df89267 12-13,17-21,27-32,37-42,47-52,57-64,198
+  s_5f98598a6d950e::t_421321180f3926 151-155,166
+  s_5f98598a6d950e::t_765e7c177d3b35 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "94ae20d155f32ef33a753717f8fbbfbca744075f",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
