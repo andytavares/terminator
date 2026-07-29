@@ -1,0 +1,25 @@
+tests/e2e/speckit-supervised-run.spec.ts
+  s_5f98598a6d950e::t_3fedbd9cbf35b1 1-31,34-48,53-112,122,124,126,128-130,133-145,150,152,154-155,157-158,161
+  s_5f98598a6d950e::t_e9a756d364e4de 116-121
+  s_5f98598a6d950e::t_562bc67a2a9fd8 131-132
+  s_5f98598a6d950e::t_b9e09d3b5bb1b6 146-149,151,153,156,159-160
+  s_5f98598a6d950e::t_cdd0b68b29e09f 32-33
+  s_5f98598a6d950e::t_6a5b7159531a05 113-115,123,125,127
+  s_5f98598a6d950e::t_2ab4c83b3fdf60 49-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "8845f15f16916cd3c2e59d07359c62b022e73000",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
