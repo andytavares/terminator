@@ -1,0 +1,25 @@
+extensions/notepad/src/ipc/front-matter.ts
+  s_5f98598a6d950e::t_2a97418d933c2a 43-48
+extensions/notepad/tests/unit/ipc/front-matter.spec.ts
+  s_5f98598a6d950e::t_a9d702d241659f 65-81
+extensions/notepad/package.json
+  s_5f98598a6d950e::t_a19bbabd0fe8a1 27,33
+package-lock.json
+  s_5f98598a6d950e::t_691293182bd3a5 109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "8295662b19d464fba5f5c9a0cbbb2dc4136537d5",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
