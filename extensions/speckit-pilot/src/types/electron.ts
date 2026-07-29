@@ -159,6 +159,16 @@ export interface SpeckitAPI {
     phase: PhaseId
   }): Promise<{ lines: string[] } | { error: string }>
   runReply(payload: { featureDir: string; text: string }): Promise<{ ok: true } | { error: string }>
+  /** Tool calls a supervised run is holding until somebody decides. */
+  permissionsList(): Promise<{ pending: PendingAskView[] }>
+  permissionResolve(payload: {
+    requestId: string
+    decision: 'allow' | 'deny'
+    /** Words back to the agent, for a request that is a question. */
+    answer?: string
+  }): Promise<{ ok: boolean; reason?: string }>
+  /** Answer it in the terminal instead, where the agent is. */
+  permissionHandBack(payload: { requestId: string }): Promise<{ ok: boolean }>
   artifactList(payload: {
     featureDir: string
   }): Promise<{ artifacts: ArtifactRef[] } | { error: string }>
@@ -167,6 +177,8 @@ export interface SpeckitAPI {
     query: string
   }): Promise<{ results: KnowledgeRef[] } | { error: string }>
   onStateChanged(handler: (data: unknown) => void): () => void
+  /** A supervised run raised or cleared a request. */
+  onPermissionsChanged(handler: () => void): () => void
   onRunOutput(
     handler: (data: { featureDir: string; phase?: string; line: string; ts: string }) => void
   ): () => void
@@ -176,6 +188,21 @@ export interface SpeckitAPI {
   onCheckinReady(
     handler: (data: { featureDir: string; batchIndex: number; diffSummary: string }) => void
   ): () => void
+}
+
+/** A tool call waiting on the operator, as a surface needs it. */
+export interface PendingAskView {
+  featureDir: string
+  sessionId: string
+  requestId: string
+  toolName: string
+  /** One line naming what is actually being asked. */
+  summary: string
+  /** The ask in full — every field the tool was given. */
+  detail: string | null
+  questions?: Array<{ question: string; options: string[] }>
+  targetHost?: string
+  at: number
 }
 
 export function getSpeckitAPI(): SpeckitAPI {
@@ -313,6 +340,15 @@ export function getSpeckitAPI(): SpeckitAPI {
       >,
     runReply: (payload) =>
       bridge.invoke('speckit:run-reply', payload) as Promise<{ ok: true } | { error: string }>,
+    permissionsList: () =>
+      bridge.invoke('speckit:permissions-list', {}) as Promise<{ pending: PendingAskView[] }>,
+    permissionResolve: (payload) =>
+      bridge.invoke('speckit:permission-resolve', payload) as Promise<{
+        ok: boolean
+        reason?: string
+      }>,
+    permissionHandBack: (payload) =>
+      bridge.invoke('speckit:permission-hand-back', payload) as Promise<{ ok: boolean }>,
     artifactList: (payload) =>
       bridge.invoke('speckit:artifact-list', payload) as Promise<
         { artifacts: ArtifactRef[] } | { error: string }
@@ -322,6 +358,16 @@ export function getSpeckitAPI(): SpeckitAPI {
         { results: KnowledgeRef[] } | { error: string }
       >,
     onStateChanged: (handler) => bridge.on('speckit:state-changed', handler),
+    onPermissionsChanged: (handler) => {
+      // Raised and cleared are two channels; a surface only cares that the set
+      // changed and re-reads it either way.
+      const raised = bridge.on('speckit:permission-requested', () => handler())
+      const answered = bridge.on('speckit:permission-resolved', () => handler())
+      return () => {
+        raised()
+        answered()
+      }
+    },
     onRunOutput: (handler) => bridge.on('speckit:run-output', handler),
     onDispatchStarted: (handler) =>
       bridge.on('speckit:dispatch-started', handler as (data: unknown) => void),

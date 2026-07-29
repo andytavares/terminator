@@ -24,6 +24,10 @@ vi.mock('../../src/types/electron.js', () => ({
     credentialsStatus: vi.fn().mockResolvedValue({ connected: false }),
     credentialsSet: vi.fn().mockResolvedValue({ ok: true }),
     onStateChanged: mockOnStateChanged,
+    onPermissionsChanged: vi.fn().mockReturnValue(vi.fn()),
+    permissionsList: vi.fn().mockResolvedValue({ pending: [] }),
+    permissionResolve: vi.fn().mockResolvedValue({ ok: true }),
+    permissionHandBack: vi.fn().mockResolvedValue({ ok: true }),
   }),
 }))
 
