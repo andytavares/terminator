@@ -7,12 +7,12 @@ import type { Hunk } from './hunk-decisions.js'
 // case the intent step exists to catch and this surface exists to act on.
 
 const FILE_HEADER = /^\+\+\+ b\/(.+)$/
-const HUNK_HEADER = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/
+const HUNK_HEADER = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/
 
 export function parseHunks(patch: string): Hunk[] {
   const hunks: Hunk[] = []
   let file = ''
-  let current: { newStart: number; lines: string[] } | null = null
+  let current: { oldStart: number; newStart: number; lines: string[] } | null = null
   let index = 0
 
   const flush = (): void => {
@@ -20,6 +20,7 @@ export function parseHunks(patch: string): Hunk[] {
     hunks.push({
       id: `${file}:${current.newStart}:${++index}`,
       file,
+      oldStart: current.oldStart,
       newStart: current.newStart,
       lines: current.lines,
     })
@@ -45,7 +46,13 @@ export function parseHunks(patch: string): Hunk[] {
     const hunkMatch = line.match(HUNK_HEADER)
     if (hunkMatch !== null) {
       flush()
-      current = { newStart: Number.parseInt(hunkMatch[1], 10), lines: [] }
+      // Both sides kept: reverting a rejected hunk needs a patch, and a patch
+      // needs the range it applies to on the old side as well as the new.
+      current = {
+        oldStart: Number.parseInt(hunkMatch[1], 10),
+        newStart: Number.parseInt(hunkMatch[2], 10),
+        lines: [],
+      }
       continue
     }
 

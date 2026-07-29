@@ -68,6 +68,14 @@ the change you asked for and the one you did not, and accepting a file wholesale
 is how the second one ships. A review cannot be finished with a hunk still
 undecided, and a fully rejected branch says so rather than offering a merge.
 
+**Finishing a review applies it.** The rejected hunks are reverted out of the
+working copy (`git apply --reverse` against a patch rebuilt from exactly those
+hunks) and the accepted ones stay. The button says which it is going to be
+before you press it — "revert 2 hunks" or "keep everything" — because this is
+not undoable from here. If git refuses the patch the review stays open with the
+reason, rather than closing over a rejection that never landed: a reject that
+changes nothing is worse than no review, because you believe the change is gone.
+
 Checks are reported as `unavailable` rather than assumed passing — the extension
 does not poll a code host, and assuming green would let a change auto-merge on
 evidence nobody has.

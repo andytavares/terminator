@@ -792,6 +792,15 @@ let supervision: Supervision | null = null
 const stallFirings: Array<{ firing: StallFiring; featureDir: string; shadow: boolean }> = []
 
 /**
+ * How many firings to keep.
+ *
+ * Enough to judge a week of them by hand, which is what shadow mode is for, and
+ * bounded because this is an application that stays open for days and an
+ * unbounded list is a leak with a UI on it.
+ */
+const MAX_STALL_FIRINGS = 200
+
+/**
  * Shadow mode: record, do not interrupt. On by default and deliberately so — a
  * detector with a 20% false-positive rate produces alarm fatigue and gets turned
  * off, which is worse than not shipping it. Turn it off on the evidence of the
@@ -853,6 +862,7 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
       onFiring: (firing, featureDir) => {
         const shadow = stallShadowMode(api)
         stallFirings.unshift({ firing, featureDir, shadow })
+        if (stallFirings.length > MAX_STALL_FIRINGS) stallFirings.length = MAX_STALL_FIRINGS
         supervision?.runs.setState(firing.sessionId, 'stalled', firing.firedAt)
         // Attributed to the pilot, not the agent: the agent did not say this,
         // and a feed that blurs the two is one you stop trusting.
@@ -922,14 +932,6 @@ export function activate(api: ExtensionAPI): void {
     const { from, to } = payload as { from: number; to?: number }
     const entries = supervision?.feed.list() ?? []
     return buildDigest(entries, from, to ?? Date.now())
-  })
-
-  // Recorded with the queue depth at the moment it was ignored, so a backlog
-  // built by overriding is visible afterwards rather than only felt.
-  reg(api, 'speckit:backpressure-override', (payload: unknown) => {
-    const { sessionId } = payload as { sessionId: string }
-    supervision?.backpressure.override(sessionId, Date.now())
-    return { ok: true }
   })
 
   reg(api, 'speckit:review-advance', (payload: unknown) => {
@@ -1019,6 +1021,28 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'speckit:unattended-merges', () => ({
     merges: supervision?.mergePolicy.unattendedMerges() ?? [],
   }))
+
+  // Applying the decisions is what makes a rejection mean anything: the
+  // rejected hunks come back out of the working copy, the accepted ones stay.
+  reg(api, 'speckit:review-apply', async (payload: unknown) => {
+    const { sessionId } = payload as { sessionId: string }
+    const result = (await supervision?.applyDecisions(sessionId)) ?? {
+      ok: false,
+      reverted: 0,
+      error: 'the supervision runtime is not running',
+    }
+    if (result.ok && result.reverted > 0) {
+      supervision?.feed.post({
+        at: Date.now(),
+        sessionId,
+        author: 'console',
+        summary: `reverted ${result.reverted} rejected ${result.reverted === 1 ? 'hunk' : 'hunks'}`,
+      })
+      // The diff changed under it, so the queue's summary is now wrong.
+      await supervision?.measure(sessionId)
+    }
+    return result
+  })
 
   reg(api, 'speckit:review-done', (payload: unknown) => {
     const { sessionId } = payload as { sessionId: string }
@@ -1134,6 +1158,10 @@ export function activate(api: ExtensionAPI): void {
       await discardWorktree(api, workspacePath ?? '', run.worktreePath, run.branch)
       supervision?.review.remove(sessionId)
       supervision?.runs.forget(sessionId)
+      // Everything said about it goes too: the run, its worktree and its branch
+      // are gone, so its feed entries are noise about something that no longer
+      // exists. Posted after, so the discard itself is what remains.
+      supervision?.feed.forget(sessionId)
       supervision?.feed.post({
         at: Date.now(),
         sessionId,

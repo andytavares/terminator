@@ -687,7 +687,8 @@ activate(api)
   │    ├─ speckit:supervision-snapshot → what is running, what is queued, whether the gate is open
   │    ├─ speckit:stalls-list        → firings, and whether they were recorded or surfaced
   │    ├─ speckit:feed-list / -digest → what happened, and what happened since you last looked
-  │    ├─ speckit:review-hunks / -decide-hunk / -intent / -done → per-hunk review
+  │    ├─ speckit:review-hunks / -decide-hunk / -intent / -apply / -done → per-hunk review,
+  │    │                                              applied by reverting the rejected hunks
   │    ├─ speckit:backpressure-override → recorded with the queue depth it ignored
   │    ├─ speckit:lanes / -may-merge  → merge ordering across a card's repositories
   │    └─ speckit:run-terminal / -transcript / -interrupt / -redirect / -stop / -discard

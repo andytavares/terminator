@@ -23,6 +23,7 @@ const api = {
   reviewAdvance: vi.fn(),
   reviewIntent: vi.fn(),
   unattendedMerges: vi.fn(),
+  reviewApply: vi.fn(),
 }
 
 vi.mock('../../src/types/electron.js', () => ({ getSpeckitAPI: () => api }))
@@ -90,6 +91,7 @@ beforeEach(() => {
   api.reviewAdvance.mockResolvedValue({ step: 'risk' })
   api.reviewIntent.mockResolvedValue({ intent: null })
   api.unattendedMerges.mockResolvedValue({ merges: [] })
+  api.reviewApply.mockResolvedValue({ ok: true, reverted: 0, error: null })
   window.localStorage.clear()
 })
 
@@ -393,6 +395,86 @@ describe('what is waiting to be reviewed', () => {
     expect(await screen.findByText(/this branch keeps nothing/)).toBeDefined()
   })
 
+  it('says what finishing will do to the working copy before it does it', async () => {
+    // Reverting is not undoable from here, and a button that quietly rewrites
+    // the working copy is not one you can trust twice.
+    api.supervisionSnapshot.mockResolvedValue({
+      runs: [],
+      review: [item],
+      backpressure: { allowed: true, unreviewed: 1, limit: 3 },
+    })
+    api.reviewHunks.mockResolvedValue({
+      files: [
+        {
+          file: 'src/auth.ts',
+          hunks: [
+            { id: 'h1', newStart: 1, lines: ['+kept'], decision: 'accept' as const },
+            { id: 'h2', newStart: 9, lines: ['+unwanted'], decision: 'reject' as const },
+          ],
+        },
+      ],
+      complete: true,
+      fullReject: false,
+    })
+    panel()
+    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByText('Review'))
+    expect(await screen.findByText('Finish review — revert 1 hunk')).toBeDefined()
+  })
+
+  it('says so when finishing changes nothing', async () => {
+    api.supervisionSnapshot.mockResolvedValue({
+      runs: [],
+      review: [item],
+      backpressure: { allowed: true, unreviewed: 1, limit: 3 },
+    })
+    api.reviewHunks.mockResolvedValue({
+      files: [
+        {
+          file: 'src/auth.ts',
+          hunks: [{ id: 'h1', newStart: 1, lines: ['+kept'], decision: 'accept' as const }],
+        },
+      ],
+      complete: true,
+      fullReject: false,
+    })
+    panel()
+    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByText('Review'))
+    expect(await screen.findByText('Finish review — keep everything')).toBeDefined()
+  })
+
+  it('keeps the review open, and says why, when git refuses the revert', async () => {
+    // The decisions are still there to retry, and closing would lose them
+    // along with the reason.
+    api.supervisionSnapshot.mockResolvedValue({
+      runs: [],
+      review: [item],
+      backpressure: { allowed: true, unreviewed: 1, limit: 3 },
+    })
+    api.reviewHunks.mockResolvedValue({
+      files: [
+        {
+          file: 'src/auth.ts',
+          hunks: [{ id: 'h1', newStart: 1, lines: ['+x'], decision: 'reject' as const }],
+        },
+      ],
+      complete: true,
+      fullReject: true,
+    })
+    api.reviewApply.mockResolvedValue({
+      ok: false,
+      reverted: 0,
+      error: 'error: patch does not apply',
+    })
+    panel()
+    fireEvent.click(await screen.findByText(/review/))
+    fireEvent.click(await screen.findByText('Review'))
+    fireEvent.click(await screen.findByText(/Finish review/))
+    expect(await screen.findByText(/patch does not apply/)).toBeDefined()
+    expect(api.reviewDone).not.toHaveBeenCalled()
+  })
+
   it('takes it off the queue once every hunk is decided', async () => {
     api.supervisionSnapshot.mockResolvedValue({
       runs: [],
@@ -412,7 +494,10 @@ describe('what is waiting to be reviewed', () => {
     panel()
     fireEvent.click(await screen.findByText(/review/))
     fireEvent.click(await screen.findByText('Review'))
-    fireEvent.click(await screen.findByText('Finish review'))
+    fireEvent.click(await screen.findByText(/Finish review/))
+    // Applied first: a queue entry removed without the rejections landing is a
+    // review that changed nothing while saying it did.
+    await waitFor(() => expect(api.reviewApply).toHaveBeenCalledWith({ sessionId: 'session-1' }))
     await waitFor(() => expect(api.reviewDone).toHaveBeenCalledWith({ sessionId: 'session-1' }))
   })
 })

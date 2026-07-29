@@ -365,6 +365,8 @@ function HunkReview({
   const [complete, setComplete] = useState(false)
   const [fullReject, setFullReject] = useState(false)
   const [step, setStep] = useState<ReviewStepView | 'done'>('intent')
+  const [applying, setApplying] = useState(false)
+  const [failure, setFailure] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const result = await getSpeckitAPI().reviewHunks({ sessionId })
@@ -386,6 +388,10 @@ function HunkReview({
   if (files.length === 0) {
     return <div className="sk-sup__clear">This run changed nothing that can be read as a diff.</div>
   }
+
+  const rejectedCount = files
+    .flatMap((file) => file.hunks)
+    .filter((hunk) => hunk.decision === 'reject').length
 
   return (
     <div className="sk-sup__review">
@@ -442,8 +448,37 @@ function HunkReview({
           it.
         </div>
       )}
-      <button className="sk-sup__btn" disabled={!complete} onClick={onDone}>
-        {complete ? 'Finish review' : 'Decide every hunk to finish'}
+      {/* What the button is about to do, before it does it. Reverting is not
+          undoable from here, and a button that quietly rewrites the working
+          copy is not one you can trust twice. */}
+      {failure !== null && <div className="sk-sup__warn">Nothing was reverted: {failure}</div>}
+      <button
+        className="sk-sup__btn"
+        disabled={!complete || applying}
+        onClick={() => {
+          setApplying(true)
+          setFailure(null)
+          void getSpeckitAPI()
+            .reviewApply({ sessionId })
+            .then((result) => {
+              setApplying(false)
+              // Left open on failure: the decisions are still there to retry,
+              // and closing would lose them along with the reason.
+              if (!result.ok) {
+                setFailure(result.error ?? 'git refused the patch')
+                return
+              }
+              onDone()
+            })
+        }}
+      >
+        {!complete
+          ? 'Decide every hunk to finish'
+          : applying
+            ? 'Reverting…'
+            : rejectedCount === 0
+              ? 'Finish review — keep everything'
+              : `Finish review — revert ${rejectedCount} ${rejectedCount === 1 ? 'hunk' : 'hunks'}`}
       </button>
     </div>
   )

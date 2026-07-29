@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -537,5 +537,92 @@ describe('an unattended merge', () => {
       9_000
     )
     expect(s.mergePolicy.unattendedMerges()).toHaveLength(1)
+  })
+})
+
+describe('applying what was decided', () => {
+  // Per-hunk review was decision-only: you rejected a change, the queue
+  // recorded it, and every line the agent wrote stayed exactly where it was.
+
+  async function reviewable(applyReverse = vi.fn().mockResolvedValue({ ok: true, stderr: '' })) {
+    const s = createSupervision({
+      api: {} as never,
+      stateDir: dir,
+      applyReverse,
+      run: async (_command, args) => {
+        if (args.includes('ls-files')) return { ok: true, stdout: '' }
+        if (args[0] === 'diff' && args.length === 2) {
+          return {
+            ok: true,
+            stdout: [
+              'diff --git a/src/a.ts b/src/a.ts',
+              '--- a/src/a.ts',
+              '+++ b/src/a.ts',
+              '@@ -1,2 +1,2 @@',
+              ' keep',
+              '-old',
+              '+new',
+              '',
+            ].join('\n'),
+          }
+        }
+        return { ok: true, stdout: '10\t2\tsrc/a.ts' }
+      },
+    })
+    s.runs.add({
+      sessionId: 'session-1',
+      featureDir: '/repo/specs/021-a',
+      phase: 'implement',
+      worktreePath: '/wt/a',
+      branch: 'feat/a',
+      terminalSessionId: 'terminal-1',
+      transcriptPath: '/t.jsonl',
+      startedAt: 0,
+    })
+    return { s, applyReverse }
+  }
+
+  it('refuses when no review was ever opened', async () => {
+    const { s } = await reviewable()
+    expect(await s.applyDecisions('session-1')).toMatchObject({ ok: false, reverted: 0 })
+  })
+
+  it('reverts a rejected hunk against the run’s own worktree', async () => {
+    const { s, applyReverse } = await reviewable()
+    const set = await s.hunksFor('session-1')
+    const hunkId = set!.list()[0].hunk.id
+    set!.decide(hunkId, 'reject')
+
+    expect(await s.applyDecisions('session-1')).toMatchObject({ ok: true, reverted: 1 })
+    expect(applyReverse.mock.calls[0][0]).toBe('/wt/a')
+    expect(applyReverse.mock.calls[0][1]).toContain('-old')
+  })
+
+  it('leaves an accepted hunk alone', async () => {
+    const { s, applyReverse } = await reviewable()
+    const set = await s.hunksFor('session-1')
+    set!.decide(set!.list()[0].hunk.id, 'accept')
+
+    expect(await s.applyDecisions('session-1')).toMatchObject({ ok: true, reverted: 0 })
+    expect(applyReverse).not.toHaveBeenCalled()
+  })
+
+  it('keeps the decisions when git refuses, so the review can be retried', async () => {
+    const applyReverse = vi.fn().mockResolvedValue({ ok: false, stderr: 'does not apply' })
+    const { s } = await reviewable(applyReverse)
+    const set = await s.hunksFor('session-1')
+    set!.decide(set!.list()[0].hunk.id, 'reject')
+
+    expect(await s.applyDecisions('session-1')).toMatchObject({ ok: false, reverted: 0 })
+    expect((await s.hunksFor('session-1'))!.list()[0].decision).toBe('reject')
+  })
+
+  it('drops them once applied — they describe a working copy that is gone', async () => {
+    const { s } = await reviewable()
+    const set = await s.hunksFor('session-1')
+    set!.decide(set!.list()[0].hunk.id, 'reject')
+    await s.applyDecisions('session-1')
+    // Re-applying would revert the accepted changes too.
+    expect((await s.hunksFor('session-1'))!.list()[0].decision).toBeNull()
   })
 })

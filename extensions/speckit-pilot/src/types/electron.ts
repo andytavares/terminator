@@ -191,6 +191,10 @@ export interface SpeckitAPI {
     hunkId: string
     decision: 'accept' | 'reject'
   }): Promise<{ ok: boolean }>
+  /** Takes the rejected hunks back out of the working copy. */
+  reviewApply(payload: {
+    sessionId: string
+  }): Promise<{ ok: boolean; reverted: number; error: string | null }>
   reviewDone(payload: { sessionId: string }): Promise<{ ok: boolean }>
   /** Where a run is running, so a surface can go there rather than describe it. */
   runTerminal(payload: { sessionId: string }): Promise<{ terminalSessionId: string | null }>
@@ -206,7 +210,6 @@ export interface SpeckitAPI {
   runStop(payload: { sessionId: string; reason?: string }): Promise<{ ok: boolean }>
   /** Kill and discard: the run ends and its worktree and branch go with it. */
   runDiscard(payload: { sessionId: string; workspacePath: string }): Promise<{ ok: boolean }>
-  backpressureOverride(payload: { sessionId: string }): Promise<{ ok: boolean }>
   /** Where a review has got to: intent → risk → structure → tests. */
   reviewAdvance(payload: { sessionId: string }): Promise<{ step: ReviewStepView | null }>
   /** The request set against the agent's own account of what it did. */
@@ -559,6 +562,12 @@ export function getSpeckitAPI(): SpeckitAPI {
       }>,
     reviewDecideHunk: (payload) =>
       bridge.invoke('speckit:review-decide-hunk', payload) as Promise<{ ok: boolean }>,
+    reviewApply: (payload) =>
+      bridge.invoke('speckit:review-apply', payload) as Promise<{
+        ok: boolean
+        reverted: number
+        error: string | null
+      }>,
     reviewDone: (payload) =>
       bridge.invoke('speckit:review-done', payload) as Promise<{ ok: boolean }>,
     runTerminal: (payload) =>
@@ -594,8 +603,6 @@ export function getSpeckitAPI(): SpeckitAPI {
       bridge.invoke('speckit:unattended-merges', {}) as Promise<{
         merges: UnattendedMergeView[]
       }>,
-    backpressureOverride: (payload) =>
-      bridge.invoke('speckit:backpressure-override', payload) as Promise<{ ok: boolean }>,
     artifactList: (payload) =>
       bridge.invoke('speckit:artifact-list', payload) as Promise<
         { artifacts: ArtifactRef[] } | { error: string }

@@ -8,6 +8,8 @@
 export interface Hunk {
   readonly id: string
   readonly file: string
+  /** First line of the hunk in the old file — what reverting it applies to. */
+  readonly oldStart: number
   /** First line of the hunk in the new file. */
   readonly newStart: number
   readonly lines: readonly string[]
