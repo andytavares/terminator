@@ -21,6 +21,9 @@ vi.mock('../../src/api/jira.js', () => ({
   transitionStatus: vi.fn(),
 }))
 vi.mock('../../src/runner/agent-runner.js', () => ({
+  setSupervisedRunner: vi.fn(),
+  setPermissionSink: vi.fn(),
+  setReadOnlyStateDir: vi.fn(),
   createAgentRunner: vi
     .fn()
     .mockReturnValue({ startPhaseRunner: vi.fn().mockReturnValue({ stop: vi.fn() }) }),

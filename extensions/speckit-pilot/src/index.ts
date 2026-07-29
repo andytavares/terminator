@@ -97,6 +97,7 @@ import {
   phaseLogPath,
   pruneOldLogs,
   setPermissionSink,
+  setReadOnlyStateDir,
   setSupervisedRunner,
 } from './runner/agent-runner.js'
 import { createControlServer, type ControlServer } from './runtime/control-server.js'
@@ -694,6 +695,18 @@ let supervisedRunner: SupervisedRunner | null = null
 const pendingPermissions = createPendingPermissions()
 
 async function startSupervisionRuntime(api: ExtensionAPI): Promise<void> {
+  // Self-review's read-only policy does not need the control server, so it is
+  // installed whether or not the rest of the runtime comes up. Guarded on its
+  // own: activation must not fail because a host could not say where worktrees
+  // live, and a review with no policy refuses rather than bypassing.
+  try {
+    setReadOnlyStateDir(
+      path.join(api.settings.resolveWorktreeBaseDir(''), '.speckit-pilot-runtime')
+    )
+  } catch {
+    setReadOnlyStateDir(null)
+  }
+
   try {
     control = await createControlServer()
     supervisedRunner = createSupervisedRunner({
@@ -2118,6 +2131,7 @@ export function deactivate(): void {
   disposables.length = 0
   setSupervisedRunner(null)
   setPermissionSink(null)
+  setReadOnlyStateDir(null)
   supervisedRunner?.dispose()
   supervisedRunner = null
   void control?.close()

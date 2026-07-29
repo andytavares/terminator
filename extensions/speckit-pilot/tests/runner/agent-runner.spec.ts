@@ -1,5 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { spawn } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { PhaseId } from '../../src/types/speckit.types.js'
 
@@ -47,8 +50,21 @@ function makeApi(): ExtensionAPI {
 }
 
 async function loadRunner() {
-  return import('../../src/runner/agent-runner.js')
+  const mod = await import('../../src/runner/agent-runner.js')
+  // Self-review runs under a read-only policy installed here. Without a
+  // directory to install it into the runner refuses to review at all, which is
+  // its own test below.
+  mod.setReadOnlyStateDir(readOnlyDir)
+  return mod
 }
+
+let readOnlyDir: string
+
+beforeEach(() => {
+  readOnlyDir = mkdtempSync(join(tmpdir(), 'speckit-read-only-'))
+})
+
+afterEach(() => rmSync(readOnlyDir, { recursive: true, force: true, maxRetries: 5 }))
 
 describe('createAgentRunner', () => {
   it('exports createAgentRunner factory', async () => {
@@ -471,7 +487,7 @@ describe('startPhaseRunner', () => {
     )
   })
 
-  it('bypasses permission prompts for the self-review google-review step', async () => {
+  it('reviews under the read-only policy rather than bypassing permissions', async () => {
     const { child } = makeMockChild()
     vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
 
@@ -486,9 +502,11 @@ describe('startPhaseRunner', () => {
     })
 
     const spawnArgs = (vi.mocked(spawn).mock.calls[0][1] as string[]).join(' ')
-    expect(spawnArgs).toContain(
-      'claude --print --permission-mode bypassPermissions --strict-mcp-config /google-review'
-    )
+    // A review that bypasses permissions can rewrite the worktree it is
+    // reviewing. It now decides from a fixed read-only policy in a hook —
+    // deterministic, so no person is ever asked and the gate cannot hang.
+    expect(spawnArgs).not.toContain('bypassPermissions')
+    expect(spawnArgs).toContain('/google-review')
   })
 
   it('broadcasts speckit:run-phase-complete on exit', async () => {
@@ -1008,5 +1026,34 @@ describe('pruneOldLogs', () => {
   it('returns 0 when there is no logs directory', async () => {
     const { pruneOldLogs } = await import('../../src/runner/agent-runner.js')
     expect(await pruneOldLogs('/no/such/dir/xyz', 30)).toBe(0)
+  })
+})
+
+describe('self-review when the read-only policy cannot be installed', () => {
+  it('refuses to review rather than falling back to bypassing permissions', async () => {
+    // A gate that did not run must not pass, and the way this was wrong before
+    // was exactly a silent fallback to approving everything.
+    const { child } = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
+    const mod = await import('../../src/runner/agent-runner.js')
+    mod.setReadOnlyStateDir(null)
+
+    mod.createAgentRunner(makeApi()).startPhaseRunner({
+      featureDir: '/specs/feat',
+      worktreePath: '/repo/.wt/feat',
+      phaseCommand: '',
+      phase: 'self-review',
+    })
+
+    // The last call, not the first: spawn's mock accumulates across the suite.
+    const calls = vi.mocked(spawn).mock.calls
+    const cmd = (calls[calls.length - 1][1] as string[]).join(' ')
+    expect(cmd).not.toContain('bypassPermissions')
+    expect(cmd).not.toContain('/google-review')
+    expect(cmd).toContain('self-review skipped')
+    // The deterministic checks still run and the chain still fails, so the
+    // card cannot advance on a review that never happened.
+    expect(cmd).toContain('npm run lint')
+    expect(cmd).toContain('false')
   })
 })

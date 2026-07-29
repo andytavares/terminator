@@ -5,6 +5,7 @@ import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { PhaseId } from '../types/speckit.types.js'
 import type { SupervisedRunner } from '../runtime/supervised-runner.js'
 import type { PendingAsk } from '../runtime/pending-permissions.js'
+import { buildReadOnlySettings, installReadOnlyHookScript } from '../runtime/read-only-hook.js'
 import {
   noteFromStreamJsonLine,
   sessionIdFromStreamJsonLine,
@@ -111,6 +112,38 @@ export function setPermissionSink(
   onPermissionResolved = sink?.onResolved ?? null
 }
 
+/**
+ * Where the read-only policy lives on disk, installed on first use.
+ *
+ * Null when it cannot be written, which the caller turns into a refusal rather
+ * than a fallback: a review that runs unsupervised is the thing this replaced.
+ */
+let readOnlyStateDir: string | null = null
+let installedReadOnlySettings: string | null = null
+
+export function setReadOnlyStateDir(dir: string | null): void {
+  readOnlyStateDir = dir
+  installedReadOnlySettings = null
+}
+
+function readOnlySettingsPath(): string | null {
+  if (installedReadOnlySettings !== null) return installedReadOnlySettings
+  if (readOnlyStateDir === null) return null
+  try {
+    const hookPath = installReadOnlyHookScript(readOnlyStateDir)
+    const settingsPath = path.join(readOnlyStateDir, 'read-only.settings.json')
+    fs.writeFileSync(
+      settingsPath,
+      JSON.stringify(buildReadOnlySettings(hookPath, process.execPath), null, 2),
+      'utf-8'
+    )
+    installedReadOnlySettings = settingsPath
+    return settingsPath
+  } catch {
+    return null
+  }
+}
+
 /** The workspace a card's repository belongs to, for placing its terminal. */
 function workspaceIdFor(api: ExtensionAPI, workspacePath: string): string | null {
   return api.workspace.list().find((w) => w.folderPath === workspacePath)?.id ?? null
@@ -126,29 +159,28 @@ async function branchIn(api: ExtensionAPI, cwd: string): Promise<string | null> 
   return res.exitCode === 0 && branch !== '' ? branch : null
 }
 
-// The one agent invocation left that is not supervised.
-//
-// Self-review is a shell chain — format, lint, tests — with a review at the
-// end, run as a single spawn, so it does not go through the terminal path the
-// phases now use. That review still bypasses permissions.
-//
-// Restricting its tools instead does not work, and this was checked rather
-// than assumed: with `--allowedTools Read Grep Glob --disallowedTools Write
-// Edit`, an agent asked to create a file still created it, because Bash can
-// write and the review needs Bash for `git diff`. Allowlisting is whack-a-mole
-// here.
-//
-// Closing it properly means running the review through the supervised runner
-// with a decider that never abstains — allow read-only, refuse writes outright,
-// so no person is ever needed — which means splitting this chain up. Left as
-// its own change rather than smuggled into this one. The blast radius is a
-// review command inside the card's isolated worktree.
-const SELF_REVIEW_CMD = [
-  'npm run format',
-  'npm run lint',
-  'npx vitest run --coverage',
-  'claude --print --permission-mode bypassPermissions --strict-mcp-config /google-review',
-].join(' && ')
+/**
+ * Self-review: format, lint, tests, then a review of the diff.
+ *
+ * The review no longer bypasses permissions. It runs under a hook that decides
+ * from a fixed read-only policy — allow what only reads, refuse everything else
+ * — so a review cannot rewrite the worktree it is reviewing, and no person is
+ * ever asked. Waiting on one would turn an automated gate into a flaky failure.
+ *
+ * Restricting tools instead does not work, and this was checked rather than
+ * assumed: with `--allowedTools Read Grep Glob --disallowedTools Write Edit`, an
+ * agent asked to create a file still created it, because a review needs Bash for
+ * `git diff` and Bash can write. The decision has to be made on the command.
+ */
+function selfReviewCommand(settingsPath: string | null): string {
+  const review =
+    settingsPath === null
+      ? // No settings could be written. Refused rather than silently falling
+        // back to bypassing permissions, which is how this was wrong before.
+        "echo '⚠ self-review skipped: the read-only policy could not be installed' && false"
+      : `claude --print --settings ${shellQuote(settingsPath)} --permission-mode default --strict-mcp-config /google-review`
+  return ['npm run format', 'npm run lint', 'npx vitest run --coverage', review].join(' && ')
+}
 
 // Kill a phase that has produced nothing for this long — a headless run that
 // hangs (e.g. on a blocked API call) would otherwise wait forever.
@@ -218,7 +250,7 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
       const streaming = phase !== 'self-review'
       let cmd: string
       if (phase === 'self-review') {
-        cmd = SELF_REVIEW_CMD
+        cmd = selfReviewCommand(readOnlySettingsPath())
       } else {
         const prompt = feedbackNote
           ? `${phaseCommand}\n\nFeedback from reviewer:\n${feedbackNote}`

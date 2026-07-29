@@ -70,6 +70,9 @@ vi.mock('../../src/runner/agent-runner.js', () => ({
   }),
   phaseLogPath: vi.fn((dir: string, phase: string) => `${dir}/.pilot/logs/${phase}.log`),
   pruneOldLogs: vi.fn().mockResolvedValue(0),
+  setSupervisedRunner: vi.fn(),
+  setPermissionSink: vi.fn(),
+  setReadOnlyStateDir: vi.fn(),
 }))
 
 // --- mock state persistence ---
