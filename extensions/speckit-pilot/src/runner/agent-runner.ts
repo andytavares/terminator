@@ -126,6 +126,23 @@ async function branchIn(api: ExtensionAPI, cwd: string): Promise<string | null> 
   return res.exitCode === 0 && branch !== '' ? branch : null
 }
 
+// The one agent invocation left that is not supervised.
+//
+// Self-review is a shell chain — format, lint, tests — with a review at the
+// end, run as a single spawn, so it does not go through the terminal path the
+// phases now use. That review still bypasses permissions.
+//
+// Restricting its tools instead does not work, and this was checked rather
+// than assumed: with `--allowedTools Read Grep Glob --disallowedTools Write
+// Edit`, an agent asked to create a file still created it, because Bash can
+// write and the review needs Bash for `git diff`. Allowlisting is whack-a-mole
+// here.
+//
+// Closing it properly means running the review through the supervised runner
+// with a decider that never abstains — allow read-only, refuse writes outright,
+// so no person is ever needed — which means splitting this chain up. Left as
+// its own change rather than smuggled into this one. The blast radius is a
+// review command inside the card's isolated worktree.
 const SELF_REVIEW_CMD = [
   'npm run format',
   'npm run lint',
