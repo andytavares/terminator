@@ -219,3 +219,63 @@ test('a card that declares lanes gets them back in merge order', async () => {
 test('nothing merged with nobody looking, and the log says so rather than erroring', async () => {
   await expect(pilot('speckit:unattended-merges')).resolves.toEqual({ merges: [] })
 })
+
+/**
+ * What the extension's own window actually shows.
+ *
+ * The pilot's UI is a WebContentsView the main process overlays on the window,
+ * not a DOM node in it, so `page` cannot see it and a screenshot does not
+ * include it. Read through the main process instead: this is the only check in
+ * the suite that fails when a panel is built, tested and never mounted — which
+ * is how every surface on this branch went wrong at least once.
+ */
+async function pilotScreenText(): Promise<string> {
+  const texts = await handle.app.evaluate(async ({ webContents }) => {
+    const out: string[] = []
+    for (const wc of webContents.getAllWebContents()) {
+      try {
+        out.push((await wc.executeJavaScript('document.body.innerText')) as string)
+      } catch {
+        // A view mid-navigation has no document yet; it is not the one we want.
+      }
+    }
+    return out
+  })
+  return texts.join('\n').replace(/\s+/g, ' ')
+}
+
+test('the supervision panel is on screen, not merely built', async () => {
+  test.setTimeout(180_000)
+  const { page } = handle
+
+  await expandWorkspace(page, 'Pilot')
+  const tabs = page.locator('.ws-card__ws-tab')
+  const count = await tabs.count()
+  for (let i = 0; i < count; i++) {
+    if ((await tabs.nth(i).getAttribute('title')) === 'SpecKit') {
+      await tabs.nth(i).click()
+      break
+    }
+  }
+
+  await expect
+    .poll(pilotScreenText, { timeout: 60_000, intervals: [1000] })
+    .toContain('SpecKit Pilot')
+
+  const text = await pilotScreenText()
+  // All four sections, and the one that says everything is fine rather than
+  // leaving an empty box that looks identical to a surface that failed to load.
+  for (const section of ['Runs', 'Stalls', 'Review', 'Feed']) {
+    expect(text).toContain(section)
+  }
+  // Either a live run, with the actions that act on it, or the sentence that
+  // says everything is fine — never an empty box, which reads the same as a
+  // surface that failed to load. Case-insensitive: the state chip is uppercased
+  // by CSS, and `innerText` reports what is rendered.
+  expect(text).toMatch(/nothing is running\.|working|waiting on you/i)
+  if (/working|waiting on you/i.test(text)) {
+    for (const action of ['Terminal', 'Transcript', 'Interrupt', 'Redirect', 'Stop', 'Discard']) {
+      expect(text).toContain(action)
+    }
+  }
+})
