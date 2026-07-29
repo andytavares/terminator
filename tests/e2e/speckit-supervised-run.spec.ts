@@ -73,10 +73,10 @@ async function pilot(channel: string, payload: unknown = {}): Promise<unknown> {
 test('the pilot extension is loaded and answering', async () => {
   // If this is empty the extension did not activate, and everything below would
   // fail for a reason that has nothing to do with supervision.
-  const features = (await pilot('speckit:feature-list', { repoRoot: repo })) as {
-    features?: unknown[]
-  }
-  expect(features.features?.length ?? 0).toBeGreaterThan(0)
+  // Answering with a list — even an empty one — is the claim. An extension that
+  // failed to activate rejects the channel instead.
+  const cards = (await pilot('speckit:card-list', { repoRoot: repo })) as { cards?: unknown[] }
+  expect(Array.isArray(cards.cards)).toBe(true)
 })
 
 test('nothing is held, and nothing is queued, before a run starts', async () => {

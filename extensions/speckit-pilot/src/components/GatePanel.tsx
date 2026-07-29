@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { CheckCircle, RotateCcw, Undo2, MessageSquare, Edit2 } from 'lucide-react'
+import { CheckCircle, RotateCcw, Undo2, MessageSquare, Edit2, SkipForward } from 'lucide-react'
 import type { PhaseId, PhaseState } from '../types/speckit.types.js'
 
 interface GatePanelProps {
@@ -12,6 +12,14 @@ interface GatePanelProps {
   onApprove(): Promise<void> | void
   onRequestChanges(note: string): Promise<void> | void
   onRevoke?(): Promise<void> | void
+  /**
+   * Skips this phase.
+   *
+   * Not every card needs every phase — a one-line fix does not need a
+   * constitution reread — and the alternative to offering this is approving a
+   * phase you did not read, which is worse than saying you skipped it.
+   */
+  onSkip?(): Promise<void> | void
   onComment?(note: string): Promise<void> | void
   onInlineEdit?(content: string): Promise<void> | void
 }
@@ -24,6 +32,7 @@ export function GatePanel({
   onApprove,
   onRequestChanges,
   onRevoke,
+  onSkip,
   onComment,
   onInlineEdit,
   stalePhases,
@@ -338,6 +347,19 @@ export function GatePanel({
               >
                 <Undo2 size={14} />
                 Revoke
+              </button>
+            )}
+            {onSkip && (
+              <button
+                onClick={() => {
+                  void onSkip()
+                }}
+                className="sk-btn sk-btn--ghost"
+                style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}
+                aria-label="Skip phase"
+              >
+                <SkipForward size={14} />
+                Skip
               </button>
             )}
             {onComment && (

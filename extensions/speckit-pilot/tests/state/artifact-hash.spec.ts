@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHash, getDisplayHash } from '../../src/state/artifact-hash.js'
+import { computeHash, hashArtifacts } from '../../src/state/artifact-hash.js'
 import { writeFile, unlink, mkdtemp } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -59,14 +59,65 @@ describe('computeHash()', () => {
   })
 })
 
-describe('getDisplayHash()', () => {
-  it('returns first 8 characters of a full SHA-256 hash', () => {
-    const full = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2'
-    expect(getDisplayHash(full)).toBe('a1b2c3d4')
+describe('hashArtifacts()', () => {
+  // A phase can produce more than one artifact — `plan` produces three — and
+  // `approvedHash` is one field. Comparing every file against one file's hash,
+  // which is what the unused version did, reports a change on the second
+  // artifact of every multi-artifact phase.
+
+  async function dir(): Promise<string> {
+    return mkdtemp(join(tmpdir(), 'speckit-hash-'))
+  }
+
+  it('covers every artifact, not just the first', async () => {
+    const d = await dir()
+    const a = join(d, 'plan.md')
+    const b = join(d, 'research.md')
+    await writeFile(a, 'plan')
+    await writeFile(b, 'research')
+
+    const before = await hashArtifacts([a, b])
+    await writeFile(b, 'research, revised')
+    expect(await hashArtifacts([a, b])).not.toBe(before)
   })
 
-  it('result is exactly 8 characters', () => {
-    const full = 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab'
-    expect(getDisplayHash(full)).toHaveLength(8)
+  it('does not depend on the order the paths were listed in', async () => {
+    const d = await dir()
+    const a = join(d, 'a.md')
+    const b = join(d, 'b.md')
+    await writeFile(a, 'one')
+    await writeFile(b, 'two')
+    expect(await hashArtifacts([a, b])).toBe(await hashArtifacts([b, a]))
+  })
+
+  it('changes when an artifact is renamed, since the path is part of it', async () => {
+    const d = await dir()
+    const a = join(d, 'spec.md')
+    const b = join(d, 'spec-old.md')
+    await writeFile(a, 'same content')
+    await writeFile(b, 'same content')
+    expect(await hashArtifacts([a])).not.toBe(await hashArtifacts([b]))
+  })
+
+  it('changes when an artifact is deleted — an approval does not survive that', async () => {
+    const d = await dir()
+    const a = join(d, 'spec.md')
+    await writeFile(a, 'content')
+    const before = await hashArtifacts([a])
+    await unlink(a)
+    expect(await hashArtifacts([a])).not.toBe(before)
+  })
+
+  it('is stable when nothing changed', async () => {
+    const d = await dir()
+    const a = join(d, 'spec.md')
+    await writeFile(a, 'content')
+    expect(await hashArtifacts([a])).toBe(await hashArtifacts([a]))
+  })
+
+  it('reports nothing for a phase that produces no artifacts', async () => {
+    // `analyze`, `implement` and `open-pr` produce none. There is nothing to
+    // verify, and a hash of nothing would make every one of them look modified.
+    expect(await hashArtifacts([])).toBeNull()
   })
 })

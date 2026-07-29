@@ -1,11 +1,11 @@
 import type { ExtensionAPI, Disposable, SettingDefinition } from '../../../src/main/extensions/api'
+import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type {
   CardBrief,
   CardComment,
   CardSummary,
-  Feature,
   HistoryEntry,
   JiraCreds,
   PhaseId,
@@ -109,6 +109,8 @@ import { createSupervision, type Supervision } from './runtime/supervision.js'
 import { buildDigest, channelFor, type NotifiableEvent } from './runtime/feed/digest.js'
 import { paletteEntries } from './runtime/palette.js'
 import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
+import { hashArtifacts } from './state/artifact-hash.js'
+import { applyHashVerification, computeStalePhases } from './state/phase-state-machine.js'
 import { readCardLanes } from './runtime/workitem.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
 import type { HunkDecision } from './runtime/review/hunk-decisions.js'
@@ -127,9 +129,6 @@ const disposables: Disposable[] = []
 
 // Active session registry: sessionId → session metadata
 const activeSessions: Map<string, { id: string; name: string }> = new Map()
-
-// Active implement run registry: featureDir → runId
-const activeRuns: Map<string, string> = new Map()
 
 // Active agent runner handles: featureDir → RunnerHandle
 const activeRunnerHandles: Map<string, RunnerHandle> = new Map()
@@ -170,29 +169,6 @@ function reg(
   handler: (payload: unknown) => Promise<unknown> | unknown
 ) {
   disposables.push(api.ipc.registerHandler(channel, handler))
-}
-
-// Scan a specs/ directory for feature dirs (contain spec.md)
-async function listFeatures(repoRoot: string): Promise<Feature[]> {
-  const specsDir = path.join(repoRoot, 'specs')
-  let entries: string[] = []
-  try {
-    entries = await fs.promises.readdir(specsDir)
-  } catch {
-    return []
-  }
-  const features: Feature[] = []
-  for (const name of entries.sort()) {
-    const dir = path.join(specsDir, name)
-    const specPath = path.join(dir, 'spec.md')
-    try {
-      const stat = await fs.promises.stat(specPath)
-      features.push({ name, dir, specPath, lastModified: stat.mtimeMs })
-    } catch {
-      // not a feature dir
-    }
-  }
-  return features
 }
 
 // Scan specs/ for card dirs — any dir with a pilot state, card brief, or spec.md.
@@ -248,7 +224,10 @@ async function writePilotState(featureDir: string, state: PilotState): Promise<v
   const pilotDir = path.join(featureDir, '.pilot')
   await fs.promises.mkdir(pilotDir, { recursive: true })
   const stateFile = path.join(pilotDir, 'state.json')
-  const tmp = stateFile + '.tmp'
+  // Unique per write. A fixed `.tmp` is not atomic when two writes overlap —
+  // and they do: approving a phase writes, then auto-starts the next one, which
+  // writes again. The loser's rename finds nothing and throws ENOENT.
+  const tmp = `${stateFile}.${randomUUID()}.tmp`
   await fs.promises.writeFile(tmp, JSON.stringify(state, null, 2), 'utf-8')
   await fs.promises.rename(tmp, stateFile)
 }
@@ -354,6 +333,40 @@ async function gitUsername(api: ExtensionAPI, cwd: string): Promise<string> {
     // fall through to a generic prefix
   }
   return 'user'
+}
+
+/**
+ * A phase's artifacts, as absolute paths.
+ *
+ * `defaultArtifactPaths` gives the constitution a repository-relative path and
+ * everything else an absolute one. Hashing the relative one as-is reads it
+ * against whatever the process's working directory happens to be, which is not
+ * the repository — so it resolves to nothing and every approval looks modified.
+ */
+function artifactPathsOf(featureDir: string, paths: readonly string[]): string[] {
+  const repoRoot = path.dirname(path.dirname(featureDir))
+  return paths.map((artifact) =>
+    path.isAbsolute(artifact) ? artifact : path.join(repoRoot, artifact)
+  )
+}
+
+/**
+ * Marks any approved phase whose artifacts are no longer what was approved.
+ *
+ * Read-only: it never writes the state back. The record of what you approved is
+ * the approval, and rewriting it on a read would make "modified" survive the
+ * edit being undone.
+ */
+async function withHashVerification(state: PilotState): Promise<PilotState> {
+  const hashes: Partial<Record<PhaseId, string | null>> = {}
+  let anyToCheck = false
+  for (const phase of PHASE_ORDER) {
+    const phaseState = state.phases[phase]
+    if (!phaseState || phaseState.status !== 'approved' || !phaseState.approvedHash) continue
+    anyToCheck = true
+    hashes[phase] = await hashArtifacts(artifactPathsOf(state.featureDir, phaseState.artifactPaths))
+  }
+  return anyToCheck ? applyHashVerification(state, hashes) : state
 }
 
 // Decide the branch name for a card's worktree. Prefer the tracker's suggested
@@ -684,41 +697,6 @@ async function advanceQueue(api: ExtensionAPI, workspacePath: string): Promise<v
       )
     }
   }
-}
-
-// Check which artifact paths exist for a feature dir
-async function checkArtifacts(
-  featureDir: string,
-  repoRoot: string
-): Promise<Record<string, boolean>> {
-  const PHASE_ARTIFACT_MAP: Record<string, string[]> = {
-    constitution: ['.specify/memory/constitution.md'],
-    specify: ['spec.md'],
-    clarify: ['spec.md'],
-    plan: ['plan.md'],
-    checklist: ['checklists'],
-    tasks: ['tasks.md'],
-    analyze: ['tasks.md'],
-    implement: ['tasks.md'],
-  }
-  const result: Record<string, boolean> = {}
-  for (const [phase, artifacts] of Object.entries(PHASE_ARTIFACT_MAP)) {
-    let exists = false
-    for (const rel of artifacts) {
-      const absPath = rel.startsWith('.specify')
-        ? path.join(repoRoot, rel)
-        : path.join(featureDir, rel)
-      try {
-        await fs.promises.access(absPath)
-        exists = true
-        break
-      } catch {
-        // not found
-      }
-    }
-    result[phase] = exists
-  }
-  return result
 }
 
 // Every notification kind this extension ever raises, so the user can
@@ -1284,14 +1262,6 @@ export function activate(api: ExtensionAPI): void {
     return { ok: run !== null }
   })
 
-  // speckit:feature-list — scan specs/ for feature dirs
-  reg(api, 'speckit:feature-list', async (payload: unknown) => {
-    const { repoRoot } = payload as { repoRoot: string }
-    if (!repoRoot) return { error: 'repoRoot required' }
-    const features = await listFeatures(repoRoot)
-    return { features }
-  })
-
   // speckit:card-list — board data: every card with brief + derived stage + phase summary
   reg(api, 'speckit:card-list', async (payload: unknown) => {
     const { repoRoot } = payload as { repoRoot: string }
@@ -1600,21 +1570,14 @@ export function activate(api: ExtensionAPI): void {
     return { results: searchFiles(files, query) }
   })
 
-  // speckit:check-artifacts — which phase artifact files exist?
-  reg(api, 'speckit:check-artifacts', async (payload: unknown) => {
-    const { featureDir, repoRoot } = payload as { featureDir: string; repoRoot: string }
-    if (!featureDir || !repoRoot) return { error: 'featureDir and repoRoot required' }
-    const exists = await checkArtifacts(featureDir, repoRoot)
-    return { exists }
-  })
-
   // speckit:pilot-state — load or create .pilot/state.json
   reg(api, 'speckit:pilot-state', async (payload: unknown) => {
     const { featureDir } = payload as { featureDir: string }
     if (!featureDir) return { error: 'featureDir required' }
     const state = await readPilotState(featureDir)
     if (!state) return { notFound: true }
-    return { state }
+    // Approve a spec, edit it by hand, and the board said nothing. Now it does.
+    return { state: await withHashVerification(state) }
   })
 
   // speckit:phase-approve — mark a phase approved
@@ -1632,14 +1595,12 @@ export function activate(api: ExtensionAPI): void {
     ps.status = 'approved'
     ps.approvedAt = new Date().toISOString()
     ps.approvedBy = 'user'
+    // What was approved, so an edit afterwards is visible rather than silent.
+    ps.approvedHash = await hashArtifacts(artifactPathsOf(featureDir, ps.artifactPaths))
     if (note) ps.lastRunId = note
-    // Mark downstream approved phases as stale
-    const idx = PHASE_ORDER.indexOf(phase)
-    for (let i = idx + 1; i < PHASE_ORDER.length; i++) {
-      const downstream = state.phases[PHASE_ORDER[i]]
-      if (downstream && downstream.status === 'approved') {
-        downstream.status = 'stale'
-      }
+    // Everything downstream was approved against what this phase used to say.
+    for (const downstream of computeStalePhases(state, phase)) {
+      state.phases[downstream].status = 'stale'
     }
     if (state.run && state.run.status === 'running') {
       state.stage = deriveStage(state.phases, state.run)
@@ -1655,7 +1616,7 @@ export function activate(api: ExtensionAPI): void {
     api.window.broadcast('speckit:state-changed', { state })
 
     // Auto-start the next phase if the run is still active
-    const nextPhaseId = PHASE_ORDER[idx + 1]
+    const nextPhaseId = PHASE_ORDER[PHASE_ORDER.indexOf(phase) + 1]
     if (nextPhaseId && nextPhaseId !== 'open-pr' && state.run?.status !== 'cancelled') {
       const nextPs = state.phases[nextPhaseId]
       if (nextPs && (nextPs.status === 'locked' || nextPs.status === 'ready')) {
@@ -1676,42 +1637,6 @@ export function activate(api: ExtensionAPI): void {
       }
     }
 
-    return { state }
-  })
-
-  // speckit:phase-reject — reject a phase, delete artifact, reset to ready
-  reg(api, 'speckit:phase-reject', async (payload: unknown) => {
-    const { featureDir, phase, reason } = payload as {
-      featureDir: string
-      phase: PhaseId
-      reason: string
-    }
-    if (!featureDir || !phase) return { error: 'featureDir and phase required' }
-    let state = await readPilotState(featureDir)
-    if (!state) state = createPilotState(featureDir)
-    const ps = state.phases[phase]
-    if (!ps) return { error: `Unknown phase: ${phase}` }
-    // Delete phase output artifacts
-    for (const artifactPath of ps.artifactPaths) {
-      try {
-        await fs.promises.unlink(artifactPath)
-      } catch {
-        // ignore if missing
-      }
-    }
-    ps.status = 'ready'
-    ps.approvedAt = null
-    ps.approvedBy = null
-    ps.approvedHash = null
-    await writePilotState(featureDir, state)
-    await appendHistory(featureDir, {
-      ts: new Date().toISOString(),
-      actor: 'user',
-      action: 'rejected',
-      phase,
-      note: reason,
-    })
-    api.window.broadcast('speckit:state-changed', { state })
     return { state }
   })
 
@@ -1803,63 +1728,6 @@ export function activate(api: ExtensionAPI): void {
     return { entries }
   })
 
-  // speckit:session-list — return active terminal sessions
-  reg(api, 'speckit:session-list', (_payload: unknown) => {
-    return { sessions: Array.from(activeSessions.values()) }
-  })
-
-  // speckit:implement-stop — stop an active implement run
-  reg(api, 'speckit:implement-stop', async (payload: unknown) => {
-    const { featureDir, phase } = payload as { featureDir: string; phase?: PhaseId }
-    if (!featureDir) return { error: 'featureDir required' }
-    activeRuns.delete(featureDir)
-    if (phase) {
-      const state = await readPilotState(featureDir)
-      if (state) {
-        const ps = state.phases[phase]
-        if (ps && ps.status === 'running') {
-          ps.status = 'ready'
-          await writePilotState(featureDir, state)
-          await appendHistory(featureDir, {
-            ts: new Date().toISOString(),
-            actor: 'user',
-            action: 'run_failed',
-            phase,
-            note: 'stopped by user',
-          })
-          api.window.broadcast('speckit:state-changed', { state })
-        }
-      }
-    }
-    return { ok: true }
-  })
-
-  // speckit:checkpoint-create — create a git checkpoint commit before implement run
-  reg(api, 'speckit:checkpoint-create', async (payload: unknown) => {
-    const { featureDir, repoRoot, worktreePath } = payload as {
-      featureDir: string
-      repoRoot?: string
-      worktreePath?: string
-    }
-    if (!featureDir) return { error: 'featureDir required' }
-    const cwd = worktreePath ?? repoRoot ?? featureDir
-    try {
-      const { exec } = await import('node:child_process')
-      const { promisify } = await import('node:util')
-      const execAsync = promisify(exec)
-      await execAsync('git add -A', { cwd })
-      const result = await execAsync(
-        'git commit --allow-empty -m "[SpecKit] checkpoint before implement run"',
-        { cwd }
-      )
-      // Extract commit hash from output
-      const match = result.stdout.match(/\[[\w/]+ ([0-9a-f]+)\]/)
-      return { commitHash: match ? match[1] : 'unknown' }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
-
   // speckit:phase-skip — mark a phase as intentionally skipped
   reg(api, 'speckit:phase-skip', async (payload: unknown) => {
     const { featureDir, phase, note } = payload as {
@@ -1911,36 +1779,6 @@ export function activate(api: ExtensionAPI): void {
     })
     api.window.broadcast('speckit:state-changed', { state })
     return { state }
-  })
-
-  // speckit:implement-file-decision — approve or skip a pending file write
-  reg(api, 'speckit:implement-file-decision', async (payload: unknown) => {
-    const { filePath, decision, featureDir, repoRoot } = payload as {
-      filePath: string
-      decision: 'approve' | 'skip'
-      featureDir: string
-      repoRoot?: string
-    }
-    if (!filePath || !decision) return { error: 'filePath and decision required' }
-    if (decision === 'skip') {
-      const cwd = repoRoot || featureDir
-      try {
-        const { exec } = await import('node:child_process')
-        const { promisify } = await import('node:util')
-        const execAsync = promisify(exec)
-        await execAsync(`git checkout -- "${filePath}"`, { cwd })
-      } catch {
-        // ignore if file not tracked
-      }
-    }
-    await appendHistory(featureDir, {
-      ts: new Date().toISOString(),
-      actor: 'user',
-      action: decision === 'approve' ? 'file_approved' : 'file_skipped',
-      phase: 'implement',
-      filePath,
-    })
-    return { ok: true }
   })
 
   // speckit:file-write — write any file within the project (markdown edits)

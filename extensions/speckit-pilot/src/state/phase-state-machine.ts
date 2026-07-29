@@ -1,11 +1,4 @@
-import type {
-  PhaseId,
-  PhaseStatus,
-  PhaseState,
-  PhaseGateConfig,
-  PilotState,
-  AutonomyLevel,
-} from '../types/speckit.types.js'
+import type { PhaseId, PhaseStatus, PhaseState, PilotState } from '../types/speckit.types.js'
 import { PHASE_ORDER } from '../types/speckit.types.js'
 
 type PhaseEvent =
@@ -71,35 +64,6 @@ export function transition(phaseState: PhaseState, event: PhaseEvent): PhaseStat
   return { ...phaseState, status: next }
 }
 
-/**
- * Returns true when a phase should be auto-approved based on the autonomy level and gate config.
- * Self-Review and Open PR are NEVER auto-approved regardless of autonomy or gate config.
- */
-export function shouldAutoApprove(
-  phase: PhaseId,
-  autonomy: AutonomyLevel,
-  gate: PhaseGateConfig
-): boolean {
-  if (phase === 'self-review' || phase === 'open-pr') return false
-  if (autonomy === 'guided') return false
-  return gate.autoApprove
-}
-
-export function isUpstreamApproved(state: PilotState, phase: PhaseId): boolean {
-  const idx = PHASE_ORDER.indexOf(phase)
-  if (idx <= 0) return true // constitution has no upstream
-
-  const upstream = PHASE_ORDER[idx - 1]
-  const upstreamState = state.phases[upstream]
-  if (!upstreamState) return false
-
-  // checklist does not require upstream approval (required: false)
-  const gate = state.settings.phaseGates[phase]
-  if (gate && !gate.required) return true
-
-  return upstreamState.status === 'approved'
-}
-
 export function computeStalePhases(state: PilotState, changedPhase: PhaseId): PhaseId[] {
   const idx = PHASE_ORDER.indexOf(changedPhase)
   if (idx < 0) return []
@@ -115,9 +79,21 @@ export function computeStalePhases(state: PilotState, changedPhase: PhaseId): Ph
   return stale
 }
 
+/**
+ * Marks an approved phase whose artifacts have changed since.
+ *
+ * `modified`, not `stale`: the state machine above distinguishes them, and so
+ * should the board. Stale means something upstream moved; modified means the
+ * thing you approved is not the thing on disk any more.
+ *
+ * Keyed by phase rather than by path, because the approved hash covers a
+ * phase's artifacts as a set. A phase with no recorded hash is left alone: it
+ * was approved before hashes were kept, and reporting every one of those as
+ * modified would be noise nobody could act on.
+ */
 export function applyHashVerification(
   state: PilotState,
-  diskHashes: Record<string, string | null>
+  hashesByPhase: Partial<Record<PhaseId, string | null>>
 ): PilotState {
   const updated = structuredClone(state)
   let changed = false
@@ -127,19 +103,13 @@ export function applyHashVerification(
     if (!phaseState || phaseState.status !== 'approved') continue
     if (!phaseState.approvedHash) continue
 
-    for (const artifactPath of phaseState.artifactPaths) {
-      const diskHash = diskHashes[artifactPath]
-      if (diskHash === null) {
-        phaseState.status = 'stale'
-        changed = true
-        break
-      }
-      if (diskHash !== undefined && diskHash !== phaseState.approvedHash) {
-        phaseState.status = 'stale'
-        changed = true
-        break
-      }
-    }
+    const current = hashesByPhase[phaseId]
+    // `undefined` means nothing was computed for it — not that it is gone.
+    if (current === undefined) continue
+    if (current === phaseState.approvedHash) continue
+
+    phaseState.status = 'modified'
+    changed = true
   }
 
   return changed ? updated : state

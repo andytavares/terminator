@@ -6,6 +6,7 @@ import { getSpeckitAPI } from '../types/electron.js'
 import { PhaseRail } from './PhaseRail.js'
 import { RunConsole } from './RunConsole.js'
 import { GatePanel } from './GatePanel.js'
+import { computeStalePhases } from '../state/phase-state-machine.js'
 import { SelfReviewGate } from './SelfReviewGate.js'
 import { OpenPrGate } from './OpenPrGate.js'
 import { BatchCheckIn } from './BatchCheckIn.js'
@@ -145,6 +146,18 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
     if ('state' in result) setState(result.state)
   }
 
+  async function handleSkip(phase: PhaseId) {
+    const api = getSpeckitAPI()
+    const result = await api.phaseSkip({ featureDir, phase })
+    if ('state' in result) setState(result.state)
+  }
+
+  async function handleUnskip(phase: PhaseId) {
+    const api = getSpeckitAPI()
+    const result = await api.phaseUnskip({ featureDir, phase })
+    if ('state' in result) setState(result.state)
+  }
+
   async function handleComment(phase: PhaseId, note: string) {
     const api = getSpeckitAPI()
     await api.phaseComment({ featureDir, phase, note })
@@ -193,6 +206,10 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
   }, [displayPhase, activePhase, featureDir])
   // When no specific phase is selected and no phase is running yet (brief gap),
   // show all accumulated output so lines from the new phase aren't hidden.
+  // What revoking this phase would knock over. The panel has always been able
+  // to say it; nothing ever worked it out.
+  const stalePhases = state && awaitingPhase ? computeStalePhases(state, awaitingPhase) : undefined
+
   const displayLines = displayPhase
     ? (linesByPhase[displayPhase] ?? [])
     : Object.values(linesByPhase)
@@ -288,6 +305,27 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
         )}
       </div>
 
+      {/* What the phase you are looking at is, when it is not simply running.
+          A skipped phase with no way back is a decision you cannot undo, and a
+          modified one that says nothing is an approval you no longer have. */}
+      {state && displayPhase && state.phases[displayPhase]?.status === 'skipped' && (
+        <div className="sk-sup__note" role="status">
+          This phase was skipped.
+          <button className="sk-sup__btn" onClick={() => void handleUnskip(displayPhase)}>
+            Unskip
+          </button>
+        </div>
+      )}
+      {state && displayPhase && state.phases[displayPhase]?.status === 'modified' && (
+        <div className="sk-sup__warn" role="status">
+          Its artifacts have changed since you approved them — what is on disk is not what was
+          approved.
+          <button className="sk-sup__btn" onClick={() => void handleApprove(displayPhase)}>
+            Approve as it stands
+          </button>
+        </div>
+      )}
+
       {/* Console */}
       <RunConsole featureDir={featureDir} lines={displayLines} phase={displayPhase} />
 
@@ -316,7 +354,9 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
           phaseState={state.phases[awaitingPhase]}
           artifactContent={gateContent}
           comments={gateComments}
+          stalePhases={stalePhases}
           onApprove={() => handleApprove(awaitingPhase)}
+          onSkip={() => handleSkip(awaitingPhase)}
           onRequestChanges={(note) => handleRequestChanges(awaitingPhase, note)}
           onRevoke={() => handleRevoke(awaitingPhase)}
           onComment={(note) => handleComment(awaitingPhase, note)}

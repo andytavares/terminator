@@ -1,10 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   transition,
-  isUpstreamApproved,
   computeStalePhases,
   applyHashVerification,
-  shouldAutoApprove,
   InvalidTransitionError,
 } from '../../src/state/phase-state-machine.js'
 import type { PhaseState, PilotState } from '../../src/types/speckit.types.js'
@@ -64,36 +62,6 @@ describe('PHASE_ORDER', () => {
 
   it('includes open-pr as phase 10', () => {
     expect(PHASE_ORDER[9]).toBe('open-pr')
-  })
-})
-
-describe('shouldAutoApprove()', () => {
-  const fastGate = { required: true, autoApprove: true, perFileConfirm: false }
-  const offGate = { required: true, autoApprove: false, perFileConfirm: false }
-
-  it('returns false for self-review even when autonomy=fast and autoApprove=true', () => {
-    expect(shouldAutoApprove('self-review', 'fast', fastGate)).toBe(false)
-  })
-
-  it('returns false for open-pr even when autonomy=fast and autoApprove=true', () => {
-    expect(shouldAutoApprove('open-pr', 'fast', fastGate)).toBe(false)
-  })
-
-  it('returns true for specify when autonomy=fast and gate.autoApprove=true', () => {
-    expect(shouldAutoApprove('specify', 'fast', fastGate)).toBe(true)
-  })
-
-  it('returns false for specify when autonomy=fast but gate.autoApprove=false', () => {
-    expect(shouldAutoApprove('specify', 'fast', offGate)).toBe(false)
-  })
-
-  it('returns false for specify when autonomy=guided even if gate.autoApprove=true', () => {
-    expect(shouldAutoApprove('specify', 'guided', fastGate)).toBe(false)
-  })
-
-  it('returns false for implement (perFileConfirm gate) even in fast autonomy', () => {
-    const implementGate = { required: true, autoApprove: false, perFileConfirm: true }
-    expect(shouldAutoApprove('implement', 'fast', implementGate)).toBe(false)
   })
 })
 
@@ -202,43 +170,6 @@ describe('transition()', () => {
   })
 })
 
-describe('isUpstreamApproved()', () => {
-  it('returns true for constitution (no upstream)', () => {
-    const state = makePilotState()
-    expect(isUpstreamApproved(state, 'constitution')).toBe(true)
-  })
-
-  it('returns false when upstream is ready (not approved)', () => {
-    const state = makePilotState({ constitution: { status: 'ready' } })
-    expect(isUpstreamApproved(state, 'specify')).toBe(false)
-  })
-
-  it('returns true when upstream is approved', () => {
-    const state = makePilotState({ constitution: { status: 'approved', approvedHash: 'abc' } })
-    expect(isUpstreamApproved(state, 'specify')).toBe(true)
-  })
-
-  it('checklist does not require upstream approval (gate.required=false)', () => {
-    const state = makePilotState({ tasks: { status: 'ready' } })
-    expect(isUpstreamApproved(state, 'checklist')).toBe(true)
-  })
-
-  it('self-review requires implement to be approved', () => {
-    const state = makePilotState({ implement: { status: 'ready' } })
-    expect(isUpstreamApproved(state, 'self-review')).toBe(false)
-  })
-
-  it('self-review unlocked when implement is approved', () => {
-    const state = makePilotState({ implement: { status: 'approved', approvedHash: 'xyz' } })
-    expect(isUpstreamApproved(state, 'self-review')).toBe(true)
-  })
-
-  it('open-pr requires self-review to be approved', () => {
-    const state = makePilotState({ 'self-review': { status: 'ready' } })
-    expect(isUpstreamApproved(state, 'open-pr')).toBe(false)
-  })
-})
-
 describe('computeStalePhases()', () => {
   it('returns downstream approved phases', () => {
     const state = makePilotState({
@@ -276,55 +207,99 @@ describe('computeStalePhases()', () => {
 })
 
 describe('applyHashVerification()', () => {
-  it('marks phase stale when disk hash differs from approved hash', () => {
-    const state = makePilotState({
-      constitution: {
-        status: 'approved',
-        approvedHash: 'aaaa1234',
-        artifactPaths: ['.specify/memory/constitution.md'],
+  // Approving a spec and then editing it by hand is how you fix a typo, and
+  // also how the plan downstream ends up built against something nobody
+  // approved. This is what tells those apart.
+
+  function approved(over: Partial<PilotState> = {}): PilotState {
+    const state: PilotState = {
+      version: 3,
+      featureDir: '/repo/specs/021-a',
+      card: {
+        title: 'A card',
+        type: 'feature',
+        scope: '',
+        checklist: [],
+        attachments: [],
+        knowledgeRefs: [],
+        source: 'native',
+        createdAt: '2026-07-29T00:00:00.000Z',
       },
-    })
-    const updated = applyHashVerification(state, {
-      '.specify/memory/constitution.md': 'bbbb5678',
-    })
-    expect(updated.phases['constitution'].status).toBe('stale')
+      stage: 'in-progress',
+      mode: 'speckit',
+      ticket: null,
+      run: null,
+      queuePosition: null,
+      worktreePath: null,
+      branchName: null,
+      prUrl: null,
+      phases: Object.fromEntries(
+        PHASE_ORDER.map((id) => [
+          id,
+          {
+            id,
+            status: 'locked',
+            approvedHash: null,
+            approvedAt: null,
+            approvedBy: null,
+            lastRunId: null,
+            lastRunAt: null,
+            artifactPaths: [],
+            feedback: null,
+            batchIndex: null,
+          } as PhaseState,
+        ])
+      ) as Record<PhaseId, PhaseState>,
+      settings: DEFAULT_SETTINGS,
+      ...over,
+    }
+    state.phases.specify.status = 'approved'
+    state.phases.specify.approvedHash = 'hash-at-approval'
+    return state
+  }
+
+  it('marks a phase modified when its artifacts are not what was approved', () => {
+    const after = applyHashVerification(approved(), { specify: 'a different hash' })
+    expect(after.phases.specify.status).toBe('modified')
   })
 
-  it('does not mutate when hashes match', () => {
-    const state = makePilotState({
-      constitution: {
-        status: 'approved',
-        approvedHash: 'aaaa1234',
-        artifactPaths: ['.specify/memory/constitution.md'],
-      },
-    })
-    const updated = applyHashVerification(state, {
-      '.specify/memory/constitution.md': 'aaaa1234',
-    })
-    expect(updated).toBe(state)
+  it('says modified rather than stale — they mean different things', () => {
+    // Stale means something upstream moved; modified means the thing you
+    // approved is not the thing on disk.
+    const after = applyHashVerification(approved(), { specify: 'a different hash' })
+    expect(after.phases.specify.status).not.toBe('stale')
   })
 
-  it('marks phase stale when file is missing (null hash)', () => {
-    const state = makePilotState({
-      specify: {
-        status: 'approved',
-        approvedHash: 'aaaa1234',
-        artifactPaths: ['specs/test/spec.md'],
-      },
-    })
-    const updated = applyHashVerification(state, {
-      'specs/test/spec.md': null,
-    })
-    expect(updated.phases['specify'].status).toBe('stale')
+  it('leaves it alone when the artifacts are unchanged', () => {
+    const state = approved()
+    expect(applyHashVerification(state, { specify: 'hash-at-approval' })).toBe(state)
   })
 
-  it('ignores non-approved phases', () => {
-    const state = makePilotState({
-      constitution: { status: 'ready', artifactPaths: ['.specify/memory/constitution.md'] },
-    })
-    const updated = applyHashVerification(state, {
-      '.specify/memory/constitution.md': 'differenthash',
-    })
-    expect(updated.phases['constitution'].status).toBe('ready')
+  it('leaves a phase that was approved before hashes were kept', () => {
+    // Reporting every one of those as modified would be noise nobody can act on.
+    const state = approved()
+    state.phases.specify.approvedHash = null
+    expect(applyHashVerification(state, { specify: 'anything' }).phases.specify.status).toBe(
+      'approved'
+    )
+  })
+
+  it('leaves a phase nothing was computed for', () => {
+    const state = approved()
+    expect(applyHashVerification(state, {}).phases.specify.status).toBe('approved')
+  })
+
+  it('does not touch a phase that was never approved', () => {
+    const state = approved()
+    state.phases.plan.status = 'awaiting_review'
+    state.phases.plan.approvedHash = 'hash-at-approval'
+    expect(applyHashVerification(state, { plan: 'different' }).phases.plan.status).toBe(
+      'awaiting_review'
+    )
+  })
+
+  it('returns the same object when nothing changed, so a read is free', () => {
+    const state = approved()
+    expect(applyHashVerification(state, { specify: 'hash-at-approval' })).toBe(state)
   })
 })

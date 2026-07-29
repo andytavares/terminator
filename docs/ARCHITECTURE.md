@@ -663,8 +663,11 @@ Each phase has a `PhaseState` (status: `locked | ready | running | awaiting_revi
 activate(api)
   ├─ IPC handlers (via api.ipc.registerHandler)
   │    ├─ speckit:dispatch          → create worktree, branch, start phase runner
-  │    ├─ speckit:pilot-state       → read .pilot/state.json
-  │    ├─ speckit:phase-approve     → persist approval, start next phase runner
+  │    ├─ speckit:pilot-state       → read .pilot/state.json, marking any approved
+  │    │                              phase whose artifacts have changed since
+  │    ├─ speckit:phase-approve     → persist approval + a hash of its artifacts,
+  │    │                              start next phase runner
+  │    ├─ speckit:phase-skip / -unskip → a phase this card does not need
   │    ├─ speckit:phase-request-changes → record feedback, re-queue runner
   │    ├─ speckit:phase-comment     → append history entry (no re-run)
   │    ├─ speckit:phase-revoke      → reset approved → ready

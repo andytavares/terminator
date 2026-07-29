@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import React from 'react'
 
 const mockPilotState = vi.fn()
@@ -8,6 +8,8 @@ const mockOnRunOutput = vi.fn()
 const mockPhaseApprove = vi.fn()
 const mockPhaseReject = vi.fn()
 const mockPhaseRevoke = vi.fn()
+const mockPhaseSkip = vi.fn()
+const mockPhaseUnskip = vi.fn()
 const mockPhaseRequestChanges = vi.fn()
 const mockPhaseComment = vi.fn()
 const mockFileWrite = vi.fn()
@@ -33,6 +35,10 @@ vi.mock('../../src/types/electron.js', () => ({
     openPr: vi.fn().mockResolvedValue({ prUrl: 'https://github.com/owner/repo/pull/1' }),
     onCheckinReady: vi.fn().mockReturnValue(vi.fn()),
     checkinDecision: vi.fn().mockResolvedValue({ ok: true }),
+    phaseSkip: mockPhaseSkip,
+    phaseUnskip: mockPhaseUnskip,
+    // Selecting a phase other than the running one loads its persisted output.
+    runOutputRead: vi.fn().mockResolvedValue({ lines: [] }),
   }),
 }))
 
@@ -206,5 +212,73 @@ describe('RunDashboard', () => {
     await waitFor(() => screen.getByRole('button', { name: /back to runs list/i }))
     fireEvent.click(screen.getByRole('button', { name: /back to runs list/i }))
     expect(onBack).toHaveBeenCalledOnce()
+  })
+})
+
+describe('a phase that is not simply running', () => {
+  // Not every card needs every phase, and the alternative to offering a skip is
+  // approving something you did not read.
+
+  beforeEach(() => {
+    mockPhaseSkip.mockResolvedValue({ state: makeState() })
+    mockPhaseUnskip.mockResolvedValue({ state: makeState() })
+  })
+
+  it('skips the phase at the gate', async () => {
+    mockPilotState.mockResolvedValue({
+      state: makeState({ phases: makePhases({ specify: { status: 'awaiting_review' } }) }),
+    })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    fireEvent.click(await screen.findByRole('button', { name: /skip phase/i }))
+    await waitFor(() =>
+      expect(mockPhaseSkip).toHaveBeenCalledWith({
+        featureDir: '/repo/specs/001',
+        phase: 'specify',
+      })
+    )
+  })
+
+  it('offers a way back from a skipped phase', async () => {
+    // A decision you cannot undo is one you make less often than you should.
+    mockPilotState.mockResolvedValue({
+      state: makeState({
+        phases: makePhases({ constitution: { status: 'skipped' } }),
+      }),
+    })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    // Selected in the rail, which is how you look at a phase that is not the
+    // one currently running.
+    fireEvent.click(await screen.findByRole('button', { name: 'Constitution' }))
+    fireEvent.click(await screen.findByRole('button', { name: /unskip/i }))
+    await waitFor(() =>
+      expect(mockPhaseUnskip).toHaveBeenCalledWith({
+        featureDir: '/repo/specs/001',
+        phase: 'constitution',
+      })
+    )
+  })
+
+  it('says when what is on disk is not what was approved', async () => {
+    mockPilotState.mockResolvedValue({
+      state: makeState({ phases: makePhases({ constitution: { status: 'modified' } }) }),
+    })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Constitution' }))
+    expect(await screen.findByText(/not what was approved/i)).toBeTruthy()
+  })
+
+  it('lets you approve it as it now stands', async () => {
+    mockPhaseApprove.mockResolvedValue({ state: makeState() })
+    mockPilotState.mockResolvedValue({
+      state: makeState({ phases: makePhases({ constitution: { status: 'modified' } }) }),
+    })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Constitution' }))
+    fireEvent.click(await screen.findByRole('button', { name: /approve as it stands/i }))
+    await waitFor(() =>
+      expect(mockPhaseApprove).toHaveBeenCalledWith(
+        expect.objectContaining({ phase: 'constitution' })
+      )
+    )
   })
 })

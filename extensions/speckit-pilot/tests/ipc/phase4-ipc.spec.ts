@@ -511,7 +511,9 @@ describe('speckit:checkin-decision', () => {
     expect(result.ok).toBe(true)
     // batchIndex must be persisted — check writeFile was called
     const writeCalls = vi.mocked(nodefs.promises.writeFile).mock.calls
-    const stateWrite = writeCalls.find(([p]) => String(p).endsWith('state.json.tmp'))
+    // The temp name carries a uuid — writes overlap, and a fixed one is not
+    // atomic — so match the state file it is a temp for.
+    const stateWrite = writeCalls.find(([p]) => /state\.json\..*\.tmp$/.test(String(p)))
     expect(stateWrite).toBeDefined()
   })
 

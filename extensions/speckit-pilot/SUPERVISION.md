@@ -170,6 +170,18 @@ project, the terminal exists, and `claude --session-id` is visible in it — nev
 `bypassPermissions`. Every worst bug on this line of work passed its unit tests
 and only appeared when the application ran.
 
+## Approved, and then edited
+
+Approving a phase records a hash of its artifacts — one hash over the set, since
+`plan` produces three files. Reading the card recomputes it, and a phase whose
+artifacts no longer match is marked **modified**: what is on disk is not what you
+approved. That is a different thing from **stale**, which means something
+upstream moved, and the board says which.
+
+A phase can also be **skipped** from its gate, and unskipped from the rail. Not
+every card needs every phase, and the alternative to offering that is approving
+something you did not read.
+
 ## What is deliberately not here
 
 - **Unattended merge of a P3 change.** The grading is real and shown, but
