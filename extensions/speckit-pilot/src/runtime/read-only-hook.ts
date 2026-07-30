@@ -15,16 +15,17 @@ import { join } from 'path'
 
 export const READ_ONLY_HOOK_SCRIPT = `// Written by SpecKit Pilot. Do not edit: overwritten on every start.
 const READ_ONLY_TOOLS = new Set(['Read', 'Grep', 'Glob', 'NotebookRead', 'TodoWrite', 'Task'])
+// No sed/find/awk: each reads by default and writes with one flag.
 const READ_ONLY_BINARIES = new Set([
-  'cat', 'head', 'tail', 'wc', 'ls', 'find', 'grep', 'rg', 'sed', 'awk', 'file', 'stat', 'diff',
+  'cat', 'head', 'tail', 'wc', 'ls', 'grep', 'rg', 'file', 'stat', 'diff',
 ])
+// No config/branch/remote: each reads bare and destroys with one argument.
 const READ_ONLY_GIT = new Set([
-  'diff', 'log', 'show', 'status', 'rev-parse', 'ls-files', 'blame', 'describe', 'branch',
-  'remote', 'config',
+  'diff', 'log', 'show', 'status', 'rev-parse', 'ls-files', 'blame', 'describe',
 ])
 // Anything that chains, redirects or substitutes. Without this an allowlist is
 // theatre: 'git diff' passes and so does 'git diff; rm -rf .'.
-const COMPOUND = /[;&|><\`]|\\$\\(/
+const COMPOUND = /[;&|><\`\\n\\r]|\\$\\(/
 
 function decide(toolName, input) {
   if (READ_ONLY_TOOLS.has(toolName)) return { allow: true, reason: toolName + ' cannot change anything' }

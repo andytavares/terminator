@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'fs'
+import { closeSync, openSync, readFileSync, readSync, statSync } from 'fs'
 
 /**
  * What the agent has been doing, read from its own record.
@@ -96,11 +96,35 @@ function eventsFromEntry(entry: Record<string, unknown>): ToolActivity[] {
  * Reads the whole transcript and returns the supervision-relevant events in it.
  * Cheap enough to re-read: a session's transcript is bounded by its own run.
  */
+/**
+ * How much of the tail to read.
+ *
+ * The stall detector asks what happened recently; it has never needed the
+ * beginning. Reading the whole file put an unbounded synchronous read on the
+ * main thread every thirty seconds per run, and a multi-hour transcript is not
+ * small.
+ */
+const MAX_TAIL_BYTES = 256 * 1024
+
 export function readTranscript(transcriptPath: string): ToolActivity[] {
   let raw: string
+  let truncated = false
   try {
-    if (!statSync(transcriptPath).isFile()) return []
-    raw = readFileSync(transcriptPath, 'utf-8')
+    const stat = statSync(transcriptPath)
+    if (!stat.isFile()) return []
+    if (stat.size > MAX_TAIL_BYTES) {
+      const handle = openSync(transcriptPath, 'r')
+      try {
+        const buffer = Buffer.alloc(MAX_TAIL_BYTES)
+        const read = readSync(handle, buffer, 0, MAX_TAIL_BYTES, stat.size - MAX_TAIL_BYTES)
+        raw = buffer.subarray(0, read).toString('utf-8')
+        truncated = true
+      } finally {
+        closeSync(handle)
+      }
+    } else {
+      raw = readFileSync(transcriptPath, 'utf-8')
+    }
   } catch {
     // Not written yet, removed, or not a file. None of those is an error the
     // operator needs to see — the session simply has no durable record yet.
@@ -108,7 +132,11 @@ export function readTranscript(transcriptPath: string): ToolActivity[] {
   }
 
   const events: ToolActivity[] = []
-  for (const line of raw.split('\n')) {
+  const lines = raw.split('\n')
+  // Reading from an offset lands mid-line; that first fragment is not JSON and
+  // is not a torn write worth reporting.
+  if (truncated) lines.shift()
+  for (const line of lines) {
     const trimmed = line.trim()
     if (trimmed === '') continue
     let entry: unknown

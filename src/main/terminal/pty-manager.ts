@@ -58,6 +58,14 @@ interface ActiveSession {
   exitListeners: Set<(exitCode: number) => void>
   /** Output produced before anything attached; null once released. */
   held: string[] | null
+  /**
+   * How much is held, tracked rather than recomputed.
+   *
+   * `held.join('')` inside the trim loop re-joined up to a megabyte on every
+   * chunk once the cap was reached — on the main thread, for the whole life of
+   * a chatty agent.
+   */
+  heldChars: number
 }
 
 /**
@@ -96,15 +104,17 @@ export class PtyManager {
       dataListeners: new Set(),
       exitListeners: new Set(),
       held: opts.holdOutput === true ? [] : null,
+      heldChars: 0,
     }
 
     ptyProcess.onData((data) => {
       if (session.held !== null) {
         session.held.push(data)
+        session.heldChars += data.length
         // Oldest first: what matters most on a long-running agent is the recent
         // output, and the alternative is an unbounded buffer.
-        while (session.held.join('').length > MAX_HELD_CHARS && session.held.length > 1) {
-          session.held.shift()
+        while (session.heldChars > MAX_HELD_CHARS && session.held.length > 1) {
+          session.heldChars -= session.held.shift()?.length ?? 0
         }
         return
       }
@@ -148,6 +158,7 @@ export class PtyManager {
     if (!session || session.held === null) return false
     const buffered = session.held.join('')
     session.held = null
+    session.heldChars = 0
     if (buffered !== '') {
       for (const listener of session.dataListeners) listener(buffered)
     }

@@ -73,8 +73,12 @@ refused outright rather than parsed.
 ### Detecting a run that stopped
 
 `runtime/evaluate-stall.ts` fires on tool silence, or on no net diff plus a
-single-file loop, or on repeated reverts. A long-running Bash call is exempt or
-every test run reads as a stall.
+single-file loop. A long-running Bash call is exempt or every test run reads as
+a stall.
+
+A third signal — repeated self-reverts — was specified and is not implemented:
+it needs a per-edit history of the working copy and nothing records one. It was
+removed rather than left as a threshold no input could cross.
 
 It ships in **shadow mode**: firings are recorded and shown, not notified. A
 detector with a 20% false-positive rate produces alarm fatigue and gets turned
@@ -96,7 +100,10 @@ a week of recorded firings, not on faith.
 - The hook contract is not a published API; a runtime upgrade can change it, and
   the failure mode is silent. The e2e test drives a real run through the real
   application specifically to catch that.
-- The headless spawn still exists for self-review, so there are two run paths.
+- The headless spawn still exists for self-review, so there are two run paths —
+  and it is also where a phase lands if supervision cannot be arranged (no
+  runtime, or a repository in no workspace). That path approves every tool call,
+  so it raises a notification naming the card rather than proceeding quietly.
 
 ## Alternatives considered
 

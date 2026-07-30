@@ -55,6 +55,7 @@ function api() {
     },
     window: { broadcast: vi.fn() },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    notifications: { showToast: vi.fn(), createNotification: vi.fn() },
   } as never
 }
 
@@ -297,5 +298,58 @@ describe('when a supervised phase is finished', () => {
     handle.stop()
     await settle()
     expect(stopped).toContain(startResult.sessionId)
+  })
+})
+
+describe('when a phase cannot be supervised', () => {
+  // It falls through to `claude --print --permission-mode bypassPermissions`:
+  // an agent nobody can see, approving its own tool calls in a worktree. That
+  // is the thing this whole path replaced, so it must never be silent.
+
+  it('says so when the repository belongs to no workspace', async () => {
+    // There is nowhere to put the terminal, so the run has no home — and the
+    // fall-through is the headless spawn.
+    setSupervisedRunner(fakeRunner())
+    const a = api()
+    ;(a.workspace as unknown as { list: () => unknown[] }).list = () => []
+
+    createAgentRunner(a).startPhaseRunner(phaseOpts)
+    await settle()
+
+    const toasts = vi.mocked(a.notifications.showToast).mock.calls
+    expect(toasts.length).toBeGreaterThan(0)
+    expect(String(toasts[0][1])).toMatch(/unsupervised/i)
+  })
+
+  it('does not fall back when the terminal itself could not be opened', async () => {
+    // That path ends the phase rather than running it unwatched, which is the
+    // right answer: it reports a failure instead of quietly bypassing.
+    const runner = fakeRunner()
+    runner.start = async () => null
+    setSupervisedRunner(runner)
+
+    const codes: number[] = []
+    const a = api()
+    createAgentRunner(a).startPhaseRunner({ ...phaseOpts, onComplete: (c) => codes.push(c) })
+    await settle()
+
+    expect(codes).toEqual([1])
+    expect(vi.mocked(a.notifications.showToast)).not.toHaveBeenCalled()
+  })
+
+  it('says so when there is no supervised runner at all', async () => {
+    setSupervisedRunner(null)
+    const a = api()
+    createAgentRunner(a).startPhaseRunner(phaseOpts)
+    await settle()
+    expect(vi.mocked(a.notifications.showToast)).toHaveBeenCalled()
+  })
+
+  it('stays quiet for self-review, which is a shell chain rather than an agent', async () => {
+    setSupervisedRunner(null)
+    const a = api()
+    createAgentRunner(a).startPhaseRunner({ ...phaseOpts, phase: 'self-review' })
+    await settle()
+    expect(vi.mocked(a.notifications.showToast)).not.toHaveBeenCalled()
   })
 })

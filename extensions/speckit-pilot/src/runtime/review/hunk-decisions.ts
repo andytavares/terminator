@@ -10,6 +10,15 @@ export interface Hunk {
   readonly file: string
   /** First line of the hunk in the old file — what reverting it applies to. */
   readonly oldStart: number
+  /**
+   * The file did not exist before this change.
+   *
+   * Reverting needs to say so: a patch header naming the file on both sides
+   * asks git to reverse an addition against something it thinks was already
+   * there, and it refuses. Creating files is most of what an agent does, so
+   * this is the common case rather than the corner.
+   */
+  readonly isNew: boolean
   /** First line of the hunk in the new file. */
   readonly newStart: number
   readonly lines: readonly string[]

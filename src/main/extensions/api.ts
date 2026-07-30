@@ -322,6 +322,7 @@ import {
 import type { NotificationTarget } from '../notifications/notification-manager.js'
 import { getExtensionSetting, setExtensionSetting } from '../storage/extension-settings-store.js'
 import { getGlobalSettings, getWorkspaceSettings } from '../storage/settings-store.js'
+import { basename } from 'path'
 import { randomUUID } from 'crypto'
 import { makeLogger } from '../logger.js'
 import {
@@ -645,21 +646,36 @@ export function createExtensionAPI(
         }))
       },
       createProject(input): ProjectSnapshot | null {
-        // Reused rather than duplicated: provisioning the same branch twice
+        // Reused rather than duplicated: provisioning the same worktree twice
         // should land in the project you were already looking at.
+        //
+        // By path only. Matching on the name as well meant two cards whose
+        // branches happened to share a name got one project — pointing at
+        // whichever worktree was registered first — and the snapshot returned
+        // described a different directory than the caller had asked for.
         const existing = listProjectsFromStore(input.workspaceId).find(
-          (project) => project.worktreePath === input.worktreePath || project.name === input.name
+          (project) => project.worktreePath === input.worktreePath
         )
         if (existing !== undefined) {
           return { id: existing.id, workspaceId: existing.workspaceId, name: existing.name }
         }
-        const created = createProjectInStore({
-          workspaceId: input.workspaceId,
-          name: input.name,
-          worktreePath: input.worktreePath,
-          gitBranch: input.gitBranch,
-          isWorktree: input.isWorktree ?? true,
-        })
+        const create = (name: string) =>
+          createProjectInStore({
+            workspaceId: input.workspaceId,
+            name,
+            worktreePath: input.worktreePath,
+            gitBranch: input.gitBranch,
+            isWorktree: input.isWorktree ?? true,
+          })
+
+        let created = create(input.name)
+        if ('error' in created && created.error === 'DUPLICATE_NAME') {
+          // A different worktree that happens to share a branch name. The store
+          // keeps names unique per workspace, so disambiguate rather than
+          // return null — the caller's alternative is running the agent with
+          // nowhere to show it.
+          created = create(`${input.name} (${basename(input.worktreePath)})`)
+        }
         if (!('project' in created)) return null
         const { id, workspaceId, name } = created.project
         deps?.broadcastToWindows?.('workspace:project-added', created.project)

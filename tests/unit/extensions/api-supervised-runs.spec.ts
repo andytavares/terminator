@@ -138,6 +138,26 @@ describe('workspace.createProject', () => {
     expect(projects).toHaveLength(1)
   })
 
+  it('does not merge two worktrees that happen to share a name', () => {
+    // Matching on the name as well meant two cards whose branches were called
+    // the same thing got one project, pointing at whichever was registered
+    // first — and the snapshot handed back described a directory the caller
+    // had not asked for.
+    const api = build()
+    const first = api.workspace.createProject({
+      workspaceId: 'ws-1',
+      name: 'fix/login',
+      worktreePath: '/wt/one',
+    })
+    const second = api.workspace.createProject({
+      workspaceId: 'ws-1',
+      name: 'fix/login',
+      worktreePath: '/wt/two',
+    })
+    expect(second?.id).not.toBe(first?.id)
+    expect(projects).toHaveLength(2)
+  })
+
   it('tells the sidebar, which otherwise only learns on a reload', () => {
     const api = build()
     api.workspace.createProject({ workspaceId: 'ws-1', name: 'a', worktreePath: '/wt/a' })

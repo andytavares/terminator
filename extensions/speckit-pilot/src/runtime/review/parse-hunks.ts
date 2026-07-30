@@ -13,6 +13,11 @@ export function parseHunks(patch: string): Hunk[] {
   const hunks: Hunk[] = []
   let file = ''
   let current: { oldStart: number; newStart: number; lines: string[] } | null = null
+  // A file git has never seen. `git diff --no-index /dev/null <file>` is how a
+  // new file gets hunks at all, and reversing them needs the same `/dev/null`
+  // on the way out — asking git to reverse an addition against a file it
+  // believes pre-existed just fails.
+  let isNew = false
   let index = 0
 
   const flush = (): void => {
@@ -21,6 +26,7 @@ export function parseHunks(patch: string): Hunk[] {
       id: `${file}:${current.newStart}:${++index}`,
       file,
       oldStart: current.oldStart,
+      isNew,
       newStart: current.newStart,
       lines: current.lines,
     })
@@ -33,6 +39,7 @@ export function parseHunks(patch: string): Hunk[] {
     // lands in the wrong hunk.
     if (line.startsWith('diff --git ') || line.startsWith('--- ')) {
       flush()
+      if (line.startsWith('--- ')) isNew = line.trim() === '--- /dev/null'
       continue
     }
 

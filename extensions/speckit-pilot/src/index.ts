@@ -696,6 +696,9 @@ async function handoffCard(
   if (!worktreePath) return { error: 'Could not resolve a worktree for the card' }
   state.worktreePath = worktreePath
   state.branchName = branchName
+  // Remembered, so a card that drains through the queue later is still
+  // measured against what it was cut from rather than `main`.
+  state.baseBranch = baseBranch ?? state.baseBranch ?? null
   state.queuePosition = 'active'
   state.stage = deriveStage(state.phases, state.run)
   await writePilotState(featureDir, state)
@@ -753,7 +756,15 @@ async function advanceQueue(api: ExtensionAPI, workspacePath: string): Promise<v
       await writePilotState(s.featureDir, s)
       const qCard = (await readCard(s.featureDir)) ?? s.card
       await writeWorktreeTicket(worktreePath, qCard, s.ticket)
-      await startRunAt(api, s.featureDir, worktreePath, firstRunnablePhase(s), s.mode, s.card.title)
+      await startRunAt(
+        api,
+        s.featureDir,
+        worktreePath,
+        firstRunnablePhase(s),
+        s.mode,
+        s.card.title,
+        s.baseBranch ?? undefined
+      )
       api.window.broadcast('speckit:dispatch-started', {
         featureDir: s.featureDir,
         branchName,
@@ -1066,6 +1077,21 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     // Without it, phases fall back to the headless spawn. Said out loud: the
     // difference is whether tool calls are asked about or approved silently.
     api.log.error('supervised runtime unavailable — phases will run unsupervised', error)
+    // Close what was opened. A failure after the control server bound left it
+    // listening on a port nothing would ever answer on, and nothing would ever
+    // close it either.
+    void control?.close()
+    control = null
+    supervisedRunner?.dispose()
+    supervisedRunner = null
+    stallWatcher?.stop()
+    stallWatcher = null
+    supervision = null
+    api.notifications.showToast(
+      'error',
+      'Supervision could not start — phases will run unsupervised, approving their own tool calls',
+      'speckit.runtime.unavailable'
+    )
     return null
   }
 }
@@ -1402,7 +1428,9 @@ export function activate(api: ExtensionAPI): void {
           ts: new Date().toISOString(),
           actor: 'user',
           action: 'run_cancelled',
-          phase: 'constitution',
+          // The phase it was actually on. Recording a constant made the audit
+          // log claim every discard happened during the constitution.
+          phase: (run.phase as PhaseId) ?? 'constitution',
           note: 'run discarded, worktree removed',
         })
         api.window.broadcast('speckit:state-changed', { state })

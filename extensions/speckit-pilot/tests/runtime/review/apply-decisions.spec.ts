@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { buildPatch, revertRejected } from '../../../src/runtime/review/apply-decisions.js'
@@ -18,6 +18,7 @@ const hunk = (over: Partial<Hunk> = {}): Hunk => ({
   file: 'src/a.ts',
   oldStart: 10,
   newStart: 10,
+  isNew: false,
   lines: [' context', '-gone', '+added'],
   ...over,
 })
@@ -163,6 +164,35 @@ describe('against real git', () => {
     expect(after).toContain('ASKED FOR')
     expect(after).toContain('line 20')
     expect(after).not.toContain('NEVER ASKED FOR')
+  })
+
+  it('takes back a file the agent created, which is most of what it creates', async () => {
+    // The hunks for a file git has never seen come from
+    // `git diff --no-index /dev/null <file>`; reversing them needs the same
+    // `/dev/null` on the way out. Naming the file on both sides asks git to
+    // reverse an addition against something it thinks pre-existed, and it
+    // refuses — so a rejected new file used to stay on disk.
+    const newFile = join(dir, 'new.ts')
+    writeFileSync(newFile, 'this was never asked for\n')
+
+    // `--no-index` exits non-zero precisely because the files differ, so its
+    // output is taken from the error rather than the return value.
+    let diff = ''
+    try {
+      diff = execFileSync('git', ['diff', '--no-index', '/dev/null', 'new.ts'], {
+        cwd: dir,
+        encoding: 'utf8',
+      })
+    } catch (error) {
+      diff = String((error as { stdout?: string }).stdout ?? '')
+    }
+    expect(diff).toContain('--- /dev/null')
+
+    const result = await revertRejected(parseHunks(diff), {
+      applyReverse: async (patch) => git(['apply', '--reverse', '--recount', '-'], patch),
+    })
+    expect(result.error).toBeNull()
+    expect(existsSync(newFile)).toBe(false)
   })
 
   it('reverts several hunks in one file without the offsets drifting', async () => {

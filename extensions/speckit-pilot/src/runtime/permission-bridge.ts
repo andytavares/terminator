@@ -32,6 +32,15 @@ export interface PermissionDecision {
  * its own state, and a core event union that the console happened to share was
  * how the two ended up coupled in the first place.
  */
+/**
+ * What became of a held tool call.
+ *
+ * Four outcomes, not two: handing one back to the terminal was published as a
+ * `deny` and an answered question as an `allow` — both wrong in the feed and in
+ * `speckit:permission-resolved`, where they read as decisions nobody made.
+ */
+export type PermissionOutcome = 'allow' | 'deny' | 'handback' | 'answered'
+
 export interface PendingPermission {
   /** The conversation it belongs to, so an answer reaches the right run. */
   readonly sessionId: string
@@ -51,7 +60,7 @@ export interface PermissionBridgeOptions {
   /** Raised when a tool call needs a person. */
   onPending: (pending: PendingPermission) => void
   /** Cleared when it has been answered, by the operator or the ladder. */
-  onResolved: (requestId: string, decision: 'allow' | 'deny') => void
+  onResolved: (requestId: string, decision: PermissionOutcome) => void
   now: () => number
   /** The autonomy ladder. Returns null to abstain and let the operator decide. */
   autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
@@ -98,9 +107,11 @@ function targetHostOf(input: unknown): string | undefined {
   return undefined
 }
 
-/** One readable line describing what the agent wants to do. FR-007 requires it. */
 /**
  * What is actually being asked, in one line and then in full.
+ *
+ * One readable line describing what the agent wants to do, because a decision
+ * needs the ask rather than the tool's name.
  *
  * Deciding requires seeing the ask. A summary of "AskUserQuestion request" is
  * the tool's name, not its question — you cannot approve or deny that, and
@@ -186,13 +197,6 @@ function questionsOf(input: unknown): Array<{ question: string; options: string[
 }
 
 /**
- * Every field the tool was given, verbatim.
- *
- * Bounded generously rather than tightly: a command must never be cut, because
- * the whole reason to show it is that the half you cannot see is the half that
- * might delete something. The surface scrolls.
- */
-/**
  * Five minutes. Long enough to walk back to the console, short enough that a
  * run left alone keeps moving on the operator's own terminal rather than
  * sitting on a held hook for the twelve hours the hook itself allows.
@@ -202,6 +206,13 @@ const DEFAULT_ASK_AFTER_MS = 5 * 60_000
 const FIELD_LIMIT = 4_000
 const FIELD_COUNT = 24
 
+/**
+ * Every field the tool was given, verbatim.
+ *
+ * Bounded generously rather than tightly: a command must never be cut, because
+ * the whole reason to show it is that the half you cannot see is the half that
+ * might delete something. The surface scrolls.
+ */
 function renderInput(record: Record<string, unknown>): string | null {
   const lines = Object.entries(record)
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
@@ -239,7 +250,9 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
     if (entry === undefined) return
     outstanding.delete(requestId)
     clearTimeout(entry.timer)
-    onResolved(requestId, 'deny')
+    // Handed back, not denied: the runtime asks in the terminal instead. The
+    // feed said "denied" for a request nobody had refused.
+    onResolved(requestId, 'handback')
     entry.settle({ permissionDecision: 'ask' })
   }
 
@@ -291,7 +304,17 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
       if (entry === undefined) return false
       outstanding.delete(requestId)
       clearTimeout(entry.timer)
-      onResolved(requestId, decision.allow ? 'allow' : 'deny')
+      // An answer is its own outcome. `toResult` encodes one as a deny
+      // carrying the words, so reporting it as `allow` — or as `deny` — both
+      // misread what the operator did.
+      onResolved(
+        requestId,
+        decision.answer !== undefined && decision.answer.trim() !== ''
+          ? 'answered'
+          : decision.allow
+            ? 'allow'
+            : 'deny'
+      )
       entry.settle(toResult(decision, entry.input))
       return true
     },

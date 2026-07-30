@@ -94,13 +94,20 @@ const MAX_BODY_BYTES = 1_000_000
 function readBody(request: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let body = ''
+    let refused = false
     request.on('data', (chunk: Buffer) => {
+      if (refused) return
       body += chunk.toString('utf8')
-      // A hook input carries whatever the agent passed the tool, which can be a
-      // whole file. Bounded anyway: this port is reachable by any process on
-      // the machine, and an unbounded read is a way to exhaust the app.
-      if (body.length > MAX_BODY_BYTES) reject(new Error('hook payload too large'))
+      if (body.length > MAX_BODY_BYTES) {
+        // Refused *and* stopped. Leaving the listener attached meant the body
+        // kept growing on a request the code had already decided against,
+        // which is not a bound.
+        refused = true
+        request.destroy()
+        reject(new Error('request too large'))
+      }
     })
+
     request.on('end', () => resolve(body))
     request.on('error', reject)
   })

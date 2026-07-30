@@ -114,12 +114,23 @@ describe('saying that everything is fine', () => {
     expect(await screen.findByText('Nothing is running.')).toBeDefined()
   })
 
-  it('reads every channel on mount, not just the one on screen', async () => {
-    // The counts on the other tabs are what tells you to look at them.
+  it('reads what the tab counts are made of, not only the section on screen', async () => {
+    // Both are in-memory, and the counts on the other tabs are what tells you
+    // to look at them.
     panel()
     await waitFor(() => expect(api.supervisionSnapshot).toHaveBeenCalled())
     expect(api.stallsList).toHaveBeenCalled()
-    expect(api.feedList).toHaveBeenCalled()
+  })
+
+  it('leaves the feed alone until it is on screen', async () => {
+    // It re-reads a file that grows for the life of the workspace; fetching it
+    // every five seconds to render nothing is invisible until the log is long.
+    panel()
+    await waitFor(() => expect(api.supervisionSnapshot).toHaveBeenCalled())
+    expect(api.feedList).not.toHaveBeenCalled()
+
+    fireEvent.click(await screen.findByText(/feed/))
+    await waitFor(() => expect(api.feedList).toHaveBeenCalled())
   })
 })
 
@@ -198,7 +209,9 @@ describe('acting on a run', () => {
     expect(api.runRedirect).not.toHaveBeenCalled()
   })
 
-  it('discards it against the repository it belongs to', async () => {
+  it('discards it against the repository it belongs to, once confirmed', async () => {
+    // It deletes the worktree and the branch, uncommitted work included.
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     panel()
     fireEvent.click(await screen.findByText('Discard'))
     await waitFor(() =>
@@ -207,6 +220,14 @@ describe('acting on a run', () => {
         workspacePath: '/repo',
       })
     )
+  })
+
+  it('does not discard when the confirmation is declined', async () => {
+    // A misclick must not take everything the agent has not committed.
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    panel()
+    fireEvent.click(await screen.findByText('Discard'))
+    expect(api.runDiscard).not.toHaveBeenCalled()
   })
 
   it('offers no discard when there is no repository to discard from', async () => {

@@ -173,3 +173,36 @@ describe('removing one entry', () => {
     expect(log.list()).toHaveLength(1)
   })
 })
+
+describe('a feed that has been running for months', () => {
+  it('compacts, so the file and the cost of reading it stay bounded', () => {
+    // Every read parses the whole file and tombstones append rather than
+    // removing, so without a bound both grow for the life of the workspace.
+    const log = newLog()
+    for (let i = 0; i < 2_300; i++) {
+      log.post({ at: i, sessionId: 's1', author: 'agent', summary: `entry ${i}` })
+    }
+    // The cap plus one compaction interval: checking on every post would
+    // rewrite the file for each line written.
+    expect(log.list().length).toBeLessThanOrEqual(2_200)
+    expect(log.list().length).toBeGreaterThan(1_000)
+  })
+
+  it('keeps the newest, which is what a catch-up is about', () => {
+    const log = newLog()
+    for (let i = 0; i < 2_300; i++) {
+      log.post({ at: i, sessionId: 's1', author: 'agent', summary: `entry ${i}` })
+    }
+    const summaries = log.list().map((entry) => entry.summary)
+    expect(summaries).toContain('entry 2299')
+    expect(summaries).not.toContain('entry 0')
+  })
+
+  it('survives a reopen with the compacted file intact', () => {
+    const log = newLog()
+    for (let i = 0; i < 2_300; i++) {
+      log.post({ at: i, sessionId: 's1', author: 'agent', summary: `entry ${i}` })
+    }
+    expect(newLog().list().length).toBe(log.list().length)
+  })
+})

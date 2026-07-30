@@ -178,6 +178,35 @@ export function createSupervision(options: SupervisionOptions): Supervision {
       }
     })
 
+  async function hunksFor(sessionId: string): Promise<DecisionSet | null> {
+    const held = decisions.get(sessionId)
+    if (held !== undefined) return held
+    const run = runs.get(sessionId)
+    if (run === null) return null
+    // Against the base, so the hunks are the same change the summary counted
+    // — including work the agent never committed.
+    // A separate `git diff --no-index` per untracked file, so a file git has
+    // never seen has hunks too. Without it a run that only added files queued
+    // a review with a non-empty summary and nothing in it to accept or
+    // reject.
+    const untracked = await readUntrackedFiles(run.worktreePath, runCommand)
+    const patch = await runCommand('git', ['diff', run.baseBranch ?? baseBranch], run.worktreePath)
+    const added = await Promise.all(
+      untracked.map((file) =>
+        runCommand('git', ['diff', '--no-index', '/dev/null', file], run.worktreePath)
+      )
+    )
+    const combined = [
+      patch.ok ? patch.stdout : '',
+      // `--no-index` exits non-zero precisely because the files differ, so
+      // its output is used regardless of the code.
+      ...added.map((result) => result.stdout),
+    ].join('\n')
+    const set = createDecisionSet(parseHunks(combined))
+    decisions.set(sessionId, set)
+    return set
+  }
+
   async function measure(sessionId: string): Promise<void> {
     const run = runs.get(sessionId)
     if (run === null || run.worktreePath === '') return
@@ -257,40 +286,12 @@ export function createSupervision(options: SupervisionOptions): Supervision {
       runs.setState(sessionId, run.diff.files > 0 ? 'ready' : 'finished', at)
     },
 
-    async hunksFor(sessionId): Promise<DecisionSet | null> {
-      const held = decisions.get(sessionId)
-      if (held !== undefined) return held
-      const run = runs.get(sessionId)
-      if (run === null) return null
-      // Against the base, so the hunks are the same change the summary counted
-      // — including work the agent never committed.
-      // `--` with the untracked files named, so a file git has never seen has
-      // hunks too. Without it a run that only added files queued a review with
-      // a non-empty summary and nothing in it to accept or reject.
-      const untracked = await readUntrackedFiles(run.worktreePath, runCommand)
-      const patch = await runCommand(
-        'git',
-        ['diff', run.baseBranch ?? baseBranch],
-        run.worktreePath
-      )
-      const added = await Promise.all(
-        untracked.map((file) =>
-          runCommand('git', ['diff', '--no-index', '/dev/null', file], run.worktreePath)
-        )
-      )
-      const combined = [
-        patch.ok ? patch.stdout : '',
-        // `--no-index` exits non-zero precisely because the files differ, so
-        // its output is used regardless of the code.
-        ...added.map((result) => result.stdout),
-      ].join('\n')
-      const set = createDecisionSet(parseHunks(combined))
-      decisions.set(sessionId, set)
-      return set
-    },
+    hunksFor,
 
     async decideHunk(sessionId, hunkId, decision): Promise<boolean> {
-      const set = await this.hunksFor(sessionId)
+      // `hunksFor`, not `this.hunksFor`: reaching through `this` from inside an
+      // object literal breaks the moment anyone destructures the interface.
+      const set = await hunksFor(sessionId)
       if (set === null) return false
       set.decide(hunkId, decision)
       return true

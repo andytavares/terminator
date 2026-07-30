@@ -60,9 +60,29 @@ function isDropped(row: FeedRow): row is DroppedRow {
 
 type FeedRow = FeedEntry | ForgottenRow | DroppedRow
 
+/**
+ * How many entries the feed keeps.
+ *
+ * It is a record of what happened while you were away, not an archive: every
+ * read parses the whole file, and tombstones append rather than removing, so
+ * without a bound both the file and the cost of reading it grow for the life of
+ * the workspace.
+ */
+const MAX_ENTRIES = 2_000
+
+/**
+ * How often to check.
+ *
+ * Compacting on every post would re-read and rewrite the file for each line
+ * written. The feed therefore sits at up to `MAX_ENTRIES + COMPACT_EVERY`
+ * between checks, which is the bound — not `MAX_ENTRIES` exactly.
+ */
+const COMPACT_EVERY = 200
+
 export function createFeedLog(path: string): FeedLog {
   const log = createJsonlLog<FeedRow>(path)
   let counter = 0
+  let sinceCompaction = 0
 
   /** What survives: entries about sessions nothing has forgotten since. */
   function live(): FeedEntry[] {
@@ -88,6 +108,16 @@ export function createFeedLog(path: string): FeedLog {
 
   return {
     post(entry): FeedEntry {
+      // Rewritten from what survives, occasionally: the tombstones for
+      // forgotten sessions and dropped entries are only meaningful until the
+      // rows they hide are gone.
+      if (++sinceCompaction >= COMPACT_EVERY) {
+        sinceCompaction = 0
+        const surviving = live()
+        if (surviving.length > MAX_ENTRIES) {
+          log.rewrite(surviving.slice(-MAX_ENTRIES))
+        }
+      }
       const full: FeedEntry = {
         ...entry,
         id: `${entry.sessionId}-${entry.at}-${++counter}`,

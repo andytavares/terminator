@@ -2,13 +2,14 @@ import { randomUUID } from 'node:crypto'
 import * as path from 'node:path'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { PhaseId } from '../types/speckit.types.js'
-import { buildLaunchSpec } from './claude-launch.js'
+import { buildLaunchSpec, shellQuote } from './claude-launch.js'
 import { installHookScript } from './hook-script.js'
 import type { ControlServer } from './control-server.js'
 import {
   createPermissionBridge,
   type PendingPermission,
   type PermissionDecision,
+  type PermissionOutcome,
 } from './permission-bridge.js'
 import { countTurns } from './transcript-tailer.js'
 import type { WatchedRun } from './stall-watcher.js'
@@ -52,7 +53,15 @@ export interface StartSupervisedRunOptions {
   /** Decides without asking when the autonomy ladder allows it. */
   autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
   onPending: (pending: PendingPermission) => void
-  onResolved: (requestId: string, decision: 'allow' | 'deny') => void
+  onResolved: (requestId: string, decision: PermissionOutcome) => void
+  /**
+   * The run exists and can be found, before anything is typed into it.
+   *
+   * Ordering, not decoration: the launch command goes to the terminal inside
+   * `start`, and anything the agent does between that write and `start`
+   * returning would reach a caller that had not registered the run yet.
+   */
+  onRegistered?: (run: SupervisedRun) => void
   /** The agent stopped responding and is waiting. Not an ending. */
   onTurnEnd?: (turns: number) => void
   /**
@@ -239,6 +248,15 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         release,
       })
 
+      // Registered before a single keystroke reaches the terminal: the launch
+      // command is written below, and a hook or turn-end arriving before the
+      // caller had added the run would hit an empty registry and be dropped.
+      start.onRegistered?.({
+        sessionId,
+        terminalSessionId,
+        transcriptPath: spec.transcriptPath,
+      })
+
       // Typed, exactly as a person would. The skills read these to find the
       // card's spec, plan and tasks regardless of the branch name.
       const featureSlug = path.basename(start.featureDir)
@@ -252,7 +270,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       // forever. Documented as the override for exactly this case.
       api.pty.write(
         terminalSessionId,
-        `export SPECIFY_FEATURE=${featureSlug} SPECIFY_FEATURE_DIRECTORY=${path.join('specs', featureSlug)} CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1\r`
+        `export SPECIFY_FEATURE=${shellQuote(featureSlug)} SPECIFY_FEATURE_DIRECTORY=${shellQuote(path.join('specs', featureSlug))} CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1\r`
       )
       api.pty.write(terminalSessionId, `${spec.command}\r`)
 

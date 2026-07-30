@@ -120,8 +120,10 @@ describe('starting a supervised run', () => {
   it('points the skills at the card, so they work whatever the branch is called', async () => {
     await runner().start(start)
     const typed = written.map((w) => w.data).join('')
-    expect(typed).toContain('SPECIFY_FEATURE=021-thing')
-    expect(typed).toContain('SPECIFY_FEATURE_DIRECTORY=specs/021-thing')
+    // Quoted: it goes into the operator's shell, and a slug is not guaranteed
+    // to be a bare word.
+    expect(typed).toContain("SPECIFY_FEATURE='021-thing'")
+    expect(typed).toContain("SPECIFY_FEATURE_DIRECTORY='specs/021-thing'")
   })
 
   it('knows where the transcript will be before the process exists', async () => {

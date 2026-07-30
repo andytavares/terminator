@@ -31,15 +31,20 @@ export function createMuteStore(filePath: string): MuteStore {
       if (!Array.isArray(parsed)) return []
       // Filtered on read rather than trusted: the file is small, hand-editable,
       // and a malformed rule would silently mute everything or nothing.
-      return parsed.filter(
-        (rule): rule is MuteRule =>
-          typeof rule === 'object' &&
-          rule !== null &&
-          (rule as MuteRule).sessionId !== null &&
-          ((rule as MuteRule).author === undefined ||
-            (rule as MuteRule).author === 'agent' ||
-            (rule as MuteRule).author === 'console')
-      )
+      return parsed.filter((rule): rule is MuteRule => {
+        if (typeof rule !== 'object' || rule === null) return false
+        const candidate = rule as MuteRule
+        const namesSession = typeof candidate.sessionId === 'string'
+        const namesAuthor = candidate.author === 'agent' || candidate.author === 'console'
+        // At least one, or the rule matches every entry: `shouldNotify` treats
+        // an empty rule as "mute everything", which is the opposite of what a
+        // filter over hand-editable JSON should let through.
+        if (!namesSession && !namesAuthor) return false
+        return (
+          (candidate.author === undefined || namesAuthor) &&
+          (candidate.sessionId === undefined || namesSession)
+        )
+      })
     } catch {
       return []
     }

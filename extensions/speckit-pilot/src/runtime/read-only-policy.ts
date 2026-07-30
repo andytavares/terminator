@@ -39,15 +39,17 @@ const READ_ONLY_BINARIES: ReadonlySet<string> = new Set([
   'tail',
   'wc',
   'ls',
-  'find',
   'grep',
   'rg',
-  'sed',
-  'awk',
   'file',
   'stat',
   'diff',
 ])
+
+// Deliberately absent, having once been here: `sed` (`-i` edits in place),
+// `find` (`-delete`, `-exec`) and `awk` (its own redirection). Each reads by
+// default and writes with one flag, which an allowlist matched on the first
+// word cannot tell apart. A review that needs them can ask.
 
 /** The git sub-commands that only read. `git checkout` and friends are not here. */
 const READ_ONLY_GIT: ReadonlySet<string> = new Set([
@@ -59,10 +61,11 @@ const READ_ONLY_GIT: ReadonlySet<string> = new Set([
   'ls-files',
   'blame',
   'describe',
-  'branch',
-  'remote',
-  'config',
 ])
+
+// Also deliberately absent: `config` writes the repository's configuration,
+// `branch -D` deletes branches, and `remote add` rewrites where a push goes.
+// All three read with no arguments and destroy with one.
 
 /**
  * Anything that chains, redirects or substitutes.
@@ -71,8 +74,12 @@ const READ_ONLY_GIT: ReadonlySet<string> = new Set([
  * passes, and so does `git diff; rm -rf .`, `git diff > file` and
  * `git diff $(rm -rf .)`. A review never needs any of them, so the whole class
  * is refused rather than parsed.
+ *
+ * Newlines included, and they were the hole: a shell runs each line of
+ * `git diff\nrm -rf .` in turn, while a check that only looked for `;` saw the
+ * first word, said "git diff", and allowed it.
  */
-const COMPOUND = /[;&|><`]|\$\(/
+const COMPOUND = /[;&|><`\n\r]|\$\(/
 
 export function decideReadOnly(toolName: string, input: unknown): PolicyDecision {
   if (READ_ONLY_TOOLS.has(toolName)) {

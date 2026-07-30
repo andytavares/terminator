@@ -46,7 +46,13 @@ function makeApi(): ExtensionAPI {
     openAuxiliary: vi.fn(),
     focusSelf: vi.fn(),
   }
-  return { window } as unknown as ExtensionAPI
+  // An unsupervised phase says so out loud, so the api it says it through has
+  // to be here.
+  return {
+    window,
+    log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    notifications: { showToast: vi.fn(), createNotification: vi.fn() },
+  } as unknown as ExtensionAPI
 }
 
 async function loadRunner() {

@@ -122,9 +122,16 @@ function RunActions({
           <button
             className="sk-sup__btn"
             title="End it and remove its worktree and branch"
-            onClick={() =>
+            onClick={() => {
+              // It runs `git worktree remove --force` and `git branch -D`:
+              // every uncommitted line the agent wrote goes with it. Parking a
+              // card, which is far milder, already asks.
+              const sure = window.confirm(
+                `Discard ${label}?\n\nThis deletes its worktree and its branch, including anything the agent has not committed. It cannot be undone.`
+              )
+              if (!sure) return
               void getSpeckitAPI().runDiscard({ sessionId, workspacePath }).then(onChanged)
-            }
+            }}
           >
             Discard
           </button>
@@ -670,15 +677,20 @@ export function SupervisionPanel({
 
   const load = useCallback(async () => {
     const api = getSpeckitAPI()
+    // The snapshot and the stall list every time: both are in-memory, and both
+    // are what the tab counts are made of. The feed only when it is on screen —
+    // it re-reads a file that grows for the life of the workspace, and doing
+    // that every five seconds to render nothing is a cost that stays invisible
+    // until the log is long.
     const [next, firings, entries] = await Promise.all([
       api.supervisionSnapshot(),
       api.stallsList(),
-      api.feedList(),
+      section === 'feed' ? api.feedList() : null,
     ])
     setSnapshot(next)
     setStalls(firings)
-    setFeed({ entries: entries.entries, mutes: entries.mutes })
-  }, [])
+    if (entries !== null) setFeed({ entries: entries.entries, mutes: entries.mutes })
+  }, [section])
 
   const reload = useCallback(() => {
     void load()

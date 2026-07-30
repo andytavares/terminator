@@ -210,6 +210,26 @@ function readOnlySettingsPath(): string | null {
   }
 }
 
+/**
+ * Says, where anyone can see it, that a phase is about to run unsupervised.
+ *
+ * Three things drop a run to the headless spawn: the supervision runtime
+ * failed to start, the repository belongs to no workspace, or no terminal could
+ * be opened. All three end in `bypassPermissions`, and a log line is not a
+ * signal — the operator would see a card working normally and never learn that
+ * this one approved everything itself.
+ */
+function warnUnsupervised(api: ExtensionAPI, featureDir: string, phase: PhaseId): void {
+  const card = path.basename(featureDir)
+  api.log.error(`running ${phase} unsupervised in ${card} — no terminal, no held tool calls`)
+  api.notifications.showToast(
+    'error',
+    `${card}: ${phase} is running unsupervised — its tool calls are being approved automatically`,
+    // Keyed by card, so one unsupervised run does not stack a toast per phase.
+    `speckit.unsupervised.${card}`
+  )
+}
+
 /** The workspace a card's repository belongs to, for placing its terminal. */
 function workspaceIdFor(api: ExtensionAPI, workspacePath: string): string | null {
   return api.workspace.list().find((w) => w.folderPath === workspacePath)?.id ?? null
@@ -278,6 +298,13 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
           onSession,
         })
         if (startedSupervised !== null) return startedSupervised
+        // It could not be supervised, and the fall-through below is
+        // `--permission-mode bypassPermissions`: an agent nobody can see,
+        // approving its own tool calls in a worktree. That is the exact thing
+        // this replaced, so it is said out loud rather than logged.
+        warnUnsupervised(api, featureDir, phase)
+      } else if (phase !== 'self-review') {
+        warnUnsupervised(api, featureDir, phase)
       }
 
       const shellBin = process.env.SHELL ?? '/bin/sh'
@@ -601,6 +628,22 @@ function startSupervised(opts: {
           decision,
         })
       },
+      onRegistered: (started) => {
+        // Before the terminal is written to, so nothing the agent does can
+        // arrive at a registry that has never heard of it.
+        sessionId = started.sessionId
+        supervision?.runs.add({
+          sessionId: started.sessionId,
+          featureDir: opts.featureDir,
+          phase: opts.phase,
+          worktreePath: opts.worktreePath,
+          branch,
+          baseBranch: opts.baseBranch ?? null,
+          terminalSessionId: started.terminalSessionId,
+          transcriptPath: started.transcriptPath,
+          startedAt: Date.now(),
+        })
+      },
       onTurnEnd: (turns) => {
         // A turn ending is what finishes a supervised phase.
         //
@@ -630,23 +673,14 @@ function startSupervised(opts: {
       void opts.onComplete?.(1)
       return
     }
-    sessionId = run.sessionId
     if (stopRequested) {
       // Asked to stop before it had started. Honour it now that there is
       // something to stop.
       runner.stop(run.sessionId, 'stopped from the pilot')
     }
-    supervision?.runs.add({
-      sessionId: run.sessionId,
-      featureDir: opts.featureDir,
-      phase: opts.phase,
-      worktreePath: opts.worktreePath,
-      branch,
-      baseBranch: opts.baseBranch ?? null,
-      terminalSessionId: run.terminalSessionId,
-      transcriptPath: run.transcriptPath,
-      startedAt: Date.now(),
-    })
+    // `onRegistered` above already added it, before the terminal was written
+    // to; this only has to cover a runner that does not report registration.
+    sessionId = run.sessionId
     opts.onSession?.(run.sessionId)
     void opts.onStart?.()
   })()

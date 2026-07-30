@@ -86,9 +86,9 @@ export async function readUntrackedFiles(worktreePath: string, run: RunCommand):
   }
 }
 
-/** Lines in a new file, so it counts towards the change like any other. */
 const MAX_COUNTED_BYTES = 2_000_000
 
+/** Lines in a new file, so it counts towards the change like any other. */
 function addedLinesIn(worktreePath: string, relativePath: string): number {
   try {
     const path = join(worktreePath, relativePath)

@@ -28,7 +28,11 @@ await window.electronAPI.extensionBridge.invoke('speckit-pilot:my-action', paylo
 ### What extensions MUST NOT do
 
 - **Never** modify `src/main/preload.ts` (core file)
-- **Never** modify `src/renderer/electron.d.ts` (core file)
+- **Never** modify `src/renderer/electron.d.ts` **to add an extension-specific
+  channel**. Core-generic additions belong there and cannot be avoided:
+  `src/shared/electron-api/manifest.ts` requires the declaration file to be kept
+  in step, so a new core capability an extension needs — `terminal.attach`, say —
+  has to appear in both. What is forbidden is putting `speckit:*` in it.
 - **Never** add extension-only npm deps to the **root** `package.json` — add to `extensions/speckit-pilot/package.json`
 - **Never** import from other extensions (`extensions/git-integration/...`, `extensions/task-vault/...`)
 - **Never** hardcode the extension ID (`terminator.speckit-pilot`) in core app files

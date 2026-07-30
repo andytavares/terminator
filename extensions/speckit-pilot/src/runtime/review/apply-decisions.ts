@@ -44,7 +44,11 @@ export function buildPatch(hunks: readonly Hunk[]): string {
 
   const out: string[] = []
   for (const [file, fileHunks] of byFile) {
-    out.push(`--- a/${file}`, `+++ b/${file}`)
+    // `/dev/null` for a file that did not exist, which is what `git diff
+    // --no-index` produced when the hunks were read. Naming the file on both
+    // sides makes `git apply --reverse` refuse.
+    out.push(fileHunks.some((hunk) => hunk.isNew) ? '--- /dev/null' : `--- a/${file}`)
+    out.push(`+++ b/${file}`)
     // In order, because `git apply` tracks the offset each hunk introduces for
     // the ones after it and cannot do that from a shuffled list.
     for (const hunk of [...fileHunks].sort((a, b) => a.oldStart - b.oldStart)) {

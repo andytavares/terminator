@@ -157,3 +157,32 @@ describe('the hook script agrees with the policy', () => {
     expect(JSON.parse(stdout).hookSpecificOutput.permissionDecision).toBe('deny')
   })
 })
+
+describe('the ways this was bypassable', () => {
+  // Every one of these was allowed, verified by running the policy directly.
+  // A review that can run them is not a review — it is an agent with write
+  // access and a reassuring name.
+
+  it.each([
+    ['a newline runs the next command', 'git diff\nrm -rf .'],
+    ['so does a carriage return', 'git diff\rrm -rf .'],
+    ['sed rewrites the file in place', 'sed -i.bak s/a/b/ file.ts'],
+    ['find deletes what it finds', 'find . -name x -delete'],
+    ['find executes anything', 'find . -exec rm {} ;'],
+    ['awk redirects on its own', 'awk {print} file > out'],
+    ['git config writes configuration', 'git config user.email evil@example.com'],
+    ['git branch -D destroys branches', 'git branch -D main'],
+    ['git remote repoints a push', 'git remote add evil https://example.invalid'],
+  ])('refuses: %s', (_why, command) => {
+    expect(decideReadOnly('Bash', { command }).allow).toBe(false)
+  })
+
+  it.each([
+    ['reading a file', 'cat README.md'],
+    ['searching', 'grep -rn thing src'],
+    ['the diff a review is mostly made of', 'git diff main'],
+    ['the log', 'git log --oneline -20'],
+  ])('still allows: %s', (_why, command) => {
+    expect(decideReadOnly('Bash', { command }).allow).toBe(true)
+  })
+})

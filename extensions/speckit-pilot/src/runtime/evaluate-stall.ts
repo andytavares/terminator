@@ -8,7 +8,6 @@ export interface StallThresholds {
   readonly silenceMs: number
   /** No net change before the loop signal can fire. */
   readonly noProgressMs: number
-  /** Reverts within the recent-edit window that constitute thrashing. */
 }
 
 export const DEFAULT_THRESHOLDS: StallThresholds = {

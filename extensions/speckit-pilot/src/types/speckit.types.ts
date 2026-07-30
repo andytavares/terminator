@@ -240,6 +240,14 @@ export interface PilotState {
   queuePosition: 'active' | 'pending' | null
   worktreePath: string | null
   branchName: string | null
+  /**
+   * What the worktree was cut from.
+   *
+   * Persisted because a card can be provisioned now and started later, when
+   * the queue drains — and a run measured against `main` instead reports the
+   * difference between two branches rather than the work it did.
+   */
+  baseBranch?: string | null
   prUrl: string | null
   phases: Record<PhaseId, PhaseState>
   settings: PilotSettings

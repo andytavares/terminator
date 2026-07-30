@@ -272,3 +272,41 @@ describe('counting turns', () => {
     expect(countTurns(dir)).toBe(0)
   })
 })
+
+describe('a transcript too big to read whole', () => {
+  it('reads the tail rather than the file, and still finds recent calls', () => {
+    // The stall detector asks what happened recently and never needed the
+    // beginning; reading it all put an unbounded synchronous read on the main
+    // thread every thirty seconds per run.
+    const path = join(dir, 'huge.jsonl')
+    const filler = JSON.stringify({
+      type: 'assistant',
+      timestamp: new Date(0).toISOString(),
+      message: { content: [{ type: 'text', text: 'x'.repeat(4_000) }] },
+    })
+    const recent = JSON.stringify({
+      type: 'assistant',
+      timestamp: new Date(9_000).toISOString(),
+      message: { content: [{ type: 'tool_use', id: 'late', name: 'Edit', input: {} }] },
+    })
+    writeFileSync(path, [...Array(200).fill(filler), recent].join('\n') + '\n')
+
+    const events = readTranscript(path)
+    expect(events.some((event) => event.callId === 'late')).toBe(true)
+  })
+
+  it('drops the fragment the offset landed in the middle of', () => {
+    // Reading from a byte offset lands mid-line, and that partial is not a torn
+    // write worth reporting.
+    const path = join(dir, 'fragment.jsonl')
+    const filler = 'x'.repeat(300_000)
+    const good = JSON.stringify({
+      type: 'assistant',
+      timestamp: new Date(1_000).toISOString(),
+      message: { content: [{ type: 'tool_use', id: 'ok', name: 'Read', input: {} }] },
+    })
+    writeFileSync(path, `${filler}\n${good}\n`)
+
+    expect(readTranscript(path).map((event) => event.callId)).toEqual(['ok'])
+  })
+})

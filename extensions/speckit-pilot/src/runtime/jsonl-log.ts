@@ -7,7 +7,10 @@ import {
   openSync,
   readSync,
   closeSync,
+  writeFileSync,
+  renameSync,
 } from 'fs'
+import { randomUUID } from 'crypto'
 import { dirname } from 'path'
 
 // Append-only JSONL, backing the two logs that grow without bound: stall
@@ -21,6 +24,10 @@ import { dirname } from 'path'
 export interface JsonlLog<T> {
   append(record: T): void
   readAll(): T[]
+  /** Replaces the file with exactly these records, atomically. */
+  rewrite(records: readonly T[]): void
+  /** Replaces the file with exactly these records, atomically. */
+  rewrite(records: readonly T[]): void
   readRange(predicate: (record: T) => boolean): T[]
   count(): number
 }
@@ -72,6 +79,21 @@ export function createJsonlLog<T>(path: string): JsonlLog<T> {
 
     readAll(): T[] {
       return parseLines<T>(path)
+    },
+
+    /**
+     * Replaces the file with exactly these records.
+     *
+     * Append-only is right for a log being written to and wrong forever: a
+     * tombstone hiding a row still costs a parse on every read. Written to a
+     * unique temp and renamed, so a crash leaves the old log rather than half
+     * a new one.
+     */
+    rewrite(records: readonly T[]): void {
+      mkdirSync(dirname(path), { recursive: true })
+      const tmp = `${path}.${randomUUID()}.tmp`
+      writeFileSync(tmp, records.map((record) => JSON.stringify(record) + '\n').join(''), 'utf-8')
+      renameSync(tmp, path)
     },
 
     readRange(predicate: (record: T) => boolean): T[] {

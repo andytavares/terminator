@@ -198,7 +198,7 @@ waiting on it and sends you to the terminal.
 - **In memory** — the run register, the review queue, the stall firings. A run
   does not outlive the application: its terminal is a child of this process, and
   a registry reloaded from disk would describe runs that no longer exist.
-- **On disk**, under `<worktree base>/.speckit-pilot-runtime/` — the feed
+- **On disk**, under `userData/speckit-pilot-runtime/` — the feed
   (`feed.jsonl`), backpressure overrides, mute rules, and the per-session
   `--settings` files and hook script.
 - **In the browser** — when you last read the feed. That is a property of the
@@ -257,6 +257,18 @@ in the worktree: a review that adds a `coverage/` directory to the diff it is
 reviewing has changed the thing it was measuring. Step output is not captured —
 it streams to the run console live, and capturing it per step would mean piping,
 whose status variable differs between bash and zsh.
+
+## When a phase cannot be supervised
+
+Three things drop a run to the headless spawn — `claude --print
+--permission-mode bypassPermissions`, an agent nobody can see approving its own
+tool calls: the supervision runtime failed to start, the repository belongs to
+no workspace, or there is no window to put a terminal in. All three raise a
+notification naming the card, because a log line is not a signal and a card that
+ran unsupervised looks exactly like one that did not.
+
+A terminal that could not be opened is different: that ends the phase with a
+failure rather than running it unwatched.
 
 ## What is deliberately not here
 
