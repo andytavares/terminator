@@ -1,0 +1,112 @@
+extensions/speckit-pilot/SUPERVISION.md
+  s_5f98598a6d950e::t_4e5f272d49e8f8 201,261-271
+  s_5f98598a6d950e::t_c021e86bf862f3 272
+extensions/speckit-pilot/tests/runtime/transcript-tailer.spec.ts
+  s_5f98598a6d950e::t_563009bc8a1df3 275-312
+extensions/speckit-pilot/src/runtime/feed/mutes.ts
+  s_5f98598a6d950e::t_60c13435d601a3 34-42,47
+  s_5f98598a6d950e::t_e32a764fa03b01 43-46
+src/main/extensions/api.ts
+  s_5f98598a6d950e::t_524761df41f999 325,662-678
+  s_5f98598a6d950e::t_596e614d293c2d 649,651-655,657
+docs/adr/026-supervised-runs-in-a-terminal.md
+  s_5f98598a6d950e::t_4e5f272d49e8f8 76-81,103-106
+src/main/terminal/pty-manager.ts
+  s_5f98598a6d950e::t_0e8e115bcb6a7c 61-68,107,113,116-117,161
+extensions/speckit-pilot/src/components/SupervisionPanel.tsx
+  s_5f98598a6d950e::t_51b71434c8e041 688,692-693
+  s_5f98598a6d950e::t_4207fc2d087da3 125-132,134
+  s_5f98598a6d950e::t_e39a87c5de555c 680-684
+extensions/speckit-pilot/src/runtime/feed/feed-log.ts
+  s_5f98598a6d950e::t_5b15eef68ac600 63-72,85,111-113,115-120
+  s_5f98598a6d950e::t_88c971764ebe16 73-81,114
+extensions/speckit-pilot/tests/runtime/read-only-policy.spec.ts
+  s_5f98598a6d950e::t_9cf7d6725d9f2f 160-188
+extensions/speckit-pilot/src/types/speckit.types.ts
+  s_5f98598a6d950e::t_a728f1e5503903 243-250
+extensions/speckit-pilot/src/runtime/read-only-policy.ts
+  s_5f98598a6d950e::t_f93ee090c4cbba 49-53,66-69,77-80,82
+extensions/speckit-pilot/CLAUDE.md
+  s_5f98598a6d950e::t_15b98646ecd1f7 31-35
+extensions/speckit-pilot/tests/runner/supervised-phase.spec.ts
+  s_5f98598a6d950e::t_7142321fc56ac4 303-308,313,316-321,338-355
+  s_5f98598a6d950e::t_7061422e90b079 58
+  s_5f98598a6d950e::t_73cdb4b45d118c 309-312,314-315,322-337
+extensions/speckit-pilot/src/runtime/jsonl-log.ts
+  s_5f98598a6d950e::t_a01b4140e0ca05 29-30
+  s_5f98598a6d950e::t_38f6c2f16837f3 27-28,84-98
+  s_5f98598a6d950e::t_1c0fd1f9c3b8f9 10-11,13
+extensions/speckit-pilot/tests/runtime/review/apply-decisions.spec.ts
+  s_5f98598a6d950e::t_94d15c0770ffb1 178-189
+  s_5f98598a6d950e::t_1bb5cb35b13943 3,21,169-177,190-195
+  s_5f98598a6d950e::t_5fb9b567618043 196-197
+extensions/speckit-pilot/src/runtime/supervised-runner.ts
+  s_5f98598a6d950e::t_2515e08697ada0 5,273
+  s_5f98598a6d950e::t_1ad51575b0a649 12,56
+  s_5f98598a6d950e::t_158f5495455ac5 57-64,251-257
+  s_5f98598a6d950e::t_8979a79ed57df7 258-259
+extensions/speckit-pilot/src/runtime/review/apply-decisions.ts
+  s_5f98598a6d950e::t_3ff465120558cd 47-51
+extensions/speckit-pilot/src/runtime/supervision.ts
+  s_5f98598a6d950e::t_e32a764fa03b01 193,208
+  s_5f98598a6d950e::t_a495b90cebf339 181-192,194-207,209,289
+  s_5f98598a6d950e::t_60c13435d601a3 292-294
+extensions/speckit-pilot/src/runtime/diff-metrics.ts
+  s_5f98598a6d950e::t_086388c6a3a2ab 91
+extensions/speckit-pilot/tests/components/SupervisionPanel.spec.tsx
+  s_5f98598a6d950e::t_e20aa5ae2405de 212-214,225-230
+  s_5f98598a6d950e::t_8eb41ef49938b3 117-119,123-133,231
+  s_5f98598a6d950e::t_99ff7f256c8436 232
+extensions/speckit-pilot/src/runtime/review/parse-hunks.ts
+  s_5f98598a6d950e::t_3ff465120558cd 16-20,29,42
+extensions/speckit-pilot/src/runtime/control-server.ts
+  s_5f98598a6d950e::t_4207fc2d087da3 97,99,101-106,108,110
+  s_5f98598a6d950e::t_ac82be3d192caf 107
+extensions/speckit-pilot/src/runtime/review/hunk-decisions.ts
+  s_5f98598a6d950e::t_3ff465120558cd 13-21
+extensions/speckit-pilot/tests/runtime/feed/feed-log.spec.ts
+  s_5f98598a6d950e::t_88c971764ebe16 185-188
+  s_5f98598a6d950e::t_8de93957077ad1 176-184,189-208
+extensions/speckit-pilot/src/runtime/read-only-hook.ts
+  s_5f98598a6d950e::t_f93ee090c4cbba 18,20,22,24,28
+extensions/speckit-pilot/src/runtime/transcript-tailer.ts
+  s_5f98598a6d950e::t_2a69d91b271a9f 1
+  s_5f98598a6d950e::t_2a669b857e2090 99-108
+  s_5f98598a6d950e::t_370f11374f382f 111,113-127,135-139
+tests/unit/extensions/api-supervised-runs.spec.ts
+  s_5f98598a6d950e::t_aaf7e55d1e41e8 141-160
+extensions/speckit-pilot/src/runtime/permission-bridge.ts
+  s_5f98598a6d950e::t_1ad51575b0a649 253-255,307-317
+  s_5f98598a6d950e::t_f772a5954b1c6c 35-43,63
+  s_5f98598a6d950e::t_cc9c5c87702c47 113-115
+  s_5f98598a6d950e::t_73c12555a9b2f3 209-215
+extensions/speckit-pilot/src/runner/agent-runner.ts
+  s_5f98598a6d950e::t_51689a30ccd1ef 213-232,301-307
+  s_5f98598a6d950e::t_158f5495455ac5 631-646,681-683
+extensions/speckit-pilot/tests/runtime/read-only-hook-agrees.spec.ts
+  s_5f98598a6d950e::t_d5b870c5f41196 1-89
+extensions/speckit-pilot/tests/runner/agent-runner.spec.ts
+  s_5f98598a6d950e::t_7061422e90b079 49-55
+extensions/speckit-pilot/tests/runtime/supervised-runner.spec.ts
+  s_5f98598a6d950e::t_016af7696f27e5 123-126
+extensions/speckit-pilot/src/index.ts
+  s_5f98598a6d950e::t_60c13435d601a3 1431-1433
+  s_5f98598a6d950e::t_fce63de4d00c5a 1080-1094
+  s_5f98598a6d950e::t_a728f1e5503903 699-701,759-767
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "8119f048af7807bd96ec75e8725839d359db4218",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
