@@ -672,6 +672,11 @@ async function handoffCard(
     autonomyLevel: state.run?.autonomyLevel ?? state.settings.defaultAutonomy ?? 'standard',
   }
   primePhasesForRun(state)
+  // Before any early return. A card that queues here is started later by
+  // `advanceQueue`, which reads this — and without it every queued card's diff
+  // is measured against `main`, which on a repository whose default is
+  // something else fails and reads as "changed nothing".
+  state.baseBranch = baseBranch ?? state.baseBranch ?? null
 
   const cap = getMaxConcurrent(api)
   const active = await countActiveRuns(workspacePath)
@@ -696,9 +701,6 @@ async function handoffCard(
   if (!worktreePath) return { error: 'Could not resolve a worktree for the card' }
   state.worktreePath = worktreePath
   state.branchName = branchName
-  // Remembered, so a card that drains through the queue later is still
-  // measured against what it was cut from rather than `main`.
-  state.baseBranch = baseBranch ?? state.baseBranch ?? null
   state.queuePosition = 'active'
   state.stage = deriveStage(state.phases, state.run)
   await writePilotState(featureDir, state)
@@ -1169,8 +1171,13 @@ export function activate(api: ExtensionAPI): void {
   // the change you asked for and the one you did not.
   reg(api, 'speckit:review-hunks', async (payload: unknown) => {
     const { sessionId } = payload as { sessionId: string }
-    const set = await supervision?.hunksFor(sessionId)
-    if (set === undefined || set === null) return { files: [], complete: false, fullReject: false }
+    if (supervision === null) {
+      // Distinguished from "changed nothing": a panel that cannot tell them
+      // apart shows an empty review for a runtime that never started.
+      return { files: null, complete: false, fullReject: false }
+    }
+    const set = await supervision.hunksFor(sessionId)
+    if (set === null) return { files: [], complete: false, fullReject: false }
     // Grouped by file, with the hunk's own lines: a reviewer decides on what
     // the change says, and a list of identifiers is not a diff.
     const files = new Map<string, HunkView[]>()
@@ -1398,8 +1405,12 @@ export function activate(api: ExtensionAPI): void {
       workspacePath?: string
     }
     const run = supervision?.runs.get(sessionId) ?? null
-    supervisedRunner?.stop(sessionId, 'Discarding this run.')
     if (run !== null) {
+      // Killed, not asked. `stop` types `/exit` into the terminal and returns
+      // immediately: the write is asynchronous and nothing waits for the
+      // process, so removing the worktree underneath it raced an agent still
+      // running in that directory.
+      api.pty.kill(run.terminalSessionId)
       await discardWorktree(api, workspacePath ?? '', run.worktreePath, run.branch)
       supervision?.review.remove(sessionId)
       supervision?.runs.forget(sessionId)
@@ -1439,6 +1450,16 @@ export function activate(api: ExtensionAPI): void {
       // are gone, so its feed entries are noise about something that no longer
       // exists. Posted after, so the discard itself is what remains.
       supervision?.feed.forget(sessionId)
+      // The project the run needed goes with the directory it pointed at.
+      // Left behind, the sidebar keeps an entry for a path that is gone.
+      const workspace = api.workspace.list().find((w) => w.folderPath === (workspacePath ?? ''))
+      const project = workspace
+        ? api.workspace
+            .listProjects(workspace.id)
+            .find((candidate) => candidate.name === run.branch)
+        : undefined
+      if (project !== undefined) api.workspace.deleteProject(project.id)
+
       supervision?.feed.post({
         at: Date.now(),
         sessionId,
@@ -2144,6 +2165,9 @@ export function activate(api: ExtensionAPI): void {
         queuePosition: 'active',
         worktreePath,
         branchName,
+        // Recorded here too: dispatch can hit the gate below and queue, and
+        // whatever starts it later reads this to know what to measure against.
+        baseBranch: baseBranch ?? null,
       })
 
       // Through the one writer, which names its temp file uniquely: two

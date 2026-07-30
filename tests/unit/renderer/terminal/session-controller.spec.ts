@@ -257,15 +257,25 @@ describe('adoptTerminalSession', () => {
   })
 
   it('stores the instance before activating, so the pane effect finds it', () => {
+    mockGetActiveSessionForProject.mockReturnValue(null)
     adoptTerminalSession(adopted)
     const instanceCall = mockSetTerminalInstance.mock.invocationCallOrder[0]
     const activateCall = mockSetActiveSessionForProject.mock.invocationCallOrder[0]
     expect(instanceCall).toBeLessThan(activateCall)
   })
 
-  it('shows it, rather than adding a tab nothing selects', () => {
+  it('shows it when the project has nothing selected', () => {
+    mockGetActiveSessionForProject.mockReturnValue(null)
     adoptTerminalSession(adopted)
     expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('proj-1', 'terminal-1')
+  })
+
+  it('does not steal focus from the terminal being read', () => {
+    // A supervised run starting in the background used to yank the operator
+    // away from whatever they had open in that project.
+    mockGetActiveSessionForProject.mockReturnValue('the-one-being-read')
+    adoptTerminalSession(adopted)
+    expect(mockSetActiveSessionForProject).not.toHaveBeenCalled()
   })
 
   it('does nothing for a session it already has, so a repeat is not a second tab', () => {

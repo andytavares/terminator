@@ -894,8 +894,9 @@ describe('startPhaseRunner — self-review mode', () => {
     const cmd = spawnArgs.join(' ')
     // Never the formatter itself: that writes, and a review may only read.
     expect(cmd).not.toMatch(/npm run format(?!:check)/)
-    expect(cmd).toContain('vitest')
-    expect(cmd).toContain('--coverage.reporter=json-summary')
+    // The fake worktree defines no scripts, so each step says it did not run
+    // rather than pretending it passed.
+    expect(cmd).toContain('tests not run')
     expect(cmd).toContain('google-review')
     // Each step records its own status: one exit code cannot carry four.
     for (const id of ['format', 'lint', 'test', 'review']) {
@@ -943,7 +944,7 @@ describe('startPhaseRunner — self-review mode', () => {
     expect(cmd).toContain('linting not run')
   })
 
-  it('shell command contains vitest coverage check when phase is self-review', async () => {
+  it('says the tests did not run when the repository defines no test script', async () => {
     const { child } = makeMockChild()
     vi.mocked(spawn).mockReturnValue(child as unknown as ReturnType<typeof spawn>)
 
@@ -960,8 +961,10 @@ describe('startPhaseRunner — self-review mode', () => {
 
     const spawnArgs = vi.mocked(spawn).mock.calls[0][1] as string[]
     const cmd = spawnArgs.join(' ')
-    expect(cmd).toContain('vitest')
-    expect(cmd).toContain('coverage')
+    expect(cmd).toContain('tests not run')
+    // And its exit code is still recorded, so "did not run" is distinguishable
+    // from "passed".
+    expect(cmd).toContain('test.code')
   })
 
   it('shell command contains google-review check when phase is self-review', async () => {
@@ -1065,7 +1068,7 @@ describe('self-review when the read-only policy cannot be installed', () => {
     expect(cmd).toContain('review skipped')
     // The deterministic checks still run, and the review step still fails, so
     // the card cannot advance on a review that never happened.
-    expect(cmd).toContain('vitest')
+    expect(cmd).toContain('tests not run')
     expect(cmd).toContain('false')
   })
 })

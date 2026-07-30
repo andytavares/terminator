@@ -143,6 +143,8 @@ export interface RunSupervision {
     }): unknown
     setState(sessionId: string, state: 'working' | 'waiting', at: number): void
     noteAsked(sessionId: string): void
+    /** What the run has changed so far, for deciding whether a turn finished it. */
+    get(sessionId: string): { diff: { files: number } } | null
   }
   finishTurn(sessionId: string, turns: number, at: number): Promise<void>
   finish(sessionId: string, at: number): void
@@ -651,10 +653,20 @@ function startSupervised(opts: {
         // its prompt, and `session_end` may never come. Waiting for it left the
         // phase `running` forever: the gate never appeared, approval never
         // unlocked, and the card looked busy while the agent sat idle.
-        if (sessionId !== null) void supervision?.finishTurn(sessionId, turns, Date.now())
-        if (ended) return
-        ended = true
-        void opts.onComplete?.(0)
+        //
+        // Only once it has changed something, though, which is the same rule
+        // `finishTurn` applies to the register. A first turn that ends with a
+        // plain question — text, so no tool call and no permission hold — was
+        // driving the card to `awaiting_review` while the agent was still
+        // working, and `ended` made that one-way.
+        if (sessionId === null) return
+        void supervision?.finishTurn(sessionId, turns, Date.now()).then(() => {
+          if (ended) return
+          const changed = supervision?.runs.get(sessionId as string)?.diff
+          if (changed === undefined || changed.files === 0) return
+          ended = true
+          void opts.onComplete?.(0)
+        })
       },
       onEnd: (exitCode) => {
         if (sessionId !== null) supervision?.finish(sessionId, Date.now())

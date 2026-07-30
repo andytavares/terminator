@@ -438,7 +438,9 @@ const sessionId = api.pty.openTerminalTab({
   tabTitle: branch,
   type: 'agent', // default; a person can still type into it
 })
-// null when there is no window to show it in — nothing is spawned in that case.
+// null when this extension context cannot reach the windows at all — nothing
+// is spawned in that case. Note it does not check that a window is *open*: with
+// no renderer listening the PTY runs and its output is held until one attaches.
 ```
 
 Output produced before the tab is mounted is **held, not dropped**. The renderer
@@ -462,9 +464,11 @@ const project = api.workspace.createProject({
 })
 ```
 
-Returns the **existing** project when the workspace already has one for that path
-or name, so provisioning the same branch twice lands in the project you were
-already looking at rather than beside it. The sidebar is notified, so it appears
+Returns the **existing** project when the workspace already has one for that
+**path**, so provisioning the same worktree twice lands in the project you were
+already looking at rather than beside it. Matching on the name as well would
+merge two different worktrees whose branches happen to share one; a name
+collision is disambiguated instead, as `name (directory)`. The sidebar is notified, so it appears
 without a reload.
 
 ---

@@ -80,7 +80,13 @@ export function adoptTerminalSession(adopted: {
   // Instance first, then activate, so TerminalPane's effect finds it — the same
   // ordering the create path depends on.
   store.setTerminalInstance(adopted.sessionId, instance)
-  store.setActiveSessionForProject(adopted.projectId, adopted.sessionId)
+  // Only when that project has nothing selected. `adoptSession` already keeps
+  // an existing selection (`activeSessionId ?? sessionId`), and overriding it
+  // here meant a supervised run starting in the background yanked the operator
+  // away from the terminal they were reading.
+  if (store.getActiveSessionForProject(adopted.projectId) === null) {
+    store.setActiveSessionForProject(adopted.projectId, adopted.sessionId)
+  }
 }
 
 export async function splitTerminalSession(

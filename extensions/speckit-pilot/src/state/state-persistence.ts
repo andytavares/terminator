@@ -180,6 +180,7 @@ export function createInitialState(
     queuePosition?: PilotState['queuePosition']
     worktreePath?: PilotState['worktreePath']
     branchName?: PilotState['branchName']
+    baseBranch?: PilotState['baseBranch']
     mode?: PilotState['mode']
   }
 ): PilotState {
@@ -218,6 +219,7 @@ export function createInitialState(
     queuePosition: overrides?.queuePosition ?? null,
     worktreePath: overrides?.worktreePath ?? null,
     branchName: overrides?.branchName ?? null,
+    baseBranch: overrides?.baseBranch ?? null,
     prUrl: null,
     phases,
     settings: DEFAULT_SETTINGS,

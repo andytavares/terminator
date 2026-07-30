@@ -178,6 +178,19 @@ describe('the ways this was bypassable', () => {
   })
 
   it.each([
+    // Flags, not chaining: neither of these needs a shell metacharacter, so the
+    // compound check never saw them.
+    ['git writes the diff to a file', 'git diff --output=/tmp/pwned.txt'],
+    ['and with the short flag', 'git diff -o /tmp/pwned.txt'],
+    ['ripgrep runs a program per file', 'rg --pre /tmp/evil.sh foo'],
+    ['and picks it by glob', 'rg --pre-glob *.md foo'],
+    ['anything that takes --exec', 'grep --exec rm foo'],
+    ['in-place editing wherever it appears', 'diff --in-place a b'],
+  ])('refuses: %s', (_why, command) => {
+    expect(decideReadOnly('Bash', { command }).allow).toBe(false)
+  })
+
+  it.each([
     ['reading a file', 'cat README.md'],
     ['searching', 'grep -rn thing src'],
     ['the diff a review is mostly made of', 'git diff main'],

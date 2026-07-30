@@ -81,6 +81,34 @@ const READ_ONLY_GIT: ReadonlySet<string> = new Set([
  */
 const COMPOUND = /[;&|><`\n\r]|\$\(/
 
+/**
+ * Flags that make a reading command write or execute.
+ *
+ * The binary allowlist matches the first word, so it cannot see these. Both are
+ * real: `git diff --output=FILE` writes the file, and ripgrep's `--pre` runs an
+ * arbitrary program once per file searched — neither needs a shell
+ * metacharacter, so `COMPOUND` never sees them either.
+ *
+ * A denylist of flags is the wrong shape in general, but the alternative here
+ * is parsing every tool's option grammar. It is checked against the whole
+ * argument list rather than the first word, so it cannot be slipped past by
+ * ordering.
+ */
+const WRITING_FLAGS: ReadonlyArray<RegExp> = [
+  // `--output=x`, `--output x`, `-o x`.
+  /^--output(=|$)/,
+  /^-o$/,
+  // ripgrep: runs a program per file, and picks the program by glob.
+  /^--pre(=|$)/,
+  /^--pre-glob(=|$)/,
+  /^--hostname-bin(=|$)/,
+  // `--exec`/`-exec` on anything that takes it.
+  /^--?exec(=|$)/,
+  // In-place editing, wherever it turns up.
+  /^--in-place(=|$)/,
+  /^-i$/,
+]
+
 export function decideReadOnly(toolName: string, input: unknown): PolicyDecision {
   if (READ_ONLY_TOOLS.has(toolName)) {
     return { allow: true, reason: `${toolName} cannot change anything` }
@@ -110,6 +138,14 @@ export function decideReadOnly(toolName: string, input: unknown): PolicyDecision
 
   const words = command.trim().split(/\s+/)
   const binary = words[0]
+
+  const writing = words.slice(1).find((word) => WRITING_FLAGS.some((flag) => flag.test(word)))
+  if (writing !== undefined) {
+    return {
+      allow: false,
+      reason: `${writing} makes this write or execute, which a review may not do`,
+    }
+  }
 
   if (binary === 'git') {
     const subcommand = words[1] ?? ''

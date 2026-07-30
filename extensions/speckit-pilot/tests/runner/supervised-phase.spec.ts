@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   createAgentRunner,
   setPermissionSink,
+  setRunSupervision,
   setSupervisedRunner,
 } from '../../src/runner/agent-runner.js'
 import type { SupervisedRunner } from '../../src/runtime/supervised-runner.js'
@@ -250,7 +251,21 @@ describe('when a supervised phase is finished', () => {
   // `running` forever: the gate never appeared and approval never unlocked
   // while the agent sat idle.
 
-  it('completes the phase when the turn ends, not only when the session does', async () => {
+  /** A supervision layer reporting a run that has changed `files` files. */
+  function supervisionWith(files: number) {
+    return {
+      runs: {
+        add: () => ({}),
+        setState: () => {},
+        noteAsked: () => {},
+        get: () => ({ diff: { files } }),
+      },
+      finishTurn: async () => {},
+      finish: () => {},
+    }
+  }
+
+  it('completes the phase when a turn ends having changed something', async () => {
     const codes: number[] = []
     const runner = fakeRunner()
     let endTurn: ((turns: number) => void) | null = null
@@ -259,11 +274,36 @@ describe('when a supervised phase is finished', () => {
       return startResult
     }
     setSupervisedRunner(runner)
+    setRunSupervision(supervisionWith(2) as never)
 
     createAgentRunner(api()).startPhaseRunner({ ...phaseOpts, onComplete: (c) => codes.push(c) })
     await settle()
     endTurn?.(3)
+    await settle()
     expect(codes).toEqual([0])
+    setRunSupervision(null)
+  })
+
+  it('leaves it running when the turn changed nothing', async () => {
+    // A first turn that ends with a plain question — text, so no tool call and
+    // no permission hold — was driving the card to `awaiting_review` while the
+    // agent was still working, and the latch made it one-way.
+    const codes: number[] = []
+    const runner = fakeRunner()
+    let endTurn: ((turns: number) => void) | null = null
+    runner.start = async (options) => {
+      endTurn = (options as { onTurnEnd?: (turns: number) => void }).onTurnEnd ?? null
+      return startResult
+    }
+    setSupervisedRunner(runner)
+    setRunSupervision(supervisionWith(0) as never)
+
+    createAgentRunner(api()).startPhaseRunner({ ...phaseOpts, onComplete: (c) => codes.push(c) })
+    await settle()
+    endTurn?.(1)
+    await settle()
+    expect(codes).toEqual([])
+    setRunSupervision(null)
   })
 
   it('reports the terminal’s code, so a crashed run is not awaiting review', async () => {

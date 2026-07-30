@@ -19,6 +19,13 @@ export interface Hunk {
    * this is the common case rather than the corner.
    */
   readonly isNew: boolean
+  /**
+   * The file is gone after this change.
+   *
+   * The mirror of `isNew`: a deletion's new side is `/dev/null`, and reverting
+   * it has to say so or git is asked to restore a file it thinks still exists.
+   */
+  readonly isDeleted: boolean
   /** First line of the hunk in the new file. */
   readonly newStart: number
   readonly lines: readonly string[]

@@ -57,6 +57,15 @@ function has(scripts: Record<string, unknown>, name: string): boolean {
   return typeof scripts[name] === 'string'
 }
 
+/** Whether a script actually runs the tool whose flags we would be appending. */
+function runs(scripts: Record<string, unknown>, name: string, tool: string): boolean {
+  const script = scripts[name]
+  return typeof script === 'string' && script.includes(tool)
+}
+
+const isEslint = (scripts: Record<string, unknown>) => runs(scripts, 'lint', 'eslint')
+const isVitest = (scripts: Record<string, unknown>) => runs(scripts, 'test', 'vitest')
+
 /** A step that does nothing and says why, so "not run" never reads as "passed". */
 function skipped(reason: string): string {
   return `echo ${shellQuote(`⚠ ${reason}`)} && false`
@@ -81,15 +90,27 @@ export function selfReviewSteps(options: SelfReviewPlanOptions): SelfReviewStep[
       // `--format json --output-file`: a documented report shape, written even
       // when there is nothing to report, rather than counts read off the
       // console.
-      command: has(scripts, 'lint')
-        ? `npm run lint -- --format json --output-file ${shellQuote(lintReport)}`
-        : skipped('linting not run: this repository defines no lint script'),
+      // `--format json` only where the lint script is eslint. Appending
+      // eslint's flags to biome or dprint fails on the flag rather than on the
+      // code, which reads as a lint failure that is nothing of the kind.
+      command: !has(scripts, 'lint')
+        ? skipped('linting not run: this repository defines no lint script')
+        : isEslint(scripts)
+          ? `npm run lint -- --format json --output-file ${shellQuote(lintReport)}`
+          : 'npm run lint',
     },
     {
       id: 'test',
       // Coverage reported as data, and written outside the repository: a review
       // must not add a `coverage/` directory to the diff it is reviewing.
-      command: `npx vitest run --coverage --coverage.reporter=json-summary --coverage.reportsDirectory=${shellQuote(coverageDir)}`,
+      // The repository's own test script where it has one, and vitest's
+      // coverage flags only where vitest is what runs. Running `npx vitest` in
+      // a repository that uses something else downloads it and fails.
+      command: !has(scripts, 'test')
+        ? skipped('tests not run: this repository defines no test script')
+        : isVitest(scripts)
+          ? `npm test -- --coverage --coverage.reporter=json-summary --coverage.reportsDirectory=${shellQuote(coverageDir)}`
+          : 'npm test',
     },
     {
       id: 'review',

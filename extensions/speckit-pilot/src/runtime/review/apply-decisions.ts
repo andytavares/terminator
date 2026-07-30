@@ -16,6 +16,10 @@ function counts(lines: readonly string[]): { old: number; next: number } {
   let oldCount = 0
   let newCount = 0
   for (const line of lines) {
+    // `\ No newline at end of file` belongs to the hunk but is not a line of
+    // either side; counting it as context makes both ranges one too long and
+    // git refuses the patch.
+    if (line.startsWith('\\')) continue
     if (line.startsWith('-')) oldCount += 1
     else if (line.startsWith('+')) newCount += 1
     else {
@@ -44,11 +48,11 @@ export function buildPatch(hunks: readonly Hunk[]): string {
 
   const out: string[] = []
   for (const [file, fileHunks] of byFile) {
-    // `/dev/null` for a file that did not exist, which is what `git diff
-    // --no-index` produced when the hunks were read. Naming the file on both
-    // sides makes `git apply --reverse` refuse.
+    // `/dev/null` on whichever side the file did not exist. Naming the file on
+    // both sides makes `git apply --reverse` refuse — for an added file on the
+    // old side, and for a deleted one on the new.
     out.push(fileHunks.some((hunk) => hunk.isNew) ? '--- /dev/null' : `--- a/${file}`)
-    out.push(`+++ b/${file}`)
+    out.push(fileHunks.some((hunk) => hunk.isDeleted) ? '+++ /dev/null' : `+++ b/${file}`)
     // In order, because `git apply` tracks the offset each hunk introduces for
     // the ones after it and cannot do that from a shuffled list.
     for (const hunk of [...fileHunks].sort((a, b) => a.oldStart - b.oldStart)) {

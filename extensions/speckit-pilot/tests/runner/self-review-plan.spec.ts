@@ -70,6 +70,27 @@ describe('the lint step', () => {
   })
 })
 
+describe('a repository that uses other tools', () => {
+  // Appending eslint's flags to biome, or running `npx vitest` where the tests
+  // are jest, fails on the flag rather than on the code — which reads as a lint
+  // or test failure that is nothing of the kind.
+
+  it('runs the lint script plainly when it is not eslint', () => {
+    withScripts({ lint: 'biome check .', test: 'vitest run' })
+    expect(step('lint')).toBe('npm run lint')
+  })
+
+  it('runs the test script plainly when it is not vitest', () => {
+    withScripts({ lint: 'eslint .', test: 'jest' })
+    expect(step('test')).toBe('npm test')
+  })
+
+  it('says so when there is no test script at all', () => {
+    withScripts({ lint: 'eslint .' })
+    expect(step('test')).toContain('not run')
+  })
+})
+
 describe('the test step', () => {
   it('asks coverage to report itself as data', () => {
     expect(step('test')).toContain('--coverage.reporter=json-summary')

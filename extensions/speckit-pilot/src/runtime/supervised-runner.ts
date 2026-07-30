@@ -31,7 +31,7 @@ import type { WatchedRun } from './stall-watcher.js'
 // and the hooks rather than the process.
 
 export interface SupervisedRun {
-  /** The claude session id, which this chose. `--resume` takes it. */
+  /** The claude session id, which this chose. `--resume` continues it. */
   readonly sessionId: string
   /** The terminal it is running in, so a surface can go to it. */
   readonly terminalSessionId: string
@@ -109,6 +109,17 @@ export interface SupervisedRunner {
   dispose(): void
 }
 
+/**
+ * One line, whatever was typed.
+ *
+ * A newline in a terminal is "send". A three-line redirect pasted into the box
+ * therefore arrived as three separate turns, the agent answering the first
+ * fragment before it had read the rest.
+ */
+function oneLine(text: string): string {
+  return text.replace(/\r?\n/g, ' ').trim()
+}
+
 /** Escape. Ends the turn and keeps the session, which is what makes a redirect land. */
 const INTERRUPT = '\x1b'
 
@@ -158,6 +169,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
     async start(start: StartSupervisedRunOptions): Promise<SupervisedRun | null> {
       // Ours, not the runtime's. Choosing it means the transcript path is known
       // before the process exists and a hook callback needs no correlation.
+      const resuming = start.resumeSessionId !== undefined
       const sessionId = start.resumeSessionId ?? randomUUID()
 
       const bridge = createPermissionBridge({
@@ -179,6 +191,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
 
       const spec = buildLaunchSpec({
         sessionId,
+        resume: resuming,
         cwd: start.worktreePath,
         prompt: start.prompt,
         settingsDirectory: path.join(stateDir, 'settings'),
@@ -298,7 +311,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       // through and the run outlives the instruction to end.
       api.pty.write(run.terminalSessionId, INTERRUPT)
       if (reason !== undefined && reason.trim() !== '') {
-        api.pty.write(run.terminalSessionId, `${reason.trim()}\r`)
+        api.pty.write(run.terminalSessionId, `${oneLine(reason)}\r`)
       }
       api.pty.write(run.terminalSessionId, EXIT)
       return true
@@ -309,7 +322,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       if (run === undefined) return false
       // Claude Code queues input arriving mid-turn, so a redirect does not
       // require the agent to be idle first.
-      api.pty.write(run.terminalSessionId, `${message}\r`)
+      api.pty.write(run.terminalSessionId, `${oneLine(message)}\r`)
       return true
     },
 

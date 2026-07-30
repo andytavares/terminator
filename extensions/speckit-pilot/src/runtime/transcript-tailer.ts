@@ -106,36 +106,41 @@ function eventsFromEntry(entry: Record<string, unknown>): ToolActivity[] {
  */
 const MAX_TAIL_BYTES = 256 * 1024
 
-export function readTranscript(transcriptPath: string): ToolActivity[] {
-  let raw: string
-  let truncated = false
+/**
+ * The tail of the file, as whole lines.
+ *
+ * Null when there is nothing to read. Reading from an offset lands mid-line, so
+ * the first fragment is dropped — it is not JSON, and it is not a torn write
+ * worth reporting.
+ */
+function tailLines(transcriptPath: string): string[] | null {
   try {
     const stat = statSync(transcriptPath)
-    if (!stat.isFile()) return []
-    if (stat.size > MAX_TAIL_BYTES) {
-      const handle = openSync(transcriptPath, 'r')
-      try {
-        const buffer = Buffer.alloc(MAX_TAIL_BYTES)
-        const read = readSync(handle, buffer, 0, MAX_TAIL_BYTES, stat.size - MAX_TAIL_BYTES)
-        raw = buffer.subarray(0, read).toString('utf-8')
-        truncated = true
-      } finally {
-        closeSync(handle)
-      }
-    } else {
-      raw = readFileSync(transcriptPath, 'utf-8')
+    if (!stat.isFile()) return null
+    if (stat.size <= MAX_TAIL_BYTES) return readFileSync(transcriptPath, 'utf-8').split('\n')
+
+    const handle = openSync(transcriptPath, 'r')
+    try {
+      const buffer = Buffer.alloc(MAX_TAIL_BYTES)
+      const read = readSync(handle, buffer, 0, MAX_TAIL_BYTES, stat.size - MAX_TAIL_BYTES)
+      const lines = buffer.subarray(0, read).toString('utf-8').split('\n')
+      lines.shift()
+      return lines
+    } finally {
+      closeSync(handle)
     }
   } catch {
     // Not written yet, removed, or not a file. None of those is an error the
     // operator needs to see — the session simply has no durable record yet.
-    return []
+    return null
   }
+}
+
+export function readTranscript(transcriptPath: string): ToolActivity[] {
+  const lines = tailLines(transcriptPath)
+  if (lines === null) return []
 
   const events: ToolActivity[] = []
-  const lines = raw.split('\n')
-  // Reading from an offset lands mid-line; that first fragment is not JSON and
-  // is not a torn write worth reporting.
-  if (truncated) lines.shift()
   for (const line of lines) {
     const trimmed = line.trim()
     if (trimmed === '') continue
@@ -161,17 +166,20 @@ export function readTranscript(transcriptPath: string): ToolActivity[] {
  * available, and the surfaces say nothing rather than showing a confident
  * $0.00 that means "not measured".
  */
+/**
+ * How many turns the agent has taken.
+ *
+ * Counted over the tail, like everything else here: the number is shown on a
+ * card and used to decide a turn ended, and neither is worth an unbounded
+ * synchronous read of a multi-hour transcript on the main thread. A run past
+ * the bound under-reports rather than freezing the window.
+ */
 export function countTurns(transcriptPath: string): number {
-  let raw: string
-  try {
-    if (!statSync(transcriptPath).isFile()) return 0
-    raw = readFileSync(transcriptPath, 'utf-8')
-  } catch {
-    return 0
-  }
+  const lines = tailLines(transcriptPath)
+  if (lines === null) return 0
 
   let turns = 0
-  for (const line of raw.split('\n')) {
+  for (const line of lines) {
     const trimmed = line.trim()
     if (trimmed === '') continue
     try {

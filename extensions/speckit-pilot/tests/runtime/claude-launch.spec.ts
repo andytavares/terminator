@@ -210,3 +210,31 @@ describe('the settings path handed to the runtime', () => {
     ).toThrow(/must be absolute/)
   })
 })
+
+describe('continuing a conversation that already exists', () => {
+  // `--session-id` names a session being created. Handing it one the runtime
+  // has already seen makes it exit with "Session ID … is already in use" —
+  // and the shell around it survives, so no PTY exit fires and the run sits
+  // registered as working with a dead agent.
+  const options = {
+    sessionId: 'eefcf9a4-143f-4e73-8d8d-6b6ad94b9ab5',
+    cwd: '/repo/.worktrees/a',
+    prompt: 'carry on',
+    hookScriptPath: '/state/hook.js',
+    controlUrl: 'http://127.0.0.1:1/pretooluse',
+    controlEventUrl: 'http://127.0.0.1:1/event',
+    controlToken: 'token',
+  }
+
+  it('resumes rather than claiming the id again', () => {
+    const spec = buildLaunchSpec({ ...options, settingsDirectory: directory, resume: true })
+    expect(spec.command).toContain(`--resume ${options.sessionId}`)
+    expect(spec.command).not.toContain('--session-id')
+  })
+
+  it('still claims a new id when it is starting one', () => {
+    const spec = buildLaunchSpec({ ...options, settingsDirectory: directory })
+    expect(spec.command).toContain(`--session-id ${options.sessionId}`)
+    expect(spec.command).not.toContain('--resume')
+  })
+})

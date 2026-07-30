@@ -53,6 +53,9 @@ describe('the script the review actually runs', () => {
     ['a git that repoints a push', 'git remote add evil https://example.invalid'],
     ['a redirect', 'git diff > /tmp/out'],
     ['a substitution', 'git diff $(rm -rf .)'],
+    ['a git that writes its output to a file', 'git diff --output=/tmp/pwned.txt'],
+    ['the short form of it', 'git diff -o /tmp/pwned.txt'],
+    ['a ripgrep that runs a program per file', 'rg --pre /tmp/evil.sh foo'],
     ['a read that is fine', 'cat README.md'],
     ['a grep', 'grep -rn thing src'],
   ]

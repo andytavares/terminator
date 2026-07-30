@@ -160,7 +160,8 @@ export interface SpeckitAPI {
   /** What happened between two moments, rolled up rather than replayed. */
   feedDigest(payload: { from: number; to?: number }): Promise<DigestView>
   reviewHunks(payload: { sessionId: string }): Promise<{
-    files: HunkFileView[]
+    /** Null when the supervision runtime is not running — not the same as none. */
+    files: HunkFileView[] | null
     complete: boolean
     fullReject?: boolean
   }>
@@ -519,7 +520,7 @@ export function getSpeckitAPI(): SpeckitAPI {
     feedDigest: (payload) => bridge.invoke('speckit:feed-digest', payload) as Promise<DigestView>,
     reviewHunks: (payload) =>
       bridge.invoke('speckit:review-hunks', payload) as Promise<{
-        files: HunkFileView[]
+        files: HunkFileView[] | null
         complete: boolean
         fullReject?: boolean
       }>,

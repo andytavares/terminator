@@ -350,7 +350,7 @@ function HunkReview({
   request: string
   onDone: () => void
 }): JSX.Element {
-  const [files, setFiles] = useState<HunkFileView[]>([])
+  const [files, setFiles] = useState<HunkFileView[] | null>([])
   const [complete, setComplete] = useState(false)
   const [fullReject, setFullReject] = useState(false)
   const [step, setStep] = useState<ReviewStepView | 'done'>('intent')
@@ -373,6 +373,16 @@ function HunkReview({
       void getSpeckitAPI().reviewDecideHunk({ sessionId, hunkId, decision }).then(load),
     [sessionId, load]
   )
+
+  if (files === null) {
+    // Not the same as a run that changed nothing, and saying the wrong one
+    // sends you looking at the diff instead of at the runtime.
+    return (
+      <div className="sk-sup__warn">
+        The supervision runtime is not running, so this diff cannot be read.
+      </div>
+    )
+  }
 
   if (files.length === 0) {
     return <div className="sk-sup__clear">This run changed nothing that can be read as a diff.</div>

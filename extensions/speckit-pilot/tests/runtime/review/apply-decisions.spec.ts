@@ -19,6 +19,7 @@ const hunk = (over: Partial<Hunk> = {}): Hunk => ({
   oldStart: 10,
   newStart: 10,
   isNew: false,
+  isDeleted: false,
   lines: [' context', '-gone', '+added'],
   ...over,
 })
@@ -193,6 +194,32 @@ describe('against real git', () => {
     })
     expect(result.error).toBeNull()
     expect(existsSync(newFile)).toBe(false)
+  })
+
+  it('puts back a file the agent deleted', async () => {
+    // A deletion's new side is `/dev/null`. Emitting the file name there makes
+    // git refuse the reverse, and because a revert is all-or-nothing that takes
+    // every other rejected hunk down with it.
+    rmSync(join(dir, 'a.ts'))
+    const after = await revertFrom((hunks) => hunks)
+    expect(after).toBe(LINES.join('\n') + '\n')
+  })
+
+  it('reverts a change to a file with no trailing newline', async () => {
+    // `\\ No newline at end of file` is part of the hunk. Dropped, the rebuilt
+    // patch is refused outright — and `--recount` cannot save it, because the
+    // marker is not a count.
+    writeFileSync(join(dir, 'nn.txt'), 'one\ntwo')
+    git(['add', 'nn.txt'])
+    git(['commit', '-m', 'no trailing newline'])
+    writeFileSync(join(dir, 'nn.txt'), 'one\nCHANGED')
+
+    const diff = execFileSync('git', ['diff'], { cwd: dir }).toString()
+    const result = await revertRejected(parseHunks(diff), {
+      applyReverse: async (patch) => git(['apply', '--reverse', '--recount', '-'], patch),
+    })
+    expect(result.error).toBeNull()
+    expect(readFileSync(join(dir, 'nn.txt'), 'utf8')).toBe('one\ntwo')
   })
 
   it('reverts several hunks in one file without the offsets drifting', async () => {

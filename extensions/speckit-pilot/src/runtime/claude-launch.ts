@@ -33,6 +33,8 @@ export interface LaunchSpecOptions {
   prompt: string
   /** Written here, one file per session. */
   settingsDirectory: string
+  /** Continuing an existing conversation rather than starting one. */
+  resume?: boolean
   hookScriptPath: string
   controlUrl: string
   controlEventUrl: string
@@ -168,7 +170,13 @@ export function buildLaunchSpec(options: LaunchSpecOptions): LaunchSpec {
 
   const command = [
     claudePath,
-    '--session-id',
+    // `--resume` for a conversation that already exists, `--session-id` only
+    // for one being created. The runtime refuses a `--session-id` it has seen
+    // — "Session ID … is already in use" — and it refuses it by exiting, while
+    // the shell around it lives on: no PTY exit fires, so the run sits
+    // registered as working with a dead agent until the stall detector
+    // eventually notices.
+    options.resume === true ? '--resume' : '--session-id',
     options.sessionId,
     '--settings',
     shellQuote(settingsPath),

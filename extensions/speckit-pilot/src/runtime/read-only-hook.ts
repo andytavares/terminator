@@ -26,6 +26,13 @@ const READ_ONLY_GIT = new Set([
 // Anything that chains, redirects or substitutes. Without this an allowlist is
 // theatre: 'git diff' passes and so does 'git diff; rm -rf .'.
 const COMPOUND = /[;&|><\`\\n\\r]|\\$\\(/
+// Flags that make a reading command write or execute: \`git diff --output=FILE\`
+// writes, ripgrep's --pre runs a program per file. Neither needs a shell
+// metacharacter, so COMPOUND never sees them.
+const WRITING_FLAGS = [
+  /^--output(=|$)/, /^-o$/, /^--pre(=|$)/, /^--pre-glob(=|$)/, /^--hostname-bin(=|$)/,
+  /^--?exec(=|$)/, /^--in-place(=|$)/, /^-i$/,
+]
 
 function decide(toolName, input) {
   if (READ_ONLY_TOOLS.has(toolName)) return { allow: true, reason: toolName + ' cannot change anything' }
@@ -39,6 +46,10 @@ function decide(toolName, input) {
   }
   const words = command.trim().split(/\\s+/)
   const binary = words[0]
+  const writing = words.slice(1).find((w) => WRITING_FLAGS.some((f) => f.test(w)))
+  if (writing) {
+    return { allow: false, reason: writing + ' makes this write or execute, which a review may not do' }
+  }
   if (binary === 'git') {
     const sub = words[1] || ''
     return READ_ONLY_GIT.has(sub)
