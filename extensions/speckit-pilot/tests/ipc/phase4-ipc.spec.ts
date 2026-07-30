@@ -30,6 +30,9 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('node:fs', () => ({
+  // Reading a repository's installed skills is synchronous: a phase asks
+  // whether `/speckit-<phase>` exists before sending it.
+  existsSync: vi.fn().mockReturnValue(false),
   promises: {
     mkdir: vi.fn().mockResolvedValue(undefined),
     readdir: vi.fn().mockResolvedValue([]),

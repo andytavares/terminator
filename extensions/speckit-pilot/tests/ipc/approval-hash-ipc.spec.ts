@@ -255,6 +255,37 @@ describe('the gate preview', () => {
   })
 })
 
+describe('a repository without the SpecKit skills', () => {
+  // `/speckit-specify` in a repository that has no such skill is not a command,
+  // it is a message the runtime rejects: "Unknown command: /speckit-specify",
+  // and the phase is over before it began having written nothing.
+  it('asks for the same thing in words instead of sending a slash command', async () => {
+    const { phaseCommandForTests } = await import('../../src/index.ts')
+    const prompt = phaseCommandForTests('specify', 'speckit', 'Make all text red', worktreePath)
+    expect(prompt.startsWith('/')).toBe(false)
+    expect(prompt).toContain('spec.md')
+    expect(prompt).toContain('Make all text red')
+  })
+
+  it('still uses the skill where the repository has one', async () => {
+    const { phaseCommandForTests } = await import('../../src/index.ts')
+    mkdirSync(join(worktreePath, '.claude', 'skills', 'speckit-specify'), { recursive: true })
+    writeFileSync(join(worktreePath, '.claude', 'skills', 'speckit-specify', 'SKILL.md'), '#\n')
+    const prompt = phaseCommandForTests('specify', 'speckit', 'Make all text red', worktreePath)
+    expect(prompt.startsWith('/speckit-specify')).toBe(true)
+  })
+
+  it('names the feature directory, which is most of what the skill was for', async () => {
+    // The gates, the artifact list and the review queue all read
+    // `$SPECIFY_FEATURE_DIRECTORY/<file>`; an agent left to choose writes it at
+    // the repository root.
+    const { phaseCommandForTests } = await import('../../src/index.ts')
+    expect(phaseCommandForTests('plan', 'speckit', '', worktreePath)).toContain(
+      '$SPECIFY_FEATURE_DIRECTORY'
+    )
+  })
+})
+
 describe('skipping a phase', () => {
   it('skips it, and lets it back', async () => {
     const skipped = (await call('speckit:phase-skip', { featureDir, phase: 'checklist' })) as {

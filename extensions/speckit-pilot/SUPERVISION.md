@@ -160,6 +160,22 @@ does; the entries keep arriving in the feed. Mutes persist, because one you have
 to set again after every restart is one you stop bothering with — and then
 notifications get turned off wholesale.
 
+## When the SpecKit skills are not installed
+
+A phase sends `/speckit-<phase>` only when the **worktree** has that skill —
+`.claude/skills/speckit-<phase>/SKILL.md` or `.claude/commands/speckit-<phase>.md`.
+Checked in the worktree because that is where the agent runs, and
+`git worktree add` only brings across what is committed: `.claude/skills/` is
+routinely untracked, so the run's checkout often does not have it even when your
+main one does.
+
+Without it the phase is asked for in plain words instead. Each fallback names
+the file the pipeline expects — the gates, the artifact list and the review
+queue all read `$SPECIFY_FEATURE_DIRECTORY/<file>`, and an agent left to choose
+writes it at the repository root. Sending the slash command anyway is what used
+to happen, and the runtime's answer was "Unknown command: /speckit-specify",
+with the phase over before it began.
+
 ## Two things the runtime does to a supervised run
 
 **Session persistence is forced.** Claude Code sets `CLAUDE_CODE_CHILD_SESSION=1`

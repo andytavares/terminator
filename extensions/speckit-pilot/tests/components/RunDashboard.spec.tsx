@@ -338,18 +338,16 @@ describe('a phase running in a terminal', () => {
     await waitFor(() => expect(mockRunTerminal).toHaveBeenCalledWith({ sessionId: 'session-1' }))
   })
 
-  it('says where the agent probably is when it has said nothing at all', async () => {
-    // Silence at the very start usually is not the agent thinking: the runtime
-    // asks you to trust a directory the first time it runs in one, and a
-    // worktree is a new directory every time. There is no documented way to
-    // pre-answer that, so the card says where to go.
+  it('sends you to the terminal when no turn has been recorded, without guessing why', async () => {
+    // It may be waiting on the folder-trust prompt, or on a question, or still
+    // starting. The terminal is the one place that knows.
     mockSupervisionSnapshot.mockResolvedValue({
       runs: [{ ...run, turns: 0 }],
       review: [],
       backpressure: { allowed: true, unreviewed: 0, limit: 3 },
     })
     render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
-    expect(await screen.findByText(/waiting for you to trust the folder/i)).toBeTruthy()
+    expect(await screen.findByText(/No turn recorded yet/i)).toBeTruthy()
   })
 
   it('stops saying it once the agent has spoken', async () => {
@@ -358,13 +356,13 @@ describe('a phase running in a terminal', () => {
     })
     render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
     await screen.findByText(/Reading the spec…/)
-    expect(screen.queryByText(/trust the folder/i)).toBeNull()
+    expect(screen.queryByText(/No turn recorded yet/i)).toBeNull()
   })
 
   it('says the output is in the terminal when it has said nothing yet', async () => {
     // Not "Waiting for output…", which never resolves for a supervised run.
     render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
-    expect(await screen.findByText(/open it above to watch or take over/i)).toBeTruthy()
+    expect(await screen.findByText(/terminal above has the live view/i)).toBeTruthy()
   })
 
   it('names the branch, so you know which terminal you are being sent to', async () => {

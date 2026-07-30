@@ -374,16 +374,14 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
           >
             Open the terminal
           </button>
-          {/* Silence at the very start usually is not the agent thinking. The
-              runtime asks you to trust a directory the first time it runs in
-              one, and a worktree is a new directory every time — so it waits
-              there, having said nothing, and the card looks stuck. There is no
-              documented way to pre-answer that prompt, so the honest thing is
-              to say where it is. */}
+          {/* No guess at why. An empty transcript means the agent has written
+              no turn yet — it may be waiting on the runtime's folder-trust
+              prompt, or on a question, or still starting. The terminal is the
+              one place that actually knows, so send them there rather than
+              inventing a reason. */}
           {liveRun.turns === 0 && transcript.length === 0 && (
             <div className="sk-sup__meta">
-              Nothing yet. The first run in a new worktree is usually waiting for you to trust the
-              folder — open the terminal and answer it.
+              No turn recorded yet. Whatever it is doing — or waiting on — is in the terminal.
             </div>
           )}
         </div>

@@ -31,6 +31,7 @@ import {
 } from './state/state-persistence.js'
 import { buildCardSummary } from './state/card-summary.js'
 import { deriveStage } from './state/derive-stage.js'
+import { hasSpeckitSkill } from './state/skill-availability.js'
 import { shouldQueue, orderPending } from './state/run-queue.js'
 import { parseRgLines, searchFiles } from './utils/knowledge-search.js'
 import { parseGitLog, artifactSpecs, buildArtifactRef } from './state/artifact-list.js'
@@ -65,12 +66,66 @@ const QUICK_PHASE_COMMANDS: Partial<Record<PhaseId, string>> = {
   implement: 'Implement the change described in plan.md',
 }
 
+/**
+ * The same phases, asked for in plain words.
+ *
+ * Used when the repository has no SpecKit skills — otherwise the phase sends
+ * `/speckit-specify`, the runtime answers "Unknown command", and the run is
+ * over before it began having written nothing.
+ *
+ * Each one names the file the pipeline expects, because that placement is most
+ * of what the skill was providing: the gates, the artifact list and the review
+ * queue all read `$SPECIFY_FEATURE_DIRECTORY/<file>`, and an agent left to
+ * choose writes it at the repository root.
+ */
+const PLAIN_PHASE_COMMANDS: Record<PhaseId, string> = {
+  constitution:
+    'Read .specify/memory/constitution.md if it exists and summarise the rules this change must follow. Do not edit code.',
+  specify:
+    'Read ticket.md. Write a specification to $SPECIFY_FEATURE_DIRECTORY/spec.md covering: the problem, user stories with acceptance criteria, functional requirements, and what is explicitly out of scope. Ask about anything genuinely ambiguous rather than guessing. Do not write code.',
+  clarify:
+    'Read $SPECIFY_FEATURE_DIRECTORY/spec.md. List anything ambiguous or underspecified that would change the implementation, ask about it, and fold the answers back into spec.md. Do not write code.',
+  plan: 'Read $SPECIFY_FEATURE_DIRECTORY/spec.md. Write a technical implementation plan to $SPECIFY_FEATURE_DIRECTORY/plan.md: the approach, the files it touches, the trade-offs, and anything it deliberately does not do. Do not write code.',
+  checklist:
+    'Read $SPECIFY_FEATURE_DIRECTORY/spec.md and plan.md. Write a review checklist to $SPECIFY_FEATURE_DIRECTORY/checklists/requirements.md covering what has to be true for this to be done. Do not write code.',
+  tasks:
+    'Read $SPECIFY_FEATURE_DIRECTORY/spec.md and plan.md. Write an ordered task breakdown to $SPECIFY_FEATURE_DIRECTORY/tasks.md, each task with the file it touches and how to tell it is finished. Do not write code.',
+  analyze:
+    'Read $SPECIFY_FEATURE_DIRECTORY/spec.md, plan.md and tasks.md together. Report inconsistencies, duplication, and requirements no task covers. Do not change the files; report what you find.',
+  implement:
+    'Work through $SPECIFY_FEATURE_DIRECTORY/tasks.md in order, following plan.md. Write tests first where the repository has them, and keep to the conventions of the code around you.',
+  'self-review': '', // handled by the self-review plan; not dispatched as a prompt
+  'open-pr': '', // not auto-started; triggered explicitly by user action
+}
+
 // The prompt for a phase, honoring the card's run mode. `description` seeds
 // /speckit-specify with the card title.
-function phaseCommandFor(phase: PhaseId, mode: RunMode, description = ''): string {
+function phaseCommandFor(
+  phase: PhaseId,
+  mode: RunMode,
+  description = '',
+  worktreePath?: string
+): string {
   if (mode === 'quick') return QUICK_PHASE_COMMANDS[phase] ?? PHASE_COMMANDS[phase]
+
+  // Without the skill installed, the slash command is not a command — it is a
+  // message the runtime rejects. Ask for the same thing in words instead.
+  if (worktreePath !== undefined && !hasSpeckitSkill(worktreePath, phase)) {
+    const plain = PLAIN_PHASE_COMMANDS[phase]
+    if (plain !== '') {
+      return description ? `${plain}\n\nThe ticket: ${description}` : plain
+    }
+  }
+
   return PHASE_COMMANDS[phase].replace('${DESCRIPTION}', description || 'the assigned ticket')
 }
+
+/**
+ * The phase prompt, exposed so a test can assert the fallback without starting
+ * a run. Same function the dispatcher uses; nothing here is test-only
+ * behaviour.
+ */
+export const phaseCommandForTests = phaseCommandFor
 
 // Card title, tolerant of pre-v3 states read raw (which have no `card` field).
 function cardTitleOf(state: PilotState): string {
@@ -507,7 +562,7 @@ async function startRunAt(
   const handle = runner.startPhaseRunner({
     featureDir,
     worktreePath,
-    phaseCommand: phaseCommandFor(phase, mode, description),
+    phaseCommand: phaseCommandFor(phase, mode, description, worktreePath),
     phase,
     feedbackNote,
     ...makePhaseCallbacks(api, featureDir, phase),
@@ -1643,7 +1698,7 @@ export function activate(api: ExtensionAPI): void {
         const handle = runner.startPhaseRunner({
           featureDir,
           worktreePath,
-          phaseCommand: phaseCommandFor(nextPhaseId, state.mode, cardTitleOf(state)),
+          phaseCommand: phaseCommandFor(nextPhaseId, state.mode, cardTitleOf(state), worktreePath),
           phase: nextPhaseId,
           feedbackNote: steer,
           ...makePhaseCallbacks(api, featureDir, nextPhaseId),
@@ -2444,7 +2499,7 @@ export function activate(api: ExtensionAPI): void {
       const handle = runner.startPhaseRunner({
         featureDir,
         worktreePath,
-        phaseCommand: phaseCommandFor(phase, state.mode, cardTitleOf(state)),
+        phaseCommand: phaseCommandFor(phase, state.mode, cardTitleOf(state), worktreePath),
         phase,
         feedbackNote: note,
         ...makePhaseCallbacks(api, featureDir, phase),

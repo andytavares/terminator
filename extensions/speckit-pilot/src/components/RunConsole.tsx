@@ -111,7 +111,7 @@ export function RunConsole({ featureDir, lines = [], phase, inTerminal = false }
           {lines.length === 0 ? (
             <span style={{ color: 'var(--tm-text-secondary)' }}>
               {inTerminal
-                ? 'The agent has not said anything yet. Everything it does is in its terminal — open it above to watch or take over.'
+                ? 'Nothing in this run’s transcript yet. The terminal above has the live view — open it to watch or take over.'
                 : 'Waiting for output…'}
             </span>
           ) : (

@@ -31,6 +31,9 @@ vi.mock('electron', () => ({
 
 // --- mock node:fs (dispatch/cancel/open-pr read/write state files directly) ---
 vi.mock('node:fs', () => ({
+  // Reading a repository's installed skills is synchronous: a phase asks
+  // whether `/speckit-<phase>` exists before sending it.
+  existsSync: vi.fn().mockReturnValue(false),
   promises: {
     mkdir: vi.fn().mockResolvedValue(undefined),
     readdir: vi.fn().mockResolvedValue([]),
@@ -757,6 +760,9 @@ describe('speckit:card-handoff', () => {
   })
 
   it('speckit mode invokes the native /speckit-specify skill with the card title', async () => {
+    // Only where the repository has it. `.claude/skills/` is routinely
+    // untracked, so the worktree a run happens in often does not.
+    vi.mocked(nodefs.existsSync).mockReturnValue(true)
     vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
     vi.mocked(persistence.readState).mockResolvedValue(
       makeState('/repo/specs/x', { card: { title: 'Auto-load tickets', type: 'feature' } }) as never
@@ -776,6 +782,30 @@ describe('speckit:card-handoff', () => {
     }
     expect(runnerCall.phase).toBe('specify')
     expect(runnerCall.phaseCommand).toContain('/speckit-specify')
+    expect(runnerCall.phaseCommand).toContain('Auto-load tickets')
+    vi.mocked(nodefs.existsSync).mockReturnValue(false)
+  })
+
+  it('asks in words when the repository has no such skill', async () => {
+    // Otherwise the runtime answers "Unknown command: /speckit-specify" and the
+    // phase is over before it began, having written nothing.
+    vi.mocked(nodefs.existsSync).mockReturnValue(false)
+    vi.mocked(nodefs.promises.readdir).mockResolvedValue([] as never)
+    vi.mocked(persistence.readState).mockResolvedValue(
+      makeState('/repo/specs/x', { card: { title: 'Auto-load tickets', type: 'feature' } }) as never
+    )
+    vi.mocked(persistence.readCard).mockResolvedValue(null)
+    const mockStartPhaseRunner = vi.fn().mockReturnValue({ stop: vi.fn() })
+    vi.mocked(agentRunnerMod.createAgentRunner).mockReturnValue({
+      startPhaseRunner: mockStartPhaseRunner,
+    })
+
+    const handler = getSharedHandler('speckit:card-handoff')!
+    await handler({ featureDir: '/repo/specs/x', workspacePath: '/repo' })
+
+    const runnerCall = mockStartPhaseRunner.mock.calls[0][0] as { phaseCommand: string }
+    expect(runnerCall.phaseCommand.startsWith('/')).toBe(false)
+    expect(runnerCall.phaseCommand).toContain('spec.md')
     expect(runnerCall.phaseCommand).toContain('Auto-load tickets')
   })
 
