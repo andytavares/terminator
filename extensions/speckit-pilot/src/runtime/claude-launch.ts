@@ -1,5 +1,5 @@
 import { writeFileSync, mkdirSync } from 'fs'
-import { join } from 'path'
+import { isAbsolute, join } from 'path'
 import { homedir } from 'os'
 
 // What to type into the terminal to start an agent, and the settings that make
@@ -139,6 +139,14 @@ export function buildLaunchSpec(options: LaunchSpecOptions): LaunchSpec {
   const nodePath = options.nodePath ?? process.execPath
   const claudePath = options.claudePath ?? 'claude'
 
+  // Absolute, or the command is wrong in a way that only shows up at runtime:
+  // the runtime resolves `--settings` against the terminal's cwd, which is the
+  // card's worktree, and a relative path put it somewhere that never exists.
+  // The whole run then dies on "Settings file not found" with the card still
+  // reading WORKING.
+  if (!isAbsolute(options.settingsDirectory)) {
+    throw new Error(`settingsDirectory must be absolute, got ${options.settingsDirectory}`)
+  }
   mkdirSync(options.settingsDirectory, { recursive: true })
   const settingsPath = join(options.settingsDirectory, `${options.sessionId}.settings.json`)
   writeFileSync(

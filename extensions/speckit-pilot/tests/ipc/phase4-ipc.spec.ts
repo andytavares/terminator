@@ -5,6 +5,14 @@
  * Strategy: same mock-API approach as index-ipc.spec.ts — import index.ts
  * so vi.mock() intercepts sub-modules before the bundle inlines them.
  */
+import { tmpdir as tmpdirForUserData } from 'node:os'
+
+// A real directory. The supervision runtime writes its feed, mutes and
+// per-session settings under userData, and a path that does not exist fails at
+// mkdir. `node:fs` is mocked in some of these specs, so nothing is created
+// here — the OS temp directory is already there.
+const USER_DATA = tmpdirForUserData()
+
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { PilotState } from '../../src/types/speckit.types.js'
@@ -18,9 +26,7 @@ vi.mock('electron', () => ({
     encryptString: vi.fn((s: string) => Buffer.from(s + '-enc')),
     decryptString: vi.fn((b: Buffer) => b.toString().replace('-enc', '')),
   },
-  app: {
-    getPath: vi.fn().mockReturnValue('/mock-user-data'),
-  },
+  app: { getPath: vi.fn().mockReturnValue(USER_DATA) },
 }))
 
 vi.mock('node:fs', () => ({

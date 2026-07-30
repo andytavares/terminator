@@ -188,3 +188,25 @@ describe('transcriptPathFor — what it falls back to', () => {
     expect(transcriptPathFor('/a', 'sid')).toContain(homedir())
   })
 })
+
+describe('the settings path handed to the runtime', () => {
+  // The bug this pins: `resolveWorktreeBaseDir('')` is `join('', '.worktrees')`
+  // — relative — so `--settings .worktrees/…` was resolved against the card's
+  // worktree, where it never exists. Every supervised run died on "Settings
+  // file not found" the moment it launched, with the card still reading
+  // WORKING and its console empty.
+  it('is refused when it is relative, rather than failing inside the terminal', () => {
+    expect(() =>
+      buildLaunchSpec({
+        sessionId: 'session-1',
+        cwd: '/repo/.worktrees/a',
+        prompt: '/speckit-specify',
+        settingsDirectory: '.worktrees/.speckit-pilot-runtime/settings',
+        hookScriptPath: '/state/hook.js',
+        controlUrl: 'http://127.0.0.1:1/pretooluse',
+        controlEventUrl: 'http://127.0.0.1:1/event',
+        controlToken: 'token',
+      })
+    ).toThrow(/must be absolute/)
+  })
+})

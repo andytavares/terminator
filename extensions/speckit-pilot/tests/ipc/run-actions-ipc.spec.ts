@@ -7,6 +7,14 @@
  * cover that — but that the channel a surface calls reaches it. Every bug this
  * branch shipped was in exactly that gap.
  */
+import { tmpdir as tmpdirForUserData } from 'node:os'
+
+// A real directory. The supervision runtime writes its feed, mutes and
+// per-session settings under userData, and a path that does not exist fails at
+// mkdir. `node:fs` is mocked in some of these specs, so nothing is created
+// here — the OS temp directory is already there.
+const USER_DATA = tmpdirForUserData()
+
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/index.js'
@@ -18,7 +26,10 @@ vi.mock('electron', () => ({
     encryptString: vi.fn(),
     decryptString: vi.fn(),
   },
-  app: { getPath: vi.fn().mockReturnValue('/mock-user-data') },
+  // A real directory: the supervision runtime writes its feed, mutes and
+  // per-session settings under userData, and a path that does not exist fails
+  // at mkdir.
+  app: { getPath: vi.fn().mockReturnValue(USER_DATA) },
 }))
 
 const runner = {

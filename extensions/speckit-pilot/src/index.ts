@@ -1,4 +1,5 @@
 import type { ExtensionAPI, Disposable, SettingDefinition } from '../../../src/main/extensions/api'
+import { app } from 'electron'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type {
@@ -752,6 +753,24 @@ let supervision: Supervision | null = null
  * complete whether or not it interrupted anyone.
  */
 let mutes: MuteStore | null = null
+
+/**
+ * Where the supervision runtime keeps its files.
+ *
+ * Absolute, and outside every repository. It used to be
+ * `resolveWorktreeBaseDir('')`, which is `join('', '.worktrees')` — a
+ * *relative* path — so the `--settings` handed to claude read
+ * `.worktrees/.speckit-pilot-runtime/settings/<id>.json`, which the runtime
+ * resolved against the worktree it was started in. It was never there, so every
+ * supervised run died on "Settings file not found" the moment it launched: the
+ * card sat at WORKING with 0 turns and the console stayed empty forever.
+ *
+ * Beside the extension's credentials, in userData: this is the pilot's own
+ * state, not repository content, and nothing here should ever land in a diff.
+ */
+function runtimeStateDir(): string {
+  return path.join(app.getPath('userData'), 'speckit-pilot-runtime')
+}
 /**
  * The notification a held tool call raised, so answering it takes the
  * notification away too. A console that leaves them behind teaches you to
@@ -834,9 +853,7 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
   // own: activation must not fail because a host could not say where worktrees
   // live, and a review with no policy refuses rather than bypassing.
   try {
-    setReadOnlyStateDir(
-      path.join(api.settings.resolveWorktreeBaseDir(''), '.speckit-pilot-runtime')
-    )
+    setReadOnlyStateDir(runtimeStateDir())
   } catch {
     setReadOnlyStateDir(null)
   }
@@ -846,7 +863,7 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     supervisedRunner = createSupervisedRunner({
       api,
       control,
-      stateDir: path.join(api.settings.resolveWorktreeBaseDir(''), '.speckit-pilot-runtime'),
+      stateDir: runtimeStateDir(),
     })
     setSupervisedRunner(supervisedRunner)
     // Raised requests are held here so a surface can render them, and cleared
@@ -892,14 +909,12 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     // failure nobody instruments: it looks exactly like one that is working.
     supervision = createSupervision({
       api,
-      stateDir: path.join(api.settings.resolveWorktreeBaseDir(''), '.speckit-pilot-runtime'),
+      stateDir: runtimeStateDir(),
     })
     // Registered runs are what everything downstream reads. Without this the
     // review queue, the gate and the stall detector are all correct and empty.
     setRunSupervision(supervision)
-    mutes = createMuteStore(
-      path.join(api.settings.resolveWorktreeBaseDir(''), '.speckit-pilot-runtime', 'mutes.json')
-    )
+    mutes = createMuteStore(path.join(runtimeStateDir(), 'mutes.json'))
 
     const runner = supervisedRunner
     stallWatcher = createStallWatcher({

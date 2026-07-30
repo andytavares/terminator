@@ -143,6 +143,12 @@ test('starting a phase opens a project and a terminal running claude', async () 
   // Never the thing this replaced.
   await expect(page.locator('.xterm-screen')).not.toContainText('bypassPermissions')
 
+  // The settings the runtime is handed must be an absolute path. A relative one
+  // is resolved against this worktree, where it does not exist, and the run
+  // dies on "Settings file not found" while the card still reads WORKING.
+  await expect(page.locator('.xterm-screen')).toContainText("--settings '/")
+  await expect(page.locator('.xterm-screen')).not.toContainText('Settings file not found')
+
   // And it is on the register, where the review queue, the gate and the stall
   // detector all read from. Asserted here rather than in a test of its own:
   // they are one event, and splitting them made the second depend on the first

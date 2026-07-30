@@ -5,6 +5,14 @@
  * failure this closes is not in either pure function — both had tests and
  * neither was called. `approvedHash` was only ever written as `null`.
  */
+import { tmpdir as tmpdirForUserData } from 'node:os'
+
+// A real directory. The supervision runtime writes its feed, mutes and
+// per-session settings under userData, and a path that does not exist fails at
+// mkdir. `node:fs` is mocked in some of these specs, so nothing is created
+// here — the OS temp directory is already there.
+const USER_DATA = tmpdirForUserData()
+
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -19,7 +27,10 @@ vi.mock('electron', () => ({
     encryptString: vi.fn(),
     decryptString: vi.fn(),
   },
-  app: { getPath: vi.fn().mockReturnValue('/mock-user-data') },
+  // A real directory: the supervision runtime writes its feed, mutes and
+  // per-session settings under userData, and a path that does not exist fails
+  // at mkdir.
+  app: { getPath: vi.fn().mockReturnValue(USER_DATA) },
 }))
 
 // Approving a phase auto-starts the next one. Nothing here is about that, and

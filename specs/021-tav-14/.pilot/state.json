@@ -11,7 +11,7 @@
     "source": "linear",
     "createdAt": "2026-07-29T23:31:29.811Z"
   },
-  "stage": "in-progress",
+  "stage": "backlog",
   "mode": "speckit",
   "ticket": {
     "source": "linear",
@@ -21,12 +21,12 @@
     "branchName": "andrewtavares87/tav-14-make-all-text-in-the-application-red"
   },
   "run": {
-    "status": "running",
-    "startedAt": "2026-07-29T23:34:02.667Z",
-    "completedAt": null,
+    "status": "cancelled",
+    "startedAt": "2026-07-29T23:52:49.257Z",
+    "completedAt": "2026-07-29T23:54:09.870Z",
     "autonomyLevel": "standard"
   },
-  "queuePosition": "active",
+  "queuePosition": null,
   "worktreePath": "/Users/atavares/repos/terminator/.worktrees/tav-14",
   "branchName": "andrewtavares87/tav-14-make-all-text-in-the-application-red",
   "prUrl": null,
@@ -50,7 +50,7 @@
       "approvedAt": null,
       "approvedBy": null,
       "lastRunId": null,
-      "lastRunAt": "2026-07-29T23:34:02.888Z",
+      "lastRunAt": "2026-07-29T23:52:49.470Z",
       "artifactPaths": ["/Users/atavares/repos/terminator/specs/021-tav-14/spec.md"],
       "feedback": null,
       "batchIndex": null
