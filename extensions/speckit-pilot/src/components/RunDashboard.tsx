@@ -374,6 +374,18 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
           >
             Open the terminal
           </button>
+          {/* Silence at the very start usually is not the agent thinking. The
+              runtime asks you to trust a directory the first time it runs in
+              one, and a worktree is a new directory every time — so it waits
+              there, having said nothing, and the card looks stuck. There is no
+              documented way to pre-answer that prompt, so the honest thing is
+              to say where it is. */}
+          {liveRun.turns === 0 && transcript.length === 0 && (
+            <div className="sk-sup__meta">
+              Nothing yet. The first run in a new worktree is usually waiting for you to trust the
+              folder — open the terminal and answer it.
+            </div>
+          )}
         </div>
       )}
       <RunConsole

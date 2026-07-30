@@ -302,3 +302,17 @@ describe('taking a run over, or ending it', () => {
     expect(await pending).toMatchObject({ permissionDecision: 'deny' })
   })
 })
+
+describe('the environment the agent runs in', () => {
+  it('forces session persistence, or there is no transcript to read', async () => {
+    // Everything this runtime knows it reads from the transcript. The runtime
+    // sets CLAUDE_CODE_CHILD_SESSION=1 in everything it spawns, and a nested
+    // interactive session carrying that marker writes none — so when the
+    // console itself was started from a Claude Code session, the stall
+    // detector, the turn count and the card's console all read empty forever.
+    await runner().start(start)
+    expect(written.map((w) => w.data).join('\n')).toContain(
+      'CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1'
+    )
+  })
+})

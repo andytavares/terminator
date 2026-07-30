@@ -160,6 +160,23 @@ does; the entries keep arriving in the feed. Mutes persist, because one you have
 to set again after every restart is one you stop bothering with — and then
 notifications get turned off wholesale.
 
+## Two things the runtime does to a supervised run
+
+**Session persistence is forced.** Claude Code sets `CLAUDE_CODE_CHILD_SESSION=1`
+in every process it spawns, and a nested interactive session carrying that marker
+is excluded from history — "Transcript saving is off". Everything here reads the
+transcript, so when the console itself was started from a Claude Code session its
+agents would write none and the stall detector, the turn count and the card's
+console would all read empty forever. The runner exports
+`CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1`, which is the documented override.
+
+**The folder-trust prompt is not suppressed.** The runtime asks you to trust a
+directory the first time it runs in one, and a worktree is a new directory every
+time — so a fresh run waits at that prompt having said nothing. There is no
+documented flag or settings key to pre-answer it (only `-p`, which would give up
+the terminal), so nothing here guesses at one: the card says the run is probably
+waiting on it and sends you to the terminal.
+
 ## Where state lives
 
 - **In memory** — the run register, the review queue, the stall firings. A run

@@ -215,9 +215,17 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       // Typed, exactly as a person would. The skills read these to find the
       // card's spec, plan and tasks regardless of the branch name.
       const featureSlug = path.basename(start.featureDir)
+      // CLAUDE_CODE_FORCE_SESSION_PERSISTENCE, because everything this runtime
+      // knows it reads from the transcript. The runtime sets
+      // CLAUDE_CODE_CHILD_SESSION=1 in every process it spawns, and a nested
+      // interactive session carrying that marker is excluded from history —
+      // "Transcript saving is off" — so when the console itself was started
+      // from a Claude Code session, its agents write no transcript and the
+      // stall detector, the turn count and the card's console all read empty
+      // forever. Documented as the override for exactly this case.
       api.pty.write(
         terminalSessionId,
-        `export SPECIFY_FEATURE=${featureSlug} SPECIFY_FEATURE_DIRECTORY=${path.join('specs', featureSlug)}\r`
+        `export SPECIFY_FEATURE=${featureSlug} SPECIFY_FEATURE_DIRECTORY=${path.join('specs', featureSlug)} CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1\r`
       )
       api.pty.write(terminalSessionId, `${spec.command}\r`)
 
