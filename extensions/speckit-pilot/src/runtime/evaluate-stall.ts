@@ -9,13 +9,11 @@ export interface StallThresholds {
   /** No net change before the loop signal can fire. */
   readonly noProgressMs: number
   /** Reverts within the recent-edit window that constitute thrashing. */
-  readonly revertThreshold: number
 }
 
 export const DEFAULT_THRESHOLDS: StallThresholds = {
   silenceMs: 8 * 60_000,
   noProgressMs: 15 * 60_000,
-  revertThreshold: 2,
 }
 
 export interface SessionFacts {
@@ -41,11 +39,14 @@ export interface SessionFacts {
   readonly recentToolPaths: readonly string[]
   /** Net lines changed across that window. */
   readonly recentNetChange: number
-  /** Self-reverts within the recent-edit window. */
-  readonly recentReverts: number
 }
 
-export type StallSignal = 'silence' | 'loop' | 'revert'
+/**
+ * `revert` — thrashing on its own edits — was specified and is not here: it
+ * needs a per-edit history of the working copy, and nothing records one. It was
+ * removed rather than left as a threshold no input could ever cross.
+ */
+export type StallSignal = 'silence' | 'loop'
 
 export interface StallFiring {
   readonly sessionId: string
@@ -57,7 +58,6 @@ export interface StallFiring {
     readonly diffSilenceMs: number
     readonly distinctFiles: number
     readonly netChange: number
-    readonly reverts: number
     readonly shellInFlight: boolean
   }
 }
@@ -84,7 +84,6 @@ export function evaluateStall(
     diffSilenceMs,
     distinctFiles,
     netChange: facts.recentNetChange,
-    reverts: facts.recentReverts,
     shellInFlight,
   }
 
@@ -94,10 +93,6 @@ export function evaluateStall(
     firedAt: now,
     inputs,
   })
-
-  // Most specific diagnosis first: thrashing on its own edits is a distinct
-  // failure from simply going quiet, and more useful to report.
-  if (facts.recentReverts >= thresholds.revertThreshold) return fire('revert')
 
   // Looping on one file with nothing to show for it. Deliberately still
   // evaluated while a command is in flight — a loop is a different failure

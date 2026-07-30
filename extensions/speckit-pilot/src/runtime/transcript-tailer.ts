@@ -13,6 +13,14 @@ export interface ToolActivity {
   readonly callId: string
   /** A shell call in flight is never silence, however long it runs. */
   readonly isShell: boolean
+  /**
+   * The file the call touched, when it names one.
+   *
+   * What the loop signal is made of: eight tool calls against one file is a
+   * different failure from going quiet, and without this the signal had
+   * nothing to count.
+   */
+  readonly path: string | null
   readonly at: number
 }
 
@@ -31,6 +39,7 @@ interface ToolUseBlock {
   type?: unknown
   id?: unknown
   name?: unknown
+  input?: unknown
   tool_use_id?: unknown
 }
 
@@ -60,17 +69,24 @@ function eventsFromEntry(entry: Record<string, unknown>): ToolActivity[] {
       // long-command exemption could not close it. Better to skip it.
       if (callId === null) continue
       const toolName = typeof block.name === 'string' ? block.name : 'unknown'
+      const input = block.input
+      const named =
+        typeof input === 'object' && input !== null
+          ? ((input as Record<string, unknown>).file_path ??
+            (input as Record<string, unknown>).notebook_path)
+          : null
       events.push({
         kind: 'tool_started',
         toolName,
         callId,
         isShell: SHELL_TOOLS.has(toolName),
+        path: typeof named === 'string' ? named : null,
         at,
       })
     } else if (block.type === 'tool_result') {
       const callId = typeof block.tool_use_id === 'string' ? block.tool_use_id : null
       if (callId === null) continue
-      events.push({ kind: 'tool_finished', toolName: '', callId, isShell: false, at })
+      events.push({ kind: 'tool_finished', toolName: '', callId, isShell: false, path: null, at })
     }
   }
   return events

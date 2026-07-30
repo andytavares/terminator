@@ -561,6 +561,7 @@ function startSupervised(opts: {
 
   let sessionId: string | null = null
   let ended = false
+  let stopRequested = false
 
   void (async () => {
     const branch = (await branchIn(opts.api, opts.worktreePath)) ?? path.basename(opts.worktreePath)
@@ -595,15 +596,25 @@ function startSupervised(opts: {
         })
       },
       onTurnEnd: (turns) => {
-        // A turn ending with changes is what puts work in front of the
-        // operator; in a terminal the agent does not exit when it is done.
+        // A turn ending is what finishes a supervised phase.
+        //
+        // In a terminal the agent does not exit when it is done — it sits at
+        // its prompt, and `session_end` may never come. Waiting for it left the
+        // phase `running` forever: the gate never appeared, approval never
+        // unlocked, and the card looked busy while the agent sat idle.
         if (sessionId !== null) void supervision?.finishTurn(sessionId, turns, Date.now())
-      },
-      onEnd: () => {
         if (ended) return
         ended = true
-        if (sessionId !== null) supervision?.finish(sessionId, Date.now())
         void opts.onComplete?.(0)
+      },
+      onEnd: (exitCode) => {
+        if (sessionId !== null) supervision?.finish(sessionId, Date.now())
+        if (ended) return
+        ended = true
+        // The terminal's own code when it has one: a session that died is not
+        // a phase that succeeded, and `awaiting_review` on a crashed run is an
+        // approval gate over nothing.
+        void opts.onComplete?.(exitCode)
       },
     })
     if (run === null) {
@@ -614,6 +625,11 @@ function startSupervised(opts: {
       return
     }
     sessionId = run.sessionId
+    if (stopRequested) {
+      // Asked to stop before it had started. Honour it now that there is
+      // something to stop.
+      runner.stop(run.sessionId, 'stopped from the pilot')
+    }
     supervision?.runs.add({
       sessionId: run.sessionId,
       featureDir: opts.featureDir,
@@ -630,6 +646,10 @@ function startSupervised(opts: {
 
   return {
     stop(): void {
+      // `start` is still in flight the moment this handle is returned, so a
+      // stop that arrives first would have found no session and done nothing —
+      // leaving the terminal to open and the agent to run anyway.
+      stopRequested = true
       if (sessionId !== null) runner.stop(sessionId, 'stopped from the pilot')
     },
   }

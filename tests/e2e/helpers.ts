@@ -60,7 +60,10 @@ export async function closeApp(handle: AppHandle | undefined): Promise<void> {
   // a spec that ran a real agent fails in teardown as ENOTEMPTY, which reads
   // as a broken test rather than as tidying up too eagerly.
   if (handle.userDataDir) {
-    rmSync(handle.userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+    // Two seconds of retries, not half of one: the supervision runtime keeps
+    // its control-server settings, hook script and feed under userData, and on
+    // a loaded CI machine those are still being flushed when the window goes.
+    rmSync(handle.userDataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 })
   }
 }
 

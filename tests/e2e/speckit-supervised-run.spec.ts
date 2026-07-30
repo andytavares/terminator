@@ -149,6 +149,19 @@ test('starting a phase opens a project and a terminal running claude', async () 
   await expect(page.locator('.xterm-screen')).toContainText("--settings '/")
   await expect(page.locator('.xterm-screen')).not.toContainText('Settings file not found')
 
+  // The drawer shows this run rather than an empty console: a supervised phase
+  // broadcasts nothing on `speckit:run-output`, so what it renders is the
+  // transcript, with a jump answered by the main process — the only place that
+  // can select a tab in this window.
+  const drawer = (await pilot('speckit:supervision-snapshot')) as {
+    runs: Array<{ sessionId: string }>
+  }
+  const sessionId = drawer.runs[0]?.sessionId ?? ''
+  expect(sessionId).not.toBe('')
+  const transcript = (await pilot('speckit:run-transcript', { sessionId })) as { lines: unknown[] }
+  expect(Array.isArray(transcript.lines)).toBe(true)
+  await expect(pilot('speckit:run-terminal', { sessionId })).resolves.toEqual({ ok: true })
+
   // And it is on the register, where the review queue, the gate and the stall
   // detector all read from. Asserted here rather than in a test of its own:
   // they are one event, and splitting them made the second depend on the first
@@ -295,24 +308,4 @@ test('the supervision panel is on screen, not merely built', async () => {
       expect(text).toContain(action)
     }
   }
-})
-
-test('the card drawer shows the terminal, not an empty console', async () => {
-  test.setTimeout(180_000)
-  // The complaint this closes: a supervised phase writes nothing to
-  // `speckit:run-output`, so the drawer's console sat on "Waiting for output…"
-  // for the whole run with no way into the session.
-  const snapshot = (await pilot('speckit:supervision-snapshot')) as {
-    runs: Array<{ sessionId: string }>
-  }
-  expect(snapshot.runs.length).toBeGreaterThan(0)
-  const sessionId = snapshot.runs[0].sessionId
-
-  // The transcript is what the drawer renders in place of the dead stream.
-  const transcript = (await pilot('speckit:run-transcript', { sessionId })) as { lines: unknown[] }
-  expect(Array.isArray(transcript.lines)).toBe(true)
-
-  // And the jump is answered by the main process, which is the only place that
-  // can select a tab in this window — the extension's UI is a separate renderer.
-  await expect(pilot('speckit:run-terminal', { sessionId })).resolves.toEqual({ ok: true })
 })

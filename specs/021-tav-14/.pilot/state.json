@@ -22,7 +22,7 @@
   },
   "run": {
     "status": "running",
-    "startedAt": "2026-07-30T00:25:34.231Z",
+    "startedAt": "2026-07-30T00:33:59.600Z",
     "completedAt": null,
     "autonomyLevel": "standard"
   },
@@ -50,7 +50,7 @@
       "approvedAt": null,
       "approvedBy": null,
       "lastRunId": null,
-      "lastRunAt": "2026-07-30T00:25:34.464Z",
+      "lastRunAt": "2026-07-30T00:33:59.841Z",
       "artifactPaths": ["/Users/atavares/repos/terminator/specs/021-tav-14/spec.md"],
       "feedback": null,
       "batchIndex": null

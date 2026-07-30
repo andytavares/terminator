@@ -225,18 +225,77 @@ describe('what a raised request reaches', () => {
   it('reports the end of a run as a completion, so the card does not sit mid-phase', async () => {
     const codes: number[] = []
     const runner = fakeRunner()
-    let finish: (() => void) | null = null
+    let finish: ((exitCode: number) => void) | null = null
     runner.start = async (options) => {
-      finish = (options as { onEnd?: () => void }).onEnd ?? null
+      finish = (options as { onEnd?: (exitCode: number) => void }).onEnd ?? null
       return startResult
     }
     setSupervisedRunner(runner)
 
     createAgentRunner(api()).startPhaseRunner({ ...phaseOpts, onComplete: (c) => codes.push(c) })
     await settle()
-    finish?.()
-    finish?.()
+    // The terminal's own code: a session that died is not a phase that
+    // succeeded.
+    finish?.(0)
+    finish?.(0)
     // Once, however many times the runtime says it ended.
     expect(codes).toEqual([0])
+  })
+})
+
+describe('when a supervised phase is finished', () => {
+  // In a terminal the agent does not exit when it is done — it sits at its
+  // prompt, and `session_end` may never come. Waiting for it left the phase
+  // `running` forever: the gate never appeared and approval never unlocked
+  // while the agent sat idle.
+
+  it('completes the phase when the turn ends, not only when the session does', async () => {
+    const codes: number[] = []
+    const runner = fakeRunner()
+    let endTurn: ((turns: number) => void) | null = null
+    runner.start = async (options) => {
+      endTurn = (options as { onTurnEnd?: (turns: number) => void }).onTurnEnd ?? null
+      return startResult
+    }
+    setSupervisedRunner(runner)
+
+    createAgentRunner(api()).startPhaseRunner({ ...phaseOpts, onComplete: (c) => codes.push(c) })
+    await settle()
+    endTurn?.(3)
+    expect(codes).toEqual([0])
+  })
+
+  it('reports the terminal’s code, so a crashed run is not awaiting review', async () => {
+    const codes: number[] = []
+    const runner = fakeRunner()
+    let finish: ((exitCode: number) => void) | null = null
+    runner.start = async (options) => {
+      finish = (options as { onEnd?: (exitCode: number) => void }).onEnd ?? null
+      return startResult
+    }
+    setSupervisedRunner(runner)
+
+    createAgentRunner(api()).startPhaseRunner({ ...phaseOpts, onComplete: (c) => codes.push(c) })
+    await settle()
+    finish?.(137)
+    expect(codes).toEqual([137])
+  })
+
+  it('stops a run that was cancelled before it had started', async () => {
+    // The handle is returned while `start` is still in flight; a stop that
+    // arrived first used to find no session and do nothing, leaving the
+    // terminal to open and the agent to run anyway.
+    const runner = fakeRunner()
+    const stopped: string[] = []
+    runner.stop = (sessionId: string) => {
+      stopped.push(sessionId)
+      return true
+    }
+    setSupervisedRunner(runner)
+
+    const handle = createAgentRunner(api()).startPhaseRunner(phaseOpts)
+    handle.stop()
+    await settle()
+    expect(stopped).toContain(startResult.sessionId)
   })
 })

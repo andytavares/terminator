@@ -168,7 +168,7 @@ import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
 import { hashArtifacts } from './state/artifact-hash.js'
 import { applyHashVerification, computeStalePhases } from './state/phase-state-machine.js'
 import { artifactEntries, resolveArtifactPath } from './state/artifact-paths.js'
-import { readCardLanes } from './runtime/workitem.js'
+import { readCardLanes, WORKITEM_FILE } from './runtime/workitem.js'
 import { readTranscriptTail } from './runtime/transcript-excerpt.js'
 import type { HunkDecision } from './runtime/review/hunk-decisions.js'
 
@@ -409,6 +409,25 @@ async function withHashVerification(state: PilotState): Promise<PilotState> {
   return anyToCheck ? applyHashVerification(state, hashes) : state
 }
 
+/**
+ * A card's lanes, from wherever `workitem.json` actually is.
+ *
+ * The plan phase writes it, and a phase runs in the worktree — so it lands
+ * there, not beside the card in the main checkout. Reading the recorded path
+ * found nothing and every multi-repository card looked like a single-repository
+ * one.
+ */
+async function readLanesFor(featureDir: string): Promise<ReturnType<typeof readCardLanes>> {
+  const state = await readPilotState(featureDir)
+  const dir = path.dirname(
+    resolveArtifactPath(
+      { featureDir, worktreePath: state?.worktreePath },
+      path.join(featureDir, WORKITEM_FILE)
+    )
+  )
+  return readCardLanes(dir) ?? readCardLanes(featureDir)
+}
+
 // Decide the branch name for a card's worktree. Prefer the tracker's suggested
 // VCS branch (Linear provides one per issue); otherwise
 // <username>/<ticket-key>-<kebab-title>; fall back to feature/<slug> for native
@@ -619,6 +638,26 @@ async function handoffCard(
     return { error: 'VALIDATION_ERROR', message: 'A card needs a title before handoff' }
   }
   if (mode) state.mode = mode
+  // Refused before anything is touched: starting a fourth agent while three
+  // diffs are waiting is how a backlog nobody can review gets built, and the
+  // constraint is one person's attention rather than machine capacity.
+  //
+  // Checked before the card is primed, not after. Priming rearranges phase
+  // statuses — skipping the constitution, collapsing a quick-fix run — and a
+  // refusal that happens afterwards leaves the card rearranged for a run that
+  // never started.
+  //
+  // Overridden deliberately rather than not enforced — the override is recorded
+  // with the depth at the moment it was ignored, so a backlog built this way is
+  // visible afterwards rather than only felt.
+  const gate = supervision?.backpressure.check()
+  if (gate !== undefined && !gate.allowed && overrideBackpressure !== true) {
+    return { ok: false, error: 'backpressure', reason: gate.reason, backpressure: gate }
+  }
+  if (gate !== undefined && !gate.allowed && overrideBackpressure === true) {
+    supervision?.backpressure.override(featureDir, Date.now())
+  }
+
   const now = new Date().toISOString()
   state.run = {
     status: 'running',
@@ -627,23 +666,6 @@ async function handoffCard(
     autonomyLevel: state.run?.autonomyLevel ?? state.settings.defaultAutonomy ?? 'standard',
   }
   primePhasesForRun(state)
-
-  // Refused before anything is provisioned: starting a fourth agent while three
-  // diffs are waiting is how a backlog nobody can review gets built, and the
-  // constraint is one person's attention rather than machine capacity.
-  //
-  // Overridden deliberately rather than not enforced — the override is recorded
-  // with the depth at the moment it was ignored, so a backlog built this way is
-  // visible afterwards rather than only felt.
-  const gate = supervision?.backpressure.check()
-  if (gate !== undefined && !gate.allowed && overrideBackpressure !== true) {
-    state.run = null
-    await writePilotState(featureDir, state)
-    return { ok: false, error: 'backpressure', reason: gate.reason, backpressure: gate }
-  }
-  if (gate !== undefined && !gate.allowed && overrideBackpressure === true) {
-    supervision?.backpressure.override(featureDir, Date.now())
-  }
 
   const cap = getMaxConcurrent(api)
   const active = await countActiveRuns(workspacePath)
@@ -709,12 +731,14 @@ async function advanceQueue(api: ExtensionAPI, workspacePath: string): Promise<v
     if (supervision?.backpressure.check().allowed === false) break
     const s = item.state
     try {
-      const { worktreePath, branchName } = await createWorktree(
-        api,
-        s.featureDir,
-        workspacePath,
-        s.ticket
-      )
+      // Reuse the one it already has. A card queued by `dispatch` was
+      // provisioned before it hit the gate, and creating a worktree at a path
+      // git already knows fails — so the card sat pending forever with a live
+      // worktree and no agent.
+      const existing = s.worktreePath !== null && (await pathExists(s.worktreePath))
+      const { worktreePath, branchName } = existing
+        ? { worktreePath: s.worktreePath as string, branchName: s.branchName ?? '' }
+        : await createWorktree(api, s.featureDir, workspacePath, s.ticket)
       s.worktreePath = worktreePath
       s.branchName = branchName
       s.queuePosition = 'active'
@@ -972,8 +996,20 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     mutes = createMuteStore(path.join(runtimeStateDir(), 'mutes.json'))
 
     const runner = supervisedRunner
+    // How much each run's working copy has grown since the previous look. The
+    // watcher reads transcripts and nothing else, so without this the loop
+    // signal could never tell circling from steady work — and never fired.
+    const lastSeenChange = new Map<string, number>()
     stallWatcher = createStallWatcher({
       runs: () => runner.watchable(),
+      netChangeSince: (sessionId) => {
+        const diff = supervision?.runs.get(sessionId)?.diff
+        if (diff === undefined) return 1
+        const total = diff.added + diff.removed
+        const growth = total - (lastSeenChange.get(sessionId) ?? 0)
+        lastSeenChange.set(sessionId, total)
+        return growth
+      },
       onFiring: (firing, featureDir) => {
         const shadow = stallShadowMode(api)
         stallFirings.unshift({ firing, featureDir, shadow })
@@ -1139,20 +1175,20 @@ export function activate(api: ExtensionAPI): void {
   // Read from the card's own `workitem.json` rather than taken as a payload:
   // the contract between the pipeline and the console is a file, and a surface
   // that had to carry the lanes in would need a producer of its own.
-  reg(api, 'speckit:lanes', (payload: unknown) => {
+  reg(api, 'speckit:lanes', async (payload: unknown) => {
     const { featureDir } = payload as { featureDir: string }
-    const card = readCardLanes(featureDir)
+    const card = await readLanesFor(featureDir)
     // Null means one repository, which is not a card with a broken work item.
     return { lanes: card === null ? [] : (supervision?.lanes(card) ?? []) }
   })
 
-  reg(api, 'speckit:lane-may-merge', (payload: unknown) => {
+  reg(api, 'speckit:lane-may-merge', async (payload: unknown) => {
     const { featureDir, ord, merged } = payload as {
       featureDir: string
       ord: number
       merged: number[]
     }
-    const card = readCardLanes(featureDir)
+    const card = await readLanesFor(featureDir)
     if (card === null) {
       // Nothing declared, nothing to wait for.
       return { allowed: true, reason: null, blockingLane: null }
@@ -1188,10 +1224,16 @@ export function activate(api: ExtensionAPI): void {
     return result
   })
 
-  reg(api, 'speckit:review-done', (payload: unknown) => {
+  reg(api, 'speckit:review-done', async (payload: unknown) => {
     const { sessionId } = payload as { sessionId: string }
+    const run = supervision?.runs.get(sessionId) ?? null
     supervision?.review.remove(sessionId)
     supervision?.runs.forget(sessionId)
+    // Reviewing one is what reopens the gate. Cards held back by backpressure
+    // stayed pending until something else happened to drain the queue.
+    if (run !== null) {
+      await advanceQueue(api, path.dirname(path.dirname(run.featureDir)))
+    }
     return { ok: true }
   })
 
@@ -1313,6 +1355,36 @@ export function activate(api: ExtensionAPI): void {
       await discardWorktree(api, workspacePath ?? '', run.worktreePath, run.branch)
       supervision?.review.remove(sessionId)
       supervision?.runs.forget(sessionId)
+
+      // The card has to forget it too. Leaving `run` running and a
+      // `worktreePath` pointing at a directory that no longer exists makes the
+      // board show a live phase, and the next handoff provision against a path
+      // that is gone.
+      activeRunnerHandles.get(run.featureDir)?.stop()
+      activeRunnerHandles.delete(run.featureDir)
+      const state = await readMigratedState(run.featureDir)
+      if (state) {
+        if (state.run) {
+          state.run = {
+            ...state.run,
+            status: 'cancelled',
+            completedAt: new Date().toISOString(),
+          }
+        }
+        state.worktreePath = null
+        state.branchName = null
+        state.queuePosition = null
+        state.stage = deriveStage(state.phases, state.run)
+        await writePilotState(run.featureDir, state)
+        await appendHistory(run.featureDir, {
+          ts: new Date().toISOString(),
+          actor: 'user',
+          action: 'run_cancelled',
+          phase: 'constitution',
+          note: 'run discarded, worktree removed',
+        })
+        api.window.broadcast('speckit:state-changed', { state })
+      }
       // Everything said about it goes too: the run, its worktree and its branch
       // are gone, so its feed entries are noise about something that no longer
       // exists. Posted after, so the discard itself is what remains.
@@ -1482,6 +1554,17 @@ export function activate(api: ExtensionAPI): void {
           activeRunnerHandles.delete(featureDir)
         }
         await discardWorktree(api, workspacePath, state.worktreePath, state.branchName)
+        // Its worktree is gone, so everything the supervision layer holds about
+        // it describes something that no longer exists: a run on the register,
+        // a diff in the review queue holding the gate shut, tool calls waiting
+        // on an answer that can no longer reach anyone.
+        for (const run of supervision?.runs.list() ?? []) {
+          if (run.featureDir !== featureDir) continue
+          supervision?.review.remove(run.sessionId)
+          supervision?.feed.forget(run.sessionId)
+        }
+        supervision?.runs.forgetCard(featureDir)
+        pendingPermissions.forgetCard(featureDir)
         state.run = { ...state.run!, status: 'cancelled', completedAt: new Date().toISOString() }
         state.queuePosition = null
         state.worktreePath = null
@@ -1821,6 +1904,13 @@ export function activate(api: ExtensionAPI): void {
     ps.approvedAt = null
     ps.approvedBy = null
     ps.approvedHash = null
+    // A skip has to advance the card the way an approval does. Setting the
+    // status alone left it at a gate with nothing following it: the next phase
+    // stayed locked and no runner ever started.
+    const nextAfterSkip = PHASE_ORDER[PHASE_ORDER.indexOf(phase) + 1]
+    const followingSkip = nextAfterSkip ? state.phases[nextAfterSkip] : undefined
+    if (followingSkip && followingSkip.status === 'locked') followingSkip.status = 'ready'
+    state.stage = deriveStage(state.phases, state.run)
     await writePilotState(featureDir, state)
     await appendHistory(featureDir, {
       ts: new Date().toISOString(),
@@ -2006,12 +2096,10 @@ export function activate(api: ExtensionAPI): void {
         branchName,
       })
 
-      const pilotDir = path.join(featureDir, '.pilot')
-      await fs.promises.mkdir(pilotDir, { recursive: true })
-      const stateFile = path.join(pilotDir, 'state.json')
-      const tmp = `${stateFile}.tmp`
-      await fs.promises.writeFile(tmp, JSON.stringify(state, null, 2), 'utf-8')
-      await fs.promises.rename(tmp, stateFile)
+      // Through the one writer, which names its temp file uniquely: two
+      // overlapping writes to a fixed `.tmp` race, and the loser's rename
+      // throws ENOENT.
+      await writePilotState(featureDir, state)
 
       // Create git worktree branching from baseBranch (or HEAD if not specified),
       // reusing the branch if it already exists.
@@ -2562,6 +2650,13 @@ export function activate(api: ExtensionAPI): void {
           label: 'Enable SpecKit Pilot',
           default: true,
           workspaceScoped: true,
+        },
+        'terminator.speckit-pilot.stallShadowMode': {
+          type: 'boolean',
+          label: 'Record stalls without surfacing them',
+          description:
+            'On by default. A stall detector that cries wolf gets turned off, and then the real stalls go unreported too — judge a week of recorded firings before turning this off.',
+          default: true,
         },
         'terminator.speckit-pilot.maxConcurrentRuns': {
           type: 'number',

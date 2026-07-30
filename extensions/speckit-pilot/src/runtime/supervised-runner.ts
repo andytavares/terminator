@@ -55,8 +55,15 @@ export interface StartSupervisedRunOptions {
   onResolved: (requestId: string, decision: 'allow' | 'deny') => void
   /** The agent stopped responding and is waiting. Not an ending. */
   onTurnEnd?: (turns: number) => void
-  /** The conversation is over. */
-  onEnd?: () => void
+  /**
+   * The conversation is over, with the terminal's exit code when there is one.
+   *
+   * Zero when the runtime reported a clean `SessionEnd`; whatever the shell
+   * exited with when the tab was closed or the process died. A phase that
+   * crashed must not land in `awaiting_review`, which is an approval gate over
+   * nothing.
+   */
+  onEnd?: (exitCode: number) => void
 }
 
 export interface SupervisedRunner {
@@ -95,6 +102,8 @@ const EXIT = '/exit\r'
 
 interface Running {
   bridge: ReturnType<typeof createPermissionBridge>
+  /** Stops listening for the terminal's exit once the run is over. */
+  detachExit: (() => void) | null
   terminalSessionId: string
   projectId: string
   transcriptPath: string
@@ -123,6 +132,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
     const run = running.get(sessionId)
     if (run === undefined) return
     running.delete(sessionId)
+    run.detachExit?.()
     // Anything still waiting can no longer be answered from here, and an
     // unresolved promise holds the agent's tool call open forever.
     run.bridge.rejectAll('This run has ended')
@@ -170,7 +180,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
             start.onTurnEnd?.(countTurns(spec.transcriptPath))
             return
           }
-          start.onEnd?.()
+          start.onEnd?.(0)
           end(sessionId)
         },
       })
@@ -201,7 +211,18 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         return null
       }
 
+      // The terminal dying is the other way a run ends. Without this, closing
+      // the tab left the phase `running` with no completion ever delivered:
+      // `session_end` only arrives when the runtime exits cleanly enough to
+      // fire its hook.
+      const detachExit =
+        api.pty.onExit?.(terminalSessionId, (exitCode: number) => {
+          start.onEnd?.(exitCode)
+          end(sessionId)
+        }) ?? null
+
       running.set(sessionId, {
+        detachExit,
         bridge,
         terminalSessionId,
         projectId: project.id,

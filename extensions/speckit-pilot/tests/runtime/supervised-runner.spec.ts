@@ -20,6 +20,8 @@ let opened: Array<Record<string, unknown>>
 let written: Array<{ terminal: string; data: string }>
 let terminalId: string | null
 let projectId: string | null
+let exitListener: ((exitCode: number) => void) | null
+let exitDetached: boolean
 
 function api() {
   return {
@@ -35,6 +37,12 @@ function api() {
         return terminalId
       },
       write: (terminal: string, data: string) => written.push({ terminal, data }),
+      onExit: (_sessionId: string, listener: (exitCode: number) => void) => {
+        exitListener = listener
+        return () => {
+          exitDetached = true
+        }
+      },
     },
   } as never
 }
@@ -67,6 +75,8 @@ beforeEach(async () => {
   written = []
   terminalId = 'terminal-1'
   projectId = 'project-1'
+  exitListener = null
+  exitDetached = false
 })
 
 afterEach(async () => {
@@ -314,5 +324,34 @@ describe('the environment the agent runs in', () => {
     expect(written.map((w) => w.data).join('\n')).toContain(
       'CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1'
     )
+  })
+})
+
+describe('when the terminal itself goes', () => {
+  // Supervised runs ended on the runtime's `session_end` hook. Closing the tab
+  // fires no hook, so the phase stayed running with no completion ever
+  // delivered.
+
+  it('ends the run, carrying the terminal’s exit code', async () => {
+    const ends: number[] = []
+    const r = runner()
+    await r.start({ ...start, onEnd: (code) => ends.push(code) })
+    exitListener?.(137)
+    expect(ends).toEqual([137])
+  })
+
+  it('takes the run off the register, so nothing keeps watching it', async () => {
+    const r = runner()
+    const run = await r.start(start)
+    exitListener?.(0)
+    expect(r.watchable().map((w) => w.sessionId)).not.toContain(run?.sessionId)
+  })
+
+  it('stops listening once the run is over', async () => {
+    const r = runner()
+    const run = await r.start(start)
+    r.stop(run?.sessionId ?? '')
+    exitListener?.(0)
+    expect(exitDetached).toBe(true)
   })
 })

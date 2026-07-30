@@ -20,7 +20,6 @@ function facts(over: Partial<SessionFacts> = {}): SessionFacts {
     openShellStartedAt: null,
     recentToolPaths: [],
     recentNetChange: 1,
-    recentReverts: 0,
     ...over,
   }
 }
@@ -143,23 +142,6 @@ describe('loop signal (FR-013)', () => {
   })
 })
 
-describe('revert signal (FR-014)', () => {
-  it('fires at two self-reverts within the window', () => {
-    const firing = evaluateStall(facts({ recentReverts: 2 }), DEFAULT_THRESHOLDS, MIN)
-    expect(firing).toMatchObject({ signal: 'revert' })
-    expect(firing?.inputs.reverts).toBe(2)
-  })
-
-  it('does not fire at one revert', () => {
-    expect(evaluateStall(facts({ recentReverts: 1 }), DEFAULT_THRESHOLDS, MIN)).toBeNull()
-  })
-
-  it('fires regardless of how recently the agent was active', () => {
-    const f = facts({ recentReverts: 3, lastToolActivityAt: MIN })
-    expect(evaluateStall(f, DEFAULT_THRESHOLDS, MIN)?.signal).toBe('revert')
-  })
-})
-
 describe('runs that cannot stall', () => {
   it.each([true])(
     'never fires for a run that is waiting on a person or already finished (%s)',
@@ -172,14 +154,21 @@ describe('runs that cannot stall', () => {
 })
 
 describe('signal precedence', () => {
-  it('reports revert first when several conditions hold, as the most specific diagnosis', () => {
-    const f = facts({
-      recentReverts: 2,
-      recentToolPaths: ['a.ts', 'a.ts'],
-      recentNetChange: 0,
-      lastToolActivityAt: 0,
-    })
-    expect(evaluateStall(f, DEFAULT_THRESHOLDS, 60 * MIN)?.signal).toBe('revert')
+  it('reports the loop rather than the silence, as the more specific diagnosis', () => {
+    // Both hold: nothing has happened for a long time, and what did happen was
+    // eight calls against one file with nothing to show for it.
+    expect(
+      evaluateStall(
+        facts({
+          lastToolActivityAt: 0,
+          lastNetChangeAt: 0,
+          recentToolPaths: ['a.ts', 'a.ts'],
+          recentNetChange: 0,
+        }),
+        DEFAULT_THRESHOLDS,
+        20 * MIN
+      )?.signal
+    ).toBe('loop')
   })
 })
 

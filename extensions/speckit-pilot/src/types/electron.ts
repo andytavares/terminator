@@ -272,7 +272,7 @@ export interface SupervisionSnapshot {
 export interface StallFiringView {
   firing: {
     sessionId: string
-    signal: 'silence' | 'loop' | 'revert'
+    signal: 'silence' | 'loop'
     firedAt: number
     /**
      * Every value that satisfied the condition, so a firing can be re-judged
@@ -284,7 +284,6 @@ export interface StallFiringView {
       diffSilenceMs: number
       distinctFiles: number
       netChange: number
-      reverts: number
       shellInFlight: boolean
     }
   }

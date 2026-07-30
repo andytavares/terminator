@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createStallWatcher, factsFrom, type WatchedRun } from '../../src/runtime/stall-watcher.js'
 import type { StallFiring } from '../../src/runtime/evaluate-stall.js'
+import { readTranscript } from '../../src/runtime/transcript-tailer.js'
 
 // A run that is blocked tells you: it raises a permission request and the board
 // lights up. A run that has simply gone quiet tells you nothing, and looks
@@ -21,7 +22,7 @@ afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }))
 
 /** Writes a transcript the tailer can read, with the tool calls given. */
 function transcript(
-  entries: Array<{ tool?: string; callId?: string; result?: string; at: number }>
+  entries: Array<{ tool?: string; callId?: string; result?: string; file?: string; at: number }>
 ): string {
   const path = join(dir, `${Math.random().toString(16).slice(2)}.jsonl`)
   const lines = entries.map((entry) =>
@@ -32,7 +33,12 @@ function transcript(
         content: [
           entry.result !== undefined
             ? { type: 'tool_result', tool_use_id: entry.result }
-            : { type: 'tool_use', id: entry.callId, name: entry.tool },
+            : {
+                type: 'tool_use',
+                id: entry.callId,
+                name: entry.tool,
+                input: entry.file === undefined ? {} : { file_path: entry.file },
+              },
         ],
       },
     })
@@ -215,5 +221,33 @@ describe('starting and stopping', () => {
     watcher.start()
     watcher.stop()
     expect(true).toBe(true)
+  })
+})
+
+describe('the facts the loop signal is made of', () => {
+  // `recentToolPaths` was hardcoded empty and `recentNetChange` hardcoded to 1,
+  // so `loop` could never fire however long an agent went round in circles.
+
+  it('reads which files the recent calls touched', () => {
+    const path = transcript([
+      { tool: 'Edit', callId: 'a', file: '/wt/a.ts', at: 1_000 },
+      { tool: 'Edit', callId: 'b', file: '/wt/a.ts', at: 2_000 },
+    ])
+    expect(factsFrom(run({ transcriptPath: path }), readTranscript(path)).recentToolPaths).toEqual([
+      '/wt/a.ts',
+      '/wt/a.ts',
+    ])
+  })
+
+  it('takes the growth it is given, so circling is distinguishable from working', () => {
+    const path = transcript([{ tool: 'Edit', callId: 'a', file: '/wt/a.ts', at: 1_000 }])
+    expect(factsFrom(run({ transcriptPath: path }), readTranscript(path), 0).recentNetChange).toBe(
+      0
+    )
+  })
+
+  it('reports growth when nothing measured it, so the signal stays quiet', () => {
+    const path = transcript([{ tool: 'Edit', callId: 'a', file: '/wt/a.ts', at: 1_000 }])
+    expect(factsFrom(run({ transcriptPath: path }), readTranscript(path)).recentNetChange).toBe(1)
   })
 })
