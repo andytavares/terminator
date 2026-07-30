@@ -1,0 +1,43 @@
+extensions/speckit-pilot/src/runtime/claude-launch.ts
+  s_5f98598a6d950e::t_b2976bb52e7912 2,142-149
+extensions/speckit-pilot/src/index.ts
+  s_5f98598a6d950e::t_3759e02a461ef4 2,756-773,856,866,912
+  s_5f98598a6d950e::t_b82bd02931d93e 917
+extensions/speckit-pilot/tests/ipc/index-ipc.spec.ts
+  s_5f98598a6d950e::t_e1474cd5454f21 8-9,15,29
+  s_5f98598a6d950e::t_77456f950c828c 10-14
+extensions/speckit-pilot/tests/ipc/phase4-ipc.spec.ts
+  s_5f98598a6d950e::t_e1474cd5454f21 8-9,15,29
+  s_5f98598a6d950e::t_77456f950c828c 10-14
+extensions/speckit-pilot/tests/runtime/claude-launch.spec.ts
+  s_5f98598a6d950e::t_5d5139824f0cac 191-212
+extensions/speckit-pilot/tests/ipc/run-actions-ipc.spec.ts
+  s_5f98598a6d950e::t_e1474cd5454f21 10-11,17,29-32
+  s_5f98598a6d950e::t_77456f950c828c 12-16
+tests/e2e/speckit-supervised-run.spec.ts
+  s_5f98598a6d950e::t_4d2b29b7b83d2c 149
+  s_5f98598a6d950e::t_571208ff8ba40e 146-148,150-151
+extensions/speckit-pilot/tests/ipc/approval-hash-ipc.spec.ts
+  s_5f98598a6d950e::t_77456f950c828c 10-14
+  s_5f98598a6d950e::t_e1474cd5454f21 8-9,15,30-33
+specs/021-tav-14/.pilot/history.jsonl
+  s_5f98598a6d950e::t_57a130e41fbe66 1-2
+specs/021-tav-14/.pilot/state.json
+  s_5f98598a6d950e::t_802e2751a2b32b 14,24-26,29,53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "28da24fd8603d14d63439f2b4d01cdc4e517da36",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
