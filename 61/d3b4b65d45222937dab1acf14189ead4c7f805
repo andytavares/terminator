@@ -1,0 +1,89 @@
+extensions/speckit-pilot/src/runtime/review/parse-hunks.ts
+  s_5f98598a6d950e::t_e19755690b10e9 9-10,16,23-26,30-34,36,38,40-42,52-57,61,63-64,83-87
+extensions/speckit-pilot/tests/runtime/claude-launch.spec.ts
+  s_5f98598a6d950e::t_8bf4ff39ef8de4 230,236
+  s_5f98598a6d950e::t_12a6e7354961f4 213-229,231-235,237-240
+extensions/speckit-pilot/tests/runner/self-review-plan.spec.ts
+  s_5f98598a6d950e::t_efe4c1449d7d1b 73-93
+extensions/speckit-pilot/src/runtime/read-only-hook.ts
+  s_5f98598a6d950e::t_e1fad12ad56d99 29-35,49-52
+extensions/speckit-pilot/src/runtime/transcript-tailer.ts
+  s_5f98598a6d950e::t_0aab5a20667538 169-176
+  s_5f98598a6d950e::t_6b06bcd6f7c6ba 109-116,119-130,135,137-141,178-179,182
+extensions/speckit-pilot/src/types/electron.ts
+  s_5f98598a6d950e::t_ee37bec2251ace 163-164,523
+extensions/speckit-pilot/src/runtime/read-only-policy.ts
+  s_5f98598a6d950e::t_e1fad12ad56d99 84-111,142-148
+  s_5f98598a6d950e::t_bd9751c3681d19 149
+extensions/speckit-pilot/src/runtime/review/hunk-decisions.ts
+  s_5f98598a6d950e::t_e19755690b10e9 22-28
+extensions/speckit-pilot/tests/runner/agent-runner.spec.ts
+  s_5f98598a6d950e::t_50eed364a6796f 897-899,947,1071
+  s_5f98598a6d950e::t_dff07e8f227935 964-967
+extensions/speckit-pilot/src/runner/agent-runner.ts
+  s_5f98598a6d950e::t_7db66bc74232a1 146-147
+  s_5f98598a6d950e::t_0971a13fe761ea 656-669
+extensions/speckit-pilot/src/index.ts
+  s_5f98598a6d950e::t_b2d1443ac8d256 675-679
+  s_5f98598a6d950e::t_ccbbfa579197d9 1174-1180
+  s_5f98598a6d950e::t_da8cbd8e1a836a 2168-2170
+  s_5f98598a6d950e::t_5900e593314fda 1409-1413,1453-1462
+extensions/speckit-pilot/src/runtime/review/apply-decisions.ts
+  s_5f98598a6d950e::t_331f381fadbf3f 19-22,51-53,55
+extensions/speckit-pilot/src/state/state-persistence.ts
+  s_5f98598a6d950e::t_0704ef82c6c8ae 183,222
+extensions/speckit-pilot/src/runner/self-review-plan.ts
+  s_5f98598a6d950e::t_daf236574e6c23 60-68,93-100,106-113
+extensions/speckit-pilot/tests/runtime/read-only-hook-agrees.spec.ts
+  s_5f98598a6d950e::t_4509d50024cf30 56-58
+docs/EXTENSION-DEVELOPMENT.md
+  s_5f98598a6d950e::t_d74a62bda421e9 441-443,467-471
+extensions/speckit-pilot/tests/runtime/review/apply-decisions.spec.ts
+  s_5f98598a6d950e::t_dcc43f4b9b6f04 22,199-223
+  s_5f98598a6d950e::t_8207f94ceeb9b8 224
+src/main/terminal/pty-manager.ts
+  s_5f98598a6d950e::t_f254cbe8b8c0d1 80-88,92-102
+  s_5f98598a6d950e::t_85e0f18045179e 221-228
+  s_5f98598a6d950e::t_9d47f133e82931 145-149,151-153,163
+  s_5f98598a6d950e::t_f754d4de8c5d22 150,154-162,198-208
+  s_5f98598a6d950e::t_5b15e13a3bbca8 103
+tests/unit/renderer/terminal/session-controller.spec.ts
+  s_5f98598a6d950e::t_2ca1b4732e9803 260,267-268,273-278
+  s_5f98598a6d950e::t_8d4e0974490847 279-280
+src/renderer/terminal/session-controller.ts
+  s_5f98598a6d950e::t_ccbbfa579197d9 83-89
+extensions/speckit-pilot/tests/runtime/read-only-policy.spec.ts
+  s_5f98598a6d950e::t_4509d50024cf30 181-192
+  s_5f98598a6d950e::t_8a98e8c2918950 180
+extensions/speckit-pilot/tests/runner/supervised-phase.spec.ts
+  s_5f98598a6d950e::t_122257f931625b 5
+  s_5f98598a6d950e::t_f965bccef1bf49 254-268,277,282,284-306
+extensions/speckit-pilot/src/runtime/claude-launch.ts
+  s_5f98598a6d950e::t_5526d35f48a88b 36-37,173-179
+tests/unit/terminal/pty-manager.spec.ts
+  s_5f98598a6d950e::t_0550faacd903d6 429,433-440,523-593
+  s_5f98598a6d950e::t_835ca13137e618 594
+extensions/speckit-pilot/src/runtime/supervised-runner.ts
+  s_5f98598a6d950e::t_5526d35f48a88b 172,194
+  s_5f98598a6d950e::t_2e468716057064 112-122,314,325
+  s_5f98598a6d950e::t_12a6e7354961f4 34
+extensions/speckit-pilot/src/components/SupervisionPanel.tsx
+  s_5f98598a6d950e::t_ee37bec2251ace 353,377-385
+  s_5f98598a6d950e::t_74101d637a4dc4 386
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "61d3b4b65d45222937dab1acf14189ead4c7f805",
+  "prompts": {},
+  "sessions": {
+    "s_5f98598a6d950e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccda6c6-182d-4ed1-8d44-e49ea5aa1f67",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
