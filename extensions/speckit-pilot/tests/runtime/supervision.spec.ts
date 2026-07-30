@@ -158,11 +158,13 @@ describe('a turn that produced nothing', () => {
     expect(s.backpressure.check().allowed).toBe(true)
   })
 
-  it('is still recorded as finished rather than left working forever', async () => {
+  it('is left waiting, not finished: the session is still open at its prompt', async () => {
     const s = build()
     addRun(s)
     await s.finishTurn('session-1', 1, 2_000)
-    expect(s.runs.get('session-1')?.state).toBe('finished')
+    // Calling it finished retired a run that was still going, and took it off
+    // every surface that reads live runs.
+    expect(s.runs.get('session-1')?.state).toBe('waiting')
   })
 })
 
@@ -225,6 +227,8 @@ describe('a run that ends outright', () => {
   })
 
   it('is simply finished when it left none', () => {
+    // `finish` is the conversation being over, which is a different thing from
+    // a turn ending with nothing to show.
     const s = build()
     addRun(s)
     s.finish('session-1', 3_000)

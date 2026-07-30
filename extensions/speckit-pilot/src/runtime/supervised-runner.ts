@@ -68,8 +68,14 @@ export interface StartSupervisedRunOptions {
 
 export interface SupervisedRunner {
   start(options: StartSupervisedRunOptions): Promise<SupervisedRun | null>
-  /** Answers a tool call the operator was asked about. */
-  resolve(sessionId: string, requestId: string, decision: PermissionDecision): void
+  /**
+   * Answers a tool call the operator was asked about.
+   *
+   * False when it was no longer waiting — already answered, handed back, or the
+   * run ended — so a surface can say so rather than report a success that
+   * changed nothing.
+   */
+  resolve(sessionId: string, requestId: string, decision: PermissionDecision): boolean
   /** Gives one back to the terminal, for answering where the agent is. */
   handBackToTerminal(sessionId: string, requestId: string): void
   /** Ends the current turn, leaving the session open so a redirect lands. */
@@ -253,8 +259,8 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       return { sessionId, terminalSessionId, transcriptPath: spec.transcriptPath }
     },
 
-    resolve(sessionId, requestId, decision): void {
-      running.get(sessionId)?.bridge.resolve(requestId, decision)
+    resolve(sessionId, requestId, decision): boolean {
+      return running.get(sessionId)?.bridge.resolve(requestId, decision) ?? false
     },
 
     handBackToTerminal(sessionId, requestId): void {

@@ -29,6 +29,14 @@ export interface Run {
   readonly phase: string
   readonly worktreePath: string
   readonly branch: string
+  /**
+   * What it was cut from, so its diff is the work it did.
+   *
+   * Measuring every card against a fixed `main` reported the difference
+   * between two branches rather than this run's change, which then graded the
+   * risk and filled the review queue.
+   */
+  readonly baseBranch: string | null
   readonly terminalSessionId: string
   readonly transcriptPath: string
   readonly startedAt: number

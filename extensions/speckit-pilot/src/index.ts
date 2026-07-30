@@ -573,8 +573,12 @@ async function startRunAt(
   worktreePath: string,
   phase: PhaseId,
   mode: RunMode = 'speckit',
-  description = ''
+  description = '',
+  baseBranch?: string
 ): Promise<void> {
+  // Before anything is started: the runner is installed asynchronously during
+  // activation, and a phase that beat it ran unsupervised.
+  await runtimeStarting
   const runId = `run-${Date.now()}`
   const feedbackNote = (await consumePendingComments(featureDir, runId)) ?? undefined
   const runner = createAgentRunner(api)
@@ -583,6 +587,8 @@ async function startRunAt(
     worktreePath,
     phaseCommand: phaseCommandFor(phase, mode, description, worktreePath),
     phase,
+    // What its diff is measured against, all the way down to the review queue.
+    baseBranch,
     feedbackNote,
     ...makePhaseCallbacks(api, featureDir, phase),
   })
@@ -700,7 +706,8 @@ async function handoffCard(
     worktreePath,
     firstRunnablePhase(state),
     state.mode,
-    state.card.title
+    state.card.title,
+    baseBranch
   )
   api.window.broadcast('speckit:dispatch-started', { featureDir, branchName, worktreePath })
   api.window.broadcast('speckit:state-changed', { state })
@@ -832,6 +839,8 @@ let supervision: Supervision | null = null
  * complete whether or not it interrupted anyone.
  */
 let mutes: MuteStore | null = null
+/** Resolves once the supervision runtime is up, or has failed to come up. */
+let runtimeStarting: Promise<unknown> | null = null
 
 /**
  * Where the supervision runtime keeps its files.
@@ -1062,7 +1071,13 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
 }
 
 export function activate(api: ExtensionAPI): void {
-  void startSupervisionRuntime(api)
+  // Kept, so a phase can wait for it. Activation cannot be async — the host
+  // calls it synchronously — but a dispatch that arrives in the meantime used
+  // to find no supervised runner and fall back to a headless
+  // `bypassPermissions` spawn: an invisible agent approving its own tool calls,
+  // which is the whole thing this replaced.
+  runtimeStarting = startSupervisionRuntime(api)
+  void runtimeStarting
 
   // What a supervised run is waiting on, and how the operator answers it.
   // Without these a phase blocks at its PreToolUse hook until the bridge hands
@@ -1250,10 +1265,17 @@ export function activate(api: ExtensionAPI): void {
       // refusal that says why.
       return { ok: false, reason: 'that request is no longer waiting' }
     }
-    supervisedRunner.resolve(sessionId, requestId, {
+    const answered = supervisedRunner.resolve(sessionId, requestId, {
       allow: decision === 'allow',
       answer: answer === undefined || answer.trim() === '' ? undefined : answer,
     })
+    if (!answered) {
+      // The id was still on the board but the bridge had let it go — answered
+      // in the terminal, handed back, or the run ended. Saying "ok" left a card
+      // showing a request nobody could clear.
+      pendingPermissions.remove(requestId)
+      return { ok: false, reason: 'that request is no longer waiting' }
+    }
     return { ok: true }
   })
 
@@ -2149,7 +2171,8 @@ export function activate(api: ExtensionAPI): void {
         worktreePath,
         firstRunnablePhase(state),
         state.mode,
-        state.card.title
+        state.card.title,
+        baseBranch
       )
 
       api.window.broadcast('speckit:dispatch-started', { featureDir, branchName, worktreePath })

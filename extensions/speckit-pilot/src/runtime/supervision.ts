@@ -5,7 +5,12 @@ import { createRunRegistry, type Run, type RunRegistry } from './run-registry.js
 import { createReviewQueue, type ReviewQueue } from './review/review-queue.js'
 import { createBackpressureGate, type BackpressureGate } from './review/backpressure.js'
 import { createFeedLog, type FeedLog } from './feed/feed-log.js'
-import { readDiffSummary, readChangedFiles, type RunCommand } from './diff-metrics.js'
+import {
+  readDiffSummary,
+  readChangedFiles,
+  readUntrackedFiles,
+  type RunCommand,
+} from './diff-metrics.js'
 import type { CheckState } from './review/risk-grader.js'
 import { parseHunks } from './review/parse-hunks.js'
 import { createDecisionSet, type DecisionSet, type HunkDecision } from './review/hunk-decisions.js'
@@ -107,6 +112,9 @@ const DEFAULT_REVIEW_LIMIT = 3
 
 export function createSupervision(options: SupervisionOptions): Supervision {
   const { api, stateDir } = options
+  // Whatever the card was actually branched from. Measuring against a fixed
+  // `main` reported the difference between two branches rather than the work
+  // this run did, which then graded the risk and filled the review queue.
   const baseBranch = options.baseBranch ?? 'main'
   const runCommand: RunCommand =
     options.run ??
@@ -173,7 +181,10 @@ export function createSupervision(options: SupervisionOptions): Supervision {
   async function measure(sessionId: string): Promise<void> {
     const run = runs.get(sessionId)
     if (run === null || run.worktreePath === '') return
-    runs.noteDiff(sessionId, await readDiffSummary(run.worktreePath, baseBranch, runCommand))
+    runs.noteDiff(
+      sessionId,
+      await readDiffSummary(run.worktreePath, run.baseBranch ?? baseBranch, runCommand)
+    )
   }
 
   return {
@@ -191,9 +202,11 @@ export function createSupervision(options: SupervisionOptions): Supervision {
 
       const changed = runs.get(sessionId)?.diff ?? { files: 0, added: 0, removed: 0 }
       if (changed.files === 0) {
-        // Nothing to look at. Still a turn ending, so the run is no longer
-        // working, but it does not take a slot in a queue about diffs.
-        runs.setState(sessionId, 'finished', at)
+        // Nothing to look at, and nothing is over: in a terminal the session
+        // stays open and the next turn may well change something. Calling it
+        // `finished` retired a run that was still going, and took it off every
+        // surface that reads live runs.
+        runs.setState(sessionId, 'waiting', at)
         return
       }
 
@@ -201,7 +214,11 @@ export function createSupervision(options: SupervisionOptions): Supervision {
 
       // Without the file list the grader cannot see auth, payments, migrations
       // or a critical path, so everything would grade as ordinary work.
-      const files = await readChangedFiles(run.worktreePath, baseBranch, runCommand)
+      const files = await readChangedFiles(
+        run.worktreePath,
+        run.baseBranch ?? baseBranch,
+        runCommand
+      )
       const queued = review.enqueue({
         sessionId,
         repoPath: run.worktreePath,
@@ -247,8 +264,27 @@ export function createSupervision(options: SupervisionOptions): Supervision {
       if (run === null) return null
       // Against the base, so the hunks are the same change the summary counted
       // — including work the agent never committed.
-      const patch = await runCommand('git', ['diff', baseBranch], run.worktreePath)
-      const set = createDecisionSet(patch.ok ? parseHunks(patch.stdout) : [])
+      // `--` with the untracked files named, so a file git has never seen has
+      // hunks too. Without it a run that only added files queued a review with
+      // a non-empty summary and nothing in it to accept or reject.
+      const untracked = await readUntrackedFiles(run.worktreePath, runCommand)
+      const patch = await runCommand(
+        'git',
+        ['diff', run.baseBranch ?? baseBranch],
+        run.worktreePath
+      )
+      const added = await Promise.all(
+        untracked.map((file) =>
+          runCommand('git', ['diff', '--no-index', '/dev/null', file], run.worktreePath)
+        )
+      )
+      const combined = [
+        patch.ok ? patch.stdout : '',
+        // `--no-index` exits non-zero precisely because the files differ, so
+        // its output is used regardless of the code.
+        ...added.map((result) => result.stdout),
+      ].join('\n')
+      const set = createDecisionSet(parseHunks(combined))
       decisions.set(sessionId, set)
       return set
     },
@@ -284,7 +320,11 @@ export function createSupervision(options: SupervisionOptions): Supervision {
     async intentFor(sessionId, request, agentAccount): Promise<IntentReview | null> {
       const run = runs.get(sessionId)
       if (run === null) return null
-      const changedFiles = await readChangedFiles(run.worktreePath, baseBranch, runCommand)
+      const changedFiles = await readChangedFiles(
+        run.worktreePath,
+        run.baseBranch ?? baseBranch,
+        runCommand
+      )
       return reviewIntent({
         request,
         agentAccount,

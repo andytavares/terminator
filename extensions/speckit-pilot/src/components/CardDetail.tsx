@@ -86,10 +86,17 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
         mode: quickMode ? 'quick' : 'speckit',
         overrideBackpressure,
       })
-      if ('error' in result && result.error === 'backpressure') {
+      if ('error' in result) {
+        // Any failure, not just the gate: a validation error or a worktree that
+        // could not be made used to clear the banner and reload as though the
+        // card had started.
         setRefusal(
-          ('reason' in result ? result.reason : null) ??
-            'Diffs are waiting to be reviewed — no new run will start until one is.'
+          result.error === 'backpressure'
+            ? (('reason' in result ? result.reason : null) ??
+                'Diffs are waiting to be reviewed — no new run will start until one is.')
+            : 'message' in result && typeof result.message === 'string'
+              ? result.message
+              : `Could not start this card: ${result.error}`
         )
         return
       }

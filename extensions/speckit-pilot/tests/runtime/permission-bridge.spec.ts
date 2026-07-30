@@ -409,3 +409,49 @@ describe('a request nobody answers', () => {
     expect(() => bridge.handBackToTerminal(events[0].requestId)).not.toThrow()
   })
 })
+
+describe('when the run ends with requests still held', () => {
+  it('tells the surface they are gone, not just the agent', async () => {
+    // `rejectAll` settled the waiting hooks but said nothing, so the board went
+    // on listing tool calls from a run that had ended and clicking them did
+    // nothing at all.
+    const resolved: string[] = []
+    const bridge = createPermissionBridge({
+      sessionId: 's1',
+      now: () => 0,
+      onPending: () => {},
+      onResolved: (requestId) => resolved.push(requestId),
+    })
+    const held = bridge.canUseTool('Bash', { command: 'ls' })
+    bridge.rejectAll('This run has ended')
+    await held
+    expect(resolved).toHaveLength(1)
+  })
+})
+
+describe('answering something that is no longer waiting', () => {
+  it('says so rather than reporting a success that changed nothing', () => {
+    const bridge = createPermissionBridge({
+      sessionId: 's1',
+      now: () => 0,
+      onPending: () => {},
+      onResolved: () => {},
+    })
+    expect(bridge.resolve('never-asked', { allow: true })).toBe(false)
+  })
+
+  it('reports true for one it actually answered', async () => {
+    let asked = ''
+    const bridge = createPermissionBridge({
+      sessionId: 's1',
+      now: () => 0,
+      onPending: (pending) => {
+        asked = pending.requestId
+      },
+      onResolved: () => {},
+    })
+    const held = bridge.canUseTool('Bash', { command: 'ls' })
+    expect(bridge.resolve(asked, { allow: true })).toBe(true)
+    await held
+  })
+})

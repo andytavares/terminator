@@ -70,7 +70,8 @@ export interface PermissionBridgeOptions {
 
 export interface PermissionBridge {
   canUseTool(toolName: string, input: unknown): Promise<HookDecision>
-  resolve(requestId: string, decision: PermissionDecision): void
+  /** True when it was still waiting; false when there was nothing to answer. */
+  resolve(requestId: string, decision: PermissionDecision): boolean
   /** Hands one back to the terminal, as the timeout does. */
   handBackToTerminal(requestId: string): void
   /** Denies everything outstanding. An unresolved promise would hang the turn. */
@@ -282,15 +283,17 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
       })
     },
 
-    resolve(requestId: string, decision: PermissionDecision): void {
+    resolve(requestId: string, decision: PermissionDecision): boolean {
       const entry = outstanding.get(requestId)
       // Unknown or already-settled: a stale click must not publish a second
-      // resolution or reopen a closed prompt.
-      if (entry === undefined) return
+      // resolution or reopen a closed prompt. Reported, so the surface can say
+      // the request is gone instead of showing a success that did nothing.
+      if (entry === undefined) return false
       outstanding.delete(requestId)
       clearTimeout(entry.timer)
       onResolved(requestId, decision.allow ? 'allow' : 'deny')
       entry.settle(toResult(decision, entry.input))
+      return true
     },
 
     handBackToTerminal(requestId: string): void {
@@ -302,6 +305,9 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
         outstanding.delete(requestId)
         clearTimeout(entry.timer)
         entry.settle({ permissionDecision: 'deny', reason })
+        // Told, not just settled. Without this the board went on listing tool
+        // calls from a run that had ended, and clicking them did nothing.
+        onResolved(requestId, 'deny')
       }
     },
   }

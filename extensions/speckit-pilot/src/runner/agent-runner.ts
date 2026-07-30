@@ -66,6 +66,8 @@ export interface StartPhaseRunnerOpts {
   phaseCommand: string
   phase: PhaseId
   feedbackNote?: string
+  /** What the card's worktree was branched from, for measuring its diff. */
+  baseBranch?: string
   batchIndex?: number
   // When set, resume the given Claude session instead of starting fresh — used
   // to answer the model's questions from the run console (the reply is
@@ -134,6 +136,7 @@ export interface RunSupervision {
       phase: string
       worktreePath: string
       branch: string
+      baseBranch: string | null
       terminalSessionId: string
       transcriptPath: string
       startedAt: number
@@ -268,6 +271,7 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
           phase,
           phaseCommand,
           feedbackNote,
+          baseBranch: opts.baseBranch,
           resumeSessionId,
           onStart,
           onComplete,
@@ -543,6 +547,8 @@ function startSupervised(opts: {
   phase: PhaseId
   phaseCommand: string
   feedbackNote?: string
+  /** What the worktree was branched from, so the run's diff is its own work. */
+  baseBranch?: string
   resumeSessionId?: string
   onStart?: () => void | Promise<void>
   onComplete?: (exitCode: number) => void | Promise<void>
@@ -636,6 +642,7 @@ function startSupervised(opts: {
       phase: opts.phase,
       worktreePath: opts.worktreePath,
       branch,
+      baseBranch: opts.baseBranch ?? null,
       terminalSessionId: run.terminalSessionId,
       transcriptPath: run.transcriptPath,
       startedAt: Date.now(),

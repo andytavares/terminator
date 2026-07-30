@@ -469,13 +469,11 @@ function HunkReview({
 function Review({
   items,
   backpressure,
-  cardLabel,
   openSessionId,
   onDone,
 }: {
   items: readonly ReviewItemView[]
   backpressure: SupervisionSnapshot['backpressure']
-  cardLabel?: (featureDir: string) => string
   /** Opened from elsewhere — the palette, today. */
   openSessionId?: string | null
   onDone: (sessionId: string) => void
@@ -502,7 +500,10 @@ function Review({
             <div className="sk-sup__row" key={item.sessionId}>
               <span className={`sk-sup__grade sk-sup__grade--${item.grade}`}>{item.grade}</span>
               <span className="sk-sup__main">
-                <div className="sk-sup__title">{cardLabel?.(item.branch) ?? item.branch}</div>
+                {/* The branch, not a card lookup: `cardLabel` is keyed by
+                    feature directory, and a queued diff carries a branch. It
+                    always missed, so every row silently fell back to this. */}
+                <div className="sk-sup__title">{item.branch}</div>
                 <div className="sk-sup__meta">
                   {/* The trigger, not just the letter — a grade with no reason
                       is a number you learn to ignore. */}
@@ -523,7 +524,10 @@ function Review({
               {open === item.sessionId && (
                 <HunkReview
                   sessionId={item.sessionId}
-                  request={cardLabel?.(item.branch) ?? item.branch}
+                  // What the card asked for. A branch name is not a request,
+                  // and feeding it to the intent step compared the diff against
+                  // three words of kebab-case.
+                  request={item.gradeTrigger}
                   onDone={() => {
                     setOpen(null)
                     onDone(item.sessionId)
@@ -746,7 +750,6 @@ export function SupervisionPanel({
         <Review
           items={snapshot.review}
           backpressure={snapshot.backpressure}
-          cardLabel={cardLabel}
           openSessionId={focus?.kind === 'review' ? focus.sessionId : null}
           onDone={(sessionId) => void getSpeckitAPI().reviewDone({ sessionId }).then(reload)}
         />
