@@ -108,6 +108,19 @@ interface SessionState {
     scrollbackLimit: number,
     parentSessionId?: string
   ) => Promise<string>
+  /**
+   * Takes ownership of a terminal the main process already spawned.
+   *
+   * A supervised session's terminal is created there, because that is where
+   * the agent is started from. Without adopting it the PTY runs and no tab
+   * ever shows it, which is exactly the invisible agent this runtime replaced.
+   */
+  adoptSession: (session: {
+    sessionId: string
+    projectId: string
+    tabTitle: string
+    scrollbackLimit: number
+  }) => void
   closeSession: (sessionId: string) => Promise<void>
   getSessionsForProject: (projectId: string) => TerminalSession[]
   getScratchSessions: () => TerminalSession[]
@@ -211,6 +224,36 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     })
 
     return sessionId
+  },
+
+  adoptSession: ({ sessionId, projectId, tabTitle, scrollbackLimit }) => {
+    // Idempotent: a re-sent notification must not produce a second tab for one
+    // terminal.
+    if (get().sessions.has(sessionId)) return
+    const session: TerminalSession = {
+      id: sessionId,
+      projectId,
+      tabTitle,
+      status: 'active',
+      type: 'agent',
+      scrollbackLimit,
+      createdAt: new Date().toISOString(),
+    }
+    set((s) => {
+      const sessions = new Map(s.sessions)
+      sessions.set(sessionId, session)
+      const view = viewOf(s.projectViews, projectId)
+      const projectViews = new Map(s.projectViews)
+      projectViews.set(projectId, {
+        ...view,
+        ...(view.order ? { order: [...view.order, sessionId] } : {}),
+        // Made active when the project has nothing showing. Without this the
+        // tab exists and no pane is ever mounted, so opening the project shows
+        // an empty project rather than the agent that is running in it.
+        activeSessionId: view.activeSessionId ?? sessionId,
+      })
+      return { sessions, projectViews }
+    })
   },
 
   closeSession: async (sessionId) => {

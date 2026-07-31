@@ -417,3 +417,178 @@ describe('PtyManager session authority (spawnSession)', () => {
     expect(onExit).toHaveBeenCalledWith(0)
   })
 })
+
+describe('holding output until something is on screen to show it', () => {
+  // A terminal the application opened starts producing output while the tab
+  // that will show it does not exist yet. Delivered live, everything in that
+  // window is dropped — for a supervised agent that means the launch command
+  // and its first output are simply missing from the terminal you open.
+  async function manager() {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    let emit: (data: string) => void = () => {}
+    let exit: (e: { exitCode: number }) => void = () => {}
+    mockPty.onData.mockImplementation((cb: (data: string) => void) => {
+      emit = cb
+    })
+    mockPty.onExit.mockImplementation((cb: (e: { exitCode: number }) => void) => {
+      exit = cb
+    })
+    return {
+      mgr: new PtyManager(),
+      emit: (data: string) => emit(data),
+      exit: (exitCode = 0) => exit({ exitCode }),
+    }
+  }
+
+  const spawn = (mgr: { spawnSession: (o: unknown) => unknown }, holdOutput: boolean) =>
+    mgr.spawnSession({
+      sessionId: 's1',
+      cwd: '/repo',
+      shell: '/bin/zsh',
+      type: 'agent',
+      origin: 'app',
+      holdOutput,
+    })
+
+  it('delivers nothing while it is held', async () => {
+    const { mgr, emit } = await manager()
+    spawn(mgr, true)
+    const seen: string[] = []
+    mgr.onData('s1', (data) => seen.push(data))
+    emit('claude --session-id abc\r\n')
+    expect(seen).toEqual([])
+  })
+
+  it('delivers everything held the moment something attaches', async () => {
+    const { mgr, emit } = await manager()
+    spawn(mgr, true)
+    const seen: string[] = []
+    mgr.onData('s1', (data) => seen.push(data))
+    emit('claude --session-id abc\r\n')
+    emit('starting\r\n')
+    expect(mgr.releaseOutput('s1')).toBe(true)
+    expect(seen.join('')).toBe('claude --session-id abc\r\nstarting\r\n')
+  })
+
+  it('delivers live once released', async () => {
+    const { mgr, emit } = await manager()
+    spawn(mgr, true)
+    const seen: string[] = []
+    mgr.onData('s1', (data) => seen.push(data))
+    mgr.releaseOutput('s1')
+    emit('later output')
+    expect(seen).toEqual(['later output'])
+  })
+
+  it('holds nothing for a terminal the operator opened themselves', async () => {
+    const { mgr, emit } = await manager()
+    spawn(mgr, false)
+    const seen: string[] = []
+    mgr.onData('s1', (data) => seen.push(data))
+    emit('immediate')
+    expect(seen).toEqual(['immediate'])
+  })
+
+  it('reports that a session which was never holding had nothing to release', async () => {
+    const { mgr } = await manager()
+    spawn(mgr, false)
+    expect(mgr.releaseOutput('s1')).toBe(false)
+  })
+
+  it('reports nothing to release for a session it does not have', async () => {
+    const { mgr } = await manager()
+    expect(mgr.releaseOutput('nobody')).toBe(false)
+  })
+
+  it('releases only once, so a second attach does not replay the whole session', async () => {
+    const { mgr, emit } = await manager()
+    spawn(mgr, true)
+    emit('once')
+    mgr.releaseOutput('s1')
+    expect(mgr.releaseOutput('s1')).toBe(false)
+  })
+
+  it('drops the oldest output rather than growing without limit', async () => {
+    const { mgr, emit } = await manager()
+    spawn(mgr, true)
+    const seen: string[] = []
+    mgr.onData('s1', (data) => seen.push(data))
+    emit('the-oldest-line')
+    for (let i = 0; i < 12; i += 1) emit('x'.repeat(100_000))
+    mgr.releaseOutput('s1')
+    expect(seen.join('')).not.toContain('the-oldest-line')
+    expect(seen.join('').length).toBeLessThanOrEqual(1_100_000)
+  })
+})
+
+describe('a process that dies before anything is on screen', () => {
+  // The case this hold exists for, and the one it used to miss: a bad flag, a
+  // missing binary, the wrong cwd. The session was deleted on exit and its held
+  // output went with it, leaving exactly the blank terminal the operator then
+  // reports as "nothing ever shows up".
+
+  async function manager() {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    let emit: (data: string) => void = () => {}
+    let exit: (e: { exitCode: number }) => void = () => {}
+    mockPty.onData.mockImplementation((cb: (data: string) => void) => {
+      emit = cb
+    })
+    mockPty.onExit.mockImplementation((cb: (e: { exitCode: number }) => void) => {
+      exit = cb
+    })
+    return {
+      mgr: new PtyManager(),
+      emit: (data: string) => emit(data),
+      exit: (exitCode = 1) => exit({ exitCode }),
+    }
+  }
+
+  const spawnHeld = (mgr: { spawnSession: (o: unknown) => unknown }) =>
+    mgr.spawnSession({
+      sessionId: 'dead',
+      cwd: '/repo',
+      shell: '/bin/zsh',
+      type: 'agent',
+      origin: 'app',
+      holdOutput: true,
+    })
+
+  it('still shows what it said to a tab that mounts afterwards', async () => {
+    const { mgr, emit, exit } = await manager()
+    spawnHeld(mgr)
+    emit('Error: Settings file not found\r\n')
+    exit(1)
+
+    const seen: string[] = []
+    mgr.onData('dead', (data) => seen.push(data))
+    expect(mgr.releaseOutput('dead')).toBe(true)
+    expect(seen.join('')).toContain('Settings file not found')
+  })
+
+  it('delivers it immediately when something was already listening', async () => {
+    const { mgr, emit, exit } = await manager()
+    spawnHeld(mgr)
+    const seen: string[] = []
+    mgr.onData('dead', (data) => seen.push(data))
+    emit('Error: Settings file not found\r\n')
+    exit(1)
+    expect(seen.join('')).toContain('Settings file not found')
+  })
+
+  it('reports nothing for a session it never knew', async () => {
+    const { mgr } = await manager()
+    expect(mgr.releaseOutput('never-existed')).toBe(false)
+    expect(mgr.onData('never-existed', () => {})).toBeNull()
+  })
+
+  it('hands it over once, not to every later attach', async () => {
+    const { mgr, emit, exit } = await manager()
+    spawnHeld(mgr)
+    emit('gone\r\n')
+    exit(1)
+    mgr.onData('dead', () => {})
+    expect(mgr.releaseOutput('dead')).toBe(true)
+    expect(mgr.releaseOutput('dead')).toBe(false)
+  })
+})

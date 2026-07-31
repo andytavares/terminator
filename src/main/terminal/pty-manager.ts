@@ -26,6 +26,17 @@ export interface SpawnSessionOptions {
   origin: SessionOrigin
   projectId?: string
   tabTitle?: string
+  /**
+   * Withhold output until someone attaches.
+   *
+   * A terminal spawned by the application rather than by the operator starts
+   * producing output immediately, while the tab that will show it does not
+   * exist yet — the renderer has to be told, adopt it, render, and mount an
+   * xterm first. Delivered live, everything in that window is dropped on the
+   * floor, which for a supervised agent means the launch command and its first
+   * output are simply missing from the terminal the operator opens.
+   */
+  holdOutput?: boolean
 }
 
 export interface SessionInfo {
@@ -45,12 +56,50 @@ interface ActiveSession {
   info: SessionInfo
   dataListeners: Set<(data: string) => void>
   exitListeners: Set<(exitCode: number) => void>
+  /** Output produced before anything attached; null once released. */
+  held: string[] | null
+  /**
+   * How much is held, tracked rather than recomputed.
+   *
+   * `held.join('')` inside the trim loop re-joined up to a megabyte on every
+   * chunk once the cap was reached — on the main thread, for the whole life of
+   * a chatty agent.
+   */
+  heldChars: number
 }
+
+/**
+ * How much output to keep for a terminal nobody has attached to yet. Generous
+ * enough for a session that takes a while to appear on screen, bounded because
+ * a runaway process must not be able to grow it without limit.
+ */
+const MAX_HELD_CHARS = 1_000_000
 
 const REGISTRY_FILE = () => join(app.getPath('userData'), 'session-registry.json')
 
+/**
+ * How long a dead session's held output stays readable.
+ *
+ * Long enough for a tab that was already opening to mount and ask for it, short
+ * enough that nothing accumulates. A run that dies at launch is exactly when
+ * its output matters most, and it is also when there is no listener yet.
+ */
+const LATE_ATTACH_GRACE_MS = 60_000
+
 export class PtyManager {
   private sessions = new Map<string, ActiveSession>()
+
+  /** Held output from sessions that exited before anything attached. */
+  private exitedHeld = new Map<
+    string,
+    { output: string; listeners: Set<(data: string) => void>; expiry: NodeJS.Timeout }
+  >()
+
+  private rememberForLateAttach(sessionId: string, output: string): void {
+    const expiry = setTimeout(() => this.exitedHeld.delete(sessionId), LATE_ATTACH_GRACE_MS)
+    expiry.unref?.()
+    this.exitedHeld.set(sessionId, { output, listeners: new Set(), expiry })
+  }
 
   spawnSession(opts: SpawnSessionOptions): SessionInfo {
     const ptyProcess = pty.spawn(opts.shell, ['-l'], {
@@ -75,12 +124,43 @@ export class PtyManager {
       },
       dataListeners: new Set(),
       exitListeners: new Set(),
+      held: opts.holdOutput === true ? [] : null,
+      heldChars: 0,
     }
 
     ptyProcess.onData((data) => {
+      if (session.held !== null) {
+        session.held.push(data)
+        session.heldChars += data.length
+        // Oldest first: what matters most on a long-running agent is the recent
+        // output, and the alternative is an unbounded buffer.
+        while (session.heldChars > MAX_HELD_CHARS && session.held.length > 1) {
+          session.heldChars -= session.held.shift()?.length ?? 0
+        }
+        return
+      }
       for (const listener of session.dataListeners) listener(data)
     })
     ptyProcess.onExit(({ exitCode }) => {
+      // Everything held goes out first. A process that dies before any tab
+      // mounted — a bad flag, a missing binary, the wrong cwd — otherwise took
+      // its output to the grave and left exactly the blank terminal this hold
+      // exists to prevent. Delivered to whoever is listening; kept on the
+      // session for whoever attaches next.
+      if (session.held !== null && session.held.length > 0) {
+        const buffered = session.held.join('')
+        session.held = null
+        session.heldChars = 0
+        if (session.dataListeners.size > 0) {
+          for (const listener of session.dataListeners) listener(buffered)
+        } else {
+          // Nothing has mounted yet. Kept for a tab that is still on its way,
+          // because the alternative is the blank terminal this hold exists to
+          // prevent — and a run that dies at launch is exactly when its output
+          // matters most.
+          this.rememberForLateAttach(opts.sessionId, buffered)
+        }
+      }
       this.sessions.delete(opts.sessionId)
       this.persistRegistry()
       for (const listener of session.exitListeners) listener(exitCode ?? 0)
@@ -108,10 +188,44 @@ export class PtyManager {
     return sessionId
   }
 
+  /**
+   * Delivers everything held back and resumes live output. Called when a tab is
+   * actually on screen and ready to display it; a no-op for a session that was
+   * never holding, and for one that has already been released.
+   */
+  releaseOutput(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId)
+    if (!session) {
+      // It has already exited. Its last words are still here if the tab is only
+      // just mounting.
+      const remembered = this.exitedHeld.get(sessionId)
+      if (remembered === undefined) return false
+      this.exitedHeld.delete(sessionId)
+      clearTimeout(remembered.expiry)
+      for (const listener of remembered.listeners) listener(remembered.output)
+      return true
+    }
+    if (session.held === null) return false
+    const buffered = session.held.join('')
+    session.held = null
+    session.heldChars = 0
+    if (buffered !== '') {
+      for (const listener of session.dataListeners) listener(buffered)
+    }
+    return true
+  }
+
   /** Subscribes to a session's output. Returns a disposer, or null if unknown. */
   onData(sessionId: string, listener: (data: string) => void): (() => void) | null {
     const session = this.sessions.get(sessionId)
-    if (!session) return null
+    if (!session) {
+      // A tab mounting onto a session that has already exited: it can still be
+      // told what the session said, once it asks to be shown it.
+      const remembered = this.exitedHeld.get(sessionId)
+      if (remembered === undefined) return null
+      remembered.listeners.add(listener)
+      return () => remembered.listeners.delete(listener)
+    }
     session.dataListeners.add(listener)
     return () => session.dataListeners.delete(listener)
   }

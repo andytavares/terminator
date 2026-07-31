@@ -38,7 +38,10 @@ function wrapTx(tx: PgTx): ExtensionDB {
       const result = await tx.query<T>(s, p)
       return result.rows
     },
-    async get<T extends Record<string, unknown>>(sql: string, params?: unknown[]) {
+    async get<T extends Record<string, unknown>>(
+      sql: string,
+      params?: unknown[]
+    ): Promise<T | undefined> {
       const [s, p] = toPositional(sql, params)
       const result = await tx.query<T>(s, p)
       return result.rows[0]
@@ -74,7 +77,10 @@ export function wrapDb(db: PGlite): ExtensionDB {
       const result = await db.query<T>(s, p)
       return result.rows
     },
-    async get<T extends Record<string, unknown>>(sql: string, params?: unknown[]) {
+    async get<T extends Record<string, unknown>>(
+      sql: string,
+      params?: unknown[]
+    ): Promise<T | undefined> {
       const [s, p] = toPositional(sql, params)
       const result = await db.query<T>(s, p)
       return result.rows[0]

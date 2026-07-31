@@ -5,6 +5,14 @@
  * Strategy: same mock-API approach as index-ipc.spec.ts — import index.ts
  * so vi.mock() intercepts sub-modules before the bundle inlines them.
  */
+import { tmpdir as tmpdirForUserData } from 'node:os'
+
+// A real directory. The supervision runtime writes its feed, mutes and
+// per-session settings under userData, and a path that does not exist fails at
+// mkdir. `node:fs` is mocked in some of these specs, so nothing is created
+// here — the OS temp directory is already there.
+const USER_DATA = tmpdirForUserData()
+
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { PilotState } from '../../src/types/speckit.types.js'
@@ -18,12 +26,13 @@ vi.mock('electron', () => ({
     encryptString: vi.fn((s: string) => Buffer.from(s + '-enc')),
     decryptString: vi.fn((b: Buffer) => b.toString().replace('-enc', '')),
   },
-  app: {
-    getPath: vi.fn().mockReturnValue('/mock-user-data'),
-  },
+  app: { getPath: vi.fn().mockReturnValue(USER_DATA) },
 }))
 
 vi.mock('node:fs', () => ({
+  // Reading a repository's installed skills is synchronous: a phase asks
+  // whether `/speckit-<phase>` exists before sending it.
+  existsSync: vi.fn().mockReturnValue(false),
   promises: {
     mkdir: vi.fn().mockResolvedValue(undefined),
     readdir: vi.fn().mockResolvedValue([]),
@@ -34,6 +43,20 @@ vi.mock('node:fs', () => ({
     stat: vi.fn().mockResolvedValue({ mtimeMs: Date.now() }),
     unlink: vi.fn().mockResolvedValue(undefined),
   },
+}))
+
+// The card's state is written through state-persistence, which imports
+// `node:fs/promises` — a different specifier from the `node:fs` mock above, so
+// it needs its own or the write escapes to the real filesystem.
+vi.mock('node:fs/promises', () => ({
+  mkdir: vi.fn().mockResolvedValue(undefined),
+  readdir: vi.fn().mockResolvedValue([]),
+  writeFile: vi.fn().mockResolvedValue(undefined),
+  rename: vi.fn().mockResolvedValue(undefined),
+  readFile: vi.fn().mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })),
+  appendFile: vi.fn().mockResolvedValue(undefined),
+  stat: vi.fn().mockResolvedValue({ mtimeMs: Date.now() }),
+  unlink: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('../../src/api/credentials.js', () => ({
@@ -55,12 +78,16 @@ vi.mock('../../src/api/jira.js', () => ({
 }))
 
 vi.mock('../../src/runner/agent-runner.js', () => ({
+  setSupervisedRunner: vi.fn(),
+  setPermissionSink: vi.fn(),
+  setReadOnlyStateDir: vi.fn(),
   createAgentRunner: vi.fn().mockReturnValue({
     startPhaseRunner: vi.fn().mockReturnValue({ stop: vi.fn() }),
   }),
 }))
 
 import * as nodefs from 'node:fs'
+import * as nodefsPromises from 'node:fs/promises'
 import * as agentRunnerMod from '../../src/runner/agent-runner.js'
 
 function buildMockApi(): {
@@ -506,9 +533,12 @@ describe('speckit:checkin-decision', () => {
       ok?: boolean
     }
     expect(result.ok).toBe(true)
-    // batchIndex must be persisted — check writeFile was called
-    const writeCalls = vi.mocked(nodefs.promises.writeFile).mock.calls
-    const stateWrite = writeCalls.find(([p]) => String(p).endsWith('state.json.tmp'))
+    // batchIndex must be persisted. Written through state-persistence, which
+    // imports `node:fs/promises` — one writer for the card's state.
+    const writeCalls = vi.mocked(nodefsPromises.writeFile).mock.calls
+    // The temp name carries a uuid — writes overlap, and a fixed one is not
+    // atomic — so match the state file it is a temp for.
+    const stateWrite = writeCalls.find(([p]) => /state\.json\..*\.tmp$/.test(String(p)))
     expect(stateWrite).toBeDefined()
   })
 

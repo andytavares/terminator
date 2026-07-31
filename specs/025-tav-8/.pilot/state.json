@@ -1,0 +1,231 @@
+{
+  "version": 3,
+  "featureDir": "/Users/atavares/repos/terminator/specs/025-tav-8",
+  "card": {
+    "title": "Low contrast in code windows across the app, especially red/green diff highlights",
+    "type": "feature",
+    "scope": "# Summary\n\nCode windows across the app have too-low contrast, making code hard to read. It is especially bad where red/green diff highlights are applied, and gets worse when viewing the monitor from more than a couple of feet away. This is an accessibility issue.\n\n# Steps to Reproduce\n\n1. Open any code window in the app (e.g. a diff/review view).\n2. View code, particularly lines with red/green added/removed diff highlights.\n3. Step back a few feet from the monitor.\n\nExpected: Code text is comfortably readable against both the base background and diff highlight backgrounds, including at a normal viewing distance.\nActual: Contrast is too low; text over red/green highlights is very hard to read, worse at distance.\n\n# Acceptance Criteria\n\n- [ ] Code text meets WCAG AA contrast (≥ 4.5:1) against the base code background\n- [ ] Code text over added/removed diff-line highlights meets WCAG AA contrast (≥ 4.5:1)\n- [ ] Added vs. removed diff highlights remain distinguishable and readable at typical viewing distance\n- [ ] Verified in both light and dark themes\n\n# Dev Hints\n\n* Review the code/diff theme colors app-wide; verify foreground text contrast against both the base background and the added/removed highlight backgrounds.\n* Use the existing `--tm-*` design tokens rather than hard-coded colors.",
+    "checklist": [],
+    "attachments": [],
+    "knowledgeRefs": [],
+    "source": "linear",
+    "createdAt": "2026-07-29T23:31:29.819Z"
+  },
+  "stage": "done",
+  "mode": "speckit",
+  "ticket": {
+    "source": "linear",
+    "key": "TAV-8",
+    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-8/low-contrast-in-code-windows-across-the-app-especially-redgreen-diff",
+    "title": "Low contrast in code windows across the app, especially red/green diff highlights",
+    "branchName": "andrewtavares87/tav-8-low-contrast-in-code-windows-across-the-app-especially"
+  },
+  "run": null,
+  "queuePosition": null,
+  "worktreePath": null,
+  "branchName": null,
+  "prUrl": null,
+  "phases": {
+    "constitution": {
+      "id": "constitution",
+      "status": "ready",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [".specify/memory/constitution.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "specify": {
+      "id": "specify",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/025-tav-8/spec.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "clarify": {
+      "id": "clarify",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/025-tav-8/spec.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "plan": {
+      "id": "plan",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [
+        "/Users/atavares/repos/terminator/specs/025-tav-8/plan.md",
+        "/Users/atavares/repos/terminator/specs/025-tav-8/research.md",
+        "/Users/atavares/repos/terminator/specs/025-tav-8/data-model.md"
+      ],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "checklist": {
+      "id": "checklist",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [
+        "/Users/atavares/repos/terminator/specs/025-tav-8/checklists/requirements.md"
+      ],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "tasks": {
+      "id": "tasks",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/025-tav-8/tasks.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "analyze": {
+      "id": "analyze",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "implement": {
+      "id": "implement",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "self-review": {
+      "id": "self-review",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/025-tav-8/.pilot/self-review.json"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "open-pr": {
+      "id": "open-pr",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
+    }
+  },
+  "settings": {
+    "defaultModel": "claude-opus-4-6",
+    "defaultAutonomy": "standard",
+    "batchCheckinsEnabled": true,
+    "writeStatusBackOnPrOpen": false,
+    "linear": null,
+    "jira": null,
+    "phaseGates": {
+      "constitution": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "specify": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "clarify": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "plan": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "checklist": {
+        "required": false,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "tasks": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "analyze": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "implement": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": true
+      },
+      "self-review": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "open-pr": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      }
+    },
+    "disallowedPaths": [".env*", "secrets/**", "*.pem", "*.key"],
+    "maxFilesPerImplementRun": 25,
+    "maxTokensPerCommand": 50000,
+    "commandTimeoutMs": 300000,
+    "requireCleanTreeForImplement": true,
+    "createCheckpointBeforeImplement": true,
+    "runConsolePosition": "bottom",
+    "reviewerIdentity": "git",
+    "customReviewerName": null,
+    "branchConvention": "sequential",
+    "customBranchPattern": null,
+    "openSidebarOnStart": true,
+    "maxConcurrentRuns": 3,
+    "runConstitutionPhase": false,
+    "logRetentionDays": 30
+  }
+}

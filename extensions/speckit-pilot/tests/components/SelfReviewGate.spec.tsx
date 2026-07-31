@@ -115,3 +115,81 @@ describe('SelfReviewGate', () => {
     )
   })
 })
+
+describe('when no summary was parsed', () => {
+  // Nothing writes `.pilot/self-review.json` yet. Returning early on that left
+  // the phase with no approve button anywhere and the card could not move.
+
+  beforeEach(() => {
+    mockSelfReviewRead.mockResolvedValue({ notFound: true, error: 'self-review.json not found' })
+  })
+
+  it('still lets the phase be approved', async () => {
+    render(<SelfReviewGate featureDir="/repo/specs/001" />)
+    fireEvent.click(await screen.findByRole('button', { name: /approve/i }))
+    await waitFor(() =>
+      expect(mockPhaseApprove).toHaveBeenCalledWith(
+        expect.objectContaining({ phase: 'self-review' })
+      )
+    )
+  })
+
+  it('still lets it be sent back', async () => {
+    render(<SelfReviewGate featureDir="/repo/specs/001" />)
+    fireEvent.click(await screen.findByRole('button', { name: /implement/i }))
+    await waitFor(() => expect(mockPhaseRequestChanges).toHaveBeenCalled())
+  })
+
+  it('says where to read the result instead of pretending there is none', async () => {
+    render(<SelfReviewGate featureDir="/repo/specs/001" />)
+    expect(await screen.findByText(/output is in the console above/i)).toBeDefined()
+  })
+})
+
+describe('a check nothing measured', () => {
+  // A zero would read as "no errors". A review that says that when it does not
+  // know is worse than one that says nothing.
+
+  beforeEach(() => {
+    mockSelfReviewRead.mockResolvedValue({
+      result: makeResult({
+        format: { passed: null, output: null },
+        lint: { passed: null, errorCount: null, warningCount: null, output: null },
+        coverage: { passed: true, percentage: null, output: null },
+        googleReview: { passed: true, blockerCount: null, output: null },
+        summary: 'Did not run: format, lint.',
+      }),
+    })
+  })
+
+  it('says a step did not run rather than showing it as passing', async () => {
+    render(<SelfReviewGate featureDir="/repo/specs/001" />)
+    expect(await screen.findByText('Not checked')).toBeDefined()
+    expect(screen.getByText('Not run')).toBeDefined()
+  })
+
+  it('never turns an unreported count into a zero', async () => {
+    render(<SelfReviewGate featureDir="/repo/specs/001" />)
+    await screen.findByText('Not checked')
+    expect(screen.queryByText(/0 errors/)).toBeNull()
+    expect(screen.queryByText(/0 blockers/)).toBeNull()
+  })
+
+  it('says coverage was not reported rather than showing a percentage', async () => {
+    render(<SelfReviewGate featureDir="/repo/specs/001" />)
+    expect(await screen.findByText('Not reported')).toBeDefined()
+  })
+
+  it('does not warn about checks that merely did not run', async () => {
+    // The warning is for checks that failed. "Did not run" is not a failure.
+    render(<SelfReviewGate featureDir="/repo/specs/001" />)
+    await screen.findByText('Not checked')
+    expect(screen.queryByText(/did not pass/i)).toBeNull()
+  })
+
+  it('still lets the phase be approved', async () => {
+    render(<SelfReviewGate featureDir="/repo/specs/001" />)
+    fireEvent.click(await screen.findByRole('button', { name: /approve/i }))
+    await waitFor(() => expect(mockPhaseApprove).toHaveBeenCalled())
+  })
+})

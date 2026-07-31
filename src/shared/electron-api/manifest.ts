@@ -45,6 +45,15 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     toPayload: (sessionId: string) => ({ sessionId }),
   },
   {
+    // Says a terminal is on screen and ready. Output produced before this is
+    // held rather than dropped, so a terminal the application opened for you
+    // shows what happened before you looked at it.
+    path: 'terminal.attach',
+    kind: 'invoke',
+    channel: 'terminal:attach',
+    toPayload: (sessionId: string) => ({ sessionId }),
+  },
+  {
     path: 'terminal.input',
     kind: 'send',
     channel: 'terminal:input',

@@ -1,0 +1,238 @@
+{
+  "version": 3,
+  "featureDir": "/Users/atavares/repos/terminator/specs/021-tav-14",
+  "card": {
+    "title": "Make all text in the application red",
+    "type": "feature",
+    "scope": "# Summary\n\nMake all text in the application red\n\n# Context\n\nMake all text in the application red\n\n# Acceptance Criteria\n\n- [ ] All text in the application is red\n\n# Dev Hints\n\n* Text should be red",
+    "checklist": [],
+    "attachments": [],
+    "knowledgeRefs": [],
+    "source": "linear",
+    "createdAt": "2026-07-29T23:31:29.811Z"
+  },
+  "stage": "in-progress",
+  "mode": "speckit",
+  "ticket": {
+    "source": "linear",
+    "key": "TAV-14",
+    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-14/make-all-text-in-the-application-red",
+    "title": "Make all text in the application red",
+    "branchName": "andrewtavares87/tav-14-make-all-text-in-the-application-red"
+  },
+  "run": {
+    "status": "running",
+    "startedAt": "2026-07-30T00:33:59.600Z",
+    "completedAt": null,
+    "autonomyLevel": "standard"
+  },
+  "queuePosition": "active",
+  "worktreePath": "/Users/atavares/repos/terminator/.worktrees/tav-14",
+  "branchName": "andrewtavares87/tav-14-make-all-text-in-the-application-red",
+  "prUrl": null,
+  "phases": {
+    "constitution": {
+      "id": "constitution",
+      "status": "skipped",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [".specify/memory/constitution.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "specify": {
+      "id": "specify",
+      "status": "running",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": "2026-07-30T00:33:59.841Z",
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/021-tav-14/spec.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "clarify": {
+      "id": "clarify",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/021-tav-14/spec.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "plan": {
+      "id": "plan",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [
+        "/Users/atavares/repos/terminator/specs/021-tav-14/plan.md",
+        "/Users/atavares/repos/terminator/specs/021-tav-14/research.md",
+        "/Users/atavares/repos/terminator/specs/021-tav-14/data-model.md"
+      ],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "checklist": {
+      "id": "checklist",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [
+        "/Users/atavares/repos/terminator/specs/021-tav-14/checklists/requirements.md"
+      ],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "tasks": {
+      "id": "tasks",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/021-tav-14/tasks.md"],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "analyze": {
+      "id": "analyze",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "implement": {
+      "id": "implement",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "self-review": {
+      "id": "self-review",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [
+        "/Users/atavares/repos/terminator/specs/021-tav-14/.pilot/self-review.json"
+      ],
+      "feedback": null,
+      "batchIndex": null
+    },
+    "open-pr": {
+      "id": "open-pr",
+      "status": "locked",
+      "approvedHash": null,
+      "approvedAt": null,
+      "approvedBy": null,
+      "lastRunId": null,
+      "lastRunAt": null,
+      "artifactPaths": [],
+      "feedback": null,
+      "batchIndex": null
+    }
+  },
+  "settings": {
+    "defaultModel": "claude-opus-4-6",
+    "defaultAutonomy": "standard",
+    "batchCheckinsEnabled": true,
+    "writeStatusBackOnPrOpen": false,
+    "linear": null,
+    "jira": null,
+    "phaseGates": {
+      "constitution": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "specify": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "clarify": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "plan": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "checklist": {
+        "required": false,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "tasks": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "analyze": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "implement": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": true
+      },
+      "self-review": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      },
+      "open-pr": {
+        "required": true,
+        "autoApprove": false,
+        "perFileConfirm": false
+      }
+    },
+    "disallowedPaths": [".env*", "secrets/**", "*.pem", "*.key"],
+    "maxFilesPerImplementRun": 25,
+    "maxTokensPerCommand": 50000,
+    "commandTimeoutMs": 300000,
+    "requireCleanTreeForImplement": true,
+    "createCheckpointBeforeImplement": true,
+    "runConsolePosition": "bottom",
+    "reviewerIdentity": "git",
+    "customReviewerName": null,
+    "branchConvention": "sequential",
+    "customBranchPattern": null,
+    "openSidebarOnStart": true,
+    "maxConcurrentRuns": 3,
+    "runConstitutionPhase": false,
+    "logRetentionDays": 30
+  }
+}

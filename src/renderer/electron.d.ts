@@ -28,6 +28,8 @@ interface ElectronAPI {
   terminal: {
     create(payload: unknown): Promise<{ sessionId: string } | { error: string }>
     close(sessionId: string): Promise<{ success: boolean }>
+    /** Says a terminal is on screen; delivers anything held back until now. */
+    attach(sessionId: string): Promise<{ released: boolean }>
     input(sessionId: string, data: string): void
     resize(sessionId: string, cols: number, rows: number): void
     onOutput(handler: (sessionId: string, data: string) => void): () => void

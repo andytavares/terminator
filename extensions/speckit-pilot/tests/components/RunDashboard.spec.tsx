@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import React from 'react'
 
 const mockPilotState = vi.fn()
@@ -8,6 +8,11 @@ const mockOnRunOutput = vi.fn()
 const mockPhaseApprove = vi.fn()
 const mockPhaseReject = vi.fn()
 const mockPhaseRevoke = vi.fn()
+const mockPhaseSkip = vi.fn()
+const mockPhaseUnskip = vi.fn()
+const mockSupervisionSnapshot = vi.fn()
+const mockRunTranscript = vi.fn()
+const mockRunTerminal = vi.fn()
 const mockPhaseRequestChanges = vi.fn()
 const mockPhaseComment = vi.fn()
 const mockFileWrite = vi.fn()
@@ -33,6 +38,13 @@ vi.mock('../../src/types/electron.js', () => ({
     openPr: vi.fn().mockResolvedValue({ prUrl: 'https://github.com/owner/repo/pull/1' }),
     onCheckinReady: vi.fn().mockReturnValue(vi.fn()),
     checkinDecision: vi.fn().mockResolvedValue({ ok: true }),
+    phaseSkip: mockPhaseSkip,
+    phaseUnskip: mockPhaseUnskip,
+    // Selecting a phase other than the running one loads its persisted output.
+    runOutputRead: vi.fn().mockResolvedValue({ lines: [] }),
+    supervisionSnapshot: mockSupervisionSnapshot,
+    runTranscript: mockRunTranscript,
+    runTerminal: mockRunTerminal,
   }),
 }))
 
@@ -87,6 +99,13 @@ function makeState(overrides?: Partial<PilotState>): PilotState {
 describe('RunDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockSupervisionSnapshot.mockResolvedValue({
+      runs: [],
+      review: [],
+      backpressure: { allowed: true, unreviewed: 0, limit: 3 },
+    })
+    mockRunTranscript.mockResolvedValue({ lines: [] })
+    mockRunTerminal.mockResolvedValue({ ok: true })
     mockOnStateChanged.mockReturnValue(vi.fn())
     mockOnRunOutput.mockReturnValue(vi.fn())
     mockPhaseApprove.mockResolvedValue({ state: makeState() })
@@ -206,5 +225,148 @@ describe('RunDashboard', () => {
     await waitFor(() => screen.getByRole('button', { name: /back to runs list/i }))
     fireEvent.click(screen.getByRole('button', { name: /back to runs list/i }))
     expect(onBack).toHaveBeenCalledOnce()
+  })
+})
+
+describe('a phase that is not simply running', () => {
+  // Not every card needs every phase, and the alternative to offering a skip is
+  // approving something you did not read.
+
+  beforeEach(() => {
+    mockPhaseSkip.mockResolvedValue({ state: makeState() })
+    mockPhaseUnskip.mockResolvedValue({ state: makeState() })
+  })
+
+  it('skips the phase at the gate', async () => {
+    mockPilotState.mockResolvedValue({
+      state: makeState({ phases: makePhases({ specify: { status: 'awaiting_review' } }) }),
+    })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    fireEvent.click(await screen.findByRole('button', { name: /skip phase/i }))
+    await waitFor(() =>
+      expect(mockPhaseSkip).toHaveBeenCalledWith({
+        featureDir: '/repo/specs/001',
+        phase: 'specify',
+      })
+    )
+  })
+
+  it('offers a way back from a skipped phase', async () => {
+    // A decision you cannot undo is one you make less often than you should.
+    mockPilotState.mockResolvedValue({
+      state: makeState({
+        phases: makePhases({ constitution: { status: 'skipped' } }),
+      }),
+    })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    // Selected in the rail, which is how you look at a phase that is not the
+    // one currently running.
+    fireEvent.click(await screen.findByRole('button', { name: 'Constitution' }))
+    fireEvent.click(await screen.findByRole('button', { name: /unskip/i }))
+    await waitFor(() =>
+      expect(mockPhaseUnskip).toHaveBeenCalledWith({
+        featureDir: '/repo/specs/001',
+        phase: 'constitution',
+      })
+    )
+  })
+
+  it('says when what is on disk is not what was approved', async () => {
+    mockPilotState.mockResolvedValue({
+      state: makeState({ phases: makePhases({ constitution: { status: 'modified' } }) }),
+    })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Constitution' }))
+    expect(await screen.findByText(/not what was approved/i)).toBeTruthy()
+  })
+
+  it('lets you approve it as it now stands', async () => {
+    mockPhaseApprove.mockResolvedValue({ state: makeState() })
+    mockPilotState.mockResolvedValue({
+      state: makeState({ phases: makePhases({ constitution: { status: 'modified' } }) }),
+    })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Constitution' }))
+    fireEvent.click(await screen.findByRole('button', { name: /approve as it stands/i }))
+    await waitFor(() =>
+      expect(mockPhaseApprove).toHaveBeenCalledWith(
+        expect.objectContaining({ phase: 'constitution' })
+      )
+    )
+  })
+})
+
+describe('a phase running in a terminal', () => {
+  // A supervised phase writes nothing to `speckit:run-output` — it runs in a
+  // terminal and its output goes there. The console used to sit on "Waiting for
+  // output…" for the whole run.
+
+  const run = {
+    sessionId: 'session-1',
+    featureDir: '/repo/specs/001',
+    phase: 'specify',
+    branch: 'feat/red-text',
+    worktreePath: '/wt/a',
+    terminalSessionId: 'terminal-1',
+    state: 'working' as const,
+    stateSince: 1,
+    turns: 1,
+    asked: 0,
+    diff: { files: 0, added: 0, removed: 0 },
+  }
+
+  beforeEach(() => {
+    mockPilotState.mockResolvedValue({ state: makeState() })
+    mockSupervisionSnapshot.mockResolvedValue({
+      runs: [run],
+      review: [],
+      backpressure: { allowed: true, unreviewed: 0, limit: 3 },
+    })
+  })
+
+  it('shows what the agent said, read from its transcript', async () => {
+    mockRunTranscript.mockResolvedValue({
+      lines: [{ role: 'assistant', text: 'Reading the spec…', at: 1 }],
+    })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    expect(await screen.findByText(/Reading the spec…/)).toBeTruthy()
+  })
+
+  it('offers a way into the session rather than only describing it', async () => {
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    fireEvent.click(await screen.findByRole('button', { name: /open the terminal/i }))
+    await waitFor(() => expect(mockRunTerminal).toHaveBeenCalledWith({ sessionId: 'session-1' }))
+  })
+
+  it('sends you to the terminal when no turn has been recorded, without guessing why', async () => {
+    // It may be waiting on the folder-trust prompt, or on a question, or still
+    // starting. The terminal is the one place that knows.
+    mockSupervisionSnapshot.mockResolvedValue({
+      runs: [{ ...run, turns: 0 }],
+      review: [],
+      backpressure: { allowed: true, unreviewed: 0, limit: 3 },
+    })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    expect(await screen.findByText(/No turn recorded yet/i)).toBeTruthy()
+  })
+
+  it('stops saying it once the agent has spoken', async () => {
+    mockRunTranscript.mockResolvedValue({
+      lines: [{ role: 'assistant', text: 'Reading the spec…', at: 1 }],
+    })
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    await screen.findByText(/Reading the spec…/)
+    expect(screen.queryByText(/No turn recorded yet/i)).toBeNull()
+  })
+
+  it('says the output is in the terminal when it has said nothing yet', async () => {
+    // Not "Waiting for output…", which never resolves for a supervised run.
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    expect(await screen.findByText(/terminal above has the live view/i)).toBeTruthy()
+  })
+
+  it('names the branch, so you know which terminal you are being sent to', async () => {
+    render(<RunDashboard featureDir="/repo/specs/001" workspacePath="/repo" />)
+    expect(await screen.findByText(/feat\/red-text/)).toBeTruthy()
   })
 })

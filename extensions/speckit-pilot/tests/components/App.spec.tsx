@@ -24,6 +24,19 @@ vi.mock('../../src/types/electron.js', () => ({
     credentialsStatus: vi.fn().mockResolvedValue({ connected: false }),
     credentialsSet: vi.fn().mockResolvedValue({ ok: true }),
     onStateChanged: mockOnStateChanged,
+    onPermissionsChanged: vi.fn().mockReturnValue(vi.fn()),
+    permissionsList: vi.fn().mockResolvedValue({ pending: [] }),
+    permissionResolve: vi.fn().mockResolvedValue({ ok: true }),
+    permissionHandBack: vi.fn().mockResolvedValue({ ok: true }),
+    // The board carries the supervision panel, which reads on mount.
+    supervisionSnapshot: vi.fn().mockResolvedValue({
+      runs: [],
+      review: [],
+      backpressure: { allowed: true, unreviewed: 0, limit: 3 },
+    }),
+    stallsList: vi.fn().mockResolvedValue({ firings: [], shadowMode: true }),
+    feedList: vi.fn().mockResolvedValue({ entries: [] }),
+    onPaletteGoto: vi.fn().mockReturnValue(vi.fn()),
   }),
 }))
 

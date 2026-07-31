@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { PHASE_LABELS } from '../types/speckit.types.js'
+import type { PhaseId } from '../types/speckit.types.js'
 import { renderMarkdown } from '../utils/markdown.js'
 import { getSpeckitAPI } from '../types/electron.js'
 
@@ -7,11 +8,17 @@ interface RunConsoleProps {
   featureDir: string
   lines?: string[]
   phase?: string
+  /**
+   * The phase is running in a terminal, so this is a read of its transcript
+   * rather than a live stream — and an empty one means it has not said anything
+   * yet, not that this surface is broken.
+   */
+  inTerminal?: boolean
 }
 
 type RenderMode = 'text' | 'markdown'
 
-export function RunConsole({ featureDir, lines = [], phase }: RunConsoleProps) {
+export function RunConsole({ featureDir, lines = [], phase, inTerminal = false }: RunConsoleProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [mode, setMode] = useState<RenderMode>('text')
   const [reply, setReply] = useState('')
@@ -32,7 +39,7 @@ export function RunConsole({ featureDir, lines = [], phase }: RunConsoleProps) {
     }
   }, [lines, mode])
 
-  const phaseLabel = phase ? (PHASE_LABELS[phase] ?? phase) : null
+  const phaseLabel = phase ? (PHASE_LABELS[phase as PhaseId] ?? phase) : null
 
   // Shared scroll/surface styling so plain text and markdown read the same.
   const surfaceStyle: React.CSSProperties = {
@@ -102,7 +109,11 @@ export function RunConsole({ featureDir, lines = [], phase }: RunConsoleProps) {
           }}
         >
           {lines.length === 0 ? (
-            <span style={{ color: 'var(--tm-text-secondary)' }}>Waiting for output…</span>
+            <span style={{ color: 'var(--tm-text-secondary)' }}>
+              {inTerminal
+                ? 'Nothing in this run’s transcript yet. The terminal above has the live view — open it to watch or take over.'
+                : 'Waiting for output…'}
+            </span>
           ) : (
             lines.map((line, i) => <div key={i}>{line}</div>)
           )}

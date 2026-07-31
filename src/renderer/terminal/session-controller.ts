@@ -58,6 +58,37 @@ export async function createTerminalSession(
   return sessionId
 }
 
+/**
+ * Takes over a terminal the main process already spawned.
+ *
+ * A supervised agent's terminal is created there, because that is where the
+ * session is started from. The store record alone is not a tab you can see:
+ * without an xterm instance nothing ever mounts, and the operator opens the
+ * project to find it empty — which is the invisible agent this runtime exists
+ * to have got rid of.
+ */
+export function adoptTerminalSession(adopted: {
+  sessionId: string
+  projectId: string
+  tabTitle: string
+  scrollbackLimit: number
+}): void {
+  const store = useSessionStore.getState()
+  if (store.sessions.has(adopted.sessionId)) return
+  store.adoptSession(adopted)
+  const instance = buildInstance(adopted.sessionId, adopted.scrollbackLimit)
+  // Instance first, then activate, so TerminalPane's effect finds it — the same
+  // ordering the create path depends on.
+  store.setTerminalInstance(adopted.sessionId, instance)
+  // Only when that project has nothing selected. `adoptSession` already keeps
+  // an existing selection (`activeSessionId ?? sessionId`), and overriding it
+  // here meant a supervised run starting in the background yanked the operator
+  // away from the terminal they were reading.
+  if (store.getActiveSessionForProject(adopted.projectId) === null) {
+    store.setActiveSessionForProject(adopted.projectId, adopted.sessionId)
+  }
+}
+
 export async function splitTerminalSession(
   projectId: string,
   direction: PaneSplitDirection,

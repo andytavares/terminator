@@ -29,21 +29,6 @@ describe('getSpeckitAPI()', () => {
     delete (globalThis as unknown as Record<string, unknown>).window
   })
 
-  it('calls bridge.invoke with speckit:feature-list', async () => {
-    mockInvoke.mockResolvedValue({ features: [] })
-    await api.featureList({ repoRoot: '/repo' })
-    expect(mockInvoke).toHaveBeenCalledWith('speckit:feature-list', { repoRoot: '/repo' })
-  })
-
-  it('calls bridge.invoke with speckit:check-artifacts', async () => {
-    mockInvoke.mockResolvedValue({ exists: {} })
-    await api.checkArtifacts({ featureDir: '/repo/specs/001', repoRoot: '/repo' })
-    expect(mockInvoke).toHaveBeenCalledWith('speckit:check-artifacts', {
-      featureDir: '/repo/specs/001',
-      repoRoot: '/repo',
-    })
-  })
-
   it('calls bridge.invoke with speckit:file-write', async () => {
     mockInvoke.mockResolvedValue({ ok: true })
     await api.fileWrite({ filePath: '/repo/spec.md', content: '# Spec' })
@@ -94,42 +79,6 @@ describe('getSpeckitAPI()', () => {
     await api.historyLoad({ featureDir: '/repo/specs/001' })
     expect(mockInvoke).toHaveBeenCalledWith('speckit:history-load', {
       featureDir: '/repo/specs/001',
-    })
-  })
-
-  it('calls bridge.invoke with speckit:session-list', async () => {
-    mockInvoke.mockResolvedValue({ sessions: [] })
-    await api.sessionList()
-    expect(mockInvoke).toHaveBeenCalledWith('speckit:session-list', {})
-  })
-
-  it('calls bridge.invoke with speckit:implement-stop', async () => {
-    mockInvoke.mockResolvedValue({ ok: true })
-    await api.implementStop({ featureDir: '/repo/specs/001' })
-    expect(mockInvoke).toHaveBeenCalledWith('speckit:implement-stop', {
-      featureDir: '/repo/specs/001',
-    })
-  })
-
-  it('calls bridge.invoke with speckit:checkpoint-create', async () => {
-    mockInvoke.mockResolvedValue({ commitHash: 'abc123' })
-    await api.checkpointCreate({ featureDir: '/repo/specs/001' })
-    expect(mockInvoke).toHaveBeenCalledWith('speckit:checkpoint-create', {
-      featureDir: '/repo/specs/001',
-    })
-  })
-
-  it('calls bridge.invoke with speckit:implement-file-decision', async () => {
-    mockInvoke.mockResolvedValue({ ok: true })
-    await api.implementFileDecision({
-      featureDir: '/repo/specs/001',
-      filePath: 'src/app.ts',
-      decision: 'approve',
-    })
-    expect(mockInvoke).toHaveBeenCalledWith('speckit:implement-file-decision', {
-      featureDir: '/repo/specs/001',
-      filePath: 'src/app.ts',
-      decision: 'approve',
     })
   })
 
