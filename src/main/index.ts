@@ -16,6 +16,7 @@ import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
 import { ExtensionViewHost } from './extensions/extension-view-host.js'
 import { logger } from './logger.js'
+import { sendToWindow } from './safe-send.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
@@ -337,7 +338,9 @@ app.whenReady().then(async () => {
     ptyManager,
     db: getAppDb(),
     broadcastToWindows: (channel, data) => {
-      mainWindow?.webContents.send(channel, data)
+      // Guarded: a PTY opened through the extension API broadcasts on every
+      // chunk, and keeps running after the window that opened it has closed.
+      sendToWindow(mainWindow, channel, data)
       viewHost?.broadcastToAll(channel, data)
     },
     focusExtensionView: (extId, viewParam) => viewHost?.focusView(extId, viewParam),

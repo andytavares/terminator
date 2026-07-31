@@ -311,6 +311,7 @@ export interface ExtensionAPI {
 import { handleChannel, removeChannel } from '../ipc/channel-registrar.js'
 import { BrowserWindow, globalShortcut as electronGlobalShortcut } from 'electron'
 import { EXTENSION_BASE_CSS } from './extension-view-host.js'
+import { sendToWindow } from '../safe-send.js'
 import { join } from 'path'
 
 import { execShell, assertCommandAllowed } from '../shell/shell-executor.js'
@@ -955,7 +956,7 @@ export function createExtensionAPI(
           deps.broadcastToWindows(channel, data)
         } else {
           for (const win of BrowserWindow.getAllWindows()) {
-            if (!win.isDestroyed()) win.webContents.send(channel, data)
+            sendToWindow(win, channel, data)
           }
         }
       },

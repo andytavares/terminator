@@ -15,6 +15,7 @@ const { mockDefaultSession, capturedWebContentsViewArgs } = vi.hoisted(() => ({
   capturedWebContentsViewArgs: [] as unknown[],
 }))
 
+const mockIsDestroyed = vi.fn().mockReturnValue(false)
 const mockGetVisible = vi.fn().mockReturnValue(true)
 const mockOpenDevTools = vi.fn()
 const mockFocus = vi.fn()
@@ -32,6 +33,7 @@ vi.mock('electron', () => ({
       openDevTools: mockOpenDevTools,
       focus: mockFocus,
       insertCSS: vi.fn().mockResolvedValue(undefined),
+      isDestroyed: mockIsDestroyed,
     }
     setBounds = mockSetBounds
     setVisible = mockSetVisible
@@ -188,6 +190,17 @@ describe('ExtensionViewHost', () => {
     await host.createView(makeExt(), 'main')
     host.broadcastToAll('workspace:changed', { foo: 'bar' })
     expect(mockSend).toHaveBeenCalledWith('workspace:changed', { foo: 'bar' })
+  })
+
+  it('broadcastToAll skips a view whose webContents is destroyed', async () => {
+    // PTY output outlives the view that asked for the terminal. Sending to a
+    // destroyed view throws "Object has been destroyed" from inside a node-pty
+    // data event, where nothing catches it, and the main process dies.
+    await host.createView(makeExt(), 'main')
+    mockIsDestroyed.mockReturnValue(true)
+    expect(() => host.broadcastToAll('terminal:output', { data: 'x' })).not.toThrow()
+    expect(mockSend).not.toHaveBeenCalled()
+    mockIsDestroyed.mockReturnValue(false)
   })
 
   it('broadcastToExtension sends only to views for the given extension', async () => {
