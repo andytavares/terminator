@@ -22,6 +22,13 @@ vi.stubGlobal(
 )
 
 import { ExtensionPanelPortal } from '../../../../src/renderer/components/ExtensionPanelPortal.js'
+import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+
+const mockExitExtensionToTerminal = vi.fn()
+
+vi.mock('../../../../src/renderer/lib/focus-terminal', () => ({
+  focusActiveTerminal: vi.fn(),
+}))
 
 describe('ExtensionPanelPortal', () => {
   let panelLoadedHandler: ((id: string) => void) | null = null
@@ -209,6 +216,70 @@ describe('ExtensionPanelPortal', () => {
     it('does not call updatePanelBounds (no WebContentsView to position)', () => {
       render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
       expect(mockUpdatePanelBounds).not.toHaveBeenCalled()
+    })
+
+    describe('double-Escape exit', () => {
+      function pressEscapeInIframe(iframe: HTMLIFrameElement, times: number): void {
+        act(() => {
+          for (let i = 0; i < times; i++) {
+            iframe.contentWindow?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+          }
+        })
+      }
+
+      beforeEach(() => {
+        mockExitExtensionToTerminal.mockReset().mockReturnValue(true)
+        useExtensionRegistry.setState({
+          sidebarPanels: new Map(),
+          exitExtensionToTerminal: mockExitExtensionToTerminal,
+        })
+      })
+
+      it('ignores a single Escape', () => {
+        const { container } = render(
+          <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
+        )
+        pressEscapeInIframe(container.querySelector('iframe') as HTMLIFrameElement, 1)
+        expect(mockExitExtensionToTerminal).not.toHaveBeenCalled()
+      })
+
+      it('exits the full-screen surface on a second Escape', () => {
+        const { container } = render(
+          <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
+        )
+        pressEscapeInIframe(container.querySelector('iframe') as HTMLIFrameElement, 2)
+        expect(mockExitExtensionToTerminal).toHaveBeenCalledWith(undefined)
+      })
+
+      it('closes the panel when the iframe is the extension’s sidebar surface', () => {
+        useExtensionRegistry.setState({
+          sidebarPanels: new Map([
+            [
+              'com.test.ext',
+              { id: 'com.test.ext', label: 'Git', view: 'sidebar', component: null as never },
+            ],
+          ]),
+        })
+        const { container } = render(
+          <ExtensionPanelPortal extensionId="com.test.ext" viewParam="sidebar" isActive={true} />
+        )
+        pressEscapeInIframe(container.querySelector('iframe') as HTMLIFrameElement, 2)
+        expect(mockExitExtensionToTerminal).toHaveBeenCalledWith('com.test.ext')
+      })
+
+      it('stops listening after unmount', () => {
+        const { container, unmount } = render(
+          <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
+        )
+        const iframe = container.querySelector('iframe') as HTMLIFrameElement
+        const win = iframe.contentWindow
+        unmount()
+        act(() => {
+          win?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+          win?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+        })
+        expect(mockExitExtensionToTerminal).not.toHaveBeenCalled()
+      })
     })
   })
 })

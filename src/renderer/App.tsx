@@ -13,6 +13,7 @@ import { useSettingsStore } from './stores/settings.store'
 import { useSessionStore } from './stores/session.store'
 import { useTerminalSession } from './hooks/useTerminalSession'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { useExtensionEscapeExit } from './hooks/useExtensionEscapeExit'
 import { installLogInterceptor, useLogStore } from './stores/log.store'
 import { useToastStore } from './stores/toast.store'
 import { dispatchNotification } from './lib/notifications'
@@ -152,6 +153,8 @@ export function App(): JSX.Element {
     onNewTab: handleNewTab,
     scratchProjectId: scratchActive ? SCRATCH_PROJECT_ID : null,
   })
+
+  useExtensionEscapeExit()
 
   function builtinCommands(): CommandRegistration[] {
     const cmds: CommandRegistration[] = [
