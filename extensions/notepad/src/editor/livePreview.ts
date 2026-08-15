@@ -234,16 +234,19 @@ function inlineSpanToDOM(span: InlineSpan): Node {
 export class TableWidget extends WidgetType {
   constructor(
     readonly source: string,
-    readonly table: ParsedTable
+    readonly table: ParsedTable,
+    /** Document offset the table source starts at, used to place the caret. */
+    readonly from: number
   ) {
     super()
   }
 
-  toDOM(): HTMLElement {
+  toDOM(view: EditorView): HTMLElement {
     const wrap = document.createElement('div')
     wrap.className = 'notepad-table-wrap'
     const table = document.createElement('table')
     table.className = 'notepad-table'
+    table.title = 'Click a cell to edit'
 
     const thead = document.createElement('thead')
     const headRow = document.createElement('tr')
@@ -251,7 +254,8 @@ export class TableWidget extends WidgetType {
       const th = document.createElement('th')
       const align = this.table.align[i]
       if (align) th.style.textAlign = align
-      appendInline(th, cell)
+      appendInline(th, cell.text)
+      this.makeEditable(view, th, cell.offset)
       headRow.appendChild(th)
     })
     thead.appendChild(headRow)
@@ -264,7 +268,8 @@ export class TableWidget extends WidgetType {
         const td = document.createElement('td')
         const align = this.table.align[i]
         if (align) td.style.textAlign = align
-        appendInline(td, cell)
+        appendInline(td, cell.text)
+        this.makeEditable(view, td, cell.offset)
         tr.appendChild(td)
       })
       tbody.appendChild(tr)
@@ -275,11 +280,28 @@ export class TableWidget extends WidgetType {
     return wrap
   }
 
+  /**
+   * A replaced range is unreachable by clicking, so without this the caret can
+   * never get inside a rendered table and it becomes uneditable. Clicking a
+   * cell drops the caret into that cell's source, which reveals the raw
+   * markdown (the decoration yields whenever the cursor is inside the table).
+   */
+  private makeEditable(view: EditorView, cell: HTMLElement, offset: number): void {
+    cell.addEventListener('mousedown', (event) => {
+      event.preventDefault()
+      const pos = Math.min(this.from + offset, view.state.doc.length)
+      view.dispatch({ selection: { anchor: pos }, scrollIntoView: true })
+      view.focus()
+    })
+  }
+
   eq(other: TableWidget): boolean {
-    return other.source === this.source
+    return other.source === this.source && other.from === this.from
   }
 
   ignoreEvent(): boolean {
+    // The widget handles its own mousedown; letting CodeMirror also process
+    // events inside replaced content puts the caret in the wrong place.
     return true
   }
 }
@@ -544,7 +566,7 @@ export function buildDecorations(
                 node.from,
                 node.to,
                 Decoration.replace({
-                  widget: new TableWidget(source, parsed),
+                  widget: new TableWidget(source, parsed, node.from),
                   block: wholeLines,
                 })
               )

@@ -43,8 +43,16 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
   const [commentHover, setCommentHover] = useState<{ id: string; top: number } | null>(null)
   const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const { bodyDraft, saveStatus, setActiveNote, markDirty, markSaving, markSaved } =
-    useEditorStore()
+  const {
+    bodyDraft,
+    saveStatus,
+    previewMode,
+    setActiveNote,
+    markDirty,
+    markSaving,
+    markSaved,
+    togglePreviewMode,
+  } = useEditorStore()
   const { comments, setComments } = useCommentsStore()
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const anchorTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -335,6 +343,13 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
       <div className="notepad-window__titlebar">
         <span className="notepad-window__title">{note.title || 'Untitled'}</span>
         <div className="notepad-window__titlebar-right">
+          <button
+            className="notepad-btn-ghost"
+            onClick={togglePreviewMode}
+            title={previewMode ? 'Show raw markdown source' : 'Show the rendered live preview'}
+          >
+            {previewMode ? 'Markdown' : 'Live'}
+          </button>
           {note.tags.length > 0 && (
             <div className="notepad-window__tags">
               {note.tags.map((t) => (
@@ -379,6 +394,7 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
               setPendingAnchor(sel)
               if (!sel) setComposingAnchor(null)
             }}
+            sourceMode={!previewMode}
           />
           {pendingAnchor && !composingAnchor && (
             <button

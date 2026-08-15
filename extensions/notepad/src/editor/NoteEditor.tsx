@@ -19,6 +19,7 @@ import { StreamLanguage } from '@codemirror/language'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { searchKeymap } from '@codemirror/search'
 import { livePreviewPlugin } from './livePreview'
+import { insertNewlineKeepingHeadingMarker } from './headingEnter'
 import {
   commentAnchorField,
   commentAnchorDecorations,
@@ -48,6 +49,8 @@ interface NoteEditorProps {
   onAnchorsReady?: (getView: () => EditorView | null) => void
   onSelectionChange?: (sel: SelectionAnchor | null) => void
   readOnly?: boolean
+  /** When true, show the raw markdown instead of the live-preview rendering. */
+  sourceMode?: boolean
 }
 
 export function NoteEditor({
@@ -56,10 +59,12 @@ export function NoteEditor({
   onAnchorsReady,
   onSelectionChange,
   readOnly,
+  sourceMode,
 }: NoteEditorProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const readOnlyCompartment = useRef(new Compartment())
+  const previewCompartment = useRef(new Compartment())
   const onSelectionChangeRef = useRef(onSelectionChange)
   useEffect(() => {
     onSelectionChangeRef.current = onSelectionChange
@@ -130,13 +135,21 @@ export function NoteEditor({
             ],
           }),
           syntaxHighlighting(oneDarkHighlightStyle),
-          livePreviewPlugin,
+          previewCompartment.current.of(sourceMode ? [] : livePreviewPlugin),
           commentAnchorField,
           hoveredAnchorField,
           commentAnchorDecorations,
           readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly ?? false)),
           EditorView.lineWrapping,
-          keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
+          keymap.of([
+            // Ahead of defaultKeymap so Enter at the start of a heading keeps
+            // the heading marker with its text.
+            { key: 'Enter', run: insertNewlineKeepingHeadingMarker },
+            ...defaultKeymap,
+            ...historyKeymap,
+            ...searchKeymap,
+            indentWithTab,
+          ]),
           /* v8 ignore next 3 */
           EditorView.updateListener.of((update) => {
             const isExternal = update.transactions.some((tr) => tr.annotation(externalUpdate))
@@ -277,6 +290,15 @@ export function NoteEditor({
       effects: readOnlyCompartment.current.reconfigure(EditorState.readOnly.of(readOnly ?? false)),
     })
   }, [readOnly])
+
+  useEffect(() => {
+    const view = viewRef.current
+    /* v8 ignore next 3 */
+    if (!view) return
+    view.dispatch({
+      effects: previewCompartment.current.reconfigure(sourceMode ? [] : livePreviewPlugin),
+    })
+  }, [sourceMode])
 
   return <div ref={containerRef} className="notepad-editor-cm" style={{ height: '100%' }} />
 }

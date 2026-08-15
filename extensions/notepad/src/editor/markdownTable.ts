@@ -8,10 +8,21 @@
 
 export type ColumnAlign = 'left' | 'center' | 'right' | null
 
+/**
+ * A cell's text plus where that text starts, so clicking a rendered cell can
+ * put the caret in the matching place in the source. Offsets are relative to
+ * whatever text was parsed: the row line for splitTableRow, the whole table
+ * source for parseTable.
+ */
+export interface TableCell {
+  text: string
+  offset: number
+}
+
 export interface ParsedTable {
-  header: string[]
+  header: TableCell[]
   align: ColumnAlign[]
-  rows: string[][]
+  rows: TableCell[][]
 }
 
 /**
@@ -19,12 +30,14 @@ export interface ParsedTable {
  * segments produced by leading and trailing pipes. Empty interior cells are
  * kept so columns stay aligned.
  */
-export function splitTableRow(line: string): string[] {
-  const cells: string[] = []
+export function splitTableRow(line: string): TableCell[] {
+  const segments: { raw: string; start: number }[] = []
   let current = ''
+  let start = 0
   let escaped = false
 
-  for (const char of line) {
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
     if (escaped) {
       current += char
       escaped = false
@@ -36,20 +49,26 @@ export function splitTableRow(line: string): string[] {
       continue
     }
     if (char === '|') {
-      cells.push(current)
+      segments.push({ raw: current, start })
       current = ''
+      start = i + 1
       continue
     }
     current += char
   }
-  cells.push(current)
+  segments.push({ raw: current, start })
 
   // A row is conventionally fenced by pipes; those produce an empty leading and
   // trailing segment that is not a column.
-  if (cells.length > 1 && cells[0].trim() === '') cells.shift()
-  if (cells.length > 1 && cells[cells.length - 1].trim() === '') cells.pop()
+  if (segments.length > 1 && segments[0].raw.trim() === '') segments.shift()
+  if (segments.length > 1 && segments[segments.length - 1].raw.trim() === '') segments.pop()
 
-  return cells.map((c) => c.trim())
+  return segments.map(({ raw, start: segmentStart }) => {
+    // Point at the trimmed text, not the padding, so a click lands on a
+    // character the user can actually see.
+    const leading = raw.length - raw.trimStart().length
+    return { text: raw.trim(), offset: segmentStart + leading }
+  })
 }
 
 const DELIMITER_CELL = /^:?-+:?$/
@@ -59,7 +78,7 @@ const DELIMITER_CELL = /^:?-+:?$/
  * the line is not a delimiter row, which is what makes a table a table.
  */
 export function parseDelimiterRow(line: string): ColumnAlign[] | null {
-  const cells = splitTableRow(line)
+  const cells = splitTableRow(line).map((c) => c.text)
   if (cells.length === 0) return null
   if (!cells.every((c) => DELIMITER_CELL.test(c))) return null
 
@@ -82,17 +101,33 @@ export function parseTable(source: string): ParsedTable | null {
   const lines = source.split('\n')
   if (lines.length < 2) return null
 
-  const header = splitTableRow(lines[0])
+  // Absolute start of each line within the source, so cell offsets can be
+  // reported against the table as a whole.
+  const lineStarts: number[] = []
+  let cursor = 0
+  for (const line of lines) {
+    lineStarts.push(cursor)
+    cursor += line.length + 1
+  }
+
+  const shift = (cells: TableCell[], lineIndex: number): TableCell[] =>
+    cells.map((cell) => ({ ...cell, offset: cell.offset + lineStarts[lineIndex] }))
+
+  const header = shift(splitTableRow(lines[0]), 0)
   const align = parseDelimiterRow(lines[1])
   if (!align) return null
 
   const columnCount = header.length
   const rows = lines
+    .map((line, index) => ({ line, index }))
     .slice(2)
-    .filter((line) => line.trim() !== '')
-    .map((line) => {
-      const cells = splitTableRow(line)
-      return Array.from({ length: columnCount }, (_, i) => cells[i] ?? '')
+    .filter(({ line }) => line.trim() !== '')
+    .map(({ line, index }) => {
+      const cells = shift(splitTableRow(line), index)
+      // Pad short rows so the grid stays rectangular; a padded cell points at
+      // the end of its row, which is where new text would go.
+      const rowEnd = lineStarts[index] + line.length
+      return Array.from({ length: columnCount }, (_, i) => cells[i] ?? { text: '', offset: rowEnd })
     })
 
   return {

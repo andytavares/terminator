@@ -1,11 +1,22 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import type { EditorView } from '@codemirror/view'
 import { TableWidget, AlertHeaderWidget } from '../../src/editor/livePreview'
 import { parseTable, ALERT_KINDS } from '../../src/editor/markdownTable'
 
-function renderTable(source: string): HTMLElement {
+function makeView(docLength = 10_000) {
+  const dispatch = vi.fn()
+  const focus = vi.fn()
+  return {
+    view: { state: { doc: { length: docLength } }, dispatch, focus } as unknown as EditorView,
+    dispatch,
+    focus,
+  }
+}
+
+function renderTable(source: string, from = 0, view = makeView().view): HTMLElement {
   const parsed = parseTable(source)
   if (!parsed) throw new Error('expected the fixture to parse as a table')
-  return new TableWidget(source, parsed).toDOM()
+  return new TableWidget(source, parsed, from).toDOM(view)
 }
 
 describe('TableWidget', () => {
@@ -63,17 +74,96 @@ describe('TableWidget', () => {
     expect(dom.querySelector('tbody td')?.textContent).toBe('<img src=x>')
   })
 
-  it('treats widgets with identical source as equal, so redraws are skipped', () => {
-    const a = new TableWidget(SOURCE, parseTable(SOURCE)!)
-    const b = new TableWidget(SOURCE, parseTable(SOURCE)!)
+  it('treats widgets with identical source and position as equal, so redraws are skipped', () => {
+    const a = new TableWidget(SOURCE, parseTable(SOURCE)!, 0)
+    const b = new TableWidget(SOURCE, parseTable(SOURCE)!, 0)
     expect(a.eq(b)).toBe(true)
   })
 
   it('treats widgets with different source as unequal', () => {
     const other = '| A |\n| --- |\n| x |'
-    const a = new TableWidget(SOURCE, parseTable(SOURCE)!)
-    const b = new TableWidget(other, parseTable(other)!)
+    const a = new TableWidget(SOURCE, parseTable(SOURCE)!, 0)
+    const b = new TableWidget(other, parseTable(other)!, 0)
     expect(a.eq(b)).toBe(false)
+  })
+
+  it('treats an identical table at a different position as unequal', () => {
+    const a = new TableWidget(SOURCE, parseTable(SOURCE)!, 0)
+    const b = new TableWidget(SOURCE, parseTable(SOURCE)!, 40)
+    expect(a.eq(b)).toBe(false)
+  })
+})
+
+// A replaced range cannot be clicked into, so without this the rendered table
+// would be uneditable — the caret could never get inside it.
+describe('TableWidget editing', () => {
+  const SOURCE = ['| Name | Count |', '| --- | --- |', '| apples | 3 |'].join('\n')
+
+  function clickCell(selector: string, index: number, from = 0) {
+    const { view, dispatch, focus } = makeView()
+    const dom = renderTable(SOURCE, from, view)
+    const cells = dom.querySelectorAll<HTMLElement>(selector)
+    cells[index].dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+    return { dispatch, focus }
+  }
+
+  it('puts the caret in the clicked header cell', () => {
+    const { dispatch } = clickCell('thead th', 0)
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ selection: { anchor: SOURCE.indexOf('Name') } })
+    )
+  })
+
+  it('puts the caret in the clicked body cell', () => {
+    const { dispatch } = clickCell('tbody td', 0)
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ selection: { anchor: SOURCE.indexOf('apples') } })
+    )
+  })
+
+  it('distinguishes columns within a row', () => {
+    const { dispatch } = clickCell('tbody td', 1)
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ selection: { anchor: SOURCE.indexOf('3') } })
+    )
+  })
+
+  it('offsets the caret by the table position in the document', () => {
+    const { dispatch } = clickCell('thead th', 1, 500)
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ selection: { anchor: 500 + SOURCE.indexOf('Count') } })
+    )
+  })
+
+  it('focuses the editor so the user can type straight away', () => {
+    const { focus } = clickCell('tbody td', 0)
+    expect(focus).toHaveBeenCalled()
+  })
+
+  it('scrolls the caret into view', () => {
+    const { dispatch } = clickCell('tbody td', 0)
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ scrollIntoView: true }))
+  })
+
+  it('clamps the caret to the document length', () => {
+    const { view, dispatch } = makeView(5)
+    const dom = renderTable(SOURCE, 0, view)
+    dom
+      .querySelectorAll<HTMLElement>('tbody td')[1]
+      .dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ selection: { anchor: 5 } }))
+  })
+
+  it('prevents the default so the browser does not fight the caret placement', () => {
+    const { view } = makeView()
+    const dom = renderTable(SOURCE, 0, view)
+    const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true })
+    dom.querySelector('tbody td')!.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it('advertises that cells are clickable', () => {
+    expect(renderTable(SOURCE).querySelector('table')?.getAttribute('title')).toMatch(/edit/i)
   })
 })
 

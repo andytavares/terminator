@@ -70,11 +70,13 @@ export function NotepadView(): React.JSX.Element {
     bodyDraft,
     isDirty,
     saveStatus,
+    previewMode,
     setActiveNote,
     markDirty,
     markSaving,
     markSaved,
     markError,
+    togglePreviewMode,
   } = useEditorStore()
   const { comments, setComments } = useCommentsStore()
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -591,6 +593,13 @@ export function NotepadView(): React.JSX.Element {
           <span className="notepad-view__save-status">{saveStatusLabel()}</span>
           <button
             className="notepad-btn-ghost"
+            onClick={togglePreviewMode}
+            title={previewMode ? 'Show raw markdown source' : 'Show the rendered live preview'}
+          >
+            {previewMode ? 'Markdown' : 'Live'}
+          </button>
+          <button
+            className="notepad-btn-ghost"
             onClick={() => setReadingMode((v) => !v)}
             title={readingMode ? 'Switch to edit mode' : 'Switch to reading mode'}
           >
@@ -645,6 +654,7 @@ export function NotepadView(): React.JSX.Element {
                 if (!sel) setComposingAnchor(null)
               }}
               readOnly={readingMode}
+              sourceMode={!previewMode}
             />
             {pendingAnchor && !composingAnchor && (
               <button

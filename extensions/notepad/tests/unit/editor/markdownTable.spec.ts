@@ -10,28 +10,49 @@ import {
 } from '../../../src/editor/markdownTable'
 
 describe('splitTableRow', () => {
+  const texts = (line: string) => splitTableRow(line).map((c) => c.text)
+
   it('splits a fenced row into cells', () => {
-    expect(splitTableRow('| a | b | c |')).toEqual(['a', 'b', 'c'])
+    expect(texts('| a | b | c |')).toEqual(['a', 'b', 'c'])
   })
 
   it('splits an unfenced row', () => {
-    expect(splitTableRow('a | b | c')).toEqual(['a', 'b', 'c'])
+    expect(texts('a | b | c')).toEqual(['a', 'b', 'c'])
   })
 
   it('trims surrounding whitespace from each cell', () => {
-    expect(splitTableRow('|   padded   |  cells |')).toEqual(['padded', 'cells'])
+    expect(texts('|   padded   |  cells |')).toEqual(['padded', 'cells'])
   })
 
   it('keeps empty interior cells so columns stay aligned', () => {
-    expect(splitTableRow('| a |  | c |')).toEqual(['a', '', 'c'])
+    expect(texts('| a |  | c |')).toEqual(['a', '', 'c'])
   })
 
   it('does not split on an escaped pipe', () => {
-    expect(splitTableRow('| a \\| b | c |')).toEqual(['a \\| b', 'c'])
+    expect(texts('| a \\| b | c |')).toEqual(['a \\| b', 'c'])
   })
 
   it('handles a single-column row', () => {
-    expect(splitTableRow('| only |')).toEqual(['only'])
+    expect(texts('| only |')).toEqual(['only'])
+  })
+
+  // Offsets are what let a click on a rendered cell put the caret in the right
+  // place in the source.
+  it('reports where each cell text starts', () => {
+    const line = '| a | b |'
+    const cells = splitTableRow(line)
+    expect(cells.map((c) => c.offset)).toEqual([line.indexOf('a'), line.indexOf('b')])
+  })
+
+  it('points past the padding, at the first visible character', () => {
+    const line = '|    spaced    |'
+    expect(splitTableRow(line)[0].offset).toBe(line.indexOf('s'))
+  })
+
+  it('reports an offset for an empty cell', () => {
+    const cells = splitTableRow('| a |  | c |')
+    expect(cells[1].offset).toBeGreaterThan(cells[0].offset)
+    expect(cells[1].offset).toBeLessThan(cells[2].offset)
   })
 })
 
@@ -62,38 +83,54 @@ describe('parseTable', () => {
     '\n'
   )
 
+  const rowTexts = (source: string) => parseTable(source)?.rows.map((row) => row.map((c) => c.text))
+
   it('parses header, alignment, and rows', () => {
-    expect(parseTable(table)).toEqual({
-      header: ['Name', 'Count'],
-      align: [null, 'right'],
-      rows: [
-        ['apples', '3'],
-        ['pears', '12'],
-      ],
-    })
+    const parsed = parseTable(table)
+    expect(parsed?.header.map((c) => c.text)).toEqual(['Name', 'Count'])
+    expect(parsed?.align).toEqual([null, 'right'])
+    expect(rowTexts(table)).toEqual([
+      ['apples', '3'],
+      ['pears', '12'],
+    ])
   })
 
   it('parses a header-only table', () => {
-    expect(parseTable('| A | B |\n| --- | --- |')).toEqual({
-      header: ['A', 'B'],
-      align: [null, null],
-      rows: [],
-    })
+    const parsed = parseTable('| A | B |\n| --- | --- |')
+    expect(parsed?.header.map((c) => c.text)).toEqual(['A', 'B'])
+    expect(parsed?.align).toEqual([null, null])
+    expect(parsed?.rows).toEqual([])
   })
 
   it('pads short rows to the header column count', () => {
-    const parsed = parseTable('| A | B | C |\n| --- | --- | --- |\n| only |')
-    expect(parsed?.rows).toEqual([['only', '', '']])
+    expect(rowTexts('| A | B | C |\n| --- | --- | --- |\n| only |')).toEqual([['only', '', '']])
   })
 
   it('truncates rows with more cells than the header', () => {
-    const parsed = parseTable('| A |\n| --- |\n| x | extra |')
-    expect(parsed?.rows).toEqual([['x']])
+    expect(rowTexts('| A |\n| --- |\n| x | extra |')).toEqual([['x']])
   })
 
   it('skips blank lines between rows', () => {
-    const parsed = parseTable('| A |\n| --- |\n| x |\n\n')
-    expect(parsed?.rows).toEqual([['x']])
+    expect(rowTexts('| A |\n| --- |\n| x |\n\n')).toEqual([['x']])
+  })
+
+  it('reports cell offsets against the whole table source', () => {
+    const parsed = parseTable(table)
+    expect(parsed?.header[0].offset).toBe(table.indexOf('Name'))
+    expect(parsed?.rows[0][0].offset).toBe(table.indexOf('apples'))
+    expect(parsed?.rows[1][1].offset).toBe(table.indexOf('12'))
+  })
+
+  it('points a padded cell at the end of its row', () => {
+    const source = '| A | B |\n| --- | --- |\n| only |'
+    const parsed = parseTable(source)
+    expect(parsed?.rows[0][1].offset).toBe(source.length)
+  })
+
+  it('keeps offsets correct when a blank line precedes a row', () => {
+    const source = '| A |\n| --- |\n| x |\n\n| y |'
+    const parsed = parseTable(source)
+    expect(parsed?.rows[1][0].offset).toBe(source.lastIndexOf('y'))
   })
 
   it('returns null without a delimiter row', () => {

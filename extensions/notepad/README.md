@@ -5,7 +5,9 @@ Markdown notepad with live preview, margin comments, tags, and full-text search.
 ## Features
 
 - **Markdown editor** — CodeMirror 6 editor with live preview
-- **Live-preview constructs** — headings, bold/italic/strikethrough, inline and fenced code, links, images, blockquotes, horizontal rules, task checkboxes, mermaid diagrams, GFM tables, and GitHub alerts (`> [!NOTE|TIP|IMPORTANT|WARNING|CAUTION]`). Tables and alerts fall back to raw markdown while the caret is inside them, so they stay editable
+- **Live-preview constructs** — headings, bold/italic/strikethrough, inline and fenced code, links, images, blockquotes, horizontal rules, task checkboxes, mermaid diagrams, GFM tables, and GitHub alerts (`> [!NOTE|TIP|IMPORTANT|WARNING|CAUTION]`). Tables and alerts fall back to raw markdown while the caret is inside them, so they stay editable — click any table cell to put the caret in that cell
+- **Markdown / Live toggle** — the toolbar button (and the same button in a pop-out note window) switches between the rendered live preview and the raw markdown source. This is independent of Read mode, which controls editability
+- **Enter keeps block markers with their text** — pressing Enter at the start of a heading pushes the whole heading down instead of stranding its `#` on the line above
 - **One note, one body** — a note open in both the docked panel and a pop-out window stays in sync; each surface adopts saves made by the other
 - **Margin comments** — anchored, threaded comments (max depth 2) that re-map as the document changes; comments that fail to re-anchor are marked orphaned
 - **Tags** — tag notes, rename or delete tags globally, filter the note list by tag

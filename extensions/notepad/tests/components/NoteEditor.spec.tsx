@@ -24,6 +24,9 @@ vi.mock('@codemirror/view', () => {
   }
 })
 
+const compartmentOf = vi.fn(() => ({}))
+const compartmentReconfigure = vi.fn(() => ({}))
+
 vi.mock('@codemirror/state', () => ({
   Annotation: { define: vi.fn(() => ({ of: vi.fn((v: unknown) => v) })) },
   EditorState: {
@@ -31,10 +34,7 @@ vi.mock('@codemirror/state', () => ({
     readOnly: { of: vi.fn(() => ({})) },
   },
   Compartment: vi.fn().mockImplementation(function () {
-    return {
-      of: vi.fn(() => ({})),
-      reconfigure: vi.fn(() => ({})),
-    }
+    return { of: compartmentOf, reconfigure: compartmentReconfigure }
   }),
   RangeSetBuilder: vi.fn().mockImplementation(function () {
     return { add: vi.fn(), finish: vi.fn(() => ({})) }
@@ -108,6 +108,34 @@ describe('NoteEditor', () => {
     const onAnchorsReady = vi.fn()
     render(<NoteEditor initialDoc="hello" onChange={vi.fn()} onAnchorsReady={onAnchorsReady} />)
     expect(onAnchorsReady).toHaveBeenCalledWith(expect.any(Function))
+  })
+
+  // Source mode is expressed by configuring the live-preview compartment with
+  // nothing in it, so the raw markdown shows through.
+  it('configures the preview compartment with the plugin by default', () => {
+    compartmentOf.mockClear()
+    render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} />)
+    expect(compartmentOf).toHaveBeenCalledWith({})
+  })
+
+  it('configures the preview compartment empty in source mode', () => {
+    compartmentOf.mockClear()
+    render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} sourceMode />)
+    expect(compartmentOf).toHaveBeenCalledWith([])
+  })
+
+  it('reconfigures the compartment when the mode is switched on', () => {
+    const { rerender } = render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} />)
+    compartmentReconfigure.mockClear()
+    rerender(<NoteEditor initialDoc="# Test" onChange={vi.fn()} sourceMode />)
+    expect(compartmentReconfigure).toHaveBeenCalledWith([])
+  })
+
+  it('reconfigures the compartment when the mode is switched back off', () => {
+    const { rerender } = render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} sourceMode />)
+    compartmentReconfigure.mockClear()
+    rerender(<NoteEditor initialDoc="# Test" onChange={vi.fn()} />)
+    expect(compartmentReconfigure).toHaveBeenCalledWith({})
   })
 })
 
