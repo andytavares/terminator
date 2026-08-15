@@ -97,6 +97,10 @@ beforeEach(() => {
     if (channel === 'task-vault:vault:update-project-status')
       return Promise.resolve({ success: true })
     if (channel === 'task-vault:vault:add-task') return Promise.resolve({ success: true })
+    if (channel === 'task-vault:review:start')
+      return Promise.resolve({ review: { id: 'review-1' }, resumed: false })
+    if (channel === 'task-vault:review:complete') return Promise.resolve({ ok: true })
+    if (channel === 'task-vault:review:list') return Promise.resolve({ reviews: [] })
     return Promise.resolve({})
   })
 })
@@ -190,7 +194,25 @@ describe('WeeklyReview', () => {
     })
   })
 
-  it('completing all steps writes completion to daily log', async () => {
+  it('starts (or resumes) a persisted review on mount', async () => {
+    render(<WeeklyReview />)
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith('task-vault:review:start', {})
+    })
+  })
+
+  it('offers a way into past reviews', async () => {
+    render(<WeeklyReview />)
+    await waitFor(() => screen.getByText(/step 1 of 6/i))
+
+    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+    await waitFor(() => {
+      expect(screen.getByText('Past Reviews')).toBeTruthy()
+    })
+    expect(mockInvoke).toHaveBeenCalledWith('task-vault:review:list', {})
+  })
+
+  it('completing all steps records the reflection against the review', async () => {
     render(<WeeklyReview />)
     await waitFor(() => screen.getByText(/step 1 of 6/i))
 
@@ -206,8 +228,8 @@ describe('WeeklyReview', () => {
       fireEvent.click(finishBtn)
       await waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith(
-          'task-vault:vault:add-task',
-          expect.objectContaining({ text: expect.stringContaining('weekly review') })
+          'task-vault:review:complete',
+          expect.objectContaining({ reviewId: 'review-1' })
         )
       })
     }
