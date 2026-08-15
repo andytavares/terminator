@@ -1,0 +1,28 @@
+docs/EXTENSION-DEVELOPMENT.md
+  s_47d4ee14eac270::t_eb201b71851703 271-278
+docs/user-guide/USER-GUIDE.md
+  s_47d4ee14eac270::t_db1bb656a8a55b 248-253
+  s_47d4ee14eac270::t_ca9c38e277a9da 229-247
+docs/adr/026-double-escape-extension-exit.md
+  s_47d4ee14eac270::t_048937fac536f8 1-71
+docs/ARCHITECTURE.md
+  s_47d4ee14eac270::t_1fa828b40faf30 294-315
+README.md
+  s_47d4ee14eac270::t_00582df747ac4a 35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "d3923f7f004a47a410447244d195f6b4cb3e7a23",
+  "prompts": {},
+  "sessions": {
+    "s_47d4ee14eac270": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7019d270-5ad6-44b9-b515-ead0f0848ed6",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
