@@ -15,6 +15,7 @@ import { registerDbIpcHandlers } from './ipc/db.ipc.js'
 import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
 import { ExtensionViewHost } from './extensions/extension-view-host.js'
+import { routeExtensionExitRequest } from './extensions/extension-exit.js'
 import { logger } from './logger.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
@@ -331,6 +332,22 @@ app.whenReady().then(async () => {
 
   onChannel('extension:set-bottom-inset', (_event, { inset }: { inset: number }) => {
     viewHost?.setBottomInset(inset)
+  })
+
+  // Sent by the double-Escape gesture in the extension webview preload. The
+  // extension view is its own webContents, so the host renderer never sees the
+  // keystroke — main attributes it to a surface and relays the exit.
+  onChannel('extension:request-exit', (event) => {
+    if (!viewHost || !mainWindow || mainWindow.isDestroyed()) return
+    routeExtensionExitRequest(event.sender, {
+      findViewByWebContents: (wc) => viewHost!.findViewByWebContents(wc),
+      listExtensions: () => extensionHost.listExtensions(),
+      focusMainRenderer: () => {
+        viewHost!.noteFocused(null)
+        mainWindow!.webContents.focus()
+      },
+      send: (channel, payload) => mainWindow!.webContents.send(channel, payload),
+    })
   })
 
   onChannel('workspace:active-changed', (_event, data) => {

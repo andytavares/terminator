@@ -409,6 +409,33 @@ describe('ExtensionViewHost focus restoration', () => {
 
     expect(mockMainWebContentsFocus).toHaveBeenCalled()
   })
+
+  describe('findViewByWebContents', () => {
+    it('resolves the extension id and viewParam for a created view', async () => {
+      await host.createView(makeExt(), 'sidebar')
+      const { webContents } = mockAddChildView.mock.calls[0][0]
+
+      expect(host.findViewByWebContents(webContents)).toEqual({
+        extensionId: 'com.test.ext',
+        viewParam: 'sidebar',
+      })
+    })
+
+    it('distinguishes two views of the same extension', async () => {
+      await host.createView(makeExt(), 'main')
+      await host.createView(makeExt(), 'sidebar')
+      const second = mockAddChildView.mock.calls[1][0].webContents
+
+      expect(host.findViewByWebContents(second)).toEqual({
+        extensionId: 'com.test.ext',
+        viewParam: 'sidebar',
+      })
+    })
+
+    it('returns null for webContents that belong to no extension view', () => {
+      expect(host.findViewByWebContents({} as never)).toBeNull()
+    })
+  })
 })
 
 describe('EXTENSION_BASE_CSS', () => {
