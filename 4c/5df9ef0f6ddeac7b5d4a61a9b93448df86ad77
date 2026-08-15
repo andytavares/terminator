@@ -1,0 +1,41 @@
+extensions/notepad/src/components/notepad.css
+  s_f7956b1857ba1f::t_11814e644d3f2d 1603-1674
+extensions/notepad/tests/unit/editor/markdownTable.spec.ts
+  s_f7956b1857ba1f::t_a2c82268b7b70c 61-63
+  s_f7956b1857ba1f::t_b8ba9a8af14ec4 1-60,64-204
+extensions/notepad/tests/unit/editor/livePreviewCursorLine.spec.ts
+  s_f7956b1857ba1f::t_a12546f02a1424 58-61,63,67,71,75
+  s_f7956b1857ba1f::t_d374e23fe9ddfa 1-57,62,64-66,68-70,72-74,76-94
+extensions/notepad/tests/unit/editor/livePreviewBlocks.spec.ts
+  s_f7956b1857ba1f::t_2b9a84548b31f6 148-157
+  s_f7956b1857ba1f::t_eaf81dff9d875f 1-147,158-181
+extensions/notepad/src/editor/markdownTable.ts
+  s_f7956b1857ba1f::t_766bd87231e3a5 1-187
+extensions/notepad/tests/components/PreviewWidgets.spec.tsx
+  s_f7956b1857ba1f::t_39552a4cba4177 1-100
+extensions/notepad/README.md
+  s_f7956b1857ba1f::t_741f3501e959bf 8-9
+extensions/notepad/src/editor/livePreview.ts
+  s_f7956b1857ba1f::t_1992194eb24cb7 10-18
+  s_f7956b1857ba1f::t_8a96e2cf600e2d 584-588
+  s_f7956b1857ba1f::t_cd638b20896271 234,295
+  s_f7956b1857ba1f::t_ea08781b772012 522-530,535-537,542-583,589-597
+  s_f7956b1857ba1f::t_09ae6d7da50741 181-233,235-294,296-323
+  s_f7956b1857ba1f::t_b69ae1b141dc1e 531-534,538-541
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "4c5df9ef0f6ddeac7b5d4a61a9b93448df86ad77",
+  "prompts": {},
+  "sessions": {
+    "s_f7956b1857ba1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b1ebb91d-f4b1-438d-bcd5-4f4611f2e780",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
