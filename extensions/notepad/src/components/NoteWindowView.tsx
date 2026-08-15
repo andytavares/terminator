@@ -8,10 +8,12 @@ import { CommentComposer } from './CommentComposer'
 import {
   NoteEditor,
   applyAnchors,
+  applyExternalDoc,
   scrollToAnchor,
   setEditorHoverAnchor,
   type SelectionAnchor,
 } from '../editor/NoteEditor'
+import { ORIGIN_ID, onForeignNoteChange } from '../editor/noteSync'
 import { reanchorComment } from '../editor/reanchor'
 import { commentAnchorField } from '../editor/commentField'
 import type { EditorView } from '@codemirror/view'
@@ -41,7 +43,8 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
   const [commentHover, setCommentHover] = useState<{ id: string; top: number } | null>(null)
   const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const { bodyDraft, saveStatus, setActiveNote, markSaving, markSaved } = useEditorStore()
+  const { bodyDraft, saveStatus, setActiveNote, markDirty, markSaving, markSaved } =
+    useEditorStore()
   const { comments, setComments } = useCommentsStore()
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const anchorTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -212,6 +215,7 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
             title,
             body: newBody,
             tags: note.tags,
+            originId: ORIGIN_ID,
           })
           setNote((n) => (n ? { ...n, title } : n))
           document.title = title || 'Note'
@@ -267,8 +271,24 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
   )
 
   function handleEditorChange(newBody: string) {
+    // markDirty so an in-flight local edit outranks a foreign push (see the
+    // notes.changed subscription below) — the panel does the same.
+    markDirty(newBody)
     scheduleAutosave(newBody)
   }
+
+  // Adopt bodies saved by the docked panel so this window and the panel never
+  // hold different content for the same note.
+  useEffect(() => {
+    return onForeignNoteChange((event) => {
+      if (event.id !== NOTE_ID) return
+      if (useEditorStore.getState().isDirty) return
+      applyExternalDoc(editorViewRef.current, event.body)
+      setActiveNote(event.id, event.body)
+      setNote((n) => (n ? { ...n, title: event.title, tags: event.tags } : n))
+      document.title = event.title || 'Note'
+    })
+  }, [setActiveNote])
 
   function handleEditorMouseOver(e: React.MouseEvent<HTMLDivElement>) {
     const target = e.target as HTMLElement

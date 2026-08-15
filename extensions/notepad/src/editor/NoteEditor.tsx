@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { EditorView, keymap } from '@codemirror/view'
-import { Compartment, EditorState } from '@codemirror/state'
+import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import { LanguageDescription, syntaxHighlighting } from '@codemirror/language'
@@ -27,6 +27,11 @@ import {
   setHoveredAnchor,
   type CommentAnchor,
 } from './commentField'
+
+// Marks a transaction as adopting a body written by another surface, so the
+// update listener does not report it back as a local edit and trigger an
+// autosave/broadcast loop.
+const externalUpdate = Annotation.define<boolean>()
 
 export interface SelectionAnchor {
   from: number
@@ -134,7 +139,8 @@ export function NoteEditor({
           keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
           /* v8 ignore next 3 */
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) onChange(update.state.doc.toString())
+            const isExternal = update.transactions.some((tr) => tr.annotation(externalUpdate))
+            if (update.docChanged && !isExternal) onChange(update.state.doc.toString())
 
             /* v8 ignore next 20 */
             if (update.docChanged || update.selectionSet) {
@@ -273,6 +279,22 @@ export function NoteEditor({
   }, [readOnly])
 
   return <div ref={containerRef} className="notepad-editor-cm" style={{ height: '100%' }} />
+}
+
+/**
+ * Replaces the document with a body saved by another surface, keeping the
+ * caret where it was (clamped to the new length). No-ops when the text already
+ * matches, so an echo of this surface's own save costs nothing.
+ */
+export function applyExternalDoc(view: EditorView | null, body: string): void {
+  if (!view) return
+  if (view.state.doc.toString() === body) return
+  const anchor = Math.min(view.state.selection.main.head, body.length)
+  view.dispatch({
+    changes: { from: 0, to: view.state.doc.length, insert: body },
+    selection: { anchor },
+    annotations: externalUpdate.of(true),
+  })
 }
 
 export function applyAnchors(view: EditorView | null, anchors: CommentAnchor[]): void {

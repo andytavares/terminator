@@ -25,6 +25,7 @@ vi.mock('@codemirror/view', () => {
 })
 
 vi.mock('@codemirror/state', () => ({
+  Annotation: { define: vi.fn(() => ({ of: vi.fn((v: unknown) => v) })) },
   EditorState: {
     create: vi.fn().mockReturnValue({}),
     readOnly: { of: vi.fn(() => ({})) },
