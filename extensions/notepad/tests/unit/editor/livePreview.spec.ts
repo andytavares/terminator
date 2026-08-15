@@ -143,14 +143,15 @@ describe('buildDecorations', () => {
 
   it('does NOT hide fenced code fences when cursor is inside block', () => {
     const state = makeState('```\ncode\n```\n')
-    // Cursor at position 4 (inside "code")
+    // Cursor at position 4 (inside "code"). The body is still styled as code,
+    // but both fences stay visible so the language remains editable.
     const decos = buildDecorations(state, { anchor: 4 })
-    let foundLineDeco = false
+    let foundHiddenFence = false
     decos.between(0, state.doc.length, (_from, _to, deco) => {
-      if ((deco.spec as { class?: string })?.class?.includes('notepad-code-block-line'))
-        foundLineDeco = true
+      if ((deco.spec as { class?: string })?.class?.includes('notepad-fence-hidden'))
+        foundHiddenFence = true
     })
-    expect(foundLineDeco).toBe(false)
+    expect(foundHiddenFence).toBe(false)
   })
 
   it('produces a blockquote line deco (cursor off quote line)', () => {

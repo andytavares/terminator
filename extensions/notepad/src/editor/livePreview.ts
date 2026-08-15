@@ -31,14 +31,23 @@ const editorFocusedField = StateField.define<boolean>({
     return focused
   },
 })
-/* v8 ignore next 9 */
-const focusTrackPlugin = ViewPlugin.define((view) => ({
-  update(update) {
-    if (update.focusChanged) {
-      view.dispatch({ effects: setEditorFocused.of(view.hasFocus) })
-    }
-  },
-}))
+/* v8 ignore next 16 */
+const focusTrackPlugin = ViewPlugin.define((view) => {
+  // Seed from the live focus state. `focusChanged` only fires on a transition,
+  // so a view created while already focused would stay marked unfocused and
+  // render as though the user were not editing. Deferred because a view may not
+  // dispatch during its own construction.
+  if (view.hasFocus) {
+    setTimeout(() => view.dispatch({ effects: setEditorFocused.of(true) }), 0)
+  }
+  return {
+    update(update) {
+      if (update.focusChanged) {
+        view.dispatch({ effects: setEditorFocused.of(view.hasFocus) })
+      }
+    },
+  }
+})
 
 // ── Widgets ──────────────────────────────────────────────────────
 
@@ -479,17 +488,47 @@ export function buildDecorations(
         }
 
         case 'FencedCode': {
-          // Show raw fences when cursor is inside the block (focused edit mode only)
-          const isInBlock =
-            focused && !state.readOnly && cursorPos >= node.from && cursorPos <= node.to
-          if (!isInBlock) {
+          const editable = !state.readOnly
+          const openingLine = state.doc.lineAt(node.from)
+          const codeText = node.node.getChild('CodeText')
+
+          // While the caret is on the opening fence line the user is still
+          // typing the ``` and its language, so nothing may render — otherwise
+          // the line collapses out from under them mid-keystroke. Deliberately
+          // not gated on `focused`: that flag only flips on a focus-change
+          // event, so a stale false made a half-typed fence disappear.
+          if (editable && cursorPos >= openingLine.from && cursorPos <= openingLine.to) {
+            return false
+          }
+
+          // A fence with no body yet is a block under construction. Leaving it
+          // raw is what makes it appear only once there is something to show.
+          if (!codeText || codeText.to <= codeText.from) return false
+
+          // Caret in the body: style the code but keep both fences visible, so
+          // the language stays readable and clickable while editing.
+          if (editable && cursorPos >= node.from && cursorPos <= node.to) {
+            let bodyLine = state.doc.lineAt(codeText.from)
+            for (;;) {
+              builder.add(
+                bodyLine.from,
+                bodyLine.from,
+                Decoration.line({ class: 'notepad-code-block-line' })
+              )
+              const nextFrom = bodyLine.to + 1
+              if (nextFrom >= codeText.to) break
+              bodyLine = state.doc.lineAt(nextFrom)
+            }
+            return false
+          }
+
+          {
             const codeInfoNode = node.node.getChild('CodeInfo')
             const lang = codeInfoNode
               ? state.sliceDoc(codeInfoNode.from, codeInfoNode.to).trim()
               : ''
             if (lang === 'mermaid') {
-              const codeText = node.node.getChild('CodeText')
-              const code = codeText ? state.sliceDoc(codeText.from, codeText.to) : ''
+              const code = state.sliceDoc(codeText.from, codeText.to)
               builder.add(
                 node.from,
                 node.to,
@@ -497,8 +536,7 @@ export function buildDecorations(
               )
               return false
             }
-            const codeText = node.node.getChild('CodeText')
-            if (codeText && codeText.to > codeText.from) {
+            {
               // Opening fence: collapse the line to zero-height by adding a line class
               // then replace the fence text (NOT the trailing \n) so the code line
               // keeps its own .cm-line element and gets its line decoration properly.
@@ -533,9 +571,6 @@ export function buildDecorations(
                 Decoration.line({ class: 'notepad-fence-hidden' })
               )
               builder.add(closingLineFrom, node.to, Decoration.replace({}))
-              /* v8 ignore next 2 */
-            } else {
-              builder.add(node.from, node.to, Decoration.replace({}))
             }
           }
           return false
@@ -543,10 +578,14 @@ export function buildDecorations(
 
         case 'Table': {
           // Rendered as a whole: a table only reads as a grid if every row is
-          // replaced at once. Raw pipes come back while the cursor is inside,
+          // replaced at once. Raw pipes come back while the caret is inside,
           // matching how FencedCode behaves.
-          const isInTable =
-            focused && !state.readOnly && cursorPos >= node.from && cursorPos <= node.to
+          //
+          // Deliberately not gated on `focused`: that flag only flips on a
+          // focus-change event, so a stale false kept the table rendered even
+          // with the caret inside it — the caret then had nowhere to land and
+          // the table could not be edited at all, by mouse or keyboard.
+          const isInTable = !state.readOnly && cursorPos >= node.from && cursorPos <= node.to
           if (!isInTable) {
             const source = state.sliceDoc(node.from, node.to)
             const parsed = parseTable(source)
@@ -582,8 +621,8 @@ export function buildDecorations(
           const kind = parseAlertMarker(firstLine.text)
           if (kind === null) break // ordinary blockquote — let QuoteMark handle it
 
-          const isInAlert =
-            focused && !state.readOnly && cursorPos >= node.from && cursorPos <= node.to
+          // Not gated on `focused`, for the same reason as Table above.
+          const isInAlert = !state.readOnly && cursorPos >= node.from && cursorPos <= node.to
           if (isInAlert) return false
 
           let line = firstLine

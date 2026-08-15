@@ -80,11 +80,38 @@ describe('buildDecorations — tables', () => {
     expect(widgetNames(decos)).toContain('TableWidget')
   })
 
-  it('renders the table before the editor has been focused', () => {
+  // Regression: this used to be gated on a focus flag that only flips on a
+  // focus-change event. A stale false kept the table rendered with the caret
+  // inside it, so the caret had nowhere to land and the table could not be
+  // edited at all — by mouse or by keyboard.
+  it('shows raw markdown with the caret inside even when focus has not registered', () => {
     const state = makeState(`${TABLE}\n`)
     const decos = collect(buildDecorations(state, { anchor: 3 }, false), state.doc.length)
 
+    expect(widgetNames(decos)).not.toContain('TableWidget')
+  })
+
+  it('renders the table with the caret outside even before focus registers', () => {
+    const doc = `${TABLE}\n\nafter`
+    const state = makeState(doc)
+    const decos = collect(buildDecorations(state, { anchor: doc.length }, false), doc.length)
+
     expect(widgetNames(decos)).toContain('TableWidget')
+  })
+
+  it('keeps the table reachable by keyboard: entering its range reveals the source', () => {
+    const doc = `before\n\n${TABLE}\n\nafter`
+    const state = makeState(doc)
+    const tableStart = doc.indexOf('| Name')
+
+    // One position before the table: still rendered.
+    expect(
+      widgetNames(collect(buildDecorations(state, { anchor: tableStart - 1 }), doc.length))
+    ).toContain('TableWidget')
+    // Arrowing in: the source appears so the caret has somewhere to sit.
+    expect(
+      widgetNames(collect(buildDecorations(state, { anchor: tableStart }), doc.length))
+    ).not.toContain('TableWidget')
   })
 
   it('leaves a pipe-looking paragraph that is not a table alone', () => {
