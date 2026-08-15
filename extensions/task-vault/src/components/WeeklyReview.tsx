@@ -124,7 +124,7 @@ export function WeeklyReview(): React.JSX.Element {
             </div>
           </div>
           <div className="weekly-review__nav">
-            <button className="tv-btn tv-btn--secondary" onClick={() => setShowHistory(false)}>
+            <button className="weekly-review__nav-text-btn" onClick={() => setShowHistory(false)}>
               Back
             </button>
           </div>
@@ -174,7 +174,7 @@ export function WeeklyReview(): React.JSX.Element {
           ))}
         </div>
         <div className="weekly-review__nav">
-          <button className="tv-btn tv-btn--ghost" onClick={openHistory}>
+          <button className="weekly-review__nav-text-btn" onClick={openHistory}>
             History
           </button>
           <button

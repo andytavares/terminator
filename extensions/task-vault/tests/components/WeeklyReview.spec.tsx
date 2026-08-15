@@ -201,6 +201,27 @@ describe('WeeklyReview', () => {
     })
   })
 
+  // The nav row sizes its buttons as 28px squares for the icon-only step
+  // arrows; a text button in that row must opt out or its label overflows.
+  it('gives the History button the text-button class, not the square arrow sizing', async () => {
+    render(<WeeklyReview />)
+    await waitFor(() => screen.getByText(/step 1 of 6/i))
+
+    const history = screen.getByRole('button', { name: 'History' })
+    expect(history.className).toContain('weekly-review__nav-text-btn')
+  })
+
+  it('gives the Back button the same text-button class', async () => {
+    render(<WeeklyReview />)
+    await waitFor(() => screen.getByText(/step 1 of 6/i))
+    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+
+    await waitFor(() => screen.getByText('Past Reviews'))
+    expect(screen.getByRole('button', { name: 'Back' }).className).toContain(
+      'weekly-review__nav-text-btn'
+    )
+  })
+
   it('offers a way into past reviews', async () => {
     render(<WeeklyReview />)
     await waitFor(() => screen.getByText(/step 1 of 6/i))

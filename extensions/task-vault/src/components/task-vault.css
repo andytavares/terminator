@@ -709,6 +709,17 @@
     color 0.1s;
 }
 
+/* The rule above sizes the icon-only step arrows as 28px squares. Text buttons
+   in the same row have to opt out of that or their label overflows the box. */
+.weekly-review__nav .weekly-review__nav-text-btn {
+  width: auto;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .weekly-review__nav button:hover:not(:disabled) {
   background: var(--tm-accent-dim);
   color: var(--tm-accent);
