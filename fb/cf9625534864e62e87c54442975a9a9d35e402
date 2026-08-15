@@ -1,0 +1,22 @@
+src/shared/double-escape.ts
+  s_47d4ee14eac270::t_ee8e5acf56d321 1-33
+tests/unit/shared/double-escape.spec.ts
+  s_47d4ee14eac270::t_ff28f95d0698b8 1,6-54
+  s_47d4ee14eac270::t_ca26844fb2db98 2-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "fbcf9625534864e62e87c54442975a9a9d35e402",
+  "prompts": {},
+  "sessions": {
+    "s_47d4ee14eac270": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7019d270-5ad6-44b9-b515-ead0f0848ed6",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
