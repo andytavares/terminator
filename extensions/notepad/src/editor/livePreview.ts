@@ -7,6 +7,15 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
+import {
+  ALERT_LABELS,
+  parseAlertMarker,
+  parseInlineSpans,
+  parseTable,
+  type AlertKind,
+  type InlineSpan,
+  type ParsedTable,
+} from './markdownTable'
 
 // Track editor focus so cursor-line raw reveal only activates after the user
 // has actually focused the editor (not on initial mount).
@@ -22,14 +31,23 @@ const editorFocusedField = StateField.define<boolean>({
     return focused
   },
 })
-/* v8 ignore next 9 */
-const focusTrackPlugin = ViewPlugin.define((view) => ({
-  update(update) {
-    if (update.focusChanged) {
-      view.dispatch({ effects: setEditorFocused.of(view.hasFocus) })
-    }
-  },
-}))
+/* v8 ignore next 16 */
+const focusTrackPlugin = ViewPlugin.define((view) => {
+  // Seed from the live focus state. `focusChanged` only fires on a transition,
+  // so a view created while already focused would stay marked unfocused and
+  // render as though the user were not editing. Deferred because a view may not
+  // dispatch during its own construction.
+  if (view.hasFocus) {
+    setTimeout(() => view.dispatch({ effects: setEditorFocused.of(true) }), 0)
+  }
+  return {
+    update(update) {
+      if (update.focusChanged) {
+        view.dispatch({ effects: setEditorFocused.of(view.hasFocus) })
+      }
+    },
+  }
+})
 
 // ── Widgets ──────────────────────────────────────────────────────
 
@@ -162,6 +180,171 @@ class MermaidWidget extends WidgetType {
 
   eq(other: MermaidWidget): boolean {
     return other.code === this.code
+  }
+
+  ignoreEvent(): boolean {
+    return true
+  }
+}
+
+function appendInline(parent: HTMLElement, text: string): void {
+  for (const span of parseInlineSpans(text)) {
+    parent.appendChild(inlineSpanToDOM(span))
+  }
+}
+
+function inlineSpanToDOM(span: InlineSpan): Node {
+  switch (span.type) {
+    case 'text':
+      return document.createTextNode(span.text)
+    case 'code': {
+      const el = document.createElement('code')
+      el.className = 'notepad-code'
+      el.textContent = span.text
+      return el
+    }
+    case 'strong': {
+      const el = document.createElement('strong')
+      el.textContent = span.text
+      return el
+    }
+    case 'em': {
+      const el = document.createElement('em')
+      el.textContent = span.text
+      return el
+    }
+    case 'del': {
+      const el = document.createElement('del')
+      el.textContent = span.text
+      return el
+    }
+    case 'link': {
+      const el = document.createElement('a')
+      el.className = 'notepad-link-widget'
+      el.textContent = span.text
+      el.href = span.href ?? ''
+      el.title = span.href ?? ''
+      el.addEventListener('click', (e) => {
+        e.preventDefault()
+        const api = (
+          window as unknown as { electronAPI?: { shell?: { openExternal?: (u: string) => void } } }
+        ).electronAPI
+        if (api?.shell?.openExternal) {
+          api.shell.openExternal(span.href ?? '')
+        } else {
+          window.open(span.href ?? '', '_blank', 'noopener')
+        }
+      })
+      return el
+    }
+  }
+}
+
+export class TableWidget extends WidgetType {
+  constructor(
+    readonly source: string,
+    readonly table: ParsedTable,
+    /** Document offset the table source starts at, used to place the caret. */
+    readonly from: number
+  ) {
+    super()
+  }
+
+  toDOM(view: EditorView): HTMLElement {
+    const wrap = document.createElement('div')
+    wrap.className = 'notepad-table-wrap'
+    const table = document.createElement('table')
+    table.className = 'notepad-table'
+    table.title = 'Click a cell to edit'
+
+    const thead = document.createElement('thead')
+    const headRow = document.createElement('tr')
+    this.table.header.forEach((cell, i) => {
+      const th = document.createElement('th')
+      const align = this.table.align[i]
+      if (align) th.style.textAlign = align
+      appendInline(th, cell.text)
+      this.makeEditable(view, th, cell.offset)
+      headRow.appendChild(th)
+    })
+    thead.appendChild(headRow)
+    table.appendChild(thead)
+
+    const tbody = document.createElement('tbody')
+    for (const row of this.table.rows) {
+      const tr = document.createElement('tr')
+      row.forEach((cell, i) => {
+        const td = document.createElement('td')
+        const align = this.table.align[i]
+        if (align) td.style.textAlign = align
+        appendInline(td, cell.text)
+        this.makeEditable(view, td, cell.offset)
+        tr.appendChild(td)
+      })
+      tbody.appendChild(tr)
+    }
+    table.appendChild(tbody)
+
+    wrap.appendChild(table)
+    return wrap
+  }
+
+  /**
+   * A replaced range is unreachable by clicking, so without this the caret can
+   * never get inside a rendered table and it becomes uneditable. Clicking a
+   * cell drops the caret into that cell's source, which reveals the raw
+   * markdown (the decoration yields whenever the cursor is inside the table).
+   */
+  private makeEditable(view: EditorView, cell: HTMLElement, offset: number): void {
+    cell.addEventListener('mousedown', (event) => {
+      event.preventDefault()
+      const pos = Math.min(this.from + offset, view.state.doc.length)
+      view.dispatch({ selection: { anchor: pos }, scrollIntoView: true })
+      view.focus()
+    })
+  }
+
+  eq(other: TableWidget): boolean {
+    return other.source === this.source && other.from === this.from
+  }
+
+  ignoreEvent(): boolean {
+    // The widget handles its own mousedown; letting CodeMirror also process
+    // events inside replaced content puts the caret in the wrong place.
+    return true
+  }
+}
+
+const ALERT_GLYPHS: Record<AlertKind, string> = {
+  note: 'i',
+  tip: '★',
+  important: '!',
+  warning: '▲',
+  caution: '✕',
+}
+
+export class AlertHeaderWidget extends WidgetType {
+  constructor(readonly kind: AlertKind) {
+    super()
+  }
+
+  toDOM(): HTMLElement {
+    const header = document.createElement('span')
+    header.className = `notepad-alert__header notepad-alert__header--${this.kind}`
+    const icon = document.createElement('span')
+    icon.className = 'notepad-alert__icon'
+    icon.textContent = ALERT_GLYPHS[this.kind]
+    icon.setAttribute('aria-hidden', 'true')
+    const label = document.createElement('span')
+    label.className = 'notepad-alert__label'
+    label.textContent = ALERT_LABELS[this.kind]
+    header.appendChild(icon)
+    header.appendChild(label)
+    return header
+  }
+
+  eq(other: AlertHeaderWidget): boolean {
+    return other.kind === this.kind
   }
 
   ignoreEvent(): boolean {
@@ -305,17 +488,47 @@ export function buildDecorations(
         }
 
         case 'FencedCode': {
-          // Show raw fences when cursor is inside the block (focused edit mode only)
-          const isInBlock =
-            focused && !state.readOnly && cursorPos >= node.from && cursorPos <= node.to
-          if (!isInBlock) {
+          const editable = !state.readOnly
+          const openingLine = state.doc.lineAt(node.from)
+          const codeText = node.node.getChild('CodeText')
+
+          // While the caret is on the opening fence line the user is still
+          // typing the ``` and its language, so nothing may render — otherwise
+          // the line collapses out from under them mid-keystroke. Deliberately
+          // not gated on `focused`: that flag only flips on a focus-change
+          // event, so a stale false made a half-typed fence disappear.
+          if (editable && cursorPos >= openingLine.from && cursorPos <= openingLine.to) {
+            return false
+          }
+
+          // A fence with no body yet is a block under construction. Leaving it
+          // raw is what makes it appear only once there is something to show.
+          if (!codeText || codeText.to <= codeText.from) return false
+
+          // Caret in the body: style the code but keep both fences visible, so
+          // the language stays readable and clickable while editing.
+          if (editable && cursorPos >= node.from && cursorPos <= node.to) {
+            let bodyLine = state.doc.lineAt(codeText.from)
+            for (;;) {
+              builder.add(
+                bodyLine.from,
+                bodyLine.from,
+                Decoration.line({ class: 'notepad-code-block-line' })
+              )
+              const nextFrom = bodyLine.to + 1
+              if (nextFrom >= codeText.to) break
+              bodyLine = state.doc.lineAt(nextFrom)
+            }
+            return false
+          }
+
+          {
             const codeInfoNode = node.node.getChild('CodeInfo')
             const lang = codeInfoNode
               ? state.sliceDoc(codeInfoNode.from, codeInfoNode.to).trim()
               : ''
             if (lang === 'mermaid') {
-              const codeText = node.node.getChild('CodeText')
-              const code = codeText ? state.sliceDoc(codeText.from, codeText.to) : ''
+              const code = state.sliceDoc(codeText.from, codeText.to)
               builder.add(
                 node.from,
                 node.to,
@@ -323,8 +536,7 @@ export function buildDecorations(
               )
               return false
             }
-            const codeText = node.node.getChild('CodeText')
-            if (codeText && codeText.to > codeText.from) {
+            {
               // Opening fence: collapse the line to zero-height by adding a line class
               // then replace the fence text (NOT the trailing \n) so the code line
               // keeps its own .cm-line element and gets its line decoration properly.
@@ -359,10 +571,87 @@ export function buildDecorations(
                 Decoration.line({ class: 'notepad-fence-hidden' })
               )
               builder.add(closingLineFrom, node.to, Decoration.replace({}))
-              /* v8 ignore next 2 */
-            } else {
-              builder.add(node.from, node.to, Decoration.replace({}))
             }
+          }
+          return false
+        }
+
+        case 'Table': {
+          // Rendered as a whole: a table only reads as a grid if every row is
+          // replaced at once. Raw pipes come back while the caret is inside,
+          // matching how FencedCode behaves.
+          //
+          // Deliberately not gated on `focused`: that flag only flips on a
+          // focus-change event, so a stale false kept the table rendered even
+          // with the caret inside it — the caret then had nowhere to land and
+          // the table could not be edited at all, by mouse or keyboard.
+          const isInTable = !state.readOnly && cursorPos >= node.from && cursorPos <= node.to
+          if (!isInTable) {
+            const source = state.sliceDoc(node.from, node.to)
+            const parsed = parseTable(source)
+            // Defensive: a Table node always carries a delimiter row, so
+            // parseTable should never reject it. Falling through leaves the
+            // raw pipes visible rather than throwing inside the state field.
+            /* v8 ignore next */
+            if (parsed) {
+              const startLine = state.doc.lineAt(node.from)
+              const endLine = state.doc.lineAt(node.to)
+              // Defensive: a block widget may only replace whole lines. Table
+              // nodes do span whole lines, but a mismatch here would throw and
+              // take the whole editor down, so fall back to an inline replace.
+              /* v8 ignore next */
+              const wholeLines = node.from === startLine.from && node.to === endLine.to
+              builder.add(
+                node.from,
+                node.to,
+                Decoration.replace({
+                  widget: new TableWidget(source, parsed, node.from),
+                  block: wholeLines,
+                })
+              )
+            }
+          }
+          return false
+        }
+
+        case 'Blockquote': {
+          // GitHub alerts (`> [!NOTE]`) are not a lezer construct — they parse
+          // as an ordinary blockquote, so the marker is matched textually here.
+          const firstLine = state.doc.lineAt(node.from)
+          const kind = parseAlertMarker(firstLine.text)
+          if (kind === null) break // ordinary blockquote — let QuoteMark handle it
+
+          // Not gated on `focused`, for the same reason as Table above.
+          const isInAlert = !state.readOnly && cursorPos >= node.from && cursorPos <= node.to
+          if (isInAlert) return false
+
+          let line = firstLine
+          for (;;) {
+            builder.add(
+              line.from,
+              line.from,
+              Decoration.line({ class: `notepad-alert notepad-alert--${kind}` })
+            )
+            if (line.from === firstLine.from) {
+              // Replace the whole marker line with the alert's title row.
+              builder.add(
+                line.from,
+                line.to,
+                Decoration.replace({ widget: new AlertHeaderWidget(kind) })
+              )
+            } else {
+              const markerLength = /^\s*>\s?/.exec(line.text)?.[0].length ?? 0
+              if (markerLength > 0) {
+                builder.add(
+                  line.from,
+                  Math.min(line.from + markerLength, line.to),
+                  Decoration.replace({})
+                )
+              }
+            }
+            const nextFrom = line.to + 1
+            if (nextFrom > node.to) break
+            line = state.doc.lineAt(nextFrom)
           }
           return false
         }

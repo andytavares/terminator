@@ -175,21 +175,28 @@ export async function getNote(db: ExtensionDB, payload: unknown): Promise<Record
   }
 }
 
+/** Push channel announcing a saved note body to every open notepad surface. */
+export const NOTES_CHANGED_CHANNEL = 'terminator.notepad:notes.changed'
+
 export async function autosaveNote(
   db: ExtensionDB,
-  payload: unknown
+  payload: unknown,
+  broadcast?: (channel: string, data: unknown) => void
 ): Promise<Record<string, unknown>> {
   const schema = z.object({
     id: z.string(),
     title: z.string(),
     body: z.string(),
     tags: z.array(z.string()),
+    // Identifies the renderer that saved, so it can ignore the echo of its own
+    // write instead of stomping on newer keystrokes.
+    originId: z.string().optional(),
   })
 
   const parsed = schema.safeParse(payload)
   if (!parsed.success) return VALIDATION_ERROR
 
-  const { id, title, body, tags } = parsed.data
+  const { id, title, body, tags, originId } = parsed.data
   const now = new Date().toISOString()
 
   const existing = await db.get<{ id: string }>('SELECT id FROM notes WHERE id=?', [id])
@@ -207,6 +214,18 @@ export async function autosaveNote(
       id,
     ])
     await reconcileTags(tx, id, mergedTags)
+  })
+
+  // The docked panel and a popped-out note window are separate renderers with
+  // separate in-memory body caches. Without this push each keeps serving (and
+  // re-saving) its own stale copy, so the same note shows different content.
+  broadcast?.(NOTES_CHANGED_CHANNEL, {
+    id,
+    title,
+    body,
+    tags: mergedTags,
+    updatedAt: now,
+    originId: originId ?? null,
   })
 
   return { data: { updatedAt: now } }
@@ -350,7 +369,9 @@ export function registerNotesIpcHandlers(api: ExtensionAPI, db: ExtensionDB): ()
   handle('terminator.notepad:notes.create', (payload) => createNote(db, payload))
   handle('terminator.notepad:notes.list', (payload) => listNotes(db, payload))
   handle('terminator.notepad:notes.get', (payload) => getNote(db, payload))
-  handle('terminator.notepad:notes.autosave', (payload) => autosaveNote(db, payload))
+  handle('terminator.notepad:notes.autosave', (payload) =>
+    autosaveNote(db, payload, (channel, data) => api.window.broadcast(channel, data))
+  )
   handle('terminator.notepad:notes.archive', (payload) => archiveNote(db, payload))
   handle('terminator.notepad:notes.restore', (payload) => restoreNote(db, payload))
   handle('terminator.notepad:notes.hardDelete', (payload) => hardDeleteNote(db, payload))

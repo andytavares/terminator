@@ -15,10 +15,12 @@ import { SearchOverlay } from './SearchOverlay'
 import {
   NoteEditor,
   applyAnchors,
+  applyExternalDoc,
   scrollToAnchor,
   setEditorHoverAnchor,
   type SelectionAnchor,
 } from '../editor/NoteEditor'
+import { ORIGIN_ID, onForeignNoteChange } from '../editor/noteSync'
 import { reanchorComment } from '../editor/reanchor'
 import { commentAnchorField } from '../editor/commentField'
 import type { EditorView } from '@codemirror/view'
@@ -68,11 +70,13 @@ export function NotepadView(): React.JSX.Element {
     bodyDraft,
     isDirty,
     saveStatus,
+    previewMode,
     setActiveNote,
     markDirty,
     markSaving,
     markSaved,
     markError,
+    togglePreviewMode,
   } = useEditorStore()
   const { comments, setComments } = useCommentsStore()
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -306,6 +310,7 @@ export function NotepadView(): React.JSX.Element {
             title,
             body: bodyDraft,
             tags: n?.tags ?? [],
+            originId: ORIGIN_ID,
           })
           .catch((err) => console.error('[notepad] flush autosave failed', err))
       } else if (autosaveTimer.current) {
@@ -314,6 +319,26 @@ export function NotepadView(): React.JSX.Element {
       }
     }
   }, [selectedNoteId, setActiveNote, setComments])
+
+  // Adopt bodies saved by another surface (a popped-out note window) so the
+  // panel never serves — or re-saves — a stale copy of the same note.
+  useEffect(() => {
+    return onForeignNoteChange((event) => {
+      useNotesStore.getState().setBodyCache(event.id, event.body)
+      useNotesStore.getState().patchNote(event.id, {
+        title: event.title,
+        updatedAt: event.updatedAt,
+        bodyPreview: event.body.slice(0, 120),
+        tags: event.tags,
+      })
+      if (event.id !== activeIdRef.current) return
+      // A local edit still in flight is newer than this push — leave it alone;
+      // its own save will win and re-broadcast.
+      if (useEditorStore.getState().isDirty) return
+      applyExternalDoc(editorViewRef.current, event.body)
+      setActiveNote(event.id, event.body)
+    })
+  }, [setActiveNote])
 
   const scheduleAutosave = useCallback(
     (newBody: string) => {
@@ -333,6 +358,7 @@ export function NotepadView(): React.JSX.Element {
             title: derivedTitle,
             body: newBody,
             tags: note?.tags ?? [],
+            originId: ORIGIN_ID,
           })
           markSaved()
           // Keep the sidebar and body cache in sync so navigate-back never loses content
@@ -567,6 +593,13 @@ export function NotepadView(): React.JSX.Element {
           <span className="notepad-view__save-status">{saveStatusLabel()}</span>
           <button
             className="notepad-btn-ghost"
+            onClick={togglePreviewMode}
+            title={previewMode ? 'Show raw markdown source' : 'Show the rendered live preview'}
+          >
+            {previewMode ? 'Markdown' : 'Live'}
+          </button>
+          <button
+            className="notepad-btn-ghost"
             onClick={() => setReadingMode((v) => !v)}
             title={readingMode ? 'Switch to edit mode' : 'Switch to reading mode'}
           >
@@ -621,6 +654,7 @@ export function NotepadView(): React.JSX.Element {
                 if (!sel) setComposingAnchor(null)
               }}
               readOnly={readingMode}
+              sourceMode={!previewMode}
             />
             {pendingAnchor && !composingAnchor && (
               <button

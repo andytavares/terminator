@@ -1,24 +1,35 @@
 import React, { useState } from 'react'
 import { Check } from 'lucide-react'
 import type { IndexedProject } from '../vault/types'
+import { logReviewAction } from '../utils/review-log'
 
 interface Props {
   activeProjects: IndexedProject[]
   onComplete: () => void
+  reviewId: string | null
 }
 
 export function WeeklyReviewStep3Projects({
   activeProjects,
   onComplete,
+  reviewId,
 }: Props): React.JSX.Element {
   const [projects, setProjects] = useState(activeProjects)
 
-  async function updateStatus(filePath: string, status: string) {
+  async function updateStatus(project: IndexedProject, status: string) {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:update-project-status', {
-      projectFilePath: filePath,
+      projectFilePath: project.filePath,
       status,
     })
-    setProjects((prev) => prev.filter((p) => p.filePath !== filePath))
+    logReviewAction(reviewId, {
+      step: 3,
+      action: 'project-status',
+      entityType: 'project',
+      entityId: project.id,
+      entityLabel: project.name,
+      detail: status,
+    })
+    setProjects((prev) => prev.filter((p) => p.filePath !== project.filePath))
   }
 
   return (
@@ -41,13 +52,13 @@ export function WeeklyReviewStep3Projects({
                 <>
                   <button
                     className="tv-btn tv-btn--secondary"
-                    onClick={() => updateStatus(project.filePath, 'someday')}
+                    onClick={() => updateStatus(project, 'someday')}
                   >
                     Someday
                   </button>
                   <button
                     className="tv-btn tv-btn--secondary"
-                    onClick={() => updateStatus(project.filePath, 'archived')}
+                    onClick={() => updateStatus(project, 'archived')}
                   >
                     Archive
                   </button>
@@ -55,7 +66,7 @@ export function WeeklyReviewStep3Projects({
               ) : (
                 <button
                   className="tv-btn tv-btn--primary"
-                  onClick={() => updateStatus(project.filePath, 'active')}
+                  onClick={() => updateStatus(project, 'active')}
                 >
                   Keep <Check size={14} />
                 </button>

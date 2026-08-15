@@ -2,9 +2,10 @@ import React, { useState } from 'react'
 
 interface Props {
   onComplete: () => void
+  reviewId: string | null
 }
 
-export function WeeklyReviewStep6Reflect({ onComplete }: Props): React.JSX.Element {
+export function WeeklyReviewStep6Reflect({ onComplete, reviewId }: Props): React.JSX.Element {
   const [worked, setWorked] = useState('')
   const [didnt, setDidnt] = useState('')
   const [tryNext, setTryNext] = useState('')
@@ -12,12 +13,19 @@ export function WeeklyReviewStep6Reflect({ onComplete }: Props): React.JSX.Eleme
 
   async function finishReview() {
     setSaving(true)
-    const d = new Date()
-    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    const note = `weekly review completed ${today}: worked: ${worked || '—'} | didn't: ${didnt || '—'} | try: ${tryNext || '—'}`
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:add-task', {
-      text: note,
-    })
+    // The reflection is stored on the review record itself. It used to be
+    // flattened into a single inbox task, which made the review unreadable
+    // afterwards and cluttered the inbox.
+    if (reviewId) {
+      await window.electronAPI.extensionBridge
+        .invoke('task-vault:review:complete', {
+          reviewId,
+          worked,
+          didntWork: didnt,
+          tryNext,
+        })
+        .catch((err) => console.error('[task-vault] failed to complete review', err))
+    }
     setSaving(false)
     onComplete()
   }

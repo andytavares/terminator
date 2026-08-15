@@ -263,6 +263,83 @@ Get cached calendar events for the surrounding 14-day window.
 
 ---
 
+## Weekly Review History
+
+The weekly review is persisted so it can be revisited and exported. A review row
+is created (or resumed) when the wizard mounts; every decision taken during the
+review is recorded against it.
+
+### `task-vault:review:start`
+
+Return the open review, creating one if none is in progress. Resuming rather
+than always inserting keeps a mid-review reload from forking the record.
+
+**Request**: `{}`
+
+**Response**: `{ review: WeeklyReview; resumed: boolean }`
+
+### `task-vault:review:log`
+
+Record one action taken during a review.
+
+**Request**:
+
+```typescript
+{
+  reviewId: string
+  step: number // 1-6
+  action:
+    | 'captured'
+    | 'inbox-processed'
+    | 'project-status'
+    | 'task-promoted'
+    | 'task-backlogged'
+    | 'task-archived'
+    | 'task-deleted'
+    | 'task-kept'
+  entityType: 'task' | 'project'
+  entityId?: string | null
+  entityLabel: string
+  detail?: string | null
+}
+```
+
+**Response**: `{ action: WeeklyReviewAction } | { error: 'VALIDATION_ERROR' }`
+
+### `task-vault:review:complete`
+
+Store the step 6 reflection answers and close the review.
+
+**Request**: `{ reviewId: string; worked?: string; didntWork?: string; tryNext?: string }`
+
+**Response**: `{ ok: true } | { error: 'VALIDATION_ERROR' }`
+
+### `task-vault:review:list`
+
+List past reviews, newest first, each with its recorded action count.
+
+**Request**: `{ limit?: number }` (default 50, max 500)
+
+**Response**: `{ reviews: WeeklyReviewSummary[] }`
+
+### `task-vault:review:get`
+
+Fetch one review with all of its recorded actions.
+
+**Request**: `{ reviewId: string }`
+
+**Response**: `{ review: WeeklyReviewDetail } | { error: 'REVIEW_NOT_FOUND' | 'VALIDATION_ERROR' }`
+
+### `task-vault:review:export`
+
+Write a review to a Markdown file chosen through a save dialog.
+
+**Request**: `{ reviewId: string }`
+
+**Response**: `{ filePath: string } | { canceled: true } | { error: string }`
+
+---
+
 ## Push Channels (Main → Renderer)
 
 These are sent from main process to renderer when vault state changes.

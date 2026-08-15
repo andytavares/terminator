@@ -6,6 +6,7 @@ import { registerProjectsIpcHandlers } from './ipc/projects.ipc.js'
 import { registerLinksIpcHandlers } from './ipc/links.ipc.js'
 import { registerKanbanIpcHandlers } from './ipc/kanban.ipc.js'
 import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
+import { registerWeeklyReviewIpcHandlers } from './ipc/weekly-review.ipc.js'
 import { applyTaskVaultSchema, applyTaskVaultMigrations } from './vault/db.js'
 import { backfillRecurringTasks } from './vault/ensure-next-occurrence.js'
 import { startTaskScheduler, setSchedulerTick } from './notifications/task-scheduler.js'
@@ -180,6 +181,8 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   disposables.push({ dispose: disposeKanbanIpc })
   const disposeAdminIpc = registerAdminIpcHandlers(api, db)
   disposables.push({ dispose: disposeAdminIpc })
+  const disposeWeeklyReviewIpc = registerWeeklyReviewIpcHandlers(api, db)
+  disposables.push({ dispose: disposeWeeklyReviewIpc })
 
   try {
     await applyTaskVaultSchema(db)

@@ -56,6 +56,19 @@ function createWindow(): void {
 
   viewHost = new ExtensionViewHost(mainWindow, join(__dirname, '../preload/webview.js'))
 
+  // Returning to Terminator from another app must land the caret back where the
+  // user left it — no second click. Electron restores focus to the window's own
+  // webContents (and on macOS not even that), so the focused surface is
+  // snapshotted on blur and re-focused explicitly on focus. The snapshot has to
+  // happen on blur: by 'focus' time Electron has already overwritten the record.
+  mainWindow.webContents.on('focus', () => viewHost?.noteFocused(null))
+  mainWindow.on('blur', () => viewHost?.captureFocusTarget())
+  mainWindow.on('focus', () => {
+    // Deferred a tick so Electron's own RestoreFocus runs first and does not
+    // immediately undo the restore.
+    setImmediate(() => viewHost?.restoreFocus())
+  })
+
   if (process.env.NODE_ENV === 'development' || process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] || 'http://localhost:5173')
   } else {
@@ -337,8 +350,21 @@ app.whenReady().then(async () => {
     ptyManager,
     db: getAppDb(),
     broadcastToWindows: (channel, data) => {
-      mainWindow?.webContents.send(channel, data)
-      viewHost?.broadcastToAll(channel, data)
+      // Auxiliary windows (extension pop-outs) are real BrowserWindows and must
+      // receive pushes too, otherwise a pop-out and the docked panel drift apart.
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.webContents.send(channel, data)
+      }
+      // The main window's send is patched above to relay to extension
+      // WebContentsViews for every channel except the two it filters out — only
+      // relay explicitly when that patch did not already do it, or the views
+      // would receive the same push twice.
+      const relayedByMainWindow =
+        !!mainWindow &&
+        !mainWindow.isDestroyed() &&
+        !channel.startsWith('terminal:') &&
+        channel !== 'workspace:changed'
+      if (!relayedByMainWindow) viewHost?.broadcastToAll(channel, data)
     },
     focusExtensionView: (extId, viewParam) => viewHost?.focusView(extId, viewParam),
     bridge: {

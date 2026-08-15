@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
 import { createIpcRegistrar } from './register'
+import { lastCompletedReviewDate } from '../vault/weekly-review-repository'
 import { randomUUID } from '../vault/db'
 import { toDisplayName } from '../vault/tags'
 import { broadcast } from '../notifications/task-scheduler.js'
@@ -131,7 +132,7 @@ export function registerProjectsIpcHandlers(api: ExtensionAPI, db: ExtensionDB):
       completedLastWeek,
       staleTasks,
       staleDaysThreshold,
-      lastReviewDate: null,
+      lastReviewDate: await lastCompletedReviewDate(db),
     }
   })
 
