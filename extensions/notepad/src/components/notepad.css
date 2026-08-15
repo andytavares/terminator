@@ -1600,6 +1600,78 @@
   color: var(--tm-text-secondary, rgba(255, 255, 255, 0.55));
 }
 
+/* ── Tables ─────────────────────────────────────────────────────── */
+.notepad-table-wrap {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.notepad-table {
+  border-collapse: collapse;
+  font-size: 0.95em;
+  min-width: 100%;
+}
+
+.notepad-table th,
+.notepad-table td {
+  border: 1px solid var(--tm-border-strong, rgba(255, 255, 255, 0.12));
+  padding: 5px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.notepad-table th {
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.notepad-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ── Alerts (GitHub callouts) ───────────────────────────────────── */
+.notepad-alert {
+  border-left: 3px solid var(--notepad-alert-color);
+  padding-left: 12px;
+  background: color-mix(in srgb, var(--notepad-alert-color) 8%, transparent);
+}
+
+.notepad-alert--note {
+  --notepad-alert-color: #58a6ff;
+}
+.notepad-alert--tip {
+  --notepad-alert-color: #3fb950;
+}
+.notepad-alert--important {
+  --notepad-alert-color: #a371f7;
+}
+.notepad-alert--warning {
+  --notepad-alert-color: #d29922;
+}
+.notepad-alert--caution {
+  --notepad-alert-color: #f85149;
+}
+
+.notepad-alert__header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--notepad-alert-color);
+}
+
+.notepad-alert__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 1;
+}
+
 /* ── Comment cards ──────────────────────────────────────────────── */
 .notepad-comment {
   border: 1px solid var(--tm-border, rgba(255, 255, 255, 0.1));

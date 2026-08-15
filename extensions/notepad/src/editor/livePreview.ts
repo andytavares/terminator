@@ -7,6 +7,15 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
+import {
+  ALERT_LABELS,
+  parseAlertMarker,
+  parseInlineSpans,
+  parseTable,
+  type AlertKind,
+  type InlineSpan,
+  type ParsedTable,
+} from './markdownTable'
 
 // Track editor focus so cursor-line raw reveal only activates after the user
 // has actually focused the editor (not on initial mount).
@@ -162,6 +171,149 @@ class MermaidWidget extends WidgetType {
 
   eq(other: MermaidWidget): boolean {
     return other.code === this.code
+  }
+
+  ignoreEvent(): boolean {
+    return true
+  }
+}
+
+function appendInline(parent: HTMLElement, text: string): void {
+  for (const span of parseInlineSpans(text)) {
+    parent.appendChild(inlineSpanToDOM(span))
+  }
+}
+
+function inlineSpanToDOM(span: InlineSpan): Node {
+  switch (span.type) {
+    case 'text':
+      return document.createTextNode(span.text)
+    case 'code': {
+      const el = document.createElement('code')
+      el.className = 'notepad-code'
+      el.textContent = span.text
+      return el
+    }
+    case 'strong': {
+      const el = document.createElement('strong')
+      el.textContent = span.text
+      return el
+    }
+    case 'em': {
+      const el = document.createElement('em')
+      el.textContent = span.text
+      return el
+    }
+    case 'del': {
+      const el = document.createElement('del')
+      el.textContent = span.text
+      return el
+    }
+    case 'link': {
+      const el = document.createElement('a')
+      el.className = 'notepad-link-widget'
+      el.textContent = span.text
+      el.href = span.href ?? ''
+      el.title = span.href ?? ''
+      el.addEventListener('click', (e) => {
+        e.preventDefault()
+        const api = (
+          window as unknown as { electronAPI?: { shell?: { openExternal?: (u: string) => void } } }
+        ).electronAPI
+        if (api?.shell?.openExternal) {
+          api.shell.openExternal(span.href ?? '')
+        } else {
+          window.open(span.href ?? '', '_blank', 'noopener')
+        }
+      })
+      return el
+    }
+  }
+}
+
+export class TableWidget extends WidgetType {
+  constructor(
+    readonly source: string,
+    readonly table: ParsedTable
+  ) {
+    super()
+  }
+
+  toDOM(): HTMLElement {
+    const wrap = document.createElement('div')
+    wrap.className = 'notepad-table-wrap'
+    const table = document.createElement('table')
+    table.className = 'notepad-table'
+
+    const thead = document.createElement('thead')
+    const headRow = document.createElement('tr')
+    this.table.header.forEach((cell, i) => {
+      const th = document.createElement('th')
+      const align = this.table.align[i]
+      if (align) th.style.textAlign = align
+      appendInline(th, cell)
+      headRow.appendChild(th)
+    })
+    thead.appendChild(headRow)
+    table.appendChild(thead)
+
+    const tbody = document.createElement('tbody')
+    for (const row of this.table.rows) {
+      const tr = document.createElement('tr')
+      row.forEach((cell, i) => {
+        const td = document.createElement('td')
+        const align = this.table.align[i]
+        if (align) td.style.textAlign = align
+        appendInline(td, cell)
+        tr.appendChild(td)
+      })
+      tbody.appendChild(tr)
+    }
+    table.appendChild(tbody)
+
+    wrap.appendChild(table)
+    return wrap
+  }
+
+  eq(other: TableWidget): boolean {
+    return other.source === this.source
+  }
+
+  ignoreEvent(): boolean {
+    return true
+  }
+}
+
+const ALERT_GLYPHS: Record<AlertKind, string> = {
+  note: 'i',
+  tip: '★',
+  important: '!',
+  warning: '▲',
+  caution: '✕',
+}
+
+export class AlertHeaderWidget extends WidgetType {
+  constructor(readonly kind: AlertKind) {
+    super()
+  }
+
+  toDOM(): HTMLElement {
+    const header = document.createElement('span')
+    header.className = `notepad-alert__header notepad-alert__header--${this.kind}`
+    const icon = document.createElement('span')
+    icon.className = 'notepad-alert__icon'
+    icon.textContent = ALERT_GLYPHS[this.kind]
+    icon.setAttribute('aria-hidden', 'true')
+    const label = document.createElement('span')
+    label.className = 'notepad-alert__label'
+    label.textContent = ALERT_LABELS[this.kind]
+    header.appendChild(icon)
+    header.appendChild(label)
+    return header
+  }
+
+  eq(other: AlertHeaderWidget): boolean {
+    return other.kind === this.kind
   }
 
   ignoreEvent(): boolean {
@@ -363,6 +515,82 @@ export function buildDecorations(
             } else {
               builder.add(node.from, node.to, Decoration.replace({}))
             }
+          }
+          return false
+        }
+
+        case 'Table': {
+          // Rendered as a whole: a table only reads as a grid if every row is
+          // replaced at once. Raw pipes come back while the cursor is inside,
+          // matching how FencedCode behaves.
+          const isInTable =
+            focused && !state.readOnly && cursorPos >= node.from && cursorPos <= node.to
+          if (!isInTable) {
+            const source = state.sliceDoc(node.from, node.to)
+            const parsed = parseTable(source)
+            // Defensive: a Table node always carries a delimiter row, so
+            // parseTable should never reject it. Falling through leaves the
+            // raw pipes visible rather than throwing inside the state field.
+            /* v8 ignore next */
+            if (parsed) {
+              const startLine = state.doc.lineAt(node.from)
+              const endLine = state.doc.lineAt(node.to)
+              // Defensive: a block widget may only replace whole lines. Table
+              // nodes do span whole lines, but a mismatch here would throw and
+              // take the whole editor down, so fall back to an inline replace.
+              /* v8 ignore next */
+              const wholeLines = node.from === startLine.from && node.to === endLine.to
+              builder.add(
+                node.from,
+                node.to,
+                Decoration.replace({
+                  widget: new TableWidget(source, parsed),
+                  block: wholeLines,
+                })
+              )
+            }
+          }
+          return false
+        }
+
+        case 'Blockquote': {
+          // GitHub alerts (`> [!NOTE]`) are not a lezer construct — they parse
+          // as an ordinary blockquote, so the marker is matched textually here.
+          const firstLine = state.doc.lineAt(node.from)
+          const kind = parseAlertMarker(firstLine.text)
+          if (kind === null) break // ordinary blockquote — let QuoteMark handle it
+
+          const isInAlert =
+            focused && !state.readOnly && cursorPos >= node.from && cursorPos <= node.to
+          if (isInAlert) return false
+
+          let line = firstLine
+          for (;;) {
+            builder.add(
+              line.from,
+              line.from,
+              Decoration.line({ class: `notepad-alert notepad-alert--${kind}` })
+            )
+            if (line.from === firstLine.from) {
+              // Replace the whole marker line with the alert's title row.
+              builder.add(
+                line.from,
+                line.to,
+                Decoration.replace({ widget: new AlertHeaderWidget(kind) })
+              )
+            } else {
+              const markerLength = /^\s*>\s?/.exec(line.text)?.[0].length ?? 0
+              if (markerLength > 0) {
+                builder.add(
+                  line.from,
+                  Math.min(line.from + markerLength, line.to),
+                  Decoration.replace({})
+                )
+              }
+            }
+            const nextFrom = line.to + 1
+            if (nextFrom > node.to) break
+            line = state.doc.lineAt(nextFrom)
           }
           return false
         }
