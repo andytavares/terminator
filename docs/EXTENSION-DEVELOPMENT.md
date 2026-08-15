@@ -268,6 +268,14 @@ const disposable = api.keyboard.register('CmdOrCtrl+Shift+G', () => {
 
 Use [Electron accelerator syntax](https://www.electronjs.org/docs/latest/api/accelerator).
 
+#### `Esc` and the exit gesture
+
+Your extension keeps `Esc` for its own dismissals — closing a dropdown, cancelling an inline edit, dismissing a dialog. Nothing is intercepted, and no `preventDefault()` call is required or inspected.
+
+Terminator layers one gesture on top: **two `Esc` presses within 500 ms** exit the extension and return the user to their terminal. The listener that detects it lives in the core-owned webview preload, is bubble-phase, and is passive — your handlers still see both presses and run normally. A sidebar panel closes in place; any full-screen surface (global, workspace, or project tab) closes and reveals the terminal.
+
+You get this for free. Do not implement it yourself, and do not swallow `Esc` at the window level (`stopPropagation` on a `window` capture listener would suppress the gesture inside your panel). See [ADR-026](adr/026-double-escape-extension-exit.md).
+
 ---
 
 ### `api.terminal` — Terminal Session Events
