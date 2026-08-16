@@ -226,24 +226,31 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 
 ## 12. Keyboard Shortcuts
 
-| Action                              | Shortcut                 |
-| ----------------------------------- | ------------------------ |
-| Toggle sidebar                      | `Cmd+B`                  |
-| Focus workspace 1–9                 | `Cmd+1`–`Cmd+9`          |
-| Cycle workspaces                    | `Cmd++` / `Cmd+-`        |
-| New tab                             | `Cmd+T`                  |
-| New scratch terminal                | `Cmd+Shift+T`            |
-| Close focused pane / active tab     | `Cmd+W`                  |
-| Split pane vertically               | `Cmd+D`                  |
-| Split pane horizontally             | `Cmd+Shift+D`            |
-| Cycle tabs left/right               | `Cmd+Left` / `Cmd+Right` |
-| Clear terminal                      | `Cmd+K`                  |
-| Command palette                     | `Cmd+P`                  |
-| Settings                            | `Cmd+,`                  |
-| Toggle Git sidebar                  | `Cmd+Shift+G`            |
-| Toggle Overview screen              | `Cmd+Shift+E`            |
-| Send newline (always)               | `Cmd+Enter`              |
-| Send newline (bracketed paste mode) | `Shift+Enter`            |
+| Action                               | Shortcut                 |
+| ------------------------------------ | ------------------------ |
+| Toggle sidebar                       | `Cmd+B`                  |
+| Focus workspace 1–9                  | `Cmd+1`–`Cmd+9`          |
+| Cycle workspaces                     | `Cmd++` / `Cmd+-`        |
+| New tab                              | `Cmd+T`                  |
+| New scratch terminal                 | `Cmd+Shift+T`            |
+| Close focused pane / active tab      | `Cmd+W`                  |
+| Split pane vertically                | `Cmd+D`                  |
+| Split pane horizontally              | `Cmd+Shift+D`            |
+| Cycle tabs left/right                | `Cmd+Left` / `Cmd+Right` |
+| Clear terminal                       | `Cmd+K`                  |
+| Command palette                      | `Cmd+P`                  |
+| Settings                             | `Cmd+,`                  |
+| Toggle Git sidebar                   | `Cmd+Shift+G`            |
+| Toggle Overview screen               | `Cmd+Shift+E`            |
+| Send newline (always)                | `Cmd+Enter`              |
+| Send newline (bracketed paste mode)  | `Shift+Enter`            |
+| Leave an extension, back to terminal | `Esc` `Esc`              |
+
+### Leaving an extension
+
+Press `Esc` twice in quick succession (within half a second) inside any extension — Notes, Task Vault, Git Integration, SpecKit Pilot, Remote Control — and Terminator returns you to the terminal session you were last in. Extension sidebar panels close in place; full-screen extension tabs close and reveal the terminal behind them.
+
+It takes two presses because extensions use a single `Esc` for their own dismissals — closing a dropdown, cancelling a rename, dismissing a dialog. The first press still goes to the extension, so nothing is stolen; the second is what leaves. `Esc` inside a terminal always goes to the shell and never exits anything.
 
 ---
 

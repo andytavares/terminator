@@ -352,6 +352,79 @@ describe('useExtensionRegistry', () => {
       expect(useExtensionRegistry.getState().pendingNavigations.size).toBe(0)
     })
   })
+
+  describe('exitExtensionToTerminal', () => {
+    it('clears an active global tab and reports that it exited', () => {
+      useExtensionRegistry.getState().setActiveGlobalTab('notepad')
+      expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(true)
+      expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
+    })
+
+    it('clears an active workspace tab', () => {
+      useExtensionRegistry.getState().setActiveWorkspaceTab('speckit-pilot')
+      expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(true)
+      expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBeNull()
+    })
+
+    it('clears an active project tab', () => {
+      useExtensionRegistry.getState().setActiveProjectTab('git-integration')
+      expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(true)
+      expect(useExtensionRegistry.getState().activeProjectTabId).toBeNull()
+    })
+
+    it('clears every full-screen surface in a single call', () => {
+      useExtensionRegistry.setState({
+        activeGlobalTabId: 'notepad',
+        activeWorkspaceTabId: 'speckit-pilot',
+        activeProjectTabId: 'git-integration',
+      })
+      expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(true)
+      const state = useExtensionRegistry.getState()
+      expect(state.activeGlobalTabId).toBeNull()
+      expect(state.activeWorkspaceTabId).toBeNull()
+      expect(state.activeProjectTabId).toBeNull()
+    })
+
+    it('never exits the core Overview tab', () => {
+      useExtensionRegistry.getState().setActiveGlobalTab('core.overview')
+      expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(false)
+      expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.overview')
+    })
+
+    it('closes the named sidebar panel when it is the surface being exited', () => {
+      useExtensionRegistry
+        .getState()
+        .registerSidebarPanel({ id: 'git-integration', label: 'Git', component: NullComponent })
+      useExtensionRegistry.getState().togglePanel('git-integration')
+      expect(useExtensionRegistry.getState().exitExtensionToTerminal('git-integration')).toBe(true)
+      expect(useExtensionRegistry.getState().openPanels.has('git-integration')).toBe(false)
+    })
+
+    it('leaves other open sidebar panels alone', () => {
+      const registry = useExtensionRegistry.getState()
+      registry.registerSidebarPanel({
+        id: 'git-integration',
+        label: 'Git',
+        component: NullComponent,
+      })
+      registry.registerSidebarPanel({ id: 'task-vault', label: 'Vault', component: NullComponent })
+      registry.togglePanel('git-integration')
+      registry.togglePanel('task-vault')
+      useExtensionRegistry.getState().exitExtensionToTerminal('git-integration')
+      expect(useExtensionRegistry.getState().openPanels.has('task-vault')).toBe(true)
+    })
+
+    it('reports false when nothing is open to exit', () => {
+      expect(useExtensionRegistry.getState().exitExtensionToTerminal()).toBe(false)
+    })
+
+    it('ignores a sidebar panel id that is not open', () => {
+      useExtensionRegistry
+        .getState()
+        .registerSidebarPanel({ id: 'git-integration', label: 'Git', component: NullComponent })
+      expect(useExtensionRegistry.getState().exitExtensionToTerminal('git-integration')).toBe(false)
+    })
+  })
 })
 
 // ─── matchesAccelerator ────────────────────────────────────────────────────────

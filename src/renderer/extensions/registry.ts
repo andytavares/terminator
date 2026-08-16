@@ -26,6 +26,8 @@ export interface SidebarPanelRegistration {
   label: string
   component: ComponentType<{ repoRoot: string | null; onClose: () => void }>
   defaultOpen?: boolean
+  /** Resolved manifest `view` param, used to tell this surface from the extension's others. */
+  view?: string
 }
 
 export interface ProjectTabRegistration {
@@ -87,6 +89,7 @@ interface ExtensionRegistry {
   updateCommand(id: string, patch: Partial<Omit<CommandRegistration, 'id' | 'action'>>): void
   updateGlobalTab(id: string, patch: Partial<Omit<GlobalTabRegistration, 'id' | 'component'>>): void
   togglePanel(panelId: string): void
+  exitExtensionToTerminal(sidebarPanelId?: string): boolean
   setActiveProjectTab(tabId: string | null): void
   setActiveGlobalTab(tabId: string | null): void
   setActiveWorkspaceTab(tabId: string | null): void
@@ -108,7 +111,11 @@ export type ExtensionRendererAPI = Pick<
   | 'updateCommand'
 >
 
-export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
+// Core-contributed surfaces use this id prefix (see the sort weight in App.tsx).
+// They are not extensions, so the Escape exit gesture leaves them alone.
+const CORE_SURFACE_PREFIX = 'core.'
+
+export const useExtensionRegistry = create<ExtensionRegistry>((set, get) => ({
   sidebarPanels: new Map(),
   projectTabs: new Map(),
   globalTabs: new Map(),
@@ -242,6 +249,44 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set) => ({
       else open.add(panelId)
       return { openPanels: open }
     })
+  },
+
+  /**
+   * Dismisses the extension surface the user is in so the terminal shows again.
+   * `sidebarPanelId` is passed only when the exit came from a sidebar panel —
+   * those sit beside the terminal rather than replacing it, so closing the panel
+   * is the whole exit. Everything else is a full-screen surface: clearing all
+   * three tab slots at once lands on TerminalPane, which still holds the
+   * project's activeSessionId, i.e. the session the user left.
+   *
+   * Returns false when there was nothing to exit, so the caller can skip
+   * re-focusing the terminal.
+   */
+  exitExtensionToTerminal(sidebarPanelId) {
+    const s = get()
+
+    if (sidebarPanelId) {
+      if (!s.openPanels.has(sidebarPanelId)) return false
+      s.togglePanel(sidebarPanelId)
+      return true
+    }
+
+    const isExitable = (id: string | null): boolean =>
+      id !== null && !id.startsWith(CORE_SURFACE_PREFIX)
+    const exiting =
+      isExitable(s.activeGlobalTabId) ||
+      isExitable(s.activeWorkspaceTabId) ||
+      isExitable(s.activeProjectTabId)
+    if (!exiting) return false
+
+    set((prev) => ({
+      activeGlobalTabId: isExitable(prev.activeGlobalTabId) ? null : prev.activeGlobalTabId,
+      activeWorkspaceTabId: isExitable(prev.activeWorkspaceTabId)
+        ? null
+        : prev.activeWorkspaceTabId,
+      activeProjectTabId: isExitable(prev.activeProjectTabId) ? null : prev.activeProjectTabId,
+    }))
+    return true
   },
 
   setActiveProjectTab(tabId) {

@@ -305,6 +305,24 @@ export class ExtensionViewHost {
     }
   }
 
+  /**
+   * Identifies which extension surface a webContents belongs to. Extension
+   * views are separate webContents, so IPC arriving from one carries no
+   * identity beyond the sender — this is how the main process attributes it.
+   */
+  findViewByWebContents(
+    webContents: Electron.WebContents
+  ): { extensionId: string; viewParam: string } | null {
+    for (const entries of this.views.values()) {
+      for (const entry of entries) {
+        if (entry.view.webContents === webContents) {
+          return { extensionId: entry.extensionId, viewParam: entry.viewParam }
+        }
+      }
+    }
+    return null
+  }
+
   hasView(extensionId: string, viewParam: string): boolean {
     return !!this.views.get(extensionId)?.some((e) => e.viewParam === viewParam)
   }

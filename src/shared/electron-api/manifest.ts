@@ -407,6 +407,16 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     toHandlerArgs: (args) => [(args[0] as { id: string }).id],
     remote: 'omit',
   },
+  // Emitted when the double-Escape exit gesture fires inside an extension
+  // WebContentsView. Native only: remote extension panels are iframes in the
+  // host page, so their Escape never leaves the renderer.
+  {
+    path: 'extensionEvents.onExtensionExitToTerminal',
+    kind: 'event',
+    channel: 'extension:exit-to-terminal',
+    toHandlerArgs: (args) => [args[0]],
+    remote: 'omit',
+  },
 
   // ── app ───────────────────────────────────────────────────────────────────
   { path: 'app.getInfo', kind: 'invoke', channel: 'app:get-info' },

@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useModalStore } from '../stores/modal.store'
+import { useExtensionRegistry } from '../extensions/registry'
+import { createDoubleEscapeDetector } from '../../shared/double-escape'
+import { focusActiveTerminal } from '../lib/focus-terminal'
 
 interface Props {
   extensionId: string
@@ -14,9 +17,44 @@ function isElectronLocal(): boolean {
 }
 
 function RemoteIframe({ extensionId, viewParam, repoRoot, isActive }: Props): JSX.Element {
+  const iframeRef = useRef<HTMLIFrameElement>(null)
   const params = new URLSearchParams({ viewParam })
   if (repoRoot) params.set('repoRoot', repoRoot)
   const src = `/ext/${extensionId}/?${params.toString()}`
+
+  // Native panels get the double-Escape exit from the webview preload; browser
+  // clients have no preload, so the host page listens on the same-origin frame.
+  useEffect(() => {
+    const iframe = iframeRef.current
+    if (!iframe) return
+    const detector = createDoubleEscapeDetector()
+
+    function handleKeyDown(e: KeyboardEvent): void {
+      if (e.key !== 'Escape') return
+      if (!detector.register(performance.now())) return
+      const { sidebarPanels, exitExtensionToTerminal } = useExtensionRegistry.getState()
+      const isSidebar = sidebarPanels.get(extensionId)?.view === viewParam
+      if (exitExtensionToTerminal(isSidebar ? extensionId : undefined)) {
+        setTimeout(focusActiveTerminal, 0)
+      }
+    }
+
+    // The frame swaps its window on navigation, so re-attach on every load.
+    const attached = new Set<Window>()
+    const attach = (): void => {
+      const win = iframe.contentWindow
+      if (!win || attached.has(win)) return
+      win.addEventListener('keydown', handleKeyDown)
+      attached.add(win)
+    }
+    attach()
+    iframe.addEventListener('load', attach)
+
+    return () => {
+      iframe.removeEventListener('load', attach)
+      for (const win of attached) win.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [extensionId, viewParam])
 
   return (
     <div
@@ -31,6 +69,7 @@ function RemoteIframe({ extensionId, viewParam, repoRoot, isActive }: Props): JS
       }}
     >
       <iframe
+        ref={iframeRef}
         src={src}
         style={{ flex: 1, border: 'none', width: '100%', minHeight: 0 }}
         allow="clipboard-read; clipboard-write"

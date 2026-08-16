@@ -291,6 +291,28 @@ Host Renderer (React)
 
 See [ADR-022](adr/022-webview-isolated-extension-renderer.md) for the full decision record.
 
+### Escape-to-terminal exit
+
+Pressing `Esc` twice within 500 ms inside any extension surface returns the user to the terminal session they were last in. Because an extension view is its own `webContents`, the gesture is detected in two places and converges on one action:
+
+```
+Extension WebContentsView            Host renderer chrome
+  preload-webview.ts keydown           useExtensionEscapeExit keydown
+    │ extension:request-exit                    │
+    ▼                                           │
+  routeExtensionExitRequest (main)              │
+    │  attributes sender → { extensionId, viewParam }
+    │  focuses main renderer                    │
+    │ extension:exit-to-terminal                │
+    ▼                                           ▼
+        registry.exitExtensionToTerminal(sidebarPanelId?)
+          sidebar panel → togglePanel
+          otherwise     → clear global/workspace/project tab
+                          → focusActiveTerminal()
+```
+
+The listeners are passive and bubble-phase, so an extension's own single-`Esc` dismissals are untouched. Core surfaces (`core.*` ids) are never exited, the host-side listener stands down inside a terminal, a text field, or an open modal, and remote `/app/` clients get the same gesture through a same-origin listener on the extension iframe. See [ADR-026](adr/026-double-escape-extension-exit.md).
+
 ### Contribution rendering
 
 The renderer queries contributions via IPC on mount:

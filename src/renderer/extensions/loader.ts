@@ -64,6 +64,7 @@ export function registerWebviewExtension(
       id: ext.id,
       label: sidebarPanel.label,
       defaultOpen: sidebarPanel.defaultOpen,
+      view: viewParam,
       component: makePortalComponent(ext.id, viewParam) as ComponentType<{
         repoRoot: string | null
         onClose: () => void
