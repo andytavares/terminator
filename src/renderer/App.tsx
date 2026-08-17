@@ -28,6 +28,7 @@ import { useMetricsStore } from './stores/metrics.store'
 import { AboutDialog } from './components/AboutDialog'
 import { NameTerminalDialog } from './components/NameTerminalDialog'
 import { SCRATCH_PROJECT_ID } from '../shared/types/index'
+import { adoptTerminalSession } from './terminal/session-controller'
 
 installLogInterceptor()
 
@@ -424,6 +425,21 @@ export function App(): JSX.Element {
       if (typeof tabId === 'string') setActiveGlobalTab(tabId)
     })
   }, [setActiveGlobalTab])
+
+  // A terminal an extension opened. The renderer owns the tab list, so without
+  // adopting it the process runs and nothing on screen ever shows it — and its
+  // output is held until the tab is mounted rather than delivered to nobody.
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on('terminal:adopt', (data) => {
+      const { sessionId, projectId, tabTitle, scrollbackLimit } = data as {
+        sessionId: string
+        projectId: string
+        tabTitle: string
+        scrollbackLimit: number
+      }
+      adoptTerminalSession({ sessionId, projectId, tabTitle, scrollbackLimit })
+    })
+  }, [])
 
   useEffect(() => {
     return window.electronAPI.extensionBridge.on('terminal:navigate-to-session', (data) => {

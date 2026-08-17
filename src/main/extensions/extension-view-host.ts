@@ -2,6 +2,7 @@ import { WebContentsView, session as electronSession } from 'electron'
 import type { BrowserWindow } from 'electron'
 import type { Extension } from '../../shared/types/index.js'
 import { makeLogger } from '../logger.js'
+import { sendToView } from '../safe-send.js'
 
 const logger = makeLogger('extension-view-host')
 
@@ -300,7 +301,7 @@ export class ExtensionViewHost {
   broadcastToAll(channel: string, data: unknown): void {
     for (const entries of this.views.values()) {
       for (const { view } of entries) {
-        view.webContents.send(channel, data)
+        sendToView(view, channel, data)
       }
     }
   }
@@ -331,7 +332,7 @@ export class ExtensionViewHost {
     const entries = this.views.get(extensionId)
     if (!entries) return
     for (const { view } of entries) {
-      view.webContents.send(channel, data)
+      sendToView(view, channel, data)
     }
   }
 

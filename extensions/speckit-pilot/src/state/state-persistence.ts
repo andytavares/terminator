@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import type {
@@ -148,10 +149,18 @@ export async function consumePendingComments(
   return pending.map((c) => c.body).join('\n')
 }
 
+/**
+ * Writes the card's state atomically.
+ *
+ * The temp name is unique per write. A fixed `.tmp` is not atomic when two
+ * writes overlap — and they do: approving a phase writes, then auto-starts the
+ * next one, which writes again. The loser's rename finds nothing and throws
+ * ENOENT.
+ */
 export async function writeState(featureDir: string, state: PilotState): Promise<void> {
   await ensurePilotDir(featureDir)
   const p = statePath(featureDir)
-  const tmp = `${p}.tmp`
+  const tmp = `${p}.${randomUUID()}.tmp`
   await fs.writeFile(tmp, JSON.stringify(state, null, 2), 'utf-8')
   await fs.rename(tmp, p)
 }
@@ -171,6 +180,7 @@ export function createInitialState(
     queuePosition?: PilotState['queuePosition']
     worktreePath?: PilotState['worktreePath']
     branchName?: PilotState['branchName']
+    baseBranch?: PilotState['baseBranch']
     mode?: PilotState['mode']
   }
 ): PilotState {
@@ -209,6 +219,7 @@ export function createInitialState(
     queuePosition: overrides?.queuePosition ?? null,
     worktreePath: overrides?.worktreePath ?? null,
     branchName: overrides?.branchName ?? null,
+    baseBranch: overrides?.baseBranch ?? null,
     prUrl: null,
     phases,
     settings: DEFAULT_SETTINGS,

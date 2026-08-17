@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Electron mock ────────────────────────────────────────────────────────────
 const mockSend = vi.fn()
-const mockWindow = { webContents: { send: mockSend }, isDestroyed: vi.fn(() => false) }
+const mockWindow = {
+  webContents: { send: mockSend, isDestroyed: vi.fn(() => false) },
+  isDestroyed: vi.fn(() => false),
+}
 const registeredGlobalShortcuts = new Map<string, () => void>()
 
 const mockBWInstance = vi.hoisted(() => ({

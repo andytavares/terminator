@@ -1,0 +1,32 @@
+{
+  // The root typecheck references only main, renderer and shared, so extension
+  // code was never checked at all — type errors in it reached CI green. This
+  // brings the pilot's own sources under `tsc`, at the same strictness.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"]
+  },
+  // The whole extension, not just the runtime. The root typecheck references
+  // only main, renderer and shared, so none of this was ever checked and type
+  // errors in it reached CI green.
+  //
+  // The core's renderer declarations come along because components legitimately
+  // call core IPC through `window.electronAPI`; without them every such call is
+  // an error about a global that does exist at runtime.
+  // Sources only. The tests are deliberately outside: 36 of them build partial
+  // mocks that do not satisfy the real types (a `Uint8Array` where a `Buffer` is
+  // declared, a v2 `PilotState` in a migration test), and making them typecheck
+  // would mean rewriting mocks that are correct for what they assert.
+  "include": ["src/**/*.ts", "src/**/*.tsx", "../../src/renderer/electron.d.ts"],
+  "exclude": ["src/index.js", "dist", "node_modules"]
+}

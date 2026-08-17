@@ -17,6 +17,7 @@ import { ExtensionHost } from './extensions/extension-host.js'
 import { ExtensionViewHost } from './extensions/extension-view-host.js'
 import { routeExtensionExitRequest } from './extensions/extension-exit.js'
 import { logger } from './logger.js'
+import { sendToWindow } from './safe-send.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
@@ -369,8 +370,10 @@ app.whenReady().then(async () => {
     broadcastToWindows: (channel, data) => {
       // Auxiliary windows (extension pop-outs) are real BrowserWindows and must
       // receive pushes too, otherwise a pop-out and the docked panel drift apart.
+      // Guarded: a PTY opened through the extension API broadcasts on every
+      // chunk, and keeps running after the window that opened it has closed.
       for (const win of BrowserWindow.getAllWindows()) {
-        if (!win.isDestroyed()) win.webContents.send(channel, data)
+        sendToWindow(win, channel, data)
       }
       // The main window's send is patched above to relay to extension
       // WebContentsViews for every channel except the two it filters out — only
@@ -379,6 +382,7 @@ app.whenReady().then(async () => {
       const relayedByMainWindow =
         !!mainWindow &&
         !mainWindow.isDestroyed() &&
+        !mainWindow.webContents.isDestroyed() &&
         !channel.startsWith('terminal:') &&
         channel !== 'workspace:changed'
       if (!relayedByMainWindow) viewHost?.broadcastToAll(channel, data)

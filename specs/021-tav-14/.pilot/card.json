@@ -1,0 +1,10 @@
+{
+  "title": "Make all text in the application red",
+  "type": "feature",
+  "scope": "# Summary\n\nMake all text in the application red\n\n# Context\n\nMake all text in the application red\n\n# Acceptance Criteria\n\n- [ ] All text in the application is red\n\n# Dev Hints\n\n* Text should be red",
+  "checklist": [],
+  "attachments": [],
+  "knowledgeRefs": [],
+  "source": "linear",
+  "createdAt": "2026-07-29T23:31:29.811Z"
+}

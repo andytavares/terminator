@@ -14,7 +14,9 @@ import {
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { STAGE_ORDER } from '../types/speckit.types.js'
 import type { BoardStage, CardSummary } from '../types/speckit.types.js'
-import { getSpeckitAPI } from '../types/electron.js'
+import { getSpeckitAPI, type PendingAskView } from '../types/electron.js'
+import { PermissionQueue } from './PermissionQueue.js'
+import { SupervisionPanel } from './SupervisionPanel.js'
 import { CardTile } from './CardTile.js'
 import { bucketCards, resolveDrop } from './board-util.js'
 
@@ -72,8 +74,14 @@ interface BoardViewProps {
 
 export function BoardView({ repoRoot, onOpenCard, onNewCard }: BoardViewProps) {
   const [cards, setCards] = useState<CardSummary[]>([])
+  // What supervised runs are holding. Above the board rather than inside a
+  // card: a held tool call is the one state where nothing moves until a person
+  // acts, and finding it would mean opening cards one at a time.
+  const [pending, setPending] = useState<PendingAskView[]>([])
   const [error, setError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
+  // Where the palette last asked to go, so the panel opens on it.
+  const [focus, setFocus] = useState<{ kind: 'run' | 'review'; sessionId: string } | null>(null)
   // Require an 8px drag before a pointer gesture counts as a drag, so a plain click
   // opens the card instead of being mistaken for a drag.
   const sensors = useSensors(
@@ -96,6 +104,35 @@ export function BoardView({ repoRoot, onOpenCard, onNewCard }: BoardViewProps) {
     const unsub = getSpeckitAPI().onStateChanged(() => void load())
     return unsub
   }, [load])
+
+  // The palette jumps here for anything that is not a live run — a run with a
+  // terminal is taken straight there by the core's own navigation, in the main
+  // process, because this UI is a separate renderer and cannot drive it.
+  useEffect(() => {
+    return getSpeckitAPI().onPaletteGoto((goto) => {
+      setFocus({ kind: goto.kind, sessionId: goto.sessionId })
+    })
+  }, [])
+
+  const loadPending = useCallback(async () => {
+    const result = await getSpeckitAPI().permissionsList()
+    setPending(result.pending)
+  }, [])
+
+  useEffect(() => {
+    void loadPending()
+    // Raised and cleared by the runtime rather than by anything on screen, so
+    // the board is told rather than asked.
+    return getSpeckitAPI().onPermissionsChanged(() => void loadPending())
+  }, [loadPending])
+
+  const answer = useCallback(
+    async (call: Promise<unknown>) => {
+      await call
+      await loadPending()
+    },
+    [loadPending]
+  )
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(String(event.active.id))
@@ -145,6 +182,41 @@ export function BoardView({ repoRoot, onOpenCard, onNewCard }: BoardViewProps) {
           </span>
         )}
       </div>
+      {pending.length > 0 && (
+        <PermissionQueue
+          pending={pending}
+          cardLabel={(featureDir) =>
+            cards.find((card) => card.featureDir === featureDir)?.title ??
+            featureDir.split('/').pop() ??
+            featureDir
+          }
+          onAllow={(requestId) =>
+            void answer(getSpeckitAPI().permissionResolve({ requestId, decision: 'allow' }))
+          }
+          onDeny={(requestId) =>
+            void answer(getSpeckitAPI().permissionResolve({ requestId, decision: 'deny' }))
+          }
+          onAnswer={(requestId, text) =>
+            void answer(
+              getSpeckitAPI().permissionResolve({ requestId, decision: 'deny', answer: text })
+            )
+          }
+          onHandBack={(requestId) => void answer(getSpeckitAPI().permissionHandBack({ requestId }))}
+        />
+      )}
+      {/* Everything the supervision layer knows: what is running, what has
+          stopped making progress, what is waiting to be reviewed, and what
+          happened while you were away. */}
+      <SupervisionPanel
+        cardLabel={(featureDir) =>
+          cards.find((card) => card.featureDir === featureDir)?.title ??
+          featureDir.split('/').pop() ??
+          featureDir
+        }
+        workspacePath={repoRoot}
+        onChanged={() => void load()}
+        focus={focus}
+      />
       {cards.length === 0 ? (
         <div className="sk-board__empty">Create your first card to get started.</div>
       ) : (

@@ -1,0 +1,10 @@
+{
+  "title": "Pop-out during PR review returns to PR search screen instead of the active PR",
+  "type": "feature",
+  "scope": "# Summary\n\nIn the git integration, popping out a window while reviewing a PR loses the review context — the popped-out window returns to the PR search screen instead of showing the PR that was being reviewed.\n\n# Steps to Reproduce\n\n1. Open the git integration.\n2. Start a review of a specific PR.\n3. Click \"pop out\" to detach the review into its own window.\n\nExpected: The popped-out window shows the PR that was being reviewed, preserving the current context/navigation state.\nActual: The popped-out window returns to the PR search screen.\n\n# Acceptance Criteria\n\n- [ ] Popping out during an active PR review opens the popped-out window on the same PR\n- [ ] Review navigation/context state is preserved in the popped-out window (not reset to search)\n- [ ] The original (source) window behavior is unchanged\n\n# Dev Hints\n\n* The popped-out window likely isn't passed the currently selected PR / review state on creation. Investigate how the pop-out window is spawned and initialized, and ensure the active PR/review context is handed through to it.",
+  "checklist": [],
+  "attachments": [],
+  "knowledgeRefs": [],
+  "source": "linear",
+  "createdAt": "2026-07-29T23:31:29.824Z"
+}

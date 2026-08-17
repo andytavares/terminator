@@ -24,6 +24,7 @@ vi.mock('electron', () => ({
       on: vi.fn(),
       openDevTools: vi.fn(),
       insertCSS: vi.fn().mockResolvedValue(undefined),
+      isDestroyed: vi.fn().mockReturnValue(false),
     }
     setBounds = vi.fn()
     setVisible = vi.fn()

@@ -35,6 +35,7 @@ describe('remoteAccessibleCoreChannels()', () => {
   const EXPECTED = [
     'app:get-info',
     'terminal:create',
+    'terminal:attach',
     'terminal:close',
     'terminal:close-all',
     'terminal:cleanup-orphans',

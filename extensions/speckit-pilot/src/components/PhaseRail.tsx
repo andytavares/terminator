@@ -16,6 +16,10 @@ function statusToClass(status: PhaseState['status']): NodeClass {
     case 'locked':
     case 'stale':
       return 'locked'
+    // Approved once, and no longer what was approved. It needs a person, so it
+    // reads like the other thing that needs one rather than like "not started".
+    case 'modified':
+      return 'review'
     default:
       return 'pending'
   }

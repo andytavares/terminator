@@ -6,6 +6,7 @@ import { RunDashboard } from './RunDashboard.js'
 import { CardBriefEditor } from './CardBriefEditor.js'
 import { ActivityFeed } from './ActivityFeed.js'
 import { ArtifactsPanel } from './ArtifactsPanel.js'
+import { LaneStrip } from './LaneStrip.js'
 
 type Tab = 'brief' | 'phases' | 'activity' | 'artifacts'
 const TABS: { id: Tab; label: string }[] = [
@@ -46,9 +47,7 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
     if (!workspacePath) return
     void (async () => {
       try {
-        const res = (await window.electronAPI.git.listBranches({ repoRoot: workspacePath })) as {
-          branches?: Array<{ name: string; isCurrent?: boolean; isRemote?: boolean }>
-        }
+        const res = await window.electronAPI.git.listBranches(workspacePath)
         const local = (res.branches ?? []).filter((b) => !b.isRemote)
         setBranches(local.map((b) => b.name))
         const current = local.find((b) => b.isCurrent)?.name
@@ -73,15 +72,39 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
     [featureDir, load]
   )
 
-  const handoff = useCallback(async () => {
-    await getSpeckitAPI().cardHandoff({
-      featureDir,
-      workspacePath,
-      baseBranch: baseBranch || undefined,
-      mode: quickMode ? 'quick' : 'speckit',
-    })
-    void load()
-  }, [featureDir, workspacePath, baseBranch, quickMode, load])
+  // The gate refuses a start when unreviewed diffs are waiting. Refusing
+  // silently would read as a button that does nothing, so the reason is shown
+  // and the override is offered next to it — one click, and recorded.
+  const [refusal, setRefusal] = useState<string | null>(null)
+
+  const handoff = useCallback(
+    async (overrideBackpressure = false) => {
+      const result = await getSpeckitAPI().cardHandoff({
+        featureDir,
+        workspacePath,
+        baseBranch: baseBranch || undefined,
+        mode: quickMode ? 'quick' : 'speckit',
+        overrideBackpressure,
+      })
+      if ('error' in result) {
+        // Any failure, not just the gate: a validation error or a worktree that
+        // could not be made used to clear the banner and reload as though the
+        // card had started.
+        setRefusal(
+          result.error === 'backpressure'
+            ? (('reason' in result ? result.reason : null) ??
+                'Diffs are waiting to be reviewed — no new run will start until one is.')
+            : 'message' in result && typeof result.message === 'string'
+              ? result.message
+              : `Could not start this card: ${result.error}`
+        )
+        return
+      }
+      setRefusal(null)
+      void load()
+    },
+    [featureDir, workspacePath, baseBranch, quickMode, load]
+  )
 
   const reset = useCallback(async () => {
     setConfirmingReset(false)
@@ -126,6 +149,9 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
           ))}
         {tab === 'phases' && (
           <>
+            {/* A card that touches more than one repository, in merge order.
+                Renders nothing for the single-repository case. */}
+            <LaneStrip featureDir={featureDir} />
             {canHandoff && (
               <div className="sk-startcard">
                 <p className="sk-startcard__status">
@@ -164,10 +190,26 @@ export function CardDetail({ featureDir, workspacePath, onClose }: CardDetailPro
                   </span>
                 </label>
                 <div className="sk-startcard__actions">
-                  <button type="button" className="sk-btn sk-btn--primary" onClick={handoff}>
+                  <button
+                    type="button"
+                    className="sk-btn sk-btn--primary"
+                    onClick={() => void handoff()}
+                  >
                     {hasRun ? 'Resume / re-run' : 'Hand off to agent'}
                   </button>
                 </div>
+                {refusal !== null && (
+                  <div className="sk-sup__warn" role="alert">
+                    {refusal}
+                    <button
+                      type="button"
+                      className="sk-sup__btn"
+                      onClick={() => void handoff(true)}
+                    >
+                      Start anyway
+                    </button>
+                  </div>
+                )}
               </div>
             )}
             {hasRun && (

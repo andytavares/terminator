@@ -197,9 +197,14 @@ describe('writeState', () => {
     vi.mocked(fs.rename).mockResolvedValue(undefined)
     const state = createInitialState(featureDir)
     await writeState(featureDir, state)
-    const tmpPath = `${statePath}.tmp`
-    expect(fs.writeFile).toHaveBeenCalledWith(tmpPath, expect.any(String), 'utf-8')
-    expect(fs.rename).toHaveBeenCalledWith(tmpPath, statePath)
+    // The temp name carries a uuid: writes overlap (approving a phase writes,
+    // then auto-starts the next, which writes again) and a fixed `.tmp` is not
+    // atomic — the loser's rename finds nothing.
+    const tmpName = expect.stringMatching(
+      new RegExp(`^${statePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\..+\\.tmp$`)
+    )
+    expect(fs.writeFile).toHaveBeenCalledWith(tmpName, expect.any(String), 'utf-8')
+    expect(fs.rename).toHaveBeenCalledWith(tmpName, statePath)
   })
 
   it('writes valid JSON v2 state', async () => {

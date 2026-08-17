@@ -1,11 +1,11 @@
 import type { ExtensionAPI, Disposable, SettingDefinition } from '../../../src/main/extensions/api'
+import { app } from 'electron'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type {
   CardBrief,
   CardComment,
   CardSummary,
-  Feature,
   HistoryEntry,
   JiraCreds,
   PhaseId,
@@ -21,6 +21,7 @@ import {
 } from './types/speckit.types.js'
 import {
   readState as readMigratedState,
+  writeState,
   readCard,
   writeCard,
   appendComment,
@@ -30,6 +31,7 @@ import {
 } from './state/state-persistence.js'
 import { buildCardSummary } from './state/card-summary.js'
 import { deriveStage } from './state/derive-stage.js'
+import { hasSpeckitSkill } from './state/skill-availability.js'
 import { shouldQueue, orderPending } from './state/run-queue.js'
 import { parseRgLines, searchFiles } from './utils/knowledge-search.js'
 import { parseGitLog, artifactSpecs, buildArtifactRef } from './state/artifact-list.js'
@@ -64,12 +66,66 @@ const QUICK_PHASE_COMMANDS: Partial<Record<PhaseId, string>> = {
   implement: 'Implement the change described in plan.md',
 }
 
+/**
+ * The same phases, asked for in plain words.
+ *
+ * Used when the repository has no SpecKit skills — otherwise the phase sends
+ * `/speckit-specify`, the runtime answers "Unknown command", and the run is
+ * over before it began having written nothing.
+ *
+ * Each one names the file the pipeline expects, because that placement is most
+ * of what the skill was providing: the gates, the artifact list and the review
+ * queue all read `$SPECIFY_FEATURE_DIRECTORY/<file>`, and an agent left to
+ * choose writes it at the repository root.
+ */
+const PLAIN_PHASE_COMMANDS: Record<PhaseId, string> = {
+  constitution:
+    'Read .specify/memory/constitution.md if it exists and summarise the rules this change must follow. Do not edit code.',
+  specify:
+    'Read ticket.md. Write a specification to $SPECIFY_FEATURE_DIRECTORY/spec.md covering: the problem, user stories with acceptance criteria, functional requirements, and what is explicitly out of scope. Ask about anything genuinely ambiguous rather than guessing. Do not write code.',
+  clarify:
+    'Read $SPECIFY_FEATURE_DIRECTORY/spec.md. List anything ambiguous or underspecified that would change the implementation, ask about it, and fold the answers back into spec.md. Do not write code.',
+  plan: 'Read $SPECIFY_FEATURE_DIRECTORY/spec.md. Write a technical implementation plan to $SPECIFY_FEATURE_DIRECTORY/plan.md: the approach, the files it touches, the trade-offs, and anything it deliberately does not do. Do not write code.',
+  checklist:
+    'Read $SPECIFY_FEATURE_DIRECTORY/spec.md and plan.md. Write a review checklist to $SPECIFY_FEATURE_DIRECTORY/checklists/requirements.md covering what has to be true for this to be done. Do not write code.',
+  tasks:
+    'Read $SPECIFY_FEATURE_DIRECTORY/spec.md and plan.md. Write an ordered task breakdown to $SPECIFY_FEATURE_DIRECTORY/tasks.md, each task with the file it touches and how to tell it is finished. Do not write code.',
+  analyze:
+    'Read $SPECIFY_FEATURE_DIRECTORY/spec.md, plan.md and tasks.md together. Report inconsistencies, duplication, and requirements no task covers. Do not change the files; report what you find.',
+  implement:
+    'Work through $SPECIFY_FEATURE_DIRECTORY/tasks.md in order, following plan.md. Write tests first where the repository has them, and keep to the conventions of the code around you.',
+  'self-review': '', // handled by the self-review plan; not dispatched as a prompt
+  'open-pr': '', // not auto-started; triggered explicitly by user action
+}
+
 // The prompt for a phase, honoring the card's run mode. `description` seeds
 // /speckit-specify with the card title.
-function phaseCommandFor(phase: PhaseId, mode: RunMode, description = ''): string {
+function phaseCommandFor(
+  phase: PhaseId,
+  mode: RunMode,
+  description = '',
+  worktreePath?: string
+): string {
   if (mode === 'quick') return QUICK_PHASE_COMMANDS[phase] ?? PHASE_COMMANDS[phase]
+
+  // Without the skill installed, the slash command is not a command — it is a
+  // message the runtime rejects. Ask for the same thing in words instead.
+  if (worktreePath !== undefined && !hasSpeckitSkill(worktreePath, phase)) {
+    const plain = PLAIN_PHASE_COMMANDS[phase]
+    if (plain !== '') {
+      return description ? `${plain}\n\nThe ticket: ${description}` : plain
+    }
+  }
+
   return PHASE_COMMANDS[phase].replace('${DESCRIPTION}', description || 'the assigned ticket')
 }
+
+/**
+ * The phase prompt, exposed so a test can assert the fallback without starting
+ * a run. Same function the dispatcher uses; nothing here is test-only
+ * behaviour.
+ */
+export const phaseCommandForTests = phaseCommandFor
 
 // Card title, tolerant of pre-v3 states read raw (which have no `card` field).
 function cardTitleOf(state: PilotState): string {
@@ -92,16 +148,44 @@ import {
   fetchAssignedTickets as fetchJiraTickets,
   postComment as postJiraComment,
 } from './api/jira.js'
-import { createAgentRunner, phaseLogPath, pruneOldLogs } from './runner/agent-runner.js'
+import {
+  createAgentRunner,
+  phaseLogPath,
+  pruneOldLogs,
+  setPermissionSink,
+  setReadOnlyStateDir,
+  setRunSupervision,
+  setSupervisedRunner,
+} from './runner/agent-runner.js'
+import { createControlServer, type ControlServer } from './runtime/control-server.js'
+import { createSupervisedRunner, type SupervisedRunner } from './runtime/supervised-runner.js'
+import { createPendingPermissions } from './runtime/pending-permissions.js'
+import { createStallWatcher, type StallWatcher } from './runtime/stall-watcher.js'
+import { createSupervision, type Supervision } from './runtime/supervision.js'
+import { buildDigest, channelFor, type NotifiableEvent } from './runtime/feed/digest.js'
+import { paletteEntries } from './runtime/palette.js'
+import { createMuteStore, type MuteStore } from './runtime/feed/mutes.js'
+import { hashArtifacts } from './state/artifact-hash.js'
+import { applyHashVerification, computeStalePhases } from './state/phase-state-machine.js'
+import { artifactEntries, resolveArtifactPath } from './state/artifact-paths.js'
+import { readCardLanes, WORKITEM_FILE } from './runtime/workitem.js'
+import { readTranscriptTail } from './runtime/transcript-excerpt.js'
+import type { HunkDecision } from './runtime/review/hunk-decisions.js'
+
+/** One hunk as a surface renders it: the change, and what was decided. */
+interface HunkView {
+  id: string
+  newStart: number
+  lines: string[]
+  decision: HunkDecision | null
+}
+import type { StallFiring } from './runtime/evaluate-stall.js'
 import type { RunnerHandle } from './runner/agent-runner.js'
 
 const disposables: Disposable[] = []
 
 // Active session registry: sessionId → session metadata
 const activeSessions: Map<string, { id: string; name: string }> = new Map()
-
-// Active implement run registry: featureDir → runId
-const activeRuns: Map<string, string> = new Map()
 
 // Active agent runner handles: featureDir → RunnerHandle
 const activeRunnerHandles: Map<string, RunnerHandle> = new Map()
@@ -142,29 +226,6 @@ function reg(
   handler: (payload: unknown) => Promise<unknown> | unknown
 ) {
   disposables.push(api.ipc.registerHandler(channel, handler))
-}
-
-// Scan a specs/ directory for feature dirs (contain spec.md)
-async function listFeatures(repoRoot: string): Promise<Feature[]> {
-  const specsDir = path.join(repoRoot, 'specs')
-  let entries: string[] = []
-  try {
-    entries = await fs.promises.readdir(specsDir)
-  } catch {
-    return []
-  }
-  const features: Feature[] = []
-  for (const name of entries.sort()) {
-    const dir = path.join(specsDir, name)
-    const specPath = path.join(dir, 'spec.md')
-    try {
-      const stat = await fs.promises.stat(specPath)
-      features.push({ name, dir, specPath, lastModified: stat.mtimeMs })
-    } catch {
-      // not a feature dir
-    }
-  }
-  return features
 }
 
 // Scan specs/ for card dirs — any dir with a pilot state, card brief, or spec.md.
@@ -215,14 +276,10 @@ async function readPilotState(featureDir: string): Promise<PilotState | null> {
   }
 }
 
-// Write pilot state atomically
+// One writer for the card's state, in state-persistence. This wrapper exists so
+// the fifty call sites below do not all have to say `writeState`.
 async function writePilotState(featureDir: string, state: PilotState): Promise<void> {
-  const pilotDir = path.join(featureDir, '.pilot')
-  await fs.promises.mkdir(pilotDir, { recursive: true })
-  const stateFile = path.join(pilotDir, 'state.json')
-  const tmp = stateFile + '.tmp'
-  await fs.promises.writeFile(tmp, JSON.stringify(state, null, 2), 'utf-8')
-  await fs.promises.rename(tmp, stateFile)
+  await writeState(featureDir, state)
 }
 
 // Create initial pilot state for a feature dir (v3, backlog card).
@@ -328,6 +385,49 @@ async function gitUsername(api: ExtensionAPI, cwd: string): Promise<string> {
   return 'user'
 }
 
+/**
+ * Marks any approved phase whose artifacts are no longer what was approved.
+ *
+ * Read-only: it never writes the state back. The record of what you approved is
+ * the approval, and rewriting it on a read would make "modified" survive the
+ * edit being undone.
+ */
+async function withHashVerification(state: PilotState): Promise<PilotState> {
+  const hashes: Partial<Record<PhaseId, string | null>> = {}
+  let anyToCheck = false
+  for (const phase of PHASE_ORDER) {
+    const phaseState = state.phases[phase]
+    if (!phaseState || phaseState.status !== 'approved' || !phaseState.approvedHash) continue
+    anyToCheck = true
+    hashes[phase] = await hashArtifacts(
+      artifactEntries(
+        { featureDir: state.featureDir, worktreePath: state.worktreePath },
+        phaseState.artifactPaths
+      )
+    )
+  }
+  return anyToCheck ? applyHashVerification(state, hashes) : state
+}
+
+/**
+ * A card's lanes, from wherever `workitem.json` actually is.
+ *
+ * The plan phase writes it, and a phase runs in the worktree — so it lands
+ * there, not beside the card in the main checkout. Reading the recorded path
+ * found nothing and every multi-repository card looked like a single-repository
+ * one.
+ */
+async function readLanesFor(featureDir: string): Promise<ReturnType<typeof readCardLanes>> {
+  const state = await readPilotState(featureDir)
+  const dir = path.dirname(
+    resolveArtifactPath(
+      { featureDir, worktreePath: state?.worktreePath },
+      path.join(featureDir, WORKITEM_FILE)
+    )
+  )
+  return readCardLanes(dir) ?? readCardLanes(featureDir)
+}
+
 // Decide the branch name for a card's worktree. Prefer the tracker's suggested
 // VCS branch (Linear provides one per issue); otherwise
 // <username>/<ticket-key>-<kebab-title>; fall back to feature/<slug> for native
@@ -389,6 +489,36 @@ async function createWorktree(
   return { worktreePath, branchName }
 }
 
+// Reclaim a worktree and the branch it was on.
+//
+// Both, always: a removed worktree whose branch survives leaves a branch nobody
+// will ever check out and makes recreating the card fail on "already exists".
+// Failures are swallowed deliberately — this runs when the operator has already
+// decided the work is going away, and a discard that half-happens and then
+// throws leaves worse state than one that finishes quietly.
+async function discardWorktree(
+  api: ExtensionAPI,
+  workspacePath: string,
+  worktreePath: string | null,
+  branchName: string | null
+): Promise<void> {
+  if (!workspacePath) return
+  if (worktreePath) {
+    await api.shell
+      .exec({
+        command: 'git',
+        args: ['worktree', 'remove', worktreePath, '--force'],
+        cwd: workspacePath,
+      })
+      .catch(() => {})
+  }
+  if (branchName) {
+    await api.shell
+      .exec({ command: 'git', args: ['branch', '-D', branchName], cwd: workspacePath })
+      .catch(() => {})
+  }
+}
+
 // Guarantee a card runs in its own worktree, never the main checkout. Returns
 // the existing worktree when present, otherwise creates one and persists it to
 // state. Every phase runner must resolve its cwd through this.
@@ -443,16 +573,22 @@ async function startRunAt(
   worktreePath: string,
   phase: PhaseId,
   mode: RunMode = 'speckit',
-  description = ''
+  description = '',
+  baseBranch?: string
 ): Promise<void> {
+  // Before anything is started: the runner is installed asynchronously during
+  // activation, and a phase that beat it ran unsupervised.
+  await runtimeStarting
   const runId = `run-${Date.now()}`
   const feedbackNote = (await consumePendingComments(featureDir, runId)) ?? undefined
   const runner = createAgentRunner(api)
   const handle = runner.startPhaseRunner({
     featureDir,
     worktreePath,
-    phaseCommand: phaseCommandFor(phase, mode, description),
+    phaseCommand: phaseCommandFor(phase, mode, description, worktreePath),
     phase,
+    // What its diff is measured against, all the way down to the review queue.
+    baseBranch,
     feedbackNote,
     ...makePhaseCallbacks(api, featureDir, phase),
   })
@@ -492,8 +628,14 @@ async function handoffCard(
   featureDir: string,
   workspacePath: string,
   baseBranch?: string,
-  mode?: RunMode
-): Promise<{ ok: true; dispatched: true; queued: boolean } | { error: string; message?: string }> {
+  mode?: RunMode,
+  /** Set after the operator accepts a recorded refusal. */
+  overrideBackpressure?: boolean
+): Promise<
+  | { ok: true; dispatched: true; queued: boolean }
+  | { ok: false; error: string; reason?: string | null; backpressure?: unknown }
+  | { error: string; message?: string }
+> {
   const state = await readMigratedState(featureDir)
   if (!state) return { error: 'No card state found' }
   const card = await readCard(featureDir)
@@ -502,6 +644,26 @@ async function handoffCard(
     return { error: 'VALIDATION_ERROR', message: 'A card needs a title before handoff' }
   }
   if (mode) state.mode = mode
+  // Refused before anything is touched: starting a fourth agent while three
+  // diffs are waiting is how a backlog nobody can review gets built, and the
+  // constraint is one person's attention rather than machine capacity.
+  //
+  // Checked before the card is primed, not after. Priming rearranges phase
+  // statuses — skipping the constitution, collapsing a quick-fix run — and a
+  // refusal that happens afterwards leaves the card rearranged for a run that
+  // never started.
+  //
+  // Overridden deliberately rather than not enforced — the override is recorded
+  // with the depth at the moment it was ignored, so a backlog built this way is
+  // visible afterwards rather than only felt.
+  const gate = supervision?.backpressure.check()
+  if (gate !== undefined && !gate.allowed && overrideBackpressure !== true) {
+    return { ok: false, error: 'backpressure', reason: gate.reason, backpressure: gate }
+  }
+  if (gate !== undefined && !gate.allowed && overrideBackpressure === true) {
+    supervision?.backpressure.override(featureDir, Date.now())
+  }
+
   const now = new Date().toISOString()
   state.run = {
     status: 'running',
@@ -510,6 +672,11 @@ async function handoffCard(
     autonomyLevel: state.run?.autonomyLevel ?? state.settings.defaultAutonomy ?? 'standard',
   }
   primePhasesForRun(state)
+  // Before any early return. A card that queues here is started later by
+  // `advanceQueue`, which reads this — and without it every queued card's diff
+  // is measured against `main`, which on a repository whose default is
+  // something else fails and reads as "changed nothing".
+  state.baseBranch = baseBranch ?? state.baseBranch ?? null
 
   const cap = getMaxConcurrent(api)
   const active = await countActiveRuns(workspacePath)
@@ -544,7 +711,8 @@ async function handoffCard(
     worktreePath,
     firstRunnablePhase(state),
     state.mode,
-    state.card.title
+    state.card.title,
+    baseBranch
   )
   api.window.broadcast('speckit:dispatch-started', { featureDir, branchName, worktreePath })
   api.window.broadcast('speckit:state-changed', { state })
@@ -570,14 +738,19 @@ async function advanceQueue(api: ExtensionAPI, workspacePath: string): Promise<v
   for (const item of ordered) {
     const active = await countActiveRuns(workspacePath)
     if (shouldQueue(active, cap)) break
+    // The queue drains into the same wall: unreviewed diffs pile up whether a
+    // run was started by hand or by the queue emptying itself.
+    if (supervision?.backpressure.check().allowed === false) break
     const s = item.state
     try {
-      const { worktreePath, branchName } = await createWorktree(
-        api,
-        s.featureDir,
-        workspacePath,
-        s.ticket
-      )
+      // Reuse the one it already has. A card queued by `dispatch` was
+      // provisioned before it hit the gate, and creating a worktree at a path
+      // git already knows fails — so the card sat pending forever with a live
+      // worktree and no agent.
+      const existing = s.worktreePath !== null && (await pathExists(s.worktreePath))
+      const { worktreePath, branchName } = existing
+        ? { worktreePath: s.worktreePath as string, branchName: s.branchName ?? '' }
+        : await createWorktree(api, s.featureDir, workspacePath, s.ticket)
       s.worktreePath = worktreePath
       s.branchName = branchName
       s.queuePosition = 'active'
@@ -585,7 +758,15 @@ async function advanceQueue(api: ExtensionAPI, workspacePath: string): Promise<v
       await writePilotState(s.featureDir, s)
       const qCard = (await readCard(s.featureDir)) ?? s.card
       await writeWorktreeTicket(worktreePath, qCard, s.ticket)
-      await startRunAt(api, s.featureDir, worktreePath, firstRunnablePhase(s), s.mode, s.card.title)
+      await startRunAt(
+        api,
+        s.featureDir,
+        worktreePath,
+        firstRunnablePhase(s),
+        s.mode,
+        s.card.title,
+        s.baseBranch ?? undefined
+      )
       api.window.broadcast('speckit:dispatch-started', {
         featureDir: s.featureDir,
         branchName,
@@ -600,41 +781,6 @@ async function advanceQueue(api: ExtensionAPI, workspacePath: string): Promise<v
       )
     }
   }
-}
-
-// Check which artifact paths exist for a feature dir
-async function checkArtifacts(
-  featureDir: string,
-  repoRoot: string
-): Promise<Record<string, boolean>> {
-  const PHASE_ARTIFACT_MAP: Record<string, string[]> = {
-    constitution: ['.specify/memory/constitution.md'],
-    specify: ['spec.md'],
-    clarify: ['spec.md'],
-    plan: ['plan.md'],
-    checklist: ['checklists'],
-    tasks: ['tasks.md'],
-    analyze: ['tasks.md'],
-    implement: ['tasks.md'],
-  }
-  const result: Record<string, boolean> = {}
-  for (const [phase, artifacts] of Object.entries(PHASE_ARTIFACT_MAP)) {
-    let exists = false
-    for (const rel of artifacts) {
-      const absPath = rel.startsWith('.specify')
-        ? path.join(repoRoot, rel)
-        : path.join(featureDir, rel)
-      try {
-        await fs.promises.access(absPath)
-        exists = true
-        break
-      } catch {
-        // not found
-      }
-    }
-    result[phase] = exists
-  }
-  return result
 }
 
 // Every notification kind this extension ever raises, so the user can
@@ -675,13 +821,653 @@ function buildNotificationSettingProperties(): Record<string, SettingDefinition>
   return properties
 }
 
+// The loopback endpoint the agents' hooks answer on, and the runner that owns
+// their terminals. Started once for the extension rather than per run: a port
+// per agent would be a port per card.
+let control: ControlServer | null = null
+let supervisedRunner: SupervisedRunner | null = null
+// What is waiting on the operator, across every card. Without somewhere to
+// hold these the surface has nothing to render and a phase sits at its hook.
+const pendingPermissions = createPendingPermissions()
+let stallWatcher: StallWatcher | null = null
+/**
+ * The palette's current entries, disposed and rebuilt when what is running
+ * changes.
+ *
+ * The host takes a fixed contribution list, so keeping runs in the palette
+ * means re-registering rather than answering a query. Cheap: the list is one
+ * entry per live run and one per queued diff, and it only rebuilds when the
+ * text would actually differ.
+ */
+let paletteRegistrations: Disposable[] = []
+let paletteSignature = ''
+let paletteTimer: NodeJS.Timeout | null = null
+// What is running, what it changed, what needs looking at, and what must not
+// start yet.
+let supervision: Supervision | null = null
+/**
+ * Which runs are allowed to interrupt you.
+ *
+ * Muting suppresses the notification, never the entry: the feed's record stays
+ * complete whether or not it interrupted anyone.
+ */
+let mutes: MuteStore | null = null
+/** Resolves once the supervision runtime is up, or has failed to come up. */
+let runtimeStarting: Promise<unknown> | null = null
+
+/**
+ * Where the supervision runtime keeps its files.
+ *
+ * Absolute, and outside every repository. It used to be
+ * `resolveWorktreeBaseDir('')`, which is `join('', '.worktrees')` — a
+ * *relative* path — so the `--settings` handed to claude read
+ * `.worktrees/.speckit-pilot-runtime/settings/<id>.json`, which the runtime
+ * resolved against the worktree it was started in. It was never there, so every
+ * supervised run died on "Settings file not found" the moment it launched: the
+ * card sat at WORKING with 0 turns and the console stayed empty forever.
+ *
+ * Beside the extension's credentials, in userData: this is the pilot's own
+ * state, not repository content, and nothing here should ever land in a diff.
+ */
+function runtimeStateDir(): string {
+  return path.join(app.getPath('userData'), 'speckit-pilot-runtime')
+}
+/**
+ * The notification a held tool call raised, so answering it takes the
+ * notification away too. A console that leaves them behind teaches you to
+ * dismiss without reading.
+ */
+const raisedNotifications = new Map<string, Disposable>()
+
+/**
+ * Says something, through the channel the event's kind is allowed.
+ *
+ * Automation complacency is the documented failure mode of supervisory control:
+ * a console that only speaks when something is wrong teaches you that silence
+ * means fine — and silence is also what a crashed console looks like. So the
+ * rule is fixed rather than per-call: only a blocking permission request may
+ * interrupt, everything else that needs a person is an indication, and routine
+ * progress goes to the feed and nowhere else.
+ */
+function notify(
+  api: ExtensionAPI,
+  event: NotifiableEvent,
+  message: string,
+  actions?: Array<{ id: string; label: string; handler: () => void }>
+): Disposable | null {
+  switch (channelFor(event)) {
+    case 'modal':
+      // The nearest thing an extension has to a modal: it persists until it is
+      // answered, and it carries the answer with it.
+      return api.notifications.createNotification({
+        type: 'warning',
+        title: message,
+        key: `speckit.permission.${event.sessionId}`,
+        actions,
+      })
+    case 'indicator':
+      api.notifications.showToast('warning', message, `speckit.${event.kind}.${event.sessionId}`)
+      return null
+    case 'digest':
+      // Already in the feed. Interrupting for it is how a feed gets muted.
+      return null
+  }
+}
+/**
+ * Stalls that have fired, newest first, and whether they were judged right.
+ *
+ * Kept in memory rather than persisted: the point of the record is tuning the
+ * thresholds against a week of real use, and a firing about a run that no longer
+ * exists is not something to reload on the next start.
+ */
+const stallFirings: Array<{ firing: StallFiring; featureDir: string; shadow: boolean }> = []
+
+/**
+ * How many firings to keep.
+ *
+ * Enough to judge a week of them by hand, which is what shadow mode is for, and
+ * bounded because this is an application that stays open for days and an
+ * unbounded list is a leak with a UI on it.
+ */
+const MAX_STALL_FIRINGS = 200
+
+/**
+ * Shadow mode: record, do not interrupt. On by default and deliberately so — a
+ * detector with a 20% false-positive rate produces alarm fatigue and gets turned
+ * off, which is worse than not shipping it. Turn it off on the evidence of the
+ * firings below, not on faith.
+ */
+function stallShadowMode(api: ExtensionAPI): boolean {
+  return api.settings.get<boolean>('terminator.speckit-pilot.stallShadowMode') ?? true
+}
+
+/**
+ * Brings up the control server, the runner, the supervision layer and the stall
+ * detector, and returns the layer so a caller can read what is running.
+ *
+ * Returns null when the runtime could not start: phases then fall back to the
+ * unsupervised spawn, and every surface reads empty rather than throwing.
+ */
+export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Supervision | null> {
+  // Self-review's read-only policy does not need the control server, so it is
+  // installed whether or not the rest of the runtime comes up. Guarded on its
+  // own: activation must not fail because a host could not say where worktrees
+  // live, and a review with no policy refuses rather than bypassing.
+  try {
+    setReadOnlyStateDir(runtimeStateDir())
+  } catch {
+    setReadOnlyStateDir(null)
+  }
+
+  try {
+    control = await createControlServer()
+    supervisedRunner = createSupervisedRunner({
+      api,
+      control,
+      stateDir: runtimeStateDir(),
+    })
+    setSupervisedRunner(supervisedRunner)
+    // Raised requests are held here so a surface can render them, and cleared
+    // when answered — by the operator, the autonomy ladder, or the bridge
+    // handing the decision back to the terminal.
+    setPermissionSink({
+      onPending: (ask) => {
+        pendingPermissions.add(ask)
+        // The one thing allowed to interrupt: the run is stopped dead until
+        // somebody answers, and a request nobody sees is a twelve-hour hang.
+        const notification = notify(
+          api,
+          { kind: 'permission_requested', sessionId: ask.sessionId },
+          `${path.basename(ask.featureDir)} is asking: ${ask.summary}`,
+          [
+            {
+              id: 'allow',
+              label: 'Allow',
+              handler: () =>
+                supervisedRunner?.resolve(ask.sessionId, ask.requestId, { allow: true }),
+            },
+            {
+              id: 'deny',
+              label: 'Deny',
+              handler: () =>
+                supervisedRunner?.resolve(ask.sessionId, ask.requestId, { allow: false }),
+            },
+            { id: 'open', label: 'Open the board', handler: () => api.window.focusSelf() },
+          ]
+        )
+        if (notification !== null) raisedNotifications.set(ask.requestId, notification)
+      },
+      onResolved: (requestId) => {
+        pendingPermissions.remove(requestId)
+        // Taken away with the request: a notification left behind after the
+        // thing it was about is answered teaches you to dismiss without reading.
+        raisedNotifications.get(requestId)?.dispose()
+        raisedNotifications.delete(requestId)
+      },
+    })
+
+    // A run that stops making progress without asking for anything is the
+    // failure nobody instruments: it looks exactly like one that is working.
+    supervision = createSupervision({
+      api,
+      stateDir: runtimeStateDir(),
+    })
+    // Registered runs are what everything downstream reads. Without this the
+    // review queue, the gate and the stall detector are all correct and empty.
+    setRunSupervision(supervision)
+    mutes = createMuteStore(path.join(runtimeStateDir(), 'mutes.json'))
+
+    const runner = supervisedRunner
+    // How much each run's working copy has grown since the previous look. The
+    // watcher reads transcripts and nothing else, so without this the loop
+    // signal could never tell circling from steady work — and never fired.
+    const lastSeenChange = new Map<string, number>()
+    stallWatcher = createStallWatcher({
+      runs: () => runner.watchable(),
+      netChangeSince: (sessionId) => {
+        const diff = supervision?.runs.get(sessionId)?.diff
+        if (diff === undefined) return 1
+        const total = diff.added + diff.removed
+        const growth = total - (lastSeenChange.get(sessionId) ?? 0)
+        lastSeenChange.set(sessionId, total)
+        return growth
+      },
+      onFiring: (firing, featureDir) => {
+        const shadow = stallShadowMode(api)
+        stallFirings.unshift({ firing, featureDir, shadow })
+        if (stallFirings.length > MAX_STALL_FIRINGS) stallFirings.length = MAX_STALL_FIRINGS
+        supervision?.runs.setState(firing.sessionId, 'stalled', firing.firedAt)
+        // Attributed to the pilot, not the agent: the agent did not say this,
+        // and a feed that blurs the two is one you stop trusting.
+        const entry = supervision?.feed.post({
+          at: firing.firedAt,
+          sessionId: firing.sessionId,
+          author: 'console',
+          summary: `stopped making progress (${firing.signal}) in ${path.basename(featureDir)}`,
+        })
+        api.window.broadcast('speckit:stall-fired', { firing, featureDir, shadow })
+        if (shadow) return
+        // Muted runs are recorded and shown, never surfaced — which is the only
+        // alternative to turning the detector off wholesale when one run is
+        // noisy.
+        if (
+          entry !== undefined &&
+          supervision !== null &&
+          !supervision.feed.shouldNotify(entry, mutes?.list() ?? [])
+        ) {
+          return
+        }
+        // An indication, not an interruption: a stall is not blocked on an
+        // answer the way a held tool call is.
+        notify(
+          api,
+          { kind: 'stalled', sessionId: firing.sessionId },
+          `A run stopped making progress (${firing.signal})`
+        )
+      },
+    })
+    stallWatcher.start()
+
+    // Kept in step with the register on a timer rather than an event: the
+    // registry is read by everything and subscribed to by nothing, and a
+    // palette that lists a run which ended is worse than one a few seconds
+    // behind.
+    refreshPalette(api)
+    paletteTimer = setInterval(() => refreshPalette(api), 5_000)
+    return supervision
+  } catch (error) {
+    // Without it, phases fall back to the headless spawn. Said out loud: the
+    // difference is whether tool calls are asked about or approved silently.
+    api.log.error('supervised runtime unavailable — phases will run unsupervised', error)
+    // Close what was opened. A failure after the control server bound left it
+    // listening on a port nothing would ever answer on, and nothing would ever
+    // close it either.
+    void control?.close()
+    control = null
+    supervisedRunner?.dispose()
+    supervisedRunner = null
+    stallWatcher?.stop()
+    stallWatcher = null
+    supervision = null
+    api.notifications.showToast(
+      'error',
+      'Supervision could not start — phases will run unsupervised, approving their own tool calls',
+      'speckit.runtime.unavailable'
+    )
+    return null
+  }
+}
+
 export function activate(api: ExtensionAPI): void {
-  // speckit:feature-list — scan specs/ for feature dirs
-  reg(api, 'speckit:feature-list', async (payload: unknown) => {
-    const { repoRoot } = payload as { repoRoot: string }
-    if (!repoRoot) return { error: 'repoRoot required' }
-    const features = await listFeatures(repoRoot)
-    return { features }
+  // Kept, so a phase can wait for it. Activation cannot be async — the host
+  // calls it synchronously — but a dispatch that arrives in the meantime used
+  // to find no supervised runner and fall back to a headless
+  // `bypassPermissions` spawn: an invisible agent approving its own tool calls,
+  // which is the whole thing this replaced.
+  runtimeStarting = startSupervisionRuntime(api)
+  void runtimeStarting
+
+  // What a supervised run is waiting on, and how the operator answers it.
+  // Without these a phase blocks at its PreToolUse hook until the bridge hands
+  // the decision back to the terminal — which works, but makes the console a
+  // spectator of its own agents.
+  reg(api, 'speckit:permissions-list', () => ({ pending: pendingPermissions.list() }))
+
+  // The firings, and whether they were recorded or surfaced. Precision is
+  // measured against these by hand before shadow mode is turned off.
+  reg(api, 'speckit:stalls-list', () => ({
+    firings: stallFirings,
+    shadowMode: stallShadowMode(api),
+  }))
+
+  // What is running, what is waiting to be reviewed, and whether a new run
+  // would be refused.
+  reg(api, 'speckit:supervision-snapshot', () =>
+    supervision === null
+      ? { runs: [], review: [], backpressure: { allowed: true, unreviewed: 0, limit: 0 } }
+      : supervision.snapshot()
+  )
+
+  reg(api, 'speckit:feed-list', () => ({
+    entries: supervision?.feed.list() ?? [],
+    mutes: mutes?.list() ?? [],
+  }))
+
+  // Anything shown as a list should be prunable, and a feed you cannot clear a
+  // line from is one you stop reading.
+  reg(api, 'speckit:feed-dismiss', (payload: unknown) => {
+    const { id } = payload as { id: string }
+    supervision?.feed.removeEntry(id)
+    return { ok: true }
+  })
+
+  reg(api, 'speckit:feed-mute', (payload: unknown) => {
+    const { sessionId, author } = payload as { sessionId?: string; author?: 'agent' | 'console' }
+    mutes?.add({ sessionId, author })
+    return { mutes: mutes?.list() ?? [] }
+  })
+
+  reg(api, 'speckit:feed-unmute', (payload: unknown) => {
+    const { sessionId, author } = payload as { sessionId?: string; author?: 'agent' | 'console' }
+    mutes?.remove({ sessionId, author })
+    return { mutes: mutes?.list() ?? [] }
+  })
+
+  // What happened while you were away. Progress posts are rolled up rather
+  // than replayed one by one — the point of coming back to a digest is not to
+  // read every line the agents wrote.
+  reg(api, 'speckit:feed-digest', (payload: unknown) => {
+    const { from, to } = payload as { from: number; to?: number }
+    const entries = supervision?.feed.list() ?? []
+    return buildDigest(entries, from, to ?? Date.now())
+  })
+
+  reg(api, 'speckit:review-advance', (payload: unknown) => {
+    const { sessionId } = payload as { sessionId: string }
+    return { step: supervision?.review.advance(sessionId) ?? null }
+  })
+
+  // The unit of review is the hunk, not the file: one file routinely holds both
+  // the change you asked for and the one you did not.
+  reg(api, 'speckit:review-hunks', async (payload: unknown) => {
+    const { sessionId } = payload as { sessionId: string }
+    if (supervision === null) {
+      // Distinguished from "changed nothing": a panel that cannot tell them
+      // apart shows an empty review for a runtime that never started.
+      return { files: null, complete: false, fullReject: false }
+    }
+    const set = await supervision.hunksFor(sessionId)
+    if (set === null) return { files: [], complete: false, fullReject: false }
+    // Grouped by file, with the hunk's own lines: a reviewer decides on what
+    // the change says, and a list of identifiers is not a diff.
+    const files = new Map<string, HunkView[]>()
+    for (const { hunk, decision } of set.list()) {
+      const entry = files.get(hunk.file) ?? []
+      entry.push({ id: hunk.id, newStart: hunk.newStart, lines: [...hunk.lines], decision })
+      files.set(hunk.file, entry)
+    }
+    return {
+      files: [...files]
+        .map(([file, hunks]) => ({ file, hunks }))
+        .sort((a, b) => a.file.localeCompare(b.file)),
+      complete: set.isComplete(),
+      fullReject: set.isFullReject(),
+    }
+  })
+
+  reg(api, 'speckit:review-decide-hunk', async (payload: unknown) => {
+    const { sessionId, hunkId, decision } = payload as {
+      sessionId: string
+      hunkId: string
+      decision: 'accept' | 'reject'
+    }
+    const ok = (await supervision?.decideHunk(sessionId, hunkId, decision)) ?? false
+    return { ok }
+  })
+
+  // The request set against the agent's own account of what it did. The step
+  // every diff viewer skips, and the one that catches work that is defensible
+  // in isolation and was never asked for.
+  reg(api, 'speckit:review-intent', async (payload: unknown) => {
+    const { sessionId, request, agentAccount } = payload as {
+      sessionId: string
+      request: string
+      agentAccount: string
+    }
+    const intent = await supervision?.intentFor(sessionId, request, agentAccount)
+    return { intent: intent ?? null }
+  })
+
+  // Merge ordering across the repositories a card touches. A card with one lane
+  // costs nothing: every rule collapses to a no-op.
+  // Read from the card's own `workitem.json` rather than taken as a payload:
+  // the contract between the pipeline and the console is a file, and a surface
+  // that had to carry the lanes in would need a producer of its own.
+  reg(api, 'speckit:lanes', async (payload: unknown) => {
+    const { featureDir } = payload as { featureDir: string }
+    const card = await readLanesFor(featureDir)
+    // Null means one repository, which is not a card with a broken work item.
+    return { lanes: card === null ? [] : (supervision?.lanes(card) ?? []) }
+  })
+
+  reg(api, 'speckit:lane-may-merge', async (payload: unknown) => {
+    const { featureDir, ord, merged } = payload as {
+      featureDir: string
+      ord: number
+      merged: number[]
+    }
+    const card = await readLanesFor(featureDir)
+    if (card === null) {
+      // Nothing declared, nothing to wait for.
+      return { allowed: true, reason: null, blockingLane: null }
+    }
+    return (
+      supervision?.mayMerge(card, ord, merged ?? []) ?? {
+        allowed: false,
+        reason: 'the supervision runtime is not running',
+        blockingLane: null,
+      }
+    )
+  })
+
+  // Applying the decisions is what makes a rejection mean anything: the
+  // rejected hunks come back out of the working copy, the accepted ones stay.
+  reg(api, 'speckit:review-apply', async (payload: unknown) => {
+    const { sessionId } = payload as { sessionId: string }
+    const result = (await supervision?.applyDecisions(sessionId)) ?? {
+      ok: false,
+      reverted: 0,
+      error: 'the supervision runtime is not running',
+    }
+    if (result.ok && result.reverted > 0) {
+      supervision?.feed.post({
+        at: Date.now(),
+        sessionId,
+        author: 'console',
+        summary: `reverted ${result.reverted} rejected ${result.reverted === 1 ? 'hunk' : 'hunks'}`,
+      })
+      // The diff changed under it, so the queue's summary is now wrong.
+      await supervision?.measure(sessionId)
+    }
+    return result
+  })
+
+  reg(api, 'speckit:review-done', async (payload: unknown) => {
+    const { sessionId } = payload as { sessionId: string }
+    const run = supervision?.runs.get(sessionId) ?? null
+    supervision?.review.remove(sessionId)
+    supervision?.runs.forget(sessionId)
+    // Reviewing one is what reopens the gate. Cards held back by backpressure
+    // stayed pending until something else happened to drain the queue.
+    if (run !== null) {
+      await advanceQueue(api, path.dirname(path.dirname(run.featureDir)))
+    }
+    return { ok: true }
+  })
+
+  reg(api, 'speckit:permission-resolve', (payload: unknown) => {
+    const { requestId, decision, answer } = payload as {
+      requestId: string
+      decision: 'allow' | 'deny'
+      answer?: string
+    }
+    const sessionId = pendingPermissions.sessionFor(requestId)
+    if (sessionId === null || supervisedRunner === null) {
+      // Already answered, already handed back, or the run has ended. Reported
+      // rather than swallowed: a click that does nothing is worse than a
+      // refusal that says why.
+      return { ok: false, reason: 'that request is no longer waiting' }
+    }
+    const answered = supervisedRunner.resolve(sessionId, requestId, {
+      allow: decision === 'allow',
+      answer: answer === undefined || answer.trim() === '' ? undefined : answer,
+    })
+    if (!answered) {
+      // The id was still on the board but the bridge had let it go — answered
+      // in the terminal, handed back, or the run ended. Saying "ok" left a card
+      // showing a request nobody could clear.
+      pendingPermissions.remove(requestId)
+      return { ok: false, reason: 'that request is no longer waiting' }
+    }
+    return { ok: true }
+  })
+
+  // Hands one back deliberately: the operator would rather answer it in the
+  // terminal, where they can see what the agent was doing around it.
+  reg(api, 'speckit:permission-hand-back', (payload: unknown) => {
+    const { requestId } = payload as { requestId: string }
+    const sessionId = pendingPermissions.sessionFor(requestId)
+    if (sessionId === null || supervisedRunner === null) return { ok: false }
+    supervisedRunner.handBackToTerminal(sessionId, requestId)
+    return { ok: true }
+  })
+
+  // The four things you do about a run that has stopped making progress, and
+  // the one you do about any run. Without these the supervision panel could
+  // name a stall and offer nothing — which is the shape of every "correct and
+  // useless" surface this line of work exists to stop shipping.
+
+  // Takes you to the terminal the run is in.
+  //
+  // Done here rather than in the panel: the extension's UI is a separate
+  // renderer process, so a store it imports from core is a second copy that
+  // nothing renders. `terminal:navigate-to-session` is the core's own channel
+  // for this — it selects the workspace, the project and the tab.
+  reg(api, 'speckit:run-terminal', (payload: unknown) => {
+    const { sessionId } = payload as { sessionId: string }
+    const terminal = supervisedRunner?.terminalFor(sessionId) ?? null
+    if (terminal === null) return { ok: false }
+    api.window.focusSelf()
+    api.window.broadcast('terminal:navigate-to-session', {
+      sessionId: terminal.terminalSessionId,
+      projectId: terminal.projectId,
+    })
+    return { ok: true }
+  })
+
+  // What it was doing, in its own words. The action that decides the others.
+  reg(api, 'speckit:run-transcript', (payload: unknown) => {
+    const { sessionId, limit } = payload as { sessionId: string; limit?: number }
+    const run = supervision?.runs.get(sessionId) ?? null
+    if (run === null) return { lines: [] }
+    return { lines: readTranscriptTail(run.transcriptPath, limit ?? 40) }
+  })
+
+  // Ends the turn and keeps the session, which is what makes the next message
+  // land instead of queueing behind whatever it is part-way through.
+  reg(api, 'speckit:run-interrupt', (payload: unknown) => {
+    const { sessionId } = payload as { sessionId: string }
+    if (supervisedRunner === null) return { ok: false }
+    supervisedRunner.interrupt(sessionId)
+    return { ok: true }
+  })
+
+  // Asking it what is wrong, or telling it what to do instead — the same
+  // action, and the reason interrupt does not also end the run.
+  reg(api, 'speckit:run-redirect', (payload: unknown) => {
+    const { sessionId, message } = payload as { sessionId: string; message?: string }
+    // Guarded rather than assumed: an IPC payload is whatever the caller sent,
+    // and a handler that throws on a missing field takes the channel down for
+    // everyone rather than refusing one call.
+    if (supervisedRunner === null || typeof message !== 'string' || message.trim() === '') {
+      return { ok: false }
+    }
+    supervisedRunner.interrupt(sessionId)
+    const ok = supervisedRunner.send(sessionId, message.trim())
+    if (ok) {
+      supervision?.runs.setState(sessionId, 'working', Date.now())
+      supervision?.feed.post({
+        at: Date.now(),
+        sessionId,
+        author: 'console',
+        summary: `redirected: ${message.trim()}`,
+      })
+    }
+    return { ok }
+  })
+
+  // Ends the run, saying why first so the agent's own record carries it.
+  reg(api, 'speckit:run-stop', (payload: unknown) => {
+    const { sessionId, reason } = payload as { sessionId: string; reason?: string }
+    if (supervisedRunner === null) return { ok: false }
+    const ok = supervisedRunner.stop(sessionId, reason)
+    if (ok) supervision?.finish(sessionId, Date.now())
+    return { ok }
+  })
+
+  // Kill and discard: the run ends, its worktree and branch go with it, and the
+  // card is put back where it can be started again. A discarded run must not
+  // keep occupying a review slot — that would gate the next run on reviewing a
+  // diff that no longer exists.
+  reg(api, 'speckit:run-discard', async (payload: unknown) => {
+    const { sessionId, workspacePath } = payload as {
+      sessionId: string
+      workspacePath?: string
+    }
+    const run = supervision?.runs.get(sessionId) ?? null
+    if (run !== null) {
+      // Killed, not asked. `stop` types `/exit` into the terminal and returns
+      // immediately: the write is asynchronous and nothing waits for the
+      // process, so removing the worktree underneath it raced an agent still
+      // running in that directory.
+      api.pty.kill(run.terminalSessionId)
+      await discardWorktree(api, workspacePath ?? '', run.worktreePath, run.branch)
+      supervision?.review.remove(sessionId)
+      supervision?.runs.forget(sessionId)
+
+      // The card has to forget it too. Leaving `run` running and a
+      // `worktreePath` pointing at a directory that no longer exists makes the
+      // board show a live phase, and the next handoff provision against a path
+      // that is gone.
+      activeRunnerHandles.get(run.featureDir)?.stop()
+      activeRunnerHandles.delete(run.featureDir)
+      const state = await readMigratedState(run.featureDir)
+      if (state) {
+        if (state.run) {
+          state.run = {
+            ...state.run,
+            status: 'cancelled',
+            completedAt: new Date().toISOString(),
+          }
+        }
+        state.worktreePath = null
+        state.branchName = null
+        state.queuePosition = null
+        state.stage = deriveStage(state.phases, state.run)
+        await writePilotState(run.featureDir, state)
+        await appendHistory(run.featureDir, {
+          ts: new Date().toISOString(),
+          actor: 'user',
+          action: 'run_cancelled',
+          // The phase it was actually on. Recording a constant made the audit
+          // log claim every discard happened during the constitution.
+          phase: (run.phase as PhaseId) ?? 'constitution',
+          note: 'run discarded, worktree removed',
+        })
+        api.window.broadcast('speckit:state-changed', { state })
+      }
+      // Everything said about it goes too: the run, its worktree and its branch
+      // are gone, so its feed entries are noise about something that no longer
+      // exists. Posted after, so the discard itself is what remains.
+      supervision?.feed.forget(sessionId)
+      // The project the run needed goes with the directory it pointed at.
+      // Left behind, the sidebar keeps an entry for a path that is gone.
+      const workspace = api.workspace.list().find((w) => w.folderPath === (workspacePath ?? ''))
+      const project = workspace
+        ? api.workspace
+            .listProjects(workspace.id)
+            .find((candidate) => candidate.name === run.branch)
+        : undefined
+      if (project !== undefined) api.workspace.deleteProject(project.id)
+
+      supervision?.feed.post({
+        at: Date.now(),
+        sessionId,
+        author: 'console',
+        summary: `discarded ${path.basename(run.featureDir)} and removed its worktree`,
+      })
+    }
+    return { ok: run !== null }
   })
 
   // speckit:card-list — board data: every card with brief + derived stage + phase summary
@@ -838,24 +1624,18 @@ export function activate(api: ExtensionAPI): void {
           handle.stop()
           activeRunnerHandles.delete(featureDir)
         }
-        if (state.worktreePath) {
-          await api.shell
-            .exec({
-              command: 'git',
-              args: ['worktree', 'remove', state.worktreePath, '--force'],
-              cwd: workspacePath,
-            })
-            .catch(() => {})
-          if (state.branchName) {
-            await api.shell
-              .exec({
-                command: 'git',
-                args: ['branch', '-D', state.branchName],
-                cwd: workspacePath,
-              })
-              .catch(() => {})
-          }
+        await discardWorktree(api, workspacePath, state.worktreePath, state.branchName)
+        // Its worktree is gone, so everything the supervision layer holds about
+        // it describes something that no longer exists: a run on the register,
+        // a diff in the review queue holding the gate shut, tool calls waiting
+        // on an answer that can no longer reach anyone.
+        for (const run of supervision?.runs.list() ?? []) {
+          if (run.featureDir !== featureDir) continue
+          supervision?.review.remove(run.sessionId)
+          supervision?.feed.forget(run.sessionId)
         }
+        supervision?.runs.forgetCard(featureDir)
+        pendingPermissions.forgetCard(featureDir)
         state.run = { ...state.run!, status: 'cancelled', completedAt: new Date().toISOString() }
         state.queuePosition = null
         state.worktreePath = null
@@ -882,15 +1662,23 @@ export function activate(api: ExtensionAPI): void {
 
   // speckit:card-handoff — explicit "start" action: run the card through the pipeline
   reg(api, 'speckit:card-handoff', async (payload: unknown) => {
-    const { featureDir, workspacePath, baseBranch, mode } = payload as {
+    const { featureDir, workspacePath, baseBranch, mode, overrideBackpressure } = payload as {
       featureDir: string
       workspacePath: string
       baseBranch?: string
       mode?: RunMode
+      overrideBackpressure?: boolean
     }
     if (!featureDir || !workspacePath) return { error: 'featureDir and workspacePath required' }
     try {
-      return await handoffCard(api, featureDir, workspacePath, baseBranch, mode)
+      return await handoffCard(
+        api,
+        featureDir,
+        workspacePath,
+        baseBranch,
+        mode,
+        overrideBackpressure
+      )
     } catch (err) {
       api.notifications.showToast('error', `Handoff failed: ${String(err)}`, 'handoffFailed')
       return { error: String(err) }
@@ -912,7 +1700,10 @@ export function activate(api: ExtensionAPI): void {
           )
           continue
         }
-        const absPath = path.join(featureDir, spec.relPath)
+        const absPath = resolveArtifactPath(
+          { featureDir, worktreePath: state?.worktreePath },
+          path.join(featureDir, spec.relPath)
+        )
         let exists = false
         try {
           await fs.promises.access(absPath)
@@ -947,27 +1738,22 @@ export function activate(api: ExtensionAPI): void {
     const { repoRoot, query } = payload as { repoRoot: string; query: string }
     if (!repoRoot || !query) return { error: 'repoRoot and query required' }
     try {
+      // `git grep`, not `rg`: the host only permits git and gh, so the ripgrep
+      // call this replaced threw on every search and the fallback below was
+      // doing all the work — silently, because nothing typechecked this file.
+      // Same `path:line:text` output, so the parser is unchanged.
       const res = await api.shell.exec({
-        command: 'rg',
-        args: [
-          '--line-number',
-          '--no-heading',
-          '--color',
-          'never',
-          '--glob',
-          '*.md',
-          '--',
-          query,
-          '.',
-        ],
+        command: 'git',
+        args: ['grep', '--line-number', '--no-color', '-I', '-i', '-e', query, '--', '*.md'],
         cwd: repoRoot,
       })
-      // rg exit 0 = matches, 1 = no matches (both authoritative)
+      // 0 = matches, 1 = none. Both are answers; anything else is a failure.
       if (res.exitCode === 0 || res.exitCode === 1) {
         return { results: parseRgLines(res.stdout) }
       }
     } catch {
-      // rg unavailable — fall through to fs scan
+      // Not a repository, or git is unavailable — fall through to the fs scan,
+      // which also covers files git has never seen.
     }
     // Fallback: scan markdown under specs/ and docs/ plus README.md
     const files: { file: string; content: string }[] = []
@@ -1006,21 +1792,14 @@ export function activate(api: ExtensionAPI): void {
     return { results: searchFiles(files, query) }
   })
 
-  // speckit:check-artifacts — which phase artifact files exist?
-  reg(api, 'speckit:check-artifacts', async (payload: unknown) => {
-    const { featureDir, repoRoot } = payload as { featureDir: string; repoRoot: string }
-    if (!featureDir || !repoRoot) return { error: 'featureDir and repoRoot required' }
-    const exists = await checkArtifacts(featureDir, repoRoot)
-    return { exists }
-  })
-
   // speckit:pilot-state — load or create .pilot/state.json
   reg(api, 'speckit:pilot-state', async (payload: unknown) => {
     const { featureDir } = payload as { featureDir: string }
     if (!featureDir) return { error: 'featureDir required' }
     const state = await readPilotState(featureDir)
     if (!state) return { notFound: true }
-    return { state }
+    // Approve a spec, edit it by hand, and the board said nothing. Now it does.
+    return { state: await withHashVerification(state) }
   })
 
   // speckit:phase-approve — mark a phase approved
@@ -1038,14 +1817,14 @@ export function activate(api: ExtensionAPI): void {
     ps.status = 'approved'
     ps.approvedAt = new Date().toISOString()
     ps.approvedBy = 'user'
+    // What was approved, so an edit afterwards is visible rather than silent.
+    ps.approvedHash = await hashArtifacts(
+      artifactEntries({ featureDir, worktreePath: state.worktreePath }, ps.artifactPaths)
+    )
     if (note) ps.lastRunId = note
-    // Mark downstream approved phases as stale
-    const idx = PHASE_ORDER.indexOf(phase)
-    for (let i = idx + 1; i < PHASE_ORDER.length; i++) {
-      const downstream = state.phases[PHASE_ORDER[i]]
-      if (downstream && downstream.status === 'approved') {
-        downstream.status = 'stale'
-      }
+    // Everything downstream was approved against what this phase used to say.
+    for (const downstream of computeStalePhases(state, phase)) {
+      state.phases[downstream].status = 'stale'
     }
     if (state.run && state.run.status === 'running') {
       state.stage = deriveStage(state.phases, state.run)
@@ -1061,7 +1840,7 @@ export function activate(api: ExtensionAPI): void {
     api.window.broadcast('speckit:state-changed', { state })
 
     // Auto-start the next phase if the run is still active
-    const nextPhaseId = PHASE_ORDER[idx + 1]
+    const nextPhaseId = PHASE_ORDER[PHASE_ORDER.indexOf(phase) + 1]
     if (nextPhaseId && nextPhaseId !== 'open-pr' && state.run?.status !== 'cancelled') {
       const nextPs = state.phases[nextPhaseId]
       if (nextPs && (nextPs.status === 'locked' || nextPs.status === 'ready')) {
@@ -1073,7 +1852,7 @@ export function activate(api: ExtensionAPI): void {
         const handle = runner.startPhaseRunner({
           featureDir,
           worktreePath,
-          phaseCommand: phaseCommandFor(nextPhaseId, state.mode, cardTitleOf(state)),
+          phaseCommand: phaseCommandFor(nextPhaseId, state.mode, cardTitleOf(state), worktreePath),
           phase: nextPhaseId,
           feedbackNote: steer,
           ...makePhaseCallbacks(api, featureDir, nextPhaseId),
@@ -1082,42 +1861,6 @@ export function activate(api: ExtensionAPI): void {
       }
     }
 
-    return { state }
-  })
-
-  // speckit:phase-reject — reject a phase, delete artifact, reset to ready
-  reg(api, 'speckit:phase-reject', async (payload: unknown) => {
-    const { featureDir, phase, reason } = payload as {
-      featureDir: string
-      phase: PhaseId
-      reason: string
-    }
-    if (!featureDir || !phase) return { error: 'featureDir and phase required' }
-    let state = await readPilotState(featureDir)
-    if (!state) state = createPilotState(featureDir)
-    const ps = state.phases[phase]
-    if (!ps) return { error: `Unknown phase: ${phase}` }
-    // Delete phase output artifacts
-    for (const artifactPath of ps.artifactPaths) {
-      try {
-        await fs.promises.unlink(artifactPath)
-      } catch {
-        // ignore if missing
-      }
-    }
-    ps.status = 'ready'
-    ps.approvedAt = null
-    ps.approvedBy = null
-    ps.approvedHash = null
-    await writePilotState(featureDir, state)
-    await appendHistory(featureDir, {
-      ts: new Date().toISOString(),
-      actor: 'user',
-      action: 'rejected',
-      phase,
-      note: reason,
-    })
-    api.window.broadcast('speckit:state-changed', { state })
     return { state }
   })
 
@@ -1167,11 +1910,18 @@ export function activate(api: ExtensionAPI): void {
       commit?: string
     }
     if (!filePath) return { error: 'filePath required' }
-    const cwd = repoRoot || featureDir || path.dirname(filePath)
+    // Resolved against the run's worktree: the recorded path names the main
+    // checkout, and that is not where the phase wrote it.
+    const state = featureDir ? await readPilotState(featureDir) : null
+    const resolved =
+      featureDir === undefined
+        ? filePath
+        : resolveArtifactPath({ featureDir, worktreePath: state?.worktreePath }, filePath)
+    const cwd = state?.worktreePath || repoRoot || featureDir || path.dirname(resolved)
     const { exec } = await import('node:child_process')
     const { promisify } = await import('node:util')
     const execAsync = promisify(exec)
-    const relPath = path.relative(cwd, filePath)
+    const relPath = path.relative(cwd, resolved)
 
     let current: string | null = null
     if (commit) {
@@ -1184,7 +1934,7 @@ export function activate(api: ExtensionAPI): void {
       }
     } else {
       try {
-        current = await fs.promises.readFile(filePath, 'utf-8')
+        current = await fs.promises.readFile(resolved, 'utf-8')
       } catch {
         current = null
       }
@@ -1209,63 +1959,6 @@ export function activate(api: ExtensionAPI): void {
     return { entries }
   })
 
-  // speckit:session-list — return active terminal sessions
-  reg(api, 'speckit:session-list', (_payload: unknown) => {
-    return { sessions: Array.from(activeSessions.values()) }
-  })
-
-  // speckit:implement-stop — stop an active implement run
-  reg(api, 'speckit:implement-stop', async (payload: unknown) => {
-    const { featureDir, phase } = payload as { featureDir: string; phase?: PhaseId }
-    if (!featureDir) return { error: 'featureDir required' }
-    activeRuns.delete(featureDir)
-    if (phase) {
-      const state = await readPilotState(featureDir)
-      if (state) {
-        const ps = state.phases[phase]
-        if (ps && ps.status === 'running') {
-          ps.status = 'ready'
-          await writePilotState(featureDir, state)
-          await appendHistory(featureDir, {
-            ts: new Date().toISOString(),
-            actor: 'user',
-            action: 'run_failed',
-            phase,
-            note: 'stopped by user',
-          })
-          api.window.broadcast('speckit:state-changed', { state })
-        }
-      }
-    }
-    return { ok: true }
-  })
-
-  // speckit:checkpoint-create — create a git checkpoint commit before implement run
-  reg(api, 'speckit:checkpoint-create', async (payload: unknown) => {
-    const { featureDir, repoRoot, worktreePath } = payload as {
-      featureDir: string
-      repoRoot?: string
-      worktreePath?: string
-    }
-    if (!featureDir) return { error: 'featureDir required' }
-    const cwd = worktreePath ?? repoRoot ?? featureDir
-    try {
-      const { exec } = await import('node:child_process')
-      const { promisify } = await import('node:util')
-      const execAsync = promisify(exec)
-      await execAsync('git add -A', { cwd })
-      const result = await execAsync(
-        'git commit --allow-empty -m "[SpecKit] checkpoint before implement run"',
-        { cwd }
-      )
-      // Extract commit hash from output
-      const match = result.stdout.match(/\[[\w/]+ ([0-9a-f]+)\]/)
-      return { commitHash: match ? match[1] : 'unknown' }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
-
   // speckit:phase-skip — mark a phase as intentionally skipped
   reg(api, 'speckit:phase-skip', async (payload: unknown) => {
     const { featureDir, phase, note } = payload as {
@@ -1282,6 +1975,13 @@ export function activate(api: ExtensionAPI): void {
     ps.approvedAt = null
     ps.approvedBy = null
     ps.approvedHash = null
+    // A skip has to advance the card the way an approval does. Setting the
+    // status alone left it at a gate with nothing following it: the next phase
+    // stayed locked and no runner ever started.
+    const nextAfterSkip = PHASE_ORDER[PHASE_ORDER.indexOf(phase) + 1]
+    const followingSkip = nextAfterSkip ? state.phases[nextAfterSkip] : undefined
+    if (followingSkip && followingSkip.status === 'locked') followingSkip.status = 'ready'
+    state.stage = deriveStage(state.phases, state.run)
     await writePilotState(featureDir, state)
     await appendHistory(featureDir, {
       ts: new Date().toISOString(),
@@ -1317,36 +2017,6 @@ export function activate(api: ExtensionAPI): void {
     })
     api.window.broadcast('speckit:state-changed', { state })
     return { state }
-  })
-
-  // speckit:implement-file-decision — approve or skip a pending file write
-  reg(api, 'speckit:implement-file-decision', async (payload: unknown) => {
-    const { filePath, decision, featureDir, repoRoot } = payload as {
-      filePath: string
-      decision: 'approve' | 'skip'
-      featureDir: string
-      repoRoot?: string
-    }
-    if (!filePath || !decision) return { error: 'filePath and decision required' }
-    if (decision === 'skip') {
-      const cwd = repoRoot || featureDir
-      try {
-        const { exec } = await import('node:child_process')
-        const { promisify } = await import('node:util')
-        const execAsync = promisify(exec)
-        await execAsync(`git checkout -- "${filePath}"`, { cwd })
-      } catch {
-        // ignore if file not tracked
-      }
-    }
-    await appendHistory(featureDir, {
-      ts: new Date().toISOString(),
-      actor: 'user',
-      action: decision === 'approve' ? 'file_approved' : 'file_skipped',
-      phase: 'implement',
-      filePath,
-    })
-    return { ok: true }
   })
 
   // speckit:file-write — write any file within the project (markdown edits)
@@ -1437,7 +2107,12 @@ export function activate(api: ExtensionAPI): void {
     }
   })
 
-  // speckit:dispatch — create feature dir, init state v2, start agent on constitution phase
+  // speckit:dispatch — create the feature dir, its state, and start the first
+  // phase, in one call.
+  //
+  // The board's own route is card-create then card-handoff; this is the
+  // one-step entry a tracker or the remote bridge uses, and what the e2e drives
+  // to prove a phase really opens a terminal.
   reg(api, 'speckit:dispatch', async (payload: unknown) => {
     const { ticket, workspacePath, autonomyLevel, baseBranch, mode } = payload as {
       ticket: TicketRef
@@ -1490,14 +2165,15 @@ export function activate(api: ExtensionAPI): void {
         queuePosition: 'active',
         worktreePath,
         branchName,
+        // Recorded here too: dispatch can hit the gate below and queue, and
+        // whatever starts it later reads this to know what to measure against.
+        baseBranch: baseBranch ?? null,
       })
 
-      const pilotDir = path.join(featureDir, '.pilot')
-      await fs.promises.mkdir(pilotDir, { recursive: true })
-      const stateFile = path.join(pilotDir, 'state.json')
-      const tmp = `${stateFile}.tmp`
-      await fs.promises.writeFile(tmp, JSON.stringify(state, null, 2), 'utf-8')
-      await fs.promises.rename(tmp, stateFile)
+      // Through the one writer, which names its temp file uniquely: two
+      // overlapping writes to a fixed `.tmp` race, and the loser's rename
+      // throws ENOENT.
+      await writePilotState(featureDir, state)
 
       // Create git worktree branching from baseBranch (or HEAD if not specified),
       // reusing the branch if it already exists.
@@ -1529,13 +2205,26 @@ export function activate(api: ExtensionAPI): void {
       primePhasesForRun(state)
       state.stage = deriveStage(state.phases, state.run)
       await writePilotState(featureDir, state)
+
+      // Dispatch provisions the card and then runs it. The gate is checked here
+      // too — a card taken in from a tracker is still an agent starting while
+      // diffs wait, and refusing after the worktree exists would waste it.
+      const gate = supervision?.backpressure.check()
+      if (gate !== undefined && !gate.allowed) {
+        state.queuePosition = 'pending'
+        await writePilotState(featureDir, state)
+        api.window.broadcast('speckit:state-changed', { state })
+        return { featureDir, queued: true, reason: gate.reason, backpressure: gate }
+      }
+
       await startRunAt(
         api,
         featureDir,
         worktreePath,
         firstRunnablePhase(state),
         state.mode,
-        state.card.title
+        state.card.title,
+        baseBranch
       )
 
       api.window.broadcast('speckit:dispatch-started', { featureDir, branchName, worktreePath })
@@ -1704,6 +2393,25 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'speckit:run-reply', async (payload: unknown) => {
     const { featureDir, text } = payload as { featureDir?: string; text?: string }
     if (!featureDir || !text || !text.trim()) return { error: 'featureDir and text required' }
+
+    // A supervised run is a terminal with claude in it: the reply is typed
+    // there. Falling through to the headless path below would kill the session
+    // the operator is watching and start a second, invisible agent.
+    const live = supervision?.runs
+      .live()
+      .find((run) => run.featureDir === featureDir && run.state !== 'finished')
+    if (live !== undefined && supervisedRunner !== null) {
+      const sent = supervisedRunner.send(live.sessionId, text.trim())
+      if (sent) {
+        supervision?.feed.post({
+          at: Date.now(),
+          sessionId: live.sessionId,
+          author: 'console',
+          summary: `replied: ${text.trim()}`,
+        })
+        return { ok: true }
+      }
+    }
 
     const sessionId = phaseSessionIds.get(featureDir)
     if (!sessionId) {
@@ -1954,7 +2662,7 @@ export function activate(api: ExtensionAPI): void {
       const handle = runner.startPhaseRunner({
         featureDir,
         worktreePath,
-        phaseCommand: phaseCommandFor(phase, state.mode, cardTitleOf(state)),
+        phaseCommand: phaseCommandFor(phase, state.mode, cardTitleOf(state), worktreePath),
         phase,
         feedbackNote: note,
         ...makePhaseCallbacks(api, featureDir, phase),
@@ -1996,7 +2704,7 @@ export function activate(api: ExtensionAPI): void {
   if (api.terminal?.onSessionCreate) {
     disposables.push(
       api.terminal.onSessionCreate((session) => {
-        activeSessions.set(session.id, { id: session.id, name: session.name ?? session.id })
+        activeSessions.set(session.id, { id: session.id, name: session.tabTitle })
       })
     )
   }
@@ -2018,6 +2726,13 @@ export function activate(api: ExtensionAPI): void {
           default: true,
           workspaceScoped: true,
         },
+        'terminator.speckit-pilot.stallShadowMode': {
+          type: 'boolean',
+          label: 'Record stalls without surfacing them',
+          description:
+            'On by default. A stall detector that cries wolf gets turned off, and then the real stalls go unreported too — judge a week of recorded firings before turning this off.',
+          default: true,
+        },
         'terminator.speckit-pilot.maxConcurrentRuns': {
           type: 'number',
           label: 'Maximum cards running in parallel',
@@ -2034,7 +2749,73 @@ export function activate(api: ExtensionAPI): void {
   )
 }
 
+/**
+ * Puts what is running, and what is waiting to be reviewed, one keystroke away.
+ *
+ * Three surfaces answer the same question — what needs me, ranked — and this is
+ * the one you reach without moving your hands.
+ */
+function refreshPalette(api: ExtensionAPI): void {
+  const snapshot = supervision?.snapshot() ?? null
+  const entries = snapshot === null ? [] : paletteEntries(snapshot.runs, snapshot.review)
+  // Rebuilt only when it would read differently, so an open palette is not
+  // re-registered under the cursor every tick.
+  const signature = entries.map((e) => `${e.id}:${e.description}`).join('|')
+  if (signature === paletteSignature) return
+  paletteSignature = signature
+
+  for (const registration of paletteRegistrations) registration.dispose()
+  paletteRegistrations = entries.map((entry) =>
+    api.commands.register(
+      {
+        id: entry.id,
+        label: entry.label,
+        description: entry.description,
+        category: entry.category,
+      },
+      () => {
+        // The window first: a command that changes what is on screen behind
+        // another window has done nothing you can see.
+        api.window.focusSelf()
+        const terminal =
+          entry.kind === 'run' ? (supervisedRunner?.terminalFor(entry.sessionId) ?? null) : null
+        if (terminal !== null) {
+          // Straight to the terminal, through the core's own navigation.
+          api.window.broadcast('terminal:navigate-to-session', {
+            sessionId: terminal.terminalSessionId,
+            projectId: terminal.projectId,
+          })
+          return
+        }
+        api.window.broadcast('speckit:palette-goto', {
+          kind: entry.kind,
+          sessionId: entry.sessionId,
+        })
+      }
+    )
+  )
+}
+
 export function deactivate(): void {
   disposables.forEach((d) => d.dispose())
   disposables.length = 0
+  setSupervisedRunner(null)
+  setPermissionSink(null)
+  setReadOnlyStateDir(null)
+  setRunSupervision(null)
+  supervision = null
+  mutes = null
+  for (const notification of raisedNotifications.values()) notification.dispose()
+  raisedNotifications.clear()
+  stallWatcher?.stop()
+  stallWatcher = null
+  if (paletteTimer !== null) clearInterval(paletteTimer)
+  paletteTimer = null
+  for (const registration of paletteRegistrations) registration.dispose()
+  paletteRegistrations = []
+  paletteSignature = ''
+  supervisedRunner?.dispose()
+  supervisedRunner = null
+  void control?.close()
+  control = null
 }

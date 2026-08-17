@@ -2,7 +2,7 @@
 
 Extensions let you add functionality to Terminator without touching its core code. They contribute to the application through the `ExtensionAPI` — a stable, versioned interface. This guide covers everything you need to write, test, and distribute an extension.
 
-**Current API version**: 2.0.0 (webview renderer isolation — see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
+**Current API version**: 2.1.0 (an extension can own a supervised agent run — `workspace.createProject` and `pty.openTerminalTab`; webview renderer isolation since 2.0.0, see [ADR-022](adr/022-webview-isolated-extension-renderer.md))
 
 ---
 
@@ -425,6 +425,59 @@ api.pty.listSessions() // every live session with full SessionInfo
 ```
 
 `onData`/`onExit` support any number of subscribers per session and return disposers; all listeners are cleaned up automatically when the PTY exits. The v1.1.0 methods `spawn(sessionId, cwd, shell, type, onData, onExit)`, `attachOnData`, and `attachOnExit` remain as deprecated aliases.
+
+#### `openTerminalTab` — a terminal the operator can see _(v2.1.0)_
+
+`spawnSession` gives you a process and a data stream, but nothing on screen: the
+renderer owns the tab list and does not know your session exists. An extension
+that runs an agent this way produces a process nobody can watch or type into.
+
+```typescript
+const projectId = api.workspace.createProject({
+  workspaceId,
+  name: branch,
+  worktreePath,
+  gitBranch: branch,
+})?.id
+
+const sessionId = api.pty.openTerminalTab({
+  projectId,
+  cwd: worktreePath,
+  tabTitle: branch,
+  type: 'agent', // default; a person can still type into it
+})
+// null when this extension context cannot reach the windows at all — nothing
+// is spawned in that case. Note it does not check that a window is *open*: with
+// no renderer listening the PTY runs and its output is held until one attaches.
+```
+
+Output produced before the tab is mounted is **held, not dropped**. The renderer
+has to be told, adopt the session, render, and mount an xterm before anything is
+listening; delivered live, everything in that window goes to nobody — including
+the command you just typed into it. The hold is released automatically when the
+tab mounts.
+
+### `api.workspace.createProject` — somewhere to put a worktree _(v2.1.0)_
+
+An extension that provisions a git worktree previously had nowhere to put it: the
+checkout existed and nothing in the sidebar showed it.
+
+```typescript
+const project = api.workspace.createProject({
+  workspaceId,
+  name: 'feat/session-ulid',
+  worktreePath: '/…/worktrees/feat-session-ulid',
+  gitBranch: 'feat/session-ulid',
+  isWorktree: true, // default
+})
+```
+
+Returns the **existing** project when the workspace already has one for that
+**path**, so provisioning the same worktree twice lands in the project you were
+already looking at rather than beside it. Matching on the name as well would
+merge two different worktrees whose branches happen to share one; a name
+collision is disambiguated instead, as `name (directory)`. The sidebar is notified, so it appears
+without a reload.
 
 ---
 

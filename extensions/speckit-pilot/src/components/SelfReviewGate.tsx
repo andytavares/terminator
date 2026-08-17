@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { CheckCircle, XCircle, AlertCircle, ArrowLeft, GitMerge } from 'lucide-react'
+import { CheckCircle, XCircle, MinusCircle, AlertCircle, ArrowLeft, GitMerge } from 'lucide-react'
 import type { SelfReviewResult } from '../types/speckit.types.js'
 import { getSpeckitAPI } from '../types/electron.js'
 
@@ -9,8 +9,14 @@ interface SelfReviewGateProps {
 
 interface QualityRow {
   label: string
-  passed: boolean
+  /** Null when the check did not run: not a pass, and not its failure either. */
+  passed: boolean | null
   detail: string
+}
+
+/** A count the tool did not report reads as unknown, never as zero. */
+function count(value: number | null, unit: string): string {
+  return value === null ? `${unit} not reported` : `${value} ${unit}`
 }
 
 function parseRows(result: SelfReviewResult): QualityRow[] {
@@ -18,26 +24,44 @@ function parseRows(result: SelfReviewResult): QualityRow[] {
     {
       label: 'Format',
       passed: result.format.passed,
-      detail: result.format.passed ? 'Clean' : 'Issues found',
+      detail:
+        result.format.passed === null
+          ? 'Not checked'
+          : result.format.passed
+            ? 'Clean'
+            : 'Issues found',
     },
     {
       label: 'Lint',
       passed: result.lint.passed,
-      detail: result.lint.passed
-        ? `${result.lint.warningCount} warnings`
-        : `${result.lint.errorCount} errors, ${result.lint.warningCount} warnings`,
+      detail:
+        result.lint.passed === null
+          ? 'Not run'
+          : result.lint.passed
+            ? count(result.lint.warningCount, 'warnings')
+            : `${count(result.lint.errorCount, 'errors')}, ${count(result.lint.warningCount, 'warnings')}`,
     },
     {
       label: 'Coverage',
       passed: result.coverage.passed,
-      detail: `${result.coverage.percentage}%`,
+      detail:
+        result.coverage.percentage === null
+          ? result.coverage.passed === null
+            ? 'Not run'
+            : 'Not reported'
+          : `${result.coverage.percentage}%`,
     },
     {
       label: 'Google Review',
       passed: result.googleReview.passed,
-      detail: result.googleReview.passed
-        ? 'No blockers'
-        : `${result.googleReview.blockerCount} blockers`,
+      detail:
+        result.googleReview.passed === null
+          ? 'Not run'
+          : // The review writes prose, not a count. Saying "0 blockers" from a
+            // passing exit code would be a number nobody measured.
+            result.googleReview.passed
+            ? 'No blockers reported'
+            : 'Blockers reported — read the review above',
     },
   ]
 }
@@ -90,21 +114,25 @@ export function SelfReviewGate({ featureDir }: SelfReviewGateProps) {
     )
   }
 
-  if (!result) {
-    return (
-      <div style={{ padding: 16, color: 'var(--tm-text-secondary)' }}>
-        No self-review results available.
-      </div>
-    )
-  }
-
-  const rows = parseRows(result)
+  // Deliberately not an early return. The checks run as a shell chain whose
+  // output goes to the console, and nothing writes the parsed summary yet — so
+  // returning here left the phase with no approve button anywhere, and the card
+  // could not move. A gate that cannot be answered is worse than one with no
+  // summary on it.
+  const rows = result === null ? [] : parseRows(result)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16 }}>
       <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--tm-text-primary)' }}>
         Self-Review Quality Gate
       </div>
+
+      {rows.length === 0 && (
+        <div style={{ color: 'var(--tm-text-secondary)', fontSize: 12 }}>
+          No parsed summary — the checks ran as a shell chain and their output is in the console
+          above. Read it before deciding.
+        </div>
+      )}
 
       {/* Quality rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -120,7 +148,11 @@ export function SelfReviewGate({ featureDir }: SelfReviewGateProps) {
               borderRadius: 6,
             }}
           >
-            {row.passed ? (
+            {/* A check that did not run gets neither mark: a tick would claim
+                it passed, a cross would blame it for failing. */}
+            {row.passed === null ? (
+              <MinusCircle size={14} style={{ color: 'var(--tm-text-secondary)' }} />
+            ) : row.passed ? (
               <CheckCircle size={14} style={{ color: 'var(--tm-success, #22c55e)' }} />
             ) : (
               <XCircle size={14} style={{ color: 'var(--tm-danger)' }} />
@@ -131,7 +163,7 @@ export function SelfReviewGate({ featureDir }: SelfReviewGateProps) {
             <span
               style={{
                 fontSize: 12,
-                color: row.passed ? 'var(--tm-text-secondary)' : 'var(--tm-danger)',
+                color: row.passed === false ? 'var(--tm-danger)' : 'var(--tm-text-secondary)',
               }}
             >
               {row.detail}
@@ -149,9 +181,9 @@ export function SelfReviewGate({ featureDir }: SelfReviewGateProps) {
               >
                 <div
                   style={{
-                    width: `${Math.min(result.coverage.percentage, 100)}%`,
+                    width: `${Math.min(result?.coverage.percentage ?? 0, 100)}%`,
                     height: '100%',
-                    background: result.coverage.passed
+                    background: result?.coverage.passed
                       ? 'var(--tm-success, #22c55e)'
                       : 'var(--tm-danger)',
                   }}
@@ -163,7 +195,7 @@ export function SelfReviewGate({ featureDir }: SelfReviewGateProps) {
       </div>
 
       {/* Warning for non-passing items */}
-      {rows.some((r) => !r.passed) && (
+      {rows.some((r) => r.passed === false) && (
         <div
           style={{
             display: 'flex',
@@ -180,7 +212,7 @@ export function SelfReviewGate({ featureDir }: SelfReviewGateProps) {
       )}
 
       {/* Summary */}
-      {result.summary && (
+      {result?.summary && (
         <div style={{ fontSize: 12, color: 'var(--tm-text-secondary)', padding: '4px 0' }}>
           {result.summary}
         </div>

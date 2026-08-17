@@ -176,11 +176,27 @@ export interface RunMeta {
   autonomyLevel: AutonomyLevel
 }
 
+/**
+ * What the self-review checks found.
+ *
+ * Every field is nullable because "not measured" has to be sayable: the checks
+ * run as separate steps and any of them can be skipped (a repository with no
+ * lint script) or never reached. A zero would read as "no errors", and a review
+ * that claims that when it does not know is worse than one that says nothing.
+ *
+ * `output` is null by design — each step streams to the run console live, and
+ * capturing it per step would mean piping, which costs the live view.
+ */
 export interface SelfReviewResult {
-  format: { passed: boolean; output: string }
-  lint: { passed: boolean; errorCount: number; warningCount: number; output: string }
-  coverage: { passed: boolean; percentage: number; output: string }
-  googleReview: { passed: boolean; blockerCount: number; output: string }
+  format: { passed: boolean | null; output: string | null }
+  lint: {
+    passed: boolean | null
+    errorCount: number | null
+    warningCount: number | null
+    output: string | null
+  }
+  coverage: { passed: boolean | null; percentage: number | null; output: string | null }
+  googleReview: { passed: boolean | null; blockerCount: number | null; output: string | null }
   summary: string
 }
 
@@ -224,6 +240,14 @@ export interface PilotState {
   queuePosition: 'active' | 'pending' | null
   worktreePath: string | null
   branchName: string | null
+  /**
+   * What the worktree was cut from.
+   *
+   * Persisted because a card can be provisioned now and started later, when
+   * the queue drains — and a run measured against `main` instead reports the
+   * difference between two branches rather than the work it did.
+   */
+  baseBranch?: string | null
   prUrl: string | null
   phases: Record<PhaseId, PhaseState>
   settings: PilotSettings

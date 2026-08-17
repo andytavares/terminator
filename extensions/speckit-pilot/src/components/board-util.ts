@@ -1,12 +1,13 @@
-import { STAGE_ORDER } from '../types/speckit.types.js'
 import type { BoardStage, CardSummary } from '../types/speckit.types.js'
 
 /** Group cards by their board stage, preserving STAGE_ORDER for the columns. */
 export function bucketCards(cards: CardSummary[]): Record<BoardStage, CardSummary[]> {
-  const buckets = Object.fromEntries(STAGE_ORDER.map((s) => [s, []])) as Record<
-    BoardStage,
-    CardSummary[]
-  >
+  const buckets: Record<BoardStage, CardSummary[]> = {
+    backlog: [],
+    'in-progress': [],
+    'in-review': [],
+    done: [],
+  }
   for (const card of cards) {
     ;(buckets[card.stage] ?? buckets.backlog).push(card)
   }

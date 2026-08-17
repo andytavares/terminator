@@ -1,6 +1,7 @@
 # ADR-007: Agent Runner as Child Subprocess
 
 **Status:** Accepted  
+**Superseded in part by:** [ADR-026](026-supervised-runs-in-a-terminal.md) — a card's phases now run supervised, in a visible terminal. The headless spawn described here remains only for self-review, which needs an agent that cannot write.  
 **Date:** 2026-06-27
 
 ## Context
@@ -26,6 +27,12 @@ We spawn **Claude Code CLI** (`claude`) as a child process via Node.js `child_pr
 - **Requires Claude Code installed.** The user must have `claude` on their PATH. We validate this at dispatch time.
 - **Headless runs bypass permission prompts.** Each phase is spawned as a non-interactive `claude --print` pipe with no channel to answer approval prompts, so it runs with `--permission-mode bypassPermissions`. Without this every Write/Edit/Bash tool call stalls forever waiting on approval that can never arrive. This is safe because each phase runs in the card's own isolated git worktree (see ADR-011), the exact "isolated environment" this mode is intended for. Batch check-ins (implement phase) remain the human gate — the user reviews diffs at batch boundaries rather than approving individual tool calls.
 - **Self-review command:** `npm run format && npm run lint && npx vitest run --coverage && claude --print --permission-mode bypassPermissions /google-review`
+  - _Superseded._ The review no longer bypasses permissions — it runs under a
+    read-only command policy (see [ADR-026](026-supervised-runs-in-a-terminal.md)) — and the
+    four checks run as separate steps rather than an `&&` chain, so each records
+    its own result. `format` was replaced by the repository's `format:check`:
+    the former is `prettier --write`, and a review that reformats the code under
+    review is not a review. See `src/runner/self-review-plan.ts`.
 
 ## Alternatives Considered
 

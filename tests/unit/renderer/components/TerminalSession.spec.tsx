@@ -97,6 +97,7 @@ vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
 )
 
 const mockOnOutput = vi.fn()
+const mockAttach = vi.fn()
 const mockInput = vi.fn()
 const mockResize = vi.fn()
 const mockUnsubscribe = vi.fn()
@@ -112,6 +113,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockMeasureText.mockReturnValue({ width: 8 })
   mockOnOutput.mockReturnValue(mockUnsubscribe)
+  mockAttach.mockResolvedValue({ released: false })
   mockOpenExternal.mockResolvedValue({ ok: true })
   mockOpenPath.mockResolvedValue({ ok: true })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
@@ -119,6 +121,7 @@ beforeEach(() => {
       onOutput: mockOnOutput,
       input: mockInput,
       resize: mockResize,
+      attach: mockAttach,
     },
     shell: {
       openExternal: mockOpenExternal,
@@ -926,5 +929,22 @@ describe('TerminalInstance', () => {
       instance.dispose()
       expect(mockDisconnect).toHaveBeenCalled()
     })
+  })
+})
+
+describe('taking over a terminal that was already running', () => {
+  it('says it is on screen, so held output is delivered rather than dropped', () => {
+    // A supervised agent's terminal starts producing output before this
+    // component exists. It is held until this call, and without it the operator
+    // opens the tab to find the launch command and everything after it missing.
+    new TerminalInstance('agent-session', 1000)
+    expect(mockAttach).toHaveBeenCalledWith('agent-session')
+  })
+
+  it('subscribes before attaching, so nothing arrives with nowhere to go', () => {
+    new TerminalInstance('agent-session', 1000)
+    expect(mockOnOutput.mock.invocationCallOrder[0]).toBeLessThan(
+      mockAttach.mock.invocationCallOrder[0]
+    )
   })
 })

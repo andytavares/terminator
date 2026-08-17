@@ -33,6 +33,7 @@ vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import {
+  adoptTerminalSession,
   createTerminalSession,
   splitTerminalSession,
 } from '../../../../src/renderer/terminal/session-controller'
@@ -46,6 +47,7 @@ const mockSetSessionBusy = vi.fn()
 const mockSetSessionIdle = vi.fn()
 const mockGetFocusedSession = vi.fn()
 const mockGetActiveSessionForProject = vi.fn()
+const mockAdoptSession = vi.fn()
 
 const sessions = new Map<
   string,
@@ -68,6 +70,7 @@ beforeEach(() => {
     setSessionIdle: mockSetSessionIdle,
     getFocusedSession: mockGetFocusedSession,
     getActiveSessionForProject: mockGetActiveSessionForProject,
+    adoptSession: mockAdoptSession,
   } as unknown as ReturnType<typeof useSessionStore.getState>)
   vi.mocked(useWorkspaceStore.getState).mockReturnValue({
     activeProjectId: 'other-project',
@@ -226,5 +229,67 @@ describe('splitTerminalSession', () => {
     expect(mockDispatchNotification).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'Split Tab needs attention' })
     )
+  })
+})
+
+describe('adoptTerminalSession', () => {
+  // A supervised agent's terminal is spawned in the main process. The store
+  // record alone is not a tab you can see: without an xterm instance nothing
+  // ever mounts and the project opens empty, which is the invisible agent this
+  // runtime exists to have got rid of.
+  const adopted = {
+    sessionId: 'terminal-1',
+    projectId: 'proj-1',
+    tabTitle: 'feat/x',
+    scrollbackLimit: 5000,
+  }
+
+  it('records the session', () => {
+    adoptTerminalSession(adopted)
+    expect(mockAdoptSession).toHaveBeenCalledWith(adopted)
+  })
+
+  it('builds the xterm instance, without which no pane ever mounts', () => {
+    adoptTerminalSession(adopted)
+    expect(capturedCtorArgs).toEqual([
+      expect.objectContaining({ sessionId: 'terminal-1', scrollbackLimit: 5000 }),
+    ])
+  })
+
+  it('stores the instance before activating, so the pane effect finds it', () => {
+    mockGetActiveSessionForProject.mockReturnValue(null)
+    adoptTerminalSession(adopted)
+    const instanceCall = mockSetTerminalInstance.mock.invocationCallOrder[0]
+    const activateCall = mockSetActiveSessionForProject.mock.invocationCallOrder[0]
+    expect(instanceCall).toBeLessThan(activateCall)
+  })
+
+  it('shows it when the project has nothing selected', () => {
+    mockGetActiveSessionForProject.mockReturnValue(null)
+    adoptTerminalSession(adopted)
+    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('proj-1', 'terminal-1')
+  })
+
+  it('does not steal focus from the terminal being read', () => {
+    // A supervised run starting in the background used to yank the operator
+    // away from whatever they had open in that project.
+    mockGetActiveSessionForProject.mockReturnValue('the-one-being-read')
+    adoptTerminalSession(adopted)
+    expect(mockSetActiveSessionForProject).not.toHaveBeenCalled()
+  })
+
+  it('does nothing for a session it already has, so a repeat is not a second tab', () => {
+    sessions.set('terminal-1', { projectId: 'proj-1', tabTitle: 'feat/x' })
+    adoptTerminalSession(adopted)
+    expect(mockAdoptSession).not.toHaveBeenCalled()
+    expect(capturedCtorArgs).toEqual([])
+  })
+
+  it('wires bell, busy and idle exactly as a terminal the operator opened', () => {
+    adoptTerminalSession(adopted)
+    capturedCtorArgs[0].hooks?.onBusy?.()
+    capturedCtorArgs[0].hooks?.onIdle?.()
+    expect(mockSetSessionBusy).toHaveBeenCalledWith('terminal-1')
+    expect(mockSetSessionIdle).toHaveBeenCalledWith('terminal-1')
   })
 })

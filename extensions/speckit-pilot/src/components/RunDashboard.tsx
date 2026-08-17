@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Square } from 'lucide-react'
 import type { PhaseId, PilotState } from '../types/speckit.types.js'
 import { PHASE_ORDER } from '../types/speckit.types.js'
-import { getSpeckitAPI } from '../types/electron.js'
+import { getSpeckitAPI, type RunView } from '../types/electron.js'
 import { PhaseRail } from './PhaseRail.js'
 import { RunConsole } from './RunConsole.js'
 import { GatePanel } from './GatePanel.js'
+import { computeStalePhases } from '../state/phase-state-machine.js'
 import { SelfReviewGate } from './SelfReviewGate.js'
 import { OpenPrGate } from './OpenPrGate.js'
 import { BatchCheckIn } from './BatchCheckIn.js'
@@ -41,6 +42,40 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
   const [linesByPhase, setLinesByPhase] = useState<Partial<Record<string, string[]>>>({})
   const [viewingPhase, setViewingPhase] = useState<PhaseId | null>(null)
   const [gateContent, setGateContent] = useState<string | null>(null)
+  // The run this card has in a terminal, and what it has been saying.
+  //
+  // A supervised phase writes nothing to `speckit:run-output` — it runs in a
+  // terminal, and its output goes there. Without this the console below sits on
+  // "Waiting for output…" for the whole run, which is what it used to do.
+  const [liveRun, setLiveRun] = useState<RunView | null>(null)
+  const [transcript, setTranscript] = useState<string[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    const read = async () => {
+      const api = getSpeckitAPI()
+      const snapshot = await api.supervisionSnapshot()
+      const run =
+        snapshot.runs.find((r) => r.featureDir === featureDir && r.state !== 'finished') ?? null
+      if (cancelled) return
+      setLiveRun(run)
+      if (run === null) {
+        setTranscript([])
+        return
+      }
+      const { lines } = await api.runTranscript({ sessionId: run.sessionId, limit: 60 })
+      if (cancelled) return
+      setTranscript(lines.map((line) => `${line.role === 'user' ? '🧑' : '🤖'} ${line.text}`))
+    }
+    void read()
+    // Polled rather than pushed: the terminal's output does not come through
+    // this extension at all, so there is no event to subscribe to.
+    const timer = setInterval(() => void read(), 3_000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [featureDir])
   const [gateComments, setGateComments] = useState<Array<{ note: string; ts: string }>>([])
   const [checkinData, setCheckinData] = useState<CheckinReadyData | null>(null)
   const [stopping, setStopping] = useState(false)
@@ -145,6 +180,18 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
     if ('state' in result) setState(result.state)
   }
 
+  async function handleSkip(phase: PhaseId) {
+    const api = getSpeckitAPI()
+    const result = await api.phaseSkip({ featureDir, phase })
+    if ('state' in result) setState(result.state)
+  }
+
+  async function handleUnskip(phase: PhaseId) {
+    const api = getSpeckitAPI()
+    const result = await api.phaseUnskip({ featureDir, phase })
+    if ('state' in result) setState(result.state)
+  }
+
   async function handleComment(phase: PhaseId, note: string) {
     const api = getSpeckitAPI()
     await api.phaseComment({ featureDir, phase, note })
@@ -193,9 +240,19 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
   }, [displayPhase, activePhase, featureDir])
   // When no specific phase is selected and no phase is running yet (brief gap),
   // show all accumulated output so lines from the new phase aren't hidden.
+  // What revoking this phase would knock over. The panel has always been able
+  // to say it; nothing ever worked it out.
+  const stalePhases = state && awaitingPhase ? computeStalePhases(state, awaitingPhase) : undefined
+
   const displayLines = displayPhase
     ? (linesByPhase[displayPhase] ?? [])
-    : Object.values(linesByPhase).flat()
+    : Object.values(linesByPhase)
+        .flat()
+        .filter((line): line is string => line !== undefined)
+
+  // The terminal's transcript wins when there is one: it is what the agent
+  // actually said, and the broadcast lines only exist for the headless path.
+  const consoleLines = liveRun !== null ? transcript : displayLines
 
   return (
     <div
@@ -286,8 +343,55 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
         )}
       </div>
 
+      {/* What the phase you are looking at is, when it is not simply running.
+          A skipped phase with no way back is a decision you cannot undo, and a
+          modified one that says nothing is an approval you no longer have. */}
+      {state && displayPhase && state.phases[displayPhase]?.status === 'skipped' && (
+        <div className="sk-sup__note" role="status">
+          This phase was skipped.
+          <button className="sk-sup__btn" onClick={() => void handleUnskip(displayPhase)}>
+            Unskip
+          </button>
+        </div>
+      )}
+      {state && displayPhase && state.phases[displayPhase]?.status === 'modified' && (
+        <div className="sk-sup__warn" role="status">
+          Its artifacts have changed since you approved them — what is on disk is not what was
+          approved.
+          <button className="sk-sup__btn" onClick={() => void handleApprove(displayPhase)}>
+            Approve as it stands
+          </button>
+        </div>
+      )}
+
       {/* Console */}
-      <RunConsole featureDir={featureDir} lines={displayLines} phase={displayPhase} />
+      {liveRun !== null && (
+        <div className="sk-sup__note" role="status">
+          This phase is running in a terminal — {liveRun.branch}
+          <button
+            className="sk-sup__btn"
+            onClick={() => void getSpeckitAPI().runTerminal({ sessionId: liveRun.sessionId })}
+          >
+            Open the terminal
+          </button>
+          {/* No guess at why. An empty transcript means the agent has written
+              no turn yet — it may be waiting on the runtime's folder-trust
+              prompt, or on a question, or still starting. The terminal is the
+              one place that actually knows, so send them there rather than
+              inventing a reason. */}
+          {liveRun.turns === 0 && transcript.length === 0 && (
+            <div className="sk-sup__meta">
+              No turn recorded yet. Whatever it is doing — or waiting on — is in the terminal.
+            </div>
+          )}
+        </div>
+      )}
+      <RunConsole
+        featureDir={featureDir}
+        lines={consoleLines}
+        phase={displayPhase}
+        inTerminal={liveRun !== null}
+      />
 
       {/* Self-review gate */}
       {state && awaitingPhase === 'self-review' && <SelfReviewGate featureDir={featureDir} />}
@@ -314,7 +418,9 @@ export function RunDashboard({ featureDir, workspacePath, onBack }: RunDashboard
           phaseState={state.phases[awaitingPhase]}
           artifactContent={gateContent}
           comments={gateComments}
+          stalePhases={stalePhases}
           onApprove={() => handleApprove(awaitingPhase)}
+          onSkip={() => handleSkip(awaitingPhase)}
           onRequestChanges={(note) => handleRequestChanges(awaitingPhase, note)}
           onRevoke={() => handleRevoke(awaitingPhase)}
           onComment={(note) => handleComment(awaitingPhase, note)}

@@ -340,7 +340,11 @@ SpecKit Pilot automates the full ticket-to-PR lifecycle across a **10-phase pipe
 Constitution → Specify → Clarify → Plan → Checklist → Tasks → Analyze → Implement → Self-review → Open PR
 ```
 
-Claude Code runs autonomously as a subprocess per phase; **human approval gates** protect every phase boundary.
+Each phase runs Claude Code **in a terminal you can see**, in the card's own
+worktree project — it appears in the sidebar, you can read it, and you can type
+into it at any time without the pilot losing track. **Human approval gates**
+protect every phase boundary, and every tool call the agent makes is held until
+somebody decides.
 
 For small changes you can flip a card to **Quick fix** at hand-off, which skips the upfront spec/analysis phases and runs a short pipeline instead:
 
@@ -354,14 +358,46 @@ Each run happens in the card's own git **worktree** on a dedicated branch (the L
 
 Click the **SpecKit** tab in the content area tab bar.
 
-### 4-tab UI
+### Supervising what is running
 
-| Tab             | Contents                                                                                                                                                                         |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Tickets**     | Linear and Jira ticket queue; select a ticket to start a new feature run. Hand-off offers a **Quick fix** toggle (short plan→implement→review pipeline) and a base-branch picker |
-| **Features**    | All features with their current phase shown in a mini phase-rail per row                                                                                                         |
-| **Active runs** | Live view of the currently executing phase with output streaming                                                                                                                 |
-| **History**     | Completed and failed runs with full audit log                                                                                                                                    |
+Above the board are two panels that answer "does anything need me?".
+
+**Waiting on you** lists every tool call an agent is holding. Allow it, deny it,
+answer it in words, or hand it back to the terminal to deal with there. Nothing
+in that run moves until you do — after five minutes it is handed back
+automatically rather than left hanging.
+
+**Supervision** has four sections:
+
+| Section    | Answers                                                                 |
+| ---------- | ----------------------------------------------------------------------- |
+| **Runs**   | what is running, what state it is in, how long, how much it has changed |
+| **Stalls** | what stopped making progress without asking for anything                |
+| **Review** | what is finished and waiting on you, worst risk first                   |
+| **Feed**   | what happened, and a roll-up of what happened since you last looked     |
+
+Every run offers the same six actions: go to its **Terminal**, read its
+**Transcript**, **Interrupt** it (ends the turn, keeps the session, so your next
+message lands), **Redirect** it, **Stop** it, or **Discard** it — which ends it
+and removes its worktree and branch.
+
+The **command palette** (`Cmd+P`) carries every live run and every diff waiting
+on review, blocked ones first. Choosing one takes you straight there.
+
+### Review, and why a fourth agent gets refused
+
+A finished turn with changes is graded by what it touched — **P0** for auth,
+payments, secrets, migrations or a public API, down to **P3** for a lockfile
+bump — and the grade is always shown with the reason for it. You accept or
+reject **hunk by hunk**, not file by file, because one file routinely holds both
+the change you asked for and the one you did not.
+
+With **three diffs unreviewed, a new run is refused** and says so. Overriding is
+one click and is recorded with how deep the queue was at the time.
+
+Stall detection ships in **shadow mode**: stalls are recorded and shown, never
+notified, until you have judged a week of them against your own read. Turn it off
+in Settings once the thresholds have earned it.
 
 ### Workflow
 
@@ -375,7 +411,10 @@ Click the **SpecKit** tab in the content area tab bar.
 
 Each SpecKit-mode phase invokes the project's native SpecKit skill (`/speckit-specify`, `/speckit-plan`, `/speckit-tasks`, …) rather than a freeform prompt, so artifacts land in the right feature directory and the agent doesn't wander. This requires the SpecKit Claude skills to be installed (`.claude/skills/speckit-*`, via the `specify` CLI) and reachable in the run's worktree.
 
-**Answering the agent.** If a phase asks a question (e.g. during `/speckit-clarify`), type your answer in the reply box under the run console and click **Send** — the pilot resumes that Claude session with your message and streams the response back into the same console.
+**Answering the agent.** If a phase asks a question (e.g. during
+`/speckit-clarify`), answer it in the **Waiting on you** panel, or open the run's
+terminal and answer it where the agent is — both work, and the pilot follows
+either.
 
 State is persisted to `.pilot/state.json` inside each feature directory; audit log in `.pilot/history.json`.
 

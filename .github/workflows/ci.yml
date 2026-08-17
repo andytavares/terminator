@@ -60,6 +60,12 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      # The root typecheck references only main, renderer and shared, so
+      # extension code was never checked at all and type errors in it reached
+      # a green build.
+      - name: Typecheck extensions
+        run: npm run typecheck:extensions
+
   format:
     name: Format
     runs-on: ubuntu-latest
@@ -142,6 +148,10 @@ jobs:
           path: |
             out/
             extensions/*/src/index.js
+            # The extensions' renderer bundles. Without these an extension's UI
+            # is "Not found: dist/index.html" in the E2E job while passing
+            # locally, which is exactly the gap the panel test exists to close.
+            extensions/*/dist/
           retention-days: 1
 
   e2e:

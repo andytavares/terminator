@@ -1,8 +1,16 @@
-import { spawn } from 'node:child_process'
+import { spawn, type SpawnOptions } from 'node:child_process'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { selfReviewCommand } from './self-review-plan.js'
+import { shellQuote } from '../runtime/claude-launch.js'
+import { readSelfReviewSummary } from '../state/self-review-summary.js'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { PhaseId } from '../types/speckit.types.js'
+import type { SupervisedRunner } from '../runtime/supervised-runner.js'
+import type { PendingAsk } from '../runtime/pending-permissions.js'
+import { buildReadOnlySettings, installReadOnlyHookScript } from '../runtime/read-only-hook.js'
 import {
   noteFromStreamJsonLine,
   sessionIdFromStreamJsonLine,
@@ -58,6 +66,8 @@ export interface StartPhaseRunnerOpts {
   phaseCommand: string
   phase: PhaseId
   feedbackNote?: string
+  /** What the card's worktree was branched from, for measuring its diff. */
+  baseBranch?: string
   batchIndex?: number
   // When set, resume the given Claude session instead of starting fresh — used
   // to answer the model's questions from the run console (the reply is
@@ -76,20 +86,184 @@ export interface AgentRunner {
   startPhaseRunner(opts: StartPhaseRunnerOpts): RunnerHandle
 }
 
-const SELF_REVIEW_CMD = [
-  'npm run format',
-  'npm run lint',
-  'npx vitest run --coverage',
-  'claude --print --permission-mode bypassPermissions --strict-mcp-config /google-review',
-].join(' && ')
+/**
+ * The supervised path, when one is available.
+ *
+ * Set during activation. When present a phase runs in a terminal the operator
+ * can see, with every tool call held at a PreToolUse hook until somebody
+ * decides; when absent — a build with no window, or a test — the headless
+ * spawn below is still used. Kept as a module-level seam rather than threaded
+ * through five call sites, none of which cares how a phase is executed.
+ */
+let supervised: SupervisedRunner | null = null
+
+export function setSupervisedRunner(runner: SupervisedRunner | null): void {
+  supervised = runner
+}
+
+/**
+ * Where a raised request is held so a surface can show it, and cleared again
+ * once it is answered. Injected rather than imported so the runner does not
+ * reach into the extension's state, and so a test can watch it.
+ */
+let onPermissionPending: ((ask: PendingAsk) => void) | null = null
+let onPermissionResolved: ((requestId: string) => void) | null = null
+
+export function setPermissionSink(
+  sink: {
+    onPending: (ask: PendingAsk) => void
+    onResolved: (requestId: string) => void
+  } | null
+): void {
+  onPermissionPending = sink?.onPending ?? null
+  onPermissionResolved = sink?.onResolved ?? null
+}
+
+/**
+ * The supervision layer, when the extension has one.
+ *
+ * A run has to be registered for anything downstream to see it: the review
+ * queue reads finished runs, backpressure counts them, the stall detector
+ * watches them. Without this they are all correct and all empty.
+ */
+let supervision: RunSupervision | null = null
+
+export interface RunSupervision {
+  runs: {
+    add(run: {
+      sessionId: string
+      featureDir: string
+      phase: string
+      worktreePath: string
+      branch: string
+      baseBranch: string | null
+      terminalSessionId: string
+      transcriptPath: string
+      startedAt: number
+    }): unknown
+    setState(sessionId: string, state: 'working' | 'waiting', at: number): void
+    noteAsked(sessionId: string): void
+    /** What the run has changed so far, for deciding whether a turn finished it. */
+    get(sessionId: string): { diff: { files: number } } | null
+  }
+  finishTurn(sessionId: string, turns: number, at: number): Promise<void>
+  finish(sessionId: string, at: number): void
+}
+
+export function setRunSupervision(next: RunSupervision | null): void {
+  supervision = next
+}
+
+/**
+ * Where the read-only policy lives on disk, installed on first use.
+ *
+ * Null when it cannot be written, which the caller turns into a refusal rather
+ * than a fallback: a review that runs unsupervised is the thing this replaced.
+ */
+let readOnlyStateDir: string | null = null
+
+/**
+ * Where a self-review's exit codes and reports go.
+ *
+ * Beside the runtime's other state, never in the worktree: a review that adds a
+ * `coverage/` directory to the diff it is reviewing has changed the thing it
+ * was measuring.
+ */
+function selfReviewDir(featureDir: string): string | null {
+  if (readOnlyStateDir === null) return null
+  return path.join(readOnlyStateDir, 'self-review', path.basename(featureDir))
+}
+
+/** Records the summary beside the card, where the gate reads it. */
+function writeSelfReviewSummary(featureDir: string, outputDir: string): void {
+  try {
+    const summary = readSelfReviewSummary(outputDir)
+    if (summary === null) return
+    const pilotDir = path.join(featureDir, '.pilot')
+    mkdirSync(pilotDir, { recursive: true })
+    writeFileSync(path.join(pilotDir, 'self-review.json'), JSON.stringify(summary, null, 2), 'utf8')
+  } catch {
+    // The gate reads the console when there is no summary, so failing to write
+    // one must not fail the phase.
+  }
+}
+let installedReadOnlySettings: string | null = null
+
+export function setReadOnlyStateDir(dir: string | null): void {
+  readOnlyStateDir = dir
+  installedReadOnlySettings = null
+}
+
+function readOnlySettingsPath(): string | null {
+  if (installedReadOnlySettings !== null) return installedReadOnlySettings
+  if (readOnlyStateDir === null) return null
+  try {
+    const hookPath = installReadOnlyHookScript(readOnlyStateDir)
+    const settingsPath = path.join(readOnlyStateDir, 'read-only.settings.json')
+    fs.writeFileSync(
+      settingsPath,
+      JSON.stringify(buildReadOnlySettings(hookPath, process.execPath), null, 2),
+      'utf-8'
+    )
+    installedReadOnlySettings = settingsPath
+    return settingsPath
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Says, where anyone can see it, that a phase is about to run unsupervised.
+ *
+ * Three things drop a run to the headless spawn: the supervision runtime
+ * failed to start, the repository belongs to no workspace, or no terminal could
+ * be opened. All three end in `bypassPermissions`, and a log line is not a
+ * signal — the operator would see a card working normally and never learn that
+ * this one approved everything itself.
+ */
+function warnUnsupervised(api: ExtensionAPI, featureDir: string, phase: PhaseId): void {
+  const card = path.basename(featureDir)
+  api.log.error(`running ${phase} unsupervised in ${card} — no terminal, no held tool calls`)
+  api.notifications.showToast(
+    'error',
+    `${card}: ${phase} is running unsupervised — its tool calls are being approved automatically`,
+    // Keyed by card, so one unsupervised run does not stack a toast per phase.
+    `speckit.unsupervised.${card}`
+  )
+}
+
+/** The workspace a card's repository belongs to, for placing its terminal. */
+function workspaceIdFor(api: ExtensionAPI, workspacePath: string): string | null {
+  return api.workspace.list().find((w) => w.folderPath === workspacePath)?.id ?? null
+}
+
+async function branchIn(api: ExtensionAPI, cwd: string): Promise<string | null> {
+  const res = await api.shell.exec({
+    command: 'git',
+    args: ['rev-parse', '--abbrev-ref', 'HEAD'],
+    cwd,
+  })
+  const branch = res.stdout.trim()
+  return res.exitCode === 0 && branch !== '' ? branch : null
+}
+
+/**
+ * Self-review: format, lint, tests, then a review of the diff.
+ *
+ * The review no longer bypasses permissions. It runs under a hook that decides
+ * from a fixed read-only policy — allow what only reads, refuse everything else
+ * — so a review cannot rewrite the worktree it is reviewing, and no person is
+ * ever asked. Waiting on one would turn an automated gate into a flaky failure.
+ *
+ * Restricting tools instead does not work, and this was checked rather than
+ * assumed: with `--allowedTools Read Grep Glob --disallowedTools Write Edit`, an
+ * agent asked to create a file still created it, because a review needs Bash for
+ * `git diff` and Bash can write. The decision has to be made on the command.
+ */
 
 // Kill a phase that has produced nothing for this long — a headless run that
 // hangs (e.g. on a blocked API call) would otherwise wait forever.
 const DEFAULT_PHASE_TIMEOUT_MS = 15 * 60 * 1000
-
-function shellQuote(s: string): string {
-  return "'" + s.replace(/'/g, "'\\''") + "'"
-}
 
 export function createAgentRunner(api: ExtensionAPI): AgentRunner {
   return {
@@ -108,6 +282,33 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
         onSession,
       } = opts
 
+      // Supervised when the extension has a runtime and the card's repository
+      // belongs to a workspace we can place a terminal in. Self-review is a
+      // shell chain rather than an agent, so it stays a plain spawn.
+      if (supervised !== null && phase !== 'self-review') {
+        const startedSupervised = startSupervised({
+          api,
+          featureDir,
+          worktreePath,
+          phase,
+          phaseCommand,
+          feedbackNote,
+          baseBranch: opts.baseBranch,
+          resumeSessionId,
+          onStart,
+          onComplete,
+          onSession,
+        })
+        if (startedSupervised !== null) return startedSupervised
+        // It could not be supervised, and the fall-through below is
+        // `--permission-mode bypassPermissions`: an agent nobody can see,
+        // approving its own tool calls in a worktree. That is the exact thing
+        // this replaced, so it is said out loud rather than logged.
+        warnUnsupervised(api, featureDir, phase)
+      } else if (phase !== 'self-review') {
+        warnUnsupervised(api, featureDir, phase)
+      }
+
       const shellBin = process.env.SHELL ?? '/bin/sh'
       // Point the native `/speckit-*` skills at this card's feature directory so
       // they operate on the right spec/plan/tasks files regardless of the git
@@ -115,14 +316,17 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
       // The dir is relative to the worktree cwd, matching SpecKit's own
       // `specs/<slug>` convention.
       const featureSlug = path.basename(featureDir)
-      const spawnOpts = {
+      // Typed, so `spawn` picks the overload that gives the child piped
+      // streams. As a bare object literal the `as const` stdio tuple matched no
+      // overload at all and every use of the child below inferred `never`.
+      const spawnOpts: SpawnOptions = {
         cwd: worktreePath,
         env: {
           ...process.env,
           SPECIFY_FEATURE: featureSlug,
           SPECIFY_FEATURE_DIRECTORY: path.join('specs', featureSlug),
         } as Record<string, string>,
-        stdio: ['ignore', 'pipe', 'pipe'] as const,
+        stdio: ['ignore', 'pipe', 'pipe'],
       }
 
       // Self-review runs a shell chain (npm/vitest/google-review) whose stdout is
@@ -130,9 +334,19 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
       // stream-json mode so its assistant output streams to the console in real
       // time instead of arriving in one chunk when --print buffers to the end.
       const streaming = phase !== 'self-review'
+      let selfReviewOutputDir: string | null = null
       let cmd: string
       if (phase === 'self-review') {
-        cmd = SELF_REVIEW_CMD
+        selfReviewOutputDir = selfReviewDir(opts.featureDir)
+        cmd = selfReviewCommand({
+          worktreePath: opts.worktreePath,
+          // Anywhere but the worktree. A review that adds files to the diff it
+          // is reviewing has changed the thing it was measuring, so with no
+          // state directory this goes to a temp one and the gate falls back to
+          // the console as it did before.
+          outputDir: selfReviewOutputDir ?? path.join(tmpdir(), 'speckit-self-review'),
+          settingsPath: readOnlySettingsPath(),
+        })
       } else {
         const prompt = feedbackNote
           ? `${phaseCommand}\n\nFeedback from reviewer:\n${feedbackNote}`
@@ -316,6 +530,12 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
         flushStreamJson()
         const code = exitCode ?? 0
         logStream?.end()
+        // What the checks recorded, assembled for the gate. Written before
+        // `onComplete`, which is what moves the phase to awaiting_review and
+        // puts the gate on screen.
+        if (selfReviewOutputDir !== null) {
+          writeSelfReviewSummary(opts.featureDir, selfReviewOutputDir)
+        }
         if (onComplete) void Promise.resolve(onComplete(code))
         if (phase === 'implement' && batchIndex !== undefined) {
           api.window.broadcast('speckit:checkin-ready', {
@@ -338,6 +558,152 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
           child.kill('SIGTERM')
         },
       }
+    },
+  }
+}
+
+/**
+ * Starts a phase in a terminal, returning null when it cannot — no workspace
+ * for the repository, or no window to show a tab in. Falling back to the
+ * headless spawn is deliberate: a phase that does not run at all is worse than
+ * one that runs unsupervised, and the caller is told either way through the
+ * same callbacks.
+ */
+function startSupervised(opts: {
+  api: ExtensionAPI
+  featureDir: string
+  worktreePath: string
+  phase: PhaseId
+  phaseCommand: string
+  feedbackNote?: string
+  /** What the worktree was branched from, so the run's diff is its own work. */
+  baseBranch?: string
+  resumeSessionId?: string
+  onStart?: () => void | Promise<void>
+  onComplete?: (exitCode: number) => void | Promise<void>
+  onSession?: (sessionId: string) => void
+}): RunnerHandle | null {
+  const runner = supervised
+  if (runner === null) return null
+
+  const workspacePath = path.dirname(path.dirname(opts.featureDir))
+  const workspaceId = workspaceIdFor(opts.api, workspacePath)
+  if (workspaceId === null) return null
+
+  const prompt = opts.feedbackNote
+    ? `${opts.phaseCommand}\n\nFeedback from reviewer:\n${opts.feedbackNote}`
+    : opts.phaseCommand
+
+  let sessionId: string | null = null
+  let ended = false
+  let stopRequested = false
+
+  void (async () => {
+    const branch = (await branchIn(opts.api, opts.worktreePath)) ?? path.basename(opts.worktreePath)
+    const run = await runner.start({
+      featureDir: opts.featureDir,
+      worktreePath: opts.worktreePath,
+      workspaceId,
+      branch,
+      prompt,
+      phase: opts.phase,
+      resumeSessionId: opts.resumeSessionId,
+      onPending: (pending) => {
+        // The session comes from the bridge, which knows it: reading it back
+        // from the run being started would be a reference to a binding that is
+        // not assigned until start() returns.
+        onPermissionPending?.({ ...pending, featureDir: opts.featureDir })
+        supervision?.runs.setState(pending.sessionId, 'waiting', pending.at)
+        supervision?.runs.noteAsked(pending.sessionId)
+        opts.api.window.broadcast('speckit:permission-requested', {
+          featureDir: opts.featureDir,
+          phase: opts.phase,
+          pending,
+        })
+      },
+      onResolved: (requestId, decision) => {
+        onPermissionResolved?.(requestId)
+        if (sessionId !== null) supervision?.runs.setState(sessionId, 'working', Date.now())
+        opts.api.window.broadcast('speckit:permission-resolved', {
+          featureDir: opts.featureDir,
+          requestId,
+          decision,
+        })
+      },
+      onRegistered: (started) => {
+        // Before the terminal is written to, so nothing the agent does can
+        // arrive at a registry that has never heard of it.
+        sessionId = started.sessionId
+        supervision?.runs.add({
+          sessionId: started.sessionId,
+          featureDir: opts.featureDir,
+          phase: opts.phase,
+          worktreePath: opts.worktreePath,
+          branch,
+          baseBranch: opts.baseBranch ?? null,
+          terminalSessionId: started.terminalSessionId,
+          transcriptPath: started.transcriptPath,
+          startedAt: Date.now(),
+        })
+      },
+      onTurnEnd: (turns) => {
+        // A turn ending is what finishes a supervised phase.
+        //
+        // In a terminal the agent does not exit when it is done — it sits at
+        // its prompt, and `session_end` may never come. Waiting for it left the
+        // phase `running` forever: the gate never appeared, approval never
+        // unlocked, and the card looked busy while the agent sat idle.
+        //
+        // Only once it has changed something, though, which is the same rule
+        // `finishTurn` applies to the register. A first turn that ends with a
+        // plain question — text, so no tool call and no permission hold — was
+        // driving the card to `awaiting_review` while the agent was still
+        // working, and `ended` made that one-way.
+        if (sessionId === null) return
+        void supervision?.finishTurn(sessionId, turns, Date.now()).then(() => {
+          if (ended) return
+          const changed = supervision?.runs.get(sessionId as string)?.diff
+          if (changed === undefined || changed.files === 0) return
+          ended = true
+          void opts.onComplete?.(0)
+        })
+      },
+      onEnd: (exitCode) => {
+        if (sessionId !== null) supervision?.finish(sessionId, Date.now())
+        if (ended) return
+        ended = true
+        // The terminal's own code when it has one: a session that died is not
+        // a phase that succeeded, and `awaiting_review` on a crashed run is an
+        // approval gate over nothing.
+        void opts.onComplete?.(exitCode)
+      },
+    })
+    if (run === null) {
+      // Nothing was started, and the caller is waiting on a completion it will
+      // otherwise never get.
+      ended = true
+      void opts.onComplete?.(1)
+      return
+    }
+    if (stopRequested) {
+      // Asked to stop before it had started. Honour it now that there is
+      // something to stop.
+      runner.stop(run.sessionId, 'stopped from the pilot')
+    }
+    // `onRegistered` above already added it, before the terminal was written
+    // to; this only has to cover a runner that does not report registration.
+    sessionId = run.sessionId
+    opts.onSession?.(run.sessionId)
+    void opts.onStart?.()
+  })()
+
+  return {
+    stop(): void {
+      // `start` is still in flight the moment this handle is returned, so a
+      // stop that arrives first would have found no session and done nothing —
+      // leaving the terminal to open and the agent to run anyway.
+      stopRequested = true
+      if (sessionId !== null) runner.stop(sessionId, 'stopped from the pilot')
     },
   }
 }

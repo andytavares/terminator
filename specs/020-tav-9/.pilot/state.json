@@ -11,7 +11,8 @@
     "source": "linear",
     "createdAt": "2026-07-03T14:35:34.353Z"
   },
-  "stage": "backlog",
+  "stage": "done",
+  "mode": "speckit",
   "ticket": {
     "source": "linear",
     "key": "TAV-9",
