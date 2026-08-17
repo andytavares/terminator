@@ -1,0 +1,172 @@
+src/main/index.ts
+  s_6ccaa8e70a8db7::t_e8662521b01601 376-385
+  s_6ccaa8e70a8db7::t_978c762f424735 375
+  s_6ccaa8e70a8db7::t_5ee241bfec1eae 386-388
+  s_6ccaa8e70a8db7::t_19b4caf90850db 18,61-73,338-353,371-372
+README.md
+  s_6ccaa8e70a8db7::t_a19e5f5ab33da3 35
+docs/ARCHITECTURE.md
+  s_6ccaa8e70a8db7::t_8362c4d807dcf5 294-315
+docs/EXTENSION-DEVELOPMENT.md
+  s_6ccaa8e70a8db7::t_4e798c90f8334b 271-278
+docs/adr/026-double-escape-extension-exit.md
+  s_6ccaa8e70a8db7::t_e135d6c4c53ba2 1-71
+docs/user-guide/USER-GUIDE.md
+  s_6ccaa8e70a8db7::t_1ad62af98fed6f 229-253
+extensions/notepad/README.md
+  s_6ccaa8e70a8db7::t_f2a7f5d77f572f 8-11
+extensions/notepad/src/components/NoteWindowView.tsx
+  s_6ccaa8e70a8db7::t_7551f75b5f06fa 11,16,46-55,226,282-284,288-300,346-352,397
+extensions/notepad/src/components/NotepadView.tsx
+  s_6ccaa8e70a8db7::t_44e6a7959dadd0 18,23,73,79,313,323-342,361,594-600,657
+extensions/notepad/src/components/notepad.css
+  s_6ccaa8e70a8db7::t_f8967d6588640a 1603-1674
+extensions/notepad/src/editor/NoteEditor.tsx
+  s_6ccaa8e70a8db7::t_33a3a950b6d150 3,22,32-36,52-53,62,67,138,144-152,155-156,294-302,306-321
+extensions/notepad/src/editor/headingEnter.ts
+  s_6ccaa8e70a8db7::t_4767d3a804a6cc 1-59
+extensions/notepad/src/editor/livePreview.ts
+  s_6ccaa8e70a8db7::t_635f2587ed25a0 10-18,34-50,190-354,491-525,531,539,574-641,643-650,652-654
+extensions/notepad/src/editor/markdownTable.ts
+  s_6ccaa8e70a8db7::t_6d6b276512dec8 1-222
+extensions/notepad/src/editor/noteSync.ts
+  s_6ccaa8e70a8db7::t_f68a3aded7887e 1-58
+extensions/notepad/src/ipc/notes.ipc.ts
+  s_6ccaa8e70a8db7::t_bdb598d790a4a5 178-180,183-184,191-193,199,219-230,372-374
+extensions/notepad/tests/components/NoteEditor.spec.tsx
+  s_6ccaa8e70a8db7::t_3e86ba0168a025 27-29,31,37,112-139
+extensions/notepad/tests/components/PreviewWidgets.spec.tsx
+  s_6ccaa8e70a8db7::t_a387689d30e5fb 1-190
+extensions/notepad/tests/components/TableEditing.spec.tsx
+  s_6ccaa8e70a8db7::t_d2bf972b3e7559 1-158
+extensions/notepad/tests/unit/editor/applyExternalDoc.spec.ts
+  s_6ccaa8e70a8db7::t_3474441d6e2e32 1-63
+extensions/notepad/tests/unit/editor/fencedCode.spec.ts
+  s_6ccaa8e70a8db7::t_da6e08fba36a47 1-121
+extensions/notepad/tests/unit/editor/headingEnter.spec.ts
+  s_6ccaa8e70a8db7::t_2b36d81360e27a 1-148
+extensions/notepad/tests/unit/editor/livePreview.spec.ts
+  s_6ccaa8e70a8db7::t_c0e8901ed9ced5 146-147,149,151-152,154
+extensions/notepad/tests/unit/editor/livePreviewBlocks.spec.ts
+  s_6ccaa8e70a8db7::t_8aa8f109ed6b33 1-208
+extensions/notepad/tests/unit/editor/livePreviewCursorLine.spec.ts
+  s_6ccaa8e70a8db7::t_c44520408e8517 1-94
+extensions/notepad/tests/unit/editor/markdownTable.spec.ts
+  s_6ccaa8e70a8db7::t_01ddf15d095f14 1-241
+extensions/notepad/tests/unit/editor/noteSync.spec.ts
+  s_6ccaa8e70a8db7::t_d9959d13d49545 1-118
+extensions/notepad/tests/unit/editor/sourceMode.spec.ts
+  s_6ccaa8e70a8db7::t_ab995ee6bac80d 1-96
+extensions/notepad/tests/unit/ipc/notes.ipc.spec.ts
+  s_6ccaa8e70a8db7::t_de24f2716d9757 43,197-256
+extensions/task-vault/README.md
+  s_6ccaa8e70a8db7::t_bb9ca22b2abb65 11
+extensions/task-vault/src/components/InboxProcessor.tsx
+  s_6ccaa8e70a8db7::t_04fb1aa97af9fd 5,12-13,16-20,43-50
+extensions/task-vault/src/components/WeeklyReview.tsx
+  s_6ccaa8e70a8db7::t_d79bcbd4907325 10,33-35,44-52,110-113,116-137,147-149,177-179,200,202-206,212,220,228,231
+extensions/task-vault/src/components/WeeklyReviewHistory.tsx
+  s_6ccaa8e70a8db7::t_e782a594102155 1-205
+extensions/task-vault/src/components/WeeklyReviewStep1GetClear.tsx
+  s_6ccaa8e70a8db7::t_f4c18a04d1067e 2,6,9,23-28
+extensions/task-vault/src/components/WeeklyReviewStep2Inbox.tsx
+  s_6ccaa8e70a8db7::t_950ba483308af6 8,11-15,34
+extensions/task-vault/src/components/WeeklyReviewStep3Projects.tsx
+  s_6ccaa8e70a8db7::t_85eba335e4787f 4,9,15,19,21,24-32,55,61,69
+extensions/task-vault/src/components/WeeklyReviewStep5Someday.tsx
+  s_6ccaa8e70a8db7::t_86262e068474a8 3,9,16,21,23,26-34,37-48,51-62,82,87,108,114
+extensions/task-vault/src/components/WeeklyReviewStep6Reflect.tsx
+  s_6ccaa8e70a8db7::t_723f6bbcfe015a 5,8,16-28
+extensions/task-vault/src/components/WeeklyReviewStepStaleTasks.tsx
+  s_6ccaa8e70a8db7::t_c4011ea9cf3add 4,10,17,21-29,42,53,65
+extensions/task-vault/src/components/task-vault.css
+  s_6ccaa8e70a8db7::t_238fa7979f8972 712-722,891-1006
+extensions/task-vault/src/index.ts
+  s_6ccaa8e70a8db7::t_934eb6ed0f60b6 9,184-185
+extensions/task-vault/src/ipc/projects.ipc.ts
+  s_6ccaa8e70a8db7::t_04a53e9aa746f3 3,135
+extensions/task-vault/src/ipc/weekly-review.ipc.ts
+  s_6ccaa8e70a8db7::t_669cbb673f51f6 1-115
+extensions/task-vault/src/utils/review-log.ts
+  s_6ccaa8e70a8db7::t_098f359e691a17 1-30
+extensions/task-vault/src/vault/db.ts
+  s_6ccaa8e70a8db7::t_a374cf396a8eea 68-92
+extensions/task-vault/src/vault/weekly-review-repository.ts
+  s_6ccaa8e70a8db7::t_4b2467308eb4b9 1-297
+extensions/task-vault/tests/components/WeeklyReview.spec.tsx
+  s_6ccaa8e70a8db7::t_1775861d4eb1d2 100-103,197-236,252-253
+extensions/task-vault/tests/components/WeeklyReviewHistory.spec.tsx
+  s_6ccaa8e70a8db7::t_fafb613221cc30 1-259
+extensions/task-vault/tests/ipc/weekly-review.ipc.spec.ts
+  s_6ccaa8e70a8db7::t_6e452a5aa471b1 1-260
+extensions/task-vault/tests/utils/review-log.spec.ts
+  s_6ccaa8e70a8db7::t_1fda4ed5e3b3c8 1-64
+extensions/task-vault/tests/vault/weekly-review-repository.spec.ts
+  s_6ccaa8e70a8db7::t_72087638867b39 1-308
+package-lock.json
+  s_6ccaa8e70a8db7::t_705ac8599bd75f 3,9,2602-2604,2607,6500-6502,7673-7675,8163-8165,9386-9388,10487-10489,10492,10494,10497,10503-10504,10506
+package.json
+  s_6ccaa8e70a8db7::t_7df23f940b28bf 3
+specs/005-task-vault-extension/contracts/ipc-channels.md
+  s_6ccaa8e70a8db7::t_171967959c80b5 266-342
+src/main/extensions/extension-exit.ts
+  s_6ccaa8e70a8db7::t_1594bffea9a078 1-48
+src/main/extensions/extension-view-host.ts
+  s_6ccaa8e70a8db7::t_0dec68399607f1 86-92,99-136,194-196,230-232,240-243,309-326
+src/main/preload-webview.ts
+  s_6ccaa8e70a8db7::t_fcd3d2307db2ad 24-39
+src/renderer/App.tsx
+  s_6ccaa8e70a8db7::t_4a9e1a83d5ec42 16,158-159
+src/renderer/components/ExtensionPanelPortal.tsx
+  s_6ccaa8e70a8db7::t_49b0c99c22a924 3-5,20,25-58,72
+src/renderer/electron.d.ts
+  s_6ccaa8e70a8db7::t_bd58a42319c114 175-177
+src/renderer/extensions/loader.ts
+  s_6ccaa8e70a8db7::t_8da9e27882a08d 67
+src/renderer/extensions/registry.ts
+  s_6ccaa8e70a8db7::t_ca739ac267a843 29-30,92,114-118,254-291
+src/renderer/hooks/useExtensionEscapeExit.ts
+  s_6ccaa8e70a8db7::t_69425c679440ed 1-57
+src/renderer/lib/focus-terminal.ts
+  s_6ccaa8e70a8db7::t_b904525075696a 1-21
+src/shared/double-escape.ts
+  s_6ccaa8e70a8db7::t_05bed8e66aa868 1-33
+src/shared/electron-api/manifest.ts
+  s_6ccaa8e70a8db7::t_ffebd4033622ca 419-428
+tests/e2e/extension-escape-exit.spec.ts
+  s_6ccaa8e70a8db7::t_251e573982f1e1 1-102
+tests/unit/extensions/extension-view-host.spec.ts
+  s_6ccaa8e70a8db7::t_b07c13330a33c2 101-103
+tests/unit/main/extensions/extension-exit.spec.ts
+  s_6ccaa8e70a8db7::t_4dd23382c928a5 1-118
+tests/unit/main/extensions/extension-view-host.spec.ts
+  s_6ccaa8e70a8db7::t_7ce8be501bbea6 59-60,63,305-453
+tests/unit/main/preload-webview.spec.ts
+  s_6ccaa8e70a8db7::t_bdfe4edd841360 1-3,7,17,30,75-106
+tests/unit/renderer/components/ExtensionPanelPortal.spec.tsx
+  s_6ccaa8e70a8db7::t_369764b7792574 25-31,220-283
+tests/unit/renderer/extensions/registry.spec.ts
+  s_6ccaa8e70a8db7::t_f0bc09d41807e0 355-427
+tests/unit/renderer/hooks/useExtensionEscapeExit.spec.tsx
+  s_6ccaa8e70a8db7::t_8bdd7e1894c964 1-178
+tests/unit/renderer/lib/focus-terminal.spec.ts
+  s_6ccaa8e70a8db7::t_db165dcfa1ef72 1-79
+tests/unit/shared/double-escape.spec.ts
+  s_6ccaa8e70a8db7::t_0cb7a8bf73fbb0 1-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "0ad348679c7d5acd530150178901c7116aebe098",
+  "prompts": {},
+  "sessions": {
+    "s_6ccaa8e70a8db7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "117b6a59-f838-43cc-a5aa-ad228aa45a13",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
