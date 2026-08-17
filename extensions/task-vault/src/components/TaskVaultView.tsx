@@ -378,11 +378,18 @@ export function TaskVaultView(): React.JSX.Element {
   // Handle navigation from the in-app calendar sidebar / standalone calendar panel.
   useEffect(() => {
     return window.electronAPI.extensionBridge.on('task-vault:navigate', (data) => {
-      const { date, taskId } = (data ?? {}) as { date?: string; taskId?: string }
+      const { date, taskId, view } = (data ?? {}) as {
+        date?: string
+        taskId?: string
+        view?: 'daily' | 'review'
+      }
       useVaultNavStore.getState().setSkipNextVisibilityReset(true)
       if (date) void loadDate(date)
       else void loadToday()
       if (taskId) useVaultNavStore.getState().navigateToTask(taskId, date)
+      // After the task, because `navigateToTask` puts you on the daily log —
+      // an explicit view is the caller overriding that, not competing with it.
+      if (view) useVaultNavStore.getState().setView(view)
     })
   }, [loadDate, loadToday])
 
@@ -396,11 +403,16 @@ export function TaskVaultView(): React.JSX.Element {
           null
         )
         if (!nav || typeof nav !== 'object') return
-        const { date, taskId } = nav as { date?: string; taskId?: string }
+        const { date, taskId, view } = nav as {
+          date?: string
+          taskId?: string
+          view?: 'daily' | 'review'
+        }
         useVaultNavStore.getState().setSkipNextVisibilityReset(true)
         if (date) void loadDate(date)
         else void loadToday()
         if (taskId) useVaultNavStore.getState().navigateToTask(taskId, date)
+        if (view) useVaultNavStore.getState().setView(view)
       } catch {
         // non-critical
       }

@@ -356,10 +356,27 @@ describe('what is allowed to interrupt you', () => {
       id: string
       handler: () => void
     }>
-    expect(actions.map((a) => a.id)).toEqual(['allow', 'deny', 'open'])
+    // Just the two answers. "Open the board" used to sit here as a third
+    // button, which is the wrong shape — opening the thing is not an answer to
+    // the question, it is what clicking the notification should do.
+    expect(actions.map((a) => a.id)).toEqual(['allow', 'deny'])
 
     actions.find((a) => a.id === 'allow')?.handler()
     expect(runner.resolve).toHaveBeenCalledWith('session-1', 'req-1', { allow: true })
+  })
+
+  it('takes you to the run it is about when the row itself is clicked', () => {
+    permissionSink?.onPending(ask)
+    const { onClick } = createNotification.mock.calls[0][0] as { onClick?: () => void }
+    expect(onClick).toBeTypeOf('function')
+    onClick?.()
+    // The window first — navigation behind another window has done nothing you
+    // can see — then the terminal the agent is actually in.
+    expect(api.window.focusSelf).toHaveBeenCalled()
+    expect(api.window.broadcast).toHaveBeenCalledWith('terminal:navigate-to-session', {
+      sessionId: 'terminal-1',
+      projectId: 'project-1',
+    })
   })
 
   it('takes it away once answered', () => {

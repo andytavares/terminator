@@ -76,6 +76,17 @@ export class ExtensionViewHost {
   private mainWindow: BrowserWindow
   private preloadPath: string
   private bottomInset = 0
+  /**
+   * How much of the window's left edge something else has claimed.
+   *
+   * A `WebContentsView` is a native overlay: it paints above the renderer's
+   * DOM, so anything the renderer draws over it is invisible. The blunt answer
+   * — hide the view while a modal is open — is right for a centred dialog and
+   * wrong for a drawer pinned to one edge, because it blanks the whole
+   * application to show a 340px panel. Reserving the strip instead keeps the
+   * extension on screen, just narrower.
+   */
+  private leftInset = 0
   // Bounds updates can arrive while createView is still awaiting loadURL; the
   // latest one per view is applied once creation finishes.
   private pendingBounds = new Map<
@@ -279,16 +290,18 @@ export class ExtensionViewHost {
 
   private applyBounds(entry: ViewEntry, bounds: BoundsRect, visible: boolean): void {
     const { width: winW, height: winH } = this.mainWindow.getContentBounds()
-    const x = Math.round(bounds.x)
+    // Never left of the reserved strip, and never wider than what is left of
+    // the window once it is taken.
+    const x = Math.max(Math.round(bounds.x), this.leftInset)
     const y = Math.round(bounds.y)
     const maxH = winH - y - this.bottomInset
     const height = Math.min(Math.round(bounds.height), Math.max(0, maxH))
-    entry.view.setBounds({ x, y, width: winW - x, height })
+    entry.view.setBounds({ x, y, width: Math.max(0, winW - x), height })
     entry.view.setVisible(visible)
   }
 
-  setBottomInset(inset: number): void {
-    this.bottomInset = Math.max(0, inset)
+  /** Reapplies every view's bounds after an inset changed. */
+  private reapply(): void {
     for (const entries of this.views.values()) {
       for (const entry of entries) {
         if (entry.lastBounds && entry.lastVisible) {
@@ -296,6 +309,16 @@ export class ExtensionViewHost {
         }
       }
     }
+  }
+
+  setBottomInset(inset: number): void {
+    this.bottomInset = Math.max(0, inset)
+    this.reapply()
+  }
+
+  setLeftInset(inset: number): void {
+    this.leftInset = Math.max(0, inset)
+    this.reapply()
   }
 
   broadcastToAll(channel: string, data: unknown): void {

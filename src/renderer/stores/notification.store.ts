@@ -14,6 +14,14 @@ interface NotificationState {
   markRead(id: string): void
   markAllRead(): void
   dismiss(id: string): void
+  /**
+   * Drops the row without telling main to forget it.
+   *
+   * For a notification main has already dropped itself — triggering an action
+   * settles it there — where `dismiss` would ask it to forget an id it no
+   * longer has.
+   */
+  remove(id: string): void
   clearAll(): void
   openPanel(): void
   closePanel(): void
@@ -50,11 +58,15 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   dismiss(id) {
+    get().remove(id)
+    void window.electronAPI.notifications.dismiss(id)
+  },
+
+  remove(id) {
     set((s) => {
       const notifications = s.notifications.filter((n) => n.id !== id)
       return { notifications, unreadCount: notifications.filter((n) => !n.read).length }
     })
-    void window.electronAPI.notifications.dismiss(id)
   },
 
   clearAll() {

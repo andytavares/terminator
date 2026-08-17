@@ -368,6 +368,30 @@ toast). Extensions call `api.notifications.showToast()` /
 `createNotification()`, both of which resolve identically through the same
 dispatcher.
 
+**Acting on a notification settles it.** `triggerAction()` runs the callback and
+then drops the record: one that survives the decision it asked for — approve a
+phase and the request to approve that phase is still sitting there — teaches
+people to dismiss without reading. The one exception is the reserved
+`__open__` action behind `onClick`, which takes you to what the notification is
+about and leaves the row alone, because looking is not deciding.
+
+**A notification's destination is a handler, not a route.** Only its author
+knows what "the thing" is — a card, a task, a review — and a route shape
+general enough to name all of them would be a second navigation system. Since a
+function cannot cross IPC it lives in main under that reserved action, and the
+serialized notification carries only `clickable: true` so the panel knows to
+render the row as a link.
+
+**The notification drawer reserves a strip rather than hiding what is under
+it.** An extension's UI is a native `WebContentsView` painting above the
+renderer's DOM, so anything drawn over it is invisible; the general answer is
+`useModalEffect()`, which hides every extension view while a modal is open.
+That is right for a centred dialog and wrong for a drawer down one edge — it
+blanked the whole application to show a 340px panel. The drawer measures itself
+and calls `extension.setLeftInset()`, the left-edge counterpart of the log
+window's `setBottomInset()`: the view moves aside and narrows instead of
+disappearing.
+
 ---
 
 ## Remote Control Server

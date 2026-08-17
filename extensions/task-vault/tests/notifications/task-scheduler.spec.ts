@@ -62,6 +62,8 @@ function makeApi(overrides: Record<string, unknown> = {}) {
     notifications: {
       createNotification: vi.fn(() => ({ dispose: vi.fn() })),
     },
+    // Clicking a notification navigates, and navigating is these two.
+    window: { focusSelf: vi.fn(), broadcast: vi.fn() },
     ...overrides,
   } as unknown as import('../../../../src/main/extensions/api.js').ExtensionAPI
 }
@@ -72,6 +74,7 @@ import {
   setSchedulerTick,
   triggerSchedulerTick,
   startTaskScheduler,
+  broadcast,
 } from '../../src/notifications/task-scheduler.js'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -464,8 +467,12 @@ describe('startTaskScheduler — blocked tasks', () => {
   })
 })
 
-describe('broadcast via action handler', () => {
-  it('action handler sends IPC to all windows', async () => {
+describe('clicking a due-task notification', () => {
+  it('takes you to the task rather than offering a button that did not', async () => {
+    // It used to be an "Open Vault" action broadcasting `task-vault:navigate-task`
+    // — a channel with no listener anywhere in the extension, so it opened
+    // nothing and went nowhere. Opening the task is what clicking the row does
+    // now, through the path the calendar already used.
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
@@ -478,12 +485,22 @@ describe('broadcast via action handler', () => {
     scheduler.dispose()
 
     const call = createNotification.mock.calls[0]?.[0] as {
-      actions: Array<{ handler: () => void }>
+      actions?: unknown[]
+      onClick?: () => void
     }
-    expect(call?.actions).toHaveLength(1)
-    call.actions[0].handler()
-    expect(mockSend).toHaveBeenCalledWith(
-      'task-vault:navigate-task',
+    expect(call?.actions).toBeUndefined()
+    expect(call?.onClick).toBeTypeOf('function')
+
+    call.onClick?.()
+    // The window, then the vault's tab — the view is created on activation, so
+    // saying where to go before that is a broadcast to nobody.
+    expect(api.window.focusSelf).toHaveBeenCalled()
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'extension:activate-global-tab',
+      'terminator.task-vault'
+    )
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'task-vault:navigate',
       expect.objectContaining({ taskId: 't-action' })
     )
   })
@@ -633,7 +650,7 @@ describe('startTaskScheduler — scheduler never inserts task rows', () => {
 // bubble's click event to actions[0].handler(), the same handler tested here.
 
 describe('startTaskScheduler — action handler navigation', () => {
-  it('in-app action handler for blocked task broadcasts { taskId, date }', async () => {
+  it('takes you to the blocked task, on the day it was blocked', async () => {
     vi.setSystemTime(new Date('2026-05-26T10:00:00'))
 
     const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
@@ -651,13 +668,11 @@ describe('startTaskScheduler — action handler navigation', () => {
     await scheduler.startupPromise
     scheduler.dispose()
 
-    const call = createNotification.mock.calls[0]?.[0] as {
-      actions: Array<{ handler: () => void }>
-    }
-    expect(call?.actions).toHaveLength(1)
-    call.actions[0].handler()
-    expect(mockSend).toHaveBeenCalledWith(
-      'task-vault:navigate-task',
+    const call = createNotification.mock.calls[0]?.[0] as { onClick?: () => void }
+    expect(call?.onClick).toBeTypeOf('function')
+    call.onClick?.()
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'task-vault:navigate',
       expect.objectContaining({ taskId: 'b-inapp', date: '2026-05-21' })
     )
   })
@@ -688,5 +703,34 @@ describe('startTaskScheduler — midnight dedup reset', () => {
     scheduler.dispose()
 
     expect(createNotification.mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('telling every window something changed', () => {
+  // Still the vault's push channel — the task and project IPC handlers use it
+  // to say the index moved. Only the notifications stopped: they navigate now,
+  // and navigating is a different thing from announcing.
+  it('reaches every window that is still there', () => {
+    broadcast('task-vault:push:index-updated', { a: 1 })
+    expect(mockSend).toHaveBeenCalledWith('task-vault:push:index-updated', { a: 1 })
+  })
+
+  it('skips one that has been destroyed, rather than throwing on the way out', () => {
+    mockWin.isDestroyed.mockReturnValueOnce(true)
+    mockSend.mockClear()
+    broadcast('task-vault:push:index-updated', {})
+    expect(mockSend).not.toHaveBeenCalled()
+  })
+})
+
+describe('running a pass on demand', () => {
+  it('exposes a tick, so a write can refresh what is due without waiting an hour', async () => {
+    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+    const api = makeApi({ settings: { get: vi.fn(() => '09:00') } })
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    expect(() => scheduler.tick()).not.toThrow()
+    await scheduler.tickAsync()
+    scheduler.dispose()
   })
 })

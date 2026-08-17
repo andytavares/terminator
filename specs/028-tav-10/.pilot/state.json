@@ -1,24 +1,24 @@
 {
   "version": 3,
-  "featureDir": "/Users/atavares/repos/terminator/specs/021-tav-14",
+  "featureDir": "/Users/atavares/repos/terminator/specs/028-tav-10",
   "card": {
-    "title": "Make all text in the application red",
+    "title": "Make all app notifications configurable (target: toast / in-app / system) via global or extension settings",
     "type": "feature",
-    "scope": "# Summary\n\nMake all text in the application red\n\n# Context\n\nMake all text in the application red\n\n# Acceptance Criteria\n\n- [ ] All text in the application is red\n\n# Dev Hints\n\n* Text should be red",
+    "scope": "# Summary\n\nMake every notification the app sends configurable, via both global settings and per-extension settings, and let the user choose which target(s) each notification is delivered to: toast, in-app, and/or system (OS-level) notification.\n\n# Context\n\nNotifications should not be hard-coded to a single delivery mechanism. Configuration should exist at two levels: global settings (app-wide defaults) and per-extension settings (overrides), with extension settings taking precedence over global. For each notification the user should be able to select any combination of toast, in-app, and system targets. The main work is introducing a shared dispatcher and migrating existing notification call sites to route through it.\n\n# Acceptance Criteria\n\n- [ ] Every notification routes through a shared, configurable dispatcher (no notification hard-coded to one mechanism)\n- [ ] Global settings let the user set default delivery target(s) for notifications\n- [ ] Extension settings can override notification targets per extension\n- [ ] The user can choose any combination of toast, in-app, and system targets\n- [ ] Precedence is defined and implemented: extension setting overrides global\n- [ ] Existing notification call sites are migrated to the dispatcher\n\n# Dev Hints\n\n* Introduce a shared notification abstraction/dispatcher that resolves the effective target(s) from global + extension settings before delivering.\n* Toast delivery today goes through `useToastStore` (`src/renderer/stores/toast.store`). \"System\" = OS-level notifications.\n* Align with Constitution Principle VII (error handling): errors must still surface as toasts regardless of configured targets.",
     "checklist": [],
     "attachments": [],
     "knowledgeRefs": [],
     "source": "linear",
-    "createdAt": "2026-07-29T23:31:29.811Z"
+    "createdAt": "2026-08-17T01:24:30.134Z"
   },
   "stage": "backlog",
   "mode": "speckit",
   "ticket": {
     "source": "linear",
-    "key": "TAV-14",
-    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-14/make-all-text-in-the-application-red",
-    "title": "Make all text in the application red",
-    "branchName": "andrewtavares87/tav-14-make-all-text-in-the-application-red"
+    "key": "TAV-10",
+    "sourceUrl": "https://linear.app/andrew-tavares/issue/TAV-10/make-all-app-notifications-configurable-target-toast-in-app-system-via",
+    "title": "Make all app notifications configurable (target: toast / in-app / system) via global or extension settings",
+    "branchName": "andrewtavares87/tav-10-make-all-app-notifications-configurable-target-toast-in-app"
   },
   "run": null,
   "queuePosition": null,
@@ -47,7 +47,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/021-tav-14/spec.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/028-tav-10/spec.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -59,7 +59,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/021-tav-14/spec.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/028-tav-10/spec.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -72,9 +72,9 @@
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": [
-        "/Users/atavares/repos/terminator/specs/021-tav-14/plan.md",
-        "/Users/atavares/repos/terminator/specs/021-tav-14/research.md",
-        "/Users/atavares/repos/terminator/specs/021-tav-14/data-model.md"
+        "/Users/atavares/repos/terminator/specs/028-tav-10/plan.md",
+        "/Users/atavares/repos/terminator/specs/028-tav-10/research.md",
+        "/Users/atavares/repos/terminator/specs/028-tav-10/data-model.md"
       ],
       "feedback": null,
       "batchIndex": null
@@ -88,7 +88,7 @@
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": [
-        "/Users/atavares/repos/terminator/specs/021-tav-14/checklists/requirements.md"
+        "/Users/atavares/repos/terminator/specs/028-tav-10/checklists/requirements.md"
       ],
       "feedback": null,
       "batchIndex": null
@@ -101,7 +101,7 @@
       "approvedBy": null,
       "lastRunId": null,
       "lastRunAt": null,
-      "artifactPaths": ["/Users/atavares/repos/terminator/specs/021-tav-14/tasks.md"],
+      "artifactPaths": ["/Users/atavares/repos/terminator/specs/028-tav-10/tasks.md"],
       "feedback": null,
       "batchIndex": null
     },
@@ -138,7 +138,7 @@
       "lastRunId": null,
       "lastRunAt": null,
       "artifactPaths": [
-        "/Users/atavares/repos/terminator/specs/021-tav-14/.pilot/self-review.json"
+        "/Users/atavares/repos/terminator/specs/028-tav-10/.pilot/self-review.json"
       ],
       "feedback": null,
       "batchIndex": null

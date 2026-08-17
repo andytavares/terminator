@@ -348,3 +348,91 @@ describe('NotificationManager.triggerAction', () => {
     expect(result).toEqual({ ok: true })
   })
 })
+
+describe('taking you to the thing a notification is about', () => {
+  it('marks a notification with a destination as clickable', () => {
+    // The renderer cannot see the handler — a function does not cross IPC — so
+    // the serialized row has to say whether clicking it goes anywhere.
+    notificationManager.create({
+      type: 'info',
+      title: 'Due today: pay rent',
+      key: 'k',
+      onClick: () => {},
+    })
+    expect(notificationManager.list()[0].clickable).toBe(true)
+  })
+
+  it('leaves a bare report unclickable, rather than a link to nowhere', () => {
+    notificationManager.create({ type: 'info', title: 'Area archived', key: 'k' })
+    expect(notificationManager.list()[0].clickable).toBeFalsy()
+  })
+
+  it('does not render the destination as a button beside the real answers', () => {
+    // Otherwise "Open" sits next to "Approve" and "Deny" as if it were a third
+    // way of answering the question.
+    notificationManager.create({
+      type: 'warning',
+      title: 'Allow this?',
+      key: 'k',
+      actions: [{ id: 'allow', label: 'Allow', handler: () => {} }],
+      onClick: () => {},
+    })
+    expect(notificationManager.list()[0].actions?.map((a) => a.id)).toEqual(['allow'])
+  })
+
+  it('runs the destination when the reserved action is triggered', () => {
+    const open = vi.fn()
+    notificationManager.create({ type: 'info', title: 'Go', key: 'k', onClick: open })
+    const id = notificationManager.list()[0].id
+    expect(notificationManager.triggerAction(id, '__open__')).toEqual({ ok: true })
+    expect(open).toHaveBeenCalled()
+  })
+
+  it('keeps the row after opening it, because looking is not deciding', () => {
+    notificationManager.create({ type: 'info', title: 'Go', key: 'k', onClick: () => {} })
+    const id = notificationManager.list()[0].id
+    notificationManager.triggerAction(id, '__open__')
+    expect(notificationManager.list().map((n) => n.id)).toContain(id)
+  })
+})
+
+describe('acting on a notification settles it', () => {
+  it('drops the record once its action has fired', () => {
+    // Approve a phase and the request to approve that phase should not still be
+    // sitting there. One that survives the decision it asked for teaches you to
+    // dismiss without reading.
+    const approve = vi.fn()
+    notificationManager.create({
+      type: 'warning',
+      title: 'Approve?',
+      key: 'k',
+      actions: [{ id: 'approve', label: 'Approve', handler: approve }],
+    })
+    const id = notificationManager.list()[0].id
+    notificationManager.triggerAction(id, 'approve')
+    expect(approve).toHaveBeenCalled()
+    expect(notificationManager.list().map((n) => n.id)).not.toContain(id)
+  })
+
+  it('refuses a second answer to a question already answered', () => {
+    const approve = vi.fn()
+    notificationManager.create({
+      type: 'warning',
+      title: 'Approve?',
+      key: 'k',
+      actions: [{ id: 'approve', label: 'Approve', handler: approve }],
+    })
+    const id = notificationManager.list()[0].id
+    notificationManager.triggerAction(id, 'approve')
+    expect(notificationManager.triggerAction(id, 'approve')).toEqual({
+      error: 'UNKNOWN_NOTIFICATION',
+    })
+    expect(approve).toHaveBeenCalledTimes(1)
+  })
+
+  it('says so for an action the notification never offered', () => {
+    notificationManager.create({ type: 'info', title: 'Report', key: 'k' })
+    const id = notificationManager.list()[0].id
+    expect(notificationManager.triggerAction(id, 'nope')).toEqual({ error: 'UNKNOWN_ACTION' })
+  })
+})

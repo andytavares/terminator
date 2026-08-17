@@ -911,7 +911,9 @@ function notify(
   api: ExtensionAPI,
   event: NotifiableEvent,
   message: string,
-  actions?: Array<{ id: string; label: string; handler: () => void }>
+  actions?: Array<{ id: string; label: string; handler: () => void }>,
+  /** Where the row takes you. Without one it is a report, not a link. */
+  onClick?: () => void
 ): Disposable | null {
   switch (channelFor(event)) {
     case 'modal':
@@ -922,6 +924,7 @@ function notify(
         title: message,
         key: `speckit.permission.${event.sessionId}`,
         actions,
+        onClick,
       })
     case 'indicator':
       api.notifications.showToast('warning', message, `speckit.${event.kind}.${event.sessionId}`)
@@ -1041,8 +1044,13 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
               handler: () =>
                 supervisedRunner?.resolve(ask.sessionId, ask.requestId, { allow: false }),
             },
-            { id: 'open', label: 'Open the board', handler: () => api.window.focusSelf() },
-          ]
+          ],
+          // Was an "Open the board" button sitting beside Allow and Deny —
+          // which is the wrong shape: opening the thing is not a third answer
+          // to the question, it is what clicking the notification should do.
+          // It also went no further than focusing the window, leaving you to
+          // find the run yourself.
+          () => gotoRun(api, 'run', ask.sessionId)
         )
         if (notification !== null) raisedNotifications.set(ask.requestId, notification)
       },
@@ -1111,7 +1119,11 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
         notify(
           api,
           { kind: 'stalled', sessionId: firing.sessionId },
-          `A run stopped making progress (${firing.signal})`
+          `A run stopped making progress (${firing.signal})`,
+          undefined,
+          // A stall is the notification you most want to act on, and acting on
+          // it means reading what the agent was doing when it went quiet.
+          () => gotoRun(api, 'run', firing.sessionId)
         )
       },
     })
@@ -2842,6 +2854,33 @@ export function activate(api: ExtensionAPI): void {
  * Three surfaces answer the same question — what needs me, ranked — and this is
  * the one you reach without moving your hands.
  */
+/**
+ * Take me to the run this is about.
+ *
+ * The window first: navigation that changes what is on screen behind another
+ * window has done nothing you can see. Then the terminal it is actually in,
+ * when it still has one — that is where the agent is and where you can type at
+ * it. A run that has ended has no terminal, so the panel opened on it is the
+ * closest thing to the same place.
+ *
+ * Shared by the command palette and by clicking a notification, because they
+ * are the same request phrased twice, and two copies would drift.
+ */
+function gotoRun(api: ExtensionAPI, kind: 'run' | 'review', sessionId: string): void {
+  api.window.focusSelf()
+  const terminal = kind === 'run' ? (supervisedRunner?.terminalFor(sessionId) ?? null) : null
+  if (terminal !== null) {
+    // Through the core's own navigation: it selects the workspace, the project
+    // and the tab, none of which this extension's separate renderer can do.
+    api.window.broadcast('terminal:navigate-to-session', {
+      sessionId: terminal.terminalSessionId,
+      projectId: terminal.projectId,
+    })
+    return
+  }
+  api.window.broadcast('speckit:palette-goto', { kind, sessionId })
+}
+
 function refreshPalette(api: ExtensionAPI): void {
   const snapshot = supervision?.snapshot() ?? null
   const entries = snapshot === null ? [] : paletteEntries(snapshot.runs, snapshot.review)
@@ -2860,25 +2899,7 @@ function refreshPalette(api: ExtensionAPI): void {
         description: entry.description,
         category: entry.category,
       },
-      () => {
-        // The window first: a command that changes what is on screen behind
-        // another window has done nothing you can see.
-        api.window.focusSelf()
-        const terminal =
-          entry.kind === 'run' ? (supervisedRunner?.terminalFor(entry.sessionId) ?? null) : null
-        if (terminal !== null) {
-          // Straight to the terminal, through the core's own navigation.
-          api.window.broadcast('terminal:navigate-to-session', {
-            sessionId: terminal.terminalSessionId,
-            projectId: terminal.projectId,
-          })
-          return
-        }
-        api.window.broadcast('speckit:palette-goto', {
-          kind: entry.kind,
-          sessionId: entry.sessionId,
-        })
-      }
+      () => gotoRun(api, entry.kind, entry.sessionId)
     )
   )
 }

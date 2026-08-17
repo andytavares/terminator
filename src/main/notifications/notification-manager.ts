@@ -35,6 +35,15 @@ export interface NotificationAction {
   label: string
 }
 
+/**
+ * The reserved action id behind "take me to the thing".
+ *
+ * Reserved rather than arbitrary so a caller cannot declare a button that
+ * silently becomes the row's click target — and so the renderer can ask for it
+ * without the author having to name it.
+ */
+export const OPEN_ACTION_ID = '__open__'
+
 export interface SerializedNotification {
   id: string
   type: NotificationType
@@ -43,6 +52,8 @@ export interface SerializedNotification {
   timestamp: number
   source?: string
   actions?: NotificationAction[]
+  /** Whether clicking the row goes anywhere. False for a bare report. */
+  clickable?: boolean
   targets: NotificationTarget[]
 }
 
@@ -68,6 +79,17 @@ class NotificationManager {
     source?: string
     key: string
     actions?: Array<{ id: string; label: string; handler: () => void }>
+    /**
+     * Take me to the thing this is about.
+     *
+     * A handler rather than a route, because only the notification's author
+     * knows what "the thing" is — a card, a task, a review — and a route
+     * shape general enough to name all of them would be a second navigation
+     * system. It is stored as a reserved action so the existing trigger path
+     * carries it: a function cannot cross IPC, and inventing a channel for
+     * one that could would be the same mechanism twice.
+     */
+    onClick?: () => void
   }): string {
     const id = randomUUID()
     const callbacks = new Map<string, () => void>()
@@ -77,6 +99,9 @@ class NotificationManager {
       callbacks.set(action.id, action.handler)
       actions.push({ id: action.id, label: action.label })
     }
+    // Not pushed onto `actions`: it is what clicking the row does, not a
+    // button, and rendering it as one would put "Open" beside "Approve".
+    if (opts.onClick) callbacks.set(OPEN_ACTION_ID, opts.onClick)
 
     const globalSettings = getGlobalSettings()
     const base = opts.source
@@ -115,6 +140,7 @@ class NotificationManager {
       timestamp: Date.now(),
       source: opts.source,
       actions: actions.length > 0 ? actions : undefined,
+      clickable: opts.onClick !== undefined,
       targets,
       callbacks,
     }
@@ -135,6 +161,11 @@ class NotificationManager {
     const cb = record.callbacks.get(actionId)
     if (!cb) return { error: 'UNKNOWN_ACTION' }
     cb()
+    // Acting on it settles it. A notification that survives the decision it
+    // asked for teaches you to dismiss without reading — approve a phase and
+    // the request to approve that phase is still sitting there. Opening the
+    // thing is not a decision, though, so it leaves the row alone.
+    if (actionId !== OPEN_ACTION_ID) this.dismiss(notifId)
     return { ok: true }
   }
 
@@ -151,6 +182,7 @@ class NotificationManager {
       timestamp: record.timestamp,
       source: record.source,
       actions: record.actions,
+      clickable: record.clickable,
       targets: record.targets,
     }
   }

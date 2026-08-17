@@ -9,7 +9,10 @@
 .notif-panel {
   position: fixed;
   top: 12px;
-  left: var(--rail-w);
+  /* `--rail-w` is not defined anywhere, so this silently resolved to
+     `auto` and the drawer sat wherever static flow put it. The fallback
+     makes the left edge a decision rather than an accident. */
+  left: var(--rail-w, 0px);
   width: 340px;
   max-height: 70vh;
   display: flex;

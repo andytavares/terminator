@@ -225,6 +225,65 @@ describe('ExtensionViewHost', () => {
     })
   })
 
+  describe('reserving a strip of the window', () => {
+    const rect = (y: number) => ({ x: 10, y, width: 500, height: 300 })
+
+    it('moves the view aside rather than leaving it under a drawer', async () => {
+      // A WebContentsView paints above the renderer's DOM, so a panel drawn
+      // over it would be invisible. The old answer was to hide every extension
+      // view while a modal was open — right for a centred dialog, and wrong for
+      // a drawer down one edge: opening it blanked the whole application.
+      const ext = makeExt()
+      await host.updatePanelBounds(() => ext, ext.id, 'panel', rect(50), true, '/repo')
+      host.setLeftInset(340)
+      const bounds = createdViews[0].setBounds.mock.calls.at(-1)![0]
+      expect(bounds.x).toBe(340)
+    })
+
+    it('keeps the view visible while the strip is reserved', async () => {
+      const ext = makeExt()
+      await host.updatePanelBounds(() => ext, ext.id, 'panel', rect(50), true, '/repo')
+      host.setLeftInset(340)
+      expect(createdViews[0].setVisible).toHaveBeenLastCalledWith(true)
+    })
+
+    it('narrows the view by exactly what it gave up', async () => {
+      const ext = makeExt()
+      await host.updatePanelBounds(() => ext, ext.id, 'panel', rect(50), true, '/repo')
+      const before = createdViews[0].setBounds.mock.calls.at(-1)![0]
+      host.setLeftInset(340)
+      const after = createdViews[0].setBounds.mock.calls.at(-1)![0]
+      expect(after.x - before.x + after.width).toBe(before.width)
+    })
+
+    it('gives the strip back when the drawer closes', async () => {
+      const ext = makeExt()
+      await host.updatePanelBounds(() => ext, ext.id, 'panel', rect(50), true, '/repo')
+      const before = createdViews[0].setBounds.mock.calls.at(-1)![0]
+      host.setLeftInset(340)
+      host.setLeftInset(0)
+      expect(createdViews[0].setBounds.mock.calls.at(-1)![0]).toEqual(before)
+    })
+
+    it('leaves a view already right of the strip where it is', async () => {
+      const ext = makeExt()
+      await host.updatePanelBounds(() => ext, ext.id, 'panel', rect(50), true, '/repo')
+      host.setLeftInset(5)
+      expect(createdViews[0].setBounds.mock.calls.at(-1)![0].x).toBe(10)
+    })
+
+    it('refuses a negative reservation rather than pushing the view off-screen', async () => {
+      const ext = makeExt()
+      await host.updatePanelBounds(() => ext, ext.id, 'panel', rect(50), true, '/repo')
+      host.setLeftInset(-500)
+      expect(createdViews[0].setBounds.mock.calls.at(-1)![0].x).toBe(10)
+    })
+
+    it('does nothing at all when there is no view to move', () => {
+      expect(() => host.setLeftInset(340)).not.toThrow()
+    })
+  })
+
   describe('updatePanelBounds', () => {
     const rect = (y: number) => ({ x: 10, y, width: 500, height: 300 })
 
