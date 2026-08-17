@@ -357,3 +357,206 @@ describe('when the terminal itself goes', () => {
     expect(exitDetached).toBe(true)
   })
 })
+
+async function reportEvent(sessionId: string, kind: string): Promise<void> {
+  await fetch(control.eventUrl, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ sessionId, kind }),
+  })
+  await new Promise((r) => setTimeout(r, 25))
+}
+
+async function askPermission(sessionId: string): Promise<void> {
+  const pending = fetch(control.url, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ sessionId, toolName: 'Bash', input: { command: 'ls' } }),
+  })
+  pending.catch(() => {})
+  await new Promise((r) => setTimeout(r, 40))
+}
+
+describe('running the next phase in the conversation that is already open', () => {
+  it('finds the card its open session, so a phase need not start a new one', async () => {
+    const supervised = runner()
+    const run = await supervised.start(start)
+    expect(supervised.liveSessionFor(start.featureDir)).toBe(run?.sessionId)
+  })
+
+  it('has no session for a card that has never run', () => {
+    expect(runner().liveSessionFor('/repo/specs/999-nothing')).toBeNull()
+  })
+
+  it('opens no second terminal, which is where the tab-per-phase sprawl came from', async () => {
+    const supervised = runner()
+    const run = await supervised.start(start)
+    opened.length = 0
+    supervised.continueRun(run!.sessionId, {
+      prompt: '/speckit-plan',
+      phase: 'plan' as never,
+      onPending: () => {},
+      onResolved: () => {},
+    })
+    expect(opened).toEqual([])
+    expect(created).toHaveLength(1)
+  })
+
+  it('types the next phase into the terminal the agent is already sitting in', async () => {
+    const supervised = runner()
+    const run = await supervised.start(start)
+    written.length = 0
+    supervised.continueRun(run!.sessionId, {
+      prompt: '/speckit-plan',
+      phase: 'plan' as never,
+      onPending: () => {},
+      onResolved: () => {},
+    })
+    expect(written).toEqual([{ terminal: 'terminal-1', data: '/speckit-plan\r' }])
+  })
+
+  it('keeps the session and its transcript, which is the point of reusing it', async () => {
+    const supervised = runner()
+    const run = await supervised.start(start)
+    const continued = supervised.continueRun(run!.sessionId, {
+      prompt: '/speckit-plan',
+      phase: 'plan' as never,
+      onPending: () => {},
+      onResolved: () => {},
+    })
+    expect(continued).toEqual(run)
+  })
+
+  it('flattens a multi-line prompt, since a newline in a terminal means send', async () => {
+    const supervised = runner()
+    const run = await supervised.start(start)
+    written.length = 0
+    supervised.continueRun(run!.sessionId, {
+      prompt: 'do this\nand that',
+      phase: 'plan' as never,
+      onPending: () => {},
+      onResolved: () => {},
+    })
+    expect(written[0].data).toBe('do this and that\r')
+  })
+
+  it('reports nothing for a session that is gone, rather than typing into thin air', () => {
+    // The tab was closed, or the console restarted. The caller's signal to open
+    // a fresh conversation instead of silently dropping the phase.
+    expect(
+      runner().continueRun('never-existed', {
+        prompt: '/speckit-plan',
+        phase: 'plan' as never,
+        onPending: () => {},
+        onResolved: () => {},
+      })
+    ).toBeNull()
+  })
+
+  it('reports the new phase’s turn end, not the one that just finished', async () => {
+    const supervised = runner()
+    const seen: string[] = []
+    const run = await supervised.start({ ...start, onTurnEnd: () => seen.push('specify') })
+    supervised.continueRun(run!.sessionId, {
+      prompt: '/speckit-plan',
+      phase: 'plan' as never,
+      onPending: () => {},
+      onResolved: () => {},
+      onTurnEnd: () => seen.push('plan'),
+    })
+    await reportEvent(run!.sessionId, 'stop')
+    expect(seen).toEqual(['plan'])
+  })
+
+  it('reports the new phase’s permission asks, not the one that just finished', async () => {
+    const supervised = runner()
+    const seen: string[] = []
+    const run = await supervised.start({
+      ...start,
+      onPending: () => seen.push('specify'),
+    })
+    supervised.continueRun(run!.sessionId, {
+      prompt: '/speckit-plan',
+      phase: 'plan' as never,
+      onPending: () => seen.push('plan'),
+      onResolved: () => {},
+    })
+    await askPermission(run!.sessionId)
+    expect(seen).toEqual(['plan'])
+  })
+
+  it('clears the waiting flag, so the new phase is not born already blocked', async () => {
+    const supervised = runner()
+    const run = await supervised.start(start)
+    await reportEvent(run!.sessionId, 'stop')
+    expect(supervised.watchable()[0].isWaiting).toBe(true)
+    supervised.continueRun(run!.sessionId, {
+      prompt: '/speckit-plan',
+      phase: 'plan' as never,
+      onPending: () => {},
+      onResolved: () => {},
+    })
+    expect(supervised.watchable()[0].isWaiting).toBe(false)
+  })
+})
+
+describe('an agent sitting at its prompt', () => {
+  it('counts as blocked on a person, not as having stopped making progress', async () => {
+    // A phase that finished cleanly and was waiting to be approved went quiet,
+    // fired a stall eight minutes later, and stayed in the Stalls tab offering
+    // to interrupt work that was already done.
+    const supervised = runner()
+    const run = await supervised.start(start)
+    expect(supervised.watchable()[0].isWaiting).toBe(false)
+    await reportEvent(run!.sessionId, 'stop')
+    expect(supervised.watchable()[0].isWaiting).toBe(true)
+  })
+
+  it('is working again once it has been given something to do', async () => {
+    const supervised = runner()
+    const run = await supervised.start(start)
+    await reportEvent(run!.sessionId, 'stop')
+    supervised.send(run!.sessionId, 'carry on')
+    expect(supervised.watchable()[0].isWaiting).toBe(false)
+  })
+})
+
+describe('acting on a session that is not there', () => {
+  // Every one of these is reachable from the panel: it polls every five
+  // seconds, so a row can be clicked after the run behind it has ended.
+  it('refuses to answer a tool call for it, rather than reporting success', () => {
+    expect(runner().resolve('gone', 'request-1', { permissionDecision: 'allow' })).toBe(false)
+  })
+
+  it('shrugs off handing one back to a terminal that is not there', () => {
+    expect(() => runner().handBackToTerminal('gone', 'request-1')).not.toThrow()
+  })
+
+  it('shrugs off interrupting it', () => {
+    const supervised = runner()
+    supervised.interrupt('gone')
+    expect(written).toEqual([])
+  })
+
+  it('says so when asked to stop it, so a surface can report the truth', () => {
+    expect(runner().stop('gone')).toBe(false)
+  })
+
+  it('says so when asked to send it a message', () => {
+    expect(runner().send('gone', 'carry on')).toBe(false)
+  })
+
+  it('has no terminal to send anyone to', () => {
+    expect(runner().terminalFor('gone')).toBeNull()
+  })
+
+  it('ends twice without complaint, since the terminal and the runtime both report it', async () => {
+    // A clean `/exit` fires the runtime's SessionEnd hook and the terminal's
+    // own exit; whichever arrives second finds the run already gone.
+    const supervised = runner()
+    const run = await supervised.start(start)
+    exitListener?.(0)
+    expect(() => exitListener?.(0)).not.toThrow()
+    expect(supervised.terminalFor(run!.sessionId)).toBeNull()
+  })
+})

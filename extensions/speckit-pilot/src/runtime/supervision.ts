@@ -1,7 +1,12 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
-import { createRunRegistry, type Run, type RunRegistry } from './run-registry.js'
+import {
+  createRunRegistry,
+  type Run,
+  type RunHistoryEntry,
+  type RunRegistry,
+} from './run-registry.js'
 import { createReviewQueue, type ReviewQueue } from './review/review-queue.js'
 import { createBackpressureGate, type BackpressureGate } from './review/backpressure.js'
 import { createFeedLog, type FeedLog } from './feed/feed-log.js'
@@ -85,6 +90,8 @@ export interface Supervision {
     runs: Run[]
     review: ReturnType<ReviewQueue['list']>
     backpressure: ReturnType<BackpressureGate['check']>
+    /** What is over, so the live list does not have to be the record too. */
+    history: RunHistoryEntry[]
   }
 }
 
@@ -351,6 +358,7 @@ export function createSupervision(options: SupervisionOptions): Supervision {
         runs: runs.list(),
         review: review.list(),
         backpressure: backpressure.check(),
+        history: runs.history(),
       }
     },
   }

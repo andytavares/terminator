@@ -78,6 +78,28 @@ function migrateToV3(raw: PreV3State): PilotState {
   }
 }
 
+/**
+ * The pinned model ids the settings view used to offer, mapped to the alias
+ * that keeps meaning the same thing a year from now.
+ *
+ * Rewritten rather than left alone because `defaultModel` was never read: it
+ * was stored and rendered and never reached `--model`, so nobody chose these
+ * values in any meaningful sense — they are the shape of a dropdown, not a
+ * decision. Now that the setting is wired up, honouring them literally would
+ * pin every existing card to a superseded generation, which is the opposite of
+ * what wiring it up was for.
+ */
+const STALE_PINNED_MODELS: Readonly<Record<string, string>> = {
+  'claude-opus-4-6': 'opus',
+  'claude-sonnet-4-6': 'sonnet',
+  'claude-haiku-4-5-20251001': 'haiku',
+}
+
+function migrateModelSetting(settings: PilotState['settings']): PilotState['settings'] {
+  const replacement = STALE_PINNED_MODELS[settings.defaultModel]
+  return replacement === undefined ? settings : { ...settings, defaultModel: replacement }
+}
+
 export async function readState(featureDir: string): Promise<PilotState | null> {
   const p = statePath(featureDir)
   try {
@@ -86,8 +108,8 @@ export async function readState(featureDir: string): Promise<PilotState | null> 
     const result = PilotStateAnyVersionSchema.safeParse(parsed)
     if (!result.success) return null
     const data = result.data
-    if (data.version === 3) return data as PilotState
-    return migrateToV3(data as PreV3State)
+    const state = data.version === 3 ? (data as PilotState) : migrateToV3(data as PreV3State)
+    return { ...state, settings: migrateModelSetting(state.settings) }
   } catch {
     return null
   }

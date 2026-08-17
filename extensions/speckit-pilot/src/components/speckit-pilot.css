@@ -2886,12 +2886,33 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* The panel owns its own scrolling. Without these it grew to whatever its
+     contents needed, pushed the board off the bottom of the window, and there
+     was nothing to scroll — expanding one run's transcript made everything
+     below it unreachable. `min-height: 0` because a flex child will not shrink
+     below its content otherwise, which is what defeats `overflow` here. */
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Its share of the board, and no more. `.sk-board` is a fixed-height flex
+     column with `overflow: hidden`, so a panel that grew to fit its contents
+     pushed the columns out of the window entirely — and being clipped by an
+     ancestor rather than overflowing itself, there was nothing to scroll. */
+  flex: 0 1 auto;
+  max-height: 45vh;
 }
 .sk-sup__tabs {
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--tm-border, #1f2937);
   padding-bottom: 6px;
+  /* Stays put while the list under it scrolls: with five sections, losing the
+     tabs on the way down means scrolling back up to change what you are
+     looking at. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--tm-bg, #0b1220);
 }
 .sk-sup__tab {
   padding: 4px 10px;
@@ -2967,6 +2988,16 @@
   border-color: var(--tm-accent, #3b82f6);
   color: var(--tm-accent, #3b82f6);
 }
+/* History outcomes. Only the two that went wrong are coloured — a list where
+   every row is coloured is a list where none of them stand out. */
+.sk-sup__state--approved {
+  border-color: var(--tm-success, #15803d);
+  color: var(--tm-success, #15803d);
+}
+.sk-sup__state--discarded {
+  border-color: var(--tm-danger, #dc2626);
+  color: var(--tm-danger, #dc2626);
+}
 /* Worst first is the queue's order; the grade should read that way too. */
 .sk-sup__grade--P0 {
   border-color: var(--tm-danger, #dc2626);
@@ -3025,18 +3056,43 @@
   flex: 1 0 100%;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-height: 320px;
+  gap: 2px;
+  /* Capped and scrollable in its own right. `min-height: 0` is what makes the
+     cap bind: as a flex item its shrink floor is its content height, so
+     without it the box grew past `max-height` and never scrolled. */
+  min-height: 0;
+  max-height: 40vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding-top: 6px;
+  border-top: 1px solid var(--tm-border, #1f2937);
+  margin-top: 6px;
 }
+/* A row per thing said, sized to the sentence rather than to the pill beside
+   it. Each line used to be as tall as a bordered uppercase badge, so fifteen
+   tool calls filled the window. */
 .sk-sup__line {
-  display: flex;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
   gap: 8px;
-  align-items: flex-start;
+  align-items: baseline;
+  padding: 1px 0;
+}
+/* The author on a transcript line is a margin note, not a status. The pill
+   treatment belongs to run state and review grade, which are the things worth
+   spotting from across the row. */
+.sk-sup__line .sk-sup__author {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  font-size: 10px;
+  text-align: right;
+  opacity: 0.6;
 }
 .sk-sup__said {
-  font-size: 12px;
+  font-family: var(--tm-font-mono, monospace);
+  font-size: 11.5px;
+  line-height: 1.5;
   color: var(--tm-text-primary);
   white-space: pre-wrap;
   word-break: break-word;

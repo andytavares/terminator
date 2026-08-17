@@ -47,6 +47,15 @@ export interface LaunchSpecOptions {
   nodePath?: string
   /** Overridden only by tests; the real one is resolved from PATH. */
   claudePath?: string
+  /**
+   * Which model to run, as `--model` takes it.
+   *
+   * An alias (`opus`, `sonnet`) resolves to the latest of that family, which is
+   * why the settings default is one: a pinned id is a thing that silently goes
+   * a generation stale. Absent, the runtime uses whatever the operator's own
+   * configuration says, which is the right answer when nobody has chosen.
+   */
+  model?: string
 }
 
 /**
@@ -180,11 +189,19 @@ export function buildLaunchSpec(options: LaunchSpecOptions): LaunchSpec {
     options.sessionId,
     '--settings',
     shellQuote(settingsPath),
-    // The ladder decides in the hook, so the runtime is left at its normal
-    // footing. Anything the ladder abstains on becomes `ask`, and `ask` is the
-    // prompt the operator can see in front of them.
+    ...(options.model === undefined || options.model === ''
+      ? []
+      : ['--model', shellQuote(options.model)]),
+    // The ladder still decides first: a PreToolUse hook runs under every
+    // permission mode, and its allow/deny is honoured before the mode is
+    // consulted at all. What the mode picks up is only what the ladder
+    // abstains on — and under `default` that was a prompt, which is the whole
+    // reason a run asked twenty-five times before finishing a phase. Under
+    // `auto` the runtime's own classifier answers those instead, so the
+    // ladder's judgement is unchanged and the questions are the ones it
+    // actually wanted a person for.
     '--permission-mode',
-    'default',
+    'auto',
     shellQuote(options.prompt),
   ].join(' ')
 

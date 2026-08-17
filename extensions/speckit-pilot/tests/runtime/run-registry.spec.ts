@@ -143,3 +143,129 @@ describe('forgetting', () => {
     }).not.toThrow()
   })
 })
+
+describe('moving on to the next phase in the same conversation', () => {
+  it('renames the run, so it does not still read as the phase it opened with', () => {
+    // A card keeps one conversation across its phases now. Without this the
+    // run list said `specify` for a card three phases in.
+    const registry = createRunRegistry()
+    add(registry)
+    registry.notePhase('session-1', 'plan', 5_000)
+    expect(registry.get('session-1')?.phase).toBe('plan')
+  })
+
+  it('restarts the clock, since "how long like this" is now about this phase', () => {
+    const registry = createRunRegistry()
+    add(registry)
+    registry.notePhase('session-1', 'plan', 5_000)
+    expect(registry.get('session-1')?.stateSince).toBe(5_000)
+  })
+
+  it('brings an archived run back to working, which is what starting a phase means', () => {
+    const registry = createRunRegistry()
+    add(registry)
+    registry.archive('session-1', 'approved', 4_000)
+    registry.notePhase('session-1', 'plan', 5_000)
+    expect(registry.get('session-1')?.state).toBe('working')
+    expect(registry.live()).toHaveLength(1)
+  })
+
+  it('does nothing at all when the phase has not actually changed', () => {
+    const registry = createRunRegistry()
+    add(registry)
+    registry.setState('session-1', 'waiting', 2_000)
+    registry.notePhase('session-1', 'implement', 5_000)
+    expect(registry.get('session-1')?.state).toBe('waiting')
+    expect(registry.get('session-1')?.stateSince).toBe(2_000)
+  })
+
+  it('ignores a session it has never heard of', () => {
+    expect(() => createRunRegistry().notePhase('nobody', 'plan', 1)).not.toThrow()
+  })
+})
+
+describe('the record of what is over', () => {
+  it('starts empty, and says so rather than inventing a row', () => {
+    expect(createRunRegistry().history()).toEqual([])
+  })
+
+  it('takes an approved phase off the live list', () => {
+    // The run list used to stack every approved phase forever, so by the third
+    // card it answered "what has this workspace ever done" instead of "what is
+    // happening now".
+    const registry = createRunRegistry()
+    add(registry)
+    registry.archive('session-1', 'approved', 9_000)
+    expect(registry.live()).toEqual([])
+    expect(registry.get('session-1')?.state).toBe('finished')
+  })
+
+  it('keeps what the phase actually did, not just that it happened', () => {
+    const registry = createRunRegistry()
+    add(registry)
+    registry.noteTurns('session-1', 12)
+    registry.noteDiff('session-1', { files: 3, added: 90, removed: 4 })
+    registry.noteAsked('session-1')
+    const entry = registry.archive('session-1', 'approved', 9_000)
+    expect(entry).toMatchObject({
+      phase: 'implement',
+      branch: 'feat/a',
+      outcome: 'approved',
+      endedAt: 9_000,
+      turns: 12,
+      diff: { files: 3, added: 90, removed: 4 },
+      asked: 1,
+    })
+  })
+
+  it('copies the diff rather than aliasing it, so later work cannot rewrite history', () => {
+    const registry = createRunRegistry()
+    add(registry)
+    registry.noteDiff('session-1', { files: 1, added: 1, removed: 0 })
+    registry.archive('session-1', 'approved', 9_000)
+    registry.noteDiff('session-1', { files: 99, added: 99, removed: 99 })
+    expect(registry.history()[0].diff).toEqual({ files: 1, added: 1, removed: 0 })
+  })
+
+  it('reads newest first, because the last thing that happened is what you want', () => {
+    const registry = createRunRegistry()
+    add(registry)
+    add(registry, { sessionId: 'session-2', branch: 'feat/b' })
+    registry.archive('session-1', 'approved', 1_000)
+    registry.archive('session-2', 'discarded', 2_000)
+    expect(registry.history().map((entry) => entry.sessionId)).toEqual(['session-2', 'session-1'])
+  })
+
+  it('records every phase of one conversation separately', () => {
+    // The point of the view: "specify approved, then plan approved", not one
+    // row per session.
+    const registry = createRunRegistry()
+    add(registry)
+    registry.archive('session-1', 'approved', 1_000)
+    registry.notePhase('session-1', 'plan', 1_100)
+    registry.archive('session-1', 'approved', 2_000)
+    expect(registry.history().map((entry) => entry.phase)).toEqual(['plan', 'implement'])
+  })
+
+  it('is bounded, since it lives in memory for as long as the app does', () => {
+    const registry = createRunRegistry()
+    add(registry)
+    for (let n = 0; n < 250; n++) {
+      registry.notePhase('session-1', `phase-${n}`, n)
+      registry.archive('session-1', 'approved', n)
+    }
+    expect(registry.history()).toHaveLength(200)
+  })
+
+  it('hands back a copy, so a surface cannot mutate the record it is showing', () => {
+    const registry = createRunRegistry()
+    add(registry)
+    registry.archive('session-1', 'approved', 1_000)
+    registry.history().length = 0
+    expect(registry.history()).toHaveLength(1)
+  })
+
+  it('reports nothing for a session it does not have', () => {
+    expect(createRunRegistry().archive('nobody', 'approved', 1)).toBeNull()
+  })
+})

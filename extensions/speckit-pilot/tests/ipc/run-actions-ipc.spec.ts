@@ -8,6 +8,8 @@
  * branch shipped was in exactly that gap.
  */
 import { tmpdir as tmpdirForUserData } from 'node:os'
+import { mkdtempSync } from 'node:fs'
+import { join } from 'node:path'
 
 // A real directory. The supervision runtime writes its feed, mutes and
 // per-session settings under userData, and a path that does not exist fails at
@@ -373,5 +375,109 @@ describe('what is allowed to interrupt you', () => {
   it('does not interrupt for a request that is no longer held', () => {
     permissionSink?.onResolved('never-raised')
     expect(createNotification).not.toHaveBeenCalled()
+  })
+})
+
+describe('what a decision on a card stops saying about it', () => {
+  // Approving writes the card's state, so this one needs a real directory
+  // rather than the fabricated paths the read-only channels above use.
+  let cardDir: string
+
+  /** The queue only takes a diff that actually changed something (FR-045). */
+  function queueDiffFor(sessionId = 'session-1'): void {
+    supervision.runs.noteDiff(sessionId, { files: 2, added: 40, removed: 1 })
+    supervision.review.enqueue({
+      sessionId,
+      repoPath: '/repo',
+      branch: 'feat/thing',
+      diffSummary: { files: 2, added: 40, removed: 1 },
+      change: {
+        files: ['src/a.ts'],
+        linesChanged: 41,
+        checkState: 'passing' as never,
+        sharedContractFiles: [],
+        criticalPaths: [],
+      },
+      queuedAt: 1,
+    })
+  }
+
+  beforeEach(() => {
+    cardDir = mkdtempSync(join(tmpdirForUserData(), 'speckit-approve-'))
+    supervision.runs.add({
+      sessionId: 'session-1',
+      featureDir: cardDir,
+      phase: 'implement',
+      worktreePath: '/repo/.worktrees/thing',
+      branch: 'feat/thing',
+      terminalSessionId: 'terminal-1',
+      transcriptPath: '/t.jsonl',
+      startedAt: 0,
+    })
+    queueDiffFor()
+  })
+
+  it('takes the diff out of the review queue when the phase is approved', async () => {
+    // Approving is reviewing. The Review tab used to keep offering work that
+    // had already been accepted.
+    expect(supervision.review.count()).toBe(1)
+    await call('speckit:phase-approve', { featureDir: cardDir, phase: 'implement' })
+    expect(supervision.review.count()).toBe(0)
+  })
+
+  it('reopens the gate, since the queue is what backpressure counts', async () => {
+    // Three approved phases were enough to refuse the next run outright.
+    await call('speckit:phase-approve', { featureDir: cardDir, phase: 'implement' })
+    const snapshot = (await call('speckit:supervision-snapshot')) as {
+      backpressure: { unreviewed: number }
+    }
+    expect(snapshot.backpressure.unreviewed).toBe(0)
+  })
+
+  it('takes the run off the live list rather than stacking it there forever', async () => {
+    await call('speckit:phase-approve', { featureDir: cardDir, phase: 'implement' })
+    const snapshot = (await call('speckit:supervision-snapshot')) as {
+      runs: Array<{ sessionId: string; state: string }>
+    }
+    // Other tests in this file leave runs on the shared register; what matters
+    // is that this card's is no longer live.
+    expect(snapshot.runs.find((run) => run.sessionId === 'session-1')?.state).toBe('finished')
+  })
+
+  it('keeps what it did, in the record', async () => {
+    await call('speckit:phase-approve', { featureDir: cardDir, phase: 'implement' })
+    const snapshot = (await call('speckit:supervision-snapshot')) as {
+      history: Array<{ phase: string; outcome: string; diff: { files: number } }>
+    }
+    // Newest first, and the register is shared across this file's tests.
+    expect(snapshot.history[0]).toMatchObject({
+      phase: 'implement',
+      outcome: 'approved',
+      diff: { files: 2 },
+    })
+  })
+
+  it('leaves another card’s queued diff exactly where it is', async () => {
+    supervision.runs.add({
+      sessionId: 'session-2',
+      featureDir: join(cardDir, 'other'),
+      phase: 'implement',
+      worktreePath: '/repo/.worktrees/other',
+      branch: 'feat/other',
+      terminalSessionId: 'terminal-2',
+      transcriptPath: '/t2.jsonl',
+      startedAt: 0,
+    })
+    queueDiffFor('session-2')
+    await call('speckit:phase-approve', { featureDir: cardDir, phase: 'implement' })
+    expect(supervision.review.list().map((item) => item.sessionId)).toEqual(['session-2'])
+  })
+
+  it('records a run that was stopped, not just one that was approved', async () => {
+    await call('speckit:run-stop', { sessionId: 'session-1', reason: 'wrong approach' })
+    const snapshot = (await call('speckit:supervision-snapshot')) as {
+      history: Array<{ outcome: string }>
+    }
+    expect(snapshot.history[0]?.outcome).toBe('stopped')
   })
 })

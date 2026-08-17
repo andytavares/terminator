@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { CheckCircle, XCircle, Save, Eye, EyeOff, Lock } from 'lucide-react'
-import { getSpeckitAPI } from '../types/electron.js'
+import { getSpeckitAPI, type ModelChoiceView } from '../types/electron.js'
 import type { PhaseGateConfig, PilotSettings } from '../types/speckit.types.js'
 import { PHASE_ORDER, DEFAULT_SETTINGS } from '../types/speckit.types.js'
 
@@ -44,11 +44,31 @@ const PHASE_LABEL: Record<string, string> = {
 
 const LOCKED_PHASES = new Set(['self-review', 'open-pr', 'implement'])
 
+/**
+ * The aliases, duplicated here so the picker renders before the main process
+ * answers — and still renders if it never does.
+ *
+ * Duplication rather than an import because this is the renderer: the catalog
+ * module reads `process.env` and talks to the network, neither of which
+ * belongs on this side of the bridge.
+ */
+const FALLBACK_MODELS: ModelChoiceView[] = [
+  { id: '', label: 'Use my Claude Code default', floating: true },
+  { id: 'opus', label: 'Opus (latest)', floating: true },
+  { id: 'sonnet', label: 'Sonnet (latest)', floating: true },
+  { id: 'haiku', label: 'Haiku (latest)', floating: true },
+  { id: 'fable', label: 'Fable (latest)', floating: true },
+]
+
 export function SettingsView() {
   const [connection, setConnection] = useState<ConnectionStatus>({ linear: false, jira: false })
   const [connLoading, setConnLoading] = useState(true)
   const [settings, setSettings] = useState<PilotSettings>(loadSettings)
   const [settingsSaved, setSettingsSaved] = useState(false)
+  // Seeded with the aliases so the box is never briefly empty: the pinned ids
+  // need a round trip, and the aliases are the whole list for anyone without a
+  // Models API credential anyway.
+  const [models, setModels] = useState<ModelChoiceView[]>(FALLBACK_MODELS)
 
   // Linear form state
   const [linearKey, setLinearKey] = useState('')
@@ -67,6 +87,35 @@ export function SettingsView() {
   const [jiraSaving, setJiraSaving] = useState(false)
   const [jiraError, setJiraError] = useState<string | null>(null)
   const [jiraSaved, setJiraSaved] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    // Left on the seeded aliases whenever this fails, which is the honest
+    // result: there is nothing extra to offer, not an error to report. Wrapped
+    // rather than `.catch`ed because the bridge may not carry the channel at
+    // all — an older main process throws on the call itself, not on its
+    // promise, and that took the whole settings page down.
+    void (async () => {
+      try {
+        const { models: next, selected } = await getSpeckitAPI().modelsList()
+        if (cancelled) return
+        if (next.length > 0) setModels(next)
+        // The main process is the authority: it is what builds the launch
+        // command. A local copy that disagrees would show one model in the box
+        // while every run used another.
+        if (typeof selected === 'string') {
+          setSettings((current) =>
+            current.defaultModel === selected ? current : { ...current, defaultModel: selected }
+          )
+        }
+      } catch {
+        // The aliases stand.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     const api = getSpeckitAPI()
@@ -707,13 +756,51 @@ export function SettingsView() {
           <select
             id="default-model"
             value={settings.defaultModel}
-            onChange={(e) => updateSettings({ defaultModel: e.target.value })}
+            onChange={(e) => {
+              const model = e.target.value
+              updateSettings({ defaultModel: model })
+              // Persisted where it is read from. Kept in localStorage too, so
+              // the box renders before the round trip returns.
+              void getSpeckitAPI()
+                .modelSet({ model })
+                .catch(() => {})
+            }}
             style={s.select}
             aria-label="Default model"
           >
-            <option value="claude-opus-4-6">Claude Opus 4.6</option>
-            <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
-            <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
+            {/* Two groups, because they age differently: an alias resolves to
+                the latest of its family every time a run starts, and a pinned
+                id is a decision to stay on one generation. The pinned group is
+                only there at all when the environment carries a credential the
+                Models API accepts, so it is absent for most people rather than
+                stale for all of them. */}
+            <optgroup label="Always current">
+              {models
+                .filter((model) => model.floating)
+                .map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.label}
+                  </option>
+                ))}
+            </optgroup>
+            {models.some((model) => !model.floating) && (
+              <optgroup label="Pin to one version">
+                {models
+                  .filter((model) => !model.floating)
+                  .map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.label}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
+            {/* A saved setting naming something the list does not offer still
+                has to be selectable, or the box silently shows a different
+                model from the one the runs are using. */}
+            {settings.defaultModel !== '' &&
+              !models.some((model) => model.id === settings.defaultModel) && (
+                <option value={settings.defaultModel}>{settings.defaultModel}</option>
+              )}
           </select>
         </div>
 

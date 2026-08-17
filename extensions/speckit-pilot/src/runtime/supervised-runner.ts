@@ -50,6 +50,8 @@ export interface StartSupervisedRunOptions {
   phase: PhaseId
   /** Resume an existing conversation rather than starting one. */
   resumeSessionId?: string
+  /** What `--model` gets. Empty or absent leaves the flag off entirely. */
+  model?: string
   /** Decides without asking when the autonomy ladder allows it. */
   autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
   onPending: (pending: PendingPermission) => void
@@ -75,8 +77,39 @@ export interface StartSupervisedRunOptions {
   onEnd?: (exitCode: number) => void
 }
 
+/**
+ * The parts of a run that belong to the phase rather than to the session.
+ *
+ * Everything here is rebound when a card moves from one phase to the next in
+ * the same conversation: the terminal, the session id and the transcript are
+ * the card's, but "which phase finished" is not.
+ */
+export interface PhaseCallbacks {
+  onPending: (pending: PendingPermission) => void
+  onResolved: (requestId: string, decision: PermissionOutcome) => void
+  onTurnEnd?: (turns: number) => void
+  onEnd?: (exitCode: number) => void
+}
+
 export interface SupervisedRunner {
   start(options: StartSupervisedRunOptions): Promise<SupervisedRun | null>
+  /**
+   * Runs the next phase inside a conversation that is already open.
+   *
+   * A card used to get one terminal, one session and one `claude` process per
+   * phase: five tabs for a single card, five transcripts, five agents that had
+   * each read the spec from scratch — and, because the earlier ones never
+   * exited, four of them sitting idle in the run list looking stalled.
+   *
+   * Returns null when the session is no longer live, which is the caller's
+   * signal to start a fresh one rather than silently drop the phase.
+   */
+  continueRun(
+    sessionId: string,
+    options: { prompt: string; phase: PhaseId } & PhaseCallbacks
+  ): SupervisedRun | null
+  /** The card's open conversation, if it still has one. */
+  liveSessionFor(featureDir: string): string | null
   /**
    * Answers a tool call the operator was asked about.
    *
@@ -138,6 +171,16 @@ interface Running {
   /** True while a tool call is held: blocked on a person is not stuck. */
   isWaiting: boolean
   release: () => void
+  /**
+   * Whose callbacks the next hook or turn-end belongs to.
+   *
+   * A one-field box rather than the callbacks themselves, and shared with the
+   * closures `start` installed on the bridge and the control server. The
+   * session outlives the phase, so `continueRun` has to redirect callbacks
+   * those closures captured before this record existed — a permission raised
+   * during `plan` must not be reported against `specify`.
+   */
+  readonly phase: { current: PhaseCallbacks & { id: PhaseId } }
 }
 
 export interface SupervisedRunnerOptions {
@@ -172,6 +215,12 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       const resuming = start.resumeSessionId !== undefined
       const sessionId = start.resumeSessionId ?? randomUUID()
 
+      // Shared with the record below rather than closed over by value, so
+      // `continueRun` can swap which phase a hook belongs to without tearing
+      // the session down and building a new one. A box, because these closures
+      // are installed before the record exists.
+      const phase: Running['phase'] = { current: { id: start.phase, ...start } }
+
       const bridge = createPermissionBridge({
         sessionId,
         now,
@@ -180,12 +229,12 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
           // Held on a person, so the detector must not call it stuck.
           const run = running.get(sessionId)
           if (run !== undefined) run.isWaiting = true
-          start.onPending(pending)
+          phase.current.onPending(pending)
         },
         onResolved: (requestId, decision) => {
           const run = running.get(sessionId)
           if (run !== undefined) run.isWaiting = false
-          start.onResolved(requestId, decision)
+          phase.current.onResolved(requestId, decision)
         },
       })
 
@@ -194,6 +243,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         resume: resuming,
         cwd: start.worktreePath,
         prompt: start.prompt,
+        model: start.model,
         settingsDirectory: path.join(stateDir, 'settings'),
         hookScriptPath,
         controlUrl: control.url,
@@ -204,11 +254,19 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       const release = control.register(sessionId, {
         decide: (request) => bridge.canUseTool(request.toolName, request.input),
         onEvent: (kind) => {
+          const run = running.get(sessionId)
           if (kind === 'stop') {
-            start.onTurnEnd?.(countTurns(spec.transcriptPath))
+            // The agent has finished responding and is sitting at its prompt.
+            // That is blocked on a person — the same state as a held tool call
+            // — and the stall detector must not read it as stuck. It used to:
+            // a phase that finished cleanly and was waiting to be approved
+            // went quiet, fired a stall eight minutes later, and stayed in the
+            // Stalls tab offering to interrupt work that was already done.
+            if (run !== undefined) run.isWaiting = true
+            phase.current.onTurnEnd?.(countTurns(spec.transcriptPath))
             return
           }
-          start.onEnd?.(0)
+          phase.current.onEnd?.(0)
           end(sessionId)
         },
       })
@@ -245,7 +303,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       // fire its hook.
       const detachExit =
         api.pty.onExit?.(terminalSessionId, (exitCode: number) => {
-          start.onEnd?.(exitCode)
+          phase.current.onEnd?.(exitCode)
           end(sessionId)
         }) ?? null
 
@@ -259,6 +317,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
         startedAt: now(),
         isWaiting: false,
         release,
+        phase,
       })
 
       // Registered before a single keystroke reaches the terminal: the launch
@@ -288,6 +347,40 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       api.pty.write(terminalSessionId, `${spec.command}\r`)
 
       return { sessionId, terminalSessionId, transcriptPath: spec.transcriptPath }
+    },
+
+    continueRun(sessionId, next): SupervisedRun | null {
+      const run = running.get(sessionId)
+      // Gone: the tab was closed, the agent exited, or the console restarted.
+      // Saying so lets the caller open a fresh one rather than typing a
+      // `/speckit-plan` into a terminal that is not there.
+      if (run === undefined) return null
+
+      // Swapped before a keystroke reaches the terminal, or the first thing the
+      // new phase does is reported against the phase that just finished.
+      run.phase.current = { id: next.phase, ...next }
+      // A phase that begins on a held tool call is a phase that begins blocked,
+      // not stalled — but the previous phase left this true if it ended while
+      // something was waiting, and nothing else clears it.
+      run.isWaiting = false
+
+      // Typed as a person would type it. The agent is sitting at its prompt
+      // with the whole card's conversation behind it: the spec it wrote, the
+      // plan it derived from it, and every decision made in between.
+      api.pty.write(run.terminalSessionId, `${oneLine(next.prompt)}\r`)
+
+      return {
+        sessionId,
+        terminalSessionId: run.terminalSessionId,
+        transcriptPath: run.transcriptPath,
+      }
+    },
+
+    liveSessionFor(featureDir): string | null {
+      for (const [sessionId, run] of running) {
+        if (run.featureDir === featureDir) return sessionId
+      }
+      return null
     },
 
     resolve(sessionId, requestId, decision): boolean {
@@ -320,6 +413,8 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
     send(sessionId, message): boolean {
       const run = running.get(sessionId)
       if (run === undefined) return false
+      // It has been given something to do, so it is no longer waiting on us.
+      run.isWaiting = false
       // Claude Code queues input arriving mid-turn, so a redirect does not
       // require the agent to be idle first.
       api.pty.write(run.terminalSessionId, `${oneLine(message)}\r`)

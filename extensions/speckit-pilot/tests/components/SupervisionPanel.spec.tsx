@@ -31,7 +31,7 @@ const api = {
 vi.mock('../../src/types/electron.js', () => ({ getSpeckitAPI: () => api }))
 
 import { SupervisionPanel, elapsed } from '../../src/components/SupervisionPanel.js'
-import type { RunView, StallFiringView } from '../../src/types/electron.js'
+import type { RunHistoryView, RunView, StallFiringView } from '../../src/types/electron.js'
 
 const run = (over: Partial<RunView> = {}): RunView => ({
   sessionId: 'session-1',
@@ -800,5 +800,100 @@ describe('saying how long', () => {
 
   it('never says a negative age', () => {
     expect(elapsed(-5_000)).toBe('0s')
+  })
+})
+
+const past = (over: Partial<RunHistoryView> = {}): RunHistoryView => ({
+  sessionId: 'session-1',
+  featureDir: '/repo/specs/021-thing',
+  phase: 'specify',
+  branch: 'feat/thing',
+  outcome: 'approved',
+  startedAt: 1_000,
+  endedAt: 5_000,
+  turns: 4,
+  diff: { files: 2, added: 40, removed: 1 },
+  asked: 3,
+  ...over,
+})
+
+describe('what is over', () => {
+  it('is somewhere to look, so the live list does not have to be the record too', async () => {
+    // Every approved phase used to stay in the run list forever, which made
+    // "what is happening right now" unreadable by the third card.
+    api.supervisionSnapshot.mockResolvedValue({
+      runs: [],
+      review: [],
+      backpressure: { allowed: true, unreviewed: 0, limit: 3 },
+      history: [past()],
+    })
+    render(<SupervisionPanel />)
+    fireEvent.click(await screen.findByText(/history/))
+    expect(await screen.findByText('approved')).toBeTruthy()
+  })
+
+  it('says what the phase actually did, not just that it happened', async () => {
+    api.supervisionSnapshot.mockResolvedValue({
+      runs: [],
+      review: [],
+      backpressure: { allowed: true, unreviewed: 0, limit: 3 },
+      history: [past()],
+    })
+    render(<SupervisionPanel />)
+    fireEvent.click(await screen.findByText(/history/))
+    const meta = await screen.findByText(/specify/)
+    expect(meta.textContent).toContain('4 turns')
+    expect(meta.textContent).toContain('2 files')
+    expect(meta.textContent).toContain('asked 3')
+  })
+
+  it('names the card rather than the branch, when it can', async () => {
+    api.supervisionSnapshot.mockResolvedValue({
+      runs: [],
+      review: [],
+      backpressure: { allowed: true, unreviewed: 0, limit: 3 },
+      history: [past()],
+    })
+    render(<SupervisionPanel cardLabel={() => 'Make all text red'} />)
+    fireEvent.click(await screen.findByText(/history/))
+    expect(await screen.findByText('Make all text red')).toBeTruthy()
+  })
+
+  it('says so plainly when nothing has finished yet', async () => {
+    render(<SupervisionPanel />)
+    fireEvent.click(await screen.findByText(/history/))
+    expect(await screen.findByText('Nothing has finished yet.')).toBeTruthy()
+  })
+
+  it('copes with a main process that does not report history at all', async () => {
+    render(<SupervisionPanel />)
+    fireEvent.click(await screen.findByText(/history/))
+    expect(await screen.findByText('Nothing has finished yet.')).toBeTruthy()
+  })
+
+  it('wears no count, since a number that only grows reads as work waiting', async () => {
+    api.supervisionSnapshot.mockResolvedValue({
+      runs: [],
+      review: [],
+      backpressure: { allowed: true, unreviewed: 0, limit: 3 },
+      history: [past(), past({ phase: 'plan' })],
+    })
+    render(<SupervisionPanel />)
+    const tab = await screen.findByText(/history/)
+    await waitFor(() => expect(tab.textContent?.trim()).toBe('history'))
+  })
+
+  it('offers no actions, because there is nothing left to do to it', async () => {
+    api.supervisionSnapshot.mockResolvedValue({
+      runs: [],
+      review: [],
+      backpressure: { allowed: true, unreviewed: 0, limit: 3 },
+      history: [past()],
+    })
+    render(<SupervisionPanel workspacePath="/repo" />)
+    fireEvent.click(await screen.findByText(/history/))
+    await screen.findByText('approved')
+    expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Interrupt' })).toBeNull()
   })
 })

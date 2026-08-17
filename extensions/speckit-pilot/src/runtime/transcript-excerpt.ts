@@ -18,6 +18,36 @@ export interface TranscriptLine {
 /** How many lines back. Enough to see the loop, short enough to read. */
 const DEFAULT_LIMIT = 40
 
+/** Longest a tool's arguments get before they stop being a summary. */
+const ARGUMENT_BUDGET = 120
+
+/**
+ * The one field of a tool call worth reading at a glance.
+ *
+ * A tool call rendered as its name alone is what the transcript used to show,
+ * and fifteen consecutive `[Bash]` rows say nothing at all — you cannot tell a
+ * run stuck in a loop from one working steadily through a test suite, which is
+ * the single question the transcript exists to answer. The whole input is the
+ * other extreme: a `Write` carries the entire file.
+ *
+ * So: the argument that identifies the call, by the conventions the built-in
+ * tools actually use, and nothing else.
+ */
+function argumentOf(input: unknown): string {
+  if (typeof input !== 'object' || input === null) return ''
+  const fields = input as Record<string, unknown>
+  for (const key of ['command', 'file_path', 'path', 'pattern', 'query', 'url', 'description']) {
+    const value = fields[key]
+    if (typeof value === 'string' && value.trim() !== '') {
+      const oneLine = value.replace(/\s+/g, ' ').trim()
+      return oneLine.length > ARGUMENT_BUDGET
+        ? `${oneLine.slice(0, ARGUMENT_BUDGET - 1)}…`
+        : oneLine
+    }
+  }
+  return ''
+}
+
 function textOf(message: Record<string, unknown>): string {
   const content = message.content
   if (typeof content === 'string') return content
@@ -27,9 +57,10 @@ function textOf(message: Record<string, unknown>): string {
       if (typeof block !== 'object' || block === null) return ''
       const b = block as Record<string, unknown>
       if (b.type === 'text' && typeof b.text === 'string') return b.text
-      // Named rather than rendered: a wall of arguments buries the sentence
-      // that says what went wrong.
-      if (b.type === 'tool_use' && typeof b.name === 'string') return `[${b.name}]`
+      if (b.type === 'tool_use' && typeof b.name === 'string') {
+        const argument = argumentOf(b.input)
+        return argument === '' ? `${b.name}` : `${b.name}: ${argument}`
+      }
       return ''
     })
     .filter((part) => part !== '')
