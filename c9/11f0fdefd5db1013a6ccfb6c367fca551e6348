@@ -1,0 +1,98 @@
+extensions/speckit-pilot/src/index.ts
+  s_8079ec5b35817a::t_60da841ba75649 914-916,927,1047-1053
+  s_8079ec5b35817a::t_856357eba828a1 1122-1126
+  s_8079ec5b35817a::t_3ba4c931014f57 2857-2883,2902
+src/renderer/components/NotificationPanel.tsx
+  s_8079ec5b35817a::t_abb20ea4e875e7 1,136-163,180
+  s_8079ec5b35817a::t_2608a5727abd50 29-37,45-49,52,55-59,69,80
+  s_8079ec5b35817a::t_418da3b4cb824d 70-72,74
+specs/021-tav-14/.pilot/history.jsonl
+  s_8079ec5b35817a::t_5cf744664a5256 1
+specs/029-tav-9/.pilot/state.json
+  s_8079ec5b35817a::t_67cdc2014ee57f 38-232
+  s_8079ec5b35817a::t_ac1919c497cec2 1-37
+src/renderer/electron.d.ts
+  s_8079ec5b35817a::t_94a6f540569d72 24-25
+  s_8079ec5b35817a::t_b1d5606987eedb 163
+tests/unit/renderer/components/NotificationPanel.spec.tsx
+  s_8079ec5b35817a::t_91432337e456f0 255-261,283-289,328-334
+  s_8079ec5b35817a::t_aebe68ae400cab 10,18,253-254,262-282,290-327,335-364
+src/renderer/components/NotificationPanel.css
+  s_8079ec5b35817a::t_abb20ea4e875e7 12-15
+specs/028-tav-10/.pilot/state.json
+  s_8079ec5b35817a::t_67cdc2014ee57f 38-234
+  s_8079ec5b35817a::t_f02f5542c72a52 1-37
+extensions/task-vault/tests/navigation.spec.ts
+  s_8079ec5b35817a::t_f5ea725df80cd2 1-89
+docs/ARCHITECTURE.md
+  s_8079ec5b35817a::t_6fe3c3b8eac2c1 371-394
+src/shared/electron-api/manifest.ts
+  s_8079ec5b35817a::t_b1d5606987eedb 316-322
+specs/021-tav-14/.pilot/state.json
+  s_8079ec5b35817a::t_5cf744664a5256 14,23-27,32,44,49
+extensions/task-vault/src/index.ts
+  s_8079ec5b35817a::t_c56a1b751a46b5 295
+  s_8079ec5b35817a::t_19e0cf444a2ae8 13,217,222-223,225
+  s_8079ec5b35817a::t_2b176f4f121738 288-294,296
+src/main/index.ts
+  s_8079ec5b35817a::t_b1d5606987eedb 338-341
+specs/029-tav-9/.pilot/card.json
+  s_8079ec5b35817a::t_67cdc2014ee57f 10
+  s_8079ec5b35817a::t_9355c9edf30bea 1-9
+extensions/task-vault/src/notifications/task-scheduler.ts
+  s_8079ec5b35817a::t_4022be66eba1b0 3
+  s_8079ec5b35817a::t_9b675ac4ad62f4 148-150
+  s_8079ec5b35817a::t_19e0cf444a2ae8 151,204
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_8079ec5b35817a::t_87cbf8b952e7ce 406-410,415
+  s_8079ec5b35817a::t_c56a1b751a46b5 381-385,390-392
+docs/EXTENSION-DEVELOPMENT.md
+  s_8079ec5b35817a::t_6fe3c3b8eac2c1 898,902-912,921-946
+  s_8079ec5b35817a::t_a20ab2a31625bc 947
+src/main/extensions/api.ts
+  s_8079ec5b35817a::t_dcdc4266206920 738,747
+  s_8079ec5b35817a::t_bddfcd0ba53d75 266-273
+src/main/notifications/notification-manager.ts
+  s_8079ec5b35817a::t_94a6f540569d72 38-46,55-56
+  s_8079ec5b35817a::t_91021aee79a78f 82-92,102-104,143,164-168
+  s_8079ec5b35817a::t_bddfcd0ba53d75 185
+src/main/extensions/extension-view-host.ts
+  s_8079ec5b35817a::t_9f196dfd7f6a35 79-89,293-295,299,303-304,314-322
+  s_8079ec5b35817a::t_43019928e6d778 323
+tests/unit/extensions/extension-view-host.spec.ts
+  s_8079ec5b35817a::t_bcff3011605e79 228-286
+specs/028-tav-10/.pilot/card.json
+  s_8079ec5b35817a::t_67cdc2014ee57f 10
+  s_8079ec5b35817a::t_316cd4495e684b 1-9
+extensions/speckit-pilot/tests/ipc/run-actions-ipc.spec.ts
+  s_8079ec5b35817a::t_33c22f7825f41c 359-362,368-379
+  s_8079ec5b35817a::t_3881791346fc33 380-381
+tests/unit/notifications/notification-manager.spec.ts
+  s_8079ec5b35817a::t_8c8ebd83e4c92a 351-438
+extensions/task-vault/src/navigation.ts
+  s_8079ec5b35817a::t_9bdb6bc2e56a3a 1-22,24-27,37-48,58-70
+  s_8079ec5b35817a::t_c56a1b751a46b5 23,28-36,49-57
+extensions/task-vault/tests/notifications/task-scheduler.spec.ts
+  s_8079ec5b35817a::t_20291627666ce0 470-475,488-489,491-503
+  s_8079ec5b35817a::t_6c92ad6c7bc2fa 653,671-675
+  s_8079ec5b35817a::t_8998d564dd5def 65-66
+  s_8079ec5b35817a::t_4e23e1ba1e8471 77,708-736
+src/renderer/stores/notification.store.ts
+  s_8079ec5b35817a::t_418da3b4cb824d 17-24,61-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c911f0fdefd5db1013a6ccfb6c367fca551e6348",
+  "prompts": {},
+  "sessions": {
+    "s_8079ec5b35817a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba954686-132a-423d-8f5a-28b2f5b179f3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
