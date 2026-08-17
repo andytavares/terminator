@@ -40,6 +40,7 @@ import {
   deleteTag,
   registerTagsIpcHandlers,
   reorderItems,
+  NOTES_CHANGED_CHANNEL,
 } from '../../../src/ipc/notes.ipc'
 import type { ExtensionDB } from '../../../../../src/main/db/index'
 
@@ -192,6 +193,66 @@ describe('autosaveNote', () => {
       null as unknown as { id: string; title: string; body: string; tags: string[] }
     )
     expect(result).toHaveProperty('error')
+  })
+
+  // The docked panel and a popped-out note window are separate renderers with
+  // separate body caches; without this push they serve divergent content.
+  it('broadcasts the saved body so other surfaces can adopt it', async () => {
+    const created = await createNote(db, { title: 'T', body: 'before' })
+    const id = (created as { data: { id: string } }).data.id
+    const broadcast = vi.fn()
+
+    await autosaveNote(
+      db,
+      { id, title: 'After', body: 'after', tags: ['a'], originId: 'window-1' },
+      broadcast
+    )
+
+    expect(broadcast).toHaveBeenCalledWith(
+      NOTES_CHANGED_CHANNEL,
+      expect.objectContaining({
+        id,
+        title: 'After',
+        body: 'after',
+        originId: 'window-1',
+      })
+    )
+  })
+
+  it('includes inline body tags in the broadcast payload', async () => {
+    const created = await createNote(db, { title: 'T', body: '' })
+    const id = (created as { data: { id: string } }).data.id
+    const broadcast = vi.fn()
+
+    await autosaveNote(db, { id, title: 'T', body: 'see #alpha', tags: ['beta'] }, broadcast)
+
+    const payload = broadcast.mock.calls[0][1] as { tags: string[]; originId: string | null }
+    expect(payload.tags).toEqual(expect.arrayContaining(['alpha', 'beta']))
+    expect(payload.originId).toBeNull()
+  })
+
+  it('does not broadcast when the note does not exist', async () => {
+    const broadcast = vi.fn()
+    const result = await autosaveNote(
+      db,
+      { id: 'missing', title: 'T', body: 'b', tags: [] },
+      broadcast
+    )
+    expect(result).toHaveProperty('error', 'NOTE_NOT_FOUND')
+    expect(broadcast).not.toHaveBeenCalled()
+  })
+
+  it('does not broadcast on an invalid payload', async () => {
+    const broadcast = vi.fn()
+    await autosaveNote(db, null, broadcast)
+    expect(broadcast).not.toHaveBeenCalled()
+  })
+
+  it('saves without a broadcast callback', async () => {
+    const created = await createNote(db, { title: 'T', body: 'x' })
+    const id = (created as { data: { id: string } }).data.id
+    const result = await autosaveNote(db, { id, title: 'T', body: 'y', tags: [] })
+    expect(result).toHaveProperty('data')
   })
 })
 

@@ -2,15 +2,22 @@ import React, { useState } from 'react'
 import type { IndexedTask } from '../vault/types'
 import { FileToPicker } from './FileToPicker'
 import { useVaultStore } from '../stores/vault.store'
+import { logReviewAction } from '../utils/review-log'
 
 type InboxStep = 'actionable' | 'two-minute' | 'destination'
 
 interface InboxProcessorProps {
   items: IndexedTask[]
   onDone: () => void
+  /** Set when running inside a weekly review, so each decision is recorded. */
+  reviewId?: string | null
 }
 
-export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JSX.Element {
+export function InboxProcessor({
+  items,
+  onDone,
+  reviewId = null,
+}: InboxProcessorProps): React.JSX.Element {
   const [currentIdx, setCurrentIdx] = useState(0)
   const [step, setStep] = useState<InboxStep>('actionable')
   const [isProcessing, setIsProcessing] = useState(false)
@@ -33,6 +40,14 @@ export function InboxProcessor({ items, onDone }: InboxProcessorProps): React.JS
           return
         }
       }
+      logReviewAction(reviewId, {
+        step: 2,
+        action: 'inbox-processed',
+        entityType: 'task',
+        entityId: current.id,
+        entityLabel: current.text,
+        detail: dest ? `${action} → ${dest}` : action,
+      })
       await refreshInboxCount()
       advanceToNext()
     } catch {

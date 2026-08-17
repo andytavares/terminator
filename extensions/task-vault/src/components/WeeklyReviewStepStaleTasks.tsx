@@ -1,21 +1,32 @@
 import React, { useState } from 'react'
 import { notify } from '../utils/notify'
 import type { IndexedTask } from '../vault/types'
+import { logReviewAction, type ReviewActionKind } from '../utils/review-log'
 
 interface Props {
   staleTasks: IndexedTask[]
   staleDaysThreshold: number
   onComplete: () => void
+  reviewId: string | null
 }
 
 export function WeeklyReviewStepStaleTasks({
   staleTasks: initialTasks,
   staleDaysThreshold,
   onComplete,
+  reviewId,
 }: Props): React.JSX.Element {
   const [tasks, setTasks] = useState(initialTasks)
 
-  function remove(taskId: string) {
+  function remove(taskId: string, action: ReviewActionKind) {
+    const task = tasks.find((t) => t.id === taskId)
+    logReviewAction(reviewId, {
+      step: 4,
+      action,
+      entityType: 'task',
+      entityId: taskId,
+      entityLabel: task?.text ?? taskId,
+    })
     setTasks((prev) => prev.filter((t) => t.id !== taskId))
   }
 
@@ -28,7 +39,7 @@ export function WeeklyReviewStepStaleTasks({
       notify('error', `Could not move to backlog: ${result.error}`, 'staleTaskBacklogFailed')
       return
     }
-    remove(taskId)
+    remove(taskId, 'task-backlogged')
   }
 
   async function handleDelete(taskId: string) {
@@ -39,7 +50,7 @@ export function WeeklyReviewStepStaleTasks({
       notify('error', `Could not delete task: ${result.error}`, 'staleTaskDeleteFailed')
       return
     }
-    remove(taskId)
+    remove(taskId, 'task-deleted')
   }
 
   async function handleKeep(taskId: string) {
@@ -51,7 +62,7 @@ export function WeeklyReviewStepStaleTasks({
       notify('error', `Could not reset task: ${result.error}`, 'staleTaskResetFailed')
       return
     }
-    remove(taskId)
+    remove(taskId, 'task-kept')
   }
 
   return (

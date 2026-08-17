@@ -8,7 +8,7 @@ GTD+BuJo+PARA daily productivity system backed by the shared PGlite (PostgreSQL-
 - **Quick Capture** — OS-level global hotkey opens floating overlay from any app
 - **Projects Browser** — list projects with stale detection
 - **Inbox Processing** — GTD clarify flow for inbox items
-- **Weekly Review** — full review payload including stale projects and completed tasks
+- **Weekly Review** — full review payload including stale projects and completed tasks. Every review is persisted: each promote, archive, backlog, delete, keep, project status change, and inbox decision is recorded against the review, alongside the reflection answers. Past reviews are browsable from the review's **History** button and exportable as Markdown
 - **Recurring Tasks** — set daily/weekly/biweekly/monthly recurrence on any task; the engine automatically ensures exactly one future open instance exists at all times
 
 ## Task ID format

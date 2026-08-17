@@ -56,9 +56,11 @@ import {
 } from '../../../../src/main/extensions/extension-view-host.js'
 import type { Extension } from '../../../../src/shared/types/index.js'
 
+const mockMainWebContentsFocus = vi.fn()
+
 function makeMainWindow() {
   return {
-    webContents: { send: mockSend },
+    webContents: { send: mockSend, focus: mockMainWebContentsFocus },
     contentView: { addChildView: mockAddChildView, removeChildView: mockRemoveChildView },
     getContentBounds: vi.fn().mockReturnValue({ x: 0, y: 0, width: 1280, height: 800 }),
   } as unknown as Parameters<typeof ExtensionViewHost>[0]
@@ -297,6 +299,155 @@ describe('ExtensionViewHost', () => {
     // No handleBoundsUpdate call — lastBounds is null
     host.setBottomInset(280)
     expect(mockSetBounds).not.toHaveBeenCalled()
+  })
+})
+
+describe('ExtensionViewHost focus restoration', () => {
+  let host: ExtensionViewHost
+  let mainWindow: ReturnType<typeof makeMainWindow>
+
+  // The electron mock shares one `on` spy across every WebContentsView, so the
+  // handlers are recovered positionally: one 'focus' registration per created view.
+  function focusHandlers(): Array<() => void> {
+    return mockOn.mock.calls
+      .filter(([event]) => event === 'focus')
+      .map(([, handler]) => handler as () => void)
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mainWindow = makeMainWindow()
+    host = new ExtensionViewHost(mainWindow as never, '/fake/preload/webview.js')
+  })
+
+  async function makeVisibleView(viewParam: string) {
+    await host.createView(makeExt(), viewParam)
+    host.handleBoundsUpdate(
+      'com.test.ext',
+      viewParam,
+      { x: 0, y: 0, width: 100, height: 100 },
+      true
+    )
+  }
+
+  it('restores focus to the extension view that was focused when the window blurred', async () => {
+    await makeVisibleView('main')
+
+    focusHandlers()[0]() // the view takes focus
+    host.captureFocusTarget() // window blurs
+    host.restoreFocus() // window regains focus
+
+    expect(mockFocus).toHaveBeenCalled()
+    expect(mockMainWebContentsFocus).not.toHaveBeenCalled()
+  })
+
+  it('ignores focus moving to the main renderer after the blur snapshot was taken', async () => {
+    await makeVisibleView('main')
+
+    focusHandlers()[0]()
+    host.captureFocusTarget()
+    // Electron restores focus to the window's own webContents before the
+    // window 'focus' event fires — that must not clobber the snapshot.
+    host.noteFocused(null)
+    host.restoreFocus()
+
+    expect(mockFocus).toHaveBeenCalled()
+    expect(mockMainWebContentsFocus).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the main renderer when focus was last in the main renderer', async () => {
+    await makeVisibleView('main')
+
+    focusHandlers()[0]()
+    host.noteFocused(null) // user clicked back into the main renderer
+    host.captureFocusTarget()
+    host.restoreFocus()
+
+    expect(mockMainWebContentsFocus).toHaveBeenCalled()
+    expect(mockFocus).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the main renderer when the remembered view is hidden', async () => {
+    await makeVisibleView('main')
+
+    focusHandlers()[0]()
+    host.captureFocusTarget()
+    host.handleBoundsUpdate('com.test.ext', 'main', { x: 0, y: 0, width: 100, height: 100 }, false)
+    host.restoreFocus()
+
+    expect(mockMainWebContentsFocus).toHaveBeenCalled()
+    expect(mockFocus).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the main renderer when the remembered view was destroyed', async () => {
+    await makeVisibleView('main')
+
+    focusHandlers()[0]()
+    host.captureFocusTarget()
+    host.destroyAllViews('com.test.ext')
+    host.restoreFocus()
+
+    expect(mockMainWebContentsFocus).toHaveBeenCalled()
+    expect(mockFocus).not.toHaveBeenCalled()
+  })
+
+  it('restores the correct view when several are open', async () => {
+    await makeVisibleView('main')
+    await makeVisibleView('sidebar')
+
+    focusHandlers()[1]() // the sidebar view takes focus
+    host.captureFocusTarget()
+    host.restoreFocus()
+
+    expect(mockFocus).toHaveBeenCalledTimes(1)
+    expect(mockMainWebContentsFocus).not.toHaveBeenCalled()
+  })
+
+  it('focusView records the focused view so a later restore targets it', async () => {
+    await makeVisibleView('main')
+
+    host.focusView('com.test.ext', 'main')
+    mockFocus.mockClear()
+
+    host.captureFocusTarget()
+    host.restoreFocus()
+
+    expect(mockFocus).toHaveBeenCalled()
+    expect(mockMainWebContentsFocus).not.toHaveBeenCalled()
+  })
+
+  it('restores to the main renderer when nothing has ever been focused', () => {
+    host.captureFocusTarget()
+    host.restoreFocus()
+
+    expect(mockMainWebContentsFocus).toHaveBeenCalled()
+  })
+
+  describe('findViewByWebContents', () => {
+    it('resolves the extension id and viewParam for a created view', async () => {
+      await host.createView(makeExt(), 'sidebar')
+      const { webContents } = mockAddChildView.mock.calls[0][0]
+
+      expect(host.findViewByWebContents(webContents)).toEqual({
+        extensionId: 'com.test.ext',
+        viewParam: 'sidebar',
+      })
+    })
+
+    it('distinguishes two views of the same extension', async () => {
+      await host.createView(makeExt(), 'main')
+      await host.createView(makeExt(), 'sidebar')
+      const second = mockAddChildView.mock.calls[1][0].webContents
+
+      expect(host.findViewByWebContents(second)).toEqual({
+        extensionId: 'com.test.ext',
+        viewParam: 'sidebar',
+      })
+    })
+
+    it('returns null for webContents that belong to no extension view', () => {
+      expect(host.findViewByWebContents({} as never)).toBeNull()
+    })
   })
 })
 

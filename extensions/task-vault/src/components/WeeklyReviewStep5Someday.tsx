@@ -1,36 +1,65 @@
 import React, { useState } from 'react'
 import type { IndexedProject, IndexedTask } from '../vault/types'
+import { logReviewAction } from '../utils/review-log'
 
 interface Props {
   somedayProjects: IndexedProject[]
   somedayTasks: IndexedTask[]
   onComplete: () => void
+  reviewId: string | null
 }
 
 export function WeeklyReviewStep5Someday({
   somedayProjects,
   somedayTasks,
   onComplete,
+  reviewId,
 }: Props): React.JSX.Element {
   const [projects, setProjects] = useState(somedayProjects)
   const [tasks, setTasks] = useState(somedayTasks)
 
-  async function updateProjectStatus(filePath: string, status: string) {
+  async function updateProjectStatus(project: IndexedProject, status: string) {
     await window.electronAPI.extensionBridge.invoke('task-vault:vault:update-project-status', {
-      projectFilePath: filePath,
+      projectFilePath: project.filePath,
       status,
     })
-    setProjects((prev) => prev.filter((p) => p.filePath !== filePath))
+    logReviewAction(reviewId, {
+      step: 5,
+      action: 'project-status',
+      entityType: 'project',
+      entityId: project.id,
+      entityLabel: project.name,
+      detail: status,
+    })
+    setProjects((prev) => prev.filter((p) => p.filePath !== project.filePath))
   }
 
-  async function promoteTask(taskId: string) {
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:someday-to-today', { taskId })
-    setTasks((prev) => prev.filter((t) => t.id !== taskId))
+  async function promoteTask(task: IndexedTask) {
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:someday-to-today', {
+      taskId: task.id,
+    })
+    logReviewAction(reviewId, {
+      step: 5,
+      action: 'task-promoted',
+      entityType: 'task',
+      entityId: task.id,
+      entityLabel: task.text,
+    })
+    setTasks((prev) => prev.filter((t) => t.id !== task.id))
   }
 
-  async function archiveTask(taskId: string) {
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:cancel-task', { taskId })
-    setTasks((prev) => prev.filter((t) => t.id !== taskId))
+  async function archiveTask(task: IndexedTask) {
+    await window.electronAPI.extensionBridge.invoke('task-vault:vault:cancel-task', {
+      taskId: task.id,
+    })
+    logReviewAction(reviewId, {
+      step: 5,
+      action: 'task-archived',
+      entityType: 'task',
+      entityId: task.id,
+      entityLabel: task.text,
+    })
+    setTasks((prev) => prev.filter((t) => t.id !== task.id))
   }
 
   const isEmpty = projects.length === 0 && tasks.length === 0
@@ -50,15 +79,12 @@ export function WeeklyReviewStep5Someday({
               <li key={task.id} className="wr-step__item">
                 <span className="wr-step__project-name">{task.text}</span>
                 <span className="wr-step__project-actions">
-                  <button
-                    className="tv-btn tv-btn--primary"
-                    onClick={() => void promoteTask(task.id)}
-                  >
+                  <button className="tv-btn tv-btn--primary" onClick={() => void promoteTask(task)}>
                     Pick up today
                   </button>
                   <button
                     className="tv-btn tv-btn--secondary"
-                    onClick={() => void archiveTask(task.id)}
+                    onClick={() => void archiveTask(task)}
                   >
                     Archive
                   </button>
@@ -79,13 +105,13 @@ export function WeeklyReviewStep5Someday({
                 <span className="wr-step__project-actions">
                   <button
                     className="tv-btn tv-btn--primary"
-                    onClick={() => void updateProjectStatus(project.filePath, 'active')}
+                    onClick={() => void updateProjectStatus(project, 'active')}
                   >
                     Promote to active
                   </button>
                   <button
                     className="tv-btn tv-btn--secondary"
-                    onClick={() => void updateProjectStatus(project.filePath, 'archived')}
+                    onClick={() => void updateProjectStatus(project, 'archived')}
                   >
                     Archive
                   </button>

@@ -98,8 +98,9 @@ describe('ExtensionViewHost', () => {
 
     it('injects design token CSS and signals panel-loaded on did-finish-load', async () => {
       await host.createView(makeExt(), 'main')
-      const [, finishLoadCb] = (createdViews[0].webContents.on as ReturnType<typeof vi.fn>).mock
-        .calls[0] as [string, () => void]
+      const calls = (createdViews[0].webContents.on as ReturnType<typeof vi.fn>).mock
+        .calls as Array<[string, () => void]>
+      const finishLoadCb = calls.find(([event]) => event === 'did-finish-load')![1]
       finishLoadCb()
       expect(createdViews[0].webContents.insertCSS).toHaveBeenCalledWith(
         expect.stringContaining('--tm-bg-base')

@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
+import { logReviewAction } from '../utils/review-log'
 
 interface Props {
   onComplete: () => void
+  reviewId: string | null
 }
 
-export function WeeklyReviewStep1GetClear({ onComplete }: Props): React.JSX.Element {
+export function WeeklyReviewStep1GetClear({ onComplete, reviewId }: Props): React.JSX.Element {
   const [text, setText] = useState('')
   const [adding, setAdding] = useState(false)
   const [captured, setCaptured] = useState<string[]>([])
@@ -18,6 +20,12 @@ export function WeeklyReviewStep1GetClear({ onComplete }: Props): React.JSX.Elem
         text: text.trim(),
       })) as { error?: string }
       if (result?.error) return
+      logReviewAction(reviewId, {
+        step: 1,
+        action: 'captured',
+        entityType: 'task',
+        entityLabel: text.trim(),
+      })
       setCaptured((prev) => [...prev, text.trim()])
       setText('')
     } finally {

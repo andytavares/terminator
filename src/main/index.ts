@@ -15,6 +15,7 @@ import { registerDbIpcHandlers } from './ipc/db.ipc.js'
 import { PtyManager } from './terminal/pty-manager.js'
 import { ExtensionHost } from './extensions/extension-host.js'
 import { ExtensionViewHost } from './extensions/extension-view-host.js'
+import { routeExtensionExitRequest } from './extensions/extension-exit.js'
 import { logger } from './logger.js'
 import { sendToWindow } from './safe-send.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
@@ -56,6 +57,19 @@ function createWindow(): void {
   })
 
   viewHost = new ExtensionViewHost(mainWindow, join(__dirname, '../preload/webview.js'))
+
+  // Returning to Terminator from another app must land the caret back where the
+  // user left it — no second click. Electron restores focus to the window's own
+  // webContents (and on macOS not even that), so the focused surface is
+  // snapshotted on blur and re-focused explicitly on focus. The snapshot has to
+  // happen on blur: by 'focus' time Electron has already overwritten the record.
+  mainWindow.webContents.on('focus', () => viewHost?.noteFocused(null))
+  mainWindow.on('blur', () => viewHost?.captureFocusTarget())
+  mainWindow.on('focus', () => {
+    // Deferred a tick so Electron's own RestoreFocus runs first and does not
+    // immediately undo the restore.
+    setImmediate(() => viewHost?.restoreFocus())
+  })
 
   if (process.env.NODE_ENV === 'development' || process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] || 'http://localhost:5173')
@@ -321,6 +335,22 @@ app.whenReady().then(async () => {
     viewHost?.setBottomInset(inset)
   })
 
+  // Sent by the double-Escape gesture in the extension webview preload. The
+  // extension view is its own webContents, so the host renderer never sees the
+  // keystroke — main attributes it to a surface and relays the exit.
+  onChannel('extension:request-exit', (event) => {
+    if (!viewHost || !mainWindow || mainWindow.isDestroyed()) return
+    routeExtensionExitRequest(event.sender, {
+      findViewByWebContents: (wc) => viewHost!.findViewByWebContents(wc),
+      listExtensions: () => extensionHost.listExtensions(),
+      focusMainRenderer: () => {
+        viewHost!.noteFocused(null)
+        mainWindow!.webContents.focus()
+      },
+      send: (channel, payload) => mainWindow!.webContents.send(channel, payload),
+    })
+  })
+
   onChannel('workspace:active-changed', (_event, data) => {
     viewHost?.broadcastToAll('workspace:changed', data)
   })
@@ -338,10 +368,24 @@ app.whenReady().then(async () => {
     ptyManager,
     db: getAppDb(),
     broadcastToWindows: (channel, data) => {
+      // Auxiliary windows (extension pop-outs) are real BrowserWindows and must
+      // receive pushes too, otherwise a pop-out and the docked panel drift apart.
       // Guarded: a PTY opened through the extension API broadcasts on every
       // chunk, and keeps running after the window that opened it has closed.
-      sendToWindow(mainWindow, channel, data)
-      viewHost?.broadcastToAll(channel, data)
+      for (const win of BrowserWindow.getAllWindows()) {
+        sendToWindow(win, channel, data)
+      }
+      // The main window's send is patched above to relay to extension
+      // WebContentsViews for every channel except the two it filters out — only
+      // relay explicitly when that patch did not already do it, or the views
+      // would receive the same push twice.
+      const relayedByMainWindow =
+        !!mainWindow &&
+        !mainWindow.isDestroyed() &&
+        !mainWindow.webContents.isDestroyed() &&
+        !channel.startsWith('terminal:') &&
+        channel !== 'workspace:changed'
+      if (!relayedByMainWindow) viewHost?.broadcastToAll(channel, data)
     },
     focusExtensionView: (extId, viewParam) => viewHost?.focusView(extId, viewParam),
     bridge: {

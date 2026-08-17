@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { EditorView, keymap } from '@codemirror/view'
-import { Compartment, EditorState } from '@codemirror/state'
+import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import { LanguageDescription, syntaxHighlighting } from '@codemirror/language'
@@ -19,6 +19,7 @@ import { StreamLanguage } from '@codemirror/language'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { searchKeymap } from '@codemirror/search'
 import { livePreviewPlugin } from './livePreview'
+import { insertNewlineKeepingHeadingMarker } from './headingEnter'
 import {
   commentAnchorField,
   commentAnchorDecorations,
@@ -27,6 +28,11 @@ import {
   setHoveredAnchor,
   type CommentAnchor,
 } from './commentField'
+
+// Marks a transaction as adopting a body written by another surface, so the
+// update listener does not report it back as a local edit and trigger an
+// autosave/broadcast loop.
+const externalUpdate = Annotation.define<boolean>()
 
 export interface SelectionAnchor {
   from: number
@@ -43,6 +49,8 @@ interface NoteEditorProps {
   onAnchorsReady?: (getView: () => EditorView | null) => void
   onSelectionChange?: (sel: SelectionAnchor | null) => void
   readOnly?: boolean
+  /** When true, show the raw markdown instead of the live-preview rendering. */
+  sourceMode?: boolean
 }
 
 export function NoteEditor({
@@ -51,10 +59,12 @@ export function NoteEditor({
   onAnchorsReady,
   onSelectionChange,
   readOnly,
+  sourceMode,
 }: NoteEditorProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const readOnlyCompartment = useRef(new Compartment())
+  const previewCompartment = useRef(new Compartment())
   const onSelectionChangeRef = useRef(onSelectionChange)
   useEffect(() => {
     onSelectionChangeRef.current = onSelectionChange
@@ -125,16 +135,25 @@ export function NoteEditor({
             ],
           }),
           syntaxHighlighting(oneDarkHighlightStyle),
-          livePreviewPlugin,
+          previewCompartment.current.of(sourceMode ? [] : livePreviewPlugin),
           commentAnchorField,
           hoveredAnchorField,
           commentAnchorDecorations,
           readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly ?? false)),
           EditorView.lineWrapping,
-          keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
+          keymap.of([
+            // Ahead of defaultKeymap so Enter at the start of a heading keeps
+            // the heading marker with its text.
+            { key: 'Enter', run: insertNewlineKeepingHeadingMarker },
+            ...defaultKeymap,
+            ...historyKeymap,
+            ...searchKeymap,
+            indentWithTab,
+          ]),
           /* v8 ignore next 3 */
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) onChange(update.state.doc.toString())
+            const isExternal = update.transactions.some((tr) => tr.annotation(externalUpdate))
+            if (update.docChanged && !isExternal) onChange(update.state.doc.toString())
 
             /* v8 ignore next 20 */
             if (update.docChanged || update.selectionSet) {
@@ -272,7 +291,32 @@ export function NoteEditor({
     })
   }, [readOnly])
 
+  useEffect(() => {
+    const view = viewRef.current
+    /* v8 ignore next 3 */
+    if (!view) return
+    view.dispatch({
+      effects: previewCompartment.current.reconfigure(sourceMode ? [] : livePreviewPlugin),
+    })
+  }, [sourceMode])
+
   return <div ref={containerRef} className="notepad-editor-cm" style={{ height: '100%' }} />
+}
+
+/**
+ * Replaces the document with a body saved by another surface, keeping the
+ * caret where it was (clamped to the new length). No-ops when the text already
+ * matches, so an echo of this surface's own save costs nothing.
+ */
+export function applyExternalDoc(view: EditorView | null, body: string): void {
+  if (!view) return
+  if (view.state.doc.toString() === body) return
+  const anchor = Math.min(view.state.selection.main.head, body.length)
+  view.dispatch({
+    changes: { from: 0, to: view.state.doc.length, insert: body },
+    selection: { anchor },
+    annotations: externalUpdate.of(true),
+  })
 }
 
 export function applyAnchors(view: EditorView | null, anchors: CommentAnchor[]): void {

@@ -65,6 +65,31 @@ export async function applyTaskVaultSchema(db: ExtensionDB): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_tasks_source ON tasks(source, source_ref);
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
     CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id);
+
+    CREATE TABLE IF NOT EXISTS weekly_reviews (
+      id           TEXT PRIMARY KEY,
+      started_at   TEXT NOT NULL,
+      completed_at TEXT,
+      status       TEXT NOT NULL DEFAULT 'in_progress',
+      worked       TEXT,
+      didnt_work   TEXT,
+      try_next     TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_weekly_reviews_started ON weekly_reviews(started_at DESC);
+
+    CREATE TABLE IF NOT EXISTS weekly_review_actions (
+      id           TEXT PRIMARY KEY,
+      review_id    TEXT NOT NULL REFERENCES weekly_reviews(id) ON DELETE CASCADE,
+      step         INTEGER NOT NULL,
+      action       TEXT NOT NULL,
+      entity_type  TEXT NOT NULL,
+      entity_id    TEXT,
+      entity_label TEXT NOT NULL,
+      detail       TEXT,
+      created_at   TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_weekly_review_actions_review
+      ON weekly_review_actions(review_id, created_at);
   `)
 }
 

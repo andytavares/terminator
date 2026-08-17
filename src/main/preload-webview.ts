@@ -21,6 +21,22 @@ const RESERVED_SHORTCUTS = new Set([
   'CmdOrCtrl+,',
 ])
 
+// Escape twice in quick succession exits the extension and returns the user to
+// their terminal. The listener is deliberately passive and bubble-phase: the
+// page sees every Escape first, so an extension's own dismissals (dropdowns,
+// inline renames, modals) keep working on the first press. Mirrors
+// src/shared/double-escape.ts — inlined for the same reason as RESERVED_SHORTCUTS.
+const DOUBLE_ESCAPE_WINDOW_MS = 500
+let pendingEscapeAt: number | null = null
+
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return
+  const now = performance.now()
+  const paired = pendingEscapeAt !== null && now - pendingEscapeAt < DOUBLE_ESCAPE_WINDOW_MS
+  pendingEscapeAt = paired ? null : now
+  if (paired) ipcRenderer.send('extension:request-exit')
+})
+
 contextBridge.exposeInMainWorld('electronAPI', {
   terminal: {
     create: (payload: unknown) => ipcRenderer.invoke('terminal:create', payload),

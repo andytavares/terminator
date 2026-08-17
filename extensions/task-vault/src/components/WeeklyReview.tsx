@@ -7,6 +7,7 @@ import { WeeklyReviewStep3Projects } from './WeeklyReviewStep3Projects'
 import { WeeklyReviewStepStaleTasks } from './WeeklyReviewStepStaleTasks'
 import { WeeklyReviewStep5Someday } from './WeeklyReviewStep5Someday'
 import { WeeklyReviewStep6Reflect } from './WeeklyReviewStep6Reflect'
+import { WeeklyReviewHistory } from './WeeklyReviewHistory'
 
 interface WeeklyReviewPayload {
   inboxItems: IndexedTask[]
@@ -29,6 +30,9 @@ export function WeeklyReview(): React.JSX.Element {
   const [payload, setPayload] = useState<WeeklyReviewPayload | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [done, setDone] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  // Identifies the persisted review every step records its actions against.
+  const [reviewId, setReviewId] = useState<string | null>(null)
 
   useEffect(() => {
     // Restore draft step if present
@@ -37,6 +41,15 @@ export function WeeklyReview(): React.JSX.Element {
       const parsed = JSON.parse(draft) as { step?: number }
       if (parsed.step && parsed.step > 1) setStep(parsed.step)
     }
+    // Resumes the open review rather than forking a second record, which
+    // matters because the step above is restored from sessionStorage.
+    void window.electronAPI.extensionBridge
+      .invoke('task-vault:review:start', {})
+      .then((result) => {
+        const id = (result as { review?: { id: string } })?.review?.id
+        if (id) setReviewId(id)
+      })
+      .catch((err) => console.error('[task-vault] failed to start review', err))
     load()
   }, [])
 
@@ -94,8 +107,34 @@ export function WeeklyReview(): React.JSX.Element {
     setDone(true)
   }
 
+  function openHistory() {
+    setShowHistory(true)
+  }
+
   if (isLoading)
     return <div className="weekly-review weekly-review--loading">Loading review data…</div>
+  if (showHistory)
+    return (
+      <div className="weekly-review">
+        <div className="weekly-review__header">
+          <div className="weekly-review__header-left">
+            <div>
+              <h2>Past Reviews</h2>
+              <span className="weekly-review__stepper">what you decided, week by week</span>
+            </div>
+          </div>
+          <div className="weekly-review__nav">
+            <button className="weekly-review__nav-text-btn" onClick={() => setShowHistory(false)}>
+              Back
+            </button>
+          </div>
+        </div>
+        <div className="weekly-review__content">
+          <WeeklyReviewHistory />
+        </div>
+      </div>
+    )
+
   if (done)
     return (
       <div className="weekly-review weekly-review--done">
@@ -105,6 +144,9 @@ export function WeeklyReview(): React.JSX.Element {
           <p className="weekly-review__complete-sub">
             Your mind is clear. You're ready for the week.
           </p>
+          <button className="tv-btn tv-btn--secondary" onClick={openHistory}>
+            View past reviews
+          </button>
         </div>
       </div>
     )
@@ -132,6 +174,9 @@ export function WeeklyReview(): React.JSX.Element {
           ))}
         </div>
         <div className="weekly-review__nav">
+          <button className="weekly-review__nav-text-btn" onClick={openHistory}>
+            History
+          </button>
           <button
             className="tv-btn tv-btn--secondary"
             onClick={prevStep}
@@ -152,14 +197,19 @@ export function WeeklyReview(): React.JSX.Element {
       </div>
 
       <div className="weekly-review__content">
-        {step === 1 && <WeeklyReviewStep1GetClear onComplete={nextStep} />}
+        {step === 1 && <WeeklyReviewStep1GetClear onComplete={nextStep} reviewId={reviewId} />}
         {step === 2 && (
-          <WeeklyReviewStep2Inbox inboxItems={payload.inboxItems} onComplete={nextStep} />
+          <WeeklyReviewStep2Inbox
+            inboxItems={payload.inboxItems}
+            onComplete={nextStep}
+            reviewId={reviewId}
+          />
         )}
         {step === 3 && (
           <WeeklyReviewStep3Projects
             activeProjects={payload.activeProjects}
             onComplete={nextStep}
+            reviewId={reviewId}
           />
         )}
         {step === 4 && (
@@ -167,6 +217,7 @@ export function WeeklyReview(): React.JSX.Element {
             staleTasks={payload.staleTasks}
             staleDaysThreshold={payload.staleDaysThreshold}
             onComplete={nextStep}
+            reviewId={reviewId}
           />
         )}
         {step === 5 && (
@@ -174,9 +225,10 @@ export function WeeklyReview(): React.JSX.Element {
             somedayProjects={payload.somedayProjects}
             somedayTasks={payload.somedayTasks}
             onComplete={nextStep}
+            reviewId={reviewId}
           />
         )}
-        {step === 6 && <WeeklyReviewStep6Reflect onComplete={handleDone} />}
+        {step === 6 && <WeeklyReviewStep6Reflect onComplete={handleDone} reviewId={reviewId} />}
       </div>
     </div>
   )

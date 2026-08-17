@@ -83,10 +83,55 @@ export class ExtensionViewHost {
     { bounds: BoundsRect; visible: boolean; repoRoot?: string | null }
   >()
   private creatingViews = new Set<string>()
+  // The extension view that currently holds keyboard focus, or null when focus
+  // sits in the main renderer. Electron restores focus to the window's own
+  // webContents on window focus (and on macOS skips even that), so the child
+  // view that was focused before the app lost focus has to be re-focused by
+  // hand — see restoreFocus().
+  private focusedViewKey: string | null = null
+  private focusKeyToRestore: string | null = null
 
   constructor(mainWindow: BrowserWindow, preloadPath: string) {
     this.mainWindow = mainWindow
     this.preloadPath = preloadPath
+  }
+
+  /**
+   * Records which surface owns keyboard focus. Called from the webContents
+   * 'focus' events wired up in createView and from the main window's own
+   * webContents focus event (with null).
+   */
+  noteFocused(viewKey: string | null): void {
+    this.focusedViewKey = viewKey
+  }
+
+  /**
+   * Snapshots the focused surface as the window loses focus. Must run on
+   * 'blur', not 'focus': by the time the window's 'focus' event fires Electron
+   * has already moved focus to the main webContents, clobbering the record.
+   */
+  captureFocusTarget(): void {
+    this.focusKeyToRestore = this.focusedViewKey
+  }
+
+  /**
+   * Re-focuses the surface that was focused when the window lost focus, so the
+   * user can type immediately instead of having to click the panel again.
+   * Falls back to the main renderer when the remembered view is gone or hidden.
+   */
+  restoreFocus(): void {
+    const key = this.focusKeyToRestore
+    if (key) {
+      for (const entries of this.views.values()) {
+        for (const entry of entries) {
+          if (`${entry.extensionId}:${entry.viewParam}` === key && entry.lastVisible) {
+            entry.view.webContents.focus()
+            return
+          }
+        }
+      }
+    }
+    this.mainWindow.webContents.focus()
   }
 
   /**
@@ -146,6 +191,9 @@ export class ExtensionViewHost {
       },
     })
 
+    const viewKey = `${ext.id}:${viewParam}`
+    view.webContents.on('focus', () => this.noteFocused(viewKey))
+
     view.webContents.on('did-finish-load', () => {
       view.webContents.insertCSS(EXTENSION_BASE_CSS).catch(() => {})
       this.mainWindow.webContents.send('extension:panel-loaded', { id: ext.id, viewParam })
@@ -179,7 +227,9 @@ export class ExtensionViewHost {
 
   focusView(extensionId: string, viewParam: string): void {
     const entry = this.views.get(extensionId)?.find((e) => e.viewParam === viewParam)
-    entry?.view.webContents.focus()
+    if (!entry) return
+    entry.view.webContents.focus()
+    this.noteFocused(`${extensionId}:${viewParam}`)
   }
 
   destroyAllViews(extensionId: string): void {
@@ -187,7 +237,10 @@ export class ExtensionViewHost {
     if (!entries) return
     for (const { view, viewParam } of entries) {
       this.mainWindow.contentView.removeChildView(view)
-      this.pendingBounds.delete(`${extensionId}:${viewParam}`)
+      const viewKey = `${extensionId}:${viewParam}`
+      this.pendingBounds.delete(viewKey)
+      if (this.focusedViewKey === viewKey) this.focusedViewKey = null
+      if (this.focusKeyToRestore === viewKey) this.focusKeyToRestore = null
     }
     this.views.delete(extensionId)
   }
@@ -251,6 +304,24 @@ export class ExtensionViewHost {
         sendToView(view, channel, data)
       }
     }
+  }
+
+  /**
+   * Identifies which extension surface a webContents belongs to. Extension
+   * views are separate webContents, so IPC arriving from one carries no
+   * identity beyond the sender — this is how the main process attributes it.
+   */
+  findViewByWebContents(
+    webContents: Electron.WebContents
+  ): { extensionId: string; viewParam: string } | null {
+    for (const entries of this.views.values()) {
+      for (const entry of entries) {
+        if (entry.view.webContents === webContents) {
+          return { extensionId: entry.extensionId, viewParam: entry.viewParam }
+        }
+      }
+    }
+    return null
   }
 
   hasView(extensionId: string, viewParam: string): boolean {

@@ -172,6 +172,9 @@ interface ElectronAPI {
     notifyPanelState(panelId: string, open: boolean): void
     onExtensionPanelLoaded(handler: (id: string) => void): () => void
     onExtensionRendererReload(handler: (id: string) => void): () => void
+    onExtensionExitToTerminal(
+      handler: (payload: { extensionId: string; sidebarPanelId: string | null }) => void
+    ): () => void
   }
   app: {
     getInfo(): Promise<{
