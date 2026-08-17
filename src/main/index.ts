@@ -335,6 +335,10 @@ app.whenReady().then(async () => {
     viewHost?.setBottomInset(inset)
   })
 
+  onChannel('extension:set-left-inset', (_event, { inset }: { inset: number }) => {
+    viewHost?.setLeftInset(inset)
+  })
+
   // Sent by the double-Escape gesture in the extension webview preload. The
   // extension view is its own webContents, so the host renderer never sees the
   // keystroke — main attributes it to a surface and relays the exit.

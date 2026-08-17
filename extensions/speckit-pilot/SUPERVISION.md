@@ -15,12 +15,13 @@ Architecture and the verified hook contract:
 The **supervision panel** sits above the board (`components/SupervisionPanel.tsx`)
 in four sections:
 
-| Section    | Reads                                      | Answers                                |
-| ---------- | ------------------------------------------ | -------------------------------------- |
-| **runs**   | `speckit:supervision-snapshot`             | what is running, and how it is going   |
-| **stalls** | `speckit:stalls-list`                      | what stopped making progress           |
-| **review** | `speckit:supervision-snapshot`             | what is waiting on a decision from you |
-| **feed**   | `speckit:feed-list`, `speckit:feed-digest` | what happened while you were away      |
+| Section     | Reads                                      | Answers                                |
+| ----------- | ------------------------------------------ | -------------------------------------- |
+| **runs**    | `speckit:supervision-snapshot`             | what is running, and how it is going   |
+| **stalls**  | `speckit:stalls-list`                      | what stopped making progress           |
+| **review**  | `speckit:supervision-snapshot`             | what is waiting on a decision from you |
+| **feed**    | `speckit:feed-list`, `speckit:feed-digest` | what happened while you were away      |
+| **history** | `speckit:supervision-snapshot`             | what is over, and what it did          |
 
 A card's drawer shows the same run: the phase's console renders the **terminal's
 transcript**, with **Open the terminal** next to it. A supervised phase
@@ -58,6 +59,57 @@ moment you most want to redirect an agent is usually before that.
 Discard takes the run off the review queue too. A discarded diff holding a
 review slot would gate the next run on reviewing something that no longer
 exists.
+
+## One conversation per card
+
+A card gets **one** terminal, one Claude session and one `claude` process, and
+every phase runs in it. `specify` opens it; `plan`, `tasks` and `implement` are
+typed into the same prompt the agent is already sitting at, via
+`SupervisedRunner.continueRun`.
+
+Before this, each phase minted its own session id and called `openTerminalTab`
+again. A single card ended up with five tabs, five transcripts and five agents
+that had each read the spec from scratch — and because a terminal agent never
+exits on its own, the four finished ones sat in the run list looking stalled.
+
+Two things follow from the session outliving the phase, and both are handled
+rather than assumed:
+
+- **Phase callbacks are rebound, not captured.** `continueRun` swaps them so a
+  permission raised during `plan` is not reported against `specify`, and
+  `runs.notePhase` renames the run so the list does not still say `specify` for
+  a card three phases in.
+- **A phase is measured from the diff it inherited.** The conversation carries
+  every earlier phase's changes, so "a turn that changed something ended the
+  phase" would be true before the agent had read its prompt. The runner records
+  the diff as it stood when the phase began and compares against that.
+
+When the session is gone — the tab was closed, the console restarted —
+`continueRun` returns null and the caller opens a fresh conversation with
+`--resume` rather than silently dropping the phase.
+
+## What is over
+
+Approving a phase takes its diff off the review queue and its run off the live
+list, and writes a row into **history** instead.
+
+Neither happened before. The queue kept offering work that had already been
+accepted — and since the queue is what backpressure counts, three approved
+phases were enough to refuse the next run outright. The run list, meanwhile, was
+the only record there was, so it stacked every finished phase forever and by the
+third card answered "what has this workspace ever done" rather than "what is
+happening now".
+
+History records one row per phase (`approved`, `stopped`, `discarded`, `ended`)
+with what that phase actually did — turns, diff, how often it asked. It is in
+memory and bounded at 200 rows; it does not outlive the application, because
+neither do the runs it describes.
+
+A run that has been approved also stops being stallable: the runtime marks a
+session **waiting** when its `Stop` hook fires, because an agent sitting at its
+prompt is blocked on a person, not stuck. Without that, a phase that finished
+cleanly and was waiting to be approved went quiet, fired a stall eight minutes
+later, and stayed in the Stalls tab offering to interrupt work that was done.
 
 ## Review
 
@@ -175,6 +227,37 @@ queue all read `$SPECIFY_FEATURE_DIRECTORY/<file>`, and an agent left to choose
 writes it at the repository root. Sending the slash command anyway is what used
 to happen, and the runtime's answer was "Unknown command: /speckit-specify",
 with the phase over before it began.
+
+## Which model, and how many questions
+
+A run is launched with `--permission-mode auto` and, when one is chosen,
+`--model`.
+
+**The autonomy ladder still decides first.** A `PreToolUse` hook runs under every
+permission mode and its `allow`/`deny` is honoured before the mode is consulted
+at all, so the ladder's judgement is unchanged. What the mode picks up is only
+what the ladder _abstains_ on — and under `default` that was a prompt. A single
+phase routinely asked twenty-five times. Under `auto` the runtime's own
+classifier answers those instead, so the questions that reach you are the ones
+the ladder actually wanted a person for.
+
+**The model is an alias, not a pinned id.** `--model opus` is documented as
+resolving to the latest of that family, so the default cannot go a generation
+stale sitting in the source — which is exactly what the pinned `claude-opus-4-6`
+it replaces did. Choosing nothing passes no `--model` at all, so the run follows
+your own Claude Code configuration.
+
+The picker reads `speckit:models-list`: the aliases always, plus every model the
+account can reach from `GET /v1/models` when the environment carries an
+`ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`. There is no CLI subcommand that
+lists models, and a subscription login is not a Models API credential, so for
+most people the aliases are the whole list — which is why they are the ones that
+have to keep working.
+
+The choice is persisted through `speckit:model-set` into the extension's own
+settings, because the main process is the only thing that builds a `claude`
+command line. It previously lived only in the renderer's `localStorage`, which
+is why the setting existed, rendered, and did nothing at all.
 
 ## Two things the runtime does to a supervised run
 

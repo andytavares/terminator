@@ -532,3 +532,43 @@ describe('consumePendingComments', () => {
     expect(lines.find((c) => c.id === 'c3')?.appliedToRunId).toBe('old')
   })
 })
+
+describe('the model a card runs with', () => {
+  const stateWith = (defaultModel: string): string =>
+    JSON.stringify({
+      ...createInitialState(featureDir),
+      settings: { ...createInitialState(featureDir).settings, defaultModel },
+    })
+
+  it.each([
+    ['claude-opus-4-6', 'opus'],
+    ['claude-sonnet-4-6', 'sonnet'],
+    ['claude-haiku-4-5-20251001', 'haiku'],
+  ])('rewrites the pinned %s to the alias that keeps meaning it', async (pinned, alias) => {
+    // These are the three values the old settings dropdown offered, and the
+    // setting was never read — it was stored, rendered, and never reached
+    // `--model`. Nobody chose them in any meaningful sense, so honouring them
+    // literally now would pin every existing card to a superseded generation.
+    vi.mocked(fs.readFile).mockResolvedValue(stateWith(pinned) as unknown as Uint8Array)
+    expect((await readState(featureDir))?.settings.defaultModel).toBe(alias)
+  })
+
+  it('leaves an alias exactly as it is', async () => {
+    vi.mocked(fs.readFile).mockResolvedValue(stateWith('sonnet') as unknown as Uint8Array)
+    expect((await readState(featureDir))?.settings.defaultModel).toBe('sonnet')
+  })
+
+  it('leaves a model it does not recognise alone, since that one was a decision', async () => {
+    vi.mocked(fs.readFile).mockResolvedValue(stateWith('claude-opus-5') as unknown as Uint8Array)
+    expect((await readState(featureDir))?.settings.defaultModel).toBe('claude-opus-5')
+  })
+
+  it('leaves an explicit "use my own default" alone', async () => {
+    vi.mocked(fs.readFile).mockResolvedValue(stateWith('') as unknown as Uint8Array)
+    expect((await readState(featureDir))?.settings.defaultModel).toBe('')
+  })
+
+  it('defaults a new card to an alias, which cannot go a generation stale', () => {
+    expect(createInitialState(featureDir).settings.defaultModel).toBe('opus')
+  })
+})

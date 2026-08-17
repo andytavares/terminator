@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron'
 import type { ExtensionAPI, ExtensionDB, Disposable } from '../../../../src/main/extensions/api.js'
+import { openInVault } from '../navigation.js'
 
 let _tick: (() => void) | null = null
 
@@ -144,13 +145,10 @@ export function startTaskScheduler(
           type: isOverdue ? 'error' : 'warning',
           title: notifTitle,
           key: 'dueTaskReminder',
-          actions: [
-            {
-              id: 'open',
-              label: 'Open Vault',
-              handler: () => broadcast('task-vault:navigate-task', { taskId, date: taskDate }),
-            },
-          ],
+          // Was an "Open Vault" button, which is the wrong shape: opening the
+          // task is what clicking the notification should do, not a choice
+          // beside it. The row is the link now.
+          onClick: () => openInVault(api, { taskId, date: taskDate ?? undefined }),
         })
         dueTaskNotifs.set(task.id, notif)
       }
@@ -203,13 +201,7 @@ export function startTaskScheduler(
           title: blockedTitle,
           message: meta.blocked_reason ?? undefined,
           key: 'blockedTaskCheckin',
-          actions: [
-            {
-              id: 'open',
-              label: 'Open Vault',
-              handler: () => broadcast('task-vault:navigate-task', { taskId, date: taskDate }),
-            },
-          ],
+          onClick: () => openInVault(api, { taskId, date: taskDate ?? undefined }),
         })
         blockedTaskNotifs.set(task.id, notif)
       }

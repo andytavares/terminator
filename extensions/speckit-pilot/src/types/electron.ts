@@ -144,6 +144,10 @@ export interface SpeckitAPI {
   permissionHandBack(payload: { requestId: string }): Promise<{ ok: boolean }>
   /** What is running, what is waiting to be reviewed, and whether the gate is open. */
   supervisionSnapshot(): Promise<SupervisionSnapshot>
+  /** What can go in the model box, and which one the runs actually use. */
+  modelsList(): Promise<{ models: ModelChoiceView[]; selected: string }>
+  /** Chooses the model, on the side of the bridge that builds launch commands. */
+  modelSet(payload: { model: string }): Promise<{ ok?: boolean; selected?: string; error?: string }>
   stallsList(): Promise<{ firings: StallFiringView[]; shadowMode: boolean }>
   feedList(): Promise<{ entries: FeedEntryView[]; mutes: MuteRuleView[] }>
   /** Drops one line from the feed. Anything shown as a list should be prunable. */
@@ -268,6 +272,31 @@ export interface SupervisionSnapshot {
   runs: RunView[]
   review: ReviewItemView[]
   backpressure: { allowed: boolean; unreviewed: number; limit: number; reason?: string | null }
+  /** What is over. Absent from an older main process, so optional. */
+  history?: RunHistoryView[]
+}
+
+/** A phase of work that is over. Mirrors `RunHistoryEntry` across the bridge. */
+export interface RunHistoryView {
+  readonly sessionId: string
+  readonly featureDir: string
+  readonly phase: string
+  readonly branch: string
+  readonly outcome: 'approved' | 'stopped' | 'discarded' | 'ended'
+  readonly startedAt: number
+  readonly endedAt: number
+  readonly turns: number
+  readonly diff: { files: number; added: number; removed: number }
+  readonly asked: number
+}
+
+/** One row in the model picker. Mirrors `ModelChoice` across the bridge. */
+export interface ModelChoiceView {
+  /** What goes on the `--model` command line. Empty means "don't pass one". */
+  readonly id: string
+  readonly label: string
+  /** An alias, which resolves to the latest of its family at launch. */
+  readonly floating: boolean
 }
 
 export interface StallFiringView {
@@ -501,6 +530,17 @@ export function getSpeckitAPI(): SpeckitAPI {
       bridge.invoke('speckit:permission-hand-back', payload) as Promise<{ ok: boolean }>,
     supervisionSnapshot: () =>
       bridge.invoke('speckit:supervision-snapshot', {}) as Promise<SupervisionSnapshot>,
+    modelsList: () =>
+      bridge.invoke('speckit:models-list', {}) as Promise<{
+        models: ModelChoiceView[]
+        selected: string
+      }>,
+    modelSet: (payload) =>
+      bridge.invoke('speckit:model-set', payload) as Promise<{
+        ok?: boolean
+        selected?: string
+        error?: string
+      }>,
     stallsList: () =>
       bridge.invoke('speckit:stalls-list', {}) as Promise<{
         firings: StallFiringView[]

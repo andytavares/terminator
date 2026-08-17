@@ -10,6 +10,7 @@ import { registerWeeklyReviewIpcHandlers } from './ipc/weekly-review.ipc.js'
 import { applyTaskVaultSchema, applyTaskVaultMigrations } from './vault/db.js'
 import { backfillRecurringTasks } from './vault/ensure-next-occurrence.js'
 import { startTaskScheduler, setSchedulerTick } from './notifications/task-scheduler.js'
+import { openInVault, popPendingNavigation } from './navigation.js'
 import type { SettingDefinition } from '../../../src/main/extensions/api'
 
 // Every notification kind task-vault ever raises, so the user can independently
@@ -210,27 +211,18 @@ export async function activate(api: ExtensionAPI): Promise<void> {
     })
   )
 
-  // Pending navigation from CalendarDrawer — consumed by TaskVaultView on cold-start mount.
-  let pendingNavigation: { date?: string; taskId?: string } | null = null
-
   disposables.push(
     api.ipc.registerHandler('task-vault:open-panel', (data) => {
       const { date, taskId } = (data ?? {}) as { date?: string; taskId?: string }
-      api.window.broadcast('extension:activate-global-tab', 'terminator.task-vault')
-      if (date ?? taskId) {
-        pendingNavigation = { date, taskId }
-        api.window.broadcast('task-vault:navigate', { date, taskId })
-      }
+      openInVault(api, { date, taskId })
       return { ok: true }
     })
   )
 
+  // Consumed by TaskVaultView on cold-start mount, when the broadcast above
+  // was sent before its WebContentsView existed to hear it.
   disposables.push(
-    api.ipc.registerHandler('task-vault:pop-pending-navigation', () => {
-      const nav = pendingNavigation
-      pendingNavigation = null
-      return nav
-    })
+    api.ipc.registerHandler('task-vault:pop-pending-navigation', () => popPendingNavigation())
   )
 
   disposables.push(
@@ -293,11 +285,15 @@ function scheduleWeeklyReviewNudge(api: ExtensionAPI, reviewDay: number): void {
   function checkAndNudge() {
     const now = new Date()
     if (now.getDay() !== reviewDay) return
-    api.notifications.showToast(
-      'info',
-      'Weekly review is ready — open Task Vault to start',
-      'weeklyReviewReady'
-    )
+    // A notification rather than a toast: a toast is transient and has nothing
+    // to click, so "open Task Vault to start" was an instruction to go and do
+    // the navigation yourself. This one is the link.
+    api.notifications.createNotification({
+      type: 'info',
+      title: 'Weekly review is ready',
+      key: 'weeklyReviewReady',
+      onClick: () => openInVault(api, { view: 'review' }),
+    })
   }
 
   checkAndNudge()

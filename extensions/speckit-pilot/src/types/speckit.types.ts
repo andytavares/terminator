@@ -348,7 +348,11 @@ export const DEFAULT_PHASE_GATE: PhaseGateConfig = {
 }
 
 export const DEFAULT_SETTINGS: PilotSettings = {
-  defaultModel: 'claude-opus-4-6',
+  // An alias, not a pinned id: `--model opus` is documented as resolving to
+  // the latest of that family, so this default cannot go a generation stale
+  // sitting here — which is exactly what the pinned `claude-opus-4-6` it
+  // replaces did.
+  defaultModel: 'opus',
   defaultAutonomy: 'standard',
   batchCheckinsEnabled: true,
   writeStatusBackOnPrOpen: false,

@@ -152,8 +152,26 @@ describe('buildLaunchSpec', () => {
     expect(() => buildLaunchSpec(options())).not.toThrow()
   })
 
-  it('leaves the runtime on its normal permission footing, so an abstention becomes a prompt', () => {
-    expect(buildLaunchSpec(options()).command).toContain('--permission-mode default')
+  it('lets the runtime decide what the ladder abstains on, rather than prompting', () => {
+    // The PreToolUse hook runs under every permission mode and its allow/deny
+    // is honoured first, so the ladder's judgement is unchanged; what the mode
+    // picks up is only the abstentions. Under `default` those were questions —
+    // twenty-five of them in one phase — and under `auto` the runtime's own
+    // classifier answers them.
+    expect(buildLaunchSpec(options()).command).toContain('--permission-mode auto')
+  })
+
+  it('passes no --model when none was chosen, so the operator config wins', () => {
+    expect(buildLaunchSpec(options()).command).not.toContain('--model')
+  })
+
+  it('passes the chosen model, which is what the setting never used to do', () => {
+    expect(buildLaunchSpec({ ...options(), model: 'opus' }).command).toContain("--model 'opus'")
+  })
+
+  it('quotes the model, since it is untrusted text on a shell command line', () => {
+    const spec = buildLaunchSpec({ ...options(), model: "o'; rm -rf /" })
+    expect(spec.command).toContain(`--model 'o'\\''; rm -rf /'`)
   })
 
   it('passes the composed prompt as one argument however it is punctuated', () => {

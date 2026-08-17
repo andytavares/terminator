@@ -895,14 +895,21 @@ Use `api.ipc.registerHandler` to back the auxiliary window's data needs.
 
 ### `api.notifications.createNotification(opts): Disposable`
 
-Creates a persistent notification in the notification center (without an ephemeral toast). Supports optional action buttons with callbacks that run in the main process.
+Creates a persistent notification in the notification center (without an ephemeral toast). Supports optional action buttons with callbacks that run in the main process, and an `onClick` that decides where the row takes you.
 
 ```typescript
 const notif = api.notifications.createNotification({
-  type: 'info',
-  title: 'Build complete',
-  message: '3 files changed',
-  actions: [{ id: 'open', label: 'Open log', handler: () => openLogWindow() }],
+  type: 'warning',
+  title: 'Allow this command?',
+  message: 'redis-cli -h prod-cache-01',
+  key: 'permissionRequest',
+  actions: [
+    { id: 'allow', label: 'Allow', handler: () => allow() },
+    { id: 'deny', label: 'Deny', handler: () => deny() },
+  ],
+  // Where clicking the row goes. Not a button — opening the thing is not a
+  // third answer to the question.
+  onClick: () => goToTheRun(),
 })
 
 // Remove the notification when the extension is torn down:
@@ -910,6 +917,33 @@ notif.dispose()
 ```
 
 Returns a `Disposable` — calling `.dispose()` dismisses the notification.
+
+**`actions` are answers; `onClick` is a destination.** Triggering an action
+settles the notification: the callback runs and the record is dropped, because
+one that survives the decision it asked for teaches people to dismiss without
+reading. `onClick` leaves the row alone — looking at something is not deciding
+about it — and marks it `clickable` so the panel renders it as a link.
+
+**A handler, not a route.** Only the notification's author knows what "the
+thing" is: a card, a task, a review. A route shape general enough to name all
+of them would be a second navigation system. A function cannot cross IPC, so it
+is held in the main process and the renderer asks for it by a reserved id.
+
+**Navigating from a notification usually takes three steps**, because an
+extension's UI is a `WebContentsView` created when its surface is first
+activated:
+
+```typescript
+onClick: () => {
+  api.window.focusSelf() // the window, or nothing you do is visible
+  api.window.broadcast('extension:activate-global-tab', id) // creates the view if this is the first time
+  api.window.broadcast('my-ext:navigate', { taskId }) // and only then, where to go
+}
+```
+
+Because the view may not exist yet when that last broadcast is sent, hold the
+destination in main and let the view claim it on mount — see
+`extensions/task-vault/src/navigation.ts` for the pattern.
 
 ### Renderer-side: `registry.registerKeyboardShortcut(shortcut)`
 

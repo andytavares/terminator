@@ -8,7 +8,8 @@ import { shellQuote } from '../runtime/claude-launch.js'
 import { readSelfReviewSummary } from '../state/self-review-summary.js'
 import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
 import type { PhaseId } from '../types/speckit.types.js'
-import type { SupervisedRunner } from '../runtime/supervised-runner.js'
+import type { SupervisedRun, SupervisedRunner } from '../runtime/supervised-runner.js'
+import type { PendingPermission, PermissionOutcome } from '../runtime/permission-bridge.js'
 import type { PendingAsk } from '../runtime/pending-permissions.js'
 import { buildReadOnlySettings, installReadOnlyHookScript } from '../runtime/read-only-hook.js'
 import {
@@ -73,6 +74,8 @@ export interface StartPhaseRunnerOpts {
   // to answer the model's questions from the run console (the reply is
   // `phaseCommand`).
   resumeSessionId?: string
+  /** What `--model` gets. Empty or absent leaves the flag off entirely. */
+  model?: string
   // Kill the run if it hasn't finished in this long (default 15 min).
   timeoutMs?: number
   onStart?: () => void | Promise<void>
@@ -142,9 +145,11 @@ export interface RunSupervision {
       startedAt: number
     }): unknown
     setState(sessionId: string, state: 'working' | 'waiting', at: number): void
+    /** The card moved on to the next phase inside the same conversation. */
+    notePhase(sessionId: string, phase: string, at: number): void
     noteAsked(sessionId: string): void
     /** What the run has changed so far, for deciding whether a turn finished it. */
-    get(sessionId: string): { diff: { files: number } } | null
+    get(sessionId: string): { diff: { files: number; added: number; removed: number } } | null
   }
   finishTurn(sessionId: string, turns: number, at: number): Promise<void>
   finish(sessionId: string, at: number): void
@@ -295,6 +300,7 @@ export function createAgentRunner(api: ExtensionAPI): AgentRunner {
           feedbackNote,
           baseBranch: opts.baseBranch,
           resumeSessionId,
+          model: opts.model,
           onStart,
           onComplete,
           onSession,
@@ -579,6 +585,7 @@ function startSupervised(opts: {
   /** What the worktree was branched from, so the run's diff is its own work. */
   baseBranch?: string
   resumeSessionId?: string
+  model?: string
   onStart?: () => void | Promise<void>
   onComplete?: (exitCode: number) => void | Promise<void>
   onSession?: (sessionId: string) => void
@@ -597,18 +604,27 @@ function startSupervised(opts: {
   let sessionId: string | null = null
   let ended = false
   let stopRequested = false
+  /**
+   * The diff as it stood when this phase began.
+   *
+   * A card now keeps one conversation across all its phases, so by the time
+   * `plan` starts the run has already changed files — the ones `specify`
+   * wrote. The rule below is "a turn that changed something ended the phase",
+   * and against a cumulative diff that is true before the agent has read the
+   * prompt. Measured from here instead, it means what it always meant.
+   */
+  let baseline = { files: 0, added: 0, removed: 0 }
+
+  /** True once this phase's own work shows up in the diff. */
+  const movedSinceBaseline = (diff: { files: number; added: number; removed: number }): boolean =>
+    diff.files !== baseline.files ||
+    diff.added !== baseline.added ||
+    diff.removed !== baseline.removed
 
   void (async () => {
     const branch = (await branchIn(opts.api, opts.worktreePath)) ?? path.basename(opts.worktreePath)
-    const run = await runner.start({
-      featureDir: opts.featureDir,
-      worktreePath: opts.worktreePath,
-      workspaceId,
-      branch,
-      prompt,
-      phase: opts.phase,
-      resumeSessionId: opts.resumeSessionId,
-      onPending: (pending) => {
+    const phaseCallbacks = {
+      onPending: (pending: PendingPermission) => {
         // The session comes from the bridge, which knows it: reading it back
         // from the run being started would be a reference to a binding that is
         // not assigned until start() returns.
@@ -621,7 +637,7 @@ function startSupervised(opts: {
           pending,
         })
       },
-      onResolved: (requestId, decision) => {
+      onResolved: (requestId: string, decision: PermissionOutcome) => {
         onPermissionResolved?.(requestId)
         if (sessionId !== null) supervision?.runs.setState(sessionId, 'working', Date.now())
         opts.api.window.broadcast('speckit:permission-resolved', {
@@ -630,7 +646,7 @@ function startSupervised(opts: {
           decision,
         })
       },
-      onRegistered: (started) => {
+      onRegistered: (started: SupervisedRun) => {
         // Before the terminal is written to, so nothing the agent does can
         // arrive at a registry that has never heard of it.
         sessionId = started.sessionId
@@ -646,7 +662,7 @@ function startSupervised(opts: {
           startedAt: Date.now(),
         })
       },
-      onTurnEnd: (turns) => {
+      onTurnEnd: (turns: number) => {
         // A turn ending is what finishes a supervised phase.
         //
         // In a terminal the agent does not exit when it is done — it sits at
@@ -663,12 +679,12 @@ function startSupervised(opts: {
         void supervision?.finishTurn(sessionId, turns, Date.now()).then(() => {
           if (ended) return
           const changed = supervision?.runs.get(sessionId as string)?.diff
-          if (changed === undefined || changed.files === 0) return
+          if (changed === undefined || !movedSinceBaseline(changed)) return
           ended = true
           void opts.onComplete?.(0)
         })
       },
-      onEnd: (exitCode) => {
+      onEnd: (exitCode: number) => {
         if (sessionId !== null) supervision?.finish(sessionId, Date.now())
         if (ended) return
         ended = true
@@ -677,6 +693,47 @@ function startSupervised(opts: {
         // approval gate over nothing.
         void opts.onComplete?.(exitCode)
       },
+    }
+
+    // The card's open conversation, when it has one.
+    //
+    // Preferred over opening a second terminal because the agent sitting at
+    // that prompt has already read the spec, written the plan and made every
+    // decision in between — and because a card used to accumulate one tab, one
+    // session and one idle-looking `claude` process per phase. An explicit
+    // resume id wins: that is the run console answering a specific question.
+    const reusable = opts.resumeSessionId ?? runner.liveSessionFor(opts.featureDir)
+    const continued =
+      reusable === null || reusable === undefined
+        ? null
+        : runner.continueRun(reusable, {
+            prompt,
+            phase: opts.phase,
+            ...phaseCallbacks,
+          })
+
+    if (continued !== null) {
+      sessionId = continued.sessionId
+      // Whatever the previous phase left in the diff is this phase's starting
+      // point, not its output.
+      baseline = { ...(supervision?.runs.get(continued.sessionId)?.diff ?? baseline) }
+      supervision?.runs.notePhase(continued.sessionId, opts.phase, Date.now())
+      if (stopRequested) runner.stop(continued.sessionId, 'stopped from the pilot')
+      opts.onSession?.(continued.sessionId)
+      void opts.onStart?.()
+      return
+    }
+
+    const run = await runner.start({
+      featureDir: opts.featureDir,
+      worktreePath: opts.worktreePath,
+      workspaceId,
+      branch,
+      prompt,
+      phase: opts.phase,
+      resumeSessionId: opts.resumeSessionId,
+      model: opts.model,
+      ...phaseCallbacks,
     })
     if (run === null) {
       // Nothing was started, and the caller is waiting on a completion it will

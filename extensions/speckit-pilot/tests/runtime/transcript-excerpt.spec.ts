@@ -44,9 +44,12 @@ describe('the tail of a conversation', () => {
     ])
   })
 
-  it('names a tool call rather than printing its arguments', () => {
-    // The sentence that says what went wrong is what you came for; a wall of
-    // arguments buries it.
+  it('summarises a tool call rather than printing all of its arguments', () => {
+    // Both extremes are useless. The name alone gives fifteen consecutive
+    // `[Bash]` rows, which cannot distinguish a run looping on one command
+    // from one working through a test suite — the single question the
+    // transcript exists to answer. The whole input buries the sentence that
+    // says what went wrong, and a `Write` carries an entire file.
     write(
       line({
         type: 'assistant',
@@ -59,7 +62,47 @@ describe('the tail of a conversation', () => {
         },
       })
     )
-    expect(readTranscriptTail(file)[0].text).toBe('checking\n[Bash]')
+    const text = readTranscriptTail(file)[0].text
+    expect(text.startsWith('checking\nBash: xxx')).toBe(true)
+    expect(text.length).toBeLessThan(200)
+    expect(text.endsWith('\u2026')).toBe(true)
+  })
+
+  it('picks the argument that identifies the call, whatever the tool calls it', () => {
+    write(
+      line({
+        type: 'assistant',
+        timestamp: '2026-07-27T10:00:06Z',
+        message: {
+          content: [{ type: 'tool_use', name: 'Read', input: { file_path: '/repo/spec.md' } }],
+        },
+      })
+    )
+    expect(readTranscriptTail(file).at(-1)?.text).toBe('Read: /repo/spec.md')
+  })
+
+  it('falls back to the bare name when nothing in the input identifies the call', () => {
+    write(
+      line({
+        type: 'assistant',
+        timestamp: '2026-07-27T10:00:07Z',
+        message: { content: [{ type: 'tool_use', name: 'TodoWrite', input: { todos: [] } }] },
+      })
+    )
+    expect(readTranscriptTail(file).at(-1)?.text).toBe('TodoWrite')
+  })
+
+  it('flattens a multi-line command, so one call stays one line', () => {
+    write(
+      line({
+        type: 'assistant',
+        timestamp: '2026-07-27T10:00:08Z',
+        message: {
+          content: [{ type: 'tool_use', name: 'Bash', input: { command: 'a\n  b\n  c' } }],
+        },
+      })
+    )
+    expect(readTranscriptTail(file).at(-1)?.text).toBe('Bash: a b c')
   })
 
   it('keeps only the last few, since a long run is unreadable whole', () => {

@@ -7,6 +7,7 @@ import type { Notification } from '../../../../src/renderer/stores/notification.
 
 const mockTriggerAction = vi.fn().mockResolvedValue({ ok: true })
 const mockDismiss = vi.fn().mockResolvedValue({ ok: true })
+const mockSetLeftInset = vi.fn()
 
 // In jsdom, globalThis === window, so setting globalThis.electronAPI sets window.electronAPI
 ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
@@ -14,6 +15,7 @@ const mockDismiss = vi.fn().mockResolvedValue({ ok: true })
     dismiss: mockDismiss,
     triggerAction: mockTriggerAction,
   },
+  extension: { setLeftInset: mockSetLeftInset },
 }
 
 import {
@@ -246,5 +248,117 @@ describe('BellButton', () => {
     render(<BellButton unreadCount={0} onClick={onClick} />)
     fireEvent.click(screen.getByTitle('Notifications'))
     expect(onClick).toHaveBeenCalled()
+  })
+})
+
+describe('opening the drawer without blanking what is behind it', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockTriggerAction.mockResolvedValue({ ok: true })
+    resetStore()
+  })
+  afterEach(cleanup)
+
+  it('reserves the strip it occupies instead of hiding the extension views', () => {
+    // It used to push onto the modal store, which hides every extension
+    // WebContentsView while a modal is open. That is right for a centred
+    // dialog and wrong for a drawer down one edge: the whole application went
+    // black to show a 340px panel.
+    useNotificationStore.setState({ notifications: [], panelOpen: true, unreadCount: 0 })
+    render(<NotificationPanel />)
+    expect(mockSetLeftInset).toHaveBeenCalled()
+    expect(mockSetLeftInset.mock.calls.at(-1)![0]).toBeGreaterThanOrEqual(0)
+  })
+
+  it('gives the strip back when it closes', () => {
+    useNotificationStore.setState({ notifications: [], panelOpen: true, unreadCount: 0 })
+    const { unmount } = render(<NotificationPanel />)
+    mockSetLeftInset.mockClear()
+    unmount()
+    expect(mockSetLeftInset).toHaveBeenLastCalledWith(0)
+  })
+})
+
+describe('taking you to the thing a notification is about', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockTriggerAction.mockResolvedValue({ ok: true })
+    resetStore()
+  })
+  afterEach(cleanup)
+
+  it('asks main for the destination when only main knows it', async () => {
+    // An extension's notification carries a handler that lives in the main
+    // process — a function cannot cross IPC — so the row asks for it by name.
+    const n = makeNotif({ clickable: true })
+    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
+    render(<NotificationPanel />)
+    fireEvent.click(screen.getByText('Test notification'))
+    expect(mockTriggerAction).toHaveBeenCalledWith(n.id, '__open__')
+  })
+
+  it('prefers a local handler, for a notification raised in this renderer', () => {
+    const onClick = vi.fn()
+    const n = { ...makeNotif(), onClick }
+    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
+    render(<NotificationPanel />)
+    fireEvent.click(screen.getByText('Test notification'))
+    expect(onClick).toHaveBeenCalled()
+    expect(mockTriggerAction).not.toHaveBeenCalled()
+  })
+
+  it('does nothing for a bare report, which is a link to nowhere', () => {
+    const n = makeNotif()
+    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
+    render(<NotificationPanel />)
+    fireEvent.click(screen.getByText('Test notification'))
+    expect(mockTriggerAction).not.toHaveBeenCalled()
+  })
+
+  it('closes the drawer on the way, so it does not cover where you landed', async () => {
+    const n = makeNotif({ clickable: true })
+    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
+    render(<NotificationPanel />)
+    fireEvent.click(screen.getByText('Test notification'))
+    expect(useNotificationStore.getState().panelOpen).toBe(false)
+  })
+})
+
+describe('acting on a notification settles it', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockTriggerAction.mockResolvedValue({ ok: true })
+    resetStore()
+  })
+  afterEach(cleanup)
+
+  it('takes the row away once its action has fired', async () => {
+    // Approve a phase and the request to approve that phase should not still be
+    // sitting in the list.
+    const n = makeNotif({ actions: [{ id: 'approve', label: 'Approve' }] })
+    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
+    render(<NotificationPanel />)
+    fireEvent.click(screen.getByText('Approve'))
+    await vi.waitFor(() => expect(useNotificationStore.getState().notifications).toHaveLength(0))
+  })
+
+  it('does not ask main to forget an id it has already forgotten', async () => {
+    const n = makeNotif({ actions: [{ id: 'approve', label: 'Approve' }] })
+    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
+    render(<NotificationPanel />)
+    fireEvent.click(screen.getByText('Approve'))
+    await vi.waitFor(() => expect(useNotificationStore.getState().notifications).toHaveLength(0))
+    expect(mockDismiss).not.toHaveBeenCalled()
+  })
+
+  it('still takes the row away when main says it was already answered', async () => {
+    // The same decision made somewhere else — the extension's own UI, most
+    // likely. Still not something to keep showing.
+    mockTriggerAction.mockResolvedValueOnce({ error: 'UNKNOWN_NOTIFICATION' })
+    const n = makeNotif({ actions: [{ id: 'approve', label: 'Approve' }] })
+    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
+    render(<NotificationPanel />)
+    fireEvent.click(screen.getByText('Approve'))
+    await vi.waitFor(() => expect(useNotificationStore.getState().notifications).toHaveLength(0))
   })
 })

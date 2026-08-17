@@ -14,6 +14,7 @@ import type {
   TicketRef,
 } from './types/speckit.types.js'
 import {
+  DEFAULT_SETTINGS,
   PHASE_ORDER,
   QUICK_PHASES,
   STAGE_ORDER,
@@ -36,6 +37,7 @@ import { shouldQueue, orderPending } from './state/run-queue.js'
 import { parseRgLines, searchFiles } from './utils/knowledge-search.js'
 import { parseGitLog, artifactSpecs, buildArtifactRef } from './state/artifact-list.js'
 import { buildTicketMarkdown } from './state/ticket-markdown.js'
+import { modelCatalog } from './state/model-catalog.js'
 import type { ArtifactRef, BoardStage } from './types/speckit.types.js'
 
 // SpecKit-mode phases invoke the project's native `/speckit-*` skills rather
@@ -332,6 +334,21 @@ function makePhaseCallbacks(
   }
 }
 
+/** Where the chosen model lives, on the side of the bridge that launches runs. */
+const MODEL_SETTING_KEY = 'terminator.speckit-pilot.defaultModel'
+
+/**
+ * The model every phase launches with.
+ *
+ * Empty string is a real answer, not a missing one: it means "pass no
+ * `--model`", so the run follows the operator's own Claude Code configuration.
+ * Only an unset setting falls through to the default.
+ */
+function defaultModel(api: ExtensionAPI): string {
+  const value = api.settings.get<string>(MODEL_SETTING_KEY)
+  return typeof value === 'string' ? value : DEFAULT_SETTINGS.defaultModel
+}
+
 function getMaxConcurrent(api: ExtensionAPI): number {
   const v = api.settings.get<number>('terminator.speckit-pilot.maxConcurrentRuns')
   return typeof v === 'number' && v >= 1 ? Math.floor(v) : 3
@@ -590,6 +607,7 @@ async function startRunAt(
     // What its diff is measured against, all the way down to the review queue.
     baseBranch,
     feedbackNote,
+    model: defaultModel(api),
     ...makePhaseCallbacks(api, featureDir, phase),
   })
   activeRunnerHandles.set(featureDir, handle)
@@ -893,7 +911,9 @@ function notify(
   api: ExtensionAPI,
   event: NotifiableEvent,
   message: string,
-  actions?: Array<{ id: string; label: string; handler: () => void }>
+  actions?: Array<{ id: string; label: string; handler: () => void }>,
+  /** Where the row takes you. Without one it is a report, not a link. */
+  onClick?: () => void
 ): Disposable | null {
   switch (channelFor(event)) {
     case 'modal':
@@ -904,6 +924,7 @@ function notify(
         title: message,
         key: `speckit.permission.${event.sessionId}`,
         actions,
+        onClick,
       })
     case 'indicator':
       api.notifications.showToast('warning', message, `speckit.${event.kind}.${event.sessionId}`)
@@ -921,6 +942,37 @@ function notify(
  * exists is not something to reload on the next start.
  */
 const stallFirings: Array<{ firing: StallFiring; featureDir: string; shadow: boolean }> = []
+
+/**
+ * Everything a decision on a card's work should stop saying about it.
+ *
+ * Approving a phase is the operator having read the diff and accepted it, and
+ * until now nothing downstream heard about that. The diff stayed in the review
+ * queue — where backpressure counts it, so approving three phases was enough to
+ * refuse the next run — and any stall the run had fired stayed in the Stalls
+ * tab, still offering Interrupt and Discard for work that had been signed off.
+ *
+ * Both are cleared by session, not by phase: a card now keeps one conversation
+ * across its phases, so the session that produced the approved diff is the one
+ * about to start the next phase.
+ */
+function clearReviewFor(featureDir: string): void {
+  const sessions = (supervision?.runs.list() ?? [])
+    .filter((run) => run.featureDir === featureDir)
+    .map((run) => run.sessionId)
+  for (const sessionId of sessions) {
+    supervision?.review.remove(sessionId)
+    // Off the live list and into the record. The run list used to stack every
+    // approved phase forever, so by the third card it answered "what has this
+    // workspace ever done" instead of "what is happening now". If the card has
+    // another phase, `notePhase` brings this straight back to `working` when it
+    // starts — the same session, correctly named.
+    supervision?.runs.archive(sessionId, 'approved', Date.now())
+  }
+  const keep = stallFirings.filter((entry) => !sessions.includes(entry.firing.sessionId))
+  stallFirings.length = 0
+  stallFirings.push(...keep)
+}
 
 /**
  * How many firings to keep.
@@ -992,8 +1044,13 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
               handler: () =>
                 supervisedRunner?.resolve(ask.sessionId, ask.requestId, { allow: false }),
             },
-            { id: 'open', label: 'Open the board', handler: () => api.window.focusSelf() },
-          ]
+          ],
+          // Was an "Open the board" button sitting beside Allow and Deny —
+          // which is the wrong shape: opening the thing is not a third answer
+          // to the question, it is what clicking the notification should do.
+          // It also went no further than focusing the window, leaving you to
+          // find the run yourself.
+          () => gotoRun(api, 'run', ask.sessionId)
         )
         if (notification !== null) raisedNotifications.set(ask.requestId, notification)
       },
@@ -1062,7 +1119,11 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
         notify(
           api,
           { kind: 'stalled', sessionId: firing.sessionId },
-          `A run stopped making progress (${firing.signal})`
+          `A run stopped making progress (${firing.signal})`,
+          undefined,
+          // A stall is the notification you most want to act on, and acting on
+          // it means reading what the agent was doing when it went quiet.
+          () => gotoRun(api, 'run', firing.sessionId)
         )
       },
     })
@@ -1112,6 +1173,27 @@ export function activate(api: ExtensionAPI): void {
   // the decision back to the terminal — which works, but makes the console a
   // spectator of its own agents.
   reg(api, 'speckit:permissions-list', () => ({ pending: pendingPermissions.list() }))
+
+  // What can go in the model box, and which one is chosen. Asked for rather
+  // than hardcoded in the view, where the last list sat naming a superseded
+  // generation until somebody noticed.
+  //
+  // `selected` comes back with the list because the two must not drift: the
+  // settings view keeps its own copy for rendering, and a copy that disagrees
+  // with what the runs are actually launched with is worse than no setting.
+  reg(api, 'speckit:models-list', async () => ({
+    models: await modelCatalog(),
+    selected: defaultModel(api),
+  }))
+
+  // Persisted where the main process can read it, which is the only place that
+  // matters: the launch command is built here, not in the renderer.
+  reg(api, 'speckit:model-set', (payload: unknown) => {
+    const { model } = payload as { model?: unknown }
+    if (typeof model !== 'string') return { error: 'model must be a string' }
+    api.settings.set(MODEL_SETTING_KEY, model)
+    return { ok: true, selected: model }
+  })
 
   // The firings, and whether they were recorded or surfaced. Precision is
   // measured against these by hand before shadow mode is turned off.
@@ -1391,7 +1473,12 @@ export function activate(api: ExtensionAPI): void {
     const { sessionId, reason } = payload as { sessionId: string; reason?: string }
     if (supervisedRunner === null) return { ok: false }
     const ok = supervisedRunner.stop(sessionId, reason)
-    if (ok) supervision?.finish(sessionId, Date.now())
+    if (ok) {
+      supervision?.finish(sessionId, Date.now())
+      // Recorded before it leaves the live list, so a run somebody stopped is
+      // still answerable later — "what was it doing when I killed it".
+      supervision?.runs.archive(sessionId, 'stopped', Date.now())
+    }
     return { ok }
   })
 
@@ -1413,6 +1500,9 @@ export function activate(api: ExtensionAPI): void {
       api.pty.kill(run.terminalSessionId)
       await discardWorktree(api, workspacePath ?? '', run.worktreePath, run.branch)
       supervision?.review.remove(sessionId)
+      // Recorded first: `forget` drops it entirely, and a discard is the run
+      // you are most likely to want to look back at.
+      supervision?.runs.archive(sessionId, 'discarded', Date.now())
       supervision?.runs.forget(sessionId)
 
       // The card has to forget it too. Leaving `run` running and a
@@ -1829,6 +1919,11 @@ export function activate(api: ExtensionAPI): void {
     if (state.run && state.run.status === 'running') {
       state.stage = deriveStage(state.phases, state.run)
     }
+    // Approving is reviewing. Without this the diff stayed queued after the
+    // decision was made: the Review tab kept offering work that had already
+    // been accepted, and — because the queue is what backpressure counts —
+    // three approved phases were enough to refuse the next run outright.
+    clearReviewFor(featureDir)
     await writePilotState(featureDir, state)
     await appendHistory(featureDir, {
       ts: new Date().toISOString(),
@@ -1855,6 +1950,7 @@ export function activate(api: ExtensionAPI): void {
           phaseCommand: phaseCommandFor(nextPhaseId, state.mode, cardTitleOf(state), worktreePath),
           phase: nextPhaseId,
           feedbackNote: steer,
+          model: defaultModel(api),
           ...makePhaseCallbacks(api, featureDir, nextPhaseId),
         })
         activeRunnerHandles.set(featureDir, handle)
@@ -2450,6 +2546,7 @@ export function activate(api: ExtensionAPI): void {
       phaseCommand: text,
       phase,
       resumeSessionId: sessionId,
+      model: defaultModel(api),
       ...makePhaseCallbacks(api, featureDir, phase),
     })
     activeRunnerHandles.set(featureDir, handle)
@@ -2581,6 +2678,7 @@ export function activate(api: ExtensionAPI): void {
           phaseCommand: `Continue implementation batch ${nextBatch}`,
           phase: 'implement',
           batchIndex: nextBatch,
+          model: defaultModel(api),
           ...makePhaseCallbacks(api, featureDir, 'implement', nextBatch),
         })
         activeRunnerHandles.set(featureDir, newHandle)
@@ -2665,6 +2763,7 @@ export function activate(api: ExtensionAPI): void {
         phaseCommand: phaseCommandFor(phase, state.mode, cardTitleOf(state), worktreePath),
         phase,
         feedbackNote: note,
+        model: defaultModel(api),
         ...makePhaseCallbacks(api, featureDir, phase),
       })
       activeRunnerHandles.set(featureDir, handle)
@@ -2755,6 +2854,33 @@ export function activate(api: ExtensionAPI): void {
  * Three surfaces answer the same question — what needs me, ranked — and this is
  * the one you reach without moving your hands.
  */
+/**
+ * Take me to the run this is about.
+ *
+ * The window first: navigation that changes what is on screen behind another
+ * window has done nothing you can see. Then the terminal it is actually in,
+ * when it still has one — that is where the agent is and where you can type at
+ * it. A run that has ended has no terminal, so the panel opened on it is the
+ * closest thing to the same place.
+ *
+ * Shared by the command palette and by clicking a notification, because they
+ * are the same request phrased twice, and two copies would drift.
+ */
+function gotoRun(api: ExtensionAPI, kind: 'run' | 'review', sessionId: string): void {
+  api.window.focusSelf()
+  const terminal = kind === 'run' ? (supervisedRunner?.terminalFor(sessionId) ?? null) : null
+  if (terminal !== null) {
+    // Through the core's own navigation: it selects the workspace, the project
+    // and the tab, none of which this extension's separate renderer can do.
+    api.window.broadcast('terminal:navigate-to-session', {
+      sessionId: terminal.terminalSessionId,
+      projectId: terminal.projectId,
+    })
+    return
+  }
+  api.window.broadcast('speckit:palette-goto', { kind, sessionId })
+}
+
 function refreshPalette(api: ExtensionAPI): void {
   const snapshot = supervision?.snapshot() ?? null
   const entries = snapshot === null ? [] : paletteEntries(snapshot.runs, snapshot.review)
@@ -2773,25 +2899,7 @@ function refreshPalette(api: ExtensionAPI): void {
         description: entry.description,
         category: entry.category,
       },
-      () => {
-        // The window first: a command that changes what is on screen behind
-        // another window has done nothing you can see.
-        api.window.focusSelf()
-        const terminal =
-          entry.kind === 'run' ? (supervisedRunner?.terminalFor(entry.sessionId) ?? null) : null
-        if (terminal !== null) {
-          // Straight to the terminal, through the core's own navigation.
-          api.window.broadcast('terminal:navigate-to-session', {
-            sessionId: terminal.terminalSessionId,
-            projectId: terminal.projectId,
-          })
-          return
-        }
-        api.window.broadcast('speckit:palette-goto', {
-          kind: entry.kind,
-          sessionId: entry.sessionId,
-        })
-      }
+      () => gotoRun(api, entry.kind, entry.sessionId)
     )
   )
 }

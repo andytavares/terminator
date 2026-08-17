@@ -313,6 +313,13 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     toPayload: (inset: number) => ({ inset }),
     remote: 'omit',
   },
+  {
+    path: 'extension.setLeftInset',
+    kind: 'send',
+    channel: 'extension:set-left-inset',
+    toPayload: (inset: number) => ({ inset }),
+    remote: 'omit',
+  },
 
   // ── keyboard ──────────────────────────────────────────────────────────────
   // Local on both transports: native checks the reserved-shortcut set, remote

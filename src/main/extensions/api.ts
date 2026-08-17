@@ -263,6 +263,14 @@ export interface ExtensionAPI {
       message?: string
       key: string
       actions?: Array<{ id: string; label: string; handler: () => void }>
+      /**
+       * Take me to the thing this is about — the card, the task, the review.
+       *
+       * Only the author knows what that is, so it is a handler rather than a
+       * route. Without one the row is a report: readable, dismissable, and
+       * not clickable.
+       */
+      onClick?: () => void
     }): Disposable
   }
   nativeMenu: {
@@ -727,6 +735,7 @@ export function createExtensionAPI(
         message?: string
         key: string
         actions?: Array<{ id: string; label: string; handler: () => void }>
+        onClick?: () => void
       }): Disposable {
         const id = notificationManager.create({
           type: opts.type,
@@ -735,6 +744,7 @@ export function createExtensionAPI(
           source: extensionId,
           key: opts.key,
           actions: opts.actions,
+          onClick: opts.onClick,
         })
         return disposable(() => notificationManager.dismiss(id))
       },

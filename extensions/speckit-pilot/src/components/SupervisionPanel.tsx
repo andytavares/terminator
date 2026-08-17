@@ -10,6 +10,7 @@ import {
   type HunkFileView,
   type IntentReviewView,
   type ReviewStepView,
+  type RunHistoryView,
   type SupervisionSnapshot,
   type TranscriptLineView,
 } from '../types/electron.js'
@@ -661,7 +662,57 @@ function Feed({
   )
 }
 
-type Section = 'runs' | 'stalls' | 'review' | 'feed'
+const OUTCOME_LABEL: Record<RunHistoryView['outcome'], string> = {
+  approved: 'approved',
+  stopped: 'stopped',
+  discarded: 'discarded',
+  ended: 'ended',
+}
+
+/**
+ * What is over.
+ *
+ * Split out because the run list was doing both jobs and doing neither well:
+ * every approved phase stayed in it forever so nothing would be lost, which
+ * made "what is happening right now" unreadable by the third card. The live
+ * list answers that question now; this one answers "what did it actually do".
+ */
+function History({
+  entries,
+  now,
+  cardLabel,
+}: {
+  entries: readonly RunHistoryView[]
+  now: number
+  cardLabel?: (featureDir: string) => string
+}): JSX.Element {
+  if (entries.length === 0) {
+    return <div className="sk-sup__clear">Nothing has finished yet.</div>
+  }
+  return (
+    <div className="sk-sup__list">
+      {entries.map((entry, index) => (
+        <div className="sk-sup__row" key={`${entry.sessionId}-${entry.endedAt}-${index}`}>
+          <span className={`sk-sup__state sk-sup__state--${entry.outcome}`}>
+            {OUTCOME_LABEL[entry.outcome]}
+          </span>
+          <span className="sk-sup__main">
+            <div className="sk-sup__title">{cardLabel?.(entry.featureDir) ?? entry.branch}</div>
+            <div className="sk-sup__meta">
+              {entry.phase} · {entry.branch} · {elapsed(Math.max(0, now - entry.endedAt))} ago ·{' '}
+              {entry.turns} {entry.turns === 1 ? 'turn' : 'turns'}
+              {entry.diff.files > 0 &&
+                ` · ${entry.diff.files} ${entry.diff.files === 1 ? 'file' : 'files'} +${entry.diff.added} −${entry.diff.removed}`}
+              {entry.asked > 0 && ` · asked ${entry.asked}×`}
+            </div>
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+type Section = 'runs' | 'stalls' | 'review' | 'feed' | 'history'
 
 export function SupervisionPanel({
   cardLabel,
@@ -732,12 +783,15 @@ export function SupervisionPanel({
     stalls: stalls.firings.length,
     review: snapshot.review.length,
     feed: feed.entries.length,
+    // Deliberately uncounted: history only ever grows, and a tab wearing a
+    // number that never goes down reads as work waiting to be done.
+    history: 0,
   }
 
   return (
     <div className="sk-sup">
       <div className="sk-sup__tabs">
-        {(['runs', 'stalls', 'review', 'feed'] as const).map((id) => (
+        {(['runs', 'stalls', 'review', 'feed', 'history'] as const).map((id) => (
           <button
             key={id}
             className={`sk-sup__tab${section === id ? ' sk-sup__tab--on' : ''}`}
@@ -778,6 +832,9 @@ export function SupervisionPanel({
       )}
       {section === 'feed' && (
         <Feed entries={feed.entries} mutes={feed.mutes} now={now} onChanged={reload} />
+      )}
+      {section === 'history' && (
+        <History entries={snapshot.history ?? []} now={now} cardLabel={cardLabel} />
       )}
     </div>
   )

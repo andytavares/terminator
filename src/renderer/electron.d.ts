@@ -21,6 +21,8 @@ export interface SerializedNotification {
   timestamp: number
   source?: string
   actions?: Array<{ id: string; label: string }>
+  /** Whether clicking the row goes anywhere. False for a bare report. */
+  clickable?: boolean
   targets: NotificationTarget[]
 }
 
@@ -158,6 +160,7 @@ interface ElectronAPI {
       repoRoot?: string | null
     }): Promise<void>
     setBottomInset(inset: number): void
+    setLeftInset(inset: number): void
   }
   keyboard: {
     isReserved(accelerator: string): boolean

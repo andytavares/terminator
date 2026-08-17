@@ -1,8 +1,7 @@
-import React, { useEffect, useCallback } from 'react'
+import React, { useEffect, useCallback, useRef } from 'react'
 import { Bell, Info, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
 import { useNotificationStore, type Notification } from '../stores/notification.store'
 import { AlertBadge } from './AlertBadge'
-import { useModalEffect } from '../stores/modal.store'
 import './NotificationPanel.css'
 
 function TypeIcon({ type }: { type: string }): JSX.Element {
@@ -27,6 +26,15 @@ function relativeTime(timestamp: number): string {
   return `${Math.floor(diff / 86400)}d ago`
 }
 
+/**
+ * The reserved action behind "take me to the thing this is about".
+ *
+ * A notification's author is the only thing that knows where that is, and a
+ * function cannot cross IPC — so the destination lives in the main process as
+ * a reserved callback and the row asks for it by name.
+ */
+const OPEN_ACTION_ID = '__open__'
+
 function NotificationItem({
   notification,
   onNavigate,
@@ -34,13 +42,21 @@ function NotificationItem({
   notification: Notification
   onNavigate: () => void
 }): JSX.Element {
-  const { dismiss, markRead } = useNotificationStore()
+  const { dismiss, markRead, remove } = useNotificationStore()
+
+  // Either a local handler (core notifications, which are created in the
+  // renderer) or a reserved callback in main (everything an extension raises).
+  const canOpen = notification.onClick !== undefined || notification.clickable === true
 
   function handleClick(): void {
-    if (!notification.onClick) return
+    if (!canOpen) return
     markRead(notification.id)
     onNavigate()
-    notification.onClick()
+    if (notification.onClick) {
+      notification.onClick()
+      return
+    }
+    void window.electronAPI.notifications.triggerAction(notification.id, OPEN_ACTION_ID)
   }
 
   function handleDismiss(e: React.MouseEvent): void {
@@ -50,14 +66,18 @@ function NotificationItem({
 
   async function handleAction(e: React.MouseEvent, actionId: string): Promise<void> {
     e.stopPropagation()
-    markRead(notification.id)
+    // Acting on it settles it: approve a phase and the request to approve that
+    // phase should not still be sitting in the list. Dropped whatever main
+    // says — either it fired and main forgot the record, or the same decision
+    // was already made elsewhere and there is nothing left to answer.
     await window.electronAPI.notifications.triggerAction(notification.id, actionId)
+    remove(notification.id)
     onNavigate()
   }
 
   return (
     <div
-      className={`notif-item${notification.read ? '' : ' notif-item--unread'}${notification.onClick ? ' notif-item--clickable' : ''}`}
+      className={`notif-item${notification.read ? '' : ' notif-item--unread'}${canOpen ? ' notif-item--clickable' : ''}`}
       onClick={handleClick}
     >
       <TypeIcon type={notification.type} />
@@ -112,8 +132,35 @@ export function BellButton({
 }
 
 function NotificationPanelInner(): JSX.Element {
-  useModalEffect()
   const { closePanel, notifications, markAllRead, clearAll } = useNotificationStore()
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  /**
+   * Reserve the strip this drawer sits in, rather than hiding what is under it.
+   *
+   * An extension's UI is a native `WebContentsView` that paints above the
+   * renderer's DOM, so a panel drawn over it would be invisible. This used to
+   * call `useModalEffect`, which is the blunt answer: it hides every extension
+   * view while a modal is open. That is right for a centred dialog and wrong
+   * here — opening the drawer blanked the whole application to show a 340px
+   * panel down the left edge.
+   *
+   * Measured from the rendered element rather than assumed, so the reservation
+   * cannot drift from the CSS the way a duplicated width would.
+   */
+  useEffect(() => {
+    const setInset = (px: number): void => window.electronAPI?.extension?.setLeftInset?.(px)
+    const reserve = (): void => {
+      const rect = panelRef.current?.getBoundingClientRect()
+      if (rect !== undefined) setInset(Math.ceil(rect.right))
+    }
+    reserve()
+    window.addEventListener('resize', reserve)
+    return () => {
+      window.removeEventListener('resize', reserve)
+      setInset(0)
+    }
+  }, [])
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent): void => {
@@ -130,7 +177,7 @@ function NotificationPanelInner(): JSX.Element {
   return (
     <>
       <div className="notif-backdrop" onClick={closePanel} />
-      <div className="notif-panel" role="dialog" aria-label="Notifications">
+      <div className="notif-panel" ref={panelRef} role="dialog" aria-label="Notifications">
         <div className="notif-panel__header">
           <span className="notif-panel__title">Notifications</span>
           {notifications.length > 0 && (

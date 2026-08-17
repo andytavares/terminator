@@ -24,6 +24,9 @@ let started: Started[]
 let stopped: Array<{ sessionId: string; reason?: string }>
 let startResult: { sessionId: string; terminalSessionId: string; transcriptPath: string } | null
 let branchExitCode: number
+/** The card's already-open conversation, when the test wants there to be one. */
+let liveSession: string | null
+let continued: Array<{ sessionId: string; prompt: string; phase: string }>
 
 function fakeRunner(): SupervisedRunner {
   return {
@@ -34,6 +37,14 @@ function fakeRunner(): SupervisedRunner {
     stop: (sessionId, reason) => {
       stopped.push({ sessionId, reason })
       return true
+    },
+    liveSessionFor: () => liveSession,
+    continueRun: (sessionId, options) => {
+      // Null for a session that is gone, exactly as the real one does: that is
+      // the caller's signal to open a fresh conversation instead.
+      if (sessionId !== liveSession) return null
+      continued.push({ sessionId, prompt: options.prompt, phase: options.phase })
+      return startResult
     },
     resolve: () => {},
     interrupt: () => {},
@@ -72,6 +83,8 @@ const settle = (): Promise<unknown> => new Promise((r) => setTimeout(r, 20))
 beforeEach(() => {
   started = []
   stopped = []
+  continued = []
+  liveSession = null
   startResult = {
     sessionId: 'session-1',
     terminalSessionId: 'terminal-1',
@@ -85,6 +98,20 @@ afterEach(() => {
   setSupervisedRunner(null)
   setPermissionSink(null)
 })
+
+function supervisionWith(files: number) {
+  return {
+    runs: {
+      add: () => ({}),
+      setState: () => {},
+      notePhase: () => {},
+      noteAsked: () => {},
+      get: () => ({ diff: { files, added: files * 10, removed: 0 } }),
+    },
+    finishTurn: async () => {},
+    finish: () => {},
+  }
+}
 
 describe('a phase run, once the extension has a supervised runtime', () => {
   it('goes to the terminal rather than a hidden child process', async () => {
@@ -252,19 +279,6 @@ describe('when a supervised phase is finished', () => {
   // while the agent sat idle.
 
   /** A supervision layer reporting a run that has changed `files` files. */
-  function supervisionWith(files: number) {
-    return {
-      runs: {
-        add: () => ({}),
-        setState: () => {},
-        noteAsked: () => {},
-        get: () => ({ diff: { files } }),
-      },
-      finishTurn: async () => {},
-      finish: () => {},
-    }
-  }
-
   it('completes the phase when a turn ends having changed something', async () => {
     const codes: number[] = []
     const runner = fakeRunner()
@@ -391,5 +405,87 @@ describe('when a phase cannot be supervised', () => {
     createAgentRunner(a).startPhaseRunner({ ...phaseOpts, phase: 'self-review' })
     await settle()
     expect(vi.mocked(a.notifications.showToast)).not.toHaveBeenCalled()
+  })
+})
+
+describe('a card that already has a conversation open', () => {
+  it('runs the next phase in it rather than opening a second one', async () => {
+    // A card used to get one terminal, one session and one `claude` process per
+    // phase: five tabs for a single card, and four idle agents in the run list.
+    liveSession = 'session-1'
+    setSupervisedRunner(fakeRunner())
+    createAgentRunner(api()).startPhaseRunner({ ...phaseOpts, phase: 'plan' })
+    await settle()
+    expect(started).toEqual([])
+    expect(continued).toEqual([
+      { sessionId: 'session-1', prompt: phaseOpts.phaseCommand, phase: 'plan' },
+    ])
+  })
+
+  it('opens a fresh one when the card has none, which is the first phase', async () => {
+    liveSession = null
+    setSupervisedRunner(fakeRunner())
+    createAgentRunner(api()).startPhaseRunner(phaseOpts)
+    await settle()
+    expect(continued).toEqual([])
+    expect(started).toHaveLength(1)
+  })
+
+  it('carries reviewer feedback into a continued phase too', async () => {
+    liveSession = 'session-1'
+    setSupervisedRunner(fakeRunner())
+    createAgentRunner(api()).startPhaseRunner({ ...phaseOpts, feedbackNote: 'use the other API' })
+    await settle()
+    expect(continued[0].prompt).toContain('use the other API')
+  })
+
+  it('reports the session it continued, so the console can reply to it', async () => {
+    liveSession = 'session-1'
+    setSupervisedRunner(fakeRunner())
+    const seen: string[] = []
+    createAgentRunner(api()).startPhaseRunner({ ...phaseOpts, onSession: (id) => seen.push(id) })
+    await settle()
+    expect(seen).toEqual(['session-1'])
+  })
+
+  it('starts a fresh conversation when the one it was told to resume is gone', async () => {
+    // The tab was closed, or the console restarted. Falling through to `start`
+    // with `--resume` is what keeps a reply from being silently dropped.
+    liveSession = null
+    setSupervisedRunner(fakeRunner())
+    createAgentRunner(api()).startPhaseRunner({ ...phaseOpts, resumeSessionId: 'earlier' })
+    await settle()
+    expect(continued).toEqual([])
+    expect(started[0].resumeSessionId).toBe('earlier')
+  })
+
+  it('stops a continued phase that was cancelled before it got going', async () => {
+    liveSession = 'session-1'
+    setSupervisedRunner(fakeRunner())
+    createAgentRunner(api()).startPhaseRunner(phaseOpts).stop()
+    await settle()
+    expect(stopped).toEqual([{ sessionId: 'session-1', reason: 'stopped from the pilot' }])
+  })
+
+  it('measures the phase from the diff it inherited, not from nothing', async () => {
+    // The conversation carries every earlier phase's changes, so "a turn that
+    // changed something" is true before this phase has read its prompt.
+    liveSession = 'session-1'
+    const codes: number[] = []
+    const runner = fakeRunner()
+    let endTurn: ((turns: number) => void) | null = null
+    runner.continueRun = (_sessionId, options) => {
+      endTurn = options.onTurnEnd ?? null
+      return startResult
+    }
+    setSupervisedRunner(runner)
+    setRunSupervision(supervisionWith(4) as never)
+
+    createAgentRunner(api()).startPhaseRunner({ ...phaseOpts, onComplete: (c) => codes.push(c) })
+    await settle()
+    endTurn?.(1)
+    await settle()
+    expect(codes).toEqual([])
+    setRunSupervision(null)
   })
 })
