@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { Bot, Terminal } from 'lucide-react'
 import type { TerminalSession } from '../../../shared/types/index'
 import { useSessionStore } from '../../stores/session.store'
 import { MoveSessionDialog } from './MoveSessionDialog'
+import { ContextMenu, closeAllContextMenus } from '../ContextMenu'
 import './SessionRow.css'
 
 interface SessionRowProps {
@@ -33,14 +34,6 @@ export function SessionRow({
   const [moveOpen, setMoveOpen] = useState(false)
   const renameRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    function closeHandler() {
-      setCtxMenu(null)
-    }
-    window.addEventListener('close-context-menus', closeHandler)
-    return () => window.removeEventListener('close-context-menus', closeHandler)
-  }, [])
-
   if (hidden) return <></>
 
   function startRename(): void {
@@ -62,7 +55,7 @@ export function SessionRow({
 
   function handleContextMenu(e: React.MouseEvent): void {
     e.preventDefault()
-    window.dispatchEvent(new CustomEvent('close-context-menus'))
+    closeAllContextMenus()
     setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 
@@ -112,63 +105,39 @@ export function SessionRow({
       </div>
 
       {ctxMenu && (
-        <SessionRowCtxMenu
+        <ContextMenu
           x={ctxMenu.x}
           y={ctxMenu.y}
-          onRename={() => {
-            setCtxMenu(null)
-            startRename()
-          }}
-          onMove={() => {
-            setCtxMenu(null)
-            setMoveOpen(true)
-          }}
-          onClose={() => {
-            setCtxMenu(null)
-            void useSessionStore.getState().closeSession(session.id)
-          }}
-          onMenuClose={() => setCtxMenu(null)}
+          onDismiss={() => setCtxMenu(null)}
+          items={[
+            {
+              label: 'Rename',
+              onSelect: () => {
+                setCtxMenu(null)
+                startRename()
+              },
+            },
+            {
+              label: 'Move to project',
+              onSelect: () => {
+                setCtxMenu(null)
+                setMoveOpen(true)
+              },
+            },
+            {
+              label: 'Close',
+              danger: true,
+              separatorBefore: true,
+              onSelect: () => {
+                setCtxMenu(null)
+                void useSessionStore.getState().closeSession(session.id)
+              },
+            },
+          ]}
         />
       )}
 
       {moveOpen && <MoveSessionDialog sessionId={session.id} onClose={() => setMoveOpen(false)} />}
     </>
-  )
-}
-
-function SessionRowCtxMenu({
-  x,
-  y,
-  onRename,
-  onMove,
-  onClose,
-  onMenuClose,
-}: {
-  x: number
-  y: number
-  onRename: () => void
-  onMove: () => void
-  onClose: () => void
-  onMenuClose: () => void
-}): JSX.Element {
-  React.useEffect(() => {
-    const close = (): void => onMenuClose()
-    window.addEventListener('click', close)
-    return () => window.removeEventListener('click', close)
-  }, [onMenuClose])
-
-  return (
-    <div className="ctx-menu" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
-      <button className="ctx-menu__item" onClick={onRename}>
-        Rename
-      </button>
-      <button className="ctx-menu__item" onClick={onMove}>
-        Move to project
-      </button>
-      <div className="ctx-menu__separator" />
-      <button className="ctx-menu__item ctx-menu__item--danger" onClick={onClose}>
-        Close
-      </button>
-    </div>
   )
 }

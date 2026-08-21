@@ -27,6 +27,9 @@ const makeProject = (overrides: Partial<Project> = {}): Project => ({
 const mockSessionStore = {
   getSessionsForProject: vi.fn().mockReturnValue([]),
   getBellCountForProject: vi.fn().mockReturnValue(0),
+  getBellCountForSession: vi.fn().mockReturnValue(0),
+  renameSession: vi.fn(),
+  closeSession: vi.fn(),
   isProjectBusy: vi.fn().mockReturnValue(false),
   isSessionBusy: vi.fn().mockReturnValue(false),
   projectViews: new Map(),
@@ -394,57 +397,6 @@ describe('ProjectRow', () => {
     })
   })
 
-  describe('branch chip (T039)', () => {
-    it('renders branch chip when project has gitBranch', () => {
-      render(<ProjectRow {...defaultProps} project={makeProject({ gitBranch: 'main' })} />)
-      expect(screen.getByText('main')).toBeTruthy()
-    })
-
-    it('does not render branch chip when project has no gitBranch', () => {
-      const { container } = render(<ProjectRow {...defaultProps} />)
-      expect(container.querySelector('.project-row__branch-chip')).toBeNull()
-    })
-
-    it('chip has chip-clean class when gitDirty is false and no conflict', () => {
-      const { container } = render(
-        <ProjectRow
-          {...defaultProps}
-          project={makeProject({ gitBranch: 'main' })}
-          gitDirty={false}
-          gitConflict={false}
-        />
-      )
-      expect(container.querySelector('.chip-clean')).toBeTruthy()
-    })
-
-    it('chip has chip-dirty class when gitDirty is true', () => {
-      const { container } = render(
-        <ProjectRow {...defaultProps} project={makeProject({ gitBranch: 'feat' })} gitDirty />
-      )
-      expect(container.querySelector('.chip-dirty')).toBeTruthy()
-    })
-
-    it('chip has chip-conflict class when gitConflict is true', () => {
-      const { container } = render(
-        <ProjectRow {...defaultProps} project={makeProject({ gitBranch: 'feat' })} gitConflict />
-      )
-      expect(container.querySelector('.chip-conflict')).toBeTruthy()
-    })
-
-    it('clicking chip calls onBranchBadgeClick', () => {
-      const onBranchBadgeClick = vi.fn()
-      const { container } = render(
-        <ProjectRow
-          {...defaultProps}
-          project={makeProject({ gitBranch: 'main' })}
-          onBranchBadgeClick={onBranchBadgeClick}
-        />
-      )
-      fireEvent.click(container.querySelector('.project-row__branch-chip')!)
-      expect(onBranchBadgeClick).toHaveBeenCalledOnce()
-    })
-  })
-
   describe('branch coverage — grouping, dimming, expand toggle, worktree icon', () => {
     const mkSession = (id: string, tabTitle: string, parentSessionId?: string) => ({
       id,
@@ -512,6 +464,95 @@ describe('ProjectRow', () => {
         <ProjectRow {...defaultProps} project={makeProject({ isWorktree: true })} />
       )
       expect(container.querySelector('.project-row__icon')).toBeTruthy()
+    })
+  })
+
+  describe('per-session status attribution (FR-034, FR-035)', () => {
+    const parent = {
+      id: 's1',
+      projectId: 'proj-1',
+      tabTitle: 'Parent',
+      status: 'active' as const,
+      type: 'human' as const,
+      scrollbackLimit: 1000,
+      createdAt: '',
+    }
+    const child = { ...parent, id: 's2', tabTitle: 'Child', parentSessionId: 's1' }
+
+    it('shows a bell count only on the session that rang, not its siblings', () => {
+      mockSessionStore.getSessionsForProject.mockReturnValue([
+        parent,
+        { ...parent, id: 's3', tabTitle: 'Quiet' },
+      ])
+      // One bell on s1; the project total is also 1.
+      mockSessionStore.getBellCountForProject.mockReturnValue(1)
+      mockSessionStore.getBellCountForSession.mockImplementation((id: string) =>
+        id === 's1' ? 1 : 0
+      )
+
+      const { container } = render(<ProjectRow {...defaultProps} isExpanded />)
+
+      // Exactly one row shows a bell — not every row in the project.
+      expect(container.querySelectorAll('.session-row__bell')).toHaveLength(1)
+    })
+
+    it("reads a child row's busy state from the child, not its parent", () => {
+      mockSessionStore.getSessionsForProject.mockReturnValue([parent, child])
+      mockSessionStore.isSessionBusy.mockImplementation((id: string) => id === 's1')
+
+      render(<ProjectRow {...defaultProps} isExpanded />)
+
+      // The child must have been asked about itself at least once.
+      expect(mockSessionStore.isSessionBusy).toHaveBeenCalledWith('s2')
+    })
+  })
+
+  describe('session row callbacks are bound to the right session', () => {
+    const parent = {
+      id: 's1',
+      projectId: 'proj-1',
+      tabTitle: 'Parent',
+      status: 'active' as const,
+      type: 'human' as const,
+      scrollbackLimit: 1000,
+      createdAt: '',
+    }
+    const child = { ...parent, id: 's2', tabTitle: 'Child', parentSessionId: 's1' }
+
+    beforeEach(() => {
+      vi.spyOn(useSessionStore, 'getState').mockReturnValue(
+        mockSessionStore as unknown as ReturnType<typeof useSessionStore.getState>
+      )
+    })
+
+    function renameVia(title: string, next: string) {
+      fireEvent.doubleClick(screen.getByText(title))
+      const input = document.querySelector('.session-row__rename-input') as HTMLInputElement
+      fireEvent.change(input, { target: { value: next } })
+      fireEvent.blur(input)
+    }
+
+    it('renames the root session it was rendered for', () => {
+      mockSessionStore.getSessionsForProject.mockReturnValue([parent])
+      render(<ProjectRow {...defaultProps} isExpanded />)
+      renameVia('Parent', 'Renamed parent')
+      expect(mockSessionStore.renameSession).toHaveBeenCalledWith('s1', 'Renamed parent')
+    })
+
+    it('renames the child session, not its parent', () => {
+      mockSessionStore.getSessionsForProject.mockReturnValue([parent, child])
+      render(<ProjectRow {...defaultProps} isExpanded />)
+      renameVia('Child', 'Renamed child')
+      expect(mockSessionStore.renameSession).toHaveBeenCalledWith('s2', 'Renamed child')
+    })
+
+    it('activates the child session when a child row is selected', () => {
+      mockSessionStore.getSessionsForProject.mockReturnValue([parent, child])
+      const onSelect = vi.fn()
+      render(<ProjectRow {...defaultProps} isExpanded onSelect={onSelect} />)
+      fireEvent.click(screen.getByText('Child'))
+      expect(onSelect).toHaveBeenCalled()
+      expect(mockSessionStore.setActiveSessionForProject).toHaveBeenCalledWith('proj-1', 's2')
     })
   })
 })

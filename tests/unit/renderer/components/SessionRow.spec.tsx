@@ -254,4 +254,28 @@ describe('SessionRow', () => {
       expect(document.querySelector('.ctx-menu')).toBeNull()
     })
   })
+
+  describe('rename input and move dialog lifecycle', () => {
+    it('does not select the row when the rename input itself is clicked', () => {
+      const onSelect = vi.fn()
+      const { container } = render(
+        <SessionRow session={makeSession()} {...defaultProps} onSelect={onSelect} />
+      )
+      fireEvent.doubleClick(container.querySelector('.session-row__title')!)
+      onSelect.mockClear()
+      fireEvent.click(container.querySelector('.session-row__rename-input')!)
+      expect(onSelect).not.toHaveBeenCalled()
+    })
+
+    it('closes the move dialog when it asks to close', () => {
+      const { container } = render(<SessionRow session={makeSession()} {...defaultProps} />)
+      fireEvent.contextMenu(container.querySelector('.session-row')!)
+      const moveBtn = Array.from(document.querySelectorAll('.ctx-menu__item')).find((el) =>
+        el.textContent?.includes('Move')
+      ) as HTMLElement
+      fireEvent.click(moveBtn)
+      fireEvent.click(screen.getByText('Cancel'))
+      expect(screen.queryByTestId('move-session-dialog')).toBeNull()
+    })
+  })
 })

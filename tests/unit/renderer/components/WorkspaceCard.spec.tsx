@@ -13,6 +13,11 @@ vi.mock('../../../../src/renderer/hooks/useBranchSync', () => ({
   useBranchSync: vi.fn(),
 }))
 
+const mockCreateSession = vi.fn()
+vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
+  useTerminalSession: () => ({ createSession: mockCreateSession }),
+}))
+
 vi.mock('../../../../src/renderer/stores/session.store', () => ({
   useSessionStore: vi.fn().mockReturnValue({
     getSessionsForProject: vi.fn().mockReturnValue([]),
@@ -29,6 +34,7 @@ const mockWorkspaceStore = {
   workspaces: [] as Workspace[],
   updateProjectBranch: vi.fn().mockResolvedValue(undefined),
   collapsedProjectIds: new Set<string>(),
+  resolveActiveCwd: vi.fn().mockReturnValue('/tmp/ws'),
   toggleProjectCollapse: vi.fn(),
   ensureProjectExpanded: vi.fn(),
 }
@@ -333,5 +339,34 @@ describe('WorkspaceCard', () => {
       <WorkspaceCard {...defaultProps} onSelectWorkspaceTab={vi.fn()} activeWorkspaceTabId="git" />
     )
     expect(document.querySelector('.ws-card__ws-tab--active')).toBeTruthy()
+  })
+
+  describe('project-scoped callbacks', () => {
+    it('creates a session in the project when its + new terminal button is clicked', () => {
+      render(<WorkspaceCard {...defaultProps} />)
+      fireEvent.click(screen.getAllByTitle('New terminal')[0])
+      expect(mockCreateSession).toHaveBeenCalledOnce()
+      const [projectId, kind] = mockCreateSession.mock.calls[0]
+      expect(projectId).toBe('p1')
+      expect(kind).toBe('human')
+    })
+
+    it('closes the edit dialog when it asks to close', () => {
+      const { container } = render(<WorkspaceCard {...defaultProps} />)
+      fireEvent.contextMenu(container.querySelector('.ws-card__header')!)
+      const edit = Array.from(document.querySelectorAll('.ctx-menu__item')).find(
+        (b) => b.textContent === 'Edit workspace'
+      ) as HTMLElement
+      fireEvent.click(edit)
+      fireEvent.click(screen.getByText('close-edit'))
+      expect(screen.queryByTestId('edit-workspace-dialog')).toBeNull()
+    })
+
+    it('closes the create-project dialog when it asks to close', () => {
+      render(<WorkspaceCard {...defaultProps} />)
+      fireEvent.click(screen.getByText('New project'))
+      fireEvent.click(screen.getByText('close-dialog'))
+      expect(screen.queryByTestId('create-project-dialog')).toBeNull()
+    })
   })
 })

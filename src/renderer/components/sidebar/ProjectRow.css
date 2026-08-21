@@ -75,13 +75,6 @@
   min-width: 0;
 }
 
-.project-row__badges {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  flex-shrink: 0;
-}
-
 .project-row__busy {
   width: 6px;
   height: 6px;
@@ -153,38 +146,4 @@
 .project-row__branch-row .branch-sw__trigger:hover {
   background: rgba(255, 255, 255, 0.07);
   border-color: rgba(255, 255, 255, 0.13);
-}
-
-/* Branch chip variants */
-.project-row__branch-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-size: 9px;
-  font-family: var(--font-mono);
-  border: 1px solid transparent;
-  cursor: pointer;
-  max-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chip-clean {
-  background: rgba(74, 222, 128, 0.1);
-  color: var(--success);
-  border-color: rgba(74, 222, 128, 0.2);
-}
-
-.chip-dirty {
-  background: rgba(250, 204, 21, 0.1);
-  color: var(--warning);
-  border-color: rgba(250, 204, 21, 0.2);
-}
-
-.chip-conflict {
-  background: rgba(224, 92, 92, 0.12);
-  color: var(--danger);
-  border-color: rgba(224, 92, 92, 0.25);
 }

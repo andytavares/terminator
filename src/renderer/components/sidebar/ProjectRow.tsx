@@ -1,11 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef } from 'react'
 import { GitBranch, FolderGit2, ChevronRight, ChevronDown } from 'lucide-react'
 import type { Project } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
 import { useBranchSync } from '../../hooks/useBranchSync'
+import { useDragReorder } from '../../hooks/useDragReorder'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { SessionRow } from './SessionRow'
+import { ContextMenu, closeAllContextMenus } from '../ContextMenu'
 import './ProjectRow.css'
 
 interface ProjectRowProps {
@@ -17,9 +19,6 @@ interface ProjectRowProps {
   onSelect: () => void
   onAddSession: () => void
   onToggleExpand?: () => void
-  gitDirty?: boolean
-  gitConflict?: boolean
-  onBranchBadgeClick?: () => void
   branchSwitcher?: React.ReactNode
   searchQuery?: string
 }
@@ -33,9 +32,6 @@ export function ProjectRow({
   onSelect,
   onAddSession,
   onToggleExpand,
-  gitDirty,
-  gitConflict,
-  onBranchBadgeClick,
   branchSwitcher,
   searchQuery = '',
 }: ProjectRowProps): JSX.Element {
@@ -43,14 +39,12 @@ export function ProjectRow({
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState('')
-  const [sessionDragOver, setSessionDragOver] = useState<number | null>(null)
   const renameRef = useRef<HTMLInputElement>(null)
-  const sessionDragIndexRef = useRef<number | null>(null)
   const { deleteProject, renameProject, workspaces } = useWorkspaceStore()
   const {
     getSessionsForProject,
     projectViews,
-    getBellCountForProject,
+    getBellCountForSession,
     isProjectBusy,
     isSessionBusy,
   } = useSessionStore()
@@ -63,6 +57,14 @@ export function ProjectRow({
   const isBusy = isProjectBusy(project.id)
 
   const rootSessions = sessions.filter((s) => !s.parentSessionId)
+  const { dragOverIndex: sessionDragOverIndex, getItemProps: getSessionDragProps } = useDragReorder(
+    rootSessions,
+    (reordered) =>
+      useSessionStore.getState().reorderSessions(
+        project.id,
+        reordered.map((s) => s.id)
+      )
+  )
   const childSessionsByParentId = new Map<string, typeof sessions>()
   for (const s of sessions) {
     if (s.parentSessionId) {
@@ -79,17 +81,9 @@ export function ProjectRow({
     !projectNameMatches &&
     !sessions.some((s) => s.tabTitle.toLowerCase().includes(lowerQuery))
 
-  useEffect(() => {
-    function closeHandler() {
-      setCtxMenu(null)
-    }
-    window.addEventListener('close-context-menus', closeHandler)
-    return () => window.removeEventListener('close-context-menus', closeHandler)
-  }, [])
-
   function handleContextMenu(e: React.MouseEvent): void {
     e.preventDefault()
-    window.dispatchEvent(new CustomEvent('close-context-menus'))
+    closeAllContextMenus()
     setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 
@@ -160,21 +154,6 @@ export function ProjectRow({
             {project.name}
           </span>
         )}
-        <div className="project-row__badges">
-          {!branchSwitcher && project.gitBranch && (
-            <span
-              className={`project-row__branch-chip ${
-                gitConflict ? 'chip-conflict' : gitDirty ? 'chip-dirty' : 'chip-clean'
-              }`}
-              onClick={(e) => {
-                e.stopPropagation()
-                onBranchBadgeClick?.()
-              }}
-            >
-              {project.gitBranch}
-            </span>
-          )}
-        </div>
         {isBusy && <span className="project-row__busy" />}
         {isExpanded && (
           <button
@@ -200,40 +179,14 @@ export function ProjectRow({
         rootSessions.map((session, index) => (
           <div key={session.id}>
             <div
-              draggable
-              onDragStart={() => {
-                sessionDragIndexRef.current = index
-              }}
-              onDragOver={(e) => {
-                e.preventDefault()
-                setSessionDragOver(index)
-              }}
-              onDragLeave={() => setSessionDragOver(null)}
-              onDrop={() => {
-                const from = sessionDragIndexRef.current
-                if (from !== null && from !== index) {
-                  const reordered = [...rootSessions]
-                  const [moved] = reordered.splice(from, 1)
-                  reordered.splice(index, 0, moved)
-                  useSessionStore.getState().reorderSessions(
-                    project.id,
-                    reordered.map((s) => s.id)
-                  )
-                }
-                sessionDragIndexRef.current = null
-                setSessionDragOver(null)
-              }}
-              onDragEnd={() => {
-                sessionDragIndexRef.current = null
-                setSessionDragOver(null)
-              }}
-              className={sessionDragOver === index ? 'session-dnd-over' : ''}
+              {...getSessionDragProps(index)}
+              className={sessionDragOverIndex === index ? 'session-dnd-over' : ''}
             >
               <SessionRow
                 session={session}
                 isActive={activeSessionId === session.id}
                 isBusy={isSessionBusy(session.id)}
-                bellCount={getBellCountForProject(project.id)}
+                bellCount={getBellCountForSession(session.id)}
                 workspaceColor={workspaceColor}
                 onSelect={() => {
                   onSelect()
@@ -254,8 +207,8 @@ export function ProjectRow({
                 key={child.id}
                 session={child}
                 isActive={activeSessionId === child.id}
-                isBusy={isSessionBusy(session.id)}
-                bellCount={getBellCountForProject(project.id)}
+                isBusy={isSessionBusy(child.id)}
+                bellCount={getBellCountForSession(child.id)}
                 workspaceColor={workspaceColor}
                 isSubSession
                 onSelect={() => {
@@ -276,12 +229,19 @@ export function ProjectRow({
         ))}
 
       {ctxMenu && (
-        <ProjectRowCtxMenu
+        <ContextMenu
           x={ctxMenu.x}
           y={ctxMenu.y}
-          onRename={startRename}
-          onRemove={handleRemove}
-          onClose={() => setCtxMenu(null)}
+          onDismiss={() => setCtxMenu(null)}
+          items={[
+            { label: 'Rename', onSelect: startRename },
+            {
+              label: 'Remove project',
+              danger: true,
+              separatorBefore: true,
+              onSelect: handleRemove,
+            },
+          ]}
         />
       )}
 
@@ -298,37 +258,5 @@ export function ProjectRow({
         />
       )}
     </>
-  )
-}
-
-function ProjectRowCtxMenu({
-  x,
-  y,
-  onRename,
-  onRemove,
-  onClose,
-}: {
-  x: number
-  y: number
-  onRename: () => void
-  onRemove: () => void
-  onClose: () => void
-}): JSX.Element {
-  React.useEffect(() => {
-    const close = (): void => onClose()
-    window.addEventListener('click', close)
-    return () => window.removeEventListener('click', close)
-  }, [onClose])
-
-  return (
-    <div className="ctx-menu" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
-      <button className="ctx-menu__item" onClick={onRename}>
-        Rename
-      </button>
-      <div className="ctx-menu__separator" />
-      <button className="ctx-menu__item ctx-menu__item--danger" onClick={onRemove}>
-        Remove project
-      </button>
-    </div>
   )
 }

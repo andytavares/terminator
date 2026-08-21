@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useRef, useState } from 'react'
 import type { TerminalSession } from '../../../shared/types/index'
 import { useSessionStore } from '../../stores/session.store'
 import { MoveSessionDialog } from './MoveSessionDialog'
+import { ContextMenu, closeAllContextMenus } from '../ContextMenu'
 import './ScratchSection.css'
 
 interface ScratchSectionProps {
@@ -24,17 +25,9 @@ export function ScratchSection({
   const [renameValue, setRenameValue] = useState('')
   const renameRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    function closeHandler() {
-      setCtxMenu(null)
-    }
-    window.addEventListener('close-context-menus', closeHandler)
-    return () => window.removeEventListener('close-context-menus', closeHandler)
-  }, [])
-
   function handleContextMenu(e: React.MouseEvent, sessionId: string): void {
     e.preventDefault()
-    window.dispatchEvent(new CustomEvent('close-context-menus'))
+    closeAllContextMenus()
     setCtxMenu({ x: e.clientX, y: e.clientY, sessionId })
   }
 
@@ -88,60 +81,33 @@ export function ScratchSection({
       </button>
 
       {ctxMenu && (
-        <ScratchCtxMenu
+        <ContextMenu
           x={ctxMenu.x}
           y={ctxMenu.y}
-          sessionId={ctxMenu.sessionId}
-          sessions={sessions}
-          onRename={() => {
-            const session = sessions.find((s) => s.id === ctxMenu.sessionId)
-            if (session) startRename(session)
-            setCtxMenu(null)
-          }}
-          onMove={() => {
-            setMoveSessionId(ctxMenu.sessionId)
-            setCtxMenu(null)
-          }}
-          onClose={() => setCtxMenu(null)}
+          onDismiss={() => setCtxMenu(null)}
+          items={[
+            {
+              label: 'Rename',
+              onSelect: () => {
+                const session = sessions.find((s) => s.id === ctxMenu.sessionId)
+                if (session) startRename(session)
+                setCtxMenu(null)
+              },
+            },
+            {
+              label: 'Move to project…',
+              onSelect: () => {
+                setMoveSessionId(ctxMenu.sessionId)
+                setCtxMenu(null)
+              },
+            },
+          ]}
         />
       )}
 
       {moveSessionId && (
         <MoveSessionDialog sessionId={moveSessionId} onClose={() => setMoveSessionId(null)} />
       )}
-    </div>
-  )
-}
-
-function ScratchCtxMenu({
-  x,
-  y,
-  onRename,
-  onMove,
-  onClose,
-}: {
-  x: number
-  y: number
-  sessionId: string
-  sessions: TerminalSession[]
-  onRename: () => void
-  onMove: () => void
-  onClose: () => void
-}): JSX.Element {
-  useEffect(() => {
-    const close = (): void => onClose()
-    window.addEventListener('click', close)
-    return () => window.removeEventListener('click', close)
-  }, [onClose])
-
-  return (
-    <div className="ctx-menu" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
-      <button className="ctx-menu__item" onClick={onRename}>
-        Rename
-      </button>
-      <button className="ctx-menu__item" onClick={onMove}>
-        Move to project…
-      </button>
     </div>
   )
 }

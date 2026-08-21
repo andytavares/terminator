@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import type { Workspace, Project } from '../../../shared/types/index'
 import { useExtensionRegistry } from '../../extensions/registry'
@@ -8,8 +8,9 @@ import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { EditWorkspaceDialog } from './EditWorkspaceDialog'
 import { ConfirmDialog } from '../ConfirmDialog'
-import { ExtensionFooter } from './ExtensionFooter'
 import { ProjectRow } from './ProjectRow'
+import { useDragReorder } from '../../hooks/useDragReorder'
+import { ContextMenu, closeAllContextMenus } from '../ContextMenu'
 import { BranchSwitcher } from './BranchSwitcher'
 import './WorkspaceCard.css'
 
@@ -36,10 +37,7 @@ export function WorkspaceCard({
   activeWorkspaceTabId,
   searchQuery = '',
 }: WorkspaceCardProps): JSX.Element {
-  const { sidebarButtons, workspaceTabs } = useExtensionRegistry((s) => ({
-    sidebarButtons: s.sidebarButtons,
-    workspaceTabs: s.workspaceTabs,
-  }))
+  const workspaceTabs = useExtensionRegistry((s) => s.workspaceTabs)
   const {
     deleteWorkspace,
     resolveActiveCwd,
@@ -53,48 +51,17 @@ export function WorkspaceCard({
   const [editOpen, setEditOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
-  const dragIndexRef = useRef<number | null>(null)
-  const [dragOver, setDragOver] = useState<number | null>(null)
   const { reorderProjects } = useWorkspaceStore()
-
-  useEffect(() => {
-    function closeHandler() {
-      setCtxMenu(null)
-    }
-    window.addEventListener('close-context-menus', closeHandler)
-    return () => window.removeEventListener('close-context-menus', closeHandler)
-  }, [])
-
-  function handleDragStart(index: number): void {
-    dragIndexRef.current = index
-  }
-
-  function handleDragOver(e: React.DragEvent, index: number): void {
-    e.preventDefault()
-    setDragOver(index)
-  }
-
-  function handleDrop(dropIndex: number): void {
-    const fromIndex = dragIndexRef.current
-    if (fromIndex === null || fromIndex === dropIndex) {
-      setDragOver(null)
-      dragIndexRef.current = null
-      return
-    }
-    const reordered = [...projects]
-    const [moved] = reordered.splice(fromIndex, 1)
-    reordered.splice(dropIndex, 0, moved)
-    void reorderProjects(
+  const { dragOverIndex, getItemProps } = useDragReorder(projects, (reordered) =>
+    reorderProjects(
       workspace.id,
       reordered.map((p) => p.id)
     )
-    dragIndexRef.current = null
-    setDragOver(null)
-  }
+  )
 
   function handleContextMenu(e: React.MouseEvent): void {
     e.preventDefault()
-    window.dispatchEvent(new CustomEvent('close-context-menus'))
+    closeAllContextMenus()
     setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 
@@ -140,16 +107,8 @@ export function WorkspaceCard({
             {projects.map((project, index) => (
               <div
                 key={project.id}
-                draggable
-                onDragStart={() => handleDragStart(index)}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDragLeave={() => setDragOver(null)}
-                onDrop={() => handleDrop(index)}
-                onDragEnd={() => {
-                  dragIndexRef.current = null
-                  setDragOver(null)
-                }}
-                className={dragOver === index ? 'proj-dnd-target' : ''}
+                {...getItemProps(index)}
+                className={dragOverIndex === index ? 'proj-dnd-target' : ''}
               >
                 <ProjectRow
                   project={project}
@@ -188,24 +147,33 @@ export function WorkspaceCard({
               <span>+</span>
               <span>New project</span>
             </button>
-            <ExtensionFooter buttons={sidebarButtons} />
           </div>
         )}
       </div>
 
       {ctxMenu && (
-        <WorkspaceCtxMenu
+        <ContextMenu
           x={ctxMenu.x}
           y={ctxMenu.y}
-          onEdit={() => {
-            setEditOpen(true)
-            setCtxMenu(null)
-          }}
-          onRemove={() => {
-            setCtxMenu(null)
-            setConfirmOpen(true)
-          }}
-          onClose={() => setCtxMenu(null)}
+          onDismiss={() => setCtxMenu(null)}
+          items={[
+            {
+              label: 'Edit workspace',
+              onSelect: () => {
+                setEditOpen(true)
+                setCtxMenu(null)
+              },
+            },
+            {
+              label: 'Remove workspace',
+              danger: true,
+              separatorBefore: true,
+              onSelect: () => {
+                setCtxMenu(null)
+                setConfirmOpen(true)
+              },
+            },
+          ]}
         />
       )}
 
@@ -229,37 +197,5 @@ export function WorkspaceCard({
         <CreateProjectDialog workspaceId={workspace.id} onClose={() => setCreateOpen(false)} />
       )}
     </>
-  )
-}
-
-function WorkspaceCtxMenu({
-  x,
-  y,
-  onEdit,
-  onRemove,
-  onClose,
-}: {
-  x: number
-  y: number
-  onEdit: () => void
-  onRemove: () => void
-  onClose: () => void
-}): JSX.Element {
-  React.useEffect(() => {
-    const close = (): void => onClose()
-    window.addEventListener('click', close)
-    return () => window.removeEventListener('click', close)
-  }, [onClose])
-
-  return (
-    <div className="ctx-menu" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
-      <button className="ctx-menu__item" onClick={onEdit}>
-        Edit workspace
-      </button>
-      <div className="ctx-menu__separator" />
-      <button className="ctx-menu__item ctx-menu__item--danger" onClick={onRemove}>
-        Remove workspace
-      </button>
-    </div>
   )
 }
