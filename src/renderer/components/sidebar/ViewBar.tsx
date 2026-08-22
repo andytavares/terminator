@@ -22,10 +22,10 @@ export interface ViewBarProps {
   views: SessionView[]
   activeViewId: string
   onSelectView: (id: string) => void
+  /** How many sessions each view would show, keyed by view id. */
+  counts?: Record<string, number>
   /** Applies a grouping/sort/filter change to the active view. */
   onChangeView: (patch: Partial<SessionView>) => void
-  onSaveAsNew: (name: string) => void
-  onDeleteView: (id: string) => void
   /** True when the active view already shows only stale sessions. */
   hideStaleUnavailable: boolean
 }
@@ -37,10 +37,9 @@ export interface ViewBarProps {
 export function ViewBar({
   views,
   activeViewId,
+  counts,
   onSelectView,
   onChangeView,
-  onSaveAsNew,
-  onDeleteView,
   hideStaleUnavailable,
 }: ViewBarProps): JSX.Element {
   const [menu, setMenu] = useState<'group' | 'sort' | null>(null)
@@ -57,14 +56,7 @@ export function ViewBar({
       window.removeEventListener('close-context-menus', close)
     }
   }, [menu])
-  const [newName, setNewName] = useState<string | null>(null)
   const active = views.find((v) => v.id === activeViewId) ?? views[0]
-
-  function commitNewView(): void {
-    const trimmed = newName?.trim()
-    if (trimmed) onSaveAsNew(trimmed.slice(0, 40))
-    setNewName(null)
-  }
 
   return (
     <div className="view-bar">
@@ -74,40 +66,13 @@ export function ViewBar({
             key={v.id}
             className={`view-bar__chip${v.id === activeViewId ? ' view-bar__chip--active' : ''}`}
             onClick={() => onSelectView(v.id)}
-            onContextMenu={(e) => {
-              if (v.builtIn) return
-              e.preventDefault()
-              onDeleteView(v.id)
-            }}
-            title={v.builtIn ? v.name : `${v.name} (right-click to delete)`}
+            title={v.name}
           >
             {v.name}
+            {counts?.[v.id] ? <span className="view-bar__count"> · {counts[v.id]}</span> : null}
           </button>
         ))}
-        <button
-          className="view-bar__chip view-bar__chip--add"
-          title="Save current view"
-          onClick={() => setNewName('')}
-        >
-          +
-        </button>
       </div>
-
-      {newName !== null && (
-        <input
-          className="view-bar__name-input"
-          placeholder="View name"
-          value={newName}
-          autoFocus
-          maxLength={40}
-          onChange={(e) => setNewName(e.target.value)}
-          onBlur={commitNewView}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commitNewView()
-            if (e.key === 'Escape') setNewName(null)
-          }}
-        />
-      )}
 
       <div className="view-bar__controls">
         <button

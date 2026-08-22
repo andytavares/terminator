@@ -95,6 +95,7 @@ export function UnifiedSidebar({
 }: UnifiedSidebarProps): JSX.Element {
   const {
     workspaces,
+    activeProjectId,
     activeWorkspaceId,
     projectsByWorkspaceId,
     setActiveProject,
@@ -224,18 +225,6 @@ export function UnifiedSidebar({
     persist(views.map((v) => (v.id === activeViewId ? { ...v, ...patch } : v)))
   }
 
-  function saveAsNewView(name: string): void {
-    const id = `custom.${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
-    const base = views.find((v) => v.id === activeViewId) ?? views[0]
-    persist([...views.filter((v) => v.id !== id), { ...base, id, name, builtIn: undefined }])
-    setActiveViewId(id)
-  }
-
-  function deleteView(id: string): void {
-    persist(views.filter((v) => v.id !== id))
-    if (activeViewId === id) setActiveViewId(DEFAULT_VIEW_ID)
-  }
-
   function showAll(): void {
     setSearchQuery('')
     setActiveViewId(DEFAULT_VIEW_ID)
@@ -256,6 +245,16 @@ export function UnifiedSidebar({
     () => buildGroups(sessionList, allProjects, workspaces, view, clock, staleAfterMs),
     [sessionList, allProjects, workspaces, view, clock, staleAfterMs]
   )
+
+  // What each view would show, so a chip can say "Needs me · 6" without the
+  // user having to switch to it and look.
+  const viewCounts = useMemo(() => {
+    const out: Record<string, number> = {}
+    for (const v of views) {
+      out[v.id] = buildGroups(sessionList, allProjects, workspaces, v, clock, staleAfterMs).shown
+    }
+    return out
+  }, [views, sessionList, allProjects, workspaces, clock, staleAfterMs])
 
   const projectById = useMemo(() => new Map(allProjects.map((p) => [p.id, p])), [allProjects])
   const workspaceById = useMemo(() => new Map(workspaces.map((w) => [w.id, w])), [workspaces])
@@ -378,6 +377,26 @@ export function UnifiedSidebar({
 
   const workspaceTabList = Array.from(workspaceTabs.values())
 
+  // Which group closes out each workspace's run, so the "new project" entry can
+  // sit with the workspace it belongs to instead of in a heap at the bottom.
+  const lastGroupKeyByWorkspace = new Map<string, string>()
+  for (const group of groups) {
+    const workspaceId = group.scope?.workspaceId
+    if (workspaceId) lastGroupKeyByWorkspace.set(workspaceId, group.key)
+  }
+  // A workspace with no groups at all still needs a way in — but not while the
+  // view is narrowed, where an empty workspace is noise the filter notice
+  // already accounts for. Mirrors the same rule in the view model.
+  const isNarrowed =
+    view.filters.query !== undefined ||
+    view.filters.states !== undefined ||
+    view.filters.projectIds !== undefined ||
+    view.filters.staleOnly === true
+  const workspacesWithoutGroups =
+    view.groupBy === 'project' && !isNarrowed
+      ? workspaces.filter((ws) => !lastGroupKeyByWorkspace.has(ws.id))
+      : []
+
   return (
     <>
       <div
@@ -401,10 +420,9 @@ export function UnifiedSidebar({
         <ViewBar
           views={views}
           activeViewId={activeViewId}
+          counts={viewCounts}
           onSelectView={setActiveViewId}
           onChangeView={changeActiveView}
-          onSaveAsNew={saveAsNewView}
-          onDeleteView={deleteView}
           hideStaleUnavailable={view.filters.staleOnly === true}
         />
 
@@ -420,88 +438,107 @@ export function UnifiedSidebar({
               workspaceId !== undefined && firstGroupKeyByWorkspace.get(workspaceId) === group.key
             const collapsed = isGroupCollapsed(collapseState, view.groupBy, group.key)
 
+            const closesWorkspace =
+              workspaceId !== undefined && lastGroupKeyByWorkspace.get(workspaceId) === group.key
+
             return (
-              <SessionGroup
-                key={group.key}
-                group={group}
-                collapsed={collapsed}
-                onToggleCollapse={() => toggleGroup(group.key)}
-                workspaceColor={workspace?.color}
-                isWorktree={project?.isWorktree}
-                busy={group.sessions.some((s) => isSessionBusy(s.id))}
-                branchSwitcher={
-                  project && workspace ? (
-                    <BranchSwitcher
-                      project={project}
-                      workspaceFolderPath={workspace.folderPath}
-                      workspaceId={workspace.id}
+              <React.Fragment key={group.key}>
+                <SessionGroup
+                  group={group}
+                  collapsed={collapsed}
+                  onToggleCollapse={() => toggleGroup(group.key)}
+                  workspaceColor={workspace?.color}
+                  busy={group.sessions.some((s) => isSessionBusy(s.id))}
+                  branchSwitcher={
+                    project && workspace ? (
+                      <BranchSwitcher
+                        project={project}
+                        workspaceFolderPath={workspace.folderPath}
+                        workspaceId={workspace.id}
+                      />
+                    ) : undefined
+                  }
+                  isActiveScope={project !== undefined && project.id === activeProjectId}
+                  onSelectScope={project ? () => selectProjectScope(project.id) : undefined}
+                  onAddSession={project ? () => addSessionToProject(project.id) : undefined}
+                  onSelectAll={selectionEnabled ? () => selectGroup(group.key) : undefined}
+                  onRename={project ? (name) => void renameProject(project.id, name) : undefined}
+                  onRemove={
+                    project
+                      ? () => setConfirmDeleteProject({ id: project.id, name: project.name })
+                      : undefined
+                  }
+                  workspaceTabs={ownsWorkspaceTabs ? workspaceTabList : undefined}
+                  activeWorkspaceTabId={
+                    activeWorkspaceId === workspaceId ? activeWorkspaceTabId : null
+                  }
+                  onSelectWorkspaceTab={
+                    workspaceId ? (tabId) => onSelectWorkspaceTab(workspaceId, tabId) : undefined
+                  }
+                >
+                  {group.sessions.map((session) => (
+                    <SessionRow
+                      key={session.id}
+                      session={session}
+                      isActive={projectViews.get(session.projectId)?.activeSessionId === session.id}
+                      isBusy={isSessionBusy(session.id)}
+                      bellCount={getBellCountForSession(session.id)}
+                      workspaceColor={workspace?.color ?? ''}
+                      now={clock}
+                      projectBadge={
+                        group.scope?.kind === 'project'
+                          ? undefined
+                          : projectById.get(session.projectId)?.name
+                      }
+                      onSetNote={(note) => sessionStore.setSessionNote(session.id, note)}
+                      noteEditing={noteEditingId === session.id}
+                      onNoteEditingChange={(editing) =>
+                        setNoteEditingId(editing ? session.id : null)
+                      }
+                      selectable={selectionEnabled}
+                      selected={selectedIds.includes(session.id)}
+                      onToggleSelected={(shiftKey) => toggleSelection(session.id, shiftKey)}
+                      onScopeClick={(e) =>
+                        setScopeMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          projectId: session.projectId,
+                        })
+                      }
+                      isSubSession={session.parentSessionId !== undefined}
+                      onSelect={() => selectSession(session.projectId, session.id)}
+                      onRename={(newTitle) => sessionStore.renameSession(session.id, newTitle)}
                     />
-                  ) : undefined
-                }
-                onSelectScope={project ? () => selectProjectScope(project.id) : undefined}
-                onAddSession={project ? () => addSessionToProject(project.id) : undefined}
-                onSelectAll={selectionEnabled ? () => selectGroup(group.key) : undefined}
-                onRename={project ? (name) => void renameProject(project.id, name) : undefined}
-                onRemove={
-                  project
-                    ? () => setConfirmDeleteProject({ id: project.id, name: project.name })
-                    : undefined
-                }
-                workspaceTabs={ownsWorkspaceTabs ? workspaceTabList : undefined}
-                activeWorkspaceTabId={
-                  activeWorkspaceId === workspaceId ? activeWorkspaceTabId : null
-                }
-                onSelectWorkspaceTab={
-                  workspaceId ? (tabId) => onSelectWorkspaceTab(workspaceId, tabId) : undefined
-                }
-              >
-                {group.sessions.map((session) => (
-                  <SessionRow
-                    key={session.id}
-                    session={session}
-                    isActive={projectViews.get(session.projectId)?.activeSessionId === session.id}
-                    isBusy={isSessionBusy(session.id)}
-                    bellCount={getBellCountForSession(session.id)}
-                    workspaceColor={workspace?.color ?? ''}
-                    now={clock}
-                    projectBadge={
-                      group.scope?.kind === 'project'
-                        ? undefined
-                        : projectById.get(session.projectId)?.name
-                    }
-                    onSetNote={(note) => sessionStore.setSessionNote(session.id, note)}
-                    noteEditing={noteEditingId === session.id}
-                    onNoteEditingChange={(editing) => setNoteEditingId(editing ? session.id : null)}
-                    selectable={selectionEnabled}
-                    selected={selectedIds.includes(session.id)}
-                    onToggleSelected={(shiftKey) => toggleSelection(session.id, shiftKey)}
-                    onScopeClick={(e) =>
-                      setScopeMenu({
-                        x: e.clientX,
-                        y: e.clientY,
-                        projectId: session.projectId,
-                      })
-                    }
-                    isSubSession={session.parentSessionId !== undefined}
-                    onSelect={() => selectSession(session.projectId, session.id)}
-                    onRename={(newTitle) => sessionStore.renameSession(session.id, newTitle)}
-                  />
-                ))}
-              </SessionGroup>
+                  ))}
+                </SessionGroup>
+
+                {closesWorkspace && workspace && (
+                  <div
+                    {...getItemProps(workspaces.findIndex((w) => w.id === workspace.id))}
+                    className={`unified-sidebar__ws-actions${
+                      dragOverIndex === workspaces.findIndex((w) => w.id === workspace.id)
+                        ? ' ws-card--dnd-over'
+                        : ''
+                    }`}
+                  >
+                    <WorkspaceRow
+                      workspace={workspace}
+                      onAddProject={() => setCreateProjectFor(workspace.id)}
+                      onEdit={() => setEditWorkspace(workspace)}
+                      onRemove={() => setConfirmDeleteWorkspace(workspace)}
+                    />
+                  </div>
+                )}
+              </React.Fragment>
             )
           })}
 
-          {groups.length === 0 && (
-            <div className="unified-sidebar__empty">
-              {searchQuery ? `No sessions match "${searchQuery}"` : 'No sessions yet'}
-            </div>
-          )}
-
-          {workspaces.map((ws, index) => (
+          {/* A workspace with no projects yet still needs its way in. */}
+          {workspacesWithoutGroups.map((ws) => (
             <div
               key={ws.id}
-              {...getItemProps(index)}
-              className={`unified-sidebar__ws-actions${dragOverIndex === index ? ' ws-card--dnd-over' : ''}`}
+              {...getItemProps(workspaces.findIndex((w) => w.id === ws.id))}
+              className="unified-sidebar__ws-actions"
             >
               <WorkspaceRow
                 workspace={ws}
@@ -511,6 +548,12 @@ export function UnifiedSidebar({
               />
             </div>
           ))}
+
+          {groups.length === 0 && workspacesWithoutGroups.length === 0 && (
+            <div className="unified-sidebar__empty">
+              {searchQuery ? `No sessions match "${searchQuery}"` : 'No sessions yet'}
+            </div>
+          )}
         </div>
 
         {selectionEnabled && selectedIds.length > 0 && (

@@ -1,9 +1,9 @@
 .session-row {
   display: flex;
   align-items: center;
-  gap: 5px;
-  height: var(--session-row-h, 28px);
-  padding: 0 10px 0 24px;
+  gap: 7px;
+  height: 24px;
+  padding: 0 var(--sidebar-gutter, 10px) 0 var(--sidebar-content-indent, 20px);
   cursor: pointer;
   color: var(--text-secondary);
   font-size: 11px;

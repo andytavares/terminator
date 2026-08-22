@@ -21,8 +21,6 @@ beforeEach(() => {
     activeViewId: 'everything',
     onSelectView: vi.fn(),
     onChangeView: vi.fn(),
-    onSaveAsNew: vi.fn(),
-    onDeleteView: vi.fn(),
     hideStaleUnavailable: false,
   }
 })
@@ -32,9 +30,27 @@ const renderBar = (patch: Partial<typeof props> = {}) => render(<ViewBar {...pro
 describe('ViewBar — saved views', () => {
   it('renders a chip for every view', () => {
     renderBar()
-    for (const name of ['Everything', 'Needs me', 'Active', 'Stale', 'Mine']) {
+    for (const name of ['Everything', 'Needs me', 'Active', 'Stale']) {
       expect(screen.getByText(name)).toBeTruthy()
     }
+  })
+
+  it('shows how many sessions a view holds, so Needs me is answerable without switching', () => {
+    renderBar({ counts: { 'needs-me': 6, everything: 22 } })
+    expect(screen.getByText('· 6')).toBeTruthy()
+    expect(screen.getByText('· 22')).toBeTruthy()
+  })
+
+  it('shows no count for a view that holds nothing', () => {
+    const { container } = renderBar({ counts: { 'needs-me': 0 } })
+    expect(container.querySelectorAll('.view-bar__count')).toHaveLength(0)
+  })
+
+  it('offers no way to author a view — the predefined ones are the whole set', () => {
+    const { container } = renderBar({ views: BUILT_IN_VIEWS })
+    expect(container.querySelector('.view-bar__chip--add')).toBeNull()
+    expect(container.querySelector('.view-bar__name-input')).toBeNull()
+    expect(container.querySelectorAll('.view-bar__chip')).toHaveLength(4)
   })
 
   it('marks the active view', () => {
@@ -47,52 +63,6 @@ describe('ViewBar — saved views', () => {
     renderBar()
     fireEvent.click(screen.getByText('Needs me'))
     expect(props.onSelectView).toHaveBeenCalledWith('needs-me')
-  })
-
-  it('deletes a custom view from its context menu', () => {
-    renderBar()
-    fireEvent.contextMenu(screen.getByText('Mine'))
-    expect(props.onDeleteView).toHaveBeenCalledWith('mine')
-  })
-
-  it('refuses to delete a built-in view', () => {
-    renderBar()
-    fireEvent.contextMenu(screen.getByText('Everything'))
-    expect(props.onDeleteView).not.toHaveBeenCalled()
-  })
-
-  it('saves the current view under a new name', () => {
-    const { container } = renderBar()
-    fireEvent.click(screen.getByTitle('Save current view'))
-    const input = container.querySelector('.view-bar__name-input') as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'Deploys' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-    expect(props.onSaveAsNew).toHaveBeenCalledWith('Deploys')
-  })
-
-  it('abandons the save on Escape', () => {
-    const { container } = renderBar()
-    fireEvent.click(screen.getByTitle('Save current view'))
-    fireEvent.keyDown(container.querySelector('.view-bar__name-input')!, { key: 'Escape' })
-    expect(props.onSaveAsNew).not.toHaveBeenCalled()
-  })
-
-  it('ignores a blank view name', () => {
-    const { container } = renderBar()
-    fireEvent.click(screen.getByTitle('Save current view'))
-    const input = container.querySelector('.view-bar__name-input') as HTMLInputElement
-    fireEvent.change(input, { target: { value: '   ' } })
-    fireEvent.blur(input)
-    expect(props.onSaveAsNew).not.toHaveBeenCalled()
-  })
-
-  it('caps a view name at 40 characters', () => {
-    const { container } = renderBar()
-    fireEvent.click(screen.getByTitle('Save current view'))
-    const input = container.querySelector('.view-bar__name-input') as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'x'.repeat(60) } })
-    fireEvent.blur(input)
-    expect(props.onSaveAsNew.mock.calls[0][0]).toHaveLength(40)
   })
 })
 

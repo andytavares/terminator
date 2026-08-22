@@ -59,18 +59,11 @@ beforeEach(() => {
 })
 
 describe('SessionRow', () => {
-  it('renders Terminal icon prefix for human sessions', () => {
-    const { container } = render(
-      <SessionRow session={makeSession({ type: 'human' })} {...defaultProps} />
-    )
-    expect(container.querySelector('.session-row__prefix svg')).toBeTruthy()
-  })
-
-  it('renders Bot icon prefix for agent sessions', () => {
-    const { container } = render(
-      <SessionRow session={makeSession({ type: 'agent' })} {...defaultProps} />
-    )
-    expect(container.querySelector('.session-row__prefix svg')).toBeTruthy()
+  it('leads with the status indicator, not a type icon — the screenshots put the dot first', () => {
+    const { container } = render(<SessionRow session={makeSession()} {...defaultProps} />)
+    const first = container.querySelector('.session-row')!.firstElementChild
+    expect(first?.className).toContain('session-row__status')
+    expect(container.querySelector('.session-row__prefix')).toBeNull()
   })
 
   it('renders the session tabTitle', () => {

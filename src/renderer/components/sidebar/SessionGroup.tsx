@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ChevronDown, ChevronRight, FolderGit2, GitBranch } from 'lucide-react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { WorkspaceTabRegistration } from '../../extensions/registry'
 import type { Group } from '../../sidebar/view-model'
 import { ContextMenu, closeAllContextMenus } from '../ContextMenu'
@@ -11,11 +11,15 @@ export interface SessionGroupProps {
   onToggleCollapse: () => void
   /** Colour band inherited from the group's workspace. */
   workspaceColor?: string
-  /** True for a worktree-backed project, which gets the worktree icon. */
-  isWorktree?: boolean
   busy?: boolean
-  /** Rendered inside the header for project-scoped groups. */
+  /**
+   * Rendered under the header, but only for the project you are working in.
+   * On every group at once it dominated the list; the design keeps the resting
+   * state to project names and sessions.
+   */
   branchSwitcher?: React.ReactNode
+  /** True when this group's scope is the active project. */
+  isActiveScope?: boolean
   /**
    * Selects the group's scope. FR-026 requires the header to host everything
    * the tree's project row hosted, and that row's primary action was selecting
@@ -50,9 +54,9 @@ export function SessionGroup({
   collapsed,
   onToggleCollapse,
   workspaceColor,
-  isWorktree,
   busy,
   branchSwitcher,
+  isActiveScope,
   onSelectScope,
   onAddSession,
   onSelectAll,
@@ -99,7 +103,9 @@ export function SessionGroup({
 
   return (
     <div
-      className={`session-group${isScope ? ' session-group--scope' : ''}`}
+      className={`session-group${isScope ? ' session-group--scope' : ''}${
+        isActiveScope ? ' session-group--active' : ''
+      }`}
       style={
         workspaceColor
           ? ({ ['--ws-color' as string]: workspaceColor } as React.CSSProperties)
@@ -121,12 +127,6 @@ export function SessionGroup({
         >
           {collapsed ? <ChevronRight size={10} /> : <ChevronDown size={10} />}
         </button>
-
-        {group.scope?.kind === 'project' && (
-          <span className="session-group__icon">
-            {isWorktree ? <FolderGit2 size={12} /> : <GitBranch size={12} />}
-          </span>
-        )}
 
         {renameValue !== null ? (
           <input
@@ -194,7 +194,7 @@ export function SessionGroup({
         )}
       </div>
 
-      {branchSwitcher && !collapsed && (
+      {branchSwitcher && isActiveScope && !collapsed && (
         <div className="session-group__branch-row" onClick={(e) => e.stopPropagation()}>
           {branchSwitcher}
         </div>

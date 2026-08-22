@@ -3,25 +3,34 @@
   flex-direction: column;
 }
 
+/*
+ * The header is the project, tinted with its workspace's colour. That tint is
+ * the only thing saying which workspace a project belongs to now that the tree
+ * is gone, so it carries real information — it is not decoration.
+ */
 .session-group__header {
   display: flex;
   align-items: center;
-  gap: 5px;
-  height: 26px;
-  padding: 0 8px 0 4px;
+  gap: 6px;
+  height: 22px;
+  padding: 0 var(--sidebar-gutter, 10px);
+  margin-top: 6px;
   cursor: pointer;
-  color: var(--text-secondary);
-  font-size: 11px;
+  color: var(--ws-color, var(--text-secondary));
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   user-select: none;
 }
 
 .session-group__header:hover {
   background: var(--bg-card-hover);
-  color: var(--text-primary);
 }
 
 .session-group__chevron,
 .session-group__add,
+.session-group__select-all,
 .session-group__ws-tab {
   display: inline-flex;
   align-items: center;
@@ -34,20 +43,34 @@
   flex-shrink: 0;
 }
 
+/* Chrome stays out of the way until the row is hovered, so the resting list is
+   just project names and counts. */
+.session-group__chevron,
+.session-group__add,
+.session-group__select-all,
+.session-group__ws-tab {
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.session-group__header:hover .session-group__chevron,
+.session-group__header:hover .session-group__add,
+.session-group__header:hover .session-group__select-all,
+.session-group__header:hover .session-group__ws-tab {
+  opacity: 0.75;
+}
+
+.session-group__chevron:hover,
+.session-group__add:hover,
+.session-group__select-all:hover,
+.session-group__ws-tab:hover {
+  opacity: 1 !important;
+}
+
 .session-group__chevron {
-  width: 14px;
-  height: 14px;
-}
-
-.session-group__icon {
-  display: inline-flex;
-  flex-shrink: 0;
-  opacity: 0.7;
-}
-
-.session-group__icon svg {
   width: 12px;
   height: 12px;
+  margin-left: -4px;
 }
 
 .session-group__label {
@@ -55,34 +78,38 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 500;
 }
 
 .session-group__busy {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: var(--ws-color, var(--accent));
+  background: currentcolor;
   flex-shrink: 0;
 }
 
 .session-group__count {
   flex-shrink: 0;
-  font-size: 9px;
-  opacity: 0.5;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.65;
   font-variant-numeric: tabular-nums;
 }
 
 .session-group__add {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   font-size: 13px;
   line-height: 1;
-  opacity: 0;
 }
 
-/* Extension buttons and the add control are hover-revealed, matching the
-   behaviour the workspace card had before the sidebar was flattened. */
+.session-group__select-all {
+  font-size: 9px;
+  text-decoration: underline;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 .session-group__ws-tabs {
   display: flex;
   gap: 2px;
@@ -90,26 +117,14 @@
 }
 
 .session-group__ws-tab {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 3px;
-  opacity: 0;
 }
 
 .session-group__ws-tab svg {
-  width: 12px;
-  height: 12px;
-}
-
-.session-group__header:hover .session-group__ws-tab,
-.session-group__header:hover .session-group__add {
-  opacity: 0.7;
-}
-
-.session-group__ws-tab:hover,
-.session-group__add:hover {
-  opacity: 1 !important;
-  background: var(--bg-card-hover);
+  width: 11px;
+  height: 11px;
 }
 
 .session-group__ws-tab--active {
@@ -118,7 +133,14 @@
 }
 
 .session-group__branch-row {
-  padding: 0 8px 2px 24px;
+  padding: 2px var(--sidebar-gutter, 10px) 4px var(--sidebar-content-indent, 20px);
+}
+
+/* The switcher is a secondary control here, not a form field. */
+.session-group__branch-row :is(button, select, .branch-switcher__trigger) {
+  height: 22px;
+  min-height: 0;
+  font-size: 10px;
 }
 
 .session-group__rename-input {
@@ -129,26 +151,11 @@
   background: var(--bg-input, var(--bg-card));
   color: var(--text-primary);
   font: inherit;
+  text-transform: none;
+  letter-spacing: 0;
   padding: 0 4px;
 }
 
-.session-group__select-all {
-  flex-shrink: 0;
-  border: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 9px;
-  cursor: pointer;
-  padding: 0 2px;
-  opacity: 0;
-  text-decoration: underline;
-}
-
-.session-group__header:hover .session-group__select-all {
-  opacity: 0.7;
-}
-
-.session-group__select-all:hover {
-  opacity: 1;
+.session-group--active .session-group__header {
+  background: var(--bg-card-hover);
 }

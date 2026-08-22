@@ -51,7 +51,7 @@ export interface BuildResult {
 const STATUS_ORDER: AgentState[] = ['awaiting-input', 'working', 'idle', 'exited']
 
 const STATUS_LABEL: Record<AgentState, string> = {
-  'awaiting-input': 'Needs you',
+  'awaiting-input': 'Awaiting you',
   working: 'Working',
   idle: 'Idle',
   exited: 'Exited',

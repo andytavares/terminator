@@ -1027,19 +1027,6 @@
   border-color: var(--tm-accent);
 }
 
-.sk-checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--tm-text-primary);
-  cursor: pointer;
-}
-
-.sk-checkbox-label input[type='checkbox'] {
-  cursor: pointer;
-}
-
 .sk-approval__provenance {
   border-top: 1px solid var(--tm-border);
   padding-top: 12px;
@@ -2570,14 +2557,6 @@
   cursor: pointer;
 }
 
-/* The card-detail form rule forces inputs to width:100%; keep checkboxes native
-   so the toggle text sits right next to the box instead of being pushed off. */
-.sk-card-detail input[type='checkbox'] {
-  width: auto;
-  padding: 0;
-  border-radius: 0;
-}
-
 .sk-toggle input[type='checkbox'] {
   margin-top: 2px;
   cursor: pointer;
@@ -2642,13 +2621,13 @@
 }
 
 /* ─── Detail-view form controls: inherit the dark theme (fix white inputs) ─── */
-.sk-card-detail input,
+.sk-card-detail input:not([type='checkbox']):not([type='radio']),
 .sk-card-detail textarea,
 .sk-card-detail select,
-.sk-modal input,
+.sk-modal input:not([type='checkbox']):not([type='radio']),
 .sk-modal textarea,
 .sk-modal select,
-.sk-brief-editor input,
+.sk-brief-editor input:not([type='checkbox']):not([type='radio']),
 .sk-brief-editor textarea,
 .sk-activity textarea {
   background: var(--tm-bg-elevated);
@@ -2661,11 +2640,11 @@
   box-sizing: border-box;
   outline: none;
 }
-.sk-card-detail input:focus,
+.sk-card-detail input:not([type='checkbox']):not([type='radio']):focus,
 .sk-card-detail textarea:focus,
-.sk-modal input:focus,
+.sk-modal input:not([type='checkbox']):not([type='radio']):focus,
 .sk-modal textarea:focus,
-.sk-brief-editor input:focus,
+.sk-brief-editor input:not([type='checkbox']):not([type='radio']):focus,
 .sk-brief-editor textarea:focus,
 .sk-activity textarea:focus {
   border-color: var(--tm-accent, #3b82f6);
@@ -2707,9 +2686,6 @@
   align-items: center;
   gap: 6px;
   flex: 1;
-}
-.sk-checklist li > label input[type='checkbox'] {
-  width: auto;
 }
 .sk-checklist__add input {
   flex: 1;

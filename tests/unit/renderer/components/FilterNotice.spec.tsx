@@ -6,7 +6,7 @@ import { FilterNotice } from '../../../../src/renderer/components/sidebar/Filter
 describe('FilterNotice (FR-016, SC-007)', () => {
   it('states the shown and total counts when something is hidden', () => {
     render(<FilterNotice shown={6} total={22} onShowAll={vi.fn()} />)
-    expect(screen.getByText('showing 6 of 22')).toBeTruthy()
+    expect(screen.getByText('Filtered · showing 6 of 22')).toBeTruthy()
   })
 
   it('renders nothing when no session is hidden', () => {
@@ -21,7 +21,7 @@ describe('FilterNotice (FR-016, SC-007)', () => {
 
   it('still explains itself when a filter hides everything', () => {
     render(<FilterNotice shown={0} total={22} onShowAll={vi.fn()} />)
-    expect(screen.getByText('showing 0 of 22')).toBeTruthy()
+    expect(screen.getByText('Filtered · showing 0 of 22')).toBeTruthy()
   })
 
   it('clears every filter in one interaction', () => {
