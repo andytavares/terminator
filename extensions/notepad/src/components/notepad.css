@@ -1563,12 +1563,10 @@
   vertical-align: middle;
 }
 
-.notepad-task-checkbox {
-  width: 14px;
-  height: 14px;
+/* Raised above the base `input[type='checkbox']` rule (0,1,1), which sets
+   `margin: 0` — at a bare class this spacing never applied. */
+input[type='checkbox'].notepad-task-checkbox {
   margin: 0 4px 0 0;
-  cursor: pointer;
-  accent-color: var(--tm-accent, #4f8ef7);
   vertical-align: middle;
 }
 

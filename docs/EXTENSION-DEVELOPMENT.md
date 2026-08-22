@@ -728,9 +728,21 @@ Extensions MUST use only `--tm-*` CSS custom properties for colors, typography, 
 | `--tm-accent`      | `#5C6BC0`               | Primary accent — overridden per-workspace |
 | `--tm-accent-dim`  | `rgba(92,107,192,0.18)` | Tinted accent background                  |
 | `--tm-accent-glow` | `rgba(92,107,192,0.35)` | Glow / shadow effects                     |
+| `--tm-on-accent`   | `#ffffff`               | Foreground on an accent fill              |
 | `--tm-danger`      | `#E05C5C`               | Error / destructive actions               |
 | `--tm-success`     | `#4ade80`               | Success states                            |
 | `--tm-warning`     | `#facc15`               | Warning / caution states                  |
+
+#### Checkboxes and radios
+
+Do not style them. The host injects a themed replacement for `input[type='checkbox']`
+and `input[type='radio']` into every extension view, so a plain `<input type="checkbox" />`
+already matches the app. `accent-color` has no effect on the result — the native
+widget is replaced outright — and a rule of your own is likely to be outranked by
+the injected one anyway, leaving dead CSS behind.
+
+If you need to nudge layout, target `input[type='checkbox'].your-class` so your rule
+actually wins, and set only spacing properties.
 
 ### Diff / Syntax Highlighting
 

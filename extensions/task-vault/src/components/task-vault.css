@@ -5767,14 +5767,6 @@ h2.daily-log__date {
   background: var(--tm-hover, rgba(255, 255, 255, 0.06));
 }
 
-.tv-context-filter__checkbox {
-  width: 13px;
-  height: 13px;
-  accent-color: var(--tm-accent, #818cf8);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
 .tv-context-filter__empty {
   padding: 8px;
   font-size: 11px;
