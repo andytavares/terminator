@@ -23,6 +23,9 @@
 
   /* accent — overridden per-workspace via inline style vars */
   --accent: #5c6bc0;
+  /* Sits on top of an --accent fill. Fixed white in both themes: light mode
+     keeps the same indigo accent, so a themed text colour would go unreadable. */
+  --on-accent: #ffffff;
   --accent-dim: rgba(92, 107, 192, 0.18);
   --accent-glow: rgba(92, 107, 192, 0.35);
 
@@ -89,6 +92,7 @@
   --tm-accent: var(--accent);
   --tm-accent-dim: var(--accent-dim);
   --tm-accent-glow: var(--accent-glow);
+  --tm-on-accent: var(--on-accent);
   --tm-danger: var(--danger);
   --tm-success: var(--success);
   --tm-warning: var(--warning);
@@ -119,6 +123,8 @@
   --bg-card: #f5f5fa;
   --bg-card-hover: #eaeaf5;
   --bg-input: #ffffff;
+  /* unchanged from dark: the accent fill this sits on is the same colour */
+  --on-accent: #ffffff;
 
   /* text */
   --text-primary: #1a1a2e;
@@ -374,4 +380,132 @@ button {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
+}
+
+/* ── Checkboxes and radios ───────────────────────────────────────
+ *
+ * The native control paints a white box the theme cannot reach — `accent-color`
+ * only tints the fill and leaves the surrounding chrome light. So the widget is
+ * replaced outright.
+ *
+ * The tick is drawn with borders rather than a glyph: a unicode check
+ * font-falls-back at a different baseline, and a lucide component cannot live
+ * inside a form control's box. This is control chrome, not an icon.
+ */
+input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--bg-input);
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+input[type='checkbox']:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+input[type='checkbox']:checked,
+input[type='checkbox']:indeterminate {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--on-accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+input[type='checkbox']:indeterminate::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 5px;
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--on-accent);
+}
+
+input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--accent-glow);
+  outline-offset: 1px;
+}
+
+input[type='checkbox']:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+/*
+ * Radios: the same box, circular, with a dot instead of a tick. Kept as its own
+ * block rather than grouped with the checkbox selector — the styling tests find
+ * each rule by its exact selector string.
+ *
+ * `box-sizing: border-box` is global, so a 14px box with a 1px border has a
+ * 12px padding box and `::after` offsets from that corner. A 6px dot therefore
+ * centres at (12 - 6) / 2 = 3px.
+ */
+input[type='radio'] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--bg-input);
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+input[type='radio']:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+input[type='radio']:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+input[type='radio']:checked::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--on-accent);
+}
+
+input[type='radio']:focus-visible {
+  outline: 2px solid var(--accent-glow);
+  outline-offset: 1px;
+}
+
+input[type='radio']:disabled {
+  cursor: default;
+  opacity: 0.4;
 }

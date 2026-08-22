@@ -352,7 +352,7 @@ export function SettingsView() {
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
         aria-label={label}
-        style={{ cursor: disabled ? 'not-allowed' : 'pointer', accentColor: 'var(--tm-accent)' }}
+        style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
       />
     )
   }

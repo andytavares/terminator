@@ -22,6 +22,7 @@ export const EXTENSION_BASE_CSS = `
   --tm-border: rgba(255,255,255,0.06);
   --tm-border-strong: rgba(255,255,255,0.12);
   --tm-accent: #5c6bc0;
+  --tm-on-accent: #ffffff;
   --tm-accent-dim: rgba(92,107,192,0.18);
   --tm-accent-glow: rgba(92,107,192,0.35);
   --tm-danger: #e05c5c;
@@ -53,6 +54,47 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 #app { width: 100%; height: 100%; display: flex; flex-direction: column; }
+/* Checkboxes — extension views are isolated WebContentsViews and inherit none
+   of the host's CSS, so the same replacement the core applies is injected here.
+   Without it an extension's checkbox is a white OS widget on a dark panel. */
+input[type='checkbox'] {
+  appearance: none; -webkit-appearance: none; position: relative; flex-shrink: 0;
+  width: 14px; height: 14px; margin: 0; padding: 0;
+  border: 1px solid var(--tm-border-strong); border-radius: 3px;
+  background: var(--tm-bg-input); cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+input[type='checkbox']:hover:not(:disabled) { border-color: var(--tm-accent); }
+input[type='checkbox']:checked, input[type='checkbox']:indeterminate {
+  background: var(--tm-accent); border-color: var(--tm-accent);
+}
+input[type='checkbox']:checked::after {
+  content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px;
+  border: solid var(--tm-on-accent); border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+input[type='checkbox']:indeterminate::after {
+  content: ''; position: absolute; left: 2px; top: 5px; width: 8px; height: 2px;
+  border-radius: 1px; background: var(--tm-on-accent);
+}
+input[type='checkbox']:focus-visible { outline: 2px solid var(--tm-accent-glow); outline-offset: 1px; }
+input[type='checkbox']:disabled { cursor: default; opacity: 0.4; }
+/* Radios: same box, circular, dot instead of a tick. left/top 3px centres a 6px
+   dot in the 12px padding box of a 14px border-box with a 1px border. */
+input[type='radio'] {
+  appearance: none; -webkit-appearance: none; position: relative; flex-shrink: 0;
+  width: 14px; height: 14px; margin: 0; padding: 0;
+  border: 1px solid var(--tm-border-strong); border-radius: 50%;
+  background: var(--tm-bg-input); cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+input[type='radio']:hover:not(:disabled) { border-color: var(--tm-accent); }
+input[type='radio']:checked { background: var(--tm-accent); border-color: var(--tm-accent); }
+input[type='radio']:checked::after {
+  content: ''; position: absolute; left: 3px; top: 3px; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--tm-on-accent);
+}
+input[type='radio']:focus-visible { outline: 2px solid var(--tm-accent-glow); outline-offset: 1px; }
+input[type='radio']:disabled { cursor: default; opacity: 0.4; }
 `
 
 interface BoundsRect {
