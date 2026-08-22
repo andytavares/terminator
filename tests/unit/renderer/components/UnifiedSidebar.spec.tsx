@@ -609,3 +609,110 @@ describe('UnifiedSidebar — contributed sidebar items in the footer (FR-028)', 
     expect(container.querySelector('.extension-footer')).toBeNull()
   })
 })
+
+describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
+  it('switches grouping from the view bar', () => {
+    const { container } = renderSidebar()
+    fireEvent.click(screen.getByText('Group: Project'))
+    fireEvent.click(screen.getByText('Status'))
+    const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
+      (el) => el.textContent
+    )
+    expect(labels).toEqual(['Idle'])
+  })
+
+  it('persists a grouping change for that view across a remount', () => {
+    const { unmount } = renderSidebar()
+    fireEvent.click(screen.getByText('Group: Project'))
+    fireEvent.click(screen.getByText('Workspace'))
+    unmount()
+    const { container } = renderSidebar()
+    const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
+      (el) => el.textContent
+    )
+    expect(labels).toEqual(['Backend', 'Frontend'])
+  })
+
+  it('saves the current view under a new name and switches to it', () => {
+    const { container } = renderSidebar()
+    fireEvent.click(screen.getByTitle('Save current view'))
+    const input = container.querySelector('.view-bar__name-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'My view' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(container.querySelector('.view-bar__chip--active')!.textContent).toBe('My view')
+  })
+
+  it('keeps a saved custom view across a remount (FR-014)', () => {
+    const { container, unmount } = renderSidebar()
+    fireEvent.click(screen.getByTitle('Save current view'))
+    const input = container.querySelector('.view-bar__name-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'My view' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    unmount()
+    renderSidebar()
+    expect(screen.getByText('My view')).toBeTruthy()
+  })
+
+  it('restores the unfiltered Everything view on mount, never a filtered one (FR-015)', () => {
+    const { container, unmount } = renderSidebar()
+    fireEvent.click(screen.getByText('Needs me'))
+    expect(screen.queryByText('api-shell')).toBeNull()
+    unmount()
+    renderSidebar()
+    expect(screen.getByText('api-shell')).toBeTruthy()
+    expect(container.querySelector('.filter-notice')).toBeNull()
+  })
+
+  it('deletes a custom view and falls back to the default', () => {
+    const { container } = renderSidebar()
+    fireEvent.click(screen.getByTitle('Save current view'))
+    const input = container.querySelector('.view-bar__name-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'Doomed' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    fireEvent.contextMenu(screen.getByText('Doomed'))
+    expect(screen.queryByText('Doomed')).toBeNull()
+    expect(container.querySelector('.view-bar__chip--active')!.textContent).toBe('Everything')
+  })
+
+  it('explains a filtered list with shown and total counts (FR-016)', () => {
+    renderSidebar()
+    fireEvent.click(screen.getByText('Needs me'))
+    expect(screen.getByText('showing 0 of 4')).toBeTruthy()
+  })
+
+  it('explains a search-filtered list too', () => {
+    const { container } = renderSidebar()
+    fireEvent.change(container.querySelector('.sidebar-search input, input')!, {
+      target: { value: 'jobs' },
+    })
+    expect(screen.getByText('showing 1 of 4')).toBeTruthy()
+  })
+
+  it('shows no notice when nothing is filtered', () => {
+    const { container } = renderSidebar()
+    expect(container.querySelector('.filter-notice')).toBeNull()
+  })
+
+  it('restores every session in one interaction from the notice (SC-007)', () => {
+    renderSidebar()
+    fireEvent.click(screen.getByText('Needs me'))
+    fireEvent.click(screen.getByText('show all'))
+    expect(screen.getByText('api-shell')).toBeTruthy()
+    expect(screen.queryByText('show all')).toBeNull()
+  })
+
+  it('hides the hide-stale toggle on the Stale view (FR-021)', () => {
+    renderSidebar()
+    expect(screen.getByText('Hide stale')).toBeTruthy()
+    fireEvent.click(screen.getByText('Stale'))
+    expect(screen.queryByText('Hide stale')).toBeNull()
+  })
+
+  it('hides stale sessions when the toggle is turned on', () => {
+    sessions.set('old', session('old', 'p1', { tabTitle: 'ancient', lastActivityAt: 0 }))
+    renderSidebar()
+    expect(screen.getByText('ancient')).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('Hide stale'))
+    expect(screen.queryByText('ancient')).toBeNull()
+  })
+})

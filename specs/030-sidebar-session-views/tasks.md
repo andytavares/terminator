@@ -182,14 +182,14 @@ Only items 3 and 4 of the R12 inventory are deleted. Items 1 and 2 — `register
 
 ### Tests for User Story 4
 
-- [ ] T049 [P] [US4] Write `tests/unit/renderer/components/ViewBar.spec.tsx` covering view chip selection, the group-by and sort menus, per-view persistence of grouping/sort overrides, and custom-view save and delete
-- [ ] T050 [P] [US4] Write a spec asserting the sidebar restores to the unfiltered `everything` view on mount even when the last-used view was filtered (FR-015) — a user opening a laptop to 6 of 22 sessions reads it as data loss
+- [x] T049 [P] [US4] Write `tests/unit/renderer/components/ViewBar.spec.tsx` covering view chip selection, the group-by and sort menus, per-view persistence of grouping/sort overrides, and custom-view save and delete
+- [x] T050 [P] [US4] Write a spec asserting the sidebar restores to the unfiltered `everything` view on mount even when the last-used view was filtered (FR-015) — a user opening a laptop to 6 of 22 sessions reads it as data loss
 
 ### Implementation for User Story 4
 
-- [ ] T051 [US4] Implement `src/renderer/components/sidebar/ViewBar.tsx` + `ViewBar.css` — saved-view chips, group-by/sort menu, and the hide-stale toggle — inserted **below** `SidebarHeader`, which stays untouched (invariant I1)
-- [ ] T052 [US4] Wire `ViewBar` into `src/renderer/components/sidebar/UnifiedSidebar.tsx` as the source of the `view` argument passed to `buildGroups`, with the active view held in component state and never persisted
-- [ ] T053 [US4] Implement custom-view creation, rename, and delete against `saveViews` in `src/renderer/sidebar/views.ts`, enforcing the reserved built-in ids and the 1-40 character name rule from [data-model.md](./data-model.md)
+- [x] T051 [US4] Implement `src/renderer/components/sidebar/ViewBar.tsx` + `ViewBar.css` — saved-view chips, group-by/sort menu, and the hide-stale toggle — inserted **below** `SidebarHeader`, which stays untouched (invariant I1)
+- [x] T052 [US4] Wire `ViewBar` into `src/renderer/components/sidebar/UnifiedSidebar.tsx` as the source of the `view` argument passed to `buildGroups`, with the active view held in component state and never persisted
+- [x] T053 [US4] Implement custom-view creation, rename, and delete against `saveViews` in `src/renderer/sidebar/views.ts`, enforcing the reserved built-in ids and the 1-40 character name rule from [data-model.md](./data-model.md)
 
 **Checkpoint**: Views switch, persist, and never restore filtered.
 
@@ -203,12 +203,12 @@ Only items 3 and 4 of the R12 inventory are deleted. Items 1 and 2 — `register
 
 ### Tests for User Story 5
 
-- [ ] T054 [P] [US5] Write `tests/unit/renderer/components/FilterNotice.spec.tsx` asserting the notice renders with correct shown/total counts when filtered, does not render when unfiltered, cannot be dismissed, and that "show all" clears every filter
+- [x] T054 [P] [US5] Write `tests/unit/renderer/components/FilterNotice.spec.tsx` asserting the notice renders with correct shown/total counts when filtered, does not render when unfiltered, cannot be dismissed, and that "show all" clears every filter
 
 ### Implementation for User Story 5
 
-- [ ] T055 [US5] Implement `src/renderer/components/sidebar/FilterNotice.tsx` + `FilterNotice.css` reading `shown` and `total` straight off the `BuildResult` (they exist on it precisely for this — see [contracts/view-model.md](./contracts/view-model.md))
-- [ ] T056 [US5] Render it in `src/renderer/components/sidebar/UnifiedSidebar.tsx` whenever `shown < total`, and wire "show all" to reset the active view to `everything` with filters cleared
+- [x] T055 [US5] Implement `src/renderer/components/sidebar/FilterNotice.tsx` + `FilterNotice.css` reading `shown` and `total` straight off the `BuildResult` (they exist on it precisely for this — see [contracts/view-model.md](./contracts/view-model.md))
+- [x] T056 [US5] Render it in `src/renderer/components/sidebar/UnifiedSidebar.tsx` whenever `shown < total`, and wire "show all" to reset the active view to `everything` with filters cleared
 
 **Checkpoint**: No filter can hide a session without saying so.
 

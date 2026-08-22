@@ -84,7 +84,7 @@ describe('loadViews', () => {
   })
 
   it('appends stored custom views after the built-ins', () => {
-    localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify([custom]))
+    localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify({ custom: [custom], overrides: {} }))
     expect(loadViews().map((v) => v.id)).toEqual([
       'everything',
       'needs-me',
@@ -99,13 +99,16 @@ describe('loadViews', () => {
     expect(loadViews()).toEqual(BUILT_IN_VIEWS)
   })
 
-  it('degrades to the built-ins when the stored value is not an array', () => {
+  it('degrades to the built-ins when the stored value has neither shape', () => {
     localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify({ id: 'x' }))
     expect(loadViews()).toEqual(BUILT_IN_VIEWS)
   })
 
   it('drops stored entries that are not shaped like a view', () => {
-    localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify([custom, { id: 'bad' }, null, 7]))
+    localStorage.setItem(
+      VIEWS_STORAGE_KEY,
+      JSON.stringify({ custom: [custom, { id: 'bad' }, null, 7], overrides: {} })
+    )
     expect(loadViews().map((v) => v.id)).toEqual([
       'everything',
       'needs-me',
@@ -117,7 +120,7 @@ describe('loadViews', () => {
 
   it('ignores a stored view that squats on a built-in id', () => {
     const impostor = { ...custom, id: 'everything', name: 'Impostor' }
-    localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify([impostor]))
+    localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify({ custom: [impostor], overrides: {} }))
     const loaded = loadViews()
     expect(loaded.filter((v) => v.id === 'everything')).toHaveLength(1)
     expect(loaded.find((v) => v.id === 'everything')!.name).toBe('Everything')
@@ -132,9 +135,55 @@ describe('loadViews', () => {
 })
 
 describe('saveViews', () => {
-  it('persists only the custom views', () => {
+  it('persists the custom views', () => {
     saveViews([...BUILT_IN_VIEWS, custom])
-    expect(JSON.parse(localStorage.getItem(VIEWS_STORAGE_KEY)!)).toEqual([custom])
+    expect(JSON.parse(localStorage.getItem(VIEWS_STORAGE_KEY)!).custom).toEqual([custom])
+  })
+
+  it('writes no override for a built-in the user has not changed', () => {
+    saveViews([...BUILT_IN_VIEWS, custom])
+    expect(JSON.parse(localStorage.getItem(VIEWS_STORAGE_KEY)!).overrides).toEqual({})
+  })
+
+  it("persists a built-in's changed grouping and sort (FR-014)", () => {
+    const regrouped = BUILT_IN_VIEWS.map((v) =>
+      v.id === 'everything' ? { ...v, groupBy: 'status' as const, sortBy: 'name' as const } : v
+    )
+    saveViews(regrouped)
+    expect(loadViews().find((v) => v.id === 'everything')).toMatchObject({
+      groupBy: 'status',
+      sortBy: 'name',
+      builtIn: true,
+    })
+  })
+
+  it("persists a built-in's hide-stale choice", () => {
+    const hidden = BUILT_IN_VIEWS.map((v) =>
+      v.id === 'everything' ? { ...v, filters: { hideStale: true } } : v
+    )
+    saveViews(hidden)
+    expect(loadViews().find((v) => v.id === 'everything')!.filters).toEqual({ hideStale: true })
+  })
+
+  it('an override can never rename or re-id a built-in', () => {
+    localStorage.setItem(
+      VIEWS_STORAGE_KEY,
+      JSON.stringify({ custom: [], overrides: { everything: { id: 'hijacked', name: 'Nope' } } })
+    )
+    const everything = loadViews().find((v) => v.id === 'everything')!
+    expect(everything.name).toBe('Nope')
+    expect(everything.id).toBe('everything')
+  })
+
+  it('reads the legacy bare-array shape written before overrides existed', () => {
+    localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify([custom]))
+    expect(loadViews().map((v) => v.id)).toEqual([
+      'everything',
+      'needs-me',
+      'active',
+      'stale',
+      'mine',
+    ])
   })
 
   it('round-trips a custom view unchanged', () => {
@@ -142,9 +191,9 @@ describe('saveViews', () => {
     expect(loadViews().find((v) => v.id === 'mine')).toEqual(custom)
   })
 
-  it('writes an empty list when every view is a built-in', () => {
+  it('writes an empty custom list when every view is a built-in', () => {
     saveViews(BUILT_IN_VIEWS)
-    expect(JSON.parse(localStorage.getItem(VIEWS_STORAGE_KEY)!)).toEqual([])
+    expect(JSON.parse(localStorage.getItem(VIEWS_STORAGE_KEY)!).custom).toEqual([])
   })
 
   it('swallows a storage write failure instead of breaking the sidebar', () => {

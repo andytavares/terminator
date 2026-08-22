@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { GlobalTabRegistration } from '../../extensions/registry'
+import type { SessionView } from '../../sidebar/view-model'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
 import { useSettingsStore } from '../../stores/settings.store'
 import { useTerminalSession } from '../../hooks/useTerminalSession'
 import { buildGroups } from '../../sidebar/view-model'
-import { BUILT_IN_VIEWS, DEFAULT_VIEW_ID, loadViews } from '../../sidebar/views'
+import { BUILT_IN_VIEWS, DEFAULT_VIEW_ID, loadViews, saveViews } from '../../sidebar/views'
 import {
   isCollapsed as isGroupCollapsed,
   loadCollapseState,
@@ -20,9 +21,11 @@ import { CreateProjectDialog } from './CreateProjectDialog'
 import { SidebarHeader } from './SidebarHeader'
 import { ScratchSection } from './ScratchSection'
 import { ExtensionFooter } from './ExtensionFooter'
+import { FilterNotice } from './FilterNotice'
 import { ScopeMenu } from './ScopeMenu'
 import { SessionGroup } from './SessionGroup'
 import { SessionRow } from './SessionRow'
+import { ViewBar } from './ViewBar'
 import { BranchSwitcher } from './BranchSwitcher'
 import './UnifiedSidebar.css'
 
@@ -185,13 +188,40 @@ export function UnifiedSidebar({
 
   // The active view is deliberately component state, never restored from
   // storage: a filtered view must never be what greets you at launch (FR-015).
-  const [activeViewId] = useState(initialViewId)
+  const [views, setViews] = useState(loadViews)
+  const [activeViewId, setActiveViewId] = useState(initialViewId)
   const view = useMemo(() => {
     const base =
-      loadViews().find((v) => v.id === activeViewId) ??
+      views.find((v) => v.id === activeViewId) ??
       BUILT_IN_VIEWS.find((v) => v.id === DEFAULT_VIEW_ID)!
     return searchQuery ? { ...base, filters: { ...base.filters, query: searchQuery } } : base
-  }, [activeViewId, searchQuery])
+  }, [views, activeViewId, searchQuery])
+
+  function persist(next: SessionView[]): void {
+    setViews(next)
+    saveViews(next)
+  }
+
+  function changeActiveView(patch: Partial<SessionView>): void {
+    persist(views.map((v) => (v.id === activeViewId ? { ...v, ...patch } : v)))
+  }
+
+  function saveAsNewView(name: string): void {
+    const id = `custom.${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+    const base = views.find((v) => v.id === activeViewId) ?? views[0]
+    persist([...views.filter((v) => v.id !== id), { ...base, id, name, builtIn: undefined }])
+    setActiveViewId(id)
+  }
+
+  function deleteView(id: string): void {
+    persist(views.filter((v) => v.id !== id))
+    if (activeViewId === id) setActiveViewId(DEFAULT_VIEW_ID)
+  }
+
+  function showAll(): void {
+    setSearchQuery('')
+    setActiveViewId(DEFAULT_VIEW_ID)
+  }
 
   const allProjects = useMemo(
     () => workspaces.flatMap((ws) => projectsByWorkspaceId.get(ws.id) ?? []),
@@ -204,7 +234,7 @@ export function UnifiedSidebar({
   )
 
   const clock = now ?? Date.now()
-  const { groups } = useMemo(
+  const { groups, shown, total } = useMemo(
     () =>
       buildGroups(
         sessionList,
@@ -309,6 +339,18 @@ export function UnifiedSidebar({
           onSearchChange={setSearchQuery}
           onSearchClear={() => setSearchQuery('')}
         />
+
+        <ViewBar
+          views={views}
+          activeViewId={activeViewId}
+          onSelectView={setActiveViewId}
+          onChangeView={changeActiveView}
+          onSaveAsNew={saveAsNewView}
+          onDeleteView={deleteView}
+          hideStaleUnavailable={view.filters.staleOnly === true}
+        />
+
+        <FilterNotice shown={shown} total={total} onShowAll={showAll} />
 
         <div className="unified-sidebar__list">
           {groups.map((group) => {
