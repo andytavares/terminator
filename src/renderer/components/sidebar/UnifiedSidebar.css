@@ -72,3 +72,28 @@
   color: var(--text-primary);
   opacity: 1;
 }
+
+.unified-sidebar__bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
+}
+
+.unified-sidebar__bulk-bar button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.unified-sidebar__bulk-close {
+  margin-left: auto;
+  color: var(--danger) !important;
+}

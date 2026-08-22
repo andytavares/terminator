@@ -23,6 +23,10 @@ interface SessionRowProps {
   projectBadge?: string
   /** Opens the scope menu for this row's project (D3). */
   onScopeClick?: (e: React.MouseEvent) => void
+  /** True in the Stale view, where rows can be multi-selected for bulk close. */
+  selectable?: boolean
+  selected?: boolean
+  onToggleSelected?: (shiftKey: boolean) => void
 }
 
 export function SessionRow({
@@ -37,6 +41,9 @@ export function SessionRow({
   now,
   projectBadge,
   onScopeClick,
+  selectable,
+  selected,
+  onToggleSelected,
 }: SessionRowProps): JSX.Element {
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState('')
@@ -98,6 +105,19 @@ export function SessionRow({
         onDoubleClick={startRename}
         onContextMenu={handleContextMenu}
       >
+        {selectable && (
+          <input
+            type="checkbox"
+            className="session-row__select"
+            aria-label={`Select ${session.tabTitle}`}
+            checked={selected ?? false}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleSelected?.(e.shiftKey)
+            }}
+            onChange={() => {}}
+          />
+        )}
         <span className="session-row__prefix">
           <PrefixIcon size={11} />
         </span>

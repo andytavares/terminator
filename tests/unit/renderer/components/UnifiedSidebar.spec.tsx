@@ -39,9 +39,13 @@ const mockCreateSession = vi.fn()
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
   useTerminalSession: () => ({ createSession: mockCreateSession }),
 }))
+let staleAfterMs = 2 * 60 * 60 * 1000
 vi.mock('../../../../src/renderer/stores/settings.store', () => ({
   useSettingsStore: () => ({
-    resolveSettings: () => ({ terminal: { scrollbackLimit: 5000 } }),
+    resolveSettings: () => ({
+      terminal: { scrollbackLimit: 5000 },
+      sidebar: { staleAfterMs },
+    }),
   }),
 }))
 
@@ -714,5 +718,117 @@ describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
     expect(screen.getByText('ancient')).toBeTruthy()
     fireEvent.click(screen.getByLabelText('Hide stale'))
     expect(screen.queryByText('ancient')).toBeNull()
+  })
+})
+
+describe('UnifiedSidebar — stale cleanup (US3)', () => {
+  beforeEach(() => {
+    // Four stale sessions: three idle-and-old, one waiting on the user.
+    sessions = new Map([
+      ['a', session('a', 'p1', { tabTitle: 'old-a', lastActivityAt: 0 })],
+      ['b', session('b', 'p1', { tabTitle: 'old-b', lastActivityAt: 0 })],
+      ['c', session('c', 'p2', { tabTitle: 'old-c', lastActivityAt: 0 })],
+      [
+        'w',
+        session('w', 'p1', {
+          tabTitle: 'waiting',
+          lastActivityAt: 0,
+          agentState: 'awaiting-input',
+        }),
+      ],
+    ])
+    mockSessionStore.sessions = sessions
+    mockSessionStore.closeSession = vi.fn()
+  })
+
+  const openStale = () => {
+    const r = renderSidebar()
+    fireEvent.click(screen.getByText('Stale'))
+    return r
+  }
+
+  it('lists only stale sessions, never one that is waiting on you (FR-018)', () => {
+    openStale()
+    expect(screen.getByText('old-a')).toBeTruthy()
+    expect(screen.queryByText('waiting')).toBeNull()
+  })
+
+  it('offers selection only in the Stale view', () => {
+    const { container } = renderSidebar()
+    expect(container.querySelector('.session-row__select')).toBeNull()
+    fireEvent.click(screen.getByText('Stale'))
+    expect(container.querySelector('.session-row__select')).toBeTruthy()
+  })
+
+  it('selects a range with shift-click', () => {
+    openStale()
+    fireEvent.click(screen.getByLabelText('Select old-a'))
+    fireEvent.click(screen.getByLabelText('Select old-c'), { shiftKey: true })
+    expect(screen.getByText('3 selected')).toBeTruthy()
+  })
+
+  it('selects every session in a group', () => {
+    const { container } = openStale()
+    fireEvent.click(container.querySelectorAll('.session-group__select-all')[0])
+    expect(screen.getByText('2 selected')).toBeTruthy()
+  })
+
+  it('deselects a session that is clicked twice', () => {
+    openStale()
+    fireEvent.click(screen.getByLabelText('Select old-a'))
+    fireEvent.click(screen.getByLabelText('Select old-a'))
+    expect(screen.queryByText(/selected/)).toBeNull()
+  })
+
+  it('clears the selection', () => {
+    openStale()
+    fireEvent.click(screen.getByLabelText('Select old-a'))
+    fireEvent.click(screen.getByText('Clear'))
+    expect(screen.queryByText(/selected/)).toBeNull()
+  })
+
+  it('closes exactly the selected sessions (SC-005)', () => {
+    openStale()
+    fireEvent.click(screen.getByLabelText('Select old-a'))
+    fireEvent.click(screen.getByLabelText('Select old-c'), { shiftKey: true })
+    fireEvent.click(screen.getByText('Close selected'))
+    fireEvent.click(screen.getByText('Close sessions'))
+    expect(mockSessionStore.closeSession.mock.calls.map((c) => c[0]).sort()).toEqual([
+      'a',
+      'b',
+      'c',
+    ])
+  })
+
+  it('removes a worktree-backed project through the existing delete path', () => {
+    mockWorkspaceStore.projectsByWorkspaceId = new Map([
+      ['ws-1', [api, { ...jobs, worktreePath: '/repo/.worktrees/jobs' }]],
+      ['ws-2', [web]],
+    ])
+    openStale()
+    fireEvent.click(screen.getByLabelText('Select old-c'))
+    fireEvent.click(screen.getByText('Close selected'))
+    expect(screen.getByText('/repo/.worktrees/jobs')).toBeTruthy()
+    fireEvent.click(screen.getByText('Close sessions'))
+    expect(mockWorkspaceStore.deleteProject).toHaveBeenCalledWith('p2')
+    mockWorkspaceStore.projectsByWorkspaceId = new Map([
+      ['ws-1', [api, jobs]],
+      ['ws-2', [web]],
+    ])
+  })
+
+  it('reflects a changed staleness threshold without a restart (FR-019)', () => {
+    sessions.set('recent', session('recent', 'p1', { tabTitle: 'recent', lastActivityAt: NOW }))
+    // Two hours is the default, so a session active a minute ago is not stale.
+    const { unmount } = renderSidebar({ now: NOW + 60_000 })
+    fireEvent.click(screen.getByText('Stale'))
+    expect(screen.queryByText('recent')).toBeNull()
+    unmount()
+
+    staleAfterMs = 30_000
+    renderSidebar({ now: NOW + 60_000 })
+    fireEvent.click(screen.getByText('Stale'))
+    expect(screen.getByText('recent')).toBeTruthy()
+    staleAfterMs = 2 * 60 * 60 * 1000
   })
 })

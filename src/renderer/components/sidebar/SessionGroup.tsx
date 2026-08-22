@@ -17,6 +17,8 @@ export interface SessionGroupProps {
   /** Rendered inside the header for project-scoped groups. */
   branchSwitcher?: React.ReactNode
   onAddSession?: () => void
+  /** Selects every session in this group; offered only where bulk close is. */
+  onSelectAll?: () => void
   /** Commits an inline rename of the group's scope. */
   onRename?: (name: string) => void
   onRemove?: () => void
@@ -46,6 +48,7 @@ export function SessionGroup({
   busy,
   branchSwitcher,
   onAddSession,
+  onSelectAll,
   onRename,
   onRemove,
   workspaceTabs,
@@ -156,6 +159,19 @@ export function SessionGroup({
         )}
 
         <span className="session-group__count">{group.count}</span>
+
+        {onSelectAll && (
+          <button
+            className="session-group__select-all"
+            title="Select all in group"
+            onClick={(e) => {
+              e.stopPropagation()
+              onSelectAll()
+            }}
+          >
+            all
+          </button>
+        )}
 
         {onAddSession && (
           <button

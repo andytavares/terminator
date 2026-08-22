@@ -27,6 +27,7 @@ import { SessionGroup } from './SessionGroup'
 import { SessionRow } from './SessionRow'
 import { ViewBar } from './ViewBar'
 import { BranchSwitcher } from './BranchSwitcher'
+import { BulkCloseDialog } from './BulkCloseDialog'
 import './UnifiedSidebar.css'
 
 interface UnifiedSidebarProps {
@@ -102,6 +103,7 @@ export function UnifiedSidebar({
   const { getScratchSessions, sessions, projectViews, isSessionBusy, getBellCountForSession } =
     sessionStore
   const { resolveSettings } = useSettingsStore()
+  const staleAfterMs = resolveSettings().sidebar?.staleAfterMs ?? DEFAULT_STALE_AFTER_MS
   const { createSession } = useTerminalSession()
   const workspaceTabs = useExtensionRegistry((s) => s.workspaceTabs)
   const sidebarButtons = useExtensionRegistry((s) => s.sidebarButtons)
@@ -126,6 +128,8 @@ export function UnifiedSidebar({
     id: string
     name: string
   } | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkCloseOpen, setBulkCloseOpen] = useState(false)
   const [scopeMenu, setScopeMenu] = useState<{
     x: number
     y: number
@@ -235,17 +239,8 @@ export function UnifiedSidebar({
 
   const clock = now ?? Date.now()
   const { groups, shown, total } = useMemo(
-    () =>
-      buildGroups(
-        sessionList,
-        allProjects,
-        workspaces,
-        view,
-        clock,
-        // Phase 4 replaces this constant with the configurable setting (FR-020).
-        DEFAULT_STALE_AFTER_MS
-      ),
-    [sessionList, allProjects, workspaces, view, clock]
+    () => buildGroups(sessionList, allProjects, workspaces, view, clock, staleAfterMs),
+    [sessionList, allProjects, workspaces, view, clock, staleAfterMs]
   )
 
   const projectById = useMemo(() => new Map(allProjects.map((p) => [p.id, p])), [allProjects])
@@ -274,6 +269,36 @@ export function UnifiedSidebar({
     )
     return () => disposers.forEach((dispose) => dispose())
   }, [allProjects, registerCommand, createSession, resolveActiveCwd, resolveSettings])
+
+  // Multi-select exists only in the Stale view. Extending it to every view is
+  // out of scope, and offering it where nothing is safe to bulk-close would be
+  // an invitation to a mistake.
+  const selectionEnabled = view.filters.staleOnly === true
+  const orderedIds = groups.flatMap((g) => g.sessions.map((s) => s.id))
+  const lastClickedRef = useRef<string | null>(null)
+
+  function toggleSelection(sessionId: string, shiftKey: boolean): void {
+    const anchor = lastClickedRef.current
+    if (shiftKey && anchor) {
+      const from = orderedIds.indexOf(anchor)
+      const to = orderedIds.indexOf(sessionId)
+      if (from !== -1 && to !== -1) {
+        const range = orderedIds.slice(Math.min(from, to), Math.max(from, to) + 1)
+        setSelectedIds((prev) => [...new Set([...prev, ...range])])
+        return
+      }
+    }
+    lastClickedRef.current = sessionId
+    setSelectedIds((prev) =>
+      prev.includes(sessionId) ? prev.filter((id) => id !== sessionId) : [...prev, sessionId]
+    )
+  }
+
+  function selectGroup(groupKey: string): void {
+    const group = groups.find((g) => g.key === groupKey)
+    if (!group) return
+    setSelectedIds((prev) => [...new Set([...prev, ...group.sessions.map((s) => s.id)])])
+  }
 
   function toggleGroup(key: string): void {
     const next = toggleCollapsed(collapseState, view.groupBy, key)
@@ -381,6 +406,7 @@ export function UnifiedSidebar({
                   ) : undefined
                 }
                 onAddSession={project ? () => addSessionToProject(project.id) : undefined}
+                onSelectAll={selectionEnabled ? () => selectGroup(group.key) : undefined}
                 onRename={project ? (name) => void renameProject(project.id, name) : undefined}
                 onRemove={
                   project
@@ -409,6 +435,9 @@ export function UnifiedSidebar({
                         ? undefined
                         : projectById.get(session.projectId)?.name
                     }
+                    selectable={selectionEnabled}
+                    selected={selectedIds.includes(session.id)}
+                    onToggleSelected={(shiftKey) => toggleSelection(session.id, shiftKey)}
                     onScopeClick={(e) =>
                       setScopeMenu({
                         x: e.clientX,
@@ -448,6 +477,16 @@ export function UnifiedSidebar({
           ))}
         </div>
 
+        {selectionEnabled && selectedIds.length > 0 && (
+          <div className="unified-sidebar__bulk-bar">
+            <span>{selectedIds.length} selected</span>
+            <button onClick={() => setSelectedIds([])}>Clear</button>
+            <button className="unified-sidebar__bulk-close" onClick={() => setBulkCloseOpen(true)}>
+              Close selected
+            </button>
+          </div>
+        )}
+
         {/* Sidebar items are a flat global contribution, so the footer hosts
             them once per window, outside the group list and independent of how
             sessions are grouped (FR-028). */}
@@ -486,6 +525,22 @@ export function UnifiedSidebar({
             />
           )
         })()}
+
+      {bulkCloseOpen && (
+        <BulkCloseDialog
+          sessions={sessionList.filter((s) => selectedIds.includes(s.id))}
+          projectById={projectById}
+          onConfirm={(sessionIds, worktreeProjectIds) => {
+            for (const id of sessionIds) void sessionStore.closeSession(id)
+            // Worktree removal already happens inside project:delete, so this
+            // reuses that path rather than adding a second way to do it.
+            for (const projectId of worktreeProjectIds) void deleteProject(projectId)
+            setSelectedIds([])
+            setBulkCloseOpen(false)
+          }}
+          onClose={() => setBulkCloseOpen(false)}
+        />
+      )}
 
       {createWsOpen && <CreateWorkspaceDialog onClose={() => setCreateWsOpen(false)} />}
       {createProjectFor && (

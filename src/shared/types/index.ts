@@ -141,6 +141,10 @@ export interface GlobalSettings {
     hasSeenWelcome: boolean
     showMetricsBar?: boolean
   }
+  sidebar?: {
+    /** How long a quiet session waits before the sidebar treats it as stale. */
+    staleAfterMs: number
+  }
   notifications: {
     defaultTargets: NotificationTarget[]
     overrides: {

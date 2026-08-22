@@ -27,6 +27,7 @@ const globalSettings = {
   git: { worktreeBaseDir: '' },
   extensions: {},
   ui: { hasSeenWelcome: false, showMetricsBar: false },
+  sidebar: { staleAfterMs: 7_200_000 },
   notifications: {
     defaultTargets: ['system', 'center', 'toast'] as const,
     overrides: {},
@@ -202,5 +203,59 @@ describe('GlobalSettings', () => {
       render(<GlobalSettings />)
       expect(screen.queryByText('Per-Extension Overrides')).toBeNull()
     })
+  })
+})
+
+describe('GlobalSettings — staleness threshold (FR-020)', () => {
+  const field = () => screen.getByLabelText('Mark sessions stale after (minutes)')
+
+  it('shows the current threshold in minutes', () => {
+    render(<GlobalSettings />)
+    expect((field() as HTMLInputElement).value).toBe('120')
+  })
+
+  it('saves a changed threshold as milliseconds', () => {
+    render(<GlobalSettings />)
+    fireEvent.blur(field(), { target: { value: '30' } })
+    expect(mockUpdateGlobal).toHaveBeenCalledWith({ sidebar: { staleAfterMs: 1_800_000 } })
+  })
+
+  it('accepts the one-minute minimum', () => {
+    render(<GlobalSettings />)
+    fireEvent.blur(field(), { target: { value: '1' } })
+    expect(mockUpdateGlobal).toHaveBeenCalledWith({ sidebar: { staleAfterMs: 60_000 } })
+  })
+
+  it('rejects zero rather than making every session stale', () => {
+    render(<GlobalSettings />)
+    fireEvent.blur(field(), { target: { value: '0' } })
+    expect(mockUpdateGlobal).not.toHaveBeenCalled()
+  })
+
+  it('rejects a value beyond thirty days', () => {
+    render(<GlobalSettings />)
+    fireEvent.blur(field(), { target: { value: '43201' } })
+    expect(mockUpdateGlobal).not.toHaveBeenCalled()
+  })
+
+  it('rejects a non-numeric entry', () => {
+    render(<GlobalSettings />)
+    fireEvent.blur(field(), { target: { value: '' } })
+    expect(mockUpdateGlobal).not.toHaveBeenCalled()
+  })
+
+  it('rounds a fractional entry to whole minutes', () => {
+    render(<GlobalSettings />)
+    fireEvent.blur(field(), { target: { value: '2.6' } })
+    expect(mockUpdateGlobal).toHaveBeenCalledWith({ sidebar: { staleAfterMs: 180_000 } })
+  })
+
+  it('falls back to two hours when the setting is absent', () => {
+    vi.mocked(useSettingsStore).mockReturnValue({
+      globalSettings: { ...globalSettings, sidebar: undefined },
+      updateGlobalTheme: mockUpdateTheme,
+    } as unknown as ReturnType<typeof useSettingsStore>)
+    render(<GlobalSettings />)
+    expect((field() as HTMLInputElement).value).toBe('120')
   })
 })

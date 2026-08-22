@@ -222,20 +222,20 @@ Only items 3 and 4 of the R12 inventory are deleted. Items 1 and 2 — `register
 
 ### Tests for User Story 3
 
-- [ ] T057 [P] [US3] Write specs in `tests/unit/schemas/settings.schema.spec.ts` for the new `sidebar.staleAfterMs` field — default 7_200_000, rejects below 60_000 and above 2_592_000_000 (the spec's "zero or very large" edge case must be a validation failure, not a nonsense view)
-- [ ] T058 [P] [US3] Write a spec asserting a threshold change in settings is reflected in the Stale view without a restart (FR-019 / spec acceptance scenario 6)
-- [ ] T059 [P] [US3] Write `tests/unit/renderer/components/BulkCloseDialog.spec.tsx` asserting the confirmation names the exact worktree paths leaving disk before confirmation, and that an `awaiting-input` session in the selection is excluded from the action (SC-006)
-- [ ] T060 [P] [US3] Write a regression spec in `tests/integration/ipc/workspace.ipc.spec.ts` pinning the **existing** `project:delete` → `removeWorktree` behaviour at `workspace.ipc.ts:91-98` — this is FR-037, which is already implemented ([research.md](./research.md) R2), so this task writes a test and no production code
-- [ ] T061 [P] [US3] Write specs for multi-select interaction in `tests/unit/renderer/components/UnifiedSidebar.spec.tsx` — shift-click range within a group and select-all-within-group
+- [x] T057 [P] [US3] Write specs in `tests/unit/schemas/settings.schema.spec.ts` for the new `sidebar.staleAfterMs` field — default 7_200_000, rejects below 60_000 and above 2_592_000_000 (the spec's "zero or very large" edge case must be a validation failure, not a nonsense view)
+- [x] T058 [P] [US3] Write a spec asserting a threshold change in settings is reflected in the Stale view without a restart (FR-019 / spec acceptance scenario 6)
+- [x] T059 [P] [US3] Write `tests/unit/renderer/components/BulkCloseDialog.spec.tsx` asserting the confirmation names the exact worktree paths leaving disk before confirmation, and that an `awaiting-input` session in the selection is excluded from the action (SC-006)
+- [x] T060 [P] [US3] ~~Write~~ **Verified already present** — `tests/integration/ipc/workspace.ipc.spec.ts:197-260` already pins the **existing** `project:delete` → `removeWorktree` behaviour at `workspace.ipc.ts:91-98` — this is FR-037, which is already implemented ([research.md](./research.md) R2), so this task writes a test and no production code
+- [x] T061 [P] [US3] Write specs for multi-select interaction in `tests/unit/renderer/components/UnifiedSidebar.spec.tsx` — shift-click range within a group and select-all-within-group
 
 ### Implementation for User Story 3
 
-- [ ] T062 [US3] Add the `sidebar: { staleAfterMs }` group to `GlobalSettingsSchema` and `DEFAULT_GLOBAL_SETTINGS` in `src/shared/schemas/settings.schema.ts` per [contracts/session-state.md](./contracts/session-state.md), leaving `WorkspaceSettingsSchema` deliberately unextended (Principle VII)
-- [ ] T063 [US3] Add the staleness threshold row to `src/renderer/components/settings/GlobalSettings.tsx`
-- [ ] T064 [US3] Thread `staleAfterMs` from `useSettingsStore` into the `buildGroups` call in `UnifiedSidebar.tsx` so it is read at render time and the view updates as the clock and the setting move
-- [ ] T065 [US3] Implement multi-select state in `src/renderer/components/sidebar/UnifiedSidebar.tsx` — shift-click range and select-all-within-group, active in the Stale view only (extending it to other views is out of scope per spec Assumptions)
-- [ ] T066 [US3] Implement `src/renderer/components/sidebar/BulkCloseDialog.tsx` + `BulkCloseDialog.css`, listing exactly what closes and exactly which worktree paths are removed from disk, and excluding `awaiting-input` sessions from the action
-- [ ] T067 [US3] Wire bulk close to the existing session-close path, and for worktree-backed projects to the existing `project.delete` IPC — **no new IPC channel and no change to `src/main/git/git-service.ts`** ([research.md](./research.md) R2)
+- [x] T062 [US3] Add the `sidebar: { staleAfterMs }` group to `GlobalSettingsSchema` and `DEFAULT_GLOBAL_SETTINGS` in `src/shared/schemas/settings.schema.ts` per [contracts/session-state.md](./contracts/session-state.md), leaving `WorkspaceSettingsSchema` deliberately unextended (Principle VII)
+- [x] T063 [US3] Add the staleness threshold row to `src/renderer/components/settings/GlobalSettings.tsx`
+- [x] T064 [US3] Thread `staleAfterMs` from `useSettingsStore` into the `buildGroups` call in `UnifiedSidebar.tsx` so it is read at render time and the view updates as the clock and the setting move
+- [x] T065 [US3] Implement multi-select state in `src/renderer/components/sidebar/UnifiedSidebar.tsx` — shift-click range and select-all-within-group, active in the Stale view only (extending it to other views is out of scope per spec Assumptions)
+- [x] T066 [US3] Implement `src/renderer/components/sidebar/BulkCloseDialog.tsx` + `BulkCloseDialog.css`, listing exactly what closes and exactly which worktree paths are removed from disk, and excluding `awaiting-input` sessions from the action
+- [x] T067 [US3] Wire bulk close to the existing session-close path, and for worktree-backed projects to the existing `project.delete` IPC — **no new IPC channel and no change to `src/main/git/git-service.ts`** ([research.md](./research.md) R2)
 
 **Checkpoint**: Cleanup works end to end. Verify with `git worktree list` that a removed worktree is actually gone.
 

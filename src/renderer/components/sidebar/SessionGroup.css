@@ -131,3 +131,24 @@
   font: inherit;
   padding: 0 4px;
 }
+
+.session-group__select-all {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 9px;
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0;
+  text-decoration: underline;
+}
+
+.session-group__header:hover .session-group__select-all {
+  opacity: 0.7;
+}
+
+.session-group__select-all:hover {
+  opacity: 1;
+}

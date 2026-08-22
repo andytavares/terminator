@@ -162,3 +162,8 @@
   font-weight: 600;
   padding: 0 3px;
 }
+
+.session-row__select {
+  flex-shrink: 0;
+  margin: 0;
+}
