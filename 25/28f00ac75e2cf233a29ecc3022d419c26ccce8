@@ -1,0 +1,36 @@
+docs/ARCHITECTURE.md
+  s_fde32f6e6ef8c3::t_535bbe3b4d1ce3 519-521,523
+  s_fde32f6e6ef8c3::t_b8bb75f6e50c39 522,527
+  s_fde32f6e6ef8c3::t_594ef3f314296c 469-488,492-514
+docs/EXTENSION-DEVELOPMENT.md
+  s_fde32f6e6ef8c3::t_535bbe3b4d1ce3 192-193,206-215
+  s_fde32f6e6ef8c3::t_6714caf44db76b 216-218
+README.md
+  s_fde32f6e6ef8c3::t_b8bb75f6e50c39 7-10
+  s_fde32f6e6ef8c3::t_535bbe3b4d1ce3 11-12,17
+docs/adr/027-flat-session-list-view-model.md
+  s_fde32f6e6ef8c3::t_6e25ea4db24890 1-81
+tests/unit/renderer/sidebar/view-model-performance.spec.ts
+  s_fde32f6e6ef8c3::t_7e96cea9053b2e 1-78
+tests/unit/renderer/sidebar-status-colour-independence.spec.ts
+  s_fde32f6e6ef8c3::t_a394f24b5b74a4 10
+  s_fde32f6e6ef8c3::t_6c0ab8133c953d 1-9,11-61
+specs/030-sidebar-session-views/tasks.md
+  s_fde32f6e6ef8c3::t_8e0357d80fef24 273-277,279-280,283-284
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "2528f00ac75e2cf233a29ecc3022d419c26ccce8",
+  "prompts": {},
+  "sessions": {
+    "s_fde32f6e6ef8c3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be90eef1-a995-4869-95eb-54c81798909c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
