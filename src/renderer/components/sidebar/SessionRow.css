@@ -167,3 +167,24 @@
   flex-shrink: 0;
   margin: 0;
 }
+
+.session-row__note,
+.session-row__note-input {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+  opacity: 0.6;
+}
+
+.session-row__note-input {
+  opacity: 1;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: var(--bg-input, var(--bg-card));
+  color: var(--text-primary);
+  font-family: inherit;
+  padding: 0 3px;
+}

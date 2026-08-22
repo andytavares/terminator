@@ -13,6 +13,8 @@ interface Options {
   onToggleOverview?: () => void
   onNewScratch?: () => void
   onNewTab?: () => void
+  /** Opens the inline note editor for the focused session. */
+  onEditSessionNote?: () => void
   /** When scratch mode is active, pass SCRATCH_PROJECT_ID here so all terminal shortcuts work. */
   scratchProjectId?: string | null
 }
@@ -24,6 +26,7 @@ export function useKeyboardShortcuts({
   onToggleOverview,
   onNewScratch,
   onNewTab,
+  onEditSessionNote,
   scratchProjectId,
 }: Options = {}): void {
   const {
@@ -50,6 +53,37 @@ export function useKeyboardShortcuts({
   const effectiveProjectId = scratchProjectId ?? activeProjectId
 
   useEffect(() => {
+    function selectSessionEverywhere(session: { id: string; projectId: string }): void {
+      // Keep activeProjectId in step, exactly as sidebar selection does, or the
+      // project tab bar and per-project auto-open lose their footing.
+      useWorkspaceStore.getState().setActiveProject(session.projectId)
+      setActiveSessionForProject(session.projectId, session.id)
+    }
+
+    function cycleMostRecentlyAttended(delta: number): void {
+      const all = [...useSessionStore.getState().sessions.values()]
+        .filter((s) => s.status !== 'closed')
+        .sort((a, b) => (b.lastAttendedAt ?? 0) - (a.lastAttendedAt ?? 0))
+      if (all.length < 2) return
+      const currentId = effectiveProjectId
+        ? getActiveSessionForProject(effectiveProjectId)
+        : all[0].id
+      const index = all.findIndex((s) => s.id === currentId)
+      const next =
+        all[((((index === -1 ? 0 : index) + delta) % all.length) + all.length) % all.length]
+      selectSessionEverywhere(next)
+    }
+
+    function jumpToNextAwaitingInput(): void {
+      const waiting = [...useSessionStore.getState().sessions.values()].filter(
+        (s) => s.agentState === 'awaiting-input'
+      )
+      if (waiting.length === 0) return
+      const currentId = effectiveProjectId ? getActiveSessionForProject(effectiveProjectId) : null
+      const index = waiting.findIndex((s) => s.id === currentId)
+      selectSessionEverywhere(waiting[(index + 1) % waiting.length])
+    }
+
     function cycleWorkspace(delta: number): void {
       if (workspaces.length === 0) return
       const idx = workspaces.findIndex((w) => w.id === activeWorkspaceId)
@@ -248,6 +282,29 @@ export function useKeyboardShortcuts({
         return
       }
 
+      // Cmd+] / Cmd+[: cycle recently attended sessions across project
+      // boundaries. lastAttendedAt is what makes "recently used" meaningful;
+      // this is its only consumer.
+      if (isMeta && (e.key === ']' || e.key === '[') && !inTextField) {
+        e.preventDefault()
+        cycleMostRecentlyAttended(e.key === ']' ? 1 : -1)
+        return
+      }
+
+      // Cmd+Shift+A: jump to the next session waiting on you.
+      if (isMeta && e.shiftKey && (e.key === 'a' || e.key === 'A') && !inTextField) {
+        e.preventDefault()
+        jumpToNextAwaitingInput()
+        return
+      }
+
+      // Cmd+I: edit the focused session's one-line note.
+      if (isMeta && !e.shiftKey && (e.key === 'i' || e.key === 'I') && !inTextField) {
+        e.preventDefault()
+        onEditSessionNote?.()
+        return
+      }
+
       // Cmd+Left: previous tab (skip if typing — Cmd+Left/Right navigates within text)
       if (isMeta && e.key === 'ArrowLeft' && !inTextField) {
         e.preventDefault()
@@ -272,6 +329,9 @@ export function useKeyboardShortcuts({
     scratchProjectId,
     effectiveProjectId,
     keyboardShortcuts,
+    onEditSessionNote,
+    setActiveSessionForProject,
+    getActiveSessionForProject,
     setActiveWorkspace,
     resolveSettings,
     resolveActiveCwd,

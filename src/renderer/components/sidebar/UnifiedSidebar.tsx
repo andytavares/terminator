@@ -31,6 +31,8 @@ import { BulkCloseDialog } from './BulkCloseDialog'
 import './UnifiedSidebar.css'
 
 interface UnifiedSidebarProps {
+  /** Session whose note the host asked to edit (Cmd+I). */
+  editNoteSessionId?: string | null
   globalTabs: GlobalTabRegistration[]
   activeGlobalTabId: string | null
   onSelectGlobalTab: (id: string) => void
@@ -86,6 +88,7 @@ export function UnifiedSidebar({
   visible,
   now,
   initialViewId = DEFAULT_VIEW_ID,
+  editNoteSessionId,
 }: UnifiedSidebarProps): JSX.Element {
   const {
     workspaces,
@@ -128,6 +131,7 @@ export function UnifiedSidebar({
     id: string
     name: string
   } | null>(null)
+  const [noteEditingId, setNoteEditingId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [bulkCloseOpen, setBulkCloseOpen] = useState(false)
   const [scopeMenu, setScopeMenu] = useState<{
@@ -189,6 +193,10 @@ export function UnifiedSidebar({
   useEffect(() => {
     widthRef.current = width
   }, [width])
+
+  useEffect(() => {
+    if (editNoteSessionId) setNoteEditingId(editNoteSessionId)
+  }, [editNoteSessionId])
 
   // The active view is deliberately component state, never restored from
   // storage: a filtered view must never be what greets you at launch (FR-015).
@@ -435,6 +443,9 @@ export function UnifiedSidebar({
                         ? undefined
                         : projectById.get(session.projectId)?.name
                     }
+                    onSetNote={(note) => sessionStore.setSessionNote(session.id, note)}
+                    noteEditing={noteEditingId === session.id}
+                    onNoteEditingChange={(editing) => setNoteEditingId(editing ? session.id : null)}
                     selectable={selectionEnabled}
                     selected={selectedIds.includes(session.id)}
                     onToggleSelected={(shiftKey) => toggleSelection(session.id, shiftKey)}

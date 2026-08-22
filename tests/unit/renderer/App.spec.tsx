@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../src/renderer/stores/workspace.store'
 import { useSettingsStore } from '../../../src/renderer/stores/settings.store'
 import { useSessionStore } from '../../../src/renderer/stores/session.store'
@@ -32,6 +32,7 @@ type ShortcutCallbacks = {
   onToggleOverview?: () => void
   onNewScratch?: () => void
   onNewTab?: () => void
+  onEditSessionNote?: () => void
 }
 let capturedShortcutCallbacks: ShortcutCallbacks = {}
 vi.mock('../../../src/renderer/hooks/useKeyboardShortcuts', () => ({
@@ -43,16 +44,25 @@ vi.mock('../../../src/renderer/hooks/useTerminalSession', () => ({
   useTerminalSession: vi.fn(() => ({ createSession: vi.fn(), splitSession: vi.fn() })),
 }))
 type CommandRegistration = { id: string; label: string; action: () => void }
+type PaletteSession = { id: string; projectId: string; tabTitle: string; projectName: string }
 let capturedPaletteCommands: CommandRegistration[] = []
+let capturedPaletteSessions: PaletteSession[] = []
+let capturedPaletteSelect: ((s: PaletteSession) => void) | undefined
 vi.mock('../../../src/renderer/components/CommandPalette', () => ({
   CommandPalette: ({
     onClose,
     commands,
+    sessions,
+    onSelectSession,
   }: {
     onClose: () => void
     commands: CommandRegistration[]
+    sessions?: PaletteSession[]
+    onSelectSession?: (s: PaletteSession) => void
   }) => {
     capturedPaletteCommands = commands
+    capturedPaletteSessions = sessions ?? []
+    capturedPaletteSelect = onSelectSession
     return (
       <div data-testid="command-palette">
         <button onClick={onClose}>Close Palette</button>
@@ -65,18 +75,22 @@ type GlobalTabCallback = (id: string) => void
 let capturedOnSelectGlobalTab: GlobalTabCallback | null = null
 let capturedOnSelectSession: ((sessionId: string) => void) | null = null
 let capturedOnSelectProject: (() => void) | null = null
+let capturedEditNoteSessionId: string | null = null
 vi.mock('../../../src/renderer/components/sidebar/UnifiedSidebar', () => ({
   UnifiedSidebar: ({
     onSelectGlobalTab,
     onSelectScratchSession,
     onSelectProject,
     visible,
+    editNoteSessionId,
   }: {
     onSelectGlobalTab: GlobalTabCallback
     onSelectScratchSession: (sessionId: string) => void
     onSelectProject?: () => void
     visible: boolean
+    editNoteSessionId?: string | null
   }) => {
+    capturedEditNoteSessionId = editNoteSessionId ?? null
     capturedOnSelectGlobalTab = onSelectGlobalTab
     capturedOnSelectSession = onSelectScratchSession
     capturedOnSelectProject = onSelectProject ?? null
@@ -180,6 +194,9 @@ function setupMocks(
     globalSettings?: Record<string, unknown> | null
     workspaces?: unknown[]
     scratchActive?: boolean
+    sessions?: Map<string, unknown>
+    projectViews?: Map<string, unknown>
+    projectsByWorkspaceId?: Map<string, unknown>
   } = {}
 ) {
   const {
@@ -195,8 +212,9 @@ function setupMocks(
     activeWorkspaceId,
     activeProjectId,
     workspaces,
-    projectsByWorkspaceId: new Map(),
+    projectsByWorkspaceId: overrides.projectsByWorkspaceId ?? new Map(),
     setActiveWorkspace: vi.fn(),
+    setActiveProject: mockSetActiveProject,
     resolveActiveCwd: vi.fn().mockReturnValue('~'),
     scratchActive: initialScratchActive,
     setScratchActive: vi.fn((value: boolean) => {
@@ -219,9 +237,10 @@ function setupMocks(
     handleProcessExit: mockHandleProcessExit,
     getSessionsForProject: vi.fn().mockReturnValue([]),
     getScratchSessions: vi.fn().mockReturnValue([]),
+    sessions: overrides.sessions ?? new Map(),
+    setActiveSessionForProject: mockSetActiveSessionForProject,
     closeSession: vi.fn().mockResolvedValue(undefined),
-    projectViews: new Map(),
-    setActiveSessionForProject: vi.fn(),
+    projectViews: overrides.projectViews ?? new Map(),
   } as unknown as ReturnType<typeof useWorkspaceStore>)
   vi.mocked(useToastStore).mockReturnValue({
     addToast: mockAddToast,
@@ -230,6 +249,9 @@ function setupMocks(
     defaultExtensionRegistry as unknown as ReturnType<typeof useExtensionRegistry>
   )
 }
+
+const mockSetActiveProject = vi.fn()
+const mockSetActiveSessionForProject = vi.fn()
 
 let mockUnsubscribe: ReturnType<typeof vi.fn>
 
@@ -761,6 +783,10 @@ describe('App', () => {
         handleProcessExit: mockHandleProcessExit,
         getSessionsForProject: vi.fn().mockReturnValue([]),
         getScratchSessions: vi.fn().mockReturnValue([]),
+        sessions: new Map(),
+        setActiveSessionForProject: vi.fn(),
+        sessions: new Map(),
+        setActiveSessionForProject: vi.fn(),
         closeSession: mockCloseSession,
         projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'ses-active' }]]),
         setActiveSessionForProject: vi.fn(),
@@ -770,6 +796,10 @@ describe('App', () => {
         handleProcessExit: mockHandleProcessExit,
         getSessionsForProject: vi.fn().mockReturnValue([]),
         getScratchSessions: vi.fn().mockReturnValue([]),
+        sessions: new Map(),
+        setActiveSessionForProject: vi.fn(),
+        sessions: new Map(),
+        setActiveSessionForProject: vi.fn(),
         closeSession: mockCloseSession,
         projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'ses-active' }]]),
         setActiveSessionForProject: vi.fn(),
@@ -811,6 +841,10 @@ describe('App', () => {
         handleProcessExit: mockHandleProcessExit,
         getSessionsForProject: vi.fn().mockReturnValue([]),
         getScratchSessions: vi.fn().mockReturnValue([]),
+        sessions: new Map(),
+        setActiveSessionForProject: vi.fn(),
+        sessions: new Map(),
+        setActiveSessionForProject: vi.fn(),
         closeSession: mockCloseSession,
         projectViews: new Map(),
         setActiveSessionForProject: vi.fn(),
@@ -855,6 +889,10 @@ describe('App', () => {
         handleProcessExit: mockHandleProcessExit,
         getSessionsForProject: vi.fn().mockReturnValue([]),
         getScratchSessions: vi.fn().mockReturnValue([]),
+        sessions: new Map(),
+        setActiveSessionForProject: vi.fn(),
+        sessions: new Map(),
+        setActiveSessionForProject: vi.fn(),
         closeSession: mockCloseSession,
         projectViews: new Map([
           [SCRATCH_PROJECT_ID, { terminalCounter: 0, activeSessionId: 'ses-scratch' }],
@@ -902,6 +940,10 @@ describe('App', () => {
         handleProcessExit: mockHandleProcessExit,
         getSessionsForProject: vi.fn().mockReturnValue([]),
         getScratchSessions: vi.fn().mockReturnValue([]),
+        sessions: new Map(),
+        setActiveSessionForProject: vi.fn(),
+        sessions: new Map(),
+        setActiveSessionForProject: vi.fn(),
         closeSession: mockCloseSession,
         // proj-1 has no active session mapped
         projectViews: new Map(),
@@ -1359,5 +1401,81 @@ describe('App', () => {
     rerender(<App />)
     // togglePanel called when entering extension tab AND when returning to terminal
     expect(mockTogglePanel).toHaveBeenCalledWith('panel-a')
+  })
+})
+
+describe('App — command palette sessions and note editing (US6)', () => {
+  const paletteSession = {
+    id: 's1',
+    projectId: 'proj-1',
+    tabTitle: 'api-shell',
+    status: 'active' as const,
+    type: 'agent' as const,
+    scrollbackLimit: 10000,
+    createdAt: '',
+    lastActivityAt: 0,
+    agentState: 'idle' as const,
+  }
+  const projects = new Map([
+    ['ws-1', [{ id: 'proj-1', workspaceId: 'ws-1', name: 'API', isWorktree: false }]],
+  ])
+
+  it('offers open sessions to the palette, named by project', () => {
+    setupMocks({
+      sessions: new Map([['s1', paletteSession]]),
+      projectsByWorkspaceId: projects,
+    })
+    render(<App />)
+    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
+    expect(capturedPaletteSessions).toEqual([
+      { id: 's1', projectId: 'proj-1', tabTitle: 'api-shell', projectName: 'API' },
+    ])
+  })
+
+  it('omits closed sessions from the palette', () => {
+    setupMocks({
+      sessions: new Map([['s1', { ...paletteSession, status: 'closed' as const }]]),
+      projectsByWorkspaceId: projects,
+    })
+    render(<App />)
+    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
+    expect(capturedPaletteSessions).toEqual([])
+  })
+
+  it('leaves the project name blank when the project is unknown', () => {
+    setupMocks({ sessions: new Map([['s1', paletteSession]]) })
+    render(<App />)
+    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
+    expect(capturedPaletteSessions[0].projectName).toBe('')
+  })
+
+  it('activates both the project and the session when one is chosen', () => {
+    setupMocks({
+      sessions: new Map([['s1', paletteSession]]),
+      projectsByWorkspaceId: projects,
+    })
+    render(<App />)
+    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
+    act(() => capturedPaletteSelect?.(capturedPaletteSessions[0]))
+    expect(mockSetActiveProject).toHaveBeenCalledWith('proj-1')
+    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('proj-1', 's1')
+  })
+
+  it('asks the sidebar to edit the active session note on Cmd+I', () => {
+    setupMocks({
+      activeProjectId: 'proj-1',
+      sessions: new Map([['s1', paletteSession]]),
+      projectViews: new Map([['proj-1', { activeSessionId: 's1' }]]),
+    })
+    render(<App />)
+    act(() => capturedShortcutCallbacks.onEditSessionNote?.())
+    expect(capturedEditNoteSessionId).toBe('s1')
+  })
+
+  it('asks for nothing when no project is active', () => {
+    setupMocks()
+    render(<App />)
+    act(() => capturedShortcutCallbacks.onEditSessionNote?.())
+    expect(capturedEditNoteSessionId).toBeNull()
   })
 })

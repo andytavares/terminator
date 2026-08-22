@@ -27,6 +27,11 @@ interface SessionRowProps {
   selectable?: boolean
   selected?: boolean
   onToggleSelected?: (shiftKey: boolean) => void
+  /** Commits the row's one-line note. */
+  onSetNote?: (note: string) => void
+  /** Opens the note editor from outside, e.g. the Cmd+I shortcut. */
+  noteEditing?: boolean
+  onNoteEditingChange?: (editing: boolean) => void
 }
 
 export function SessionRow({
@@ -44,6 +49,9 @@ export function SessionRow({
   selectable,
   selected,
   onToggleSelected,
+  onSetNote,
+  noteEditing,
+  onNoteEditingChange,
 }: SessionRowProps): JSX.Element {
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState('')
@@ -97,6 +105,11 @@ export function SessionRow({
 
   const needsYou = session.agentState === 'awaiting-input'
 
+  function commitNote(value: string): void {
+    onSetNote?.(value)
+    onNoteEditingChange?.(false)
+  }
+
   return (
     <>
       <div
@@ -136,6 +149,28 @@ export function SessionRow({
           <span className="session-row__title" title={session.tabTitle}>
             {session.tabTitle}
           </span>
+        )}
+        {noteEditing ? (
+          <input
+            className="session-row__note-input"
+            defaultValue={session.note ?? ''}
+            placeholder="note"
+            autoFocus
+            maxLength={120}
+            onClick={(e) => e.stopPropagation()}
+            onBlur={(e) => commitNote(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitNote((e.target as HTMLInputElement).value)
+              if (e.key === 'Escape') onNoteEditingChange?.(false)
+              e.stopPropagation()
+            }}
+          />
+        ) : (
+          session.note && (
+            <span className="session-row__note" title={session.note}>
+              {session.note}
+            </span>
+          )
         )}
         {needsYou && <span className="session-row__needs-you-pill">needs you</span>}
         {projectBadge && (

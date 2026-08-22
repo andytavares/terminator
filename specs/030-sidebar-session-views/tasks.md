@@ -249,18 +249,18 @@ Only items 3 and 4 of the R12 inventory are deleted. Items 1 and 2 — `register
 
 ### Tests for User Story 6
 
-- [ ] T068 [P] [US6] Write specs asserting search is a filter with one behaviour — matching sessions remain, non-matching are removed, never dimmed — matching name, note, project name, and branch (replacing the split dim/hide behaviour that `ProjectRow.tsx:75-80` and `SessionRow.tsx:44` had)
-- [ ] T069 [P] [US6] Write specs asserting an empty-result query renders an explanatory empty state offering to clear the query, and that zero sessions overall renders a create-a-session empty state with no filter notice
-- [ ] T070 [P] [US6] Write specs in `tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx` for `⌘]` / `⌘[` MRU cycling across project boundaries, `⌘⇧A` jumping to the next `awaiting-input` session, and `⌘I` opening the note editor — and asserting `Escape` remains unbound
-- [ ] T071 [P] [US6] Write specs in `tests/unit/renderer/components/CommandPalette.spec.tsx` for the session section listing sessions alongside existing commands
+- [x] T068 [P] [US6] Write specs asserting search is a filter with one behaviour — matching sessions remain, non-matching are removed, never dimmed — matching name, note, project name, and branch (replacing the split dim/hide behaviour that `ProjectRow.tsx:75-80` and `SessionRow.tsx:44` had)
+- [x] T069 [P] [US6] Write specs asserting an empty-result query renders an explanatory empty state offering to clear the query, and that zero sessions overall renders a create-a-session empty state with no filter notice
+- [x] T070 [P] [US6] Write specs in `tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx` for `⌘]` / `⌘[` MRU cycling across project boundaries, `⌘⇧A` jumping to the next `awaiting-input` session, and `⌘I` opening the note editor — and asserting `Escape` remains unbound
+- [x] T071 [P] [US6] Write specs in `tests/unit/renderer/components/CommandPalette.spec.tsx` for the session section listing sessions alongside existing commands
 
 ### Implementation for User Story 6
 
-- [ ] T072 [US6] Route search through the view model's `query` filter in `UnifiedSidebar.tsx` and delete the old dim/hide paths, keeping `SidebarSearch.tsx` as the input
-- [ ] T073 [US6] Implement the two empty states in `UnifiedSidebar.tsx` using lucide icons only (Principle XII — do not copy the `⬡` / `⌥` pattern at `App.tsx:583,600`, which is a pre-existing violation this feature does not own)
-- [ ] T074 [US6] Add `⌘]`, `⌘[`, `⌘⇧A`, and `⌘I` to `src/renderer/hooks/useKeyboardShortcuts.ts`, verified against the taken-bindings list in [research.md](./research.md) R9, as renderer `keydown` handlers only — never `globalShortcut`, which takes an OS-exclusive claim. `⌘]` / `⌘[` order by `lastAttendedAt` descending — **this is FR-006's only consumer; if this task is cut, cut FR-006 with it** rather than leaving a field that is written and never read
-- [ ] T075 [US6] Add the session section to the existing `src/renderer/components/CommandPalette.tsx` rather than building a second palette (`⌘K` is already bound to it — [research.md](./research.md) R9)
-- [ ] T076 [US6] Implement inline note editing on `SessionRow.tsx` writing through the store setter from T021
+- [x] T072 [US6] Route search through the view model's `query` filter in `UnifiedSidebar.tsx` and delete the old dim/hide paths, keeping `SidebarSearch.tsx` as the input
+- [x] T073 [US6] Implement the two empty states in `UnifiedSidebar.tsx` using lucide icons only (Principle XII — do not copy the `⬡` / `⌥` pattern at `App.tsx:583,600`, which is a pre-existing violation this feature does not own)
+- [x] T074 [US6] Add `⌘]`, `⌘[`, `⌘⇧A`, and `⌘I` to `src/renderer/hooks/useKeyboardShortcuts.ts`, verified against the taken-bindings list in [research.md](./research.md) R9, as renderer `keydown` handlers only — never `globalShortcut`, which takes an OS-exclusive claim. `⌘]` / `⌘[` order by `lastAttendedAt` descending — **this is FR-006's only consumer; if this task is cut, cut FR-006 with it** rather than leaving a field that is written and never read
+- [x] T075 [US6] Add the session section to the existing `src/renderer/components/CommandPalette.tsx` rather than building a second palette (`⌘K` is already bound to it — [research.md](./research.md) R9)
+- [x] T076 [US6] Implement inline note editing on `SessionRow.tsx` writing through the store setter from T021
 
 **Checkpoint**: All six stories functional.
 

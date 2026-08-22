@@ -832,3 +832,56 @@ describe('UnifiedSidebar — stale cleanup (US3)', () => {
     staleAfterMs = 2 * 60 * 60 * 1000
   })
 })
+
+describe('UnifiedSidebar — session notes (FR-005)', () => {
+  beforeEach(() => {
+    mockSessionStore.setSessionNote = vi.fn()
+  })
+
+  it('opens the note editor for the session the host names (Cmd+I)', () => {
+    const { container } = renderSidebar({ editNoteSessionId: 's1' })
+    expect(container.querySelector('.session-row__note-input')).toBeTruthy()
+  })
+
+  it('saves the note on Enter', () => {
+    const { container } = renderSidebar({ editNoteSessionId: 's1' })
+    const input = container.querySelector('.session-row__note-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'waiting on review' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(mockSessionStore.setSessionNote).toHaveBeenCalledWith('s1', 'waiting on review')
+  })
+
+  it('saves the note on blur', () => {
+    const { container } = renderSidebar({ editNoteSessionId: 's1' })
+    const input = container.querySelector('.session-row__note-input') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'blurred' } })
+    fireEvent.blur(input)
+    expect(mockSessionStore.setSessionNote).toHaveBeenCalledWith('s1', 'blurred')
+  })
+
+  it('abandons the edit on Escape', () => {
+    const { container } = renderSidebar({ editNoteSessionId: 's1' })
+    fireEvent.keyDown(container.querySelector('.session-row__note-input')!, { key: 'Escape' })
+    expect(mockSessionStore.setSessionNote).not.toHaveBeenCalled()
+    expect(container.querySelector('.session-row__note-input')).toBeNull()
+  })
+
+  it('shows an existing note on the row', () => {
+    sessions.set('s1', session('s1', 'p1', { tabTitle: 'api-shell', note: 'blocked on infra' }))
+    renderSidebar()
+    expect(screen.getByText('blocked on infra')).toBeTruthy()
+  })
+
+  it('matches a note in search (FR-031)', () => {
+    sessions.set('s1', session('s1', 'p1', { tabTitle: 'api-shell', note: 'blocked on infra' }))
+    const { container } = renderSidebar()
+    fireEvent.change(container.querySelector('input')!, { target: { value: 'infra' } })
+    expect(screen.getByText('api-shell')).toBeTruthy()
+    expect(screen.queryByText('web-dev')).toBeNull()
+  })
+
+  it('shows no note element when the session has none', () => {
+    const { container } = renderSidebar()
+    expect(container.querySelector('.session-row__note')).toBeNull()
+  })
+})
