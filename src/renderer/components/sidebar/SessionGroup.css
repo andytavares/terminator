@@ -1,0 +1,133 @@
+.session-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.session-group__header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px 0 4px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 11px;
+  user-select: none;
+}
+
+.session-group__header:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.session-group__chevron,
+.session-group__add,
+.session-group__ws-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.session-group__chevron {
+  width: 14px;
+  height: 14px;
+}
+
+.session-group__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.session-group__icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.session-group__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.session-group__busy {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ws-color, var(--accent));
+  flex-shrink: 0;
+}
+
+.session-group__count {
+  flex-shrink: 0;
+  font-size: 9px;
+  opacity: 0.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-group__add {
+  width: 16px;
+  height: 16px;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0;
+}
+
+/* Extension buttons and the add control are hover-revealed, matching the
+   behaviour the workspace card had before the sidebar was flattened. */
+.session-group__ws-tabs {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.session-group__ws-tab {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  opacity: 0;
+}
+
+.session-group__ws-tab svg {
+  width: 12px;
+  height: 12px;
+}
+
+.session-group__header:hover .session-group__ws-tab,
+.session-group__header:hover .session-group__add {
+  opacity: 0.7;
+}
+
+.session-group__ws-tab:hover,
+.session-group__add:hover {
+  opacity: 1 !important;
+  background: var(--bg-card-hover);
+}
+
+.session-group__ws-tab--active {
+  opacity: 1;
+  background: var(--bg-card-hover);
+}
+
+.session-group__branch-row {
+  padding: 0 8px 2px 24px;
+}
+
+.session-group__rename-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: var(--bg-input, var(--bg-card));
+  color: var(--text-primary);
+  font: inherit;
+  padding: 0 4px;
+}

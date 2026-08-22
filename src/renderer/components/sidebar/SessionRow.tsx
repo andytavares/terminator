@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { Bot, Terminal } from 'lucide-react'
 import type { TerminalSession } from '../../../shared/types/index'
+import { formatRelativeTime } from '../../sidebar/relative-time'
 import { useSessionStore } from '../../stores/session.store'
 import { MoveSessionDialog } from './MoveSessionDialog'
 import { ContextMenu, closeAllContextMenus } from '../ContextMenu'
@@ -16,6 +17,12 @@ interface SessionRowProps {
   onRename: (newTitle: string) => void
   isSubSession?: boolean
   hidden?: boolean
+  /** Epoch ms used for the relative activity label; omitted hides the label. */
+  now?: number
+  /** Project name shown as a badge when the grouping does not already say it. */
+  projectBadge?: string
+  /** Opens the scope menu for this row's project (D3). */
+  onScopeClick?: (e: React.MouseEvent) => void
 }
 
 export function SessionRow({
@@ -27,6 +34,9 @@ export function SessionRow({
   onRename,
   isSubSession,
   hidden,
+  now,
+  projectBadge,
+  onScopeClick,
 }: SessionRowProps): JSX.Element {
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState('')
@@ -70,14 +80,20 @@ export function SessionRow({
         </span>
       )
     }
+    // One dot shape at three opacities. Hue never carries meaning on its own —
+    // awaiting-input is marked by the edge bar and pill below, not by colour.
+    if (session.agentState === 'exited')
+      return <span className="session-row__dot session-row__dot--exited" />
     if (isActive) return <span className="session-row__dot session-row__dot--active" />
     return <span className="session-row__dot session-row__dot--dim" />
   }
 
+  const needsYou = session.agentState === 'awaiting-input'
+
   return (
     <>
       <div
-        className={`session-row${isActive ? ' session-row--active' : ''}${isSubSession ? ' session-row--sub' : ''}`}
+        className={`session-row${isActive ? ' session-row--active' : ''}${isSubSession ? ' session-row--sub' : ''}${needsYou ? ' session-row--needs-you' : ''}`}
         onClick={onSelect}
         onDoubleClick={startRename}
         onContextMenu={handleContextMenu}
@@ -99,6 +115,24 @@ export function SessionRow({
         ) : (
           <span className="session-row__title" title={session.tabTitle}>
             {session.tabTitle}
+          </span>
+        )}
+        {needsYou && <span className="session-row__needs-you-pill">needs you</span>}
+        {projectBadge && (
+          <button
+            className="session-row__project-badge"
+            title={`Actions for ${projectBadge}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              onScopeClick?.(e)
+            }}
+          >
+            {projectBadge}
+          </button>
+        )}
+        {now !== undefined && (
+          <span className="session-row__activity">
+            {formatRelativeTime(session.lastActivityAt, now)}
           </span>
         )}
         <span className="session-row__status">{renderStatus()}</span>

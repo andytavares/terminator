@@ -71,6 +71,63 @@
   opacity: 0.4;
 }
 
+/* One dot shape at three opacities — never hue alone (WCAG 1.4.1). */
+.session-row__dot--exited {
+  background: var(--text-muted);
+  opacity: 0.18;
+}
+
+/*
+ * A session waiting on you is marked by shape and text, not colour: a 3px
+ * left-edge bar plus a pill. Both survive greyscale and colour-blindness.
+ */
+.session-row--needs-you {
+  box-shadow: inset 3px 0 0 0 var(--accent);
+}
+
+.session-row__needs-you-pill {
+  flex-shrink: 0;
+  padding: 0 4px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  font-size: 9px;
+  line-height: 14px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+.session-row__project-badge {
+  flex-shrink: 0;
+  max-width: 74px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 9px;
+  line-height: 14px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.session-row__project-badge:hover {
+  opacity: 1;
+  background: var(--bg-card-hover);
+}
+
+.session-row__activity {
+  flex-shrink: 0;
+  min-width: 22px;
+  text-align: right;
+  font-size: 9px;
+  opacity: 0.5;
+  font-variant-numeric: tabular-nums;
+}
+
 .session-row__spinner {
   width: 8px;
   height: 8px;

@@ -34,6 +34,8 @@ const makeSession = (overrides: Partial<TerminalSession> = {}): TerminalSession 
   type: 'human',
   scrollbackLimit: 1000,
   createdAt: '',
+  lastActivityAt: 0,
+  agentState: 'idle',
   ...overrides,
 })
 
@@ -276,6 +278,82 @@ describe('SessionRow', () => {
       fireEvent.click(moveBtn)
       fireEvent.click(screen.getByText('Cancel'))
       expect(screen.queryByTestId('move-session-dialog')).toBeNull()
+    })
+  })
+
+  describe('row anatomy for the flat list (US1)', () => {
+    const NOW = 1_000_000_000
+
+    it('shows a relative last-activity label', () => {
+      render(
+        <SessionRow
+          session={makeSession({ lastActivityAt: NOW - 5 * 60_000 })}
+          {...defaultProps}
+          now={NOW}
+        />
+      )
+      expect(screen.getByText('5m')).toBeTruthy()
+    })
+
+    it('omits the activity label when no clock is supplied', () => {
+      const { container } = render(<SessionRow session={makeSession()} {...defaultProps} />)
+      expect(container.querySelector('.session-row__activity')).toBeNull()
+    })
+
+    it('shows the project badge when the grouping does not already say it', () => {
+      render(<SessionRow session={makeSession()} {...defaultProps} projectBadge="API" />)
+      expect(screen.getByText('API')).toBeTruthy()
+    })
+
+    it('omits the project badge when the group header already names the project', () => {
+      const { container } = render(<SessionRow session={makeSession()} {...defaultProps} />)
+      expect(container.querySelector('.session-row__project-badge')).toBeNull()
+    })
+
+    it('opens the scope menu from the badge without selecting the row', () => {
+      const onScopeClick = vi.fn()
+      const onSelect = vi.fn()
+      render(
+        <SessionRow
+          session={makeSession()}
+          {...defaultProps}
+          onSelect={onSelect}
+          projectBadge="API"
+          onScopeClick={onScopeClick}
+        />
+      )
+      fireEvent.click(screen.getByText('API'))
+      expect(onScopeClick).toHaveBeenCalledOnce()
+      expect(onSelect).not.toHaveBeenCalled()
+    })
+
+    it('marks awaiting-input with an edge bar and a text pill, not colour alone', () => {
+      const { container } = render(
+        <SessionRow session={makeSession({ agentState: 'awaiting-input' })} {...defaultProps} />
+      )
+      expect(container.querySelector('.session-row--needs-you')).toBeTruthy()
+      expect(screen.getByText('needs you')).toBeTruthy()
+    })
+
+    it('does not mark a session that is not awaiting input', () => {
+      const { container } = render(<SessionRow session={makeSession()} {...defaultProps} />)
+      expect(container.querySelector('.session-row--needs-you')).toBeNull()
+      expect(screen.queryByText('needs you')).toBeNull()
+    })
+
+    it('dims the dot for an exited session', () => {
+      const { container } = render(
+        <SessionRow session={makeSession({ agentState: 'exited' })} {...defaultProps} />
+      )
+      expect(container.querySelector('.session-row__dot--exited')).toBeTruthy()
+    })
+
+    it('shows the busy spinner ahead of any dot', () => {
+      const { container } = render(
+        <SessionRow session={makeSession({ agentState: 'working' })} {...defaultProps} isBusy />
+      )
+      expect(container.querySelector('.session-row__spinner')).toBeTruthy()
+      expect(container.querySelector('.session-row__dot')).toBeNull()
     })
   })
 })
