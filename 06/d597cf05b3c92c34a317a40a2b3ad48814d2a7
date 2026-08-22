@@ -1,0 +1,19 @@
+specs/030-sidebar-session-views/tasks.md
+  s_fde32f6e6ef8c3::t_74f3542958bda9 278,281-282,285
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "06d597cf05b3c92c34a317a40a2b3ad48814d2a7",
+  "prompts": {},
+  "sessions": {
+    "s_fde32f6e6ef8c3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be90eef1-a995-4869-95eb-54c81798909c",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
