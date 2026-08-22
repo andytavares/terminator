@@ -25,8 +25,18 @@
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: var(--ws-card-gap, 6px);
-  padding: 8px 8px 4px;
+  /* No gap and no side padding: this is a dense list, and every row owns its
+     own gutter so the left edges line up. A gap here also separated each
+     workspace's "new project" row from the group it belongs to. */
+  gap: 0;
+  padding: 4px 0;
+
+  /* One gutter for every row in the list, so headers, sessions and workspace
+     rows share a left edge instead of each inventing their own. */
+  --sidebar-gutter: 10px;
+  /* gutter + the hover-only chevron (12px) + its gap (6px): rows line up under
+     the group label rather than under the invisible chevron. */
+  --sidebar-content-indent: 28px;
 }
 
 .unified-sidebar__resize-handle {
