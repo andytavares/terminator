@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { GlobalTabRegistration } from '../../extensions/registry'
 import type { SessionView } from '../../sidebar/view-model'
+import type { Workspace } from '../../../shared/types/index'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
@@ -17,6 +18,7 @@ import {
 import { useDragReorder } from '../../hooks/useDragReorder'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
+import { EditWorkspaceDialog } from './EditWorkspaceDialog'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { SidebarHeader } from './SidebarHeader'
 import { ScratchSection } from './ScratchSection'
@@ -25,6 +27,7 @@ import { FilterNotice } from './FilterNotice'
 import { ScopeMenu } from './ScopeMenu'
 import { SessionGroup } from './SessionGroup'
 import { SessionRow } from './SessionRow'
+import { WorkspaceRow } from './WorkspaceRow'
 import { ViewBar } from './ViewBar'
 import { BranchSwitcher } from './BranchSwitcher'
 import { BulkCloseDialog } from './BulkCloseDialog'
@@ -99,6 +102,7 @@ export function UnifiedSidebar({
     loadProjects,
     reorderWorkspaces,
     deleteProject,
+    deleteWorkspace,
     renameProject,
     resolveActiveCwd,
   } = useWorkspaceStore()
@@ -127,6 +131,8 @@ export function UnifiedSidebar({
   const [width, setWidth] = useState(readStoredWidth)
   const [createWsOpen, setCreateWsOpen] = useState(false)
   const [createProjectFor, setCreateProjectFor] = useState<string | null>(null)
+  const [editWorkspace, setEditWorkspace] = useState<Workspace | null>(null)
+  const [confirmDeleteWorkspace, setConfirmDeleteWorkspace] = useState<Workspace | null>(null)
   const [confirmDeleteProject, setConfirmDeleteProject] = useState<{
     id: string
     name: string
@@ -327,9 +333,28 @@ export function UnifiedSidebar({
     onSelectProject?.()
   }
 
+  /**
+   * Selecting a project is what the tree's project row did on click, and what
+   * the per-project auto-open effect keys off: a project with no sessions gets
+   * its first terminal from this.
+   */
+  function selectProjectScope(projectId: string): void {
+    const project = projectById.get(projectId)
+    if (!project) return
+    setActiveWorkspace(project.workspaceId)
+    setActiveProject(projectId)
+    onSelectProject?.()
+  }
+
   function addSessionToProject(projectId: string): void {
     const project = projectById.get(projectId)
     if (!project) return
+    // Starting a terminal in a project selects it, the way clicking the tree's
+    // project row used to. Without this the session appears in the sidebar
+    // while the main area still shows whatever was there before.
+    setActiveWorkspace(project.workspaceId)
+    setActiveProject(projectId)
+    onSelectProject?.()
     const settings = resolveSettings(project.workspaceId)
     void createSession(
       projectId,
@@ -413,6 +438,7 @@ export function UnifiedSidebar({
                     />
                   ) : undefined
                 }
+                onSelectScope={project ? () => selectProjectScope(project.id) : undefined}
                 onAddSession={project ? () => addSessionToProject(project.id) : undefined}
                 onSelectAll={selectionEnabled ? () => selectGroup(group.key) : undefined}
                 onRename={project ? (name) => void renameProject(project.id, name) : undefined}
@@ -477,13 +503,12 @@ export function UnifiedSidebar({
               {...getItemProps(index)}
               className={`unified-sidebar__ws-actions${dragOverIndex === index ? ' ws-card--dnd-over' : ''}`}
             >
-              <button
-                className="unified-sidebar__add-project"
-                onClick={() => setCreateProjectFor(ws.id)}
-              >
-                <span>+</span>
-                <span>New project in {ws.name}</span>
-              </button>
+              <WorkspaceRow
+                workspace={ws}
+                onAddProject={() => setCreateProjectFor(ws.id)}
+                onEdit={() => setEditWorkspace(ws)}
+                onRemove={() => setConfirmDeleteWorkspace(ws)}
+              />
             </div>
           ))}
         </div>
@@ -554,6 +579,21 @@ export function UnifiedSidebar({
       )}
 
       {createWsOpen && <CreateWorkspaceDialog onClose={() => setCreateWsOpen(false)} />}
+      {editWorkspace && (
+        <EditWorkspaceDialog workspace={editWorkspace} onClose={() => setEditWorkspace(null)} />
+      )}
+      {confirmDeleteWorkspace && (
+        <ConfirmDialog
+          title={`Remove workspace "${confirmDeleteWorkspace.name}"?`}
+          confirmLabel="Remove"
+          danger
+          onConfirm={() => {
+            void deleteWorkspace(confirmDeleteWorkspace.id)
+            setConfirmDeleteWorkspace(null)
+          }}
+          onClose={() => setConfirmDeleteWorkspace(null)}
+        />
+      )}
       {createProjectFor && (
         <CreateProjectDialog
           workspaceId={createProjectFor}

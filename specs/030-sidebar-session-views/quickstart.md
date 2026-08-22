@@ -141,3 +141,43 @@ Not optional and not a follow-up:
   already taken twice.
 - PR body — the deleted dead code (`ExtensionFooter`, `registerSidebarButton`, `TerminalSessionSchema`, the
   dead `ProjectRow` git props) named explicitly, so removal reads as intent rather than collateral.
+
+---
+
+## Gate 5 results — manual pass run 2026-08-21
+
+Run against `npm run dev` with the real bundled extensions.
+
+| #     | Check                                                          | Result                                                                                                                        |
+| ----- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1-2   | All sessions visible on first paint; groups default expanded   | PASS                                                                                                                          |
+| 3     | `awaiting-input` distinguishable without colour                | Covered by `sidebar-status-colour-independence.spec.ts`; no waiting session existed to eyeball                                |
+| 4     | Grouping switches through all five modes                       | PASS                                                                                                                          |
+| 5     | Header global-tab buttons                                      | PASS                                                                                                                          |
+| 6     | SpecKit + Code Reviews on group header hover                   | **PASS** — both icons revealed on hover                                                                                       |
+| 7     | Scope affordance under status grouping                         | **PASS** — project badge opens ScopeMenu; Code Reviews opened the real surface                                                |
+| 8     | Git project tab resolves under status grouping                 | **PASS**                                                                                                                      |
+| 9     | `⇧⌘G` toggles the Git Changes panel                            | PASS (via View menu accelerator)                                                                                              |
+| 10    | **Git Changes footer item toggles the panel**                  | **PASS** — the whole chain, working for the first time                                                                        |
+| 11-12 | Threshold change takes effect live; belled session never stale | PASS                                                                                                                          |
+| 13    | Stale view, multi-select, bulk close                           | PASS                                                                                                                          |
+| 14    | Bulk close excludes awaiting-input                             | Covered by `BulkCloseDialog.spec.tsx`                                                                                         |
+| 15    | Filter notice with shown/total                                 | **PASS** — "showing 0 of 1 · show all"                                                                                        |
+| 16    | Restores to Everything on relaunch                             | Covered by spec; not re-launched during the pass                                                                              |
+| 17    | `⌘K` palette lists sessions                                    | **Not verified by hand** — synthetic `⌘K` never reached the renderer. Covered by `App.spec.tsx` and `CommandPalette.spec.tsx` |
+| 18    | Escape untouched                                               | PASS                                                                                                                          |
+| 19    | SC-005 ≤3 interactions                                         | PASS                                                                                                                          |
+| 20    | SC-002 under 10s                                               | PASS for search                                                                                                               |
+
+### Defects the pass found, all fixed
+
+1. **A project with no sessions was invisible** — no header, no way to select it or start its first terminal. The tree always showed every project. `buildGroups` now seeds a group per project/workspace when the view is not narrowed.
+2. **ViewBar menus did not dismiss on outside click**, unlike every other menu in the app.
+3. **Hide-stale hid the empty project headers too**, so turning it on removed any way to start work. It is a standing browsing preference, not a narrowing filter, and no longer suppresses seeding.
+4. **Workspace edit/remove/colour/tags lost their host.** Grouping by project leaves a workspace with no element of its own; `WorkspaceRow` restores them.
+5. **Starting a terminal from a group header did not select the project**, so the main area kept showing whatever was there before. Selecting is also what the header click now does, matching the tree's project row (FR-026).
+6. Bulk close read "Close 1 sessions?".
+
+### Also found
+
+`npm run test:e2e` runs against whatever is in `out/`. Earlier runs in this feature passed against a **stale build** and were not exercising the new sidebar at all. Always `npm run build` before trusting an e2e result. Settings writes did not persist in this dev session — reproduced on an untouched field (scrollback), so it is pre-existing and unrelated to this feature.

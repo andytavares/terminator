@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import type { GroupKey, SessionView, SortKey } from '../../sidebar/view-model'
 import './ViewBar.css'
 
@@ -44,6 +44,19 @@ export function ViewBar({
   hideStaleUnavailable,
 }: ViewBarProps): JSX.Element {
   const [menu, setMenu] = useState<'group' | 'sort' | null>(null)
+
+  // Dismiss like every other menu in the app: an outside click, or another
+  // menu announcing it is opening.
+  useEffect(() => {
+    if (menu === null) return
+    const close = (): void => setMenu(null)
+    window.addEventListener('click', close)
+    window.addEventListener('close-context-menus', close)
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('close-context-menus', close)
+    }
+  }, [menu])
   const [newName, setNewName] = useState<string | null>(null)
   const active = views.find((v) => v.id === activeViewId) ?? views[0]
 
@@ -99,13 +112,19 @@ export function ViewBar({
       <div className="view-bar__controls">
         <button
           className="view-bar__control"
-          onClick={() => setMenu(menu === 'group' ? null : 'group')}
+          onClick={(e) => {
+            e.stopPropagation()
+            setMenu(menu === 'group' ? null : 'group')
+          }}
         >
           Group: {GROUP_LABELS[active.groupBy]}
         </button>
         <button
           className="view-bar__control"
-          onClick={() => setMenu(menu === 'sort' ? null : 'sort')}
+          onClick={(e) => {
+            e.stopPropagation()
+            setMenu(menu === 'sort' ? null : 'sort')
+          }}
         >
           Sort: {SORT_LABELS[active.sortBy]}
         </button>
@@ -126,7 +145,7 @@ export function ViewBar({
       </div>
 
       {menu === 'group' && (
-        <div className="view-bar__menu" role="menu">
+        <div className="view-bar__menu" role="menu" onClick={(e) => e.stopPropagation()}>
           {(Object.keys(GROUP_LABELS) as GroupKey[]).map((key) => (
             <button
               key={key}
@@ -143,7 +162,7 @@ export function ViewBar({
       )}
 
       {menu === 'sort' && (
-        <div className="view-bar__menu" role="menu">
+        <div className="view-bar__menu" role="menu" onClick={(e) => e.stopPropagation()}>
           {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
             <button
               key={key}

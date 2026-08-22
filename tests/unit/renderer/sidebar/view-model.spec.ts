@@ -125,6 +125,7 @@ describe('buildGroups — grouping', () => {
     expect(r.groups.map((g) => [g.key, g.label])).toEqual([
       ['p1', 'API'],
       ['p2', 'Web'],
+      ['p3', 'Docs'],
     ])
     expect(r.groups[0].scope).toEqual({ kind: 'project', projectId: 'p1', workspaceId: 'w1' })
   })
@@ -176,14 +177,48 @@ describe('buildGroups — grouping', () => {
     }
   })
 
-  it('drops empty groups', () => {
+  it('shows every project when unfiltered, even one with no sessions yet', () => {
+    // Without this there is no way to reach a project that has never had a
+    // terminal — no row to click, no + to press. The tree always showed them.
     const r = build([session('a')], view({ groupBy: 'project' }))
+    expect(r.groups.map((g) => g.label)).toEqual(['API', 'Web', 'Docs'])
+    expect(r.groups[1].sessions).toEqual([])
+    expect(r.groups[1].count).toBe(0)
+  })
+
+  it('shows every workspace when unfiltered, even one with no sessions yet', () => {
+    const r = build([session('a')], view({ groupBy: 'workspace' }))
+    expect(r.groups.map((g) => g.label)).toEqual(['Backend', 'Writing'])
+  })
+
+  it('still shows every project when only hide-stale is on — that is browsing, not hunting', () => {
+    const r = build([session('a')], view({ groupBy: 'project', filters: { hideStale: true } }))
+    expect(r.groups.map((g) => g.label)).toEqual(['API', 'Web', 'Docs'])
+  })
+
+  it('drops empty scope groups once a filter is active — the notice explains the absence', () => {
+    const r = build(
+      [session('a', { agentState: 'working' })],
+      view({ groupBy: 'project', filters: { states: ['working'] } })
+    )
+    expect(r.groups.map((g) => g.label)).toEqual(['API'])
+  })
+
+  it('drops empty scope groups while searching', () => {
+    const r = build([session('a')], view({ groupBy: 'project', filters: { query: 'a' } }))
     expect(r.groups).toHaveLength(1)
+  })
+
+  it('never invents empty groups for non-scope groupings', () => {
+    for (const groupBy of ['status', 'branch', 'none'] as const) {
+      const r = build([session('a')], view({ groupBy }))
+      expect(r.groups).toHaveLength(1)
+    }
   })
 
   it('counts each group', () => {
     const r = build([session('a'), session('b'), session('c', { projectId: 'p2' })])
-    expect(r.groups.map((g) => g.count)).toEqual([2, 1])
+    expect(r.groups.map((g) => g.count)).toEqual([2, 1, 0])
   })
 
   it('places every session in exactly one group', () => {
@@ -216,12 +251,12 @@ describe('buildGroups — grouping', () => {
       NOW,
       STALE_AFTER
     )
-    expect(r.groups.map((g) => g.label)).toEqual(['Backend', 'w-gone'])
+    expect(r.groups.map((g) => g.label)).toEqual(['Backend', 'Writing', 'w-gone'])
   })
 
   it('ignores a session whose project is unknown rather than throwing', () => {
     const r = build([session('orphan', { projectId: 'gone' })])
-    expect(r.groups).toEqual([])
+    expect(r.groups.flatMap((g) => g.sessions)).toEqual([])
     expect(r.total).toBe(1)
   })
 })
@@ -378,8 +413,18 @@ describe('buildGroups — purity', () => {
     expect(buildGroups(s, projects, workspaces, v, NOW + 2, STALE_AFTER).shown).toBe(1)
   })
 
-  it('handles an empty session list', () => {
+  it('handles an empty session list, still offering every project to start one in', () => {
     const r = build([])
-    expect(r).toEqual({ groups: [], shown: 0, total: 0 })
+    expect({ shown: r.shown, total: r.total }).toEqual({ shown: 0, total: 0 })
+    expect(r.groups.map((g) => g.label)).toEqual(['API', 'Web', 'Docs'])
+    expect(r.groups.every((g) => g.count === 0)).toBe(true)
+  })
+
+  it('returns no groups at all when there are no projects either', () => {
+    expect(buildGroups([], [], workspaces, view(), NOW, STALE_AFTER)).toEqual({
+      groups: [],
+      shown: 0,
+      total: 0,
+    })
   })
 })

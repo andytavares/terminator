@@ -35,7 +35,9 @@ export function BulkCloseDialog({
   return (
     <div className="bulk-close__backdrop" onClick={onClose}>
       <div className="bulk-close" onClick={(e) => e.stopPropagation()}>
-        <h2 className="bulk-close__title">Close {closable.length} sessions?</h2>
+        <h2 className="bulk-close__title">
+          Close {closable.length} session{closable.length === 1 ? '' : 's'}?
+        </h2>
 
         <ul className="bulk-close__list">
           {closable.map((s) => (

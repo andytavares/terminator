@@ -27,6 +27,13 @@ vi.mock('../../../../src/renderer/components/sidebar/CreateProjectDialog', () =>
     </div>
   ),
 }))
+vi.mock('../../../../src/renderer/components/sidebar/EditWorkspaceDialog', () => ({
+  EditWorkspaceDialog: ({ onClose }: { workspace: unknown; onClose: () => void }) => (
+    <div data-testid="edit-workspace-dialog">
+      <button onClick={onClose}>close-edit</button>
+    </div>
+  ),
+}))
 vi.mock('../../../../src/renderer/components/sidebar/CreateWorkspaceDialog', () => ({
   CreateWorkspaceDialog: ({ onClose }: { onClose: () => void }) => (
     <div data-testid="create-workspace-dialog">
@@ -132,6 +139,7 @@ const mockWorkspaceStore = {
   deleteProject: vi.fn().mockResolvedValue(undefined),
   renameProject: vi.fn().mockResolvedValue(undefined),
   resolveActiveCwd: vi.fn().mockReturnValue('/b'),
+  deleteWorkspace: vi.fn().mockResolvedValue(undefined),
 }
 
 const mockSessionStore = {
@@ -231,10 +239,25 @@ describe('UnifiedSidebar — every session visible at a glance (US1)', () => {
     expect(container.querySelector('.session-row__project-badge')).toBeNull()
   })
 
-  it('renders an empty state when no session exists', () => {
+  it('still lists every project when no session exists, so you can start one', () => {
     mockSessionStore.sessions = new Map()
+    const { container } = renderSidebar()
+    const labels = Array.from(container.querySelectorAll('.session-group__label')).map(
+      (el) => el.textContent
+    )
+    expect(labels).toEqual(['API', 'Jobs', 'Web'])
+    expect(container.querySelectorAll('.session-group__add')).toHaveLength(3)
+  })
+
+  it('renders an empty state only when there is nothing at all to show', () => {
+    mockSessionStore.sessions = new Map()
+    mockWorkspaceStore.projectsByWorkspaceId = new Map()
     renderSidebar()
     expect(screen.getByText('No sessions yet')).toBeTruthy()
+    mockWorkspaceStore.projectsByWorkspaceId = new Map([
+      ['ws-1', [api, jobs]],
+      ['ws-2', [web]],
+    ])
   })
 })
 
@@ -266,16 +289,22 @@ describe('UnifiedSidebar — selection keeps project-scoped state resolved (I4, 
 })
 
 describe('UnifiedSidebar — collapse state', () => {
-  it('collapses a group and hides only its sessions', () => {
+  it('selects the project when its header is clicked', () => {
     const { container } = renderSidebar()
     fireEvent.click(container.querySelectorAll('.session-group__header')[0])
+    expect(mockWorkspaceStore.setActiveProject).toHaveBeenCalledWith('p1')
+  })
+
+  it('collapses a group and hides only its sessions', () => {
+    const { container } = renderSidebar()
+    fireEvent.click(container.querySelectorAll('.session-group__chevron')[0])
     expect(screen.queryByText('api-shell')).toBeNull()
     expect(screen.getByText('jobs-run')).toBeTruthy()
   })
 
   it('persists the collapsed group across a remount', () => {
     const { container, unmount } = renderSidebar()
-    fireEvent.click(container.querySelectorAll('.session-group__header')[0])
+    fireEvent.click(container.querySelectorAll('.session-group__chevron')[0])
     unmount()
     renderSidebar()
     expect(screen.queryByText('api-shell')).toBeNull()
@@ -292,6 +321,13 @@ describe('UnifiedSidebar — scope actions on the group header (FR-026)', () => 
     renderSidebar()
     fireEvent.click(screen.getAllByTitle('New terminal')[1])
     expect(mockCreateSession).toHaveBeenCalledWith('p2', 'human', '', '/b', 5000)
+  })
+
+  it('selects the project it just started a terminal in', () => {
+    renderSidebar()
+    fireEvent.click(screen.getAllByTitle('New terminal')[1])
+    expect(mockWorkspaceStore.setActiveProject).toHaveBeenCalledWith('p2')
+    expect(mockWorkspaceStore.setActiveWorkspace).toHaveBeenCalledWith('ws-1')
   })
 
   it('offers project removal from the header context menu', () => {
@@ -335,7 +371,10 @@ describe('UnifiedSidebar — workspace extension buttons (surface 2)', () => {
 describe('UnifiedSidebar — search filters rather than dims (FR-031)', () => {
   it('removes non-matching sessions instead of dimming them', () => {
     const { container } = renderSidebar()
-    fireEvent.change(container.querySelector('input')!, { target: { value: 'jobs' } })
+    fireEvent.change(
+      container.querySelector('.sidebar-search input') ?? container.querySelector('input')!,
+      { target: { value: 'jobs' } }
+    )
     expect(screen.getByText('jobs-run')).toBeTruthy()
     expect(screen.queryByText('api-shell')).toBeNull()
     expect(container.querySelector('.project-row--dimmed')).toBeNull()
@@ -369,13 +408,35 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
 
   it('offers a create-project entry point per workspace', () => {
     renderSidebar()
-    fireEvent.click(screen.getByText('New project in Frontend'))
+    fireEvent.click(screen.getByText('Frontend'))
     expect(screen.getByTestId('create-project-dialog')).toBeTruthy()
+  })
+
+  it('keeps workspace edit and remove reachable under project grouping', () => {
+    const { container } = renderSidebar()
+    fireEvent.contextMenu(container.querySelectorAll('.ws-row')[0])
+    fireEvent.click(screen.getByText('Remove workspace'))
+    expect(screen.getByText('Remove workspace "Backend"?')).toBeTruthy()
+  })
+
+  it('deletes the workspace once removal is confirmed', () => {
+    const { container } = renderSidebar()
+    fireEvent.contextMenu(container.querySelectorAll('.ws-row')[0])
+    fireEvent.click(screen.getByText('Remove workspace'))
+    fireEvent.click(screen.getAllByText('Remove').at(-1)!)
+    expect(mockWorkspaceStore.deleteWorkspace).toHaveBeenCalledWith('ws-1')
+  })
+
+  it('opens the workspace editor', () => {
+    const { container } = renderSidebar()
+    fireEvent.contextMenu(container.querySelectorAll('.ws-row')[0])
+    fireEvent.click(screen.getByText('Edit workspace'))
+    expect(screen.getByTestId('edit-workspace-dialog')).toBeTruthy()
   })
 
   it('closes the create-project dialog when it asks to close', () => {
     renderSidebar()
-    fireEvent.click(screen.getByText('New project in Frontend'))
+    fireEvent.click(screen.getByText('Frontend'))
     fireEvent.click(screen.getByText('close-project'))
     expect(screen.queryByTestId('create-project-dialog')).toBeNull()
   })
@@ -452,7 +513,10 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
 
   it('clears the search from the header control', () => {
     const { container } = renderSidebar()
-    fireEvent.change(container.querySelector('input')!, { target: { value: 'jobs' } })
+    fireEvent.change(
+      container.querySelector('.sidebar-search input') ?? container.querySelector('input')!,
+      { target: { value: 'jobs' } }
+    )
     expect(screen.queryByText('api-shell')).toBeNull()
     fireEvent.click(container.querySelector('.sidebar-search__clear')!)
     expect(screen.getByText('api-shell')).toBeTruthy()
@@ -536,7 +600,7 @@ describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
 
   it('collapses one group without touching the same key in another grouping mode', () => {
     const { container, unmount } = renderSidebar({ initialViewId: 'by-status' })
-    fireEvent.click(container.querySelectorAll('.session-group__header')[0])
+    fireEvent.click(container.querySelectorAll('.session-group__chevron')[0])
     expect(screen.queryByText('api-shell')).toBeNull()
     unmount()
     renderSidebar()

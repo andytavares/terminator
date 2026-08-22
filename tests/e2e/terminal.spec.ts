@@ -6,7 +6,7 @@ import {
   createWorkspace,
   addAndSelectProject,
   selectProject,
-  workspaceCard,
+  workspaceRow,
 } from './helpers'
 
 // Sessions are created with default titles ("Terminal 1", "Terminal 2", …) — the
@@ -54,8 +54,7 @@ test('US3-5: Cmd+1 activates and expands the first workspace', async () => {
   const { page } = handle
   await page.keyboard.press('Meta+1')
   // Cmd+1 expands the first workspace and collapses the others.
-  const firstCard = page.locator('.ws-card').first()
-  await expect(firstCard.locator('.ws-card__projects')).toBeVisible()
+  await expect(page.locator('.session-group').first()).toBeVisible()
 })
 
 test('US3-6: Cmd+ArrowRight cycles to the next session tab', async () => {
@@ -115,5 +114,5 @@ test('SC-008: the UI stays responsive with several background sessions', async (
   await sessionTabs().last().click()
   await expect(page.locator('.terminal-pane').first()).toBeVisible()
   // The created workspace card still renders — UI not wedged.
-  await expect(workspaceCard(page, 'WS-Perf')).toBeVisible()
+  await expect(workspaceRow(page, 'WS-Perf')).toBeVisible()
 })

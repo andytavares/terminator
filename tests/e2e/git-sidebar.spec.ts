@@ -3,14 +3,7 @@ import { execSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-  AppHandle,
-  launchApp,
-  closeApp,
-  createWorkspace,
-  expandWorkspace,
-  workspaceCard,
-} from './helpers'
+import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
 
 // Exercises the git-integration extension against a REAL temporary repo:
 // the Git Changes sidebar panel, the Git project tab, and the extension's
@@ -37,10 +30,11 @@ test.beforeAll(async () => {
   // A workspace whose folder is a git repo auto-creates a project on the current
   // branch; selecting it gives the git panels a repoRoot to read.
   await createWorkspace(handle.page, WS, gitRepoDir)
-  await expandWorkspace(handle.page, WS)
-  const firstProject = workspaceCard(handle.page, WS).locator('.project-row').first()
+  const firstProject = handle.page.locator('.session-group').first()
   await expect(firstProject).toBeVisible()
-  await firstProject.click()
+  // The header click is what selects the project, which is what gives the git
+  // panels a repoRoot and puts the Git project tab in the primary bar.
+  await firstProject.locator('.session-group__header').click()
 })
 
 test.afterAll(async () => {

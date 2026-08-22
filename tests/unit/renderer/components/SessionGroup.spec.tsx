@@ -62,10 +62,26 @@ describe('SessionGroup — a scope-bearing header (FR-026)', () => {
     expect(onToggleCollapse).toHaveBeenCalledOnce()
   })
 
-  it('toggles from the header itself', () => {
-    const { container } = renderGroup()
+  it('toggles from the header when the group has no scope to select', () => {
+    const { container } = renderGroup({ group: statusGroup })
     fireEvent.click(container.querySelector('.session-group__header')!)
     expect(onToggleCollapse).toHaveBeenCalledOnce()
+  })
+
+  it('selects the scope on a header click, as the tree project row did', () => {
+    const onSelectScope = vi.fn()
+    const { container } = renderGroup({ onSelectScope })
+    fireEvent.click(container.querySelector('.session-group__header')!)
+    expect(onSelectScope).toHaveBeenCalledOnce()
+    expect(onToggleCollapse).not.toHaveBeenCalled()
+  })
+
+  it('still collapses from the chevron when the header selects', () => {
+    const onSelectScope = vi.fn()
+    const { container } = renderGroup({ onSelectScope })
+    fireEvent.click(container.querySelector('.session-group__chevron')!)
+    expect(onToggleCollapse).toHaveBeenCalledOnce()
+    expect(onSelectScope).not.toHaveBeenCalled()
   })
 
   it('shows the worktree icon for a worktree-backed project', () => {

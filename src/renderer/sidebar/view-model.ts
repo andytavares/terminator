@@ -91,7 +91,8 @@ interface Bucket {
 
 function bucketFor(
   groupBy: GroupKey,
-  session: TerminalSession,
+  /** Absent when seeding an empty scope bucket, which has no session to read. */
+  session: TerminalSession | undefined,
   project: Project,
   workspace: Workspace | undefined,
   projects: Project[],
@@ -114,13 +115,15 @@ function bucketFor(
         sessions: [],
         order: workspace ? workspaces.indexOf(workspace) : Number.MAX_SAFE_INTEGER,
       }
-    case 'status':
+    case 'status': {
+      const state = session!.agentState
       return {
-        key: session.agentState,
-        label: STATUS_LABEL[session.agentState],
+        key: state,
+        label: STATUS_LABEL[state],
         sessions: [],
-        order: STATUS_ORDER.indexOf(session.agentState),
+        order: STATUS_ORDER.indexOf(state),
       }
+    }
     case 'branch': {
       const branch = project.gitBranch ?? ''
       return {
@@ -179,6 +182,31 @@ export function buildGroups(
   })
 
   const buckets = new Map<string, Bucket>()
+
+  // A scope grouping seeds a bucket for every project or workspace, so one that
+  // has never had a terminal still shows a header you can start a session from.
+  // The tree always listed them; a flat list built only from sessions would
+  // make them unreachable.
+  //
+  // A narrowing filter suppresses that: in Needs me, Stale, or a search the
+  // user is hunting, and a dozen empty project headers is noise the
+  // FilterNotice already accounts for. `hideStale` is deliberately not counted
+  // — it is a standing preference on top of ordinary browsing, so hiding a
+  // stale session must not also hide the project you wanted to start work in.
+  const isNarrowed =
+    normalisedQuery !== undefined ||
+    states !== undefined ||
+    projectIds !== undefined ||
+    staleOnly === true
+
+  if (!isNarrowed && (view.groupBy === 'project' || view.groupBy === 'workspace')) {
+    for (const project of projects) {
+      const workspace = workspaceById.get(project.workspaceId)
+      const bucket = bucketFor(view.groupBy, undefined, project, workspace, projects, workspaces)
+      if (!buckets.has(bucket.key)) buckets.set(bucket.key, bucket)
+    }
+  }
+
   for (const session of kept) {
     const project = projectById.get(session.projectId)
     // A session whose project has gone is dropped rather than crashing the

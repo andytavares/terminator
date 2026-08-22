@@ -48,7 +48,7 @@ test('/app/ browser remote renderer loads and the IPC bridge serves workspace:li
   // folderPath is required by the schema; point it at the (non-repo) temp profile dir.
   await page.getByPlaceholder('/path/to/folder').fill(userDataDir)
   await page.click('.dialog__btn-primary')
-  await expect(page.locator('.ws-card__name').filter({ hasText: WS_NAME })).toBeVisible()
+  await expect(page.locator('.ws-row__name').filter({ hasText: WS_NAME })).toBeVisible()
 
   // 2. Enable the remote-control server on an isolated port and read its password.
   const remote = await page.evaluate(async (port) => {
@@ -94,7 +94,7 @@ test('/app/ browser remote renderer loads and the IPC bridge serves workspace:li
 
   // 5. The remote renderer must boot, connect the bridge, and render the
   //    desktop-created workspace — proving the bridge invoke path works.
-  await expect(remotePage.locator('.ws-card__name').filter({ hasText: WS_NAME })).toBeVisible({
+  await expect(remotePage.locator('.ws-row__name').filter({ hasText: WS_NAME })).toBeVisible({
     timeout: 20000,
   })
 

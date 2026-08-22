@@ -4,8 +4,8 @@ import {
   launchApp,
   closeApp,
   createWorkspace,
-  expandWorkspace,
-  workspaceCard,
+  workspaceRow,
+  projectGroup,
 } from './helpers'
 
 let handle: AppHandle
@@ -14,7 +14,6 @@ const WS = 'Project Test Workspace'
 test.beforeAll(async () => {
   handle = await launchApp()
   await createWorkspace(handle.page, WS, handle.userDataDir)
-  await expandWorkspace(handle.page, WS)
 })
 
 test.afterAll(async () => {
@@ -23,7 +22,7 @@ test.afterAll(async () => {
 
 test('US2-1: clicking Add Project shows the Create Project dialog', async () => {
   const { page } = handle
-  await workspaceCard(page, WS).locator('.ws-card__add-project').click()
+  await workspaceRow(page, WS).locator('.ws-row__add').click()
   await expect(page.locator('.dialog__title')).toContainText('Create Project')
   await page.getByRole('button', { name: 'Cancel' }).click()
   await expect(page.locator('.dialog__title')).toHaveCount(0)
@@ -31,18 +30,16 @@ test('US2-1: clicking Add Project shows the Create Project dialog', async () => 
 
 test('US2-2: a created project appears under its workspace', async () => {
   const { page } = handle
-  await workspaceCard(page, WS).locator('.ws-card__add-project').click()
+  await workspaceRow(page, WS).locator('.ws-row__add').click()
   await page.waitForSelector('.dialog__title')
   await page.getByPlaceholder('My Project').fill('alpha-project')
   await page.click('.dialog__btn-primary')
-  await expect(
-    workspaceCard(page, WS).locator('.project-row').filter({ hasText: 'alpha-project' })
-  ).toBeVisible()
+  await expect(projectGroup(page, 'alpha-project')).toBeVisible()
 })
 
 test('US2-3: clicking a project switches the main area to the tabbed terminal view', async () => {
   const { page } = handle
-  await workspaceCard(page, WS).locator('.project-row').filter({ hasText: 'alpha-project' }).click()
+  await projectGroup(page, 'alpha-project').locator('.session-group__header').click()
   // A project view has a primary tab bar (Terminal/Git/…) and a session tab bar.
   await expect(page.locator('.tab-bar--sessions')).toBeVisible()
   // Selecting a project auto-creates its first terminal session.

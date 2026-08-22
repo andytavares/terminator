@@ -65,6 +65,11 @@ const renderDialog = (sessions: TerminalSession[]) =>
   )
 
 describe('BulkCloseDialog — what will happen (FR-024)', () => {
+  it('uses the singular when only one session will close', () => {
+    renderDialog([session('a', 'p1')])
+    expect(screen.getByText('Close 1 session?')).toBeTruthy()
+  })
+
   it('counts and lists exactly the sessions that will close', () => {
     renderDialog([session('a', 'p1'), session('b', 'p1')])
     expect(screen.getByText('Close 2 sessions?')).toBeTruthy()
@@ -104,7 +109,7 @@ describe('BulkCloseDialog — what will happen (FR-024)', () => {
 describe('BulkCloseDialog — a session waiting on you is never closed (FR-023, SC-006)', () => {
   it('excludes it from the list and the count', () => {
     renderDialog([session('a', 'p1'), session('waiting', 'p1', { agentState: 'awaiting-input' })])
-    expect(screen.getByText('Close 1 sessions?')).toBeTruthy()
+    expect(screen.getByText('Close 1 session?')).toBeTruthy()
     expect(screen.queryByText('waiting')).toBeNull()
   })
 

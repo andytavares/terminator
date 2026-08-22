@@ -133,6 +133,35 @@ describe('ViewBar — grouping and sort', () => {
     expect(props.onChangeView).toHaveBeenCalledWith({ sortBy: 'oldest' })
   })
 
+  it('closes the menu on an outside click, like every other menu in the app', () => {
+    const { container } = renderBar()
+    fireEvent.click(screen.getByText('Group: Project'))
+    expect(container.querySelector('.view-bar__menu')).toBeTruthy()
+    fireEvent.click(window)
+    expect(container.querySelector('.view-bar__menu')).toBeNull()
+  })
+
+  it('does not close when the menu itself is clicked', () => {
+    const { container } = renderBar()
+    fireEvent.click(screen.getByText('Sort: Manual'))
+    fireEvent.click(container.querySelector('.view-bar__menu')!)
+    expect(container.querySelector('.view-bar__menu')).toBeTruthy()
+  })
+
+  it('closes an open menu when another context menu broadcasts a close', () => {
+    const { container } = renderBar()
+    fireEvent.click(screen.getByText('Group: Project'))
+    fireEvent(window, new CustomEvent('close-context-menus'))
+    expect(container.querySelector('.view-bar__menu')).toBeNull()
+  })
+
+  it('stops listening once unmounted', () => {
+    const { unmount } = renderBar()
+    fireEvent.click(screen.getByText('Group: Project'))
+    unmount()
+    expect(() => fireEvent.click(window)).not.toThrow()
+  })
+
   it('closes the menu when the same control is clicked again', () => {
     const { container } = renderBar()
     fireEvent.click(screen.getByText('Group: Project'))

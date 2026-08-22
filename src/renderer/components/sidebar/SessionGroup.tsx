@@ -16,6 +16,12 @@ export interface SessionGroupProps {
   busy?: boolean
   /** Rendered inside the header for project-scoped groups. */
   branchSwitcher?: React.ReactNode
+  /**
+   * Selects the group's scope. FR-026 requires the header to host everything
+   * the tree's project row hosted, and that row's primary action was selecting
+   * the project — so a header click selects, and the chevron owns collapse.
+   */
+  onSelectScope?: () => void
   onAddSession?: () => void
   /** Selects every session in this group; offered only where bulk close is. */
   onSelectAll?: () => void
@@ -47,6 +53,7 @@ export function SessionGroup({
   isWorktree,
   busy,
   branchSwitcher,
+  onSelectScope,
   onAddSession,
   onSelectAll,
   onRename,
@@ -101,7 +108,7 @@ export function SessionGroup({
     >
       <div
         className="session-group__header"
-        onClick={onToggleCollapse}
+        onClick={onSelectScope ?? onToggleCollapse}
         onContextMenu={handleContextMenu}
       >
         <button
