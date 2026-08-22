@@ -91,6 +91,28 @@ export function registerWebviewExtension(
   }
 }
 
+/**
+ * Brings main-process sidebar item contributions into the renderer registry.
+ *
+ * Extensions register these through `api.sidebar.registerItem`, which stores
+ * them in the main process. Nothing in the renderer ever read them, so a
+ * contributed item was stored and never drawn; this closes that gap. Clicks go
+ * back over IPC because the item's handler is a closure in the extension's own
+ * main-process code.
+ */
+async function registerContributedSidebarItems(
+  registry: ReturnType<typeof useExtensionRegistry.getState>
+): Promise<void> {
+  const result = await window.electronAPI.extension.getSidebarItems?.()
+  for (const item of result?.items ?? []) {
+    registry.registerSidebarButton({
+      id: item.id,
+      label: item.label,
+      action: () => void window.electronAPI.extension.sidebarItemClick(item.id),
+    })
+  }
+}
+
 export async function initExtensions(): Promise<void> {
   const result = await window.electronAPI.extension.list()
   const activeExtensions = result.extensions.filter((e) => e.status === 'enabled')
@@ -99,4 +121,6 @@ export async function initExtensions(): Promise<void> {
   for (const ext of activeExtensions) {
     registerWebviewExtension(ext, registry)
   }
+
+  await registerContributedSidebarItems(registry)
 }

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState, createElement } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState, createElement } from 'react'
 import { LayoutGrid } from 'lucide-react'
 import { UnifiedSidebar } from './components/sidebar/UnifiedSidebar'
 import { TerminalPane } from './components/terminal/TerminalPane'
@@ -50,6 +50,7 @@ export function App(): JSX.Element {
     activeProjectId,
     workspaces,
     setActiveWorkspace,
+    setActiveProject,
     projectsByWorkspaceId,
     resolveActiveCwd,
     scratchActive,
@@ -63,6 +64,8 @@ export function App(): JSX.Element {
     closeSession,
     projectViews,
     getScratchSessions,
+    sessions,
+    setActiveSessionForProject,
   } = useSessionStore()
   const activeScratchSessionId = projectViews.get(SCRATCH_PROJECT_ID)?.activeSessionId ?? null
   const { addToast } = useToastStore()
@@ -145,7 +148,17 @@ export function App(): JSX.Element {
       .catch(() => {})
   }, [activeWorkspaceId, resolveSettings, resolveActiveCwd, createSession])
 
+  const [editNoteSessionId, setEditNoteSessionId] = useState<string | null>(null)
+
   useKeyboardShortcuts({
+    onEditSessionNote: () => {
+      const sessionId = activeProjectId
+        ? (projectViews.get(activeProjectId)?.activeSessionId ?? null)
+        : null
+      // Set then clear, so pressing the shortcut twice reopens the editor.
+      setEditNoteSessionId(sessionId)
+      queueMicrotask(() => setEditNoteSessionId(null))
+    },
     onOpenSettings: handleOpenSettings,
     onToggleLog: handleToggleLog,
     onOpenCommandPalette: handleOpenCommandPalette,
@@ -245,6 +258,21 @@ export function App(): JSX.Element {
   }
 
   const paletteCommands = [...builtinCommands(), ...extensionCommands]
+
+  // Sessions are offered in the existing palette rather than a second overlay.
+  const paletteSessions = useMemo(() => {
+    const projectName = new Map(
+      [...projectsByWorkspaceId.values()].flat().map((p) => [p.id, p.name])
+    )
+    return [...sessions.values()]
+      .filter((s) => s.status !== 'closed')
+      .map((s) => ({
+        id: s.id,
+        projectId: s.projectId,
+        tabTitle: s.tabTitle,
+        projectName: projectName.get(s.projectId) ?? '',
+      }))
+  }, [sessions, projectsByWorkspaceId])
 
   useEffect(() => {
     loadWorkspaces()
@@ -521,6 +549,7 @@ export function App(): JSX.Element {
               useSessionStore.getState().setActiveSessionForProject(SCRATCH_PROJECT_ID, sessionId)
             }}
             visible={sidebarVisible}
+            editNoteSessionId={editNoteSessionId}
           />
 
           <div className="app-main-area">
@@ -644,7 +673,16 @@ export function App(): JSX.Element {
           )}
           {logOpen && <LogWindow onClose={() => setLogOpenWithInset(false)} />}
           {paletteOpen && (
-            <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />
+            <CommandPalette
+              commands={paletteCommands}
+              sessions={paletteSessions}
+              onSelectSession={(session) => {
+                setActiveProject(session.projectId)
+                setActiveSessionForProject(session.projectId, session.id)
+                setPaletteOpen(false)
+              }}
+              onClose={() => setPaletteOpen(false)}
+            />
           )}
           <ToastContainer />
           {overlays.map((Overlay, i) => (

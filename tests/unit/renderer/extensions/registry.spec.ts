@@ -16,6 +16,7 @@ function resetStore() {
     workspaceTabs: new Map(),
     keyboardShortcuts: [],
     commands: [],
+    sidebarButtons: [],
     overlays: [],
     openPanels: new Set(),
     activeProjectTabId: null,
@@ -500,5 +501,56 @@ describe('matchesAccelerator', () => {
   it('still matches normally when e.key is unmodified by Alt', () => {
     const event = makeEvent({ key: 'k', code: 'KeyK', metaKey: true, altKey: true, shiftKey: true })
     expect(matchesAccelerator(event, 'CmdOrCtrl+Alt+Shift+K')).toBe(true)
+  })
+})
+
+describe('registerSidebarButton', () => {
+  beforeEach(resetStore)
+
+  it('adds the button to sidebarButtons', () => {
+    const button = { id: 'git.toggle', label: 'Git Changes', action: () => {} }
+    useExtensionRegistry.getState().registerSidebarButton(button)
+    expect(useExtensionRegistry.getState().sidebarButtons).toEqual([button])
+  })
+
+  it('keeps buttons in registration order', () => {
+    const a = { id: 'a', label: 'A', action: () => {} }
+    const b = { id: 'b', label: 'B', action: () => {} }
+    useExtensionRegistry.getState().registerSidebarButton(a)
+    useExtensionRegistry.getState().registerSidebarButton(b)
+    expect(useExtensionRegistry.getState().sidebarButtons.map((x) => x.id)).toEqual(['a', 'b'])
+  })
+
+  it('removes the button when the returned disposer is called', () => {
+    const button = { id: 'git.toggle', label: 'Git Changes', action: () => {} }
+    const dispose = useExtensionRegistry.getState().registerSidebarButton(button)
+    dispose()
+    expect(useExtensionRegistry.getState().sidebarButtons).toEqual([])
+  })
+
+  it('leaves other buttons alone when one is disposed', () => {
+    const a = { id: 'a', label: 'A', action: () => {} }
+    const b = { id: 'b', label: 'B', action: () => {} }
+    const disposeA = useExtensionRegistry.getState().registerSidebarButton(a)
+    useExtensionRegistry.getState().registerSidebarButton(b)
+    disposeA()
+    expect(useExtensionRegistry.getState().sidebarButtons.map((x) => x.id)).toEqual(['b'])
+  })
+
+  // Invariant I7: extensions register through the main-process API, never this one.
+  it('is not exposed on the renderer-facing extension API', () => {
+    const rendererApiMembers = [
+      'registerGlobalTab',
+      'registerWorkspaceTab',
+      'registerSidebarPanel',
+      'registerProjectTab',
+      'registerWindowView',
+      'registerOverlay',
+      'registerKeyboardShortcut',
+      'registerCommand',
+      'updateGlobalTab',
+      'updateCommand',
+    ]
+    expect(rendererApiMembers).not.toContain('registerSidebarButton')
   })
 })

@@ -6,8 +6,12 @@ import { useSettingsStore } from '../../../../src/renderer/stores/settings.store
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useTerminalSession } from '../../../../src/renderer/hooks/useTerminalSession'
 
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({ useWorkspaceStore: vi.fn() }))
-vi.mock('../../../../src/renderer/stores/session.store', () => ({ useSessionStore: vi.fn() }))
+vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
+  useWorkspaceStore: Object.assign(vi.fn(), { getState: vi.fn() }),
+}))
+vi.mock('../../../../src/renderer/stores/session.store', () => ({
+  useSessionStore: Object.assign(vi.fn(), { getState: vi.fn() }),
+}))
 vi.mock('../../../../src/renderer/stores/settings.store', () => ({ useSettingsStore: vi.fn() }))
 vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: vi.fn(),
@@ -31,6 +35,8 @@ const mockGetFocusedSession = vi.fn().mockReturnValue(null)
 const mockCloseSplitLeaf = vi.fn()
 const mockCloseSession = vi.fn().mockResolvedValue(undefined)
 const mockResolveSettings = vi.fn().mockReturnValue({ terminal: { scrollbackLimit: 5000 } })
+const mockSetActiveProject = vi.fn()
+let storeSessions = new Map<string, unknown>()
 const { matchesAccelerator } = await import('../../../../src/renderer/extensions/registry')
 
 const workspace1 = { id: 'ws-1', name: 'WS 1', folderPath: '/ws1', color: '#fff', tags: [] }
@@ -60,6 +66,12 @@ function setupMocks(
     closeSplitLeaf: mockCloseSplitLeaf,
     closeSession: mockCloseSession,
   } as unknown as ReturnType<typeof useWorkspaceStore>)
+  vi.mocked(useWorkspaceStore.getState).mockReturnValue({
+    setActiveProject: mockSetActiveProject,
+  } as unknown as ReturnType<typeof useWorkspaceStore.getState>)
+  vi.mocked(useSessionStore.getState).mockReturnValue({
+    sessions: storeSessions,
+  } as unknown as ReturnType<typeof useSessionStore.getState>)
   vi.mocked(useSettingsStore).mockReturnValue({
     resolveSettings: mockResolveSettings,
   } as unknown as ReturnType<typeof useWorkspaceStore>)
@@ -493,5 +505,102 @@ describe('useKeyboardShortcuts', () => {
       expect(mockOnNewTab).toHaveBeenCalled()
       expect(mockCreateSession).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe('session navigation shortcuts (FR-032)', () => {
+  const mkSession = (id: string, projectId: string, patch: Record<string, unknown> = {}) => ({
+    id,
+    projectId,
+    tabTitle: id,
+    status: 'active',
+    type: 'agent',
+    scrollbackLimit: 10000,
+    createdAt: '',
+    lastActivityAt: 0,
+    agentState: 'idle',
+    ...patch,
+  })
+
+  beforeEach(() => {
+    storeSessions = new Map([
+      ['a', mkSession('a', 'p1', { lastAttendedAt: 300 })],
+      ['b', mkSession('b', 'p2', { lastAttendedAt: 200 })],
+      ['c', mkSession('c', 'p3', { lastAttendedAt: 100, agentState: 'awaiting-input' })],
+    ])
+    setupMocks({ activeProjectId: 'p1' })
+    mockGetActiveSessionForProject.mockReturnValue('a')
+  })
+
+  it('Cmd+] moves to the next most-recently-attended session, across projects', async () => {
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey(']', { metaKey: true })
+    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('p2', 'b')
+  })
+
+  it('Cmd+[ moves the other way and wraps around', async () => {
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey('[', { metaKey: true })
+    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('p3', 'c')
+  })
+
+  it('keeps activeProjectId in step so the project tab bar does not lose its footing', async () => {
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey(']', { metaKey: true })
+    expect(mockSetActiveProject).toHaveBeenCalledWith('p2')
+  })
+
+  it('does nothing when there is only one session to cycle', async () => {
+    storeSessions = new Map([['a', mkSession('a', 'p1', { lastAttendedAt: 1 })]])
+    setupMocks({ activeProjectId: 'p1' })
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey(']', { metaKey: true })
+    expect(mockSetActiveSessionForProject).not.toHaveBeenCalled()
+  })
+
+  it('Cmd+Shift+A jumps to a session waiting on you', async () => {
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey('a', { metaKey: true, shiftKey: true })
+    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('p3', 'c')
+  })
+
+  it('Cmd+Shift+A does nothing when no session is waiting', async () => {
+    storeSessions = new Map([['a', mkSession('a', 'p1')]])
+    setupMocks({ activeProjectId: 'p1' })
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts({}))
+    pressKey('a', { metaKey: true, shiftKey: true })
+    expect(mockSetActiveSessionForProject).not.toHaveBeenCalled()
+  })
+
+  it('Cmd+I opens the note editor', async () => {
+    const useKeyboardShortcuts = await importHook()
+    const onEditSessionNote = vi.fn()
+    renderHook(() => useKeyboardShortcuts({ onEditSessionNote }))
+    pressKey('i', { metaKey: true })
+    expect(onEditSessionNote).toHaveBeenCalledOnce()
+  })
+
+  it('never binds Escape — it belongs to the terminal (FR-033)', async () => {
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts({ onEditSessionNote: vi.fn() }))
+    const event = pressKey('Escape', { metaKey: true })
+    expect(event.defaultPrevented).toBe(false)
+  })
+
+  it('leaves the new bindings alone while typing in a text field', async () => {
+    const useKeyboardShortcuts = await importHook()
+    renderHook(() => useKeyboardShortcuts({}))
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    input.focus()
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: ']', metaKey: true, bubbles: true }))
+    expect(mockSetActiveSessionForProject).not.toHaveBeenCalled()
+    input.remove()
   })
 })

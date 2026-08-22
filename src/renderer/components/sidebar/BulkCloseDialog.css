@@ -1,0 +1,69 @@
+.bulk-close__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 45%);
+}
+
+.bulk-close {
+  width: min(420px, 90vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.bulk-close__title {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.bulk-close__list {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.bulk-close__note {
+  margin: 0 0 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.bulk-close__note--danger {
+  color: var(--danger);
+}
+
+.bulk-close__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.bulk-close__button {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.bulk-close__button--danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.bulk-close__button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

@@ -139,6 +139,7 @@ interface ElectronAPI {
     getSettingsValues(): Promise<{ values: Record<string, unknown> }>
     updateSetting(key: string, value: unknown): Promise<{ ok: true }>
     getSidebarItems(): Promise<{ items: Array<{ id: string; label: string; tooltip?: string }> }>
+    sidebarItemClick(itemId: string): Promise<{ ok: boolean }>
     getContextMenuItems(target: string): Promise<{ items: Array<{ id: string; label: string }> }>
     contextMenuClick(target: string, itemId: string, targetId: string): void
     getCommands(): Promise<{

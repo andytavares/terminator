@@ -3,6 +3,7 @@ import {
   GlobalSettingsSchema,
   WorkspaceSettingsSchema,
   ThemeSchema,
+  DEFAULT_GLOBAL_SETTINGS,
 } from '../../../src/shared/schemas/settings.schema'
 
 const validGlobal = {
@@ -320,5 +321,53 @@ describe('WorkspaceSettingsSchema', () => {
       extensions: {},
     })
     expect(result.success).toBe(true)
+  })
+})
+
+describe('GlobalSettingsSchema — sidebar staleness (FR-020)', () => {
+  const base = { ...DEFAULT_GLOBAL_SETTINGS }
+
+  it('defaults the threshold to two hours', () => {
+    const parsed = GlobalSettingsSchema.parse({ ...base, sidebar: undefined })
+    expect(parsed.sidebar.staleAfterMs).toBe(7_200_000)
+  })
+
+  it('accepts a threshold inside the allowed range', () => {
+    const parsed = GlobalSettingsSchema.parse({ ...base, sidebar: { staleAfterMs: 900_000 } })
+    expect(parsed.sidebar.staleAfterMs).toBe(900_000)
+  })
+
+  it('rejects zero, which would make every session stale', () => {
+    expect(GlobalSettingsSchema.safeParse({ ...base, sidebar: { staleAfterMs: 0 } }).success).toBe(
+      false
+    )
+  })
+
+  it('rejects anything under a minute', () => {
+    expect(
+      GlobalSettingsSchema.safeParse({ ...base, sidebar: { staleAfterMs: 59_999 } }).success
+    ).toBe(false)
+  })
+
+  it('accepts exactly one minute', () => {
+    expect(
+      GlobalSettingsSchema.safeParse({ ...base, sidebar: { staleAfterMs: 60_000 } }).success
+    ).toBe(true)
+  })
+
+  it('rejects anything over thirty days, which would make the filter meaningless', () => {
+    expect(
+      GlobalSettingsSchema.safeParse({ ...base, sidebar: { staleAfterMs: 2_592_000_001 } }).success
+    ).toBe(false)
+  })
+
+  it('rejects a fractional millisecond count', () => {
+    expect(
+      GlobalSettingsSchema.safeParse({ ...base, sidebar: { staleAfterMs: 60_000.5 } }).success
+    ).toBe(false)
+  })
+
+  it('ships the default in DEFAULT_GLOBAL_SETTINGS so the panel has a value on first run', () => {
+    expect(DEFAULT_GLOBAL_SETTINGS.sidebar.staleAfterMs).toBe(7_200_000)
   })
 })

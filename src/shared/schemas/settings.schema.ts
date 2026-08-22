@@ -22,6 +22,18 @@ export const GlobalSettingsSchema = z.object({
       hasSeenWelcome: z.boolean(),
     })
     .default({ hasSeenWelcome: false }),
+  // Bounded 1 minute to 30 days so "zero" or "a year" is a validation failure
+  // rather than a view that shows everything or nothing.
+  sidebar: z
+    .object({
+      staleAfterMs: z
+        .number()
+        .int()
+        .min(60_000)
+        .max(30 * 24 * 60 * 60 * 1000)
+        .default(2 * 60 * 60 * 1000),
+    })
+    .default({ staleAfterMs: 2 * 60 * 60 * 1000 }),
   // Core's own notification kinds only (e.g. 'terminalBell') — never keyed by
   // extension id. Each extension's own notification settings live entirely in
   // its own per-extension settings (registered via api.settings.register),
@@ -71,6 +83,7 @@ export const DEFAULT_GLOBAL_SETTINGS = {
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
   extensions: {},
   ui: { hasSeenWelcome: false },
+  sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
   notifications: {
     defaultTargets: ['system', 'center', 'toast'] as ('system' | 'center' | 'toast')[],
     overrides: {} as Record<string, ('system' | 'center' | 'toast')[]>,

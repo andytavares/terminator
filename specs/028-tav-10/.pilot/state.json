@@ -11,7 +11,7 @@
     "source": "linear",
     "createdAt": "2026-08-17T01:24:30.134Z"
   },
-  "stage": "backlog",
+  "stage": "done",
   "mode": "speckit",
   "ticket": {
     "source": "linear",
@@ -24,7 +24,6 @@
   "queuePosition": null,
   "worktreePath": null,
   "branchName": null,
-  "baseBranch": null,
   "prUrl": null,
   "phases": {
     "constitution": {

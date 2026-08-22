@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { launchApp, closeApp, createWorkspace, expandWorkspace, type AppHandle } from './helpers'
+import { launchApp, closeApp, createWorkspace, type AppHandle } from './helpers'
 
 // The claim the whole re-home rests on: a card's phase runs in a terminal you
 // can see, in its own project, with its tool calls held for you.
@@ -127,9 +127,8 @@ test('starting a phase opens a project and a terminal running claude', async () 
   expect(started?.error ?? 'ok').toBe('ok')
 
   // The worktree became a project in the sidebar, named for its branch.
-  await expandWorkspace(page, 'Pilot')
   // Named for the branch the card cut, which is what makes it findable at all.
-  const project = page.locator('.project-row__name').filter({ hasText: 'e2e-1' })
+  const project = page.locator('.session-group__label').filter({ hasText: 'e2e-1' })
   await expect(project.first()).toBeVisible({ timeout: 60_000 })
 
   // And it is running in a terminal, with the command visible in it — held
@@ -277,9 +276,7 @@ async function pilotScreenText(): Promise<string> {
 test('the supervision panel is on screen, not merely built', async () => {
   test.setTimeout(180_000)
   const { page } = handle
-
-  await expandWorkspace(page, 'Pilot')
-  const tabs = page.locator('.ws-card__ws-tab')
+  const tabs = page.locator('.session-group__ws-tab')
   const count = await tabs.count()
   for (let i = 0; i < count; i++) {
     if ((await tabs.nth(i).getAttribute('title')) === 'SpecKit') {

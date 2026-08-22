@@ -140,6 +140,31 @@ export function GlobalSettings(): JSX.Element {
         </span>
       </div>
 
+      <div className="settings-section__field">
+        <label className="settings-section__label" htmlFor="stale-after-minutes">
+          Mark sessions stale after (minutes)
+        </label>
+        <input
+          id="stale-after-minutes"
+          type="number"
+          className="settings-section__input"
+          min={1}
+          max={43200}
+          defaultValue={Math.round((globalSettings.sidebar?.staleAfterMs ?? 7_200_000) / 60_000)}
+          onBlur={(e) => {
+            const minutes = Number(e.target.value)
+            if (!Number.isFinite(minutes) || minutes < 1 || minutes > 43200) return
+            window.electronAPI.settings.updateGlobal({
+              sidebar: { staleAfterMs: Math.round(minutes) * 60_000 },
+            })
+          }}
+        />
+        <span className="settings-section__hint">
+          How long a quiet session waits before the sidebar treats it as abandoned. A session
+          waiting on you is never stale, however long it waits.
+        </span>
+      </div>
+
       <h3 className="settings-section__title" style={{ marginTop: 20 }}>
         Git
       </h3>

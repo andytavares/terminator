@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockSend = vi.fn()
-const mockWindow = { webContents: { send: mockSend }, isDestroyed: vi.fn(() => false) }
+const mockWindow = {
+  webContents: { send: mockSend, isDestroyed: vi.fn(() => false) },
+  isDestroyed: vi.fn(() => false),
+}
 
 // Mock electron before importing api.ts
 vi.mock('electron', () => ({
@@ -75,6 +78,7 @@ import {
   listExtensionSidebarItems,
   listExtensionContextMenuItems,
   dispatchContextMenuClick,
+  dispatchSidebarItemClick,
   listExtensionCommands,
   executeExtensionCommand,
   listNativeViewMenuItems,
@@ -622,6 +626,47 @@ describe('registry query functions', () => {
     dispatchContextMenuClick('workspace', 'nope', 'target-1')
     expect(onClick).toHaveBeenCalledTimes(1)
     d.dispose()
+  })
+
+  it('a contributed sidebar item is dispatched by id (FR-028)', () => {
+    const api = createExtensionAPI('com.query.side', '0.1.0')
+    const onClick = vi.fn()
+    const d = api.sidebar.registerItem({ id: 'toggle', label: 'Git Changes', onClick })
+    dispatchSidebarItemClick('toggle')
+    expect(onClick).toHaveBeenCalledOnce()
+    d.dispose()
+  })
+
+  it('dispatching an unknown sidebar item id is a no-op, not a throw', () => {
+    const api = createExtensionAPI('com.query.side2', '0.1.0')
+    const onClick = vi.fn()
+    const d = api.sidebar.registerItem({ id: 'known', label: 'Known', onClick })
+    expect(() => dispatchSidebarItemClick('unknown')).not.toThrow()
+    expect(onClick).not.toHaveBeenCalled()
+    d.dispose()
+  })
+
+  it('a disposed sidebar item is no longer dispatchable', () => {
+    const api = createExtensionAPI('com.query.side3', '0.1.0')
+    const onClick = vi.fn()
+    api.sidebar.registerItem({ id: 'gone', label: 'Gone', onClick }).dispose()
+    dispatchSidebarItemClick('gone')
+    expect(onClick).not.toHaveBeenCalled()
+  })
+
+  it('togglePanel tells every window to toggle this extension panel (FR-028a)', () => {
+    const api = createExtensionAPI('com.query.toggle', '0.1.0')
+    mockSend.mockClear()
+    api.sidebar.togglePanel()
+    expect(mockSend).toHaveBeenCalledWith('extension:toggle-panel', 'com.query.toggle')
+  })
+
+  it('togglePanel drops the send when the window is already gone', () => {
+    const api = createExtensionAPI('com.query.toggle2', '0.1.0')
+    mockWindow.isDestroyed.mockReturnValueOnce(true)
+    mockSend.mockClear()
+    expect(() => api.sidebar.togglePanel()).not.toThrow()
+    expect(mockSend).not.toHaveBeenCalled()
   })
 
   it('commands are listed with their key and executed through it', () => {

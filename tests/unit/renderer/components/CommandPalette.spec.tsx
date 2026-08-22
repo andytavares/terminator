@@ -184,3 +184,47 @@ describe('CommandPalette', () => {
     expect(selected.length).toBe(1)
   })
 })
+
+describe('CommandPalette — sessions alongside commands (FR-032)', () => {
+  const sessions = [
+    { id: 's1', projectId: 'p1', tabTitle: 'api-shell', projectName: 'API' },
+    { id: 's2', projectId: 'p2', tabTitle: 'web-dev', projectName: 'Web' },
+  ]
+
+  it('lists open sessions', () => {
+    render(<CommandPalette commands={[]} sessions={sessions} onClose={vi.fn()} />)
+    expect(screen.getByText('api-shell')).toBeTruthy()
+    expect(screen.getByText('web-dev')).toBeTruthy()
+  })
+
+  it('names the owning project so two similarly named sessions are tellable apart', () => {
+    render(<CommandPalette commands={[]} sessions={sessions} onClose={vi.fn()} />)
+    expect(screen.getByText('API')).toBeTruthy()
+  })
+
+  it('selects the session when its row is chosen', () => {
+    const onSelectSession = vi.fn()
+    render(
+      <CommandPalette
+        commands={[]}
+        sessions={sessions}
+        onSelectSession={onSelectSession}
+        onClose={vi.fn()}
+      />
+    )
+    fireEvent.mouseDown(screen.getByText('web-dev'))
+    expect(onSelectSession).toHaveBeenCalledWith(sessions[1])
+  })
+
+  it('filters sessions with the same query as commands', () => {
+    render(<CommandPalette commands={[]} sessions={sessions} onClose={vi.fn()} />)
+    fireEvent.change(screen.getByPlaceholderText(/type a command/i), { target: { value: 'web' } })
+    expect(screen.getByText('web-dev')).toBeTruthy()
+    expect(screen.queryByText('api-shell')).toBeNull()
+  })
+
+  it('works with no sessions at all', () => {
+    render(<CommandPalette commands={[]} onClose={vi.fn()} />)
+    expect(screen.getByPlaceholderText(/type a command/i)).toBeTruthy()
+  })
+})

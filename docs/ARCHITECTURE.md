@@ -466,35 +466,65 @@ The primary navigation is a single resizable sidebar (`UnifiedSidebar`) replacin
 
 ```
 UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
-├── SidebarHeader — search placeholder + global tab icons (scrolls horizontally when
-│                   many global tabs registered; bell + add button stay pinned right)
-│                   + "+ workspace" button
-├── [workspace list] — draggable wrappers around WorkspaceCard components
-│   └── WorkspaceCard — color-coded card per workspace
-│       ├── ws-card__band — 3px left color bar (background: var(--ws-color))
-│       ├── ws-card__header — click toggles collapse; right-click shows ctx menu
-│       │   └── workspace tab icons — hover-reveal icons from registerWorkspaceTab()
-│       │         clicking one sets activeWorkspaceTabId and clears global/project tabs
-│       └── ws-card__projects — collapsible list of ProjectRow + ExtensionFooter
-│           └── ProjectRow — project name, branch chip, inline rename, session expansion
-│               └── SessionRow — per-session status dot/spinner/bell + inline rename
-│                     clicking a session also clears activeWorkspaceTabId (shows terminal)
+├── SidebarHeader — search + global tab icons (scrolls horizontally when many global
+│                   tabs registered; bell + add button stay pinned right)
+│                   + "+ workspace" button. Workspace-independent, so the flattening
+│                   left it untouched.
+├── ViewBar — saved-view chips, group-by / sort menus, hide-stale toggle
+├── FilterNotice — "showing N of M · show all"; rendered only while something is hidden
+├── [group list] — SessionGroup per group returned by buildGroups()
+│   └── SessionGroup — the scope-bearing header. When the grouping key is a project or
+│       │             workspace this header IS the row the old tree had, and hosts
+│       │             everything it hosted.
+│       ├── chevron / worktree icon / label / busy aggregate / count / + new terminal
+│       ├── workspace tab icons — hover-reveal icons from registerWorkspaceTab(),
+│       │     rendered on each workspace's FIRST group so they appear once per
+│       │     workspace rather than once per project
+│       ├── BranchSwitcher (project groups only)
+│       └── SessionRow[] — status dot / spinner / bell, relative activity, optional
+│             note, project badge (which opens ScopeMenu when the header does not
+│             already name the project), and a needs-you edge bar + pill
+├── bulk bar — selection count + Close selected (Stale view only)
+├── ExtensionFooter — sidebar items from api.sidebar.registerItem(), once per window
 └── ScratchSection — pinned scratch terminal sessions at the bottom
 ```
+
+### The view-model layer
+
+`src/renderer/sidebar/` holds the pure core: `view-model.ts` (`buildGroups`, `isStale`),
+`views.ts` (built-in views as data + persistence), `agent-state.ts`, `collapse-state.ts`,
+and `relative-time.ts`.
+
+**These modules import nothing but types.** No React, no store, no `Date.now()` — `now`
+is always a parameter. That physical separation is the point: it makes the whole
+"what is shown" decision a pure function of `(sessions, projects, workspaces, view, now,
+staleAfterMs)`, exhaustively testable without a DOM, and it keeps the layout reversible.
+The components above are a thin rendering of whatever `buildGroups` returns.
+
+`buildGroups` applies a fixed, observable order: filter → group → sort within each group
+→ sort the groups. `shown` and `total` come back with the groups, which is what
+`FilterNotice` reads.
+
+Session recency and state are renderer-only view state on `TerminalSession`
+(`lastActivityAt`, `lastAttendedAt`, `agentState`, `note`), following the existing
+`bellCount` / `busy` convention. Sessions are not persisted, so there is no schema
+change and nothing to migrate. Activity stamping is throttled to at most one store write
+per session per second in `session-controller.ts` — `onBusy` fires on every PTY output
+chunk, and the store stays a plain reducer with no timing logic of its own.
 
 ### Tab activation mutual-exclusion
 
 Three tab layers compete for the main content area. Only one is active at a time:
 
-| Layer         | Registry state         | Activated by                                           | Cleared by                                             |
-| ------------- | ---------------------- | ------------------------------------------------------ | ------------------------------------------------------ |
-| Global tab    | `activeGlobalTabId`    | Clicking an icon in `SidebarHeader`                    | Activating workspace/project tab, clicking any session |
-| Workspace tab | `activeWorkspaceTabId` | Clicking a hover-reveal icon in `WorkspaceCard` header | Activating global/project tab, clicking any session    |
-| Project tab   | `activeProjectTabId`   | Clicking a tab in the project view tab bar             | Activating global/workspace tab                        |
+| Layer         | Registry state         | Activated by                                                                                       | Cleared by                                             |
+| ------------- | ---------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Global tab    | `activeGlobalTabId`    | Clicking an icon in `SidebarHeader`                                                                | Activating workspace/project tab, clicking any session |
+| Workspace tab | `activeWorkspaceTabId` | Clicking a hover-reveal icon on a `SessionGroup` header, or the same action in a row's `ScopeMenu` | Activating global/project tab, clicking any session    |
+| Project tab   | `activeProjectTabId`   | Clicking a tab in the project view tab bar                                                         | Activating global/workspace tab                        |
 
 ### Color propagation
 
-Each workspace has a `color` field (hex string). The `WorkspaceCard` sets `style={{ '--ws-color': workspace.color }}` on its root element. All descendant CSS rules (`ProjectRow`, `SessionRow`, etc.) inherit `var(--ws-color)` for accent colors, tinted backgrounds, and border highlights without any prop drilling.
+Each workspace has a `color` field (hex string). `SessionGroup` sets `style={{ '--ws-color': workspace.color }}` on its root element. All descendant CSS rules (`SessionRow`, etc.) inherit `var(--ws-color)` for accent colors, tinted backgrounds, and border highlights without any prop drilling.
 
 ### Collapse persistence
 

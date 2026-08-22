@@ -214,6 +214,13 @@ export interface ExtensionAPI {
     registerItem(item: SidebarContribution): Disposable
     registerPanel(slot: PanelSlot, panel: PanelContribution): Disposable
     registerGlobalTab(tab: GlobalTabContribution): Disposable
+    /**
+     * Shows or hides this extension's own sidebar panel. Without this an
+     * extension could contribute a sidebar item but had no way to make it do
+     * anything — which is why the one real contributor showed a hint toast
+     * instead of acting. (v1.1.0)
+     */
+    togglePanel(): void
   }
   globalShortcut: {
     register(accelerator: string, handler: () => void): Disposable
@@ -482,6 +489,20 @@ export function dispatchContextMenuClick(target: string, itemId: string, targetI
   }
 }
 
+/**
+ * Runs a contributed sidebar item's handler. The renderer only ever sees the
+ * item's id and label — the onClick closure lives here, in the extension's own
+ * main-process code — so the click has to come back over IPC to be invoked.
+ */
+export function dispatchSidebarItemClick(itemId: string): void {
+  for (const item of globalRegistry.sidebarItems.values()) {
+    if (item.id === itemId) {
+      item.onClick()
+      return
+    }
+  }
+}
+
 export function listExtensionCommands(): Array<{
   key: string
   id: string
@@ -630,6 +651,11 @@ export function createExtensionAPI(
         }
         globalRegistry.globalTabs.set(key, tab)
         return disposable(() => globalRegistry.globalTabs.delete(key))
+      },
+      togglePanel(): void {
+        for (const win of BrowserWindow.getAllWindows()) {
+          sendToWindow(win, 'extension:toggle-panel', extensionId)
+        }
       },
     },
     globalShortcut: {

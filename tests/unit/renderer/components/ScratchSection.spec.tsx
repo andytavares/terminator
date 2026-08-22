@@ -283,4 +283,19 @@ describe('ScratchSection', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(mockRenameSession).not.toHaveBeenCalled()
   })
+
+  it('does not select the row when the rename input itself is clicked', () => {
+    const { container } = render(
+      <ScratchSection
+        sessions={[makeSession('s1', 'Alpha')]}
+        activeSessionId={null}
+        onSelectSession={mockOnSelectSession}
+        onNewScratch={mockOnNewScratch}
+      />
+    )
+    fireEvent.doubleClick(screen.getByText('Alpha'))
+    mockOnSelectSession.mockClear()
+    fireEvent.click(container.querySelector('.scratch-section__rename-input')!)
+    expect(mockOnSelectSession).not.toHaveBeenCalled()
+  })
 })

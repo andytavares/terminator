@@ -281,6 +281,12 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
   },
   { path: 'extension.getSidebarItems', kind: 'invoke', channel: 'extension:get-sidebar-items' },
   {
+    path: 'extension.sidebarItemClick',
+    kind: 'invoke',
+    channel: 'extension:sidebar-item-click',
+    toPayload: (itemId: string) => ({ itemId }),
+  },
+  {
     path: 'extension.getContextMenuItems',
     kind: 'invoke',
     channel: 'extension:get-context-menu-items',

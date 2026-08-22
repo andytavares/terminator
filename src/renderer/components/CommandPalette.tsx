@@ -21,8 +21,18 @@ interface PaletteItem {
   action(): void
 }
 
+export interface PaletteSession {
+  id: string
+  projectId: string
+  tabTitle: string
+  projectName: string
+}
+
 interface Props {
   commands: CommandRegistration[]
+  /** Open sessions, offered alongside commands so ⌘K is the one palette. */
+  sessions?: PaletteSession[]
+  onSelectSession?: (session: PaletteSession) => void
   onClose(): void
 }
 
@@ -37,7 +47,12 @@ function fuzzyMatch(query: string, text: string): boolean {
   return qi === q.length
 }
 
-export function CommandPalette({ commands, onClose }: Props): JSX.Element {
+export function CommandPalette({
+  commands,
+  sessions = [],
+  onSelectSession,
+  onClose,
+}: Props): JSX.Element {
   useModalEffect()
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
@@ -70,8 +85,17 @@ export function CommandPalette({ commands, onClose }: Props): JSX.Element {
       category: c.category ?? 'Extensions',
       action: () => window.electronAPI.extension.executeCommand(c.key),
     }))
-    return [...rendererItems, ...extItems]
-  }, [commands, extensionCommands])
+    // Sessions live in the same palette rather than a second overlay: ⌘K is
+    // already bound, and one list is one thing to learn.
+    const sessionItems: PaletteItem[] = sessions.map((s) => ({
+      id: `session:${s.id}`,
+      label: s.tabTitle,
+      description: s.projectName,
+      category: 'Sessions',
+      action: () => onSelectSession?.(s),
+    }))
+    return [...sessionItems, ...rendererItems, ...extItems]
+  }, [commands, extensionCommands, sessions, onSelectSession])
 
   const filtered = useMemo(
     () => allItems.filter((item) => fuzzyMatch(query, item.label)),

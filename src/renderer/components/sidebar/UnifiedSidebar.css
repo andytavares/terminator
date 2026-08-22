@@ -42,3 +42,58 @@
 .unified-sidebar__resize-handle:hover {
   background: var(--border-strong);
 }
+
+.unified-sidebar__empty {
+  padding: 12px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.unified-sidebar__add-project {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  height: 24px;
+  padding: 0 8px 0 22px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+  opacity: 0.7;
+}
+
+.unified-sidebar__add-project:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  opacity: 1;
+}
+
+.unified-sidebar__bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
+}
+
+.unified-sidebar__bulk-bar button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.unified-sidebar__bulk-close {
+  margin-left: auto;
+  color: var(--danger) !important;
+}
