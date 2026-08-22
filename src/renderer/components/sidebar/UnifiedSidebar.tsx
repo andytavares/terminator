@@ -19,6 +19,8 @@ import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { SidebarHeader } from './SidebarHeader'
 import { ScratchSection } from './ScratchSection'
+import { ExtensionFooter } from './ExtensionFooter'
+import { ScopeMenu } from './ScopeMenu'
 import { SessionGroup } from './SessionGroup'
 import { SessionRow } from './SessionRow'
 import { BranchSwitcher } from './BranchSwitcher'
@@ -99,6 +101,7 @@ export function UnifiedSidebar({
   const { resolveSettings } = useSettingsStore()
   const { createSession } = useTerminalSession()
   const workspaceTabs = useExtensionRegistry((s) => s.workspaceTabs)
+  const sidebarButtons = useExtensionRegistry((s) => s.sidebarButtons)
 
   const scratchSessions = getScratchSessions()
 
@@ -119,6 +122,11 @@ export function UnifiedSidebar({
   const [confirmDeleteProject, setConfirmDeleteProject] = useState<{
     id: string
     name: string
+  } | null>(null)
+  const [scopeMenu, setScopeMenu] = useState<{
+    x: number
+    y: number
+    projectId: string
   } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [collapseState, setCollapseState] = useState(loadCollapseState)
@@ -212,6 +220,30 @@ export function UnifiedSidebar({
 
   const projectById = useMemo(() => new Map(allProjects.map((p) => [p.id, p])), [allProjects])
   const workspaceById = useMemo(() => new Map(workspaces.map((w) => [w.id, w])), [workspaces])
+
+  // FR-027 lists three ways to reach a scope action: the group header, the row
+  // scope menu, and the command palette. This is the third.
+  const registerCommand = useExtensionRegistry((s) => s.registerCommand)
+  useEffect(() => {
+    const disposers = allProjects.map((project) =>
+      registerCommand({
+        id: `core.scope.new-terminal.${project.id}`,
+        label: `New terminal in ${project.name}`,
+        category: 'Sessions',
+        action: () => {
+          const settings = resolveSettings(project.workspaceId)
+          void createSession(
+            project.id,
+            'human',
+            '',
+            resolveActiveCwd(),
+            settings.terminal.scrollbackLimit
+          )
+        },
+      })
+    )
+    return () => disposers.forEach((dispose) => dispose())
+  }, [allProjects, registerCommand, createSession, resolveActiveCwd, resolveSettings])
 
   function toggleGroup(key: string): void {
     const next = toggleCollapsed(collapseState, view.groupBy, key)
@@ -335,6 +367,13 @@ export function UnifiedSidebar({
                         ? undefined
                         : projectById.get(session.projectId)?.name
                     }
+                    onScopeClick={(e) =>
+                      setScopeMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        projectId: session.projectId,
+                      })
+                    }
                     isSubSession={session.parentSessionId !== undefined}
                     onSelect={() => selectSession(session.projectId, session.id)}
                     onRename={(newTitle) => sessionStore.renameSession(session.id, newTitle)}
@@ -367,6 +406,11 @@ export function UnifiedSidebar({
           ))}
         </div>
 
+        {/* Sidebar items are a flat global contribution, so the footer hosts
+            them once per window, outside the group list and independent of how
+            sessions are grouped (FR-028). */}
+        <ExtensionFooter buttons={sidebarButtons} />
+
         <ScratchSection
           sessions={scratchSessions}
           activeSessionId={activeScratchSessionId}
@@ -380,6 +424,26 @@ export function UnifiedSidebar({
           onDoubleClick={handleResizeDblClick}
         />
       </div>
+
+      {scopeMenu &&
+        (() => {
+          const project = projectById.get(scopeMenu.projectId)
+          if (!project) return null
+          return (
+            <ScopeMenu
+              x={scopeMenu.x}
+              y={scopeMenu.y}
+              projectName={project.name}
+              workspaceTabs={workspaceTabList}
+              onSelectWorkspaceTab={(tabId) => onSelectWorkspaceTab(project.workspaceId, tabId)}
+              onAddSession={() => addSessionToProject(project.id)}
+              onRemoveProject={() =>
+                setConfirmDeleteProject({ id: project.id, name: project.name })
+              }
+              onDismiss={() => setScopeMenu(null)}
+            />
+          )
+        })()}
 
       {createWsOpen && <CreateWorkspaceDialog onClose={() => setCreateWsOpen(false)} />}
       {createProjectFor && (

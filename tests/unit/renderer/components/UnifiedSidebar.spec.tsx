@@ -144,8 +144,9 @@ const mockRegistryState = {
   globalTabs: new Map(),
   workspaceTabs: new Map(),
   activeGlobalTabId: null,
-  sidebarButtons: [],
+  sidebarButtons: [] as Array<{ id: string; label: string; action: () => void }>,
   setActiveGlobalTab: vi.fn(),
+  registerCommand: vi.fn(() => vi.fn()),
 }
 
 const defaultProps = {
@@ -565,5 +566,46 @@ describe('UnifiedSidebar — non-project groupings (FR-010, FR-027)', () => {
     const targets = container.querySelectorAll('.unified-sidebar__ws-actions')
     fireEvent.dragOver(targets[1])
     expect(container.querySelector('.ws-card--dnd-over')).toBeTruthy()
+  })
+})
+
+describe('UnifiedSidebar — contributed sidebar items in the footer (FR-028)', () => {
+  const action = vi.fn()
+
+  beforeEach(() => {
+    mockRegistryState.sidebarButtons = [{ id: 'git-sidebar-toggle', label: 'Git Changes', action }]
+  })
+
+  it('renders each contributed item exactly once', () => {
+    renderSidebar()
+    expect(screen.getAllByText('Git Changes')).toHaveLength(1)
+  })
+
+  it('fires the item action on click', () => {
+    renderSidebar()
+    fireEvent.click(screen.getByText('Git Changes'))
+    expect(action).toHaveBeenCalledOnce()
+  })
+
+  it.each(['by-status', 'by-workspace', 'flat'])(
+    'keeps the item in the footer under the %s grouping',
+    (viewId) => {
+      localStorage.setItem(
+        'terminator.sidebar.views',
+        JSON.stringify([
+          { id: 'by-status', name: 'S', groupBy: 'status', sortBy: 'name', filters: {} },
+          { id: 'by-workspace', name: 'W', groupBy: 'workspace', sortBy: 'name', filters: {} },
+          { id: 'flat', name: 'F', groupBy: 'none', sortBy: 'name', filters: {} },
+        ])
+      )
+      renderSidebar({ initialViewId: viewId })
+      expect(screen.getAllByText('Git Changes')).toHaveLength(1)
+    }
+  )
+
+  it('renders no footer when no extension contributes an item', () => {
+    mockRegistryState.sidebarButtons = []
+    const { container } = renderSidebar()
+    expect(container.querySelector('.extension-footer')).toBeNull()
   })
 })

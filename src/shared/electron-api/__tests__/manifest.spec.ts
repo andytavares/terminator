@@ -78,6 +78,7 @@ describe('remoteAccessibleCoreChannels()', () => {
     'extension:get-settings-schemas',
     'extension:get-settings-values',
     'extension:get-sidebar-items',
+    'extension:sidebar-item-click',
     'extension:context-menu-click',
     'extension:execute-command',
     'metrics:system',

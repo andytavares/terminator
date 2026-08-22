@@ -3,6 +3,7 @@ import type { ExtensionHost } from '../extensions/extension-host.js'
 import {
   listExtensionSettingsSections,
   listExtensionSidebarItems,
+  dispatchSidebarItemClick,
   listExtensionContextMenuItems,
   dispatchContextMenuClick,
   listExtensionCommands,
@@ -60,6 +61,11 @@ export function registerExtensionHandlers(
 
   handleChannel('extension:get-sidebar-items', () => {
     return { items: listExtensionSidebarItems() }
+  })
+
+  handleChannel('extension:sidebar-item-click', (_event, { itemId }: { itemId: string }) => {
+    dispatchSidebarItemClick(itemId)
+    return { ok: true }
   })
 
   handleChannel('extension:get-context-menu-items', (_event, { target }: { target: string }) => {

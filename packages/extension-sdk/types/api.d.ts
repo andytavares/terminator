@@ -145,6 +145,8 @@ export interface ExtensionAPI {
     registerItem(item: SidebarContribution): Disposable
     registerPanel(slot: PanelSlot, panel: PanelContribution): Disposable
     registerGlobalTab(tab: GlobalTabContribution): Disposable
+    /** Shows or hides this extension's own sidebar panel. (v1.1.0) */
+    togglePanel(): void
   }
   globalShortcut: {
     register(accelerator: string, handler: () => void): Disposable

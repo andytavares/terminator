@@ -147,13 +147,7 @@ export function activate(api: ExtensionAPI): void {
       id: 'git-sidebar-toggle',
       label: 'Git Changes',
       tooltip: 'Toggle Git Changes sidebar',
-      onClick: () => {
-        api.notifications.showToast(
-          'info',
-          'Toggle git sidebar via View menu or shortcut',
-          'sidebarToggleHint'
-        )
-      },
+      onClick: () => api.sidebar.togglePanel(),
     })
   )
 
