@@ -1,0 +1,65 @@
+src/renderer/components/sidebar/SessionGroup.css
+  s_fde32f6e6ef8c3::t_6aa1b348600a9e 6-10,14-16,18-22,32,45-52,55-66,69,72,83-84,86,92-94,99-100,105-111,119-120,125-126,135,146-147
+  s_fde32f6e6ef8c3::t_96d6ba9202b64a 151-152
+tests/unit/renderer/components/SessionRow.spec.tsx
+  s_fde32f6e6ef8c3::t_4ab7912c0b5d82 62-66
+tests/unit/renderer/components/FilterNotice.spec.tsx
+  s_fde32f6e6ef8c3::t_01903cd2610d6a 9,24
+src/renderer/sidebar/views.ts
+  s_fde32f6e6ef8c3::t_f928241ea8becb 26-29
+src/renderer/components/sidebar/WorkspaceRow.css
+  s_fde32f6e6ef8c3::t_eb36b40408046b 1-8,14,20-23,25,34-35,40,43,51-54,59,69
+src/renderer/components/sidebar/ViewBar.tsx
+  s_fde32f6e6ef8c3::t_e4cb27613ede16 69
+  s_fde32f6e6ef8c3::t_710757083034fb 25-26,40,72
+tests/unit/renderer/components/ViewBar.spec.tsx
+  s_fde32f6e6ef8c3::t_2c433d2ae5b953 33,49-55
+  s_fde32f6e6ef8c3::t_e17d3d3b7787be 38-48
+src/renderer/sidebar/view-model.ts
+  s_fde32f6e6ef8c3::t_f928241ea8becb 54
+src/renderer/components/sidebar/FilterNotice.tsx
+  s_fde32f6e6ef8c3::t_f928241ea8becb 22
+tests/unit/renderer/components/SessionGroup.spec.tsx
+  s_fde32f6e6ef8c3::t_25d3c1788ec0cb 87-90
+  s_fde32f6e6ef8c3::t_7f9c060bbc9d76 93-95,98,100,104-108
+src/renderer/components/sidebar/ViewBar.css
+  s_fde32f6e6ef8c3::t_710757083034fb 113-118
+tests/unit/renderer/sidebar-status-colour-independence.spec.ts
+  s_fde32f6e6ef8c3::t_dc52b6d93ee299 38,52-54,56-58
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_fde32f6e6ef8c3::t_fcf45bed485853 380-386
+  s_fde32f6e6ef8c3::t_e0682b2fbefa8e 441-443,445-460,462-510,512-532,536-537,540-541,551-556
+  s_fde32f6e6ef8c3::t_96d6ba9202b64a 98,461
+  s_fde32f6e6ef8c3::t_710757083034fb 249-258,423
+  s_fde32f6e6ef8c3::t_6a8b22cc3afff4 387-398
+  s_fde32f6e6ef8c3::t_bef6f109966eb6 399
+src/renderer/components/sidebar/SessionRow.css
+  s_fde32f6e6ef8c3::t_dc55e5b41da9fc 4,6
+src/renderer/components/sidebar/SessionGroup.tsx
+  s_fde32f6e6ef8c3::t_833f2b2898690a 2
+  s_fde32f6e6ef8c3::t_96d6ba9202b64a 15-19,21-22,59,106-108,197
+src/renderer/components/sidebar/SessionRow.tsx
+  s_fde32f6e6ef8c3::t_3b46ab0503814d 131,170-172,185
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_fde32f6e6ef8c3::t_01903cd2610d6a 749,757
+  s_fde32f6e6ef8c3::t_6d0cd4f330899b 192-195,256,260-271,273
+  s_fde32f6e6ef8c3::t_0f272c813bc067 431-440
+  s_fde32f6e6ef8c3::t_cd94388e75789a 412-413,415
+  s_fde32f6e6ef8c3::t_7f9c060bbc9d76 328-334,336
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "c0fa6792cd985235f5f7dd5e200b9c61f5295fcb",
+  "prompts": {},
+  "sessions": {
+    "s_fde32f6e6ef8c3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be90eef1-a995-4869-95eb-54c81798909c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
