@@ -93,22 +93,22 @@ Only items 3 and 4 of the R12 inventory are deleted. Items 1 and 2 — `register
 
 ### 2d — Session model and activity tracking (plan Phase 1, [contracts/session-state.md](./contracts/session-state.md))
 
-- [ ] T017 [P] Write `tests/unit/renderer/sidebar/agent-state.spec.ts` as a table test over the four-row derivation precedence in [contracts/session-state.md](./contracts/session-state.md), including a session that is both belled and busy resolving to `awaiting-input`
-- [ ] T018 Add `lastActivityAt: number`, `lastAttendedAt?: number`, `agentState: AgentState`, and `note?: string` to `TerminalSession` in `src/shared/types/index.ts:44-58`, each commented as renderer-side view state in the same style as the existing `bellCount` / `busy`, and export the `AgentState` union
-- [ ] T019 Implement `src/renderer/sidebar/agent-state.ts` — the `AgentStateSource` interface and the single `BellAndBusySource` implementation — satisfying T017
-- [ ] T020 [P] Write failing specs in `tests/unit/renderer/stores/session.store.spec.ts` for `stampActivity(sessionId, now)` as a pure patch, `lastActivityAt` backfill to `Date.parse(createdAt)` at construction, `note` normalisation (newlines stripped, ≤120 chars, empty stored as `undefined`), and `lastAttendedAt` stamping inside `setActiveSessionForProject`
-- [ ] T021 Implement those setters in `src/renderer/stores/session.store.ts`, keeping every one a pure patch with no timing logic (Principle XI)
-- [ ] T022 [P] Write `tests/unit/renderer/terminal/session-controller.spec.ts` proving that with an injected fake clock, 100 `onBusy` callbacks inside one second produce exactly one `stampActivity` write, and the next call after the clock advances past one second produces a second
-- [ ] T023 Implement the throttle in `src/renderer/terminal/session-controller.ts:28-34` — a module-level `Map<sessionId, number>` plus an injectable `now()` defaulting to `Date.now` — satisfying T022
+- [x] T017 [P] Write `tests/unit/renderer/sidebar/agent-state.spec.ts` as a table test over the four-row derivation precedence in [contracts/session-state.md](./contracts/session-state.md), including a session that is both belled and busy resolving to `awaiting-input`
+- [x] T018 Add `lastActivityAt: number`, `lastAttendedAt?: number`, `agentState: AgentState`, and `note?: string` to `TerminalSession` in `src/shared/types/index.ts:44-58`, each commented as renderer-side view state in the same style as the existing `bellCount` / `busy`, and export the `AgentState` union
+- [x] T019 Implement `src/renderer/sidebar/agent-state.ts` — the `AgentStateSource` interface and the single `BellAndBusySource` implementation — satisfying T017
+- [x] T020 [P] Write failing specs in `tests/unit/renderer/stores/session.store.spec.ts` for `stampActivity(sessionId, now)` as a pure patch, `lastActivityAt` backfill to `Date.parse(createdAt)` at construction, `note` normalisation (newlines stripped, ≤120 chars, empty stored as `undefined`), and `lastAttendedAt` stamping inside `setActiveSessionForProject`
+- [x] T021 Implement those setters in `src/renderer/stores/session.store.ts`, keeping every one a pure patch with no timing logic (Principle XI)
+- [x] T022 [P] Write `tests/unit/renderer/terminal/session-controller.spec.ts` proving that with an injected fake clock, 100 `onBusy` callbacks inside one second produce exactly one `stampActivity` write, and the next call after the clock advances past one second produces a second
+- [x] T023 Implement the throttle in `src/renderer/terminal/session-controller.ts:28-34` — a module-level `Map<sessionId, number>` plus an injectable `now()` defaulting to `Date.now` — satisfying T022
 
 ### 2e — The pure view model (plan Phase 2, [contracts/view-model.md](./contracts/view-model.md))
 
-- [ ] T024 [P] Write `tests/unit/renderer/sidebar/view-model.spec.ts` covering `isStale` for all five rows of the boundary table in [contracts/view-model.md](./contracts/view-model.md) — exactly at threshold is NOT stale, one ms past IS, `awaiting-input` never, `exited` always, and recomputation as `now` advances
-- [ ] T025 [P] Extend `tests/unit/renderer/sidebar/view-model.spec.ts` with a table test over every `GroupKey` × `SortKey` × filter combination, plus: empty groups dropped, no session in two groups, deep-equality on repeat calls, and no mutation of any input
-- [ ] T026 Implement `isStale` and `buildGroups` in `src/renderer/sidebar/view-model.ts` with the fixed filter → group → sort-within → sort-groups order and the `BuildResult { groups, shown, total }` shape, importing only types — no React, no store, no `Date.now()`
-- [ ] T027 [P] Write `tests/unit/renderer/sidebar/views.spec.ts` covering the four built-in view definitions, `loadViews` degrading to built-ins on corrupt JSON without throwing, `saveViews` swallowing write failures, and `loadViews` never returning a filtered view as active
-- [ ] T028 Implement `src/renderer/sidebar/views.ts` — built-in views as data, plus `loadViews` / `saveViews` over the `terminator.sidebar.views` localStorage key, following the `workspace.store.ts:38-47` try/catch convention
-- [ ] T029 Run `npx vitest run --coverage src/renderer/sidebar/` and confirm the pure layer is at **100%**, not 80% — it is the cheapest place in this feature to be certain
+- [x] T024 [P] Write `tests/unit/renderer/sidebar/view-model.spec.ts` covering `isStale` for all five rows of the boundary table in [contracts/view-model.md](./contracts/view-model.md) — exactly at threshold is NOT stale, one ms past IS, `awaiting-input` never, `exited` always, and recomputation as `now` advances
+- [x] T025 [P] Extend `tests/unit/renderer/sidebar/view-model.spec.ts` with a table test over every `GroupKey` × `SortKey` × filter combination, plus: empty groups dropped, no session in two groups, deep-equality on repeat calls, and no mutation of any input
+- [x] T026 Implement `isStale` and `buildGroups` in `src/renderer/sidebar/view-model.ts` with the fixed filter → group → sort-within → sort-groups order and the `BuildResult { groups, shown, total }` shape, importing only types — no React, no store, no `Date.now()`
+- [x] T027 [P] Write `tests/unit/renderer/sidebar/views.spec.ts` covering the four built-in view definitions, `loadViews` degrading to built-ins on corrupt JSON without throwing, `saveViews` swallowing write failures, and `loadViews` never returning a filtered view as active
+- [x] T028 Implement `src/renderer/sidebar/views.ts` — built-in views as data, plus `loadViews` / `saveViews` over the `terminator.sidebar.views` localStorage key, following the `workspace.store.ts:38-47` try/catch convention
+- [x] T029 Run `npx vitest run --coverage src/renderer/sidebar/` and confirm the pure layer is at **100%**, not 80% — it is the cheapest place in this feature to be certain
 
 **Checkpoint**: Suite green, coverage not below the T002 baseline, zero visual change in the running app. The only behavioural delta is the `ExtensionFooter` deletion, which is provably invisible because it returned `null` on every render.
 

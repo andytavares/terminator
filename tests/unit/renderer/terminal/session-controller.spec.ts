@@ -36,6 +36,8 @@ import {
   adoptTerminalSession,
   createTerminalSession,
   splitTerminalSession,
+  setActivityClock,
+  resetActivityThrottle,
 } from '../../../../src/renderer/terminal/session-controller'
 
 const mockCreateSession = vi.fn()
@@ -48,6 +50,7 @@ const mockSetSessionIdle = vi.fn()
 const mockGetFocusedSession = vi.fn()
 const mockGetActiveSessionForProject = vi.fn()
 const mockAdoptSession = vi.fn()
+const mockStampActivity = vi.fn()
 
 const sessions = new Map<
   string,
@@ -71,7 +74,10 @@ beforeEach(() => {
     getFocusedSession: mockGetFocusedSession,
     getActiveSessionForProject: mockGetActiveSessionForProject,
     adoptSession: mockAdoptSession,
+    stampActivity: mockStampActivity,
   } as unknown as ReturnType<typeof useSessionStore.getState>)
+  resetActivityThrottle()
+  setActivityClock(() => 0)
   vi.mocked(useWorkspaceStore.getState).mockReturnValue({
     activeProjectId: 'other-project',
   } as unknown as ReturnType<typeof useWorkspaceStore.getState>)
@@ -291,5 +297,91 @@ describe('adoptTerminalSession', () => {
     capturedCtorArgs[0].hooks?.onIdle?.()
     expect(mockSetSessionBusy).toHaveBeenCalledWith('terminal-1')
     expect(mockSetSessionIdle).toHaveBeenCalledWith('terminal-1')
+  })
+})
+
+describe('activity stamping throttle (FR-002)', () => {
+  // onBusy fires on every PTY output chunk. Without a throttle a chatty agent
+  // would write to the store — and re-render the sidebar — per chunk.
+  async function busyHookFor(sessionId: string) {
+    mockCreateSession.mockResolvedValue(sessionId)
+    await createTerminalSession('proj-1', 'agent', 'A', '/repo', 5000)
+    const hooks = capturedCtorArgs.at(-1)!.hooks!
+    return hooks.onBusy!
+  }
+
+  it('writes once for a burst of output inside one second', async () => {
+    const now = 1_000
+    setActivityClock(() => now)
+    const onBusy = await busyHookFor('s1')
+    mockStampActivity.mockClear()
+    for (let i = 0; i < 100; i++) onBusy()
+    expect(mockStampActivity).toHaveBeenCalledTimes(1)
+    expect(mockStampActivity).toHaveBeenCalledWith('s1', 1_000)
+  })
+
+  it('writes again once the clock passes one second', async () => {
+    let now = 1_000
+    setActivityClock(() => now)
+    const onBusy = await busyHookFor('s1')
+    mockStampActivity.mockClear()
+    onBusy()
+    now = 2_001
+    onBusy()
+    expect(mockStampActivity).toHaveBeenCalledTimes(2)
+    expect(mockStampActivity).toHaveBeenLastCalledWith('s1', 2_001)
+  })
+
+  it('writes again exactly at the one-second boundary — "at most once per second" allows it', async () => {
+    let now = 1_000
+    setActivityClock(() => now)
+    const onBusy = await busyHookFor('s1')
+    mockStampActivity.mockClear()
+    onBusy()
+    now = 2_000
+    onBusy()
+    expect(mockStampActivity).toHaveBeenCalledTimes(2)
+  })
+
+  it('suppresses a write one millisecond short of the boundary', async () => {
+    let now = 1_000
+    setActivityClock(() => now)
+    const onBusy = await busyHookFor('s1')
+    mockStampActivity.mockClear()
+    onBusy()
+    now = 1_999
+    onBusy()
+    expect(mockStampActivity).toHaveBeenCalledTimes(1)
+  })
+
+  it('throttles each session independently', async () => {
+    setActivityClock(() => 5_000)
+    const first = await busyHookFor('s1')
+    const second = await busyHookFor('s2')
+    mockStampActivity.mockClear()
+    first()
+    second()
+    expect(mockStampActivity).toHaveBeenCalledTimes(2)
+    expect(mockStampActivity.mock.calls.map((c) => c[0])).toEqual(['s1', 's2'])
+  })
+
+  it('still marks the session busy on every chunk — only the stamp is throttled', async () => {
+    setActivityClock(() => 1_000)
+    const onBusy = await busyHookFor('s1')
+    mockSetSessionBusy.mockClear()
+    onBusy()
+    onBusy()
+    onBusy()
+    expect(mockSetSessionBusy).toHaveBeenCalledTimes(3)
+  })
+
+  it('stamps activity when the session goes idle so the last byte counts', async () => {
+    setActivityClock(() => 9_000)
+    mockCreateSession.mockResolvedValue('s1')
+    await createTerminalSession('proj-1', 'agent', 'A', '/repo', 5000)
+    const hooks = capturedCtorArgs.at(-1)!.hooks!
+    mockStampActivity.mockClear()
+    hooks.onIdle!()
+    expect(mockStampActivity).toHaveBeenCalledWith('s1', 9_000)
   })
 })

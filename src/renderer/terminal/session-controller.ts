@@ -25,11 +25,46 @@ function handleBell(sessionId: string): void {
   })
 }
 
+/**
+ * onBusy fires on every PTY output chunk, so the activity stamp is throttled
+ * here rather than in the store — the store stays a plain reducer with no
+ * timing logic of its own.
+ */
+const ACTIVITY_STAMP_INTERVAL_MS = 1000
+const lastStampedAt = new Map<string, number>()
+let now: () => number = Date.now
+
+/** Test seam: lets a spec drive the throttle without timers. */
+export function setActivityClock(clock: () => number): void {
+  now = clock
+}
+
+/** Test seam: clears the per-session throttle state between specs. */
+export function resetActivityThrottle(): void {
+  lastStampedAt.clear()
+}
+
+function stampActivity(sessionId: string, force = false): void {
+  const at = now()
+  const last = lastStampedAt.get(sessionId)
+  if (!force && last !== undefined && at - last < ACTIVITY_STAMP_INTERVAL_MS) return
+  lastStampedAt.set(sessionId, at)
+  useSessionStore.getState().stampActivity(sessionId, at)
+}
+
 function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInstance {
   return new TerminalInstance(sessionId, scrollbackLimit, {
     onBell: () => handleBell(sessionId),
-    onBusy: () => useSessionStore.getState().setSessionBusy(sessionId),
-    onIdle: () => useSessionStore.getState().setSessionIdle(sessionId),
+    onBusy: () => {
+      stampActivity(sessionId)
+      useSessionStore.getState().setSessionBusy(sessionId)
+    },
+    onIdle: () => {
+      // Unthrottled: idle is the end of a burst, and its timestamp is the one
+      // that decides how stale the session looks from here on.
+      stampActivity(sessionId, true)
+      useSessionStore.getState().setSessionIdle(sessionId)
+    },
   })
 }
 

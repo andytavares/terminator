@@ -41,6 +41,14 @@ export interface WorktreeInfo {
 export type SessionStatus = 'active' | 'backgrounded' | 'closed'
 export type SessionType = 'human' | 'agent'
 
+/**
+ * What a session appears to be doing. Derived on read from the bell, byte-flow
+ * and exit signals — see src/renderer/sidebar/agent-state.ts. `awaiting-input`
+ * is a heuristic and under-reports: core cannot consume an extension's agent
+ * hooks, and a shell-launched agent emits none.
+ */
+export type AgentState = 'working' | 'awaiting-input' | 'idle' | 'exited'
+
 export interface TerminalSession {
   id: string
   projectId: string
@@ -55,6 +63,18 @@ export interface TerminalSession {
   bellCount?: number
   /** True while output is streaming (renderer-side view state). */
   busy?: boolean
+  /**
+   * Epoch ms of the last PTY output. Renderer-side view state, never
+   * serialised — epoch ms rather than the ISO strings used by createdAt and
+   * closedAt because it is compared against Date.now() on every row render.
+   */
+  lastActivityAt: number
+  /** Epoch ms of when this session last became the visible one (renderer-side view state). */
+  lastAttendedAt?: number
+  /** Derived from bell/busy/exit, never stored authoritatively (renderer-side view state). */
+  agentState: AgentState
+  /** Optional single-line user note: one line, at most 120 chars (renderer-side view state). */
+  note?: string
 }
 
 export type ExtensionStatus = 'enabled' | 'disabled' | 'error'

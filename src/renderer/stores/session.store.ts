@@ -21,6 +21,9 @@ export interface ProjectView {
 
 const EMPTY_VIEW: ProjectView = { terminalCounter: 0 }
 
+/** A session note is a single line of free text, never a structured task. */
+const NOTE_MAX_LENGTH = 120
+
 function viewOf(views: Map<string, ProjectView>, projectId: string): ProjectView {
   return views.get(projectId) ?? EMPTY_VIEW
 }
@@ -128,7 +131,11 @@ interface SessionState {
   reorderSessions: (projectId: string, orderedIds: string[]) => void
   setTerminalInstance: (sessionId: string, terminal: TerminalInstance) => void
   getTerminalInstance: (sessionId: string) => TerminalInstance | undefined
-  setActiveSessionForProject: (projectId: string, sessionId: string) => void
+  /** Records PTY activity. `now` is supplied by the caller so this stays pure. */
+  stampActivity: (sessionId: string, now: number) => void
+  /** Sets a session's one-line note. Newlines collapsed, capped at 120 chars. */
+  setSessionNote: (sessionId: string, note: string) => void
+  setActiveSessionForProject: (projectId: string, sessionId: string, now?: number) => void
   getActiveSessionForProject: (projectId: string) => string | null
   handleProcessExit: (sessionId: string, exitCode: number) => void
   incrementBellCount: (sessionId: string) => void
@@ -200,6 +207,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if ('error' in result) throw new Error(result.error)
 
     const { sessionId } = result
+    const createdAt = new Date().toISOString()
     const session: TerminalSession = {
       id: sessionId,
       projectId,
@@ -207,8 +215,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       status: 'active',
       type,
       scrollbackLimit,
-      createdAt: new Date().toISOString(),
+      createdAt,
       parentSessionId,
+      // A session with no recorded activity is treated as last active when it
+      // was created, so recency is representable from the first render (FR-007).
+      lastActivityAt: Date.parse(createdAt),
+      agentState: 'idle',
     }
 
     set((s) => {
@@ -230,6 +242,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // Idempotent: a re-sent notification must not produce a second tab for one
     // terminal.
     if (get().sessions.has(sessionId)) return
+    const createdAt = new Date().toISOString()
     const session: TerminalSession = {
       id: sessionId,
       projectId,
@@ -237,7 +250,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       status: 'active',
       type: 'agent',
       scrollbackLimit,
-      createdAt: new Date().toISOString(),
+      createdAt,
+      lastActivityAt: Date.parse(createdAt),
+      agentState: 'idle',
     }
     set((s) => {
       const sessions = new Map(s.sessions)
@@ -338,17 +353,33 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   getTerminalInstance: (sessionId) => get().terminalInstances.get(sessionId),
 
-  setActiveSessionForProject: (projectId, sessionId) => {
+  setActiveSessionForProject: (projectId, sessionId, now = Date.now()) => {
     set((s) => {
       const sessions = new Map(s.sessions)
       for (const [id, session] of sessions) {
         if (session.projectId !== projectId) continue
-        const status = id === sessionId ? ('active' as const) : ('backgrounded' as const)
-        const bellCount = id === sessionId ? undefined : session.bellCount
-        sessions.set(id, { ...session, status, bellCount })
+        const isActive = id === sessionId
+        const status = isActive ? ('active' as const) : ('backgrounded' as const)
+        const bellCount = isActive ? undefined : session.bellCount
+        sessions.set(id, {
+          ...session,
+          status,
+          bellCount,
+          ...(isActive ? { lastAttendedAt: now } : {}),
+        })
       }
       return { sessions, ...patchView(s, projectId, { activeSessionId: sessionId }) }
     })
+  },
+
+  stampActivity: (sessionId, now) => {
+    set((s) => patchSession(s, sessionId, { lastActivityAt: now }) ?? s)
+  },
+
+  setSessionNote: (sessionId, note) => {
+    const oneLine = note.replace(/\s*[\r\n]+\s*/g, ' ').trim()
+    const normalised = oneLine.slice(0, NOTE_MAX_LENGTH)
+    set((s) => patchSession(s, sessionId, { note: normalised || undefined }) ?? s)
   },
 
   getActiveSessionForProject: (projectId) =>
