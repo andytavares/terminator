@@ -35,7 +35,7 @@ describe('sidebar status vocabulary survives greyscale (SC-011)', () => {
 
   it('marks awaiting-input with a text cue as well as the bar', () => {
     expect(ROW_TSX).toContain('needs you')
-    expect(ROW_TSX).toMatch(/needsYou && <span className="session-row__needs-you-pill">/)
+    expect(ROW_TSX).toMatch(/session-row__needs-you-pill/)
   })
 
   it('gives the needs-you pill a border, so it reads as a pill without colour', () => {
@@ -49,10 +49,13 @@ describe('sidebar status vocabulary survives greyscale (SC-011)', () => {
     }
   })
 
-  it('draws every icon with lucide, never an emoji (Principle XII)', () => {
-    expect(ROW_TSX).toMatch(/from 'lucide-react'/)
-    // eslint-disable-next-line no-control-regex
+  it('uses no emoji anywhere in the row (Principle XII)', () => {
+    // The row draws no icon at all now — the status dot leads it, matching the
+    // design. Any icon it grows later must come from lucide.
     expect(ROW_TSX).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u)
+    if (/<[A-Z]\w*Icon|size=\{/.test(ROW_TSX)) {
+      expect(ROW_TSX).toMatch(/from 'lucide-react'/)
+    }
   })
 
   it('never sets an explicit colour on an icon', () => {

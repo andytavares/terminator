@@ -23,7 +23,10 @@ export const BUILT_IN_VIEWS: SessionView[] = [
   {
     id: 'needs-me',
     name: 'Needs me',
-    groupBy: 'project',
+    // Grouped by status, not project: the whole point of this view is that it
+    // is cross-project, so one "Awaiting you" section with a project badge per
+    // row beats the same six sessions split across five headings.
+    groupBy: 'status',
     sortBy: 'recent',
     filters: { states: ['awaiting-input'] },
     builtIn: true,

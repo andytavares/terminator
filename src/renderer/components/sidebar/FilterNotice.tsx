@@ -19,7 +19,7 @@ export function FilterNotice({ shown, total, onShowAll }: FilterNoticeProps): JS
   return (
     <div className="filter-notice">
       <span>
-        showing {shown} of {total}
+        Filtered · showing {shown} of {total}
       </span>
       <button className="filter-notice__show-all" onClick={onShowAll}>
         show all

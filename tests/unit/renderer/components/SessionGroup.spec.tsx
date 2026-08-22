@@ -84,23 +84,28 @@ describe('SessionGroup — a scope-bearing header (FR-026)', () => {
     expect(onSelectScope).not.toHaveBeenCalled()
   })
 
-  it('shows the worktree icon for a worktree-backed project', () => {
-    const { container } = renderGroup({ isWorktree: true })
-    expect(container.querySelector('.session-group__icon')).toBeTruthy()
+  it('tints the header with the workspace colour, which is how you tell workspaces apart', () => {
+    const { container } = renderGroup({ workspaceColor: '#abcdef' })
+    const root = container.querySelector('.session-group') as HTMLElement
+    expect(root.style.getPropertyValue('--ws-color')).toBe('#abcdef')
   })
 
-  it('shows no project icon for a non-scope group', () => {
-    const { container } = renderGroup({ group: statusGroup })
-    expect(container.querySelector('.session-group__icon')).toBeNull()
-  })
-
-  it('hosts the branch switcher when expanded', () => {
-    renderGroup({ branchSwitcher: <div data-testid="branch" /> })
+  it('hosts the branch switcher for the project you are working in', () => {
+    renderGroup({ isActiveScope: true, branchSwitcher: <div data-testid="branch" /> })
     expect(screen.getByTestId('branch')).toBeTruthy()
   })
 
+  it('keeps the branch switcher out of every other group, so the list stays names and sessions', () => {
+    renderGroup({ branchSwitcher: <div data-testid="branch" /> })
+    expect(screen.queryByTestId('branch')).toBeNull()
+  })
+
   it('hides the branch switcher when collapsed', () => {
-    renderGroup({ collapsed: true, branchSwitcher: <div data-testid="branch" /> })
+    renderGroup({
+      collapsed: true,
+      isActiveScope: true,
+      branchSwitcher: <div data-testid="branch" />,
+    })
     expect(screen.queryByTestId('branch')).toBeNull()
   })
 

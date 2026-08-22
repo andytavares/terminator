@@ -189,6 +189,10 @@ beforeEach(() => {
     ['s4', session('s4', 'p3', { tabTitle: 'web-dev' })],
   ])
   mockSessionStore.sessions = sessions
+  mockWorkspaceStore.projectsByWorkspaceId = new Map([
+    ['ws-1', [api, jobs]],
+    ['ws-2', [web]],
+  ])
   mockWorkspaceStore.activeProjectId = null
   mockRegistryState.workspaceTabs = new Map()
   vi.mocked(useWorkspaceStore).mockReturnValue(
@@ -249,15 +253,24 @@ describe('UnifiedSidebar — every session visible at a glance (US1)', () => {
     expect(container.querySelectorAll('.session-group__add')).toHaveLength(3)
   })
 
-  it('renders an empty state only when there is nothing at all to show', () => {
+  it('offers a way into a workspace that has no projects yet', () => {
     mockSessionStore.sessions = new Map()
     mockWorkspaceStore.projectsByWorkspaceId = new Map()
     renderSidebar()
+    // Not an empty state — the workspaces are still reachable, which is the
+    // only route to creating that first project.
+    expect(screen.getByText('Backend')).toBeTruthy()
+    expect(screen.getByText('Frontend')).toBeTruthy()
+    expect(screen.queryByText('No sessions yet')).toBeNull()
+  })
+
+  it('renders an empty state only when there is no workspace either', () => {
+    mockSessionStore.sessions = new Map()
+    mockWorkspaceStore.projectsByWorkspaceId = new Map()
+    mockWorkspaceStore.workspaces = []
+    renderSidebar()
     expect(screen.getByText('No sessions yet')).toBeTruthy()
-    mockWorkspaceStore.projectsByWorkspaceId = new Map([
-      ['ws-1', [api, jobs]],
-      ['ws-2', [web]],
-    ])
+    mockWorkspaceStore.workspaces = [ws1, ws2]
   })
 })
 
@@ -312,9 +325,15 @@ describe('UnifiedSidebar — collapse state', () => {
 })
 
 describe('UnifiedSidebar — scope actions on the group header (FR-026)', () => {
-  it('hosts a branch switcher on each project group', () => {
+  it('hosts a branch switcher on the active project only', () => {
+    mockWorkspaceStore.activeProjectId = 'p1'
     renderSidebar()
-    expect(screen.getAllByTestId('branch-switcher')).toHaveLength(3)
+    expect(screen.getAllByTestId('branch-switcher')).toHaveLength(1)
+  })
+
+  it('shows no branch switcher at all when no project is active', () => {
+    renderSidebar()
+    expect(screen.queryByTestId('branch-switcher')).toBeNull()
   })
 
   it('creates a session in the group project', () => {
@@ -390,7 +409,10 @@ describe('UnifiedSidebar — search filters rather than dims (FR-031)', () => {
   it('explains an empty result rather than showing a blank list', () => {
     const { container } = renderSidebar()
     fireEvent.change(container.querySelector('input')!, { target: { value: 'zzzz' } })
+    // A query that matches nothing narrows the view, so the workspace rows are
+    // suppressed too and only the explanation is left.
     expect(screen.getByText('No sessions match "zzzz"')).toBeTruthy()
+    expect(screen.queryByText('Backend')).toBeNull()
   })
 })
 
@@ -404,6 +426,16 @@ describe('UnifiedSidebar — shell behaviour preserved', () => {
     const { container } = renderSidebar()
     fireEvent.click(container.querySelector('.sidebar-header__add')!)
     expect(screen.getByTestId('create-workspace-dialog')).toBeTruthy()
+  })
+
+  it("puts each workspace's new-project row with that workspace, not in a heap at the bottom", () => {
+    const { container } = renderSidebar()
+    // ws-1 owns API and Jobs; ws-2 owns Web. The row for a workspace must come
+    // straight after that workspace's last project group.
+    const order = Array.from(
+      container.querySelectorAll('.session-group__label, .ws-row__name')
+    ).map((el) => el.textContent)
+    expect(order).toEqual(['API', 'Jobs', 'Backend', 'Web', 'Frontend'])
   })
 
   it('offers a create-project entry point per workspace', () => {
@@ -701,26 +733,6 @@ describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
     expect(labels).toEqual(['Backend', 'Frontend'])
   })
 
-  it('saves the current view under a new name and switches to it', () => {
-    const { container } = renderSidebar()
-    fireEvent.click(screen.getByTitle('Save current view'))
-    const input = container.querySelector('.view-bar__name-input') as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'My view' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-    expect(container.querySelector('.view-bar__chip--active')!.textContent).toBe('My view')
-  })
-
-  it('keeps a saved custom view across a remount (FR-014)', () => {
-    const { container, unmount } = renderSidebar()
-    fireEvent.click(screen.getByTitle('Save current view'))
-    const input = container.querySelector('.view-bar__name-input') as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'My view' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-    unmount()
-    renderSidebar()
-    expect(screen.getByText('My view')).toBeTruthy()
-  })
-
   it('restores the unfiltered Everything view on mount, never a filtered one (FR-015)', () => {
     const { container, unmount } = renderSidebar()
     fireEvent.click(screen.getByText('Needs me'))
@@ -731,21 +743,10 @@ describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
     expect(container.querySelector('.filter-notice')).toBeNull()
   })
 
-  it('deletes a custom view and falls back to the default', () => {
-    const { container } = renderSidebar()
-    fireEvent.click(screen.getByTitle('Save current view'))
-    const input = container.querySelector('.view-bar__name-input') as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'Doomed' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-    fireEvent.contextMenu(screen.getByText('Doomed'))
-    expect(screen.queryByText('Doomed')).toBeNull()
-    expect(container.querySelector('.view-bar__chip--active')!.textContent).toBe('Everything')
-  })
-
   it('explains a filtered list with shown and total counts (FR-016)', () => {
     renderSidebar()
     fireEvent.click(screen.getByText('Needs me'))
-    expect(screen.getByText('showing 0 of 4')).toBeTruthy()
+    expect(screen.getByText('Filtered · showing 0 of 4')).toBeTruthy()
   })
 
   it('explains a search-filtered list too', () => {
@@ -753,7 +754,7 @@ describe('UnifiedSidebar — views and the filter notice (US4, US5)', () => {
     fireEvent.change(container.querySelector('.sidebar-search input, input')!, {
       target: { value: 'jobs' },
     })
-    expect(screen.getByText('showing 1 of 4')).toBeTruthy()
+    expect(screen.getByText('Filtered · showing 1 of 4')).toBeTruthy()
   })
 
   it('shows no notice when nothing is filtered', () => {

@@ -1,5 +1,4 @@
 import React, { useRef, useState } from 'react'
-import { Bot, Terminal } from 'lucide-react'
 import type { TerminalSession } from '../../../shared/types/index'
 import { formatRelativeTime } from '../../sidebar/relative-time'
 import { useSessionStore } from '../../stores/session.store'
@@ -84,8 +83,6 @@ export function SessionRow({
     setCtxMenu({ x: e.clientX, y: e.clientY })
   }
 
-  const PrefixIcon = session.type === 'agent' ? Bot : Terminal
-
   function renderStatus(): React.ReactNode {
     if (isBusy) return <span className="session-row__spinner" />
     if (bellCount > 0) {
@@ -131,9 +128,7 @@ export function SessionRow({
             onChange={() => {}}
           />
         )}
-        <span className="session-row__prefix">
-          <PrefixIcon size={11} />
-        </span>
+        <span className="session-row__status">{renderStatus()}</span>
         {renaming ? (
           <input
             ref={renameRef}
@@ -172,7 +167,9 @@ export function SessionRow({
             </span>
           )
         )}
-        {needsYou && <span className="session-row__needs-you-pill">needs you</span>}
+        {needsYou && !projectBadge && (
+          <span className="session-row__needs-you-pill">needs you</span>
+        )}
         {projectBadge && (
           <button
             className="session-row__project-badge"
@@ -185,12 +182,11 @@ export function SessionRow({
             {projectBadge}
           </button>
         )}
-        {now !== undefined && (
+        {now !== undefined && !needsYou && (
           <span className="session-row__activity">
             {formatRelativeTime(session.lastActivityAt, now)}
           </span>
         )}
-        <span className="session-row__status">{renderStatus()}</span>
       </div>
 
       {ctxMenu && (

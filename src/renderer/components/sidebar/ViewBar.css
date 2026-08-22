@@ -110,3 +110,9 @@
   background: var(--bg-card-hover);
   color: var(--text-primary);
 }
+
+/* The count is what makes "Needs me" answerable without switching to it. */
+.view-bar__count {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}

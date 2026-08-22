@@ -1,19 +1,28 @@
+/*
+ * The workspace's own row, sitting at the end of its run of project groups.
+ *
+ * It is deliberately quiet: the project headers above it already carry the
+ * workspace's colour, so this row only has to offer the way in to a new project
+ * and host the workspace-level actions. Making it as loud as a project header
+ * is what made the old bottom-of-the-list version read as clutter.
+ */
 .ws-row {
   position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
-  padding-left: 6px;
+  padding-left: 10px;
 }
 
 .ws-row__band {
   position: absolute;
   left: 0;
-  top: 2px;
-  bottom: 2px;
-  width: 3px;
-  border-radius: 2px;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 1px;
   background: var(--ws-color, var(--accent));
+  opacity: 0.55;
 }
 
 .ws-row__add {
@@ -22,28 +31,32 @@
   gap: 4px;
   flex: 1;
   min-width: 0;
-  height: 24px;
-  padding: 0 8px 0 12px;
+  height: 20px;
+  padding: 0 8px 0 8px;
   border: none;
   background: transparent;
   color: var(--text-muted);
   font: inherit;
-  font-size: 11px;
+  font-size: 10px;
   cursor: pointer;
   text-align: left;
-  opacity: 0.75;
+  opacity: 0.45;
 }
 
 .ws-row:hover .ws-row__add {
-  background: var(--bg-card-hover);
   color: var(--text-primary);
   opacity: 1;
+}
+
+.ws-row__plus {
+  opacity: 0.8;
 }
 
 .ws-row__name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--ws-color, inherit);
 }
 
 .ws-row__tag {
@@ -53,5 +66,5 @@
   border: 1px solid var(--border);
   border-radius: 3px;
   font-size: 9px;
-  opacity: 0.7;
+  opacity: 0.6;
 }
