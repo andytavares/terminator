@@ -189,7 +189,8 @@ const url = api.settings.get<string>('myext.apiUrl')
 
 #### Register a simple sidebar item
 
-Adds a clickable item beneath the workspace list.
+Adds a clickable item to the sidebar footer, below the session list. The item appears
+once per window regardless of how sessions are grouped.
 
 ```typescript
 const disposable = api.sidebar.registerItem({
@@ -199,6 +200,19 @@ const disposable = api.sidebar.registerItem({
   onClick: () => {
     /* handle click */
   },
+})
+```
+
+#### Toggle your own sidebar panel _(v1.1.0)_
+
+Shows or hides the panel this extension registered with `registerPanel`. Pair it with a
+sidebar item so the item does something:
+
+```typescript
+api.sidebar.registerItem({
+  id: 'my-panel-trigger',
+  label: 'My Panel',
+  onClick: () => api.sidebar.togglePanel(),
 })
 ```
 
