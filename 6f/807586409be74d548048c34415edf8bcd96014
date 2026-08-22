@@ -1,0 +1,54 @@
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_fde32f6e6ef8c3::t_d24d550259fc4c 835-887
+src/renderer/components/sidebar/SessionRow.tsx
+  s_fde32f6e6ef8c3::t_ee1787b1adfe73 30-34,52-54,108-112,153-173
+  s_fde32f6e6ef8c3::t_6cf38f161bb2de 174
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_fde32f6e6ef8c3::t_a3d4d98487e1c9 9-14,38-39,69-74,510-511,513-605
+  s_fde32f6e6ef8c3::t_c9955e4d56f04d 512
+  s_fde32f6e6ef8c3::t_5bb36297f3ac7b 606
+tests/unit/renderer/components/CommandPalette.spec.tsx
+  s_fde32f6e6ef8c3::t_e89953e0c969d9 187-214,216-230
+  s_fde32f6e6ef8c3::t_ac054b60fa682e 215
+src/renderer/components/CommandPalette.tsx
+  s_fde32f6e6ef8c3::t_e89953e0c969d9 24-30,33-35,50-55,88-98
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_fde32f6e6ef8c3::t_e9020ad16904e0 16-17,29,56-71,74-86,285-307,332-334
+  s_fde32f6e6ef8c3::t_c9955e4d56f04d 72-73
+tests/unit/renderer/App.spec.tsx
+  s_fde32f6e6ef8c3::t_6e81971f65c579 50,65,78,85,91,93,1406-1418,1428-1434,1440-1444,1447-1448,1459,1462-1463,1470-1474,1477-1480
+  s_fde32f6e6ef8c3::t_cf96470047fe82 3
+  s_fde32f6e6ef8c3::t_603d752f902ad4 197-199,215,217,240-241,243,253-255,1419-1427,1435-1439,1445-1446,1449-1458,1460-1461,1464-1469,1475-1476
+  s_fde32f6e6ef8c3::t_c9955e4d56f04d 788-789,801-802,844-845,892-893,943-944
+  s_fde32f6e6ef8c3::t_2e81e28dd8e98d 35,47,49,55-56,60-61,64
+  s_fde32f6e6ef8c3::t_278a23e22da209 786-787,799-800,846-847,894-895,945-946
+  s_fde32f6e6ef8c3::t_095eba5ef7de6e 1481
+src/renderer/components/sidebar/SessionRow.css
+  s_fde32f6e6ef8c3::t_ee1787b1adfe73 170-190
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_fde32f6e6ef8c3::t_c9955e4d56f04d 448
+  s_fde32f6e6ef8c3::t_1092d271a9c270 34-35,91,134,197-200,446-447
+src/renderer/App.tsx
+  s_fde32f6e6ef8c3::t_fd8958c255b620 262-276,676-685
+  s_fde32f6e6ef8c3::t_9748dd9239949a 151-152,154-161
+  s_fde32f6e6ef8c3::t_aa929e5dc58401 1,53,67-68
+  s_fde32f6e6ef8c3::t_d24d550259fc4c 552
+specs/030-sidebar-session-views/tasks.md
+  s_fde32f6e6ef8c3::t_9f918ed75db0f9 252-255,259-263
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "6f807586409be74d548048c34415edf8bcd96014",
+  "prompts": {},
+  "sessions": {
+    "s_fde32f6e6ef8c3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be90eef1-a995-4869-95eb-54c81798909c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
