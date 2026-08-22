@@ -1,0 +1,42 @@
+docs/EXTENSION-DEVELOPMENT.md
+  s_fde32f6e6ef8c3::t_04f8fdaab4d9b5 731,736-745
+  s_fde32f6e6ef8c3::t_e40fdb1838025b 746
+extensions/remote-control/src/server/remote-server.ts
+  s_fde32f6e6ef8c3::t_b481db9d723e5d 34,66-106
+src/renderer/styles.css
+  s_fde32f6e6ef8c3::t_6aa104a8067a45 126-127
+  s_fde32f6e6ef8c3::t_4b9b23c3ddc7ff 95
+  s_fde32f6e6ef8c3::t_ef4427376fe97c 26-28,384,386-402,404-451,509-510
+  s_fde32f6e6ef8c3::t_94304812995b41 385,403,452-508,511
+extensions/speckit-pilot/src/components/speckit-pilot.css
+  s_fde32f6e6ef8c3::t_538ab80471a006 2624,2627,2630,2643,2645,2647
+extensions/speckit-pilot/src/components/SettingsView.tsx
+  s_fde32f6e6ef8c3::t_2a5841713b5b9d 355
+tests/unit/renderer/form-control-styling.spec.ts
+  s_fde32f6e6ef8c3::t_948f44b060afe2 1,4-167,284-285
+  s_fde32f6e6ef8c3::t_a6fcdc1af50282 2-3,168-243,246-253,258-261,266-277
+  s_fde32f6e6ef8c3::t_04f8fdaab4d9b5 244-245
+  s_fde32f6e6ef8c3::t_7133e97b7ab747 254-257,265
+  s_fde32f6e6ef8c3::t_02fa2ef4ea4c41 262-264,278-283
+extensions/notepad/src/components/notepad.css
+  s_fde32f6e6ef8c3::t_3309f295621657 1566-1568
+src/main/extensions/extension-view-host.ts
+  s_fde32f6e6ef8c3::t_6f5a191b892c9a 62,81-97
+  s_fde32f6e6ef8c3::t_94cdfe1e886b10 25,57-61,63-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "88c4dd6b0e9a0748239f8473f5aee901638595d2",
+  "prompts": {},
+  "sessions": {
+    "s_fde32f6e6ef8c3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be90eef1-a995-4869-95eb-54c81798909c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
