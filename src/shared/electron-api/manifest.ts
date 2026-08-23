@@ -501,6 +501,44 @@ export const ELECTRON_API_MANIFEST: readonly ChannelSpec[] = [
     }),
   },
 
+  // ── integrations (issue trackers) ─────────────────────────────────────────
+  { path: 'integrations.status', kind: 'invoke', channel: 'integrations:status' },
+  // Credential entry stays on the local renderer. The /app/ surface is
+  // authenticated, but "authenticated" is not a reason to let a LAN client
+  // write the operator's Linear key (ADR-023 default-deny).
+  { path: 'integrations.connect', kind: 'invoke', channel: 'integrations:connect', remote: 'omit' },
+  {
+    path: 'integrations.disconnect',
+    kind: 'invoke',
+    channel: 'integrations:disconnect',
+    remote: 'omit',
+  },
+  { path: 'integrations.setMine', kind: 'invoke', channel: 'integrations:set-mine' },
+  { path: 'integrations.listMine', kind: 'invoke', channel: 'integrations:issue-list-mine' },
+  { path: 'integrations.search', kind: 'invoke', channel: 'integrations:issue-search' },
+  { path: 'integrations.getIssue', kind: 'invoke', channel: 'integrations:issue-get' },
+  { path: 'integrations.comment', kind: 'invoke', channel: 'integrations:issue-comment' },
+  { path: 'integrations.linkSet', kind: 'invoke', channel: 'integrations:link-set' },
+  { path: 'integrations.linkGet', kind: 'invoke', channel: 'integrations:link-get' },
+  { path: 'integrations.linkClear', kind: 'invoke', channel: 'integrations:link-clear' },
+  { path: 'integrations.contextPreview', kind: 'invoke', channel: 'integrations:context-preview' },
+  {
+    path: 'integrations.setInjectContext',
+    kind: 'invoke',
+    channel: 'integrations:set-inject-context',
+  },
+  {
+    path: 'integrations.onStatusChanged',
+    kind: 'event',
+    channel: 'integrations:status-changed',
+  },
+  { path: 'integrations.onLinkChanged', kind: 'event', channel: 'integrations:link-changed' },
+  {
+    path: 'integrations.onContextInjected',
+    kind: 'event',
+    channel: 'integrations:context-injected',
+  },
+
   // ── top-level ─────────────────────────────────────────────────────────────
   // Native: webUtils.getPathForFile. No remote equivalent.
   { path: 'getFilePath', kind: 'local', remote: 'omit' },
