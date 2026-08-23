@@ -1,0 +1,130 @@
+tests/unit/renderer/components/LinkIssueDialog.spec.tsx
+  s_1b2bbe25506890::t_7d60864f8bc4f1 194-196
+  s_1b2bbe25506890::t_c8daa918875828 21
+  s_1b2bbe25506890::t_85ddf7f1ed59c2 1-20,22-193,197-237,241-247,249-256
+  s_1b2bbe25506890::t_3b82b6a2b93487 238-240,248
+tests/unit/renderer/components/ScopeMenu.spec.tsx
+  s_1b2bbe25506890::t_8aa5f86cb2156c 69-147
+  s_1b2bbe25506890::t_22d4959b43dbf3 148-152
+tests/unit/renderer/components/IssueMarkdown.spec.tsx
+  s_1b2bbe25506890::t_bb2a9f3642490e 1-146,148-172,176-223
+  s_1b2bbe25506890::t_e047ce3357d6ac 147,173-175
+src/renderer/components/settings/IntegrationsSettings.css
+  s_1b2bbe25506890::t_59fa33ac16be96 1-111
+src/renderer/components/integrations/IssueBadge.css
+  s_1b2bbe25506890::t_69afd381cd602c 1-66
+src/renderer/components/sidebar/SessionGroup.tsx
+  s_1b2bbe25506890::t_ce4c166344bd22 24-28,66,160
+  s_1b2bbe25506890::t_87d432ecbe5b00 23,161
+src/renderer/components/integrations/IssuePicker.tsx
+  s_1b2bbe25506890::t_edda9b39360258 107-109
+  s_1b2bbe25506890::t_788b9fd7adb074 16-23,60-63,105
+  s_1b2bbe25506890::t_c654292641401e 46-47
+  s_1b2bbe25506890::t_b3366d87adc154 1-15,24-45,48-59,64-104,106,110-136
+src/renderer/components/integrations/LinkIssueDialog.tsx
+  s_1b2bbe25506890::t_7d60864f8bc4f1 87
+  s_1b2bbe25506890::t_a6d62bd699b585 1-86,88-105,107-180,182-184,186-195
+  s_1b2bbe25506890::t_51a50a11c4ed58 106,181,185
+src/renderer/components/sidebar/UnifiedSidebar.css
+  s_1b2bbe25506890::t_9e4a72db092674 110-124
+src/renderer/components/integrations/LinkIssueDialog.css
+  s_1b2bbe25506890::t_bcffb7a6ca0c3d 24-26
+  s_1b2bbe25506890::t_8af33058c3735e 1-23,27-153
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_1b2bbe25506890::t_684efda5ea5a92 28-29,31,148-154,161-162,524,660,662-664,676-684
+  s_1b2bbe25506890::t_a343f11dde88a9 419-444,446-460
+  s_1b2bbe25506890::t_5b1e1f169a48d0 155-157,661,685
+  s_1b2bbe25506890::t_9e4a72db092674 30,158-160,445,687-703
+  s_1b2bbe25506890::t_5abd35873a6671 461,686,704
+src/renderer/components/integrations/IssueMarkdown.css
+  s_1b2bbe25506890::t_a098555b17a636 1-143
+tests/unit/renderer/components/IssuePicker.spec.tsx
+  s_1b2bbe25506890::t_c8daa918875828 17,92-104,112-114
+  s_1b2bbe25506890::t_4b05d77a1f8656 1-16,18-34,36-91,105-111,115-132
+  s_1b2bbe25506890::t_c654292641401e 35
+src/renderer/stores/integrations.store.ts
+  s_1b2bbe25506890::t_9e4a72db092674 49-50,71-72,134,210-213
+  s_1b2bbe25506890::t_e57a077b9c7c54 83-88,90-101,139,141,146-147,153,164-165,173-174,190,194
+  s_1b2bbe25506890::t_7340193bce2351 1-2,4,6-34,40,51-54,65-68,73-75,78-80,89,102-103,128-130,132,135-138,140,142-145,148-152,154-159,178,195-197,199-202,204-205,214-219,221-223,231,236-238,243-245
+  s_1b2bbe25506890::t_5b1e1f169a48d0 41-48,69-70,133,206-209
+  s_1b2bbe25506890::t_0f516acb2b6bf7 104-127,182,198,203,220,225
+  s_1b2bbe25506890::t_c046815e890d89 3,5,35-39,55-64,76-77,81-82,131,160-163,166-172,175-177,179-181,183-189,191-193,224,226-230,232-235,239-242
+tests/unit/renderer/stores/integrations.store.spec.ts
+  s_1b2bbe25506890::t_d7d2ab03aa98e0 97-99,112-114
+  s_1b2bbe25506890::t_3729a5d923a3e4 9-13,15,41-42,46,172-181,198-328
+  s_1b2bbe25506890::t_8a2d7567edd91c 17-25
+  s_1b2bbe25506890::t_2847e10bd8bfb5 331-397
+  s_1b2bbe25506890::t_1e1ef3edf461b4 1-8,14,16,26-40,43-45,47-96,100-111,115-171,182-197,329-330
+src/renderer/components/integrations/IssueDrawer.tsx
+  s_1b2bbe25506890::t_aea8ad8276255b 1-200,202-256
+  s_1b2bbe25506890::t_e047ce3357d6ac 201
+src/shared/integrations/branch-from-issue.ts
+  s_1b2bbe25506890::t_6054fa6fbf53ec 1-29,40-62,66-90
+  s_1b2bbe25506890::t_c654292641401e 30-39,63-65
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_1b2bbe25506890::t_5acaf60651fd2b 526,529,531
+  s_1b2bbe25506890::t_4fbf9b9ce875c0 14,462-525,527-528,530,532-545,547-590
+  s_1b2bbe25506890::t_c654292641401e 546
+  s_1b2bbe25506890::t_3e5fd66dfcf697 591
+src/renderer/components/integrations/IssueMarkdown.tsx
+  s_1b2bbe25506890::t_257d3fe77dea50 2,22-24,30-32,34-40,43,45-53,69
+  s_1b2bbe25506890::t_cc16103e9811bf 42,44
+  s_1b2bbe25506890::t_1832c49857ee9e 1,3-21,25-29,33,41,54-68,70-86
+src/renderer/components/sidebar/CreateProjectDialog.tsx
+  s_1b2bbe25506890::t_564a82eeba53a6 7-8,13,36-38,41,82-97,119-126,170,201,226-237
+  s_1b2bbe25506890::t_c654292641401e 9-12
+src/renderer/components/integrations/IssueDrawer.css
+  s_1b2bbe25506890::t_0a79f02593f4ab 1-211
+src/renderer/App.tsx
+  s_1b2bbe25506890::t_e047ce3357d6ac 61
+  s_1b2bbe25506890::t_75b1810ed1fe78 13
+  s_1b2bbe25506890::t_20aedb57e8cd95 249-258,260-262,269-282
+  s_1b2bbe25506890::t_5b1e1f169a48d0 259
+  s_1b2bbe25506890::t_9e4a72db092674 263-268
+  s_1b2bbe25506890::t_27639a22199197 283-284
+src/renderer/components/sidebar/ScopeMenu.tsx
+  s_1b2bbe25506890::t_ce4c166344bd22 9-14,35-39,59-104
+tests/unit/renderer/components/IssueBadge.spec.tsx
+  s_1b2bbe25506890::t_6e50b777677a2a 1-12,16-104
+  s_1b2bbe25506890::t_7d60864f8bc4f1 13-15
+tests/unit/integrations/branch-from-issue.spec.ts
+  s_1b2bbe25506890::t_1025c0447ea889 1-4,6-42,46-58,62-72,76-126
+  s_1b2bbe25506890::t_c654292641401e 43-45,59-61,73-75
+  s_1b2bbe25506890::t_6054fa6fbf53ec 5
+src/renderer/components/settings/IntegrationsSettings.tsx
+  s_1b2bbe25506890::t_d7d2ab03aa98e0 20-22,102-108
+  s_1b2bbe25506890::t_5bcc3e87ce6bee 1-19,23-101,109-270
+src/renderer/components/integrations/IssueBadge.tsx
+  s_1b2bbe25506890::t_ceee6497415575 1-63
+src/renderer/components/settings/SettingsPanel.tsx
+  s_1b2bbe25506890::t_2fb75c58170af1 3,10,49-54,71
+src/renderer/components/integrations/IssuePicker.css
+  s_1b2bbe25506890::t_b8f89b26f4901f 1-25,29-157
+  s_1b2bbe25506890::t_bcffb7a6ca0c3d 26-28
+tests/unit/renderer/components/IssueDrawer.spec.tsx
+  s_1b2bbe25506890::t_5b55876029f01c 94-97
+  s_1b2bbe25506890::t_c0478c6eef08f3 1-44,46-49,57-83,85-91,98-100,103,107-111,114-116,119-121,124-128,131-135,138-142,144-155,157-170,173-177,179-188,190-197,199-221,223-251,253-260,262-265,268-270
+  s_1b2bbe25506890::t_e047ce3357d6ac 45,104-106,222
+  s_1b2bbe25506890::t_3b82b6a2b93487 50-56,84,92-93,101-102,112-113,117-118,122-123,136-137,143,156,171-172,178,252,261,266-267
+  s_1b2bbe25506890::t_97592b9af218ef 129-130,189,198
+tests/unit/renderer/components/IntegrationsSettings.spec.tsx
+  s_1b2bbe25506890::t_1f612f8b1c08fb 131-135,141-151
+  s_1b2bbe25506890::t_d7d2ab03aa98e0 87-91,208-212
+  s_1b2bbe25506890::t_ba079e02a06747 1-86,92-130,136-140,152-207,213-304
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "ad49b9f230707a6ae46673be9113380fe15fc8b6",
+  "prompts": {},
+  "sessions": {
+    "s_1b2bbe25506890": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "039a9a9a-6645-4d53-990e-4529c70b1991",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
