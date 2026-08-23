@@ -6,6 +6,10 @@ import { registerTerminalHandlers } from './ipc/terminal.ipc.js'
 import { registerSettingsHandlers } from './ipc/settings.ipc.js'
 import { registerExtensionHandlers } from './ipc/extension.ipc.js'
 import { registerGitHandlers } from './ipc/git.ipc.js'
+import { registerIntegrationsHandlers } from './ipc/integrations.ipc.js'
+import { migrateLegacyCredentials } from './integrations/tracker-store.js'
+import { loadLinks, registerLinkGarbageCollection } from './integrations/issue-link-store.js'
+import { ensureHookScript } from './integrations/context-sync.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
 import { registerFsHandlers } from './ipc/fs.ipc.js'
 import { registerLogHandlers } from './ipc/log.ipc.js'
@@ -359,6 +363,18 @@ app.whenReady().then(async () => {
     viewHost?.broadcastToAll('workspace:changed', data)
   })
   registerGitHandlers()
+  registerIntegrationsHandlers(() => mainWindow)
+  // The operator already gave these to the SpecKit Pilot extension; asking
+  // again because the code moved would be the migration failing at the only
+  // thing it exists to do. Best-effort — a failure here never blocks startup.
+  void migrateLegacyCredentials()
+  // Links are read once and held in memory; every reader of them is on a hot
+  // path (the sidebar draws a badge per project) and none can await a file.
+  void loadLinks()
+  registerLinkGarbageCollection()
+  // Written at startup rather than shipped beside the bundle: a loose script
+  // survives development and vanishes from the packaged app (ADR-026).
+  void ensureHookScript()
   registerShellHandlers()
   registerFsHandlers(() => mainWindow)
   registerLogHandlers()

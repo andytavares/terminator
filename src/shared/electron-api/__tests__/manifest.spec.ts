@@ -105,11 +105,36 @@ describe('remoteAccessibleCoreChannels()', () => {
     'menu:toggle-sidebar',
     'menu:close-tab',
     'menu:open-about',
+    // Issue-tracker integrations. Everything the remote surface needs to read
+    // and attach issues — but note connect/disconnect are deliberately absent
+    // below, and asserted absent in their own test.
+    'integrations:status',
+    'integrations:set-mine',
+    'integrations:issue-list-mine',
+    'integrations:issue-search',
+    'integrations:issue-get',
+    'integrations:issue-comment',
+    'integrations:link-set',
+    'integrations:link-get',
+    'integrations:link-clear',
+    'integrations:context-preview',
+    'integrations:set-inject-context',
+    'integrations:status-changed',
+    'integrations:link-changed',
+    'integrations:context-injected',
   ]
 
   it('derives exactly the expected remote surface', () => {
     const derived = remoteAccessibleCoreChannels()
     expect([...derived].sort()).toEqual([...EXPECTED].sort())
+  })
+
+  it('never exposes credential writes to the remote bridge', () => {
+    // A LAN-reachable surface has no business storing or destroying the
+    // operator's tracker credentials, however well authenticated it is.
+    const derived = remoteAccessibleCoreChannels()
+    expect(derived.has('integrations:connect')).toBe(false)
+    expect(derived.has('integrations:disconnect')).toBe(false)
   })
 
   it('keeps internal-only channels unreachable (default-deny holds)', () => {

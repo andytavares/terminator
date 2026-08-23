@@ -4,6 +4,13 @@ import { useSettingsStore } from '../../stores/settings.store'
 import type { Branch, WorktreeInfo } from '../../../shared/types/index'
 import { BranchSelect } from './BranchSelect'
 import { useModalEffect } from '../../stores/modal.store'
+import { useIntegrationsStore } from '../../stores/integrations.store'
+import { IssuePicker } from '../integrations/IssuePicker'
+import {
+  branchFromIssue,
+  projectNameFromIssue,
+} from '../../../shared/integrations/branch-from-issue'
+import type { IssueSummary } from '../../../shared/types/index'
 import './Dialog.css'
 
 type BranchMode = 'existing' | 'worktree'
@@ -26,8 +33,12 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
   const [worktreePath, setWorktreePath] = useState('')
   const [gitRoot, setGitRoot] = useState<string | null>(null)
   const [error, setError] = useState('')
+  // Set when the operator started from an issue; drives the prefill and the
+  // link made once the project exists.
+  const [issue, setIssue] = useState<IssueSummary | null>(null)
 
   const { createProject, projectsByWorkspaceId, workspaces } = useWorkspaceStore()
+  const { linkIssue, isAnyConnected } = useIntegrationsStore()
   const { resolveSettings } = useSettingsStore()
   const workspace = workspaces.find((w) => w.id === workspaceId)
   const worktreeBaseDir = resolveSettings(workspaceId).git.worktreeBaseDir || undefined
@@ -68,6 +79,22 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
     })
   }, [gitRoot, branchMode, selectedBranch, worktreeIsNewBranch, newBranchName, worktreeBaseDir])
 
+  /**
+   * Fill in from the issue, once.
+   *
+   * Every field stays editable afterwards and is never re-derived: an operator
+   * who renamed the branch meant it, and a second prefill would quietly undo
+   * their edit.
+   */
+  function applyIssue(picked: IssueSummary): void {
+    setIssue(picked)
+    setName(projectNameFromIssue(picked))
+    setNameError('')
+    setWorktreeIsNewBranch(true)
+    setNewBranchName(branchFromIssue(picked))
+    setBranchMode('worktree')
+  }
+
   function validateName(value: string): string {
     if (!value.trim()) return 'Name is required'
     if (value.length > 100) return 'Name must be 100 characters or less'
@@ -87,6 +114,14 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
         .replace(/\.\.+/g, '.')
         .replace(/^[./]+|[./]+$/g, '')
     )
+  }
+
+  /** The project exists; give it the issue it was created for (FR-011). */
+  async function attachIssue(result: unknown): Promise<void> {
+    if (issue === null) return
+    const project = (result as { project?: { id?: string } }).project
+    if (project?.id === undefined) return
+    await linkIssue(project.id, issue.tracker, issue.key)
   }
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
@@ -132,6 +167,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
         else setError('Failed to create project')
         return
       }
+      await attachIssue(result)
     } else {
       // worktree
       const branch = worktreeIsNewBranch ? newBranchName.trim() : selectedBranch
@@ -162,6 +198,7 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
         else setError('Failed to create project')
         return
       }
+      await attachIssue(result)
     }
     onClose()
   }
@@ -186,6 +223,18 @@ export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Elemen
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
         <h2 className="dialog__title">Create Project</h2>
         <form onSubmit={handleSubmit}>
+          {isAnyConnected() && (
+            <div className="dialog__field">
+              <label className="dialog__label">Start from an issue</label>
+              <IssuePicker selected={issue} onSelect={applyIssue} onClear={() => setIssue(null)} />
+              {issue !== null && (
+                <span className="dialog__hint">
+                  Name and branch filled in from {issue.key}. Both stay editable.
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="dialog__field">
             <label className="dialog__label">Name *</label>
             <input

@@ -227,3 +227,76 @@ describe('SessionGroup — hosting workspace extension buttons (surface 2)', () 
     expect(onToggleCollapse).not.toHaveBeenCalled()
   })
 })
+
+// ── Issue actions on the group header ───────────────────────────────────────
+//
+// This is the menu a right-click actually reaches when the sidebar is grouped
+// by project — which is the default. The actions first shipped only on
+// ScopeMenu, which is the *other* grouping, so they were unreachable for
+// everyone using the default view. Tested here so that cannot recur.
+
+describe('SessionGroup — the attached issue', () => {
+  const actions = {
+    onLinkIssue: vi.fn(),
+    onOpenIssue: vi.fn(),
+    onCopyIssueKey: vi.fn(),
+    onUnlinkIssue: vi.fn(),
+  }
+
+  function openMenu(issueActions: Record<string, unknown> | undefined) {
+    const { container } = render(
+      <SessionGroup
+        group={
+          {
+            key: 'p1',
+            label: 'terminator',
+            count: 1,
+            sessions: [],
+            scope: { projectId: 'p1' },
+          } as never
+        }
+        collapsed={false}
+        onToggleCollapse={vi.fn()}
+        onRename={vi.fn()}
+        onRemove={vi.fn()}
+        issueActions={issueActions as never}
+      >
+        <div />
+      </SessionGroup>
+    )
+    fireEvent.contextMenu(container.querySelector('.session-group__header') as Element)
+  }
+
+  beforeEach(() => vi.clearAllMocks())
+
+  it('offers Link when the project has no issue', () => {
+    openMenu({ issueKey: null, ...actions })
+    expect(screen.getByText('Link issue…')).toBeTruthy()
+  })
+
+  it('offers the full set once an issue is attached', () => {
+    openMenu({ issueKey: 'TAV-42', ...actions })
+    expect(screen.getByText('Open TAV-42 in tracker')).toBeTruthy()
+    expect(screen.getByText('Copy issue key')).toBeTruthy()
+    expect(screen.getByText('Change linked issue…')).toBeTruthy()
+    expect(screen.getByText('Unlink TAV-42')).toBeTruthy()
+  })
+
+  it('still offers Rename and Remove alongside them', () => {
+    openMenu({ issueKey: 'TAV-42', ...actions })
+    expect(screen.getByText('Rename')).toBeTruthy()
+    expect(screen.getByText('Remove')).toBeTruthy()
+  })
+
+  it('calls the handler for the item picked', () => {
+    openMenu({ issueKey: 'TAV-42', ...actions })
+    fireEvent.click(screen.getByText('Copy issue key'))
+    expect(actions.onCopyIssueKey).toHaveBeenCalled()
+  })
+
+  it('shows only Rename and Remove when the host offers no issue actions', () => {
+    openMenu(undefined)
+    expect(screen.getByText('Rename')).toBeTruthy()
+    expect(screen.queryByText('Link issue…')).toBeNull()
+  })
+})

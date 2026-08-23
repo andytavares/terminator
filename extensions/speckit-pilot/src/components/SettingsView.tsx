@@ -1,13 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { CheckCircle, XCircle, Save, Eye, EyeOff, Lock } from 'lucide-react'
+import { CheckCircle, Save, Lock } from 'lucide-react'
 import { getSpeckitAPI, type ModelChoiceView } from '../types/electron.js'
 import type { PhaseGateConfig, PilotSettings } from '../types/speckit.types.js'
 import { PHASE_ORDER, DEFAULT_SETTINGS } from '../types/speckit.types.js'
-
-interface ConnectionStatus {
-  linear: boolean
-  jira: boolean
-}
 
 const SETTINGS_KEY = 'speckit-pilot-global-settings'
 
@@ -61,32 +56,12 @@ const FALLBACK_MODELS: ModelChoiceView[] = [
 ]
 
 export function SettingsView() {
-  const [connection, setConnection] = useState<ConnectionStatus>({ linear: false, jira: false })
-  const [connLoading, setConnLoading] = useState(true)
   const [settings, setSettings] = useState<PilotSettings>(loadSettings)
   const [settingsSaved, setSettingsSaved] = useState(false)
   // Seeded with the aliases so the box is never briefly empty: the pinned ids
   // need a round trip, and the aliases are the whole list for anyone without a
   // Models API credential anyway.
   const [models, setModels] = useState<ModelChoiceView[]>(FALLBACK_MODELS)
-
-  // Linear form state
-  const [linearKey, setLinearKey] = useState('')
-  const [linearEmail, setLinearEmail] = useState('')
-  const [linearKeyVisible, setLinearKeyVisible] = useState(false)
-  const [linearSaving, setLinearSaving] = useState(false)
-  const [linearError, setLinearError] = useState<string | null>(null)
-  const [linearSaved, setLinearSaved] = useState(false)
-
-  // Jira form state
-  const [jiraDomain, setJiraDomain] = useState('')
-  const [jiraEmail, setJiraEmail] = useState('')
-  const [jiraToken, setJiraToken] = useState('')
-  const [jiraTokenVisible, setJiraTokenVisible] = useState(false)
-  const [jiraJql, setJiraJql] = useState('')
-  const [jiraSaving, setJiraSaving] = useState(false)
-  const [jiraError, setJiraError] = useState<string | null>(null)
-  const [jiraSaved, setJiraSaved] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -116,78 +91,6 @@ export function SettingsView() {
       cancelled = true
     }
   }, [])
-
-  useEffect(() => {
-    const api = getSpeckitAPI()
-    Promise.all([
-      api.credentialsStatus({ source: 'linear' }),
-      api.credentialsStatus({ source: 'jira' }),
-    ])
-      .then(([lin, jir]) => {
-        setConnection({
-          linear: 'connected' in lin ? lin.connected : false,
-          jira: 'connected' in jir ? jir.connected : false,
-        })
-        if ('email' in lin && lin.email) setLinearEmail(lin.email)
-      })
-      .catch(() => {})
-      .finally(() => setConnLoading(false))
-  }, [])
-
-  async function saveLinear() {
-    // Allow saving the email alone (to update it) once a key is already stored.
-    if (!linearKey.trim() && !connection.linear) return
-    setLinearSaving(true)
-    setLinearError(null)
-    setLinearSaved(false)
-    try {
-      const result = await getSpeckitAPI().credentialsSet({
-        source: 'linear',
-        apiKey: linearKey.trim() || undefined,
-        email: linearEmail.trim() || undefined,
-      })
-      if ('error' in result) {
-        setLinearError(result.error)
-      } else {
-        setConnection((c) => ({ ...c, linear: true }))
-        setLinearKey('')
-        setLinearSaved(true)
-        setTimeout(() => setLinearSaved(false), 3000)
-      }
-    } catch (e) {
-      setLinearError(String(e))
-    } finally {
-      setLinearSaving(false)
-    }
-  }
-
-  async function saveJira() {
-    if (!jiraDomain.trim() || !jiraEmail.trim() || !jiraToken.trim()) return
-    setJiraSaving(true)
-    setJiraError(null)
-    setJiraSaved(false)
-    try {
-      const result = await getSpeckitAPI().credentialsSet({
-        source: 'jira',
-        domain: jiraDomain.trim(),
-        email: jiraEmail.trim(),
-        apiToken: jiraToken.trim(),
-        jql: jiraJql.trim(),
-      })
-      if ('error' in result) {
-        setJiraError(result.error)
-      } else {
-        setConnection((c) => ({ ...c, jira: true }))
-        setJiraToken('')
-        setJiraSaved(true)
-        setTimeout(() => setJiraSaved(false), 3000)
-      }
-    } catch (e) {
-      setJiraError(String(e))
-    } finally {
-      setJiraSaving(false)
-    }
-  }
 
   function updateSettings(patch: Partial<PilotSettings>) {
     setSettings((prev) => ({ ...prev, ...patch }))
@@ -359,173 +262,15 @@ export function SettingsView() {
 
   return (
     <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
-      {/* ─── Section 1: Ticket integrations ─── */}
+      {/* Tracker credentials moved to Settings → Integrations (ExtensionAPI
+          v2.2.0). This extension holds none: it asks the application, which
+          means uninstalling it orphans nothing. */}
       <div style={s.section}>
         <div style={s.label}>Ticket integrations</div>
-        {connLoading ? (
-          <div style={{ color: 'var(--tm-text-secondary)', fontSize: 13 }}>Loading…</div>
-        ) : (
-          <>
-            {/* Linear */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={s.row}>
-                {connection.linear ? <CheckCircle size={14} /> : <XCircle size={14} />}
-                <span>Linear — {connection.linear ? 'Connected' : 'Not connected'}</span>
-              </div>
-              <div style={s.field}>
-                <label style={s.fieldLabel} htmlFor="linear-api-key">
-                  API Key
-                  {connection.linear && (
-                    <span style={{ color: 'var(--tm-success)' }}> (update)</span>
-                  )}
-                </label>
-                <div style={s.inputWrap}>
-                  <input
-                    id="linear-api-key"
-                    type={linearKeyVisible ? 'text' : 'password'}
-                    placeholder={connection.linear ? '••••••••••••••••' : 'lin_api_...'}
-                    value={linearKey}
-                    onChange={(e) => setLinearKey(e.target.value)}
-                    style={s.input}
-                    aria-label="Linear API key"
-                  />
-                  <button
-                    style={s.iconBtn}
-                    onClick={() => setLinearKeyVisible((v) => !v)}
-                    aria-label={linearKeyVisible ? 'Hide key' : 'Show key'}
-                    type="button"
-                  >
-                    {linearKeyVisible ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </div>
-                <label
-                  style={{ ...s.fieldLabel, display: 'block', marginTop: 10 }}
-                  htmlFor="linear-email"
-                >
-                  Your Linear email
-                </label>
-                <input
-                  id="linear-email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={linearEmail}
-                  onChange={(e) => setLinearEmail(e.target.value)}
-                  style={s.input}
-                  aria-label="Linear user email"
-                />
-                <div style={{ fontSize: 11, color: 'var(--tm-text-secondary)', marginTop: 4 }}>
-                  Used to look up your assigned issues. Leave blank to use the API key's own user.
-                </div>
-              </div>
-              <button
-                style={s.saveBtn}
-                onClick={saveLinear}
-                disabled={linearSaving || (!linearKey.trim() && !connection.linear)}
-                aria-label="Save Linear credentials"
-              >
-                <Save size={13} />
-                {linearSaving ? 'Saving…' : 'Save'}
-              </button>
-              {linearError && <div style={s.error}>{linearError}</div>}
-              {linearSaved && (
-                <div style={s.saved}>
-                  <CheckCircle size={12} /> Saved
-                </div>
-              )}
-            </div>
-
-            {/* Jira */}
-            <div>
-              <div style={s.row}>
-                {connection.jira ? <CheckCircle size={14} /> : <XCircle size={14} />}
-                <span>Jira — {connection.jira ? 'Connected' : 'Not connected'}</span>
-              </div>
-              <div style={s.field}>
-                <label style={s.fieldLabel} htmlFor="jira-domain">
-                  Domain
-                </label>
-                <input
-                  id="jira-domain"
-                  type="text"
-                  placeholder="yourcompany.atlassian.net"
-                  value={jiraDomain}
-                  onChange={(e) => setJiraDomain(e.target.value)}
-                  style={s.input}
-                  aria-label="Jira domain"
-                />
-              </div>
-              <div style={s.field}>
-                <label style={s.fieldLabel} htmlFor="jira-email">
-                  Email
-                </label>
-                <input
-                  id="jira-email"
-                  type="email"
-                  placeholder="you@company.com"
-                  value={jiraEmail}
-                  onChange={(e) => setJiraEmail(e.target.value)}
-                  style={s.input}
-                  aria-label="Jira email"
-                />
-              </div>
-              <div style={s.field}>
-                <label style={s.fieldLabel} htmlFor="jira-token">
-                  API Token
-                </label>
-                <div style={s.inputWrap}>
-                  <input
-                    id="jira-token"
-                    type={jiraTokenVisible ? 'text' : 'password'}
-                    placeholder={connection.jira ? '••••••••••••••••' : 'ATATT3...'}
-                    value={jiraToken}
-                    onChange={(e) => setJiraToken(e.target.value)}
-                    style={s.input}
-                    aria-label="Jira API token"
-                  />
-                  <button
-                    style={s.iconBtn}
-                    onClick={() => setJiraTokenVisible((v) => !v)}
-                    aria-label={jiraTokenVisible ? 'Hide token' : 'Show token'}
-                    type="button"
-                  >
-                    {jiraTokenVisible ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </div>
-              </div>
-              <div style={s.field}>
-                <label style={s.fieldLabel} htmlFor="jira-jql">
-                  JQL filter <span style={{ fontWeight: 400 }}>(optional)</span>
-                </label>
-                <input
-                  id="jira-jql"
-                  type="text"
-                  placeholder="project = ENG AND assignee = currentUser()"
-                  value={jiraJql}
-                  onChange={(e) => setJiraJql(e.target.value)}
-                  style={s.input}
-                  aria-label="Jira JQL filter"
-                />
-              </div>
-              <button
-                style={s.saveBtn}
-                onClick={saveJira}
-                disabled={
-                  jiraSaving || !jiraDomain.trim() || !jiraEmail.trim() || !jiraToken.trim()
-                }
-                aria-label="Save Jira credentials"
-              >
-                <Save size={13} />
-                {jiraSaving ? 'Saving…' : 'Save'}
-              </button>
-              {jiraError && <div style={s.error}>{jiraError}</div>}
-              {jiraSaved && (
-                <div style={s.saved}>
-                  <CheckCircle size={12} /> Saved
-                </div>
-              )}
-            </div>
-          </>
-        )}
+        <div style={{ color: 'var(--tm-text-secondary)', fontSize: 13 }}>
+          Linear and Jira are connected once in the application&rsquo;s own Settings → Integrations.
+          The board reads that connection.
+        </div>
       </div>
 
       {/* ─── Section 2: Autonomy & gates ─── */}

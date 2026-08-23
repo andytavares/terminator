@@ -92,9 +92,16 @@ export const PrApprovalSchema = z.object({
 // ─── Issue references ─────────────────────────────────────────────────────────
 
 export const IssueRefSchema = z.object({
-  type: z.enum(['github', 'linear']),
+  type: z.enum(['github', 'linear', 'jira']),
   ref: z.string(),
   url: z.string().optional(),
+  /**
+   * Filled in from the application's tracker connection when there is one
+   * (ExtensionAPI v2.2.0). A bare key tells a reviewer nothing; the title and
+   * state are the reason the reference is worth showing at all.
+   */
+  title: z.string().optional(),
+  state: z.string().optional(),
 })
 
 // ─── DRY violations ───────────────────────────────────────────────────────────

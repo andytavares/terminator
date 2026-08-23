@@ -592,3 +592,49 @@ describe('a process that dies before anything is on screen', () => {
     expect(mgr.releaseOutput('dead')).toBe(false)
   })
 })
+
+/** The environment node-pty was actually handed. */
+async function lastSpawnEnv(): Promise<Record<string, string | undefined>> {
+  const pty = await import('node-pty')
+  const calls = vi.mocked(pty.spawn).mock.calls
+  return (calls[calls.length - 1][2] as { env: Record<string, string | undefined> }).env
+}
+
+describe('pty-manager — linked issue environment (FR-020 support)', () => {
+  it('adds the issue variables on top of the inherited environment', async () => {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const manager = new PtyManager()
+    manager.spawnSession({
+      sessionId: 'env-1',
+      cwd: '/tmp',
+      shell: '/bin/sh',
+      type: 'human',
+      origin: 'app',
+      env: { TERMINATOR_ISSUE_KEY: 'TAV-42', TERMINATOR_ISSUE_TRACKER: 'linear' },
+    })
+
+    const spawned = await lastSpawnEnv()
+    expect(spawned.TERMINATOR_ISSUE_KEY).toBe('TAV-42')
+    expect(spawned.TERMINATOR_ISSUE_TRACKER).toBe('linear')
+    // The rest of the parent environment is still there.
+    expect(spawned.PATH).toBe(process.env.PATH)
+    manager.kill('env-1')
+  })
+
+  it('adds nothing for a session with no linked issue', async () => {
+    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+    const manager = new PtyManager()
+    manager.spawnSession({
+      sessionId: 'env-2',
+      cwd: '/tmp',
+      shell: '/bin/sh',
+      type: 'human',
+      origin: 'app',
+    })
+
+    const spawned = await lastSpawnEnv()
+    expect(spawned.TERMINATOR_ISSUE_KEY).toBeUndefined()
+    expect(spawned.PATH).toBe(process.env.PATH)
+    manager.kill('env-2')
+  })
+})

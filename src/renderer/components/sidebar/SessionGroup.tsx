@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { WorkspaceTabRegistration } from '../../extensions/registry'
 import type { Group } from '../../sidebar/view-model'
 import { ContextMenu, closeAllContextMenus } from '../ContextMenu'
+import { issueMenuItems, type IssueMenuActions } from './issue-menu-items'
 import './SessionGroup.css'
 
 export interface SessionGroupProps {
@@ -20,6 +21,20 @@ export interface SessionGroupProps {
   branchSwitcher?: React.ReactNode
   /** True when this group's scope is the active project. */
   isActiveScope?: boolean
+  /**
+   * The attached issue's badge, for a group whose scope is a project. Passed
+   * as a node rather than as data so the sidebar's view-model stays ignorant
+   * of issue trackers entirely.
+   */
+  issueBadge?: React.ReactNode
+  /**
+   * The issue actions for this group's project.
+   *
+   * The header's own menu is what a right-click reaches when the sidebar is
+   * grouped by project — which is the default — so these have to be here as
+   * well as on ScopeMenu, not only there.
+   */
+  issueActions?: IssueMenuActions
   /**
    * Selects the group's scope. FR-026 requires the header to host everything
    * the tree's project row hosted, and that row's primary action was selecting
@@ -57,6 +72,8 @@ export function SessionGroup({
   busy,
   branchSwitcher,
   isActiveScope,
+  issueBadge,
+  issueActions,
   onSelectScope,
   onAddSession,
   onSelectAll,
@@ -78,7 +95,7 @@ export function SessionGroup({
   }
 
   function handleContextMenu(e: React.MouseEvent): void {
-    if (!onRename && !onRemove) return
+    if (!onRename && !onRemove && issueActions?.onLinkIssue === undefined) return
     e.preventDefault()
     closeAllContextMenus()
     setCtxMenu({ x: e.clientX, y: e.clientY })
@@ -96,6 +113,7 @@ export function SessionGroup({
           },
         ]
       : []),
+    ...issueMenuItems(issueActions ?? {}, () => setCtxMenu(null)),
     ...(onRemove
       ? [{ label: 'Remove', danger: true, separatorBefore: true, onSelect: onRemove }]
       : []),
@@ -149,6 +167,8 @@ export function SessionGroup({
         )}
 
         {busy && <span className="session-group__busy" />}
+
+        {issueBadge}
 
         {workspaceTabs && workspaceTabs.length > 0 && (
           <div className="session-group__ws-tabs" onClick={(e) => e.stopPropagation()}>

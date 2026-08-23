@@ -1,4 +1,8 @@
 import { handleChannel, onChannel } from './channel-registrar.js'
+import { getLink } from '../integrations/issue-link-store.js'
+import { readContextFile } from '../integrations/agent-context.js'
+import { notificationManager } from '../notifications/notification-manager.js'
+import { sendToWindow } from '../safe-send.js'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { homedir } from 'os'
@@ -26,6 +30,58 @@ const TerminalResizeSchema = z.object({
   rows: z.number().int().positive(),
 })
 
+/**
+ * The linked issue, for scripts and prompts inside the project's terminals.
+ *
+ * Convenience, not mechanism: an agent gets its context from the SessionStart
+ * hook, which also covers a `claude` the operator starts by hand elsewhere.
+ */
+function issueEnvFor(projectId: string | undefined): Record<string, string> | undefined {
+  if (projectId === undefined) return undefined
+  const link = getLink(projectId)
+  if (link === null) return undefined
+  return { TERMINATOR_ISSUE_KEY: link.key, TERMINATOR_ISSUE_TRACKER: link.tracker }
+}
+
+/**
+ * Tell the operator a session started knowing about an issue (FR-024).
+ *
+ * Through the notification system under its own key, so it can be turned down
+ * to centre-only or off like anything else — a notice on every terminal in a
+ * linked project would otherwise become noise nobody reads.
+ */
+async function announceIssueContext(
+  projectId: string | undefined,
+  sessionId: string,
+  getWindow: () => BrowserWindow | null
+): Promise<void> {
+  if (projectId === undefined) return
+  const link = getLink(projectId)
+  if (link === null || !link.injectContext) return
+
+  const context = await readContextFile(projectId)
+  if (context === null) return
+
+  sendToWindow(getWindow(), 'integrations:context-injected', {
+    projectId,
+    sessionId,
+    tracker: context.tracker,
+    key: context.key,
+    chars: context.chars,
+    truncated: context.truncated,
+  })
+
+  notificationManager.create({
+    type: 'info',
+    title: `Session started with ${context.key}`,
+    message: `${context.chars.toLocaleString()} characters of issue context${
+      context.truncated ? ' (shortened)' : ''
+    }`,
+    key: 'issueContextInjected',
+    source: 'core',
+  })
+}
+
 // PtyManager owns session state (see ADR-024); this layer only translates IPC
 // payloads and relays output/exit pushes to the renderer window.
 export function registerTerminalHandlers(
@@ -52,6 +108,7 @@ export function registerTerminalHandlers(
       origin: 'app',
       projectId,
       tabTitle,
+      env: issueEnvFor(projectId),
     })
     ptyManager.onData(sessionId, (data) => {
       const win = getWindow()
@@ -62,6 +119,8 @@ export function registerTerminalHandlers(
       if (win && !win.isDestroyed())
         win.webContents.send('terminal:process-exit', { sessionId, exitCode })
     })
+
+    void announceIssueContext(projectId, sessionId, getWindow)
 
     return { sessionId }
   })

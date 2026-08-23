@@ -10,6 +10,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { CommandPalette } from './components/CommandPalette'
 import { useWorkspaceStore } from './stores/workspace.store'
 import { useSettingsStore } from './stores/settings.store'
+import { useIntegrationsStore } from './stores/integrations.store'
 import { useSessionStore } from './stores/session.store'
 import { useTerminalSession } from './hooks/useTerminalSession'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -57,6 +58,7 @@ export function App(): JSX.Element {
     setScratchActive,
   } = useWorkspaceStore()
   const { loadSettings, globalSettings, markWelcomeSeen, resolveSettings } = useSettingsStore()
+  const { linkFor: issueLinkFor, issueFor, openLinkDialog, openDrawer } = useIntegrationsStore()
   const { system, enableGlobalMetrics, disableGlobalMetrics } = useMetricsStore()
   const {
     handleProcessExit,
@@ -242,6 +244,42 @@ export function App(): JSX.Element {
           void splitSession(activeProjectId, 'horizontal', cwd, settings.terminal.scrollbackLimit)
         },
       })
+    }
+
+    // Issue-tracker actions, scoped to the project you are in. Absent when
+    // there is no project, and pared back to "link" when nothing is attached —
+    // three dead rows would be worse than none.
+    if (activeProjectId) {
+      const link = issueLinkFor(activeProjectId)
+      const issue = issueFor(activeProjectId)
+      cmds.push({
+        id: 'core.link-issue',
+        label: link === null ? 'Link Issue to Project' : 'Change Linked Issue',
+        category: 'Issues',
+        action: () => openLinkDialog(activeProjectId),
+      })
+      if (link !== null) {
+        cmds.push({
+          id: 'core.view-issue',
+          label: `View ${link.key}`,
+          category: 'Issues',
+          action: () => openDrawer(activeProjectId),
+        })
+        cmds.push({
+          id: 'core.copy-issue-key',
+          label: `Copy Issue Key (${link.key})`,
+          category: 'Issues',
+          action: () => void navigator.clipboard?.writeText(link.key),
+        })
+        if (issue !== null) {
+          cmds.push({
+            id: 'core.open-issue',
+            label: `Open ${link.key} in ${link.tracker === 'linear' ? 'Linear' : 'Jira'}`,
+            category: 'Issues',
+            action: () => void window.electronAPI.shell.openExternal(issue.url),
+          })
+        }
+      }
     }
 
     workspaces.forEach((ws, i) => {

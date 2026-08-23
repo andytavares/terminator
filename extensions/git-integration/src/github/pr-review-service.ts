@@ -850,7 +850,49 @@ export function extractIssueRefs(body: string): IssueRef[] {
   while ((m = linearRe.exec(body)) !== null) {
     refs.push({ type: 'linear', ref: m[1], url: m[0] })
   }
+  // Jira: https://your-team.atlassian.net/browse/TEAM-123
+  const jiraRe = /https?:\/\/[^\s/]+\.atlassian\.net\/browse\/([A-Z][A-Z0-9]*-\d+)/g
+  while ((m = jiraRe.exec(body)) !== null) {
+    refs.push({ type: 'jira', ref: m[1], url: m[0] })
+  }
   return refs
+}
+
+/**
+ * Fill in what a bare key does not say.
+ *
+ * The scraper can only ever produce a key and a URL — it is a regex over a
+ * pull-request description. The application's tracker connection knows the
+ * title and the state, which is the part a reviewer actually wants.
+ *
+ * Best-effort by design: an unconnected or unreachable tracker leaves the
+ * references exactly as they render today, rather than failing a review.
+ */
+export async function enrichIssueRefs(
+  refs: IssueRef[],
+  issues: {
+    get(
+      tracker: 'linear' | 'jira',
+      key: string,
+      opts?: { refresh?: boolean }
+    ): Promise<{
+      title: string
+      state: { name: string }
+    } | null>
+  }
+): Promise<IssueRef[]> {
+  return Promise.all(
+    refs.map(async (ref) => {
+      if (ref.type === 'github') return ref
+      try {
+        const issue = await issues.get(ref.type, ref.ref)
+        if (issue === null) return ref
+        return { ...ref, title: issue.title, state: issue.state.name }
+      } catch {
+        return ref
+      }
+    })
+  )
 }
 
 // ─── DRY violation detection ──────────────────────────────────────────────────

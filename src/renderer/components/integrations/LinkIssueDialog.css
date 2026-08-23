@@ -1,0 +1,153 @@
+/* ── Link issue dialog ───────────────────────────────────────── */
+
+.link-issue {
+  width: 460px;
+  max-width: 92vw;
+}
+
+.link-issue__search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 9px;
+  margin-top: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.link-issue__search svg {
+  width: 11px;
+  height: 11px;
+  /* Inherits currentColor and dims by opacity — never a colour of its own
+     (Constitution XII). */
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+
+.link-issue__input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.link-issue__input::placeholder {
+  color: var(--text-muted);
+}
+
+/*
+ * A tracker that failed is named here rather than replacing the results: what
+ * arrived is still useful, and hiding it would turn a partial answer into no
+ * answer.
+ */
+.link-issue__failures {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--warning);
+}
+
+.link-issue__list {
+  margin-top: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.link-issue__group {
+  padding: 7px 10px 5px;
+  background: var(--bg-surface);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  position: sticky;
+  top: 0;
+}
+
+.link-issue__row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.link-issue__row:last-child {
+  border-bottom: none;
+}
+
+.link-issue__row:hover {
+  background: var(--bg-card-hover);
+}
+
+.link-issue__row--selected {
+  background: var(--accent-dim);
+}
+
+.link-issue__row--muted {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.link-issue__key {
+  width: 64px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.link-issue__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Which tracker an issue came from, because two trackers can share a key. */
+.link-issue__tracker,
+.link-issue__state {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.link-issue__warning {
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--warning);
+}
+
+.link-issue__empty {
+  margin-top: 16px;
+  padding: 20px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.link-issue__hint {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}

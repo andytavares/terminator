@@ -1,11 +1,14 @@
 import React from 'react'
 import type { WorkspaceTabRegistration } from '../../extensions/registry'
 import { ContextMenu } from '../ContextMenu'
+import { issueMenuItems, type IssueMenuActions } from './issue-menu-items'
 
 export interface ScopeMenuProps {
   x: number
   y: number
   projectName: string
+  /** The issue attached to this project, and what can be done with it. */
+  issueActions?: IssueMenuActions
   /** Workspace-scoped extension buttons, offered here as menu items instead. */
   workspaceTabs: WorkspaceTabRegistration[]
   onSelectWorkspaceTab: (tabId: string) => void
@@ -26,6 +29,7 @@ export function ScopeMenu({
   x,
   y,
   projectName,
+  issueActions,
   workspaceTabs,
   onSelectWorkspaceTab,
   onAddSession,
@@ -45,6 +49,7 @@ export function ScopeMenu({
             onAddSession()
           },
         },
+        ...issueMenuItems(issueActions ?? {}, onDismiss),
         ...workspaceTabs.map((tab, index) => ({
           label: tab.label,
           separatorBefore: index === 0,

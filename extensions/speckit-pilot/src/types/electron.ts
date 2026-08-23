@@ -52,14 +52,6 @@ export interface SpeckitAPI {
     note?: string
   }): Promise<{ state: PilotState } | { error: string }>
   ticketList(): Promise<{ tickets: Ticket[] } | { error: string }>
-  credentialsSet(
-    payload:
-      | { source: 'linear'; apiKey?: string; email?: string }
-      | { source: 'jira'; domain: string; email: string; apiToken: string; jql: string }
-  ): Promise<{ ok: true } | { error: string }>
-  credentialsStatus(payload: {
-    source: 'linear' | 'jira'
-  }): Promise<{ connected: boolean; email?: string; domain?: string } | { error: string }>
   runCancel(payload: {
     featureDir: string
     workspacePath: string
@@ -450,14 +442,6 @@ export function getSpeckitAPI(): SpeckitAPI {
     ticketList: () =>
       bridge.invoke('speckit:ticket-list', {}) as Promise<
         { tickets: Ticket[] } | { error: string }
-      >,
-    credentialsSet: (payload) =>
-      bridge.invoke('speckit:credentials-set', payload) as Promise<
-        { ok: true } | { error: string }
-      >,
-    credentialsStatus: (payload) =>
-      bridge.invoke('speckit:credentials-status', payload) as Promise<
-        { connected: boolean; email?: string; domain?: string } | { error: string }
       >,
     runCancel: (payload) =>
       bridge.invoke('speckit:run-cancel', payload) as Promise<

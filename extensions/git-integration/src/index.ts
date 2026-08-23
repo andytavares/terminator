@@ -55,10 +55,16 @@ export function activate(api: ExtensionAPI): void {
     disposables.push(api.ipc.registerHandler(channel, handler))
   }
   registerGitExtensionHandlers(registerFn)
-  registerGithubHandlers(registerFn, {
-    getGhPath: () => api.settings.get<string>('terminator.git-integration.git.ghCliPath') ?? '',
-    getToken: () => api.settings.get<string>('terminator.git-integration.git.githubToken') ?? '',
-  })
+  registerGithubHandlers(
+    registerFn,
+    {
+      getGhPath: () => api.settings.get<string>('terminator.git-integration.git.ghCliPath') ?? '',
+      getToken: () => api.settings.get<string>('terminator.git-integration.git.githubToken') ?? '',
+    },
+    // Optional: an older host has no issues namespace, and the review view
+    // then renders references exactly as it does today.
+    api.issues
+  )
 
   // Cross-iframe broadcast: any extension view can invoke this to open the
   // merge-flow view in the GitFullView iframe (which lives in a separate iframe context).

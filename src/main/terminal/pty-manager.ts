@@ -37,6 +37,15 @@ export interface SpawnSessionOptions {
    * output are simply missing from the terminal the operator opens.
    */
   holdOutput?: boolean
+  /**
+   * Added to the child's environment, on top of the parent's.
+   *
+   * Used for the linked issue's key and URL, so scripts and prompts in a
+   * project's terminals can reach them. Not how an agent receives its context
+   * — that is the SessionStart hook, which also covers a session started by
+   * hand outside the application.
+   */
+  env?: Record<string, string>
 }
 
 export interface SessionInfo {
@@ -107,7 +116,7 @@ export class PtyManager {
       cols: 80,
       rows: 24,
       cwd: opts.cwd,
-      env: process.env as { [key: string]: string },
+      env: { ...(process.env as { [key: string]: string }), ...(opts.env ?? {}) },
     })
 
     const session: ActiveSession = {

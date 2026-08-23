@@ -10,6 +10,29 @@ vi.mock('../../../src/main/storage/settings-store.js', () => ({
   getGlobalSettings: vi.fn(() => ({ terminal: { defaultShell: '/bin/zsh' } })),
 }))
 
+const issues = vi.hoisted(() => ({
+  link: null as unknown,
+  context: null as unknown,
+  create: vi.fn(),
+  sent: [] as Array<{ channel: string; data: unknown }>,
+}))
+
+vi.mock('../../../src/main/integrations/issue-link-store.js', () => ({
+  getLink: () => issues.link,
+}))
+vi.mock('../../../src/main/integrations/agent-context.js', () => ({
+  readContextFile: async () => issues.context,
+}))
+vi.mock('../../../src/main/notifications/notification-manager.js', () => ({
+  notificationManager: { create: issues.create },
+}))
+vi.mock('../../../src/main/safe-send.js', () => ({
+  sendToWindow: (_w: unknown, channel: string, data: unknown) => {
+    issues.sent.push({ channel, data })
+  },
+  sendToView: () => {},
+}))
+
 import { registerTerminalHandlers } from '../../../src/main/ipc/terminal.ipc.js'
 import type { SessionInfo } from '../../../src/main/terminal/pty-manager.js'
 
@@ -230,5 +253,89 @@ describe('registerTerminalHandlers', () => {
     it('delegates orphan cleanup', () => {
       expect(invokeHandler('terminal:cleanup-orphans')({})).toEqual({ cleanedCount: 2 })
     })
+  })
+})
+
+describe('terminal:create — linked issue', () => {
+  const P = '11111111-1111-4111-8111-111111111111'
+
+  beforeEach(() => {
+    issues.link = null
+    issues.context = null
+    issues.sent.length = 0
+    issues.create.mockClear()
+  })
+
+  async function createTerminal(ptyManager: ReturnType<typeof makeFakePtyManager>) {
+    registerTerminalHandlers(ptyManager as never, () => ({}) as never)
+    // The outer suite has already registered handlers against a different fake;
+    // mockHandle accumulates, so take the most recent registration, not the
+    // first one find() would return.
+    const calls = mockHandle.mock.calls.filter(([ch]) => ch === 'terminal:create')
+    const handler = calls[calls.length - 1][1] as (event: unknown, payload?: unknown) => unknown
+    return handler({}, { projectId: P, tabTitle: 'shell', type: 'human', cwd: '/tmp' })
+  }
+
+  it('passes the issue key and tracker into the session environment', async () => {
+    issues.link = { projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: true }
+    const ptyManager = makeFakePtyManager()
+    await createTerminal(ptyManager)
+
+    expect(ptyManager.spawnSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: { TERMINATOR_ISSUE_KEY: 'TAV-42', TERMINATOR_ISSUE_TRACKER: 'linear' },
+      })
+    )
+  })
+
+  it('passes no environment for an unlinked project', async () => {
+    const ptyManager = makeFakePtyManager()
+    await createTerminal(ptyManager)
+    expect(ptyManager.spawnSession).toHaveBeenCalledWith(
+      expect.objectContaining({ env: undefined })
+    )
+  })
+
+  it('tells the operator the session started with issue context (FR-024)', async () => {
+    issues.link = { projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: true }
+    issues.context = { tracker: 'linear', key: 'TAV-42', chars: 2143, truncated: false }
+    await createTerminal(makeFakePtyManager())
+    await new Promise((r) => setImmediate(r))
+
+    expect(issues.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'issueContextInjected',
+        title: expect.stringContaining('TAV-42'),
+      })
+    )
+    expect(issues.sent.map((s) => s.channel)).toContain('integrations:context-injected')
+  })
+
+  it('says how much context, and whether it was shortened', async () => {
+    issues.link = { projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: true }
+    issues.context = { tracker: 'linear', key: 'TAV-42', chars: 9900, truncated: true }
+    await createTerminal(makeFakePtyManager())
+    await new Promise((r) => setImmediate(r))
+
+    const call = issues.create.mock.calls[0][0] as { message: string }
+    expect(call.message).toContain('9,900')
+    expect(call.message).toContain('shortened')
+  })
+
+  it('says nothing when injection is turned off for the project', async () => {
+    issues.link = { projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: false }
+    issues.context = { tracker: 'linear', key: 'TAV-42', chars: 10, truncated: false }
+    await createTerminal(makeFakePtyManager())
+    await new Promise((r) => setImmediate(r))
+
+    expect(issues.create).not.toHaveBeenCalled()
+    expect(issues.sent).toHaveLength(0)
+  })
+
+  it('says nothing when no context has been written yet', async () => {
+    issues.link = { projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: true }
+    await createTerminal(makeFakePtyManager())
+    await new Promise((r) => setImmediate(r))
+    expect(issues.create).not.toHaveBeenCalled()
   })
 })

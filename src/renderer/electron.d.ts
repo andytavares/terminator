@@ -9,6 +9,13 @@ import type {
   SystemMetrics,
   ProcessMetrics,
   NotificationTarget,
+  AgentContext,
+  Issue,
+  IssueLink,
+  IssueListResult,
+  MineSelector,
+  TrackerConnection,
+  TrackerId,
 } from '../shared/types/index'
 
 export type { NotificationTarget }
@@ -215,6 +222,63 @@ interface ElectronAPI {
   }
   logger: {
     write(level: string, namespace: string, message: string): void
+  }
+  integrations: {
+    status(input: {
+      tracker?: TrackerId
+    }): Promise<{ connections: TrackerConnection[] } | { error: string; message?: string }>
+    connect(
+      input:
+        | { tracker: 'linear'; apiKey: string; email?: string | null }
+        | { tracker: 'jira'; site: string; email: string; apiToken: string; jql: string }
+    ): Promise<{ connection: TrackerConnection } | { error: string; message?: string }>
+    disconnect(input: { tracker: TrackerId }): Promise<{ ok: true } | { error: string }>
+    setMine(input: {
+      tracker: TrackerId
+      mine: MineSelector
+    }): Promise<{ ok: true } | { error: string }>
+    listMine(input: {
+      tracker?: TrackerId
+      limit?: number
+    }): Promise<IssueListResult | { error: string; message?: string }>
+    search(input: {
+      term: string
+      tracker?: TrackerId
+      limit?: number
+    }): Promise<IssueListResult | { error: string; message?: string }>
+    getIssue(input: {
+      tracker: TrackerId
+      key: string
+      refresh?: boolean
+    }): Promise<{ issue: Issue | null } | { error: string; message?: string }>
+    comment(input: {
+      tracker: TrackerId
+      key: string
+      body: string
+    }): Promise<{ ok: true } | { error: string; message?: string }>
+    linkSet(input: {
+      projectId: string
+      tracker: TrackerId
+      key: string
+      injectContext?: boolean
+    }): Promise<{ link: IssueLink } | { error: string; message?: string }>
+    linkGet(input: {
+      projectId: string
+    }): Promise<
+      | { link: IssueLink | null; issue: Issue | null; issueError?: string }
+      | { error: string; message?: string }
+    >
+    linkClear(input: { projectId: string }): Promise<{ ok: true } | { error: string }>
+    contextPreview(input: {
+      projectId: string
+    }): Promise<{ context: AgentContext } | { error: string; message?: string }>
+    setInjectContext(input: {
+      projectId: string
+      injectContext: boolean
+    }): Promise<{ ok: true } | { error: string; message?: string }>
+    onStatusChanged(handler: (payload: unknown) => void): () => void
+    onLinkChanged(handler: (payload: unknown) => void): () => void
+    onContextInjected(handler: (payload: unknown) => void): () => void
   }
   getFilePath(file: File): string
   extensionBridge: {
