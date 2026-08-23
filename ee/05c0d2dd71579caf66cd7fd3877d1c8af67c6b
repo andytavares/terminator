@@ -1,0 +1,98 @@
+tests/unit/integrations/tracker-store.spec.ts
+  s_1b2bbe25506890::t_738de142028429 1-7,13-15,17-34,36-165,168,170-256
+  s_1b2bbe25506890::t_7c1103224893a8 8-12,16,35,166-167,169
+src/main/integrations/providers/provider.ts
+  s_1b2bbe25506890::t_d0232119d815f3 1-77
+tests/unit/integrations/tracker-error.spec.ts
+  s_1b2bbe25506890::t_bb7e582e17ff3d 1-85
+tests/unit/integrations/issue-service.spec.ts
+  s_1b2bbe25506890::t_46b67e58b4c99c 1-174,176-180,185-219,230,232-296
+  s_1b2bbe25506890::t_c20195f3de4963 297-369
+  s_1b2bbe25506890::t_b31638a0619a5a 175,181-184,220-229,231
+src/main/integrations/tracker-store.ts
+  s_1b2bbe25506890::t_19d7fd38b8593e 1-24,27-227
+  s_1b2bbe25506890::t_9d719ce5e2e443 25-26
+src/shared/types/index.ts
+  s_1b2bbe25506890::t_788b9fd7adb074 274-282
+  s_1b2bbe25506890::t_0bf75400582ed0 194-273,283-328
+src/main/integrations/index.ts
+  s_1b2bbe25506890::t_ef701ca2282227 1-31
+docs/ARCHITECTURE.md
+  s_1b2bbe25506890::t_9d719ce5e2e443 60-74,103-113
+  s_1b2bbe25506890::t_c84692a9535a1a 78-79,401-436
+  s_1b2bbe25506890::t_f100a96f69b219 437-439
+tests/unit/integrations/providers/provider.spec.ts
+  s_1b2bbe25506890::t_f56bf297551a7b 1-38,42-67
+  s_1b2bbe25506890::t_9d719ce5e2e443 39-41
+src/main/integrations/providers/linear.provider.ts
+  s_1b2bbe25506890::t_7c728ba60c2843 1-36,40-60,64-134,136-154,156-244,249-262
+  s_1b2bbe25506890::t_788b9fd7adb074 135
+  s_1b2bbe25506890::t_9d719ce5e2e443 37-39,61-63,155
+  s_1b2bbe25506890::t_6b21079660011d 245-248
+tests/unit/integrations/providers/linear.provider.spec.ts
+  s_1b2bbe25506890::t_79e6d20ccf8c30 328-331
+  s_1b2bbe25506890::t_a36dd41b4381bd 160,182-194
+  s_1b2bbe25506890::t_6be1778160ea11 214-235,241-261,269-278,282-285,289-323,327,332-340
+  s_1b2bbe25506890::t_9d719ce5e2e443 100-102,143-145,236-240,262-268,279-281,286-288,324-326
+  s_1b2bbe25506890::t_dec0f0b0e3637c 1-63,78-99,103-142,146-159,161-181,195-213
+  s_1b2bbe25506890::t_c8daa918875828 64-77
+src/shared/schemas/integrations.schema.ts
+  s_1b2bbe25506890::t_fdfec1f86338fc 1-8,13,15-26,28-31,33-79
+  s_1b2bbe25506890::t_bcddb4809ed846 9-12,14,27,32
+tests/fixtures/integrations/linear/index.ts
+  s_1b2bbe25506890::t_f91607182d06af 1-76
+src/main/integrations/issue-service.ts
+  s_1b2bbe25506890::t_87cc0b53b98def 1-231
+src/main/integrations/tracker-error.ts
+  s_1b2bbe25506890::t_210a81c783e99f 23-24,26-29
+  s_1b2bbe25506890::t_86488f406ef7c5 1-22,25,30-97
+tests/unit/integrations/index.spec.ts
+  s_1b2bbe25506890::t_4cf569dd3d600c 63
+  s_1b2bbe25506890::t_57bb12ce93ddbe 54-58
+  s_1b2bbe25506890::t_7f54a97697534d 1-53,59-62,64-71
+src/main/integrations/providers/jira.provider.ts
+  s_1b2bbe25506890::t_467e31b7834916 1-142,146-213,216-285
+  s_1b2bbe25506890::t_788b9fd7adb074 143-145
+  s_1b2bbe25506890::t_9d719ce5e2e443 214-215
+tests/unit/integrations/providers/jira.provider.spec.ts
+  s_1b2bbe25506890::t_f5b6497c875c7e 249-269,275-375
+  s_1b2bbe25506890::t_9d719ce5e2e443 270-274
+  s_1b2bbe25506890::t_667dfdf8bdf400 1-15,21-78,80-118,125-152,154-158,160-248
+  s_1b2bbe25506890::t_d218c9b1431d32 16-20,79,153,159
+  s_1b2bbe25506890::t_c8daa918875828 119-124
+package.json
+  s_1b2bbe25506890::t_fbc79dc54f6a15 52,64-65
+tests/fixtures/integrations/jira/index.ts
+  s_1b2bbe25506890::t_be7d6e885d1842 1-104
+src/main/integrations/adf-to-markdown.ts
+  s_1b2bbe25506890::t_37a5ed2bd447b4 1-102,118-119,139-187,190-222
+  s_1b2bbe25506890::t_9d719ce5e2e443 103-117,188-189
+  s_1b2bbe25506890::t_e3c149f8696209 120-138
+tests/unit/integrations/adf-to-markdown.spec.ts
+  s_1b2bbe25506890::t_470b037368065b 1-166,168-215
+  s_1b2bbe25506890::t_9d719ce5e2e443 167,219-221,255-257,295-298
+  s_1b2bbe25506890::t_8772788be7bfe5 216-218,222-254,258-294,299-307
+docs/adr/029-core-issue-tracker-service.md
+  s_1b2bbe25506890::t_6b21079660011d 138-140
+  s_1b2bbe25506890::t_cdfc3431f6a203 134-136,141-144
+  s_1b2bbe25506890::t_933d84235bd4a2 1-13,16-43,45-69,74-90,92-133,137
+  s_1b2bbe25506890::t_9d719ce5e2e443 14-15,44,70-73,91
+package-lock.json
+  s_1b2bbe25506890::t_3f1c59ecd73d55 18,30-31,91-134,2563-2565,2568,2571,8376,12388-12390,12394,12543-12545
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "ee05c0d2dd71579caf66cd7fd3877d1c8af67c6b",
+  "prompts": {},
+  "sessions": {
+    "s_1b2bbe25506890": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "039a9a9a-6645-4d53-990e-4529c70b1991",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
