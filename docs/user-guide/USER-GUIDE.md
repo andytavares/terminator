@@ -15,15 +15,16 @@ An end-to-end reference for every feature and extension in Terminator — an ext
 7. [Scratch Terminals](#7-scratch-terminals)
 8. [Command Palette](#8-command-palette)
 9. [Settings](#9-settings)
-10. [Overview Screen](#10-overview-screen)
-11. [Notification Center & Activity Indicators](#11-notification-center--activity-indicators)
-12. [Keyboard Shortcuts](#12-keyboard-shortcuts)
-13. [Extensions Overview](#13-extensions-overview)
-14. [Extension: Git Integration](#14-extension-git-integration)
-15. [Extension: SpecKit Pilot](#15-extension-speckit-pilot)
-16. [Extension: Notepad](#16-extension-notepad)
-17. [Extension: Task Vault](#17-extension-task-vault)
-18. [Extension: Remote Control](#18-extension-remote-control)
+10. [Issue Tracking](#10-issue-tracking)
+11. [Overview Screen](#11-overview-screen)
+12. [Notification Center & Activity Indicators](#12-notification-center--activity-indicators)
+13. [Keyboard Shortcuts](#13-keyboard-shortcuts)
+14. [Extensions Overview](#14-extensions-overview)
+15. [Extension: Git Integration](#15-extension-git-integration)
+16. [Extension: SpecKit Pilot](#16-extension-speckit-pilot)
+17. [Extension: Notepad](#17-extension-notepad)
+18. [Extension: Task Vault](#18-extension-task-vault)
+19. [Extension: Remote Control](#19-extension-remote-control)
 
 ---
 
@@ -177,8 +178,38 @@ Open Settings with **`Cmd+,`** or via **View → Open Settings**.
 | ------------------ | --------------------------------------------------------- |
 | **Interface**      | Theme (dark/light), show CPU/Memory/Network bar           |
 | **Terminal**       | Default shell, scrollback limit                           |
+| **Integrations**   | Connect Linear and Jira — see below                       |
 | **Extensions**     | Enable/disable individual extensions                      |
 | **Remote Control** | Enable local server, port, ngrok tunnel, session password |
+
+### Integrations — connecting an issue tracker
+
+**Settings → Integrations** is the only place Terminator asks for a tracker credential, and every
+part of the app reads that one connection. Linear and Jira can both be connected, independently.
+
+| Tracker    | What you provide                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------------------ |
+| **Linear** | API key. Optionally an email, to list someone else's assigned issues instead of the key's own account. |
+| **Jira**   | Site (`your-team.atlassian.net`), account email, API token, and a JQL query defining "my issues".      |
+
+**The credential is checked before it is kept.** Terminator calls the tracker with it first, so a
+mistyped key is rejected there and then, with the tracker's own message, rather than turning up
+later as an empty issue list. Nothing is stored unless it works.
+
+**Where it lives.** Encrypted with your operating system's keychain (`safeStorage`) in
+`integrations.json` in the app's data directory, and read only inside the main process. No part of
+the interface can ask for it back — status only ever reports _whether_ a tracker is connected and
+_which account_ the credential proved to belong to. The connect and disconnect actions are also
+the only two settings deliberately unavailable over Remote Control: an authenticated browser on
+your LAN still has no business writing your API keys.
+
+**Already used SpecKit Pilot?** Your Linear and Jira credentials move across automatically the
+first time you launch a build with this feature. You will not be asked for them again, and the
+extension's old credential file is renamed `.bak` rather than deleted.
+
+**Disconnecting** destroys that tracker's credential and leaves the other one alone. Anything you
+had linked to a project stays linked — it is your association, not the tracker's — and starts
+working again as soon as you reconnect.
 
 ### Per-workspace overrides
 
@@ -188,7 +219,123 @@ Themes switch immediately across the entire app — no restart required. Termina
 
 ---
 
-## 10. Overview Screen
+## 10. Issue Tracking
+
+Terminator attaches a **Linear or Jira issue to a project**, so the thing you are working on is on
+screen — and so every agent session you start there already knows it.
+
+Connect a tracker first: [Settings → Integrations](#9-settings).
+
+### Attaching an issue to a project
+
+A project can carry **one** issue at a time — a project is a branch of work, and so is a ticket.
+
+**To attach one**: right-click the project in the sidebar → **Link issue…**. The picker opens on
+the issues assigned to you across every connected tracker, so the common case needs no typing.
+Type to search, or type an issue key exactly (`TAV-42`) to jump straight to it. Each row shows
+which tracker it came from, because two trackers can both have a `TAV-42` and they are different
+issues.
+
+You can also reach it from the command palette (`⌘K`) with **Link Issue to Project**, scoped to
+whichever project you are in.
+
+**The badge.** Once attached, the project's row in the sidebar carries the issue key with a small
+dot:
+
+| Dot            | Meaning                                       |
+| -------------- | --------------------------------------------- |
+| Dim            | Backlog or not started                        |
+| Amber          | In progress                                   |
+| Green          | Done or cancelled                             |
+| Dashed outline | Terminator could not read the issue right now |
+
+The dot is never the only signal — hover the badge for the tracker, the state by name, and the
+issue title, and screen readers get the same text. Clicking the badge opens the issue.
+
+**Changing it.** Picking a different issue **replaces** the one attached; you are warned before it
+happens. Right-click the project for **Change linked issue…**, **Copy issue key**, **Open … in
+tracker**, or **Unlink**.
+
+**Removing a project** discards its association with it. Nothing is left behind.
+
+### Reading an issue
+
+Click the issue key on a project to open it. Description and comments are **rendered** — headings,
+lists, task lists, tables, code blocks, links and emphasis all appear as formatted text, the same
+whether the issue came from Linear or from Jira.
+
+Issue text is treated as untrusted: embedded HTML never runs, images are not loaded (a remote image
+in a ticket is a tracking pixel aimed at whoever opens it), and links open in your browser rather
+than navigating the app.
+
+The panel also carries **Refresh** (fetches current data, ignoring the cache), **Comment**, and
+**Unlink**. If a comment fails to post you are told, and what you typed stays in the box.
+
+If the issue cannot be read right now — tracker down, credential expired — the panel says so and
+keeps the attachment. Your link is yours; it does not disappear because a tracker had a bad minute.
+
+### What your agent sessions are told
+
+This is the point of attaching an issue. With one attached, **any agent session started in that
+project already knows it** — you do not paste the ticket in.
+
+That includes a session you start yourself, at an ordinary shell prompt in the project directory,
+outside Terminator entirely. It is not a launch flag; it is a hook registered in the project.
+
+**What it gets**, in this order: the issue key, title, tracker, state, assignee, labels and URL,
+then the description, then the most recent handful of comments. Header first on purpose — if the
+context has to be shortened, it costs discussion, never the identity of what you are working on.
+
+**How much.** The agent runtime caps this at 10,000 characters. Terminator enforces that itself and
+shows you the number, rather than letting the runtime silently swap your context for a file path.
+Long descriptions are trimmed near 4,000 characters and a closing line tells the agent it was
+shortened and where to read the rest. You can see the exact text and its size before any session
+starts.
+
+**You are told when it happens** — a notification naming the issue and the character count. It is
+an ordinary notification, so turn it down to the notification centre, or off, in Settings.
+
+**Turning it off** for a project stops it for new sessions and removes what was written into that
+project's directory. Sessions already running are unaffected.
+
+### What Terminator writes into your project
+
+To make the above work, Terminator adds one hook to **`.claude/settings.local.json`** in the
+project's directory. That file is gitignored by convention and is not the shared, checked-in
+`.claude/settings.json`, which Terminator never reads or writes.
+
+The rules it holds to:
+
+- It **merges**. Any `SessionStart` hooks you already had stay, along with every other setting.
+- If it cannot parse the file, it **refuses** rather than overwriting it.
+- **Unlinking removes it.** If the file is then empty it is deleted, and if Terminator created the
+  `.claude` directory, that goes too — your project directory ends up exactly as it started.
+- If the directory is not writable, **linking fails and tells you why**. It will not leave you with
+  an issue that looks attached but silently feeds nothing.
+
+The hook itself runs a small script that reads one file and prints it. It holds no credential,
+makes no network request, and knows nothing about your trackers.
+
+Terminals opened in a linked project also carry `TERMINATOR_ISSUE_KEY` and
+`TERMINATOR_ISSUE_TRACKER` in their environment, for your own scripts and prompts.
+
+### Writing back to your tracker
+
+Terminator **never changes a field on an issue** — not its state, not its assignee, nothing. The
+only thing it can write is a comment, and only in two places:
+
+- **You press Comment** in the issue panel.
+- **A pull request opens** for a SpecKit Pilot card whose issue is attached — and this is
+  **off by default**.
+
+> **Behaviour change.** That pull-request comment used to fire whenever its setting happened to be
+> on, and its failures were discarded silently — so nobody could tell a comment that posted from
+> one that never had. It is now off unless you turn it on, in the SpecKit Pilot settings, and when
+> it fails you are told. **If you were relying on it, switch it back on.**
+
+---
+
+## 11. Overview Screen
 
 ![Overview screen](screenshots/12-overview-screen.png)
 
@@ -204,7 +351,7 @@ Click any tile to navigate directly to that session.
 
 ---
 
-## 11. Notification Center & Activity Indicators
+## 12. Notification Center & Activity Indicators
 
 ### Notification center
 
@@ -224,7 +371,7 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 
 ---
 
-## 12. Keyboard Shortcuts
+## 13. Keyboard Shortcuts
 
 | Action                               | Shortcut                 |
 | ------------------------------------ | ------------------------ |
@@ -254,7 +401,7 @@ It takes two presses because extensions use a single `Esc` for their own dismiss
 
 ---
 
-## 13. Extensions Overview
+## 14. Extensions Overview
 
 Extensions install from any directory on disk via a `manifest.json`. They contribute UI without modifying core code: sidebar items, sidebar panels, global tabs, workspace-scoped tabs, top-bar menu items, native View menu items, context menu entries, and terminal event hooks. Extension UIs run in isolated `WebContentsView` contexts — no app rebuild required after updates.
 
@@ -270,7 +417,7 @@ Terminator ships five built-in extensions:
 
 ---
 
-## 14. Extension: Git Integration
+## 15. Extension: Git Integration
 
 The Git integration is a workspace-scoped extension that surfaces git tooling directly inside the terminal window.
 
@@ -330,7 +477,7 @@ Features:
 
 ---
 
-## 15. Extension: SpecKit Pilot
+## 16. Extension: SpecKit Pilot
 
 ![SpecKit tab](screenshots/08-speckit-tab.png)
 
@@ -420,7 +567,7 @@ State is persisted to `.pilot/state.json` inside each feature directory; audit l
 
 ---
 
-## 16. Extension: Notepad
+## 17. Extension: Notepad
 
 ![Notes new note](screenshots/09-notes-tab.png)
 
@@ -456,7 +603,7 @@ The **new item dialog** offers three types:
 
 ---
 
-## 17. Extension: Task Vault
+## 18. Extension: Task Vault
 
 ![Task Vault with capture dialog](screenshots/10-task-vault-tab.png)
 
@@ -515,7 +662,7 @@ During the Weekly Review, optionally connect an ICS calendar feed to surface sch
 
 ---
 
-## 18. Extension: Remote Control
+## 19. Extension: Remote Control
 
 Remote Control enables you to access your Terminator terminals from **any web browser** over a local network or the internet.
 
