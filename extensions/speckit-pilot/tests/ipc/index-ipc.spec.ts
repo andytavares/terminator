@@ -257,7 +257,7 @@ let sharedApi: ExtensionAPI
 const mockApi = new Proxy({} as never, {
   get: (_t, prop: string) => (sharedApi as unknown as Record<string, unknown>)[prop],
 }) as never as {
-  issues: { listMine: ReturnType<typeof vi.fn> }
+  issues: { listMine: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn> }
   notifications: { showToast: ReturnType<typeof vi.fn> }
 }
 let getSharedHandler: (channel: string) => ((payload: unknown) => Promise<unknown>) | undefined
@@ -1005,6 +1005,7 @@ describe('speckit:ticket-list', () => {
           url: 'https://linear/ENG-1',
           state: { name: 'In Progress', type: 'started' },
           assignee: null,
+          branchName: 'andrew/eng-1-build-thing',
         },
         {
           tracker: 'jira',
@@ -1014,6 +1015,7 @@ describe('speckit:ticket-list', () => {
           url: 'https://jira/PROJ-1',
           state: { name: 'Done', type: 'completed' },
           assignee: null,
+          branchName: null,
         },
       ],
       failures: [],
@@ -1027,6 +1029,83 @@ describe('speckit:ticket-list', () => {
     expect(result.tickets.map((t) => t.source)).toEqual(['linear', 'jira'])
     // The board's own shape is unchanged (FR-029).
     expect(result.tickets[1].completed).toBe(true)
+  })
+
+  it("carries the tracker's suggested branch through to the board", async () => {
+    // A card dispatched from a ticket reuses this instead of inventing a
+    // branch name; dropping it here is invisible until a worktree is made.
+    mockApi.issues.listMine.mockResolvedValue({
+      issues: [
+        {
+          tracker: 'linear',
+          id: 'i1',
+          key: 'ENG-1',
+          title: 'Build thing',
+          url: 'https://linear/ENG-1',
+          state: { name: 'In Progress', type: 'started' },
+          assignee: null,
+          branchName: 'andrew/eng-1-build-thing',
+        },
+      ],
+      failures: [],
+    })
+
+    const handler = getSharedHandler('speckit:ticket-list')!
+    const result = (await handler({})) as { tickets: { branchName: string | null }[] }
+
+    expect(result.tickets[0].branchName).toBe('andrew/eng-1-build-thing')
+  })
+
+  it("fills each ticket's body from the issue, since a card's scope is its description", async () => {
+    mockApi.issues.listMine.mockResolvedValue({
+      issues: [
+        {
+          tracker: 'linear',
+          id: 'uuid-1',
+          key: 'ENG-1',
+          title: 'Build thing',
+          url: 'https://linear/ENG-1',
+          state: { name: 'In Progress', type: 'started' },
+          assignee: null,
+          branchName: null,
+        },
+      ],
+      failures: [],
+    })
+    mockApi.issues.get.mockResolvedValue({ description: '## Why\nBecause.' })
+
+    const handler = getSharedHandler('speckit:ticket-list')!
+    const result = (await handler({})) as { tickets: { body: string }[] }
+
+    // Addressed by the tracker's own id, never the key (the keys collide
+    // across trackers; the ids do not).
+    expect(mockApi.issues.get).toHaveBeenCalledWith('linear', 'uuid-1')
+    expect(result.tickets[0].body).toBe('## Why\nBecause.')
+  })
+
+  it('still lists a ticket whose body cannot be fetched', async () => {
+    mockApi.issues.listMine.mockResolvedValue({
+      issues: [
+        {
+          tracker: 'linear',
+          id: 'uuid-1',
+          key: 'ENG-1',
+          title: 'Build thing',
+          url: 'https://linear/ENG-1',
+          state: { name: 'In Progress', type: 'started' },
+          assignee: null,
+          branchName: null,
+        },
+      ],
+      failures: [],
+    })
+    mockApi.issues.get.mockRejectedValue(new Error('rate limited'))
+
+    const handler = getSharedHandler('speckit:ticket-list')!
+    const result = (await handler({})) as { tickets: { key: string; body: string }[] }
+
+    expect(result.tickets).toHaveLength(1)
+    expect(result.tickets[0].body).toBe('')
   })
 
   it('returns no tickets when nothing is connected, without complaining', async () => {

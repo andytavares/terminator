@@ -10,6 +10,7 @@ import type {
   PhaseId,
   PilotState,
   RunMode,
+  Ticket,
   TicketRef,
 } from './types/speckit.types.js'
 import {
@@ -2120,17 +2121,29 @@ export function activate(api: ExtensionAPI): void {
   reg(api, 'speckit:ticket-list', async () => {
     try {
       const { issues, failures } = await api.issues.listMine()
-      const tickets: Ticket[] = issues.map((issue) => ({
-        source: issue.tracker,
-        key: issue.key,
-        title: issue.title,
-        sourceUrl: issue.url,
-        body: '',
-        bodyFormat: 'markdown' as const,
-        acceptanceCriteria: [],
-        branchName: null,
-        completed: issue.state.type === 'completed',
-      }))
+
+      // The board turns a ticket into a card, and the card's scope is the
+      // ticket's description — so the description has to be here. A summary
+      // does not carry one (the picker has no use for it), which is why each
+      // is fetched. Core caches per issue, so a board reopened inside the TTL
+      // makes no requests at all, and one that cannot be fetched degrades to
+      // an empty scope rather than failing the whole list.
+      const tickets: Ticket[] = await Promise.all(
+        issues.map(async (issue) => {
+          const full = await api.issues.get(issue.tracker, issue.id).catch(() => null)
+          return {
+            source: issue.tracker,
+            key: issue.key,
+            title: issue.title,
+            sourceUrl: issue.url,
+            body: full?.description ?? '',
+            bodyFormat: 'markdown' as const,
+            acceptanceCriteria: [],
+            branchName: issue.branchName,
+            completed: issue.state.type === 'completed',
+          }
+        })
+      )
 
       // A tracker that could not be reached is said out loud rather than
       // showing as "nothing assigned to you", which is what an empty list from
