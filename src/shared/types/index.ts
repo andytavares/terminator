@@ -191,3 +191,138 @@ export type PaneNode =
     }
 
 export const SCRATCH_PROJECT_ID = '00000000-0000-0000-0000-000000000000'
+
+// ── Issue tracker integrations (feature 031) ─────────────────────────────────
+//
+// One shape for every tracker. A provider converts its tracker's wire format
+// into these types and nothing downstream knows which tracker it came from —
+// except where the operator needs to be told, which is why `tracker` is on
+// every issue, link and connection.
+
+export type TrackerId = 'linear' | 'jira'
+
+/**
+ * Two trackers can issue the same key (`TAV-42` in both), so nothing in this
+ * feature is identified by key alone. This pair is the identity.
+ */
+export interface IssueRef {
+  tracker: TrackerId
+  key: string
+}
+
+export type TrackerErrorKind =
+  | 'not-connected'
+  | 'auth-failed'
+  | 'rate-limited'
+  | 'unavailable'
+  | 'not-found'
+  | 'failed'
+
+/**
+ * How "my issues" is defined, per tracker. Tracker-shaped rather than
+ * flattened: Linear identifies an assignee directly, Jira expresses it as a
+ * saved query, and pretending those are the same loses information.
+ */
+export type MineSelector =
+  | { kind: 'assignee'; email: string | null }
+  | { kind: 'query'; jql: string }
+
+export interface TrackerAccount {
+  name: string
+  email: string
+}
+
+/** What the renderer is told about a tracker. Never carries the secret. */
+export interface TrackerConnection {
+  tracker: TrackerId
+  connected: boolean
+  /** Proof the credential was verified — absent means it never was. */
+  account: TrackerAccount | null
+  /** Jira only: the site domain. Always null for Linear. */
+  site: string | null
+  mine: MineSelector
+  /** Set when a credential that worked starts failing. */
+  lastError: TrackerErrorKind | null
+}
+
+export type IssueStateType = 'backlog' | 'unstarted' | 'started' | 'completed' | 'canceled'
+
+export interface IssueState {
+  /** The tracker's own label, displayed as-is. */
+  name: string
+  /** What the UI reasons about — never the colour. */
+  type: IssueStateType
+}
+
+export interface IssueComment {
+  author: string
+  /** Markdown, normalised the same way as a description. */
+  body: string
+  createdAt: string
+}
+
+/** The subset lists and pickers need. No description, no comments. */
+export interface IssueSummary {
+  tracker: TrackerId
+  /** The tracker's own stable id — a UUID for Linear, a numeric string for Jira. */
+  id: string
+  key: string
+  title: string
+  url: string
+  state: IssueState
+  assignee: TrackerAccount | null
+  /**
+   * The tracker's suggested VCS branch. Always null for Jira.
+   *
+   * On the summary rather than only the full issue because the new-project
+   * dialog prefills a branch straight from a picked row, and Linear returns
+   * this on the same query the list already makes — fetching the whole issue
+   * again just to read one string would be a request for nothing.
+   */
+  branchName: string | null
+}
+
+export interface Issue extends IssueSummary {
+  /** Always markdown. Jira's ADF is converted before it reaches this type. */
+  description: string
+  labels: string[]
+  completed: boolean
+  updatedAt: string
+  /** Most recent first, bounded — a long thread is read in the tracker. */
+  comments: IssueComment[]
+}
+
+/** A project's attachment to exactly one issue. */
+export interface IssueLink {
+  projectId: string
+  tracker: TrackerId
+  key: string
+  injectContext: boolean
+  linkedAt: string
+}
+
+/** Derived, never authored. Rebuilt when the link, issue, or toggle changes. */
+export interface AgentContext {
+  projectId: string
+  tracker: TrackerId
+  key: string
+  /** Exactly what a session receives, and what the drawer previews. */
+  markdown: string
+  chars: number
+  truncated: boolean
+  builtAt: string
+}
+
+export interface TrackerFailure {
+  tracker: TrackerId
+  error: TrackerErrorKind
+}
+
+/**
+ * A tracker that fails does not fail the call. Callers show what arrived and
+ * say what is missing, rather than presenting a partial list as complete.
+ */
+export interface IssueListResult {
+  issues: IssueSummary[]
+  failures: TrackerFailure[]
+}

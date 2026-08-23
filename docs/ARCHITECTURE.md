@@ -57,24 +57,26 @@ On the main-process side, every channel registers through `src/main/ipc/channel-
 
 ### Channel namespaces
 
-| Namespace     | Direction        | Description                                                                                                                          |
-| ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `terminal:*`  | renderer ↔ main | PTY lifecycle: create, close, input, output, resize, cleanup                                                                         |
-| `workspace:*` | renderer → main  | Workspace and project CRUD                                                                                                           |
-| `project:*`   | renderer → main  | Project CRUD (scoped under workspace)                                                                                                |
-| `settings:*`  | renderer → main  | Global and per-workspace settings                                                                                                    |
-| `dialog:*`    | renderer → main  | Native OS dialogs (folder picker)                                                                                                    |
-| `extension:*` | renderer → main  | Extension install, toggle, contribution queries                                                                                      |
-| `git:*`       | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create                                                                           |
-| `github:*`    | renderer → main  | PR review queue, diff, file metrics, inline comments, submit, session persistence, active-review tracking, prune closed/merged       |
-| `shell:exec`  | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)                                                                                  |
-| `fs:*`        | renderer ↔ main | File watch start/stop; `fs:read-file`; `fs:changed` push events                                                                      |
-| `remote:*`    | main ↔ renderer | Remote control server: `remote:status` (main→renderer), `remote:tunnel-reconnect` (renderer→main), `remote:update-password` (invoke) |
-| `log:push`    | main → renderer  | Forwards main-process log entries to renderer LogWindow                                                                              |
+| Namespace        | Direction        | Description                                                                                                                          |
+| ---------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `terminal:*`     | renderer ↔ main | PTY lifecycle: create, close, input, output, resize, cleanup                                                                         |
+| `workspace:*`    | renderer → main  | Workspace and project CRUD                                                                                                           |
+| `project:*`      | renderer → main  | Project CRUD (scoped under workspace)                                                                                                |
+| `settings:*`     | renderer → main  | Global and per-workspace settings                                                                                                    |
+| `dialog:*`       | renderer → main  | Native OS dialogs (folder picker)                                                                                                    |
+| `extension:*`    | renderer → main  | Extension install, toggle, contribution queries                                                                                      |
+| `git:*`          | renderer → main  | Git status, diff, stage, unstage, commit, PR status/create                                                                           |
+| `github:*`       | renderer → main  | PR review queue, diff, file metrics, inline comments, submit, session persistence, active-review tracking, prune closed/merged       |
+| `shell:exec`     | renderer → main  | Sandboxed shell execution (git/gh only, CWD scoped)                                                                                  |
+| `fs:*`           | renderer ↔ main | File watch start/stop; `fs:read-file`; `fs:changed` push events                                                                      |
+| `remote:*`       | main ↔ renderer | Remote control server: `remote:status` (main→renderer), `remote:tunnel-reconnect` (renderer→main), `remote:update-password` (invoke) |
+| `log:push`       | main → renderer  | Forwards main-process log entries to renderer LogWindow                                                                              |
+| `integrations:*` | renderer ↔ main | Issue trackers: connection status, connect/disconnect, issue list/search/get/comment, project↔issue links, agent-context preview    |
 
 Full channel specifications: [`specs/001-extension-first-terminal/contracts/ipc-channels.md`](../specs/001-extension-first-terminal/contracts/ipc-channels.md),
 [`specs/002-git-github-integration/contracts/ipc-channels-git.md`](../specs/002-git-github-integration/contracts/ipc-channels-git.md),
-and [`specs/003-pr-review/contracts/ipc-channels-pr-review.md`](../specs/003-pr-review/contracts/ipc-channels-pr-review.md).
+[`specs/003-pr-review/contracts/ipc-channels-pr-review.md`](../specs/003-pr-review/contracts/ipc-channels-pr-review.md),
+and [`specs/031-linear-project-integration/contracts/ipc-channels.md`](../specs/031-linear-project-integration/contracts/ipc-channels.md).
 
 ### Type safety
 
@@ -98,15 +100,17 @@ Extension ──── contributes to ──── GlobalSettings.extensions[ext
 
 ### Persistence boundaries
 
-| Entity                   | Stored? | Where                                        |
-| ------------------------ | ------- | -------------------------------------------- |
-| Workspace, Project       | Yes     | electron-store (`workspaces.json`)           |
-| GlobalSettings           | Yes     | electron-store (`settings.json`)             |
-| WorkspaceSettings        | Yes     | electron-store (`settings.json`)             |
-| Extension registry       | Yes     | electron-store (`extensions.json`)           |
-| TerminalSession metadata | No      | In-memory (Zustand)                          |
-| xterm.js buffer          | No      | In-memory (xterm.js Terminal instance)       |
-| PTY process              | No      | OS process (killed on tab close or app quit) |
+| Entity                    | Stored? | Where                                                 |
+| ------------------------- | ------- | ----------------------------------------------------- |
+| Workspace, Project        | Yes     | electron-store (`workspaces.json`)                    |
+| GlobalSettings            | Yes     | electron-store (`settings.json`)                      |
+| WorkspaceSettings         | Yes     | electron-store (`settings.json`)                      |
+| Extension registry        | Yes     | electron-store (`extensions.json`)                    |
+| TerminalSession metadata  | No      | In-memory (Zustand)                                   |
+| xterm.js buffer           | No      | In-memory (xterm.js Terminal instance)                |
+| PTY process               | No      | OS process (killed on tab close or app quit)          |
+| Tracker credentials       | Yes     | `safeStorage`-encrypted (`integrations.json`)         |
+| Tracker connection config | Yes     | Plaintext beside the credential (`integrations.json`) |
 
 Sessions do not survive app restart. This is an explicit Phase 1 scope decision.
 
@@ -391,6 +395,45 @@ blanked the whole application to show a 340px panel. The drawer measures itself
 and calls `extension.setLeftInset()`, the left-edge counterpart of the log
 window's `setBottomInset()`: the view moves aside and narrows instead of
 disappearing.
+
+---
+
+## Issue Tracker Integrations
+
+One core-owned service reaches Linear and Jira; nothing else in the application holds a tracker
+credential or contacts a tracker. See [ADR-029](adr/029-core-issue-tracker-service.md).
+
+```
+  renderer ──integrations:*──▶ ┌────────────────────────────────────────┐
+   (settings, sidebar,         │  src/main/integrations/                │
+    dialogs, drawer)           │    tracker-store    creds (safeStorage)│
+                               │    issue-service    cache, single-     │──▶ Linear (@linear/sdk)
+  extensions ──api.issues────▶ │                     flight, backoff    │──▶ Jira (REST v3)
+   (speckit-pilot,             │    providers/       one per tracker    │
+    git-integration)           │    adf-to-markdown  Jira ADF → md      │
+                               └────────────────────────────────────────┘
+```
+
+**The credential boundary.** Secrets live in `integrations.json`, each value encrypted with
+`safeStorage`, written atomically. They are read only by a provider, inside the main process. No
+IPC channel returns one; `integrations:status` reports whether a connection exists and which
+account it proved to belong to, never the secret itself. `integrations:connect` and
+`integrations:disconnect` are the only two core channels deliberately **omitted** from the remote
+bridge — an authenticated LAN client still has no business writing the operator's API keys.
+
+**One issue shape.** Both trackers produce the same `Issue`, identified by the pair
+(`tracker`, `key`) because two trackers may both use `TAV-42`. Descriptions and comments are
+always markdown: Jira's Atlassian Document Format is converted inside its provider, so exactly one
+renderer and one sanitisation policy exist downstream.
+
+**Policy lives in the facade.** Providers are stateless functions over a credential. The 5-minute
+TTL cache, single-flight, cross-tracker merge and rate-limit backoff are all in `issue-service.ts`,
+so both trackers behave identically and a third would too. A failing or unconnected tracker is
+reported in `failures` rather than silently dropped — an incomplete list must never read as an
+empty one.
+
+**Comments are the only write.** The provider interface exposes no way to change an issue's state,
+assignee or any other field, and a test asserts the shape of that surface so it stays true.
 
 ---
 
